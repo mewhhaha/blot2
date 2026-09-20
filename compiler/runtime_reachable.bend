@@ -113,81 +113,81 @@ def visit_lambda(visited: Bool, identity: Nat, +parameter: String, +body: M.Expr
         values : List<&2, C.Value> <- closure_captures(environment, captures)
         return Step{[ExpressionWork{body}, ValuesWork{values}], add_lambda(state, F.Lambda{identity, parameter, body, captures})}
 
-def expand(work: Work, +catalog: Catalog, +state: State) -> Result<&2, &2, M.Diagnostic, Step>:
-  match work:
-    case FunctionWork{+name}:
-      visit_function(seen(state, "fn:" ++ name), function_value(catalog, name), name, state)
-    case ConstantWork{+name}:
-      visit_constant(seen(state, "const:" ++ name), constant_value(catalog, name), name, state)
-    case ExpressionWork{M.FunctionExpr{name}}:
-      Done{Step{[FunctionWork{name}], state}}
-    case ExpressionWork{M.CallExpr{callee, argument}}:
-      Done{Step{[FunctionWork{callee}, ExpressionWork{argument}], state}}
-    case ExpressionWork{M.ConstantExpr{name}}:
-      Done{Step{[ConstantWork{name}], state}}
-    case ExpressionWork{M.LambdaExpr{+identity, parameter, parameter_type, result_type, body}}:
-      visit_lambda(lambda_seen(state, identity), identity, parameter, body, None{}, state)
-    case ExpressionWork{M.OperationDescriptorExpr{identity}}:
-      Fail{I.const_only()}
-    case ExpressionWork{M.FunctionEffectsExpr{callee}}:
-      Fail{I.const_only()}
-    case ExpressionWork{M.EffectHasExpr{set, operation}}:
-      Fail{I.const_only()}
-    case ExpressionWork{M.EffectCountExpr{set}}:
-      Fail{I.const_only()}
-    case ExpressionWork{M.EffectSameExpr{left, right}}:
-      Fail{I.const_only()}
-    case ExpressionWork{expression}:
-      Done{Step{[ExpressionsWork{F.children(expression)}], state}}
-    case ExpressionsWork{Nil{}}:
-      Done{Step{Nil{}, state}}
-    case ExpressionsWork{head <> tail}:
-      Done{Step{[ExpressionWork{head}, ExpressionsWork{tail}], state}}
-    case ValueWork{C.FunctionValue{name}}:
-      Done{Step{[FunctionWork{name}], state}}
-    case ValueWork{C.ClosureValue{+identity, parameter, body, environment}}:
-      visit_lambda(lambda_seen(state, identity), identity, parameter, body, Some{environment}, state)
-    case ValueWork{C.DataValue{constructor, Some{payload}}}:
-      Done{Step{[ValueWork{payload}], state}}
-    case ValueWork{C.ProductValue{elements}}:
-      Done{Step{[ValuesWork{elements}], state}}
-    case ValueWork{C.ArrayValue{elements}}:
-      Done{Step{[ValuesWork{elements}], state}}
-    case ValueWork{C.ProviderValue{identity, implementation}}:
-      Done{Step{[ValueWork{implementation}], state}}
-    case ValueWork{C.EffectDescriptorValue{identity}}:
-      Fail{I.const_only()}
-    case ValueWork{C.EffectSetValue{operations}}:
-      Fail{I.const_only()}
-    case ValueWork{C.ReturnValue{label, value}}:
-      Fail{M.Diagnostic{"internal_error", "constant", "runtime reachability received an unhandled return"}}
-    case ValueWork{C.MatchValuesValue{values}}:
-      Fail{M.Diagnostic{"internal_error", "constant", "runtime reachability received a match scrutinee collection"}}
-    case ValueWork{value}:
-      Done{Step{Nil{}, state}}
-    case ValuesWork{Nil{}}:
-      Done{Step{Nil{}, state}}
-    case ValuesWork{head <> tail}:
-      Done{Step{[ValueWork{head}, ValuesWork{tail}], state}}
+def expanded_step(result: Result<&2, &2, M.Diagnostic, Step>, pending: List<&2, Work>) -> Result<&2, &2, M.Diagnostic, Step>:
+  match result:
+    case Fail{error}:
+      Fail{error}
+    case Done{Step{next, state}}:
+      Done{Step{List.append(&2, Work, next, pending), state}}
 
-def step_pending(step: Step) -> List<&2, Work>:
-  Step{pending, state} = step
-  pending
-
-def step_state(step: Step) -> State:
-  Step{pending, state} = step
-  state
-
-def walk(fuel: Nat, pending: List<&2, Work>, +catalog: Catalog, state: State) -> Result<&2, &2, M.Diagnostic, State>:
-  match fuel pending:
-    case _ Nil{}:
+# Keep ordinary expression/value traversal in the tail loop. Only catalog and
+# closure expansion take the fallible slow path; every Work still spends one
+# unit of the original traversal allowance.
+def walk_steps(fuel: Nat, step: Result<&2, &2, M.Diagnostic, Step>, +catalog: Catalog) -> Result<&2, &2, M.Diagnostic, State>:
+  match fuel step:
+    case _ Fail{error}:
+      Fail{error}
+    case _ Done{Step{Nil{}, state}}:
       Done{state}
     case 0n _:
       Fail{M.Diagnostic{"backend_limit", "reachability", "runtime reachability exceeded its traversal limit"}}
-    case 1n+rest head <> tail:
-      do Result<&2, &2, M.Diagnostic, State>:
-        +step : Step <- expand(head, catalog, state)
-        walk(rest, List.append(&2, Work, step_pending(step), tail), catalog, step_state(step))
+    case 1n+rest Done{Step{FunctionWork{+name} <> pending, +state}}:
+      walk_steps(rest, expanded_step(visit_function(seen(state, "fn:" ++ name), function_value(catalog, name), name, state), pending), catalog)
+    case 1n+rest Done{Step{ConstantWork{+name} <> pending, +state}}:
+      walk_steps(rest, expanded_step(visit_constant(seen(state, "const:" ++ name), constant_value(catalog, name), name, state), pending), catalog)
+    case 1n+rest Done{Step{ExpressionWork{M.FunctionExpr{name}} <> pending, state}}:
+      walk_steps(rest, Done{Step{FunctionWork{name} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ExpressionWork{M.CallExpr{callee, argument}} <> pending, state}}:
+      walk_steps(rest, Done{Step{FunctionWork{callee} <> ExpressionWork{argument} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ExpressionWork{M.ConstantExpr{name}} <> pending, state}}:
+      walk_steps(rest, Done{Step{ConstantWork{name} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ExpressionWork{M.LambdaExpr{+identity, parameter, parameter_type, result_type, body}} <> pending, +state}}:
+      walk_steps(rest, expanded_step(visit_lambda(lambda_seen(state, identity), identity, parameter, body, None{}, state), pending), catalog)
+    case 1n+rest Done{Step{ExpressionWork{M.OperationDescriptorExpr{identity}} <> pending, state}}:
+      Fail{I.const_only()}
+    case 1n+rest Done{Step{ExpressionWork{M.FunctionEffectsExpr{callee}} <> pending, state}}:
+      Fail{I.const_only()}
+    case 1n+rest Done{Step{ExpressionWork{M.EffectHasExpr{set, operation}} <> pending, state}}:
+      Fail{I.const_only()}
+    case 1n+rest Done{Step{ExpressionWork{M.EffectCountExpr{set}} <> pending, state}}:
+      Fail{I.const_only()}
+    case 1n+rest Done{Step{ExpressionWork{M.EffectSameExpr{left, right}} <> pending, state}}:
+      Fail{I.const_only()}
+    case 1n+rest Done{Step{ExpressionWork{expression} <> pending, state}}:
+      walk_steps(rest, Done{Step{ExpressionsWork{F.children(expression)} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ExpressionsWork{Nil{}} <> pending, state}}:
+      walk_steps(rest, Done{Step{pending, state}}, catalog)
+    case 1n+rest Done{Step{ExpressionsWork{head <> tail} <> pending, state}}:
+      walk_steps(rest, Done{Step{ExpressionWork{head} <> ExpressionsWork{tail} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.FunctionValue{name}} <> pending, state}}:
+      walk_steps(rest, Done{Step{FunctionWork{name} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.ClosureValue{+identity, parameter, body, environment}} <> pending, +state}}:
+      walk_steps(rest, expanded_step(visit_lambda(lambda_seen(state, identity), identity, parameter, body, Some{environment}, state), pending), catalog)
+    case 1n+rest Done{Step{ValueWork{C.DataValue{constructor, Some{payload}}} <> pending, state}}:
+      walk_steps(rest, Done{Step{ValueWork{payload} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.ProductValue{elements}} <> pending, state}}:
+      walk_steps(rest, Done{Step{ValuesWork{elements} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.ArrayValue{elements}} <> pending, state}}:
+      walk_steps(rest, Done{Step{ValuesWork{elements} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.ProviderValue{identity, implementation}} <> pending, state}}:
+      walk_steps(rest, Done{Step{ValueWork{implementation} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.EffectDescriptorValue{identity}} <> pending, state}}:
+      Fail{I.const_only()}
+    case 1n+rest Done{Step{ValueWork{C.EffectSetValue{operations}} <> pending, state}}:
+      Fail{I.const_only()}
+    case 1n+rest Done{Step{ValueWork{C.ReturnValue{label, value}} <> pending, state}}:
+      Fail{M.Diagnostic{"internal_error", "constant", "runtime reachability received an unhandled return"}}
+    case 1n+rest Done{Step{ValueWork{C.MatchValuesValue{values}} <> pending, state}}:
+      Fail{M.Diagnostic{"internal_error", "constant", "runtime reachability received a match scrutinee collection"}}
+    case 1n+rest Done{Step{ValueWork{value} <> pending, state}}:
+      walk_steps(rest, Done{Step{pending, state}}, catalog)
+    case 1n+rest Done{Step{ValuesWork{Nil{}} <> pending, state}}:
+      walk_steps(rest, Done{Step{pending, state}}, catalog)
+    case 1n+rest Done{Step{ValuesWork{head <> tail} <> pending, state}}:
+      walk_steps(rest, Done{Step{ValueWork{head} <> ValuesWork{tail} <> pending, state}}, catalog)
+
+def walk(fuel: Nat, pending: List<&2, Work>, catalog: Catalog, state: State) -> Result<&2, &2, M.Diagnostic, State>:
+  walk_steps(fuel, Done{Step{pending, state}}, catalog)
 
 def function_roots(functions: List<&2, M.CheckedFunction>) -> List<&2, Work>:
   match functions:

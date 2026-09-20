@@ -75,11 +75,22 @@ export function layout(source: string, lexer: ParserInstance) {
   const insertions = new Map<number, string>();
   const frames = [{ indent: 0, depth: 0 }];
   let depth = 0;
+  // Searching backward for an absent CR on every LF line is quadratic.
+  // Index both terminators once, including mixed-ending sources.
+  const lineStarts = [0];
+  for (let position = 0; position < source.length; position++) {
+    const code = source.charCodeAt(position);
+    if (code === 10 || code === 13) lineStarts.push(position + 1);
+  }
   const lineIndent = (token: Token) => {
-    const lineStart = Math.max(
-      source.lastIndexOf("\n", token.span.start - 1),
-      source.lastIndexOf("\r", token.span.start - 1),
-    ) + 1;
+    let low = 0;
+    let high = lineStarts.length;
+    while (low + 1 < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (lineStarts[middle] <= token.span.start) low = middle;
+      else high = middle;
+    }
+    const lineStart = lineStarts[low];
     const leading =
       /^[ \t]*/.exec(source.slice(lineStart, token.span.start))![0];
     if (leading.includes("\t")) {

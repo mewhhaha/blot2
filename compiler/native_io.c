@@ -50,13 +50,17 @@ static Term blot_native_receive_run(Env e, Term* fields, IoWork* work) {
   size_t byte_length = (size_t)length * 4;
   uint8_t* bytes = io_mem(malloc(byte_length == 0 ? 1 : byte_length));
   blot_native_read_exact(bytes, byte_length);
-  Term words = term_pak(CID_NIL, 0);
-  for (uint32_t index = length; index > 0; index -= 1) {
-    uint32_t word = blot_native_word(bytes + ((size_t)index - 1) * 4);
-    words = io_node(e, CID_CON, word, words);
+  uint32_t depth = 0;
+  while ((1u << depth) < length) depth += 1;
+  Term zero = 0;
+  Term words = blk_new(e, false, depth, 0, 1, &zero);
+  if (err_seen(e.mem)) err_fail("native protocol: request buffer allocation failed");
+  for (uint32_t index = 0; index < length; index += 1) {
+    blk_write(e.mem, false, term_loc(words), index,
+      blot_native_word(bytes + (size_t)index * 4));
   }
   free(bytes);
-  return io_box(e, CID_SOME, words);
+  return io_box(e, CID_SOME, io_node(e, CID_NATIVE_IO_FRAME, words, length));
 }
 
 static void __attribute__((constructor)) blot_native_receive_use(void) {

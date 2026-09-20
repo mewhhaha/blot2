@@ -1,6 +1,6 @@
 import { CompilerError } from "./diagnostics.ts";
 import { bendList } from "./bend_list.ts";
-import type { SourceInput } from "./source_project.ts";
+import type { SourceInput, SourceModule } from "./source_project.ts";
 import {
   createFrontend,
   type Cst,
@@ -74,44 +74,55 @@ export async function createSourceFrontend(
   const preludeOffsets = declarationOffsets(prelude.root);
   return {
     prepare(input: SourceInput) {
-      const units = typeof input === "string"
-        ? [{
+      let units: readonly SourceModule[];
+      if (typeof input === "string") {
+        const prepared = frontend.prepare(input);
+        units = [{
           name: "main",
           filename: "",
           source: input,
-          ...frontend.parse(input),
-        }]
-        : input.modules;
+          ...frontend.parsePrepared(prepared, {
+            offsetAt: (position) =>
+              BigInt(prepared.originalOffsets[position] + sourceBase),
+          }),
+        }];
+      } else {
+        units = input.modules;
+      }
       let offset = sourceBase;
       const origins = units.map((unit) => {
+        const declarations = declarationOffsets(unit.root);
+        if (typeof input === "string") {
+          for (const [name, position] of declarations) {
+            declarations.set(name, position - sourceBase);
+          }
+        }
         const origin = {
           ...unit,
           base: offset,
-          declarations: declarationOffsets(unit.root),
+          declarations,
         };
         offset += unit.source.length + 1;
         return origin;
       });
-      const root: Cst = typeof input === "string"
-        ? shifted(origins[0].root, BigInt(sourceBase))
-        : {
-          $: "Cst",
-          kind: "source_project",
-          field: "",
-          text: input.entry,
-          offset: BigInt(sourceBase),
-          children: bendList(origins.map((unit) => ({
-            $: "Cst" as const,
-            kind: "source_module",
-            field: "modules",
-            text: unit.name,
-            offset: BigInt(unit.base),
-            children: bendList([{
-              ...shifted(unit.root, BigInt(unit.base)),
-              field: "body",
-            }]),
-          }))),
-        };
+      const root: Cst = typeof input === "string" ? origins[0].root : {
+        $: "Cst",
+        kind: "source_project",
+        field: "",
+        text: input.entry,
+        offset: BigInt(sourceBase),
+        children: bendList(origins.map((unit) => ({
+          $: "Cst" as const,
+          kind: "source_module",
+          field: "modules",
+          text: unit.name,
+          offset: BigInt(unit.base),
+          children: bendList([{
+            ...shifted(unit.root, BigInt(unit.base)),
+            field: "body",
+          }]),
+        }))),
+      };
       return {
         root,
         nodeCount: units.reduce(

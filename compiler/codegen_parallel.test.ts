@@ -10,20 +10,21 @@ interface Job {
   readonly body: Node;
   readonly captures: BendList<string>;
 }
-interface WeightedEntry {
+type Entry = Omit<Job, "$"> & { readonly $: "Entry" };
+interface WeightedEntry<JobType = Job> {
   readonly $: "WeightedEntry";
-  readonly job: Job;
+  readonly job: JobType;
   readonly weight: bigint;
 }
-type Batch =
+type Batch<JobType = Job> =
   | {
     readonly $: "SequentialEntries";
-    readonly entries: BendList<WeightedEntry>;
+    readonly entries: BendList<WeightedEntry<JobType>>;
   }
   | {
     readonly $: "ParallelEntries";
-    readonly left: Batch;
-    readonly right: Batch;
+    readonly left: Batch<JobType>;
+    readonly right: Batch<JobType>;
   };
 type Result<T> =
   | { readonly $: "Done"; readonly value: T }
@@ -62,6 +63,18 @@ const backend = generated as unknown as {
     grain: bigint,
     jobs: BendList<Job>,
   ): Result<BendList<EntryCode>>;
+  "wasm.preparation_grain"(): bigint;
+  "wasm.plan_preparations"(
+    entries: BendList<Entry>,
+    grain: bigint,
+  ): Batch<Entry>;
+  "wasm.prepare_jobs_with_grain"(
+    grain: bigint,
+    entries: BendList<Entry>,
+    projection: Node,
+  ): Result<BendList<Job>>;
+  "codegen_ir.prepare"(body: Node, projection: Node): Result<Node>;
+  "codegen_ir.metadata"(lambdas: BendList<Node>, constructors: Node): Node;
 };
 const integer = (value: number): Node => ({ $: "U32Expr", value });
 const array = (length: number): Node => ({
@@ -76,8 +89,8 @@ const job = (key: string, body: Node = integer(42)): Job => ({
   captures: bendList([]),
 });
 
-function leaves(batch: Batch): WeightedEntry[][] {
-  const result: WeightedEntry[][] = [];
+function leaves<JobType>(batch: Batch<JobType>): WeightedEntry<JobType>[][] {
+  const result: WeightedEntry<JobType>[][] = [];
   const pending = [batch];
   for (let current = pending.pop(); current; current = pending.pop()) {
     if (current.$ === "SequentialEntries") {
@@ -238,4 +251,134 @@ Deno.test("parallel codegen keeps the first source-order diagnostic across batch
   const error = backend["wasm.compile_entry"](scalar);
   ok(error.$ === "Fail");
   equal(error.error.subject, "left_missing");
+});
+
+const entry = (key: string, body: Node = integer(42)): Entry => ({
+  ...job(key, body),
+  $: "Entry",
+});
+
+Deno.test("projection batches keep tiny work serial and balance clustered expensive entries", () => {
+  const grain = backend["wasm.preparation_grain"]();
+  const tiny = Array.from({ length: 64 }, (_, index) => entry(`tiny_${index}`));
+  equal(
+    backend["wasm.plan_preparations"](bendList(tiny), grain).$,
+    "SequentialEntries",
+  );
+  for (const entries of [[], [entry("single", array(10_000))]]) {
+    equal(
+      backend["wasm.plan_preparations"](bendList(entries), 0n).$,
+      "SequentialEntries",
+    );
+  }
+  const clustered = [
+    ...Array.from(
+      { length: 8 },
+      (_, index) => entry(`large_${index}`, array(2048)),
+    ),
+    ...tiny,
+  ];
+  const batches = leaves(
+    backend["wasm.plan_preparations"](bendList(clustered), grain),
+  );
+  equal(
+    batches.flat().map(({ job }) => job.key),
+    clustered.map(({ key }) => key),
+  );
+  ok(
+    batches.filter((batch) =>
+      batch.some(({ job }) => job.key.startsWith("large_"))
+    ).length >= 7,
+  );
+  ok(
+    batches.every((batch) =>
+      batch.reduce((total, entry) => total + entry.weight, 0n) >= grain
+    ),
+  );
+  const lambda = entry("reference", {
+    $: "LambdaExpr",
+    identity: 7n,
+    parameter: "argument",
+    parameter_type: { $: "None" },
+    result_type: { $: "None" },
+    body: array(10_000),
+  });
+  equal(
+    leaves(backend["wasm.plan_preparations"](bendList([lambda]), grain))[0][0]
+      .weight,
+    9n,
+  );
+});
+
+Deno.test("parallel projection matches ordered independent preparation across grains", () => {
+  const lambda: Node = {
+    $: "Lambda",
+    identity: 7n,
+    parameter: "argument",
+    body: integer(42),
+    captures: bendList(["capture"]),
+  };
+  const metadata = backend["codegen_ir.metadata"](bendList([lambda]), {
+    $: "MTip",
+  });
+  const entries = Array.from(
+    { length: 64 },
+    (_, index) =>
+      entry(
+        `entry_${index}`,
+        index === 32
+          ? {
+            $: "LambdaExpr",
+            identity: 7n,
+            parameter: "argument",
+            parameter_type: { $: "None" },
+            result_type: { $: "None" },
+            body: integer(99),
+          }
+          : array(index < 8 ? 1024 : 8),
+      ),
+  );
+  const expected = entries.map(({ key, parameter, body, captures }): Job => {
+    const prepared = backend["codegen_ir.prepare"](body, metadata);
+    ok(prepared.$ === "Done");
+    return { $: "CodegenJob", key, parameter, body: prepared.value, captures };
+  });
+  for (const grain of [0n, 128n, 512n, 2048n, 0xffff_ffff_ffffn]) {
+    const actual = backend["wasm.prepare_jobs_with_grain"](
+      grain,
+      bendList(entries),
+      metadata,
+    );
+    ok(actual.$ === "Done");
+    equal(bendArray(actual.value), expected);
+  }
+});
+
+Deno.test("parallel projection preserves the first error across batch boundaries", () => {
+  const metadata = backend["codegen_ir.metadata"](bendList([]), { $: "MTip" });
+  const invalid = (constructor: string) =>
+    entry(constructor, {
+      $: "SequenceExpr",
+      first: array(1024),
+      next: { $: "ConstructorRefExpr", constructor },
+    });
+  const first = invalid("missing_first");
+  const expected = backend["codegen_ir.prepare"](first.body, metadata);
+  ok(expected.$ === "Fail");
+  equal(expected.error.subject, "missing_first");
+  const entries = [
+    entry("valid", array(1024)),
+    first,
+    ...Array.from({ length: 30 }, (_, index) => invalid(`later_${index}`)),
+  ];
+  for (const grain of [0n, 128n, 512n, 2048n, 0xffff_ffff_ffffn]) {
+    equal(
+      backend["wasm.prepare_jobs_with_grain"](
+        grain,
+        bendList(entries),
+        metadata,
+      ),
+      expected,
+    );
+  }
 });

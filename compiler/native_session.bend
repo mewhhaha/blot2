@@ -142,25 +142,78 @@ def lower_hit(found: Maybe<&2, Lowered>, node: C.Cst, fuel: Nat, retained: Bool)
     case Some{Lowered{+prior, +budget, fragment}}:
       cached_if(Lowered, Bool.and(source_equal(retained, prior, node), Nat.is_le(budget, fuel)), Lowered{prior, budget, fragment})
 
-def lower_select(found: Maybe<&2, Lowered>, +node: C.Cst, scope: L.Context, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, Selected<Lowered>>:
-  match found:
-    case Some{value}:
-      Done{Selected{value, True{}}}
-    case None{}:
-      do Result<&2, &2, M.Diagnostic, Selected<Lowered>>:
-        fragment : M.Module <- L.lower_source_declaration(node, scope, fuel)
-        return Selected{Lowered{node, fuel, fragment}, False{}}
+type LoweringSelection is Data:
+  LoweringHit{owner: String, lowered: Lowered}
+  LoweringMiss{owner: String}
 
-def lower_declarations(nodes: List<&2, C.Cst>, +scope: L.Context, +fuel: Nat, +previous: Map<&2, Lowered>, next: Map<&2, Lowered>, reversed: List<&2, M.Module>, counts: Counts, +retained: Set()) -> Result<&2, &2, M.Diagnostic, Lowering>:
+type LoweringPlan is Data:
+  LoweringPlan{selections: List<&2, LoweringSelection>, missing: List<&2, C.Cst>}
+
+def select_lowering(found: Maybe<&2, Lowered>, node: C.Cst, owner: String, plan: LoweringPlan) -> LoweringPlan:
+  match found plan:
+    case Some{value} LoweringPlan{selections, missing}:
+      LoweringPlan{LoweringHit{owner, value} <> selections, missing}
+    case None{} LoweringPlan{selections, missing}:
+      LoweringPlan{LoweringMiss{owner} <> selections, node <> missing}
+
+def plan_lowering(nodes: List<&2, C.Cst>, +fuel: Nat, +previous: Map<&2, Lowered>, +retained: Set(), plan: LoweringPlan) -> LoweringPlan:
   match nodes:
     case Nil{}:
-      Done{Lowering{List.reverse(&2, M.Module, reversed), next, counts}}
+      LoweringPlan{selections, missing} = plan
+      LoweringPlan{List.reverse(&2, LoweringSelection, selections), List.reverse(&2, C.Cst, missing)}
     case +node <> tail:
       +owner = Nat.show(C.offset_of(node))
-      do Result<&2, &2, M.Diagnostic, Lowering>:
-        +chosen : Selected<Lowered> <- lower_select(lower_hit(Index.find(Lowered, previous, owner), node, fuel, retained_declaration(Index.find(Unit, retained, owner))), node, scope, fuel)
-        +lowered : Lowered = selected_value(Lowered, chosen)
-        lower_declarations(tail, scope, fuel, previous, Map.set(&2, Lowered, next, owner, lowered), lowered_fragment(lowered) <> reversed, count(counts, selected_reused(Lowered, chosen)), retained)
+      found = lower_hit(Index.find(Lowered, previous, owner), node, fuel, retained_declaration(Index.find(Unit, retained, owner)))
+      plan_lowering(tail, fuel, previous, retained, select_lowering(found, node, owner, plan))
+
+def lower_missing_leaf(nodes: List<&2, C.Cst>, +scope: L.Context, +fuel: Nat, reversed: List<&2, Lowered>) -> Result<&2, &2, M.Diagnostic, List<&2, Lowered>>:
+  match nodes:
+    case Nil{}:
+      Done{List.reverse(&2, Lowered, reversed)}
+    case +node <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, Lowered>>:
+        fragment : M.Module <- L.lower_source_declaration(node, scope, fuel)
+        lower_missing_leaf(tail, scope, fuel, Lowered{node, fuel, fragment} <> reversed)
+
+# Sessions select the first failing source declaration, unlike clean lowering's
+# tail-first traversal. Parallel completion order must not select the error.
+def merge_lowered(left: Result<&2, &2, M.Diagnostic, List<&2, Lowered>>, right: Result<&2, &2, M.Diagnostic, List<&2, Lowered>>) -> Result<&2, &2, M.Diagnostic, List<&2, Lowered>>:
+  do Result<&2, &2, M.Diagnostic, List<&2, Lowered>>:
+    a : List<&2, Lowered> <- left
+    b : List<&2, Lowered> <- right
+    return List.reverse.go(&2, Lowered, List.reverse(&2, Lowered, a), b)
+
+def lower_missing_batch(batch: L.DeclarationBatch, +scope: L.Context, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, Lowered>>:
+  match batch:
+    case L.DeclarationLeaf{nodes}:
+      lower_missing_leaf(nodes, scope, fuel, Nil{})
+    case L.DeclarationFork{L.DeclarationFork{L.DeclarationFork{a, b}, L.DeclarationFork{c, d}}, L.DeclarationFork{L.DeclarationFork{e, f}, L.DeclarationFork{g, h}}}:
+      ra rb rc rd re rf rg rh = lower_missing_batch(a, scope, fuel) lower_missing_batch(b, scope, fuel) lower_missing_batch(c, scope, fuel) lower_missing_batch(d, scope, fuel) lower_missing_batch(e, scope, fuel) lower_missing_batch(f, scope, fuel) lower_missing_batch(g, scope, fuel) lower_missing_batch(h, scope, fuel)
+      merge_lowered(merge_lowered(merge_lowered(ra, rb), merge_lowered(rc, rd)), merge_lowered(merge_lowered(re, rf), merge_lowered(rg, rh)))
+    case L.DeclarationFork{L.DeclarationFork{a, b}, L.DeclarationFork{c, d}}:
+      ra rb rc rd = lower_missing_batch(a, scope, fuel) lower_missing_batch(b, scope, fuel) lower_missing_batch(c, scope, fuel) lower_missing_batch(d, scope, fuel)
+      merge_lowered(merge_lowered(ra, rb), merge_lowered(rc, rd))
+    case L.DeclarationFork{left, right}:
+      a b = lower_missing_batch(left, scope, fuel) lower_missing_batch(right, scope, fuel)
+      merge_lowered(a, b)
+
+def publish_lowered(selections: List<&2, LoweringSelection>, missing: List<&2, Lowered>, next: Map<&2, Lowered>, reversed: List<&2, M.Module>, counts: Counts) -> Result<&2, &2, M.Diagnostic, Lowering>:
+  match selections missing:
+    case Nil{} Nil{}:
+      Done{Lowering{List.reverse(&2, M.Module, reversed), next, counts}}
+    case LoweringHit{owner, +lowered} <> tail _:
+      publish_lowered(tail, missing, Map.set(&2, Lowered, next, owner, lowered), lowered_fragment(lowered) <> reversed, count(counts, True{}))
+    case LoweringMiss{owner} <> tail +lowered <> rest:
+      publish_lowered(tail, rest, Map.set(&2, Lowered, next, owner, lowered), lowered_fragment(lowered) <> reversed, count(counts, False{}))
+    case _ _:
+      Fail{M.Diagnostic{"internal_error", "native_session", "lowering batch returned a different declaration count"}}
+
+def lower_plan(plan: LoweringPlan, scope: L.Context, fuel: Nat) -> Result<&2, &2, M.Diagnostic, Lowering>:
+  LoweringPlan{selections, +missing} = plan
+  +missing_count = List.length(&2, C.Cst, missing)
+  do Result<&2, &2, M.Diagnostic, Lowering>:
+    lowered : List<&2, Lowered> <- lower_missing_batch(L.declaration_batches(48n, missing, missing_count, Nat.is_le(missing_count, 4n)), scope, fuel)
+    publish_lowered(selections, lowered, Map.new(&2, Lowered), Nil{}, Counts{0n, 0n})
 
 def reusable_scope(previous: Maybe<&2, List<&2, U32>>, key: List<&2, U32>, declarations: Map<&2, Lowered>) -> Map<&2, Lowered>:
   match previous:
@@ -552,13 +605,13 @@ def unique_declaration_ids(nodes: List<&2, C.Cst>, +seen: Set()) -> Result<&2, &
         unique : Unit <- unique_identity(Index.find(Unit, seen, key), identity)
         unique_declaration_ids(tail, Set.add(seen, key))
 
-def update_source(+state: State, mode: Mode, source: L.SourcePlan, fuel: Nat, steps: Nat, retained: Set()) -> Result<&2, &2, M.Diagnostic, Completion>:
+def update_source(+state: State, mode: Mode, source: L.SourcePlan, +fuel: Nat, steps: Nat, retained: Set()) -> Result<&2, &2, M.Diagnostic, Completion>:
   State{prelude, scope_key, declarations, planning, groups, constants, entries} = state
   L.SourcePlan{prelude_module, +scope, +nodes} = source
   do Result<&2, &2, M.Diagnostic, Completion>:
     unique : Unit <- unique_declaration_ids(nodes, Set.new())
     +scope_words : List<&2, U32> <- K.scope(scope)
-    lowered : Lowering <- lower_declarations(nodes, scope, fuel, reusable_scope(scope_key, scope_words, declarations), Map.new(&2, Lowered), Nil{}, Counts{0n, 0n}, retained)
+    lowered : Lowering <- lower_plan(plan_lowering(nodes, fuel, reusable_scope(scope_key, scope_words, declarations), retained, LoweringPlan{Nil{}, Nil{}}), scope, fuel)
     update_lowered(state, mode, prelude_module, scope_words, lowered, steps)
 
 def update(+state: State, mode: Mode, root: C.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:

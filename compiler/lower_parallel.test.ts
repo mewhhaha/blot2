@@ -134,3 +134,95 @@ Deno.test("native lowering preserves ordered artifacts and diagnostics at 1/2/4/
     js.dispose();
   }
 });
+
+type Batch = { $: "DeclarationLeaf"; nodes: BendList<Cst> } | {
+  $: "DeclarationFork";
+  left: Batch;
+  right: Batch;
+};
+const planner = generated as unknown as {
+  "lower.declaration_batches"(
+    depth: bigint,
+    nodes: BendList<Cst>,
+    count: bigint,
+    small: boolean,
+  ): Batch;
+  "lower.declaration_cost"(
+    fuel: bigint,
+    nodes: BendList<Cst>,
+    cost: bigint,
+  ): bigint;
+};
+function node(identity: number, cost: number): Cst {
+  const leaf: Cst = {
+    $: "Cst",
+    kind: "leaf",
+    field: "",
+    text: "",
+    offset: BigInt(identity),
+    children: bendList([]),
+  };
+  return {
+    ...leaf,
+    children: bendList(Array.from({ length: cost - 1 }, () => leaf)),
+  };
+}
+function leaves(batch: Batch): Cst[][] {
+  return batch.$ === "DeclarationLeaf"
+    ? [bendArray(batch.nodes)]
+    : [...leaves(batch.left), ...leaves(batch.right)];
+}
+Deno.test("lowering cost counts nodes once and saturates at its traversal bound", () => {
+  equal(
+    planner["lower.declaration_cost"](65536n, bendList([node(0, 70000)]), 0n),
+    65536n,
+  );
+  equal(
+    planner["lower.declaration_cost"](
+      20n,
+      bendList([node(0, 7), node(1, 5)]),
+      0n,
+    ),
+    12n,
+  );
+});
+Deno.test("lowering partitions clustered work without empty leaves or source reordering", () => {
+  for (
+    const costs of [
+      Array(64).fill(20),
+      [...Array(8).fill(80), ...Array(56).fill(10)],
+      [1, 1, 500, 1, 1],
+      [500, 1, 1, 1, 1],
+      [1, 1, 1, 1, 500],
+    ]
+  ) {
+    const nodes = costs.map((cost, index) => node(index, cost));
+    const batch = planner["lower.declaration_batches"](
+      48n,
+      bendList(nodes),
+      BigInt(nodes.length),
+      false,
+    );
+    const groups = leaves(batch);
+    equal(groups.flat(), nodes);
+    ok(
+      groups.every((group) => group.length >= 1 && group.length <= 4),
+      JSON.stringify({
+        costs,
+        groups: groups.map((group) => group.map((node) => Number(node.offset))),
+      }),
+    );
+    ok(batch.$ === "DeclarationFork");
+    const left = leaves(batch.left).flat().reduce(
+      (cost, node) => cost + costs[Number(node.offset)],
+      0,
+    );
+    const right = costs.reduce((a, b) => a + b, 0) - left;
+    ok(Math.abs(left - right) <= Math.max(...costs));
+  }
+  const tiny = [node(0, 500), node(1, 1)];
+  equal(
+    planner["lower.declaration_batches"](48n, bendList(tiny), 2n, true),
+    { $: "DeclarationLeaf", nodes: bendList(tiny) },
+  );
+});

@@ -2,6 +2,7 @@ import Base
 import ./model.bend as M
 import ./codegen_ir.bend as I
 import ./wasm.bend as W
+import ./wasm_catalog.bend as E
 import ./groups.bend as G
 import ./check_scheduler.bend as S
 import ./native_cache_keys.bend as K
@@ -10,6 +11,7 @@ import ./native_response.bend as R
 type Phase is Data:
   Codegen{}
   Inference{}
+  Preparation{}
 
 type Shape is Data:
   Tiny{}
@@ -22,7 +24,7 @@ type Bodies is Data:
   Bodies{core: M.Expr, runtime: I.Expr}
 
 type Fixture is Data:
-  Fixture{jobs: List<&2, W.CodegenJob>, tasks: List<&2, S.Task>}
+  Fixture{jobs: List<&2, W.CodegenJob>, tasks: List<&2, S.Task>, entries: List<&2, W.Entry>}
 
 def bind_bodies(previous: Bodies, +name: String, +value: U32) -> Bodies:
   Bodies{core, runtime} = previous
@@ -43,15 +45,15 @@ def body_depth(shape: Shape, index: Nat) -> Nat:
       Bool.pick(Nat, U32.is_eq(U32.and(U32.from_nat(index), 1), 0), 8n, 64n)
 
 def fixture_entry(+index: Nat, body: Bodies, previous: Fixture) -> Fixture:
-  Bodies{core, runtime} = body
-  Fixture{jobs, tasks} = previous
+  Bodies{+core, runtime} = body
+  Fixture{jobs, tasks, entries} = previous
   +name = "bench_" ++ Nat.show(index)
   +module = {M.Module{Nil{}, [M.Function{name, False{}, "value", Some{M.UnitTy{}}, Some{M.U32Ty{}}, core}], Nil{}, Nil{}} : M.Module}
-  Fixture{W.CodegenJob{"fn:" ++ name, "value", runtime, Nil{}} <> jobs, S.Task{index, module, Nil{}, S.module_cost(module)} <> tasks}
+  Fixture{W.CodegenJob{"fn:" ++ name, "value", runtime, Nil{}} <> jobs, S.Task{index, module, Nil{}, S.module_cost(module)} <> tasks, W.Entry{"fn:" ++ name, "value", core, Nil{}} <> entries}
 
 def fixture_order(previous: Fixture) -> Fixture:
-  Fixture{jobs, tasks} = previous
-  Fixture{List.reverse(&2, W.CodegenJob, jobs), List.reverse(&2, S.Task, tasks)}
+  Fixture{jobs, tasks, entries} = previous
+  Fixture{List.reverse(&2, W.CodegenJob, jobs), List.reverse(&2, S.Task, tasks), List.reverse(&2, W.Entry, entries)}
 
 def fixture(remaining: Nat, +shape: Shape, +index: Nat, previous: Fixture) -> Fixture:
   match remaining:
@@ -151,6 +153,20 @@ def outcome_result_same(result: Result<&2, &2, M.Diagnostic, List<&2, List<&2, U
     case Done{keys}:
       same_keys(keys, expected, True{})
 
+def preparation_keys(jobs: List<&2, W.CodegenJob>, reversed: List<&2, List<&2, U32>>) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
+  match jobs:
+    case Nil{}:
+      Done{List.reverse(&2, List<&2, U32>, reversed)}
+    case job <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
+        key : List<&2, U32> <- K.entry(job)
+        preparation_keys(tail, key <> reversed)
+
+def preparation_result_keys(result: Result<&2, &2, M.Diagnostic, List<&2, W.CodegenJob>>) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
+  do Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
+    jobs : List<&2, W.CodegenJob> <- result
+    preparation_keys(jobs, Nil{})
+
 def verified(valid: Bool) -> IO(Unit):
   match valid:
     case True{}:
@@ -191,16 +207,33 @@ def time_inference(iterations: Nat, +grain: Nat, +tasks: List<&2, S.Task>, +expe
         verified(outcome_result_same(outcome_keys(checked, Nil{}), expected))
         time_inference(rest, grain, tasks, expected, Nat.add(elapsed, Nat.sub(finish, start)))
 
+def time_preparation(iterations: Nat, +grain: Nat, +entries: List<&2, W.Entry>, +projection: I.Metadata, +expected: List<&2, List<&2, U32>>, elapsed: Nat) -> IO(Nat):
+  match iterations:
+    case 0n:
+      IO.pure(Nat, elapsed)
+    case 1n+rest:
+      do IO<Nat>:
+        start : Nat <- IO.now()
+        prepared : Result<&2, &2, M.Diagnostic, List<&2, W.CodegenJob>> = W.prepare_jobs_with_grain(grain, entries, projection)
+        finish : Nat <- IO.now()
+        verified(outcome_result_same(preparation_result_keys(prepared), expected))
+        time_preparation(rest, grain, entries, projection, expected, Nat.add(elapsed, Nat.sub(finish, start)))
+
 def measure(phase: Phase, grain: Nat, iterations: Nat, prepared: Fixture) -> IO(Nat):
   match phase prepared:
-    case Codegen{} Fixture{+jobs, tasks}:
+    case Codegen{} Fixture{+jobs, tasks, entries}:
       do IO<Nat>:
         expected : List<&2, W.EntryCode> <- required(List<&2, W.EntryCode>, W.compile_entries_with_grain(Nat.read.max(), jobs))
         time_codegen(iterations, grain, jobs, expected, 0n)
-    case Inference{} Fixture{jobs, +tasks}:
+    case Inference{} Fixture{jobs, +tasks, entries}:
       do IO<Nat>:
         expected : List<&2, List<&2, U32>> <- required(List<&2, List<&2, U32>>, outcome_keys(S.check_batch_with_grain(tasks, Nat.read.max()), Nil{}))
         time_inference(iterations, grain, tasks, expected, 0n)
+    case Preparation{} Fixture{jobs, tasks, +entries}:
+      +projection = I.metadata(Nil{}, Map.new(&2, Maybe<&2, E.ConstructorSlot>))
+      do IO<Nat>:
+        expected : List<&2, List<&2, U32>> <- required(List<&2, List<&2, U32>>, preparation_result_keys(W.prepare_jobs_with_grain(Nat.read.max(), entries, projection)))
+        time_preparation(iterations, grain, entries, projection, expected, 0n)
 
 def phase_name(phase: Phase) -> String:
   match phase:
@@ -208,6 +241,8 @@ def phase_name(phase: Phase) -> String:
       "codegen"
     case Inference{}:
       "check"
+    case Preparation{}:
+      "prepare"
 
 def shape_name(shape: Shape) -> String:
   match shape:
@@ -223,16 +258,18 @@ def report(options: Options, elapsed: Nat) -> IO(Unit):
 def run(+options: Options) -> IO(Unit):
   Options{phase, shape, grain, iterations} = options
   do IO<Unit>:
-    elapsed : Nat <- measure(phase, grain, iterations, fixture(64n, shape, 0n, Fixture{Nil{}, Nil{}}))
+    elapsed : Nat <- measure(phase, grain, iterations, fixture(64n, shape, 0n, Fixture{Nil{}, Nil{}, Nil{}}))
     report(options, elapsed)
 
-def phase_option(codegen: Bool, inference: Bool) -> Maybe<&2, Phase>:
-  match codegen inference:
-    case True{} _:
+def phase_option(codegen: Bool, inference: Bool, preparation: Bool) -> Maybe<&2, Phase>:
+  match codegen inference preparation:
+    case True{} _ _:
       Some{Codegen{}}
-    case False{} True{}:
+    case False{} True{} _:
       Some{Inference{}}
-    case _ _:
+    case False{} False{} True{}:
+      Some{Preparation{}}
+    case _ _ _:
       None{}
 
 def shape_option(tiny: Bool, uneven: Bool) -> Maybe<&2, Shape>:
@@ -256,12 +293,12 @@ def parsed_options(phase: Maybe<&2, Phase>, shape: Maybe<&2, Shape>, grain: Mayb
     case Some{p} Some{s} Some{g} Some{1n+rest}:
       run(Options{p, s, g, 1n+rest})
     case _ _ _ _:
-      IO.die(Unit, 2, "usage: parallel-grain-bench [--threads N] -- codegen|check tiny|uneven serial|GRAIN ITERATIONS (>0)")
+      IO.die(Unit, 2, "usage: parallel-grain-bench [--threads N] -- codegen|check|prepare tiny|uneven serial|GRAIN ITERATIONS (>0)")
 
 def arguments(args: List<String>) -> IO(Unit):
   match args:
     case +phase <> +shape <> +grain <> iterations <> Nil{}:
-      parsed_options(phase_option(M.name_equal(phase, "codegen"), M.name_equal(phase, "check")), shape_option(M.name_equal(shape, "tiny"), M.name_equal(shape, "uneven")), grain_option(M.name_equal(grain, "serial"), grain), Nat.read(iterations))
+      parsed_options(phase_option(M.name_equal(phase, "codegen"), M.name_equal(phase, "check"), M.name_equal(phase, "prepare")), shape_option(M.name_equal(shape, "tiny"), M.name_equal(shape, "uneven")), grain_option(M.name_equal(grain, "serial"), grain), Nat.read(iterations))
     case _:
       parsed_options(None{}, None{}, None{}, None{})
 

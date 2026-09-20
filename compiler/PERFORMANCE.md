@@ -1,5 +1,11 @@
 # Compiler performance
 
+The latest [concurrency review and 1–8-core report](CONCURRENCY.md) records the
+stock-Bend CPU implementation, physical-core-pinned comparisons,
+retained-process controls and remaining bottlenecks. Its baseline includes the
+earlier follow-up work after `f55334d`. The sections below preserve the older
+measurements.
+
 ## Concurrency-compatible lowering and wider forks (2026-09-20)
 
 The compiler now lowers independent declarations in balanced batches, after name

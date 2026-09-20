@@ -2,6 +2,7 @@ import Base
 import ./model.bend as M
 import ./cst.bend as Cst
 import ./native_session.bend as Session
+import ./native_io.bend as NativeIO
 
 type Operation is Data:
   Analyze{}
@@ -13,166 +14,183 @@ type Request is Data:
   SessionRequest{operation: Operation, fuel: Nat, steps: Nat, root: Cst.Cst}
   SessionPatch{operation: Operation, fuel: Nat, steps: Nat, declarations: List<&2, Session.Declaration>}
 
-type Cursor is Data:
-  Cursor{words: List<&2, U32>, offset: Nat}
+# Array indices wrap in Bend. remaining is the validated frame length, not
+# the power-of-two allocation size; every read consumes it before indexing.
+type Cursor is Type:
+  Cursor{words: Array<U32>, offset: Nat, remaining: Nat, strings: Array<String>, string_count: U32}
 
-type Parsed<-A: Data> is Data:
+type Parsed<-A: Data> is Type:
   Parsed{value: A, cursor: Cursor}
 
-def value_of(-A: Data, parsed: Parsed<A>) -> A:
-  Parsed{value, cursor} = parsed
-  value
-
-def cursor_of(-A: Data, parsed: Parsed<A>) -> Cursor:
-  Parsed{value, cursor} = parsed
-  cursor
-
-def offset_of(cursor: Cursor) -> Nat:
-  Cursor{words, offset} = cursor
-  offset
+# Keep diagnostic formatting out of the scan. Otherwise one cold String.append
+# branch makes every successful word read use Bend's continuation machinery.
+type ScanFailure is Data:
+  MissingWord{offset: Nat, label: String}
+  Rejected{offset: Nat, message: String}
 
 def diagnostic(offset: Nat, message: String) -> M.Diagnostic:
   M.Diagnostic{"native_protocol", "word:" ++ Nat.show(offset), message}
-
-def word(cursor: Cursor, label: String) -> Result<&2, &2, M.Diagnostic, Parsed<U32>>:
-  match cursor:
-    case Cursor{Nil{}, offset}:
-      Fail{diagnostic(offset, "truncated request while reading " ++ label)}
-    case Cursor{head <> tail, offset}:
-      Done{Parsed{head, Cursor{tail, 1n+offset}}}
-
-def require(valid: Bool, offset: Nat, message: String) -> Result<&2, &2, M.Diagnostic, Unit>:
-  match valid:
-    case True{}:
-      Done{Unit{}}
-    case False{}:
-      Fail{diagnostic(offset, message)}
-
-def nat_value(valid: Bool, low: U32, high: U32, offset: Nat) -> Result<&2, &2, M.Diagnostic, Nat>:
-  match valid:
-    case False{}:
-      Fail{diagnostic(offset, "Nat high word exceeds 16 bits")}
-    case True{}:
-      Done{Nat.add(U32.to_nat(low), Nat.mul(U32.to_nat(high), Nat.mul(U32.to_nat(65536), U32.to_nat(65536))))}
-
-def natural(cursor: Cursor, +label: String) -> Result<&2, &2, M.Diagnostic, Parsed<Nat>>:
-  do Result<&2, &2, M.Diagnostic, Parsed<Nat>>:
-    +low : Parsed<U32> <- word(cursor, label ++ " low word")
-    +high : Parsed<U32> <- word(cursor_of(U32, low), label ++ " high word")
-    decoded : Nat <- nat_value(U32.is_le(value_of(U32, high), 65535), value_of(U32, low), value_of(U32, high), offset_of(cursor_of(U32, low)))
-    return Parsed{decoded, cursor_of(U32, high)}
-
-type ScannedString is Data:
-  CompleteString{value: String, cursor: Cursor}
-  TruncatedString{offset: Nat}
-  InvalidCharacter{offset: Nat}
-
-# Result.bind and diagnostic string construction make a loop non-flat in Bend.
-# Keep both outside the per-character loop, including ownership of the label.
-# A rejected scalar is discarded before any string can leave this decoder.
-def scan_string(count: Nat, cursor: Cursor, reversed: String, valid: Bool) -> ScannedString:
-  match count cursor valid:
-    case _ Cursor{words, offset} False{}:
-      InvalidCharacter{Nat.sub(offset, 1n)}
-    case 0n remaining True{}:
-      CompleteString{String.reverse(reversed), remaining}
-    case 1n+rest Cursor{Nil{}, offset} True{}:
-      TruncatedString{offset}
-    case 1n+rest Cursor{+code <> tail, offset} True{}:
-      scan_string(rest, Cursor{tail, 1n+offset}, SCon{Chr{code}, reversed}, Bool.and(U32.is_le(code, 1114111), Bool.or(U32.is_lt(code, 55296), U32.is_gt(code, 57343))))
-
-type ScanFailure is Data:
-  MissingWord{offset: Nat, label: String}
-  InvalidScalar{offset: Nat}
-  InvalidHighWord{offset: Nat}
-  ExhaustedTree{offset: Nat}
 
 def scan_failure(failure: ScanFailure) -> M.Diagnostic:
   match failure:
     case MissingWord{offset, label}:
       diagnostic(offset, "truncated request while reading " ++ label)
-    case InvalidScalar{offset}:
-      diagnostic(offset, "string contains an invalid Unicode scalar value")
-    case InvalidHighWord{offset}:
-      diagnostic(offset, "Nat high word exceeds 16 bits")
-    case ExhaustedTree{offset}:
-      diagnostic(offset, "CST traversal exceeded its request word-count bound")
+    case Rejected{offset, message}:
+      diagnostic(offset, message)
 
-def scanned_string(scanned: ScannedString, label: String) -> Result<&2, &2, ScanFailure, Parsed<String>>:
+def word_read(read: Array<U32> & U32, offset: Nat, remaining: Nat, strings: Array<String>, string_count: U32) -> Result<&2, &1, ScanFailure, Parsed<U32>>:
+  (words, value) = read
+  Done{Parsed{value, Cursor{words, offset, remaining, strings, string_count}}}
+
+def word(cursor: Cursor, label: String) -> Result<&2, &1, ScanFailure, Parsed<U32>>:
+  match cursor:
+    case Cursor{words, offset, 0n, strings, string_count}:
+      Fail{MissingWord{offset, label}}
+    case Cursor{words, +offset, 1n+remaining, strings, string_count}:
+      word_read(Array.get(U32, words, U32.from_nat(offset)), 1n+offset, remaining, strings, string_count)
+
+def natural_checked(valid: Bool, low: U32, high: U32, cursor: Cursor, offset: Nat) -> Result<&2, &1, ScanFailure, Parsed<Nat>>:
+  match valid:
+    case False{}:
+      Fail{Rejected{offset, "Nat high word exceeds 16 bits"}}
+    case True{}:
+      Done{Parsed{Nat.add(U32.to_nat(low), Nat.mul(U32.to_nat(high), Nat.mul(U32.to_nat(65536), U32.to_nat(65536)))), cursor}}
+
+def natural_high(parsed: Result<&2, &1, ScanFailure, Parsed<U32>>, low: U32, offset: Nat) -> Result<&2, &1, ScanFailure, Parsed<Nat>>:
+  match parsed:
+    case Fail{error}:
+      Fail{error}
+    case Done{Parsed{+high, cursor}}:
+      natural_checked(U32.is_le(high, 65535), low, high, cursor, offset)
+
+def natural_low(parsed: Result<&2, &1, ScanFailure, Parsed<U32>>, label: String, offset: Nat) -> Result<&2, &1, ScanFailure, Parsed<Nat>>:
+  match parsed:
+    case Fail{error}:
+      Fail{error}
+    case Done{Parsed{low, cursor}}:
+      natural_high(word(cursor, label), low, offset)
+
+def natural_words(cursor: Cursor, low_label: String, high_label: String) -> Result<&2, &1, ScanFailure, Parsed<Nat>>:
+  Cursor{words, +offset, remaining, strings, string_count} = cursor
+  natural_low(word(Cursor{words, offset, remaining, strings, string_count}, low_label), high_label, 1n+offset)
+
+def natural(cursor: Cursor, +label: String) -> Result<&2, &1, ScanFailure, Parsed<Nat>>:
+  natural_words(cursor, label ++ " low word", label ++ " high word")
+
+type ScannedString is Type:
+  CompleteString{value: String, cursor: Cursor}
+  TruncatedString{offset: Nat}
+  InvalidCharacter{offset: Nat}
+
+# No labels or Result closures in the per-scalar loop. The owned buffer is
+# released even when a malformed character aborts the scan.
+type CharacterScan is Type:
+  CharacterScan{cursor: Cursor, reversed: String, valid: Bool}
+
+def character_read(read: Array<U32> & U32, offset: Nat, remaining: Nat, reversed: String, strings: Array<String>, string_count: U32) -> CharacterScan:
+  (words, +code) = read
+  CharacterScan{Cursor{words, offset, remaining, strings, string_count}, SCon{Chr{code}, reversed}, Bool.and(U32.is_le(code, 1114111), Bool.or(U32.is_lt(code, 55296), U32.is_gt(code, 57343)))}
+
+def scan_characters(count: Nat, scan: CharacterScan) -> ScannedString:
+  match count scan:
+    case _ CharacterScan{Cursor{words, offset, remaining, strings, string_count}, reversed, False{}}:
+      InvalidCharacter{Nat.sub(offset, 1n)}
+    case 0n CharacterScan{remaining, reversed, True{}}:
+      CompleteString{String.reverse(reversed), remaining}
+    case 1n+rest CharacterScan{Cursor{words, offset, 0n, strings, string_count}, reversed, True{}}:
+      TruncatedString{offset}
+    case 1n+rest CharacterScan{Cursor{words, +offset, 1n+remaining, strings, string_count}, reversed, True{}}:
+      scan_characters(rest, character_read(Array.get(U32, words, U32.from_nat(offset)), 1n+offset, remaining, reversed, strings, string_count))
+
+def scan_string(count: Nat, cursor: Cursor, reversed: String, valid: Bool) -> ScannedString:
+  scan_characters(count, CharacterScan{cursor, reversed, valid})
+
+def scanned_string(scanned: ScannedString, label: String) -> Result<&2, &1, ScanFailure, Parsed<String>>:
   match scanned:
     case CompleteString{value, cursor}:
       Done{Parsed{value, cursor}}
     case TruncatedString{offset}:
       Fail{MissingWord{offset, label}}
     case InvalidCharacter{offset}:
-      Fail{InvalidScalar{offset}}
+      Fail{Rejected{offset, "string contains an invalid Unicode scalar value"}}
 
-def scan_field(cursor: Cursor, length_label: String, character_label: String) -> Result<&2, &2, ScanFailure, Parsed<String>>:
-  match cursor:
-    case Cursor{Nil{}, offset}:
-      Fail{MissingWord{offset, length_label}}
-    case Cursor{count <> tail, offset}:
-      scanned_string(scan_string(U32.to_nat(count), Cursor{tail, 1n+offset}, SNil{}, True{}), character_label)
+def field_length(parsed: Result<&2, &1, ScanFailure, Parsed<U32>>, character_label: String) -> Result<&2, &1, ScanFailure, Parsed<String>>:
+  match parsed:
+    case Fail{error}:
+      Fail{error}
+    case Done{Parsed{count, cursor}}:
+      scanned_string(scan_string(U32.to_nat(count), cursor, SNil{}, True{}), character_label)
+
+def scan_field(cursor: Cursor, length_label: String, character_label: String) -> Result<&2, &1, ScanFailure, Parsed<String>>:
+  field_length(word(cursor, length_label), character_label)
+
+def string_read(read: Array<String> & String, words: Array<U32>, offset: Nat, remaining: Nat, string_count: U32) -> Result<&2, &1, ScanFailure, Parsed<String>>:
+  (strings, value) = read
+  Done{Parsed{value, Cursor{words, offset, remaining, strings, string_count}}}
+
+def string_checked(valid: Bool, identity: U32, cursor: Cursor) -> Result<&2, &1, ScanFailure, Parsed<String>>:
+  match valid cursor:
+    case False{} Cursor{words, offset, remaining, strings, string_count}:
+      Fail{Rejected{Nat.sub(offset, 1n), "CST string ID is outside the request dictionary"}}
+    case True{} Cursor{words, offset, remaining, strings, string_count}:
+      string_read(Array.get(String, strings, identity), words, offset, remaining, string_count)
+
+def string_identity(parsed: Result<&2, &1, ScanFailure, Parsed<U32>>) -> Result<&2, &1, ScanFailure, Parsed<String>>:
+  match parsed:
+    case Fail{error}:
+      Fail{error}
+    case Done{Parsed{+identity, Cursor{words, offset, remaining, strings, +string_count}}}:
+      string_checked(U32.is_lt(identity, string_count), identity, Cursor{words, offset, remaining, strings, string_count})
+
+def string_reference(cursor: Cursor, label: String) -> Result<&2, &1, ScanFailure, Parsed<String>>:
+  string_identity(word(cursor, label))
 
 type Header is Data:
   Header{kind: String, field: String, text: String, offset: Nat, children: Nat}
 
-def header_children(cursor: Cursor, kind: String, field: String, text: String, offset: Nat) -> Result<&2, &2, ScanFailure, Parsed<Header>>:
-  match cursor:
-    case Cursor{Nil{}, position}:
-      Fail{MissingWord{position, "CST child count"}}
-    case Cursor{children <> tail, position}:
-      Done{Parsed{Header{kind, field, text, offset, U32.to_nat(children)}, Cursor{tail, 1n+position}}}
+def header_children(parsed: Result<&2, &1, ScanFailure, Parsed<U32>>, kind: String, field: String, text: String, offset: Nat) -> Result<&2, &1, ScanFailure, Parsed<Header>>:
+  match parsed:
+    case Fail{error}:
+      Fail{error}
+    case Done{Parsed{children, cursor}}:
+      Done{Parsed{Header{kind, field, text, offset, U32.to_nat(children)}, cursor}}
 
-def header_natural(valid: Bool, low: U32, high: U32, cursor: Cursor, kind: String, field: String, text: String) -> Result<&2, &2, ScanFailure, Parsed<Header>>:
-  match valid cursor:
-    case False{} Cursor{words, position}:
-      Fail{InvalidHighWord{Nat.sub(position, 1n)}}
-    case True{} remaining:
-      header_children(remaining, kind, field, text, Nat.add(U32.to_nat(low), Nat.mul(U32.to_nat(high), Nat.mul(U32.to_nat(65536), U32.to_nat(65536)))))
+def header_offset(parsed: Result<&2, &1, ScanFailure, Parsed<Nat>>, kind: String, field: String, text: String) -> Result<&2, &1, ScanFailure, Parsed<Header>>:
+  match parsed:
+    case Fail{error}:
+      Fail{error}
+    case Done{Parsed{offset, cursor}}:
+      header_children(word(cursor, "CST child count"), kind, field, text, offset)
 
-def header_offset(cursor: Cursor, kind: String, field: String, text: String) -> Result<&2, &2, ScanFailure, Parsed<Header>>:
-  match cursor:
-    case Cursor{Nil{}, position}:
-      Fail{MissingWord{position, "CST offset low word"}}
-    case Cursor{low <> Nil{}, position}:
-      Fail{MissingWord{1n+position, "CST offset high word"}}
-    case Cursor{low <> +high <> tail, position}:
-      header_natural(U32.is_le(high, 65535), low, high, Cursor{tail, Nat.add(position, 2n)}, kind, field, text)
-
-# Explicit matches keep the scan flat and transfer each cursor exactly once;
-# Result.bind closures and paired projections retain the unconsumed word list.
-def header_text(parsed: Result<&2, &2, ScanFailure, Parsed<String>>, kind: String, field: String) -> Result<&2, &2, ScanFailure, Parsed<Header>>:
+def header_text(parsed: Result<&2, &1, ScanFailure, Parsed<String>>, kind: String, field: String) -> Result<&2, &1, ScanFailure, Parsed<Header>>:
   match parsed:
     case Fail{error}:
       Fail{error}
     case Done{Parsed{text, cursor}}:
-      header_offset(cursor, kind, field, text)
+      header_offset(natural_words(cursor, "CST offset low word", "CST offset high word"), kind, field, text)
 
-def header_field(parsed: Result<&2, &2, ScanFailure, Parsed<String>>, kind: String) -> Result<&2, &2, ScanFailure, Parsed<Header>>:
+def header_field(parsed: Result<&2, &1, ScanFailure, Parsed<String>>, kind: String) -> Result<&2, &1, ScanFailure, Parsed<Header>>:
   match parsed:
     case Fail{error}:
       Fail{error}
     case Done{Parsed{field, cursor}}:
-      header_text(scan_field(cursor, "CST text length", "CST text character"), kind, field)
+      header_text(string_reference(cursor, "CST text ID"), kind, field)
 
-def header_kind(parsed: Result<&2, &2, ScanFailure, Parsed<String>>) -> Result<&2, &2, ScanFailure, Parsed<Header>>:
+def header_kind(parsed: Result<&2, &1, ScanFailure, Parsed<String>>) -> Result<&2, &1, ScanFailure, Parsed<Header>>:
   match parsed:
     case Fail{error}:
       Fail{error}
     case Done{Parsed{kind, cursor}}:
-      header_field(scan_field(cursor, "CST field length", "CST field character"), kind)
+      header_field(string_reference(cursor, "CST field ID"), kind)
 
-def scan_header(cursor: Cursor) -> Result<&2, &2, ScanFailure, Parsed<Header>>:
-  header_kind(scan_field(cursor, "CST kind length", "CST kind character"))
+def scan_header(cursor: Cursor) -> Result<&2, &1, ScanFailure, Parsed<Header>>:
+  header_kind(string_reference(cursor, "CST kind ID"))
 
-# remaining counts siblings after the child currently being read. Accumulated
-# children are reversed exactly once, when their parent is complete.
 type Parent is Data:
   Parent{kind: String, field: String, text: String, offset: Nat, remaining: Nat, reversed: List<&2, Cst.Cst>}
 
-type TreeWork is Data:
-  ReadNode{parsed: Result<&2, &2, ScanFailure, Parsed<Header>>, parents: List<&2, Parent>}
+type TreeWork is Type:
+  ReadNode{parsed: Result<&2, &1, ScanFailure, Parsed<Header>>, parents: List<&2, Parent>}
   FinishNode{node: Cst.Cst, parents: List<&2, Parent>, cursor: Cursor}
 
 def begin_node(header: Header, parents: List<&2, Parent>, cursor: Cursor) -> TreeWork:
@@ -182,18 +200,17 @@ def begin_node(header: Header, parents: List<&2, Parent>, cursor: Cursor) -> Tre
     case Header{kind, field, text, offset, 1n+remaining}:
       ReadNode{scan_header(cursor), Parent{kind, field, text, offset, remaining, Nil{}} <> parents}
 
-# Every CST node consumes at least six words and at most two work steps. The
-# frame's word count therefore supplies a bound without limiting valid nesting.
-def scan_tree(fuel: Nat, work: TreeWork) -> Result<&2, &2, ScanFailure, Parsed<Cst.Cst>>:
+# Every node consumes at least six words and at most two work steps.
+def scan_tree(fuel: Nat, work: TreeWork) -> Result<&2, &1, ScanFailure, Parsed<Cst.Cst>>:
   match fuel work:
     case _ FinishNode{node, Nil{}, cursor}:
       Done{Parsed{node, cursor}}
     case _ ReadNode{Fail{error}, parents}:
       Fail{error}
-    case 0n ReadNode{Done{Parsed{header, Cursor{words, position}}}, parents}:
-      Fail{ExhaustedTree{position}}
-    case 0n FinishNode{node, parents, Cursor{words, position}}:
-      Fail{ExhaustedTree{position}}
+    case 0n ReadNode{Done{Parsed{header, Cursor{words, position, remaining, strings, string_count}}}, parents}:
+      Fail{Rejected{position, "CST traversal exceeded its request word-count bound"}}
+    case 0n FinishNode{node, parents, Cursor{words, position, remaining, strings, string_count}}:
+      Fail{Rejected{position, "CST traversal exceeded its request word-count bound"}}
     case 1n+rest ReadNode{Done{Parsed{header, cursor}}, parents}:
       scan_tree(rest, begin_node(header, parents, cursor))
     case 1n+rest FinishNode{node, Parent{kind, field, text, offset, 0n, reversed} <> parents, cursor}:
@@ -201,84 +218,123 @@ def scan_tree(fuel: Nat, work: TreeWork) -> Result<&2, &2, ScanFailure, Parsed<C
     case 1n+rest FinishNode{node, Parent{kind, field, text, offset, 1n+remaining, reversed} <> parents, cursor}:
       scan_tree(rest, ReadNode{scan_header(cursor), Parent{kind, field, text, offset, remaining, node <> reversed} <> parents})
 
-def scanned_tree(result: Result<&2, &2, ScanFailure, Parsed<Cst.Cst>>) -> Result<&2, &2, M.Diagnostic, Parsed<Cst.Cst>>:
-  match result:
-    case Fail{error}:
-      Fail{scan_failure(error)}
-    case Done{parsed}:
-      Done{parsed}
+def tree(fuel: Nat, cursor: Cursor) -> Result<&2, &1, ScanFailure, Parsed<Cst.Cst>>:
+  scan_tree(fuel, ReadNode{scan_header(cursor), Nil{}})
 
-def tree(fuel: Nat, cursor: Cursor) -> Result<&2, &2, M.Diagnostic, Parsed<Cst.Cst>>:
-  scanned_tree(scan_tree(fuel, ReadNode{scan_header(cursor), Nil{}}))
-
-def end(cursor: Cursor) -> Result<&2, &2, M.Diagnostic, Unit>:
+def end(cursor: Cursor) -> Result<&2, &1, ScanFailure, Unit>:
   match cursor:
-    case Cursor{Nil{}, offset}:
+    case Cursor{words, offset, 0n, strings, string_count}:
       Done{Unit{}}
-    case Cursor{head <> tail, offset}:
-      Fail{diagnostic(offset, "trailing words after the request CST")}
+    case Cursor{words, offset, 1n+remaining, strings, string_count}:
+      Fail{Rejected{offset, "trailing words after the request CST"}}
 
-def stateless(selected: Operation, +bound: Nat, cursor: Cursor) -> Result<&2, &2, M.Diagnostic, Request>:
-  do Result<&2, &2, M.Diagnostic, Request>:
-    +fuel : Parsed<Nat> <- natural(cursor, "frontend fuel")
-    +steps : Parsed<Nat> <- natural(cursor_of(Nat, fuel), "const steps")
-    +root : Parsed<Cst.Cst> <- tree(bound, cursor_of(Nat, steps))
-    +prelude : Parsed<Cst.Cst> <- tree(bound, cursor_of(Cst.Cst, root))
-    complete : Unit <- end(cursor_of(Cst.Cst, prelude))
-    return Request{selected, value_of(Nat, fuel), value_of(Nat, steps), value_of(Cst.Cst, root), value_of(Cst.Cst, prelude)}
+def bind(-A: Data, -B: Type, parsed: Result<&2, &1, ScanFailure, Parsed<A>>, next: A -> Cursor -> Result<&2, &1, ScanFailure, B>) -> Result<&2, &1, ScanFailure, B>:
+  match parsed:
+    case Fail{error}:
+      Fail{error}
+    case Done{Parsed{value, cursor}}:
+      next(value, cursor)
 
-def cached(selected: Operation, bound: Nat, cursor: Cursor) -> Result<&2, &2, M.Diagnostic, Request>:
-  do Result<&2, &2, M.Diagnostic, Request>:
-    +fuel : Parsed<Nat> <- natural(cursor, "frontend fuel")
-    +steps : Parsed<Nat> <- natural(cursor_of(Nat, fuel), "const steps")
-    +root : Parsed<Cst.Cst> <- tree(bound, cursor_of(Nat, steps))
-    complete : Unit <- end(cursor_of(Cst.Cst, root))
-    return SessionRequest{selected, value_of(Nat, fuel), value_of(Nat, steps), value_of(Cst.Cst, root)}
+def dictionary_depth(fuel: Nat, count: U32, depth: Nat) -> Nat:
+  match fuel count:
+    case _ 0:
+      depth
+    case _ 1:
+      depth
+    case 0n _:
+      depth
+    case 1n+rest more:
+      dictionary_depth(rest, U32.shr(U32.add(more, 1)), 1n+depth)
 
-def declaration(tag: U32, bound: Nat, cursor: Cursor, offset: Nat) -> Result<&2, &2, M.Diagnostic, Parsed<Session.Declaration>>:
+def dictionary_store(index: U32, value: String, cursor: Cursor) -> Cursor:
+  Cursor{words, offset, remaining, strings, string_count} = cursor
+  Cursor{words, offset, remaining, Array.set(String, strings, index, value), string_count}
+
+def dictionary_entries(count: Nat, +index: U32, cursor: Cursor) -> Result<&2, &1, ScanFailure, Parsed<Unit>>:
+  match count:
+    case 0n:
+      Done{Parsed{Unit{}, cursor}}
+    case 1n+rest:
+      bind(String, Parsed<Unit>, scan_field(cursor, "dictionary string length", "dictionary string character"), value => cursor =>
+        dictionary_entries(rest, U32.add(index, 1), dictionary_store(index, value, cursor)))
+
+def dictionary_checked(valid: Bool, +count: U32, cursor: Cursor) -> Result<&2, &1, ScanFailure, Parsed<Unit>>:
+  match valid cursor:
+    case False{} Cursor{words, offset, remaining, strings, string_count}:
+      Fail{Rejected{Nat.sub(offset, 1n), "dictionary count exceeds remaining request words"}}
+    case True{} Cursor{words, offset, remaining, strings, string_count}:
+      dictionary_entries(U32.to_nat(count), 0, Cursor{words, offset, remaining, Array.new(String, dictionary_depth(32n, count, 0n), SNil{}), count})
+
+def dictionary_count(parsed: Result<&2, &1, ScanFailure, Parsed<U32>>) -> Result<&2, &1, ScanFailure, Parsed<Unit>>:
+  match parsed:
+    case Fail{error}:
+      Fail{error}
+    case Done{Parsed{+count, Cursor{words, offset, +remaining, strings, string_count}}}:
+      dictionary_checked(Nat.is_le(U32.to_nat(count), remaining), count, Cursor{words, offset, remaining, strings, string_count})
+
+def dictionary(cursor: Cursor) -> Result<&2, &1, ScanFailure, Parsed<Unit>>:
+  dictionary_count(word(cursor, "dictionary count"))
+
+def finish(complete: Result<&2, &1, ScanFailure, Unit>, request: Request) -> Result<&2, &1, ScanFailure, Request>:
+  match complete:
+    case Fail{error}:
+      Fail{error}
+    case Done{unit}:
+      Done{request}
+
+def stateless(selected: Operation, +bound: Nat, cursor: Cursor) -> Result<&2, &1, ScanFailure, Request>:
+  bind(Nat, Request, natural(cursor, "frontend fuel"), fuel => cursor =>
+    bind(Nat, Request, natural(cursor, "const steps"), steps => cursor =>
+      bind(Unit, Request, dictionary(cursor), unit => cursor =>
+        bind(Cst.Cst, Request, tree(bound, cursor), root => cursor =>
+          bind(Cst.Cst, Request, tree(bound, cursor), prelude => cursor =>
+            finish(end(cursor), Request{selected, fuel, steps, root, prelude}))))))
+
+def cached(selected: Operation, bound: Nat, cursor: Cursor) -> Result<&2, &1, ScanFailure, Request>:
+  bind(Nat, Request, natural(cursor, "frontend fuel"), fuel => cursor =>
+    bind(Nat, Request, natural(cursor, "const steps"), steps => cursor =>
+      bind(Unit, Request, dictionary(cursor), unit => cursor =>
+        bind(Cst.Cst, Request, tree(bound, cursor), root => cursor =>
+          finish(end(cursor), SessionRequest{selected, fuel, steps, root})))))
+
+def declaration(tag: U32, bound: Nat, cursor: Cursor, offset: Nat) -> Result<&2, &1, ScanFailure, Parsed<Session.Declaration>>:
   match tag:
     case 0:
-      do Result<&2, &2, M.Diagnostic, Parsed<Session.Declaration>>:
-        +identity : Parsed<Nat> <- natural(cursor, "retained declaration identity")
-        return Parsed{Session.Retained{value_of(Nat, identity)}, cursor_of(Nat, identity)}
+      bind(Nat, Parsed<Session.Declaration>, natural(cursor, "retained declaration identity"), identity => cursor => Done{Parsed{Session.Retained{identity}, cursor}})
     case 1:
-      do Result<&2, &2, M.Diagnostic, Parsed<Session.Declaration>>:
-        +node : Parsed<Cst.Cst> <- tree(bound, cursor)
-        return Parsed{Session.Replaced{value_of(Cst.Cst, node)}, cursor_of(Cst.Cst, node)}
+      bind(Cst.Cst, Parsed<Session.Declaration>, tree(bound, cursor), node => cursor => Done{Parsed{Session.Replaced{node}, cursor}})
     case other:
-      Fail{diagnostic(offset, "unknown declaration tag; expected 0 retained or 1 replaced")}
+      Fail{Rejected{offset, "unknown declaration tag; expected 0 retained or 1 replaced"}}
 
-def declarations(count: Nat, +bound: Nat, +cursor: Cursor, reversed: List<&2, Session.Declaration>) -> Result<&2, &2, M.Diagnostic, Parsed<List<&2, Session.Declaration>>>:
+def declarations(count: Nat, +bound: Nat, cursor: Cursor, reversed: List<&2, Session.Declaration>) -> Result<&2, &1, ScanFailure, Parsed<List<&2, Session.Declaration>>>:
   match count:
     case 0n:
       Done{Parsed{List.reverse(&2, Session.Declaration, reversed), cursor}}
     case 1n+rest:
-      do Result<&2, &2, M.Diagnostic, Parsed<List<&2, Session.Declaration>>>:
-        +tag : Parsed<U32> <- word(cursor, "declaration tag")
-        +parsed : Parsed<Session.Declaration> <- declaration(value_of(U32, tag), bound, cursor_of(U32, tag), offset_of(cursor))
-        declarations(rest, bound, cursor_of(Session.Declaration, parsed), value_of(Session.Declaration, parsed) <> reversed)
+      Cursor{words, +offset, remaining, strings, string_count} = cursor
+      bind(U32, Parsed<List<&2, Session.Declaration>>, word(Cursor{words, offset, remaining, strings, string_count}, "declaration tag"), tag => cursor =>
+        bind(Session.Declaration, Parsed<List<&2, Session.Declaration>>, declaration(tag, bound, cursor, offset), value => cursor =>
+          declarations(rest, bound, cursor, value <> reversed)))
 
-def patch(selected: Operation, bound: Nat, cursor: Cursor) -> Result<&2, &2, M.Diagnostic, Request>:
-  do Result<&2, &2, M.Diagnostic, Request>:
-    +fuel : Parsed<Nat> <- natural(cursor, "frontend fuel")
-    +steps : Parsed<Nat> <- natural(cursor_of(Nat, fuel), "const steps")
-    +count : Parsed<U32> <- word(cursor_of(Nat, steps), "declaration count")
-    +parsed : Parsed<List<&2, Session.Declaration>> <- declarations(U32.to_nat(value_of(U32, count)), bound, cursor_of(U32, count), Nil{})
-    complete : Unit <- end(cursor_of(List<&2, Session.Declaration>, parsed))
-    return SessionPatch{selected, value_of(Nat, fuel), value_of(Nat, steps), value_of(List<&2, Session.Declaration>, parsed)}
+def patch(selected: Operation, bound: Nat, cursor: Cursor) -> Result<&2, &1, ScanFailure, Request>:
+  bind(Nat, Request, natural(cursor, "frontend fuel"), fuel => cursor =>
+    bind(Nat, Request, natural(cursor, "const steps"), steps => cursor =>
+      bind(Unit, Request, dictionary(cursor), unit => cursor =>
+        bind(U32, Request, word(cursor, "declaration count"), count => cursor =>
+          bind(List<&2, Session.Declaration>, Request, declarations(U32.to_nat(count), bound, cursor, Nil{}), values => cursor =>
+            finish(end(cursor), SessionPatch{selected, fuel, steps, values}))))))
 
-def body(opcode: U32, bound: Nat, cursor: Cursor) -> Result<&2, &2, M.Diagnostic, Request>:
+def body(opcode: U32, bound: Nat, cursor: Cursor) -> Result<&2, &1, ScanFailure, Request>:
   match opcode:
     case 0:
       stateless(Analyze{}, bound, cursor)
     case 1:
       stateless(Compile{}, bound, cursor)
     case 2:
-      do Result<&2, &2, M.Diagnostic, Request>:
-        +fuel : Parsed<Nat> <- natural(cursor, "prelude fuel")
-        +prelude : Parsed<Cst.Cst> <- tree(bound, cursor_of(Nat, fuel))
-        complete : Unit <- end(cursor_of(Cst.Cst, prelude))
-        return OpenSession{value_of(Cst.Cst, prelude), value_of(Nat, fuel)}
+      bind(Nat, Request, natural(cursor, "prelude fuel"), fuel => cursor =>
+        bind(Unit, Request, dictionary(cursor), unit => cursor =>
+          bind(Cst.Cst, Request, tree(bound, cursor), prelude => cursor =>
+            finish(end(cursor), OpenSession{prelude, fuel}))))
     case 3:
       cached(Analyze{}, bound, cursor)
     case 4:
@@ -288,23 +344,35 @@ def body(opcode: U32, bound: Nat, cursor: Cursor) -> Result<&2, &2, M.Diagnostic
     case 6:
       patch(Compile{}, bound, cursor)
     case other:
-      Fail{diagnostic(2n, "unknown operation; expected 0..6")}
+      Fail{Rejected{2n, "unknown operation; expected 0..6"}}
 
-# Base.List.length is non-tail-recursive in Bend 2.0.21. Counting a large
-# protocol frame that way allocates a continuation for every word.
-def word_count(words: List<&2, U32>, count: Nat) -> Nat:
-  match words:
-    case Nil{}:
-      count
-    case head <> tail:
-      word_count(tail, 1n+count)
+def expected_word(valid: Bool, cursor: Cursor, offset: Nat, message: String) -> Result<&2, &1, ScanFailure, Parsed<Unit>>:
+  match valid:
+    case False{}:
+      Fail{Rejected{offset, message}}
+    case True{}:
+      Done{Parsed{Unit{}, cursor}}
 
-def decode(+words: List<&2, U32>) -> Result<&2, &2, M.Diagnostic, Request>:
-  +bound = word_count(words, 0n)
-  do Result<&2, &2, M.Diagnostic, Request>:
-    +magic : Parsed<U32> <- word(Cursor{words, 0n}, "protocol magic")
-    valid_magic : Unit <- require(U32.is_eq(value_of(U32, magic), 1112297300), 0n, "invalid protocol magic; expected BLOT")
-    +version : Parsed<U32> <- word(cursor_of(U32, magic), "protocol version")
-    valid_version : Unit <- require(U32.is_eq(value_of(U32, version), 6), 1n, "unsupported native protocol version; expected 6")
-    +opcode : Parsed<U32> <- word(cursor_of(U32, version), "operation")
-    body(value_of(U32, opcode), bound, cursor_of(U32, opcode))
+def expect(parsed: Result<&2, &1, ScanFailure, Parsed<U32>>, expected: U32, offset: Nat, message: String) -> Result<&2, &1, ScanFailure, Parsed<Unit>>:
+  match parsed:
+    case Fail{error}:
+      Fail{error}
+    case Done{Parsed{value, cursor}}:
+      expected_word(U32.is_eq(value, expected), cursor, offset, message)
+
+def decode_frame(frame: NativeIO.Frame) -> Result<&2, &1, ScanFailure, Request>:
+  NativeIO.Frame{words, length} = frame
+  +bound = U32.to_nat(length)
+  bind(Unit, Request, expect(word(Cursor{words, 0n, bound, [SNil{} : String*1n], 0}, "protocol magic"), 1112297300, 0n, "invalid protocol magic; expected BLOT"), unit => cursor =>
+    bind(Unit, Request, expect(word(cursor, "protocol version"), 7, 1n, "unsupported native protocol version; expected 7"), unit => cursor =>
+      bind(U32, Request, word(cursor, "operation"), opcode => cursor => body(opcode, bound, cursor))))
+
+def decoded(result: Result<&2, &1, ScanFailure, Request>) -> Result<&2, &2, M.Diagnostic, Request>:
+  match result:
+    case Fail{error}:
+      Fail{scan_failure(error)}
+    case Done{request}:
+      Done{request}
+
+def decode(frame: NativeIO.Frame) -> Result<&2, &2, M.Diagnostic, Request>:
+  decoded(decode_frame(frame))

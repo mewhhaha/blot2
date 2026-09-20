@@ -14,6 +14,7 @@ just compile examples/generic_effects.blot build/effects.wasm
 just compile examples/arrays.blot build/arrays.wasm
 just check
 just bench-native
+just bench-cpu
 ```
 
 Builds require Bend 2.0.21, Deno, and clang 14+ on POSIX. Every compiler build
@@ -62,23 +63,83 @@ cache misses. Small batches use sequential loops; worker completion order never
 chooses diagnostic or output order. Const evaluation remains sequential because
 its fuel budget is shared.
 
-Clean source lowering also splits declarations into balanced fork trees with at
-most four declarations per leaf. Name collection completes first, and joins
-preserve the serial lowerer's tail-first semantic diagnostics and source-order
-output. Malformed declaration wrappers are validated before those forks.
-Lowering, inference and codegen expose up to eight branches together while
-keeping their existing leaf cutoffs; this spreads work across Bend 2.0.21's
-coarse CPU task lanes. Native request scanning and word counting use flat tail
-loops with single-owner scan cursors; diagnostic formatting stays outside the
-loops so Bend can optimize them.
+Clean source lowering also splits declarations into cost-balanced fork trees. A
+bounded CST-node count estimates each declaration once, and partitions retain
+source order. Batches of at most four declarations stay serial; larger batches
+use leaves of at most four declarations and 512 estimated nodes, or one
+indivisible declaration. Incremental sessions use those trees for cache misses
+only, keeping retained declarations out of the forked work. Cache publication
+remains ordered and success-only; incremental lowering preserves its
+first-source failure priority. Name collection completes first, and
+clean-lowering joins preserve the serial lowerer's tail-first semantic
+diagnostics and source-order output. Malformed declaration wrappers are
+validated before those forks. Wasm runtime projection now shares codegen's
+cost-balanced partitioner, with a separate 512-unit grain, sequential tiny
+batches and first-entry error priority. Its bounded work estimate skips nested
+lambda bodies, which have their own entries. Lowering, inference, projection and
+codegen expose up to eight branches together; this spreads work across Bend
+2.0.21's coarse CPU task lanes. Native request scanning consumes a single-owner
+contiguous word buffer with flat loops; diagnostic formatting stays outside the
+hot loops so Bend can optimize them. Per-request string dictionaries reduce
+transport and allocation without bypassing Unicode validation or frame limits.
+Raw-source CST materialization adds source offsets directly, avoiding a second
+tree copy. Dependency-reference and ordinary reachability traversals use flat
+work queues while preserving their original fuel and diagnostic ordering.
 
-`just bench-native` compares JS with native 1/2/4/8-thread full builds, edits,
-and cache hits. It verifies complete artifacts and executes the emitted Wasm,
-then reports speedups against both JS and one native thread. `just bench-grains`
-isolates inference and codegen at those thread counts, with matching JS jobs and
-a sequential reference at every cutoff. The phase timings exclude parsing,
-transport and linking; they must not be substituted for full-build speedups. See
-[the measurements](PERFORMANCE.md) for the current limits.
+`just bench-native` compares JS with native 1-through-8-thread full builds,
+edits, and cache hits. It verifies complete artifacts and executes the emitted
+Wasm, then reports speedups against both JS and one native thread.
+`just bench-grains` isolates inference, projection and codegen at those thread
+counts, with matching JS jobs and a sequential reference at every cutoff. Its
+optional third argument selects phases, e.g. `just bench-grains 64 3 prepare`.
+The phase timings exclude parsing, transport and linking; they must not be
+substituted for full-build speedups. See
+[the concurrency review](CONCURRENCY.md) for current measurements, changes and
+remaining limits, and [the earlier measurements](PERFORMANCE.md) for history.
+
+`just bench-cpu` is the Linux physical-core benchmark. It requires `taskset`,
+`/proc`, sysfs CPU topology, and eight eligible physical cores by default. Each
+sample starts a fresh pinned host/native process, performs two warmups, and
+records full-build, body-edit and unchanged-request timings. JS reference
+artifacts are compiled and executed in separate processes, then deserialized
+before timing; native hosts never load the JS compiler or its JIT/GC work.
+Balanced 64 also runs 50 identical preencoded requests in one retained native
+process at one and eight workers, with fresh warmed controls at requests 10, 30
+and 50. Startup, verification, Wasm execution and CPU/RSS inspection are outside
+timed regions. It does not reserve cores from other desktop work or recycle
+retained processes.
+
+```sh
+just bench-cpu 9 build/cpu-scaling.json . 1,2,3,4,5,6,7,8
+# Interleave snapshots, each with its matching frontend, protocol and executable:
+just bench-cpu 9 build/cpu-scaling-paired.json .,build/cpu-baseline 1,8
+# Resume an interrupted sweep only with matching sources/builds and settings:
+deno run --allow-all compiler/cpu_scaling_bench.ts --resume build/cpu-scaling-paired.json .,build/cpu-baseline 9 1,8
+```
+
+Snapshot transports must expose the read-only `NativeProcess.pid` diagnostic
+getter. Baselines must be saved before rebuilding; the command builds only the
+current project. Raw reports include source/Wasm and executable hashes, CPU
+affinity, native process CPU ticks and RSS. Full-build native artifacts must
+equal JS; incremental Wasm/signatures must equal clean builds, while unchanged
+requests must equal the previous complete session artifact. Session-local
+closure identities and offsets are intentionally not compared with clean builds.
+
+For separate phase diagnostics:
+
+```sh
+BEND_NO_TELEMETRY=1 bend compiler/native_main.bend -o build/cpu-phases.c
+deno run --allow-read --allow-write compiler/cpu_scaling_trace.ts build/cpu-phases.c build/cpu-phases-trace.c build/phase-events
+clang -std=c11 -O3 build/cpu-phases-trace.c -lpthread -lm -o build/cpu-phases-trace
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-phases.json . 3 1,8 balanced_64,clustered_64 full build/cpu-phases-trace
+```
+
+The injector requires unique named phase boundaries and fails on changed
+generated structure. The trace executable is the seventh argument to the
+benchmark driver; never use instrumented timings as the production headline
+benchmark. Logs are flushed before the response payload is written, so immediate
+host disposal cannot lose the last trace. The final `send` interval measures
+frame preparation and header writing, not payload writing or log-file IO.
 
 Changed source still undergoes complete lexing and layout validation. Unchanged
 declaration token sequences reuse Baba CST islands and their stable identities;
@@ -95,11 +156,16 @@ relocation is repeated against the current catalog; cached code contains no live
 table indices or runtime pointers. The JS worker-pool implementation remains a
 separate reference with the same compiler semantics.
 
-The binary native protocol is version **6**. Its bounded little-endian frames
-contain at most 16M words (64 MiB), Unicode scalar strings, and 48-bit Nats.
-Stdout is reserved for frames; stderr carries process diagnostics. Framing or
-process failures are fatal; checked language diagnostics leave a session usable.
-No native error triggers a silent JS fallback.
+The binary native protocol is version **7**. Its bounded little-endian frames
+contain at most 16M words (64 MiB), per-request dictionaries of Unicode scalar
+strings, and 48-bit Nats. CST kind/field/text values reference dictionary IDs;
+IDs are assigned in first-seen preorder across all trees in the request. The
+native decoder owns a contiguous word buffer and checks every access against the
+valid frame length, including dictionary IDs and allocation counts. Rebuild the
+executable with the host: version 6 is not accepted. Stdout is reserved for
+frames; stderr carries process diagnostics. Framing or process failures are
+fatal; checked language diagnostics leave a session usable. No native error
+triggers a silent JS fallback.
 
 ## Source modules
 

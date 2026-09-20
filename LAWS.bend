@@ -9,6 +9,7 @@ import ./compiler/wasm.bend as Wasm
 import ./compiler/codegen_ir.bend as Codegen
 import ./compiler/index.bend as Index
 import ./compiler/native_request.bend as NativeRequest
+import ./compiler/native_io.bend as NativeIO
 import ./compiler/native_response.bend as NativeResponse
 import ./compiler/native_cache_keys.bend as NativeKeys
 import ./compiler/type_data.bend as TypeData
@@ -16,6 +17,9 @@ import ./compiler/patterns.bend as Patterns
 import ./compiler/closures.bend as Closures
 import ./compiler/check_scheduler.bend as Scheduler
 import ./compiler/cst.bend as Cst
+import ./compiler/native_session.bend as Session
+import ./compiler/dependency.bend as Dependency
+import ./compiler/runtime_reachable.bend as Reachable
 
 # Parallel compilation keeps source-order diagnostics and a sequential leaf
 # below the scheduling grain. Neither rule depends on worker completion order.
@@ -29,33 +33,68 @@ law lowering_small_batches_are_sequential:
   for count: Nat
   {Lower.declaration_batches(48n, nodes, count, True{}) == Lower.DeclarationLeaf{nodes} : Lower.DeclarationBatch}
 
+law lowering_cost_stops_at_its_bound:
+  for nodes: List<&2, Cst.Cst>
+  for +cost: Nat
+  {Lower.declaration_cost(0n, nodes, cost) == cost : Nat}
+
+law lowering_heavy_first_declaration_never_makes_an_empty_half:
+  for +node: Cst.Cst
+  {Lower.declaration_boundary([Lower.WeightedDeclaration{node, 100n}, Lower.WeightedDeclaration{node, 1n}, Lower.WeightedDeclaration{node, 1n}, Lower.WeightedDeclaration{node, 1n}, Lower.WeightedDeclaration{node, 1n}], 52n, 0n, 0n, False{}) == 1n : Nat}
+
+law session_lowering_join_preserves_first_error:
+  for +error: M.Diagnostic
+  for later: Result<&2, &2, M.Diagnostic, List<&2, Session.Lowered>>
+  {Session.merge_lowered(Fail{error}, later) == Fail{error} : Result<&2, &2, M.Diagnostic, List<&2, Session.Lowered>>}
+
 law native_empty_string_preserves_cursor:
-  for +words: List<&2, U32>
+  for words: Array<U32>
   for +offset: Nat
-  {NativeRequest.scan_string(0n, NativeRequest.Cursor{words, offset}, SNil{}, True{}) == NativeRequest.CompleteString{SNil{}, NativeRequest.Cursor{words, offset}} : NativeRequest.ScannedString}
+  for +remaining: Nat
+  {NativeRequest.scan_string(0n, NativeRequest.Cursor{words, offset, remaining, [SNil{} : String*1n], 0}, SNil{}, True{}) == NativeRequest.CompleteString{SNil{}, NativeRequest.Cursor{words, offset, remaining, [SNil{} : String*1n], 0}} : NativeRequest.ScannedString}
+
+law native_zero_nat_consumes_exactly_two_words:
+  {NativeRequest.natural(NativeRequest.Cursor{[0 : U32*2n], 0n, 2n, [SNil{} : String*1n], 0}, "fuel") == Done{NativeRequest.Parsed{0n, NativeRequest.Cursor{[0 : U32*2n], 2n, 0n, [SNil{} : String*1n], 0}}} : Result<&2, &1, NativeRequest.ScanFailure, NativeRequest.Parsed<Nat>>}
 
 law native_string_rejects_surrogate_at_its_offset:
-  {NativeRequest.scan_string(1n, NativeRequest.Cursor{[55296], 7n}, SNil{}, True{}) == NativeRequest.InvalidCharacter{7n} : NativeRequest.ScannedString}
+  {NativeRequest.scan_string(1n, NativeRequest.Cursor{[55296 : U32*8n], 7n, 1n, [SNil{} : String*1n], 0}, SNil{}, True{}) == NativeRequest.InvalidCharacter{7n} : NativeRequest.ScannedString}
 
-law native_word_count_successor:
-  for +words: List<&2, U32>
-  for +count: Nat
-  {NativeRequest.word_count(words, 1n+count) == 1n+NativeRequest.word_count(words, count) : Nat}
+law native_exhausted_buffer_never_wraps:
+  for words: Array<U32>
+  for offset: Nat
+  {Result.is_done(&2, &1, NativeRequest.ScanFailure, NativeRequest.Parsed<U32>, NativeRequest.word(NativeRequest.Cursor{words, offset, 0n, [SNil{} : String*1n], 0}, "word")) == False{} : Bool}
 
-law native_word_count_preserves_the_traversal_bound:
-  for +words: List<&2, U32>
-  {NativeRequest.word_count(words, 0n) == List.length(&2, U32, words) : Nat}
+law native_empty_dictionary_rejects_zero_id:
+  {Result.is_done(&2, &1, NativeRequest.ScanFailure, NativeRequest.Parsed<String>, NativeRequest.string_reference(NativeRequest.Cursor{[0 : U32*1n], 0n, 1n, [SNil{} : String*1n], 0}, "ID")) == False{} : Bool}
+
+law dependency_siblings_keep_their_depth_budget:
+  {Dependency.references(2n, Dependency.Expression{M.ApplyExpr{M.FunctionExpr{"left"}, M.ConstantExpr{"right"}}}) == Done{Dependency.References{["left", "right"], Nil{}}} : Result<&2, &2, M.Diagnostic, Dependency.References>}
+
+law reachability_counts_the_empty_children_step:
+  for catalog: Reachable.Catalog
+  for state: Reachable.State
+  {Result.is_done(&2, &2, M.Diagnostic, Reachable.State, Reachable.walk(1n, [Reachable.ExpressionWork{M.UnitExpr{}}], catalog, state)) == False{} : Bool}
+
+law reachability_leaf_spends_two_steps:
+  for catalog: Reachable.Catalog
+  for +state: Reachable.State
+  {Reachable.walk(2n, [Reachable.ExpressionWork{M.UnitExpr{}}], catalog, state) == Done{state} : Result<&2, &2, M.Diagnostic, Reachable.State>}
 
 law codegen_join_preserves_first_error:
   for +error: M.Diagnostic
   for later: Result<&2, &2, M.Diagnostic, List<&2, Wasm.EntryCode>>
   {Wasm.merge_entries(Fail{error}, later) == Fail{error} : Result<&2, &2, M.Diagnostic, List<&2, Wasm.EntryCode>>}
 
+law preparation_join_preserves_first_error:
+  for +error: M.Diagnostic
+  for later: Result<&2, &2, M.Diagnostic, List<&2, Wasm.CodegenJob>>
+  {Wasm.merge_prepared(Fail{error}, later) == Fail{error} : Result<&2, &2, M.Diagnostic, List<&2, Wasm.CodegenJob>>}
+
 law codegen_small_batches_are_sequential:
-  for +entries: List<&2, Wasm.WeightedEntry>
+  for +entries: List<&2, Wasm.WeightedEntry<Wasm.CodegenJob>>
   for weight: Nat
   for grain: Nat
-  {Wasm.partition_entries(False{}, Wasm.EntryWorkload{entries, weight}, grain) == Wasm.EntryLeaf{entries} : Wasm.EntryPartition}
+  {Wasm.partition_entries(Wasm.CodegenJob, False{}, Wasm.EntryWorkload{entries, weight}, grain) == Wasm.EntryLeaf{entries} : Wasm.EntryPartition<Wasm.CodegenJob>}
 
 law inference_empty_schedule_has_no_work:
   {Scheduler.schedule(Nil{}) == Done{Nil{}} : Result<&2, &2, M.Diagnostic, List<&2, Scheduler.Scheduled>>}
@@ -145,13 +184,16 @@ law f32_to_u32_saturates_overflow:
 
 # The native boundary must not interpret incomplete or extended payloads.
 law native_empty_request_fails:
-  {Result.is_done(&2, &2, M.Diagnostic, NativeRequest.Request, NativeRequest.decode(Nil{})) == False{} : Bool}
+  {Result.is_done(&2, &2, M.Diagnostic, NativeRequest.Request, NativeRequest.decode(NativeIO.Frame{[0 : U32*1n], 0})) == False{} : Bool}
 
 law native_trailing_words_fail:
-  for word: U32
-  for tail: List<&2, U32>
+  for words: Array<U32>
+  for remaining: Nat
   for offset: Nat
-  {Result.is_done(&2, &2, M.Diagnostic, Unit, NativeRequest.end(NativeRequest.Cursor{word <> tail, offset})) == False{} : Bool}
+  {Result.is_done(&2, &1, NativeRequest.ScanFailure, Unit, NativeRequest.end(NativeRequest.Cursor{words, offset, 1n+remaining, [SNil{} : String*1n], 0})) == False{} : Bool}
+
+law native_response_failure_keeps_protocol_version:
+  {List.take(&2, U32, NativeResponse.finish(Fail{M.Diagnostic{"native_protocol", "native_response", "response exceeds 16M words"}}), 3n) == [1112297300, 7, 0] : List<&2, U32>}
 
 # Metadata reads never invent entries in an empty index.
 law empty_index_is_absent:

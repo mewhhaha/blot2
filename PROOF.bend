@@ -4,7 +4,6 @@ import ./compiler/model.bend as M
 import ./compiler/lower.bend as Lower
 import ./compiler/types.bend as Substitutions
 import ./compiler/const_eval.bend as Const
-import ./compiler/native_request.bend as NativeRequest
 
 def Laws.foreign_is_a_valid_effect_label():
   {==}
@@ -45,7 +44,10 @@ def Laws.native_runtime_key_zero_room_fails():
 def Laws.native_empty_request_fails():
   {==}
 
-def Laws.native_trailing_words_fail(word, tail, offset):
+def Laws.native_trailing_words_fail(words, remaining, offset):
+  {==}
+
+def Laws.native_response_failure_keeps_protocol_version():
   {==}
 
 def Laws.empty_index_is_absent(V, name):
@@ -218,6 +220,9 @@ def Laws.operation_keys_preserve_nominal_boundaries():
 def Laws.codegen_join_preserves_first_error(error, later):
   {==}
 
+def Laws.preparation_join_preserves_first_error(error, later):
+  {==}
+
 def Laws.codegen_small_batches_are_sequential(entries, weight, grain):
   {==}
 
@@ -236,22 +241,35 @@ def Laws.lowering_join_preserves_tail_error(earlier, error):
 def Laws.lowering_small_batches_are_sequential(nodes, count):
   {==}
 
-def Laws.native_empty_string_preserves_cursor(words, offset):
+def Laws.lowering_cost_stops_at_its_bound(nodes, cost):
+  {==}
+
+def Laws.lowering_heavy_first_declaration_never_makes_an_empty_half(node):
+  {==}
+
+def Laws.session_lowering_join_preserves_first_error(error, later):
+  {==}
+
+def Laws.native_empty_string_preserves_cursor(words, offset, remaining):
+  {==}
+
+def Laws.native_zero_nat_consumes_exactly_two_words():
   {==}
 
 def Laws.native_string_rejects_surrogate_at_its_offset():
   {==}
 
-def Laws.native_word_count_successor(words, count):
-  match words:
-    case Nil{}:
-      {==}
-    case head <> tail:
-      Laws.native_word_count_successor(tail, 1n+count)
+def Laws.native_exhausted_buffer_never_wraps(words, offset):
+  {==}
 
-def Laws.native_word_count_preserves_the_traversal_bound(words):
-  match words:
-    case Nil{}:
-      {==}
-    case head <> +tail:
-      Equal.trans(Nat, NativeRequest.word_count(tail, 1n), 1n+NativeRequest.word_count(tail, 0n), 1n+List.length(&2, U32, tail), Laws.native_word_count_successor(tail, 0n), Equal.cong(Nat, Nat, x => 1n+x, NativeRequest.word_count(tail, 0n), List.length(&2, U32, tail), Laws.native_word_count_preserves_the_traversal_bound(tail)))
+def Laws.native_empty_dictionary_rejects_zero_id():
+  {==}
+
+def Laws.dependency_siblings_keep_their_depth_budget():
+  {==}
+
+def Laws.reachability_counts_the_empty_children_step(catalog, state):
+  {==}
+
+def Laws.reachability_leaf_spends_two_steps(catalog, state):
+  {==}

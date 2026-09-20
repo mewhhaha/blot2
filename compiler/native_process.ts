@@ -37,6 +37,11 @@ export class NativeProcess {
     this.#stderrDone = this.#collectStderr();
   }
 
+  /** Owned child identifier for diagnostic CPU/RSS measurements. */
+  get pid(): number {
+    return this.#child.pid;
+  }
+
   static async start(options: NativeProcessOptions = {}) {
     const threads = options.threads ?? 1;
     if (!Number.isInteger(threads) || threads < 1 || threads > 64) {

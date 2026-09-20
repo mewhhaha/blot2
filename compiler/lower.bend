@@ -1406,14 +1406,101 @@ type DeclarationBatch is Data:
   DeclarationLeaf{nodes: List<&2, C.Cst>}
   DeclarationFork{left: DeclarationBatch, right: DeclarationBatch}
 
-def declaration_batches(+depth: Nat, +nodes: List<&2, C.Cst>, +count: Nat, small: Bool) -> DeclarationBatch:
+type WeightedDeclaration is Data:
+  WeightedDeclaration{node: C.Cst, cost: Nat}
+
+type CostNode is Data:
+  CostNode{node: C.Cst, pending: List<&2, List<&2, C.Cst>>}
+
+def next_cost_node(pending: List<&2, List<&2, C.Cst>>) -> Maybe<&2, CostNode>:
+  match pending:
+    case Nil{}:
+      None{}
+    case Nil{} <> tail:
+      next_cost_node(tail)
+    case (head <> siblings) <> tail:
+      Some{CostNode{head, siblings <> tail}}
+
+def declaration_cost_walk(fuel: Nat, pending: Maybe<&2, CostNode>, cost: Nat) -> Nat:
+  match fuel pending:
+    case 0n _:
+      cost
+    case _ None{}:
+      cost
+    case 1n+rest Some{CostNode{C.Cst{kind, field, text, offset, children}, tail}}:
+      declaration_cost_walk(rest, next_cost_node(children <> tail), 1n+cost)
+
+def declaration_cost(fuel: Nat, pending: List<&2, C.Cst>, cost: Nat) -> Nat:
+  match fuel:
+    case 0n:
+      cost
+    case 1n+rest:
+      declaration_cost_walk(1n+rest, next_cost_node([pending]), cost)
+
+def weigh_declarations(nodes: List<&2, C.Cst>, reversed: List<&2, WeightedDeclaration>) -> List<&2, WeightedDeclaration>:
+  match nodes:
+    case Nil{}:
+      List.reverse(&2, WeightedDeclaration, reversed)
+    case +node <> tail:
+      weigh_declarations(tail, WeightedDeclaration{node, declaration_cost(U32.to_nat(65536), [node], 0n)} <> reversed)
+
+def declaration_nodes(nodes: List<&2, WeightedDeclaration>, reversed: List<&2, C.Cst>) -> List<&2, C.Cst>:
+  match nodes:
+    case Nil{}:
+      List.reverse(&2, C.Cst, reversed)
+    case WeightedDeclaration{node, cost} <> tail:
+      declaration_nodes(tail, node <> reversed)
+
+def declaration_weight(nodes: List<&2, WeightedDeclaration>, weight: Nat) -> Nat:
+  match nodes:
+    case Nil{}:
+      weight
+    case WeightedDeclaration{node, cost} <> tail:
+      declaration_weight(tail, Nat.add(weight, cost))
+
+def nearer_declaration_boundary(previous: Bool, count: Nat) -> Nat:
+  match previous:
+    case True{}:
+      count
+    case False{}:
+      1n+count
+
+# Choose the nearer cumulative-cost boundary, keeping at least one declaration
+# on either side. The final entry cannot move into the left partition.
+def declaration_boundary(nodes: List<&2, WeightedDeclaration>, +target: Nat, +weight: Nat, +count: Nat, ready: Bool) -> Nat:
+  match nodes ready:
+    case _ True{}:
+      count
+    case Nil{} False{}:
+      count
+    case head <> Nil{} False{}:
+      count
+    case WeightedDeclaration{node, cost} <> tail False{}:
+      +next = Nat.add(weight, cost)
+      declaration_boundary(tail, target, next, nearer_declaration_boundary(Bool.and(Nat.is_gt(count, 0n), Nat.is_le(Nat.sub(target, weight), Nat.sub(next, target))), count), Nat.is_ge(next, target))
+
+def weighted_declaration_batches(+depth: Nat, +nodes: List<&2, WeightedDeclaration>, +count: Nat, +weight: Nat, small: Bool) -> DeclarationBatch:
   match depth small:
     case 1n+rest False{}:
-      +half = Nat.div(count, 2n)
+      +half = declaration_boundary(nodes, Nat.div(weight, 2n), 0n, 0n, False{})
       +remaining = Nat.sub(count, half)
-      DeclarationFork{declaration_batches(rest, List.take(&2, C.Cst, nodes, half), half, Nat.is_le(half, 4n)), declaration_batches(rest, List.drop(&2, C.Cst, nodes, half), remaining, Nat.is_le(remaining, 4n))}
+      +left = List.take(&2, WeightedDeclaration, nodes, half)
+      right = List.drop(&2, WeightedDeclaration, nodes, half)
+      +left_weight = declaration_weight(left, 0n)
+      +right_weight = Nat.sub(weight, left_weight)
+      # Large declarations must not stop in a four-node leaf: that hides the
+      # wide fork when expensive declarations cluster near one end of a range.
+      DeclarationFork{weighted_declaration_batches(rest, left, half, left_weight, Bool.or(Nat.is_le(half, 1n), Bool.and(Nat.is_le(half, 4n), Nat.is_le(left_weight, U32.to_nat(512))))), weighted_declaration_batches(rest, right, remaining, right_weight, Bool.or(Nat.is_le(remaining, 1n), Bool.and(Nat.is_le(remaining, 4n), Nat.is_le(right_weight, U32.to_nat(512)))))}
     case _ _:
+      DeclarationLeaf{declaration_nodes(nodes, Nil{})}
+
+def declaration_batches(depth: Nat, nodes: List<&2, C.Cst>, count: Nat, small: Bool) -> DeclarationBatch:
+  match small:
+    case True{}:
       DeclarationLeaf{nodes}
+    case False{}:
+      +weighted = weigh_declarations(nodes, Nil{})
+      weighted_declaration_batches(depth, weighted, count, declaration_weight(weighted, 0n), False{})
 
 # The serial traversal lowers the tail first. Keep that diagnostic priority
 # while joining successful modules in source order.

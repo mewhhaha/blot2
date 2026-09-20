@@ -64,6 +64,62 @@ Deno.test("empty dependency graph has no inference components", () => {
   equal(components([], false), []);
 });
 
+type ReferenceExpr =
+  | { $: "FunctionExpr" | "ConstantExpr"; name: string }
+  | { $: "ApplyExpr"; callee: ReferenceExpr; argument: ReferenceExpr }
+  | {
+    $: "IfExpr";
+    condition: ReferenceExpr;
+    consequent: ReferenceExpr;
+    alternative: ReferenceExpr;
+  }
+  | { $: "ArrayExpr"; elements: List<ReferenceExpr> };
+type ReferencesResult =
+  | {
+    $: "Done";
+    value: { $: "References"; names: List<string>; lambdas: List<bigint> };
+  }
+  | Extract<ComponentsResult, { $: "Fail" }>;
+const referenceCompiler = compiled as unknown as {
+  "dependency.references"(
+    fuel: bigint,
+    work: { $: "Expression"; value: ReferenceExpr },
+  ): ReferencesResult;
+};
+
+Deno.test("flat dependency traversal preserves branch order and structural fuel", () => {
+  const fn = (name: string): ReferenceExpr => ({ $: "FunctionExpr", name });
+  const apply: ReferenceExpr = {
+    $: "ApplyExpr",
+    callee: fn("left"),
+    argument: fn("right"),
+  };
+  const call = (fuel: bigint, value: ReferenceExpr) =>
+    referenceCompiler["dependency.references"](fuel, {
+      $: "Expression",
+      value,
+    });
+  for (const fuel of [0n, 1n]) {
+    const failed = call(fuel, apply);
+    ok(failed.$ === "Fail");
+    equal(failed.error.code, "expression_complexity");
+  }
+  const shallow = call(2n, apply);
+  ok(shallow.$ === "Done");
+  equal(array(shallow.value.names), ["left", "right"]);
+  const branches: ReferenceExpr = {
+    $: "IfExpr",
+    condition: apply,
+    consequent: fn("then"),
+    alternative: { $: "ArrayExpr", elements: list([fn("last"), fn("left")]) },
+  };
+  const result = call(5n, branches);
+  ok(result.$ === "Done");
+  equal(array(result.value.names), ["left", "right", "then", "last", "left"]);
+  equal(array(result.value.lambdas), []);
+  ok(call(4n, branches).$ === "Fail");
+});
+
 Deno.test("SCCs agree with transitive closure and order dependencies before users", () => {
   let seed = 197;
   const random = () => {

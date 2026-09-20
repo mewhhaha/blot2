@@ -17,6 +17,11 @@ const compiler = compiled as unknown as {
     grain: bigint,
     jobs: BendList<unknown>,
   ): Result;
+  "wasm.prepare_jobs_with_grain"(
+    grain: bigint,
+    entries: BendList<unknown>,
+    projection: unknown,
+  ): Result;
 };
 
 // Mirrors fixture() in parallel_grain_bench.bend: the same 64 named functions,
@@ -24,6 +29,7 @@ const compiler = compiled as unknown as {
 function fixture(shape: string) {
   const jobs = [];
   const tasks = [];
+  const entries = [];
   for (let index = 0; index < 64; index++) {
     const depth = shape === "tiny" ? 0 : index % 2 === 0 ? 8 : 64;
     let body: unknown = { $: "U32Expr", value: index };
@@ -58,6 +64,13 @@ function fixture(shape: string) {
       body,
       captures: bendList([]),
     });
+    entries.push({
+      $: "Entry",
+      key: `fn:${name}`,
+      parameter: "value",
+      body,
+      captures: bendList([]),
+    });
     tasks.push({
       $: "Task",
       position: BigInt(index),
@@ -66,7 +79,11 @@ function fixture(shape: string) {
       cost: compiler["check_scheduler.module_cost"](module),
     });
   }
-  return { jobs: bendList(jobs), tasks: bendList(tasks) };
+  return {
+    jobs: bendList(jobs),
+    tasks: bendList(tasks),
+    entries: bendList(entries),
+  };
 }
 
 function median(values: readonly number[]) {
@@ -81,26 +98,45 @@ const executable = Deno.args[0] ?? "build/parallel-grain-bench";
 const reportPath = Deno.args[1] ?? "build/parallel-grains.json";
 const iterations = Number(Deno.args[2] ?? 32);
 const samples = Number(Deno.args[3] ?? 3);
+const phases = (Deno.args[4] ?? "codegen,check,prepare").split(",");
 if (
-  Deno.args.length > 4 || !Number.isSafeInteger(iterations) || iterations < 1 ||
-  !Number.isSafeInteger(samples) || samples < 1
+  Deno.args.length > 5 || !Number.isSafeInteger(iterations) || iterations < 1 ||
+  !Number.isSafeInteger(samples) || samples < 1 ||
+  phases.some((phase) => !["codegen", "check", "prepare"].includes(phase)) ||
+  new Set(phases).size !== phases.length
 ) {
   throw new Error(
-    "Usage: parallel_grain_bench.ts [executable] [report.json] [iterations] [samples]",
+    "Usage: parallel_grain_bench.ts [executable] [report.json] [iterations] [samples] [phases:codegen,check,prepare]",
   );
 }
 
 const rows = [];
-for (const phase of ["codegen", "check"]) {
+for (const phase of phases) {
   for (const shape of ["tiny", "uneven"]) {
     const prepared = fixture(shape);
-    const run = (grain: bigint) =>
-      phase === "codegen"
-        ? compiler["wasm.compile_entries_with_grain"](grain, prepared.jobs)
-        : compiler["check_scheduler.check_batch_with_grain"](
-          prepared.tasks,
+    const run = (grain: bigint) => {
+      if (phase === "codegen") {
+        return compiler["wasm.compile_entries_with_grain"](
           grain,
+          prepared.jobs,
         );
+      }
+      if (phase === "prepare") {
+        return compiler["wasm.prepare_jobs_with_grain"](
+          grain,
+          prepared.entries,
+          {
+            $: "Metadata",
+            lambdas: { $: "MTip" },
+            constructors: { $: "MTip" },
+          },
+        );
+      }
+      return compiler["check_scheduler.check_batch_with_grain"](
+        prepared.tasks,
+        grain,
+      );
+    };
     const reference = run(0xFFFF_FFFF_FFFFn);
     if (reference.$ === "Con" || reference.$ === "Nil") {
       ok(bendArray(reference).every((outcome) => outcome.checked.$ === "Done"));
@@ -129,7 +165,7 @@ for (const phase of ["codegen", "check"]) {
         samples_ms: timings,
       });
     }
-    for (const threads of [1, 2, 4, 8]) {
+    for (const threads of [1, 2, 3, 4, 5, 6, 7, 8]) {
       for (
         const grain of ["serial", "0", "128", "512", "1024", "2048", "8192"]
       ) {

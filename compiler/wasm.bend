@@ -71,19 +71,19 @@ type CodegenWeightWork is Data:
   WeightArms{arms: List<&2, M.MatchArm<I.Expr>>}
   WeightCaptures{names: List<&2, String>}
 
-type WeightedEntry is Data:
-  WeightedEntry{job: CodegenJob, weight: Nat}
+type WeightedEntry<-A: Data> is Data:
+  WeightedEntry{job: A, weight: Nat}
 
-type EntryWorkload is Data:
-  EntryWorkload{entries: List<&2, WeightedEntry>, weight: Nat}
+type EntryWorkload<-A: Data> is Data:
+  EntryWorkload{entries: List<&2, WeightedEntry<A>>, weight: Nat}
 
-type EntryPartition is Data:
-  EntryLeaf{entries: List<&2, WeightedEntry>}
-  EntryFork{left: EntryWorkload, right: EntryWorkload}
+type EntryPartition<-A: Data> is Data:
+  EntryLeaf{entries: List<&2, WeightedEntry<A>>}
+  EntryFork{left: EntryWorkload<A>, right: EntryWorkload<A>}
 
-type EntryBatch is Data:
-  SequentialEntries{entries: List<&2, WeightedEntry>}
-  ParallelEntries{left: EntryBatch, right: EntryBatch}
+type EntryBatch<-A: Data> is Data:
+  SequentialEntries{entries: List<&2, WeightedEntry<A>>}
+  ParallelEntries{left: EntryBatch<A>, right: EntryBatch<A>}
 
 type BytePlan is Data:
   BytePlan{length: Nat, chunks: List<&2, List<&2, U32>>}
@@ -1224,68 +1224,68 @@ def codegen_weight(job: CodegenJob) -> Nat:
   # Saturating this estimate bounds planning overhead without rejecting work.
   codegen_weight_work(65536n, [WeightExpression{body}, WeightCaptures{captures}], 8n)
 
-def weigh_entries(jobs: List<&2, CodegenJob>, reversed: List<&2, WeightedEntry>, weight: Nat) -> EntryWorkload:
+def weigh_entries(jobs: List<&2, CodegenJob>, reversed: List<&2, WeightedEntry<CodegenJob>>, weight: Nat) -> EntryWorkload<CodegenJob>:
   match jobs:
     case Nil{}:
-      EntryWorkload{List.reverse(&2, WeightedEntry, reversed), weight}
+      EntryWorkload{List.reverse(&2, WeightedEntry<CodegenJob>, reversed), weight}
     case +job <> tail:
       +estimated = codegen_weight(job)
       weigh_entries(tail, WeightedEntry{job, estimated} <> reversed, Nat.add(weight, estimated))
 
-def entry_partition_valid(large: Bool, left: List<&2, WeightedEntry>, right: List<&2, WeightedEntry>, left_weight: Nat, right_weight: Nat) -> EntryPartition:
+def entry_partition_valid(-A: Data, large: Bool, left: List<&2, WeightedEntry<A>>, right: List<&2, WeightedEntry<A>>, left_weight: Nat, right_weight: Nat) -> EntryPartition<A>:
   match large left right:
     case True{} first <> xs second <> ys:
       EntryFork{EntryWorkload{first <> xs, left_weight}, EntryWorkload{second <> ys, right_weight}}
     case _ _ _:
-      EntryLeaf{List.reverse.go(&2, WeightedEntry, List.reverse(&2, WeightedEntry, left), right)}
+      EntryLeaf{List.reverse.go(&2, WeightedEntry<A>, List.reverse(&2, WeightedEntry<A>, left), right)}
 
-def entry_split_boundary(previous: Bool, latest: WeightedEntry, reversed: List<&2, WeightedEntry>, following: List<&2, WeightedEntry>, +previous_weight: Nat, +weight: Nat, +total: Nat, +grain: Nat) -> EntryPartition:
+def entry_split_boundary(-A: Data, previous: Bool, latest: WeightedEntry<A>, reversed: List<&2, WeightedEntry<A>>, following: List<&2, WeightedEntry<A>>, +previous_weight: Nat, +weight: Nat, +total: Nat, +grain: Nat) -> EntryPartition<A>:
   match previous:
     case True{}:
-      EntryFork{EntryWorkload{List.reverse(&2, WeightedEntry, reversed), previous_weight}, EntryWorkload{latest <> following, Nat.sub(total, previous_weight)}}
+      EntryFork{EntryWorkload{List.reverse(&2, WeightedEntry<A>, reversed), previous_weight}, EntryWorkload{latest <> following, Nat.sub(total, previous_weight)}}
     case False{}:
       +right_weight = Nat.sub(total, weight)
-      entry_partition_valid(Bool.and(Nat.is_le(grain, weight), Nat.is_le(grain, right_weight)), List.reverse(&2, WeightedEntry, latest <> reversed), following, weight, right_weight)
+      entry_partition_valid(A, Bool.and(Nat.is_le(grain, weight), Nat.is_le(grain, right_weight)), List.reverse(&2, WeightedEntry<A>, latest <> reversed), following, weight, right_weight)
 
-def split_entries(entries: List<&2, WeightedEntry>, +target: Nat, +total: Nat, +grain: Nat, +weight: Nat, reversed: List<&2, WeightedEntry>, ready: Bool) -> EntryPartition:
+def split_entries(-A: Data, entries: List<&2, WeightedEntry<A>>, +target: Nat, +total: Nat, +grain: Nat, +weight: Nat, reversed: List<&2, WeightedEntry<A>>, ready: Bool) -> EntryPartition<A>:
   match entries reversed ready:
     case _ WeightedEntry{job, +estimated} <> previous True{}:
       +before = Nat.sub(weight, estimated)
       +earlier = Bool.and(Nat.is_le(Nat.max(1n, grain), before), Nat.is_le(grain, Nat.sub(total, before)))
       nearer = Nat.is_le(Nat.sub(target, before), Nat.sub(weight, target))
-      entry_split_boundary(Bool.and(earlier, nearer), WeightedEntry{job, estimated}, previous, entries, before, weight, total, grain)
+      entry_split_boundary(A, Bool.and(earlier, nearer), WeightedEntry{job, estimated}, previous, entries, before, weight, total, grain)
     case _ Nil{} True{}:
       EntryLeaf{entries}
     case Nil{} _ False{}:
-      EntryLeaf{List.reverse(&2, WeightedEntry, reversed)}
+      EntryLeaf{List.reverse(&2, WeightedEntry<A>, reversed)}
     case WeightedEntry{job, +estimated} <> tail _ False{}:
       +next = Nat.add(weight, estimated)
-      split_entries(tail, target, total, grain, next, WeightedEntry{job, estimated} <> reversed, Nat.is_le(target, next))
+      split_entries(A, tail, target, total, grain, next, WeightedEntry{job, estimated} <> reversed, Nat.is_le(target, next))
 
-def partition_entries(large: Bool, workload: EntryWorkload, grain: Nat) -> EntryPartition:
+def partition_entries(-A: Data, large: Bool, workload: EntryWorkload<A>, grain: Nat) -> EntryPartition<A>:
   match large workload:
     case False{} EntryWorkload{entries, weight}:
       EntryLeaf{entries}
     case True{} EntryWorkload{entries, +weight}:
-      split_entries(entries, Nat.div(weight, 2n), weight, grain, 0n, Nil{}, False{})
+      split_entries(A, entries, Nat.div(weight, 2n), weight, grain, 0n, Nil{}, False{})
 
-def entry_partition(+workload: EntryWorkload, +grain: Nat) -> EntryPartition:
+def entry_partition(-A: Data, +workload: EntryWorkload<A>, +grain: Nat) -> EntryPartition<A>:
   EntryWorkload{entries, weight} = workload
-  partition_entries(Nat.is_le(grain, Nat.div(weight, 2n)), workload, grain)
+  partition_entries(A, Nat.is_le(grain, Nat.div(weight, 2n)), workload, grain)
 
-def codegen_batches(+fuel: Nat, partition: EntryPartition, +grain: Nat) -> EntryBatch:
+def entry_batches(-A: Data, +fuel: Nat, partition: EntryPartition<A>, +grain: Nat) -> EntryBatch<A>:
   match fuel partition:
     case _ EntryLeaf{entries}:
       SequentialEntries{entries}
     case 0n EntryFork{EntryWorkload{left, lw}, EntryWorkload{right, rw}}:
-      SequentialEntries{List.reverse.go(&2, WeightedEntry, List.reverse(&2, WeightedEntry, left), right)}
+      SequentialEntries{List.reverse.go(&2, WeightedEntry<A>, List.reverse(&2, WeightedEntry<A>, left), right)}
     case 1n+rest EntryFork{left, right}:
-      ParallelEntries{codegen_batches(rest, entry_partition(left, grain), grain), codegen_batches(rest, entry_partition(right, grain), grain)}
+      ParallelEntries{entry_batches(A, rest, entry_partition(A, left, grain), grain), entry_batches(A, rest, entry_partition(A, right, grain), grain)}
 
-def plan_entries(jobs: List<&2, CodegenJob>, +grain: Nat) -> EntryBatch:
-  codegen_batches(64n, entry_partition(weigh_entries(jobs, Nil{}, 0n), grain), grain)
+def plan_entries(jobs: List<&2, CodegenJob>, +grain: Nat) -> EntryBatch<CodegenJob>:
+  entry_batches(CodegenJob, 64n, entry_partition(CodegenJob, weigh_entries(jobs, Nil{}, 0n), grain), grain)
 
-def compile_entry_leaf(entries: List<&2, WeightedEntry>, reversed: List<&2, EntryCode>) -> Result<&2, &2, M.Diagnostic, List<&2, EntryCode>>:
+def compile_entry_leaf(entries: List<&2, WeightedEntry<CodegenJob>>, reversed: List<&2, EntryCode>) -> Result<&2, &2, M.Diagnostic, List<&2, EntryCode>>:
   match entries:
     case Nil{}:
       Done{List.reverse(&2, EntryCode, reversed)}
@@ -1294,7 +1294,7 @@ def compile_entry_leaf(entries: List<&2, WeightedEntry>, reversed: List<&2, Entr
         compiled : EntryCode <- compile_entry(job)
         compile_entry_leaf(tail, compiled <> reversed)
 
-def compile_entry_batch(batch: EntryBatch) -> Result<&2, &2, M.Diagnostic, List<&2, EntryCode>>:
+def compile_entry_batch(batch: EntryBatch<CodegenJob>) -> Result<&2, &2, M.Diagnostic, List<&2, EntryCode>>:
   match batch:
     case SequentialEntries{entries}:
       compile_entry_leaf(entries, Nil{})
@@ -1723,15 +1723,133 @@ def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePla
     abi_section(abi)
   ]))
 
-def prepare_jobs(entries: List<&2, Entry>, +projection: I.Metadata) -> Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>:
+# Projection does not descend into nested lambda bodies: each has its own entry.
+# Bound the estimate, not compilation, just as for instruction generation.
+type PreparationWeightWork is Data:
+  PreparationExpression{expression: M.Expr}
+  PreparationExpressions{expressions: List<&2, M.Expr>}
+  PreparationArms{arms: List<&2, M.MatchArm<M.Expr>>}
+
+# F.children builds child lists through non-tail calls for match arms. Keeping
+# this traversal explicit lets Bend compile the estimator into one flat loop.
+def preparation_weight(fuel: Nat, pending: List<&2, PreparationWeightWork>, weight: Nat) -> Nat:
+  match fuel pending:
+    case _ Nil{}:
+      weight
+    case 0n _:
+      weight
+    case 1n+rest PreparationExpressions{Nil{}} <> tail:
+      preparation_weight(rest, tail, weight)
+    case 1n+rest PreparationExpressions{head <> following} <> tail:
+      preparation_weight(rest, PreparationExpression{head} <> PreparationExpressions{following} <> tail, weight)
+    case 1n+rest PreparationArms{Nil{}} <> tail:
+      preparation_weight(rest, tail, weight)
+    case 1n+rest PreparationArms{M.MatchArm{patterns, body} <> following} <> tail:
+      preparation_weight(rest, PreparationExpression{body} <> PreparationArms{following} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ConstructExpr{constructor, Some{payload}}} <> tail:
+      preparation_weight(rest, PreparationExpression{payload} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ApplyExpr{callee, argument}} <> tail:
+      preparation_weight(rest, PreparationExpression{callee} <> PreparationExpression{argument} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.CallExpr{callee, argument}} <> tail:
+      preparation_weight(rest, PreparationExpression{argument} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ScalarExpr{operator, left, right}} <> tail:
+      preparation_weight(rest, PreparationExpression{left} <> PreparationExpression{right} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.UnaryExpr{operator, value}} <> tail:
+      preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.LetExpr{name, value, body}} <> tail:
+      preparation_weight(rest, PreparationExpression{value} <> PreparationExpression{body} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.UseExpr{name, value, body}} <> tail:
+      preparation_weight(rest, PreparationExpression{value} <> PreparationExpression{body} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.IfExpr{condition, consequent, alternative}} <> tail:
+      preparation_weight(rest, PreparationExpression{condition} <> PreparationExpression{consequent} <> PreparationExpression{alternative} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.SequenceExpr{first, next}} <> tail:
+      preparation_weight(rest, PreparationExpression{first} <> PreparationExpression{next} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.MatchExpr{values, arms}} <> tail:
+      preparation_weight(rest, PreparationExpressions{values} <> PreparationArms{arms} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.GuardExpr{pattern, value, alternative, body}} <> tail:
+      preparation_weight(rest, PreparationExpression{value} <> PreparationExpression{alternative} <> PreparationExpression{body} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.BlockExpr{label, body}} <> tail:
+      preparation_weight(rest, PreparationExpression{body} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ReturnExpr{label, value}} <> tail:
+      preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.SourceExpr{offset, annotation, value}} <> tail:
+      preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ProviderExpr{identity, implementation}} <> tail:
+      preparation_weight(rest, PreparationExpression{implementation} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.HandleExpr{provider, body}} <> tail:
+      preparation_weight(rest, PreparationExpression{provider} <> PreparationExpression{body} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.EffectHasExpr{set, operation}} <> tail:
+      preparation_weight(rest, PreparationExpression{set} <> PreparationExpression{operation} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.EffectCountExpr{set}} <> tail:
+      preparation_weight(rest, PreparationExpression{set} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.EffectSameExpr{left, right}} <> tail:
+      preparation_weight(rest, PreparationExpression{left} <> PreparationExpression{right} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ProductExpr{elements}} <> tail:
+      preparation_weight(rest, PreparationExpressions{elements} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ProjectExpr{value, index}} <> tail:
+      preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ArrayExpr{elements}} <> tail:
+      preparation_weight(rest, PreparationExpressions{elements} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ArrayGetExpr{array, index}} <> tail:
+      preparation_weight(rest, PreparationExpression{array} <> PreparationExpression{index} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ArraySetExpr{array, index, value}} <> tail:
+      preparation_weight(rest, PreparationExpression{array} <> PreparationExpression{index} <> PreparationExpression{value} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ArrayLengthExpr{array}} <> tail:
+      preparation_weight(rest, PreparationExpression{array} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{expression} <> tail:
+      preparation_weight(rest, tail, 1n+weight)
+
+def weigh_preparations(entries: List<&2, Entry>, reversed: List<&2, WeightedEntry<Entry>>, weight: Nat) -> EntryWorkload<Entry>:
   match entries:
     case Nil{}:
-      Done{Nil{}}
-    case Entry{key, parameter, body, captures} <> tail:
+      EntryWorkload{List.reverse(&2, WeightedEntry<Entry>, reversed), weight}
+    case Entry{key, parameter, +body, captures} <> tail:
+      +estimated = preparation_weight(65536n, [PreparationExpression{body}], 8n)
+      weigh_preparations(tail, WeightedEntry{Entry{key, parameter, body, captures}, estimated} <> reversed, Nat.add(weight, estimated))
+
+def prepare_job_leaf(entries: List<&2, WeightedEntry<Entry>>, +projection: I.Metadata, reversed: List<&2, CodegenJob>) -> Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>:
+  match entries:
+    case Nil{}:
+      Done{List.reverse(&2, CodegenJob, reversed)}
+    case WeightedEntry{Entry{key, parameter, body, captures}, weight} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>:
         prepared : I.Expr <- I.prepare(body, projection)
-        rest : List<&2, CodegenJob> <- prepare_jobs(tail, projection)
-        return CodegenJob{key, parameter, prepared, captures} <> rest
+        prepare_job_leaf(tail, projection, CodegenJob{key, parameter, prepared, captures} <> reversed)
+
+def merge_prepared(left: Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>, right: Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>) -> Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>:
+  match left right:
+    case Fail{error} _:
+      Fail{error}
+    case Done{first} Fail{error}:
+      Fail{error}
+    case Done{first} Done{second}:
+      Done{List.reverse.go(&2, CodegenJob, List.reverse(&2, CodegenJob, first), second)}
+
+def prepare_job_batch(batch: EntryBatch<Entry>, +projection: I.Metadata) -> Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>:
+  match batch:
+    case SequentialEntries{entries}:
+      prepare_job_leaf(entries, projection, Nil{})
+    case ParallelEntries{ParallelEntries{ParallelEntries{a, b}, ParallelEntries{c, d}}, ParallelEntries{ParallelEntries{e, f}, ParallelEntries{g, h}}}:
+      ra rb rc rd re rf rg rh = prepare_job_batch(a, projection) prepare_job_batch(b, projection) prepare_job_batch(c, projection) prepare_job_batch(d, projection) prepare_job_batch(e, projection) prepare_job_batch(f, projection) prepare_job_batch(g, projection) prepare_job_batch(h, projection)
+      merge_prepared(merge_prepared(merge_prepared(ra, rb), merge_prepared(rc, rd)), merge_prepared(merge_prepared(re, rf), merge_prepared(rg, rh)))
+    case ParallelEntries{ParallelEntries{a, b}, ParallelEntries{c, d}}:
+      ra rb rc rd = prepare_job_batch(a, projection) prepare_job_batch(b, projection) prepare_job_batch(c, projection) prepare_job_batch(d, projection)
+      merge_prepared(merge_prepared(ra, rb), merge_prepared(rc, rd))
+    case ParallelEntries{left, right}:
+      a b = prepare_job_batch(left, projection) prepare_job_batch(right, projection)
+      merge_prepared(a, b)
+
+def preparation_grain() -> Nat:
+  512n
+
+def plan_preparations(entries: List<&2, Entry>, +grain: Nat) -> EntryBatch<Entry>:
+  entry_batches(Entry, 64n, entry_partition(Entry, weigh_preparations(entries, Nil{}, 0n), grain), grain)
+
+def prepare_jobs_with_grain(grain: Nat, entries: List<&2, Entry>, projection: I.Metadata) -> Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>:
+  prepare_job_batch(plan_preparations(entries, grain), projection)
+
+def prepare_jobs(entries: List<&2, Entry>, projection: I.Metadata) -> Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>:
+  prepare_jobs_with_grain(preparation_grain(), entries, projection)
 
 def operation_jobs(operations: List<&2, M.Operation>) -> List<&2, CodegenJob>:
   match operations:

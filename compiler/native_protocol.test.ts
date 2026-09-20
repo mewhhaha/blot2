@@ -14,6 +14,7 @@ import {
   type NativeResponse,
 } from "./native_protocol.ts";
 import type { Cst, CstList } from "./syntax.ts";
+import { bendList } from "./bend_list.ts";
 
 const emptyModule: Cst = {
   $: "Cst",
@@ -101,19 +102,105 @@ async function rejectsPayload(
 }
 
 Deno.test("native decoder rejects every truncated request prefix and recovers", async () => {
-  const payload = encodeNativeRequest(tinyRequest);
+  const payloads = [
+    encodeNativeRequest(tinyRequest),
+    encodeNativeRequest({ ...tinyRequest, operation: "compile" }),
+    encodeNativeSessionRequest({
+      operation: "open",
+      prelude: emptyModule,
+      fuel: 1n,
+    }),
+    ...(["analyze", "compile"] as const).flatMap((operation) => [
+      encodeNativeSessionRequest({ ...tinyRequest, operation }),
+      encodeNativeSessionRequest({
+        operation,
+        fuel: 1n,
+        const_steps: 7n,
+        declarations: [
+          { kind: "replaced", node: emptyModule },
+          { kind: "retained", identity: 0xFFFFFFFFFFFFn },
+          { kind: "replaced", node: { ...emptyModule, text: "雪🙂" } },
+        ],
+      }),
+    ]),
+  ];
   await withNative(async (process) => {
-    for (let count = 0; count < payload.length / 4; count++) {
-      await rejectsPayload(process, payload.slice(0, count * 4));
+    for (const payload of payloads) {
+      for (let count = 0; count < payload.length / 4; count++) {
+        await rejectsPayload(process, payload.slice(0, count * 4));
+      }
+    }
+  });
+});
+
+Deno.test("native request headers preserve exact validation order and Nat offsets", async () => {
+  const header = [nativeProtocolMagic, nativeProtocolVersion, 0];
+  const cases = [
+    [[0], 0, "invalid protocol magic; expected BLOT"],
+    [
+      [nativeProtocolMagic, 0],
+      1,
+      "unsupported native protocol version; expected 7",
+    ],
+    [
+      [nativeProtocolMagic, nativeProtocolVersion, 10],
+      2,
+      "unknown operation; expected 0..6",
+    ],
+    [[...header], 3, "truncated request while reading frontend fuel low word"],
+    [
+      [...header, 0],
+      4,
+      "truncated request while reading frontend fuel high word",
+    ],
+    [[...header, 0, 65536], 4, "Nat high word exceeds 16 bits"],
+    [
+      [...header, 0, 0],
+      5,
+      "truncated request while reading const steps low word",
+    ],
+    [
+      [...header, 0, 0, 0],
+      6,
+      "truncated request while reading const steps high word",
+    ],
+    [[...header, 0, 0, 0, 65536], 6, "Nat high word exceeds 16 bits"],
+    [
+      [nativeProtocolMagic, nativeProtocolVersion, 2, 0],
+      4,
+      "truncated request while reading prelude fuel high word",
+    ],
+    [
+      [nativeProtocolMagic, nativeProtocolVersion, 5, 0, 0, 0, 0, 0, 1, 0, 0],
+      11,
+      "truncated request while reading retained declaration identity high word",
+    ],
+    [
+      [nativeProtocolMagic, nativeProtocolVersion, 6, 0, 0, 0, 0, 0, 1, 2],
+      9,
+      "unknown declaration tag; expected 0 retained or 1 replaced",
+    ],
+  ] as const;
+  await withNative(async (process) => {
+    for (const [payload, offset, detail] of cases) {
+      const response = await process.request(words(payload));
+      throws(() => decodeNativeResponse(response), (error) => {
+        ok(error instanceof CompilerError);
+        equal(error.code, "native_protocol");
+        equal(error.subject, `word:${offset}`);
+        equal(error.detail, detail);
+        return true;
+      });
+      await acceptsTinyRequest(process);
     }
   });
 });
 
 Deno.test("native decoder rejects invalid headers, scalars, counts and trailing words", async () => {
   const payload = encodeNativeRequest(tinyRequest);
-  // Header is seven words; this root has a six-scalar kind and empty field/text.
-  const rootOffsetHigh = 17;
-  const rootChildren = 18;
+  // Seven header words, a dictionary count, "module", and the empty string.
+  const rootOffsetHigh = 20;
+  const rootChildren = 21;
   const mutations = [
     { index: 0, value: 0 },
     { index: 1, value: nativeProtocolVersion + 1 },
@@ -121,10 +208,14 @@ Deno.test("native decoder rejects invalid headers, scalars, counts and trailing 
     { index: 4, value: 65536 },
     { index: 6, value: 65536 },
     { index: rootOffsetHigh, value: 65536 },
-    { index: 8, value: 0xD800 },
-    { index: 8, value: 0xDFFF },
-    { index: 8, value: 0x110000 },
+    { index: 9, value: 0xD800 },
+    { index: 9, value: 0xDFFF },
+    { index: 9, value: 0x110000 },
     { index: 7, value: 0xFFFFFFFF },
+    { index: 8, value: 0xFFFFFFFF },
+    { index: 16, value: 2 },
+    { index: 17, value: 2 },
+    { index: 18, value: 0xFFFFFFFF },
     { index: rootChildren, value: 0xFFFFFFFF },
   ];
   await withNative(async (process) => {
@@ -161,9 +252,8 @@ for (const threads of [1, 2, 4, 8]) {
       ...tinyRequest,
       root: { ...emptyModule, text },
     });
-    // Seven request words, kind length + six characters, field length,
-    // and text length precede the root text's first Unicode scalar.
-    const first = 16;
+    // Header, dictionary count, "module", empty string, and text length.
+    const first = 17;
     await withNative(async (process) => {
       for (const offset of [0, 1023, 2047]) {
         const response = await process.request(
@@ -205,6 +295,7 @@ Deno.test("declaration patches encode compact ordered references with exact Nat 
         0,
         7,
         0,
+        0,
         1,
         0,
         0xFFFFFFFF,
@@ -239,17 +330,22 @@ Deno.test("native decoder rejects truncated and malformed declaration patches an
       },
     ],
   });
+  const view = new DataView(payload.buffer);
+  let body = 8;
+  for (let index = 0; index < view.getUint32(7 * 4, true); index++) {
+    body += 1 + view.getUint32(body * 4, true);
+  }
   await withNative(async (process) => {
     for (let count = 0; count < payload.length / 4; count++) {
       await rejectsPayload(process, payload.slice(0, count * 4));
     }
     for (
       const [index, value] of [
-        [7, 0],
-        [7, 0xFFFFFFFF],
-        [8, 2],
-        [10, 65536],
-        [11, 2],
+        [body, 0],
+        [body, 0xFFFFFFFF],
+        [body + 1, 2],
+        [body + 3, 65536],
+        [body + 4, 2],
       ]
     ) {
       await rejectsPayload(process, replaceWord(payload, index, value));
@@ -271,8 +367,130 @@ const string = (
   ...Array.from(value, (character) => character.codePointAt(0)!),
 ];
 
-Deno.test("protocol six has only generic analyze/compile session operations", () => {
-  equal(nativeProtocolVersion, 6);
+Deno.test("request dictionaries intern Unicode across trees, patches and buffer growth", () => {
+  const text = "\0雪🙂\u{10FFFF}".repeat(512);
+  const node: Cst = {
+    ...emptyModule,
+    kind: text,
+    field: text,
+    text,
+    offset: 0xFFFFFFFFFFFFn,
+  };
+  const encodedNode = [
+    0,
+    0,
+    0,
+    0xFFFFFFFF,
+    65535,
+    0,
+  ];
+  const expected = words([
+    nativeProtocolMagic,
+    nativeProtocolVersion,
+    1,
+    0xFFFFFFFF,
+    65535,
+    7,
+    0,
+    1,
+    ...string(text),
+    ...encodedNode,
+    ...encodedNode,
+  ]);
+  equal(
+    encodeNativeRequest({
+      operation: "compile",
+      root: node,
+      prelude: node,
+      fuel: 0xFFFFFFFFFFFFn,
+      const_steps: 7n,
+    }),
+    expected,
+  );
+  const declarations = [{ kind: "replaced" as const, node }, {
+    kind: "retained" as const,
+    identity: 42n,
+  }, { kind: "replaced" as const, node }];
+  equal(
+    encodeNativeSessionRequest({
+      operation: "compile",
+      declarations,
+      fuel: 1n,
+      const_steps: 7n,
+    }),
+    words([
+      nativeProtocolMagic,
+      nativeProtocolVersion,
+      6,
+      1,
+      0,
+      7,
+      0,
+      1,
+      ...string(text),
+      3,
+      1,
+      ...encodedNode,
+      0,
+      42,
+      0,
+      1,
+      ...encodedNode,
+    ]),
+  );
+  equal(
+    encodeNativeRequest(tinyRequest),
+    words([
+      nativeProtocolMagic,
+      nativeProtocolVersion,
+      0,
+      1,
+      0,
+      7,
+      0,
+      2,
+      ...string("module"),
+      ...string(""),
+      0,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      0,
+      0,
+      0,
+    ]),
+  );
+});
+
+Deno.test("dictionary compression preserves frame limits for unique strings", () => {
+  const kind = "k".repeat(8192);
+  const child = { ...emptyModule, kind };
+  const compact = encodeNativeRequest({
+    ...tinyRequest,
+    root: { ...emptyModule, children: bendList(Array(2048).fill(child)) },
+  });
+  ok(compact.length < 100_000);
+  const children = Array.from({ length: 2048 }, (_, index) => ({
+    ...child,
+    kind: `${index}:${kind}`,
+  }));
+  throws(
+    () =>
+      encodeNativeRequest({
+        ...tinyRequest,
+        root: { ...emptyModule, children: bendList(children) },
+      }),
+    /Native request exceeds 16M words/,
+  );
+});
+
+Deno.test("protocol seven has only generic analyze/compile session operations", () => {
+  equal(nativeProtocolVersion, 7);
   const opcode = (payload: Uint8Array) =>
     new DataView(payload.buffer, payload.byteOffset, payload.byteLength)
       .getUint32(8, true);

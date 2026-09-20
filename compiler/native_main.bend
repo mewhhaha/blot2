@@ -56,7 +56,7 @@ def completed(previous: Maybe<&2, Session.State>, result: Result<&2, &2, M.Diagn
     case Fail{diagnostic}:
       Reply{previous, Response.encode_diagnostic(diagnostic)}
     case Done{Session.Completion{state, output, stats}}:
-      fields = {Response.Word{1112297300} <> Response.Word{6} <> Response.Word{4} <> stat_fields(stats, output) : List<&2, Response.Work>}
+      fields = {Response.Word{1112297300} <> Response.Word{7} <> Response.Word{4} <> stat_fields(stats, output) : List<&2, Response.Work>}
       encoded(previous, state, Response.encode_work(Nat.read.max(), fields, U32.to_nat(16777216), Nil{}))
 
 def cached(previous: Maybe<&2, Session.State>, operation: Request.Operation, root: Cst.Cst, fuel: Nat, steps: Nat) -> Reply:
@@ -90,24 +90,24 @@ def respond(state: Maybe<&2, Session.State>, request: Result<&2, &2, M.Diagnosti
 
 # A malformed complete payload is recoverable; framing failures are fatal in
 # NativeIO because the next request boundary can no longer be trusted.
-def serve(fuel: Nat, state: Maybe<&2, Session.State>, incoming: Maybe<&2, List<&2, U32>>) -> IO(Unit):
+def serve(fuel: Nat, state: Maybe<&2, Session.State>, incoming: Maybe<&1, NativeIO.Frame>) -> IO(Unit):
   match fuel incoming:
     case _ None{}:
       IO.pure(Unit, Unit{})
-    case 0n Some{words}:
+    case 0n Some{frame}:
       IO.die(Unit, 1, "native compiler request limit exhausted")
-    case 1n+remaining Some{words}:
-      +reply = respond(state, Request.decode(words))
+    case 1n+remaining Some{frame}:
+      +reply = respond(state, Request.decode(frame))
       next_state = state_of(reply)
       response = words_of(reply)
       do IO<Unit>:
         NativeIO.send(response)
-        next : Maybe<&2, List<&2, U32>> <- NativeIO.receive()
+        next : Maybe<&1, NativeIO.Frame> <- NativeIO.receive()
         serve(remaining, next_state, next)
 
 def main() -> IO(Unit):
   do IO<Unit>:
     # Handshake lets the parent measure process startup separately from work.
-    NativeIO.send([1112297300, 6])
-    first : Maybe<&2, List<&2, U32>> <- NativeIO.receive()
+    NativeIO.send([1112297300, 7])
+    first : Maybe<&1, NativeIO.Frame> <- NativeIO.receive()
     serve(Nat.read.max(), None{}, first)

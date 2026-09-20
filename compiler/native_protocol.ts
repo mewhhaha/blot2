@@ -17,7 +17,7 @@ import type {
 import type { Cst, CstList } from "./syntax.ts";
 
 export const nativeProtocolMagic = 0x424C4F54;
-export const nativeProtocolVersion = 6;
+export const nativeProtocolVersion = 7;
 export const nativeProtocolMaxWords = 16 * 1024 * 1024;
 
 export type NativeOperation = "analyze" | "compile";
@@ -78,32 +78,47 @@ export class NativeProtocolError extends Error {
 // high16 words. Lists use U32 counts; optionals and Booleans use 0/1 tags.
 // Response kinds: 0 diagnostic, 1 analysis, 2 artifact, 3 opened, 4 cached.
 // Requests: 0/1 stateless analyze/compile, 2 open, 3/4 full session,
-// 5/6 declaration patches. Cached results carry eight Nat counts and an inner
+// 5/6 declaration patches. After the scalar request header: dictionary count,
+// scalar strings, then the CST/patch body. CST strings are dictionary IDs.
+// Dictionary IDs are first-seen preorder across the whole request.
+// Cached results carry eight Nat counts and an inner
 // kind 1/2. Core tags match native_response.bend (not constructor order).
 // Wasm is a byte count followed by packed words, with zero final padding.
 class WordWriter {
   #bytes = new Uint8Array(4096);
   #view = new DataView(this.#bytes.buffer);
   #length = 0;
+  readonly #strings = new Map<string, number>();
+  readonly #dictionary: { value: string; scalars: number }[] = [];
+  #dictionaryWords = 0;
+  #bodyStart: number | undefined;
 
-  word(value: number): void {
-    if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
-      throw new NativeProtocolError(`Not a U32 protocol word: ${value}`);
-    }
-    if (this.#length === nativeProtocolMaxWords) {
+  #reserve(words: number): void {
+    if (
+      words >
+        nativeProtocolMaxWords - this.#length - this.#dictionaryWords -
+          (this.#bodyStart === undefined ? 0 : 1)
+    ) {
       throw new NativeProtocolError("Native request exceeds 16M words");
     }
-    const offset = this.#length * 4;
-    if (offset === this.#bytes.length) {
+    const required = (this.#length + words) * 4;
+    if (required > this.#bytes.length) {
       const next = new Uint8Array(Math.min(
-        this.#bytes.length * 2,
+        Math.max(this.#bytes.length * 2, required),
         nativeProtocolMaxWords * 4,
       ));
       next.set(this.#bytes);
       this.#bytes = next;
       this.#view = new DataView(next.buffer);
     }
-    this.#view.setUint32(offset, value, true);
+  }
+
+  word(value: number): void {
+    if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
+      throw new NativeProtocolError(`Not a U32 protocol word: ${value}`);
+    }
+    this.#reserve(1);
+    this.#view.setUint32(this.#length * 4, value, true);
     this.#length++;
   }
 
@@ -115,18 +130,51 @@ class WordWriter {
     this.word(Number(value >> 32n));
   }
 
+  beginBody(): void {
+    this.#bodyStart = this.#length;
+    this.#reserve(0);
+  }
+
   string(value: string, label: string): void {
+    const prior = this.#strings.get(value);
+    if (prior !== undefined) {
+      this.word(prior);
+      return;
+    }
     if (typeof value !== "string" || !value.isWellFormed()) {
       throw new NativeProtocolError(`${label} is not valid Unicode`);
     }
-    let count = 0;
-    for (const _ of value) count++;
-    this.word(count);
-    for (const scalar of value) this.word(scalar.codePointAt(0)!);
+    let scalars = 0;
+    for (const _ of value) scalars++;
+    const identity = this.#dictionary.length;
+    this.#dictionaryWords += scalars + 1;
+    this.word(identity);
+    this.#strings.set(value, identity);
+    this.#dictionary.push({ value, scalars });
   }
 
   finish(): Uint8Array<ArrayBuffer> {
-    return this.#bytes.slice(0, this.#length * 4);
+    if (this.#bodyStart === undefined) {
+      throw new Error("Missing native request body");
+    }
+    const bytes = new Uint8Array(
+      (this.#length + this.#dictionaryWords + 1) * 4,
+    );
+    bytes.set(this.#bytes.subarray(0, this.#bodyStart * 4));
+    const view = new DataView(bytes.buffer);
+    let position = this.#bodyStart;
+    view.setUint32(position++ * 4, this.#dictionary.length, true);
+    for (const { value, scalars } of this.#dictionary) {
+      view.setUint32(position++ * 4, scalars, true);
+      for (const scalar of value) {
+        view.setUint32(position++ * 4, scalar.codePointAt(0)!, true);
+      }
+    }
+    bytes.set(
+      this.#bytes.subarray(this.#bodyStart * 4, this.#length * 4),
+      position * 4,
+    );
+    return bytes;
   }
 }
 
@@ -172,6 +220,7 @@ export function encodeNativeRequest(
   writer.word(operations[request.operation]);
   writer.nat(request.fuel, "Lowering fuel");
   writer.nat(request.const_steps, "Const steps");
+  writer.beginBody();
   writeTrees(writer, [request.root, request.prelude]);
   return writer.finish();
 }
@@ -185,6 +234,7 @@ export function encodeNativeSessionRequest(
   if (request.operation === "open") {
     writer.word(2);
     writer.nat(request.fuel, "Prelude fuel");
+    writer.beginBody();
     writeTrees(writer, [request.prelude]);
   } else {
     const operations = "declarations" in request
@@ -198,6 +248,7 @@ export function encodeNativeSessionRequest(
     writer.word(operations[request.operation]);
     writer.nat(request.fuel, "Lowering fuel");
     writer.nat(request.const_steps, "Const steps");
+    writer.beginBody();
     if ("declarations" in request) {
       if (!Array.isArray(request.declarations)) {
         throw new NativeProtocolError("Session declarations must be an array");

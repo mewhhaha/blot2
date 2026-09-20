@@ -40,122 +40,116 @@ def payload_expression(payload: Maybe<&2, M.Expr>) -> M.Expr:
     case Some{value}:
       value
 
-def references_go(+fuel: Nat, work: Work, reversed: References) -> Result<&2, &2, M.Diagnostic, References>:
+type PendingReference is Data:
+  PendingReference{depth: Nat, work: Work}
+
+type ReferenceStep is Data:
+  ReferenceStep{pending: List<&2, PendingReference>, reversed: References}
+
+# Each queued branch carries its original structural depth budget. Siblings
+# do not consume one another's fuel, even though the traversal is now flat.
+def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, reversed: References) -> Result<&2, &2, M.Diagnostic, ReferenceStep>:
   match fuel work:
     case 0n _:
       Fail{M.Diagnostic{"expression_complexity", "inference", "expression nesting exceeds compiler traversal limit"}}
     case 1n+rest Expression{M.ConstantExpr{name}}:
-      Done{reference_name(name, reversed)}
+      Done{ReferenceStep{pending, reference_name(name, reversed)}}
     case 1n+rest Expression{M.FunctionExpr{name}}:
-      Done{reference_name(name, reversed)}
+      Done{ReferenceStep{pending, reference_name(name, reversed)}}
     case 1n+rest Expression{M.FunctionEffectsExpr{callee}}:
-      Done{reference_name(callee, reversed)}
+      Done{ReferenceStep{pending, reference_name(callee, reversed)}}
     case 1n+rest Expression{M.CallExpr{callee, argument}}:
-      references_go(rest, Expression{argument}, reference_name(callee, reversed))
+      Done{ReferenceStep{PendingReference{rest, Expression{argument}} <> pending, reference_name(callee, reversed)}}
     case 1n+rest Expression{M.LambdaExpr{identity, parameter, p, r, body}}:
-      references_go(rest, Expression{body}, reference_lambda(identity, reversed))
+      Done{ReferenceStep{PendingReference{rest, Expression{body}} <> pending, reference_lambda(identity, reversed)}}
     case 1n+rest Expression{M.ApplyExpr{callee, argument}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{callee}, reversed)
-        references_go(rest, Expression{argument}, a)
+      Done{ReferenceStep{PendingReference{rest, Expression{callee}} <> PendingReference{rest, Expression{argument}} <> pending, reversed}}
     case 1n+rest Expression{M.ScalarExpr{operator, left, right}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{left}, reversed)
-        references_go(rest, Expression{right}, a)
+      Done{ReferenceStep{PendingReference{rest, Expression{left}} <> PendingReference{rest, Expression{right}} <> pending, reversed}}
     case 1n+rest Expression{M.UnaryExpr{operator, value}}:
-      references_go(rest, Expression{value}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.LetExpr{name, value, body}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{value}, reversed)
-        references_go(rest, Expression{body}, a)
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> PendingReference{rest, Expression{body}} <> pending, reversed}}
     case 1n+rest Expression{M.UseExpr{name, value, body}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{value}, reversed)
-        references_go(rest, Expression{body}, a)
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> PendingReference{rest, Expression{body}} <> pending, reversed}}
     case 1n+rest Expression{M.IfExpr{condition, consequent, alternative}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{condition}, reversed)
-        b : References <- references_go(rest, Expression{consequent}, a)
-        references_go(rest, Expression{alternative}, b)
+      Done{ReferenceStep{PendingReference{rest, Expression{condition}} <> PendingReference{rest, Expression{consequent}} <> PendingReference{rest, Expression{alternative}} <> pending, reversed}}
     case 1n+rest Expression{M.SequenceExpr{first, next}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{first}, reversed)
-        references_go(rest, Expression{next}, a)
+      Done{ReferenceStep{PendingReference{rest, Expression{first}} <> PendingReference{rest, Expression{next}} <> pending, reversed}}
     case 1n+rest Expression{M.MatchExpr{values, arms}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expressions{values}, reversed)
-        references_go(rest, Arms{arms}, a)
+      Done{ReferenceStep{PendingReference{rest, Expressions{values}} <> PendingReference{rest, Arms{arms}} <> pending, reversed}}
     case 1n+rest Expression{M.GuardExpr{pattern, value, alternative, body}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{value}, reversed)
-        b : References <- references_go(rest, Expression{alternative}, a)
-        references_go(rest, Expression{body}, b)
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> PendingReference{rest, Expression{alternative}} <> PendingReference{rest, Expression{body}} <> pending, reversed}}
     case 1n+rest Expression{M.ConstructExpr{constructor, payload}}:
-      references_go(rest, Expression{payload_expression(payload)}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expression{payload_expression(payload)}} <> pending, reversed}}
     case 1n+rest Expression{M.ProductExpr{elements}}:
-      references_go(rest, Expressions{elements}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expressions{elements}} <> pending, reversed}}
     case 1n+rest Expression{M.ProjectExpr{value, index}}:
-      references_go(rest, Expression{value}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.ArrayExpr{elements}}:
-      references_go(rest, Expressions{elements}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expressions{elements}} <> pending, reversed}}
     case 1n+rest Expression{M.ArrayGetExpr{array, index}}:
-      references_go(rest, Expressions{[array, index]}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expressions{[array, index]}} <> pending, reversed}}
     case 1n+rest Expression{M.ArraySetExpr{array, index, value}}:
-      references_go(rest, Expressions{[array, index, value]}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expressions{[array, index, value]}} <> pending, reversed}}
     case 1n+rest Expression{M.ArrayLengthExpr{array}}:
-      references_go(rest, Expression{array}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expression{array}} <> pending, reversed}}
     case 1n+rest Expression{M.BlockExpr{label, body}}:
-      references_go(rest, Expression{body}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expression{body}} <> pending, reversed}}
     case 1n+rest Expression{M.ReturnExpr{label, value}}:
-      references_go(rest, Expression{value}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.SourceExpr{offset, annotation, value}}:
-      references_go(rest, Expression{value}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.ProviderExpr{identity, implementation}}:
-      references_go(rest, Expression{implementation}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expression{implementation}} <> pending, reversed}}
     case 1n+rest Expression{M.HandleExpr{provider, body}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{provider}, reversed)
-        references_go(rest, Expression{body}, a)
+      Done{ReferenceStep{PendingReference{rest, Expression{provider}} <> PendingReference{rest, Expression{body}} <> pending, reversed}}
     case 1n+rest Expression{M.EffectHasExpr{set, operation}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{set}, reversed)
-        references_go(rest, Expression{operation}, a)
+      Done{ReferenceStep{PendingReference{rest, Expression{set}} <> PendingReference{rest, Expression{operation}} <> pending, reversed}}
     case 1n+rest Expression{M.EffectCountExpr{set}}:
-      references_go(rest, Expression{set}, reversed)
+      Done{ReferenceStep{PendingReference{rest, Expression{set}} <> pending, reversed}}
     case 1n+rest Expression{M.EffectSameExpr{left, right}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{left}, reversed)
-        references_go(rest, Expression{right}, a)
+      Done{ReferenceStep{PendingReference{rest, Expression{left}} <> PendingReference{rest, Expression{right}} <> pending, reversed}}
     case 1n+rest Expression{M.UnitExpr{}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.U32Expr{value}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.F32Expr{value}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.BoolExpr{value}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.LocalExpr{name}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.ConstructorRefExpr{name}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.OperationExpr{identity}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.OperationDescriptorExpr{identity}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.PanicExpr{message}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Arms{Nil{}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Arms{M.MatchArm{patterns, body} <> tail}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{body}, reversed)
-        references_go(rest, Arms{tail}, a)
+      Done{ReferenceStep{PendingReference{rest, Expression{body}} <> PendingReference{rest, Arms{tail}} <> pending, reversed}}
     case 1n+rest Expressions{Nil{}}:
-      Done{reversed}
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expressions{head <> tail}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references_go(rest, Expression{head}, reversed)
-        references_go(rest, Expressions{tail}, a)
+      Done{ReferenceStep{PendingReference{rest, Expression{head}} <> PendingReference{rest, Expressions{tail}} <> pending, reversed}}
+
+def references_walk(fuel: Nat, step: Result<&2, &2, M.Diagnostic, ReferenceStep>) -> Result<&2, &2, M.Diagnostic, References>:
+  match fuel step:
+    case _ Fail{error}:
+      Fail{error}
+    case _ Done{ReferenceStep{Nil{}, reversed}}:
+      Done{reversed}
+    case 0n _:
+      Fail{M.Diagnostic{"expression_complexity", "inference", "expression traversal exceeds compiler work limit"}}
+    case 1n+rest Done{ReferenceStep{PendingReference{depth, work} <> tail, reversed}}:
+      references_walk(rest, reference_step(depth, work, tail, reversed))
+
+def references_go(fuel: Nat, work: Work, reversed: References) -> Result<&2, &2, M.Diagnostic, References>:
+  references_walk(Nat.read.max(), Done{ReferenceStep{[PendingReference{fuel, work}], reversed}})
 
 def references(fuel: Nat, work: Work) -> Result<&2, &2, M.Diagnostic, References>:
   do Result<&2, &2, M.Diagnostic, References>:

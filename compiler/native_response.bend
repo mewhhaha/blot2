@@ -3,7 +3,7 @@ import ./model.bend as M
 import ./const_eval.bend as Const
 import ./main.bend as Main
 
-# This is the version-6 word protocol paired with native_protocol.ts. Fields
+# This is the version-7 word protocol paired with native_protocol.ts. Fields
 # follow public Analysis order; compiler-only checked declarations stay native.
 type Work is Data:
   Word{value: U32}
@@ -439,10 +439,10 @@ def finish(result: Result<&2, &2, M.Diagnostic, List<&2, U32>>) -> List<&2, U32>
     case Done{words}:
       words
     case Fail{M.Diagnostic{code, subject, message}}:
-      1112297300 <> 6 <> 0 <> text_words(code, text_words(subject, text_words(message, Nil{})))
+      1112297300 <> 7 <> 0 <> text_words(code, text_words(subject, text_words(message, Nil{})))
 
 def encode(kind: U32, fields: List<&2, Work>) -> List<&2, U32>:
-  finish(encode_work(Nat.read.max(), Word{1112297300} <> Word{6} <> Word{kind} <> fields, U32.to_nat(16777216), Nil{}))
+  finish(encode_work(Nat.read.max(), Word{1112297300} <> Word{7} <> Word{kind} <> fields, U32.to_nat(16777216), Nil{}))
 
 def encode_diagnostic(diagnostic: M.Diagnostic) -> List<&2, U32>:
   encode(0, [Diagnostic{diagnostic}])

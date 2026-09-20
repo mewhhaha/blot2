@@ -1,3 +1,4 @@
+import { benchmarkWorkloads } from "./benchmark_workloads.ts";
 import { deepStrictEqual as equal } from "node:assert/strict";
 import { cpus } from "node:os";
 import { dirname } from "node:path";
@@ -8,93 +9,22 @@ import type { Artifact } from "./host.ts";
 
 const samples = Number(Deno.args[0] ?? 7);
 const reportPath = Deno.args[1] ?? "build/native-bench.json";
-const threadCounts = (Deno.args[2] ?? "1,2,4,8").split(",").map(Number);
+const threadCounts = (Deno.args[2] ?? "1,2,3,4,5,6,7,8").split(",").map(Number);
 const warmups = Number(Deno.args[3] ?? 2);
 if (
   Deno.args.length > 4 || !Number.isSafeInteger(samples) || samples < 1 ||
   samples > 100 || !Number.isSafeInteger(warmups) || warmups < 0 ||
   warmups > 100 ||
   threadCounts.length === 0 ||
-  threadCounts.some((n) => ![1, 2, 4, 8].includes(n)) ||
+  threadCounts.some((n) => !Number.isInteger(n) || n < 1 || n > 8) ||
   new Set(threadCounts).size !== threadCounts.length
 ) {
   throw new Error(
-    "Usage: compiler/native_bench.ts [samples:1..100] [report.json] [threads:1,2,4,8] [warmups:0..100]",
+    "Usage: compiler/native_bench.ts [samples:1..100] [report.json] [threads:1..8, comma-separated] [warmups:0..100]",
   );
 }
 
-function readerSource(count: number, changed: boolean): string {
-  return [
-    "effect Reader.ask: Unit -> U32",
-    "const reader = @effect.provider Reader.ask (fn () => 1)",
-    ...Array.from({ length: count }, (_, index) =>
-      `fn work_${index} () => do:
-  use value <- Reader.ask ()
-  return @u32.add value ${changed && index === 0 ? 2 : 1}
-export fn entry_${index} () => do reader:
-  use value <- work_${index} ()
-  return value`),
-  ].join("\n");
-}
-
-function arithmeticSource(
-  shape: "uneven" | "balanced",
-  changed: boolean,
-): string {
-  return Array.from({ length: 64 }, (_, index) => {
-    const steps = shape === "balanced" || index % 8 === 0 ? 64 : 8;
-    return [
-      `export fn entry_${index} value => do:`,
-      ...Array.from(
-        { length: steps },
-        (_, step) =>
-          `  let value_${step} = @u32.add ${
-            step === 0 ? "value" : `value_${step - 1}`
-          } ${changed && index === 0 && step === 0 ? 2 : 1}`,
-      ),
-      `  return value_${steps - 1}`,
-    ].join("\n");
-  }).join("\n");
-}
-
-function chainSource(changed: boolean): string {
-  return [
-    `fn work_0 value => @u32.add value ${changed ? 2 : 1}`,
-    ...Array.from(
-      { length: 63 },
-      (_, index) =>
-        `fn work_${index + 1} value => @u32.add (work_${index} value) 1`,
-    ),
-    "export fn entry_0 value => work_63 value",
-  ].join("\n");
-}
-
-const workloads = [
-  ...[8, 64].map((count) => ({
-    name: `reader_${count}`,
-    source: readerSource(count, false),
-    changed: readerSource(count, true),
-    expected: 2,
-  })),
-  {
-    name: "uneven_64",
-    source: arithmeticSource("uneven", false),
-    changed: arithmeticSource("uneven", true),
-    expected: 64,
-  },
-  {
-    name: "balanced_64",
-    source: arithmeticSource("balanced", false),
-    changed: arithmeticSource("balanced", true),
-    expected: 64,
-  },
-  {
-    name: "chain_64",
-    source: chainSource(false),
-    changed: chainSource(true),
-    expected: 64,
-  },
-];
+const workloads = benchmarkWorkloads;
 
 function distribution(values: readonly number[]) {
   const sorted = [...values].sort((a, b) => a - b);
