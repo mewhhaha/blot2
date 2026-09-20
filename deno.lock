@@ -1,0 +1,17 @@
+{
+  "version": "5",
+  "specifiers": {
+    "npm:@jsr/mewhhaha__baba@9.0.1": "9.0.1"
+  },
+  "npm": {
+    "@jsr/mewhhaha__baba@9.0.1": {
+      "integrity": "sha512-KmljzaWTMAjbNIi6ZFpk5SJI6D2Om3FWBiMCepcoqWXGD18qLKm1JzaGUDdI1UY61Ir543ZYpYlUqyYqmDZ38g==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/mewhhaha__baba/9.0.1.tgz"
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "npm:@jsr/mewhhaha__baba@9.0.1"
+    ]
+  }
+}

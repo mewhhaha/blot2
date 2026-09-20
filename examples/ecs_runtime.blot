@@ -1,0 +1,74 @@
+// Executable scalar port of ../gdev/test_support/ecs_inferred.blot.
+// Storage tags and @ecs intrinsics are a bootstrap bridge, not const transforms.
+// The host supplies an explicit world/entity provider; use only sequences effects.
+
+#[component]
+data Position = Position U32
+
+#[component]
+data Velocity = Velocity U32
+
+#[component]
+data Visits = Visits U32
+
+#[component]
+data Ghost = Ghost U32
+
+#[resource]
+data DeltaTime = DeltaTime U32
+
+#[resource]
+data Counter = Counter U32
+
+fn read_position () => @ecs.get Position
+fn write_position value => @ecs.set value
+
+// Query: Position + Velocity. DeltaTime is world-level, not an entity filter.
+// The getter/setter helpers retain their inferred effects.
+export fn move () => do:
+  use position <- read_position ()
+  use velocity <- @ecs.get Velocity
+  use time <- @ecs.get DeltaTime
+  let Position current = position
+  let Velocity speed = velocity
+  let DeltaTime seconds = time
+  use write_position (Position (current + speed * seconds))
+  return ()
+
+export fn visit () => do:
+  use read_position ()
+  use visits <- @ecs.get Visits
+  let Visits count = visits
+  use @ecs.set (Visits (count + 1))
+  return ()
+
+// A write alone requires presence; it does not attach Velocity to other entities.
+export fn reset_velocity () => @ecs.set (Velocity 2)
+
+// Resource-only systems run once per update, including in an empty world.
+export fn increment () => do:
+  use counter <- @ecs.get Counter
+  let Counter count = counter
+  use @ecs.set (Counter (count + 1))
+  return ()
+
+export fn double () => do:
+  use counter <- @ecs.get Counter
+  let Counter count = counter
+  use @ecs.set (Counter (count * 2))
+  return ()
+
+// Query: Position, not Ghost. Insertion is a structural scheduling barrier.
+export fn add_ghost () => do:
+  use read_position ()
+  use @ecs.insert (Ghost 4)
+  return ()
+
+// This later query sees the newly inserted component in the successor world.
+export fn tick_ghost () => do:
+  use ghost <- @ecs.get Ghost
+  let Ghost remaining = ghost
+  if remaining == 0:
+    return ()
+  use @ecs.set (Ghost (remaining - 1))
+  return ()

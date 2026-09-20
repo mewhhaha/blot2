@@ -1,0 +1,377 @@
+{
+  "format": "baba-wasm-abi",
+  "version": 1,
+  "targetKind": "javascript-hosted-core-wasm",
+  "parserPlan": {
+    "format": "baba-parser-plan",
+    "version": 5,
+    "runtimeMetadataVersion": 6,
+    "semantics": "baba-island-v5",
+    "storage": "external-binary"
+  },
+  "runtimeImplementation": {
+    "format": "baba-runtime-implementation",
+    "version": 6,
+    "semantics": "baba-runtime-island-v6",
+    "hash": "fnv1a64:9e800d591166d806"
+  },
+  "core": {
+    "abiVersion": 14,
+    "memory": {
+      "export": "memory",
+      "pageBytes": 65536,
+      "maxPages": 65535,
+      "inputBase": "dynamic-after-load-plan"
+    },
+    "plan": {
+      "storage": "external-binary",
+      "moduleExport": "load_plan",
+      "path": "parser.plan",
+      "layout": "core-tables-plus-runtime-metadata"
+    },
+    "sourceEncoding": {
+      "kind": "utf16",
+      "value": 1,
+      "unitBytes": 2
+    },
+    "spanUnit": {
+      "kind": "utf16-code-units",
+      "value": 1
+    },
+    "ownership": {
+      "kind": "caller-managed-linear-memory",
+      "value": 1
+    },
+    "resultLifetime": {
+      "kind": "caller-owned-result-buffer",
+      "value": 1
+    },
+    "layouts": {
+      "lexResult": {
+        "i32Count": 2,
+        "bytes": 8,
+        "fields": [
+          "specIndex",
+          "end"
+        ]
+      },
+      "tokenRecord": {
+        "i32Count": 4,
+        "bytes": 16,
+        "fields": [
+          "specIndex",
+          "start",
+          "end",
+          "acceptingState"
+        ]
+      },
+      "incrementalTokenRecord": {
+        "i32Count": 5,
+        "bytes": 20,
+        "fields": [
+          "specIndex",
+          "start",
+          "end",
+          "acceptingState",
+          "dependencyEnd"
+        ]
+      },
+      "islandResult": {
+        "i32Count": 10,
+        "bytes": 40,
+        "fields": [
+          "tokenCount",
+          "ruleCount",
+          "childCount",
+          "fieldCount",
+          "valueCount",
+          "rootRef",
+          "errorRecord",
+          "errorState",
+          "structuralTokenCount",
+          "regionCount"
+        ]
+      },
+      "cursorRuleRecord": {
+        "i32Count": 9,
+        "bytes": 36
+      },
+      "cursorChildRecord": {
+        "i32Count": 2,
+        "bytes": 8
+      },
+      "cursorFieldRecord": {
+        "i32Count": 2,
+        "bytes": 8
+      },
+      "cursorValueRecord": {
+        "i32Count": 4,
+        "bytes": 16
+      }
+    },
+    "islandStatuses": {
+      "unexpected": 0,
+      "ok": 1,
+      "invalid": -1,
+      "lexical": -2,
+      "traceLimit": -3,
+      "capacity": -4,
+      "trailing": -5
+    },
+    "exports": [
+      {
+        "name": "memory",
+        "kind": "memory"
+      },
+      {
+        "name": "lex_one",
+        "params": [
+          "sourcePtr",
+          "sourceLength",
+          "offset",
+          "resultPtr"
+        ],
+        "result": "matchedFlag"
+      },
+      {
+        "name": "lex_all",
+        "params": [
+          "sourcePtr",
+          "sourceLength",
+          "mode",
+          "tokenPtr",
+          "tokenCapacity",
+          "memoPtr",
+          "memoCapacity"
+        ],
+        "result": "tokenRecordCountOrMinusOneTokenCapacityMinusTwoMemoRequired"
+      },
+      {
+        "name": "lex_incremental",
+        "params": [
+          "sourcePtr",
+          "sourceLength",
+          "start",
+          "minimumEnd",
+          "tokenPtr",
+          "tokenCapacity",
+          "memoPtr",
+          "memoCapacity"
+        ],
+        "result": "tokenRecordCountOrMinusOneTokenCapacityMinusTwoMemoRequired"
+      },
+      {
+        "name": "lex_memo_i32_per_position",
+        "params": [],
+        "result": "memoI32CountPerSourcePosition"
+      },
+      {
+        "name": "analyze_island_records",
+        "params": [
+          "tokenPtr",
+          "rawTokenCount",
+          "maxParserActions",
+          "resultPtr"
+        ],
+        "result": "islandStatus"
+      },
+      {
+        "name": "materialize_island_records",
+        "params": [
+          "sourceLength",
+          "tokenPtr",
+          "rawTokenCount",
+          "preserveTrivia",
+          "rulePtr",
+          "ruleCapacity",
+          "childPtr",
+          "childCapacity",
+          "fieldPtr",
+          "fieldCapacity",
+          "valuePtr",
+          "valueCapacity",
+          "resultPtr"
+        ],
+        "result": "islandStatus"
+      },
+      {
+        "name": "load_plan",
+        "params": [
+          "planPtr",
+          "planLength"
+        ],
+        "result": "loadedFlag"
+      },
+      {
+        "name": "abi_version",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "plan_version",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "semantics_version",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "reset",
+        "params": [],
+        "result": "void"
+      },
+      {
+        "name": "plan_buffer_base",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "input_base",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "max_pages",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "source_encoding",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "span_unit",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "lex_result_i32_count",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "token_record_i32_count",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "incremental_token_record_i32_count",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "island_result_i32_count",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "host_ownership_model",
+        "params": [],
+        "result": "i32"
+      },
+      {
+        "name": "result_lifetime_model",
+        "params": [],
+        "result": "i32"
+      }
+    ]
+  },
+  "adapter": {
+    "language": "typescript",
+    "handleCapability": {
+      "kind": "javascript-epoch-checked-object",
+      "value": 1
+    },
+    "sourceBuffer": {
+      "type": "WasmSourceBuffer",
+      "staleAfter": [
+        "reset",
+        "writeSource(different source)"
+      ]
+    }
+  },
+  "parserDiagnosticCodes": {
+    "parseLexicalError": 1,
+    "parseUnexpectedToken": 2,
+    "parseTrailingInput": 3,
+    "internalError": 5,
+    "traceLimit": 7,
+    "ambiguousParse": 8,
+    "inputTooLarge": 9
+  },
+  "parserDiagnostics": {
+    "detailKinds": {
+      "none": 0,
+      "parserState": 1
+    },
+    "schemas": [
+      {
+        "name": "parseLexicalError",
+        "publicCode": "PARSE_LEXICAL_ERROR",
+        "runtimeCode": 1,
+        "detailKind": "none",
+        "detailKindId": 0,
+        "payloadFields": [
+          "found"
+        ]
+      },
+      {
+        "name": "parseUnexpectedToken",
+        "publicCode": "PARSE_UNEXPECTED_TOKEN",
+        "runtimeCode": 2,
+        "detailKind": "parser-state",
+        "detailKindId": 1,
+        "payloadFields": [
+          "expected",
+          "found"
+        ]
+      },
+      {
+        "name": "parseTrailingInput",
+        "publicCode": "PARSE_TRAILING_INPUT",
+        "runtimeCode": 3,
+        "detailKind": "parser-state",
+        "detailKindId": 1,
+        "payloadFields": [
+          "expected",
+          "found"
+        ]
+      },
+      {
+        "name": "internalError",
+        "publicCode": "PARSER_INTERNAL_ERROR",
+        "runtimeCode": 5,
+        "detailKind": "none",
+        "detailKindId": 0,
+        "payloadFields": []
+      },
+      {
+        "name": "traceLimit",
+        "publicCode": "PARSER_TRACE_LIMIT",
+        "runtimeCode": 7,
+        "detailKind": "none",
+        "detailKindId": 0,
+        "payloadFields": []
+      },
+      {
+        "name": "ambiguousParse",
+        "publicCode": "PARSER_AMBIGUOUS_PARSE",
+        "runtimeCode": 8,
+        "detailKind": "none",
+        "detailKindId": 0,
+        "payloadFields": []
+      },
+      {
+        "name": "inputTooLarge",
+        "publicCode": "PARSER_INPUT_TOO_LARGE",
+        "runtimeCode": 9,
+        "detailKind": "none",
+        "detailKindId": 0,
+        "payloadFields": []
+      }
+    ]
+  }
+}

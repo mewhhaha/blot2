@@ -1,0 +1,69 @@
+// The bootstrap prelude is ordinary Blot source. Only @u32.* are primitives.
+// Numeric operators are U32-specific until static associated dispatch exists.
+infix 30 (==) = U32.eq
+infix 30 (!=) = U32.ne
+infix 30 (<) = U32.lt
+infix 30 (<=) = U32.le
+infix 30 (>) = U32.gt
+infix 30 (>=) = U32.ge
+infixl 60 (+) = U32.add
+infixl 60 (-) = U32.sub
+infixl 70 (*) = U32.mul
+
+export data Maybe a = Some a | Nothing
+export data Result value error = Ok value | Err error
+
+export fn identity value => value
+export fn always value => fn ignored => value
+export fn compose outer => fn inner => fn value => outer (inner value)
+export fn flip combine => fn right => fn left => combine left right
+export fn on combine => fn project => fn left => fn right =>
+  combine (project left) (project right)
+
+export fn Bool.not value => case value:
+  True => False
+  False => True
+
+export fn U32.add left => fn right => @u32.add left right
+export fn U32.sub left => fn right => @u32.sub left right
+export fn U32.mul left => fn right => @u32.mul left right
+export fn U32.eq left => fn right => @u32.eq left right
+export fn U32.lt left => fn right => @u32.lt left right
+export fn U32.ne left => fn right => Bool.not (U32.eq left right)
+export fn U32.le left => fn right => Bool.not (U32.lt right left)
+export fn U32.gt left => fn right => U32.lt right left
+export fn U32.ge left => fn right => Bool.not (U32.lt left right)
+
+export fn Maybe.pure value => Some value
+export fn Maybe.map transform => fn candidate => case candidate:
+  Some value => Some (transform value)
+  Nothing => Nothing
+export fn Maybe.bind candidate => fn next => case candidate:
+  Some value => next value
+  Nothing => Nothing
+export fn Maybe.unwrap_or fallback => fn candidate => case candidate:
+  Some value => value
+  Nothing => fallback
+export fn Maybe.is_some candidate => case candidate:
+  Some _ => True
+  Nothing => False
+export fn Maybe.to_result error => fn candidate => case candidate:
+  Some value => Ok value
+  Nothing => Err error
+
+export fn Result.pure value => Ok value
+export fn Result.map transform => fn candidate => case candidate:
+  Ok value => Ok (transform value)
+  Err error => Err error
+export fn Result.map_error transform => fn candidate => case candidate:
+  Ok value => Ok value
+  Err error => Err (transform error)
+export fn Result.bind candidate => fn next => case candidate:
+  Ok value => next value
+  Err error => Err error
+export fn Result.unwrap_or fallback => fn candidate => case candidate:
+  Ok value => value
+  Err _ => fallback
+export fn Result.to_maybe candidate => case candidate:
+  Ok value => Some value
+  Err _ => Nothing

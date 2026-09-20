@@ -1,0 +1,8 @@
+node_modules/
+/build/
+/generated/compiler/
+/editor/tree-sitter-blot2/src/
+/editor/tree-sitter-blot2/.cache/
+/editor/tree-sitter-blot2/*.so
+/editor/tree-sitter-blot2/*.dylib
+/editor/tree-sitter-blot2/*.dll

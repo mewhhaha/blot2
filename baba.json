@@ -1,0 +1,263 @@
+{
+  "version": 2,
+  "gpuFrontend": {
+    "version": 3,
+    "root": "program",
+    "islands": [
+      {
+        "rule": "program",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "declaration",
+        "boundary": {
+          "kind": "terminated",
+          "terminal": "LAYOUT_NEWLINE"
+        }
+      },
+      {
+        "rule": "declaration_attribute",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "function",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "constant",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "data_type",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "constructor",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "symbolic_fixity",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "named_fixity",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "qualified_name",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "parameter",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "type_expression",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "type_application",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "type_atom",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "type_group",
+        "boundary": {
+          "kind": "paired",
+          "open": "(",
+          "close": ")"
+        }
+      },
+      {
+        "rule": "expression",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "lambda",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "infix_expression",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "infix_tail",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "named_operator",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "application",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "atom",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "group",
+        "boundary": {
+          "kind": "paired",
+          "open": "(",
+          "close": ")"
+        }
+      },
+      {
+        "rule": "do_block",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "case_expression",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "case_suite",
+        "boundary": {
+          "kind": "terminated",
+          "terminal": "LAYOUT_DEDENT"
+        }
+      },
+      {
+        "rule": "case_arm",
+        "boundary": {
+          "kind": "terminated",
+          "terminal": "LAYOUT_NEWLINE"
+        }
+      },
+      {
+        "rule": "pattern",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "constructor_pattern",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "pattern_group",
+        "boundary": {
+          "kind": "paired",
+          "open": "(",
+          "close": ")"
+        }
+      },
+      {
+        "rule": "suite",
+        "boundary": {
+          "kind": "terminated",
+          "terminal": "LAYOUT_DEDENT"
+        }
+      },
+      {
+        "rule": "statement",
+        "boundary": {
+          "kind": "terminated",
+          "terminal": "LAYOUT_NEWLINE"
+        }
+      },
+      {
+        "rule": "binding",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "binding_else",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "effect_binding",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "effect_step",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "result",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "pattern_conditional",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "conditional",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "else_clause",
+        "boundary": {
+          "kind": "root"
+        }
+      }
+    ],
+    "semantics": {
+      "rules": {}
+    }
+  }
+}

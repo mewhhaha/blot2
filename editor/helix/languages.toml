@@ -1,0 +1,12 @@
+[[language]]
+name = "blot"
+language-id = "blot"
+scope = "source.blot"
+file-types = ["blot"]
+roots = ["deno.json", ".git"]
+comment-token = "//"
+grammar = "blot"
+language-servers = []
+auto-format = false
+rainbow-brackets = true
+indent = { tab-width = 2, unit = "  " }

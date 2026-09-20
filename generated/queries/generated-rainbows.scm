@@ -1,0 +1,6 @@
+[
+  "("
+  ")"
+  "]"
+] @rainbow.bracket
+

@@ -1,0 +1,56 @@
+grammar Blot
+
+// Precedence and name resolution belong to the Bend frontend, not the parser.
+token IDENT = /[a-z_][a-z0-9_]*/ ;
+token TYPE_IDENT = /[A-Z][A-Za-z0-9_]*/ ;
+token INTEGER = /(0[xX][0-9A-Fa-f](_?[0-9A-Fa-f])*|[0-9](_?[0-9])*)/ ;
+token INTRINSIC priority 3 = /@[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)*/ ;
+token SYMBOL = /([+*%=!<>^&|?-]+|\/)/ ;
+token LAYOUT_NEWLINE = // ;
+token LAYOUT_INDENT = // ;
+token LAYOUT_DEDENT = // ;
+skip WHITESPACE = /[ \t\r\n]+/ ;
+skip COMMENT priority 3 = /\/\/[^\r\n]*/ ;
+
+program = (declarations:declaration*) ;
+declaration = (attributes:declaration_attribute* exported:"export"? value:(function | constant | data_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
+declaration_attribute = ("#[" name:qualified_name "]" LAYOUT_NEWLINE?) ;
+function = ("fn" name:qualified_name parameter:parameter result:("->" type_expression)? "=>" body:expression) ;
+constant = ("const" name:IDENT annotation:(":" type_expression)? "=" value:expression) ;
+data_type = ("data" name:TYPE_IDENT parameters:IDENT* "=" constructors:constructor ("|" constructors:constructor)*) ;
+constructor = (name:TYPE_IDENT payload:type_expression?) ;
+symbolic_fixity = (associativity:("infixl" | "infixr" | "infix") precedence:INTEGER "(" symbol:SYMBOL ")" "=" target:qualified_name) ;
+named_fixity = (associativity:("infixl" | "infixr" | "infix") precedence:INTEGER "`" target:qualified_name "`") ;
+qualified_name = (root:(IDENT | TYPE_IDENT) rest:("." IDENT)*) ;
+parameter = (name:IDENT | "(" (name:IDENT ":" annotation:type_expression)? ")") ;
+type_expression = (head:type_application results:("->" type_application)*) ;
+type_application = (head:type_atom arguments:type_atom*) ;
+type_atom = (TYPE_IDENT | IDENT | type_group) ;
+type_group = ("(" value:type_expression ")") ;
+
+expression = (value:(lambda | do_block | case_expression | infix_expression)) ;
+lambda = ("fn" parameter:parameter result:("->" type_expression)? "=>" body:expression) ;
+infix_expression = (head:application tails:infix_tail*) ;
+infix_tail = (operator:(SYMBOL | named_operator) argument:application) ;
+named_operator = ("`" name:qualified_name "`") ;
+application = (head:atom arguments:atom*) ;
+atom = (INTEGER | "True" | "False" | INTRINSIC | qualified_name | group) ;
+group = ("(" value:expression? ")") ;
+do_block = ("do" resolver:application? ":" body:suite) ;
+case_expression = ("case" value:expression ":" body:case_suite) ;
+case_suite = (LAYOUT_NEWLINE LAYOUT_INDENT arms:case_arm* LAYOUT_DEDENT) ;
+case_arm = (pattern:pattern "=>" body:expression LAYOUT_NEWLINE) ;
+pattern = (IDENT | INTEGER | "True" | "False" | constructor_pattern | pattern_group) ;
+constructor_pattern = (name:TYPE_IDENT payload:pattern?) ;
+pattern_group = ("(" value:pattern? ")") ;
+suite = (LAYOUT_NEWLINE LAYOUT_INDENT statements:statement* LAYOUT_DEDENT) ;
+statement = (value:(binding | effect_binding | effect_step | result | pattern_conditional | conditional | expression) LAYOUT_NEWLINE) ;
+binding = ("let" pattern:pattern annotation:(":" type_expression)? "=" value:expression fallback:binding_else?) ;
+binding_else = ("else" ":" alternative:suite) ;
+// Separate islands avoid Baba's equal-length IDENT/expression transition tie.
+effect_binding = ("use" name:IDENT annotation:(":" type_expression)? "<-" value:expression) ;
+effect_step = ("use" value:expression) ;
+result = ("return" forwarding:"$"? value:expression) ;
+pattern_conditional = ("if" "let" pattern:pattern "=" value:expression ":" consequence:suite fallback:else_clause?) ;
+conditional = ("if" condition:expression ":" consequence:suite fallback:else_clause?) ;
+else_clause = (LAYOUT_NEWLINE? "else" ":" alternative:suite) ;

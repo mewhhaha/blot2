@@ -1,0 +1,17 @@
+{
+  "grammars": [
+    {
+      "name": "blot",
+      "camelcase": "Blot",
+      "scope": "source.blot",
+      "path": ".",
+      "file-types": ["blot"],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Highlighting for the evolving Blot 2 syntax, not a validating compiler grammar."
+  }
+}

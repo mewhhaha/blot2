@@ -1,0 +1,330 @@
+export fn identity value => value
+// <- keyword.control.import
+//     ^ keyword.function
+//        ^ function
+//                 ^ variable.parameter
+//                       ^ operator
+
+fn Vec2.scaled (value: Vec2) => fn factor => value
+// <- keyword.function
+// ^ type
+//      ^ function
+//              ^ variable.parameter
+//                     ^ type
+//                                 ^ variable.parameter
+
+const identity = fn value => value
+// <- keyword.storage.type
+//    ^ variable
+//               ^ keyword.function
+//                  ^ variable.parameter
+
+data Maybe a = Some a | Nothing
+// <- keyword.storage.type
+//   ^ type
+//             ^ type
+//                    ^ operator
+
+type Positions = Array Vec2
+// <- keyword.storage.type
+//   ^ type
+//               ^ type
+
+type Reading = F64 | Text
+// <- keyword.storage.type
+//   ^ type
+//             ^ type
+//                 ^ operator
+//                   ^ type
+
+fn read_score (ready: Bool) -> F64 | Text => do:
+// <- keyword.function
+// ^ function
+//             ^ variable.parameter
+//                             ^ type
+//                                 ^ operator
+//                                   ^ type
+
+if let Some(x) = y:
+// <- keyword.control.conditional
+// ^ keyword.storage.type
+//     ^ type
+//         ^ punctuation.bracket
+//          ^ variable
+//             ^ operator
+//               ^ variable
+  return x
+
+let Some(x) = y else:
+// <- keyword.storage.type
+//  ^ type
+//      ^ punctuation.bracket
+//       ^ variable
+//          ^ operator
+//            ^ variable
+//              ^ keyword.control.conditional
+  return 0
+//^ keyword.control.return
+
+if let Some x = y:
+// <- keyword.control.conditional
+//     ^ type
+//          ^ variable
+  return x
+else:
+// <- keyword.control.conditional
+  return 0
+
+if let (number: F64) = value:
+// <- keyword.control.conditional
+// ^ keyword.storage.type
+//     ^ punctuation.bracket
+//      ^ variable
+//            ^ punctuation.delimiter
+//              ^ type
+//                   ^ operator
+//                     ^ variable
+  return number
+
+let (number: F64) = value else:
+// <- keyword.storage.type
+//  ^ punctuation.bracket
+//   ^ variable
+//         ^ punctuation.delimiter
+//           ^ type
+//                ^ operator
+//                  ^ variable
+//                        ^ keyword.control.conditional
+  return 0.0
+
+case value:
+// <- keyword.control.conditional
+//   ^ variable
+  (number: F64) => number
+//^ punctuation.bracket
+// ^ variable
+//         ^ type
+//              ^ operator
+  (message: Text) => message
+// ^ variable
+//          ^ type
+
+"if let Some(x) = y else: F64 | Text"
+// <- string
+//  ^ !keyword.storage.type
+//      ^ string
+//      ^ !type
+//                  ^ !keyword.control.conditional
+
+// if let Some(x) = y else: F64 | Text
+// <- comment
+//    ^ !keyword.storage.type
+//        ^ !type
+
+if_let
+// <- variable
+// <- !keyword.control.conditional
+
+const alias = 1
+//    ^ variable
+//    ^ !keyword.storage.type
+
+infixl 60 (+) = add
+// <- keyword.directive
+//     ^ constant.numeric.integer
+//         ^ operator
+//              ^ variable
+
+infixr 22 (||) = or
+// <- keyword.directive
+//          ^ operator
+
+infix 30 (==) = eq
+// <- keyword.directive
+//         ^ operator
+
+prefix 90 (!) = not
+// <- keyword.directive
+//         ^ operator
+
+fn add left => fn right => (@type.of left).add left right
+//                          ^ function.builtin
+//                                   ^ variable
+//                                         ^ variable.other.member
+
+fn Int.add (left: Int) => fn (right: Int) => @int.add left right
+// <- keyword.function
+// ^ type
+//     ^ function
+//                                           ^ function.builtin
+
+@f32.sqrt value
+// <- function.builtin
+
+fn or left => fn ~right => do:
+// <- keyword.function
+// ^ function
+//               ^ operator
+//                ^ variable.parameter
+  if left:
+    return True
+  return @force right
+//       ^ function.builtin
+
+fn force ~value => @force value
+// ^ function
+//       ^ operator
+//        ^ variable.parameter
+//                 ^ function.builtin
+
+let point = Vec2 { x: 1.0, y: 2.0 }
+// <- keyword.storage.type
+//          ^ type
+//                 ^ variable.other.member
+//                    ^ constant.numeric.float
+
+use velocity <- ecs.get Velocity
+// <- keyword.storage.type
+//  ^ variable
+//           ^ operator
+//              ^ variable
+//                  ^ variable.other.member
+//                      ^ type
+
+use _ <- ecs.set next
+// <- keyword.storage.type
+//  ^ variable
+//    ^ operator
+//           ^ variable.other.member
+
+use ecs.insert (Ghost { remaining: 1.0 })
+// <- keyword.storage.type
+//  ^ variable
+//      ^ variable.other.member
+//              ^ type
+//                      ^ variable.other.member
+//                                 ^ constant.numeric.float
+
+do monad Maybe:
+// <- keyword.control
+// ^ variable
+// ^ !keyword.control
+//       ^ type
+  use candidate
+
+do (monad Maybe):
+// <- keyword.control
+// ^ punctuation.bracket
+//  ^ variable
+//        ^ type
+  return value
+
+const try = monad Maybe
+// <- keyword.storage.type
+//    ^ variable
+//          ^ variable
+
+do try:
+// <- keyword.control
+// ^ variable
+  use value <- my_maybe
+  return $ my_other_maybe value
+//^ keyword.control.return
+//       ^ punctuation.special
+//       ^ !operator
+//         ^ variable
+
+"return $ result"
+// <- string
+// ^ !keyword.control.return
+//      ^ string
+//      ^ !punctuation.special
+
+useful
+// <- variable
+// <- !keyword.storage.type
+
+"use velocity <- ecs.get Velocity"
+// <- string
+// ^ !keyword.storage.type
+
+point.x := self + 1.0
+//    ^ variable.other.member
+//      ^ operator
+//         ^ variable.builtin
+
+"Hello ${world}"
+// <- string
+//     ^ punctuation.special
+//       ^ variable
+//            ^ punctuation.special
+
+"Point ${Vec2 { x: 1.0, y: 2.0 }}!"
+//       ^ type
+//              ^ variable.other.member
+//                              ^ punctuation.special
+//                               ^ string
+
+"Message: ${greet "world"}"
+//          ^ variable
+//                 ^ string
+//                       ^ punctuation.special
+
+"Nested ${greet "Hello ${world}"}!"
+//                       ^ variable
+//                               ^ string
+
+"Literal \${world}; costs $5; quote: \""
+//       ^ constant.character.escape
+//          ^ string
+//          ^ !variable
+//                        ^ string
+//                                   ^ constant.character.escape
+
+// fn fake "${self}" is a comment.
+// <- comment
+//    ^ comment
+//            ^ comment
+
+const enabled = True
+//              ^ constant.builtin.boolean
+
+const disabled = False
+//               ^ constant.builtin.boolean
+
+"@force and ~right are text, ${@force right}"
+// <- string
+// ^ !function.builtin
+//                             ^ function.builtin
+
+// @type.of and ~right stay in comments.
+// <- comment
+// ^ !function.builtin
+
+let values: Array F32 = [1.0, 2.0]
+//          ^ type
+//                      ^ punctuation.bracket
+//                       ^ constant.numeric.float
+
+const seed: U32 = 0xC0FFEE
+//                ^ constant.numeric.integer
+
+const epsilon: F32 = 1e-5
+//                   ^ constant.numeric.float
+
+effect Random:
+// <- keyword.storage.type
+//     ^ type
+
+#[component]
+// <- punctuation.special
+//^ attribute
+data Position = Position { x: F32 }
+
+#[resource]
+//^ attribute
+data Time = Time { seconds: F32 }
+
+"// still text ${world}"
+// <- string
+//               ^ variable

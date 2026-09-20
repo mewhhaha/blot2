@@ -1,0 +1,96 @@
+left `on` right
+// <- variable
+//   ^ operator
+//    ^ function
+//      ^ operator
+//        ^ variable
+
+left `math.combine` right
+//   ^ operator
+//    ^ namespace
+//        ^ punctuation.delimiter
+//         ^ function
+//                ^ operator
+
+position `Vec2.dot` offset
+//       ^ operator
+//        ^ type
+//            ^ punctuation.delimiter
+//             ^ function
+//                  ^ variable
+
+position `geometry.Vec2.dot` offset
+//        ^ namespace
+//                 ^ type
+//                      ^ function
+
+left `math.scalar.add` right
+//    ^ namespace
+//         ^ namespace
+//                ^ function
+
+infixl 60 `add`
+// <- keyword.directive
+//     ^ constant.numeric.integer
+//        ^ operator
+//         ^ function
+//            ^ operator
+
+infixr 24 `and`
+// <- keyword.directive
+//         ^ function
+
+infix 30 `compare`
+// <- keyword.directive
+//        ^ function
+
+const closer = lt `on` Vec2.magnitude
+// <- keyword.storage.type
+//    ^ variable
+//                 ^ function
+//                     ^ type
+//                          ^ variable.other.member
+
+let on = combine
+//  ^ variable
+//  ^ !keyword
+
+False `and` (values[0] > 0.0)
+// <- constant.builtin.boolean
+//     ^ function
+//          ^ punctuation.bracket
+//                     ^ operator
+//                       ^ constant.numeric.float
+
+use left `combine` right
+// <- keyword.storage.type
+//        ^ function
+
+"Sum: ${left `add` right}"
+//    ^ punctuation.special
+//           ^ operator
+//            ^ function
+//                      ^ punctuation.special
+
+"Nested: ${label "Sum: ${left `add` right}"}"
+//                             ^ function
+//                            ^ operator
+
+"Literal left `add` right"
+// <- string
+//            ^ string
+//            ^ !operator
+//             ^ string
+//             ^ !function
+
+"Escaped \${left `add` right}"
+//       ^ constant.character.escape
+//               ^ string
+//               ^ !operator
+//                ^ !function
+
+// left `add` right
+// <- comment
+//      ^ comment
+//      ^ !operator
+//       ^ !function

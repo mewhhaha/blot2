@@ -1,0 +1,22 @@
+{
+  "format": "baba-wasm-runtime",
+  "version": 1,
+  "abiVersion": 14,
+  "parserPlan": {
+    "format": "baba-parser-plan",
+    "version": 5,
+    "runtimeMetadataVersion": 6,
+    "semantics": "baba-island-v5",
+    "storage": "external-binary",
+    "moduleExport": "load_plan",
+    "path": "parser.plan"
+  },
+  "runtimeImplementation": {
+    "format": "baba-runtime-implementation",
+    "version": 6,
+    "semantics": "baba-runtime-island-v6",
+    "hash": "fnv1a64:9e800d591166d806"
+  },
+  "module": "parser.wasm",
+  "plan": "parser.plan"
+}
