@@ -1,0 +1,15 @@
+{
+  "desktop": {
+    "backend": "raw"
+  },
+  "unstable": ["webgpu"],
+  "compilerOptions": {
+    "lib": ["deno.desktop"]
+  },
+  "imports": {
+    "@mewhhaha/baba": "npm:@jsr/mewhhaha__baba@9.0.1",
+    "imagescript/png": "npm:imagescript@1.3.1/wasm/node/png.js",
+    "imagescript/png-encode": "npm:imagescript@1.3.1/png/node.js",
+    "imagescript/jpeg": "npm:imagescript@1.3.1/wasm/node/jpeg.js"
+  }
+}

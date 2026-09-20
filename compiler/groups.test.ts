@@ -10,12 +10,12 @@ import {
   add,
   boolType,
   call,
-  descriptor,
   fn,
   integer,
+  invoke,
   local,
   module,
-  read,
+  operation,
   scalarExample,
   u32Type,
   unit,
@@ -47,7 +47,7 @@ interface Interface {
   readonly $: "Interface";
   readonly name: string;
   readonly kind: {
-    readonly $: "groups.FunctionInterface" | "groups.ConstantInterface";
+    readonly $: "FunctionInterface" | "ConstantInterface";
   };
   readonly template: unknown;
   readonly parameters: bigint;
@@ -93,25 +93,6 @@ function unwrap<A>(result: Result<A>): A {
   return result.value;
 }
 
-const nullary = new Set([
-  "UnitTy",
-  "U32Ty",
-  "BoolTy",
-  "NeverTy",
-  "UnitExpr",
-  "WildcardPattern",
-  "UnitPattern",
-  "Add",
-  "Subtract",
-  "Multiply",
-  "Equal",
-  "LessThan",
-  "Component",
-  "Resource",
-  "Read",
-  "Write",
-  "Insert",
-]);
 const optional = new Set([
   "annotation",
   "parameter_type",
@@ -122,6 +103,7 @@ const elementTag = new Map([
   ["functions", "Function"],
   ["constants", "Constant"],
   ["data_types", "DataType"],
+  ["operations", "Operation"],
   ["constructors", "Constructor"],
   ["arms", "MatchArm"],
 ]);
@@ -136,8 +118,6 @@ function wire(value: unknown, tag?: string): unknown {
       record[field] = child === null
         ? { $: "None" }
         : { $: "Some", value: wire(child) };
-    } else if (field === "$" && typeof child === "string") {
-      record[field] = nullary.has(child) ? `model.${child}` : child;
     } else {
       record[field] = wire(child, elementTag.get(field));
     }
@@ -183,6 +163,103 @@ function agrees(source: CoreModule) {
   return result;
 }
 
+Deno.test("product dependencies and nominal payloads agree across independent groups", () => {
+  const box: DataType = {
+    identity: { $: "TypeId", module_name: "products", declaration: "Box" },
+    parameters: 0n,
+    constructors: [{ name: "Box", payload: u32Type }],
+  };
+  const result = agrees(module([
+    fn("answer", {
+      $: "ProjectExpr",
+      value: call("pair"),
+      index: 0n,
+    }, { exported: false }),
+    fn("pair", {
+      $: "ProductExpr",
+      elements: [call("number"), {
+        $: "ConstructExpr",
+        constructor: "Box",
+        payload: integer(1),
+      }],
+    }, {
+      exported: false,
+      result_type: {
+        $: "ProductTy",
+        elements: [u32Type, {
+          $: "AppliedTy",
+          identity: box.identity,
+          arguments: [],
+        }],
+      },
+    }),
+    fn("number", integer(42), { exported: false }),
+  ], { data_types: [box] }));
+  const pairJob = result.jobs.find((job) =>
+    array(job.members).includes("pair")
+  );
+  ok(pairJob);
+  equal(array(pairJob.dependencies), ["number"]);
+  equal(array(pairJob.type_dependencies), [box.identity]);
+});
+
+Deno.test("tuple pattern constructors retain nominal dependencies in independent groups", () => {
+  const wrapper: DataType = {
+    identity: { $: "TypeId", module_name: "patterns", declaration: "Wrapper" },
+    parameters: 0n,
+    constructors: [{ name: "Wrapper", payload: u32Type }],
+  };
+  const result = agrees(module([fn("unpack", {
+    $: "MatchExpr",
+    values: [local("value")],
+    arms: [{
+      patterns: [{
+        $: "ProductPattern",
+        elements: [{
+          $: "ConstructorPattern",
+          constructor: "Wrapper",
+          payload: { $: "BindingPattern", name: "answer" },
+        }, { $: "WildcardPattern" }],
+      }],
+      body: local("answer"),
+    }],
+  }, { parameter_type: null, exported: false })], { data_types: [wrapper] }));
+  equal(result.jobs.length, 1);
+  equal(array(result.jobs[0].type_dependencies), [wrapper.identity]);
+});
+
+Deno.test("array interfaces generalize element types and retain nominal operation signatures", () => {
+  const box: DataType = {
+    identity: { $: "TypeId", module_name: "arrays", declaration: "Box" },
+    parameters: 0n,
+    constructors: [{ name: "Box", payload: u32Type }],
+  };
+  const send = operation("send", {
+    parameter: {
+      $: "ArrayTy",
+      element: { $: "AppliedTy", identity: box.identity, arguments: [] },
+    },
+  });
+  const result = agrees(module([
+    fn("number", call("first", { $: "ArrayExpr", elements: [integer(42)] })),
+    fn(
+      "truth",
+      call("first", {
+        $: "ArrayExpr",
+        elements: [{ $: "BoolExpr", value: true }],
+      }),
+    ),
+    fn(
+      "first",
+      { $: "ArrayGetExpr", array: local("value"), index: integer(0) },
+      { parameter_type: null, exported: false },
+    ),
+  ], { data_types: [box], operations: [send] }));
+  for (const job of result.jobs) {
+    equal(array(job.type_dependencies), [box.identity]);
+  }
+});
+
 const boolean = (value: boolean): Expr => ({ $: "BoolExpr", value });
 const ctor = (constructor: string, payload: Expr | null = null): Expr => ({
   $: "ConstructExpr",
@@ -220,6 +297,11 @@ Deno.test("independent groups agree with whole-module polymorphic inference", ()
       $: "FunctionTy",
       parameter: { $: "ParameterTy", index: 0n },
       result: { $: "ParameterTy", index: 0n },
+      effects: {
+        $: "EffectRow",
+        operations: list([]),
+        tail: { $: "ClosedRow" },
+      },
     },
   );
 });
@@ -267,46 +349,148 @@ Deno.test("pure constants, constructors and higher-order functions cross group i
   }));
 });
 
-Deno.test("all callers constraining an effectful monomorphic helper share one job", () => {
-  const position = descriptor("Position");
-  const nominal = { $: "NominalTy" as const, identity: position.identity };
+Deno.test("closed effectful helpers have independent caller jobs", () => {
+  const ask = operation("ask");
   const result = agrees(module([
-    fn("set_position", { $: "WriteExpr", value: local("value") }, {
-      parameter_type: null,
-      exported: false,
-    }),
-    fn("read_position", read(position.identity), { exported: false }),
-    fn("move", call("set_position", call("read_position"))),
-    fn("again", call("set_position", local("value")), {
-      parameter_type: nominal,
-    }),
+    fn("read", invoke(ask.identity), { exported: false }),
+    fn("left", call("read"), { exported: false }),
+    fn("right", call("read"), { exported: false }),
     fn("pure", integer(1)),
-  ], { descriptors: [position] }));
+  ], { operations: [ask] }));
   equal(
     result.jobs.map((job) => array(job.members).sort()).sort(),
-    [["again", "move", "read_position", "set_position"], ["pure"]],
+    [["left"], ["pure"], ["read"], ["right"]],
   );
 });
 
+Deno.test("higher-order dependency interfaces preserve shared effect rows", () => {
+  const ask = operation("ask");
+  const result = agrees(module([
+    fn("apply_callback", {
+      $: "ApplyExpr",
+      callee: local("value"),
+      argument: unit,
+    }, { parameter_type: null, exported: false }),
+    fn("read", invoke(ask.identity), { exported: false }),
+    fn("answer", {
+      $: "HandleExpr",
+      provider: {
+        $: "ProviderExpr",
+        identity: ask.identity,
+        implementation: lambda(91n, integer(42)),
+      },
+      body: call("apply_callback", { $: "FunctionExpr", name: "read" }),
+    }),
+    fn("pure_answer", call("apply_callback", lambda(92n, boolean(true)))),
+  ], { operations: [ask] }));
+  const signature = result.interfaces.find(({ name }) =>
+    name === "apply_callback"
+  )!;
+  const template = signature.template as {
+    parameter: { effects: { tail: { $: string; index: bigint } } };
+    effects: { tail: { $: string; index: bigint } };
+  };
+  equal(template.parameter.effects, template.effects);
+  equal(template.effects.tail.$, "RowParameter");
+  equal(array(signature.effects), []);
+  equal(result.jobs.length, 4);
+});
+
+Deno.test("returned callback interfaces retain invocation effects across groups", () => {
+  const ask = operation("ask");
+  const result = agrees(module([
+    fn("defer", {
+      $: "LambdaExpr",
+      identity: 93n,
+      parameter: "ignored",
+      parameter_type: { $: "UnitTy" },
+      result_type: null,
+      body: { $: "ApplyExpr", callee: local("action"), argument: unit },
+    }, { parameter: "action", parameter_type: null, exported: false }),
+    fn("read", {
+      $: "ApplyExpr",
+      callee: call("defer", { $: "OperationExpr", identity: ask.identity }),
+      argument: unit,
+    }, { exported: false }),
+  ], { operations: [ask] }));
+  const deferred = result.interfaces.find(({ name }) => name === "defer")!;
+  const template = deferred.template as {
+    parameter: { effects: { tail: { $: string } } };
+    result: { effects: { tail: { $: string } } };
+  };
+  equal(template.parameter.effects, template.result.effects);
+  equal(template.result.effects.tail.$, "RowParameter");
+  equal(array(deferred.effects), []);
+  equal(
+    array(result.interfaces.find(({ name }) => name === "read")!.effects),
+    [{ $: "OperationEffect", identity: ask.identity }],
+  );
+  equal(result.jobs.length, 2);
+});
+
+Deno.test("independent jobs retain nominal closures of all operation signatures", () => {
+  const inner: DataType = {
+    identity: { $: "TypeId", module_name: "operation", declaration: "Inner" },
+    parameters: 0n,
+    constructors: [{ name: "Inner", payload: u32Type }],
+  };
+  const outer: DataType = {
+    identity: { $: "TypeId", module_name: "operation", declaration: "Outer" },
+    parameters: 0n,
+    constructors: [{
+      name: "Outer",
+      payload: { $: "AppliedTy", identity: inner.identity, arguments: [] },
+    }],
+  };
+  const ask = operation("ask", {
+    result: { $: "AppliedTy", identity: outer.identity, arguments: [] },
+  });
+  const source = module([
+    fn("pure", integer(42)),
+    fn("read", invoke(ask.identity), { exported: false }),
+  ], { operations: [ask], data_types: [maybe, outer, inner] });
+  const result = agrees(source);
+  equal(result.jobs.length, 2);
+  for (const job of result.jobs) {
+    equal(
+      new Set(array(job.type_dependencies).map(identityKey)),
+      new Set([inner.identity, outer.identity].map(identityKey)),
+    );
+    const selected = unwrap(
+      groups["groups.job_module"](wire(source, "Module"), job),
+    ) as {
+      operations: List<unknown>;
+    };
+    equal(array(selected.operations), [wire(ask, "Operation")]);
+  }
+});
+
 Deno.test("metadata catalogs follow inferred dependency results but exclude unrelated layouts", () => {
-  const position = descriptor("Position");
-  const velocity = descriptor("Velocity");
+  const position = {
+    $: "TypeId" as const,
+    module_name: "test",
+    declaration: "Position",
+  };
+  const velocity = {
+    $: "TypeId" as const,
+    module_name: "test",
+    declaration: "Velocity",
+  };
   const positionType: DataType = {
-    identity: position.identity,
+    identity: position,
     parameters: 0n,
     constructors: [{ name: "Position", payload: u32Type }],
   };
   const velocityType: DataType = {
-    identity: velocity.identity,
+    identity: velocity,
     parameters: 0n,
     constructors: [{ name: "Velocity", payload: u32Type }],
   };
   const source = module([
     fn("make_position", ctor("Position", integer(42)), { exported: false }),
-    fn("set_position", { $: "WriteExpr", value: call("make_position") }),
-    fn("read_velocity", read(velocity.identity)),
+    fn("position", call("make_position")),
+    fn("velocity", ctor("Velocity", integer(7))),
   ], {
-    descriptors: [position, velocity],
     data_types: [positionType, velocityType],
   });
   const result = agrees(source);
@@ -315,9 +499,7 @@ Deno.test("metadata catalogs follow inferred dependency results but exclude unre
     equal(
       array(job.type_dependencies),
       [
-        members.includes("read_velocity")
-          ? velocity.identity
-          : position.identity,
+        members.includes("velocity") ? velocity : position,
       ],
     );
   }
@@ -329,13 +511,13 @@ Deno.test("metadata catalogs follow inferred dependency results but exclude unre
     }, velocityType],
   };
   const originalJob = result.jobs.find((job) =>
-    array(job.members).includes("read_velocity")
+    array(job.members).includes("velocity")
   )!;
   const changedJobs = array(
     unwrap(groups["groups.plan"](wire(changed, "Module"))),
   );
   const changedJob = changedJobs.find((job) =>
-    array(job.members).includes("read_velocity")
+    array(job.members).includes("velocity")
   )!;
   equal(
     groups["groups.job_module"](wire(source, "Module"), originalJob),
@@ -360,13 +542,13 @@ Deno.test("metadata catalogs include transitive constructor payload types and pa
   const result = agrees(module([
     fn("unwrap", {
       $: "MatchExpr",
-      value: local("value"),
+      values: [local("value")],
       arms: [{
-        pattern: {
+        patterns: [{
           $: "ConstructorPattern",
           constructor: "Outer",
           payload: { $: "BindingPattern", name: "inner" },
-        },
+        }],
         body: local("inner"),
       }],
     }, { parameter_type: null }),
@@ -424,21 +606,6 @@ Deno.test("planning preparation excludes bodies while preserving semantic depend
       "Module",
     ))),
   );
-  const position = descriptor("Position");
-  differs(
-    unwrap(groups["groups.prepare_plan"](wire(
-      module([fn("number", unit)], {
-        descriptors: [position],
-      }),
-      "Module",
-    ))),
-    unwrap(groups["groups.prepare_plan"](wire(
-      module([
-        fn("number", read(position.identity)),
-      ], { descriptors: [position] }),
-      "Module",
-    ))),
-  );
 });
 
 Deno.test("reusable planning still rejects duplicate lambda identities before cache lookup", () => {
@@ -492,19 +659,7 @@ function rejectsLikeWhole(source: CoreModule, code: string) {
   );
 }
 
-Deno.test("grouped checking preserves monomorphic caller conflicts and occurs checks", () => {
-  const position = descriptor("Position");
-  const velocity = descriptor("Velocity");
-  rejectsLikeWhole(
-    module([
-      fn("write", { $: "WriteExpr", value: local("value") }, {
-        parameter_type: null,
-      }),
-      fn("position", call("write", read(position.identity))),
-      fn("velocity", call("write", read(velocity.identity))),
-    ], { descriptors: [position, velocity] }),
-    "type_mismatch",
-  );
+Deno.test("grouped checking preserves occurs checks", () => {
   rejectsLikeWhole(
     module([fn(
       "self_apply",
@@ -519,21 +674,19 @@ Deno.test("grouped checking preserves monomorphic caller conflicts and occurs ch
 });
 
 Deno.test("grouped checking preserves effect purity, exhaustive matching and unknown-name failures", () => {
-  const position = descriptor("Position");
-  for (
-    const value of [
-      call("get"),
-      { $: "FunctionExpr", name: "get" } as Expr,
-    ]
-  ) {
-    rejectsLikeWhole(
-      module([
-        fn("get", read(position.identity), { exported: false }),
-        fn("bad", { $: "LetExpr", name: "bound", value, body: unit }),
-      ], { descriptors: [position] }),
-      value.$ === "CallExpr" ? "let_effect" : "effectful_function_value",
-    );
-  }
+  const ask = operation("ask");
+  rejectsLikeWhole(
+    module([
+      fn("get", invoke(ask.identity), { exported: false }),
+      fn("bad", {
+        $: "LetExpr",
+        name: "bound",
+        value: call("get"),
+        body: unit,
+      }),
+    ], { operations: [ask] }),
+    "let_effect",
+  );
   rejectsLikeWhole(
     module([fn("missing", call("unknown"))]),
     "unknown_function",
@@ -541,13 +694,13 @@ Deno.test("grouped checking preserves effect purity, exhaustive matching and unk
   rejectsLikeWhole(
     module([fn("partial", {
       $: "MatchExpr",
-      value: local("value"),
+      values: [local("value")],
       arms: [{
-        pattern: {
+        patterns: [{
           $: "ConstructorPattern",
           constructor: "Nothing",
           payload: null,
-        },
+        }],
         body: integer(0),
       }],
     }, { parameter_type: null })], { data_types: [maybe] }),
@@ -571,18 +724,24 @@ Deno.test("planning validates unused declarations before selecting minimal catal
   );
 });
 
-Deno.test("terminal open monomorphic members remain checked but are not exported as schemes", () => {
-  const position = descriptor("Position");
+Deno.test("effectful functions generalize unused value parameters", () => {
+  const ask = operation("ask");
   const result = agrees(module([
-    fn("read_ignoring_argument", read(position.identity), {
+    fn("read_ignoring_argument", invoke(ask.identity), {
       parameter_type: null,
+      exported: false,
     }),
-  ], { descriptors: [position] }));
-  equal(result.interfaces, []);
+  ], { operations: [ask] }));
+  equal(result.interfaces.length, 1);
+  equal(result.interfaces[0].parameters, 1n);
+  equal(array(result.interfaces[0].effects), [{
+    $: "OperationEffect",
+    identity: ask.identity,
+  }]);
   equal(result.checked.length, 1);
 });
 
-Deno.test("dependency boundaries reject open variables, wrong kinds and polymorphic effects", () => {
+Deno.test("dependency boundaries reject open variables, wrong kinds and inconsistent effects", () => {
   const source = wire(
     module([fn("use_dependency", call("dependency"))]),
     "Module",
@@ -590,11 +749,16 @@ Deno.test("dependency boundaries reject open variables, wrong kinds and polymorp
   const base: Interface = {
     $: "Interface",
     name: "dependency",
-    kind: { $: "groups.FunctionInterface" },
+    kind: { $: "FunctionInterface" },
     template: {
       $: "FunctionTy",
-      parameter: { $: "model.UnitTy" },
-      result: { $: "model.U32Ty" },
+      parameter: { $: "UnitTy" },
+      result: { $: "U32Ty" },
+      effects: {
+        $: "EffectRow",
+        operations: list([]),
+        tail: { $: "ClosedRow" },
+      },
     },
     parameters: 0n,
     effects: list([]),
@@ -612,43 +776,45 @@ Deno.test("dependency boundaries reject open variables, wrong kinds and polymorp
     source,
     list([{
       ...base,
-      kind: { $: "groups.ConstantInterface" },
+      kind: { $: "ConstantInterface" },
     }]),
   );
   ok(wrongKind.$ === "Fail");
   equal(wrongKind.error.code, "unknown_function");
-  const position = descriptor("Position");
+  const ask = operation("ask");
   const effectfulSource = wire(
     module([fn("use_dependency", call("dependency"))], {
-      descriptors: [position],
+      operations: [ask],
     }),
     "Module",
   );
   const effects = list([wire({
-    $: "Effect",
-    access: { $: "Read" },
-    descriptor: position,
+    $: "OperationEffect",
+    identity: ask.identity,
   })]);
-  const polymorphic = groups["groups.check_group"](
+  const missingMetadata = groups["groups.check_group"](
     effectfulSource,
     list([{
       ...base,
       template: {
         $: "FunctionTy",
-        parameter: { $: "ParameterTy", index: 0n },
-        result: { $: "model.UnitTy" },
+        parameter: { $: "UnitTy" },
+        result: { $: "U32Ty" },
+        effects: {
+          $: "EffectRow",
+          operations: list([ask.identity]),
+          tail: { $: "ClosedRow" },
+        },
       },
-      parameters: 1n,
-      effects,
     }]),
   );
-  ok(polymorphic.$ === "Fail");
-  equal(polymorphic.error.code, "invalid_interface");
+  ok(missingMetadata.$ === "Fail");
+  equal(missingMetadata.error.code, "invalid_interface");
   const effectfulConstant = groups["groups.check_group"](
     effectfulSource,
     list([{
       ...base,
-      kind: { $: "groups.ConstantInterface" },
+      kind: { $: "ConstantInterface" },
       effects,
     }]),
   );
@@ -658,11 +824,7 @@ Deno.test("dependency boundaries reject open variables, wrong kinds and polymorp
     effectfulSource,
     list([{
       ...base,
-      effects: list([wire({
-        $: "Effect",
-        access: { $: "Read" },
-        descriptor: { ...position, storage: { $: "Resource" } },
-      })]),
+      effects,
     }]),
   );
   ok(inconsistent.$ === "Fail");
@@ -672,7 +834,6 @@ Deno.test("dependency boundaries reject open variables, wrong kinds and polymorp
 interface DeclarationSummary {
   readonly name: string;
   readonly references: readonly string[];
-  readonly effectful: boolean;
   readonly nominals: readonly TypeId[];
 }
 
@@ -693,10 +854,10 @@ function plannedSummaries(
       references: list(references),
       lambdas: list([]),
     }))),
-    usages: list(declarations.map(({ name, effectful, nominals }) => ({
+    usages: list(declarations.map(({ name, nominals }) => ({
       $: "DeclarationUsage",
       name,
-      usage: { $: "Usage", effectful, nominals: list(nominals) },
+      usage: { $: "Usage", nominals: list(nominals) },
     }))),
     type_dependencies: list(nominals.map(({ identity, references }) => ({
       $: "TypeDependencies",
@@ -732,16 +893,6 @@ function plannerAgreesWithReachability(
     declarations.map(({ name }) => references.includes(name))
   );
   const reachable = transitiveClosure(edges);
-  const effectful = declarations.map((_, index) =>
-    declarations.some((declaration, target) =>
-      declaration.effectful && reachable[index][target]
-    )
-  );
-  const coupled = transitiveClosure(
-    edges.map((row, from) =>
-      row.map((edge, to) => edge || effectful[from] && edges[to][from])
-    ),
-  );
   const groupOf = new Map(
     jobs.flatMap((job, index) =>
       array(job.members).map((name) => [name, index] as const)
@@ -754,7 +905,7 @@ function plannerAgreesWithReachability(
       const source = groupOf.get(declarations[from].name);
       const target = groupOf.get(declarations[to].name);
       ok(source !== undefined && target !== undefined);
-      equal(source === target, coupled[from][to] && coupled[to][from]);
+      equal(source === target, reachable[from][to] && reachable[to][from]);
       if (edges[from][to]) ok(target <= source, "dependency-first jobs");
     }
   }
@@ -799,7 +950,7 @@ function plannerAgreesWithReachability(
   return jobs;
 }
 
-Deno.test("job summaries agree with graph reachability across nominal cycles and effect coupling", () => {
+Deno.test("job summaries agree with graph reachability across declaration and nominal cycles", () => {
   let seed = 719;
   const random = () => {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -826,7 +977,6 @@ Deno.test("job summaries agree with graph reachability across nominal cycles and
     const declarations = names.map((name) => ({
       name,
       references: references([...names, "unknown_definition"]),
-      effectful: random() % 5 === 0,
       nominals: references(identities),
     }));
     const nominals = identities.slice(0, typeCount).map((identity) => ({
@@ -852,7 +1002,6 @@ Deno.test("nominal indexes distinguish separators, empty modules and Unicode ide
   const declarations = identities.map((identity, index) => ({
     name: `read_${index}`,
     references: ["unknown_definition"],
-    effectful: false,
     nominals: [identity],
   }));
   const nominals = identities.map((identity, index) => ({
@@ -866,7 +1015,7 @@ Deno.test("nominal indexes distinguish separators, empty modules and Unicode ide
   equal(plannedSummaries([], nominals), []);
 });
 
-Deno.test("shared recursive nominal closures stay exact across pure and coupled jobs", () => {
+Deno.test("shared recursive nominal closures stay exact across independent jobs", () => {
   const identities: TypeId[] = Array.from({ length: 6 }, (_, index) => ({
     $: "TypeId",
     module_name: "recursive",
@@ -880,31 +1029,27 @@ Deno.test("shared recursive nominal closures stay exact across pure and coupled 
     {
       name: "pure",
       references: [],
-      effectful: false,
       nominals: [identities[0]],
     },
-    { name: "store", references: [], effectful: true, nominals: [] },
+    { name: "store", references: [], nominals: [] },
     {
       name: "writer_one",
       references: ["store", "pure"],
-      effectful: false,
       nominals: [identities[4]],
     },
     {
       name: "writer_two",
       references: ["store"],
-      effectful: false,
       nominals: [identities[5]],
     },
     {
       name: "pure_user",
       references: ["pure"],
-      effectful: false,
       nominals: [],
     },
   ];
   const jobs = plannerAgreesWithReachability(declarations, nominals);
-  equal(jobs.length, 3);
+  equal(jobs.length, 5);
   equal(
     new Set(
       array(
@@ -919,7 +1064,7 @@ Deno.test("shared recursive nominal closures stay exact across pure and coupled 
       jobs.find((job) => array(job.members).includes("store"))!
         .members,
     )),
-    new Set(["store", "writer_one", "writer_two"]),
+    new Set(["store"]),
   );
 });
 

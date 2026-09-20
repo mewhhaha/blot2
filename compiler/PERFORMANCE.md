@@ -1,5 +1,297 @@
 # Compiler performance
 
+## Concurrency-compatible lowering and wider forks (2026-09-20)
+
+The compiler now lowers independent declarations in balanced batches, after name
+collection. Leaves contain at most four declarations. Structural validation
+precedes the forks, semantic failures keep the original tail-first priority, and
+successful declarations retain source order. Inference and codegen retain their
+cost-balanced plans and grain cutoffs of 128 and 512.
+
+All three executors expose up to eight branches at once. Stock Bend 2.0.21's CPU
+runtime drains contiguous groups of 16 task lanes; a small binary fork tree can
+leave its runnable leaves concentrated in only a few worker chunks. Matching
+three tree levels before forking spreads those branches without changing task
+boundaries or join order. Native protocol word counting and CST scanning now use
+flat tail loops: recursive `Result.bind` continuations, diagnostic formatting
+and retained cursor projections are outside the hot scan loops. Request word
+counts remain an exact traversal bound, proved equal to `List.length`.
+
+### Full JS versus native builds
+
+Bend 2.0.21, Deno 2.9.6, clang 22.1.8, Ryzen 7 7800X3D (8 physical cores, 16
+logical CPUs), Linux. Seven samples after two warmups, sequential configurations
+in reusable processes, after builds and tests completed. The desktop also had
+other applications running; small differences are not strong scaling evidence.
+Times include the single-threaded Deno frontend, transport, Bend compilation and
+artifact decoding. Startup, verification and Wasm execution are excluded. JS is
+the single-threaded generated compiler, not the worker pool.
+
+Median milliseconds:
+
+| Workload    |     JS | Native 1 | Native 2 | Native 4 | Native 8 | 1→8 speedup |
+| ----------- | -----: | -------: | -------: | -------: | -------: | ----------: |
+| Reader 8    |  17.04 |     4.80 |     5.61 |     4.39 |     4.49 |       1.07× |
+| Reader 64   |  90.83 |    35.48 |    40.74 |    38.60 |    39.17 |       0.91× |
+| Uneven 64   | 182.09 |   104.52 |   104.25 |    94.47 |    88.77 |       1.18× |
+| Balanced 64 | 790.95 |   522.63 |   506.91 |   450.67 |   418.26 |       1.25× |
+| Chain 64    |  28.44 |    10.59 |    14.88 |    14.44 |    14.21 |       0.75× |
+
+The new balanced fixture has 64 independent functions with 64 arithmetic let
+bindings each. Other fixtures are described in the historical section below. All
+omit the prelude. Eight native threads are 1.89× faster than JS on Balanced 64,
+but only 1.25× faster than one native thread. This is real, modest end-to-end
+scaling, not linear scaling. Reader 64 and the dependency chain still lose with
+more threads; one thread remains the API default. Native's advantage over JS is
+not solely parallelism: its single-threaded backend is already faster here.
+
+The remaining serial work includes parsing/layout and request encoding in Deno,
+dependency and cache-key preparation, shared-budget constant evaluation, Wasm
+linking and transport. Isolated parallel-phase gains must not be presented as
+whole-compiler gains.
+
+### Isolated parallel phases
+
+The grain sweep now includes matching single-threaded JS jobs and native
+1/2/4/8-thread runs. Three samples of 32 iterations compile 64 independent jobs,
+alternating eight/64-binding bodies. Fixture creation, serial-reference warmup,
+complete ordered result comparisons and startup are untimed. Native uses
+monotonic millisecond intervals, JS uses `performance.now()`. Each backend is
+checked against its own serial reference; the full-build benchmark above checks
+cross-backend artifacts. No frontend, transport or Wasm linking is measured.
+
+Median milliseconds per batch, at the production cutoffs:
+
+| Phase     | Cutoff |     JS | Native 1 | Native 2 | Native 4 | Native 8 | 1→8 speedup | JS→8 speedup |
+| --------- | -----: | -----: | -------: | -------: | -------: | -------: | ----------: | -----------: |
+| Inference |    128 | 52.487 |   16.750 |    9.344 |    4.938 |    3.594 |       4.66× |       14.61× |
+| Codegen   |    512 | 10.847 |    2.313 |    1.719 |    1.000 |    0.875 |       2.64× |       12.40× |
+
+Both phases improve from four to eight threads; their gains are not linear. At
+eight threads, disabling forks takes 25.188 ms for inference and 2.938 ms for
+codegen. Those are useful scheduling controls, but are not the one-thread
+baseline used for the speedups in the table. The sweep also covers tiny bodies
+and cutoffs 0, 128, 512, 1024, 2048 and 8192. Sub-millisecond codegen intervals
+are quantized; zero intervals in the tiny runs mean below timer resolution, not
+zero work. Results and compiler hashes are in
+[the grain report](../build/concurrency-grains.json).
+
+A separate diagnostic run of the balanced source measured lowering at
+77/43/23/15 ms for 1/2/4/8 threads (three runs, median). It places IO timestamps
+between native phases and excludes host frontend work, so its phase timings must
+not be summed or substituted for the production full-build measurements. The
+local diagnostic source and output are in `build/concurrency-phases.bend`,
+`build/concurrency-phases.ts` and `build/concurrency-phases.log`.
+
+### Verification and reproduction
+
+All 20 workload/thread configurations match complete JS artifacts; the emitted
+Wasm executes, incremental edits match clean builds, and unchanged requests
+reuse their results. All 435 compiler tests pass, including parallel lowering
+order, error selection and Unicode-decoder recovery at 1/2/4/8 threads. Bend
+proofs, native ownership checks at 1/4 threads, TypeScript checking and
+changed-file formatting pass.
+
+Raw samples, p95 values, compiler hashes, cache counters and explicit JS/native
+speedup ratios are in [the full-build report](../build/concurrency-wide.json).
+These generated reports are ignored by Git. Reproduce with:
+
+```sh
+just bench-native 7 build/concurrency-wide.json 1,2,4,8 2
+just bench-grains 32 3
+```
+
+The earlier measurements below describe prior implementations, not the current
+compiler.
+
+## Dependency batches and edit reuse (2026-09-20)
+
+Clean builds and native incremental sessions now share dependency-ready
+inference batches. Recursive groups stay together; independent groups run in
+cost-balanced Bend fork trees. Independent Wasm cache misses use the same coarse
+task approach. Tiny scalar/name operations no longer fork. Grain cutoffs are 128
+estimated work units for inference and 512 for codegen, selected with the
+isolated sweep below, not elapsed-time thresholds.
+
+The incremental frontend still lexes and validates layout across changed source,
+but only reparses changed declaration islands when their boundaries are safe.
+Successful identical revisions reuse a private result without native IPC;
+trivia-only edits can also reuse it after frontend validation. Failed revisions
+never publish a result cache. Returned results are independent copies.
+
+### Matched before/after
+
+Both snapshots were built with stock Bend **2.0.21**, Deno 2.9.6 and clang
+22.1.8 on the Ryzen 7 7800X3D/Linux host. The baseline freezes the compiler
+before this optimization pass, with only the native C bridge adjustment needed
+by the new Bend runtime. This comparison does not attribute a toolchain upgrade
+to these optimizations; earlier 2.0.5 measurements below are separate history.
+
+Seven samples after two warmups per configuration, run sequentially after
+compiler builds/tests finished. Full builds use no semantic cache; body edits
+use a persistent declaration-cache session, restoring the original source
+outside each timed sample. All fixtures omit the prelude. Times include parsing,
+native transport, compilation and returned artifact construction, but exclude
+compiler bootstrap, process startup, file IO, verification and Wasm execution.
+First incremental builds and startup are separately recorded single
+observations, not medians.
+
+These are compiler-core fixtures, not the source ECS or a live game:
+
+- Reader 8/64: independent effectful functions, one scoped provider, and one
+  pure exported wrapper per function.
+- Uneven 64: independent arithmetic functions, eight with 64 let bindings and
+  the other 56 with eight; an edit changes one addition in the first function.
+- Chain 64: a dependency chain of 64 arithmetic functions and an exported
+  wrapper; an edit changes the first function without changing its interface.
+
+One native thread, medians in milliseconds; each cell is **before → after**:
+
+| Workload  |       Full build | One body edit |     Unchanged |
+| --------- | ---------------: | ------------: | ------------: |
+| Reader 8  |      6.93 → 7.35 |   3.02 → 2.38 |  4.22 → 0.056 |
+| Reader 64 |    84.13 → 57.24 | 21.59 → 16.61 | 21.14 → 0.390 |
+| Uneven 64 | 1353.84 → 169.47 | 59.87 → 44.03 | 55.27 → 0.152 |
+| Chain 64  |    20.73 → 16.82 |   7.45 → 7.18 |  7.27 → 0.123 |
+
+Reader 64 uses 32% less full-build time and 23% less body-edit time; its new
+full-build/body-edit p95 values are 58.11/17.11 ms. Uneven 64's full build is
+about 8× faster. This is not exclusively a parallelism win: clean builds now
+check dependency groups instead of solving unrelated functions together, and the
+JS reference improves on the same large fixture from 3096.34 to 199.29 ms. The
+tiny Reader full build regresses slightly; dependency-chain body edits gain
+little at one thread and regress at multiple threads. These are not
+across-the-board speedups.
+
+Reader 64 body edits parse one island and reuse 129, check one inference group
+and reuse 128, and compile one code entry and reuse 129. Unchanged requests skip
+the native compiler, but copying the public artifact still has a cost. The
+`parsed_ms` counter now covers normalization and origin remapping as well as
+parsing, so it is not a like-for-like phase comparison with the old counter.
+
+### End-to-end native concurrency
+
+After this pass, full-build medians in milliseconds:
+
+| Workload  |     JS | Native 1 | Native 2 | Native 4 | Native 8 |
+| --------- | -----: | -------: | -------: | -------: | -------: |
+| Reader 8  |  18.66 |     7.35 |    12.89 |    12.36 |    12.77 |
+| Reader 64 |  96.15 |    57.24 |    97.22 |    96.19 |    99.02 |
+| Uneven 64 | 199.29 |   169.47 |   270.25 |   272.62 |   287.75 |
+| Chain 64  |  31.97 |    16.82 |    32.37 |    31.51 |    31.57 |
+
+One thread remains the default: more threads still lose end-to-end on these
+fixtures. Parsing/layout, lowering, dependency/cache-key preparation, ordered
+const evaluation, linking and pipe transport remain outside the parallel
+inference/codegen batches. These totals do not isolate the runtime overhead
+responsible for the multithreaded slowdown.
+
+### Isolated grain calibration
+
+The native harness runs 64 independent jobs with either tiny literal bodies or
+alternating eight/64-binding bodies. Its uneven mix deliberately differs from
+the end-to-end fixture. Three samples of 32 iterations use native monotonic
+millisecond intervals; fixture creation, serial-reference warmup, full output
+comparison and process startup are outside timing. No frontend, transport or
+linking is included. Every result matches the complete ordered serial output.
+
+Uneven jobs, median milliseconds per batch at the selected production cutoffs:
+
+| Phase     | Cutoff | 1 thread | 4 threads | 4 threads, forks disabled |
+| --------- | -----: | -------: | --------: | ------------------------: |
+| Inference |    128 |   19.125 |     5.719 |                    29.031 |
+| Codegen   |    512 |    2.875 |     1.625 |                     3.188 |
+
+This demonstrates actual parallel speedups inside both batches, not a claim that
+the whole compiler scales by the same ratio. The sweep includes cutoffs 0, 128,
+512, 1024, 2048, 8192 and a sequential reference. Inference cutoff 128 beats
+1024 on the uneven fixture. Codegen cutoff 512 keeps the tiny batch sequential
+while retaining a large-batch gain; forcing every split improves the uneven
+batch further but penalizes the tiny one. Tiny codegen timings approach clock
+resolution and must not be interpreted as zero-cost compilation. These are
+measured defaults, not universal optimal cutoffs.
+
+### Verification and reproduction
+
+All 16 before/after workload/thread pairs have identical source and Wasm hashes.
+Every native full artifact equals the JS reference, incremental bytes equal
+clean rebuilds, and original/edited Wasm returns the expected values without
+imports. The final build passes 429 compiler tests, Bend proofs, the native
+ownership regression at 1/4 threads, 13 editor/case-study static checks,
+TypeScript checking and formatting. The array CLI build and host-capability demo
+also pass.
+
+Raw samples, p95 values, compiler hashes and cache counters are in the ignored
+[before](../build/parallel-before.json), [after](../build/parallel-after.json)
+and [grain sweep](../build/parallel-grains.json) reports. Reproduce current
+runs:
+
+```sh
+just bench-native 7 build/parallel-after.json 1,2,4,8 2
+just bench-grains 32 3
+```
+
+## Earlier generic effect core (2026-09-20, Bend 2.0.5)
+
+Earlier workload: independent source-defined Reader functions, one scoped
+provider, and one pure exported wrapper per function. This is a compiler-core
+fixture, not an ECS implementation or the 3D sandbox.
+
+Measured sequentially on the Ryzen 7 7800X3D/Linux host, with Deno 2.9.6, Bend
+2.0.5 and clang 22.1.8, after builds and tests completed. Full-build and
+body-edit times are medians of five samples in reusable sessions. Unchanged
+times are single observations. Timings include parsing, native transport and
+Wasm emission; they exclude the Bend bootstrap, process startup, file IO and
+Wasm instantiation/execution.
+
+| Effectful functions | Native threads | JS full   | Native full | One body edit | Unchanged |
+| ------------------- | -------------- | --------- | ----------- | ------------- | --------- |
+| 8                   | 1              | 18.44 ms  | 6.88 ms     | 2.80 ms       | 3.57 ms   |
+| 8                   | 4              | 18.44 ms  | 12.34 ms    | 4.03 ms       | 3.42 ms   |
+| 64                  | 1              | 135.26 ms | 83.59 ms    | 19.19 ms      | 18.39 ms  |
+| 64                  | 4              | 135.26 ms | 137.77 ms   | 28.36 ms      | 29.57 ms  |
+
+Each body edit rechecks one group and regenerates one Wasm entry. The
+64-function fixture reuses 128 groups and 129 code entries; unchanged revisions
+recheck and regenerate none. The remaining unchanged cost includes parsing,
+exact cache-key construction and relinking. Four native threads are slower here;
+one remains the default. These measurements do not establish a parallel speedup
+or a like-for-like improvement over the retired ECS backend.
+
+Every native full artifact matched JS analysis and bytes; incremental bytes
+matched a clean rebuild, and the resulting Wasm executed correctly without
+imports. Startup observations and cache counters are in the ignored report
+`build/generic-effects-bench.json`. Reproduce with:
+
+```sh
+just bench-native 5 build/generic-effects-bench.json 1,4
+```
+
+### Capability-boundary recheck
+
+After adding sealed `Foreign` annotations, callback wrappers and `blot:abi`
+manifests, the same five-sample protocol at one native thread measured:
+
+| Reader functions | JS full   | Native full | One body edit | Unchanged (single) |
+| ---------------- | --------- | ----------- | ------------- | ------------------ |
+| 8                | 17.83 ms  | 7.57 ms     | 2.97 ms       | 2.62 ms            |
+| 64               | 139.62 ms | 81.58 ms    | 19.92 ms      | 21.05 ms           |
+
+These are still the Reader fixture, not a host-callback or ECS benchmark. Body
+edits still recheck/regenerate exactly one group/entry; the 64-function case
+reuses 128 groups and 129 entries. Native artifacts match the JS reference,
+incremental bytes match clean builds, and execution checks pass. No speedup is
+claimed from the small differences between runs. The report is
+`build/capability-boundary-bench.json`; reproduce with
+`just bench-native 5 build/capability-boundary-bench.json 1`.
+
+## Historical ECS measurements
+
+The ECS-specific compiler backend measured here has been retired. These numbers
+are historical reference, not timings for the generic effect core. Run
+`just bench-native` for current non-ECS full-build, body-edit, and
+unchanged-cache measurements.
+
 ## Native subprocess (2026-09-20)
 
 Measured on the same AMD Ryzen 7 7800X3D / Linux x86_64 host, Deno 2.9.6, Bend

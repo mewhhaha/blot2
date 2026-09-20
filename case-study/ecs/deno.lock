@@ -1,0 +1,22 @@
+{
+  "version": "5",
+  "specifiers": {
+    "npm:@jsr/mewhhaha__baba@9.0.1": "9.0.1",
+    "npm:imagescript@1.3.1": "1.3.1"
+  },
+  "npm": {
+    "@jsr/mewhhaha__baba@9.0.1": {
+      "integrity": "sha512-KmljzaWTMAjbNIi6ZFpk5SJI6D2Om3FWBiMCepcoqWXGD18qLKm1JzaGUDdI1UY61Ir543ZYpYlUqyYqmDZ38g==",
+      "tarball": "https://npm.jsr.io/~/11/@jsr/mewhhaha__baba/9.0.1.tgz"
+    },
+    "imagescript@1.3.1": {
+      "integrity": "sha512-ue/zxSyEzj7je8Nlt2vjY9GEa2BbScFSRZJq7OTVDZFp0r57fyuxrlsF8qWgxTP+kP8WklTw4by/ZEYVX5S13w=="
+    }
+  },
+  "workspace": {
+    "dependencies": [
+      "npm:@jsr/mewhhaha__baba@9.0.1",
+      "npm:imagescript@1.3.1"
+    ]
+  }
+}

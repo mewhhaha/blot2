@@ -1,0 +1,6 @@
+{
+  "shader": "scene.wgsl",
+  "texture": "brass.png",
+  "color": [1, 1, 1, 1],
+  "lighting": "lit"
+}

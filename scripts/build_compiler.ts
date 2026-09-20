@@ -1,8 +1,15 @@
-import { cp } from "node:fs/promises";
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
-const requiredVersion = "bend 2.0.5";
+const requiredVersion = "bend 2.0.21";
+const upstreamCommit = "62e7825660327384473304f0001be1b97604eb2c";
+const loaderFiles = {
+  "main.ts": "34c69df407a8abff02752f26821ee2ff7c0a303e97a32b8b5e0082b142e63f59",
+  "bend.ts": "8ac546e7b4de498973405a8e5ebf5589075814c15b80668db1eec9a2e90ef475",
+  "comp.ts": "1cf3b5ffea86697656f8ef4d6c26040f16ac512fd92485d164f8a14425871bd0",
+  "base.bend":
+    "b8c2734d45ec6b4ce70fee70ff06ef35e08fce885af8852d8eb77dbff020e946",
+};
 const environment = { BEND_NO_TELEMETRY: "1" };
 const decoder = new TextDecoder();
 const target = Deno.args[0] ?? "native";
@@ -27,7 +34,7 @@ async function run(command: string, args: string[]) {
   return decoder.decode(result.stdout);
 }
 
-const version = (await run("bend", ["--version"])).trim();
+const version = (await run("bend", ["version"])).trim();
 if (version !== requiredVersion) {
   throw new Error(
     `Compiler bootstrap requires ${requiredVersion}; found ${version}`,
@@ -37,41 +44,15 @@ if (version !== requiredVersion) {
 console.log((await run("bend", ["PROOF.bend"])).trim());
 const output = new URL("../generated/compiler/", import.meta.url);
 await Deno.mkdir(output, { recursive: true });
-const installation = Deno.env.get("BEND_HOME") ||
-  resolve(Deno.env.get("HOME") ?? ".", ".bend");
-const backend = resolve(installation, "current/bend2");
 if (target !== "js") {
-  const original = await Deno.readTextFile(resolve(backend, "comp.ts"));
-  const unsafeUnbox =
-    "const z = r === undefined && (fl.hot.has(k) || fl.stat.has(k));";
-  if (original.split(unsafeUnbox).length !== 2) {
-    throw new Error(
-      "Bend 2.0.5 native backend changed: review the owned-constructor extraction patch before building",
-    );
-  }
-  // Bend 2.0.5 can miss sharing through generic constructors and read an RFC
-  // header as record fields. Owned nodes must use ctr_take; borrowed nodes
-  // retain term_peek. Patch an isolated build copy, never the installed Bend.
   const staging = await Deno.makeTempDir({
     dir: fileURLToPath(output),
     prefix: ".native-backend-",
   });
   try {
-    for (const name of ["main.ts", "bend.ts", "base.bend"]) {
-      await Deno.copyFile(resolve(backend, name), resolve(staging, name));
-    }
-    await Deno.writeTextFile(
-      resolve(staging, "comp.ts"),
-      original.replace(unsafeUnbox, "const z = r === undefined;"),
-    );
-    await cp(resolve(backend, "effs"), resolve(staging, "effs"), {
-      recursive: true,
-    });
-    const loader = resolve(staging, "main.ts");
     const regression = "generated/compiler/native-backend-regression";
     console.log("Checking native Bend constructor ownership...");
-    await run("bun", [
-      loader,
+    await run("bend", [
       "compiler/native_backend_regression.bend",
       "-o",
       regression,
@@ -79,9 +60,8 @@ if (target !== "js") {
     for (const threads of [1, 4]) {
       await run(`./${regression}`, ["--threads", String(threads)]);
     }
-    console.log("Building native Bend compiler (owned-constructor fix)...");
-    console.log((await run("bun", [
-      loader,
+    console.log("Building native Bend compiler...");
+    console.log((await run("bend", [
       "compiler/native_main.bend",
       "-o",
       resolve(staging, "blotc"),
@@ -94,11 +74,50 @@ if (target !== "js") {
 }
 if (target === "native") Deno.exit(0);
 
-const loader = pathToFileURL(resolve(backend, "main.ts"));
+// The binary Bend installation no longer ships its TypeScript module loader.
+// Cache the matching upstream sources with integrity checks; this pure compiler
+// module does not include any of Base's foreign IO implementations.
+const backend = new URL("bend-2.0.21/", output);
+await Deno.mkdir(backend, { recursive: true });
+await Promise.all(
+  Object.entries(loaderFiles).map(async ([name, expected]) => {
+    const destination = new URL(name, backend);
+    let bytes: Uint8Array<ArrayBuffer>;
+    let downloaded = false;
+    try {
+      bytes = await Deno.readFile(destination);
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) throw error;
+      const response = await fetch(
+        `https://raw.githubusercontent.com/bendlang/bend/${upstreamCommit}/bend2/${name}`,
+      );
+      if (!response.ok) {
+        throw new Error(
+          `Bend loader download failed: ${name} (${response.status})`,
+        );
+      }
+      bytes = new Uint8Array(await response.arrayBuffer());
+      downloaded = true;
+    }
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+    const actual = Array.from(
+      digest,
+      (byte) => byte.toString(16).padStart(2, "0"),
+    )
+      .join("");
+    if (actual !== expected) {
+      throw new Error(
+        `Bend loader integrity mismatch: ${destination.pathname}`,
+      );
+    }
+    if (downloaded) await Deno.writeFile(destination, bytes);
+  }),
+);
+const loader = new URL("main.ts", backend);
 const entry = new URL("../compiler/main.bend", import.meta.url);
 
 // Use Bend's published JS-module loader, not a second compiler implementation.
-// Bun is also required by the installed Bend launcher. The emitted pure module
+// Bun runs the upstream TypeScript loader. The emitted pure module
 // runs in Deno; its host performs no Blot typing, const evaluation, or codegen.
 const javascript = await run("bun", [
   "--eval",

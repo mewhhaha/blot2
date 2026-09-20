@@ -23,6 +23,12 @@ export interface Cst {
   readonly children: CstList;
 }
 
+export interface PreparedSource {
+  readonly source: string;
+  readonly originalOffsets: readonly number[];
+  readonly tokens: readonly Token[];
+}
+
 export class SourceError extends Error {
   constructor(
     readonly code: string,
@@ -99,7 +105,8 @@ export function layout(source: string, lexer: ParserInstance) {
     const brokenLine = previous &&
       /[\r\n]/.test(source.slice(previous.span.end, token.span.start));
     if (
-      token.text === ")" && frames.length > 1 && frames.at(-1)!.depth === depth
+      [")", "]", "}"].includes(token.text) && frames.length > 1 &&
+      frames.at(-1)!.depth === depth
     ) {
       let markers = newline;
       while (frames.length > 1 && frames.at(-1)!.depth === depth) {
@@ -112,14 +119,14 @@ export function layout(source: string, lexer: ParserInstance) {
       insertions.set(token.span.start, markers);
     } else if (brokenLine) {
       const frame = frames.at(-1)!;
-      const suite = previous.text === ":";
+      const suite = previous.text === ":" || previous.text === "of";
       if (suite || depth === frame.depth) {
         const width = lineIndent(token);
         if (suite) {
           if (width <= lineIndent(previous)) {
             throw new SourceError(
               "layout_suite",
-              "Expected an indented suite after ':'",
+              `Expected an indented suite after '${previous.text}'`,
               token.span.start,
             );
           }
@@ -150,8 +157,8 @@ export function layout(source: string, lexer: ParserInstance) {
         }
       }
     }
-    if (token.text === "(") depth++;
-    if (token.text === ")") depth--;
+    if (["(", "[", "{"].includes(token.text)) depth++;
+    if ([")", "]", "}"].includes(token.text)) depth--;
   }
   // End a trailing line comment before inserting the synthetic final newline.
   if (tokens.length) {
@@ -184,7 +191,7 @@ function materialize(
   frontend: CpuFrontend,
   program: CompactFrontendProgram,
   source: string,
-  offsets: readonly number[],
+  offsetAt: (position: number) => bigint,
 ) {
   const ruleNames = new Map(
     frontend.plan.islands.map((island) => [island.ruleId, island.ruleName]),
@@ -220,7 +227,7 @@ function materialize(
           kind: schema.tokens[identity] ?? text,
           text,
           field: label,
-          offset: BigInt(offsets[from]),
+          offset: offsetAt(from),
           children: { $: "Nil" },
         };
       } else throw new Error(`Unknown Baba edge category ${category}`);
@@ -231,7 +238,7 @@ function materialize(
       kind,
       field,
       text: "",
-      offset: BigInt(offsets[start]),
+      offset: offsetAt(start),
       children,
     };
   }
@@ -246,37 +253,69 @@ export async function createFrontend() {
   ]);
   const lexer = createParser({ bytes, plan });
   const parser = CpuFrontend.create(plan);
-  return {
-    parse(source: string) {
-      const prepared = layout(source, lexer);
-      // The compact runtime applies a signed-I32 policy to INTEGER tokens.
-      // Replace only Baba-identified integers for parsing, retaining all source
-      // text/spans for Bend's U32 interpretation and overflow diagnostics.
-      const lexed = lexer.lex(prepared.source);
-      const neutral = prepared.source.split("");
-      for (let index = 0; index < lexed.tokenTape.length; index++) {
-        const token = lexed.tokenTape.token(index)!;
-        if (token.type === "named" && token.kind === "INTEGER") {
-          neutral.fill("0", token.span.start, token.span.end);
-        }
+  function prepare(source: string): PreparedSource {
+    const prepared = layout(source, lexer);
+    const lexed = lexer.lex(prepared.source);
+    const tokens: Token[] = [];
+    for (let index = 0; index < lexed.tokenTape.length; index++) {
+      const token = lexed.tokenTape.token(index)!;
+      if (token.channel === "main" && token.type !== "eof") tokens.push(token);
+    }
+    return { ...prepared, tokens };
+  }
+  function parsePrepared(
+    prepared: PreparedSource,
+    options: {
+      readonly start?: number;
+      readonly end?: number;
+      readonly tokenStart?: number;
+      readonly tokenEnd?: number;
+      readonly offsetAt?: (position: number) => bigint;
+    } = {},
+  ) {
+    const start = options.start ?? 0;
+    const end = options.end ?? prepared.source.length;
+    const source = prepared.source.slice(start, end);
+    // The compact runtime applies a signed-I32 policy to INTEGER tokens.
+    // Replace only Baba-identified integers for parsing, retaining all source
+    // text/spans for Bend's U32 interpretation and overflow diagnostics.
+    const neutral = source.split("");
+    for (
+      let index = options.tokenStart ?? 0;
+      index < (options.tokenEnd ?? prepared.tokens.length);
+      index++
+    ) {
+      const token = prepared.tokens[index];
+      if (token.type === "named" && token.kind === "INTEGER") {
+        neutral.fill("0", token.span.start - start, token.span.end - start);
       }
-      const parsed = parser.ingest(neutral.join(""));
-      if (!parsed.ok) {
-        const diagnostic = parsed.diagnostics[0];
-        if (!diagnostic) throw new Error("Baba failed without a diagnostic");
-        throw new SourceError(
-          diagnostic.code,
-          diagnostic.message,
-          prepared.originalOffsets[diagnostic.start] ?? source.length,
-          prepared.originalOffsets[diagnostic.end] ?? source.length,
-        );
-      }
-      return materialize(
-        parser,
-        parsed.program,
-        prepared.source,
-        prepared.originalOffsets,
+    }
+    const parsed = parser.ingest(neutral.join(""));
+    if (!parsed.ok) {
+      const diagnostic = parsed.diagnostics[0];
+      if (!diagnostic) throw new Error("Baba failed without a diagnostic");
+      const last = prepared.originalOffsets.at(-1)!;
+      throw new SourceError(
+        diagnostic.code,
+        diagnostic.message,
+        prepared.originalOffsets[start + diagnostic.start] ?? last,
+        prepared.originalOffsets[start + diagnostic.end] ?? last,
       );
+    }
+    const offsetAt = options.offsetAt ??
+      ((position: number) => BigInt(prepared.originalOffsets[position]));
+    return materialize(
+      parser,
+      parsed.program,
+      source,
+      (position) => offsetAt(start + position),
+    );
+  }
+  return {
+    prepare,
+    parsePrepared,
+    parse(source: string) {
+      return parsePrepared(prepare(source));
     },
     dispose() {
       lexer.dispose();

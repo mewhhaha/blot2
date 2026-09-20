@@ -1,0 +1,45 @@
+export fn length values => @array.length values
+export fn is_empty values => length values == 0
+
+// at and replace trap on an invalid index; get and set return Nothing instead.
+export fn at index => fn values => @array.get values index
+export fn replace index => fn value => fn values => @array.set values index value
+
+export fn get index => fn values => do:
+  if index < length values:
+    return Some (at index values)
+  return Nothing
+
+export fn set index => fn value => fn values => do:
+  if index < length values:
+    return Some (replace index value values)
+  return Nothing
+
+fn fold_from index => fn reduce => fn state => fn values => do:
+  if index == length values:
+    return state
+  use next <- reduce state (at index values)
+  return fold_from (index + 1) reduce next values
+
+export fn fold_left reduce => fn initial => fn values =>
+  fold_from 0 reduce initial values
+
+fn any_from index => fn predicate => fn values => do:
+  if index == length values:
+    return False
+  use found <- predicate (at index values)
+  if found:
+    return True
+  return any_from (index + 1) predicate values
+
+export fn any predicate => fn values => any_from 0 predicate values
+
+fn all_from index => fn predicate => fn values => do:
+  if index == length values:
+    return True
+  use accepted <- predicate (at index values)
+  if Bool.not accepted:
+    return False
+  return all_from (index + 1) predicate values
+
+export fn all predicate => fn values => all_from 0 predicate values

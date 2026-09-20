@@ -58,6 +58,12 @@ produces `Unit`. Evaluating a `do` executes it; placing it inside a function
 delays that execution until the function is called. Statement suites such as
 `if` and `for` do not implicitly introduce another `do` result boundary.
 
+Consequently, a statement-bodied function needs no trailing `return ()`. This is
+already implemented for plain blocks: a final expression statement is discarded,
+not implicitly returned. Expression-bodied `fn x => expression` still returns
+its expression. An explicit non-unit return on one path and unit fallthrough on
+another is a type error; no optional/union result is invented.
+
 ### Pure and effectful bindings
 
 `let name = expression` requires a pure right-hand side. Use
@@ -133,7 +139,7 @@ For `monad Maybe`:
 The inner block above is equivalent to:
 
 ```blot
-case my_maybe:
+case my_maybe of
   Nothing => Nothing
   Some value => my_other_maybe value
 ```
@@ -167,12 +173,12 @@ execution; it does not special-case `Maybe` or aliases such as `try`.
 
 ```blot
 fn unwrap_or_else value => fn ~fallback =>
-  case value:
+  case value of
     Some found => found
     Nothing => @force fallback
 
 fn duplicate_if enabled => fn ~value =>
-  case enabled:
+  case enabled of
     False => Nothing
     True => Some (@force value, @force value)
 ```
@@ -258,6 +264,25 @@ The data model does not require a runtime tag or heap allocation for every
 constructor. A single-constructor plain record can have an inline representation
 without a discriminant. Arrays, functions, and scalar primitives retain
 dedicated representations; arrays are not implemented as recursive lists.
+
+## Case matching
+
+Use `of` to introduce the pattern suite, with one or more comma-separated
+inputs. Single-input cases also use `of`, not `:`.
+
+```blot
+fn choose first => fn enabled => fn fallback =>
+  case first, enabled, fallback of
+    Some value, True, _ => value
+    _, _, Some value => value
+    _, _, _ => 0
+```
+
+Inputs evaluate once, left to right. Each arm has one pattern per input; the
+first matching complete row wins. Bindings are local to the arm and cannot
+repeat within a row. Exhaustiveness covers combinations across all inputs, not
+each column independently. Matching several inputs does not construct a tuple or
+require a heap allocation.
 
 ## Pattern tests and guarded bindings
 
@@ -467,6 +492,13 @@ them through library APIs. The compiler owns each primitive's type, effects, and
 ownership contract; a wrapper cannot erase those requirements. Calling a
 primitive does not by itself request compile-time execution.
 
+Game, GUI, ECS, windowing, input, rendering and assets are not compiler
+primitives. Host-backed effects originate in an explicit `io` capability passed
+to the entrypoint. Effect rows describe requirements; they do not grant
+authority. Source libraries declare those effects and receive narrower
+capabilities from callers. No source effect declaration automatically creates a
+host import. See [the controlled IO contract](compiler/effects-and-io.md).
+
 ```blot
 // Standard-library source, in the module owning Int.
 // PROPOSAL: exact primitive names; integer representation remains open.
@@ -495,6 +527,24 @@ unary function. Binary operator targets are curried: `left + right` calls
 `add left right`. Ordinary eager operands are evaluated once, left to right. The
 example lookup uses the left operand's type; it does not search both operands or
 unrelated modules for an overload.
+
+The executable prelude defines low-precedence function application in source:
+
+```blot
+infixr 0 ($) = apply
+fn apply function => fn value => function value
+
+fn answer () => U32.mul 2 $ U32.add 1 $ 20
+```
+
+`f $ g $ x` means `f (g x)`. Precedence 0 is below arithmetic, comparisons and
+default backtick fixities; ordinary application still binds tighter. Infix RHSs
+may be lambdas, `do:` blocks or `case` expressions without parentheses, e.g.
+`invoke $ fn value => value + 1`. This syntax works for source operators in
+general, not through a special application opcode. Operands remain eager and
+left-to-right, unlike Haskell's evaluation model, and callback effects propagate
+through `apply`. The standalone `return $ value` form is still resolver-return
+forwarding; `return f $ value` returns an ordinary application result.
 
 The proposed `@type.of` queries the inferred static type without evaluating its
 argument or constructing a runtime type object. Its `.add` lookup selects an
@@ -810,29 +860,18 @@ propagate. An executable boundary with unresolved provider requirements must
 fail. Effectful helpers can still be inferred and checked without executing
 them.
 
-The bootstrap now has a smaller
-[executable scalar port](examples/ecs_runtime.blot) of the `../gdev` pattern.
-Known `#[component]`/`#[resource]` tags and explicit `@ecs.get/set/insert`
-intrinsics feed the same checked type/effect pipeline. `compileEcs` emits Wasm
-systems linked to an explicit host world/entity provider with typed-array
-columns and immutable snapshots. Ordinary compilation still rejects unhandled
-effects with `backend_effect`. This bridge is not the proposed reflective
-`ecs.build`, general tag transforms, or source-level `ecs.run`.
+The earlier compiler-coupled ECS bootstrap was retired: its `@ecs.*` and
+platform intrinsics, component/resource special cases, generated storage/query
+plans, and `compileEcs`/`compileApp` entry points have been removed. Experiments
+are preserved only in
+[the prototype archive](case-study/ecs/prototype/README.md). They are not a
+substitute for generic language machinery.
 
-The core harness now forms ordered, contiguous batches from closed effects.
-Reads of the same type can share a batch; writes conflict with reads/writes of
-that type. Resource accesses obey the same hazard rule. Insertion is initially a
-structural barrier, since adding one component can relocate other storage.
-Deferred insertion and more permissive scheduling require an engine contract;
-the host executor currently runs declaration order sequentially and does not
-provide a general effect handler runtime.
-
-- Reading or writing a current-entity component registers its storage and
-  requires that component in the entity query.
-- Inserting or spawning a component registers storage without requiring that
-  component to exist on a matched entity already.
-- Resources register world-level storage, never per-entity presence conditions.
-- Registration never invents values or automatically attaches components.
+Source-library scheduling should derive hazards from checked descriptors. Reads
+may share a batch, writes conflict with overlapping reads/writes, and structural
+changes need an explicit engine contract. These are library rules, not compiler
+knowledge. Component registration/query membership must not invent values or
+silently attach components.
 
 Nominal identity must remain stable across imports and rebuilds, using the
 defining module and declaration identity rather than fresh allocation order.
@@ -843,8 +882,9 @@ ask a world generated from its own unfinished effects to supply those effects.
 
 Code-only reloads may reuse compatible schemas/query plans while updating system
 implementations. Layout/ABI changes still require explicit migration or reset.
-The first compiler kernel checks effects and produces metadata only; it does not
-implement the declaration transforms, world generator, or engine runtime.
+The generic compiler kernel supports scoped providers and const effect
+descriptors; it does not yet implement declaration transforms, world generation,
+or the source ECS.
 
 ## SIMD boundary
 
@@ -904,37 +944,42 @@ A separate, permissive Tree-sitter grammar supports Helix highlighting of the
 showcase, including proposals. It is editor support, not a validating compiler
 frontend; see the [Helix setup](README.md#helix-highlighting).
 
-| Area                    | Current status                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------- |
-| Deno and Baba           | Generated lexer, general CPU parser, compact-CST schema, and binding checks.       |
-| Helix highlighting      | Separate editor grammar covers the syntax showcase.                                |
-| Annotations             | Scalars, concrete applied nominal types, and pure function arrows.                 |
-| Modules                 | Implicit source prelude; root exports; explicit imports remain unimplemented.      |
-| Data declarations       | Generic `data` with nullary/unary constructors; no records or `type` aliases yet.  |
-| Pattern narrowing       | Exhaustive nested matching, `if let`, and guarded `let … else:` execute.           |
-| Closed unions           | Design/editor examples only; no union inference or runtime representation.         |
-| Operators and demand    | Source fixities/operators backed by ordinary functions; demands remain future.     |
-| Backtick calls          | Ordinary curried function calls with source fixity/default left precedence 80.     |
-| Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.       |
-| Text interpolation      | Target design only; executable grammar has no text literals yet.                   |
-| `self`                  | No successor binding semantics yet.                                                |
-| Layout and AST          | Host layout/source mapping and Baba CST; Bend name resolution and core lowering.   |
-| Types and effects       | Rank-1 HM with pure arrows; first-order closed ECS effects remain checked.         |
-| Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.         |
-| Resolver blocks         | Headers and `return $` parse; custom resolver execution is not implemented.        |
-| Scheduling              | Inferred ordered batches; explicit ECS host currently executes sequentially.       |
-| Const evaluation        | Scalars, data, closures, and matching with one shared evaluation budget.           |
-| Tags and const types    | Known component/resource bootstrap tags; no general transforms or const types.     |
-| Arrays and SIMD         | Target design only; no storage representation or lowering yet.                     |
-| Wasm compilation        | Closures/data in a checked private arena; scalar host exports and const globals.   |
-| Game runtime and reload | U32 ECS provider with immutable snapshots; no complete game runtime or hot reload. |
+| Area                    | Current status                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------- |
+| Deno and Baba           | Generated lexer, general CPU parser, compact-CST schema, and binding checks.              |
+| Helix highlighting      | Separate editor grammar covers the syntax showcase.                                       |
+| Annotations             | Scalars, tuples, arrays, concrete applied nominal types, and effect-annotated arrows.     |
+| Modules                 | Implicit prelude; relative/explicitly mapped file imports; private scopes; entry exports. |
+| Data declarations       | Generic `data`, including named record construction/patterns; no `type` aliases yet.      |
+| Pattern narrowing       | Single/multi-value `case … of`, nested tuple/record patterns, `if let`, guarded `let`.    |
+| Closed unions           | Design/editor examples only; no union inference or runtime representation.                |
+| Operators and demand    | Source fixities/operators backed by ordinary functions; demands remain future.            |
+| Backtick calls          | Ordinary curried function calls with source fixity/default left precedence 80.            |
+| Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.              |
+| Text interpolation      | Target design only; literal strings currently serve generic panic messages.               |
+| `self`                  | No successor binding semantics yet.                                                       |
+| Layout and AST          | Host layout/source mapping and Baba CST; Bend name resolution and core lowering.          |
+| Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                |
+| Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                |
+| Resolver blocks         | Scoped effect providers execute; monad resolvers and `return $` remain future.            |
+| Scheduling              | Source-library responsibility; no compiler-generated ECS scheduler.                       |
+| Const evaluation        | Scalars, tuples, arrays, data, closures, and matching with one shared evaluation budget.  |
+| Tags and const types    | Closed const effect descriptors; no tag transforms or type-valued consts.                 |
+| Arrays and SIMD         | Immutable homogeneous arrays, checked indexing, full-copy updates; SIMD remains future.   |
+| Wasm compilation        | Private arena; scalar exports/constants and explicit scalar callbacks via guest ABI 1.    |
+| Game runtime and reload | Sandbox paused pending source ECS, capability bundles and persistent-state ABI.           |
 
 `generated/wasm` belongs to Baba's lexer/parser tooling. Separately, `just demo`
-compiles [examples/prelude.blot](examples/prelude.blot) to `build/example.wasm`
-and prints the resolved-core ECS fixture's inferred storage/query/scheduling
-plan. `just ecs` compiles the smaller scalar ECS example and executes it against
-host-backed columns; `just bench-ecs` measures full source recompilation and
-16/64-system scaling. Neither is a complete compiled game. Next come explicit
-imports, higher-order effect rows/demands, const type values, and the machinery
-for the full source ECS case. The temporary scalar export/arena boundary does
-not settle persistent game state, array storage, or the hot-reload ABI.
+compiles [examples/prelude.blot](examples/prelude.blot) and executes it as Wasm.
+[The generic effects example](examples/generic_effects.blot) tests scoped
+providers, effectful callbacks, and closed compile-time reflection.
+`just bench-native` measures the generic core's full builds, declaration edits,
+and cache reuse; historical ECS numbers do not describe this new boundary.
+
+[Explicit host callbacks](examples/host_io.blot) execute with a sealed `Foreign`
+effect; `just demo-host` tests a host-backed provider and a pure source mock.
+[Guest ABI 1](compiler/guest-abi.md) scopes opaque callback references to one
+instance and invocation. Composite host values/buffers, parameterized effect
+descriptors and the machinery for a fully source-defined ECS come next. This
+scalar/callback export ABI does not settle persistent game state, array storage,
+or hot-reload schema migration.

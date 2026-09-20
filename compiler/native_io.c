@@ -53,10 +53,10 @@ static Term blot_native_receive_run(Env e, Term* fields, IoWork* work) {
   Term words = term_pak(CID_NIL, 0);
   for (uint32_t index = length; index > 0; index -= 1) {
     uint32_t word = blot_native_word(bytes + ((size_t)index - 1) * 4);
-    words = io_node(e, CID_CON, word, words, IO_HOTS & 16);
+    words = io_node(e, CID_CON, word, words);
   }
   free(bytes);
-  return io_box(e, CID_SOME, words, IO_HOTS & 32);
+  return io_box(e, CID_SOME, words);
 }
 
 static void __attribute__((constructor)) blot_native_receive_use(void) {

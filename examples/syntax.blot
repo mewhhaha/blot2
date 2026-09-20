@@ -20,6 +20,7 @@ import { Render, SpriteHandle } from "engine/render"
 // Headers follow imports; targets can be defined below or imported by name.
 // These would normally live in standard-library source, not every game file.
 
+infixr 0 ($) = apply
 infixr 22 (||) = or
 infixr 24 (&&) = and
 infix 30 (==) = eq
@@ -159,7 +160,7 @@ fn or (left: Bool) => fn ~right => do:
   return @force right
 
 fn not (value: Bool) -> Bool =>
-  case value:
+  case value of
     True => False
     False => True
 
@@ -173,12 +174,12 @@ fn short_circuit_examples (values: Array F32) => do:
 
 // Any source function can accept a demand-driven argument.
 fn unwrap_or_else value => fn ~fallback =>
-  case value:
+  case value of
     Some found => found
     Nothing => @force fallback
 
 fn duplicate_if enabled => fn ~value =>
-  case enabled:
+  case enabled of
     False => Nothing
     True => Some (@force value, @force value)
 
@@ -294,19 +295,25 @@ const interpolation_hint: Text = "Write \${world} to interpolate."
 
 
 // Constructors and patterns mirror one another.
-// PROPOSAL: use case value: rather than the old case value of spelling.
+// Match one or more values with comma-separated pattern columns.
 
 const unwrap_or = fn (value, fallback) =>
-  case value:
+  case value of
     Some found => found
     Nothing => fallback
 
 const first_of_pair = fn pair =>
-  case pair:
+  case pair of
     Pair (first, _) => first
 
+fn choose_value first => fn enabled => fn fallback =>
+  case first, enabled, fallback of
+    Some value, True, _ => value
+    _, _, Some value => value
+    _, _, _ => 0
+
 const event_label = fn (event: Event) -> Text =>
-  case event:
+  case event of
     Tick _ => "tick"
     Teleport { entity: EntityId id, position: _ } => "teleport"
     SetMode Running => "resume"
@@ -315,7 +322,7 @@ const event_label = fn (event: Event) -> Text =>
 
 // PROPOSAL: retain case guards. A failed guard tries the following arm.
 const classify_step = fn (dt: F32) -> Text =>
-  case dt:
+  case dt of
     value if value < 0.0 => "backwards"
     value if value <= epsilon => "stationary"
     _ => "forwards"
@@ -357,7 +364,7 @@ fn reading_label (value: Reading) -> Text => do:
   return value
 
 fn reading_label_by_case (value: Reading) -> Text =>
-  case value:
+  case value of
     (number: F64) => "Score: ${number}"
     (message: Text) => message
 
@@ -368,6 +375,13 @@ fn score_or_zero (value: Reading) -> F64 => do:
 
 
 // do: is an expression. return belongs to the nearest do:.
+
+fn apply function => fn value => function value
+fn application_example () => Maybe.map (fn value => value + 1) $ Some 41
+
+// Falling through a plain do: returns (), not the last statement's value.
+fn discard_example () => do:
+  use apply (fn value => value) $ 42
 
 const clamp_position = fn (position: Vec2) -> Vec2 => do:
   let x = do:
@@ -431,7 +445,7 @@ const move_particle = fn (world: World, index: U32, dx: F32) => do:
 
 // PROPOSAL: array patterns match exact lengths; _ handles the remaining shapes.
 const first_or = fn (values: Array F32, fallback: F32) =>
-  case values:
+  case values of
     [] => fallback
     [only] => only
     _ => values[0]
@@ -481,9 +495,9 @@ export fn update (world: World, dt: F32) -> World => do:
   return next
 
 export fn react (world: World, event: Event) -> World =>
-  case event:
+  case event of
     Tick dt =>
-      case world.mode:
+      case world.mode of
         Running => update (world, dt)
         Paused => world
 
@@ -517,7 +531,7 @@ export fn react (world: World, event: Event) -> World =>
 fn Maybe.pure value => Some value
 
 fn Maybe.bind candidate => fn next =>
-  case candidate:
+  case candidate of
     Nothing => Nothing
     Some value => next value
 

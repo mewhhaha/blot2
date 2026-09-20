@@ -1,28 +1,26 @@
 import { CompilerError } from "./diagnostics.ts";
 import type {
-  Access,
   Analysis,
   ConstantValue,
-  Descriptor,
-  EcsArtifact,
-  EcsStorage,
   Effect,
+  EffectRow,
   Expr,
   FunctionAnalysis,
   MatchArm,
   Pattern,
+  RowTail,
   ScalarOp,
-  SystemPlan,
   Type,
   TypeId,
+  UnaryOp,
 } from "./host.ts";
 import type { Cst, CstList } from "./syntax.ts";
 
 export const nativeProtocolMagic = 0x424C4F54;
-export const nativeProtocolVersion = 1;
+export const nativeProtocolVersion = 6;
 export const nativeProtocolMaxWords = 16 * 1024 * 1024;
 
-export type NativeOperation = "analyze" | "compile" | "compileEcs";
+export type NativeOperation = "analyze" | "compile";
 
 export interface NativeRequest {
   readonly operation: NativeOperation;
@@ -32,6 +30,32 @@ export interface NativeRequest {
   readonly const_steps: bigint;
 }
 
+export type NativeSessionRequest =
+  | { readonly operation: "open"; readonly prelude: Cst; readonly fuel: bigint }
+  | Omit<NativeRequest, "prelude">
+  | (Omit<NativeRequest, "prelude" | "root"> & {
+    readonly declarations: readonly NativeDeclaration[];
+  });
+
+export type NativeDeclaration =
+  | { readonly kind: "retained"; readonly identity: bigint }
+  | { readonly kind: "replaced"; readonly node: Cst };
+
+export interface NativeCacheStats {
+  readonly declarations_lowered: number;
+  readonly declarations_reused: number;
+  readonly groups_checked: number;
+  readonly groups_reused: number;
+  readonly constants_evaluated: number;
+  readonly constants_reused: number;
+  readonly entries_compiled: number;
+  readonly entries_reused: number;
+}
+
+export type NativeSessionResponse =
+  | { readonly operation: "open" }
+  | { readonly result: NativeResponse; readonly stats: NativeCacheStats };
+
 export type NativeResponse =
   | { readonly operation: "analyze"; readonly analysis: Analysis }
   | {
@@ -40,8 +64,7 @@ export type NativeResponse =
       readonly analysis: Analysis;
       readonly bytes: Uint8Array<ArrayBuffer>;
     };
-  }
-  | { readonly operation: "compileEcs"; readonly artifact: EcsArtifact };
+  };
 
 export class NativeProtocolError extends Error {
   constructor(message: string) {
@@ -53,8 +76,10 @@ export class NativeProtocolError extends Error {
 // Payload words are little-endian U32s; the process transport owns framing.
 // Strings contain scalar counts followed by Unicode scalars. Nat uses low32,
 // high16 words. Lists use U32 counts; optionals and Booleans use 0/1 tags.
-// Response kinds: 0 diagnostic, 1 analysis, 2 Wasm artifact, 3 ECS artifact.
-// Type/Pattern/Expr/Value tags follow declaration order in model/const_eval.
+// Response kinds: 0 diagnostic, 1 analysis, 2 artifact, 3 opened, 4 cached.
+// Requests: 0/1 stateless analyze/compile, 2 open, 3/4 full session,
+// 5/6 declaration patches. Cached results carry eight Nat counts and an inner
+// kind 1/2. Core tags match native_response.bend (not constructor order).
 // Wasm is a byte count followed by packed words, with zero final padding.
 class WordWriter {
   #bytes = new Uint8Array(4096);
@@ -132,7 +157,10 @@ function childrenOf(node: Cst): Cst[] {
 export function encodeNativeRequest(
   request: NativeRequest,
 ): Uint8Array<ArrayBuffer> {
-  const operations = { analyze: 0, compile: 1, compileEcs: 2 } as const;
+  const operations = {
+    analyze: 0,
+    compile: 1,
+  } as const;
   if (!Object.hasOwn(operations, request.operation)) {
     throw new NativeProtocolError(
       `Unknown native operation: ${request.operation}`,
@@ -144,10 +172,62 @@ export function encodeNativeRequest(
   writer.word(operations[request.operation]);
   writer.nat(request.fuel, "Lowering fuel");
   writer.nat(request.const_steps, "Const steps");
-  const pending: ({ node: Cst } | { leave: Cst })[] = [
-    { node: request.prelude },
-    { node: request.root },
-  ];
+  writeTrees(writer, [request.root, request.prelude]);
+  return writer.finish();
+}
+
+export function encodeNativeSessionRequest(
+  request: NativeSessionRequest,
+): Uint8Array<ArrayBuffer> {
+  const writer = new WordWriter();
+  writer.word(nativeProtocolMagic);
+  writer.word(nativeProtocolVersion);
+  if (request.operation === "open") {
+    writer.word(2);
+    writer.nat(request.fuel, "Prelude fuel");
+    writeTrees(writer, [request.prelude]);
+  } else {
+    const operations = "declarations" in request
+      ? { analyze: 5, compile: 6 } as const
+      : { analyze: 3, compile: 4 } as const;
+    if (!Object.hasOwn(operations, request.operation)) {
+      throw new NativeProtocolError(
+        `Unknown session operation: ${request.operation}`,
+      );
+    }
+    writer.word(operations[request.operation]);
+    writer.nat(request.fuel, "Lowering fuel");
+    writer.nat(request.const_steps, "Const steps");
+    if ("declarations" in request) {
+      if (!Array.isArray(request.declarations)) {
+        throw new NativeProtocolError("Session declarations must be an array");
+      }
+      writer.word(request.declarations.length);
+      for (const declaration of request.declarations) {
+        if (typeof declaration !== "object" || declaration === null) {
+          throw new NativeProtocolError("Invalid session declaration");
+        }
+        if (declaration.kind === "retained") {
+          writer.word(0);
+          writer.nat(declaration.identity, "Retained declaration identity");
+        } else if (declaration.kind === "replaced") {
+          writer.word(1);
+          writeTrees(writer, [declaration.node]);
+        } else {
+          throw new NativeProtocolError("Unknown session declaration kind");
+        }
+      }
+    } else {
+      writeTrees(writer, [request.root]);
+    }
+  }
+  return writer.finish();
+}
+
+function writeTrees(writer: WordWriter, roots: readonly Cst[]): void {
+  const pending: ({ node: Cst } | { leave: Cst })[] = roots.toReversed().map(
+    (node) => ({ node }),
+  );
   const active = new Set<Cst>();
   for (let task = pending.pop(); task; task = pending.pop()) {
     if ("leave" in task) {
@@ -171,7 +251,6 @@ export function encodeNativeRequest(
       pending.push({ node: children[index] });
     }
   }
-  return writer.finish();
 }
 
 type Read<T> = (receive: (value: T) => void) => void;
@@ -202,6 +281,11 @@ class WordReader {
       throw new NativeProtocolError("Truncated native response");
     }
     return this.#view.getUint32(this.#offset++ * 4, true);
+  }
+
+  f32(): number {
+    this.word();
+    return this.#view.getFloat32((this.#offset - 1) * 4, true);
   }
 
   tag<const Tags extends readonly string[]>(tags: Tags): Tags[number] {
@@ -334,23 +418,20 @@ class WordReader {
       declaration: this.string(),
     });
 
-  readonly storage: Read<Descriptor["storage"]> = (receive) =>
-    receive({ $: this.tag(["Component", "Resource"]) });
-
-  readonly descriptor: Read<Descriptor> = (receive) =>
+  readonly rowTail: Read<RowTail> = (receive) => {
+    const $ = this.tag(["ClosedRow", "RowVariable", "RowParameter"]);
+    receive($ === "ClosedRow" ? { $ } : { $, index: this.nat() });
+  };
+  readonly row: Read<EffectRow> = (receive) =>
     this.fields(
-      [this.identity, this.storage],
-      (identity, storage) => ({ $: "Descriptor" as const, identity, storage }),
+      [this.array(this.identity), this.rowTail],
+      (operations, tail) => ({ $: "EffectRow" as const, operations, tail }),
       receive,
     );
-
-  readonly access: Read<Access> = (receive) =>
-    receive({ $: this.tag(["Read", "Write", "Insert"]) });
-
   readonly effect: Read<Effect> = (receive) =>
     this.fields(
-      [this.access, this.descriptor],
-      (access, descriptor) => ({ $: "Effect" as const, access, descriptor }),
+      [this.identity],
+      (identity) => ({ $: "OperationEffect" as const, identity }),
       receive,
     );
 
@@ -359,22 +440,27 @@ class WordReader {
       "UnitTy",
       "U32Ty",
       "BoolTy",
-      "NominalTy",
       "AppliedTy",
       "FunctionTy",
       "ParameterTy",
       "VariableTy",
       "NeverTy",
+      "F32Ty",
+      "ProviderTy",
+      "EffectDescriptorTy",
+      "EffectSetTy",
+      "ProductTy",
+      "ArrayTy",
     ]);
     switch ($) {
       case "UnitTy":
       case "U32Ty":
       case "BoolTy":
       case "NeverTy":
+      case "F32Ty":
+      case "EffectDescriptorTy":
+      case "EffectSetTy":
         receive({ $ });
-        return;
-      case "NominalTy":
-        this.fields([this.identity], (identity) => ({ $, identity }), receive);
         return;
       case "AppliedTy":
         this.fields(
@@ -383,10 +469,27 @@ class WordReader {
           receive,
         );
         return;
+      case "ProductTy":
+        this.fields(
+          [this.array(this.type)],
+          (elements) => ({ $, elements }),
+          receive,
+        );
+        return;
+      case "ArrayTy":
+        this.fields([this.type], (element) => ({ $, element }), receive);
+        return;
+      case "ProviderTy":
+        this.fields(
+          [this.identity, this.row],
+          (identity, effects) => ({ $, identity, effects }),
+          receive,
+        );
+        return;
       case "FunctionTy":
         this.fields(
-          [this.type, this.type],
-          (parameter, result) => ({ $, parameter, result }),
+          [this.type, this.type, this.row],
+          (parameter, result, effects) => ({ $, parameter, result, effects }),
           receive,
         );
         return;
@@ -404,6 +507,7 @@ class WordReader {
       "U32Pattern",
       "BoolPattern",
       "ConstructorPattern",
+      "ProductPattern",
     ]);
     switch ($) {
       case "WildcardPattern":
@@ -425,18 +529,55 @@ class WordReader {
           (constructor, payload) => ({ $, constructor, payload }),
           receive,
         );
+        return;
+      case "ProductPattern":
+        this.fields(
+          [this.array(this.pattern)],
+          (elements) => ({ $, elements }),
+          receive,
+        );
     }
   };
 
   readonly operator: Read<ScalarOp> = (receive) =>
     receive({
-      $: this.tag(["Add", "Subtract", "Multiply", "Equal", "LessThan"]),
+      $: this.tag([
+        "Add",
+        "Subtract",
+        "Multiply",
+        "Equal",
+        "LessThan",
+        "F32Add",
+        "F32Subtract",
+        "F32Multiply",
+        "F32Divide",
+        "F32Equal",
+        "F32NotEqual",
+        "F32LessThan",
+        "F32LessEqual",
+        "F32GreaterThan",
+        "F32GreaterEqual",
+      ]),
+    });
+
+  readonly unaryOperator: Read<UnaryOp> = (receive) =>
+    receive({
+      $: this.tag([
+        "F32Negate",
+        "F32Absolute",
+        "F32SquareRoot",
+        "F32Floor",
+        "F32Ceiling",
+        "F32Truncate",
+        "U32ToF32",
+        "F32ToU32",
+      ]),
     });
 
   readonly arm: Read<MatchArm> = (receive) =>
     this.fields(
-      [this.pattern, this.expression],
-      (pattern, body) => ({ pattern, body }),
+      [this.array(this.pattern), this.expression],
+      (patterns, body) => ({ patterns, body }),
       receive,
     );
 
@@ -463,16 +604,72 @@ class WordReader {
       "BlockExpr",
       "ReturnExpr",
       "SourceExpr",
-      "ReadExpr",
-      "WriteExpr",
-      "InsertExpr",
+      "F32Expr",
+      "UnaryExpr",
+      "PanicExpr",
+      "OperationExpr",
+      "ProviderExpr",
+      "HandleExpr",
+      "OperationDescriptorExpr",
+      "FunctionEffectsExpr",
+      "EffectHasExpr",
+      "EffectCountExpr",
+      "EffectSameExpr",
+      "ProductExpr",
+      "ProjectExpr",
+      "ArrayExpr",
+      "ArrayGetExpr",
+      "ArraySetExpr",
+      "ArrayLengthExpr",
     ]);
     switch ($) {
       case "UnitExpr":
         receive({ $ });
         return;
+      case "ProductExpr":
+      case "ArrayExpr":
+        this.fields(
+          [this.array(this.expression)],
+          (elements) => ({ $, elements }),
+          receive,
+        );
+        return;
+      case "ArrayGetExpr":
+        this.fields(
+          [this.expression, this.expression],
+          (array, index) => ({ $, array, index }),
+          receive,
+        );
+        return;
+      case "ArraySetExpr":
+        this.fields(
+          [this.expression, this.expression, this.expression],
+          (array, index, value) => ({ $, array, index, value }),
+          receive,
+        );
+        return;
+      case "ArrayLengthExpr":
+        this.fields([this.expression], (array) => ({ $, array }), receive);
+        return;
+      case "ProjectExpr":
+        this.fields(
+          [this.expression, this.readNat],
+          (value, index) => ({ $, value, index }),
+          receive,
+        );
+        return;
       case "U32Expr":
         receive({ $, value: this.word() });
+        return;
+      case "F32Expr":
+        receive({ $, value: this.f32() });
+        return;
+      case "UnaryExpr":
+        this.fields(
+          [this.unaryOperator, this.expression],
+          (operator, value) => ({ $, operator, value }),
+          receive,
+        );
         return;
       case "BoolExpr":
         receive({ $, value: this.boolean() });
@@ -562,8 +759,8 @@ class WordReader {
         return;
       case "MatchExpr":
         this.fields(
-          [this.expression, this.array(this.arm)],
-          (value, arms) => ({ $, value, arms }),
+          [this.array(this.expression), this.array(this.arm)],
+          (values, arms) => ({ $, values, arms }),
           receive,
         );
         return;
@@ -608,12 +805,46 @@ class WordReader {
           receive,
         );
         return;
-      case "ReadExpr":
+      case "OperationExpr":
+      case "OperationDescriptorExpr":
         this.fields([this.identity], (identity) => ({ $, identity }), receive);
         return;
-      case "WriteExpr":
-      case "InsertExpr":
-        this.fields([this.expression], (value) => ({ $, value }), receive);
+      case "PanicExpr":
+        receive({ $, message: this.string() });
+        return;
+      case "FunctionEffectsExpr":
+        receive({ $, callee: this.string() });
+        return;
+      case "ProviderExpr":
+        this.fields(
+          [this.identity, this.expression],
+          (identity, implementation) => ({ $, identity, implementation }),
+          receive,
+        );
+        return;
+      case "HandleExpr":
+        this.fields(
+          [this.expression, this.expression],
+          (provider, body) => ({ $, provider, body }),
+          receive,
+        );
+        return;
+      case "EffectHasExpr":
+        this.fields(
+          [this.expression, this.expression],
+          (set, operation) => ({ $, set, operation }),
+          receive,
+        );
+        return;
+      case "EffectCountExpr":
+        this.fields([this.expression], (set) => ({ $, set }), receive);
+        return;
+      case "EffectSameExpr":
+        this.fields(
+          [this.expression, this.expression],
+          (left, right) => ({ $, left, right }),
+          receive,
+        );
     }
   };
 
@@ -633,13 +864,49 @@ class WordReader {
       "ConstructorFunctionValue",
       "DataValue",
       "ClosureValue",
+      "F32Value",
+      "OperationValue",
+      "ProviderValue",
+      "EffectDescriptorValue",
+      "EffectSetValue",
+      "ProductValue",
+      "ArrayValue",
     ]);
     switch ($) {
       case "UnitValue":
         receive({ $ });
         return;
+      case "ProductValue":
+      case "ArrayValue":
+        this.fields(
+          [this.array(this.value)],
+          (elements) => ({ $, elements }),
+          receive,
+        );
+        return;
+      case "OperationValue":
+      case "EffectDescriptorValue":
+        this.fields([this.identity], (identity) => ({ $, identity }), receive);
+        return;
+      case "ProviderValue":
+        this.fields(
+          [this.identity, this.value],
+          (identity, implementation) => ({ $, identity, implementation }),
+          receive,
+        );
+        return;
+      case "EffectSetValue":
+        this.fields(
+          [this.array(this.identity)],
+          (operations) => ({ $, operations }),
+          receive,
+        );
+        return;
       case "U32Value":
         receive({ $, value: this.word() });
+        return;
+      case "F32Value":
+        receive({ $, value: this.f32() });
         return;
       case "BoolValue":
         receive({ $, value: this.boolean() });
@@ -685,35 +952,15 @@ class WordReader {
         this.type,
         this.array(this.readNat),
         this.array(this.effect),
+        this.row,
       ],
-      (name, parameter, result, variables, effects) => ({
+      (name, parameter, result, variables, effects, effect_row) => ({
         name,
         parameter,
         result,
         variables,
         effects,
-      }),
-      receive,
-    );
-
-  readonly system: Read<SystemPlan> = (receive) =>
-    this.fields(
-      [this.readString, this.array(this.effect), this.array(this.descriptor)],
-      (name, effects, query) => ({ name, effects, query }),
-      receive,
-    );
-
-  readonly world: Read<Analysis["world"]> = (receive) =>
-    this.fields(
-      [
-        this.array(this.descriptor),
-        this.array(this.system),
-        this.array(this.array(this.readString)),
-      ],
-      (registrations, systems, batches) => ({
-        registrations,
-        systems,
-        batches,
+        effect_row,
       }),
       receive,
     );
@@ -723,27 +970,13 @@ class WordReader {
       [
         this.array(this.function),
         this.array(this.binding),
-        this.world,
         this.readNat,
       ],
-      (functions, constants, world, remaining_steps) => ({
+      (functions, constants, remaining_steps) => ({
         functions,
         constants,
-        world,
         remaining_steps,
       }),
-      receive,
-    );
-
-  readonly ecsStorage: Read<EcsStorage> = (receive) =>
-    this.fields(
-      [this.identity, this.storage, this.readString, this.readNat],
-      (identity, storage, constructor, tag) => {
-        if (tag > 0xFFFFFFFFn) {
-          throw new NativeProtocolError("ECS storage tag exceeds U32");
-        }
-        return { identity, storage, constructor, tag: Number(tag) };
-      },
       receive,
     );
 
@@ -756,44 +989,83 @@ class WordReader {
       receive,
     );
 
-  readonly ecsArtifact: Read<EcsArtifact> = (receive) =>
-    this.fields(
-      [this.analysis, this.array(this.ecsStorage), this.readBytes],
-      (analysis, storage, bytes) => ({ analysis, storage, bytes }),
-      receive,
-    );
+  header(): void {
+    if (this.word() !== nativeProtocolMagic) {
+      throw new NativeProtocolError("Invalid native response magic");
+    }
+    if (this.word() !== nativeProtocolVersion) {
+      throw new NativeProtocolError("Unsupported native response version");
+    }
+  }
+
+  diagnostic(): never {
+    const diagnostic = {
+      code: this.string(),
+      subject: this.string(),
+      message: this.string(),
+    };
+    this.finish();
+    throw new CompilerError(diagnostic);
+  }
+
+  result(): NativeResponse {
+    const kind = this.tag([
+      "diagnostic",
+      "analyze",
+      "compile",
+      "open",
+      "cached",
+    ]);
+    switch (kind) {
+      case "diagnostic":
+        return this.diagnostic();
+      case "analyze":
+        return { operation: kind, analysis: this.read(this.analysis) };
+      case "compile":
+        return { operation: kind, artifact: this.read(this.artifact) };
+      case "open":
+      case "cached":
+        throw new NativeProtocolError(
+          `Unexpected nested response kind: ${kind}`,
+        );
+    }
+  }
 }
 
 export function decodeNativeResponse(payload: Uint8Array): NativeResponse {
   const reader = new WordReader(payload);
-  if (reader.word() !== nativeProtocolMagic) {
-    throw new NativeProtocolError("Invalid native response magic");
-  }
-  if (reader.word() !== nativeProtocolVersion) {
-    throw new NativeProtocolError("Unsupported native response version");
-  }
-  const kind = reader.tag(["diagnostic", "analyze", "compile", "compileEcs"]);
-  let response: NativeResponse;
-  switch (kind) {
-    case "diagnostic": {
-      const diagnostic = {
-        code: reader.string(),
-        subject: reader.string(),
-        message: reader.string(),
-      };
-      reader.finish();
-      throw new CompilerError(diagnostic);
-    }
-    case "analyze":
-      response = { operation: kind, analysis: reader.read(reader.analysis) };
-      break;
-    case "compile":
-      response = { operation: kind, artifact: reader.read(reader.artifact) };
-      break;
-    case "compileEcs":
-      response = { operation: kind, artifact: reader.read(reader.ecsArtifact) };
-      break;
-  }
+  reader.header();
+  const response = reader.result();
   reader.finish();
   return response;
+}
+
+export function decodeNativeSessionResponse(
+  payload: Uint8Array,
+): NativeSessionResponse {
+  const reader = new WordReader(payload);
+  reader.header();
+  const kind = reader.word();
+  if (kind === 0) return reader.diagnostic();
+  if (kind === 3) {
+    reader.finish();
+    return { operation: "open" };
+  }
+  if (kind !== 4) {
+    throw new NativeProtocolError(`Unknown session response kind: ${kind}`);
+  }
+  // Nat's 48-bit bound is exactly representable by a JavaScript number.
+  const stats: NativeCacheStats = {
+    declarations_lowered: Number(reader.nat()),
+    declarations_reused: Number(reader.nat()),
+    groups_checked: Number(reader.nat()),
+    groups_reused: Number(reader.nat()),
+    constants_evaluated: Number(reader.nat()),
+    constants_reused: Number(reader.nat()),
+    entries_compiled: Number(reader.nat()),
+    entries_reused: Number(reader.nat()),
+  };
+  const result = reader.result();
+  reader.finish();
+  return { result, stats };
 }

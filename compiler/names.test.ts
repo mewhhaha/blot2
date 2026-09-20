@@ -6,7 +6,7 @@ const names = compiled as unknown as {
   "infer.lookup_binding"(bindings: unknown, name: string): unknown;
   "type_data.lookup"(types: unknown, identity: unknown): unknown;
   "type_data.constructor"(types: unknown, name: string): unknown;
-  "type_data.known_storage"(descriptors: unknown, identity: unknown): boolean;
+  "type_data.operation"(operations: unknown, identity: unknown): unknown;
 };
 
 function list(values: readonly unknown[]): unknown {
@@ -100,18 +100,20 @@ Deno.test("metadata scans preserve first-match binding and nominal identity sema
         payload: { $: "None" },
       },
     });
-    const descriptor = {
-      $: "Descriptor",
+    const operation = {
+      $: "Operation",
       identity,
-      storage: { $: "model.Component" },
+      parameter: { $: "UnitTy" },
+      result: { $: "U32Ty" },
     };
     for (const other of identities) {
       equal(
-        names["type_data.known_storage"](list([descriptor]), other),
-        identity === other,
+        names["type_data.operation"](list([operation]), other),
+        identity === other ? { $: "Some", value: operation } : { $: "None" },
       );
     }
   }
   equal(names["type_data.lookup"](list([]), identities[0]), { $: "None" });
   equal(names["type_data.constructor"](list(types), "Missing"), { $: "None" });
+  equal(names["type_data.operation"](list([]), identities[0]), { $: "None" });
 });

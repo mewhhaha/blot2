@@ -6,10 +6,9 @@ import {
 import { createSourceCompiler } from "./source.ts";
 import { createSourceSession } from "./source_session.ts";
 import { SourceError } from "./syntax.ts";
-import { createEcsRuntime } from "./ecs_runtime.ts";
 import { CompilerWorkers } from "./worker_pool.ts";
 import { bendArray, bendList, structuralKey } from "./pipeline.ts";
-import type { Analysis, Type, TypeId } from "./host.ts";
+import type { Analysis, EffectRow, Type } from "./host.ts";
 
 type Session = Awaited<ReturnType<typeof createIncrementalCompiler>>;
 type CleanCompiler = Awaited<ReturnType<typeof createSourceCompiler>>;
@@ -43,17 +42,37 @@ function normalized(analysis: Analysis): Analysis {
         if (!names.has(original)) names.set(original, BigInt(names.size));
         return names.get(original)!;
       };
+      const row = (value: EffectRow): EffectRow => ({
+        ...value,
+        operations: value.operations.toSorted((a, b) =>
+          a.module_name < b.module_name
+            ? -1
+            : a.module_name > b.module_name
+            ? 1
+            : a.declaration < b.declaration
+            ? -1
+            : a.declaration > b.declaration
+            ? 1
+            : 0
+        ),
+        tail: value.tail.$ === "ClosedRow"
+          ? value.tail
+          : { ...value.tail, index: index(value.tail.index) },
+      });
       const type = (value: Type): Type => {
         switch (value.$) {
           case "VariableTy":
             return { ...value, index: index(value.index) };
           case "AppliedTy":
             return { ...value, arguments: value.arguments.map(type) };
+          case "ProviderTy":
+            return { ...value, effects: row(value.effects) };
           case "FunctionTy":
             return {
               ...value,
               parameter: type(value.parameter),
               result: type(value.result),
+              effects: row(value.effects),
             };
           default:
             return value;
@@ -63,8 +82,9 @@ function normalized(analysis: Analysis): Analysis {
         ...signature,
         parameter: type(signature.parameter),
         result: type(signature.result),
-        variables: signature.variables.map(index).sort((left, right) =>
-          left < right ? -1 : left > right ? 1 : 0
+        effect_row: row(signature.effect_row),
+        variables: signature.variables.map(index).sort((a, b) =>
+          a < b ? -1 : a > b ? 1 : 0
         ),
       };
     }),
@@ -174,80 +194,63 @@ incrementalTest(
 );
 
 incrementalTest(
-  "incremental effect and constructor-layout edits agree with clean ECS execution in workers",
+  "incremental effect interfaces and reflected consts agree with clean compilation in workers",
   async (session, clean) => {
-    const source = `data Marker = Marker U32
-#[component] data Position = Position U32
-#[component] data Velocity = Velocity U32
-fn read_position () => @ecs.get Position
-fn read_velocity () => @ecs.get Velocity
-export fn move () => do:
-  use position <- read_position ()
-  let Position value = position
-  use @ecs.set (Position (@u32.add value 1))
-  return ()
+    const source = `effect Reader.ask: Unit -> U32
+effect Clock.ask: Unit -> U32
+fn reader_value () => 20
+fn clock_value () => 22
+const reader = @effect.provider Reader.ask reader_value
+const clock = @effect.provider Clock.ask clock_value
+fn read () => Reader.ask ()
+const requirements = @effect.of read
+export const requirement_count = @effect.count requirements
+export fn answer () => do reader:
+  use value <- do clock:
+    use number <- read ()
+    return number
+  return value
 `;
-    const identity = (declaration: string): TypeId => ({
-      $: "TypeId",
-      module_name: "main",
-      declaration,
-    });
-    const first = await session.compileEcs(source);
-    equivalent(first.artifact, clean.compileEcs(source));
-    const runtime = await createEcsRuntime(first.artifact);
-    const world = runtime.createWorld({
-      entityCount: 2,
-      components: [
-        { identity: identity("Position"), values: [1, 2] },
-        { identity: identity("Velocity"), values: [1, null] },
-      ],
-    });
+    const first = await session.compile(source);
+    equivalent(first.artifact, clean.compile(source));
+    equal(await answer(first.artifact), 20);
     equal(
-      runtime.readComponent(runtime.run(world), identity("Position"), 1),
-      3,
+      first.artifact.analysis.constants.find((c) =>
+        c.name === "requirement_count"
+      )?.value,
+      { $: "U32Value", value: 1 },
     );
-    const effect = source.replace(
-      "fn read_position () => @ecs.get Position",
-      `fn read_position () => do:
-  use read_velocity ()
-  use position <- @ecs.get Position
-  return position`,
+    const changedSource = source.replace(
+      "fn read () => Reader.ask ()",
+      `fn read () => do:
+  use left <- Reader.ask ()
+  use right <- Clock.ask ()
+  return @u32.add left right`,
     );
-    const changed = await session.compileEcs(effect);
-    equivalent(changed.artifact, clean.compileEcs(effect));
+    const changed = await session.compile(changedSource);
+    equivalent(changed.artifact, clean.compile(changedSource));
+    equal(await answer(changed.artifact), 42);
     equal(
-      changed.artifact.analysis.world.systems[0].query.map((storage) =>
-        storage.identity.declaration
-      ),
-      ["Position", "Velocity"],
+      changed.artifact.analysis.constants.find((c) =>
+        c.name === "requirement_count"
+      )?.value,
+      { $: "U32Value", value: 2 },
     );
-    const layout = effect.replace(
-      "data Marker = Marker U32",
-      "data Marker = Marker U32 | EmptyMarker",
-    );
-    const retagged = await session.compileEcs(layout);
-    const expected = clean.compileEcs(layout);
-    equivalent(retagged.artifact, expected);
-    equal(retagged.artifact.storage, expected.storage);
-    ok(
-      retagged.artifact.storage.some((slot, index) =>
-        slot.tag !== changed.artifact.storage[index].tag
-      ),
-    );
-    for (const artifact of [changed.artifact, retagged.artifact]) {
-      const next = await runtime.reload(world, artifact);
-      const advanced = next.runtime.run(next.world);
-      equal(next.runtime.readComponent(advanced, identity("Position"), 0), 2);
-      equal(next.runtime.readComponent(advanced, identity("Position"), 1), 2);
-      equal(runtime.readComponent(world, identity("Position"), 0), 1);
-    }
+    const repeated = await session.compile(changedSource);
+    equivalent(repeated.artifact, changed.artifact);
+    equal(repeated.stats.groups_checked, 0);
+    equal(repeated.stats.constants_evaluated, 0);
+    equal(repeated.stats.entries_compiled, 0);
     await rejects(
       () =>
-        session.compileEcs(
-          "#[component] data Position = Position Bool\nexport fn move () => @ecs.set (Position True)\n",
+        session.compile(
+          changedSource.replace("Clock.ask: Unit", "Clock.ask: Bool"),
         ),
-      diagnostic("backend_ecs_layout"),
+      diagnostic("type_mismatch"),
     );
+    const recovered = await session.compile(changedSource);
+    equivalent(recovered.artifact, changed.artifact);
+    equal(await answer(recovered.artifact), 42);
   },
   { prelude: "none", workers: 2 },
 );
@@ -380,7 +383,7 @@ Deno.test("incremental disposal rejects startup jobs, queued revisions and later
       functions: bendList([]),
       constants: bendList([]),
       data_types: bendList([]),
-      descriptors: bendList([]),
+      operations: bendList([]),
     },
     dependencies: bendList([]),
   });

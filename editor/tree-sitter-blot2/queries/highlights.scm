@@ -3,7 +3,7 @@
 ["data" "type" "effect" "const" "let" "use"] @keyword.storage.type
 ["infixl" "infixr" "infix" "prefix"] @keyword.directive
 "rec" @keyword.storage.modifier
-["if" "else" "case"] @keyword.control.conditional
+["if" "else" "case" "of"] @keyword.control.conditional
 ["for" "in" "continue"] @keyword.control.repeat
 ["return" "break"] @keyword.control.return
 ["do" "test"] @keyword.control

@@ -1,8 +1,9 @@
-import { deepStrictEqual as equal, throws } from "node:assert/strict";
+import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import {
   analyze,
   CompilerError,
   type DataType,
+  emptyRow,
   type Expr,
   type MatchArm,
 } from "./host.ts";
@@ -12,10 +13,10 @@ import {
   call,
   fn,
   integer,
+  invoke,
   local,
   module,
-  position,
-  read,
+  operation,
   u32Type,
   unit,
 } from "./fixtures.ts";
@@ -207,22 +208,22 @@ Deno.test("nested constructor coverage checks payloads, not only outer tags", ()
   rejects(
     {
       $: "MatchExpr",
-      value: ctor("Some", boolean(false)),
+      values: [ctor("Some", boolean(false))],
       arms: [
         {
-          pattern: {
+          patterns: [{
             $: "ConstructorPattern",
             constructor: "Some",
             payload: { $: "BoolPattern", value: true },
-          },
+          }],
           body: integer(1),
         },
         {
-          pattern: {
+          patterns: [{
             $: "ConstructorPattern",
             constructor: "Nothing",
             payload: null,
-          },
+          }],
           body: integer(0),
         },
       ],
@@ -234,24 +235,24 @@ Deno.test("nested constructor coverage checks payloads, not only outer tags", ()
 
 Deno.test("full Bool payload coverage plus other constructors is exhaustive", () => {
   const arms: MatchArm[] = [true, false].map((value) => ({
-    pattern: {
+    patterns: [{
       $: "ConstructorPattern" as const,
       constructor: "Some",
       payload: { $: "BoolPattern" as const, value },
-    },
+    }],
     body: integer(value ? 1 : 0),
   }));
   arms.push({
-    pattern: {
+    patterns: [{
       $: "ConstructorPattern" as const,
       constructor: "Nothing",
       payload: null,
-    },
+    }],
     body: integer(0),
   });
   const checked = analyze(module([fn("test", {
     $: "MatchExpr",
-    value: ctor("Some", boolean(false)),
+    values: [ctor("Some", boolean(false))],
     arms,
   })], { data_types: [maybe] }));
   equal(checked.functions[0].result, u32Type);
@@ -273,24 +274,27 @@ Deno.test("constructor arity and type template bounds are checked", () => {
   });
 });
 
-Deno.test("latent effects cannot disappear through pure function values", () => {
-  rejects(
-    lambda(3n, "x", read(position.identity)),
-    "effectful_function_value",
-    {
-      descriptors: [position],
-    },
-  );
-  throws(
-    () =>
-      analyze(module([
-        fn("read_position", read(position.identity), { exported: false }),
-        fn("reference", { $: "FunctionExpr", name: "read_position" }),
-      ], { descriptors: [position] })),
-    (error) =>
-      error instanceof CompilerError &&
-      error.code === "effectful_function_value",
-  );
+Deno.test("function creation is pure while returned functions retain latent effects", () => {
+  const ask = operation("Reader.ask");
+  const checked = analyze(module([
+    fn("closure", lambda(3n, "x", invoke(ask.identity))),
+    fn("read", invoke(ask.identity), { exported: false }),
+    fn("reference", { $: "FunctionExpr", name: "read" }),
+  ], { operations: [ask] }));
+  for (const index of [0, 2]) {
+    const result = checked.functions[index].result;
+    ok(result.$ === "FunctionTy");
+    equal(result.effects, {
+      $: "EffectRow",
+      operations: [ask.identity],
+      tail: { $: "ClosedRow" },
+    });
+    equal(checked.functions[index].effect_row, emptyRow());
+  }
+  equal(checked.functions[1].effects, [{
+    $: "OperationEffect",
+    identity: ask.identity,
+  }]);
 });
 
 Deno.test("guard fallback must exit and pattern names do not leak into it", () => {

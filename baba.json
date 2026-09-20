@@ -18,9 +18,22 @@
         }
       },
       {
+        "rule": "import_declaration",
+        "boundary": { "kind": "terminated", "terminal": "LAYOUT_NEWLINE" }
+      },
+      { "rule": "namespace_import", "boundary": { "kind": "root" } },
+      { "rule": "named_import", "boundary": { "kind": "root" } },
+      { "rule": "import_binding", "boundary": { "kind": "root" } },
+      {
         "rule": "declaration_attribute",
+        "boundary": { "kind": "root" }
+      },
+      {
+        "rule": "attribute_name",
         "boundary": {
-          "kind": "root"
+          "kind": "paired",
+          "open": "[",
+          "close": "]"
         }
       },
       {
@@ -42,11 +55,33 @@
         }
       },
       {
+        "rule": "effect_declaration",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
         "rule": "constructor",
         "boundary": {
           "kind": "root"
         }
       },
+      {
+        "rule": "record_fields",
+        "boundary": { "kind": "paired", "open": "{", "close": "}" }
+      },
+      { "rule": "record_field", "boundary": { "kind": "root" } },
+      { "rule": "record", "boundary": { "kind": "root" } },
+      {
+        "rule": "record_values",
+        "boundary": { "kind": "paired", "open": "{", "close": "}" }
+      },
+      { "rule": "record_value", "boundary": { "kind": "root" } },
+      {
+        "rule": "record_pattern",
+        "boundary": { "kind": "paired", "open": "{", "close": "}" }
+      },
+      { "rule": "record_pattern_field", "boundary": { "kind": "root" } },
       {
         "rule": "symbolic_fixity",
         "boundary": {
@@ -73,6 +108,12 @@
       },
       {
         "rule": "type_expression",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "effect_row",
         "boundary": {
           "kind": "root"
         }
@@ -122,6 +163,12 @@
         }
       },
       {
+        "rule": "prefix_expression",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
         "rule": "named_operator",
         "boundary": {
           "kind": "root"
@@ -146,6 +193,10 @@
           "open": "(",
           "close": ")"
         }
+      },
+      {
+        "rule": "array",
+        "boundary": { "kind": "paired", "open": "[", "close": "]" }
       },
       {
         "rule": "do_block",
@@ -185,6 +236,7 @@
           "kind": "root"
         }
       },
+      { "rule": "qualified_constructor", "boundary": { "kind": "root" } },
       {
         "rule": "pattern_group",
         "boundary": {

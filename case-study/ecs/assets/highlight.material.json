@@ -1,0 +1,5 @@
+{
+  "shader": "scene.wgsl",
+  "color": [1, 0.62, 0.12, 1],
+  "lighting": "unlit"
+}

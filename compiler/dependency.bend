@@ -8,6 +8,7 @@ type Node is Data:
 type Work is Data:
   Expression{value: M.Expr}
   Arms{values: List<&2, M.MatchArm<M.Expr>>}
+  Expressions{values: List<&2, M.Expr>}
 
 type References is Data:
   References{names: List<&2, String>, lambdas: List<&2, Nat>}
@@ -20,10 +21,17 @@ def lambdas_of(refs: References) -> List<&2, Nat>:
   References{names, lambdas} = refs
   lambdas
 
-def combine(a: References, b: References) -> References:
-  References{an, al} = a
-  References{bn, bl} = b
-  References{List.append(&2, String, an, bn), List.append(&2, Nat, al, bl)}
+def reference_name(name: String, reversed: References) -> References:
+  References{names, lambdas} = reversed
+  References{name <> names, lambdas}
+
+def reference_lambda(identity: Nat, reversed: References) -> References:
+  References{names, lambdas} = reversed
+  References{names, identity <> lambdas}
+
+def reference_order(reversed: References) -> References:
+  References{names, lambdas} = reversed
+  References{List.reverse(&2, String, names), List.reverse(&2, Nat, lambdas)}
 
 def payload_expression(payload: Maybe<&2, M.Expr>) -> M.Expr:
   match payload:
@@ -32,85 +40,127 @@ def payload_expression(payload: Maybe<&2, M.Expr>) -> M.Expr:
     case Some{value}:
       value
 
-def references(+fuel: Nat, work: Work) -> Result<&2, &2, M.Diagnostic, References>:
+def references_go(+fuel: Nat, work: Work, reversed: References) -> Result<&2, &2, M.Diagnostic, References>:
   match fuel work:
     case 0n _:
       Fail{M.Diagnostic{"expression_complexity", "inference", "expression nesting exceeds compiler traversal limit"}}
     case 1n+rest Expression{M.ConstantExpr{name}}:
-      Done{References{[name], Nil{}}}
+      Done{reference_name(name, reversed)}
     case 1n+rest Expression{M.FunctionExpr{name}}:
-      Done{References{[name], Nil{}}}
+      Done{reference_name(name, reversed)}
+    case 1n+rest Expression{M.FunctionEffectsExpr{callee}}:
+      Done{reference_name(callee, reversed)}
     case 1n+rest Expression{M.CallExpr{callee, argument}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        refs : References <- references(rest, Expression{argument})
-        return combine(References{[callee], Nil{}}, refs)
+      references_go(rest, Expression{argument}, reference_name(callee, reversed))
     case 1n+rest Expression{M.LambdaExpr{identity, parameter, p, r, body}}:
-      do Result<&2, &2, M.Diagnostic, References>:
-        refs : References <- references(rest, Expression{body})
-        return combine(References{Nil{}, [identity]}, refs)
+      references_go(rest, Expression{body}, reference_lambda(identity, reversed))
     case 1n+rest Expression{M.ApplyExpr{callee, argument}}:
       do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references(rest, Expression{callee})
-        b : References <- references(rest, Expression{argument})
-        return combine(a, b)
+        a : References <- references_go(rest, Expression{callee}, reversed)
+        references_go(rest, Expression{argument}, a)
     case 1n+rest Expression{M.ScalarExpr{operator, left, right}}:
       do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references(rest, Expression{left})
-        b : References <- references(rest, Expression{right})
-        return combine(a, b)
+        a : References <- references_go(rest, Expression{left}, reversed)
+        references_go(rest, Expression{right}, a)
+    case 1n+rest Expression{M.UnaryExpr{operator, value}}:
+      references_go(rest, Expression{value}, reversed)
     case 1n+rest Expression{M.LetExpr{name, value, body}}:
       do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references(rest, Expression{value})
-        b : References <- references(rest, Expression{body})
-        return combine(a, b)
+        a : References <- references_go(rest, Expression{value}, reversed)
+        references_go(rest, Expression{body}, a)
     case 1n+rest Expression{M.UseExpr{name, value, body}}:
       do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references(rest, Expression{value})
-        b : References <- references(rest, Expression{body})
-        return combine(a, b)
+        a : References <- references_go(rest, Expression{value}, reversed)
+        references_go(rest, Expression{body}, a)
     case 1n+rest Expression{M.IfExpr{condition, consequent, alternative}}:
       do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references(rest, Expression{condition})
-        b : References <- references(rest, Expression{consequent})
-        c : References <- references(rest, Expression{alternative})
-        return combine(a, combine(b, c))
+        a : References <- references_go(rest, Expression{condition}, reversed)
+        b : References <- references_go(rest, Expression{consequent}, a)
+        references_go(rest, Expression{alternative}, b)
     case 1n+rest Expression{M.SequenceExpr{first, next}}:
       do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references(rest, Expression{first})
-        b : References <- references(rest, Expression{next})
-        return combine(a, b)
-    case 1n+rest Expression{M.MatchExpr{value, arms}}:
+        a : References <- references_go(rest, Expression{first}, reversed)
+        references_go(rest, Expression{next}, a)
+    case 1n+rest Expression{M.MatchExpr{values, arms}}:
       do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references(rest, Expression{value})
-        b : References <- references(rest, Arms{arms})
-        return combine(a, b)
+        a : References <- references_go(rest, Expressions{values}, reversed)
+        references_go(rest, Arms{arms}, a)
     case 1n+rest Expression{M.GuardExpr{pattern, value, alternative, body}}:
       do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references(rest, Expression{value})
-        b : References <- references(rest, Expression{alternative})
-        c : References <- references(rest, Expression{body})
-        return combine(a, combine(b, c))
+        a : References <- references_go(rest, Expression{value}, reversed)
+        b : References <- references_go(rest, Expression{alternative}, a)
+        references_go(rest, Expression{body}, b)
     case 1n+rest Expression{M.ConstructExpr{constructor, payload}}:
-      references(rest, Expression{payload_expression(payload)})
+      references_go(rest, Expression{payload_expression(payload)}, reversed)
+    case 1n+rest Expression{M.ProductExpr{elements}}:
+      references_go(rest, Expressions{elements}, reversed)
+    case 1n+rest Expression{M.ProjectExpr{value, index}}:
+      references_go(rest, Expression{value}, reversed)
+    case 1n+rest Expression{M.ArrayExpr{elements}}:
+      references_go(rest, Expressions{elements}, reversed)
+    case 1n+rest Expression{M.ArrayGetExpr{array, index}}:
+      references_go(rest, Expressions{[array, index]}, reversed)
+    case 1n+rest Expression{M.ArraySetExpr{array, index, value}}:
+      references_go(rest, Expressions{[array, index, value]}, reversed)
+    case 1n+rest Expression{M.ArrayLengthExpr{array}}:
+      references_go(rest, Expression{array}, reversed)
     case 1n+rest Expression{M.BlockExpr{label, body}}:
-      references(rest, Expression{body})
+      references_go(rest, Expression{body}, reversed)
     case 1n+rest Expression{M.ReturnExpr{label, value}}:
-      references(rest, Expression{value})
+      references_go(rest, Expression{value}, reversed)
     case 1n+rest Expression{M.SourceExpr{offset, annotation, value}}:
-      references(rest, Expression{value})
-    case 1n+rest Expression{M.WriteExpr{value}}:
-      references(rest, Expression{value})
-    case 1n+rest Expression{M.InsertExpr{value}}:
-      references(rest, Expression{value})
-    case 1n+rest Expression{other}:
-      Done{References{Nil{}, Nil{}}}
-    case 1n+rest Arms{Nil{}}:
-      Done{References{Nil{}, Nil{}}}
-    case 1n+rest Arms{M.MatchArm{pattern, body} <> tail}:
+      references_go(rest, Expression{value}, reversed)
+    case 1n+rest Expression{M.ProviderExpr{identity, implementation}}:
+      references_go(rest, Expression{implementation}, reversed)
+    case 1n+rest Expression{M.HandleExpr{provider, body}}:
       do Result<&2, &2, M.Diagnostic, References>:
-        a : References <- references(rest, Expression{body})
-        b : References <- references(rest, Arms{tail})
-        return combine(a, b)
+        a : References <- references_go(rest, Expression{provider}, reversed)
+        references_go(rest, Expression{body}, a)
+    case 1n+rest Expression{M.EffectHasExpr{set, operation}}:
+      do Result<&2, &2, M.Diagnostic, References>:
+        a : References <- references_go(rest, Expression{set}, reversed)
+        references_go(rest, Expression{operation}, a)
+    case 1n+rest Expression{M.EffectCountExpr{set}}:
+      references_go(rest, Expression{set}, reversed)
+    case 1n+rest Expression{M.EffectSameExpr{left, right}}:
+      do Result<&2, &2, M.Diagnostic, References>:
+        a : References <- references_go(rest, Expression{left}, reversed)
+        references_go(rest, Expression{right}, a)
+    case 1n+rest Expression{M.UnitExpr{}}:
+      Done{reversed}
+    case 1n+rest Expression{M.U32Expr{value}}:
+      Done{reversed}
+    case 1n+rest Expression{M.F32Expr{value}}:
+      Done{reversed}
+    case 1n+rest Expression{M.BoolExpr{value}}:
+      Done{reversed}
+    case 1n+rest Expression{M.LocalExpr{name}}:
+      Done{reversed}
+    case 1n+rest Expression{M.ConstructorRefExpr{name}}:
+      Done{reversed}
+    case 1n+rest Expression{M.OperationExpr{identity}}:
+      Done{reversed}
+    case 1n+rest Expression{M.OperationDescriptorExpr{identity}}:
+      Done{reversed}
+    case 1n+rest Expression{M.PanicExpr{message}}:
+      Done{reversed}
+    case 1n+rest Arms{Nil{}}:
+      Done{reversed}
+    case 1n+rest Arms{M.MatchArm{patterns, body} <> tail}:
+      do Result<&2, &2, M.Diagnostic, References>:
+        a : References <- references_go(rest, Expression{body}, reversed)
+        references_go(rest, Arms{tail}, a)
+    case 1n+rest Expressions{Nil{}}:
+      Done{reversed}
+    case 1n+rest Expressions{head <> tail}:
+      do Result<&2, &2, M.Diagnostic, References>:
+        a : References <- references_go(rest, Expression{head}, reversed)
+        references_go(rest, Expressions{tail}, a)
+
+def references(fuel: Nat, work: Work) -> Result<&2, &2, M.Diagnostic, References>:
+  do Result<&2, &2, M.Diagnostic, References>:
+    reversed : References <- references_go(fuel, work, References{Nil{}, Nil{}})
+    return reference_order(reversed)
 
 def function_nodes(functions: List<&2, M.Function>) -> Result<&2, &2, M.Diagnostic, List<&2, Node>>:
   match functions:

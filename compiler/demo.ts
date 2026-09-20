@@ -2,16 +2,10 @@ import { createNativeCompiler } from "./native.ts";
 
 const compiler = await createNativeCompiler();
 let artifact;
-let ecs;
 try {
   artifact = await compiler.compile(
     await Deno.readTextFile(
       new URL("../examples/prelude.blot", import.meta.url),
-    ),
-  );
-  ecs = await compiler.analyze(
-    await Deno.readTextFile(
-      new URL("../examples/ecs_runtime.blot", import.meta.url),
     ),
   );
 } finally {
@@ -31,4 +25,3 @@ if (answer(0) !== 42 || constAnswer.value !== 42) {
 console.log(
   `const_answer = ${constAnswer.value}; generic prelude compiled to Wasm`,
 );
-console.log("ECS plan:", JSON.stringify(ecs.world, null, 2));

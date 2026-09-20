@@ -4,105 +4,172 @@ import ./types.bend as T
 import ./type_data.bend as D
 import ./infer.bend as I
 
-def wildcard(patterns: List<&2, M.Pattern>) -> Bool:
+def wildcard_row(patterns: List<&2, M.Pattern>) -> Bool:
   match patterns:
     case Nil{}:
-      False{}
+      True{}
     case M.WildcardPattern{} <> tail:
-      True{}
+      wildcard_row(tail)
     case M.BindingPattern{name} <> tail:
-      True{}
-    case head <> tail:
-      wildcard(tail)
+      wildcard_row(tail)
+    case other <> tail:
+      False{}
 
-def bool_case(patterns: List<&2, M.Pattern>, +value: Bool) -> Bool:
-  match patterns:
+def has_wildcard_row_work(rows: List<&2, List<&2, M.Pattern>>, found: Bool) -> Bool:
+  match rows found:
+    case _ True{}:
+      True{}
+    case Nil{} False{}:
+      False{}
+    case row <> tail False{}:
+      has_wildcard_row_work(tail, wildcard_row(row))
+
+def has_wildcard_row(rows: List<&2, List<&2, M.Pattern>>) -> Bool:
+  has_wildcard_row_work(rows, False{})
+
+def has_never_column(types: List<&2, M.Ty>) -> Bool:
+  match types:
     case Nil{}:
       False{}
-    case M.BoolPattern{found} <> tail:
-      Bool.or(Bool.not(Bool.xor(found, value)), bool_case(tail, value))
-    case head <> tail:
-      bool_case(tail, value)
-
-def unit_case(patterns: List<&2, M.Pattern>) -> Bool:
-  match patterns:
-    case Nil{}:
-      False{}
-    case M.UnitPattern{} <> tail:
+    case M.NeverTy{} <> tail:
       True{}
-    case head <> tail:
-      unit_case(tail)
+    case other <> tail:
+      has_never_column(tail)
 
-def constructor_payloads(patterns: List<&2, M.Pattern>, +name: String) -> List<&2, M.Pattern>:
-  match patterns:
+type Head is Data:
+  UnitHead{}
+  BoolHead{value: Bool}
+  ConstructorHead{name: String, payload: Bool}
+  ProductHead{arity: Nat}
+  DefaultHead{}
+
+def wildcard_fields(count: Nat, tail: List<&2, M.Pattern>) -> List<&2, M.Pattern>:
+  match count:
+    case 0n:
+      tail
+    case 1n+rest:
+      wildcard_fields(rest, M.WildcardPattern{} <> tail)
+
+def select_head(head: Head, pattern: M.Pattern, remaining: List<&2, M.Pattern>) -> Maybe<&2, List<&2, M.Pattern>>:
+  match head pattern:
+    case ConstructorHead{name, True{}} M.WildcardPattern{}:
+      Some{M.WildcardPattern{} <> remaining}
+    case ConstructorHead{name, True{}} M.BindingPattern{binding}:
+      Some{M.WildcardPattern{} <> remaining}
+    case ProductHead{arity} M.WildcardPattern{}:
+      Some{wildcard_fields(arity, remaining)}
+    case ProductHead{arity} M.BindingPattern{binding}:
+      Some{wildcard_fields(arity, remaining)}
+    case _ M.WildcardPattern{}:
+      Some{remaining}
+    case _ M.BindingPattern{name}:
+      Some{remaining}
+    case UnitHead{} M.UnitPattern{}:
+      Some{remaining}
+    case BoolHead{a} M.BoolPattern{b}:
+      Bool.pick(Maybe<&2, List<&2, M.Pattern>>, Bool.not(Bool.xor(a, b)), Some{remaining}, None{})
+    case ConstructorHead{name, False{}} M.ConstructorPattern{found, None{}}:
+      Bool.pick(Maybe<&2, List<&2, M.Pattern>>, M.name_equal(name, found), Some{remaining}, None{})
+    case ConstructorHead{name, True{}} M.ConstructorPattern{found, Some{payload}}:
+      Bool.pick(Maybe<&2, List<&2, M.Pattern>>, M.name_equal(name, found), Some{payload <> remaining}, None{})
+    case ProductHead{arity} M.ProductPattern{+elements}:
+      Bool.pick(Maybe<&2, List<&2, M.Pattern>>, Nat.is_eq(arity, List.length(&2, M.Pattern, elements)), Some{List.reverse.go(&2, M.Pattern, List.reverse(&2, M.Pattern, elements), remaining)}, None{})
+    case _ _:
+      None{}
+
+def add_selected(selected: Maybe<&2, List<&2, M.Pattern>>, rows: List<&2, List<&2, M.Pattern>>) -> List<&2, List<&2, M.Pattern>>:
+  match selected:
+    case None{}:
+      rows
+    case Some{row}:
+      row <> rows
+
+def specialize(rows: List<&2, List<&2, M.Pattern>>, +head: Head) -> List<&2, List<&2, M.Pattern>>:
+  match rows:
     case Nil{}:
       Nil{}
-    case M.ConstructorPattern{found, None{}} <> tail:
-      +rest = constructor_payloads(tail, name)
-      Bool.pick(List<&2, M.Pattern>, M.name_equal(found, name), M.UnitPattern{} <> rest, rest)
-    case M.ConstructorPattern{found, Some{payload}} <> tail:
-      +rest = constructor_payloads(tail, name)
-      Bool.pick(List<&2, M.Pattern>, M.name_equal(found, name), payload <> rest, rest)
-    case head <> tail:
-      constructor_payloads(tail, name)
+    case Nil{} <> tail:
+      specialize(tail, head)
+    case (pattern <> remaining) <> tail:
+      add_selected(select_head(head, pattern, remaining), specialize(tail, head))
 
 type Work is Data:
-  Cover{inferred_type: M.Ty, patterns: List<&2, M.Pattern>}
-  Check{complete: Bool, inferred_type: M.Ty, patterns: List<&2, M.Pattern>}
-  DataCases{definition: Maybe<&2, M.DataType>, arguments: List<&2, M.Ty>, patterns: List<&2, M.Pattern>}
-  Constructors{constructors: List<&2, M.Constructor>, arguments: List<&2, M.Ty>, patterns: List<&2, M.Pattern>}
+  Cover{inferred_types: List<&2, M.Ty>, rows: List<&2, List<&2, M.Pattern>>}
+  Check{complete: Bool, inferred_types: List<&2, M.Ty>, rows: List<&2, List<&2, M.Pattern>>}
+  DataCases{definition: Maybe<&2, M.DataType>, arguments: List<&2, M.Ty>, remaining: List<&2, M.Ty>, rows: List<&2, List<&2, M.Pattern>>}
+  Constructors{constructors: List<&2, M.Constructor>, arguments: List<&2, M.Ty>, remaining: List<&2, M.Ty>, rows: List<&2, List<&2, M.Pattern>>}
 
+# Specialize complete rows, never each column independently: correlations between
+# scrutinees remain in the matrix throughout constructor/default expansion.
 def coverage(+fuel: Nat, work: Work, +types: List<&2, M.DataType>) -> Result<&2, &2, M.Diagnostic, Bool>:
   match fuel work:
     case 0n _:
       Fail{M.Diagnostic{"pattern_complexity", "inference", "pattern coverage exceeds compiler traversal limit"}}
-    case 1n+rest Cover{ty, +patterns}:
-      coverage(rest, Check{wildcard(patterns), ty, patterns}, types)
-    case 1n+rest Check{True{}, ty, patterns}:
+    case 1n+rest Cover{+inferred, +rows}:
+      # Every scrutinee runs before matching, including later divergent columns.
+      coverage(rest, Check{Bool.or(has_never_column(inferred), has_wildcard_row(rows)), inferred, rows}, types)
+    case 1n+rest Check{True{}, inferred, rows}:
       Done{True{}}
-    case 1n+rest Check{False{}, M.NeverTy{}, patterns}:
+    case 1n+rest Check{False{}, M.NeverTy{} <> remaining, rows}:
       Done{True{}}
-    case 1n+rest Check{False{}, ty, Nil{}}:
+    case 1n+rest Check{False{}, inferred, Nil{}}:
       Done{False{}}
-    case 1n+rest Check{False{}, M.BoolTy{}, +patterns}:
-      Done{Bool.and(bool_case(patterns, True{}), bool_case(patterns, False{}))}
-    case 1n+rest Check{False{}, M.UnitTy{}, patterns}:
-      Done{unit_case(patterns)}
-    case 1n+rest Check{False{}, M.AppliedTy{identity, arguments}, patterns}:
-      coverage(rest, DataCases{D.lookup(types, identity), arguments, patterns}, types)
-    case 1n+rest Check{False{}, other, patterns}:
+    case 1n+rest Check{False{}, Nil{}, rows}:
       Done{False{}}
-    case 1n+rest DataCases{None{}, arguments, patterns}:
-      Fail{M.Diagnostic{"internal_error", "inference", "coverage references an unknown data type"}}
-    case 1n+rest DataCases{Some{M.DataType{identity, count, constructors}}, arguments, patterns}:
-      coverage(rest, Constructors{constructors, arguments, patterns}, types)
-    case 1n+rest Constructors{Nil{}, arguments, patterns}:
-      Done{True{}}
-    case 1n+rest Constructors{M.Constructor{name, None{}} <> tail, +arguments, +patterns}:
+    case 1n+rest Check{False{}, M.BoolTy{} <> +remaining, +rows}:
       do Result<&2, &2, M.Diagnostic, Bool>:
-        following : Bool <- coverage(rest, Constructors{tail, arguments, patterns}, types)
-        return Bool.and(unit_case(constructor_payloads(patterns, name)), following)
-    case 1n+rest Constructors{M.Constructor{name, Some{payload}} <> tail, +arguments, +patterns}:
+        yes : Bool <- coverage(rest, Cover{remaining, specialize(rows, BoolHead{True{}})}, types)
+        no : Bool <- coverage(rest, Cover{remaining, specialize(rows, BoolHead{False{}})}, types)
+        return Bool.and(yes, no)
+    case 1n+rest Check{False{}, M.UnitTy{} <> remaining, rows}:
+      coverage(rest, Cover{remaining, specialize(rows, UnitHead{})}, types)
+    case 1n+rest Check{False{}, M.AppliedTy{identity, arguments} <> remaining, rows}:
+      coverage(rest, DataCases{D.lookup(types, identity), arguments, remaining, rows}, types)
+    case 1n+rest Check{False{}, M.ProductTy{+elements} <> remaining, rows}:
+      coverage(rest, Cover{List.reverse.go(&2, M.Ty, List.reverse(&2, M.Ty, elements), remaining), specialize(rows, ProductHead{List.length(&2, M.Ty, elements)})}, types)
+    case 1n+rest Check{False{}, other <> remaining, rows}:
+      coverage(rest, Cover{remaining, specialize(rows, DefaultHead{})}, types)
+    case 1n+rest DataCases{None{}, arguments, remaining, rows}:
+      Fail{M.Diagnostic{"internal_error", "inference", "coverage references an unknown data type"}}
+    case 1n+rest DataCases{Some{M.DataType{identity, count, constructors}}, arguments, remaining, rows}:
+      coverage(rest, Constructors{constructors, arguments, remaining, rows}, types)
+    case 1n+rest Constructors{Nil{}, arguments, remaining, rows}:
+      Done{True{}}
+    case 1n+rest Constructors{M.Constructor{name, None{}} <> tail, +arguments, +remaining, +rows}:
+      do Result<&2, &2, M.Diagnostic, Bool>:
+        current : Bool <- coverage(rest, Cover{remaining, specialize(rows, ConstructorHead{name, False{}})}, types)
+        following : Bool <- coverage(rest, Constructors{tail, arguments, remaining, rows}, types)
+        return Bool.and(current, following)
+    case 1n+rest Constructors{M.Constructor{name, Some{payload}} <> tail, +arguments, +remaining, +rows}:
       do Result<&2, &2, M.Diagnostic, Bool>:
         ty : M.Ty <- T.parameters(arguments, 0n, payload)
-        current : Bool <- coverage(rest, Cover{ty, constructor_payloads(patterns, name)}, types)
-        following : Bool <- coverage(rest, Constructors{tail, arguments, patterns}, types)
+        current : Bool <- coverage(rest, Cover{ty <> remaining, specialize(rows, ConstructorHead{name, True{}})}, types)
+        following : Bool <- coverage(rest, Constructors{tail, arguments, remaining, rows}, types)
         return Bool.and(current, following)
 
-def require(complete: Bool, ty: M.Ty, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
+def types_show(types: List<&2, M.Ty>) -> String:
+  match types:
+    case Nil{}:
+      ""
+    case head <> Nil{}:
+      M.type_show(head)
+    case head <> next <> tail:
+      M.type_show(head) ++ ", " ++ types_show(next <> tail)
+
+def require(complete: Bool, types: List<&2, M.Ty>, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
   match complete:
     case True{}:
       Done{Unit{}}
     case False{}:
-      Fail{M.Diagnostic{"non_exhaustive_match", subject, "patterns do not cover every value of " ++ M.type_show(ty)}}
+      Fail{M.Diagnostic{"non_exhaustive_match", subject, "pattern rows do not cover every value of (" ++ types_show(types) ++ ")"}}
 
 def check(constraints: List<&2, I.Coverage>, +substitutions: List<&2, T.Substitution>, +types: List<&2, M.DataType>) -> Result<&2, &2, M.Diagnostic, Unit>:
   match constraints:
     case Nil{}:
       Done{Unit{}}
-    case I.Coverage{ty, patterns, subject} <> tail:
+    case I.Coverage{inferred, patterns, subject} <> tail:
       do Result<&2, &2, M.Diagnostic, Unit>:
-        +resolved : M.Ty <- T.resolve(substitutions, ty)
-        complete : Bool <- coverage(Nat.mul(256n, 256n), Cover{resolved, patterns}, types)
+        +resolved : List<&2, M.Ty> <- T.resolve_work(substitutions, U32.to_nat(65536), T.ManyTypes{inferred})
+        complete : Bool <- coverage(U32.to_nat(65536), Cover{resolved, patterns}, types)
         valid : Unit <- require(complete, resolved, subject)
         check(tail, substitutions, types)

@@ -1,27 +1,7 @@
 import compiled from "../generated/compiler/compiler.js";
 import { CompilerError, type TypeId } from "./host.ts";
-
-export type BendList<T> = { readonly $: "Nil" } | {
-  readonly $: "Con";
-  readonly head: T;
-  readonly tail: BendList<T>;
-};
-
-export function bendList<T>(values: readonly T[]): BendList<T> {
-  let result: BendList<T> = { $: "Nil" };
-  for (let index = values.length - 1; index >= 0; index--) {
-    result = { $: "Con", head: values[index], tail: result };
-  }
-  return result;
-}
-
-export function bendArray<T>(values: BendList<T>): T[] {
-  const result: T[] = [];
-  for (let cursor = values; cursor.$ === "Con"; cursor = cursor.tail) {
-    result.push(cursor.head);
-  }
-  return result;
-}
+import type { BendList } from "./bend_list.ts";
+export { bendArray, type BendList, bendList } from "./bend_list.ts";
 
 export interface Declaration {
   readonly name: string;
@@ -34,7 +14,7 @@ export interface NominalDeclaration {
 
 export interface RawModule {
   readonly $: "Module";
-  readonly descriptors: BendList<NominalDeclaration>;
+  readonly operations: BendList<NominalDeclaration>;
   readonly data_types: BendList<NominalDeclaration>;
   readonly constants: BendList<Declaration>;
   readonly functions: BendList<Declaration>;
@@ -55,6 +35,7 @@ export interface CheckedModule {
   readonly constants: BendList<CheckedConstant>;
   readonly functions: BendList<CheckedFunction>;
   readonly data_types: BendList<unknown>;
+  readonly operations: BendList<NominalDeclaration>;
 }
 
 export interface GroupJob {
@@ -132,6 +113,7 @@ export function result<T>(name: string, ...args: readonly unknown[]): T {
 export function structuralKey(value: unknown): string {
   const parts: string[] = [];
   const pending: unknown[] = [value];
+  const numberBits = new DataView(new ArrayBuffer(8));
   while (pending.length) {
     const current = pending.pop();
     if (current === null) {
@@ -146,6 +128,18 @@ export function structuralKey(value: unknown): string {
       }
     } else if (typeof current === "bigint") {
       parts.push(`n${current};`);
+    } else if (
+      typeof current === "number" &&
+      (Object.is(current, -0) || !Number.isFinite(current))
+    ) {
+      // JSON collapses signed zero and all non-finite numbers. Preserve IEEE
+      // bits, including a NaN payload, before keys reach const/code caches.
+      numberBits.setFloat64(0, current);
+      parts.push(
+        `number:bits${numberBits.getUint32(0).toString(16).padStart(8, "0")}${
+          numberBits.getUint32(4).toString(16).padStart(8, "0")
+        };`,
+      );
     } else {
       parts.push(`${typeof current}:${JSON.stringify(current)};`);
     }

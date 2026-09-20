@@ -8,13 +8,13 @@ fn doubled value => value * 2
 const add_two = U32.add 2
 const transform = compose doubled increment
 
-export const const_answer = Maybe.unwrap_or 0 (Maybe.map transform (Some 20))
+export const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ Some 20
 
 export fn answer () => do:
   let candidate = Maybe.map add_two (Some 40)
   let Some(value) = candidate else:
     return 0
-  return Result.unwrap_or 0 (Result.map identity (Ok value))
+  return Result.unwrap_or 0 $ Result.map identity $ Ok value
 
 // One generic function and one local lambda each work at distinct types.
 export fn generic_identity () => do:
@@ -33,7 +33,7 @@ export fn inspect (enabled: Bool) => do:
     if enabled:
       return Some (Some 42)
     return Some Nothing
-  return case candidate:
+  return case candidate of
     Some (Some value) => value
     Some Nothing => 0
     Nothing => 0

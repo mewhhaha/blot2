@@ -1,0 +1,33 @@
+// Operations and their providers are source-defined; no ECS or platform builtins.
+effect Reader.ask: Unit -> U32
+effect Other.ask: Unit -> U32
+
+fn read () => Reader.ask ()
+fn invoke work => work ()
+fn reader value => @effect.provider Reader.ask (fn () => value)
+
+const forty = reader 40
+fn increment_reader () => do:
+  use outer <- Reader.ask ()
+  return @u32.add outer 1
+const increment = @effect.provider Reader.ask increment_reader
+
+export fn answer () => do forty:
+  return do increment:
+    use value <- invoke read
+    return @u32.add value 1
+
+export const const_answer = answer ()
+
+// These opaque descriptors are compile-time values, not runtime handles.
+const reads = @effect.of read
+export const effect_count = @effect.count reads
+export const reads_reader = @effect.has reads Reader.ask
+export const reads_other = @effect.has reads Other.ask
+
+// Creating a closure is pure. Its call is handled where it is invoked.
+const delayed = do forty:
+  return fn () => Reader.ask ()
+
+export fn deferred () => do (reader 7):
+  return delayed ()

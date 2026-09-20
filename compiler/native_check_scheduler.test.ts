@@ -1,0 +1,158 @@
+import { deepStrictEqual as equal, ok, rejects } from "node:assert/strict";
+import { createNativeCompiler } from "./native.ts";
+import { createNativeIncrementalCompiler } from "./native_incremental.ts";
+import { createSourceCompiler } from "./source.ts";
+import { SourceError } from "./syntax.ts";
+
+const genericSource = `effect Reader.ask: Unit -> U32
+data Maybe a = Some a | Nothing
+fn identity value => value
+fn defer action => fn () => action ()
+fn ask () => Reader.ask ()
+fn read_handler () => 40
+const reader = @effect.provider Reader.ask read_handler
+fn even value => case @u32.eq value 0 of
+  True => True
+  False => odd (@u32.sub value 1)
+fn odd value => case @u32.eq value 0 of
+  True => False
+  False => even (@u32.sub value 1)
+export const reader_effects = @effect.count (@effect.of ask)
+export fn answer () => do reader:
+  use value <- (defer ask) ()
+  return case identity (Some value), identity True, even 4 of
+    Some number, True, True => @u32.add number 2
+    _, _, _ => 0
+`;
+
+async function answer(bytes: Uint8Array<ArrayBuffer>) {
+  const { instance } = await WebAssembly.instantiate(bytes);
+  const fn = instance.exports.answer;
+  ok(typeof fn === "function");
+  return fn(0);
+}
+
+Deno.test("ready inference preserves generic SCCs and latent effects in JS and one/four-thread native compilation", async () => {
+  const reference = await createSourceCompiler({ prelude: "none" });
+  try {
+    const expected = reference.compile(genericSource);
+    equal(await answer(expected.bytes), 42);
+    for (const threads of [1, 4]) {
+      const native = await createNativeCompiler({ prelude: "none", threads });
+      const session = await createNativeIncrementalCompiler({
+        prelude: "none",
+        threads,
+      });
+      try {
+        equal(await native.compile(genericSource), expected);
+        const initial = await session.compile(genericSource);
+        equal(initial.artifact, expected);
+        ok(initial.stats.groups_checked > 0);
+        const edited = genericSource.replace(
+          "read_handler () => 40",
+          "read_handler () => 41",
+        );
+        const update = await session.compile(edited);
+        equal(update.artifact, reference.compile(edited));
+        equal(update.artifact, await native.compile(edited));
+        equal(await answer(update.artifact.bytes), 43);
+        equal(update.stats.groups_checked, 1);
+        ok(update.stats.groups_reused > 0);
+      } finally {
+        await native.dispose();
+        await session.dispose();
+      }
+    }
+  } finally {
+    reference.dispose();
+  }
+});
+
+function fanout() {
+  const branches = Array.from({ length: 24 }, (_, branch) => {
+    const lines = [
+      `export fn branch_${branch} () => do:`,
+      "  let value_0 = seed ()",
+    ];
+    for (let step = 1; step <= 16; step++) {
+      lines.push(`  let value_${step} = @u32.add value_${step - 1} 1`);
+    }
+    lines.push("  return value_16");
+    return lines.join("\n");
+  });
+  return [
+    "fn seed () => 40",
+    ...branches,
+    "export fn answer () => branch_0 ()",
+    "",
+  ].join("\n");
+}
+
+async function diagnostic(run: () => unknown | Promise<unknown>) {
+  let found: SourceError | undefined;
+  await rejects(async () => await run(), (error: unknown) => {
+    ok(error instanceof SourceError, String(error));
+    found = error;
+    return true;
+  });
+  ok(found);
+  return {
+    code: found.code,
+    message: found.message,
+    start: found.start,
+    end: found.end,
+  };
+}
+
+Deno.test("native ready batches retain interface hits and roll back all caches after parallel inference failure", async () => {
+  const reference = await createSourceCompiler({ prelude: "none" });
+  try {
+    const original = fanout();
+    const edited = original.replace("seed () => 40", "seed () => 41");
+    const broken = edited.replace("seed () => 41", "seed () => True");
+    const expected = reference.compile(edited);
+    const expectedDiagnostic = await diagnostic(() =>
+      reference.compile(broken)
+    );
+    equal(expectedDiagnostic.code, "type_mismatch");
+    for (const threads of [1, 4]) {
+      const native = await createNativeCompiler({ prelude: "none", threads });
+      const session = await createNativeIncrementalCompiler({
+        prelude: "none",
+        threads,
+      });
+      try {
+        const first = await session.compile(original);
+        const changed = await session.compile(edited);
+        equal(changed.artifact, expected);
+        equal(await native.compile(edited), expected);
+        equal(await answer(changed.artifact.bytes), 57);
+        equal(changed.stats.groups_checked, 1);
+        equal(changed.stats.groups_reused, first.stats.groups_checked - 1);
+        equal(
+          await diagnostic(() => native.compile(broken)),
+          expectedDiagnostic,
+        );
+        equal(
+          await diagnostic(() => session.compile(broken)),
+          expectedDiagnostic,
+        );
+        // A changed const budget bypasses the host's whole-result fast path.
+        // Type keys do not contain it, so all last-successful groups must hit.
+        const recovered = await session.compile(edited, { const_steps: 9999n });
+        equal(recovered.stats.result_reused, false);
+        equal(recovered.stats.groups_checked, 0);
+        equal(recovered.stats.groups_reused, first.stats.groups_checked);
+        equal(
+          recovered.artifact,
+          reference.compile(edited, { const_steps: 9999n }),
+        );
+      } finally {
+        await native.dispose();
+        await session.dispose();
+      }
+    }
+  } finally {
+    reference.dispose();
+  }
+});

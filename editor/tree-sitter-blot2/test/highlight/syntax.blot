@@ -97,9 +97,10 @@ let (number: F64) = value else:
 //                        ^ keyword.control.conditional
   return 0.0
 
-case value:
+case value of
 // <- keyword.control.conditional
 //   ^ variable
+//         ^ keyword.control.conditional
   (number: F64) => number
 //^ punctuation.bracket
 // ^ variable
@@ -108,6 +109,14 @@ case value:
   (message: Text) => message
 // ^ variable
 //          ^ type
+
+case first, second, third of
+// <- keyword.control.conditional
+//   ^ variable
+//        ^ punctuation.delimiter
+//                        ^ keyword.control.conditional
+  Some value, True, _ => value
+//^ type
 
 "if let Some(x) = y else: F64 | Text"
 // <- string
@@ -234,6 +243,13 @@ do try:
 //       ^ !operator
 //         ^ variable
 
+infixr 0 ($) = apply
+//        ^ operator
+
+return identity $ value
+//              ^ operator
+//              ^ !punctuation.special
+
 "return $ result"
 // <- string
 // ^ !keyword.control.return
@@ -312,7 +328,7 @@ const seed: U32 = 0xC0FFEE
 const epsilon: F32 = 1e-5
 //                   ^ constant.numeric.float
 
-effect Random:
+effect Random.next: Unit -> U32
 // <- keyword.storage.type
 //     ^ type
 

@@ -5,7 +5,7 @@ interface Global {
   readonly $: "Global";
   readonly source: string;
   readonly core: string;
-  readonly kind: { readonly $: "lower.FunctionName" };
+  readonly kind: { readonly $: "FunctionName" };
 }
 
 interface Context {
@@ -45,7 +45,7 @@ function empty(): Context {
 }
 
 function global(source: string, core = source): Global {
-  return { $: "Global", source, core, kind: { $: "lower.FunctionName" } };
+  return { $: "Global", source, core, kind: { $: "FunctionName" } };
 }
 
 function scope(names: readonly string[], prefix = ""): Context {
@@ -54,7 +54,7 @@ function scope(names: readonly string[], prefix = ""): Context {
       context,
       source,
       prefix + source,
-      { $: "lower.FunctionName" },
+      { $: "FunctionName" },
       {
         $: "Cst",
         kind: "IDENT",

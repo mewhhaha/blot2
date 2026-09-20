@@ -49,6 +49,9 @@ export class NativeProcess {
         executable instanceof URL ? fileURLToPath(executable) : executable,
         {
           args: ["--threads", String(threads)],
+          // The owned compiler needs no ambient environment. In particular,
+          // a desktop libxdo shim must not change its loader or require broad run permissions.
+          clearEnv: true,
           stdin: "piped",
           stdout: "piped",
           stderr: "piped",

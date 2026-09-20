@@ -109,16 +109,16 @@ Deno.test("Wasm first-class named functions and constructor functions share appl
         constructor: "Some",
       }, {
         $: "MatchExpr",
-        value: apply(
+        values: [apply(
           local("wrap"),
           apply({ $: "FunctionExpr", name: "increment" }, local("value")),
-        ),
+        )],
         arms: [
           {
-            pattern: constructorPattern("Some", capture("number")),
+            patterns: [constructorPattern("Some", capture("number"))],
             body: local("number"),
           },
-          { pattern: constructorPattern("Nothing"), body: integer(0) },
+          { patterns: [constructorPattern("Nothing")], body: integer(0) },
         ],
       }),
       { parameter_type: u32Type },
@@ -130,7 +130,7 @@ Deno.test("Wasm first-class named functions and constructor functions share appl
 Deno.test("Wasm nested constructor patterns guard payload access and capture pattern bindings", async () => {
   const matched: Expr = {
     $: "MatchExpr",
-    value: {
+    values: [{
       $: "IfExpr",
       condition: {
         $: "ScalarExpr",
@@ -140,21 +140,21 @@ Deno.test("Wasm nested constructor patterns guard payload access and capture pat
       },
       consequent: construct("Nothing"),
       alternative: construct("Some", construct("Some", local("value"))),
-    },
+    }],
     arms: [
       {
-        pattern: constructorPattern("Some", constructorPattern("Nothing")),
+        patterns: [constructorPattern("Some", constructorPattern("Nothing"))],
         body: lambda(3n, "extra", integer(1)),
       },
       {
-        pattern: constructorPattern(
+        patterns: [constructorPattern(
           "Some",
           constructorPattern("Some", capture("number")),
-        ),
+        )],
         body: lambda(4n, "extra", add(local("number"), local("extra"))),
       },
       {
-        pattern: constructorPattern("Nothing"),
+        patterns: [constructorPattern("Nothing")],
         body: lambda(5n, "extra", integer(0)),
       },
     ],
@@ -170,13 +170,13 @@ Deno.test("Wasm serializes nested algebraic constants and captured constant clos
   const compiled = await instantiate(module([
     fn("answer", {
       $: "MatchExpr",
-      value: { $: "ConstantExpr", name: "wrapped" },
+      values: [{ $: "ConstantExpr", name: "wrapped" }],
       arms: [
         {
-          pattern: constructorPattern("Some", capture("number")),
+          patterns: [constructorPattern("Some", capture("number"))],
           body: apply({ $: "ConstantExpr", name: "adder" }, local("number")),
         },
-        { pattern: constructorPattern("Nothing"), body: integer(0) },
+        { patterns: [constructorPattern("Nothing")], body: integer(0) },
       ],
     }),
   ], {
@@ -259,14 +259,14 @@ Deno.test("Wasm nested block exits preserve pending operands and enclosing retur
           label: 2n,
           body: {
             $: "MatchExpr",
-            value: construct("Some", integer(2)),
+            values: [construct("Some", integer(2))],
             arms: [
               {
-                pattern: constructorPattern("Some", capture("number")),
+                patterns: [constructorPattern("Some", capture("number"))],
                 body: { $: "ReturnExpr", label: 2n, value: local("number") },
               },
               {
-                pattern: constructorPattern("Nothing"),
+                patterns: [constructorPattern("Nothing")],
                 body: { $: "ReturnExpr", label: 1n, value: integer(99) },
               },
             ],
@@ -352,10 +352,13 @@ Deno.test("Wasm U32 pattern literals compare complete unsigned bit patterns", as
   const compiled = await instantiate(module([
     fn("answer", {
       $: "MatchExpr",
-      value: local("value"),
+      values: [local("value")],
       arms: [
-        { pattern: { $: "U32Pattern", value: 0xffff_ffff }, body: integer(42) },
-        { pattern: wildcard, body: integer(0) },
+        {
+          patterns: [{ $: "U32Pattern", value: 0xffff_ffff }],
+          body: integer(42),
+        },
+        { patterns: [wildcard], body: integer(0) },
       ],
     }, { parameter_type: u32Type }),
   ]));
@@ -367,10 +370,10 @@ Deno.test("Wasm scalar wrappers canonicalize host Bool and Unit inputs", async (
   const compiled = await instantiate(module([
     fn("boolean", {
       $: "MatchExpr",
-      value: local("value"),
+      values: [local("value")],
       arms: [
-        { pattern: { $: "BoolPattern", value: true }, body: integer(42) },
-        { pattern: { $: "BoolPattern", value: false }, body: integer(0) },
+        { patterns: [{ $: "BoolPattern", value: true }], body: integer(42) },
+        { patterns: [{ $: "BoolPattern", value: false }], body: integer(0) },
       ],
     }, { parameter_type: boolType }),
     fn("unit", local("value")),
@@ -389,16 +392,16 @@ Deno.test("Wasm serializes first-class named and constructor function constants"
     }),
     fn("answer", {
       $: "MatchExpr",
-      value: apply(
+      values: [apply(
         { $: "ConstantExpr", name: "wrap" },
         apply({ $: "ConstantExpr", name: "increment_alias" }, local("value")),
-      ),
+      )],
       arms: [
         {
-          pattern: constructorPattern("Some", capture("number")),
+          patterns: [constructorPattern("Some", capture("number"))],
           body: local("number"),
         },
-        { pattern: constructorPattern("Nothing"), body: integer(0) },
+        { patterns: [constructorPattern("Nothing")], body: integer(0) },
       ],
     }, { parameter_type: u32Type }),
   ], {

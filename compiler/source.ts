@@ -1,6 +1,5 @@
 import {
   analyzeSourceTree,
-  compileEcsSourceTree,
   type CompileOptions,
   compileSourceTree,
 } from "./host.ts";
@@ -9,6 +8,7 @@ import {
   type SourceCompilerOptions,
 } from "./source_frontend.ts";
 import type { Cst } from "./syntax.ts";
+import type { SourceInput } from "./source_project.ts";
 
 export {
   declarationOffsets,
@@ -23,7 +23,7 @@ export async function createSourceCompiler(
 ) {
   const frontend = await createSourceFrontend(options);
   function run<T>(
-    source: string,
+    source: SourceInput,
     operation: (root: Cst, nodeCount: bigint, preludeRoot: Cst) => T,
   ): T {
     const prepared = frontend.prepare(source);
@@ -34,25 +34,18 @@ export async function createSourceCompiler(
     }
   }
   return {
-    analyze(source: string, options: CompileOptions = {}) {
+    analyze(source: SourceInput, options: CompileOptions = {}) {
       return run(
         source,
         (root, count, prelude) =>
           analyzeSourceTree(root, count, prelude, options),
       );
     },
-    compile(source: string, options: CompileOptions = {}) {
+    compile(source: SourceInput, options: CompileOptions = {}) {
       return run(
         source,
         (root, count, prelude) =>
           compileSourceTree(root, count, prelude, options),
-      );
-    },
-    compileEcs(source: string, options: CompileOptions = {}) {
-      return run(
-        source,
-        (root, count, prelude) =>
-          compileEcsSourceTree(root, count, prelude, options),
       );
     },
     dispose() {

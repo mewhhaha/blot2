@@ -3,28 +3,33 @@ import Base
 type TypeId is Data:
   TypeId{module_name: String, declaration: String}
 
-type Storage is Data:
-  Component{}
-  Resource{}
+type RowTail is Data:
+  ClosedRow{}
+  RowVariable{index: Nat}
+  RowParameter{index: Nat}
 
-type Access is Data:
-  Read{}
-  Write{}
-  Insert{}
-
-type Descriptor is Data:
-  Descriptor{identity: TypeId, storage: Storage}
+# Scoped rows preserve duplicate labels during inference; reflection exposes sets.
+type EffectRow is Data:
+  EffectRow{operations: List<&2, TypeId>, tail: RowTail}
 
 type Ty is Data:
   UnitTy{}
   U32Ty{}
   BoolTy{}
-  NominalTy{identity: TypeId}
   AppliedTy{identity: TypeId, arguments: List<&2, Ty>}
-  FunctionTy{parameter: Ty, result: Ty}
+  FunctionTy{parameter: Ty, result: Ty, effects: EffectRow}
   ParameterTy{index: Nat}
   VariableTy{index: Nat}
   NeverTy{}
+  F32Ty{}
+  ProviderTy{identity: TypeId, effects: EffectRow}
+  EffectDescriptorTy{}
+  EffectSetTy{}
+  ProductTy{elements: List<&2, Ty>}
+  ArrayTy{element: Ty}
+
+type Operation is Data:
+  Operation{identity: TypeId, parameter: Ty, result: Ty}
 
 type Constructor is Data:
   Constructor{name: String, payload: Maybe<&2, Ty>}
@@ -39,9 +44,10 @@ type Pattern is Data:
   U32Pattern{value: U32}
   BoolPattern{value: Bool}
   ConstructorPattern{constructor: String, payload: Maybe<&2, Pattern>}
+  ProductPattern{elements: List<&2, Pattern>}
 
 type MatchArm<-E: Data> is Data:
-  MatchArm{pattern: Pattern, body: E}
+  MatchArm{patterns: List<&2, Pattern>, body: E}
 
 type ScalarOp is Data:
   Add{}
@@ -49,6 +55,26 @@ type ScalarOp is Data:
   Multiply{}
   Equal{}
   LessThan{}
+  F32Add{}
+  F32Subtract{}
+  F32Multiply{}
+  F32Divide{}
+  F32Equal{}
+  F32NotEqual{}
+  F32LessThan{}
+  F32LessEqual{}
+  F32GreaterThan{}
+  F32GreaterEqual{}
+
+type UnaryOp is Data:
+  F32Negate{}
+  F32Absolute{}
+  F32SquareRoot{}
+  F32Floor{}
+  F32Ceiling{}
+  F32Truncate{}
+  U32ToF32{}
+  F32ToU32{}
 
 # This is resolved core, not a second spelling of the surface grammar.
 type Expr is Data:
@@ -68,14 +94,28 @@ type Expr is Data:
   UseExpr{name: String, value: Expr, body: Expr}
   IfExpr{condition: Expr, consequent: Expr, alternative: Expr}
   SequenceExpr{first: Expr, next: Expr}
-  MatchExpr{value: Expr, arms: List<&2, MatchArm<Expr>>}
+  MatchExpr{values: List<&2, Expr>, arms: List<&2, MatchArm<Expr>>}
   GuardExpr{pattern: Pattern, value: Expr, alternative: Expr, body: Expr}
   BlockExpr{label: Nat, body: Expr}
   ReturnExpr{label: Nat, value: Expr}
   SourceExpr{offset: Nat, annotation: Maybe<&2, Ty>, value: Expr}
-  ReadExpr{identity: TypeId}
-  WriteExpr{value: Expr}
-  InsertExpr{value: Expr}
+  F32Expr{value: F32}
+  UnaryExpr{operator: UnaryOp, value: Expr}
+  OperationExpr{identity: TypeId}
+  ProviderExpr{identity: TypeId, implementation: Expr}
+  HandleExpr{provider: Expr, body: Expr}
+  OperationDescriptorExpr{identity: TypeId}
+  FunctionEffectsExpr{callee: String}
+  EffectHasExpr{set: Expr, operation: Expr}
+  EffectCountExpr{set: Expr}
+  EffectSameExpr{left: Expr, right: Expr}
+  PanicExpr{message: String}
+  ProductExpr{elements: List<&2, Expr>}
+  ProjectExpr{value: Expr, index: Nat}
+  ArrayExpr{elements: List<&2, Expr>}
+  ArrayGetExpr{array: Expr, index: Expr}
+  ArraySetExpr{array: Expr, index: Expr, value: Expr}
+  ArrayLengthExpr{array: Expr}
 
 type Function is Data:
   Function{
@@ -92,20 +132,20 @@ type Constant is Data:
 
 type Module is Data:
   Module{
-    descriptors: List<&2, Descriptor>,
     constants: List<&2, Constant>,
     functions: List<&2, Function>,
-    data_types: List<&2, DataType>
+    data_types: List<&2, DataType>,
+    operations: List<&2, Operation>
   }
 
 type Diagnostic is Data:
   Diagnostic{code: String, subject: String, message: String}
 
 type Effect is Data:
-  Effect{access: Access, descriptor: Descriptor}
+  OperationEffect{identity: TypeId}
 
 type Signature is Data:
-  Signature{name: String, parameter: Ty, result: Ty, variables: List<&2, Nat>}
+  Signature{name: String, parameter: Ty, result: Ty, variables: List<&2, Nat>, effects: EffectRow}
 
 type CheckedFunction is Data:
   CheckedFunction{function: Function, signature: Signature, effects: List<&2, Effect>}
@@ -117,14 +157,12 @@ type CheckedModule is Data:
   CheckedModule{
     constants: List<&2, CheckedConstant>,
     functions: List<&2, CheckedFunction>,
-    data_types: List<&2, DataType>
+    data_types: List<&2, DataType>,
+    operations: List<&2, Operation>
   }
 
-type SystemPlan is Data:
-  SystemPlan{name: String, effects: List<&2, Effect>, query: List<&2, Descriptor>}
-
-type WorldPlan is Data:
-  WorldPlan{registrations: List<&2, Descriptor>, systems: List<&2, SystemPlan>, batches: List<&2, List<&2, String>>}
+def empty_row() -> EffectRow:
+  EffectRow{Nil{}, ClosedRow{}}
 
 # Bend 2.0.5's String.eq reconstructs both compared inputs.
 # Compiler names only need the Boolean result; consume their common prefix.
@@ -145,8 +183,16 @@ def name_equal(left: String, right: String) -> Bool:
 def type_id_equal(a: TypeId, b: TypeId) -> Bool:
   TypeId{am, an} = a
   TypeId{bm, bn} = b
-  same_module same_name = name_equal(am, bm) name_equal(an, bn)
-  Bool.and(same_module, same_name)
+  Bool.and(name_equal(am, bm), name_equal(an, bn))
+
+def foreign_identity() -> TypeId:
+  TypeId{"blot:compiler", "Foreign"}
+
+def is_foreign(identity: TypeId) -> Bool:
+  type_id_equal(identity, foreign_identity())
+
+def foreign_row() -> EffectRow:
+  EffectRow{[foreign_identity()], ClosedRow{}}
 
 def type_id_show(identity: TypeId) -> String:
   TypeId{module_name, declaration} = identity
@@ -155,6 +201,32 @@ def type_id_show(identity: TypeId) -> String:
 type TypeDisplay is Data:
   DisplayType{value: Ty}
   DisplayArguments{values: List<&2, Ty>}
+  DisplayElements{values: List<&2, Ty>}
+
+def row_tail_show(tail: RowTail) -> String:
+  match tail:
+    case ClosedRow{}:
+      ""
+    case RowVariable{index}:
+      "| ?e" ++ Nat.show(index)
+    case RowParameter{index}:
+      "| 'e" ++ Nat.show(index)
+
+def row_operations_show(operations: List<&2, TypeId>) -> String:
+  match operations:
+    case Nil{}:
+      ""
+    case head <> Nil{}:
+      type_id_show(head)
+    case head <> next <> tail:
+      type_id_show(head) ++ ", " ++ row_operations_show(next <> tail)
+
+def row_show(row: EffectRow) -> String:
+  match row:
+    case EffectRow{Nil{}, ClosedRow{}}:
+      ""
+    case EffectRow{operations, tail}:
+      " ! {" ++ row_operations_show(operations) ++ row_tail_show(tail) ++ "}"
 
 def type_display(+depth: Nat, display: TypeDisplay) -> String:
   match depth display:
@@ -164,14 +236,24 @@ def type_display(+depth: Nat, display: TypeDisplay) -> String:
       "Unit"
     case 1n+rest DisplayType{U32Ty{}}:
       "U32"
+    case 1n+rest DisplayType{F32Ty{}}:
+      "F32"
     case 1n+rest DisplayType{BoolTy{}}:
       "Bool"
-    case 1n+rest DisplayType{NominalTy{identity}}:
-      type_id_show(identity)
     case 1n+rest DisplayType{AppliedTy{identity, arguments}}:
       type_id_show(identity) ++ type_display(rest, DisplayArguments{arguments})
-    case 1n+rest DisplayType{FunctionTy{parameter, result}}:
-      "(" ++ type_display(rest, DisplayType{parameter}) ++ " -> " ++ type_display(rest, DisplayType{result}) ++ ")"
+    case 1n+rest DisplayType{FunctionTy{parameter, result, effects}}:
+      "(" ++ type_display(rest, DisplayType{parameter}) ++ " -> " ++ type_display(rest, DisplayType{result}) ++ row_show(effects) ++ ")"
+    case 1n+rest DisplayType{ProviderTy{identity, effects}}:
+      "Provider " ++ type_id_show(identity) ++ row_show(effects)
+    case 1n+rest DisplayType{EffectDescriptorTy{}}:
+      "EffectDescriptor"
+    case 1n+rest DisplayType{EffectSetTy{}}:
+      "EffectSet"
+    case 1n+rest DisplayType{ProductTy{elements}}:
+      "(" ++ type_display(rest, DisplayElements{elements}) ++ ")"
+    case 1n+rest DisplayType{ArrayTy{element}}:
+      "Array (" ++ type_display(rest, DisplayType{element}) ++ ")"
     case 1n+rest DisplayType{ParameterTy{index}}:
       "'" ++ Nat.show(index)
     case 1n+rest DisplayType{VariableTy{index}}:
@@ -182,6 +264,12 @@ def type_display(+depth: Nat, display: TypeDisplay) -> String:
       ""
     case 1n+rest DisplayArguments{head <> tail}:
       " (" ++ type_display(rest, DisplayType{head}) ++ ")" ++ type_display(rest, DisplayArguments{tail})
+    case 1n+rest DisplayElements{Nil{}}:
+      ""
+    case 1n+rest DisplayElements{head <> Nil{}}:
+      type_display(rest, DisplayType{head})
+    case 1n+rest DisplayElements{head <> next <> tail}:
+      type_display(rest, DisplayType{head}) ++ ", " ++ type_display(rest, DisplayElements{next <> tail})
 
 def type_show(ty: Ty) -> String:
   type_display(64n, DisplayType{ty})
@@ -198,3 +286,42 @@ def scalar_result(operator: ScalarOp) -> Ty:
       BoolTy{}
     case LessThan{}:
       BoolTy{}
+    case F32Add{}:
+      F32Ty{}
+    case F32Subtract{}:
+      F32Ty{}
+    case F32Multiply{}:
+      F32Ty{}
+    case F32Divide{}:
+      F32Ty{}
+    case _:
+      BoolTy{}
+
+def scalar_parameter(operator: ScalarOp) -> Ty:
+  match operator:
+    case Add{}:
+      U32Ty{}
+    case Subtract{}:
+      U32Ty{}
+    case Multiply{}:
+      U32Ty{}
+    case Equal{}:
+      U32Ty{}
+    case LessThan{}:
+      U32Ty{}
+    case _:
+      F32Ty{}
+
+def unary_parameter(operator: UnaryOp) -> Ty:
+  match operator:
+    case U32ToF32{}:
+      U32Ty{}
+    case _:
+      F32Ty{}
+
+def unary_result(operator: UnaryOp) -> Ty:
+  match operator:
+    case F32ToU32{}:
+      U32Ty{}
+    case _:
+      F32Ty{}

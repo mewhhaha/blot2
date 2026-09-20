@@ -1,8 +1,8 @@
 import {
+  type Artifact,
   type CompileOptions,
   constSteps,
   decodePipelineArtifact,
-  type EcsArtifact,
 } from "./host.ts";
 import {
   bendArray,
@@ -97,22 +97,21 @@ export async function createIncrementalCompiler(
   let groups = new Map<string, Cached<CheckedGroup>>();
   let constants = new Map<string, Cached<Constants>>();
   let entries = new Map<string, Cached<EntryCode>>();
-  let world: Cached<unknown> | undefined;
   let planning: Cached<readonly GroupJob[]> | undefined;
   let previous:
-    | Cached<{ artifact: EcsArtifact; stats: CompilationStats }>
+    | Cached<{ artifact: Artifact; stats: CompilationStats }>
     | undefined;
   let previousInput:
-    | { source: string; steps: bigint; ecs: boolean }
+    | { source: string; steps: bigint }
     | undefined;
 
-  async function build(source: string, options: CompileOptions, ecs: boolean) {
+  async function build(source: string, options: CompileOptions) {
     if (disposed) throw new Error("Compiler session is disposed");
     const start = performance.now();
     const steps = constSteps(options);
     if (
       previous && previousInput?.source === source &&
-      previousInput.steps === steps && previousInput.ecs === ecs
+      previousInput.steps === steps
     ) {
       const prior = previous.value.stats;
       const artifact = structuredClone(previous.value.artifact);
@@ -152,7 +151,7 @@ export async function createIncrementalCompiler(
       entries_compiled: 0,
       entries_reused: 0,
     };
-    const revisionKey = structuralKey([ecs, steps, module]);
+    const revisionKey = structuralKey([steps, module]);
     if (previous?.key === revisionKey) {
       const prior = previous.value.stats;
       stats.groups_reused = prior.groups_checked + prior.groups_reused;
@@ -160,7 +159,7 @@ export async function createIncrementalCompiler(
         prior.constants_reused;
       stats.entries_reused = prior.entries_compiled + prior.entries_reused;
       const artifact = structuredClone(previous.value.artifact);
-      previousInput = { source, steps, ecs };
+      previousInput = { source, steps };
       stats.total_ms = performance.now() - start;
       return { artifact, stats };
     }
@@ -188,10 +187,6 @@ export async function createIncrementalCompiler(
         bendArray(module.data_types),
         (type) => structuralKey(type.identity),
       );
-      const descriptorIndex = indexed(
-        bendArray(module.descriptors),
-        (descriptor) => structuralKey(descriptor.identity),
-      );
       const planned: PlannedGroup[] = jobs.map((job) => {
         const members = bendArray(job.members);
         const nominals = bendArray(job.type_dependencies).map(structuralKey);
@@ -202,7 +197,7 @@ export async function createIncrementalCompiler(
           functions: select(functionIndex, members),
           constants: select(constantIndex, members),
           data_types: select(typeIndex, nominals),
-          descriptors: select(descriptorIndex, nominals),
+          operations: module.operations,
         };
         return {
           job,
@@ -285,11 +280,12 @@ export async function createIncrementalCompiler(
           ),
         ),
         data_types: module.data_types,
+        operations: module.operations,
       };
       stats.checked_ms = performance.now() - checkStart;
 
       const constStart = performance.now();
-      const context = invoke<unknown>("const_context", module);
+      const context = invoke<unknown>("const_context", module, checked);
       const nextConstants = new Map<string, Cached<Constants>>();
       const bindings: ConstantBinding[] = [];
       let remaining = steps;
@@ -330,27 +326,20 @@ export async function createIncrementalCompiler(
         bindings.push(...bendArray(value.bindings));
         remaining = value.remaining;
       }
-      const systemPlans = invoke<unknown>("system_plans", checked.functions);
-      const worldKey = structuralKey(systemPlans);
-      const nextWorld = world?.key === worldKey ? world : {
-        key: worldKey,
-        value: invoke<unknown>("world_plan", systemPlans),
-      };
       const analysis = {
         $: "Analysis",
         checked,
         constants: bendList(bindings),
-        world: nextWorld.value,
         remaining_steps: remaining,
       };
       stats.constants_ms = performance.now() - constStart;
 
       const codeStart = performance.now();
-      const prepared = ecs
-        ? result<Prepared>("wasm.prepare_ecs", checked, analysis.constants)
-        : result<Prepared>("wasm.prepare", checked, analysis.constants, {
-          $: "wasm.PureLink",
-        });
+      const prepared = result<Prepared>(
+        "wasm.prepare",
+        checked,
+        analysis.constants,
+      );
       const nextEntries = new Map<string, Cached<EntryCode>>();
       const generated = await Promise.allSettled(
         bendArray(prepared.jobs).map(async (job) => {
@@ -372,16 +361,12 @@ export async function createIncrementalCompiler(
       stats.codegen_ms = performance.now() - codeStart;
       const linkStart = performance.now();
       const bytes = result<unknown>("wasm.link", prepared, bendList(code));
-      const storage = ecs
-        ? invoke<unknown>("wasm.prepared_storage", prepared)
-        : bendList([]);
-      const artifact = decodePipelineArtifact({ analysis, storage, bytes });
+      const artifact = decodePipelineArtifact({ analysis, bytes });
       stats.linked_ms = performance.now() - linkStart;
       if (disposed) throw new Error("Compiler session is disposed");
       groups = nextGroups;
       constants = nextConstants;
       entries = nextEntries;
-      world = nextWorld;
       planning = nextPlanning;
       // Own the cached artifact. Public typed arrays and analysis objects may
       // be mutated by a consumer without corrupting a later compilation.
@@ -390,26 +375,23 @@ export async function createIncrementalCompiler(
         key: revisionKey,
         value: { artifact: structuredClone(artifact), stats: { ...stats } },
       };
-      previousInput = { source, steps, ecs };
+      previousInput = { source, steps };
       return { artifact, stats };
     } catch (error) {
       return preparedSource.translate(error);
     }
   }
 
-  function enqueue(source: string, options: CompileOptions, ecs: boolean) {
+  function enqueue(source: string, options: CompileOptions) {
     const requestOptions = { ...options };
-    const operation = queue.then(() => build(source, requestOptions, ecs));
+    const operation = queue.then(() => build(source, requestOptions));
     queue = operation.then(() => {}, () => {});
     return operation;
   }
 
   return {
-    compileEcs(source: string, options: CompileOptions = {}) {
-      return enqueue(source, options, true);
-    },
     async compile(source: string, options: CompileOptions = {}) {
-      const { artifact, stats } = await enqueue(source, options, false);
+      const { artifact, stats } = await enqueue(source, options);
       return {
         artifact: { analysis: artifact.analysis, bytes: artifact.bytes },
         stats,

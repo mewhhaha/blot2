@@ -11,34 +11,86 @@ export interface TypeId {
   readonly declaration: string;
 }
 
+export type RowTail =
+  | { readonly $: "ClosedRow" }
+  | { readonly $: "RowVariable" | "RowParameter"; readonly index: bigint };
+export interface EffectRow {
+  readonly $: "EffectRow";
+  readonly operations: readonly TypeId[];
+  readonly tail: RowTail;
+}
+export function emptyRow(): EffectRow {
+  return { $: "EffectRow", operations: [], tail: { $: "ClosedRow" } };
+}
+
 export type Type =
-  | { readonly $: "UnitTy" | "U32Ty" | "BoolTy" | "NeverTy" }
-  | { readonly $: "NominalTy"; readonly identity: TypeId }
+  | {
+    readonly $:
+      | "UnitTy"
+      | "U32Ty"
+      | "F32Ty"
+      | "BoolTy"
+      | "NeverTy"
+      | "EffectDescriptorTy"
+      | "EffectSetTy";
+  }
+  | {
+    readonly $: "ProviderTy";
+    readonly identity: TypeId;
+    readonly effects: EffectRow;
+  }
   | {
     readonly $: "AppliedTy";
     readonly identity: TypeId;
     readonly arguments: readonly Type[];
   }
+  | { readonly $: "ProductTy"; readonly elements: readonly Type[] }
+  | { readonly $: "ArrayTy"; readonly element: Type }
   | {
     readonly $: "FunctionTy";
     readonly parameter: Type;
     readonly result: Type;
+    readonly effects: EffectRow;
   }
   | { readonly $: "ParameterTy" | "VariableTy"; readonly index: bigint };
 export type InferredType = Type;
 export type ScalarOp = {
-  readonly $: "Add" | "Subtract" | "Multiply" | "Equal" | "LessThan";
+  readonly $:
+    | "Add"
+    | "Subtract"
+    | "Multiply"
+    | "Equal"
+    | "LessThan"
+    | "F32Add"
+    | "F32Subtract"
+    | "F32Multiply"
+    | "F32Divide"
+    | "F32Equal"
+    | "F32NotEqual"
+    | "F32LessThan"
+    | "F32LessEqual"
+    | "F32GreaterThan"
+    | "F32GreaterEqual";
 };
-export type Access = { readonly $: "Read" | "Write" | "Insert" };
-export interface Descriptor {
-  readonly $: "Descriptor";
-  readonly identity: TypeId;
-  readonly storage: { readonly $: "Component" | "Resource" };
-}
+export type UnaryOp = {
+  readonly $:
+    | "F32Negate"
+    | "F32Absolute"
+    | "F32SquareRoot"
+    | "F32Floor"
+    | "F32Ceiling"
+    | "F32Truncate"
+    | "U32ToF32"
+    | "F32ToU32";
+};
 export interface Effect {
-  readonly $: "Effect";
-  readonly access: Access;
-  readonly descriptor: Descriptor;
+  readonly $: "OperationEffect";
+  readonly identity: TypeId;
+}
+export interface Operation {
+  readonly identity: TypeId;
+  readonly parameter: Type;
+  readonly result: Type;
 }
 
 export interface DataType {
@@ -59,16 +111,18 @@ export type Pattern =
     readonly $: "ConstructorPattern";
     readonly constructor: string;
     readonly payload: Pattern | null;
-  };
+  }
+  | { readonly $: "ProductPattern"; readonly elements: readonly Pattern[] };
 
 export interface MatchArm {
-  readonly pattern: Pattern;
+  readonly patterns: readonly Pattern[];
   readonly body: Expr;
 }
 
 export type Expr =
   | { readonly $: "UnitExpr" }
   | { readonly $: "U32Expr"; readonly value: number }
+  | { readonly $: "F32Expr"; readonly value: number }
   | { readonly $: "BoolExpr"; readonly value: boolean }
   | {
     readonly $: "LocalExpr" | "ConstantExpr" | "FunctionExpr";
@@ -97,6 +151,11 @@ export type Expr =
     readonly right: Expr;
   }
   | {
+    readonly $: "UnaryExpr";
+    readonly operator: UnaryOp;
+    readonly value: Expr;
+  }
+  | {
     readonly $: "LetExpr" | "UseExpr";
     readonly name: string;
     readonly value: Expr;
@@ -111,7 +170,7 @@ export type Expr =
   | { readonly $: "SequenceExpr"; readonly first: Expr; readonly next: Expr }
   | {
     readonly $: "MatchExpr";
-    readonly value: Expr;
+    readonly values: readonly Expr[];
     readonly arms: readonly MatchArm[];
   }
   | {
@@ -129,8 +188,36 @@ export type Expr =
     readonly annotation: Maybe<Type>;
     readonly value: Expr;
   }
-  | { readonly $: "ReadExpr"; readonly identity: TypeId }
-  | { readonly $: "WriteExpr" | "InsertExpr"; readonly value: Expr };
+  | { readonly $: "PanicExpr"; readonly message: string }
+  | {
+    readonly $: "OperationExpr" | "OperationDescriptorExpr";
+    readonly identity: TypeId;
+  }
+  | {
+    readonly $: "ProviderExpr";
+    readonly identity: TypeId;
+    readonly implementation: Expr;
+  }
+  | { readonly $: "HandleExpr"; readonly provider: Expr; readonly body: Expr }
+  | { readonly $: "FunctionEffectsExpr"; readonly callee: string }
+  | {
+    readonly $: "EffectHasExpr";
+    readonly set: Expr;
+    readonly operation: Expr;
+  }
+  | { readonly $: "EffectCountExpr"; readonly set: Expr }
+  | { readonly $: "EffectSameExpr"; readonly left: Expr; readonly right: Expr }
+  | { readonly $: "ProductExpr"; readonly elements: readonly Expr[] }
+  | { readonly $: "ProjectExpr"; readonly value: Expr; readonly index: bigint }
+  | { readonly $: "ArrayExpr"; readonly elements: readonly Expr[] }
+  | { readonly $: "ArrayGetExpr"; readonly array: Expr; readonly index: Expr }
+  | {
+    readonly $: "ArraySetExpr";
+    readonly array: Expr;
+    readonly index: Expr;
+    readonly value: Expr;
+  }
+  | { readonly $: "ArrayLengthExpr"; readonly array: Expr };
 
 export interface FunctionDefinition {
   readonly name: string;
@@ -149,15 +236,16 @@ export interface ConstantDefinition {
 }
 
 export interface CoreModule {
-  readonly descriptors: readonly Descriptor[];
   readonly constants: readonly ConstantDefinition[];
   readonly functions: readonly FunctionDefinition[];
   readonly data_types?: readonly DataType[];
+  readonly operations?: readonly Operation[];
 }
 
 export type ConstantValue =
   | { readonly $: "UnitValue" }
   | { readonly $: "U32Value"; readonly value: number }
+  | { readonly $: "F32Value"; readonly value: number }
   | { readonly $: "BoolValue"; readonly value: boolean }
   | { readonly $: "FunctionValue"; readonly name: string }
   | { readonly $: "ConstructorFunctionValue"; readonly constructor: string }
@@ -175,7 +263,24 @@ export type ConstantValue =
       readonly name: string;
       readonly value: ConstantValue;
     }[];
-  };
+  }
+  | {
+    readonly $: "OperationValue" | "EffectDescriptorValue";
+    readonly identity: TypeId;
+  }
+  | {
+    readonly $: "ProviderValue";
+    readonly identity: TypeId;
+    readonly implementation: ConstantValue;
+  }
+  | { readonly $: "EffectSetValue"; readonly operations: readonly TypeId[] }
+  | { readonly $: "ProductValue"; readonly elements: readonly ConstantValue[] }
+  | { readonly $: "ArrayValue"; readonly elements: readonly ConstantValue[] };
+
+export type EffectDescriptorValue = {
+  readonly $: "EffectDescriptorValue";
+  readonly identity: TypeId;
+};
 
 export interface FunctionAnalysis {
   readonly name: string;
@@ -183,12 +288,7 @@ export interface FunctionAnalysis {
   readonly result: InferredType;
   readonly variables: readonly bigint[];
   readonly effects: readonly Effect[];
-}
-
-export interface SystemPlan {
-  readonly name: string;
-  readonly effects: readonly Effect[];
-  readonly query: readonly Descriptor[];
+  readonly effect_row: EffectRow;
 }
 
 export interface Analysis {
@@ -197,24 +297,11 @@ export interface Analysis {
     readonly name: string;
     readonly value: ConstantValue;
   }[];
-  readonly world: {
-    readonly registrations: readonly Descriptor[];
-    readonly systems: readonly SystemPlan[];
-    readonly batches: readonly (readonly string[])[];
-  };
   readonly remaining_steps: bigint;
 }
 
-export interface EcsStorage {
-  readonly identity: TypeId;
-  readonly storage: Descriptor["storage"];
-  readonly constructor: string;
-  readonly tag: number;
-}
-
-export interface EcsArtifact {
+export interface Artifact {
   readonly analysis: Analysis;
-  readonly storage: readonly EcsStorage[];
   readonly bytes: Uint8Array<ArrayBuffer>;
 }
 
@@ -232,8 +319,30 @@ type Result<A> = { readonly $: "Done"; readonly value: A } | {
   readonly error: Diagnostic;
 };
 
+type WireRow = {
+  readonly $: "EffectRow";
+  readonly operations: List<TypeId>;
+  readonly tail: RowTail;
+};
 type WireType =
-  | Exclude<Type, { readonly $: "AppliedTy" | "FunctionTy" }>
+  | Exclude<
+    Type,
+    {
+      readonly $:
+        | "AppliedTy"
+        | "FunctionTy"
+        | "ProviderTy"
+        | "ProductTy"
+        | "ArrayTy";
+    }
+  >
+  | { readonly $: "ProductTy"; readonly elements: List<WireType> }
+  | { readonly $: "ArrayTy"; readonly element: WireType }
+  | {
+    readonly $: "ProviderTy";
+    readonly identity: TypeId;
+    readonly effects: WireRow;
+  }
   | {
     readonly $: "AppliedTy";
     readonly identity: TypeId;
@@ -243,10 +352,12 @@ type WireType =
     readonly $: "FunctionTy";
     readonly parameter: WireType;
     readonly result: WireType;
+    readonly effects: WireRow;
   };
 
 type WirePattern =
-  | Exclude<Pattern, { readonly $: "ConstructorPattern" }>
+  | Exclude<Pattern, { readonly $: "ConstructorPattern" | "ProductPattern" }>
+  | { readonly $: "ProductPattern"; readonly elements: List<WirePattern> }
   | {
     readonly $: "ConstructorPattern";
     readonly constructor: string;
@@ -254,16 +365,39 @@ type WirePattern =
   };
 
 type WireExpr =
+  | { readonly $: "ProductExpr"; readonly elements: List<WireExpr> }
+  | { readonly $: "ArrayExpr"; readonly elements: List<WireExpr> }
+  | {
+    readonly $: "ArrayGetExpr";
+    readonly array: WireExpr;
+    readonly index: WireExpr;
+  }
+  | {
+    readonly $: "ArraySetExpr";
+    readonly array: WireExpr;
+    readonly index: WireExpr;
+    readonly value: WireExpr;
+  }
+  | { readonly $: "ArrayLengthExpr"; readonly array: WireExpr }
+  | {
+    readonly $: "ProjectExpr";
+    readonly value: WireExpr;
+    readonly index: bigint;
+  }
   | Extract<Expr, {
     readonly $:
       | "UnitExpr"
       | "U32Expr"
+      | "F32Expr"
       | "BoolExpr"
       | "LocalExpr"
       | "ConstantExpr"
       | "FunctionExpr"
       | "ConstructorRefExpr"
-      | "ReadExpr";
+      | "PanicExpr"
+      | "OperationExpr"
+      | "OperationDescriptorExpr"
+      | "FunctionEffectsExpr";
   }>
   | {
     readonly $: "ConstructExpr";
@@ -295,6 +429,11 @@ type WireExpr =
     readonly right: WireExpr;
   }
   | {
+    readonly $: "UnaryExpr";
+    readonly operator: UnaryOp;
+    readonly value: WireExpr;
+  }
+  | {
     readonly $: "LetExpr" | "UseExpr";
     readonly name: string;
     readonly value: WireExpr;
@@ -313,11 +452,11 @@ type WireExpr =
   }
   | {
     readonly $: "MatchExpr";
-    readonly value: WireExpr;
+    readonly values: List<WireExpr>;
     readonly arms: List<
       {
         readonly $: "MatchArm";
-        readonly pattern: WirePattern;
+        readonly patterns: List<WirePattern>;
         readonly body: WireExpr;
       }
     >;
@@ -341,7 +480,27 @@ type WireExpr =
     readonly annotation: Maybe<WireType>;
     readonly value: WireExpr;
   }
-  | { readonly $: "WriteExpr" | "InsertExpr"; readonly value: WireExpr };
+  | {
+    readonly $: "ProviderExpr";
+    readonly identity: TypeId;
+    readonly implementation: WireExpr;
+  }
+  | {
+    readonly $: "HandleExpr";
+    readonly provider: WireExpr;
+    readonly body: WireExpr;
+  }
+  | {
+    readonly $: "EffectHasExpr";
+    readonly set: WireExpr;
+    readonly operation: WireExpr;
+  }
+  | { readonly $: "EffectCountExpr"; readonly set: WireExpr }
+  | {
+    readonly $: "EffectSameExpr";
+    readonly left: WireExpr;
+    readonly right: WireExpr;
+  };
 
 interface WireDataType {
   readonly $: "DataType";
@@ -355,7 +514,27 @@ interface WireDataType {
 }
 
 type WireValue =
-  | Exclude<ConstantValue, { readonly $: "DataValue" | "ClosureValue" }>
+  | { readonly $: "MatchValuesValue"; readonly values: List<WireValue> }
+  | Exclude<
+    ConstantValue,
+    {
+      readonly $:
+        | "DataValue"
+        | "ClosureValue"
+        | "ProviderValue"
+        | "EffectSetValue"
+        | "ProductValue"
+        | "ArrayValue";
+    }
+  >
+  | { readonly $: "ProductValue"; readonly elements: List<WireValue> }
+  | { readonly $: "ArrayValue"; readonly elements: List<WireValue> }
+  | {
+    readonly $: "ProviderValue";
+    readonly identity: TypeId;
+    readonly implementation: WireValue;
+  }
+  | { readonly $: "EffectSetValue"; readonly operations: List<TypeId> }
   | {
     readonly $: "DataValue";
     readonly constructor: string;
@@ -378,7 +557,6 @@ type WireValue =
 
 interface WireModule {
   readonly $: "Module";
-  readonly descriptors: List<Descriptor>;
   readonly constants: List<
     Omit<ConstantDefinition, "annotation" | "value"> & {
       readonly $: "Constant";
@@ -395,6 +573,14 @@ interface WireModule {
     }
   >;
   readonly data_types: List<WireDataType>;
+  readonly operations: List<
+    {
+      readonly $: "Operation";
+      readonly identity: TypeId;
+      readonly parameter: WireType;
+      readonly result: WireType;
+    }
+  >;
 }
 interface WireAnalysis {
   readonly checked: {
@@ -404,6 +590,7 @@ interface WireAnalysis {
         readonly parameter: WireType;
         readonly result: WireType;
         readonly variables: List<bigint>;
+        readonly effects: WireRow;
       };
       readonly effects: List<Effect>;
     }>;
@@ -411,22 +598,11 @@ interface WireAnalysis {
   readonly constants: List<
     { readonly name: string; readonly value: WireValue }
   >;
-  readonly world: {
-    readonly registrations: List<Descriptor>;
-    readonly systems: List<{
-      readonly name: string;
-      readonly effects: List<Effect>;
-      readonly query: List<Descriptor>;
-    }>;
-    readonly batches: List<List<string>>;
-  };
   readonly remaining_steps: bigint;
 }
 const bend = compiled as unknown as {
   analyze(module: unknown, steps: bigint): unknown;
   compile(module: unknown, steps: bigint): unknown;
-  compile_ecs(module: unknown, steps: bigint): unknown;
-  "effects.conflicts"(left: unknown, right: unknown): boolean;
   analyze_source(
     root: Cst,
     preludeRoot: Cst,
@@ -439,71 +615,7 @@ const bend = compiled as unknown as {
     nodeCount: bigint,
     steps: bigint,
   ): unknown;
-  compile_ecs_source(
-    root: Cst,
-    preludeRoot: Cst,
-    nodeCount: bigint,
-    steps: bigint,
-  ): unknown;
 };
-
-// Bend 2.0.5 qualifies imported nullary constructors, but not constructors
-// with fields. Keep that release-specific ABI detail out of Blot's core API.
-const constructorNames = new Map([
-  ...[
-    "UnitTy",
-    "U32Ty",
-    "BoolTy",
-    "NeverTy",
-    "UnitExpr",
-    "WildcardPattern",
-    "UnitPattern",
-    "Add",
-    "Subtract",
-    "Multiply",
-    "Equal",
-    "LessThan",
-    "Component",
-    "Resource",
-    "Read",
-    "Write",
-    "Insert",
-  ].map((name) => [name, `model.${name}`] as const),
-  ["UnitValue", "const_eval.UnitValue"],
-]);
-const publicNames = new Map(
-  [...constructorNames].map(([name, wire]) => [wire, name]),
-);
-
-function mapConstructors(
-  value: unknown,
-  names: ReadonlyMap<string, string>,
-): unknown {
-  if (value === null || typeof value !== "object") return value;
-  const result = Array.isArray(value) ? [] : {};
-  const pending: { source: object; target: object }[] = [{
-    source: value,
-    target: result,
-  }];
-  for (let current = pending.pop(); current; current = pending.pop()) {
-    for (const [key, field] of Object.entries(current.source)) {
-      if (field !== null && typeof field === "object") {
-        const target = Array.isArray(field) ? [] : {};
-        Reflect.set(current.target, key, target);
-        pending.push({ source: field, target });
-      } else {
-        Reflect.set(
-          current.target,
-          key,
-          key === "$" && typeof field === "string"
-            ? names.get(field) ?? field
-            : field,
-        );
-      }
-    }
-  }
-  return result;
-}
 
 function list<A>(values: readonly A[]): List<A> {
   let result: List<A> = { $: "Nil" };
@@ -539,6 +651,13 @@ function u32(value: number): number {
   return value;
 }
 
+function f32(value: number): number {
+  if (typeof value !== "number") {
+    throw new TypeError("F32 literal must be a number");
+  }
+  return Math.fround(value);
+}
+
 function unicode(value: string, label: string): string {
   if (typeof value !== "string" || !value.isWellFormed()) {
     throw new TypeError(`${label} is not valid Unicode`);
@@ -561,26 +680,55 @@ function encodeIdentity(identity: TypeId): TypeId {
   };
 }
 
+function encodeRow(row: EffectRow): WireRow {
+  const tail = row.tail.$ === "ClosedRow"
+    ? row.tail
+    : { $: row.tail.$, index: nat(row.tail.index, "Row index") };
+  if (!["ClosedRow", "RowVariable", "RowParameter"].includes(tail.$)) {
+    throw new TypeError(`Unknown effect row tail: ${tail.$}`);
+  }
+  return {
+    $: "EffectRow",
+    operations: list(row.operations.map(encodeIdentity)),
+    tail,
+  };
+}
+function decodeRow(row: WireRow): EffectRow {
+  return { ...row, operations: array(row.operations) };
+}
+
 function encodeType(type: Type): WireType {
   switch (type.$) {
     case "UnitTy":
     case "U32Ty":
+    case "F32Ty":
     case "BoolTy":
     case "NeverTy":
+    case "EffectDescriptorTy":
+    case "EffectSetTy":
       return { $: type.$ };
-    case "NominalTy":
-      return { $: type.$, identity: encodeIdentity(type.identity) };
+    case "ProviderTy":
+      return {
+        $: type.$,
+        identity: encodeIdentity(type.identity),
+        effects: encodeRow(type.effects),
+      };
     case "AppliedTy":
       return {
         $: type.$,
         identity: encodeIdentity(type.identity),
         arguments: list(type.arguments.map(encodeType)),
       };
+    case "ProductTy":
+      return { $: type.$, elements: list(type.elements.map(encodeType)) };
+    case "ArrayTy":
+      return { $: type.$, element: encodeType(type.element) };
     case "FunctionTy":
       return {
         $: type.$,
         parameter: encodeType(type.parameter),
         result: encodeType(type.result),
+        effects: encodeRow(type.effects),
       };
     case "ParameterTy":
     case "VariableTy":
@@ -594,13 +742,20 @@ function encodeType(type: Type): WireType {
 
 function decodeType(type: WireType): Type {
   switch (type.$) {
+    case "ProviderTy":
+      return { ...type, effects: decodeRow(type.effects) };
     case "AppliedTy":
       return { ...type, arguments: array(type.arguments).map(decodeType) };
+    case "ProductTy":
+      return { ...type, elements: array(type.elements).map(decodeType) };
+    case "ArrayTy":
+      return { ...type, element: decodeType(type.element) };
     case "FunctionTy":
       return {
         ...type,
         parameter: decodeType(type.parameter),
         result: decodeType(type.result),
+        effects: decodeRow(type.effects),
       };
     default:
       return type;
@@ -634,6 +789,11 @@ function encodePattern(pattern: Pattern): WirePattern {
           pattern.payload === null ? null : encodePattern(pattern.payload),
         ),
       };
+    case "ProductPattern":
+      return {
+        $: pattern.$,
+        elements: list(pattern.elements.map(encodePattern)),
+      };
     default: {
       const invalid: never = pattern;
       throw new TypeError(`Unknown core pattern: ${String(invalid)}`);
@@ -642,6 +802,12 @@ function encodePattern(pattern: Pattern): WirePattern {
 }
 
 function decodePattern(pattern: WirePattern): Pattern {
+  if (pattern.$ === "ProductPattern") {
+    return {
+      $: pattern.$,
+      elements: array(pattern.elements).map(decodePattern),
+    };
+  }
   if (pattern.$ !== "ConstructorPattern") return pattern;
   return {
     ...pattern,
@@ -655,8 +821,37 @@ function encodeExpr(expression: Expr): WireExpr {
   switch (expression.$) {
     case "U32Expr":
       return { $: expression.$, value: u32(expression.value) };
+    case "F32Expr":
+      return { $: expression.$, value: f32(expression.value) };
     case "UnitExpr":
       return { $: expression.$ };
+    case "ProductExpr":
+    case "ArrayExpr":
+      return {
+        $: expression.$,
+        elements: list(expression.elements.map(encodeExpr)),
+      };
+    case "ArrayGetExpr":
+      return {
+        $: expression.$,
+        array: encodeExpr(expression.array),
+        index: encodeExpr(expression.index),
+      };
+    case "ArraySetExpr":
+      return {
+        $: expression.$,
+        array: encodeExpr(expression.array),
+        index: encodeExpr(expression.index),
+        value: encodeExpr(expression.value),
+      };
+    case "ArrayLengthExpr":
+      return { $: expression.$, array: encodeExpr(expression.array) };
+    case "ProjectExpr":
+      return {
+        $: expression.$,
+        value: encodeExpr(expression.value),
+        index: nat(expression.index, "Product projection index"),
+      };
     case "BoolExpr":
       return {
         $: expression.$,
@@ -669,7 +864,8 @@ function encodeExpr(expression: Expr): WireExpr {
         $: expression.$,
         name: unicode(expression.name, "Reference name"),
       };
-    case "ReadExpr":
+    case "OperationExpr":
+    case "OperationDescriptorExpr":
       return { $: expression.$, identity: encodeIdentity(expression.identity) };
     case "ConstructorRefExpr":
       return {
@@ -707,7 +903,23 @@ function encodeExpr(expression: Expr): WireExpr {
       };
     case "ScalarExpr":
       if (
-        !["Add", "Subtract", "Multiply", "Equal", "LessThan"].includes(
+        ![
+          "Add",
+          "Subtract",
+          "Multiply",
+          "Equal",
+          "LessThan",
+          "F32Add",
+          "F32Subtract",
+          "F32Multiply",
+          "F32Divide",
+          "F32Equal",
+          "F32NotEqual",
+          "F32LessThan",
+          "F32LessEqual",
+          "F32GreaterThan",
+          "F32GreaterEqual",
+        ].includes(
           expression.operator.$,
         )
       ) {
@@ -720,6 +932,22 @@ function encodeExpr(expression: Expr): WireExpr {
         left: encodeExpr(expression.left),
         right: encodeExpr(expression.right),
       };
+    case "UnaryExpr":
+      if (
+        ![
+          "F32Negate",
+          "F32Absolute",
+          "F32SquareRoot",
+          "F32Floor",
+          "F32Ceiling",
+          "F32Truncate",
+          "U32ToF32",
+          "F32ToU32",
+        ].includes(expression.operator.$)
+      ) {
+        throw new TypeError(`Unknown unary operator: ${expression.operator.$}`);
+      }
+      return { ...expression, value: encodeExpr(expression.value) };
     case "LetExpr":
     case "UseExpr":
       return {
@@ -744,10 +972,10 @@ function encodeExpr(expression: Expr): WireExpr {
     case "MatchExpr":
       return {
         $: expression.$,
-        value: encodeExpr(expression.value),
+        values: list(expression.values.map(encodeExpr)),
         arms: list(expression.arms.map((arm) => ({
           $: "MatchArm" as const,
-          pattern: encodePattern(arm.pattern),
+          patterns: list(arm.patterns.map(encodePattern)),
           body: encodeExpr(arm.body),
         }))),
       };
@@ -771,9 +999,42 @@ function encodeExpr(expression: Expr): WireExpr {
         label: nat(expression.label, "Return label"),
         value: encodeExpr(expression.value),
       };
-    case "WriteExpr":
-    case "InsertExpr":
-      return { $: expression.$, value: encodeExpr(expression.value) };
+    case "PanicExpr":
+      return {
+        $: expression.$,
+        message: unicode(expression.message, "Panic message"),
+      };
+    case "FunctionEffectsExpr":
+      return {
+        $: expression.$,
+        callee: unicode(expression.callee, "Reflected function name"),
+      };
+    case "ProviderExpr":
+      return {
+        $: expression.$,
+        identity: encodeIdentity(expression.identity),
+        implementation: encodeExpr(expression.implementation),
+      };
+    case "HandleExpr":
+      return {
+        $: expression.$,
+        provider: encodeExpr(expression.provider),
+        body: encodeExpr(expression.body),
+      };
+    case "EffectHasExpr":
+      return {
+        $: expression.$,
+        set: encodeExpr(expression.set),
+        operation: encodeExpr(expression.operation),
+      };
+    case "EffectCountExpr":
+      return { $: expression.$, set: encodeExpr(expression.set) };
+    case "EffectSameExpr":
+      return {
+        $: expression.$,
+        left: encodeExpr(expression.left),
+        right: encodeExpr(expression.right),
+      };
     case "SourceExpr":
       return {
         $: expression.$,
@@ -792,14 +1053,41 @@ function encodeExpr(expression: Expr): WireExpr {
 
 function decodeExpr(expression: WireExpr): Expr {
   switch (expression.$) {
+    case "ProductExpr":
+    case "ArrayExpr":
+      return {
+        ...expression,
+        elements: array(expression.elements).map(decodeExpr),
+      };
+    case "ArrayGetExpr":
+      return {
+        ...expression,
+        array: decodeExpr(expression.array),
+        index: decodeExpr(expression.index),
+      };
+    case "ArraySetExpr":
+      return {
+        ...expression,
+        array: decodeExpr(expression.array),
+        index: decodeExpr(expression.index),
+        value: decodeExpr(expression.value),
+      };
+    case "ArrayLengthExpr":
+      return { ...expression, array: decodeExpr(expression.array) };
+    case "ProjectExpr":
+      return { ...expression, value: decodeExpr(expression.value) };
     case "UnitExpr":
     case "U32Expr":
+    case "F32Expr":
     case "BoolExpr":
     case "LocalExpr":
     case "ConstantExpr":
     case "FunctionExpr":
     case "ConstructorRefExpr":
-    case "ReadExpr":
+    case "OperationExpr":
+    case "OperationDescriptorExpr":
+    case "PanicExpr":
+    case "FunctionEffectsExpr":
       return expression;
     case "ConstructExpr":
       return {
@@ -852,9 +1140,9 @@ function decodeExpr(expression: WireExpr): Expr {
     case "MatchExpr":
       return {
         ...expression,
-        value: decodeExpr(expression.value),
+        values: array(expression.values).map(decodeExpr),
         arms: array(expression.arms).map((arm) => ({
-          pattern: decodePattern(arm.pattern),
+          patterns: array(arm.patterns).map(decodePattern),
           body: decodeExpr(arm.body),
         })),
       };
@@ -869,9 +1157,33 @@ function decodeExpr(expression: WireExpr): Expr {
     case "BlockExpr":
       return { ...expression, body: decodeExpr(expression.body) };
     case "ReturnExpr":
-    case "WriteExpr":
-    case "InsertExpr":
+    case "UnaryExpr":
       return { ...expression, value: decodeExpr(expression.value) };
+    case "ProviderExpr":
+      return {
+        ...expression,
+        implementation: decodeExpr(expression.implementation),
+      };
+    case "HandleExpr":
+      return {
+        ...expression,
+        provider: decodeExpr(expression.provider),
+        body: decodeExpr(expression.body),
+      };
+    case "EffectHasExpr":
+      return {
+        ...expression,
+        set: decodeExpr(expression.set),
+        operation: decodeExpr(expression.operation),
+      };
+    case "EffectCountExpr":
+      return { ...expression, set: decodeExpr(expression.set) };
+    case "EffectSameExpr":
+      return {
+        ...expression,
+        left: decodeExpr(expression.left),
+        right: decodeExpr(expression.right),
+      };
     case "SourceExpr":
       return {
         ...expression,
@@ -885,12 +1197,22 @@ function decodeExpr(expression: WireExpr): Expr {
 
 function decodeValue(value: WireValue): ConstantValue {
   switch (value.$) {
+    case "ProductValue":
+    case "ArrayValue":
+      return { ...value, elements: array(value.elements).map(decodeValue) };
     case "UnitValue":
     case "U32Value":
+    case "F32Value":
     case "BoolValue":
     case "FunctionValue":
     case "ConstructorFunctionValue":
+    case "OperationValue":
+    case "EffectDescriptorValue":
       return value;
+    case "ProviderValue":
+      return { ...value, implementation: decodeValue(value.implementation) };
+    case "EffectSetValue":
+      return { ...value, operations: array(value.operations) };
     case "DataValue":
       return {
         ...value,
@@ -907,6 +1229,12 @@ function decodeValue(value: WireValue): ConstantValue {
           value: decodeValue(binding.value),
         })),
       };
+    case "MatchValuesValue":
+      throw new CompilerError({
+        code: "internal_error",
+        subject: "const",
+        message: "A checked constant leaked internal match values",
+      });
     case "ReturnValue":
       throw new CompilerError({
         code: "internal_error",
@@ -919,12 +1247,12 @@ function decodeValue(value: WireValue): ConstantValue {
 function marshal(module: CoreModule): WireModule {
   return {
     $: "Module",
-    descriptors: list(module.descriptors.map((descriptor) => {
-      if (!["Component", "Resource"].includes(descriptor.storage.$)) {
-        throw new TypeError(`Unknown storage: ${descriptor.storage.$}`);
-      }
-      return { ...descriptor, identity: encodeIdentity(descriptor.identity) };
-    })),
+    operations: list((module.operations ?? []).map((operation) => ({
+      $: "Operation" as const,
+      identity: encodeIdentity(operation.identity),
+      parameter: encodeType(operation.parameter),
+      result: encodeType(operation.result),
+    }))),
     constants: list(module.constants.map((constant) => ({
       $: "Constant" as const,
       name: unicode(constant.name, "Constant name"),
@@ -954,30 +1282,24 @@ function marshal(module: CoreModule): WireModule {
   };
 }
 
-function unmarshal(analysis: WireAnalysis): Analysis {
-  return {
+function decodeAnalysis(analysis: WireAnalysis): Analysis {
+  // Decoded leaves can still reference shared Bend cache terms. Detach only
+  // the public result, not the internal checked function bodies.
+  return structuredClone({
     functions: array(analysis.checked.functions).map((fn) => ({
       name: fn.signature.name,
       parameter: decodeType(fn.signature.parameter),
       result: decodeType(fn.signature.result),
       variables: array(fn.signature.variables),
       effects: array(fn.effects),
+      effect_row: decodeRow(fn.signature.effects),
     })),
     constants: array(analysis.constants).map(({ name, value }) => ({
       name,
       value: decodeValue(value),
     })),
-    world: {
-      registrations: array(analysis.world.registrations),
-      systems: array(analysis.world.systems).map((system) => ({
-        name: system.name,
-        effects: array(system.effects),
-        query: array(system.query),
-      })),
-      batches: array(analysis.world.batches).map(array),
-    },
     remaining_steps: analysis.remaining_steps,
-  };
+  });
 }
 
 function unwrap<A>(result: Result<A>): A {
@@ -993,41 +1315,15 @@ export function constSteps(options: CompileOptions): bigint {
   return nat(options.const_steps ?? 10_000n, "const_steps");
 }
 
-function decodeAnalysis(analysis: WireAnalysis): Analysis {
-  const publicFields: WireAnalysis = {
-    checked: {
-      functions: list(
-        array(analysis.checked.functions).map((fn) => ({
-          signature: fn.signature,
-          effects: fn.effects,
-        })),
-      ),
-    },
-    constants: analysis.constants,
-    world: analysis.world,
-    remaining_steps: analysis.remaining_steps,
-  };
-  return unmarshal(mapConstructors(publicFields, publicNames) as WireAnalysis);
-}
-
 // Internal pipeline boundary: intermediate Bend terms stay opaque until the
 // final artifact, avoiding repeated traversal of every expression between jobs.
-export function decodePipelineArtifact(value: unknown): EcsArtifact {
+export function decodePipelineArtifact(value: unknown): Artifact {
   const artifact = value as {
     readonly analysis: WireAnalysis;
-    readonly storage: List<Omit<EcsStorage, "tag"> & { readonly tag: bigint }>;
     readonly bytes: List<number>;
   };
   return {
     analysis: decodeAnalysis(artifact.analysis),
-    storage: array(
-      mapConstructors(artifact.storage, publicNames) as typeof artifact.storage,
-    ).map((binding) => ({
-      identity: binding.identity,
-      storage: binding.storage,
-      constructor: binding.constructor,
-      tag: u32(Number(binding.tag)),
-    })),
     bytes: Uint8Array.from(array(artifact.bytes)),
   };
 }
@@ -1036,18 +1332,12 @@ export function analyze(
   module: CoreModule,
   options: CompileOptions = {},
 ): Analysis {
-  const result = bend.analyze(
-    mapConstructors(marshal(module), constructorNames),
-    constSteps(options),
-  );
+  const result = bend.analyze(marshal(module), constSteps(options));
   return decodeAnalysis(unwrap(result as Result<WireAnalysis>));
 }
 
 export function compile(module: CoreModule, options: CompileOptions = {}) {
-  const result = bend.compile(
-    mapConstructors(marshal(module), constructorNames),
-    constSteps(options),
-  );
+  const result = bend.compile(marshal(module), constSteps(options));
   const artifact = unwrap(
     result as Result<{
       readonly analysis: WireAnalysis;
@@ -1058,33 +1348,6 @@ export function compile(module: CoreModule, options: CompileOptions = {}) {
     analysis: decodeAnalysis(artifact.analysis),
     bytes: Uint8Array.from(array(artifact.bytes)),
   };
-}
-
-export function compileEcs(
-  module: CoreModule,
-  options: CompileOptions = {},
-): EcsArtifact {
-  const result = bend.compile_ecs(
-    mapConstructors(marshal(module), constructorNames),
-    constSteps(options),
-  );
-  const artifact = unwrap(
-    result as Result<{
-      readonly analysis: WireAnalysis;
-      readonly storage: List<
-        Omit<EcsStorage, "tag"> & { readonly tag: bigint }
-      >;
-      readonly bytes: List<number>;
-    }>,
-  );
-  return decodePipelineArtifact(artifact);
-}
-
-export function effectsConflict(left: Effect, right: Effect): boolean {
-  return bend["effects.conflicts"](
-    mapConstructors(left, constructorNames),
-    mapConstructors(right, constructorNames),
-  );
 }
 
 export function analyzeSourceTree(
@@ -1124,19 +1387,4 @@ export function compileSourceTree(
     analysis: decodeAnalysis(artifact.analysis),
     bytes: Uint8Array.from(array(artifact.bytes)),
   };
-}
-
-export function compileEcsSourceTree(
-  root: Cst,
-  nodeCount: bigint,
-  preludeRoot: Cst,
-  options: CompileOptions = {},
-): EcsArtifact {
-  const result = bend.compile_ecs_source(
-    root,
-    preludeRoot,
-    nat(nodeCount, "CST node count"),
-    constSteps(options),
-  );
-  return decodePipelineArtifact(unwrap(result as Result<unknown>));
 }

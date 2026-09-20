@@ -1,7 +1,7 @@
 import Base
 import ./model.bend as M
 import ./closures.bend as F
-import ./ecs_abi.bend as E
+import ./wasm_catalog.bend as E
 import ./index.bend as Index
 
 type Metadata is Data:
@@ -44,20 +44,36 @@ type Expr is Data:
   LetExpr{name: String, value: Expr, body: Expr}
   IfExpr{condition: Expr, consequent: Expr, alternative: Expr}
   SequenceExpr{first: Expr, next: Expr}
-  MatchExpr{value: Expr, arms: List<&2, M.MatchArm<Expr>>}
+  MatchExpr{values: List<&2, Expr>, arms: List<&2, M.MatchArm<Expr>>}
   GuardExpr{pattern: M.Pattern, value: Expr, alternative: Expr, body: Expr}
   BlockExpr{label: Nat, body: Expr}
   ReturnExpr{label: Nat, value: Expr}
-  ReadExpr{identity: M.TypeId}
-  WriteExpr{value: Expr}
-  InsertExpr{value: Expr}
+  F32Expr{value: F32}
+  UnaryExpr{operator: M.UnaryOp, value: Expr}
+  ProviderExpr{identity: M.TypeId, implementation: Expr}
+  HandleExpr{provider: Expr, body: Expr}
+  InvokeOperationExpr{identity: M.TypeId, argument: Expr}
+  PanicExpr{message: String}
+  ProductExpr{elements: List<&2, Expr>}
+  ProjectExpr{value: Expr, index: Nat}
+  ArrayExpr{elements: List<&2, Expr>}
+  ArrayGetExpr{array: Expr, index: Expr}
+  ArraySetExpr{array: Expr, index: Expr, value: Expr}
+  ArrayLengthExpr{array: Expr}
 
 type Work is Data:
   ExpressionWork{expression: M.Expr}
-  ExpressionsWork{expressions: List<&2, M.Expr>}
+  ExpressionsWork{expressions: List<&2, M.Expr>, reversed: List<&2, Expr>}
 
 def invalid() -> M.Diagnostic:
   M.Diagnostic{"internal_error", "codegen", "runtime projection lost a checked expression child"}
+
+def operation_key(identity: M.TypeId) -> String:
+  M.TypeId{+module_name, declaration} = identity
+  "operation:" ++ Nat.show(String.length(module_name)) ++ ":" ++ module_name ++ declaration
+
+def const_only() -> M.Diagnostic:
+  M.Diagnostic{"backend_const_only", "effect reflection", "effect descriptors and reflection are only available during constant evaluation"}
 
 def one(expressions: List<&2, Expr>) -> Result<&2, &2, M.Diagnostic, Expr>:
   match expressions:
@@ -86,10 +102,10 @@ def rebuild_arms(arms: List<&2, M.MatchArm<M.Expr>>, bodies: List<&2, Expr>) -> 
   match arms bodies:
     case Nil{} Nil{}:
       Done{Nil{}}
-    case M.MatchArm{pattern, body} <> tail head <> rest:
+    case M.MatchArm{patterns, body} <> tail head <> rest:
       do Result<&2, &2, M.Diagnostic, List<&2, M.MatchArm<Expr>>>:
         remaining : List<&2, M.MatchArm<Expr>> <- rebuild_arms(tail, rest)
-        return M.MatchArm{pattern, head} <> remaining
+        return M.MatchArm{patterns, head} <> remaining
     case _ _:
       Fail{invalid()}
 
@@ -99,6 +115,8 @@ def rebuild(original: M.Expr, children: List<&2, Expr>) -> Result<&2, &2, M.Diag
       Done{UnitExpr{}}
     case M.U32Expr{value} Nil{}:
       Done{U32Expr{value}}
+    case M.F32Expr{value} Nil{}:
+      Done{F32Expr{value}}
     case M.BoolExpr{value} Nil{}:
       Done{BoolExpr{value}}
     case M.LocalExpr{name} Nil{}:
@@ -107,6 +125,36 @@ def rebuild(original: M.Expr, children: List<&2, Expr>) -> Result<&2, &2, M.Diag
       Done{ConstantExpr{name}}
     case M.FunctionExpr{name} Nil{}:
       Done{ClosureExpr{"fn:" ++ name, Nil{}}}
+    case M.OperationExpr{identity} Nil{}:
+      Done{ClosureExpr{operation_key(identity), Nil{}}}
+    case M.ProviderExpr{identity, implementation} value <> Nil{}:
+      Done{ProviderExpr{identity, value}}
+    case M.HandleExpr{provider, body} p <> b <> Nil{}:
+      Done{HandleExpr{p, b}}
+    case M.PanicExpr{message} Nil{}:
+      Done{PanicExpr{message}}
+    case M.ProductExpr{elements} children:
+      Done{ProductExpr{children}}
+    case M.ProjectExpr{value, index} child <> Nil{}:
+      Done{ProjectExpr{child, index}}
+    case M.ArrayExpr{elements} children:
+      Done{ArrayExpr{children}}
+    case M.ArrayGetExpr{array, index} a <> i <> Nil{}:
+      Done{ArrayGetExpr{a, i}}
+    case M.ArraySetExpr{array, index, value} a <> i <> v <> Nil{}:
+      Done{ArraySetExpr{a, i, v}}
+    case M.ArrayLengthExpr{array} child <> Nil{}:
+      Done{ArrayLengthExpr{child}}
+    case M.OperationDescriptorExpr{identity} _:
+      Fail{const_only()}
+    case M.FunctionEffectsExpr{callee} _:
+      Fail{const_only()}
+    case M.EffectHasExpr{set, operation} _:
+      Fail{const_only()}
+    case M.EffectCountExpr{set} _:
+      Fail{const_only()}
+    case M.EffectSameExpr{left, right} _:
+      Fail{const_only()}
     case M.ConstructExpr{constructor, None{}} Nil{}:
       Done{ConstructExpr{constructor, None{}}}
     case M.ConstructExpr{constructor, Some{payload}} child <> Nil{}:
@@ -117,6 +165,8 @@ def rebuild(original: M.Expr, children: List<&2, Expr>) -> Result<&2, &2, M.Diag
       Done{CallExpr{"fn:" ++ callee, value}}
     case M.ScalarExpr{operator, left, right} a <> b <> Nil{}:
       Done{ScalarExpr{operator, a, b}}
+    case M.UnaryExpr{operator, value} child <> Nil{}:
+      Done{UnaryExpr{operator, child}}
     case M.LetExpr{name, value, body} v <> b <> Nil{}:
       Done{LetExpr{name, v, b}}
     case M.UseExpr{name, value, body} v <> b <> Nil{}:
@@ -125,22 +175,17 @@ def rebuild(original: M.Expr, children: List<&2, Expr>) -> Result<&2, &2, M.Diag
       Done{IfExpr{c, y, n}}
     case M.SequenceExpr{first, next} a <> b <> Nil{}:
       Done{SequenceExpr{a, b}}
-    case M.MatchExpr{value, arms} subject <> bodies:
+    case M.MatchExpr{values, arms} +children:
+      +count = List.length(&2, M.Expr, values)
       do Result<&2, &2, M.Diagnostic, Expr>:
-        branches : List<&2, M.MatchArm<Expr>> <- rebuild_arms(arms, bodies)
-        return MatchExpr{subject, branches}
+        branches : List<&2, M.MatchArm<Expr>> <- rebuild_arms(arms, List.drop(&2, Expr, children, count))
+        return MatchExpr{List.take(&2, Expr, children, count), branches}
     case M.GuardExpr{pattern, value, alternative, body} v <> a <> b <> Nil{}:
       Done{GuardExpr{pattern, v, a, b}}
     case M.BlockExpr{label, body} b <> Nil{}:
       Done{BlockExpr{label, b}}
     case M.ReturnExpr{label, value} v <> Nil{}:
       Done{ReturnExpr{label, v}}
-    case M.ReadExpr{identity} Nil{}:
-      Done{ReadExpr{identity}}
-    case M.WriteExpr{value} v <> Nil{}:
-      Done{WriteExpr{v}}
-    case M.InsertExpr{value} v <> Nil{}:
-      Done{InsertExpr{v}}
     case _ _:
       Fail{invalid()}
 
@@ -160,17 +205,16 @@ def lower(+fuel: Nat, work: Work, +projection: Metadata) -> Result<&2, &2, M.Dia
         return [reference]
     case 1n+rest ExpressionWork{+expression}:
       do Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
-        children : List<&2, Expr> <- lower(rest, ExpressionsWork{F.children(expression)}, projection)
+        children : List<&2, Expr> <- lower(rest, ExpressionsWork{F.children(expression), Nil{}}, projection)
         prepared : Expr <- rebuild(expression, children)
         return [prepared]
-    case 1n+rest ExpressionsWork{Nil{}}:
-      Done{Nil{}}
-    case 1n+rest ExpressionsWork{head <> tail}:
+    case 1n+rest ExpressionsWork{Nil{}, reversed}:
+      Done{List.reverse(&2, Expr, reversed)}
+    case 1n+rest ExpressionsWork{head <> tail, reversed}:
       do Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
         first : List<&2, Expr> <- lower(rest, ExpressionWork{head}, projection)
         prepared : Expr <- one(first)
-        remaining : List<&2, Expr> <- lower(rest, ExpressionsWork{tail}, projection)
-        return prepared <> remaining
+        lower(rest, ExpressionsWork{tail, prepared <> reversed}, projection)
 
 def prepare(expression: M.Expr, projection: Metadata) -> Result<&2, &2, M.Diagnostic, Expr>:
   do Result<&2, &2, M.Diagnostic, Expr>:

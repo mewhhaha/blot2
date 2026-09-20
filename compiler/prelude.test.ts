@@ -120,7 +120,7 @@ ${allocations}
   use churn (remaining - 1)
 export fn answer () => do:
   use churn 256
-  return case stored:
+  return case stored of
     Some add_forty => add_forty 2
     Nothing => 0
 `,
@@ -162,7 +162,7 @@ preludeTest(
     const { exports } = await instantiate(
       compiler,
       `
-fn inspect candidate => case candidate:
+fn inspect candidate => case candidate of
   Ok (Some value) => value
   Ok Nothing => 1
   Err True => 2
@@ -191,7 +191,7 @@ preludeTest(
 const candidate: Maybe (Result U32 Bool) = Some (Ok 42)
 fn apply (transform: U32 -> U32) => transform 42
 export fn answer () => apply (fn value => value)
-export fn nested () => case candidate:
+export fn nested () => case candidate of
   Some (Ok value) => value
   Some (Err _) => 0
   Nothing => 0
@@ -263,7 +263,7 @@ preludeTest(
       compiler,
       `
 data Maybe a = Some a | Nothing
-export fn local_answer () => case Some 42:
+export fn local_answer () => case Some 42 of
   Some value => value
   Nothing => 0
 export fn prelude_answer () => Maybe.unwrap_or 0 (Maybe.pure 42)
@@ -275,7 +275,7 @@ export fn prelude_answer () => Maybe.unwrap_or 0 (Maybe.pure 42)
       compiler,
       `
 data Maybe a = Some a | Nothing
-export fn invalid () => case Maybe.pure 42:
+export fn invalid () => case Maybe.pure 42 of
   Some value => value
   Nothing => 0
 `,
@@ -290,7 +290,7 @@ preludeTest(
     rejects(
       compiler,
       `
-export fn invalid () => case Some 42:
+export fn invalid () => case Some 42 of
   Some => 0
   Nothing => 0
 `,
@@ -299,7 +299,7 @@ export fn invalid () => case Some 42:
     rejects(
       compiler,
       `
-export fn invalid () => case Nothing:
+export fn invalid () => case Nothing of
   Some _ => 0
   Nothing value => value
 `,
@@ -320,7 +320,7 @@ preludeTest(
     rejects(
       compiler,
       `
-fn invalid candidate => case candidate:
+fn invalid candidate => case candidate of
   Some (Some value) => value
   Nothing => 0
 `,
@@ -329,7 +329,7 @@ fn invalid candidate => case candidate:
     rejects(
       compiler,
       `
-fn invalid candidate => case candidate:
+fn invalid candidate => case candidate of
   Some True => 1
   Nothing => 0
 `,

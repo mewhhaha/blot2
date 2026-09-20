@@ -1,8 +1,8 @@
 import type {
   CoreModule,
-  Descriptor,
   Expr,
   FunctionDefinition,
+  Operation,
   Type,
   TypeId,
 } from "./host.ts";
@@ -46,7 +46,7 @@ export function module(
   options: Partial<Omit<CoreModule, "functions">> = {},
 ): CoreModule {
   return {
-    descriptors: [],
+    operations: [],
     constants: [],
     functions,
     data_types: [],
@@ -54,19 +54,26 @@ export function module(
   };
 }
 
-export function descriptor(
+export function operation(
   declaration: string,
-  storage: "Component" | "Resource" = "Component",
-  module_name = "game/components",
-): Descriptor {
+  options: { module_name?: string; parameter?: Type; result?: Type } = {},
+): Operation {
   return {
-    $: "Descriptor",
-    identity: { $: "TypeId", module_name, declaration },
-    storage: { $: storage },
+    identity: {
+      $: "TypeId",
+      module_name: options.module_name ?? "test",
+      declaration,
+    },
+    parameter: options.parameter ?? unitType,
+    result: options.result ?? u32Type,
   };
 }
 
-export const read = (identity: TypeId): Expr => ({ $: "ReadExpr", identity });
+export const invoke = (identity: TypeId, argument: Expr = unit): Expr => ({
+  $: "ApplyExpr",
+  callee: { $: "OperationExpr", identity },
+  argument,
+});
 
 export const scalarExample = module([
   fn("increment", add(local("value"), integer(1)), { parameter_type: null }),
@@ -79,33 +86,3 @@ export const scalarExample = module([
     value: add(integer(20), integer(21)),
   }],
 });
-
-export const position = descriptor("Position");
-export const velocity = descriptor("Velocity");
-export const time = descriptor("Time", "Resource");
-export const ghost = descriptor("Ghost");
-
-// The typed core corresponding to the small effects-only ECS regression case.
-export const ecsExample = module([
-  fn("read_position", read(position.identity), { exported: false }),
-  fn("move", {
-    $: "UseExpr",
-    name: "position",
-    value: call("read_position"),
-    body: {
-      $: "SequenceExpr",
-      first: read(velocity.identity),
-      next: {
-        $: "SequenceExpr",
-        first: read(time.identity),
-        next: {
-          $: "WriteExpr",
-          value: local("position"),
-        },
-      },
-    },
-  }),
-  fn("insert_ghost", { $: "InsertExpr", value: local("value") }, {
-    parameter_type: { $: "NominalTy", identity: ghost.identity },
-  }),
-], { descriptors: [position, velocity, time, ghost] });

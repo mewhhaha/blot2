@@ -1,0 +1,79 @@
+// PROPOSAL: target API for review, not executable compiler input yet.
+// Imports, records, arrays, runtime Text and the composite host ABI below
+// need implementation. Scalar callbacks/effect rows run in host_io.blot.
+// See compiler/host-api-proposal.md.
+// Io and Application are ordinary library types; main is an ordinary export.
+
+import { IoError } from "std/host"
+import { FrameInput, Update } from "engine/app"
+import { RenderFrame } from "engine/render"
+import * as ecs from "engine/ecs"
+import * as scene from "game/scene"
+import { Position, Velocity, DeltaTime } from "game/components"
+
+
+// These records would normally live in platform library source.
+// Foreign means a call can cross the host boundary, not permission to do so.
+// The host must actually supply each callable value.
+
+data WindowIo = WindowIo {
+  set_title: Text -> Result Unit IoError ! {Foreign},
+}
+
+data RenderIo = RenderIo {
+  submit: RenderFrame -> Result Unit IoError ! {Foreign},
+}
+
+data Io = Io {
+  window: WindowIo,
+  render: RenderIo,
+}
+
+data Application world = Application {
+  create: Unit -> world,
+  update: world -> (FrameInput -> Result world IoError ! {Foreign}),
+}
+
+
+// ECS registration, effects, storage, queries and scheduling are source code.
+// No ECS service or world is supplied by JavaScript.
+
+fn move () => do:
+  use position <- ecs.get Position
+  use velocity <- ecs.get Velocity
+  use time <- ecs.get DeltaTime
+  use ecs.set (Position {
+    x: position.x + velocity.x * time.seconds,
+    y: position.y + velocity.y * time.seconds,
+    z: position.z + velocity.z * time.seconds,
+  })
+  return ()
+
+const simulation = ecs.build [ecs.system Update move]
+type World = simulation.world_type
+
+fn create_world () => scene.populate (simulation.create ())
+
+// Only rendering authority reaches this function, not the entire Io bundle.
+// simulation.update handles its source-defined ECS state effects and returns
+// a successor world. scene.describe builds arrays of geometry/shader references.
+fn update (render_io: RenderIo) => fn (world: World) => fn (input: FrameInput) => do:
+  let next_world = simulation.update world input
+  let frame = scene.describe next_world
+  use submitted <- render_io.submit frame
+  return case submitted of
+    Ok () => Ok next_world
+    Err error => Err error
+
+
+// The host selects this export and passes capabilities explicitly.
+// Returning callbacks lets the host drive frames without a blocking guest loop.
+// create is called only on first launch; reload reuses compatible world state.
+export fn main (io: Io) => do:
+  use titled <- io.window.set_title "Blot sandbox"
+  return case titled of
+    Err error => Err error
+    Ok () => Ok (Application {
+      create: create_world,
+      update: update io.render,
+    })

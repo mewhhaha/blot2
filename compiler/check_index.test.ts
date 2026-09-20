@@ -5,11 +5,10 @@ import {
   CompilerError,
   type CoreModule,
   type DataType,
-  type Descriptor,
-  type Effect,
+  type Operation,
   type TypeId,
 } from "./host.ts";
-import { descriptor, fn, module, u32Type, unit } from "./fixtures.ts";
+import { fn, module, operation, u32Type, unit } from "./fixtures.ts";
 
 type List<A> = { readonly $: "Nil" } | {
   readonly $: "Con";
@@ -60,14 +59,9 @@ const sameIdentity = (left: TypeId, right: TypeId) =>
 const showIdentity = ({ module_name, declaration }: TypeId) =>
   `${module_name}::${declaration}`;
 
-const wireDescriptor = (value: Descriptor) => ({
+const wireOperation = (value: Operation) => ({
+  $: "Operation",
   ...value,
-  storage: { $: `model.${value.storage.$}` },
-});
-const wireEffect = (value: Effect) => ({
-  ...value,
-  access: { $: `model.${value.access.$}` },
-  descriptor: wireDescriptor(value.descriptor),
 });
 
 function firstDuplicate<A>(
@@ -114,7 +108,7 @@ Deno.test("indexed name and lambda validation retain first-duplicate priority", 
   }
 });
 
-Deno.test("descriptor indexes preserve first matches and distinct nominal identities", () => {
+Deno.test("operation indexes preserve first matches and distinct nominal identities", () => {
   const identities: TypeId[] = [
     { $: "TypeId", module_name: "a::b", declaration: "c" },
     { $: "TypeId", module_name: "a", declaration: "b::c" },
@@ -122,32 +116,31 @@ Deno.test("descriptor indexes preserve first matches and distinct nominal identi
     { $: "TypeId", module_name: "雪", declaration: "🙂Type" },
     { $: "TypeId", module_name: "", declaration: "" },
   ];
-  const descriptors: Descriptor[] = identities.map((identity) => ({
-    $: "Descriptor",
+  const operations: Operation[] = identities.map((identity) => ({
+    ...operation("ignored"),
     identity,
-    storage: { $: "Component" },
   }));
   const reordered = [
-    descriptors[0],
-    descriptors[1],
-    { ...descriptors[1], storage: { $: "Resource" as const } },
-    { ...descriptors[0], storage: { $: "Resource" as const } },
+    operations[0],
+    operations[1],
+    { ...operations[1], result: { $: "BoolTy" as const } },
+    { ...operations[0], result: { $: "BoolTy" as const } },
   ];
   for (
     const registrations of [
       [],
-      descriptors,
+      operations,
       reordered,
-      [...descriptors].reverse(),
+      [...operations].reverse(),
     ]
   ) {
     const duplicate = firstDuplicate(
       registrations,
       (a, b) => sameIdentity(a.identity, b.identity),
     );
-    const raw = list(registrations.map(wireDescriptor));
+    const raw = list(registrations.map(wireOperation));
     equal(
-      call("check.valid_descriptors", raw),
+      call("check.validate_operations", raw, list([])),
       duplicate === undefined ? unitResult : fail(
         "duplicate_type",
         showIdentity(duplicate.identity),
@@ -159,12 +152,8 @@ Deno.test("descriptor indexes preserve first matches and distinct nominal identi
         sameIdentity(entry.identity, identity)
       );
       equal(
-        call("check.lookup_descriptor", raw, identity),
-        found ? done(wireDescriptor(found)) : fail(
-          "unknown_storage",
-          showIdentity(identity),
-          "no component or resource descriptor for this type",
-        ),
+        call("type_data.operation", raw, identity),
+        found ? { $: "Some", value: wireOperation(found) } : { $: "None" },
       );
     }
   }
@@ -181,158 +170,97 @@ function diagnosis(source: CoreModule) {
 }
 
 Deno.test("indexed datatype validation preserves interleaved error ordering", () => {
-  const a = descriptor("A");
-  const b = descriptor("B");
-  const type = (value: Descriptor): DataType => ({
-    identity: value.identity,
+  const a = operation("A").identity;
+  const b = operation("B").identity;
+  const type = (identity: TypeId): DataType => ({
+    identity,
     parameters: 0n,
-    constructors: [{ name: value.identity.declaration, payload: u32Type }],
+    constructors: [{ name: identity.declaration, payload: u32Type }],
   });
   const empty: DataType = { ...type(a), constructors: [] };
   equal(diagnosis(module([], { data_types: [empty, type(b), type(b)] })), {
     code: "invalid_annotation",
-    subject: showIdentity(a.identity),
+    subject: showIdentity(a),
     detail: "data declarations need at least one constructor",
   });
   equal(diagnosis(module([], { data_types: [empty, type(b), empty] })), {
     code: "duplicate_type",
-    subject: showIdentity(a.identity),
+    subject: showIdentity(a),
     detail: "duplicate nominal identity",
   });
   equal(
     diagnosis(module([], {
       data_types: [type(a), { ...type(b), parameters: 1n }, type(a)],
-      descriptors: [b],
+      operations: [operation("read")],
     })),
     {
       code: "duplicate_type",
-      subject: showIdentity(a.identity),
+      subject: showIdentity(a),
       detail: "duplicate nominal identity",
     },
   );
   equal(
     diagnosis(module([fn("duplicate", unit), fn("duplicate", unit)], {
       data_types: [type(a)],
-      descriptors: [b, a, a, b],
+      operations: [
+        operation("b"),
+        operation("a"),
+        operation("a"),
+        operation("b"),
+      ],
     })),
     {
       code: "duplicate_type",
-      subject: showIdentity(b.identity),
+      subject: showIdentity(operation("b").identity),
       detail: "duplicate nominal identity",
     },
   );
 });
 
-interface EffectNode {
-  readonly name: string;
-  readonly direct: readonly Effect[];
-  readonly callees: readonly string[];
-}
-
-const wireNode = ({ name, direct, callees }: EffectNode) => ({
-  $: "EffectNode",
-  name,
-  direct: list(direct.map(wireEffect)),
-  callees: list(callees),
-});
-const sameEffect = (left: Effect, right: Effect) =>
-  left.access.$ === right.access.$ &&
-  sameIdentity(left.descriptor.identity, right.descriptor.identity);
-
-function union(left: readonly Effect[], right: readonly Effect[]) {
-  const result = [...right];
-  for (let index = left.length - 1; index >= 0; index--) {
-    if (!result.some((value) => sameEffect(value, left[index]))) {
-      result.unshift(left[index]);
-    }
-  }
-  return result;
-}
-
-function reachableOracle(
-  fuel: number,
-  initial: readonly string[],
-  nodes: readonly EffectNode[],
-  visited: readonly string[],
-  effects: readonly Effect[],
-): Result<List<ReturnType<typeof wireEffect>>> {
-  const pending = [...initial];
-  const seen = new Set(visited);
-  let result = [...effects];
-  while (pending.length) {
-    const name = pending.shift()!;
-    if (fuel-- === 0) {
-      return fail(
-        "internal_error",
-        name,
-        "effect worklist exceeded its graph bound",
-      );
-    }
-    const node = nodes.find((node) => node.name === name);
-    if (!node) return fail("internal_error", name, "missing effect-graph node");
-    if (!seen.has(name)) pending.unshift(...node.callees);
-    seen.add(name);
-    result = union(node.direct, result);
-  }
-  return done(list(result.map(wireEffect)));
-}
-
-Deno.test("indexed effect reachability agrees on cycles, duplicate nodes, missing names and fuel", () => {
-  const storages = [descriptor("A"), descriptor("B", "Resource")];
-  const effects: Effect[] = storages.flatMap((storage) =>
-    (["Read", "Write", "Insert"] as const).map((access) => ({
-      $: "Effect" as const,
-      access: { $: access },
-      descriptor: storage,
-    }))
-  );
-  let seed = 417;
-  const random = () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed >>> 8;
+Deno.test("operation signatures reject open or malformed types before duplicate values", () => {
+  const identity = operation("Reader.ask").identity;
+  const invalid: Operation = {
+    identity,
+    parameter: { $: "VariableTy", index: 0n },
+    result: u32Type,
   };
-  for (let trial = 0; trial < 128; trial++) {
-    const names = Array.from(
-      { length: 1 + random() % 7 },
-      (_, i) => `node_${i}`,
-    );
-    const nodes: EffectNode[] = names.map((name) => ({
-      name,
-      direct: effects.filter(() => random() % 5 === 0),
-      callees: [...names, "missing"].filter(() => random() % 6 === 0),
+  equal(
+    diagnosis(module([fn("duplicate", unit), fn("duplicate", unit)], {
+      operations: [invalid],
+    })),
+    {
+      code: "invalid_annotation",
+      subject: showIdentity(identity),
+      detail: "inference variables are compiler-owned",
+    },
+  );
+  equal(
+    diagnosis(module([], { operations: [invalid, invalid] })),
+    {
+      code: "duplicate_type",
+      subject: showIdentity(identity),
+      detail: "duplicate nominal identity",
+    },
+  );
+  for (
+    const tail of [
+      { $: "RowVariable" as const, index: 0n },
+      { $: "RowParameter" as const, index: 0n },
+    ]
+  ) {
+    const diagnosed = diagnosis(module([], {
+      operations: [{
+        identity,
+        parameter: {
+          $: "FunctionTy",
+          parameter: u32Type,
+          result: u32Type,
+          effects: { $: "EffectRow", operations: [], tail },
+        },
+        result: u32Type,
+      }],
     }));
-    if (trial % 4 === 0) {
-      nodes.push({ name: names[0], direct: effects, callees: ["missing"] });
-    }
-    const pending = [...names, "missing"].filter(() => random() % 3 === 0);
-    const visited = names.filter(() => random() % 5 === 0);
-    const initial = effects.filter(() => random() % 4 === 0);
-    const rawNodes = list(nodes.map(wireNode));
-    for (const fuel of [0, 1, 64]) {
-      const expected = reachableOracle(fuel, pending, nodes, visited, initial);
-      const args = [
-        BigInt(fuel),
-        list(pending),
-        rawNodes,
-        list(visited),
-        list(initial.map(wireEffect)),
-      ];
-      equal(call("check.reachable_work", ...args), expected);
-      equal(
-        call("check.reachable", ...args),
-        nodes.some((node) => node.direct.length)
-          ? expected
-          : done(list(initial.map(wireEffect))),
-      );
-    }
-    for (const name of [...names, "missing"]) {
-      const found = nodes.find((node) => node.name === name);
-      equal(
-        call("check.lookup_effect_node", rawNodes, name),
-        found
-          ? done(wireNode(found))
-          : fail("internal_error", name, "missing effect-graph node"),
-      );
-    }
+    equal(diagnosed.code, "invalid_annotation");
+    equal(diagnosed.subject, showIdentity(identity));
   }
 });

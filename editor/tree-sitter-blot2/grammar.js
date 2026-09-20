@@ -126,7 +126,7 @@ export default grammar({
     intrinsic: (_) => token(/@[a-z_][A-Za-z0-9_]*(\.[a-z_][A-Za-z0-9_]*)*/),
     identifier: (_) => /[a-z_][A-Za-z0-9_]*/,
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
-    operator: (_) => choice(":=", "..", "...", /[+\-*\/%=!<>|&^~?]+/),
+    operator: (_) => choice(":=", "..", "...", /[+\-*\/%=!<>|&^~?$]+/),
     separator: (_) => choice(":", ",", ";"),
     keyword: (_) =>
       choice(
@@ -150,6 +150,7 @@ export default grammar({
         "if",
         "else",
         "case",
+        "of",
         "for",
         "in",
         "break",

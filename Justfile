@@ -1,4 +1,4 @@
-# Build, test, and install Blot 2 syntax highlighting for Helix.
+# Build, test, and install Blot syntax highlighting for Helix.
 install:
   deno task helix:install
 
@@ -6,38 +6,37 @@ install:
 build:
   deno task build:compiler
 
-# Check formatting, types, Bend laws, and compiler/editor-config regressions.
+# Report why the retired sandbox awaits source-defined ECS and controlled IO.
+study:
+  deno task study:ecs
+
+# Check formatting, types, Bend laws, and compiler/editor regressions.
 check:
   deno task check
 
-# Execute the generic-prelude Wasm example, then print the inferred ECS plan.
+# Execute the generic-prelude Wasm example.
 demo:
   deno task demo
+
+# Execute explicit host callbacks and a source-defined effect provider.
+demo-host:
+  deno task demo:host
 
 # Measure the JS reference with the generic prelude and a wide module.
 bench:
   deno task bench
 
-# Compile and execute the scalar gdev-style ECS port with an explicit provider.
-ecs:
-  deno task demo:ecs
+# Compare clean compilation, native declaration edits, and cache reuse.
+bench-native samples="7" report="build/native-bench.json" threads="1,2,4,8" warmups="2":
+  deno task bench:native {{quote(samples)}} {{quote(report)}} {{quote(threads)}} {{quote(warmups)}}
 
-# Measure JS reference ECS workloads, excluding Bend bootstrap.
-bench-ecs samples="7" report="build/ecs-bench.json":
-  deno task bench:ecs {{quote(samples)}} {{quote(report)}}
+# Calibrate compiler task grains, checking every result against a serial run.
+bench-grains iterations="32" samples="3":
+  deno task build:compiler:js
+  mkdir -p build
+  BEND_NO_TELEMETRY=1 bend compiler/parallel_grain_bench.bend -o build/parallel-grain-bench
+  deno run --allow-read=build/parallel-grain-bench,generated/compiler/compiler.js --allow-write=build --allow-run=build/parallel-grain-bench compiler/parallel_grain_bench.ts build/parallel-grain-bench build/parallel-grains.json {{quote(iterations)}} {{quote(samples)}}
 
-# Compare native subprocess compilation against the JavaScript reference.
-bench-native samples="7" report="build/native-bench.json" threads="1,2,4,8":
-  deno task bench:native {{quote(samples)}} {{quote(report)}} {{quote(threads)}}
-
-# Measure clean builds, semantic edits, cache reuse, and state-preserving reload.
-bench-incremental samples="5" report="build/incremental-bench.json" workers="1,2,4,8":
-  deno task bench:incremental {{quote(samples)}} {{quote(report)}} {{quote(workers)}}
-
-# Save a CPU profile of full ECS compiles; use bench-ecs for unprofiled timings.
-profile-ecs systems="64" iterations="3" output="build/ecs.cpuprofile":
-  deno task profile:ecs {{quote(systems)}} {{quote(iterations)}} {{quote(output)}}
-
-# Compile the implemented source-language slice to Wasm.
+# Compile the implemented source-language core to Wasm.
 compile source="examples/prelude.blot" output="build/example.wasm":
   deno task blot build {{quote(source)}} {{quote(output)}}

@@ -8,8 +8,6 @@ import { createNativeCompiler } from "./native.ts";
 import { createSourceCompiler } from "./source.ts";
 import { SourceError } from "./syntax.ts";
 import { formatDiagnostic } from "./source_frontend.ts";
-import { ecsWorkload } from "./ecs_workload.ts";
-import { createEcsRuntime } from "./ecs_runtime.ts";
 import {
   decodeNativeResponse,
   encodeNativeRequest,
@@ -34,12 +32,12 @@ for (const prelude of ["none", "default"] as const) {
     const native = await createNativeCompiler({ prelude });
     try {
       for (
-        const name of ["scalar", "prelude", "ecs_runtime", "syntax", "ecs"]
+        const name of ["scalar", "prelude", "generic_effects"]
       ) {
         const source = await Deno.readTextFile(
           new URL(`../examples/${name}.blot`, import.meta.url),
         );
-        for (const operation of ["analyze", "compile", "compileEcs"] as const) {
+        for (const operation of ["analyze", "compile"] as const) {
           let expected;
           try {
             expected = js[operation](source);
@@ -126,35 +124,24 @@ Deno.test("native diagnostics retain source offsets, budgets, and recovery", asy
 });
 
 for (const threads of [1, 4]) {
-  Deno.test(`native ${threads}-thread ECS output executes and matches JS`, async () => {
+  Deno.test(`native ${threads}-thread generic effects execute and match JS`, async () => {
     const native = await createNativeCompiler({ threads });
     const js = await createSourceCompiler();
     try {
-      const source = ecsWorkload(16);
-      const artifact = await native.compileEcs(source);
-      equal(artifact, js.compileEcs(source));
-      const runtime = await createEcsRuntime(artifact);
-      const identity = (declaration: string) => ({
-        $: "TypeId" as const,
-        module_name: "main",
-        declaration,
-      });
-      const initial = runtime.createWorld({
-        entityCount: 1,
-        components: Array.from({ length: 16 }, (_, index) => [
-          { identity: identity(`Position${index}`), values: [2] },
-          { identity: identity(`Velocity${index}`), values: [3] },
-        ]).flat(),
-        resources: [{ identity: identity("DeltaTime"), value: 2 }],
-      });
-      const next = runtime.run(initial);
-      for (let index = 0; index < 16; index++) {
-        equal(runtime.readComponent(next, identity(`Position${index}`), 0), 8);
-        equal(
-          runtime.readComponent(initial, identity(`Position${index}`), 0),
-          2,
-        );
-      }
+      const source = await Deno.readTextFile(
+        new URL("../examples/generic_effects.blot", import.meta.url),
+      );
+      const artifact = await native.compile(source);
+      equal(artifact, js.compile(source));
+      const module = new WebAssembly.Module(artifact.bytes);
+      equal(WebAssembly.Module.imports(module), []);
+      const instance = new WebAssembly.Instance(module);
+      const answer = instance.exports.answer;
+      const deferred = instance.exports.deferred;
+      ok(typeof answer === "function");
+      ok(typeof deferred === "function");
+      equal(answer(0), 42);
+      equal(deferred(0), 7);
     } finally {
       await native.dispose();
       js.dispose();

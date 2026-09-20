@@ -1,0 +1,19 @@
+// Executable: the host supplies advance; declaring an effect grants no IO.
+effect Counter.advance: U32 -> U32
+
+fn tick value => do:
+  use next <- Counter.advance value
+  return next
+
+export fn main (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider Counter.advance advance):
+  use next <- tick 41
+  return next
+
+// Reflection describes the requirement; it does not create a capability.
+export const uses_host = @effect.has (@effect.of main) Foreign
+
+// Tests can handle the same source effect without any host authority.
+const local_counter = @effect.provider Counter.advance (fn value => value + 1)
+export fn mocked () => do local_counter:
+  use next <- tick 41
+  return next

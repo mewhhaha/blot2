@@ -1,6 +1,7 @@
 // Target-language design specimen, not an executable compiler input yet.
-// ecs_runtime.blot is the executable scalar/explicit-host-provider port.
-// Engine APIs and compiler-intrinsic spellings below are still proposals.
+// The compiler-coupled scalar port is retired under case-study/ecs/prototype.
+// Engine APIs below are proposed source libraries, not compiler intrinsics.
+// See host_capabilities.blot for the explicit host-function entrypoint proposal.
 
 import * as ecs from "engine/ecs"
 import { component, resource, Update } from "engine/ecs"

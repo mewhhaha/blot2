@@ -2,6 +2,7 @@ import { basename, dirname } from "node:path";
 import { createNativeCompiler } from "./native.ts";
 import { formatDiagnostic } from "./source_frontend.ts";
 import { SourceError } from "./syntax.ts";
+import { loadSourceProject } from "./source_project.ts";
 
 const [command, filename, output, ...extra] = Deno.args;
 if (
@@ -16,16 +17,21 @@ if (
 
 let source = "";
 try {
-  source = await Deno.readTextFile(filename);
+  const project = await loadSourceProject(filename, {
+    imports: { "std/": new URL("../std/", import.meta.url) },
+  });
+  source = project.modules.find((module) =>
+    module.name === project.entry
+  )!.source;
   const compiler = await createNativeCompiler();
   try {
     if (command === "check") {
-      const analysis = await compiler.analyze(source);
+      const analysis = await compiler.analyze(project);
       console.log(
         `${filename}: checked ${analysis.functions.length} functions, ${analysis.constants.length} constants`,
       );
     } else {
-      const artifact = await compiler.compile(source);
+      const artifact = await compiler.compile(project);
       const destination = output ?? `build/${basename(filename, ".blot")}.wasm`;
       await Deno.mkdir(dirname(destination), { recursive: true });
       await Deno.writeFile(destination, artifact.bytes);

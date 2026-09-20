@@ -8,6 +8,8 @@ import { NativeProcess } from "./native_process.ts";
 import {
   decodeNativeResponse,
   encodeNativeRequest,
+  nativeProtocolMagic,
+  nativeProtocolVersion,
 } from "./native_protocol.ts";
 import { createSourceFrontend } from "./source_frontend.ts";
 
@@ -21,7 +23,7 @@ function words(values: readonly number[]): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
-const handshake = words([2, 0x424C4F54, 1]);
+const handshake = words([2, nativeProtocolMagic, nativeProtocolVersion]);
 
 async function sendFraming(input: Uint8Array<ArrayBuffer>) {
   const child = new Deno.Command(executable, {

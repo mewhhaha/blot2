@@ -1,4 +1,6 @@
 import { CompilerError } from "./diagnostics.ts";
+import { bendList } from "./bend_list.ts";
+import type { SourceInput } from "./source_project.ts";
 import {
   createFrontend,
   type Cst,
@@ -71,11 +73,51 @@ export async function createSourceFrontend(
   const sourceBase = preludeSource.length + 1;
   const preludeOffsets = declarationOffsets(prelude.root);
   return {
-    prepare(source: string) {
-      const parsed = frontend.parse(source);
+    prepare(input: SourceInput) {
+      const units = typeof input === "string"
+        ? [{
+          name: "main",
+          filename: "",
+          source: input,
+          ...frontend.parse(input),
+        }]
+        : input.modules;
+      let offset = sourceBase;
+      const origins = units.map((unit) => {
+        const origin = {
+          ...unit,
+          base: offset,
+          declarations: declarationOffsets(unit.root),
+        };
+        offset += unit.source.length + 1;
+        return origin;
+      });
+      const root: Cst = typeof input === "string"
+        ? shifted(origins[0].root, BigInt(sourceBase))
+        : {
+          $: "Cst",
+          kind: "source_project",
+          field: "",
+          text: input.entry,
+          offset: BigInt(sourceBase),
+          children: bendList(origins.map((unit) => ({
+            $: "Cst" as const,
+            kind: "source_module",
+            field: "modules",
+            text: unit.name,
+            offset: BigInt(unit.base),
+            children: bendList([{
+              ...shifted(unit.root, BigInt(unit.base)),
+              field: "body",
+            }]),
+          }))),
+        };
       return {
-        root: shifted(parsed.root, BigInt(sourceBase)),
-        nodeCount: parsed.nodeCount + prelude.nodeCount,
+        root,
+        nodeCount: units.reduce(
+          (count, unit) => count + unit.nodeCount + 2n,
+          prelude.nodeCount,
+        ),
         prelude: prelude.root,
         translate(error: unknown): never {
           if (!(error instanceof CompilerError)) throw error;
@@ -87,10 +129,19 @@ export async function createSourceFrontend(
                 source: preludeSource,
               });
             }
+            const origin = origins.findLast((unit) => unit.base <= offset);
+            if (!origin) {
+              throw new Error(`Missing source origin for offset ${offset}`);
+            }
+            const local = offset - origin.base;
             throw new SourceError(
               error.code,
               error.detail,
-              offset - sourceBase,
+              local,
+              local,
+              origin.filename
+                ? { filename: origin.filename, source: origin.source }
+                : undefined,
             );
           }
           const preludeDeclaration = error.subject.startsWith("$prelude.")
@@ -105,15 +156,32 @@ export async function createSourceFrontend(
               source: preludeSource,
             });
           }
-          throw new SourceError(
-            error.code,
-            error.detail,
-            declarationOffsets(parsed.root).get(
-              error.subject.startsWith("main::")
-                ? error.subject.slice(6)
-                : error.subject,
-            ) ?? 0,
-          );
+          for (const unit of origins) {
+            const prefix =
+              typeof input === "string" || unit.name === input.entry
+                ? ""
+                : `$module[${unit.name}].`;
+            const declaration = error.subject.startsWith(`${unit.name}::`)
+              ? error.subject.slice(unit.name.length + 2)
+              : error.subject.startsWith(prefix)
+              ? error.subject.slice(prefix.length)
+              : undefined;
+            const local = declaration === undefined
+              ? undefined
+              : unit.declarations.get(declaration);
+            if (local !== undefined) {
+              throw new SourceError(
+                error.code,
+                error.detail,
+                local,
+                local,
+                unit.filename
+                  ? { filename: unit.filename, source: unit.source }
+                  : undefined,
+              );
+            }
+          }
+          throw new SourceError(error.code, error.detail, 0);
         },
       };
     },

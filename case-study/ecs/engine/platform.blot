@@ -1,0 +1,34 @@
+// Target composite ABI values; this does not extend the compiler's scalar ABI.
+import { RenderFrame } from "engine/render"
+import { DecodeError } from "engine/snapshot"
+import { Bytes } from "std/bytes"
+import { IoError } from "std/host"
+
+export data Viewport = Viewport { width: F32, height: F32 }
+export data InputEvent = InputEvent {
+  kind: U32, key: U32, button: U32,
+  pointer_x: F32, pointer_y: F32, wheel_delta: F32,
+  picked: U32, pick_valid: U32, viewport: Viewport,
+}
+export data FrameInput = FrameInput {
+  seconds: F32, alpha: F32, viewport: Viewport,
+}
+export data WindowIo = WindowIo {
+  set_title: Text -> Result Unit IoError ! {Foreign},
+}
+export data RenderIo = RenderIo {
+  submit: RenderFrame -> Result Unit IoError ! {Foreign},
+}
+// One host-authorized save slot, not arbitrary filesystem access.
+export data FileIo = FileIo {
+  read: Unit -> Result Bytes IoError ! {Foreign},
+  write: Bytes -> Result Unit IoError ! {Foreign},
+}
+export data Io = Io { window: WindowIo, render: RenderIo, files: FileIo }
+export data ApplicationError = HostError IoError | InvalidSnapshot DecodeError
+export data Application world = Application {
+  create: Unit -> world,
+  event: world -> (InputEvent -> Result world ApplicationError ! {Foreign}),
+  update: world -> FrameInput -> world,
+  render: world -> (FrameInput -> Result Unit ApplicationError ! {Foreign}),
+}

@@ -1,8 +1,10 @@
-import type { Analysis, CompileOptions, EcsArtifact } from "./host.ts";
+import type { Analysis, CompileOptions } from "./host.ts";
+import type { SourceInput } from "./source_project.ts";
 import { NativeProcess, type NativeProcessOptions } from "./native_process.ts";
 import {
   decodeNativeResponse,
   encodeNativeRequest,
+  type NativeOperation,
   NativeProtocolError,
 } from "./native_protocol.ts";
 import {
@@ -26,8 +28,8 @@ export async function createNativeCompiler(
   }
   let closed = false;
   async function run(
-    operation: "analyze" | "compile" | "compileEcs",
-    source: string,
+    operation: NativeOperation,
+    source: SourceInput,
     options: CompileOptions,
   ) {
     if (closed) throw new Error("Native compiler is disposed");
@@ -63,7 +65,7 @@ export async function createNativeCompiler(
   }
   return {
     async analyze(
-      source: string,
+      source: SourceInput,
       options: CompileOptions = {},
     ): Promise<Analysis> {
       const response = await run("analyze", source, options);
@@ -72,20 +74,10 @@ export async function createNativeCompiler(
       }
       return response.analysis;
     },
-    async compile(source: string, options: CompileOptions = {}) {
+    async compile(source: SourceInput, options: CompileOptions = {}) {
       const response = await run("compile", source, options);
       if (response.operation !== "compile") {
         throw new Error("Expected native artifact");
-      }
-      return response.artifact;
-    },
-    async compileEcs(
-      source: string,
-      options: CompileOptions = {},
-    ): Promise<EcsArtifact> {
-      const response = await run("compileEcs", source, options);
-      if (response.operation !== "compileEcs") {
-        throw new Error("Expected native ECS artifact");
       }
       return response.artifact;
     },

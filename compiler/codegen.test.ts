@@ -48,14 +48,7 @@ const backend = compiled as unknown as {
   "wasm.prepare"(
     checked: Node,
     constants: List<Node>,
-    linkage: Node,
   ): Result<Prepared>;
-  "wasm.prepare_ecs"(
-    checked: Node,
-    constants: List<Node>,
-  ): Result<Prepared>;
-  "wasm.prepared_storage"(prepared: Prepared): List<Node>;
-  "ecs_abi.bindings"(checked: Node): Result<List<Node>>;
   "wasm.compile_entry"(job: Job): Result<EntryCode>;
   "wasm.compile_entries"(jobs: List<Job>): Result<List<EntryCode>>;
   "wasm.link"(
@@ -63,7 +56,6 @@ const backend = compiled as unknown as {
     entries: List<EntryCode>,
   ): Result<List<number>>;
   "wasm.emit"(checked: Node, constants: List<Node>): Result<List<number>>;
-  "wasm.emit_ecs"(checked: Node, constants: List<Node>): Result<List<number>>;
   "wasm.byte_plan"(bytes: List<number>): BytePlan;
   "wasm.plan_sequence"(plans: List<BytePlan>): BytePlan;
   "wasm.plan_vector"(plans: List<BytePlan>): BytePlan;
@@ -112,9 +104,9 @@ const node = ($: string, fields: Record<string, unknown> = {}): Node => ({
 });
 const none = node("None");
 const some = (value: Node) => node("Some", { value });
-const unit = node("model.UnitExpr");
-const unitType = node("model.UnitTy");
-const u32Type = node("model.U32Ty");
+const unit = node("UnitExpr");
+const unitType = node("UnitTy");
+const u32Type = node("U32Ty");
 const integer = (value: number) => node("U32Expr", { value });
 const local = (name: string) => node("LocalExpr", { name });
 const constant = (name: string) => node("ConstantExpr", { name });
@@ -123,7 +115,7 @@ const call = (callee: string, argument = unit) =>
 const apply = (callee: Node, argument: Node) =>
   node("ApplyExpr", { callee, argument });
 const add = (left: Node, right: Node) =>
-  node("ScalarExpr", { operator: node("model.Add"), left, right });
+  node("ScalarExpr", { operator: node("Add"), left, right });
 const binding = (name: string, value: Node, body: Node) =>
   node("LetExpr", { name, value, body });
 const lambda = (identity: bigint, parameter: string, body: Node) =>
@@ -173,24 +165,24 @@ const source = (
   options: {
     constants?: readonly Node[];
     data_types?: readonly Node[];
-    descriptors?: readonly Node[];
+    operations?: readonly Node[];
   } = {},
 ) =>
   node("Module", {
     functions: list(functions),
     constants: list(options.constants ?? []),
     data_types: list(options.data_types ?? []),
-    descriptors: list(options.descriptors ?? []),
+    operations: list(options.operations ?? []),
   });
 const matched = (value: Node, constructor: string, body: Node) =>
   node("MatchExpr", {
-    value,
+    values: list([value]),
     arms: list([
       node("MatchArm", {
-        pattern: node("ConstructorPattern", {
+        patterns: list([node("ConstructorPattern", {
           constructor,
           payload: some(node("BindingPattern", { name: "payload" })),
-        }),
+        })]),
         body,
       }),
     ]),
@@ -203,16 +195,10 @@ function fingerprint(value: unknown): string {
   );
 }
 
-function prepare(program: Node, mode: "pure" | "ecs" = "pure") {
+function prepare(program: Node) {
   const analysis = unwrap(backend.analyze(program, 100_000n));
   const prepared = unwrap(
-    mode === "pure"
-      ? backend["wasm.prepare"](
-        analysis.checked,
-        analysis.constants,
-        node("wasm.PureLink"),
-      )
-      : backend["wasm.prepare_ecs"](analysis.checked, analysis.constants),
+    backend["wasm.prepare"](analysis.checked, analysis.constants),
   );
   return { analysis, prepared, jobs: array(prepared.jobs) };
 }
@@ -220,9 +206,8 @@ function prepare(program: Node, mode: "pure" | "ecs" = "pure") {
 function cached(
   program: Node,
   cache: Map<string, EntryCode>,
-  mode: "pure" | "ecs" = "pure",
 ) {
-  const prepared = prepare(program, mode);
+  const prepared = prepare(program);
   const created: string[] = [];
   const entries = prepared.jobs.map((job) => {
     const key = fingerprint(job);
@@ -237,15 +222,10 @@ function cached(
     backend["wasm.link"](prepared.prepared, list(entries)),
   )));
   const clean = unwrap(
-    mode === "pure"
-      ? backend["wasm.emit"](
-        prepared.analysis.checked,
-        prepared.analysis.constants,
-      )
-      : backend["wasm.emit_ecs"](
-        prepared.analysis.checked,
-        prepared.analysis.constants,
-      ),
+    backend["wasm.emit"](
+      prepared.analysis.checked,
+      prepared.analysis.constants,
+    ),
   );
   equal(
     bytes,
@@ -277,7 +257,7 @@ Deno.test("cached codegen relocates reordered calls across index and body-size L
   equal(await answer(first.bytes), 22);
   const fillers = Array.from(
     { length: 140 },
-    (_, index) => fn(`unrelated_${index}`, integer(index), { exported: false }),
+    (_, index) => fn(`unrelated_${index}`, integer(index)),
   );
   const expanded = cached(source([...fillers, ...functions]), cache);
   equal(expanded.created.length, fillers.length);
@@ -342,7 +322,7 @@ Deno.test("cached codegen relinks constant addresses, captured values, function 
   equal(await answer(first.bytes), 43);
   const second = cached(
     source([
-      fn("unrelated", integer(0), { exported: false }),
+      fn("unrelated", matched(constant("padding"), "Box", local("payload"))),
       ...functions,
     ], {
       data_types: [dataType("Unused", [variant("Unused")]), box],
@@ -389,7 +369,13 @@ Deno.test("constructor references depend on arity, not unrelated declarations or
     fn("reference", node("ConstructorRefExpr", { constructor: "Choice" }), {
       exported: false,
     }),
-    fn("answer", integer(0)),
+    fn(
+      "answer",
+      node("SequenceExpr", {
+        first: call("reference"),
+        next: integer(0),
+      }),
+    ),
   ];
   const first = cached(
     source(definitions, {
@@ -415,81 +401,23 @@ Deno.test("constructor references depend on arity, not unrelated declarations or
       }),
     ),
   ]);
-  equal(cached(located, cache).created, []);
+  const locations = new Map<string, EntryCode>();
+  cached(source([fn("answer", integer(0))]), locations);
+  equal(cached(located, locations).created, []);
 });
 
-Deno.test("cached ECS instructions relocate storage tags and pure entry allocator imports", async () => {
+Deno.test("unreachable private functions and constants do not create runtime entries", () => {
   const cache = new Map<string, EntryCode>();
-  const position = dataType("Position", [variant("Position", u32Type)]);
-  const identity = node("TypeId", {
-    module_name: "codegen/test",
-    declaration: "Position",
-  });
-  const descriptor = node("Descriptor", {
-    identity,
-    storage: node("model.Component"),
-  });
-  const pureFunctions = [
-    fn(
-      "answer",
-      node("SequenceExpr", {
-        first: apply(node("FunctionExpr", { name: "increment" }), integer(1)),
-        next: unit,
-      }),
-    ),
-    fn("increment", add(local("value"), integer(1)), {
-      exported: false,
-      parameter_type: u32Type,
-    }),
-  ];
-  const first = cached(source(pureFunctions), cache);
-  equal(await answer(first.bytes), 0);
-  const update = fn(
-    "update",
-    node("UseExpr", {
-      name: "position",
-      value: node("ReadExpr", { identity }),
-      body: node("WriteExpr", { value: local("position") }),
-    }),
-  );
-  const ecs = (types: readonly Node[]) =>
-    source([update, ...pureFunctions], {
-      data_types: types,
-      descriptors: [descriptor],
-    });
-  const withImports = cached(ecs([position]), cache, "ecs");
-  equal(withImports.created, ["fn:update", "constructor:Position"]);
-  const relocated = cached(
-    ecs([
-      dataType("Other", [variant("First"), variant("Second")]),
-      position,
-    ]),
+  const first = cached(source([fn("answer", integer(42))]), cache);
+  const second = cached(
+    source([
+      fn("unused", integer(7), { exported: false }),
+      fn("answer", integer(42)),
+    ], { constants: [constDefinition("unused_constant", integer(9))] }),
     cache,
-    "ecs",
   );
-  equal(relocated.created, []);
-  const operations: unknown[] = [];
-  const { instance } = await WebAssembly.instantiate(relocated.bytes, {
-    "blot:ecs": {
-      read(tag: number) {
-        operations.push(["read", tag]);
-        return 0xffff_ffff;
-      },
-      write(tag: number, value: number) {
-        operations.push(["write", tag, value >>> 0]);
-        return 0;
-      },
-      insert() {
-        throw new Error("unexpected insert");
-      },
-    },
-  });
-  const updateSystem = instance.exports.update;
-  const pureSystem = instance.exports.answer;
-  ok(typeof updateSystem === "function" && typeof pureSystem === "function");
-  equal(updateSystem(0), 0);
-  equal(pureSystem(0), 0);
-  equal(operations, [["read", 2], ["write", 2, 0xffff_ffff]]);
+  equal(second.created, []);
+  equal(second.bytes, first.bytes);
 });
 
 Deno.test("linking rejects missing, extra, and mismatched cached entry outputs", () => {
@@ -529,83 +457,6 @@ Deno.test("indexed relocation lookup rejects cached references to missing symbol
     equal(result.error.code, "backend_link");
     ok(result.error.subject.endsWith("missing"));
   }
-});
-
-Deno.test("prepared storage shares canonical metadata without conflating nominal identities", async () => {
-  const identities = [
-    node("TypeId", { module_name: "a::b", declaration: "c" }),
-    node("TypeId", { module_name: "a", declaration: "b::c" }),
-    node("TypeId", { module_name: "𐐀", declaration: "é" }),
-    node("TypeId", { module_name: "𐐀", declaration: "e\u0301" }),
-  ];
-  const constructors = ["Left", "Right", "Composed", "Decomposed"];
-  const definitions = identities.map((identity, index) =>
-    node("DataType", {
-      identity,
-      parameters: 0n,
-      constructors: list([variant(constructors[index], u32Type)]),
-    })
-  );
-  const program = source([
-    ...identities.map((identity, index) =>
-      fn(
-        `copy_${index}`,
-        node("UseExpr", {
-          name: "component",
-          value: node("ReadExpr", { identity }),
-          body: node("WriteExpr", { value: local("component") }),
-        }),
-      )
-    ),
-    fn("private_read", node("ReadExpr", { identity: identities[0] }), {
-      exported: false,
-    }),
-  ], {
-    data_types: definitions,
-    descriptors: identities.map((identity) =>
-      node("Descriptor", { identity, storage: node("model.Component") })
-    ),
-  });
-  const prepared = cached(program, new Map(), "ecs");
-  const storage = array(backend["wasm.prepared_storage"](prepared.prepared));
-  equal(
-    storage,
-    array(unwrap(backend["ecs_abi.bindings"](prepared.analysis.checked))),
-  );
-  equal(storage.map((binding) => [binding.constructor, binding.tag]), [
-    ["Right", 1n],
-    ["Left", 0n],
-    ["Decomposed", 3n],
-    ["Composed", 2n],
-  ]);
-  equal(
-    array(backend["wasm.prepared_storage"](
-      prepare(source([fn("answer", integer(0))])).prepared,
-    )),
-    [],
-  );
-  const seen: number[] = [];
-  const { instance } = await WebAssembly.instantiate(prepared.bytes, {
-    "blot:ecs": {
-      read(tag: number) {
-        seen.push(tag);
-        return tag + 10;
-      },
-      write(tag: number, value: number) {
-        equal(value, tag + 10);
-        return 0;
-      },
-      insert() {
-        throw new Error("unexpected insert");
-      },
-    },
-  });
-  for (let index = 0; index < identities.length; index++) {
-    const invoke = instance.exports[`copy_${index}`];
-    ok(typeof invoke === "function");
-    equal(invoke(0), 0);
-  }
-  equal(seen, [0, 1, 2, 3]);
 });
 
 Deno.test("chunked assembly matches byte encoders across body and section LEB boundaries", () => {

@@ -416,7 +416,8 @@ sourceTest(
       "export fn bad () => do:\n  let value: Bool = 1\n  return value\n";
     rejects(compiler, source, "type_mismatch", source.indexOf("let"));
     rejects(compiler, "export fn bad () -> Bool => 1", "type_mismatch");
-    rejects(compiler, "const bad: F32 = 1", "unsupported_type");
+    rejects(compiler, "const bad: F32 = 1", "type_mismatch");
+    rejects(compiler, "const bad: F64 = 1", "unsupported_type");
   },
 );
 
@@ -464,49 +465,89 @@ sourceTest(
 );
 
 sourceTest(
-  "resolver headers parse as expressions without silently executing as plain do",
+  "resolver values must be declared and typed providers",
   (compiler) => {
-    for (
-      const resolver of [
-        "monad Maybe",
-        "(monad Maybe)",
-        "try",
-        "other_resolver",
-        "ecs.scope world",
-        "(\n  monad Maybe\n)",
-      ]
-    ) {
-      const source = `fn example () => do ${resolver}:
-  use value <- my_maybe
-  use my_other_maybe value
-  return $ my_other_maybe value
-`;
-      rejects(
-        compiler,
-        source,
-        "unsupported_resolver",
-        source.indexOf(resolver),
-      );
-    }
+    rejects(
+      compiler,
+      "fn example () => do absent:\n  return 42",
+      "unknown_value",
+    );
+    rejects(
+      compiler,
+      "fn example () => do 7:\n  return 42",
+      "invalid_provider",
+    );
   },
 );
 
 sourceTest(
-  "resolvers are preserved in consts, nested blocks, and dead branches",
+  "domain operations are not compiler intrinsics or privileged attributes",
+  (compiler) => {
+    for (
+      const name of [
+        "@ecs.get",
+        "@ecs.set",
+        "@ecs.insert",
+        "@ecs.run",
+        "@ecs.spawn",
+        "@ecs.entity",
+        "@window.title",
+        "@window.save",
+        "@window.load",
+        "@render.draw",
+        "@render.clear",
+        "@render.view",
+        "@input.delta_time",
+        "@asset.mesh",
+      ]
+    ) {
+      rejects(compiler, `fn example () => ${name} ()`, "unknown_intrinsic");
+    }
+    rejects(
+      compiler,
+      "#[component]\ndata Position = Position U32",
+      "unsupported_attribute",
+    );
+    rejects(
+      compiler,
+      "#[resource]\ndata Clock = Clock U32",
+      "unsupported_attribute",
+    );
+  },
+);
+
+sourceTest(
+  "platform-named effects are ordinary source declarations without host imports",
+  async (compiler) => {
+    const { bytes, exports } = await instantiate(
+      compiler,
+      `effect window.title: U32 -> Unit
+const test_window = @effect.provider window.title (fn _ => ())
+export fn answer () => do test_window:
+  use window.title 7
+  return 42
+`,
+    );
+    equal(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), []);
+    equal(call(exports, "answer"), 42);
+  },
+);
+
+sourceTest(
+  "provider types are checked in consts, nested blocks, and dead branches",
   (compiler) => {
     for (
       const source of [
         "const try = 0\nfn example () => do try:\n  return 42",
-        "const example = do try:\n  return $ 42",
-        "fn example () => do:\n  let result = do try:\n    return 42\n  return result",
-        "fn example () => do:\n  if False:\n    use do try:\n      return 42\n  return 0",
+        "const try = 0\nconst example = do try:\n  return 42",
+        "const try = 0\nfn example () => do:\n  let result = do try:\n    return 42\n  return result",
+        "const try = 0\nfn example () => do:\n  if False:\n    use do try:\n      return 42\n  return 0",
       ]
     ) {
       rejects(
         compiler,
         source,
-        "unsupported_resolver",
-        source.lastIndexOf("try"),
+        "invalid_provider",
       );
     }
   },
@@ -552,12 +593,11 @@ sourceTest(
   (compiler) => {
     for (
       const source of [
-        "data Position = Position {}",
+        "data Position = Position { x: U32 }\nfn coordinate value => value.x",
         'import { get } from "engine/ecs"',
         "type Scalar = U32",
         "fn f x:\n  return x",
         "export fn f () => 1 + 2",
-        "const values = [1, 2]",
         "const value = 1 garbage",
       ]
     ) {

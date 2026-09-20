@@ -1,4 +1,4 @@
-import { deepStrictEqual as equal, throws } from "node:assert/strict";
+import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import {
   analyze,
   compile,
@@ -7,7 +7,16 @@ import {
   type Expr,
   type Pattern,
 } from "./host.ts";
-import { add, call, fn, integer, local, module, u32Type } from "./fixtures.ts";
+import {
+  add,
+  call,
+  fn,
+  integer,
+  local,
+  module,
+  operation,
+  u32Type,
+} from "./fixtures.ts";
 
 const lambda = (identity: bigint, parameter: string, body: Expr): Expr => ({
   $: "LambdaExpr",
@@ -47,6 +56,12 @@ const constructorPattern = (
   name: string,
   payload: Pattern | null = null,
 ): Pattern => ({ $: "ConstructorPattern", constructor: name, payload });
+const product = (...elements: Expr[]): Expr => ({ $: "ProductExpr", elements });
+const project = (value: Expr, index: bigint): Expr => ({
+  $: "ProjectExpr",
+  value,
+  index,
+});
 
 function constantModule(
   value: Expr,
@@ -120,13 +135,13 @@ Deno.test("const constructor functions and nested matches share ordinary applica
   expectNumber(
     constantModule({
       $: "MatchExpr",
-      value: apply(
+      values: [apply(
         { $: "ConstructorRefExpr", constructor: "Some" },
         constructor("Some", integer(42)),
-      ),
+      )],
       arms: [
-        { pattern: nested, body: local("value") },
-        { pattern: { $: "WildcardPattern" }, body: integer(0) },
+        { patterns: [nested], body: local("value") },
+        { patterns: [{ $: "WildcardPattern" }], body: integer(0) },
       ],
     }, { data_types: [maybe] }),
     42,
@@ -134,11 +149,11 @@ Deno.test("const constructor functions and nested matches share ordinary applica
   expectNumber(
     constantModule({
       $: "MatchExpr",
-      value: { $: "ConstructorRefExpr", constructor: "Nothing" },
+      values: [{ $: "ConstructorRefExpr", constructor: "Nothing" }],
       arms: [
-        { pattern: constructorPattern("Nothing"), body: integer(42) },
+        { patterns: [constructorPattern("Nothing")], body: integer(42) },
         {
-          pattern: constructorPattern("Some", { $: "WildcardPattern" }),
+          patterns: [constructorPattern("Some", { $: "WildcardPattern" })],
           body: integer(0),
         },
       ],
@@ -150,10 +165,10 @@ Deno.test("const constructor functions and nested matches share ordinary applica
 Deno.test("const matching preserves arm order and does not evaluate unused bodies", () => {
   const source = constantModule({
     $: "MatchExpr",
-    value: integer(7),
+    values: [integer(7)],
     arms: [
-      { pattern: { $: "U32Pattern", value: 7 }, body: integer(42) },
-      { pattern: { $: "WildcardPattern" }, body: call("forever") },
+      { patterns: [{ $: "U32Pattern", value: 7 }], body: integer(42) },
+      { patterns: [{ $: "WildcardPattern" }], body: call("forever") },
     ],
   }, {
     functions: [fn("forever", call("forever"), {
@@ -229,6 +244,175 @@ Deno.test("const application charges evaluated expressions once against one shar
   expectNumber(source, 42);
 });
 
+Deno.test("const products preserve immutable nested values with exact source-node fuel", () => {
+  const source = constantModule(product(
+    integer(7),
+    product(
+      { $: "BoolExpr", value: true },
+      { $: "F32Expr", value: -0 },
+      { $: "UnitExpr" },
+    ),
+  ));
+  const original = structuredClone(source);
+  const analysis = analyze(source, { const_steps: 6n });
+  equal(analysis.remaining_steps, 0n);
+  equal(analysis.constants[0].value, {
+    $: "ProductValue",
+    elements: [
+      { $: "U32Value", value: 7 },
+      {
+        $: "ProductValue",
+        elements: [
+          { $: "BoolValue", value: true },
+          { $: "F32Value", value: -0 },
+          { $: "UnitValue" },
+        ],
+      },
+    ],
+  });
+  equal(source, original);
+  throws(
+    () => analyze(source, { const_steps: 5n }),
+    (error) => error instanceof CompilerError && error.code === "const_budget",
+  );
+});
+
+Deno.test("const projection evaluates the product once and can reuse every element", () => {
+  const direct = constantModule(project(product(integer(40), integer(2)), 1n));
+  equal(analyze(direct, { const_steps: 4n }).remaining_steps, 0n);
+  expectNumber(direct, 2);
+  throws(
+    () => analyze(direct, { const_steps: 3n }),
+    (error) => error instanceof CompilerError && error.code === "const_budget",
+  );
+  const reused = constantModule(bind(
+    "pair",
+    product(integer(40), integer(2)),
+    add(project(local("pair"), 0n), project(local("pair"), 1n)),
+  ));
+  equal(analyze(reused, { const_steps: 9n }).remaining_steps, 0n);
+  expectNumber(reused, 42);
+});
+
+Deno.test("const products evaluate left-to-right even when projection ignores a later field", () => {
+  const first: Expr = { $: "PanicExpr", message: "first product element" };
+  const second: Expr = { $: "PanicExpr", message: "second product element" };
+  for (
+    const [value, detail] of [
+      [product(first, second), "first product element"],
+      [project(product(integer(42), second), 0n), "second product element"],
+    ] as const
+  ) {
+    throws(() => analyze(constantModule(value)), (error) => {
+      ok(error instanceof CompilerError);
+      equal(error.code, "const_panic");
+      equal(error.detail, detail);
+      return true;
+    });
+  }
+});
+
+Deno.test("product returns skip pending elements without extra fuel charges", () => {
+  const returning = exit(89n, integer(42));
+  const skipped: Expr = { $: "PanicExpr", message: "unreachable element" };
+  for (
+    const [expression, steps] of [
+      [product(returning, skipped), 4n],
+      [product(integer(9), returning, skipped), 5n],
+      [project(returning, 0n), 4n],
+      [project(product(returning, skipped), 1n), 5n],
+    ] as const
+  ) {
+    const analysis = analyze(constantModule(block(89n, expression)), {
+      const_steps: steps,
+    });
+    equal(analysis.remaining_steps, 0n);
+    equal(analysis.constants[0].value, { $: "U32Value", value: 42 });
+  }
+});
+
+Deno.test("const product closures remain reachable in runtime serialization", async () => {
+  const source = module([fn(
+    "entry",
+    apply(
+      project({ $: "ConstantExpr", name: "bundle" }, 1n),
+      project({ $: "ConstantExpr", name: "bundle" }, 0n),
+    ),
+  )], {
+    constants: [{
+      name: "bundle",
+      exported: false,
+      annotation: null,
+      value: bind(
+        "offset",
+        integer(2),
+        product(
+          integer(40),
+          lambda(40n, "argument", add(local("argument"), local("offset"))),
+        ),
+      ),
+    }],
+  });
+  const artifact = compile(source);
+  const value = artifact.analysis.constants[0].value;
+  ok(value.$ === "ProductValue");
+  ok(value.elements[1].$ === "ClosureValue");
+  const { instance } = await WebAssembly.instantiate(artifact.bytes);
+  const entry = instance.exports.entry;
+  ok(typeof entry === "function");
+  equal(entry(0), 42);
+  equal(entry(0), 42);
+});
+
+Deno.test("products may contain const-only descriptors but cannot leak them into Wasm", () => {
+  const ask = operation("Reader.ask");
+  const constants = [{
+    name: "bundle",
+    exported: false,
+    annotation: null,
+    value: product(
+      { $: "OperationDescriptorExpr", identity: ask.identity },
+      integer(42),
+    ),
+  }];
+  const answer = project({ $: "ConstantExpr", name: "bundle" }, 1n);
+  const artifact = compile(module([], {
+    operations: [ask],
+    constants: [...constants, {
+      name: "answer",
+      exported: true,
+      annotation: null,
+      value: answer,
+    }],
+  }));
+  equal(artifact.analysis.constants[1].value, { $: "U32Value", value: 42 });
+  throws(
+    () =>
+      compile(module([fn("entry", answer)], {
+        operations: [ask],
+        constants,
+      })),
+    (error) =>
+      error instanceof CompilerError && error.code === "backend_const_only",
+  );
+});
+
+Deno.test("malformed products and projections fail explicitly", () => {
+  for (
+    const [value, code] of [
+      [product(), "product_arity"],
+      [product(integer(1)), "product_arity"],
+      [project(product(integer(1), integer(2)), 2n), "product_index"],
+      [project(integer(1), 0n), "type_mismatch"],
+    ] as const
+  ) {
+    throws(
+      () => analyze(constantModule(value)),
+      (error) => error instanceof CompilerError && error.code === code,
+    );
+  }
+});
+
 Deno.test("const and Wasm agree on block exits from pending expression operands", async () => {
   const returning = exit(90n, integer(42));
   const forever = call("forever");
@@ -239,10 +423,14 @@ Deno.test("const and Wasm agree on block exits from pending expression operands"
     apply({ $: "FunctionExpr", name: "identity" }, returning),
     apply(returning, forever),
     constructor("Some", returning),
+    product(returning, forever),
+    product(integer(9), returning, forever),
+    project(returning, 0n),
+    project(product(returning, forever), 1n),
     {
       $: "MatchExpr",
-      value: returning,
-      arms: [{ pattern: { $: "WildcardPattern" }, body: forever }],
+      values: [returning],
+      arms: [{ patterns: [{ $: "WildcardPattern" }], body: forever }],
     },
     {
       $: "IfExpr",
