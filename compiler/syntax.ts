@@ -8,6 +8,7 @@ import {
   type Token,
 } from "../generated/wasm/mod.ts";
 import schema from "../generated/wasm/cst-schema.json" with { type: "json" };
+import { encodeCompactCst } from "./compact_cst.ts";
 
 export type CstList = { readonly $: "Nil" } | {
   readonly $: "Con";
@@ -27,6 +28,64 @@ export interface PreparedSource {
   readonly source: string;
   readonly originalOffsets: readonly number[];
   readonly tokens: readonly Token[];
+}
+
+export interface ParseRange {
+  readonly start?: number;
+  readonly end?: number;
+  readonly tokenStart?: number;
+  readonly tokenEnd?: number;
+}
+
+// Preserve the original source for CST text and diagnostics. Baba's compact
+// parser applies a signed-I32 policy to INTEGER tokens, unlike Blot's U32s.
+export function parserSource(prepared: PreparedSource, range: ParseRange = {}) {
+  const start = range.start ?? 0;
+  const neutral = prepared.source.slice(start, range.end).split("");
+  for (
+    let index = range.tokenStart ?? 0;
+    index < (range.tokenEnd ?? prepared.tokens.length);
+    index++
+  ) {
+    const token = prepared.tokens[index];
+    if (token.type === "named" && token.kind === "INTEGER") {
+      neutral.fill("0", token.span.start - start, token.span.end - start);
+    }
+  }
+  return neutral.join("");
+}
+
+// Layout/delimiter boundaries are only candidates. Each slice still goes
+// through the complete grammar; ambiguous boundaries require a whole parse.
+export function declarationRanges(prepared: PreparedSource) {
+  const closers = new Map([
+    ["(", ")"],
+    ["[", "]"],
+    ["{", "}"],
+    ["\uE001", "\uE002"],
+  ]);
+  const closing = new Set(closers.values());
+  const pending: string[] = [];
+  const ranges: { start: number; end: number }[] = [];
+  let start = 0;
+  for (let index = 0; index < prepared.tokens.length; index++) {
+    const token = prepared.tokens[index];
+    const closer = closers.get(token.text);
+    if (closer) pending.push(closer);
+    else if (closing.has(token.text) && pending.pop() !== token.text) {
+      return undefined;
+    }
+    if (
+      token.text === "\uE000" && pending.length === 0 &&
+      prepared.tokens[index + 1]?.text !== "\uE001"
+    ) {
+      ranges.push({ start, end: index + 1 });
+      start = index + 1;
+    }
+  }
+  return pending.length === 0 && start === prepared.tokens.length
+    ? ranges
+    : undefined;
 }
 
 export class SourceError extends Error {
@@ -264,6 +323,14 @@ export async function createFrontend() {
   ]);
   const lexer = createParser({ bytes, plan });
   const parser = CpuFrontend.create(plan);
+  const rules = new Map(
+    parser.plan.islands.map((island) => [island.ruleId, island.ruleName]),
+  );
+  const materializeProgram = (
+    program: CompactFrontendProgram,
+    source: string,
+    offsetAt: (position: number) => bigint,
+  ) => materialize(parser, program, source, offsetAt);
   function prepare(source: string): PreparedSource {
     const prepared = layout(source, lexer);
     const lexed = lexer.lex(prepared.source);
@@ -274,34 +341,14 @@ export async function createFrontend() {
     }
     return { ...prepared, tokens };
   }
-  function parsePrepared(
+  function compactPrepared(
     prepared: PreparedSource,
-    options: {
-      readonly start?: number;
-      readonly end?: number;
-      readonly tokenStart?: number;
-      readonly tokenEnd?: number;
+    options: ParseRange & {
       readonly offsetAt?: (position: number) => bigint;
     } = {},
   ) {
     const start = options.start ?? 0;
-    const end = options.end ?? prepared.source.length;
-    const source = prepared.source.slice(start, end);
-    // The compact runtime applies a signed-I32 policy to INTEGER tokens.
-    // Replace only Baba-identified integers for parsing, retaining all source
-    // text/spans for Bend's U32 interpretation and overflow diagnostics.
-    const neutral = source.split("");
-    for (
-      let index = options.tokenStart ?? 0;
-      index < (options.tokenEnd ?? prepared.tokens.length);
-      index++
-    ) {
-      const token = prepared.tokens[index];
-      if (token.type === "named" && token.kind === "INTEGER") {
-        neutral.fill("0", token.span.start - start, token.span.end - start);
-      }
-    }
-    const parsed = parser.ingest(neutral.join(""));
+    const parsed = parser.ingest(parserSource(prepared, options));
     if (!parsed.ok) {
       const diagnostic = parsed.diagnostics[0];
       if (!diagnostic) throw new Error("Baba failed without a diagnostic");
@@ -313,18 +360,42 @@ export async function createFrontend() {
         prepared.originalOffsets[start + diagnostic.end] ?? last,
       );
     }
+    return parsed.program;
+  }
+  function parsePrepared(
+    prepared: PreparedSource,
+    options: ParseRange & { readonly offsetAt?: (position: number) => bigint } =
+      {},
+  ) {
+    const start = options.start ?? 0;
     const offsetAt = options.offsetAt ??
       ((position: number) => BigInt(prepared.originalOffsets[position]));
-    return materialize(
-      parser,
-      parsed.program,
-      source,
+    return materializeProgram(
+      compactPrepared(prepared, options),
+      prepared.source.slice(start, options.end),
       (position) => offsetAt(start + position),
     );
   }
   return {
     prepare,
     parsePrepared,
+    encodePrepared(
+      prepared: PreparedSource,
+      sourceBase: number,
+      range: ParseRange = {},
+    ) {
+      const start = range.start ?? 0;
+      return encodeCompactCst(
+        compactPrepared(prepared, range),
+        rules,
+        prepared.source.slice(start, range.end),
+        prepared.originalOffsets.slice(
+          start,
+          range.end === undefined ? undefined : range.end + 1,
+        ),
+        sourceBase,
+      );
+    },
     parse(source: string) {
       return parsePrepared(prepare(source));
     },

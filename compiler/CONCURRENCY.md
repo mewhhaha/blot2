@@ -1,5 +1,536 @@
 # Concurrency review and benchmark report
 
+## Raw-source workers, dependency regions, and executable examples (2026-09-21)
+
+This pass uses `build/cpu-before-resolve-x13Mr9` as its baseline: the
+immediately preceding uncommitted compact-frontend/queue-reset build, not
+`2428902`.
+
+Implemented:
+
+- Large raw inputs use a conservative source-boundary scan, then lex, lay out,
+  parse, and encode independently in the caller and up to three workers. The
+  caller no longer lexes the complete input or transfers an offset array first.
+  Rejected/ambiguous splits still use the canonical whole-file diagnostic.
+- Final compact-word assembly uses bulk copies and rewrites only dictionary
+  references. Byte order, source offsets, dictionary order, and fuel are
+  unchanged.
+- Independent dependency regions advance through their own frontiers. One
+  region's join no longer blocks another region's ready successors. Regions are
+  weakly connected components of the chain graph; real dependencies, SCCs, and
+  joins within a region remain intact. Original job positions choose
+  diagnostics; region-local cache deltas/counters publish only on successful
+  requests. Plans with one frontier or one root bypass region partitioning.
+- `examples/ecs.blot`, `syntax.blot`, and `host_capabilities.blot` are
+  executable ports, not allowances for unsupported syntax. ECS storage, queries,
+  insertion, system order, and immutable state threading are ordinary source
+  functions. Host records stay inside the guest and use the current scalar
+  callback ABI. `just study` runs the headless ECS demo, not the archived
+  graphical sandbox.
+
+### Paired controls
+
+Five fresh-process samples after two warmups, medians in milliseconds, on the
+Ryzen 7 7800X3D. The host and child share physical-core affinity. No build,
+test, or second benchmark was run alongside these measurements. Other desktop
+applications were active, including a CPU-active Unity editor; these are not
+isolated-machine measurements. Every artifact is checked against JS and
+executed. These measure compilation, not native versus JS execution of the ECS
+simulation.
+
+The frontend-only control (before adding regions) gives:
+
+| Balanced 64, eight cores | Before |  After |
+| :----------------------- | -----: | -----: |
+| Full compilation         | 185.53 | 147.13 |
+| Frontend                 |  93.25 |  57.85 |
+| Dictionary/framing       |   6.35 |   2.55 |
+| Native plus transport    |  84.22 |  84.06 |
+
+End-to-end latency improves **20.7%**. Host RSS is effectively unchanged,
+**526.22 → 525.52 MiB**: moving the lexer into each worker does not remove
+isolate overhead. [Raw frontend control](../build/cpu-raw-frontend.json).
+
+The initial region control gives **125.89 → 118.01 ms** for a clean eight-core
+compile of eight staggered diamonds and **74.87 → 52.28 ms** for a body edit
+(30.2% faster). Exactly one of 208 groups is rechecked on that edit; all other
+interfaces are reused. One-core clean latency is **173.05 → 173.57 ms**. Reader
+64 regressed **40.13 → 43.58 ms** at eight cores in this first control, which
+motivated the single-root fast path. JS diamonds also regressed **467.63 →
+503.92 ms**; this control does not establish a JS speedup, and cannot separate
+planning overhead from desktop noise.
+[Initial region controls](../build/cpu-regions.json).
+
+The seven-sample Reader 64 repeat on the final build confirms the tradeoff:
+**40.39 → 43.35 ms** native at eight cores (+7.3%) and **163.95 → 177.40 ms** JS
+(+8.2%). This graph has 65 roots but one connected region, so the single-root
+fast path cannot skip its partition analysis. It is an observed regression, not
+a claimed fix. [Final Reader control](../build/cpu-single-root-control.json).
+
+### Final build: one through eight cores
+
+Balanced 64, three fresh-process samples per setting after two warmups, same
+affinity and parity checks as above. JS remains single-core at **931.91 ms**.
+
+| Native cores | Compile ms | Speedup vs native 1 | Speedup vs JS |
+| -----------: | ---------: | ------------------: | ------------: |
+|            1 |     425.42 |               1.00× |         2.19× |
+|            2 |     294.95 |               1.44× |         3.16× |
+|            3 |     227.86 |               1.87× |         4.09× |
+|            4 |     187.62 |               2.27× |         4.97× |
+|            5 |     175.03 |               2.43× |         5.32× |
+|            6 |     160.84 |               2.64× |         5.79× |
+|            7 |     155.19 |               2.74× |         6.01× |
+|            8 |     147.75 |               2.88× |         6.31× |
+
+One-to-eight-core efficiency is **36.0%**, not linear scaling. The report
+records source/executable/JS hashes and every timing:
+[final core scaling](../build/cpu-resolve-verified.json).
+
+Reproduce without running builds or tests alongside the benchmarks:
+
+```sh
+deno task build:compiler:all
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-resolve-repeat.json . 3 1,2,3,4,5,6,7,8 balanced_64 full
+```
+
+### Retained native allocator investigation
+
+An experimental free-list repacker orders known-free blocks by address without
+moving live allocations. Over 100 pre-encoded Balanced 64 requests at eight
+cores, late-request median latency improves **82.53 → 66.68 ms**. However,
+native RSS worsens **46.09 → 59.21 MiB**. A variant using temporary mapped marks
+and reclaiming completely free trailing heap pages still reaches **55.52 MiB**
+at request 200. These experiments are **not in production**: they do not resolve
+the memory tradeoff, and cached sessions would need further stress validation.
+The measurements support allocator locality as a cause of retained latency; they
+do not establish a leak-free long-term plateau.
+[Latency probe](../build/repack-compare.json),
+[tail-reclamation probe](../build/repack-trim-200.json).
+
+The final production binary reaches **48.39 MiB at requests 100 and 200**, up
+from **46.39 MiB at requests 10 and 50**. All 200 artifacts match. This retains
+the previous queue-residency improvement, but does not remove the small later
+growth. [Final native memory control](../build/native-memory-resolve.json).
+
+### Verification and ECS execution
+
+Both compiler targets build with stock Bend 2.0.21; `PROOF.bend` passes,
+including the new single-frontier/single-root planning laws. **469 compiler
+tests pass**, along with editor parsing/highlighting, six editor tests, seven
+case-study source tests, formatting, and CLI type checks. The planner test
+checks region membership and dependency closure on 256 generated DAGs. Native
+tests exercise one/eight-core diamond compilation, source-order errors,
+one-group cache misses, and rollback. All three ported examples compile through
+raw-source and file-project APIs with JS/native artifact parity, then execute
+via guest ABI 1.
+
+`just study` succeeds. One run compiled the ECS source in **84.45 ms**,
+including native compiler startup/shutdown but excluding the preceding compiler
+rebuild. The guest then ran 100 ticks in **0.59 ms**, returning checksum 633;
+component insertion and snapshot checks passed. These are single demo
+observations, not warmed runtime benchmark medians, and do not compare JS with
+native ECS execution.
+
+### Remaining boundaries
+
+This is not a general dependency-ready queue or work-stealing runtime. Shared
+ancestors can put otherwise parallel branches in one region; their frontier
+joins remain. The boundary scan, dictionary merge/framing, native protocol IO,
+ordered final assembly, and fuel-accounted const evaluation still contain serial
+work. Incremental lex/layout and already-parsed project loading retain their
+existing paths. Retained-native latency and small residual RSS growth are still
+unresolved; no allocator restart, cache eviction, or unsafe heap reset is hidden
+in these changes. The examples do not add language features,
+composite/persistent host state, or the archived GUI.
+
+## Compact frontend and retained queue residency (2026-09-21)
+
+This follow-up compares against the **immediately preceding uncommitted build**
+(`build/cpu-before-host-tyPht3`), not commit `2428902`. Bend remains stock
+2.0.21; the queue cleanup is in this repository's version-pinned native IO
+effect.
+
+Raw-source native compilation now encodes Baba's compact tree directly into
+protocol words. It no longer materializes an object CST and Bend lists just to
+walk them again for encoding. Parser workers perform this encoding themselves
+and transfer packed buffers. The caller handles one share alongside at most
+three isolates, overlapping initialization with useful parsing. Protocol 7
+bytes, dictionary order, source offsets, diagnostics and lowering fuel are
+unchanged. Already-parsed projects and incremental parsing retain their existing
+paths.
+
+### Compilation speed and host memory
+
+Three fresh-process samples after two warmups, medians in milliseconds; AMD
+Ryzen 7 7800X3D, physical cores 0–7. Host and native child share the stated CPU
+affinity. Before/after configurations are interleaved; no build, test or second
+benchmark ran alongside them. This is a shared desktop, not an isolated machine.
+These are source-to-Wasm compiler latencies, not execution speeds of the Wasm.
+
+| Cores | Balanced 64 before | Balanced 64 after |
+| ----: | -----------------: | ----------------: |
+|     1 |             415.40 |            392.35 |
+|     2 |             298.78 |            279.42 |
+|     3 |             248.09 |            228.40 |
+|     4 |             209.69 |            206.30 |
+|     5 |             200.01 |            193.73 |
+|     6 |             194.75 |            186.18 |
+|     7 |             194.00 |            173.90 |
+|     8 |             181.08 |            159.75 |
+
+Balanced 64 is **11.8% faster at eight cores**, with **2.46×** one-to-eight-core
+scaling (30.7% efficiency). Its unchanged single-core JS backend measures 922.93
+ms: native is 2.35× faster on one core and 5.78× on eight. At eight cores,
+first-compile latency including lazy worker startup falls **317.37 → 228.85 ms**
+(27.9%). This excludes compiler construction and is not complete CLI startup.
+Warm host RSS falls **574.71 → 514.04 MiB** (60.67 MiB); first-compile host RSS
+falls **446.20 → 321.39 MiB**. Parser memory overhead is reduced, not
+eliminated.
+
+The reported encoding phase falls 24.03 → 7.55 ms, but its boundary changed:
+per-chunk encoding is now included in frontend time (80.47 → 83.91 ms), and the
+encoding phase covers dictionary merging/framing. Compare end-to-end latency,
+not the encoding phase alone. Native plus transport is 75.27 → 72.55 ms; native
+CPU is unchanged at a median 240 ms, with 10 ms counter resolution. No inference
+algorithm changed in this pass.
+
+[All 166 configurations, artifacts, affinity and build hashes](../build/cpu-compact-final.json).
+
+Reader 8 and Staggered 64 at eight cores measure 5.04 → 4.73 ms and 57.13 →
+55.10 ms. Small timings are noisy. A nine-sample repeat of the apparent
+regressions at two, three, six and seven cores removes the larger regressions,
+except Reader 8 at three cores: **5.20 → 5.54 ms (+6.6%, 0.34 ms)**. This small
+cost remains an observed tradeoff; the change does not improve every workload.
+[All 180 control configurations](../build/cpu-compact-control.json).
+
+### Why native RSS grew
+
+An allocator probe found approximately 1.3 KiB of live Bend heap state after
+each stateless request, with a heap high-water mark near 22 MiB. Nevertheless
+RSS increased about 1 MiB/request. Memory maps located that growth in the
+runtime's reserved corpus. Bend's drained task queues retain advancing positions
+in a slot-major layout, gradually touching more queue planes; this is queue
+residency, not a growing cache of live compiler results.
+
+The receive effect now verifies that CPU queues are empty, clears used slot
+planes and resets their cursors after the worker pool has joined. Publication
+bits must also be cleared: resetting cursors alone could consume stale tasks.
+Compiler heap allocations and incremental session caches are untouched. This
+cleanup is CPU-only and relies on the pinned Bend runtime layout.
+
+In the paired 50-request control, eight-core native RSS grows **45.33 → 93.33
+MiB before**, versus **44.03 → 46.03 MiB after** (requests 3–50). In a separate
+200-request mapping test, the instrumented baseline reaches **174.07 MiB**; the
+production fix reaches **48.09 MiB**. Every artifact matches. The maintained
+`compiler/native_memory_bench.ts` reproduces the mapping/parity control.
+[Baseline mappings](../build/heap-lifetime-before.json),
+[fixed mappings](../build/native-memory-after.json).
+
+A longer production run reaches **51.94 MiB after 1,000 requests**, with all
+artifacts matching. RSS was 45.94 MiB at requests 10–100: small later residency
+growth remains, but the old roughly 1 MiB/request queue-plane growth is removed.
+This does not establish a strict long-term memory plateau.
+[1,000-request mapping control](../build/native-memory-1000.json).
+
+The retained-latency issue is **not** solved by fixing queue residency: at
+request 50, the last-five median remains 82.99 ms versus a fresh warmed control
+of 68.50 ms (1.21×). Before, these were 84.50/68.07 ms (1.24×). Memory and
+latency are separate findings; finite retention tests do not prove bounded
+memory for every program or session workload.
+
+### Remaining concurrency limits
+
+Whole-file lexing/layout and final dictionary merging/framing remain serial.
+Request assembly still joins parser chunks. Inference advances independent
+chains but retains fan-out/join frontiers, deterministic failure ordering, and
+success-only cache publication. Those barriers are not removed here: a general
+dependency-ready scheduler needs separate implementation and correctness tests.
+
+### Verification
+
+All **463 compiler tests pass**.
+
+The native build runs `bend PROOF.bend` and constructor-ownership checks at one
+and four threads. Protocol tests cover exact bytes, fuel and offsets at one,
+two, four and eight frontend threads, concurrent requests, diagnostics,
+disposal, startup failures and fatal encoding failures. Example-corpus tests
+compare declaration diagnostic locations as well as request bytes. The corpus
+also confirms existing parser rejections in `syntax.blot`, `ecs.blot`, and
+`host_capabilities.blot`; this pass does not implement their unsupported syntax.
+Type checking, formatting and diff whitespace checks pass. The measured JS
+backend is unchanged; the rebuilt native executable SHA-256 is
+`ae46c21596132e88cd0c1358d70bfabf354db9b228684266979b5b8ff0384a92`.
+
+## Frontend, lowering and inference follow-up (2026-09-21)
+
+This pass follows up on the three opportunities after commit `2428902`:
+parallelize the frontend, reduce lowering's aggregate CPU cost, and let ready
+inference work advance without unrelated level barriers. Comparisons below use a
+frozen copy of **that commit**, not the older baseline in the historical
+sections. The default remains one worker; Bend remains stock 2.0.21.
+
+### Production compilation results
+
+Balanced 64 is **26.0% faster at eight cores** than `2428902` (286.19 → 211.72
+ms). Its one-core latency falls 7.4% (511.94 → 474.15 ms). Scaling from one to
+eight cores is **2.24× end to end**, versus 1.79× in the paired baseline; native
+plus transport scales **1.91×**. Relative to this build's single-core JS
+compiler, native is **2.11× faster on one core and 4.72× on eight**.
+
+Five fresh-process samples, each after two warmups; medians in milliseconds.
+These are source-to-Wasm **compiler latencies**, not generated-program execution
+times. JS runs on one physical core; native and its host share the indicated
+number of physical cores. The 630 configurations pair both snapshots across
+seven workloads and all core counts.
+
+| Backend  | Balanced 64 | Uneven 64 | Clustered 64 | Chain 64 | Reader 8 | Reader 64 | Staggered 64 |
+| -------- | ----------: | --------: | -----------: | -------: | -------: | --------: | -----------: |
+| JS       |      999.25 |    302.65 |       302.49 |    88.37 |    42.11 |    167.64 |       257.24 |
+| Native 1 |      474.15 |    107.61 |       110.98 |    25.58 |    10.71 |     52.76 |        99.11 |
+| Native 2 |      359.99 |     98.30 |       109.95 |    24.23 |     6.41 |     53.85 |        91.20 |
+| Native 3 |      297.64 |     89.16 |        92.83 |    19.25 |     6.56 |     45.89 |        78.19 |
+| Native 4 |      252.38 |     84.41 |        85.30 |    17.67 |     6.07 |     45.43 |        70.41 |
+| Native 5 |      252.18 |     78.63 |        84.21 |    18.18 |     5.80 |     45.36 |        68.59 |
+| Native 6 |      241.70 |     78.13 |        78.59 |    17.85 |     5.47 |     43.18 |        67.96 |
+| Native 7 |      217.92 |     77.56 |        75.22 |    17.93 |     5.24 |     41.57 |        64.91 |
+| Native 8 |      211.72 |     77.59 |        74.94 |    16.91 |     5.17 |     43.01 |        65.56 |
+
+Balanced 64 scaling details; efficiency is speedup divided by core count:
+
+| Cores | Before (ms) | After (ms) | Native + transport (ms) | Full speedup | Full efficiency |
+| ----: | ----------: | ---------: | ----------------------: | -----------: | --------------: |
+|     1 |      511.94 |     474.15 |                  180.31 |        1.00× |          100.0% |
+|     2 |      424.15 |     359.99 |                  157.56 |        1.32× |           65.9% |
+|     3 |      356.89 |     297.64 |                  145.86 |        1.59× |           53.1% |
+|     4 |      330.68 |     252.38 |                  113.09 |        1.88× |           47.0% |
+|     5 |      326.46 |     252.18 |                  113.01 |        1.88× |           37.6% |
+|     6 |      314.89 |     241.70 |                  100.20 |        1.96× |           32.7% |
+|     7 |      306.63 |     217.92 |                   99.43 |        2.18× |           31.1% |
+|     8 |      286.19 |     211.72 |                   94.40 |        2.24× |           28.0% |
+
+Staggered 64 places one expensive declaration at a different depth in each of
+eight independent eight-declaration chains. It exposes the old per-level
+barriers and is below the parser-pool threshold. Eight-core compilation falls
+**22.7%**, from 84.81 to 65.56 ms. A single dependency chain cannot gain that
+inference parallelism; its eight-core before/after latency is essentially flat
+(16.86 → 16.91 ms).
+
+At eight cores the Balanced 64 frontend falls from 162.30 to **92.28 ms**.
+Encoding is 19.12 → 25.45 ms and native plus transport 103.99 → 94.40 ms;
+component medians need not sum to the total. Native aggregate CPU falls from 360
+to 280 ms, while host CPU rises from 260 to 340 ms (10 ms counter resolution).
+End-to-end latency improves without a corresponding reduction in combined
+host/native CPU.
+
+There are material memory and cold-start costs. Eight-core host RSS rises from
+**319.92 to 568.97 MiB** (about 249 MiB); native RSS stays near 45–46 MiB. The
+first large compile, after compiler construction but including lazy worker
+startup, takes **357.57 ms versus 332.14 ms** before (7.7% slower). This is not
+a complete cold CLI startup measurement. One-core first-compile latency improves
+from 593.32 to 561.72 ms. Warm throughput and first-use latency must not be
+conflated.
+
+[Final production samples, affinity and exact build hashes](../build/cpu-followup-final.json).
+The machine was shared with active desktop work, including a busy Unity process;
+no unrelated process was paused. Before/after configurations were interleaved,
+and no build/test/other benchmark ran alongside these samples. Absolute times
+differ from the earlier diagnostic sweeps; comparisons use the paired baseline,
+not historical numbers from a quieter run.
+
+### Incremental compilation
+
+Body-edit medians from five fresh-process samples after two warmups, including
+the existing incremental frontend. Each edit changes one declaration; this is
+not a many-cache-miss lowering benchmark. All cache counts and artifact checks
+pass. The parser worker pool does not run on this path.
+
+| Workload     | Cores | Before (ms) | After (ms) | Latency reduction |
+| ------------ | ----: | ----------: | ---------: | ----------------: |
+| Balanced 64  |     1 |      151.81 |     159.32 |             −4.9% |
+| Balanced 64  |     8 |      135.10 |     132.25 |              2.1% |
+| Uneven 64    |     1 |       35.66 |      37.60 |             −5.4% |
+| Uneven 64    |     8 |       40.93 |      40.69 |              0.6% |
+| Clustered 64 |     1 |       33.89 |      39.22 |            −15.7% |
+| Clustered 64 |     8 |       38.82 |      40.75 |             −5.0% |
+| Chain 64     |     1 |        7.65 |       7.47 |              2.4% |
+| Chain 64     |     8 |       14.62 |      14.38 |              1.6% |
+| Reader 8     |     1 |        5.60 |       5.70 |             −1.8% |
+| Reader 8     |     8 |        3.62 |       3.57 |              1.4% |
+| Reader 64    |     1 |       16.65 |      17.60 |             −5.7% |
+| Reader 64    |     8 |       21.63 |      21.23 |              1.8% |
+| Staggered 64 |     1 |       30.85 |      21.78 |             29.4% |
+| Staggered 64 |     8 |       28.03 |      24.46 |             12.7% |
+
+[Final incremental samples](../build/cpu-followup-final-incremental.json). The
+one-core arithmetic edit measurements are noisy: for example, Clustered 64's new
+`parsed_ms` ranges from 12.33 to 33.07 ms, versus 12.39 to 16.46 ms before. The
+observed slowdown is largely in the host frontend, not a changed number of
+inferred groups. This does not by itself identify JIT, GC or desktop scheduling
+as the cause.
+
+### Regression controls
+
+The full sweep contains four >5% median increases: Clustered 64 at two cores
+(14.2%), Chain 64 at two/seven cores (5.6%/7.2%), and Reader 64 at two cores
+(5.6%). An eleven-sample repeat does **not** reproduce those thresholds:
+
+| Full compilation repeat | Cores | Before (ms) | After (ms) | Change in latency |
+| ----------------------- | ----: | ----------: | ---------: | ----------------: |
+| Clustered 64            |     2 |      109.02 |     101.47 |             −6.9% |
+| Chain 64                |     2 |       27.33 |      25.27 |             −7.5% |
+| Chain 64                |     7 |       16.81 |      17.07 |             +1.5% |
+| Reader 64               |     2 |       52.63 |      53.16 |             +1.0% |
+
+The three >5% body-edit increases were also repeated, with nine samples at one
+core. Uneven 64 measures 35.29 → 36.89 ms (+4.6%); Clustered 64, 54.36 → 38.52
+ms (−29.2%); Reader 64, 17.37 → 18.03 ms (+3.8%). The arithmetic results are
+visibly unstable across sweeps; the repeat does not establish a large edit
+speedup for Clustered 64 either. No >5% full-build/body-edit regression was
+reproduced in these controls, but they are not an isolated-machine latency
+guarantee. Unchanged-cache and cold-start costs are reported separately.
+[Full-build repeat](../build/cpu-followup-full-control.json),
+[body-edit repeat](../build/cpu-followup-edit-control.json).
+
+### Retained native process
+
+Fifty identical preencoded requests, excluding frontend/encoding, with fresh
+two-warmup controls beside requests 10, 30 and 50. Times below are native plus
+transport. The parser pool is not used in this control.
+
+| Version | Cores | Last five median (ms) | Fresh at 50 (ms) | Retained / fresh | RSS at 3 (MiB) | RSS at 50 (MiB) |
+| ------- | ----: | --------------------: | ---------------: | ---------------: | -------------: | --------------: |
+| Before  |     1 |                215.12 |           207.32 |            1.04× |          34.64 |           34.64 |
+| After   |     1 |                186.23 |           170.97 |            1.09× |          35.70 |           35.70 |
+| Before  |     8 |                110.01 |            96.48 |            1.14× |          45.35 |           93.35 |
+| After   |     8 |                 95.21 |            82.98 |            1.15× |          46.07 |           94.07 |
+
+The final build is faster in absolute time, but eight-core retained latency is
+still **14.7% above its fresh control**, and native RSS still grows **48 MiB**.
+One run just under the earlier 15% threshold does not establish that the
+previously unstable retained-process gate is resolved. Fifty requests do not
+establish a memory plateau. This pass does not fix that runtime lifetime issue,
+and no recycling hides it.
+[Retained-process samples](../build/cpu-followup-final-reuse.json).
+
+### Implemented scope
+
+1. **Parallel raw-source parsing.** Native clean builds lazily retain a Baba
+   worker pool capped by `threads`. Large sources split at validated top-level
+   boundaries, with approximately 4,096 tokens per worker; inputs below 8,192
+   tokens stay local. Workers transfer compact typed arrays, avoiding the cost
+   of cloning object CSTs. The host materializes ordered CSTs with original
+   Unicode/line-ending offsets. Rejected or ambiguous splits fall back to the
+   canonical whole-file parser for diagnostic parity. Unexpected worker failures
+   propagate and terminate the pool. Disposal rejects active/queued work. JS,
+   already-parsed projects and incremental parsing retain their existing paths.
+2. **Cheaper lowering classification.** Dispatch by the first character of a
+   node's kind before exact comparisons, replacing 33 eager full-name
+   comparisons with at most four. All labels and unknown-label rejection remain
+   unchanged. A separate borrowed-CST accessor experiment did not reduce
+   eight-worker CPU cost and was reverted.
+3. **Chain-aware inference.** Contract only edges whose child depends on one
+   parent SCC and whose parent has one consumer. Each SCC still checks and
+   generalizes separately, but independent chains can progress without a join
+   after every declaration. Both clean and incremental checking use weighted,
+   bounded fork/join batches. Cache deltas/counters are local to each branch;
+   publication remains success-only and the earliest original diagnostic wins.
+   The existing dependency-plan cache now retains the schedule too, avoiding
+   reconstruction after body-only edits. Its key already includes declaration
+   order, dependency edges and nominal type dependencies.
+
+The third change is **not a general dependency-ready queue**: fan-outs and joins
+remain frontier boundaries, and Bend still assigns bounded fork/join lanes.
+Whole-file lexing/layout, CST materialization and request encoding are still
+serial. This is measurable progress on all three areas, not maximum parallelism.
+
+### Lowering work and schedule-cache control
+
+Separate five-sample diagnostic builds show the classifier reduces lowering's
+CPU work, rather than merely redistributing it. These instrumented numbers are
+not production headline timings. The follow-up trace predates the final
+incremental schedule-cache change; its clean compilation path is unchanged.
+
+| Balanced 64 lowering | Before wall (ms) | After wall (ms) | Before process CPU (ms) | After process CPU (ms) |
+| -------------------- | ---------------: | --------------: | ----------------------: | ---------------------: |
+| 1 worker             |            75.53 |           39.18 |                   73.96 |                  38.96 |
+| 8 workers            |            30.74 |           18.21 |                  175.38 |                  94.25 |
+
+Eight-worker lowering CPU falls **46.3%**, but remains about **2.4×** the
+one-worker CPU cost. Parallel CPU amplification remains despite less total work.
+Dependency planning still takes 3.38 ms at one worker versus 9.32 ms at eight in
+this trace. Further work should measure that shared/serial cost and parallel CST
+materialization/encoding before adding finer forks.
+[Baseline phases](../build/cpu-before-cst-phases-summary.json),
+[follow-up phases](../build/cpu-followup-phases-summary.json).
+
+A separate five-sample Staggered 64 trace isolates inference, including its
+schedule/prepare/execute stages. The baseline stages are summed per request
+before taking the median, not added as independent medians:
+
+| Staggered 64 inference | Before wall (ms) | After wall (ms) | Before process CPU (ms) | After process CPU (ms) |
+| ---------------------- | ---------------: | --------------: | ----------------------: | ---------------------: |
+| 1 worker               |            11.50 |           12.68 |                   10.94 |                  11.54 |
+| 8 workers              |            23.25 |            6.40 |                   27.27 |                  28.06 |
+
+The chain scheduler removes **72.5% of eight-worker inference wall time** with
+roughly the same aggregate CPU work. It increases one-worker inference overhead;
+the full compilation results include that cost. This isolates useful overlap
+from the separate lowering improvement. As above, these are instrumented clean
+builds, and the after trace uses the pre-schedule-cache snapshot.
+[Before inference trace](../build/cpu-followup-staggered-before-phases-summary.json),
+[after inference trace](../build/cpu-followup-staggered-after-phases-summary.json).
+
+Rebuilding the chain plan on every incremental request initially regressed
+Reader 64 edits. A nine-sample, three-way control at eight workers measures:
+
+| Reader 64 body edit | Median (ms) |
+| ------------------- | ----------: |
+| Baseline `2428902`  |       18.86 |
+| Uncached schedule   |       19.78 |
+| Cached schedule     |       18.84 |
+
+Caching removes that measured regression. It does not resolve the separate,
+sub-millisecond unchanged-result timing gate: the same control measures 0.305 ms
+before and 0.366 ms after. That host-only artifact-copy path is unchanged; its
+relative increase remains an open measurement, not a claimed pass.
+[Schedule-cache control and all three build hashes](../build/cpu-followup-cache-control.json).
+
+### Correctness verification
+
+The final build passes the Bend proof/ownership gates, TypeScript checks and all
+**461 compiler tests**. Added coverage includes complete parser CST/offset/node
+count parity; canonical diagnostics; concurrent requests and disposal;
+worker-construction failure cleanup; all 33 lowering labels and prefix
+collisions; 256 randomized chain-plan DAGs; SCC aliases, joins and fan-outs;
+earliest-error ordering; native one/eight-worker artifact parity; incremental
+reuse counters, failure rollback, dependency rewiring and declaration
+reordering. The benchmark also executes emitted Wasm and checks artifact parity
+outside timing. Formatting and whitespace checks pass.
+
+### Reproduction and build identity
+
+Ryzen 7 7800X3D, physical cores 0–7 (one logical CPU per core), Deno 2.9.6,
+clang 22.1.8, stock Bend 2.0.21. Sources omit the prelude. This does not
+benchmark the ECS specimen or `just study`. The final native SHA-256 starts
+`8fab49da69e70b065f696d1bad5e701e8`; the baseline starts
+`2550e81663b669f1f65b7e6f65ddcdea`. Full hashes, source fingerprints and Wasm
+hashes are retained in each raw report. Raw reports and frozen snapshots are
+local ignored `build/` artifacts; the tables above remain in the repository.
+
+```sh
+deno task build:compiler:all
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-followup-final.json .,build/cpu-before-2428902-ZjWvP7 5 1,2,3,4,5,6,7,8 balanced_64,uneven_64,clustered_64,chain_64,reader_8,reader_64,staggered_64 full
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-followup-final-incremental.json .,build/cpu-before-2428902-ZjWvP7 5 1,8 balanced_64,uneven_64,clustered_64,chain_64,reader_8,reader_64,staggered_64 incremental
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-followup-final-reuse.json .,build/cpu-before-2428902-ZjWvP7 1 1,8 balanced_64 reuse
+```
+
+Run each measurement serially, without builds/tests or other benchmark runs.
+Preserve the baseline executable, JS compiler, frontend, protocol, parser
+artifacts and sources together before rebuilding the current tree. Use the
+separate phase-instrumentation instructions in [README.md](README.md) for
+diagnostics, never for production timing claims.
+
 ## CPU scaling implementation (2026-09-20)
 
 This pass implements the repository-only CPU plan on stock Bend 2.0.21. The

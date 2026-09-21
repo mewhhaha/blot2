@@ -10,6 +10,9 @@ import ./native_cache_keys.bend as K
 import ./native_response.bend as R
 import ./index.bend as Index
 import ./check_scheduler.bend as Scheduler
+import ./check_chain_plan.bend as Chains
+import ./check_regions.bend as Regions
+import ./inference_batch.bend as B
 
 type Mode is Data:
   AnalyzeMode{}
@@ -25,12 +28,16 @@ type Declaration is Data:
   Retained{identity: Nat}
   Replaced{node: C.Cst}
 
+type InferencePlan is Data:
+  IndependentPlan{count: Nat, scheduled: List<&2, Scheduler.Scheduled>}
+  RegionPlan{regions: List<&2, Regions.Region>}
+
 type State is Data:
   State{
     prelude: L.Prelude,
     scope_key: Maybe<&2, List<&2, U32>>,
     declarations: Map<&2, Lowered>,
-    planning: Maybe<&2, Cached<List<&2, G.Job>>>,
+    planning: Maybe<&2, Cached<InferencePlan>>,
     groups: Map<&2, Cached<G.CheckedGroup>>,
     constants: Map<&2, Cached<Const.Constants>>,
     entries: Map<&2, Cached<W.EntryCode>>
@@ -229,12 +236,28 @@ def combine_fragments(fragments: List<&2, M.Module>) -> M.Module:
     case head <> tail:
       L.combine_modules(head, combine_fragments(tail))
 
-def select_plan(found: Maybe<&2, List<&2, G.Job>>, plan: G.Planning) -> Result<&2, &2, M.Diagnostic, List<&2, G.Job>>:
+def inference_plan(+jobs: List<&2, G.Job>, dependent: Bool) -> Result<&2, &2, M.Diagnostic, InferencePlan>:
+  match dependent:
+    case False{}:
+      do Result<&2, &2, M.Diagnostic, InferencePlan>:
+        scheduled : List<&2, Scheduler.Scheduled> <- Scheduler.schedule(jobs)
+        return IndependentPlan{List.length(&2, G.Job, jobs), scheduled}
+    case True{}:
+      do Result<&2, &2, M.Diagnostic, InferencePlan>:
+        chains : List<&2, Chains.Chain> <- Chains.plan(jobs)
+        regions : List<&2, Regions.Region> <- Regions.plan(chains)
+        return RegionPlan{regions}
+
+# The existing planning key covers declaration order, edges and nominal type
+# dependencies. Body-only edits can reuse the schedule as well as its SCCs.
+def select_plan(found: Maybe<&2, InferencePlan>, plan: G.Planning) -> Result<&2, &2, M.Diagnostic, InferencePlan>:
   match found:
-    case Some{jobs}:
-      Done{jobs}
+    case Some{scheduled}:
+      Done{scheduled}
     case None{}:
-      G.finish_plan(plan)
+      do Result<&2, &2, M.Diagnostic, InferencePlan>:
+        +jobs : List<&2, G.Job> <- G.finish_plan(plan)
+        inference_plan(jobs, Scheduler.has_dependencies(jobs))
 
 type CheckedGroups is Data:
   CheckedGroups{
@@ -406,10 +429,109 @@ def check_frontiers(fuel: Nat, frontier: Scheduler.Frontier, +known: Scheduler.C
     case 1n+rest Scheduler.Frontier{ready, pending}:
       check_frontiers(rest, Scheduler.next_frontier(pending), known, previous, check_frontier(ready, known, previous, progress))
 
-def check_jobs(+jobs: List<&2, G.Job>, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups) -> Result<&2, &2, M.Diagnostic, CheckedGroups>:
-  do Result<&2, &2, M.Diagnostic, CheckedGroups>:
-    scheduled : List<&2, Scheduler.Scheduled> <- Scheduler.schedule(jobs)
-    check_frontiers(List.length(&2, G.Job, jobs), Scheduler.next_frontier(scheduled), known, previous, GroupProgress{state, None{}})
+def chain_allowed(jobs: List<&2, Chains.Job>, progress: GroupProgress) -> Bool:
+  match jobs:
+    case Nil{}:
+      False{}
+    case Chains.Job{position, job} <> tail:
+      GroupProgress{state, failure} = progress
+      Scheduler.precedes_failure(position, failure)
+
+def check_chain(jobs: List<&2, Chains.Job>, +known: Scheduler.Catalog, +previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress, allowed: Bool) -> GroupProgress:
+  match jobs allowed:
+    case Nil{} _:
+      progress
+    case _ False{}:
+      progress
+    case Chains.Job{position, job} <> +tail True{}:
+      +next = check_frontier([Scheduler.Scheduled{position, 0n, job}], known, previous, progress)
+      check_chain(tail, known, previous, next, chain_allowed(tail, next))
+
+type ChainContext is Data:
+  ChainContext{
+    known: Scheduler.Catalog,
+    previous: Map<&2, Cached<G.CheckedGroup>>,
+    interfaces: Map<&2, G.Interface>,
+    closures: Map<&2, Set()>,
+    failure: Maybe<&2, Scheduler.Failure>
+  }
+
+def run_chain(chain: Chains.Chain, context: ChainContext) -> GroupProgress:
+  Chains.Chain{position, level, +jobs} = chain
+  ChainContext{known, previous, interfaces, closures, failure} = context
+  # Only dependency lookups inherit state; each lane owns its cache delta and
+  # counters. No candidate cache is published until the whole request succeeds.
+  local = {CheckedGroups{Map.new(&2, Cached<G.CheckedGroup>), interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), closures, Map.new(&2, List<&2, U32>), Counts{0n, 0n}} : CheckedGroups}
+  +initial = {GroupProgress{local, failure} : GroupProgress}
+  check_chain(jobs, known, previous, initial, chain_allowed(jobs, initial))
+
+def merge_progress(chains: List<&2, GroupProgress>, progress: GroupProgress) -> GroupProgress:
+  match chains:
+    case Nil{}:
+      progress
+    case GroupProgress{CheckedGroups{cg, ci, cf, cc, cl, ck, Counts{fresh, reused}}, failure} <> tail:
+      GroupProgress{CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, Counts{prior_fresh, prior_reused}}, prior_failure} = progress
+      combined = {CheckedGroups{Map.union(&2, Cached<G.CheckedGroup>, groups, cg), Map.union(&2, G.Interface, interfaces, ci), Map.union(&2, M.CheckedFunction, functions, cf), Map.union(&2, M.CheckedConstant, constants, cc), Map.union(&2, Set(), closures, cl), Map.union(&2, List<&2, U32>, base_keys, ck), Counts{Nat.add(prior_fresh, fresh), Nat.add(prior_reused, reused)}} : CheckedGroups}
+      merge_progress(tail, GroupProgress{combined, Scheduler.merge_failure(prior_failure, failure)})
+
+def check_parallel_chains(ready: List<&2, Chains.Chain>, +known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress) -> GroupProgress:
+  GroupProgress{CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, counts}, failure} = progress
+  outcomes = B.execute(~Chains.Chain, ~ChainContext, ~GroupProgress, ~run_chain, Scheduler.chain_batch(ready, known), ChainContext{known, previous, interfaces, closures, failure})
+  merge_progress(outcomes, progress)
+
+def check_chain_frontier_planned(ready: List<&2, Chains.Chain>, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress, singletons: Maybe<&2, List<&2, Scheduler.Scheduled>>) -> GroupProgress:
+  match ready singletons:
+    case Chains.Chain{position, level, +jobs} <> Nil{} _:
+      check_chain(jobs, known, previous, progress, chain_allowed(jobs, progress))
+    case _ Some{scheduled}:
+      check_frontier(scheduled, known, previous, progress)
+    case _ None{}:
+      check_parallel_chains(ready, known, previous, progress)
+
+def check_chain_frontier(+ready: List<&2, Chains.Chain>, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress) -> GroupProgress:
+  check_chain_frontier_planned(ready, known, previous, progress, Scheduler.singleton_jobs(ready))
+
+def check_chain_frontiers(fuel: Nat, frontier: Chains.Frontier, +known: Scheduler.Catalog, +previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, GroupProgress>:
+  match fuel frontier:
+    case _ Chains.Frontier{Nil{}, Nil{}}:
+      Done{progress}
+    case 0n _:
+      Fail{M.Diagnostic{"internal_error", "native_session", "dependency chain frontiers exceed their declaration group count"}}
+    case 1n+rest Chains.Frontier{ready, pending}:
+      check_chain_frontiers(rest, Chains.next_frontier(pending), known, previous, check_chain_frontier(ready, known, previous, progress))
+
+def run_region(region: Regions.Region, context: ChainContext) -> Result<&2, &2, M.Diagnostic, GroupProgress>:
+  Regions.Region{+chains} = region
+  ChainContext{known, previous, interfaces, closures, failure} = context
+  local = {CheckedGroups{Map.new(&2, Cached<G.CheckedGroup>), interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), closures, Map.new(&2, List<&2, U32>), Counts{0n, 0n}} : CheckedGroups}
+  check_chain_frontiers(List.length(&2, Chains.Chain, chains), Chains.next_frontier(chains), known, previous, GroupProgress{local, failure})
+
+def merge_regions(outcomes: List<&2, Result<&2, &2, M.Diagnostic, GroupProgress>>, progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, GroupProgress>:
+  match outcomes:
+    case Nil{}:
+      Done{progress}
+    case Fail{diagnostic} <> tail:
+      Fail{diagnostic}
+    case Done{region} <> tail:
+      merge_regions(tail, merge_progress([region], progress))
+
+def check_regions(regions: List<&2, Regions.Region>, +known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, GroupProgress>:
+  match regions:
+    case Regions.Region{+chains} <> Nil{}:
+      check_chain_frontiers(List.length(&2, Chains.Chain, chains), Chains.next_frontier(chains), known, previous, progress)
+    case _:
+      GroupProgress{CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, counts}, failure} = progress
+      outcomes = B.execute(~Regions.Region, ~ChainContext, ~Result<&2, &2, M.Diagnostic, GroupProgress>, ~run_region, Scheduler.region_batch(regions, known), ChainContext{known, previous, interfaces, closures, failure})
+      merge_regions(outcomes, progress)
+
+def check_plan(plan: InferencePlan, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups) -> Result<&2, &2, M.Diagnostic, CheckedGroups>:
+  match plan:
+    case IndependentPlan{group_count, scheduled}:
+      check_frontiers(group_count, Scheduler.next_frontier(scheduled), known, previous, GroupProgress{state, None{}})
+    case RegionPlan{regions}:
+      do Result<&2, &2, M.Diagnostic, CheckedGroups>:
+        progress : GroupProgress <- check_regions(regions, known, previous, GroupProgress{state, None{}})
+        finish_groups(progress)
 
 def assemble(module: M.Module, completed: CheckedGroups) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
   M.Module{constants, functions, types, operations} = module
@@ -583,9 +705,9 @@ def update_lowered(state: State, mode: Mode, prelude_module: M.Module, scope_wor
   do Result<&2, &2, M.Diagnostic, Completion>:
     +plan : G.Planning <- G.prepare_plan(module)
     +plan_key : List<&2, U32> <- K.planning(plan)
-    +jobs : List<&2, G.Job> <- select_plan(cached(List<&2, G.Job>, planning, [plan_key]), plan)
-    completed : CheckedGroups <- check_jobs(jobs, Scheduler.catalog(module), previous_groups, empty_checked())
-    update_checked(State{prelude, Some{scope_words}, next_declarations, Some{Cached{[plan_key], jobs}}, Map.new(&2, Cached<G.CheckedGroup>), constants, entries}, mode, module, completed, declaration_counts, steps)
+    +scheduled : InferencePlan <- select_plan(cached(InferencePlan, planning, [plan_key]), plan)
+    completed : CheckedGroups <- check_plan(scheduled, Scheduler.catalog(module), previous_groups, empty_checked())
+    update_checked(State{prelude, Some{scope_words}, next_declarations, Some{Cached{[plan_key], scheduled}}, Map.new(&2, Cached<G.CheckedGroup>), constants, entries}, mode, module, completed, declaration_counts, steps)
 
 def unique_identity(found: Maybe<&2, Unit>, identity: Nat) -> Result<&2, &2, M.Diagnostic, Unit>:
   match found:

@@ -1,6 +1,14 @@
 import { CompilerError } from "./diagnostics.ts";
 import { bendList } from "./bend_list.ts";
 import type { SourceInput, SourceModule } from "./source_project.ts";
+import { SyntaxWorkers } from "./syntax_workers.ts";
+import {
+  encodeCstChunk,
+  encodeNativeChunks,
+  encodeNativeRequest,
+  type NativeCstChunk,
+  type NativeOperation,
+} from "./native_protocol.ts";
 import {
   createFrontend,
   type Cst,
@@ -49,9 +57,18 @@ export interface SourceCompilerOptions {
   readonly prelude?: "default" | "none";
 }
 
+interface SourceOrigin {
+  readonly name: string;
+  readonly filename: string;
+  readonly source: string;
+  readonly base: number;
+  readonly declarations: ReadonlyMap<string, number>;
+}
+
 export async function createSourceFrontend(
-  options: SourceCompilerOptions = {},
+  options: SourceCompilerOptions & { readonly threads?: number } = {},
 ) {
+  const workers = new SyntaxWorkers(options.threads ?? 1);
   const frontend = await createFrontend();
   let preludeSource = "";
   let prelude: ReturnType<typeof frontend.parse>;
@@ -72,131 +89,197 @@ export async function createSourceFrontend(
   }
   const sourceBase = preludeSource.length + 1;
   const preludeOffsets = declarationOffsets(prelude.root);
-  return {
-    prepare(input: SourceInput) {
-      let units: readonly SourceModule[];
+  let nativePrelude: NativeCstChunk | undefined;
+  let closed = false;
+  function prepare(input: SourceInput) {
+    if (closed) throw new Error("Source frontend is disposed");
+    let units: readonly SourceModule[];
+    if (typeof input === "string") {
+      const prepared = frontend.prepare(input);
+      units = [{
+        name: "main",
+        filename: "",
+        source: input,
+        ...frontend.parsePrepared(prepared, {
+          offsetAt: (position) =>
+            BigInt(prepared.originalOffsets[position] + sourceBase),
+        }),
+      }];
+    } else {
+      units = input.modules;
+    }
+    return finish(input, units);
+  }
+  function finish(input: SourceInput, units: readonly SourceModule[]) {
+    let offset = sourceBase;
+    const origins = units.map((unit) => {
+      const declarations = declarationOffsets(unit.root);
       if (typeof input === "string") {
-        const prepared = frontend.prepare(input);
-        units = [{
+        for (const [name, position] of declarations) {
+          declarations.set(name, position - sourceBase);
+        }
+      }
+      const origin = {
+        ...unit,
+        base: offset,
+        declarations,
+      };
+      offset += unit.source.length + 1;
+      return origin;
+    });
+    const root: Cst = typeof input === "string" ? origins[0].root : {
+      $: "Cst",
+      kind: "source_project",
+      field: "",
+      text: input.entry,
+      offset: BigInt(sourceBase),
+      children: bendList(origins.map((unit) => ({
+        $: "Cst" as const,
+        kind: "source_module",
+        field: "modules",
+        text: unit.name,
+        offset: BigInt(unit.base),
+        children: bendList([{
+          ...shifted(unit.root, BigInt(unit.base)),
+          field: "body",
+        }]),
+      }))),
+    };
+    return {
+      root,
+      nodeCount: units.reduce(
+        (count, unit) => count + unit.nodeCount + 2n,
+        prelude.nodeCount,
+      ),
+      prelude: prelude.root,
+      translate: translator(input, origins),
+    };
+  }
+  function translator(input: SourceInput, origins: readonly SourceOrigin[]) {
+    return (error: unknown): never => {
+      if (!(error instanceof CompilerError)) throw error;
+      if (error.subject.startsWith("offset:")) {
+        const offset = Number(error.subject.slice(7));
+        if (offset < sourceBase) {
+          throw new SourceError(error.code, error.detail, offset, offset, {
+            filename: "std/prelude.blot",
+            source: preludeSource,
+          });
+        }
+        const origin = origins.findLast((unit) => unit.base <= offset);
+        if (!origin) {
+          throw new Error(`Missing source origin for offset ${offset}`);
+        }
+        const local = offset - origin.base;
+        throw new SourceError(
+          error.code,
+          error.detail,
+          local,
+          local,
+          origin.filename
+            ? { filename: origin.filename, source: origin.source }
+            : undefined,
+        );
+      }
+      const preludeDeclaration = error.subject.startsWith("$prelude.")
+        ? error.subject.slice(9)
+        : error.subject.startsWith("std/prelude::")
+        ? error.subject.slice(13)
+        : undefined;
+      if (preludeDeclaration !== undefined) {
+        const offset = preludeOffsets.get(preludeDeclaration) ?? 0;
+        throw new SourceError(error.code, error.detail, offset, offset, {
+          filename: "std/prelude.blot",
+          source: preludeSource,
+        });
+      }
+      for (const unit of origins) {
+        const prefix = typeof input === "string" || unit.name === input.entry
+          ? ""
+          : `$module[${unit.name}].`;
+        const declaration = error.subject.startsWith(`${unit.name}::`)
+          ? error.subject.slice(unit.name.length + 2)
+          : error.subject.startsWith(prefix)
+          ? error.subject.slice(prefix.length)
+          : undefined;
+        const local = declaration === undefined
+          ? undefined
+          : unit.declarations.get(declaration);
+        if (local !== undefined) {
+          throw new SourceError(
+            error.code,
+            error.detail,
+            local,
+            local,
+            unit.filename
+              ? { filename: unit.filename, source: unit.source }
+              : undefined,
+          );
+        }
+      }
+      throw new SourceError(error.code, error.detail, 0);
+    };
+  }
+  return {
+    prepare,
+    async prepareNative(input: SourceInput) {
+      if (closed) throw new Error("Source frontend is disposed");
+      if (typeof input !== "string") {
+        const prepared = prepare(input);
+        return {
+          encode: (operation: NativeOperation, const_steps: bigint) =>
+            encodeNativeRequest({
+              operation,
+              const_steps,
+              ...prepared,
+              fuel: prepared.nodeCount,
+            }),
+          translate: prepared.translate,
+        };
+      }
+      const parallel = await workers.encode(
+        input,
+        sourceBase,
+        (range) =>
+          frontend.encodePrepared(
+            frontend.prepare(input.slice(range.start, range.end)),
+            sourceBase + range.start,
+          ),
+      );
+      if (closed) throw new Error("Source frontend is disposed");
+      const chunks = parallel ??
+        [frontend.encodePrepared(frontend.prepare(input), sourceBase)];
+      nativePrelude ??= encodeCstChunk(prelude.root);
+      const encodedPrelude = nativePrelude;
+      const declarations = new Map<string, number>();
+      for (const chunk of chunks) {
+        for (const [name, offset] of chunk.declarations) {
+          if (!declarations.has(name)) {
+            declarations.set(name, offset - sourceBase);
+          }
+        }
+      }
+      return {
+        encode: (operation: NativeOperation, const_steps: bigint) =>
+          encodeNativeChunks({
+            operation,
+            const_steps,
+            chunks: chunks.map((chunk) => chunk.cst),
+            prelude: encodedPrelude,
+          }),
+        translate: translator(input, [{
           name: "main",
           filename: "",
           source: input,
-          ...frontend.parsePrepared(prepared, {
-            offsetAt: (position) =>
-              BigInt(prepared.originalOffsets[position] + sourceBase),
-          }),
-        }];
-      } else {
-        units = input.modules;
-      }
-      let offset = sourceBase;
-      const origins = units.map((unit) => {
-        const declarations = declarationOffsets(unit.root);
-        if (typeof input === "string") {
-          for (const [name, position] of declarations) {
-            declarations.set(name, position - sourceBase);
-          }
-        }
-        const origin = {
-          ...unit,
-          base: offset,
+          base: sourceBase,
           declarations,
-        };
-        offset += unit.source.length + 1;
-        return origin;
-      });
-      const root: Cst = typeof input === "string" ? origins[0].root : {
-        $: "Cst",
-        kind: "source_project",
-        field: "",
-        text: input.entry,
-        offset: BigInt(sourceBase),
-        children: bendList(origins.map((unit) => ({
-          $: "Cst" as const,
-          kind: "source_module",
-          field: "modules",
-          text: unit.name,
-          offset: BigInt(unit.base),
-          children: bendList([{
-            ...shifted(unit.root, BigInt(unit.base)),
-            field: "body",
-          }]),
-        }))),
-      };
-      return {
-        root,
-        nodeCount: units.reduce(
-          (count, unit) => count + unit.nodeCount + 2n,
-          prelude.nodeCount,
-        ),
-        prelude: prelude.root,
-        translate(error: unknown): never {
-          if (!(error instanceof CompilerError)) throw error;
-          if (error.subject.startsWith("offset:")) {
-            const offset = Number(error.subject.slice(7));
-            if (offset < sourceBase) {
-              throw new SourceError(error.code, error.detail, offset, offset, {
-                filename: "std/prelude.blot",
-                source: preludeSource,
-              });
-            }
-            const origin = origins.findLast((unit) => unit.base <= offset);
-            if (!origin) {
-              throw new Error(`Missing source origin for offset ${offset}`);
-            }
-            const local = offset - origin.base;
-            throw new SourceError(
-              error.code,
-              error.detail,
-              local,
-              local,
-              origin.filename
-                ? { filename: origin.filename, source: origin.source }
-                : undefined,
-            );
-          }
-          const preludeDeclaration = error.subject.startsWith("$prelude.")
-            ? error.subject.slice(9)
-            : error.subject.startsWith("std/prelude::")
-            ? error.subject.slice(13)
-            : undefined;
-          if (preludeDeclaration !== undefined) {
-            const offset = preludeOffsets.get(preludeDeclaration) ?? 0;
-            throw new SourceError(error.code, error.detail, offset, offset, {
-              filename: "std/prelude.blot",
-              source: preludeSource,
-            });
-          }
-          for (const unit of origins) {
-            const prefix =
-              typeof input === "string" || unit.name === input.entry
-                ? ""
-                : `$module[${unit.name}].`;
-            const declaration = error.subject.startsWith(`${unit.name}::`)
-              ? error.subject.slice(unit.name.length + 2)
-              : error.subject.startsWith(prefix)
-              ? error.subject.slice(prefix.length)
-              : undefined;
-            const local = declaration === undefined
-              ? undefined
-              : unit.declarations.get(declaration);
-            if (local !== undefined) {
-              throw new SourceError(
-                error.code,
-                error.detail,
-                local,
-                local,
-                unit.filename
-                  ? { filename: unit.filename, source: unit.source }
-                  : undefined,
-              );
-            }
-          }
-          throw new SourceError(error.code, error.detail, 0);
-        },
+        }]),
       };
     },
     dispose() {
+      if (closed) return;
+      closed = true;
+      workers.dispose();
       frontend.dispose();
     },
   };

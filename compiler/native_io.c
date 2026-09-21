@@ -34,7 +34,28 @@ static void blot_native_store(uint8_t* bytes, uint32_t word) {
 }
 
 #ifdef CID_RECEIVE
+// Bend 2.0.21 stores task queues in slot-major planes. Leaving their drained
+// positions advancing between requests gradually faults in every slot plane.
+// This effect runs after corpus_eval has joined the CPU pool. Clear both the
+// used slots and their cursors: resetting cursors alone would let a consumer
+// mistake an old slot's publication bit for a newly published task.
+static void blot_native_reset_queues(Corpus heap) {
+  if (io_gpu || pool_size == 1) return;
+  uint32_t slots = 0;
+  for (uint32_t lane = 0; lane < LANES; lane += 1) {
+    uint32_t put = a32_load(ring_put(heap, lane));
+    if (a32_load(ring_get(heap, lane)) != put) {
+      err_fail("native protocol: task queue is not drained at request boundary");
+    }
+    if (put > slots) slots = put;
+  }
+  if (slots > RING_LEN) slots = RING_LEN;
+  memset(heap + RING_OFF, 0, (size_t)slots * LANES * sizeof(u64));
+  memset(ring_word(heap, 0, RING_LEN), 0, 2 * LANES * sizeof(u64));
+}
+
 static Term blot_native_receive_run(Env e, Term* fields, IoWork* work) {
+  blot_native_reset_queues(e.mem);
   uint8_t prefix[4];
   ssize_t count;
   do {

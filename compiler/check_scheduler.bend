@@ -2,6 +2,9 @@ import Base
 import ./model.bend as M
 import ./groups.bend as G
 import ./index.bend as Index
+import ./inference_batch.bend as B
+import ./check_chain_plan.bend as Chains
+import ./check_regions.bend as Regions
 
 def required(-V: Data, found: Maybe<&2, V>, name: String) -> Result<&2, &2, M.Diagnostic, V>:
   match found:
@@ -212,83 +215,22 @@ def first_failure(+previous: Maybe<&2, Failure>, +candidate: Failure) -> Maybe<&
 def inference_grain() -> Nat:
   128n
 
-def total_cost(tasks: List<&2, Task>, total: Nat) -> Nat:
+def check_task(task: Task, context: Unit) -> Outcome:
+  Task{position, module, dependencies, cost} = task
+  Outcome{position, G.check_group(module, dependencies)}
+
+def weighted_tasks(tasks: List<&2, Task>) -> List<&2, B.Weighted<Task>>:
   match tasks:
     case Nil{}:
-      total
-    case Task{position, module, dependencies, cost} <> tail:
-      total_cost(tail, Nat.add(total, cost))
+      Nil{}
+    case Task{position, module, dependencies, +cost} <> tail:
+      B.Weighted{Task{position, module, dependencies, cost}, cost} <> weighted_tasks(tail)
 
-type Partition is Data:
-  Partition{left: List<&2, Task>, right: List<&2, Task>, left_cost: Nat, right_cost: Nat}
+def task_batch(tasks: List<&2, Task>, grain: Nat) -> B.Batch<Task>:
+  B.plan(Task, weighted_tasks(tasks), grain)
 
-def cut_before(tasks: List<&2, Task>, +left_cost: Nat, +target: Nat) -> Bool:
-  match tasks:
-    case Nil{}:
-      True{}
-    case Task{position, module, dependencies, cost} <> tail:
-      +after = Nat.add(left_cost, cost)
-      Bool.and(Nat.is_gt(left_cost, 0n), Bool.or(Nat.is_ge(left_cost, target), Bool.and(Nat.is_ge(after, target), Nat.is_le(Nat.sub(target, left_cost), Nat.sub(after, target)))))
-
-def partition(tasks: List<&2, Task>, reversed: List<&2, Task>, +left_cost: Nat, +total: Nat, +target: Nat, reached: Bool) -> Partition:
-  match tasks reached:
-    case Nil{} _:
-      Partition{List.reverse(&2, Task, reversed), Nil{}, left_cost, 0n}
-    case remaining True{}:
-      Partition{List.reverse(&2, Task, reversed), remaining, left_cost, Nat.sub(total, left_cost)}
-    case Task{position, module, dependencies, +cost} <> +tail False{}:
-      +next = Nat.add(left_cost, cost)
-      partition(tail, Task{position, module, dependencies, cost} <> reversed, next, total, target, cut_before(tail, next, target))
-
-type Batch is Data:
-  Sequential{tasks: List<&2, Task>}
-  Parallel{left: Batch, right: Batch}
-
-def forkable(parts: Partition, +grain: Nat) -> Bool:
-  Partition{left, right, +left_cost, +right_cost} = parts
-  Bool.and(Nat.is_gt(left_cost, 0n), Bool.and(Nat.is_gt(right_cost, 0n), Bool.and(Nat.is_ge(left_cost, grain), Nat.is_ge(right_cost, grain))))
-
-def batches(+fuel: Nat, parts: Partition, +grain: Nat, parallel: Bool) -> Batch:
-  match fuel parts parallel:
-    case 1n+rest Partition{+left, +right, +left_cost, +right_cost} True{}:
-      +left_parts = partition(left, Nil{}, 0n, left_cost, Nat.div(left_cost, 2n), False{})
-      +right_parts = partition(right, Nil{}, 0n, right_cost, Nat.div(right_cost, 2n), False{})
-      a = batches(rest, left_parts, grain, forkable(left_parts, grain))
-      b = batches(rest, right_parts, grain, forkable(right_parts, grain))
-      Parallel{a, b}
-    case _ Partition{left, right, left_cost, right_cost} _:
-      Sequential{List.reverse.go(&2, Task, List.reverse(&2, Task, left), right)}
-
-def check_sequential(tasks: List<&2, Task>, reversed: List<&2, Outcome>) -> List<&2, Outcome>:
-  match tasks:
-    case Nil{}:
-      List.reverse(&2, Outcome, reversed)
-    case Task{position, module, dependencies, cost} <> tail:
-      checked = G.check_group(module, dependencies)
-      check_sequential(tail, Outcome{position, checked} <> reversed)
-
-def join_outcomes(left: List<&2, Outcome>, right: List<&2, Outcome>) -> List<&2, Outcome>:
-  List.reverse.go(&2, Outcome, List.reverse(&2, Outcome, left), right)
-
-def check_tree(batch: Batch) -> List<&2, Outcome>:
-  match batch:
-    case Sequential{tasks}:
-      check_sequential(tasks, Nil{})
-    # Match the runtime's coarse lane assignment without changing grain cuts.
-    case Parallel{Parallel{Parallel{a, b}, Parallel{c, d}}, Parallel{Parallel{e, f}, Parallel{g, h}}}:
-      ra rb rc rd re rf rg rh = check_tree(a) check_tree(b) check_tree(c) check_tree(d) check_tree(e) check_tree(f) check_tree(g) check_tree(h)
-      join_outcomes(join_outcomes(join_outcomes(ra, rb), join_outcomes(rc, rd)), join_outcomes(join_outcomes(re, rf), join_outcomes(rg, rh)))
-    case Parallel{Parallel{a, b}, Parallel{c, d}}:
-      ra rb rc rd = check_tree(a) check_tree(b) check_tree(c) check_tree(d)
-      join_outcomes(join_outcomes(ra, rb), join_outcomes(rc, rd))
-    case Parallel{left, right}:
-      a b = check_tree(left) check_tree(right)
-      join_outcomes(a, b)
-
-def check_batch_with_grain(+tasks: List<&2, Task>, +grain: Nat) -> List<&2, Outcome>:
-  +total = total_cost(tasks, 0n)
-  +parts = partition(tasks, Nil{}, 0n, total, Nat.div(total, 2n), False{})
-  check_tree(batches(List.length(&2, Task, tasks), parts, grain, forkable(parts, grain)))
+def check_batch_with_grain(tasks: List<&2, Task>, grain: Nat) -> List<&2, Outcome>:
+  B.execute(~Task, ~Unit, ~Outcome, ~check_task, task_batch(tasks, grain), Unit{})
 
 def check_batch(tasks: List<&2, Task>) -> List<&2, Outcome>:
   check_batch_with_grain(tasks, inference_grain())
@@ -513,9 +455,162 @@ def check_frontiers(fuel: Nat, frontier: Frontier, +known: Catalog, completed: C
     case 1n+rest Frontier{ready, pending}:
       check_frontiers(rest, next_frontier(pending), known, check_frontier(ready, known, completed))
 
+def chain_cost(jobs: List<&2, Chains.Job>, +known: Catalog, cost: Nat) -> Nat:
+  match jobs:
+    case Nil{}:
+      cost
+    case Chains.Job{position, job} <> tail:
+      chain_cost(tail, known, Nat.add(cost, module_cost(group_module(known, job))))
+
+def weighted_chains(chains: List<&2, Chains.Chain>, +known: Catalog) -> List<&2, B.Weighted<Chains.Chain>>:
+  match chains:
+    case Nil{}:
+      Nil{}
+    case +chain <> tail:
+      Chains.Chain{position, level, jobs} = chain
+      B.Weighted{chain, chain_cost(jobs, known, 0n)} <> weighted_chains(tail, known)
+
+def chain_batch(chains: List<&2, Chains.Chain>, known: Catalog) -> B.Batch<Chains.Chain>:
+  B.plan(Chains.Chain, weighted_chains(chains, known), inference_grain())
+
+def chain_allowed(jobs: List<&2, Chains.Job>, completed: Completed) -> Bool:
+  match jobs:
+    case Nil{}:
+      False{}
+    case Chains.Job{position, job} <> tail:
+      Completed{interfaces, functions, constants, failure} = completed
+      precedes_failure(position, failure)
+
+def check_chain(jobs: List<&2, Chains.Job>, +known: Catalog, completed: Completed, allowed: Bool) -> Completed:
+  match jobs allowed:
+    case Nil{} _:
+      completed
+    case _ False{}:
+      completed
+    case Chains.Job{position, job} <> +tail True{}:
+      +next = check_frontier([Scheduled{position, 0n, job}], known, completed)
+      check_chain(tail, known, next, chain_allowed(tail, next))
+
+type ChainContext is Data:
+  ChainContext{known: Catalog, interfaces: Map<&2, G.Interface>, failure: Maybe<&2, Failure>}
+
+def run_chain(chain: Chains.Chain, context: ChainContext) -> Completed:
+  Chains.Chain{position, level, +jobs} = chain
+  ChainContext{known, interfaces, failure} = context
+  +initial = {Completed{interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), failure} : Completed}
+  check_chain(jobs, known, initial, chain_allowed(jobs, initial))
+
+def merge_failure(previous: Maybe<&2, Failure>, candidate: Maybe<&2, Failure>) -> Maybe<&2, Failure>:
+  match candidate:
+    case None{}:
+      previous
+    case Some{failure}:
+      first_failure(previous, failure)
+
+def merge_completed(chains: List<&2, Completed>, completed: Completed) -> Completed:
+  match chains:
+    case Nil{}:
+      completed
+    case Completed{ci, cf, cc, failure} <> tail:
+      Completed{interfaces, functions, constants, previous} = completed
+      merge_completed(tail, Completed{Map.union(&2, G.Interface, interfaces, ci), Map.union(&2, M.CheckedFunction, functions, cf), Map.union(&2, M.CheckedConstant, constants, cc), merge_failure(previous, failure)})
+
+def check_parallel_chains(ready: List<&2, Chains.Chain>, +known: Catalog, +completed: Completed) -> Completed:
+  Completed{interfaces, functions, constants, failure} = completed
+  outcomes = B.execute(~Chains.Chain, ~ChainContext, ~Completed, ~run_chain, chain_batch(ready, known), ChainContext{known, interfaces, failure})
+  merge_completed(outcomes, completed)
+
+def singleton_jobs(chains: List<&2, Chains.Chain>) -> Maybe<&2, List<&2, Scheduled>>:
+  match chains:
+    case Nil{}:
+      Some{Nil{}}
+    case Chains.Chain{head, level, Chains.Job{position, job} <> Nil{}} <> tail:
+      do Maybe<&2, List<&2, Scheduled>>:
+        rest : List<&2, Scheduled> <- singleton_jobs(tail)
+        return Scheduled{position, level, job} <> rest
+    case _:
+      None{}
+
+def check_chain_frontier_planned(ready: List<&2, Chains.Chain>, known: Catalog, +completed: Completed, singletons: Maybe<&2, List<&2, Scheduled>>) -> Completed:
+  match ready singletons:
+    case Chains.Chain{position, level, +jobs} <> Nil{} _:
+      check_chain(jobs, known, completed, chain_allowed(jobs, completed))
+    case _ Some{scheduled}:
+      check_frontier(scheduled, known, completed)
+    case _ None{}:
+      check_parallel_chains(ready, known, completed)
+
+def check_chain_frontier(+ready: List<&2, Chains.Chain>, known: Catalog, completed: Completed) -> Completed:
+  check_chain_frontier_planned(ready, known, completed, singleton_jobs(ready))
+
+def check_chain_frontiers(fuel: Nat, frontier: Chains.Frontier, +known: Catalog, completed: Completed) -> Result<&2, &2, M.Diagnostic, Completed>:
+  match fuel frontier:
+    case _ Chains.Frontier{Nil{}, Nil{}}:
+      Done{completed}
+    case 0n _:
+      Fail{M.Diagnostic{"internal_error", "check_scheduler", "dependency chain frontiers exceed their declaration group count"}}
+    case 1n+rest Chains.Frontier{ready, pending}:
+      check_chain_frontiers(rest, Chains.next_frontier(pending), known, check_chain_frontier(ready, known, completed))
+
+def has_dependencies(jobs: List<&2, G.Job>) -> Bool:
+  match jobs:
+    case Nil{}:
+      False{}
+    case G.Job{members, Nil{}, types} <> tail:
+      has_dependencies(tail)
+    case head <> tail:
+      True{}
+
+def weighted_regions(regions: List<&2, Regions.Region>, +known: Catalog) -> List<&2, B.Weighted<Regions.Region>>:
+  match regions:
+    case Nil{}:
+      Nil{}
+    case +region <> tail:
+      Regions.Region{chains} = region
+      cost = B.total_cost(Chains.Chain, weighted_chains(chains, known), 0n)
+      B.Weighted{region, cost} <> weighted_regions(tail, known)
+
+def region_batch(regions: List<&2, Regions.Region>, known: Catalog) -> B.Batch<Regions.Region>:
+  B.plan(Regions.Region, weighted_regions(regions, known), inference_grain())
+
+def run_region(region: Regions.Region, context: ChainContext) -> Result<&2, &2, M.Diagnostic, Completed>:
+  Regions.Region{+chains} = region
+  ChainContext{known, interfaces, failure} = context
+  initial = {Completed{interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), failure} : Completed}
+  check_chain_frontiers(List.length(&2, Chains.Chain, chains), Chains.next_frontier(chains), known, initial)
+
+def merge_regions(outcomes: List<&2, Result<&2, &2, M.Diagnostic, Completed>>, completed: Completed) -> Result<&2, &2, M.Diagnostic, Completed>:
+  match outcomes:
+    case Nil{}:
+      Done{completed}
+    case Fail{diagnostic} <> tail:
+      Fail{diagnostic}
+    case Done{region} <> tail:
+      merge_regions(tail, merge_completed([region], completed))
+
+def check_regions(regions: List<&2, Regions.Region>, +known: Catalog, +completed: Completed) -> Result<&2, &2, M.Diagnostic, Completed>:
+  match regions:
+    case Regions.Region{+chains} <> Nil{}:
+      check_chain_frontiers(List.length(&2, Chains.Chain, chains), Chains.next_frontier(chains), known, completed)
+    case _:
+      Completed{interfaces, functions, constants, failure} = completed
+      outcomes = B.execute(~Regions.Region, ~ChainContext, ~Result<&2, &2, M.Diagnostic, Completed>, ~run_region, region_batch(regions, known), ChainContext{known, interfaces, failure})
+      merge_regions(outcomes, completed)
+
+def check_jobs(+jobs: List<&2, G.Job>, known: Catalog, completed: Completed, dependent: Bool) -> Result<&2, &2, M.Diagnostic, Completed>:
+  match dependent:
+    case False{}:
+      do Result<&2, &2, M.Diagnostic, Completed>:
+        scheduled : List<&2, Scheduled> <- schedule(jobs)
+        check_frontiers(List.length(&2, G.Job, jobs), next_frontier(scheduled), known, completed)
+    case True{}:
+      do Result<&2, &2, M.Diagnostic, Completed>:
+        chains : List<&2, Chains.Chain> <- Chains.plan(jobs)
+        regions : List<&2, Regions.Region> <- Regions.plan(chains)
+        check_regions(regions, known, completed)
+
 def check_module(+module: M.Module) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
   do Result<&2, &2, M.Diagnostic, M.CheckedModule>:
     +jobs : List<&2, G.Job> <- G.plan(module)
-    scheduled : List<&2, Scheduled> <- schedule(jobs)
-    completed : Completed <- check_frontiers(List.length(&2, G.Job, jobs), next_frontier(scheduled), catalog(module), Completed{Map.new(&2, G.Interface), Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), None{}})
+    completed : Completed <- check_jobs(jobs, catalog(module), Completed{Map.new(&2, G.Interface), Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), None{}}, has_dependencies(jobs))
     assembled(module, completed)

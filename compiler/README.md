@@ -57,11 +57,52 @@ structure, including nominal operation identities and latent effect rows.
 Reflection references are inference/const dependencies, not runtime calls.
 
 Both clean builds and native sessions infer dependency-ready groups in balanced
-Bend batches. A recursive component stays together, and only completed, closed
-interfaces become visible to its dependents. Wasm emission batches independent
-cache misses. Small batches use sequential loops; worker completion order never
-chooses diagnostic or output order. Const evaluation remains sequential because
-its fuel budget is shared.
+Bend batches. Single-consumer dependency chains advance on their own lane after
+each checked interface closes, without waiting for unrelated chains. Recursive
+components still check separately and stay indivisible. Fan-outs and joins
+remain separate frontiers: this is structured fork/join scheduling, not a
+general ready queue or work stealing. Cache deltas and counters are lane-local
+and publish only after a successful request. Wasm emission batches independent
+cache misses. Small batches use sequential loops; completion order never chooses
+diagnostic or output order. Const evaluation remains sequential because its fuel
+budget is shared. The incremental planning cache retains the chain/frontier
+schedule too; its existing key includes declaration order, dependency edges and
+nominal type dependencies, so body-only edits do not rebuild that schedule.
+
+For plans with several frontiers, weakly connected dependency regions run
+independently. Joins in one region do not stall another region's next frontier.
+Genuine dependency joins remain within each region. Diagnostics retain original
+job positions, and each region returns its own cache delta and counters for
+success-only publication. Single-frontier plans keep their existing batching;
+single-root graphs skip partitioning because they are already connected.
+
+For raw-string clean builds, `threads` also caps a lazy, persistent Baba parser
+worker pool. Sources below 32,768 UTF-16 code units parse locally; larger
+sources split at conservative top-level boundaries with about 32,768 code units
+per participant; each slice is validated by the full lexer and parser. The
+caller parses one share alongside at most three workers, even at higher native
+core counts. Each participant encodes Baba's compact tree directly into protocol
+words, without building an object CST or Bend lists. Packed buffers transfer
+back to the host, which merges their dictionaries in source order. Workers
+perform lexing, layout, parsing, and compact encoding on raw-source slices. A
+conservative top-level boundary scan and final dictionary merging/framing remain
+serial; packed words are copied in bulk. The threshold uses source length, so
+partitioning does not require whole-file lexing first. Ambiguous/rejected splits
+use the canonical full parser for diagnostics; worker failures propagate and
+close the pool. Dispose the compiler to terminate its workers. Already-parsed
+source projects and incremental parsing retain their existing paths. The
+synchronous JS reference compiler and the default one-worker native compiler do
+not create this pool. The first large compilation overlaps worker startup with
+caller-side parsing; warmed timings exclude startup.
+
+At CPU request boundaries, the native transport clears drained Bend task queues
+and resets their positions. Otherwise Bend 2.0.21's slot-major queues gradually
+touch their full reserved region even when the live heap stays constant. This
+version-specific cleanup asserts that every queue is empty, clears publication
+bits as well as cursors, and leaves the compiler heap and session caches intact.
+The build remains pinned to Bend 2.0.21. It does not apply this cleanup to GPU
+runs. Run `deno run --allow-all compiler/native_memory_bench.ts` on Linux for a
+200-request artifact-parity and memory-mapping report (default eight threads).
 
 Clean source lowering also splits declarations into cost-balanced fork trees. A
 bounded CST-node count estimates each declaration once, and partitions retain
@@ -120,10 +161,13 @@ deno run --allow-all compiler/cpu_scaling_bench.ts --resume build/cpu-scaling-pa
 Snapshot transports must expose the read-only `NativeProcess.pid` diagnostic
 getter. Baselines must be saved before rebuilding; the command builds only the
 current project. Raw reports include source/Wasm and executable hashes, CPU
-affinity, native process CPU ticks and RSS. Full-build native artifacts must
-equal JS; incremental Wasm/signatures must equal clean builds, while unchanged
-requests must equal the previous complete session artifact. Session-local
-closure identities and offsets are intentionally not compared with clean builds.
+affinity, native process CPU ticks and RSS. Native full/reuse rows also record
+host CPU ticks and RSS, including parser workers. The Staggered 64 fixture
+places expensive declarations at different depths in independent dependency
+chains to expose inference barriers. Full-build native artifacts must equal JS;
+incremental Wasm/signatures must equal clean builds, while unchanged requests
+must equal the previous complete session artifact. Session-local closure
+identities and offsets are intentionally not compared with clean builds.
 
 For separate phase diagnostics:
 

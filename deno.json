@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "study:ecs": "deno run case-study/ecs/unavailable.ts",
+    "study:ecs": "deno task build:compiler && deno run --allow-read=generated/wasm,examples,std --allow-run=generated/compiler/blotc compiler/ecs_demo.ts",
     "generate:parser": "deno run --allow-read=. --allow-write=generated scripts/generate_parser.ts",
     "generate": "deno task generate:parser",
     "generate:editor": "cd editor/tree-sitter-blot2 && tree-sitter generate --abi 14 --js-runtime native",
@@ -18,7 +18,7 @@
     "blot": "deno run --allow-read --allow-write=build --allow-run=generated/compiler/blotc compiler/cli.ts",
     "test:editor": "deno test --allow-read=editor scripts/helix_languages.test.ts",
     "test:study-source": "deno test --allow-read=case-study/ecs/game.blot,case-study/ecs/engine scripts/case_study_source.test.ts",
-    "test:compiler": "deno task build:compiler:all && deno check compiler/demo.ts compiler/host_demo.ts compiler/cli.ts compiler/bench.ts compiler/native_bench.ts compiler/parallel_grain_bench.ts compiler/cpu_scaling_bench.ts compiler/cpu_scaling_trace.ts compiler/worker.ts && deno test --allow-read=compiler,generated,examples,std --allow-run=generated/compiler/blotc compiler/*.test.ts",
+    "test:compiler": "deno task build:compiler:all && deno check compiler/demo.ts compiler/host_demo.ts compiler/ecs_demo.ts compiler/cli.ts compiler/bench.ts compiler/native_bench.ts compiler/parallel_grain_bench.ts compiler/cpu_scaling_bench.ts compiler/cpu_scaling_trace.ts compiler/worker.ts compiler/syntax_worker.ts && deno test --allow-read=compiler,generated,examples,std --allow-run=generated/compiler/blotc compiler/*.test.ts",
     "test": "deno task test:editor && deno task test:study-source && deno task test:compiler",
     "check": "deno fmt --check && deno check generated/wasm/mod.ts scripts/setup_helix.ts scripts/build_compiler.ts scripts/generate_parser.ts && deno task test"
   },

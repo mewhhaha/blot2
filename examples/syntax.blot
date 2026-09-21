@@ -1,693 +1,79 @@
-// Blot 2 syntax showcase — for design review, not execution yet.
-// The executable core grammar does not accept this file as a whole.
-// PROPOSAL marks an unsettled form; its presence does not settle the design.
-// Standard-library and engine imports illustrate APIs that do not exist here.
-// fn declares top-level functions; const also binds ordinary function values.
-// const initializers run at compile time; let requires a pure RHS in this stage.
-// use name <- expression binds a result; use expression means use _ <- expression.
-// All values are immutable. := creates a successor binding.
-// Values/functions/fields use snake_case; types/constructors use PascalCase.
+// Executable syntax showcase for the current compiler, not proposed grammar.
+// See DESIGN.md for language proposals. Composite values stay inside the guest.
 
-import * as array from "std/array"
-import { assert } from "std/assert"
-import { sqrt, clamp as clamp_f32 } from "std/math"
-import { sub, mul, div, rem, eq, ne, lt, le, gt, ge, negate } from "std/ops"
-import { monad } from "std/control"
-import { Render, SpriteHandle } from "engine/render"
-
-
-// Operator spellings refer to source functions, including the standard ones.
-// Headers follow imports; targets can be defined below or imported by name.
-// These would normally live in standard-library source, not every game file.
-
-infixr 0 ($) = apply
-infixr 22 (||) = or
-infixr 24 (&&) = and
-infix 30 (==) = eq
-infix 30 (!=) = ne
-infix 30 (<) = lt
-infix 30 (<=) = le
-infix 30 (>) = gt
-infix 30 (>=) = ge
-infixl 60 (+) = add
-infixl 60 (-) = sub
-infixl 70 (*) = mul
-infixl 70 (/) = div
-infixl 70 (%) = rem
-infixl 70 (><) = dot
-prefix 90 (-) = negate
-prefix 90 (!) = not
-
-// Named fixity is optional; other backtick names default to infixl 80.
 infixl 60 `add`
-infixr 24 `and`
-infixl 10 `on`
+infixl 70 (><) = dot
 
-
-// data introduces a type and constructors; a record has one constructor.
-
-data Bool = True | False
-
-export data Vec2 = Vec2 { x: F32, y: F32 }
-
-export data Maybe a = Some a | Nothing
-export data Result value error = Ok value | Err error
-
-data EntityId = EntityId U32
-// PROPOSAL: a constructor can carry a tuple payload.
-data Pair a b = Pair (a, b)
+data Vec2 = Vec2 { x: F32, y: F32 }
 data Mode = Running | Paused
+data Event = Tick U32 | SetMode Mode | Reset
 
-export data Event =
-  | Tick F32
-  | Teleport { entity: EntityId, position: Vec2 }
-  | SetMode Mode
-  | Reset
+fn add left => fn right => U32.add left right
+fn dot left => fn right => do:
+  let Vec2 { x: lx, y: ly } = left
+  let Vec2 { x: rx, y: ry } = right
+  return F32.add (F32.mul lx rx) (F32.mul ly ry)
 
-export data Particle = Particle {
-  id: EntityId,
-  position: Vec2,
-  velocity: Vec2,
-  remaining: F32,
-  sprite: SpriteHandle,
-}
-
-export data World = World {
-  particles: Array Particle,
-  selected: Maybe EntityId,
-  mode: Mode,
-  ticks: U32,
-}
-
-
-// type names an existing type expression; it introduces no constructor.
-
-type Position = Vec2
-type Particles = Array Particle
-type Seconds = F32
-type Transform a = a -> a
-
-
-// Compiler primitives sit behind ordinary source functions.
-// Standard-library excerpts are colocated here for review; Int/F32 operations
-// belong in their owning library modules, not foreign extension declarations.
-// PROPOSAL: exact intrinsic names; Int width and overflow behavior remain open.
-
-fn Int.add (left: Int) => fn (right: Int) -> Int =>
-  @int.add left right
-
-fn F32.add (left: F32) => fn (right: F32) -> F32 =>
-  @f32.add left right
-
-fn primitive_sqrt (value: F32) -> F32 => @f32.sqrt value
-
-// PROPOSAL: @type.of inspects the static type, not a runtime type object.
-// Type lookup returns the unbound associated function, so pass left explicitly.
-// Infer the required add operation and its effects; no runtime name lookup.
-fn add left => fn right => (@type.of left).add left right
-
-export fn Vec2.add (left: Vec2) => fn (right: Vec2) -> Vec2 =>
-  Vec2 { x: left.x + right.x, y: left.y + right.y }
-
-fn Vec2.dot (left: Vec2) => fn (right: Vec2) -> F32 =>
-  left.x * right.x + left.y * right.y
-
-fn dot left => fn right => (@type.of left).dot left right
-
-fn operator_examples () => do:
-  let left: Int = 20
-  let right: Int = 22
-  let symbolic = left + right
-  let named = add left right
-  let associated = Int.add left right
-  let primitive = @int.add left right
-  let position: Position = Vec2 { x: 1.0, y: 2.0 }
-  let offset = Vec2 { x: 3.0, y: 4.0 }
-  let moved = position + offset
-  let alignment = position >< offset
-  return (symbolic, named, associated, primitive, moved, alignment)
-
-// Backticks turn ordinary curried calls into infix calls, including local values.
-fn on combine => fn project => fn left => fn right =>
-  combine (project left) (project right)
-
-const closer_to_origin = lt `on` Vec2.magnitude
-
-fn backtick_examples () => do:
-  let first = Vec2 { x: 1.0, y: 0.0 }
-  let second = Vec2 { x: 3.0, y: 0.0 }
-  let combine = add
-  let local = 20 `combine` 22
-  let projected = first `closer_to_origin` second
-  let qualified = first `Vec2.dot` second
-  // The named add header preserves multiplication's tighter binding.
-  let mixed = 1 `add` 2 * 3
-  return (local, projected, qualified, mixed)
-
-// Demand-driven parameters keep boolean operators source-defined.
-// The function parameter, not the &&/|| spelling, delays its argument.
-// The parameter names a suspended computation; only @force evaluates it.
-// The first force evaluates the argument; later forces reuse that result.
-// Its possible effects remain part of the call's inferred effects.
-fn and (left: Bool) => fn ~right => do:
-  if left:
-    return @force right
-  return False
-
-fn or (left: Bool) => fn ~right => do:
-  if left:
-    return True
-  return @force right
-
-fn not (value: Bool) -> Bool =>
-  case value of
-    True => False
-    False => True
-
-fn short_circuit_examples (values: Array F32) => do:
-  let nonempty = array.length values > 0
-  let first_positive = nonempty && values[0] > 0.0
-  let empty_or_positive = !nonempty || values[0] > 0.0
-  let named = and nonempty (values[0] > 0.0)
-  let named_infix = nonempty `and` (values[0] > 0.0)
-  return (first_positive, empty_or_positive, named, named_infix)
-
-// Any source function can accept a demand-driven argument.
-fn unwrap_or_else value => fn ~fallback =>
-  case value of
-    Some found => found
-    Nothing => @force fallback
-
-fn duplicate_if enabled => fn ~value =>
-  case enabled of
-    False => Nothing
-    True => Some (@force value, @force value)
-
-fn demand_examples () => do:
-  let empty: Array F32 = []
-  let cached = unwrap_or_else (Some 5.0) empty[0]
-  let skipped = duplicate_if False empty[0]
-  let repeated = duplicate_if True (primitive_sqrt 25.0)
-  // Neither empty[0] is evaluated; both forces share one sqrt evaluation.
-  return (cached, skipped, repeated)
-
-
-// Constants, scalar literals, type application, and annotations.
-
-export const title: Text = "Particles: \"Blot 2\""
-const controls: Text = "Space: pause\nR: reset\tEsc: close"
-const initial_seed: U32 = 0xC0FFEE
-const max_particles: U32 = 4_096
-const epsilon: F32 = 1e-5
-const gravity: F32 = -9.81
-const origin = Vec2 { x: 0.0, y: 0.0 }
-
-// Boolean values use PascalCase constructors.
-const pause_on_focus_loss: Bool = True
-const show_bounds: Bool = False
-
-
-// Named functions: fn name pattern => expression. Lambdas omit the name.
-
-export fn identity value => value
-fn ignore _ => ()
-fn add_pair (left, right) => left + right
-fn curried_add left => fn right => left + right
-fn squared (value: F32) -> F32 => value * value
-fn twice (transform, value) => transform (transform value)
-
-const increment = fn value => value + 1
-const add_ten = curried_add 10
-
-fn function_examples () => do:
-  let first = add_pair (2, 3)
-  let second = curried_add 2 3
-  let third = twice (add_ten, 1)
-  return (first, second, third, increment 4)
-
-
-// Type-associated functions still take an explicit receiver.
-// self remains reserved for the right-hand side of :=, not a method receiver.
-
-fn Vec2.magnitude (value: Vec2) -> F32 => do:
+fn Vec2.scaled value => fn factor => do:
   let Vec2 { x, y } = value
-  let sum = do:
-    let xx = squared x
-    let yy = squared y
-    return xx + yy
-  return sqrt sum
+  return Vec2 { x: F32.mul x factor, y: F32.mul y factor }
 
-export fn Vec2.scaled (value: Vec2) => fn (factor: F32) -> Vec2 =>
-  Vec2 { x: value.x * factor, y: value.y * factor }
+// Explicit thunks delay evaluation; they do not promise memoization.
+fn and_then left => fn right => case left of
+  False => False
+  True => right ()
 
-fn associated_examples () => do:
-  let position = Vec2 { x: 3.0, y: 4.0 }
-  let distance = Vec2.magnitude position
-  let enlarged = Vec2.scaled position 2.0
-  return (distance, enlarged)
+fn unwrap_or_else candidate => fn fallback => case candidate of
+  Some value => value
+  Nothing => fallback ()
 
-data Circle = Circle { radius: F32 }
+export fn short_circuit () => do:
+  let empty: Array U32 = []
+  return and_then False (fn () => (@array.get empty 0) > 0)
 
-fn Circle.scaled (value: Circle) => fn (factor: F32) -> Circle =>
-  Circle { radius: value.radius * factor }
+export fn lazy_fallback () => do:
+  let empty: Array U32 = []
+  return unwrap_or_else (Some 42) (fn () => @array.get empty 0)
 
-// PROPOSAL: member sugar binds the receiver as the first argument.
-// position.scaled 2.0 means Vec2.scaled position 2.0.
-// position.magnitude means Vec2.magnitude position, without an extra ().
-// Infer a compatible scaled operation; := requires its result to keep the type.
-fn scale_twice value => do:
-  let factor: F32 = 2.0
-  let next = value
-  next := self.scaled factor
-  next := self.scaled factor
-  return next
-
-// PROPOSAL: both types satisfy that requirement without an impl declaration.
-fn generic_scaling_examples () => do:
-  let position = scale_twice (Vec2 { x: 1.0, y: 2.0 })
-  let circle = scale_twice (Circle { radius: 3.0 })
-  return (position, circle)
-
-// PROPOSAL: retain rec for explicitly recursive bindings.
-// Whether named fn definitions need a rec marker remains open.
-const rec factorial = fn (value: U32) -> U32 => do:
+fn factorial value => do:
   if value <= 1:
     return 1
   return value * factorial (value - 1)
 
+fn choose first => fn enabled => fn fallback => case first, enabled, fallback of
+  Some value, True, _ => value
+  _, _, Some value => value
+  _, _, _ => 0
 
-// Text interpolation accepts expressions, not just names.
-
-fn greet (world: Text) -> Text => "Hello ${world}"
-fn quoted_greeting (world: Text) -> Text => "Message: ${greet world}"
-fn greeting_example () -> Text => "Message: ${greet "world"}"
-
-// PROPOSAL: built-in numbers supply to_text; custom types can define it too.
-fn Vec2.to_text (value: Vec2) -> Text => "(${value.x}, ${value.y})"
-fn position_label (position: Vec2) -> Text => "Position: ${position}"
-
-// PROPOSAL: the same conversion rule applies to embedded call results.
-fn world_label (world: World) -> Text =>
-  "Frame ${world.ticks}: ${array.length world.particles} particles"
-
-// PROPOSAL: escape the dollar sign to keep the interpolation spelling literal.
-const interpolation_hint: Text = "Write \${world} to interpolate."
-
-
-// Constructors and patterns mirror one another.
-// Match one or more values with comma-separated pattern columns.
-
-const unwrap_or = fn (value, fallback) =>
-  case value of
-    Some found => found
-    Nothing => fallback
-
-const first_of_pair = fn pair =>
-  case pair of
-    Pair (first, _) => first
-
-fn choose_value first => fn enabled => fn fallback =>
-  case first, enabled, fallback of
-    Some value, True, _ => value
-    _, _, Some value => value
-    _, _, _ => 0
-
-const event_label = fn (event: Event) -> Text =>
-  case event of
-    Tick _ => "tick"
-    Teleport { entity: EntityId id, position: _ } => "teleport"
-    SetMode Running => "resume"
-    SetMode Paused => "pause"
-    Reset => "reset"
-
-// PROPOSAL: retain case guards. A failed guard tries the following arm.
-const classify_step = fn (dt: F32) -> Text =>
-  case dt of
-    value if value < 0.0 => "backwards"
-    value if value <= epsilon => "stationary"
-    _ => "forwards"
-
-
-// if let binds only in the matching branch. Some(value) also spells Some value.
-// Both pattern forms evaluate a pure RHS once; use binds effectful results first.
-
-fn double_if_present (candidate: Maybe U32) -> U32 => do:
-  if let Some(value) = candidate:
-    return value * 2
-  else:
-    // candidate can only be Nothing here; value is not in scope.
-    return 0
-
-// The else suite must exit; value is available after a successful let.
-// A return in a nested do would not exit this binding's continuation.
-fn double_or_zero (candidate: Maybe U32) -> U32 => do:
+fn double_or_zero candidate => do:
   let Some(value) = candidate else:
     return 0
   return value * 2
 
+fn react event => fn ticks => case event of
+  Tick count => ticks + count
+  SetMode Running => ticks
+  SetMode Paused => ticks
+  Reset => 0
 
-// Finite, runtime-tagged unions without named wrapper constructors.
-// Text is our string type. An explicit union provides the expected branch types.
+export const operator_example = 1 `add` 2 * 3
+export fn recursive_example (value: U32) => factorial value
+export fn matching_example () => choose Nothing False (Some (double_or_zero (Some 21)))
+export fn event_example () => react (Tick 2) 40
 
-type Reading = F64 | Text
+export fn vector_example () => do:
+  let position = Vec2 { x: 3.0, y: 4.0 }
+  let scaled = Vec2.scaled position 2.0
+  return position >< scaled
 
-fn read_score (ready: Bool) -> F64 | Text => do:
-  if ready:
-    return 42.0
-  return "pending"
+export fn array_snapshot () => do:
+  let original = [1, 2, 3]
+  let next = @array.set original 1 20
+  return (@array.get original 1) + (@array.get next 1)
 
-// Typed patterns test the arm, not @type.of (which is compile-time).
-fn reading_label (value: Reading) -> Text => do:
-  if let (number: F64) = value:
-    return "Score: ${number}"
-  // The F64 path returned; the original immutable value is now known to be Text.
-  return value
+effect Counter.advance: U32 -> U32
+const local_counter = @effect.provider Counter.advance (fn value => value + 1)
 
-fn reading_label_by_case (value: Reading) -> Text =>
-  case value of
-    (number: F64) => "Score: ${number}"
-    (message: Text) => message
-
-fn score_or_zero (value: Reading) -> F64 => do:
-  let (number: F64) = value else:
-    return 0.0
-  return number
-
-
-// do: is an expression. return belongs to the nearest do:.
-
-fn apply function => fn value => function value
-fn application_example () => Maybe.map (fn value => value + 1) $ Some 41
-
-// Falling through a plain do: returns (), not the last statement's value.
-fn discard_example () => do:
-  use apply (fn value => value) $ 42
-
-const clamp_position = fn (position: Vec2) -> Vec2 => do:
-  let x = do:
-    if position.x < 0.0:
-      return 0.0
-    else if position.x > 100.0:
-      return 100.0
-    else:
-      return position.x
-
-  return Vec2 { x: x, y: clamp_f32 (position.y, 0.0, 100.0) }
-
-
-// Rebinding: self is the old value of the exact left-hand target.
-
-const advance = fn (particle: Particle, dt: F32) -> Particle => do:
-  let next = particle
-  next.position.x := self + particle.velocity.x * dt
-  next.position.y := self + particle.velocity.y * dt
-  next.velocity.y := self + gravity * dt
-  next.remaining := self - dt
+export fn provider_example () => do local_counter:
+  use next <- Counter.advance 41
   return next
-
-const shift_right = fn (position: Vec2) -> Vec2 => do:
-  let next = position
-  next := do:
-    let shifted = self
-    shifted.x := self + 1.0
-    return shifted
-  return next
-
-// Above: outer self is a Vec2, inner self is its old x coordinate.
-// Below: the closure captures the old function, not its replacement.
-const double_output = fn (callback: F32 -> F32) => do:
-  let next = callback
-  next := fn value => 2.0 * self value
-  return next
-
-
-// Arrays: values, reads, element updates, and snapshots.
-
-const array_examples = fn () => do:
-  let empty: Array F32 = []
-  let samples: Array F32 = [1.0, 2.0, 3.0]
-  let original = samples
-  let index: U32 = 1
-
-  samples[index] := self * 10.0
-
-  // original[1] is still 2.0; samples[1] is now 20.0.
-  let first = samples[0]
-
-  // PROPOSAL: retain array spread for allocation-capable concatenation.
-  let extended = [...samples, 4.0]
-  return (empty, original, samples, first, extended)
-
-const move_particle = fn (world: World, index: U32, dx: F32) => do:
-  let next = world
-  next.particles[index].position.x := self + dx
-  return next
-
-// PROPOSAL: array patterns match exact lengths; _ handles the remaining shapes.
-const first_or = fn (values: Array F32, fallback: F32) =>
-  case values of
-    [] => fallback
-    [only] => only
-    _ => values[0]
-
-
-// PROPOSAL: loop rebindings thread successor values into the next iteration
-// and out of the loop. Iterating an element does not create a mutable reference.
-
-const total_remaining = fn (particles: Array Particle) -> F32 => do:
-  let total: F32 = 0.0
-  for particle in particles:
-    total := self + particle.remaining
-  return total
-
-const first_alive = fn (particles: Array Particle) -> Maybe EntityId => do:
-  let found: Maybe EntityId = Nothing
-  for particle in particles:
-    if particle.remaining <= 0.0:
-      continue
-    found := Some particle.id
-    break
-  return found
-
-
-// Game entry points return successor state. Imports never initialize the world.
-
-export fn create (sprite: SpriteHandle) -> World => do:
-  let first = Particle {
-    id: EntityId 0,
-    position: origin,
-    velocity: Vec2 { x: 5.0, y: 10.0 },
-    remaining: 3.0,
-    sprite: sprite,
-  }
-
-  return World {
-    particles: [first],
-    selected: Nothing,
-    mode: Running,
-    ticks: 0,
-  }
-
-export fn update (world: World, dt: F32) -> World => do:
-  let next = world
-  next.particles := array.map (fn particle => advance (particle, dt), self)
-  next.ticks := self + 1
-  return next
-
-export fn react (world: World, event: Event) -> World =>
-  case event of
-    Tick dt =>
-      case world.mode of
-        Running => update (world, dt)
-        Paused => world
-
-    SetMode mode => do:
-      let next = world
-      next.mode := mode
-      return next
-
-    Teleport { entity, position } => do:
-      let next = world
-      let relocate = fn particle => do:
-        let moved = particle
-        if particle.id == entity:
-          moved.position := position
-        return moved
-      next.particles := array.map (relocate, self)
-      return next
-
-    Reset => do:
-      let next = world
-      next.particles := []
-      next.selected := Nothing
-      next.ticks := 0
-      return next
-
-
-// Resolver values choose this block's binding and return rules.
-// This syntax is agreed; resolver execution is not implemented yet.
-// monad is a library adapter, not a keyword or a compiler-known name.
-
-fn Maybe.pure value => Some value
-
-fn Maybe.bind candidate => fn next =>
-  case candidate of
-    Nothing => Nothing
-    Some value => next value
-
-const try = monad Maybe
-
-fn maybe_increment candidate => do monad Maybe:
-  use value <- candidate
-  let next = value + 1
-  return next
-
-fn maybe_double candidate => do (monad Maybe):
-  use value <- candidate
-  return value * 2
-
-fn chain_maybe (my_maybe, my_other_maybe) => do:
-  let smth = do try:
-    use value <- my_maybe
-    return $ my_other_maybe value
-  return smth
-
-// return lifts; return $ forwards without making Maybe (Maybe a).
-fn keep_nested candidate => do try:
-  return candidate
-
-fn keep_wrapped candidate => do try:
-  return $ candidate
-
-// Discarding the payload does not discard the bind: Nothing skips return 42.
-fn after_maybe candidate => do try:
-  use candidate
-  return 42
-
-// A nested plain do keeps its own rules; it returns Some value unchanged here.
-fn nested_plain value => do try:
-  let candidate = do:
-    return Some value
-  use found <- candidate
-  return found
-
-
-// In plain do, let requires a pure RHS; use permits effects and pure code.
-// use sequences operations but does not handle their effects or box an action.
-// PROPOSAL: effect declarations, ! rows, and provider APIs.
-// Allocation accounting and required annotations on exports remain open.
-
-effect Random:
-  unit: () -> F32
-
-const pure_squared = fn (value: F32) -> F32 ! {} => value * value
-
-const random_offset = fn () -> Vec2 ! {Random} => do:
-  use x <- Random.unit ()
-  use y <- Random.unit ()
-  return Vec2 { x: x - 0.5, y: y - 0.5 }
-
-export fn draw (world: World) -> Unit ! {Render} => do:
-  for particle in world.particles:
-    use Render.sprite (particle.sprite, particle.position)
-  return ()
-
-// PROPOSAL: an effect-row variable is scoped to its signature.
-const run_twice: (() -> Unit ! {..e}) -> Unit ! {..e} =
-  fn action => do:
-    use action ()
-    use action ()
-    return ()
-
-// PROPOSAL: Random.provider adapts this record into a scoped effect resolver.
-data RandomProvider = RandomProvider { unit: () -> F32 }
-
-const midpoint_random = RandomProvider { unit: fn () => 0.5 }
-
-const predictable_offset = fn () => do Random.provider midpoint_random:
-  use offset <- random_offset ()
-  return offset
-
-// The resolver supplies Random; use alone leaves Random in the effect row.
-// examples/ecs.blot shows the proposed ecs.run (world, entity, action) boundary.
-
-
-// PROPOSAL: Result propagation with postfix ?.
-// Its source-function/control-effect encoding is still open; not a built-in
-// operator exception. This form must meet the source-defined-operator rule.
-
-const validate_count = fn (count: U32) -> Result U32 Text => do:
-  if count == 0:
-    return Err "A batch must contain at least one particle."
-  if count > max_particles:
-    return Err "The particle limit was exceeded."
-  return Ok count
-
-const repeat_particle = fn (particle: Particle, count: U32) => do:
-  let accepted = validate_count count?
-  return Ok (array.filled (accepted, particle))
-
-
-// PROPOSAL: fixed-size arrays and read-only slices.
-// Borrowed return values, ownership annotations, and exact slice rules are open.
-
-const weights: [F32; 4] = [0.1, 0.2, 0.3, 0.4]
-
-const borrowed_sum = fn (values: &[F32]) -> F32 => do:
-  let total: F32 = 0.0
-  for value in values:
-    total := self + value
-  return total
-
-const slice_example = fn () => do:
-  let values: Array F32 = [1.0, 2.0, 3.0, 4.0]
-  let middle = &values[1..3]
-  return borrowed_sum middle
-
-
-// PROPOSAL: first-class test declarations alongside declaration tags.
-
-test "backtick calls preserve ordinary application":
-  assert ((20 `add` 22) == 42)
-  assert ((1 `add` 2 * 3) == 7)
-  let first = Vec2 { x: 1.0, y: 0.0 }
-  let second = Vec2 { x: 3.0, y: 0.0 }
-  assert ((first `closer_to_origin` second) == True)
-  assert ((first `Vec2.dot` second) == 3.0)
-  let empty: Array F32 = []
-  assert ((False `and` (empty[0] > 0.0)) == False)
-
-test "constructor tests and guarded bindings":
-  assert (double_if_present (Some 21) == 42)
-  assert (double_if_present Nothing == 0)
-  assert (double_or_zero (Some 21) == 42)
-  assert (double_or_zero Nothing == 0)
-
-test "closed unions narrow through patterns":
-  assert (score_or_zero (read_score True) == 42.0)
-  assert (score_or_zero (read_score False) == 0.0)
-  assert (reading_label (read_score False) == "pending")
-  assert (reading_label_by_case (read_score False) == "pending")
-
-test "rebinding preserves the earlier value":
-  let position = Vec2 { x: 1.0, y: 2.0 }
-  let original = position
-  position.x := self + 5.0
-  assert (original.x == 1.0)
-  assert (position.x == 6.0)
-
-test "a provider makes random operations predictable":
-  let offset = predictable_offset ()
-  assert (offset.x == 0.0)
-  assert (offset.y == 0.0)
-
-test "Maybe resolvers bind, lift, forward, and short-circuit":
-  assert (maybe_increment (Some 41) == Some 42)
-  assert (maybe_increment Nothing == Nothing)
-  assert (maybe_double (Some 21) == Some 42)
-  assert (chain_maybe (Some 21, fn value => Some (value * 2)) == Some 42)
-  assert (keep_nested (Some 42) == Some (Some 42))
-  assert (keep_wrapped (Some 42) == Some 42)
-  assert (after_maybe (Some 0) == Some 42)
-  assert (after_maybe Nothing == Nothing)
-  assert (nested_plain 42 == Some 42)

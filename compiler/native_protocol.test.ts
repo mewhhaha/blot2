@@ -4,6 +4,8 @@ import { NativeProcess } from "./native_process.ts";
 import {
   decodeNativeResponse,
   decodeNativeSessionResponse,
+  encodeCstChunk,
+  encodeNativeChunks,
   encodeNativeRequest,
   encodeNativeSessionRequest,
   NativeProtocolError,
@@ -31,6 +33,25 @@ const tinyRequest: NativeRequest = {
   fuel: 1n,
   const_steps: 7n,
 };
+
+Deno.test("bulk compact CST packing rejects invalid kind, field and text dictionary IDs", () => {
+  const prelude = encodeCstChunk(emptyModule);
+  for (const remapped of [false, true]) {
+    for (const field of [0, 1, 2]) {
+      const chunk = encodeCstChunk(emptyModule);
+      const words = chunk.words.slice();
+      words[field] = chunk.strings.length;
+      const first = encodeCstChunk({ ...emptyModule, kind: "different" });
+      throws(() =>
+        encodeNativeChunks({
+          operation: "compile",
+          chunks: remapped ? [first] : [{ ...chunk, words }],
+          prelude: remapped ? { ...chunk, words } : prelude,
+          const_steps: 0n,
+        }), /Unknown CST dictionary identity/);
+    }
+  }
+});
 
 function words(values: readonly number[]): Uint8Array<ArrayBuffer> {
   const payload = new Uint8Array(values.length * 4);

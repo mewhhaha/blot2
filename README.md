@@ -42,12 +42,13 @@ Start with [the executable prelude example](examples/prelude.blot),
 [array example](examples/arrays.blot) imports an ordinary source library and
 executes through `just compile examples/arrays.blot`. See also
 [record construction and destructuring](examples/records.blot) and
-[the source prelude](std/README.md). The larger
-[syntax showcase](examples/syntax.blot) and [ECS specimen](examples/ecs.blot)
-are design examples and contain unimplemented features.
+[the source prelude](std/README.md). The [syntax showcase](examples/syntax.blot)
+and [ECS example](examples/ecs.blot) also compile and execute on the current
+language. The ECS uses immutable component columns, explicit queries, and
+source-defined system scheduling; `just study` runs it headlessly.
 
-[The host-capability specimen](examples/host_capabilities.blot) proposes the
-next entrypoint API: ordinary records of host functions, no game intrinsics. See
+[The host-capability example](examples/host_capabilities.blot) constructs
+guest-side records from a scalar host callback, with no game intrinsics. See
 [the source/host contract](compiler/host-api-proposal.md) for ABI, effects and
 reload boundaries. Scalar callbacks are executable through
 [guest ABI 1](compiler/guest-abi.md); record bundles and persistent worlds in
@@ -81,15 +82,15 @@ scalar callback and return a scalar.
 
 Run `just install` to regenerate, check, and install the `blot` language
 override and its highlighting queries. The editor grammar deliberately covers
-the wider syntax showcase; highlighting does not imply the compiler implements
-every form.
+the wider language proposals; highlighting does not imply the compiler
+implements every form.
 
 ## Sandbox status
 
 The [3D sandbox/editor](case-study/ecs/README.md) is paused. Its
 compiler-coupled ECS/render backend and `compileEcs`/`compileApp` APIs have been
-removed; `just study` reports this boundary explicitly. Prior host/runtime
-experiments are preserved in
+removed; `just study` now runs the separate headless ECS example, not the
+graphical sandbox. Prior host/runtime experiments are preserved in
 [the prototype archive](case-study/ecs/prototype/README.md).
 
 The next sandbox must build storage, queries, system scheduling, and render

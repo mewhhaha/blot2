@@ -3,7 +3,6 @@ import type { SourceInput } from "./source_project.ts";
 import { NativeProcess, type NativeProcessOptions } from "./native_process.ts";
 import {
   decodeNativeResponse,
-  encodeNativeRequest,
   type NativeOperation,
   NativeProtocolError,
 } from "./native_protocol.ts";
@@ -37,15 +36,10 @@ export async function createNativeCompiler(
     if (typeof steps !== "bigint" || steps < 0n || steps > 0xFFFFFFFFFFFFn) {
       throw new RangeError("const_steps must be a Nat (0..2^48-1)");
     }
-    const prepared = frontend.prepare(source);
+    const prepared = await frontend.prepareNative(source);
+    if (closed) throw new Error("Native compiler is disposed");
     try {
-      const payload = encodeNativeRequest({
-        operation,
-        root: prepared.root,
-        prelude: prepared.prelude,
-        fuel: prepared.nodeCount,
-        const_steps: steps,
-      });
+      const payload = prepared.encode(operation, steps);
       const response = decodeNativeResponse(await process.request(payload));
       if (response.operation !== operation) {
         await process.dispose();

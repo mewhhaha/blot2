@@ -107,41 +107,53 @@ type PatternResult is Data:
 type PatternRow is Data:
   PatternRow{patterns: List<&2, M.Pattern>, locals: List<&2, Local>}
 
-# Small enums avoid multiplying each branch by bootstrap String pattern tests.
+# Keep small enums, but do not eagerly compare every node with all 33 labels.
+# Dispatching on the initial leaves at most four full, exact comparisons.
+def classify_initial(initial: Char, +kind: String) -> NodeKind:
+  match initial:
+    case 'I':
+      Bool.pick(NodeKind, M.name_equal(kind, "INTEGER"), Integer{}, Bool.pick(NodeKind, M.name_equal(kind, "INTRINSIC"), Intrinsic{}, Bool.pick(NodeKind, M.name_equal(kind, "IDENT"), PatternName{}, Unsupported{})))
+    case 'F':
+      Bool.pick(NodeKind, M.name_equal(kind, "FLOAT"), Float{}, Bool.pick(NodeKind, M.name_equal(kind, "False"), Falsehood{}, Unsupported{}))
+    case 'T':
+      Bool.pick(NodeKind, M.name_equal(kind, "True"), Truth{}, Unsupported{})
+    case 'a':
+      Bool.pick(NodeKind, M.name_equal(kind, "atom"), Wrapper{}, Bool.pick(NodeKind, M.name_equal(kind, "array"), ArrayNode{}, Bool.pick(NodeKind, M.name_equal(kind, "application"), ApplicationNode{}, Unsupported{})))
+    case 'b':
+      Bool.pick(NodeKind, M.name_equal(kind, "binding"), Binding{}, Unsupported{})
+    case 'c':
+      Bool.pick(NodeKind, M.name_equal(kind, "constant"), ConstantNode{}, Bool.pick(NodeKind, M.name_equal(kind, "case_expression"), CaseNode{}, Bool.pick(NodeKind, M.name_equal(kind, "conditional"), Conditional{}, Bool.pick(NodeKind, M.name_equal(kind, "constructor_pattern"), PatternConstructor{}, Unsupported{}))))
+    case 'd':
+      Bool.pick(NodeKind, M.name_equal(kind, "data_type"), DataNode{}, Bool.pick(NodeKind, M.name_equal(kind, "do_block"), Block{}, Unsupported{}))
+    case 'e':
+      Bool.pick(NodeKind, M.name_equal(kind, "expression"), Wrapper{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_binding"), EffectBinding{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_step"), EffectBinding{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_declaration"), EffectNode{}, Unsupported{}))))
+    case 'f':
+      Bool.pick(NodeKind, M.name_equal(kind, "function"), FunctionNode{}, Unsupported{})
+    case 'g':
+      Bool.pick(NodeKind, M.name_equal(kind, "group"), GroupNode{}, Unsupported{})
+    case 'i':
+      Bool.pick(NodeKind, M.name_equal(kind, "infix_expression"), InfixNode{}, Unsupported{})
+    case 'l':
+      Bool.pick(NodeKind, M.name_equal(kind, "lambda"), LambdaNode{}, Unsupported{})
+    case 'n':
+      Bool.pick(NodeKind, M.name_equal(kind, "named_fixity"), NamedFixity{}, Unsupported{})
+    case 'p':
+      Bool.pick(NodeKind, M.name_equal(kind, "prefix_expression"), PrefixNode{}, Bool.pick(NodeKind, M.name_equal(kind, "pattern_conditional"), PatternConditional{}, Bool.pick(NodeKind, M.name_equal(kind, "pattern"), PatternWrapper{}, Bool.pick(NodeKind, M.name_equal(kind, "pattern_group"), PatternGroup{}, Unsupported{}))))
+    case 'q':
+      Bool.pick(NodeKind, M.name_equal(kind, "qualified_name"), Name{}, Unsupported{})
+    case 'r':
+      Bool.pick(NodeKind, M.name_equal(kind, "record"), RecordNode{}, Bool.pick(NodeKind, M.name_equal(kind, "result"), Return{}, Unsupported{}))
+    case 's':
+      Bool.pick(NodeKind, M.name_equal(kind, "symbolic_fixity"), SymbolicFixity{}, Unsupported{})
+    case _:
+      Unsupported{}
+
 def classify(+kind: String) -> NodeKind:
-  Bool.pick(NodeKind, M.name_equal(kind, "expression"), Wrapper{},
-    Bool.pick(NodeKind, M.name_equal(kind, "atom"), Wrapper{},
-    Bool.pick(NodeKind, M.name_equal(kind, "INTEGER"), Integer{},
-    Bool.pick(NodeKind, M.name_equal(kind, "FLOAT"), Float{},
-    Bool.pick(NodeKind, M.name_equal(kind, "prefix_expression"), PrefixNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "True"), Truth{},
-    Bool.pick(NodeKind, M.name_equal(kind, "False"), Falsehood{},
-    Bool.pick(NodeKind, M.name_equal(kind, "qualified_name"), Name{},
-    Bool.pick(NodeKind, M.name_equal(kind, "INTRINSIC"), Intrinsic{},
-    Bool.pick(NodeKind, M.name_equal(kind, "function"), FunctionNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "constant"), ConstantNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "data_type"), DataNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "symbolic_fixity"), SymbolicFixity{},
-    Bool.pick(NodeKind, M.name_equal(kind, "named_fixity"), NamedFixity{},
-    Bool.pick(NodeKind, M.name_equal(kind, "group"), GroupNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "array"), ArrayNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "record"), RecordNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "application"), ApplicationNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "infix_expression"), InfixNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "lambda"), LambdaNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "case_expression"), CaseNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "do_block"), Block{},
-    Bool.pick(NodeKind, M.name_equal(kind, "binding"), Binding{},
-    Bool.pick(NodeKind, M.name_equal(kind, "effect_binding"), EffectBinding{},
-    Bool.pick(NodeKind, M.name_equal(kind, "effect_step"), EffectBinding{},
-    Bool.pick(NodeKind, M.name_equal(kind, "result"), Return{},
-    Bool.pick(NodeKind, M.name_equal(kind, "conditional"), Conditional{},
-    Bool.pick(NodeKind, M.name_equal(kind, "pattern_conditional"), PatternConditional{},
-    Bool.pick(NodeKind, M.name_equal(kind, "pattern"), PatternWrapper{},
-    Bool.pick(NodeKind, M.name_equal(kind, "pattern_group"), PatternGroup{},
-    Bool.pick(NodeKind, M.name_equal(kind, "constructor_pattern"), PatternConstructor{},
-    Bool.pick(NodeKind, M.name_equal(kind, "IDENT"), PatternName{},
-    Bool.pick(NodeKind, M.name_equal(kind, "effect_declaration"), EffectNode{}, Unsupported{})))))))))))))))))))))))))))))))))
+  match kind:
+    case SNil{}:
+      Unsupported{}
+    case SCon{initial, tail}:
+      classify_initial(initial, kind)
 
 def visit(+node: C.Cst) -> Work:
   Expression{classify(C.kind_of(node)), node}

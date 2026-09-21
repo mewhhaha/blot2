@@ -75,9 +75,13 @@ const boundaries = {
   SOURCE_MODULES_SOURCE_MODULE: "lower",
   MAIN_ANALYZE: "analysis",
   GROUPS_PLAN: "dependency_plan",
-  CHECK_SCHEDULER_SCHEDULE: "schedule",
-  CHECK_SCHEDULER_CHECK_FRONTIER: "inference_prepare",
-  CHECK_SCHEDULER_CHECK_BATCH: "inference_execute",
+  ...(source.includes("  WL_CASE(FID_CHECK_SCHEDULER_CHECK_JOBS)\n  {")
+    ? { CHECK_SCHEDULER_CHECK_JOBS: "inference" }
+    : {
+      CHECK_SCHEDULER_SCHEDULE: "schedule",
+      CHECK_SCHEDULER_CHECK_FRONTIER: "inference_prepare",
+      CHECK_SCHEDULER_CHECK_BATCH: "inference_execute",
+    }),
   CONST_EVAL_EVALUATE_CONSTANTS: "constants",
   WASM_EMIT: "wasm",
   WASM_PREPARE: "reachability",

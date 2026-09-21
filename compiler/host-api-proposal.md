@@ -3,9 +3,12 @@
 This is the broader target API, not the current complete FFI. The compiler
 rejects game/GUI intrinsics and implements generic operations/providers, sealed
 `Foreign` effects and scalar host callbacks through [guest ABI 1](guest-abi.md).
-Records, arrays, runtime Text, persistent guest values and the record-bundle
-entrypoint adapter below still need implementation. The full Blot specimen is
-[examples/host_capabilities.blot](../examples/host_capabilities.blot).
+Cross-boundary records/arrays, runtime Text, persistent guest values and the
+record-bundle entrypoint adapter below still need implementation. See also
+[examples/host_capabilities.blot](../examples/host_capabilities.blot), now
+ported to the current scalar callback ABI. That executable port constructs
+capability records inside the guest; it does not implement this proposal's
+composite or persistent-state ABI.
 
 ## Source contract
 

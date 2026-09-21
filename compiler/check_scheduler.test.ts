@@ -24,6 +24,14 @@ interface Scheduled {
   readonly level: bigint;
   readonly job: Job;
 }
+interface Chain {
+  readonly $: "Chain";
+  readonly position: bigint;
+  readonly level: bigint;
+  readonly jobs: BendList<
+    { readonly $: "Job"; readonly position: bigint; readonly job: Job }
+  >;
+}
 interface Task {
   readonly $: "Task";
   readonly position: bigint;
@@ -38,29 +46,37 @@ interface Outcome {
 }
 type Batch = {
   readonly $: "Sequential";
-  readonly tasks: BendList<Task>;
+  readonly tasks: BendList<
+    { readonly $: "Weighted"; readonly value: Task; readonly cost: bigint }
+  >;
 } | { readonly $: "Parallel"; readonly left: Batch; readonly right: Batch };
 
 const scheduler = compiled as unknown as {
+  "check_regions.partition"(chains: BendList<Chain>): Result<
+    BendList<{
+      readonly $: "Region";
+      readonly chains: BendList<Chain>;
+    }>
+  >;
+  "check_chain_plan.plan"(jobs: BendList<Job>): Result<BendList<Chain>>;
+  "check_chain_plan.next_frontier"(chains: BendList<Chain>): {
+    readonly ready: BendList<Chain>;
+    readonly pending: BendList<Chain>;
+  };
+  "check_scheduler.check_jobs"(
+    jobs: BendList<Job>,
+    catalog: unknown,
+    completed: unknown,
+    dependent: boolean,
+  ): Result<unknown>;
   "check_scheduler.schedule"(jobs: BendList<Job>): Result<BendList<Scheduled>>;
   "check_scheduler.check_batch_with_grain"(
     tasks: BendList<Task>,
     grain: bigint,
   ): BendList<Outcome>;
-  "check_scheduler.partition"(
+  "check_scheduler.task_batch"(
     tasks: BendList<Task>,
-    reversed: BendList<Task>,
-    left: bigint,
-    total: bigint,
-    target: bigint,
-    reached: boolean,
-  ): unknown;
-  "check_scheduler.forkable"(parts: unknown, grain: bigint): unknown;
-  "check_scheduler.batches"(
-    fuel: bigint,
-    parts: unknown,
     grain: bigint,
-    parallel: unknown,
   ): Batch;
   "check_scheduler.catalog"(module: unknown): unknown;
   "check_scheduler.next_frontier"(jobs: BendList<Scheduled>): unknown;
@@ -101,6 +117,137 @@ const add = (left: unknown, right: unknown) => ({
   operator: { $: "Add" },
   left,
   right,
+});
+
+Deno.test("dependency chains contract only single-consumer edges and preserve SCCs, joins and aliases", () => {
+  const verify = (jobs: Job[]) => {
+    const owners = new Map<string, number>();
+    const dependencies: Set<number>[] = [];
+    const consumers = jobs.map(() => new Set<number>());
+    jobs.forEach((job, position) => {
+      dependencies.push(
+        new Set(
+          bendArray(job.dependencies).map((name) => {
+            const owner = owners.get(name);
+            ok(owner !== undefined);
+            consumers[owner].add(position);
+            return owner;
+          }),
+        ),
+      );
+      bendArray(job.members).forEach((name) => owners.set(name, position));
+    });
+    const heads: number[] = [];
+    const expected = new Map<number, { level: number; jobs: number[] }>();
+    jobs.forEach((_, position) => {
+      const parents = [...dependencies[position]];
+      const parent = parents[0];
+      if (parents.length === 1 && consumers[parent].size === 1) {
+        heads.push(heads[parent]);
+        expected.get(heads[parent])!.jobs.push(position);
+      } else {
+        heads.push(position);
+        expected.set(position, {
+          level: parents.length
+            ? Math.max(
+              ...parents.map((parent) => expected.get(heads[parent])!.level),
+            ) + 1
+            : 0,
+          jobs: [position],
+        });
+      }
+    });
+    const planned = unwrap(scheduler["check_chain_plan.plan"](bendList(jobs)));
+    const regions = bendArray(unwrap(
+      scheduler["check_regions.partition"](planned),
+    ));
+    const regionOf = new Map<number, number>();
+    regions.forEach((region, regionIndex) => {
+      const chains = bendArray(region.chains);
+      equal(
+        chains,
+        chains.toSorted((a, b) =>
+          Number(a.level - b.level || a.position - b.position)
+        ),
+      );
+      for (const chain of chains) {
+        for (const assigned of bendArray(chain.jobs)) {
+          const position = Number(assigned.position);
+          ok(!regionOf.has(position));
+          equal(assigned.job, jobs[position]);
+          regionOf.set(position, regionIndex);
+        }
+      }
+    });
+    equal(regionOf.size, jobs.length);
+    const connected = jobs.map((_, position) => new Set([position]));
+    dependencies.forEach((parents, position) => {
+      for (const parent of parents) {
+        equal(regionOf.get(parent), regionOf.get(position));
+        const combined = new Set([
+          ...connected[parent],
+          ...connected[position],
+        ]);
+        for (const member of combined) connected[member] = combined;
+      }
+    });
+    equal(regions.length, new Set(connected).size);
+    equal(
+      bendArray(planned).map((chain) => ({
+        position: Number(chain.position),
+        level: Number(chain.level),
+        jobs: bendArray(chain.jobs).map(({ position, job }) => {
+          equal(job, jobs[Number(position)]);
+          return Number(position);
+        }),
+      })),
+      [...expected].map(([position, chain]) => ({ position, ...chain }))
+        .sort((a, b) => a.level - b.level || a.position - b.position),
+    );
+    let pending = planned;
+    let count = 0;
+    while (pending.$ === "Con") {
+      const frontier = scheduler["check_chain_plan.next_frontier"](pending);
+      const ready = bendArray(frontier.ready);
+      ok(ready.length > 0);
+      ok(ready.every((chain) => chain.level === ready[0].level));
+      if (frontier.pending.$ === "Con") {
+        ok(frontier.pending.head.level > ready[0].level);
+      }
+      count += ready.length;
+      pending = frontier.pending;
+    }
+    equal(count, expected.size);
+  };
+  verify([]);
+  verify([
+    job(["seed", "alias"]),
+    job(["middle"], ["seed", "alias"]),
+    job(["left"], ["middle"]),
+    job(["right"], ["middle"]),
+    job(["join"], ["left", "right"]),
+    job(["answer"], ["join"]),
+    job(["independent"]),
+  ]);
+  let seed = 813;
+  const random = () => seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+  for (let trial = 0; trial < 256; trial++) {
+    verify(Array.from({ length: 1 + random() % 24 }, (_, position) =>
+      job(
+        [`node_${position}`, `alias_${position}`],
+        Array.from({ length: position }, (_, parent) => parent)
+          .filter(() => random() % 5 === 0)
+          .flatMap((parent) =>
+            random() % 2
+              ? [`node_${parent}`, `alias_${parent}`]
+              : [`alias_${parent}`]
+          ),
+      )));
+  }
+  equal(
+    scheduler["check_chain_plan.plan"](bendList([job(["a"], ["missing"])])),
+    scheduler["check_scheduler.schedule"](bendList([job(["a"], ["missing"])])),
+  );
 });
 
 function fn(name: string, body: unknown, parameter = "value") {
@@ -210,21 +357,7 @@ Deno.test("inference grain preserves ordered results and keeps small or indivisi
   equal(failure.error.code, "type_mismatch");
 
   const tree = (tasks: Task[], grain: bigint) => {
-    const total = tasks.reduce((cost, task) => cost + task.cost, 0n);
-    const parts = scheduler["check_scheduler.partition"](
-      bendList(tasks),
-      bendList([]),
-      0n,
-      total,
-      total / 2n,
-      false,
-    );
-    return scheduler["check_scheduler.batches"](
-      BigInt(tasks.length),
-      parts,
-      grain,
-      scheduler["check_scheduler.forkable"](parts, grain),
-    );
+    return scheduler["check_scheduler.task_batch"](bendList(tasks), grain);
   };
   equal(tree(tasks.slice(1, 3), 1024n).$, "Sequential");
   equal(tree([{ ...tasks[0], cost: 1_000_000n }], 0n).$, "Sequential");
@@ -236,8 +369,11 @@ Deno.test("inference grain preserves ordered results and keeps small or indivisi
   ], 1024n);
   ok(uneven.$ === "Parallel");
   ok(uneven.left.$ === "Sequential" && uneven.right.$ === "Sequential");
-  equal(bendArray(uneven.left.tasks).map(({ position }) => position), [0n, 1n]);
-  equal(bendArray(uneven.right.tasks).map(({ position }) => position), [2n]);
+  equal(bendArray(uneven.left.tasks).map(({ value }) => value.position), [
+    0n,
+    1n,
+  ]);
+  equal(bendArray(uneven.right.tasks).map(({ value }) => value.position), [2n]);
 });
 
 Deno.test("a later ready inference error cannot hide an earlier blocked group error", () => {
@@ -267,6 +403,19 @@ Deno.test("a later ready inference error cannot hide an earlier blocked group er
   ok(actual.$ === "Fail");
   equal(actual.error.code, "type_mismatch");
   equal(actual.error.subject, "earlier");
+  const chained = unwrap(scheduler["check_scheduler.check_jobs"](
+    bendList([job(["seed"]), job(["earlier"], ["seed"]), job(["later"])]),
+    scheduler["check_scheduler.catalog"](source),
+    {
+      $: "Completed",
+      interfaces: { $: "MTip" },
+      functions: { $: "MTip" },
+      constants: { $: "MTip" },
+      failure: { $: "None" },
+    },
+    true,
+  ));
+  equal(scheduler["check_scheduler.assembled"](source, chained), actual);
 });
 
 Deno.test("ready grouped checking agrees with serial inference interfaces on a diamond and recursive SCC", () => {

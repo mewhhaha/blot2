@@ -1,79 +1,50 @@
-// PROPOSAL: target API for review, not executable compiler input yet.
-// Imports, records, arrays, runtime Text and the composite host ABI below
-// need implementation. Scalar callbacks/effect rows run in host_io.blot.
-// See compiler/host-api-proposal.md.
-// Io and Application are ordinary library types; main is an ordinary export.
+// Executable scalar-callback port of the host-capability proposal.
+// Capability records are guest values, not composite arguments in the host ABI.
+// Title and frame numbers stand in for the proposed Text and RenderFrame ABI.
 
-import { IoError } from "std/host"
-import { FrameInput, Update } from "engine/app"
-import { RenderFrame } from "engine/render"
-import * as ecs from "engine/ecs"
-import * as scene from "game/scene"
-import { Position, Velocity, DeltaTime } from "game/components"
+data WindowIo = WindowIo { set_title: U32 -> U32 ! {Foreign} }
+data RenderIo = RenderIo { submit: U32 -> U32 ! {Foreign} }
+data Io = Io { window: WindowIo, render: RenderIo }
 
+fn title window => do:
+  let WindowIo { set_title } = window
+  use status <- set_title 7
+  return status
 
-// These records would normally live in platform library source.
-// Foreign means a call can cross the host boundary, not permission to do so.
-// The host must actually supply each callable value.
+// Only rendering authority reaches this function, not the whole Io bundle.
+fn render_frame render => fn frame => do:
+  let RenderIo { submit } = render
+  use status <- submit frame
+  return status
 
-data WindowIo = WindowIo {
-  set_title: Text -> Result Unit IoError ! {Foreign},
-}
+fn launch io => do:
+  let Io { window, render } = io
+  use status <- title window
+  if status != 0:
+    return status
+  use rendered <- render_frame render 42
+  return rendered
 
-data RenderIo = RenderIo {
-  submit: RenderFrame -> Result Unit IoError ! {Foreign},
-}
-
-data Io = Io {
-  window: WindowIo,
-  render: RenderIo,
-}
-
-data Application world = Application {
-  create: Unit -> world,
-  update: world -> (FrameInput -> Result world IoError ! {Foreign}),
-}
-
-
-// ECS registration, effects, storage, queries and scheduling are source code.
-// No ECS service or world is supplied by JavaScript.
-
-fn move () => do:
-  use position <- ecs.get Position
-  use velocity <- ecs.get Velocity
-  use time <- ecs.get DeltaTime
-  use ecs.set (Position {
-    x: position.x + velocity.x * time.seconds,
-    y: position.y + velocity.y * time.seconds,
-    z: position.z + velocity.z * time.seconds,
+// The single host callback uses disjoint scalar command ranges. The wrappers
+// grant only the specific operations needed by each guest capability record.
+export fn main (dispatch: U32 -> U32 ! {Foreign}) => do:
+  let set_title = fn title_id => do:
+    if title_id >= 1000:
+      return 1
+    use status <- dispatch (1000 + title_id)
+    return status
+  let submit = fn frame => do:
+    if frame >= 1000:
+      return 1
+    use status <- dispatch (2000 + frame)
+    return status
+  use status <- launch (Io {
+    window: WindowIo { set_title },
+    render: RenderIo { submit },
   })
-  return ()
+  return status
 
-const simulation = ecs.build [ecs.system Update move]
-type World = simulation.world_type
+export fn render_only (submit: U32 -> U32 ! {Foreign}) =>
+  render_frame (RenderIo { submit }) 42
 
-fn create_world () => scene.populate (simulation.create ())
-
-// Only rendering authority reaches this function, not the entire Io bundle.
-// simulation.update handles its source-defined ECS state effects and returns
-// a successor world. scene.describe builds arrays of geometry/shader references.
-fn update (render_io: RenderIo) => fn (world: World) => fn (input: FrameInput) => do:
-  let next_world = simulation.update world input
-  let frame = scene.describe next_world
-  use submitted <- render_io.submit frame
-  return case submitted of
-    Ok () => Ok next_world
-    Err error => Err error
-
-
-// The host selects this export and passes capabilities explicitly.
-// Returning callbacks lets the host drive frames without a blocking guest loop.
-// create is called only on first launch; reload reuses compatible world state.
-export fn main (io: Io) => do:
-  use titled <- io.window.set_title "Blot sandbox"
-  return case titled of
-    Err error => Err error
-    Ok () => Ok (Application {
-      create: create_world,
-      update: update io.render,
-    })
+export const uses_host = @effect.has (@effect.of main) Foreign

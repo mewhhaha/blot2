@@ -1,105 +1,101 @@
-// Target-language design specimen, not an executable compiler input yet.
-// The compiler-coupled scalar port is retired under case-study/ecs/prototype.
-// Engine APIs below are proposed source libraries, not compiler intrinsics.
-// See host_capabilities.blot for the explicit host-function entrypoint proposal.
+// Executable, source-defined ECS using immutable component columns.
+// Entity IDs are column indices; Nothing means that component is absent.
+// Worlds stay inside the guest. The current host ABI exchanges only scalars.
 
-import * as ecs from "engine/ecs"
-import { component, resource, Update } from "engine/ecs"
-import { add, mul } from "std/ops"
-
-infixl 60 (+) = add
-infixl 70 (*) = mul
-
-// Tags are imported const-time declaration transforms, not reserved ECS words.
-// Nominal identity comes from the defining module/declaration, not this spelling.
-#[component]
 data Position = Position { x: F32, y: F32 }
-
-#[component]
 data Velocity = Velocity { x: F32, y: F32 }
-
-#[component]
 data Ghost = Ghost { remaining: F32 }
-
-#[resource]
 data Time = Time { seconds: F32 }
+data World = World {
+  positions: Array (Maybe Position),
+  velocities: Array (Maybe Velocity),
+  ghosts: Array (Maybe Ghost),
+  time: Time,
+}
 
-fn read_position () => do:
-  use position <- ecs.get Position
-  return position
+fn create () => World {
+  positions: [Some (Position { x: 0.0, y: 0.0 }), Some (Position { x: 10.0, y: 20.0 }), Nothing, Some (Position { x: 1.0, y: 2.0 })],
+  velocities: [Some (Velocity { x: 2.0, y: 4.0 }), Nothing, Some (Velocity { x: 1.0, y: 1.0 }), Some (Velocity { x: 4.0, y: 2.0 })],
+  ghosts: [Nothing, Nothing, Nothing, Nothing],
+  time: Time { seconds: 0.5 },
+}
 
-// get and set perform typed Read/Write effects; wrappers retain those effects.
-// use sequences a computation; it does not supply storage or handle its effects.
+fn move_position position => fn velocity => fn seconds =>
+  case position, velocity of
+    Some (Position { x, y }), Some (Velocity { x: vx, y: vy }) =>
+      Some (Position {
+        x: F32.add x (F32.mul vx seconds),
+        y: F32.add y (F32.mul vy seconds),
+      })
+    _, _ => position
 
-fn move () => do:
-  use position <- read_position ()
-  use velocity <- ecs.get Velocity
-  use time <- ecs.get Time
-  let next = position
-  next.x := self + velocity.x * time.seconds
-  next.y := self + velocity.y * time.seconds
-  use ecs.set next
-  return ()
+// This query requires Position and Velocity, but Time is a world resource.
+fn move_columns positions => fn velocities => fn seconds => fn index => do:
+  if index >= @array.length positions:
+    return positions
+  let next = move_position (@array.get positions index) (@array.get velocities index) seconds
+  return move_columns (@array.set positions index next) velocities seconds (index + 1)
 
-// Inferred effects include Read Position through the helper, Read Velocity,
-// Read Time, and Write Position. The entity query requires Position + Velocity;
-// Time registers world-level resource storage, not an entity requirement.
+fn move world => do:
+  let World { positions, velocities, ghosts, time } = world
+  let Time { seconds } = time
+  return World {
+    positions: move_columns positions velocities seconds 0,
+    velocities,
+    ghosts,
+    time,
+  }
 
-fn add_ghost () => do:
-  use ecs.insert (Ghost { remaining: 1.0 })
-  return ()
+fn insert_ghosts ghosts => fn index => do:
+  if index >= @array.length ghosts:
+    return ghosts
+  return insert_ghosts (@array.set ghosts index (Some (Ghost { remaining: 1.0 }))) (index + 1)
 
-// Insert Ghost registers storage but does not require Ghost to be present first.
-// No system scan invents component values or attaches components to entities.
-// Both bare use statements above mean use _ <-; discarding keeps their effects.
+// Insertion does not require the component to have been present beforehand.
+fn add_ghost world => do:
+  let World { positions, velocities, ghosts, time } = world
+  return World { positions, velocities, ghosts: insert_ghosts ghosts 0, time }
 
-const game = ecs.build [
-  ecs.system (Update, move),
-  ecs.system (Update, add_ghost),
-]
+fn run_systems systems => fn world => fn index => do:
+  if index >= @array.length systems:
+    return world
+  let next = (@array.get systems index) world
+  return run_systems systems next (index + 1)
 
-type World = game.world_type
+fn update world => run_systems [move, add_ghost] world 0
 
-// PROPOSAL: an explicit provider boundary, not an implicit global world.
-// run invokes move under this world/entity and returns (next_world, ()).
-// Component reads/writes target entity; resource reads/writes target world.
-// Earlier world/component values remain unchanged; set advances provider state.
-export fn move_entity (world: World, entity: ecs.EntityId) =>
-  ecs.run (world, entity, move)
+fn simulate ticks => fn world => do:
+  if ticks == 0:
+    return world
+  return simulate (ticks - 1) (update world)
 
-// PROPOSAL: the same boundary via a resolver value carrying world/entity state.
-// ecs.scope keeps direct bindings and finishes with (next_world, result).
-fn move_entity_scoped (world: World, entity: ecs.EntityId) =>
-  do ecs.scope (world, entity):
-    use move ()
-    return ()
+fn sum_positions positions => fn index => fn total => do:
+  if index >= @array.length positions:
+    return total
+  let next = case @array.get positions index of
+    Nothing => total
+    Some (Position { x, y }) => F32.add total (F32.add x y)
+  return sum_positions positions (index + 1) next
 
-// The generated update queries matching entities, runs each system with a
-// scoped provider, and returns the next world. It does not retain a global world.
-export fn update (world: World) -> World => game.update world
+fn checksum world => do:
+  let World { positions } = world
+  return sum_positions positions 0 0.0
 
-// Build runs only after the selected functions' type/effect rows are resolved.
-// It inspects move/add_ghost before the runner handles their ECS effects.
-// run handles only ECS effects; any other effects still reach its caller.
-// Missing providers at executable boundaries must fail, not choose a world.
-// Type and effect descriptors are compile-time values, not runtime reflection.
-// Code-only edits can reuse storage when identities, layouts, and ABI agree.
-// Provider execution and generated worlds are not implemented by the bootstrap.
+fn count_ghosts ghosts => fn index => fn count => do:
+  if index >= @array.length ghosts:
+    return count
+  let next = case @array.get ghosts index of
+    Nothing => count
+    Some _ => count + 1
+  return count_ghosts ghosts (index + 1) next
 
-// PROPOSAL: ordinary functions can run in a const context. These parameters
-// require const-known arguments; runtime input cannot select a representation.
-fn vector_type (const element: Type) => fn (const lanes: U32) -> Type =>
-  @type.simd (element, lanes)
+export fn run (ticks: U32) -> F32 => checksum (simulate ticks (create ()))
 
-type F32x4 = vector_type F32 4
+export fn ghost_count (ticks: U32) -> U32 => do:
+  let World { ghosts } = simulate ticks (create ())
+  return count_ghosts ghosts 0 0
 
-fn F32x4.add (left: F32x4) => fn (right: F32x4) -> F32x4 =>
-  @simd.f32x4.add left right
-
-// First-class arrays keep their array representation; this explicit load
-// produces a native 128-bit vector, not a record or an array of boxed numbers.
-fn load_four (values: Array F32) => fn (offset: U32) -> F32x4 =>
-  @simd.load (F32x4, values, offset)
-
-// This load must check bounds. Its exact intrinsic API and alignment rules are
-// open; relaxed SIMD and implicit auto-vectorization are not baseline promises.
+export fn snapshot () -> F32 => do:
+  let original = create ()
+  let next = update original
+  return F32.sub (checksum next) (checksum original)

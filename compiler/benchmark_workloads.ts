@@ -47,6 +47,68 @@ export function chainSource(changed: boolean): string {
   ].join("\n");
 }
 
+export function staggeredSource(changed: boolean): string {
+  return Array.from(
+    { length: 8 },
+    (_, depth) =>
+      Array.from({ length: 8 }, (_, chain) => {
+        const steps = depth === chain ? 64 : 2;
+        const declaration = depth === 7
+          ? `export fn entry_${chain}`
+          : `fn work_${chain}_${depth}`;
+        const input = depth === 0
+          ? "value"
+          : `(work_${chain}_${depth - 1} value)`;
+        return [
+          `${declaration} value => do:`,
+          ...Array.from({ length: steps }, (_, step) =>
+            `  let value_${step} = @u32.add ${
+              step === 0 ? input : `value_${step - 1}`
+            } ${changed && chain === 0 && depth === 0 && step === 0 ? 2 : 1}`),
+          `  return value_${steps - 1}`,
+        ].join("\n");
+      }).join("\n"),
+  ).join("\n");
+}
+
+export function diamondSource(changed: boolean): string {
+  return Array.from({ length: 8 }, (_, region) => {
+    const declarations = [`fn seed_${region} value => value`];
+    for (let depth = 0; depth < 8; depth++) {
+      const input = depth === 0
+        ? `seed_${region}`
+        : `join_${region}_${depth - 1}`;
+      for (const branch of ["left", "right"]) {
+        const steps = depth === region ? 64 : 2;
+        declarations.push([
+          `fn ${branch}_${region}_${depth} value => do:`,
+          `  let initial = ${input} value`,
+          ...Array.from(
+            { length: steps },
+            (_, step) =>
+              `  let value_${step} = @u32.add ${
+                step ? `value_${step - 1}` : "initial"
+              } ${
+                changed && region === 0 && depth === 7 && branch === "left" &&
+                  step === 0
+                  ? 2
+                  : 1
+              }`,
+          ),
+          `  return value_${steps - 1}`,
+        ].join("\n"));
+      }
+      declarations.push(
+        `fn join_${region}_${depth} value => @u32.add (left_${region}_${depth} value) (right_${region}_${depth} value)`,
+      );
+    }
+    declarations.push(
+      `export fn entry_${region} value => join_${region}_7 value`,
+    );
+    return declarations.join("\n");
+  }).join("\n");
+}
+
 export const benchmarkWorkloads = [
   ...[8, 64].map((count) => ({
     name: `reader_${count}`,
@@ -65,5 +127,17 @@ export const benchmarkWorkloads = [
     source: chainSource(false),
     changed: chainSource(true),
     expected: 64,
+  },
+  {
+    name: "diamonds_8",
+    source: diamondSource(false),
+    changed: diamondSource(true),
+    expected: 16892,
+  },
+  {
+    name: "staggered_64",
+    source: staggeredSource(false),
+    changed: staggeredSource(true),
+    expected: 78,
   },
 ];

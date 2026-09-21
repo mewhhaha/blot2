@@ -99,9 +99,21 @@ if (Deno.args[0] === "--reference") {
     reference: Artifact;
     changed: Artifact;
   };
-  const frontend = backend === "native" && regime !== "incremental"
-    ? await frontendModule.createSourceFrontend({ prelude: "none" })
-    : undefined;
+  const frontend = (backend === "native" && regime !== "incremental"
+    ? await frontendModule.createSourceFrontend({ prelude: "none", threads })
+    : undefined) as
+      | (Awaited<ReturnType<typeof frontendModule.createSourceFrontend>> & {
+        prepareParallel?: (
+          source: string,
+        ) => Promise<
+          ReturnType<
+            Awaited<
+              ReturnType<typeof frontendModule.createSourceFrontend>
+            >["prepare"]
+          >
+        >;
+      })
+      | undefined;
   const rows = [];
   try {
     if (backend === "js") {
@@ -182,22 +194,29 @@ if (Deno.args[0] === "--reference") {
         startup_ms: number,
       ) => {
         const before = await usage(process.pid);
+        const hostBefore = await usage(Deno.pid);
         const start = performance.now();
-        const tree = prepared ?? frontend.prepare(workload.source);
+        const tree = prepared ??
+          await (frontend.prepareNative?.(workload.source) ??
+            frontend.prepareParallel?.(workload.source) ??
+            frontend.prepare(workload.source));
         const parsed = performance.now();
-        const request = payload ?? protocol.encodeNativeRequest({
-          operation: "compile",
-          root: tree.root,
-          prelude: tree.prelude,
-          fuel: tree.nodeCount,
-          const_steps: 10000n,
-        });
+        const request = payload ?? ("encode" in tree
+          ? tree.encode("compile", 10000n)
+          : protocol.encodeNativeRequest({
+            operation: "compile",
+            root: tree.root,
+            prelude: tree.prelude,
+            fuel: tree.nodeCount,
+            const_steps: 10000n,
+          }));
         const encoded = performance.now();
         const bytes = await process.request(request);
         const received = performance.now();
         const result = protocol.decodeNativeResponse(bytes);
         const decoded = performance.now();
         const after = await usage(process.pid);
+        const hostAfter = await usage(Deno.pid);
         ok(result.operation === "compile");
         equal(result.artifact, reference);
         rows.push({
@@ -213,6 +232,8 @@ if (Deno.args[0] === "--reference") {
           request_bytes: request.length,
           cpu_ticks: after.cpu_ticks - before.cpu_ticks,
           rss_kib: after.rss_kib,
+          host_cpu_ticks: hostAfter.cpu_ticks - hostBefore.cpu_ticks,
+          host_rss_kib: hostAfter.rss_kib,
         });
       };
       const start = performance.now();

@@ -363,7 +363,8 @@ payload. Here `value` is known to be `Text` after the returning `F64` branch.
 Use the same pattern in `case` arms and guarded `let` bindings; ordinary type
 annotations remain compile-time checks, not runtime tests. `@type.of value`
 still describes the static type, so it is not a runtime discriminant operation.
-The [syntax specimen](examples/syntax.blot) includes all three matching forms.
+These union matching forms are proposals, not part of the executable
+[syntax example](examples/syntax.blot).
 
 Initial boundaries:
 
@@ -821,11 +822,15 @@ namespace resolution for a type and its same-named constructor remain open.
 
 ## ECS as a type/effect test case
 
-The [ECS specimen](examples/ecs.blot) is the first demanding design case.
-Systems infer component/resource use through ordinary helpers. A const-time
-`ecs.build` inspects **checked, closed effects**, not function bodies or names,
-to determine storage and query requirements. Demanded computations and generic
-helper calls must retain their effects when that machinery is implemented.
+The ECS design below remains a proposal. The executable
+[ECS example](examples/ecs.blot) instead uses explicit source-defined component
+columns, queries, and state threading on the current language.
+
+In the proposed design, systems infer component/resource use through ordinary
+helpers. A const-time `ecs.build` inspects **checked, closed effects**, not
+function bodies or names, to determine storage and query requirements. Demanded
+computations and generic helper calls must retain their effects when that
+machinery is implemented.
 
 `get` and `set` are effectful operations, not privileged function names for the
 scheduler to search for. Getting T performs Read T; setting a T value performs
@@ -938,7 +943,8 @@ artifacts, and a [Bend compiler](compiler/README.md). The executable
 `grammar.baba`/`baba.json` describe the generic functional core plus recognized
 resolver syntax with explicit unsupported-lowering diagnostics. They no longer
 claim to accept the old Blot language. The broader syntax design is preserved
-here and in the specimens.
+here and in the case-study source proposals. Files under `examples/` use the
+currently supported language.
 
 A separate, permissive Tree-sitter grammar supports Helix highlighting of the
 showcase, including proposals. It is editor support, not a validating compiler

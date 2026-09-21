@@ -7,6 +7,7 @@ import {
 import {
   createFrontend,
   type Cst,
+  declarationRanges,
   type PreparedSource,
   SourceError,
 } from "./syntax.ts";
@@ -130,40 +131,17 @@ type ParsedIsland = ReturnType<
 // still accepted by Baba as a complete program; ambiguous splits use a full
 // parse. In particular, NEWLINE before INDENT starts a suite, not a declaration.
 function islandRanges(prepared: PreparedSource): IslandRange[] | undefined {
-  const closers = new Map([
-    ["(", ")"],
-    ["[", "]"],
-    ["{", "}"],
-    ["\uE001", "\uE002"],
-  ]);
-  const closing = new Set(closers.values());
-  const pending: string[] = [];
-  const ranges: IslandRange[] = [];
-  let start = 0;
-  let fingerprint: string[] = [];
-  for (let index = 0; index < prepared.tokens.length; index++) {
-    const token = prepared.tokens[index];
-    fingerprint.push(
-      token.type === "named" ? token.kind : token.type,
-      token.text,
-    );
-    const closer = closers.get(token.text);
-    if (closer) pending.push(closer);
-    else if (closing.has(token.text) && pending.pop() !== token.text) {
-      return undefined;
+  return declarationRanges(prepared)?.map(({ start, end }) => {
+    const fingerprint: string[] = [];
+    for (let index = start; index < end; index++) {
+      const token = prepared.tokens[index];
+      fingerprint.push(
+        token.type === "named" ? token.kind : token.type,
+        token.text,
+      );
     }
-    if (
-      token.text === "\uE000" && pending.length === 0 &&
-      prepared.tokens[index + 1]?.text !== "\uE001"
-    ) {
-      ranges.push({ start, end: index + 1, key: JSON.stringify(fingerprint) });
-      start = index + 1;
-      fingerprint = [];
-    }
-  }
-  return pending.length === 0 && start === prepared.tokens.length
-    ? ranges
-    : undefined;
+    return { start, end, key: JSON.stringify(fingerprint) };
+  });
 }
 
 function relativeTree(node: Cst, start: number): Cst {

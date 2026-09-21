@@ -3,7 +3,9 @@
 > Paused prototype. The compiler-specific ECS, window, render, input, and asset
 > backend has been removed. The code and instructions below describe the prior
 > experiment, not a runnable application on the current compiler. `just study`
-> reports this boundary. Retired compiler-side runtime/bench experiments are
+> now runs the separate [headless ECS example](../../examples/ecs.blot), with
+> source-defined storage and queries on the current language. It does not open
+> this graphical sandbox. Retired compiler-side runtime/bench experiments are
 > preserved in [prototype/](prototype/README.md).
 >
 > The replacement requires a Blot-source ECS and explicit entrypoint IO

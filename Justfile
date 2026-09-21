@@ -6,7 +6,7 @@ install:
 build:
   deno task build:compiler
 
-# Report why the retired sandbox awaits source-defined ECS and controlled IO.
+# Compile and execute the headless source-defined ECS example.
 study:
   deno task study:ecs
 

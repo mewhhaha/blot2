@@ -85,11 +85,11 @@ token. Source providers cannot remove it. Its descriptors are inspectable at
 const time, but calling a foreign function is not. Closed function annotations
 can also name source operations, as in `Unit -> U32 ! {Reader.ask}`.
 
-[The concrete host API proposal](host-api-proposal.md) and
-[Blot specimen](../examples/host_capabilities.blot) show ordinary records of
-typed callbacks, an explicit entrypoint, source effect adapters and the reload
-boundary. Their record bundles, Text/buffers and persistent world values still
-need implementation; they must not be confused with the implemented scalar ABI.
+[The concrete host API proposal](host-api-proposal.md) describes cross-boundary
+record bundles, Text/buffers and persistent world values; these still need
+implementation. The executable
+[Blot example](../examples/host_capabilities.blot) uses the current scalar ABI
+instead, constructing ordinary records of typed callbacks inside the guest.
 
 Effect rows describe requirements. Capabilities grant authority. A source
 declaration alone never opens a window, acquires a file handle, or creates a

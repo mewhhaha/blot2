@@ -3,6 +3,7 @@ import { createNativeCompiler } from "./native.ts";
 import { createNativeIncrementalCompiler } from "./native_incremental.ts";
 import { createSourceCompiler } from "./source.ts";
 import { SourceError } from "./syntax.ts";
+import { diamondSource, staggeredSource } from "./benchmark_workloads.ts";
 
 const genericSource = `effect Reader.ask: Unit -> U32
 data Maybe a = Some a | Nothing
@@ -104,6 +105,125 @@ async function diagnostic(run: () => unknown | Promise<unknown>) {
   };
 }
 
+Deno.test("dependency chains preserve artifacts, cache counts and rollback at one/eight workers", async () => {
+  const reference = await createSourceCompiler({ prelude: "none" });
+  const original = staggeredSource(false);
+  const edited = staggeredSource(true);
+  const broken = edited.replace(
+    "value_0 = @u32.add value 2",
+    "value_0 = @u32.add True 2",
+  );
+  try {
+    const firstExpected = reference.compile(original);
+    const editExpected = reference.compile(edited);
+    const expectedDiagnostic = await diagnostic(() =>
+      reference.compile(broken)
+    );
+    for (const threads of [1, 8]) {
+      const native = await createNativeCompiler({ prelude: "none", threads });
+      const session = await createNativeIncrementalCompiler({
+        prelude: "none",
+        threads,
+      });
+      try {
+        equal(await native.compile(original), firstExpected);
+        const first = await session.compile(original);
+        equal(first.artifact.bytes, firstExpected.bytes);
+        equal(first.stats.groups_checked, 64);
+        const changed = await session.compile(edited);
+        equal(changed.artifact.bytes, editExpected.bytes);
+        equal(
+          changed.artifact.analysis.functions,
+          editExpected.analysis.functions,
+        );
+        equal(changed.stats.groups_checked, 1);
+        equal(changed.stats.groups_reused, 63);
+        equal(
+          await diagnostic(() => native.compile(broken)),
+          expectedDiagnostic,
+        );
+        equal(
+          await diagnostic(() => session.compile(broken)),
+          expectedDiagnostic,
+        );
+        const recovered = await session.compile(edited, { const_steps: 9999n });
+        equal(recovered.stats.groups_checked, 0);
+        equal(recovered.stats.groups_reused, 64);
+        equal(recovered.artifact.bytes, editExpected.bytes);
+        const { instance } = await WebAssembly.instantiate(
+          changed.artifact.bytes,
+        );
+        for (let chain = 0; chain < 8; chain++) {
+          const entry = instance.exports[`entry_${chain}`];
+          ok(typeof entry === "function");
+          equal(entry(0), chain === 0 ? 79 : 78);
+        }
+      } finally {
+        await native.dispose();
+        await session.dispose();
+      }
+    }
+  } finally {
+    reference.dispose();
+  }
+});
+
+Deno.test("independent diamond regions retain cache counts, diagnostic order and rollback", async () => {
+  const original = diamondSource(false);
+  const edited = diamondSource(true);
+  const broken = edited.replace(
+    "fn join_0_7 value => @u32.add",
+    "fn join_0_7 value => @f32.add",
+  ).replace("fn seed_7 value => value", "fn seed_7 value => @u32.add True 1");
+  const reference = await createSourceCompiler({ prelude: "none" });
+  try {
+    const firstExpected = reference.compile(original);
+    const editExpected = reference.compile(edited);
+    const expectedDiagnostic = await diagnostic(() =>
+      reference.compile(broken)
+    );
+    for (const threads of [1, 8]) {
+      const native = await createNativeCompiler({ prelude: "none", threads });
+      const session = await createNativeIncrementalCompiler({
+        prelude: "none",
+        threads,
+      });
+      try {
+        equal(await native.compile(original), firstExpected);
+        const first = await session.compile(original);
+        equal(first.artifact.bytes, firstExpected.bytes);
+        const changed = await session.compile(edited);
+        equal(changed.artifact.bytes, editExpected.bytes);
+        equal(changed.stats.groups_checked, 1);
+        equal(changed.stats.groups_reused, first.stats.groups_checked - 1);
+        equal(
+          await diagnostic(() => native.compile(broken)),
+          expectedDiagnostic,
+        );
+        equal(
+          await diagnostic(() => session.compile(broken)),
+          expectedDiagnostic,
+        );
+        const recovered = await session.compile(edited, { const_steps: 9999n });
+        equal(recovered.stats.groups_checked, 0);
+        equal(recovered.stats.groups_reused, first.stats.groups_checked);
+        equal(recovered.artifact.bytes, editExpected.bytes);
+        const { instance } = await WebAssembly.instantiate(
+          changed.artifact.bytes,
+        );
+        const entry = instance.exports.entry_0;
+        ok(typeof entry === "function");
+        equal(entry(0), 16893);
+      } finally {
+        await native.dispose();
+        await session.dispose();
+      }
+    }
+  } finally {
+    reference.dispose();
+  }
+});
+
 Deno.test("native ready batches retain interface hits and roll back all caches after parallel inference failure", async () => {
   const reference = await createSourceCompiler({ prelude: "none" });
   try {
@@ -154,5 +274,56 @@ Deno.test("native ready batches retain interface hits and roll back all caches a
     }
   } finally {
     reference.dispose();
+  }
+});
+
+Deno.test("cached inference plans invalidate for dependency rewiring, SCCs and source order", async () => {
+  const revisions = [
+    `fn seed () => 40
+fn left () => 41
+fn right () => 1
+export fn answer () => 42`,
+    `fn seed () => 40
+fn left () => seed ()
+fn right () => left ()
+export fn answer () => right ()`,
+    `fn seed () => 40
+fn left () => @u32.add (seed ()) 1
+fn right () => seed ()
+export fn answer () => @u32.add (left ()) (right ())`,
+    `fn seed () => 40
+fn left value => case @u32.eq value 0 of
+  True => seed ()
+  False => right (@u32.sub value 1)
+fn right value => left value
+export fn answer () => right 2`,
+    `export fn answer () => right 2
+fn right value => left value
+fn left value => case @u32.eq value 0 of
+  True => seed ()
+  False => right (@u32.sub value 1)
+fn seed () => 40`,
+  ];
+  for (const threads of [1, 8]) {
+    const session = await createNativeIncrementalCompiler({
+      prelude: "none",
+      threads,
+    });
+    const clean = await createNativeCompiler({ prelude: "none", threads });
+    try {
+      for (const source of [...revisions, ...revisions.toReversed()]) {
+        const actual = await session.compile(source);
+        const expected = await clean.compile(source);
+        equal(actual.artifact.bytes, expected.bytes);
+        equal(actual.artifact.analysis.functions, expected.analysis.functions);
+        equal(
+          await answer(actual.artifact.bytes),
+          await answer(expected.bytes),
+        );
+      }
+    } finally {
+      await session.dispose();
+      await clean.dispose();
+    }
   }
 });

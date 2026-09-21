@@ -241,6 +241,28 @@ def Laws.lowering_join_preserves_tail_error(earlier, error):
 def Laws.lowering_small_batches_are_sequential(nodes, count):
   {==}
 
+def Laws.inference_single_frontier_keeps_its_parallel_batch(chains, ready):
+  match ready:
+    case Nil{}:
+      {==}
+    case root <> Nil{}:
+      {==}
+    case first <> second <> rest:
+      {==}
+
+def Laws.inference_single_root_needs_no_partition(chains, root, pending):
+  match pending:
+    case Nil{}:
+      {==}
+    case head <> tail:
+      {==}
+
+def Laws.inference_chain_never_contracts_a_join(position, consumers):
+  {==}
+
+def Laws.inference_chain_never_contracts_a_fanout(position):
+  {==}
+
 def Laws.lowering_cost_stops_at_its_bound(nodes, cost):
   {==}
 

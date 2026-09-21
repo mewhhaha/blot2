@@ -19,6 +19,7 @@ import type { Cst, CstList } from "./syntax.ts";
 export const nativeProtocolMagic = 0x424C4F54;
 export const nativeProtocolVersion = 7;
 export const nativeProtocolMaxWords = 16 * 1024 * 1024;
+const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
 export type NativeOperation = "analyze" | "compile";
 
@@ -28,6 +29,11 @@ export interface NativeRequest {
   readonly prelude: Cst;
   readonly fuel: bigint;
   readonly const_steps: bigint;
+}
+
+export interface NativeCstChunk {
+  readonly strings: readonly string[];
+  readonly words: Uint32Array<ArrayBuffer>;
 }
 
 export type NativeSessionRequest =
@@ -136,11 +142,12 @@ class WordWriter {
   }
 
   string(value: string, label: string): void {
+    this.word(this.identity(value, label));
+  }
+
+  identity(value: string, label: string): number {
     const prior = this.#strings.get(value);
-    if (prior !== undefined) {
-      this.word(prior);
-      return;
-    }
+    if (prior !== undefined) return prior;
     if (typeof value !== "string" || !value.isWellFormed()) {
       throw new NativeProtocolError(`${label} is not valid Unicode`);
     }
@@ -148,9 +155,65 @@ class WordWriter {
     for (const _ of value) scalars++;
     const identity = this.#dictionary.length;
     this.#dictionaryWords += scalars + 1;
-    this.word(identity);
+    this.#reserve(0);
     this.#strings.set(value, identity);
     this.#dictionary.push({ value, scalars });
+    return identity;
+  }
+
+  chunk(
+    chunk: NativeCstChunk,
+    options: { omitRoot?: boolean; children?: number } = {},
+  ) {
+    const identities = chunk.strings.map((value) =>
+      this.identity(value, "CST string")
+    );
+    const start = options.omitRoot ? 6 : 0;
+    if (chunk.words.length < 6 || chunk.words.length % 6) {
+      throw new NativeProtocolError("Malformed encoded CST chunk");
+    }
+    this.#reserve(chunk.words.length - start);
+    const target = littleEndian
+      ? new Uint32Array(this.#bytes.buffer)
+      : undefined;
+    const unchanged = identities.every((identity, index) => identity === index);
+    // Copy offsets/counts in bulk; only dictionary references need rewriting.
+    target?.set(chunk.words.subarray(start), this.#length);
+    for (let index = start; index < chunk.words.length; index += 6) {
+      const kind = identities[chunk.words[index]];
+      const field = identities[chunk.words[index + 1]];
+      const text = identities[chunk.words[index + 2]];
+      if (kind === undefined || field === undefined || text === undefined) {
+        throw new NativeProtocolError("Unknown CST dictionary identity");
+      }
+      if (target) {
+        if (!unchanged) {
+          target[this.#length] = kind;
+          target[this.#length + 1] = field;
+          target[this.#length + 2] = text;
+        }
+      } else {
+        const at = this.#length * 4;
+        this.#view.setUint32(at, kind, true);
+        this.#view.setUint32(at + 4, field, true);
+        this.#view.setUint32(at + 8, text, true);
+        this.#view.setUint32(at + 12, chunk.words[index + 3], true);
+        this.#view.setUint32(at + 16, chunk.words[index + 4], true);
+        this.#view.setUint32(at + 20, chunk.words[index + 5], true);
+      }
+      if (index === 0 && options.children !== undefined) {
+        this.#view.setUint32((this.#length + 5) * 4, options.children, true);
+      }
+      this.#length += 6;
+    }
+  }
+
+  fragment(): NativeCstChunk {
+    const words = new Uint32Array(this.#length);
+    for (let index = 0; index < words.length; index++) {
+      words[index] = this.#view.getUint32(index * 4, true);
+    }
+    return { words, strings: this.#dictionary.map(({ value }) => value) };
   }
 
   finish(): Uint8Array<ArrayBuffer> {
@@ -222,6 +285,52 @@ export function encodeNativeRequest(
   writer.nat(request.const_steps, "Const steps");
   writer.beginBody();
   writeTrees(writer, [request.root, request.prelude]);
+  return writer.finish();
+}
+
+export function encodeCstChunk(root: Cst): NativeCstChunk {
+  const writer = new WordWriter();
+  writer.beginBody();
+  writeTrees(writer, [root]);
+  return writer.fragment();
+}
+
+export function encodeNativeChunks(request: {
+  readonly operation: NativeOperation;
+  readonly chunks: readonly NativeCstChunk[];
+  readonly prelude: NativeCstChunk;
+  readonly const_steps: bigint;
+}): Uint8Array<ArrayBuffer> {
+  if (request.operation !== "analyze" && request.operation !== "compile") {
+    throw new NativeProtocolError(
+      `Unknown native operation: ${request.operation}`,
+    );
+  }
+  if (!request.chunks.length) {
+    throw new NativeProtocolError("Missing source CST");
+  }
+  const writer = new WordWriter();
+  const sourceNodes = request.chunks.reduce(
+    (sum, chunk) => sum + chunk.words.length / 6 - 1,
+    1,
+  );
+  writer.word(nativeProtocolMagic);
+  writer.word(nativeProtocolVersion);
+  writer.word(request.operation === "analyze" ? 0 : 1);
+  writer.nat(
+    BigInt(sourceNodes + request.prelude.words.length / 6 + 4),
+    "Lowering fuel",
+  );
+  writer.nat(request.const_steps, "Const steps");
+  writer.beginBody();
+  const children = request.chunks.reduce(
+    (sum, chunk) => sum + chunk.words[5],
+    0,
+  );
+  request.chunks.forEach((chunk, index) =>
+    writer.chunk(chunk, index === 0 ? { children } : { omitRoot: true })
+  );
+  writer.chunk(request.prelude);
   return writer.finish();
 }
 

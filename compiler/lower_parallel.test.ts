@@ -20,6 +20,7 @@ type LowerDeclarations = (
   scope: unknown,
 ) => Result<unknown>;
 const lower = generated as unknown as {
+  "lower.classify"(kind: string): { readonly $: string };
   "lower.prepare_prelude"(root: Cst, fuel: bigint): Result<unknown>;
   "lower.prepare_source"(root: Cst, prelude: unknown): Result<{
     readonly declarations: BendList<Cst>;
@@ -28,6 +29,71 @@ const lower = generated as unknown as {
   "lower.lower_declarations": LowerDeclarations;
   "lower.lower_declarations_sequential": LowerDeclarations;
 };
+
+Deno.test("lowering classification retains exact labels and rejects prefix collisions", () => {
+  const kinds: Record<string, string> = {
+    expression: "Wrapper",
+    atom: "Wrapper",
+    INTEGER: "Integer",
+    FLOAT: "Float",
+    prefix_expression: "PrefixNode",
+    True: "Truth",
+    False: "Falsehood",
+    qualified_name: "Name",
+    INTRINSIC: "Intrinsic",
+    function: "FunctionNode",
+    constant: "ConstantNode",
+    data_type: "DataNode",
+    symbolic_fixity: "SymbolicFixity",
+    named_fixity: "NamedFixity",
+    group: "GroupNode",
+    array: "ArrayNode",
+    record: "RecordNode",
+    application: "ApplicationNode",
+    infix_expression: "InfixNode",
+    lambda: "LambdaNode",
+    case_expression: "CaseNode",
+    do_block: "Block",
+    binding: "Binding",
+    effect_binding: "EffectBinding",
+    effect_step: "EffectBinding",
+    result: "Return",
+    conditional: "Conditional",
+    pattern_conditional: "PatternConditional",
+    pattern: "PatternWrapper",
+    pattern_group: "PatternGroup",
+    constructor_pattern: "PatternConstructor",
+    IDENT: "PatternName",
+    effect_declaration: "EffectNode",
+  };
+  for (const [kind, expected] of Object.entries(kinds)) {
+    equal(lower["lower.classify"](kind), { $: expected });
+    for (
+      const unknown of [
+        kind[0],
+        `${kind}_suffix`,
+        `prefix_${kind}`,
+        kind.slice(1),
+      ]
+    ) {
+      equal(lower["lower.classify"](unknown), {
+        $: kinds[unknown] ?? "Unsupported",
+      });
+    }
+  }
+  for (
+    const unknown of [
+      "",
+      "🙂",
+      "𐐀name",
+      "Expression",
+      "INTEGER\0",
+      "EffectBinding",
+    ]
+  ) {
+    equal(lower["lower.classify"](unknown), { $: "Unsupported" });
+  }
+});
 
 Deno.test("parallel lowering agrees with serial lowering across batch boundaries", async () => {
   const frontend = await createSourceFrontend({ prelude: "none" });

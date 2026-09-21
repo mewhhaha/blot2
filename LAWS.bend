@@ -16,6 +16,8 @@ import ./compiler/type_data.bend as TypeData
 import ./compiler/patterns.bend as Patterns
 import ./compiler/closures.bend as Closures
 import ./compiler/check_scheduler.bend as Scheduler
+import ./compiler/check_chain_plan.bend as Chains
+import ./compiler/check_regions.bend as Regions
 import ./compiler/cst.bend as Cst
 import ./compiler/native_session.bend as Session
 import ./compiler/dependency.bend as Dependency
@@ -23,6 +25,17 @@ import ./compiler/runtime_reachable.bend as Reachable
 
 # Parallel compilation keeps source-order diagnostics and a sequential leaf
 # below the scheduling grain. Neither rule depends on worker completion order.
+law inference_single_frontier_keeps_its_parallel_batch:
+  for +chains: List<&2, Chains.Chain>
+  for ready: List<&2, Chains.Chain>
+  {Regions.plan_frontier(chains, Chains.Frontier{ready, Nil{}}) == Done{[Regions.Region{chains}]} : Result<&2, &2, M.Diagnostic, List<&2, Regions.Region>>}
+
+law inference_single_root_needs_no_partition:
+  for +chains: List<&2, Chains.Chain>
+  for root: Chains.Chain
+  for pending: List<&2, Chains.Chain>
+  {Regions.plan_frontier(chains, Chains.Frontier{[root], pending}) == Done{[Regions.Region{chains}]} : Result<&2, &2, M.Diagnostic, List<&2, Regions.Region>>}
+
 law lowering_join_preserves_tail_error:
   for earlier: Result<&2, &2, M.Diagnostic, M.Module>
   for +error: M.Diagnostic
@@ -32,6 +45,15 @@ law lowering_small_batches_are_sequential:
   for +nodes: List<&2, Cst.Cst>
   for count: Nat
   {Lower.declaration_batches(48n, nodes, count, True{}) == Lower.DeclarationLeaf{nodes} : Lower.DeclarationBatch}
+
+law inference_chain_never_contracts_a_join:
+  for position: Nat
+  for consumers: Map<&2, Chains.Consumer>
+  {Chains.continuation(Chains.SeveralParents{}, position, consumers) == None{} : Maybe<&2, Nat>}
+
+law inference_chain_never_contracts_a_fanout:
+  for position: Nat
+  {Chains.sole_consumer(Some{Chains.Several{}}, position) == False{} : Bool}
 
 law lowering_cost_stops_at_its_bound:
   for nodes: List<&2, Cst.Cst>
