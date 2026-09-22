@@ -114,23 +114,34 @@ await Promise.all(
   }),
 );
 const loader = new URL("main.ts", backend);
-const entry = new URL("../compiler/main.bend", import.meta.url);
 
 // Use Bend's published JS-module loader, not a second compiler implementation.
 // Bun runs the upstream TypeScript loader. The emitted pure module
 // runs in Deno; its host performs no Blot typing, const evaluation, or codegen.
-const javascript = await run("bun", [
-  "--eval",
-  `const { load } = await import(process.argv[1]);
+// The separate session module exposes pure cache planning to regression tests.
+for (
+  const [module, filename] of [["main", "compiler"], [
+    "native_session",
+    "native_session",
+  ], [
+    "native_output",
+    "native_output",
+  ]]
+) {
+  const entry = new URL(`../compiler/${module}.bend`, import.meta.url);
+  const javascript = await run("bun", [
+    "--eval",
+    `const { load } = await import(process.argv[1]);
 const result = await load(process.argv[2], {}, () => {
   throw new Error("Bend loader did not recognize the compiler entry");
 });
 process.stdout.write(result.source);`,
-  loader.href,
-  entry.href,
-]);
-await Deno.writeTextFile(
-  new URL("compiler.js", output),
-  `// Generated from compiler/main.bend with ${requiredVersion}. Do not edit.\n${javascript}`,
-);
-console.log("Built generated/compiler/compiler.js");
+    loader.href,
+    entry.href,
+  ]);
+  await Deno.writeTextFile(
+    new URL(`${filename}.js`, output),
+    `// Generated from compiler/${module}.bend with ${requiredVersion}. Do not edit.\n${javascript}`,
+  );
+  console.log(`Built generated/compiler/${filename}.js`);
+}

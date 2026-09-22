@@ -91,27 +91,71 @@ static void __attribute__((constructor)) blot_native_receive_use(void) {
 
 #ifdef CID_SEND
 static Term blot_native_send_run(Env e, Term* fields, IoWork* work) {
-  uint32_t length = 0;
-  uint32_t capacity = 4096;
-  uint8_t* bytes = io_mem(malloc((size_t)capacity * 4));
-  Term words = fields[0];
+  uint32_t length = (uint32_t)fields[0];
+  if (length > BLOT_NATIVE_MAX_WORDS) {
+    err_fail("native protocol: response exceeds 16777216 words");
+  }
+  size_t byte_length = (size_t)length * 4;
+  uint8_t* bytes = io_mem(malloc(byte_length == 0 ? 1 : byte_length));
+  size_t offset = 0;
+  Term words = fields[1];
   while (term_aux(words) == CID_CON) {
-    if (length == BLOT_NATIVE_MAX_WORDS) {
-      err_fail("native protocol: response exceeds 16777216 words");
-    }
-    if (length == capacity) {
-      capacity *= 2;
-      bytes = io_mem(realloc(bytes, (size_t)capacity * 4));
+    if (byte_length - offset < 4) {
+      err_fail("native protocol: response header exceeds its declared length");
     }
     Term cell[2];
     spare_free(e, cls_fit(2), ctr_take(e, words, 2, cell));
-    blot_native_store(bytes + (size_t)length * 4, (uint32_t)cell[0]);
-    length += 1;
+    blot_native_store(bytes + offset, (uint32_t)cell[0]);
+    offset += 4;
     words = cell[1];
   }
   if (term_aux(words) != CID_NIL) {
     err_fail("native protocol: response is not a word list");
   }
+  Term blocks = fields[2];
+  while (term_aux(blocks) == CID_CON) {
+    Term cell[2];
+    spare_free(e, cls_fit(2), ctr_take(e, blocks, 2, cell));
+    blocks = cell[1];
+    if (term_aux(cell[0]) != CID_NATIVE_OUTPUT_BLOCK) {
+      err_fail("native protocol: response contains an invalid byte block");
+    }
+    Term block[2];
+    spare_free(e, cls_fit(2), ctr_take(e, cell[0], 2, block));
+    uint64_t remaining = block[0];
+    if (remaining > byte_length - offset) {
+      err_fail("native protocol: byte block exceeds the declared response length");
+    }
+    words = block[1];
+    while (term_aux(words) == CID_CON) {
+      spare_free(e, cls_fit(2), ctr_take(e, words, 2, cell));
+      words = cell[1];
+      uint32_t word = (uint32_t)cell[0];
+      if (remaining == 0) {
+        err_fail("native protocol: byte block contains extra words");
+      }
+      if (remaining >= 4) {
+        blot_native_store(bytes + offset, word);
+        offset += 4;
+        remaining -= 4;
+      } else {
+        // Intermediate block padding is not part of the byte stream.
+        while (remaining > 0) {
+          bytes[offset++] = (uint8_t)word;
+          word >>= 8;
+          remaining -= 1;
+        }
+        if (word != 0) err_fail("native protocol: nonzero byte block padding");
+      }
+    }
+    if (term_aux(words) != CID_NIL || remaining != 0) {
+      err_fail("native protocol: truncated byte block");
+    }
+  }
+  if (term_aux(blocks) != CID_NIL || byte_length - offset >= 4) {
+    err_fail("native protocol: response length differs from its chunks");
+  }
+  memset(bytes + offset, 0, byte_length - offset);
   uint8_t prefix[4];
   blot_native_store(prefix, length);
   blot_native_write_exact(prefix, 4);

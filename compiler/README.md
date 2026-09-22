@@ -23,7 +23,9 @@ runs `bend PROOF.bend`. Source-only iterations reuse the compiled executable.
 both backends for parity checks. The JS build also requires Bun. Its first build
 downloads four matching upstream loader files into
 `generated/compiler/bend-2.0.21/`; subsequent builds reuse them offline. Both
-downloaded and cached files are verified against pinned SHA-256 hashes.
+downloaded and cached files are verified against pinned SHA-256 hashes. The JS
+build also emits `generated/compiler/native_session.js` for direct regression
+tests of the native session's pure cache-planning logic.
 
 The native build uses stock Bend 2.0.21. Its runtime passes the ownership
 regression that required an isolated emitter patch on 2.0.5, so that obsolete
@@ -68,13 +70,66 @@ diagnostic or output order. Const evaluation remains sequential because its fuel
 budget is shared. The incremental planning cache retains the chain/frontier
 schedule too; its existing key includes declaration order, dependency edges and
 nominal type dependencies, so body-only edits do not rebuild that schedule.
+Reused lowered declarations also retain their dependency/lambda scans and
+scheduling cost estimates. Only changed declarations repeat these body walks;
+whole-module type, operation, name, and lambda-identity validation still runs on
+every revision. Scan failures remain values until their original diagnostic
+position is reached. Prelude scans and canonical keys are still rebuilt.
+
+Incremental inference-key preparation and codegen-key serialization also use
+cost-balanced batches. Workers read an immutable frontier snapshot; cache hits,
+misses, and failures are consumed in source order before publication. In broad
+frontiers with sufficient estimated work per group, each worker proceeds
+directly from key preparation to checking a cache miss, without a frontier-wide
+preparation barrier. Singletons bypass the batch planner; two-to-four-group
+frontiers prepare keys sequentially but still batch expensive checks. Cold
+frontiers use a finer inference grain; sessions with prior group caches use a
+coarser grain to amortize warm key checks. Key generation does not bypass
+canonical comparison, dependency invalidation, or resource limits.
 
 For plans with several frontiers, weakly connected dependency regions run
 independently. Joins in one region do not stall another region's next frontier.
 Genuine dependency joins remain within each region. Diagnostics retain original
 job positions, and each region returns its own cache delta and counters for
 success-only publication. Single-frontier plans keep their existing batching;
-single-root graphs skip partitioning because they are already connected.
+single-root graphs check their shared prefix first, then partition the remaining
+graph without the already-satisfied dependency edges. Independent branches can
+advance through their own frontiers; a join between unfinished branches still
+keeps them in the same region. Connected multi-root graphs receive the same
+treatment when the remaining work spans several frontiers. A final single
+frontier keeps its batch, and already-independent regions never gain a shared
+prefix barrier. Native sessions cache this schedule; it is still static
+fork/join, not an arbitrary dependency-ready queue.
+
+Sessions averaging at least 256 cached lowering-work units per declaration also
+retain nominal-usage summaries. Changed declarations refresh in weighted
+batches; an exact type-catalog key invalidates summaries when constructor
+ownership changes. Small modules keep direct analysis and discard retained
+summaries. Global validation, operation signatures, and graph keys retain their
+original semantics. Prelude scans are not cached: a separate prelude-cache
+wrapper regressed smaller workloads in performance controls.
+
+Substantial codegen jobs also pipeline key serialization, cache lookup, and miss
+compilation within each worker. Small jobs retain staged preparation and
+balanced miss compilation. Publication remains ordered and transactional,
+including when an earlier compile error competes with a later key error.
+
+Linking resolves independent function bodies in weighted batches against one
+immutable symbol catalog. Ordered collection preserves body order and the first
+name, relocation, or entry-count error. Native output retains the sized Wasm
+chunks instead of flattening a whole byte list. A single pass groups chunks into
+coarse packing tasks; the existing batch executor packs independent groups, and
+the native writer assembles their exact byte lengths into one response buffer.
+Only the final response is padded, so the protocol and public artifacts remain
+unchanged. Size and byte validation precede success-only cache publication.
+Section planning, analysis encoding, and the final native buffer copy remain
+serial. JS callers still receive flat Wasm bytes.
+
+Large incremental diagnostic tables are resolved on demand from immutable,
+declaration-local origins. At 8,192 origin entries or more, successful warm
+edits no longer rebuild an entry for every reused syntax node. Smaller tables
+retain eager indexing to avoid short-session latency regressions. Saved
+diagnostics still refer to their own revision after later edits or disposal.
 
 For raw-string clean builds, `threads` also caps a lazy, persistent Baba parser
 worker pool. Sources below 32,768 UTF-16 code units parse locally; larger
@@ -168,6 +223,9 @@ chains to expose inference barriers. Full-build native artifacts must equal JS;
 incremental Wasm/signatures must equal clean builds, while unchanged requests
 must equal the previous complete session artifact. Session-local closure
 identities and offsets are intentionally not compared with clean builds.
+Incremental rows include `base_revision_ms` and `base_cache` for the preceding
+revision; the first warmup row records the first session compile separately from
+warm body-edit latency.
 
 For separate phase diagnostics:
 
@@ -185,14 +243,20 @@ benchmark. Logs are flushed before the response payload is written, so immediate
 host disposal cannot lose the last trace. The final `send` interval measures
 frame preparation and header writing, not payload writing or log-file IO.
 
-Changed source still undergoes complete lexing and layout validation. Unchanged
-declaration token sequences reuse Baba CST islands and their stable identities;
-ambiguous boundaries fall back to the full parser. Exact successful revisions
+Changed source undergoes a conservative declaration-boundary scan. After the
+first edit warms the fragment cache, unchanged raw fragments reuse validated
+lexing/layout and token indexes; only changed fragments are lexed again. The
+cache retains one syntactically valid revision, not the edit history. Unchanged
+declaration token sequences also reuse Baba CST islands and their stable
+identities, including across trivia edits. Ambiguous boundaries and rejected
+fragments fall back to the complete lexer/parser for exact diagnostics. The
+initial revision always uses the complete parser. Exact successful revisions
 also reuse a privately retained artifact without IPC. Returned artifacts are
 independent copies, and changing the operation or const budget prevents that
-shortcut. Stats distinguish parsed/reused islands, full-parser fallbacks and
-result reuse. `parsed_ms` includes the complete incremental frontend, including
-normalization and source-origin remapping.
+shortcut. Stats distinguish parsed/reused islands, full-parser fallbacks, result
+reuse, and `characters_lexed`/`characters_reused` (UTF-16 code units; fallback
+retries count their repeated work). `parsed_ms` includes the complete
+incremental frontend, including normalization and source-origin remapping.
 
 Failed edits do not publish partial state or advance the acknowledged revision.
 Const caches include entering fuel and transitive source dependencies. Link-time
@@ -232,6 +296,15 @@ type annotations. Only entry-module exports become Wasm exports. Importing a
 type does not implicitly import constructors with different names. Imported
 operator functions need a local fixity declaration; prelude fixities are
 available in every module.
+
+The loader overlaps up to four dependency-file reads while keeping parsing,
+cycle diagnostics and module order deterministic. Bend prepares imported name
+scopes in order, then lowers independent module bodies in weighted batches;
+single-module projects bypass the batch planner. Large value and nominal-type
+graphs also run their two SCC passes concurrently. The concurrency report
+records both multicore gains and the measured single-core tradeoffs. For
+prepared-project benchmarks, use `compiler/project_concurrency_bench.ts`;
+`nominal_256` in the standard CPU benchmark covers large type graphs.
 
 This first project API performs clean compilation; declaration-incremental
 sessions still accept single-file source only. Passing imports to a raw string

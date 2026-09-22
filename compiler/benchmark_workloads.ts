@@ -109,7 +109,63 @@ export function diamondSource(changed: boolean): string {
   }).join("\n");
 }
 
+export function sharedRootDiamondSource(changed: boolean): string {
+  return "fn shared_seed value => value\n" + diamondSource(changed).replaceAll(
+    /fn seed_(\d+) value => value/g,
+    "fn seed_$1 value => shared_seed value",
+  );
+}
+
+export function sharedFrontierDiamondSource(changed: boolean): string {
+  return "fn shared_left value => value\nfn shared_right value => 0\n" +
+    diamondSource(changed).replaceAll(
+      /fn seed_(\d+) value => value/g,
+      "fn seed_$1 value => @u32.add (shared_left value) (shared_right value)",
+    );
+}
+
+export function nominalSource(changed: boolean): string {
+  return Array.from(
+    { length: 256 },
+    (_, index) =>
+      `data T${index} = C${index} ${
+        index % 16 ? `T${index - 1}` : "U32"
+      }\nfn f${index} (value: T${index}) => value`,
+  ).join("\n") +
+    `\nexport fn entry_0 (value: U32) => @u32.add value ${changed ? 43 : 42}\n`;
+}
+
+export function lexicalScopeSource(changed: boolean): string {
+  return Array.from({ length: 8 }, (_, index) =>
+    [
+      `export fn entry_${index} value => do:`,
+      ...Array.from({ length: 256 }, (_, step) =>
+        `  let value_${step} = @u32.add ${
+          step ? `value_${step - 1}` : "value"
+        } ${changed && index === 0 && step === 0 ? 2 : 1}`),
+      "  return value_255",
+    ].join("\n")).join("\n");
+}
+
 export const benchmarkWorkloads = [
+  {
+    name: "lexical_256",
+    source: lexicalScopeSource(false),
+    changed: lexicalScopeSource(true),
+    expected: 256,
+  },
+  {
+    name: "nominal_256",
+    source: nominalSource(false),
+    changed: nominalSource(true),
+    expected: 42,
+  },
+  {
+    name: "shared_frontier_diamonds_8",
+    source: sharedFrontierDiamondSource(false),
+    changed: sharedFrontierDiamondSource(true),
+    expected: 16892,
+  },
   ...[8, 64].map((count) => ({
     name: `reader_${count}`,
     source: readerSource(count, false),
@@ -132,6 +188,12 @@ export const benchmarkWorkloads = [
     name: "diamonds_8",
     source: diamondSource(false),
     changed: diamondSource(true),
+    expected: 16892,
+  },
+  {
+    name: "shared_root_diamonds_8",
+    source: sharedRootDiamondSource(false),
+    changed: sharedRootDiamondSource(true),
     expected: 16892,
   },
   {

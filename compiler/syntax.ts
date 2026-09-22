@@ -39,7 +39,7 @@ export interface ParseRange {
 
 // Preserve the original source for CST text and diagnostics. Baba's compact
 // parser applies a signed-I32 policy to INTEGER tokens, unlike Blot's U32s.
-export function parserSource(prepared: PreparedSource, range: ParseRange = {}) {
+function parserSource(prepared: PreparedSource, range: ParseRange = {}) {
   const start = range.start ?? 0;
   const neutral = prepared.source.slice(start, range.end).split("");
   for (
@@ -382,17 +382,12 @@ export async function createFrontend() {
     encodePrepared(
       prepared: PreparedSource,
       sourceBase: number,
-      range: ParseRange = {},
     ) {
-      const start = range.start ?? 0;
       return encodeCompactCst(
-        compactPrepared(prepared, range),
+        compactPrepared(prepared, {}),
         rules,
-        prepared.source.slice(start, range.end),
-        prepared.originalOffsets.slice(
-          start,
-          range.end === undefined ? undefined : range.end + 1,
-        ),
+        prepared.source,
+        prepared.originalOffsets,
         sourceBase,
       );
     },

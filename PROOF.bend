@@ -4,6 +4,41 @@ import ./compiler/model.bend as M
 import ./compiler/lower.bend as Lower
 import ./compiler/types.bend as Substitutions
 import ./compiler/const_eval.bend as Const
+import ./compiler/native_session.bend as Session
+import ./compiler/wasm.bend as Wasm
+
+def Laws.pipelined_codegen_keeps_first_failure(error, tail, next, reversed, counts):
+  {==}
+
+def Laws.completed_dependency_does_not_join_pending_regions(owner, fuel, head, name, forest):
+  {==}
+
+def Laws.cached_scan_preserves_first_failure(error, following):
+  {==}
+
+def Laws.blocked_single_group_preserves_progress(scheduled, known, previous, progress):
+  match progress:
+    case Session.GroupProgress{state, failure}:
+      {==}
+
+def Laws.cached_group_cost_skips_body_traversal(cost, known, job):
+  {==}
+
+def Laws.small_frontier_skips_pipeline_cost_traversal(ready, known):
+  {==}
+
+def Laws.inference_union_same_root_preserves_forest(left, left_rank, right, right_rank, forest, order):
+  {==}
+
+def Laws.session_key_failure_preserves_earlier_misses(jobs, previous, selections, missing, error):
+  match jobs:
+    case Nil{}:
+      {==}
+    case Session.KeyedEntry{job, encoded} <> tail:
+      {==}
+
+def Laws.session_small_frontier_skips_cost_traversal(job, known):
+  {==}
 
 def Laws.foreign_is_a_valid_effect_label():
   {==}
@@ -295,3 +330,47 @@ def Laws.reachability_counts_the_empty_children_step(catalog, state):
 
 def Laws.reachability_leaf_spends_two_steps(catalog, state):
   {==}
+
+def Laws.parallel_linking_keeps_first_failure(error, following):
+  {==}
+
+def Laws.nominal_summaries_keep_function_failure_first(error, constants):
+  {==}
+
+def Laws.packed_output_keeps_first_failure(error, following):
+  match following:
+    case Fail{later}:
+      {==}
+    case Done{packed}:
+      {==}
+
+def Laws.parallel_modules_keep_first_failure(error, following, previous):
+  {==}
+
+def Laws.wasm_local_lookup_hit_finishes(locals, name, location):
+  match locals:
+    case Nil{}:
+      {==}
+    case Wasm.Local{declared, stored} <> tail:
+      {==}
+
+def Laws.const_local_lookup_hit_finishes(locals, name, value):
+  match locals:
+    case Nil{}:
+      {==}
+    case Const.Binding{declared, stored} <> tail:
+      {==}
+
+def Laws.const_declaration_lookup_hit_finishes(constants, name, value):
+  match constants:
+    case Nil{}:
+      {==}
+    case M.Constant{declared, exported, annotation, stored} <> tail:
+      {==}
+
+def Laws.const_function_lookup_hit_finishes(functions, name, value):
+  match functions:
+    case Nil{}:
+      {==}
+    case M.Function{declared, exported, parameter, parameter_type, result_type, body} <> tail:
+      {==}

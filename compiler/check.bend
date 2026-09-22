@@ -172,13 +172,18 @@ def unique_lambdas(identities: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, Un
   unique_names_indexed(names, repeated_names(names, Set.new(), Set.new()), "duplicate_lambda", "lambda identity must be unique within its module")
 
 
-def module_graph(module: M.Module) -> Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
+def validate_module(module: M.Module) -> Result<&2, &2, M.Diagnostic, Unit>:
   M.Module{+constants, +functions, +types, +operations} = module
   +declarations = List.append(&2, G.Declaration, G.function_declarations(functions), G.constant_declarations(constants))
-  do Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
+  do Result<&2, &2, M.Diagnostic, Unit>:
     valid_types : Unit <- validate_types(types, types, operations)
     valid_operations : Unit <- validate_operations(operations, types)
-    unique : Unit <- unique_names(List.append(&2, String, G.names(declarations), all_constructor_names(types)))
+    unique_names(List.append(&2, String, G.names(declarations), all_constructor_names(types)))
+
+def module_graph(+module: M.Module) -> Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
+  M.Module{constants, functions, types, operations} = module
+  do Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
+    valid : Unit <- validate_module(module)
     fns : List<&2, D.Node> <- D.function_nodes(functions)
     consts : List<&2, D.Node> <- D.constant_nodes(constants)
     +graph : List<&2, D.Node> = List.append(&2, D.Node, fns, consts)

@@ -4,19 +4,20 @@ import ./cst.bend as Cst
 import ./main.bend as Compiler
 import ./native_request.bend as Request
 import ./native_response.bend as Response
+import ./native_output.bend as Output
 import ./native_io.bend as NativeIO
 import ./native_session.bend as Session
 
 type Reply is Data:
-  Reply{state: Maybe<&2, Session.State>, words: List<&2, U32>}
+  Reply{state: Maybe<&2, Session.State>, packet: Output.Packet}
 
 def state_of(reply: Reply) -> Maybe<&2, Session.State>:
-  Reply{state, words} = reply
+  Reply{state, packet} = reply
   state
 
-def words_of(reply: Reply) -> List<&2, U32>:
-  Reply{state, words} = reply
-  words
+def packet_of(reply: Reply) -> Output.Packet:
+  Reply{state, packet} = reply
+  packet
 
 def mode(operation: Request.Operation) -> Session.Mode:
   match operation:
@@ -28,65 +29,68 @@ def mode(operation: Request.Operation) -> Session.Mode:
 def opened(previous: Maybe<&2, Session.State>, result: Result<&2, &2, M.Diagnostic, Session.State>) -> Reply:
   match result:
     case Fail{diagnostic}:
-      Reply{previous, Response.encode_diagnostic(diagnostic)}
+      Reply{previous, Output.words(Response.encode_diagnostic(diagnostic))}
     case Done{state}:
-      Reply{Some{state}, Response.encode(3, Nil{})}
+      Reply{Some{state}, Output.words(Response.encode(3, Nil{}))}
 
-def output_fields(output: Session.Output) -> List<&2, Response.Work>:
-  match output:
-    case Session.Analyzed{analysis}:
-      [Response.Word{1}, Response.Analysis{analysis}]
-    case Session.Compiled{Compiler.Artifact{analysis, bytes}}:
-      [Response.Word{2}, Response.Analysis{analysis}, Response.Bytes{bytes}]
-
-def stat_fields(stats: Session.Stats, output: Session.Output) -> List<&2, Response.Work>:
+def stat_fields(stats: Session.Stats, fields: List<&2, Response.Work>) -> List<&2, Response.Work>:
   Session.Stats{lowered, declarations_reused, checked, groups_reused, evaluated, constants_reused, compiled, entries_reused} = stats
-  Response.Natural{lowered} <> Response.Natural{declarations_reused} <> Response.Natural{checked} <> Response.Natural{groups_reused} <> Response.Natural{evaluated} <> Response.Natural{constants_reused} <> Response.Natural{compiled} <> Response.Natural{entries_reused} <> output_fields(output)
+  Response.Word{1112297300} <> Response.Word{7} <> Response.Word{4} <> Response.Natural{lowered} <> Response.Natural{declarations_reused} <> Response.Natural{checked} <> Response.Natural{groups_reused} <> Response.Natural{evaluated} <> Response.Natural{constants_reused} <> Response.Natural{compiled} <> Response.Natural{entries_reused} <> fields
 
 # Even a response-size failure must not publish the candidate cache state.
-def encoded(previous: Maybe<&2, Session.State>, state: Session.State, result: Result<&2, &2, M.Diagnostic, List<&2, U32>>) -> Reply:
+def encoded(previous: Maybe<&2, Session.State>, state: Session.State, result: Result<&2, &2, M.Diagnostic, Output.Packet>) -> Reply:
   match result:
     case Fail{diagnostic}:
-      Reply{previous, Response.encode_diagnostic(diagnostic)}
-    case Done{words}:
-      Reply{Some{state}, words}
+      Reply{previous, Output.words(Response.encode_diagnostic(diagnostic))}
+    case Done{packet}:
+      Reply{Some{state}, packet}
+
+def encode_analysis(fields: List<&2, Response.Work>) -> Result<&2, &2, M.Diagnostic, Output.Packet>:
+  do Result<&2, &2, M.Diagnostic, Output.Packet>:
+    words : List<&2, U32> <- Response.encode_work(Nat.read.max(), fields, U32.to_nat(16777216), Nil{})
+    return Output.words(words)
 
 def completed(previous: Maybe<&2, Session.State>, result: Result<&2, &2, M.Diagnostic, Session.Completion>) -> Reply:
   match result:
     case Fail{diagnostic}:
-      Reply{previous, Response.encode_diagnostic(diagnostic)}
-    case Done{Session.Completion{state, output, stats}}:
-      fields = {Response.Word{1112297300} <> Response.Word{7} <> Response.Word{4} <> stat_fields(stats, output) : List<&2, Response.Work>}
-      encoded(previous, state, Response.encode_work(Nat.read.max(), fields, U32.to_nat(16777216), Nil{}))
+      Reply{previous, Output.words(Response.encode_diagnostic(diagnostic))}
+    case Done{Session.Completion{state, Session.Analyzed{analysis}, stats}}:
+      encoded(previous, state, encode_analysis(stat_fields(stats, [Response.Word{1}, Response.Analysis{analysis}])))
+    case Done{Session.Completion{state, Session.Compiled{Compiler.PlannedArtifact{analysis, plan}}, stats}}:
+      encoded(previous, state, Output.encode_plan(stat_fields(stats, [Response.Word{2}, Response.Analysis{analysis}]), plan, U32.to_nat(16777216), 2048n))
 
 def cached(previous: Maybe<&2, Session.State>, operation: Request.Operation, root: Cst.Cst, fuel: Nat, steps: Nat) -> Reply:
   match previous:
     case None{}:
-      Reply{None{}, Response.encode_diagnostic(M.Diagnostic{"native_session", "session", "open a session before updating it"})}
+      Reply{None{}, Output.words(Response.encode_diagnostic(M.Diagnostic{"native_session", "session", "open a session before updating it"}))}
     case Some{+state}:
       completed(Some{state}, Session.update(state, mode(operation), root, fuel, steps))
 
 def patched(previous: Maybe<&2, Session.State>, operation: Request.Operation, declarations: List<&2, Session.Declaration>, fuel: Nat, steps: Nat) -> Reply:
   match previous:
     case None{}:
-      Reply{None{}, Response.encode_diagnostic(M.Diagnostic{"native_session", "session", "open a session before updating it"})}
+      Reply{None{}, Output.words(Response.encode_diagnostic(M.Diagnostic{"native_session", "session", "open a session before updating it"}))}
     case Some{+state}:
       completed(Some{state}, Session.update_patch(state, mode(operation), declarations, fuel, steps))
 
 def respond(state: Maybe<&2, Session.State>, request: Result<&2, &2, M.Diagnostic, Request.Request>) -> Reply:
   match request:
     case Fail{diagnostic}:
-      Reply{state, Response.encode_diagnostic(diagnostic)}
+      Reply{state, Output.words(Response.encode_diagnostic(diagnostic))}
     case Done{Request.Request{Request.Analyze{}, fuel, steps, root, prelude}}:
-      Reply{state, Response.encode_analysis(Compiler.analyze_source(root, prelude, fuel, steps))}
+      Reply{state, Output.words(Response.encode_analysis(Compiler.analyze_source(root, prelude, fuel, steps)))}
     case Done{Request.Request{Request.Compile{}, fuel, steps, root, prelude}}:
-      Reply{state, Response.encode_artifact(Compiler.compile_source(root, prelude, fuel, steps))}
+      Reply{state, Output.encode_artifact(Compiler.compile_source_plan(root, prelude, fuel, steps))}
     case Done{Request.OpenSession{prelude, fuel}}:
       opened(state, Session.open(prelude, fuel))
     case Done{Request.SessionRequest{operation, fuel, steps, root}}:
       cached(state, operation, root, fuel, steps)
     case Done{Request.SessionPatch{operation, fuel, steps, declarations}}:
       patched(state, operation, declarations, fuel, steps)
+
+def send_packet(packet: Output.Packet) -> IO(Unit):
+  Output.Packet{word_count, header, blocks} = packet
+  NativeIO.send(word_count, header, blocks)
 
 # A malformed complete payload is recoverable; framing failures are fatal in
 # NativeIO because the next request boundary can no longer be trusted.
@@ -99,15 +103,15 @@ def serve(fuel: Nat, state: Maybe<&2, Session.State>, incoming: Maybe<&1, Native
     case 1n+remaining Some{frame}:
       +reply = respond(state, Request.decode(frame))
       next_state = state_of(reply)
-      response = words_of(reply)
+      packet = packet_of(reply)
       do IO<Unit>:
-        NativeIO.send(response)
+        send_packet(packet)
         next : Maybe<&1, NativeIO.Frame> <- NativeIO.receive()
         serve(remaining, next_state, next)
 
 def main() -> IO(Unit):
   do IO<Unit>:
     # Handshake lets the parent measure process startup separately from work.
-    NativeIO.send([1112297300, 7])
+    NativeIO.send(2, [1112297300, 7], Nil{})
     first : Maybe<&1, NativeIO.Frame> <- NativeIO.receive()
     serve(Nat.read.max(), None{}, first)

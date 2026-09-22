@@ -5,6 +5,7 @@ import ./lower.bend as Lower
 import ./source_types.bend as Types
 import ./index.bend as Index
 import ./operators.bend as O
+import ./inference_batch.bend as B
 
 type Linked is Data:
   Linked{module: M.Module, scopes: Map<&2, Lower.Context>}
@@ -139,26 +140,99 @@ def imported_scope_work(nodes: List<&2, C.Cst>, +modules: Map<&2, Lower.Context>
 def imported_scope(nodes: List<&2, C.Cst>, modules: Map<&2, Lower.Context>, scope: Lower.Context) -> Result<&2, &2, M.Diagnostic, Lower.Context>:
   imported_scope_work(nodes, modules, Imported{scope, Set.new()})
 
-def link(nodes: List<&2, C.Cst>, +entry: String, +prelude_scope: Lower.Context, linked: Linked, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, M.Module>:
+# Imported scopes depend on declarations, not lowered bodies. Preserve errors
+# as task results so an earlier body failure still precedes a later scope failure.
+type ModuleTask is Data:
+  ModuleTask{declarations: List<&2, C.Cst>, prefix: String, name: String, entry: Bool, scope: Lower.Context, public: Result<&2, &2, M.Diagnostic, Lower.Context>}
+
+type ModulePreparation is Data:
+  ModulePreparation{task: ModuleTask, scopes: Map<&2, Lower.Context>}
+
+def publish_scope(public: Result<&2, &2, M.Diagnostic, Lower.Context>, name: String, scopes: Map<&2, Lower.Context>) -> Map<&2, Lower.Context>:
+  match public:
+    case Fail{error}:
+      scopes
+    case Done{scope}:
+      Map.set(&2, Lower.Context, scopes, name, scope)
+
+def prepare_module(+node: C.Cst, +entry: String, prelude_scope: Lower.Context, +scopes: Map<&2, Lower.Context>) -> Result<&2, &2, M.Diagnostic, ModulePreparation>:
+  +name = C.text_of(node)
+  +is_entry = M.name_equal(name, entry)
+  +prefix = Bool.pick(String, is_entry, "", "$module[" ++ name ++ "].")
+  do Result<&2, &2, M.Diagnostic, ModulePreparation>:
+    +body : C.Cst <- C.one(C.field_values(node, "body"))
+    +declarations : List<&2, C.Cst> = C.field_values(body, "declarations")
+    own : Lower.Context <- Lower.collect_names(declarations, prefix, name, False{})
+    imported : Lower.Context <- imported_scope(C.field_values(body, "imports"), scopes, own)
+    +scope : Lower.Context = Lower.combine_context(imported, prelude_scope)
+    fixities : List<&2, O.Fixity> <- Lower.collect_fixities(declarations, scope, False{})
+    +public : Result<&2, &2, M.Diagnostic, Lower.Context> = Lower.collect_names(declarations, prefix, name, True{})
+    return ModulePreparation{ModuleTask{declarations, prefix, name, is_entry, Lower.with_fixities(scope, fixities), public}, publish_scope(public, name, scopes)}
+
+def module_weight(prepared: Result<&2, &2, M.Diagnostic, ModuleTask>) -> Nat:
+  match prepared:
+    case Fail{error}:
+      1n
+    case Done{ModuleTask{declarations, prefix, name, entry, scope, public}}:
+      Lower.declaration_cost(65536n, declarations, 1n)
+
+def prepared_task(prepared: Result<&2, &2, M.Diagnostic, ModulePreparation>) -> Result<&2, &2, M.Diagnostic, ModuleTask>:
+  match prepared:
+    case Fail{error}:
+      Fail{error}
+    case Done{ModulePreparation{task, scopes}}:
+      Done{task}
+
+def prepared_scopes(prepared: Result<&2, &2, M.Diagnostic, ModulePreparation>) -> Map<&2, Lower.Context>:
+  match prepared:
+    case Fail{error}:
+      Map.new(&2, Lower.Context)
+    case Done{ModulePreparation{task, scopes}}:
+      scopes
+
+def prepare_modules(nodes: List<&2, C.Cst>, +entry: String, +prelude_scope: Lower.Context, scopes: Map<&2, Lower.Context>) -> List<&2, B.Weighted<Result<&2, &2, M.Diagnostic, ModuleTask>>>:
   match nodes:
     case Nil{}:
-      Linked{module, scopes} = linked
-      Done{module}
-    case +node <> tail:
-      Linked{previous, +scopes} = linked
+      Nil{}
+    case node <> tail:
+      +prepared = prepare_module(node, entry, prelude_scope, scopes)
+      +task = prepared_task(prepared)
+      B.Weighted{task, module_weight(task)} <> prepare_modules(tail, entry, prelude_scope, prepared_scopes(prepared))
+
+def lower_module_task(task: ModuleTask, fuel: Nat) -> Result<&2, &2, M.Diagnostic, M.Module>:
+  ModuleTask{declarations, prefix, name, entry, scope, public} = task
+  do Result<&2, &2, M.Diagnostic, M.Module>:
+    lowered : M.Module <- Lower.lower_declarations(declarations, prefix, name, entry, fuel, scope)
+    exported : Lower.Context <- public
+    return lowered
+
+def lower_module(prepared: Result<&2, &2, M.Diagnostic, ModuleTask>, fuel: Nat) -> Result<&2, &2, M.Diagnostic, M.Module>:
+  do Result<&2, &2, M.Diagnostic, M.Module>:
+    task : ModuleTask <- prepared
+    lower_module_task(task, fuel)
+
+def collect_modules(modules: List<&2, Result<&2, &2, M.Diagnostic, M.Module>>, previous: M.Module) -> Result<&2, &2, M.Diagnostic, M.Module>:
+  match modules:
+    case Nil{}:
+      Done{previous}
+    case head <> tail:
       do Result<&2, &2, M.Diagnostic, M.Module>:
-        +name : String <- Done{C.text_of(node)}
-        +is_entry : Bool <- Done{M.name_equal(name, entry)}
-        +prefix : String <- Done{Bool.pick(String, is_entry, "", "$module[" ++ name ++ "].")}
-        +body : C.Cst <- C.one(C.field_values(node, "body"))
-        +declarations : List<&2, C.Cst> <- Done{C.field_values(body, "declarations")}
-        own : Lower.Context <- Lower.collect_names(declarations, prefix, name, False{})
-        imported : Lower.Context <- imported_scope(C.field_values(body, "imports"), scopes, own)
-        +scope : Lower.Context <- Done{Lower.combine_context(imported, prelude_scope)}
-        fixities : List<&2, O.Fixity> <- Lower.collect_fixities(declarations, scope, False{})
-        module : M.Module <- Lower.lower_declarations(declarations, prefix, name, is_entry, fuel, Lower.with_fixities(scope, fixities))
-        public : Lower.Context <- Lower.collect_names(declarations, prefix, name, True{})
-        link(tail, entry, prelude_scope, Linked{Lower.combine_modules(previous, module), Map.set(&2, Lower.Context, scopes, name, public)}, fuel)
+        module : M.Module <- head
+        collect_modules(tail, Lower.combine_modules(previous, module))
+
+def link(nodes: List<&2, C.Cst>, entry: String, prelude_scope: Lower.Context, linked: Linked, fuel: Nat) -> Result<&2, &2, M.Diagnostic, M.Module>:
+  match nodes linked:
+    case Nil{} Linked{previous, scopes}:
+      Done{previous}
+    case node <> Nil{} Linked{previous, scopes}:
+      prepared = prepare_module(node, entry, prelude_scope, scopes)
+      do Result<&2, &2, M.Diagnostic, M.Module>:
+        module : M.Module <- lower_module(prepared_task(prepared), fuel)
+        return Lower.combine_modules(previous, module)
+    case nodes Linked{previous, scopes}:
+      tasks = prepare_modules(nodes, entry, prelude_scope, scopes)
+      outcomes = B.execute(~Result<&2, &2, M.Diagnostic, ModuleTask>, ~Nat, ~Result<&2, &2, M.Diagnostic, M.Module>, ~lower_module, B.plan(Result<&2, &2, M.Diagnostic, ModuleTask>, tasks, 512n), fuel)
+      collect_modules(outcomes, previous)
 
 def prepared_project(prepared: Result<&2, &2, M.Diagnostic, Lower.Prelude>, +root: C.Cst, fuel: Nat) -> Result<&2, &2, M.Diagnostic, M.Module>:
   match prepared:

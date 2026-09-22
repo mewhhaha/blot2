@@ -14,6 +14,9 @@ type Analysis is Data:
 type Artifact is Data:
   Artifact{analysis: Analysis, bytes: List<&2, U32>}
 
+type PlannedArtifact is Data:
+  PlannedArtifact{analysis: Analysis, bytes: Wasm.BytePlan}
+
 def checked_functions(checked: M.CheckedModule) -> List<&2, M.CheckedFunction>:
   M.CheckedModule{constants, functions, data_types, operations} = checked
   functions
@@ -44,11 +47,20 @@ def analysis_constants(analysis: Analysis) -> List<&2, Const.Binding<Const.Value
   Analysis{checked, constants, remaining_steps} = analysis
   constants
 
+def compile_plan(module: M.Module, steps: Nat) -> Result<&2, &2, M.Diagnostic, PlannedArtifact>:
+  do Result<&2, &2, M.Diagnostic, PlannedArtifact>:
+    +analysis : Analysis <- analyze(module, steps)
+    bytes : Wasm.BytePlan <- Wasm.emit_plan(analysis_checked(analysis), analysis_constants(analysis))
+    return PlannedArtifact{analysis, bytes}
+
+def flatten_artifact(artifact: PlannedArtifact) -> Artifact:
+  PlannedArtifact{analysis, bytes} = artifact
+  Artifact{analysis, Wasm.plan_finish(bytes)}
+
 def compile(module: M.Module, steps: Nat) -> Result<&2, &2, M.Diagnostic, Artifact>:
   do Result<&2, &2, M.Diagnostic, Artifact>:
-    +analysis : Analysis <- analyze(module, steps)
-    bytes : List<&2, U32> <- Wasm.emit(analysis_checked(analysis), analysis_constants(analysis))
-    return Artifact{analysis, bytes}
+    artifact : PlannedArtifact <- compile_plan(module, steps)
+    return flatten_artifact(artifact)
 
 # Keep intermediate compiler terms inside Bend; the host only receives results.
 def analyze_source(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Analysis>:
@@ -60,3 +72,8 @@ def compile_source(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> R
   do Result<&2, &2, M.Diagnostic, Artifact>:
     module : M.Module <- SourceModules.source_module(M.name_equal(Cst.kind_of(root), "source_project"), root, prelude, fuel)
     compile(module, steps)
+
+def compile_source_plan(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, PlannedArtifact>:
+  do Result<&2, &2, M.Diagnostic, PlannedArtifact>:
+    module : M.Module <- SourceModules.source_module(M.name_equal(Cst.kind_of(root), "source_project"), root, prelude, fuel)
+    compile_plan(module, steps)

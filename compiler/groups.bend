@@ -646,25 +646,60 @@ def planning_types(types: List<&2, TypeDependencies>) -> List<&2, TypeDependenci
 # Global validation still runs for every revision, including unused declarations.
 # The result retains semantic dependencies but no expression bodies, allowing a
 # body-only edit to reuse SCC planning and transitive catalog selection.
-def prepare_plan(+module: M.Module) -> Result<&2, &2, M.Diagnostic, Planning>:
+def prepare_plan_usages(module: M.Module, graph: Result<&2, &2, M.Diagnostic, List<&2, D.Node>>, scanned: Result<&2, &2, M.Diagnostic, List<&2, DeclarationUsage>>) -> Result<&2, &2, M.Diagnostic, Planning>:
+  M.Module{constants, functions, +types, operations} = module
+  do Result<&2, &2, M.Diagnostic, Planning>:
+    nodes : List<&2, D.Node> <- graph
+    +constructors : Map<&2, M.TypeId> = constructor_index(types, Map.new(&2, M.TypeId))
+    usages : List<&2, DeclarationUsage> <- scanned
+    required : List<&2, M.TypeId> <- operation_types(operations, constructors)
+    nominal_graph : List<&2, TypeDependencies> <- type_dependencies(types, constructors)
+    return Planning{planning_nodes(nodes), planning_usages(shared_operation_types(usages, required)), planning_types(nominal_graph)}
+
+def prepare_plan_graph(module: M.Module, graph: Result<&2, &2, M.Diagnostic, List<&2, D.Node>>) -> Result<&2, &2, M.Diagnostic, Planning>:
   M.Module{constants, functions, +types, operations} = module
   declarations = List.append(&2, G.Declaration, G.function_declarations(functions), G.constant_declarations(constants))
   do Result<&2, &2, M.Diagnostic, Planning>:
-    nodes : List<&2, D.Node> <- Check.module_graph(module)
+    nodes : List<&2, D.Node> <- graph
     +constructors : Map<&2, M.TypeId> = constructor_index(types, Map.new(&2, M.TypeId))
     usages : List<&2, DeclarationUsage> <- declaration_usages(declarations, constructors)
     required : List<&2, M.TypeId> <- operation_types(operations, constructors)
     nominal_graph : List<&2, TypeDependencies> <- type_dependencies(types, constructors)
     return Planning{planning_nodes(nodes), planning_usages(shared_operation_types(usages, required)), planning_types(nominal_graph)}
 
-def finish_plan(planning: Planning) -> Result<&2, &2, M.Diagnostic, List<&2, Job>>:
-  Planning{+nodes, usages, +nominal_graph} = planning
+def prepare_plan(+module: M.Module) -> Result<&2, &2, M.Diagnostic, Planning>:
+  prepare_plan_graph(module, Check.module_graph(module))
+
+def substantial_graph(nodes: List<&2, D.Node>, required: Nat) -> Bool:
+  match nodes required:
+    case _ 0n:
+      True{}
+    case Nil{} _:
+      False{}
+    case head <> tail 1n+rest:
+      substantial_graph(tail, rest)
+
+def component_pair(nodes: List<&2, D.Node>, nominals: List<&2, D.Node>, parallel: Bool) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>> & Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>:
+  match parallel:
+    case False{}:
+      (D.components(nodes), D.components(nominals))
+    case True{}:
+      values types = D.components(nodes) D.components(nominals)
+      (values, types)
+
+def finish_components(pair: Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>> & Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>, +nodes: List<&2, D.Node>, usages: List<&2, DeclarationUsage>, nominal_graph: List<&2, TypeDependencies>, +nominal_graph_nodes: List<&2, D.Node>) -> Result<&2, &2, M.Diagnostic, List<&2, Job>>:
+  (value_components, type_components) = pair
   do Result<&2, &2, M.Diagnostic, List<&2, Job>>:
-    components : List<&2, List<&2, String>> <- D.components(nodes)
-    +nominal_graph_nodes : List<&2, D.Node> = nominal_nodes(nominal_graph)
-    nominal_components : List<&2, List<&2, String>> <- D.components(nominal_graph_nodes)
+    components : List<&2, List<&2, String>> <- value_components
+    nominal_components : List<&2, List<&2, String>> <- type_components
     closures : Map<&2, TypeSet()> = nominal_summaries(nominal_components, D.adjacency(nominal_graph_nodes, Map.new(&2, List<&2, String>)), nominal_seeds(nominal_graph, Map.new(&2, TypeSet())), Set.from_list(D.node_names(nominal_graph_nodes)), Map.new(&2, TypeSet()))
     return make_jobs(components, D.adjacency(nodes, Map.new(&2, List<&2, String>)), Set.from_list(D.node_names(nodes)), usage_seeds(usages, Map.new(&2, TypeSet())), closures, Map.new(&2, TypeSet()))
+
+def finish_plan(planning: Planning) -> Result<&2, &2, M.Diagnostic, List<&2, Job>>:
+  Planning{+nodes, usages, +nominal_graph} = planning
+  +nominal_graph_nodes = nominal_nodes(nominal_graph)
+  pair = component_pair(nodes, nominal_graph_nodes, Bool.and(substantial_graph(nodes, 32n), substantial_graph(nominal_graph_nodes, 32n)))
+  finish_components(pair, nodes, usages, nominal_graph, nominal_graph_nodes)
 
 def plan(module: M.Module) -> Result<&2, &2, M.Diagnostic, List<&2, Job>>:
   do Result<&2, &2, M.Diagnostic, List<&2, Job>>:

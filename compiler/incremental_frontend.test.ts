@@ -105,6 +105,8 @@ Deno.test("frontend body edits parse one island and preserve untouched syntax id
       islands_parsed: 1,
       islands_reused: 63,
       full_parses: 0,
+      characters_lexed: revision.length,
+      characters_reused: 0,
     });
     const before = bendArray(first.root.children);
     const after = bendArray(changed.root.children);
@@ -118,6 +120,8 @@ Deno.test("frontend body edits parse one island and preserve untouched syntax id
       islands_parsed: 0,
       islands_reused: 64,
       full_parses: 0,
+      characters_lexed: 0,
+      characters_reused: revision.length,
     });
     ok(Object.isFrozen(changed.root));
     ok(Object.isFrozen(after[0].children));
@@ -147,6 +151,35 @@ Deno.test("frontend reuses tokens across trivia, CRLF, insertion, removal, and r
     equal(equivalent(left + right).syntax.islands_parsed, 1);
     equal(equivalent("").syntax.islands_parsed, 0);
     equivalent("// Only a comment, without a final newline");
+  }));
+
+Deno.test("warm frontend lexes only changed fragments and evicts removed fragments", () =>
+  withFrontends((incremental, clean, equivalent) => {
+    const left = "fn left value => @u32.add value 1\r\n";
+    const right = "fn right value => @u32.add value 2\r\n";
+    const warm = left.replace("value 1", "value 3");
+    equivalent(left + right);
+    equivalent(warm + right);
+    const edited = warm.replace("value 3", "value 4");
+    const changed = equivalent(edited + right);
+    equal(changed.syntax.characters_lexed, edited.length);
+    equal(changed.syntax.characters_reused, right.length);
+    equal(changed.syntax.islands_parsed, 1);
+    equal(changed.syntax.islands_reused, 1);
+    const reordered = equivalent(right + edited);
+    equal(reordered.syntax.characters_lexed, 0);
+    equal(reordered.syntax.characters_reused, right.length + edited.length);
+
+    const malformed = right + edited.replace("value 4", "(value 4");
+    const expected = diagnostic(() => clean.parse(malformed));
+    const actual = diagnostic(() => incremental.prepare(malformed));
+    equal([actual.code, actual.start], [expected.code, expected.start]);
+    // Failed revisions must not publish their partially constructed caches.
+    equal(equivalent(edited + right).syntax.characters_lexed, 0);
+    equal(equivalent(right).syntax.characters_lexed, 0);
+    const restored = equivalent(edited + right);
+    equal(restored.syntax.characters_lexed, edited.length);
+    equal(restored.syntax.characters_reused, right.length);
   }));
 
 Deno.test("frontend islands retain nested suites, delimiters, records and token spellings", () =>
@@ -236,6 +269,18 @@ Deno.test("frontend origins belong to their source revision and imports cannot e
     const second = equivalent(prefix + source);
     strictEqual(bendArray(second.root.children)[0], firstDeclaration);
     equal(physicalOffset(first, firstDeclaration.offset), 0);
+    const namedOrigin = (prepared: Prepared) =>
+      diagnostic(() =>
+        prepared.translate(
+          new CompilerError({
+            code: "test_named_origin",
+            subject: "main::capture",
+            message: "test named source origin",
+          }),
+        )
+      ).start;
+    equal(namedOrigin(first), source.indexOf("capture"));
+    equal(namedOrigin(second), prefix.length + source.indexOf("capture"));
     equal(physicalOffset(second, firstDeclaration.offset), prefix.length);
     equal(physicalOffset(first, firstDeclaration.offset), 0);
     const imported = prefix + 'import * as imported from "./other"\n' + source;
@@ -244,5 +289,42 @@ Deno.test("frontend origins belong to their source revision and imports cannot e
     equal(error.start, prefix.length);
     equal(equivalent(prefix + source).syntax.source_reused, true);
     incremental.dispose();
+    equal(namedOrigin(first), source.indexOf("capture"));
+    equal(physicalOffset(second, firstDeclaration.offset), prefix.length);
     throws(() => incremental.prepare(source), /disposed/);
   }));
+
+Deno.test("large lazy origin tables retain deep offsets across revisions and disposal", async () => {
+  const incremental = await createIncrementalFrontend({ prelude: "none" });
+  try {
+    const source = "fn values () => [" +
+      Array.from({ length: 8192 }, (_, index) => index).join(",") + "]\n";
+    const first = incremental.prepare(source);
+    const pending = [first.root];
+    let literal: Cst | undefined;
+    for (let node = pending.pop(); node; node = pending.pop()) {
+      if (node.text === "8191") literal = node;
+      pending.push(...bendArray(node.children));
+    }
+    ok(literal);
+    const prefix = "// shifted 😀\r\n\r\n";
+    const second = incremental.prepare(prefix + source);
+    strictEqual(
+      bendArray(first.root.children)[0],
+      bendArray(second.root.children)[0],
+    );
+    equal(physicalOffset(first, literal.offset), source.indexOf("8191"));
+    equal(
+      physicalOffset(second, literal.offset),
+      prefix.length + source.indexOf("8191"),
+    );
+    incremental.dispose();
+    equal(physicalOffset(first, literal.offset), source.indexOf("8191"));
+    equal(
+      physicalOffset(second, literal.offset),
+      prefix.length + source.indexOf("8191"),
+    );
+  } finally {
+    incremental.dispose();
+  }
+});

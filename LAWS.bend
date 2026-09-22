@@ -11,6 +11,7 @@ import ./compiler/index.bend as Index
 import ./compiler/native_request.bend as NativeRequest
 import ./compiler/native_io.bend as NativeIO
 import ./compiler/native_response.bend as NativeResponse
+import ./compiler/native_output.bend as NativeOutput
 import ./compiler/native_cache_keys.bend as NativeKeys
 import ./compiler/type_data.bend as TypeData
 import ./compiler/patterns.bend as Patterns
@@ -18,13 +19,77 @@ import ./compiler/closures.bend as Closures
 import ./compiler/check_scheduler.bend as Scheduler
 import ./compiler/check_chain_plan.bend as Chains
 import ./compiler/check_regions.bend as Regions
+import ./compiler/groups.bend as Groups
 import ./compiler/cst.bend as Cst
 import ./compiler/native_session.bend as Session
+import ./compiler/native_plan.bend as NativePlan
 import ./compiler/dependency.bend as Dependency
 import ./compiler/runtime_reachable.bend as Reachable
+import ./compiler/source_modules.bend as SourceModules
 
 # Parallel compilation keeps source-order diagnostics and a sequential leaf
 # below the scheduling grain. Neither rule depends on worker completion order.
+law cached_scan_preserves_first_failure:
+  for +error: M.Diagnostic
+  for following: Result<&2, &2, M.Diagnostic, List<&2, Dependency.Node>>
+  {NativePlan.append_nodes(Fail{error}, following) == Fail{error} : Result<&2, &2, M.Diagnostic, List<&2, Dependency.Node>>}
+
+law blocked_single_group_preserves_progress:
+  for scheduled: Scheduler.Scheduled
+  for known: Scheduler.Catalog
+  for previous: Map<&2, Session.Cached<Groups.CheckedGroup>>
+  for +progress: Session.GroupProgress
+  {Session.check_single_group(scheduled, known, previous, progress, False{}) == progress : Session.GroupProgress}
+
+law cached_group_cost_skips_body_traversal:
+  for +cost: Nat
+  for known: Scheduler.Catalog
+  for job: Groups.Job
+  {Scheduler.group_cost_found(Some{cost}, known, job) == cost : Nat}
+
+law small_frontier_skips_pipeline_cost_traversal:
+  for ready: List<&2, Scheduler.Scheduled>
+  for known: Scheduler.Catalog
+  {Session.staged_frontier(ready, known, True{}) == True{} : Bool}
+
+law inference_union_same_root_preserves_forest:
+  for left: String
+  for left_rank: Nat
+  for right: String
+  for right_rank: Nat
+  for +forest: Map<&2, Regions.Link>
+  for order: Cmp
+  {Regions.join_roots(left, left_rank, right, right_rank, forest, True{}, order) == forest : Map<&2, Regions.Link>}
+
+law session_key_failure_preserves_earlier_misses:
+  for jobs: List<&2, Session.KeyedEntry>
+  for previous: Map<&2, Session.Cached<Wasm.EntryCode>>
+  for +selections: List<&2, Session.EntrySelection>
+  for +missing: List<&2, Wasm.CodegenJob>
+  for +error: M.Diagnostic
+  {Session.plan_entries(jobs, previous, Session.EntryPlan{selections, missing, Some{error}}) == Session.EntryPlan{List.reverse(&2, Session.EntrySelection, selections), List.reverse(&2, Wasm.CodegenJob, missing), Some{error}} : Session.EntryPlan}
+
+law pipelined_codegen_keeps_first_failure:
+  for +error: M.Diagnostic
+  for tail: List<&2, Result<&2, &2, M.Diagnostic, Session.PreparedEntry>>
+  for next: Map<&2, Session.Cached<Wasm.EntryCode>>
+  for reversed: List<&2, Wasm.EntryCode>
+  for counts: Session.Counts
+  {Session.publish_compiled_entries(Fail{error} <> tail, next, reversed, counts) == Fail{error} : Result<&2, &2, M.Diagnostic, Session.CompiledEntries>}
+
+law completed_dependency_does_not_join_pending_regions:
+  for owner: Nat
+  for fuel: Nat
+  for head: String
+  for name: String
+  for +forest: Map<&2, Regions.Link>
+  {Regions.link_dependency(None{}, Some{owner}, fuel, head, name, forest) == Done{forest} : Result<&2, &2, M.Diagnostic, Map<&2, Regions.Link>>}
+
+law session_small_frontier_skips_cost_traversal:
+  for job: Groups.Job
+  for known: Scheduler.Catalog
+  {Session.group_preparation_cost(job, known, True{}) == 0n : Nat}
+
 law inference_single_frontier_keeps_its_parallel_batch:
   for +chains: List<&2, Chains.Chain>
   for ready: List<&2, Chains.Chain>
@@ -408,3 +473,50 @@ law constant_code_is_relocatable:
 # The linker must not confuse distinct nominal operations at module separators.
 law operation_keys_preserve_nominal_boundaries:
   {M.name_equal(Codegen.operation_key(M.TypeId{"a::b", "c"}), Codegen.operation_key(M.TypeId{"a", "b::c"})) == False{} : Bool}
+
+law parallel_linking_keeps_first_failure:
+  for +error: M.Diagnostic
+  for following: List<&2, Result<&2, &2, M.Diagnostic, Wasm.BytePlan>>
+  {Wasm.collect_bodies(Fail{error} <> following) == Fail{error} : Result<&2, &2, M.Diagnostic, List<&2, Wasm.BytePlan>>}
+
+law nominal_summaries_keep_function_failure_first:
+  for +error: M.Diagnostic
+  for constants: Result<&2, &2, M.Diagnostic, List<&2, Groups.DeclarationUsage>>
+  {NativePlan.nominal_usages(NativePlan.Nominals{Fail{error}, constants}) == Fail{error} : Result<&2, &2, M.Diagnostic, List<&2, Groups.DeclarationUsage>>}
+
+law packed_output_keeps_first_failure:
+  for +error: M.Diagnostic
+  for following: Result<&2, &2, M.Diagnostic, NativeOutput.Packed>
+  {NativeOutput.merge(Fail{error}, following) == Fail{error} : Result<&2, &2, M.Diagnostic, NativeOutput.Packed>}
+
+law parallel_modules_keep_first_failure:
+  for +error: M.Diagnostic
+  for following: List<&2, Result<&2, &2, M.Diagnostic, M.Module>>
+  for previous: M.Module
+  {SourceModules.collect_modules(Fail{error} <> following, previous) == Fail{error} : Result<&2, &2, M.Diagnostic, M.Module>}
+
+# A resolved lexical binding must not scan the remaining scope. This also keeps
+# host stack usage independent of the number of unrelated bindings.
+law wasm_local_lookup_hit_finishes:
+  for locals: List<&2, Wasm.Local>
+  for name: String
+  for +location: Wasm.Location
+  {Wasm.lookup_local_work(locals, name, Some{location}) == Done{location} : Result<&2, &2, M.Diagnostic, Wasm.Location>}
+
+law const_local_lookup_hit_finishes:
+  for locals: List<&2, Const.Binding<Const.Value>>
+  for name: String
+  for +value: Const.Value
+  {Const.lookup_local_work(locals, name, Some{value}) == Done{value} : Result<&2, &2, M.Diagnostic, Const.Value>}
+
+law const_declaration_lookup_hit_finishes:
+  for constants: List<&2, M.Constant>
+  for name: String
+  for +value: M.Expr
+  {Const.lookup_constant_work(constants, name, Some{value}) == Done{value} : Result<&2, &2, M.Diagnostic, M.Expr>}
+
+law const_function_lookup_hit_finishes:
+  for functions: List<&2, M.Function>
+  for name: String
+  for +value: M.Function
+  {Const.lookup_function_work(functions, name, Some{value}) == Done{value} : Result<&2, &2, M.Diagnostic, M.Function>}

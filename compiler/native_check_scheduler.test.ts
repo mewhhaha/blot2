@@ -3,7 +3,12 @@ import { createNativeCompiler } from "./native.ts";
 import { createNativeIncrementalCompiler } from "./native_incremental.ts";
 import { createSourceCompiler } from "./source.ts";
 import { SourceError } from "./syntax.ts";
-import { diamondSource, staggeredSource } from "./benchmark_workloads.ts";
+import {
+  diamondSource,
+  sharedFrontierDiamondSource,
+  sharedRootDiamondSource,
+  staggeredSource,
+} from "./benchmark_workloads.ts";
 
 const genericSource = `effect Reader.ask: Unit -> U32
 data Maybe a = Some a | Nothing
@@ -89,6 +94,76 @@ function fanout() {
   ].join("\n");
 }
 
+Deno.test("retained nominal scans follow constructor moves, edits, failures and eviction", async () => {
+  const wrap = [
+    "fn wrap value => do:",
+    ...Array.from(
+      { length: 64 },
+      (_, index) =>
+        `  let value_${index} = @u32.add ${
+          index === 0 ? "value" : `value_${index - 1}`
+        } 0`,
+    ),
+    "  return Carry value_63",
+  ].join("\n");
+  const original = `data Left = Carry U32 | EmptyLeft
+data Right = EmptyRight
+${wrap}
+export fn answer () => case wrap 40 of
+  Carry value => @u32.add value 2
+  _ => 0
+`;
+  const moved = original.replace(
+    "data Left = Carry U32 | EmptyLeft\ndata Right = EmptyRight",
+    "data Left = EmptyLeft\ndata Right = Carry U32 | EmptyRight",
+  );
+  const edited = moved.replace("wrap 40", "wrap 41");
+  const reference = await createSourceCompiler({ prelude: "none" });
+  try {
+    for (const threads of [1, 8]) {
+      const session = await createNativeIncrementalCompiler({
+        prelude: "none",
+        threads,
+      });
+      try {
+        for (
+          const source of [
+            original,
+            moved,
+            edited,
+            moved.replace(wrap, "fn wrap value => Carry value"),
+            original,
+          ]
+        ) {
+          const result = await session.compile(source);
+          equal(result.artifact, reference.compile(source));
+          equal(
+            await answer(result.artifact.bytes),
+            source === edited ? 43 : 42,
+          );
+        }
+        await rejects(
+          () => session.compile(moved.replace("Carry U32", "Carry Bool")),
+          SourceError,
+        );
+        equal(
+          (await session.compile(edited)).artifact,
+          reference.compile(edited),
+        );
+        await session.compile("export fn answer () => 42\n");
+        equal(
+          (await session.compile(moved)).artifact,
+          reference.compile(moved),
+        );
+      } finally {
+        await session.dispose();
+      }
+    }
+  } finally {
+    reference.dispose();
+  }
+});
+
 async function diagnostic(run: () => unknown | Promise<unknown>) {
   let found: SourceError | undefined;
   await rejects(async () => await run(), (error: unknown) => {
@@ -168,61 +243,74 @@ Deno.test("dependency chains preserve artifacts, cache counts and rollback at on
   }
 });
 
-Deno.test("independent diamond regions retain cache counts, diagnostic order and rollback", async () => {
-  const original = diamondSource(false);
-  const edited = diamondSource(true);
-  const broken = edited.replace(
-    "fn join_0_7 value => @u32.add",
-    "fn join_0_7 value => @f32.add",
-  ).replace("fn seed_7 value => value", "fn seed_7 value => @u32.add True 1");
-  const reference = await createSourceCompiler({ prelude: "none" });
-  try {
-    const firstExpected = reference.compile(original);
-    const editExpected = reference.compile(edited);
-    const expectedDiagnostic = await diagnostic(() =>
-      reference.compile(broken)
+for (
+  const source of [
+    diamondSource,
+    sharedRootDiamondSource,
+    sharedFrontierDiamondSource,
+  ]
+) {
+  Deno.test(`${source.name} regions retain cache counts, diagnostic order and rollback`, async () => {
+    const original = source(false);
+    const edited = source(true);
+    const broken = edited.replace(
+      "fn join_0_7 value => @u32.add",
+      "fn join_0_7 value => @f32.add",
+    ).replace(
+      /fn seed_7 value => [^\n]+/,
+      "fn seed_7 value => @u32.add True 1",
     );
-    for (const threads of [1, 8]) {
-      const native = await createNativeCompiler({ prelude: "none", threads });
-      const session = await createNativeIncrementalCompiler({
-        prelude: "none",
-        threads,
-      });
-      try {
-        equal(await native.compile(original), firstExpected);
-        const first = await session.compile(original);
-        equal(first.artifact.bytes, firstExpected.bytes);
-        const changed = await session.compile(edited);
-        equal(changed.artifact.bytes, editExpected.bytes);
-        equal(changed.stats.groups_checked, 1);
-        equal(changed.stats.groups_reused, first.stats.groups_checked - 1);
-        equal(
-          await diagnostic(() => native.compile(broken)),
-          expectedDiagnostic,
-        );
-        equal(
-          await diagnostic(() => session.compile(broken)),
-          expectedDiagnostic,
-        );
-        const recovered = await session.compile(edited, { const_steps: 9999n });
-        equal(recovered.stats.groups_checked, 0);
-        equal(recovered.stats.groups_reused, first.stats.groups_checked);
-        equal(recovered.artifact.bytes, editExpected.bytes);
-        const { instance } = await WebAssembly.instantiate(
-          changed.artifact.bytes,
-        );
-        const entry = instance.exports.entry_0;
-        ok(typeof entry === "function");
-        equal(entry(0), 16893);
-      } finally {
-        await native.dispose();
-        await session.dispose();
+    const reference = await createSourceCompiler({ prelude: "none" });
+    try {
+      const firstExpected = reference.compile(original);
+      const editExpected = reference.compile(edited);
+      const expectedDiagnostic = await diagnostic(() =>
+        reference.compile(broken)
+      );
+      for (const threads of [1, 8]) {
+        const native = await createNativeCompiler({ prelude: "none", threads });
+        const session = await createNativeIncrementalCompiler({
+          prelude: "none",
+          threads,
+        });
+        try {
+          equal(await native.compile(original), firstExpected);
+          const first = await session.compile(original);
+          equal(first.artifact.bytes, firstExpected.bytes);
+          const changed = await session.compile(edited);
+          equal(changed.artifact.bytes, editExpected.bytes);
+          equal(changed.stats.groups_checked, 1);
+          equal(changed.stats.groups_reused, first.stats.groups_checked - 1);
+          equal(
+            await diagnostic(() => native.compile(broken)),
+            expectedDiagnostic,
+          );
+          equal(
+            await diagnostic(() => session.compile(broken)),
+            expectedDiagnostic,
+          );
+          const recovered = await session.compile(edited, {
+            const_steps: 9999n,
+          });
+          equal(recovered.stats.groups_checked, 0);
+          equal(recovered.stats.groups_reused, first.stats.groups_checked);
+          equal(recovered.artifact.bytes, editExpected.bytes);
+          const { instance } = await WebAssembly.instantiate(
+            changed.artifact.bytes,
+          );
+          const entry = instance.exports.entry_0;
+          ok(typeof entry === "function");
+          equal(entry(0), 16893);
+        } finally {
+          await native.dispose();
+          await session.dispose();
+        }
       }
+    } finally {
+      reference.dispose();
     }
-  } finally {
-    reference.dispose();
-  }
-});
+  });
+}
 
 Deno.test("native ready batches retain interface hits and roll back all caches after parallel inference failure", async () => {
   const reference = await createSourceCompiler({ prelude: "none" });

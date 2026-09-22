@@ -52,6 +52,10 @@ type Batch = {
 } | { readonly $: "Parallel"; readonly left: Batch; readonly right: Batch };
 
 const scheduler = compiled as unknown as {
+  "check_regions.rooted_plan"(chains: BendList<Chain>): Result<{
+    readonly prefix: BendList<Chain>;
+    readonly regions: BendList<{ readonly chains: BendList<Chain> }>;
+  }>;
   "check_regions.partition"(chains: BendList<Chain>): Result<
     BendList<{
       readonly $: "Region";
@@ -117,6 +121,102 @@ const add = (left: unknown, right: unknown) => ({
   operator: { $: "Add" },
   left,
   right,
+});
+
+Deno.test("completed shared roots release independent branches but preserve unfinished joins", () => {
+  const jobs = [
+    job(["root", "root_alias"]),
+    job(["left_a"], ["root"]),
+    job(["left_b"], ["root_alias"]),
+    job(["left_join"], ["left_a", "left_b"]),
+    job(["right_a"], ["root"]),
+    job(["right_b"], ["root"]),
+    job(["right_join"], ["right_a", "right_b"]),
+  ];
+  const regions = (input: Job[]) => {
+    const planned = unwrap(scheduler["check_regions.rooted_plan"](
+      unwrap(scheduler["check_chain_plan.plan"](bendList(input))),
+    ));
+    equal(
+      bendArray(planned.prefix).flatMap((chain) =>
+        bendArray(chain.jobs).map(({ position }) => Number(position))
+      ),
+      [0],
+    );
+    return bendArray(planned.regions).map((region) =>
+      bendArray(region.chains).flatMap((chain) =>
+        bendArray(chain.jobs).map(({ position }) => Number(position))
+      ).sort((a, b) => a - b)
+    ).sort((a, b) => a[0] - b[0]);
+  };
+  equal(regions(jobs), [[1, 2, 3], [4, 5, 6]]);
+  equal(regions([...jobs, job(["final"], ["left_join", "right_join"])]), [
+    [1, 2, 3, 4, 5, 6, 7],
+  ]);
+  const invalid: Chain = {
+    $: "Chain",
+    position: 1n,
+    level: 1n,
+    jobs: bendList([{
+      $: "Job",
+      position: 1n,
+      job: job(["bad"], ["unknown"]),
+    }]),
+  };
+  const root = bendArray(unwrap(
+    scheduler["check_chain_plan.plan"](bendList([jobs[0]])),
+  ))[0];
+  const rejected = scheduler["check_regions.rooted_plan"](
+    bendList([root, invalid]),
+  );
+  ok(rejected.$ === "Fail");
+  equal(rejected.error.subject, "unknown");
+});
+
+Deno.test("shared multi-root frontiers release branches without synchronizing independent regions", () => {
+  const plan = (jobs: Job[]) =>
+    unwrap(scheduler["check_regions.rooted_plan"](
+      unwrap(scheduler["check_chain_plan.plan"](bendList(jobs))),
+    ));
+  const jobs = [
+    job(["root_a", "alias"]),
+    job(["root_b"]),
+    job(["left_a"], ["root_a", "root_b"]),
+    job(["left_b"], ["alias", "root_b"]),
+    job(["left_join"], ["left_a", "left_b"]),
+    job(["right_a"], ["root_a", "root_b"]),
+    job(["right_b"], ["root_a", "root_b"]),
+    job(["right_join"], ["right_a", "right_b"]),
+  ];
+  const released = plan(jobs);
+  equal(bendArray(released.prefix).map((chain) => chain.position), [0n, 1n]);
+  equal(bendArray(released.regions).length, 2);
+  equal(
+    bendArray(
+      plan([...jobs, job(["final"], ["left_join", "right_join"])]).regions,
+    ).length,
+    1,
+  );
+  const independent = plan([
+    job(["left"]),
+    job(["left_1"], ["left"]),
+    job(["left_2"], ["left"]),
+    job(["right"]),
+    job(["right_1"], ["right"]),
+    job(["right_2"], ["right"]),
+  ]);
+  equal(bendArray(independent.prefix), []);
+  equal(bendArray(independent.regions).length, 2);
+  const finalBatch = plan([
+    job(["root_a"]),
+    job(["root_b"]),
+    ...Array.from(
+      { length: 8 },
+      (_, index) => job([`leaf_${index}`], ["root_a", "root_b"]),
+    ),
+  ]);
+  equal(bendArray(finalBatch.prefix), []);
+  equal(bendArray(finalBatch.regions).length, 1);
 });
 
 Deno.test("dependency chains contract only single-consumer edges and preserve SCCs, joins and aliases", () => {

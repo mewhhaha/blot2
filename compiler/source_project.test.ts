@@ -295,3 +295,133 @@ Deno.test("raw source compilation does not silently ignore unresolved imports", 
     compiler.dispose();
   }
 });
+
+Deno.test("source project reads overlap with a bounded fanout and retain dependency order", async () => {
+  const sources = Array.from(
+    { length: 8 },
+    (_, index) => `branch${index}.blot`,
+  );
+  const waiting = new Map<string, (source: string) => void>();
+  const started = Promise.withResolvers<void>();
+  let active = 0;
+  let peak = 0;
+  const loaded = loadSourceProject(new URL("file:///blot-project/main.blot"), {
+    readSource(url) {
+      const name = fileURLToPath(url).split("/").at(-1)!;
+      if (name === "main.blot") {
+        return Promise.resolve(
+          sources.map((name, index) =>
+            `import * as branch${index} from "./${name}"`
+          ).join("\n"),
+        );
+      }
+      active++;
+      peak = Math.max(peak, active);
+      const result = new Promise<string>((resolve) =>
+        waiting.set(name, resolve)
+      );
+      if (waiting.size === 4) started.resolve();
+      return result.finally(() => active--);
+    },
+  });
+  await started.promise;
+  equal([...waiting.keys()], sources.slice(0, 4));
+  for (let batch = 0; batch < 2; batch++) {
+    for (const name of sources.slice(batch * 4, batch * 4 + 4).reverse()) {
+      waiting.get(name)!("export fn answer () => 42\n");
+    }
+    if (batch === 0) {
+      while (waiting.size < 8) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+    }
+  }
+  const project = await loaded;
+  equal(peak, 4);
+  equal(project.modules.map((module) => module.name), [
+    ...sources,
+    "main.blot",
+  ]);
+});
+
+Deno.test("prefetched read failures cannot overtake an earlier imported syntax diagnostic", async () => {
+  const missing = new Error("later read failed");
+  await rejects(
+    loadSourceProject(new URL("file:///blot-project/main.blot"), {
+      readSource(url) {
+        if (url.pathname.endsWith("main.blot")) {
+          return Promise.resolve(
+            'import * as first from "./first"\nimport * as second from "./second"\n',
+          );
+        }
+        if (url.pathname.endsWith("first.blot")) {
+          return Promise.resolve("export fn =\n");
+        }
+        return Promise.reject(missing);
+      },
+    }),
+    (error) => {
+      ok(error instanceof SourceError);
+      equal(error.origin?.filename, "/blot-project/first.blot");
+      return true;
+    },
+  );
+});
+
+Deno.test("parallel module lowering preserves earlier body errors before later scope errors", async () => {
+  const { loaded } = project({
+    "main.blot":
+      'import * as first from "./first"\nimport * as second from "./second"\nexport fn answer () => 42\n',
+    "first.blot": "export fn broken value => @missing.operation value\n",
+    "second.blot": "fn duplicate () => 1\nfn duplicate () => 2\n",
+  });
+  const input = await loaded;
+  for (const threads of [1, 2, 4, 8]) {
+    const compiler = await createNativeCompiler({ threads });
+    try {
+      await rejects(() => compiler.compile(input), (error) => {
+        ok(error instanceof SourceError);
+        equal(error.origin?.filename, "/blot-project/first.blot");
+        ok(error.message.includes("missing.operation"));
+        return true;
+      });
+    } finally {
+      await compiler.dispose();
+    }
+  }
+});
+
+Deno.test("large independent module bodies preserve native artifacts and nominal catalogs", async () => {
+  const sources: Record<string, string> = {};
+  sources["main.blot"] = Array.from(
+    { length: 8 },
+    (_, index) => `import * as part${index} from "./part${index}"`,
+  ).join("\n") + "\nexport fn answer value => part0.answer value\n";
+  for (let module = 0; module < 8; module++) {
+    sources[`part${module}.blot`] = Array.from({ length: 8 }, (_, index) =>
+      `data T${index} = C${index} ${
+        index ? `T${index - 1}` : "U32"
+      }\nfn identity${index} (value: T${index}) => value\n`).join("") +
+      "export fn answer value => " + Array.from({ length: 96 }, () =>
+        "value").join(" + ") +
+      "\n";
+  }
+  const input = await project(sources).loaded;
+  const js = await createSourceCompiler();
+  try {
+    const expected = js.compile(input);
+    for (const threads of [1, 8]) {
+      const native = await createNativeCompiler({ threads });
+      try {
+        const actual = await native.compile(input);
+        equal(actual, expected);
+        const { instance } = await WebAssembly.instantiate(actual.bytes);
+        equal((instance.exports.answer as CallableFunction)(1), 96);
+      } finally {
+        await native.dispose();
+      }
+    }
+  } finally {
+    js.dispose();
+  }
+});

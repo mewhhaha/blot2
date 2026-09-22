@@ -6,6 +6,7 @@ import ./wasm_catalog.bend as E
 import ./codegen_ir.bend as I
 import ./index.bend as Index
 import ./runtime_reachable.bend as Reachable
+import ./inference_batch.bend as B
 
 type Slot is Data:
   Slot{name: String, index: Nat}
@@ -267,12 +268,19 @@ def lookup_lambda(found: Maybe<&2, F.Lambda>, identity: Nat) -> Result<&2, &2, M
     case Some{lambda}:
       Done{lambda}
 
-def lookup_local(locals: List<&2, Local>, +name: String) -> Result<&2, &2, M.Diagnostic, Location>:
-  match locals:
-    case Nil{}:
+# Bool.pick evaluates both arguments; carry a hit into the next match so the
+# remaining lexical scope is not scanned after finding the nearest binding.
+def lookup_local_work(locals: List<&2, Local>, +name: String, found: Maybe<&2, Location>) -> Result<&2, &2, M.Diagnostic, Location>:
+  match locals found:
+    case _ Some{location}:
+      Done{location}
+    case Nil{} None{}:
       Fail{M.Diagnostic{"internal_error", name, "Wasm lowering lost a lexical local"}}
-    case Local{found, location} <> tail:
-      Bool.pick(Result<&2, &2, M.Diagnostic, Location>, M.name_equal(found, name), Done{location}, lookup_local(tail, name))
+    case Local{declared, location} <> tail None{}:
+      lookup_local_work(tail, name, Bool.pick(Maybe<&2, Location>, M.name_equal(declared, name), Some{location}, None{}))
+
+def lookup_local(locals: List<&2, Local>, name: String) -> Result<&2, &2, M.Diagnostic, Location>:
+  lookup_local_work(locals, name, None{})
 
 def function_entries(functions: List<&2, M.CheckedFunction>) -> List<&2, Entry>:
   match functions:
@@ -1377,18 +1385,57 @@ def matching_entry(same: Bool, key: String) -> Result<&2, &2, M.Diagnostic, Unit
     case False{}:
       Fail{M.Diagnostic{"backend_link", key, "cached codegen entry does not match the prepared job order"}}
 
-def link_bodies(jobs: List<&2, CodegenJob>, entries: List<&2, EntryCode>, +symbols: Catalog, +imports: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
+type LinkTask is Data:
+  LinkBody{key: String, entry: EntryCode}
+  LinkCountMismatch{}
+
+type LinkContext is Data:
+  LinkContext{symbols: Catalog, imports: Nat}
+
+def relocation_cost(fragments: List<&2, Fragment>, cost: Nat) -> Nat:
+  match fragments:
+    case Nil{}:
+      cost
+    case Bytes{bytes} <> tail:
+      relocation_cost(tail, Nat.add(cost, 1n))
+    case head <> tail:
+      relocation_cost(tail, Nat.add(cost, 8n))
+
+def link_tasks(jobs: List<&2, CodegenJob>, entries: List<&2, EntryCode>) -> List<&2, B.Weighted<LinkTask>>:
   match jobs entries:
     case Nil{} Nil{}:
-      Done{Nil{}}
-    case CodegenJob{+key, parameter, body, captures} <> tail EntryCode{found, Code{fragments, locals}} <> rest:
-      do Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
+      Nil{}
+    case CodegenJob{key, parameter, body, captures} <> tail EntryCode{found, Code{+fragments, locals}} <> rest:
+      B.Weighted{LinkBody{key, EntryCode{found, Code{fragments, locals}}}, relocation_cost(fragments, 8n)} <> link_tasks(tail, rest)
+    case _ _:
+      [B.Weighted{LinkCountMismatch{}, 1n}]
+
+def link_body(task: LinkTask, context: LinkContext) -> Result<&2, &2, M.Diagnostic, BytePlan>:
+  match task context:
+    case LinkBody{+key, EntryCode{found, Code{fragments, locals}}} LinkContext{symbols, imports}:
+      do Result<&2, &2, M.Diagnostic, BytePlan>:
         matched : Unit <- matching_entry(M.name_equal(key, found), key)
         instructions : BytePlan <- resolve_fragments(fragments, symbols, imports, Done{BytePlan{0n, Nil{}}})
-        remaining : List<&2, BytePlan> <- link_bodies(tail, rest, symbols, imports)
-        return body_plan(instructions, locals, 3n) <> remaining
-    case _ _:
+        return body_plan(instructions, locals, 3n)
+    case LinkCountMismatch{} _:
       Fail{M.Diagnostic{"backend_link", "codegen", "cached codegen entry count differs from the prepared jobs"}}
+
+def collect_bodies(results: List<&2, Result<&2, &2, M.Diagnostic, BytePlan>>) -> Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
+  match results:
+    case Nil{}:
+      Done{Nil{}}
+    case Fail{error} <> tail:
+      Fail{error}
+    case Done{body} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
+        rest : List<&2, BytePlan> <- collect_bodies(tail)
+        return body <> rest
+
+def link_bodies_with_grain(grain: Nat, jobs: List<&2, CodegenJob>, entries: List<&2, EntryCode>, symbols: Catalog, imports: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
+  collect_bodies(B.execute(~LinkTask, ~LinkContext, ~Result<&2, &2, M.Diagnostic, BytePlan>, ~link_body, B.plan(LinkTask, link_tasks(jobs, entries), grain), LinkContext{symbols, imports}))
+
+def link_bodies(jobs: List<&2, CodegenJob>, entries: List<&2, EntryCode>, symbols: Catalog, imports: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
+  link_bodies_with_grain(256n, jobs, entries, symbols, imports)
 
 # The first defined function is (byte_count:i32) -> pointer:i32. Memory is bounded
 # at 256 pages (16 MiB); every addition and memory.grow failure is checked.
@@ -1701,14 +1748,14 @@ def callback_globals(callbacks: List<&2, Callback>, values: List<&2, List<&2, U3
     case head <> tail:
       [111, 1, 208, 111, 11] <> values
 
-def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePlan>, names: List<&2, ExportedConstant>, values: List<&2, List<&2, U32>>, heap: Heap) -> List<&2, U32>:
+def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePlan>, names: List<&2, ExportedConstant>, values: List<&2, List<&2, U32>>, heap: Heap) -> BytePlan:
   Abi{+functions, constants, +callbacks} = abi
   Heap{+heap_start, chunks} = heap
   +count = List.length(&2, BytePlan, bodies)
   +imports = List.length(&2, Callback, callbacks)
   +wrapper_count = List.length(&2, BytePlan, wrappers)
   +pages = Nat.max(1n, U32.to_nat(U32.shrn(U32.add(U32.from_nat(heap_start), 65535), 16n)))
-  plan_finish(plan_sequence([
+  plan_sequence([
     byte_plan([0, 97, 115, 109, 1, 0, 0, 0]),
     type_section(callbacks),
     import_section(callbacks),
@@ -1721,7 +1768,7 @@ def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePla
     plan_section(10, plan_vector(byte_plan(allocator()) <> List.append(&2, BytePlan, bodies, wrappers))),
     data_section(Heap{heap_start, chunks}),
     abi_section(abi)
-  ]))
+  ])
 
 # Projection does not descend into nested lambda bodies: each has its own entry.
 # Bound the estimate, not compilation, just as for instruction generation.
@@ -1890,9 +1937,9 @@ def prepared_jobs(prepared: Prepared) -> List<&2, CodegenJob>:
   Prepared{jobs, catalog, functions, names, heap} = prepared
   jobs
 
-def link(prepared: Prepared, entries: List<&2, EntryCode>) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+def link_plan(prepared: Prepared, entries: List<&2, EntryCode>) -> Result<&2, &2, M.Diagnostic, BytePlan>:
   Prepared{jobs, +symbols, +functions, +names, +heap} = prepared
-  do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+  do Result<&2, &2, M.Diagnostic, BytePlan>:
     +abi : Abi <- module_abi(functions, names)
     +callbacks : List<&2, Callback> = abi_callbacks(abi)
     +bodies : List<&2, BytePlan> <- link_bodies(jobs, entries, symbols, List.length(&2, Callback, callbacks))
@@ -1900,8 +1947,18 @@ def link(prepared: Prepared, entries: List<&2, EntryCode>) -> Result<&2, &2, M.D
     values : List<&2, List<&2, U32>> <- globals(names, symbol_constants(symbols))
     return assemble(abi, List.append(&2, BytePlan, bodies, callback_bodies(callbacks, 0n)), wrappers, names, values, heap)
 
-def emit(checked: M.CheckedModule, constants: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+def link(prepared: Prepared, entries: List<&2, EntryCode>) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
   do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+    plan : BytePlan <- link_plan(prepared, entries)
+    return plan_finish(plan)
+
+def emit_plan(checked: M.CheckedModule, constants: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, BytePlan>:
+  do Result<&2, &2, M.Diagnostic, BytePlan>:
     +prepared : Prepared <- prepare(checked, constants)
     entries : List<&2, EntryCode> <- compile_entries(prepared_jobs(prepared))
-    link(prepared, entries)
+    link_plan(prepared, entries)
+
+def emit(checked: M.CheckedModule, constants: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+  do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+    plan : BytePlan <- emit_plan(checked, constants)
+    return plan_finish(plan)

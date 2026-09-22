@@ -154,6 +154,8 @@ export async function createNativeIncrementalCompiler(
           islands_parsed: 0,
           islands_reused: bendArray(reusable.root.children).length,
           full_parses: 0,
+          characters_lexed: 0,
+          characters_reused: source.length,
         }, 0);
       }
       const prepared = frontend.prepare(source);

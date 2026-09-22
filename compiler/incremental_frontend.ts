@@ -1,5 +1,6 @@
 import { CompilerError } from "./diagnostics.ts";
 import { bendArray, bendList } from "./bend_list.ts";
+import { sourceDeclarationRanges } from "./source_ranges.ts";
 import {
   declarationOffsets,
   type SourceCompilerOptions,
@@ -17,11 +18,52 @@ export interface IncrementalSyntaxStats {
   readonly islands_parsed: number;
   readonly islands_reused: number;
   readonly full_parses: number;
+  readonly characters_lexed: number;
+  readonly characters_reused: number;
+}
+
+interface OriginSegment {
+  readonly offsets: ReadonlyMap<bigint, bigint>;
+  readonly offsetAt: (offset: bigint) => number;
+  readonly prelude: boolean;
 }
 
 interface Origin {
   readonly offset: number;
   readonly prelude: boolean;
+}
+
+function originLookup(segments: readonly OriginSegment[]) {
+  const count = segments.reduce(
+    (count, segment) => count + segment.offsets.size,
+    0,
+  );
+  // Small eager indexes have better short-session latency. Avoid rebuilding
+  // large per-node maps, where successful edits pay for unused diagnostics.
+  if (count >= 8192) {
+    return (identity: bigint) => sourceOrigin(segments, identity);
+  }
+  const indexed = new Map<bigint, Origin>();
+  for (const segment of segments) {
+    for (const [identity, offset] of segment.offsets) {
+      indexed.set(identity, {
+        offset: segment.offsetAt(offset),
+        prelude: segment.prelude,
+      });
+    }
+  }
+  return (identity: bigint) => indexed.get(identity);
+}
+
+function sourceOrigin(segments: readonly OriginSegment[], identity: bigint) {
+  // Duplicate declaration identities historically use the last source origin.
+  for (let index = segments.length - 1; index >= 0; index--) {
+    const segment = segments[index];
+    const offset = segment.offsets.get(identity);
+    if (offset !== undefined) {
+      return { offset: segment.offsetAt(offset), prelude: segment.prelude };
+    }
+  }
 }
 
 function field(node: Cst, name: string): Cst | undefined {
@@ -64,15 +106,13 @@ class SourceIdentities {
   normalize(
     root: Cst,
     prelude: boolean,
-    origins: Map<bigint, Origin>,
+    origins: OriginSegment[],
     offsetAt = (offset: bigint) => Number(offset),
   ): Cst {
     const children = bendArray(root.children).map((declaration) => {
       const cached = this.#normalized.get(declaration);
       if (cached) {
-        for (const [offset, identity] of cached.offsets) {
-          origins.set(identity, { offset: offsetAt(offset), prelude });
-        }
+        origins.push({ offsets: cached.offsets, offsetAt, prelude });
         return cached.declaration;
       }
       const value = field(declaration, "value") ?? declaration;
@@ -81,6 +121,7 @@ class SourceIdentities {
       const identities = this.#owners.get(owner) ?? [];
       this.#owners.set(owner, identities);
       const offsets = new Map<bigint, bigint>();
+      const sourceOffsets = new Map<bigint, bigint>();
       const visit = (node: Cst): Cst => {
         let identity = offsets.get(node.offset);
         if (identity === undefined) {
@@ -92,7 +133,7 @@ class SourceIdentities {
             );
           }
           offsets.set(node.offset, identity);
-          origins.set(identity, { offset: offsetAt(node.offset), prelude });
+          sourceOffsets.set(identity, node.offset);
         }
         return Object.freeze({
           ...node,
@@ -101,9 +142,10 @@ class SourceIdentities {
         });
       };
       const normalized = visit(declaration);
+      origins.push({ offsets: sourceOffsets, offsetAt, prelude });
       this.#normalized.set(declaration, {
         declaration: normalized,
-        offsets,
+        offsets: sourceOffsets,
       });
       return normalized;
     });
@@ -171,7 +213,7 @@ export async function createIncrementalFrontend(
 ) {
   const frontend = await createFrontend();
   const identities = new SourceIdentities();
-  const preludeOrigins = new Map<bigint, Origin>();
+  const preludeOrigins: OriginSegment[] = [];
   let preludeSource = "";
   let prelude: Cst;
   let preludeCount: bigint;
@@ -197,13 +239,13 @@ export async function createIncrementalFrontend(
 
   function translate(
     error: unknown,
-    origins: ReadonlyMap<bigint, Origin>,
-    sourceOffsets: ReadonlyMap<string, number>,
+    originAt: (identity: bigint) => Origin | undefined,
+    sourceOffsetAt: (name: string) => number | undefined,
     preludeOnly = false,
   ): never {
     if (!(error instanceof CompilerError)) throw error;
     const origin = error.subject.startsWith("offset:")
-      ? origins.get(BigInt(error.subject.slice(7)))
+      ? originAt(BigInt(error.subject.slice(7)))
       : undefined;
     const fromPrelude = preludeOnly || origin?.prelude ||
       error.subject.startsWith("$prelude.") ||
@@ -213,7 +255,7 @@ export async function createIncrementalFrontend(
         ? preludeOffsets.get(
           error.subject.replace(/^(\$prelude\.|std\/prelude::)/, ""),
         )
-        : sourceOffsets.get(error.subject.replace(/^main::/, ""))) ??
+        : sourceOffsetAt(error.subject.replace(/^main::/, ""))) ??
       0;
     throw new SourceError(
       error.code,
@@ -227,6 +269,27 @@ export async function createIncrementalFrontend(
   }
 
   let islands = new Map<string, ParsedIsland>();
+  function lex(source: string) {
+    const prepared = frontend.prepare(source);
+    let indexes: Map<number, number> | undefined;
+    return {
+      prepared,
+      ranges: islandRanges(prepared),
+      tokenIndex(position: number): bigint {
+        if (prepared.tokens.length === 0) return 0n;
+        indexes ??= new Map(
+          prepared.tokens.map((token, index) => [token.span.start, index]),
+        );
+        const index = indexes.get(position);
+        if (index === undefined) {
+          throw new Error(`Baba CST offset ${position} is not a token start`);
+        }
+        return BigInt(index);
+      },
+    };
+  }
+  type LexedSource = ReturnType<typeof lex>;
+  let lexedSources = new Map<string, LexedSource>();
   let closed = false;
   let previous: {
     readonly source: string;
@@ -240,7 +303,12 @@ export async function createIncrementalFrontend(
     prelude,
     preludeCount,
     translatePrelude(error: unknown): never {
-      return translate(error, preludeOrigins, preludeOffsets, true);
+      return translate(
+        error,
+        originLookup(preludeOrigins),
+        () => undefined,
+        true,
+      );
     },
     prepare(source: string) {
       if (closed) throw new Error("Incremental frontend is disposed");
@@ -256,53 +324,72 @@ export async function createIncrementalFrontend(
             islands_parsed: 0,
             islands_reused: previous.islandCount,
             full_parses: 0,
+            characters_lexed: 0,
+            characters_reused: source.length,
           } satisfies IncrementalSyntaxStats,
         };
       }
-      const prepared = frontend.prepare(source);
-      const ranges = islandRanges(prepared);
-      const tokenIndexes = new Map(
-        prepared.tokens.map((token, index) => [token.span.start, index]),
-      );
-      const offsetAt = (position: number): bigint => {
-        if (prepared.tokens.length === 0) return 0n;
-        const index = tokenIndexes.get(position);
-        if (index === undefined) {
-          throw new Error(`Baba CST offset ${position} is not a token start`);
-        }
-        return BigInt(index);
-      };
       const next = new Map<string, ParsedIsland>();
-      let pieces: { readonly parsed: ParsedIsland; readonly start: number }[] =
-        [];
+      const nextLexed = new Map<string, LexedSource>();
+      let pieces: {
+        readonly parsed: ParsedIsland;
+        readonly prepared: PreparedSource;
+        readonly start: number;
+        readonly base: number;
+      }[] = [];
       let islands_parsed = 0;
       let islands_reused = 0;
       let full_parses = 0;
-      let useFullParse = previous === undefined || ranges === undefined;
+      let characters_lexed = 0;
+      let characters_reused = 0;
+      const sourceRanges = previous
+        ? sourceDeclarationRanges(source)
+        : undefined;
+      let useFullParse = sourceRanges === undefined;
       if (!useFullParse) {
         try {
-          for (const range of ranges!) {
-            let parsed = islands.get(range.key);
-            if (parsed) islands_reused++;
+          fragments: for (const fragment of sourceRanges!) {
+            const text = source.slice(fragment.start, fragment.end);
+            let lexed = lexedSources.get(text);
+            if (lexed) characters_reused += text.length;
             else {
-              parsed = frontend.parsePrepared(prepared, {
-                start: prepared.tokens[range.start].span.start,
-                end: prepared.tokens[range.end - 1].span.end,
-                tokenStart: range.start,
-                tokenEnd: range.end,
-                offsetAt: (position) =>
-                  offsetAt(position) - BigInt(range.start),
-              });
-              islands_parsed++;
+              characters_lexed += text.length;
+              lexed = lex(text);
             }
-            // Imports must also obey the full program's import-before-value
-            // order before this single-file API rejects unresolved modules.
-            if (field(parsed.root, "imports")) {
+            nextLexed.set(text, lexed);
+            const { prepared, ranges } = lexed;
+            if (!ranges) {
               useFullParse = true;
               break;
             }
-            next.set(range.key, parsed);
-            pieces.push({ parsed, start: range.start });
+            for (const range of ranges) {
+              let parsed = islands.get(range.key);
+              if (parsed) islands_reused++;
+              else {
+                parsed = frontend.parsePrepared(prepared, {
+                  start: prepared.tokens[range.start].span.start,
+                  end: prepared.tokens[range.end - 1].span.end,
+                  tokenStart: range.start,
+                  tokenEnd: range.end,
+                  offsetAt: (position) =>
+                    lexed.tokenIndex(position) - BigInt(range.start),
+                });
+                islands_parsed++;
+              }
+              // Imports must also obey the full program's import-before-value
+              // order before this single-file API rejects unresolved modules.
+              if (field(parsed.root, "imports")) {
+                useFullParse = true;
+                break fragments;
+              }
+              next.set(range.key, parsed);
+              pieces.push({
+                parsed,
+                prepared,
+                start: range.start,
+                base: fragment.start,
+              });
+            }
           }
         } catch (error) {
           if (!(error instanceof SourceError)) throw error;
@@ -312,6 +399,10 @@ export async function createIncrementalFrontend(
         }
       }
       if (useFullParse) {
+        characters_lexed += source.length;
+        const lexed = lex(source);
+        const { prepared, ranges } = lexed;
+        const offsetAt = lexed.tokenIndex;
         const parsed = frontend.parsePrepared(prepared, { offsetAt });
         const unresolved = field(parsed.root, "imports");
         if (unresolved) {
@@ -326,7 +417,7 @@ export async function createIncrementalFrontend(
         full_parses = 1;
         islands_parsed = declarations.length;
         islands_reused = 0;
-        pieces = [{ parsed, start: 0 }];
+        pieces = [{ parsed, prepared, start: 0, base: 0 }];
         next.clear();
         if (
           ranges?.length === declarations.length &&
@@ -344,11 +435,11 @@ export async function createIncrementalFrontend(
             };
             const part = { root, nodeCount: treeCount(root) };
             next.set(range.key, part);
-            return { parsed: part, start: range.start };
+            return { parsed: part, prepared, start: range.start, base: 0 };
           });
         }
       }
-      const origins = new Map(preludeOrigins);
+      const origins = [...preludeOrigins];
       const children: Cst[] = [];
       let nodeCount = 2n + preludeCount;
       for (const piece of pieces) {
@@ -357,8 +448,9 @@ export async function createIncrementalFrontend(
           false,
           origins,
           (index) => {
-            const token = prepared.tokens[Number(index) + piece.start];
-            return prepared.originalOffsets[token.span.start];
+            const token = piece.prepared.tokens[Number(index) + piece.start];
+            return piece.base +
+              piece.prepared.originalOffsets[token.span.start];
           },
         );
         children.push(...bendArray(normalized.children));
@@ -372,23 +464,28 @@ export async function createIncrementalFrontend(
         offset: 0n,
         children: frozenList(children),
       });
-      const sourceOffsets = new Map(
-        [...declarationOffsets(root)].map(([name, identity]) => [
-          name,
-          origins.get(BigInt(identity))!.offset,
-        ]),
-      );
+      let declarationIdentities: ReadonlyMap<string, number> | undefined;
+      const originAt = originLookup(origins);
+      const sourceOffsetAt = (name: string) => {
+        declarationIdentities ??= declarationOffsets(root);
+        const identity = declarationIdentities.get(name);
+        if (identity === undefined) return undefined;
+        const origin = originAt(BigInt(identity));
+        if (!origin) throw new Error(`Missing source origin for ${name}`);
+        return origin.offset;
+      };
       previous = {
         source,
         root,
         nodeCount,
         islandCount: children.length,
         translate: (error: unknown): never => {
-          return translate(error, origins, sourceOffsets);
+          return translate(error, originAt, sourceOffsetAt);
         },
       };
       // Retain one syntactically valid revision, not a growing edit history.
       islands = next;
+      lexedSources = nextLexed;
       return {
         root,
         nodeCount,
@@ -399,12 +496,15 @@ export async function createIncrementalFrontend(
           islands_parsed,
           islands_reused,
           full_parses,
+          characters_lexed,
+          characters_reused,
         } satisfies IncrementalSyntaxStats,
       };
     },
     dispose() {
       closed = true;
       islands.clear();
+      lexedSources.clear();
       previous = undefined;
       frontend.dispose();
     },

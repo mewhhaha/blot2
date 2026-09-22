@@ -55,26 +55,41 @@ type PatternProgress is Data:
   PatternPending{work: List<&2, PatternWork>, reversed: List<&2, Binding<Value>>}
   PatternRejected{}
 
-def lookup_local(locals: List<&2, Binding<Value>>, +name: String) -> Result<&2, &2, M.Diagnostic, Value>:
-  match locals:
-    case Nil{}:
+def lookup_local_work(locals: List<&2, Binding<Value>>, +name: String, found: Maybe<&2, Value>) -> Result<&2, &2, M.Diagnostic, Value>:
+  match locals found:
+    case _ Some{value}:
+      Done{value}
+    case Nil{} None{}:
       Fail{M.Diagnostic{"internal_error", name, "const evaluator lost a checked local"}}
-    case Binding{found, value} <> tail:
-      Bool.pick(Result<&2, &2, M.Diagnostic, Value>, M.name_equal(found, name), Done{value}, lookup_local(tail, name))
+    case Binding{declared, value} <> tail None{}:
+      lookup_local_work(tail, name, Bool.pick(Maybe<&2, Value>, M.name_equal(declared, name), Some{value}, None{}))
 
-def lookup_constant(constants: List<&2, M.Constant>, +name: String) -> Result<&2, &2, M.Diagnostic, M.Expr>:
-  match constants:
-    case Nil{}:
+def lookup_local(locals: List<&2, Binding<Value>>, name: String) -> Result<&2, &2, M.Diagnostic, Value>:
+  lookup_local_work(locals, name, None{})
+
+def lookup_constant_work(constants: List<&2, M.Constant>, +name: String, found: Maybe<&2, M.Expr>) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match constants found:
+    case _ Some{value}:
+      Done{value}
+    case Nil{} None{}:
       Fail{M.Diagnostic{"internal_error", name, "const evaluator lost a checked constant"}}
-    case M.Constant{found, exported, annotation, value} <> tail:
-      Bool.pick(Result<&2, &2, M.Diagnostic, M.Expr>, M.name_equal(found, name), Done{value}, lookup_constant(tail, name))
+    case M.Constant{declared, exported, annotation, value} <> tail None{}:
+      lookup_constant_work(tail, name, Bool.pick(Maybe<&2, M.Expr>, M.name_equal(declared, name), Some{value}, None{}))
 
-def lookup_function(functions: List<&2, M.Function>, +name: String) -> Result<&2, &2, M.Diagnostic, M.Function>:
-  match functions:
-    case Nil{}:
+def lookup_constant(constants: List<&2, M.Constant>, name: String) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  lookup_constant_work(constants, name, None{})
+
+def lookup_function_work(functions: List<&2, M.Function>, +name: String, found: Maybe<&2, M.Function>) -> Result<&2, &2, M.Diagnostic, M.Function>:
+  match functions found:
+    case _ Some{value}:
+      Done{value}
+    case Nil{} None{}:
       Fail{M.Diagnostic{"internal_error", name, "const evaluator lost a checked function"}}
-    case M.Function{+found, +exported, +parameter, +parameter_type, +result_type, +body} <> tail:
-      Bool.pick(Result<&2, &2, M.Diagnostic, M.Function>, M.name_equal(found, name), Done{M.Function{found, exported, parameter, parameter_type, result_type, body}}, lookup_function(tail, name))
+    case M.Function{+declared, exported, parameter, parameter_type, result_type, body} <> tail None{}:
+      lookup_function_work(tail, name, Bool.pick(Maybe<&2, M.Function>, M.name_equal(declared, name), Some{M.Function{declared, exported, parameter, parameter_type, result_type, body}}, None{}))
+
+def lookup_function(functions: List<&2, M.Function>, name: String) -> Result<&2, &2, M.Diagnostic, M.Function>:
+  lookup_function_work(functions, name, None{})
 
 def eval_value(evaluation: Evaluation) -> Value:
   Evaluation{value, remaining} = evaluation

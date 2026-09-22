@@ -147,7 +147,9 @@ if (Deno.args[0] === "--reference") {
       });
       try {
         for (let sample = -warmups; sample < 1; sample++) {
-          await session.compile(workload.source);
+          const baseStart = performance.now();
+          const { stats: base_cache } = await session.compile(workload.source);
+          const base_revision_ms = performance.now() - baseStart;
           const start = performance.now();
           const edited = await session.compile(workload.changed);
           const body_edit_ms = performance.now() - start;
@@ -164,6 +166,8 @@ if (Deno.args[0] === "--reference") {
           equal(unchanged.artifact, edited.artifact);
           rows.push({
             sample,
+            base_revision_ms,
+            base_cache,
             body_edit_ms,
             unchanged_ms,
             cache: edited.stats,

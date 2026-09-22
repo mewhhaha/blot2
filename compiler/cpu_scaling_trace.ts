@@ -83,12 +83,30 @@ const boundaries = {
       CHECK_SCHEDULER_CHECK_BATCH: "inference_execute",
     }),
   CONST_EVAL_EVALUATE_CONSTANTS: "constants",
-  WASM_EMIT: "wasm",
+  ...(source.includes("  WL_CASE(FID_WASM_EMIT_PLAN)\n  {")
+    ? { WASM_EMIT_PLAN: "wasm" }
+    : { WASM_EMIT: "wasm" }),
   WASM_PREPARE: "reachability",
   WASM_PREPARE_JOBS: "projection",
   WASM_COMPILE_ENTRIES: "codegen",
-  WASM_LINK: "link",
-  NATIVE_RESPONSE_ENCODE_ARTIFACT: "encode_response",
+  ...(source.includes("  WL_CASE(FID_WASM_LINK_PLAN)\n  {")
+    ? { WASM_LINK_PLAN: "link" }
+    : { WASM_LINK: "link" }),
+  ...(source.includes("  WL_CASE(FID_NATIVE_OUTPUT_ENCODE_ARTIFACT)\n  {")
+    ? { NATIVE_OUTPUT_ENCODE_ARTIFACT: "encode_response" }
+    : { NATIVE_RESPONSE_ENCODE_ARTIFACT: "encode_response" }),
+  ...(source.includes("  WL_CASE(FID_NATIVE_OUTPUT_PACK_CHUNKS)\n  {")
+    ? { NATIVE_OUTPUT_PACK_CHUNKS: "pack_output_chunks" }
+    : {}),
+  NATIVE_SESSION_UPDATE_SOURCE: "session_lower",
+  ...(source.includes("  WL_CASE(FID_GROUPS_PREPARE_PLAN_USAGES)\n  {")
+    ? { GROUPS_PREPARE_PLAN_USAGES: "prepare_dependency_plan" }
+    : { GROUPS_PREPARE_PLAN_GRAPH: "prepare_dependency_plan" }),
+  NATIVE_CACHE_KEYS_PLANNING: "planning_key",
+  NATIVE_SESSION_CHECK_PLAN: "session_inference",
+  NATIVE_SESSION_EVALUATE_CONSTANTS: "session_constants",
+  NATIVE_SESSION_COMPILE_JOBS: "session_codegen",
+  COMPLETED: "session_encode_response",
 };
 for (const [name, phase] of Object.entries(boundaries)) {
   const marker = `  WL_CASE(FID_${name})\n  {`;

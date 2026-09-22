@@ -21,7 +21,8 @@ type Catalog is Data:
     functions: Map<&2, Positioned<M.Function>>,
     constants: Map<&2, Positioned<M.Constant>>,
     types: Map<&2, Positioned<M.DataType>>,
-    operations: List<&2, M.Operation>
+    operations: List<&2, M.Operation>,
+    costs: Map<&2, Nat>
   }
 
 def index_functions(values: List<&2, M.Function>, +position: Nat, found: Map<&2, Positioned<M.Function>>) -> Map<&2, Positioned<M.Function>>:
@@ -45,9 +46,12 @@ def index_types(values: List<&2, M.DataType>, +position: Nat, found: Map<&2, Pos
     case M.DataType{+identity, parameters, constructors} <> tail:
       index_types(tail, 1n+position, Map.set(&2, Positioned<M.DataType>, found, G.type_key(identity), Positioned{position, M.DataType{identity, parameters, constructors}}))
 
-def catalog(module: M.Module) -> Catalog:
+def catalog_costs(module: M.Module, costs: Map<&2, Nat>) -> Catalog:
   M.Module{constants, functions, types, operations} = module
-  Catalog{index_functions(functions, 0n, Map.new(&2, Positioned<M.Function>)), index_constants(constants, 0n, Map.new(&2, Positioned<M.Constant>)), index_types(types, 0n, Map.new(&2, Positioned<M.DataType>)), operations}
+  Catalog{index_functions(functions, 0n, Map.new(&2, Positioned<M.Function>)), index_constants(constants, 0n, Map.new(&2, Positioned<M.Constant>)), index_types(types, 0n, Map.new(&2, Positioned<M.DataType>)), operations, costs}
+
+def catalog(module: M.Module) -> Catalog:
+  catalog_costs(module, Map.new(&2, Nat))
 
 def selected_position(-V: Data, found: Maybe<&2, Positioned<V>>, rest: List<&2, Positioned<V>>) -> List<&2, Positioned<V>>:
   match found:
@@ -85,7 +89,7 @@ def type_position_le(left: Positioned<M.DataType>, right: Positioned<M.DataType>
   position_le(M.DataType, left, right)
 
 def group_module(known: Catalog, job: G.Job) -> M.Module:
-  Catalog{functions, constants, types, operations} = known
+  Catalog{functions, constants, types, operations, costs} = known
   G.Job{+members, dependencies, required_types} = job
   +nominals = G.type_keys(required_types)
   cs = positioned_values(M.Constant, List.sort(~Positioned<M.Constant>, ~constant_position_le, select_positions(M.Constant, members, constants)))
@@ -360,6 +364,29 @@ def module_cost(module: M.Module) -> Nat:
   M.Module{constants, functions, types, operations} = module
   expression_cost(65536n, function_work(functions, constant_work(constants, Nil{})), 64n)
 
+def cached_cost(names: List<&2, String>, +costs: Map<&2, Nat>, total: Nat) -> Maybe<&2, Nat>:
+  match names:
+    case Nil{}:
+      Some{total}
+    case name <> tail:
+      do Maybe<&2, Nat>:
+        cost : Nat <- Index.find(Nat, costs, name)
+        cached_cost(tail, costs, Nat.add(total, Nat.sub(cost, 64n)))
+
+def group_cost_found(found: Maybe<&2, Nat>, known: Catalog, job: G.Job) -> Nat:
+  match found:
+    case Some{cost}:
+      cost
+    case None{}:
+      module_cost(group_module(known, job))
+
+# Cost is scheduling metadata, not a validation budget. Per-declaration
+# saturation may overestimate a large SCC; that SCC still remains indivisible.
+def group_cost(+known: Catalog, +job: G.Job) -> Nat:
+  Catalog{functions, constants, types, operations, costs} = known
+  G.Job{members, dependencies, required_types} = job
+  group_cost_found(cached_cost(members, costs, 64n), known, job)
+
 type Completed is Data:
   Completed{
     interfaces: Map<&2, G.Interface>,
@@ -460,7 +487,7 @@ def chain_cost(jobs: List<&2, Chains.Job>, +known: Catalog, cost: Nat) -> Nat:
     case Nil{}:
       cost
     case Chains.Job{position, job} <> tail:
-      chain_cost(tail, known, Nat.add(cost, module_cost(group_module(known, job))))
+      chain_cost(tail, known, Nat.add(cost, group_cost(known, job)))
 
 def weighted_chains(chains: List<&2, Chains.Chain>, +known: Catalog) -> List<&2, B.Weighted<Chains.Chain>>:
   match chains:
@@ -597,7 +624,7 @@ def check_regions(regions: List<&2, Regions.Region>, +known: Catalog, +completed
       outcomes = B.execute(~Regions.Region, ~ChainContext, ~Result<&2, &2, M.Diagnostic, Completed>, ~run_region, region_batch(regions, known), ChainContext{known, interfaces, failure})
       merge_regions(outcomes, completed)
 
-def check_jobs(+jobs: List<&2, G.Job>, known: Catalog, completed: Completed, dependent: Bool) -> Result<&2, &2, M.Diagnostic, Completed>:
+def check_jobs(+jobs: List<&2, G.Job>, +known: Catalog, completed: Completed, dependent: Bool) -> Result<&2, &2, M.Diagnostic, Completed>:
   match dependent:
     case False{}:
       do Result<&2, &2, M.Diagnostic, Completed>:
@@ -606,8 +633,8 @@ def check_jobs(+jobs: List<&2, G.Job>, known: Catalog, completed: Completed, dep
     case True{}:
       do Result<&2, &2, M.Diagnostic, Completed>:
         chains : List<&2, Chains.Chain> <- Chains.plan(jobs)
-        regions : List<&2, Regions.Region> <- Regions.plan(chains)
-        check_regions(regions, known, completed)
+        +rooted : Regions.RootedPlan <- Regions.rooted_plan(chains)
+        check_regions(Regions.branches(rooted), known, check_chain_frontier(Regions.prefix(rooted), known, completed))
 
 def check_module(+module: M.Module) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
   do Result<&2, &2, M.Diagnostic, M.CheckedModule>:

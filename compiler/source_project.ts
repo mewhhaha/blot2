@@ -76,6 +76,30 @@ export async function loadSourceProject(
   const frontend = await createFrontend();
   const modules = new Map<string, SourceModule>();
   const visiting: string[] = [];
+  const reads = new Map<string, Promise<PromiseSettledResult<string>>>();
+  const waiting: (() => void)[] = [];
+  let activeReads = 0;
+  function prefetch(url: URL): Promise<PromiseSettledResult<string>> {
+    const existing = reads.get(url.href);
+    if (existing) return existing;
+    const result = (async () => {
+      if (activeReads >= 4) {
+        await new Promise<void>((resolve) => waiting.push(resolve));
+      } else activeReads++;
+      try {
+        return { status: "fulfilled", value: await readSource(url) } as const;
+      } catch (reason) {
+        return { status: "rejected", reason } as const;
+      } finally {
+        const next = waiting.shift();
+        if (next) next();
+        else activeReads--;
+      }
+    })();
+    reads.set(url.href, result);
+    return result;
+  }
+
   const moduleName = (url: URL) =>
     relative(directory, fileURLToPath(url)).split(sep).join("/");
 
@@ -83,30 +107,43 @@ export async function loadSourceProject(
     const ready = modules.get(url.href);
     if (ready) return ready;
     const filename = fileURLToPath(url);
-    const source = await readSource(url);
+    const read = await prefetch(url);
+    if (read.status === "rejected") throw read.reason;
+    const source = read.value;
     visiting.push(url.href);
     try {
       const parsed = frontend.parse(source);
       const imports = bendArray(parsed.root.children).filter((node) =>
         node.field === "imports"
       );
-      const linked: Cst[] = [];
-      for (const node of imports) {
+      // Resolve and read siblings ahead; consume failures in depth-first order.
+      const targets = imports.map((node): PromiseSettledResult<URL> => {
         const path = field(node, "path");
         const specifier: unknown = JSON.parse(path.text);
         if (typeof specifier !== "string") {
           throw new Error("Parser produced a non-string import path");
         }
-        let target: URL;
         try {
-          target = dependency(specifier, url, options);
+          const target = dependency(specifier, url, options);
+          prefetch(target);
+          return { status: "fulfilled", value: target };
         } catch (error) {
-          throw new SourceError(
-            "import_path",
-            String(error),
-            Number(path.offset),
-          );
+          return {
+            status: "rejected",
+            reason: new SourceError(
+              "import_path",
+              String(error),
+              Number(path.offset),
+            ),
+          };
         }
+      });
+      const linked: Cst[] = [];
+      for (const [index, node] of imports.entries()) {
+        const resolved = targets[index];
+        if (resolved.status === "rejected") throw resolved.reason;
+        const target = resolved.value;
+        const path = field(node, "path");
         if (visiting.includes(target.href)) {
           throw new SourceError(
             "import_cycle",
@@ -168,6 +205,7 @@ export async function loadSourceProject(
       modules: [...modules.values()],
     };
   } finally {
+    await Promise.all(reads.values());
     frontend.dispose();
   }
 }

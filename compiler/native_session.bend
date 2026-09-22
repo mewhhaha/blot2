@@ -13,6 +13,8 @@ import ./check_scheduler.bend as Scheduler
 import ./check_chain_plan.bend as Chains
 import ./check_regions.bend as Regions
 import ./inference_batch.bend as B
+import ./native_plan.bend as Plan
+import ./dependency.bend as D
 
 type Mode is Data:
   AnalyzeMode{}
@@ -22,7 +24,7 @@ type Cached<-V: Data> is Data:
   Cached{keys: List<&2, List<&2, U32>>, value: V}
 
 type Lowered is Data:
-  Lowered{node: C.Cst, fuel: Nat, fragment: M.Module}
+  Lowered{node: C.Cst, fuel: Nat, fragment: M.Module, scanned: Plan.Scanned, nominals: Maybe<&2, Cached<Plan.Nominals>>}
 
 type Declaration is Data:
   Retained{identity: Nat}
@@ -30,7 +32,7 @@ type Declaration is Data:
 
 type InferencePlan is Data:
   IndependentPlan{count: Nat, scheduled: List<&2, Scheduler.Scheduled>}
-  RegionPlan{regions: List<&2, Regions.Region>}
+  RegionPlan{prefix: List<&2, Chains.Chain>, regions: List<&2, Regions.Region>}
 
 type State is Data:
   State{
@@ -45,7 +47,7 @@ type State is Data:
 
 type Output is Data:
   Analyzed{analysis: Main.Analysis}
-  Compiled{artifact: Main.Artifact}
+  Compiled{artifact: Main.PlannedArtifact}
 
 type Stats is Data:
   Stats{
@@ -122,11 +124,15 @@ def open(prelude: C.Cst, fuel: Nat) -> Result<&2, &2, M.Diagnostic, State>:
     return State{prepared, None{}, Map.new(&2, Lowered), None{}, Map.new(&2, Cached<G.CheckedGroup>), Map.new(&2, Cached<Const.Constants>), Map.new(&2, Cached<W.EntryCode>)}
 
 type Lowering is Data:
-  Lowering{fragments: List<&2, M.Module>, declarations: Map<&2, Lowered>, counts: Counts}
+  Lowering{values: List<&2, Lowered>, scans: List<&2, Plan.Scanned>, counts: Counts}
 
 def lowered_fragment(lowered: Lowered) -> M.Module:
-  Lowered{node, fuel, fragment} = lowered
+  Lowered{node, fuel, fragment, scanned, nominals} = lowered
   fragment
+
+def lowered_scan(lowered: Lowered) -> Plan.Scanned:
+  Lowered{node, fuel, fragment, scanned, nominals} = lowered
+  scanned
 
 def source_equal(retained: Bool, previous: C.Cst, node: C.Cst) -> Bool:
   match retained:
@@ -146,22 +152,22 @@ def lower_hit(found: Maybe<&2, Lowered>, node: C.Cst, fuel: Nat, retained: Bool)
   match found:
     case None{}:
       None{}
-    case Some{Lowered{+prior, +budget, fragment}}:
-      cached_if(Lowered, Bool.and(source_equal(retained, prior, node), Nat.is_le(budget, fuel)), Lowered{prior, budget, fragment})
+    case Some{Lowered{+prior, +budget, fragment, scanned, nominals}}:
+      cached_if(Lowered, Bool.and(source_equal(retained, prior, node), Nat.is_le(budget, fuel)), Lowered{prior, budget, fragment, scanned, nominals})
 
 type LoweringSelection is Data:
-  LoweringHit{owner: String, lowered: Lowered}
-  LoweringMiss{owner: String}
+  LoweringHit{lowered: Lowered}
+  LoweringMiss{}
 
 type LoweringPlan is Data:
   LoweringPlan{selections: List<&2, LoweringSelection>, missing: List<&2, C.Cst>}
 
-def select_lowering(found: Maybe<&2, Lowered>, node: C.Cst, owner: String, plan: LoweringPlan) -> LoweringPlan:
+def select_lowering(found: Maybe<&2, Lowered>, node: C.Cst, plan: LoweringPlan) -> LoweringPlan:
   match found plan:
     case Some{value} LoweringPlan{selections, missing}:
-      LoweringPlan{LoweringHit{owner, value} <> selections, missing}
+      LoweringPlan{LoweringHit{value} <> selections, missing}
     case None{} LoweringPlan{selections, missing}:
-      LoweringPlan{LoweringMiss{owner} <> selections, node <> missing}
+      LoweringPlan{LoweringMiss{} <> selections, node <> missing}
 
 def plan_lowering(nodes: List<&2, C.Cst>, +fuel: Nat, +previous: Map<&2, Lowered>, +retained: Set(), plan: LoweringPlan) -> LoweringPlan:
   match nodes:
@@ -171,7 +177,7 @@ def plan_lowering(nodes: List<&2, C.Cst>, +fuel: Nat, +previous: Map<&2, Lowered
     case +node <> tail:
       +owner = Nat.show(C.offset_of(node))
       found = lower_hit(Index.find(Lowered, previous, owner), node, fuel, retained_declaration(Index.find(Unit, retained, owner)))
-      plan_lowering(tail, fuel, previous, retained, select_lowering(found, node, owner, plan))
+      plan_lowering(tail, fuel, previous, retained, select_lowering(found, node, plan))
 
 def lower_missing_leaf(nodes: List<&2, C.Cst>, +scope: L.Context, +fuel: Nat, reversed: List<&2, Lowered>) -> Result<&2, &2, M.Diagnostic, List<&2, Lowered>>:
   match nodes:
@@ -179,8 +185,8 @@ def lower_missing_leaf(nodes: List<&2, C.Cst>, +scope: L.Context, +fuel: Nat, re
       Done{List.reverse(&2, Lowered, reversed)}
     case +node <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, Lowered>>:
-        fragment : M.Module <- L.lower_source_declaration(node, scope, fuel)
-        lower_missing_leaf(tail, scope, fuel, Lowered{node, fuel, fragment} <> reversed)
+        +fragment : M.Module <- L.lower_source_declaration(node, scope, fuel)
+        lower_missing_leaf(tail, scope, fuel, Lowered{node, fuel, fragment, Plan.scan(fragment), None{}} <> reversed)
 
 # Sessions select the first failing source declaration, unlike clean lowering's
 # tail-first traversal. Parallel completion order must not select the error.
@@ -204,14 +210,14 @@ def lower_missing_batch(batch: L.DeclarationBatch, +scope: L.Context, +fuel: Nat
       a b = lower_missing_batch(left, scope, fuel) lower_missing_batch(right, scope, fuel)
       merge_lowered(a, b)
 
-def publish_lowered(selections: List<&2, LoweringSelection>, missing: List<&2, Lowered>, next: Map<&2, Lowered>, reversed: List<&2, M.Module>, counts: Counts) -> Result<&2, &2, M.Diagnostic, Lowering>:
+def publish_lowered(selections: List<&2, LoweringSelection>, missing: List<&2, Lowered>, reversed: List<&2, Lowered>, scans: List<&2, Plan.Scanned>, counts: Counts) -> Result<&2, &2, M.Diagnostic, Lowering>:
   match selections missing:
     case Nil{} Nil{}:
-      Done{Lowering{List.reverse(&2, M.Module, reversed), next, counts}}
-    case LoweringHit{owner, +lowered} <> tail _:
-      publish_lowered(tail, missing, Map.set(&2, Lowered, next, owner, lowered), lowered_fragment(lowered) <> reversed, count(counts, True{}))
-    case LoweringMiss{owner} <> tail +lowered <> rest:
-      publish_lowered(tail, rest, Map.set(&2, Lowered, next, owner, lowered), lowered_fragment(lowered) <> reversed, count(counts, False{}))
+      Done{Lowering{List.reverse(&2, Lowered, reversed), List.reverse(&2, Plan.Scanned, scans), counts}}
+    case LoweringHit{+lowered} <> tail _:
+      publish_lowered(tail, missing, lowered <> reversed, lowered_scan(lowered) <> scans, count(counts, True{}))
+    case LoweringMiss{} <> tail +lowered <> rest:
+      publish_lowered(tail, rest, lowered <> reversed, lowered_scan(lowered) <> scans, count(counts, False{}))
     case _ _:
       Fail{M.Diagnostic{"internal_error", "native_session", "lowering batch returned a different declaration count"}}
 
@@ -220,7 +226,7 @@ def lower_plan(plan: LoweringPlan, scope: L.Context, fuel: Nat) -> Result<&2, &2
   +missing_count = List.length(&2, C.Cst, missing)
   do Result<&2, &2, M.Diagnostic, Lowering>:
     lowered : List<&2, Lowered> <- lower_missing_batch(L.declaration_batches(48n, missing, missing_count, Nat.is_le(missing_count, 4n)), scope, fuel)
-    publish_lowered(selections, lowered, Map.new(&2, Lowered), Nil{}, Counts{0n, 0n})
+    publish_lowered(selections, lowered, Nil{}, Nil{}, Counts{0n, 0n})
 
 def reusable_scope(previous: Maybe<&2, List<&2, U32>>, key: List<&2, U32>, declarations: Map<&2, Lowered>) -> Map<&2, Lowered>:
   match previous:
@@ -236,6 +242,119 @@ def combine_fragments(fragments: List<&2, M.Module>) -> M.Module:
     case head <> tail:
       L.combine_modules(head, combine_fragments(tail))
 
+type NominalContext is Data:
+  NominalContext{key: List<&2, U32>, constructors: Map<&2, M.TypeId>}
+
+def select_nominals(found: Maybe<&2, Plan.Nominals>, fragment: M.Module, constructors: Map<&2, M.TypeId>) -> Plan.Nominals:
+  match found:
+    case Some{scanned}:
+      scanned
+    case None{}:
+      Plan.nominal_scan(fragment, constructors)
+
+def refresh_nominals(lowered: Lowered, context: NominalContext) -> Lowered:
+  Lowered{node, fuel, +fragment, scanned, nominals} = lowered
+  NominalContext{+key, constructors} = context
+  found = select_nominals(cached(Plan.Nominals, nominals, [key]), fragment, constructors)
+  Lowered{node, fuel, fragment, scanned, Some{Cached{[key], found}}}
+
+def sum_costs(costs: List<&2, Nat>, total: Nat) -> Nat:
+  match costs:
+    case Nil{}:
+      total
+    case head <> tail:
+      sum_costs(tail, Nat.add(total, head))
+
+def nominal_cost(found: Maybe<&2, Plan.Nominals>, scanned: Plan.Scanned) -> Nat:
+  match found:
+    case Some{value}:
+      1n
+    case None{}:
+      Plan.Scanned{functions, constants, costs} = scanned
+      sum_costs(Map.values(&2, Nat, costs), 16n)
+
+def nominal_tasks(values: List<&2, Lowered>, +key: List<&2, U32>) -> List<&2, B.Weighted<Lowered>>:
+  match values:
+    case Nil{}:
+      Nil{}
+    case +value <> tail:
+      Lowered{node, fuel, fragment, scanned, +nominals} = value
+      cost = nominal_cost(cached(Plan.Nominals, nominals, [key]), scanned)
+      B.Weighted{value, cost} <> nominal_tasks(tail, key)
+
+type NominalRevision is Data:
+  NominalRevision{declarations: Map<&2, Lowered>, usages: Plan.Nominals}
+
+def merge_nominal_revision(found: Plan.Nominals, rest: NominalRevision) -> NominalRevision:
+  NominalRevision{declarations, usages} = rest
+  NominalRevision{declarations, Plan.merge_nominals(found, usages)}
+
+def publish_nominals(values: List<&2, Lowered>, next: Map<&2, Lowered>) -> Result<&2, &2, M.Diagnostic, NominalRevision>:
+  match values:
+    case Nil{}:
+      Done{NominalRevision{next, Plan.Nominals{Done{Nil{}}, Done{Nil{}}}}}
+    case Lowered{node, fuel, fragment, scanned, None{}} <> tail:
+      Fail{M.Diagnostic{"internal_error", "native_session", "nominal scan was not prepared"}}
+    case Lowered{+node, fuel, fragment, scanned, Some{Cached{keys, +found}}} <> tail:
+      value = {Lowered{node, fuel, fragment, scanned, Some{Cached{keys, found}}} : Lowered}
+      do Result<&2, &2, M.Diagnostic, NominalRevision>:
+        rest : NominalRevision <- publish_nominals(tail, Map.set(&2, Lowered, next, Nat.show(C.offset_of(node)), value))
+        return merge_nominal_revision(found, rest)
+
+def nominal_declarations(revision: NominalRevision) -> Map<&2, Lowered>:
+  NominalRevision{declarations, usages} = revision
+  declarations
+
+def nominal_usages(revision: NominalRevision, prelude: Plan.Nominals) -> Result<&2, &2, M.Diagnostic, List<&2, G.DeclarationUsage>>:
+  NominalRevision{declarations, usages} = revision
+  Plan.nominal_usages(Plan.merge_nominals(prelude, usages))
+
+# Small summaries cost less to rescan than to retain, key, and publish.
+# Use cached lowering estimates, never another body traversal or workload name.
+def cache_nominal_scans(scans: List<&2, Plan.Scanned>, work: Nat, +count: Nat) -> Bool:
+  match scans:
+    case Nil{}:
+      Bool.and(Nat.is_gt(count, 0n), Nat.is_ge(work, Nat.mul(count, 256n)))
+    case Plan.Scanned{functions, constants, costs} <> tail:
+      cache_nominal_scans(tail, sum_costs(Map.values(&2, Nat, costs), work), 1n+count)
+
+def index_lowered(values: List<&2, Lowered>, next: Map<&2, Lowered>) -> Map<&2, Lowered>:
+  match values:
+    case Nil{}:
+      next
+    case Lowered{+node, fuel, fragment, scanned, nominals} <> tail:
+      index_lowered(tail, Map.set(&2, Lowered, next, Nat.show(C.offset_of(node)), Lowered{node, fuel, fragment, scanned, None{}}))
+
+type PreparedPlanning is Data:
+  PreparedPlanning{declarations: Map<&2, Lowered>, plan: G.Planning}
+
+def planning_declarations(prepared: PreparedPlanning) -> Map<&2, Lowered>:
+  PreparedPlanning{declarations, plan} = prepared
+  declarations
+
+def planning_value(prepared: PreparedPlanning) -> G.Planning:
+  PreparedPlanning{declarations, plan} = prepared
+  plan
+
+def module_types(module: M.Module) -> List<&2, M.DataType>:
+  M.Module{constants, functions, types, operations} = module
+  types
+
+def prepare_planning(+module: M.Module, prelude: M.Module, +values: List<&2, Lowered>, graph: List<&2, D.Node>, retain: Bool) -> Result<&2, &2, M.Diagnostic, PreparedPlanning>:
+  match retain:
+    case False{}:
+      do Result<&2, &2, M.Diagnostic, PreparedPlanning>:
+        plan : G.Planning <- G.prepare_plan_graph(module, Done{graph})
+        return PreparedPlanning{index_lowered(values, Map.new(&2, Lowered)), plan}
+    case True{}:
+      +types = module_types(module)
+      +constructors = G.constructor_index(types, Map.new(&2, M.TypeId))
+      do Result<&2, &2, M.Diagnostic, PreparedPlanning>:
+        +key : List<&2, U32> <- K.encode([K.DataTypes{types}])
+        +nominals : NominalRevision <- publish_nominals(B.execute(~Lowered, ~NominalContext, ~Lowered, ~refresh_nominals, B.plan(Lowered, nominal_tasks(values, key), 512n), NominalContext{key, constructors}), Map.new(&2, Lowered))
+        plan : G.Planning <- G.prepare_plan_usages(module, Done{graph}, nominal_usages(nominals, Plan.nominal_scan(prelude, constructors)))
+        return PreparedPlanning{nominal_declarations(nominals), plan}
+
 def inference_plan(+jobs: List<&2, G.Job>, dependent: Bool) -> Result<&2, &2, M.Diagnostic, InferencePlan>:
   match dependent:
     case False{}:
@@ -245,8 +364,8 @@ def inference_plan(+jobs: List<&2, G.Job>, dependent: Bool) -> Result<&2, &2, M.
     case True{}:
       do Result<&2, &2, M.Diagnostic, InferencePlan>:
         chains : List<&2, Chains.Chain> <- Chains.plan(jobs)
-        regions : List<&2, Regions.Region> <- Regions.plan(chains)
-        return RegionPlan{regions}
+        +rooted : Regions.RootedPlan <- Regions.rooted_plan(chains)
+        return RegionPlan{Regions.prefix(rooted), Regions.branches(rooted)}
 
 # The existing planning key covers declaration order, edges and nominal type
 # dependencies. Body-only edits can reuse the schedule as well as its SCCs.
@@ -314,6 +433,7 @@ def publish_group(state: CheckedGroups, owner: String, members: List<&2, String>
 type GroupSelection is Data:
   GroupHit{checked: G.CheckedGroup}
   GroupMiss{task: Scheduler.Task}
+  GroupChecked{checked: G.CheckedGroup}
 
 type PreparedGroup is Data:
   PreparedGroup{
@@ -353,15 +473,66 @@ def prepare_group(+position: Nat, job: G.Job, known: Scheduler.Catalog, previous
     closure : Set() <- dependency_closure(dependencies, closures, Set.add(Set.new(), owner))
     return PreparedGroup{position, owner, members, closure, base_key, keys, selection}
 
-def prepare_groups(ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, +previous: Map<&2, Cached<G.CheckedGroup>>, +state: CheckedGroups, +failure: Maybe<&2, Scheduler.Failure>, reversed: List<&2, GroupPreparation>, allowed: Bool) -> List<&2, GroupPreparation>:
+type GroupPreparationContext is Data:
+  GroupPreparationContext{known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups}
+
+def prepare_group_task(scheduled: Scheduler.Scheduled, context: GroupPreparationContext) -> GroupPreparation:
+  Scheduler.Scheduled{+position, level, job} = scheduled
+  GroupPreparationContext{known, previous, state} = context
+  GroupPreparation{position, prepare_group(position, job, known, previous, state)}
+
+def group_preparation_cost(job: G.Job, known: Scheduler.Catalog, small: Bool) -> Nat:
+  match small:
+    case True{}:
+      0n
+    case False{}:
+      Scheduler.group_cost(known, job)
+
+def group_preparation_tasks(ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, +failure: Maybe<&2, Scheduler.Failure>, +small: Bool, reversed: List<&2, B.Weighted<Scheduler.Scheduled>>, allowed: Bool) -> List<&2, B.Weighted<Scheduler.Scheduled>>:
   match ready allowed:
     case Nil{} _:
-      List.reverse(&2, GroupPreparation, reversed)
+      List.reverse(&2, B.Weighted<Scheduler.Scheduled>, reversed)
     case _ False{}:
-      List.reverse(&2, GroupPreparation, reversed)
-    case Scheduler.Scheduled{+position, level, job} <> +tail True{}:
-      prepared = prepare_group(position, job, known, previous, state)
-      prepare_groups(tail, known, previous, state, failure, GroupPreparation{position, prepared} <> reversed, Scheduler.next_allowed(tail, failure))
+      List.reverse(&2, B.Weighted<Scheduler.Scheduled>, reversed)
+    case Scheduler.Scheduled{position, level, +job} <> +tail True{}:
+      cost = group_preparation_cost(job, known, small)
+      group_preparation_tasks(tail, known, failure, small, B.Weighted{Scheduler.Scheduled{position, level, job}, cost} <> reversed, Scheduler.next_allowed(tail, failure))
+
+# Key construction reads one immutable frontier snapshot. Results retain source
+# order; no candidate cache state is published by a worker. Small frontiers need
+# no cost traversal or extra forks inside an already-parallel dependency region.
+def prepare_groups(+ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups, +failure: Maybe<&2, Scheduler.Failure>) -> List<&2, GroupPreparation>:
+  tasks = group_preparation_tasks(ready, known, failure, Nat.is_le(List.length(&2, Scheduler.Scheduled, ready), 4n), Nil{}, Scheduler.next_allowed(ready, failure))
+  B.execute(~Scheduler.Scheduled, ~GroupPreparationContext, ~GroupPreparation, ~prepare_group_task, B.plan(Scheduler.Scheduled, tasks, 2048n), GroupPreparationContext{known, previous, state})
+
+def complete_preparation(prepared: Result<&2, &2, M.Diagnostic, PreparedGroup>) -> Result<&2, &2, M.Diagnostic, PreparedGroup>:
+  match prepared:
+    case Done{PreparedGroup{position, owner, members, closure, base_key, keys, GroupMiss{Scheduler.Task{index, module, dependencies, cost}}}}:
+      do Result<&2, &2, M.Diagnostic, PreparedGroup>:
+        checked : G.CheckedGroup <- G.check_group(module, dependencies)
+        return PreparedGroup{position, owner, members, closure, base_key, keys, GroupChecked{checked}}
+    case other:
+      other
+
+def check_group_task(scheduled: Scheduler.Scheduled, context: GroupPreparationContext) -> GroupPreparation:
+  Scheduler.Scheduled{+position, level, job} = scheduled
+  GroupPreparationContext{known, previous, state} = context
+  GroupPreparation{position, complete_preparation(prepare_group(position, job, known, previous, state))}
+
+# Warm frontiers usually check few misses, so amortize their key work with a
+# coarser grain. Cache presence affects scheduling only, never hit validation.
+def group_pipeline_grain(previous: Map<&2, Cached<G.CheckedGroup>>) -> Nat:
+  match previous:
+    case MTip{}:
+      Scheduler.inference_grain()
+    case _:
+      2048n
+
+# Each leaf can begin inference before another leaf finishes its cache keys.
+# Workers still read a single immutable frontier; publication remains ordered.
+def check_groups(+ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, +previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups, +failure: Maybe<&2, Scheduler.Failure>) -> List<&2, GroupPreparation>:
+  tasks = group_preparation_tasks(ready, known, failure, False{}, Nil{}, Scheduler.next_allowed(ready, failure))
+  B.execute(~Scheduler.Scheduled, ~GroupPreparationContext, ~GroupPreparation, ~check_group_task, B.plan(Scheduler.Scheduled, tasks, group_pipeline_grain(previous)), GroupPreparationContext{known, previous, state})
 
 def group_tasks(prepared: List<&2, GroupPreparation>, reversed: List<&2, Scheduler.Task>) -> List<&2, Scheduler.Task>:
   match prepared:
@@ -401,15 +572,53 @@ def publish_prepared(prepared: List<&2, GroupPreparation>, outcomes: List<&2, Sc
       publish_prepared(tail, remaining, group_failure(progress, position, diagnostic))
     case GroupPreparation{position, Done{PreparedGroup{index, owner, members, closure, base_key, keys, GroupHit{checked}}}} <> tail remaining:
       publish_prepared(tail, remaining, group_success(progress, owner, members, closure, base_key, keys, Selected{checked, True{}}))
+    case GroupPreparation{position, Done{PreparedGroup{index, owner, members, closure, base_key, keys, GroupChecked{checked}}}} <> tail remaining:
+      publish_prepared(tail, remaining, group_success(progress, owner, members, closure, base_key, keys, Selected{checked, False{}}))
     case GroupPreparation{position, Done{PreparedGroup{index, owner, members, closure, base_key, keys, GroupMiss{task}}}} <> tail Nil{}:
       group_failure(progress, position, M.Diagnostic{"internal_error", "native_session", "inference batch omitted a declaration group"})
     case GroupPreparation{+position, Done{PreparedGroup{index, owner, members, closure, base_key, keys, GroupMiss{task}}}} <> tail outcome <> remaining:
       publish_prepared(tail, remaining, publish_group_result(checked_outcome(outcome, position), progress, position, owner, members, closure, base_key, keys))
 
-def check_frontier(+ready: List<&2, Scheduler.Scheduled>, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress) -> GroupProgress:
-  GroupProgress{state, +failure} = progress
-  +prepared = prepare_groups(ready, known, previous, state, failure, Nil{}, Scheduler.next_allowed(ready, failure))
-  publish_prepared(prepared, Scheduler.check_batch(group_tasks(prepared, Nil{})), progress)
+def check_single_group(scheduled: Scheduler.Scheduled, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress, allowed: Bool) -> GroupProgress:
+  match progress allowed:
+    case prior False{}:
+      prior
+    case GroupProgress{+state, failure} True{}:
+      publish_prepared([check_group_task(scheduled, GroupPreparationContext{known, previous, state})], Nil{}, GroupProgress{state, failure})
+
+def check_frontier_sized(ready: List<&2, Scheduler.Scheduled>, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress, small: Bool) -> GroupProgress:
+  match progress small:
+    case GroupProgress{+state, +failure} True{}:
+      +prepared = prepare_groups(ready, known, previous, state, failure)
+      publish_prepared(prepared, Scheduler.check_batch(group_tasks(prepared, Nil{})), GroupProgress{state, failure})
+    case GroupProgress{+state, +failure} False{}:
+      publish_prepared(check_groups(ready, known, previous, state, failure), Nil{}, GroupProgress{state, failure})
+
+def frontier_cost(ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, cost: Nat) -> Nat:
+  match ready:
+    case Nil{}:
+      cost
+    case Scheduler.Scheduled{position, level, job} <> tail:
+      frontier_cost(tail, known, Nat.add(cost, Scheduler.group_cost(known, job)))
+
+# Tiny jobs benefit from collecting misses into their own balanced batch.
+# Fuse stages only when the average job amortizes the worker-local checking path.
+def staged_frontier(+ready: List<&2, Scheduler.Scheduled>, known: Scheduler.Catalog, small: Bool) -> Bool:
+  match small:
+    case True{}:
+      True{}
+    case False{}:
+      Nat.is_lt(frontier_cost(ready, known, 0n), Nat.mul(List.length(&2, Scheduler.Scheduled, ready), 256n))
+
+def check_frontier(ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress) -> GroupProgress:
+  match ready:
+    case Nil{}:
+      progress
+    case Scheduler.Scheduled{+position, level, job} <> Nil{}:
+      GroupProgress{state, failure} = progress
+      check_single_group(Scheduler.Scheduled{position, level, job}, known, previous, progress, Scheduler.precedes_failure(position, failure))
+    case +remaining:
+      check_frontier_sized(remaining, known, previous, progress, staged_frontier(remaining, known, Nat.is_le(List.length(&2, Scheduler.Scheduled, remaining), 4n)))
 
 def finish_groups(progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, CheckedGroups>:
   match progress:
@@ -524,13 +733,14 @@ def check_regions(regions: List<&2, Regions.Region>, +known: Scheduler.Catalog, 
       outcomes = B.execute(~Regions.Region, ~ChainContext, ~Result<&2, &2, M.Diagnostic, GroupProgress>, ~run_region, Scheduler.region_batch(regions, known), ChainContext{known, previous, interfaces, closures, failure})
       merge_regions(outcomes, progress)
 
-def check_plan(plan: InferencePlan, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups) -> Result<&2, &2, M.Diagnostic, CheckedGroups>:
+def check_plan(plan: InferencePlan, +known: Scheduler.Catalog, +previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups) -> Result<&2, &2, M.Diagnostic, CheckedGroups>:
   match plan:
     case IndependentPlan{group_count, scheduled}:
       check_frontiers(group_count, Scheduler.next_frontier(scheduled), known, previous, GroupProgress{state, None{}})
-    case RegionPlan{regions}:
+    case RegionPlan{prefix, regions}:
       do Result<&2, &2, M.Diagnostic, CheckedGroups>:
-        progress : GroupProgress <- check_regions(regions, known, previous, GroupProgress{state, None{}})
+        initial : GroupProgress = check_chain_frontier(prefix, known, previous, GroupProgress{state, None{}})
+        progress : GroupProgress <- check_regions(regions, known, previous, initial)
         finish_groups(progress)
 
 def assemble(module: M.Module, completed: CheckedGroups) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
@@ -615,14 +825,31 @@ def plan_entry_key(encoded: Result<&2, &2, M.Diagnostic, List<&2, U32>>, +job: W
       W.CodegenJob{name, parameter, body, captures} = job
       select_entry(cached(W.EntryCode, Index.find(Cached<W.EntryCode>, previous, name), [key]), job, key, plan)
 
-def plan_entries(jobs: List<&2, W.CodegenJob>, +previous: Map<&2, Cached<W.EntryCode>>, plan: EntryPlan) -> EntryPlan:
+type KeyedEntry is Data:
+  KeyedEntry{job: W.CodegenJob, encoded: Result<&2, &2, M.Diagnostic, List<&2, U32>>}
+
+def entry_key_task(job: W.CodegenJob, context: Unit) -> KeyedEntry:
+  +entry = job
+  KeyedEntry{entry, K.entry(entry)}
+
+def entry_key_tasks(jobs: List<&2, W.CodegenJob>, reversed: List<&2, B.Weighted<W.CodegenJob>>) -> List<&2, B.Weighted<W.CodegenJob>>:
+  match jobs:
+    case Nil{}:
+      List.reverse(&2, B.Weighted<W.CodegenJob>, reversed)
+    case +job <> tail:
+      entry_key_tasks(tail, B.Weighted{job, W.codegen_weight(job)} <> reversed)
+
+def keyed_entries(jobs: List<&2, W.CodegenJob>) -> List<&2, KeyedEntry>:
+  B.execute(~W.CodegenJob, ~Unit, ~KeyedEntry, ~entry_key_task, B.plan(W.CodegenJob, entry_key_tasks(jobs, Nil{}), 512n), Unit{})
+
+def plan_entries(jobs: List<&2, KeyedEntry>, +previous: Map<&2, Cached<W.EntryCode>>, plan: EntryPlan) -> EntryPlan:
   match jobs plan:
     case Nil{} EntryPlan{selections, missing, failure}:
       EntryPlan{List.reverse(&2, EntrySelection, selections), List.reverse(&2, W.CodegenJob, missing), failure}
     case _ EntryPlan{selections, missing, Some{error}}:
       EntryPlan{List.reverse(&2, EntrySelection, selections), List.reverse(&2, W.CodegenJob, missing), Some{error}}
-    case +job <> tail EntryPlan{selections, missing, None{}}:
-      plan_entries(tail, previous, plan_entry_key(K.entry(job), job, previous, EntryPlan{selections, missing, None{}}))
+    case KeyedEntry{job, encoded} <> tail EntryPlan{selections, missing, None{}}:
+      plan_entries(tail, previous, plan_entry_key(encoded, job, previous, EntryPlan{selections, missing, None{}}))
 
 def finish_entries(failure: Maybe<&2, M.Diagnostic>, next: Map<&2, Cached<W.EntryCode>>, reversed: List<&2, W.EntryCode>, counts: Counts) -> Result<&2, &2, M.Diagnostic, CompiledEntries>:
   match failure:
@@ -653,8 +880,57 @@ def compile_entry_plan(plan: EntryPlan, next: Map<&2, Cached<W.EntryCode>>, reve
     compiled : List<&2, W.EntryCode> <- W.compile_entries(missing)
     publish_entries(selections, compiled, failure, next, reversed, counts)
 
+type PreparedEntry is Data:
+  PreparedEntry{name: String, key: List<&2, U32>, selected: Selected<W.EntryCode>}
+
+def select_compiled_entry(found: Maybe<&2, W.EntryCode>, job: W.CodegenJob) -> Result<&2, &2, M.Diagnostic, Selected<W.EntryCode>>:
+  match found:
+    case Some{value}:
+      Done{Selected{value, True{}}}
+    case None{}:
+      do Result<&2, &2, M.Diagnostic, Selected<W.EntryCode>>:
+        value : W.EntryCode <- W.compile_entry(job)
+        return Selected{value, False{}}
+
+def compile_keyed_entry(entry: KeyedEntry, previous: Map<&2, Cached<W.EntryCode>>) -> Result<&2, &2, M.Diagnostic, PreparedEntry>:
+  KeyedEntry{+job, encoded} = entry
+  W.CodegenJob{+name, parameter, body, captures} = job
+  do Result<&2, &2, M.Diagnostic, PreparedEntry>:
+    +key : List<&2, U32> <- encoded
+    selected : Selected<W.EntryCode> <- select_compiled_entry(cached(W.EntryCode, Index.find(Cached<W.EntryCode>, previous, name), [key]), job)
+    return PreparedEntry{name, key, selected}
+
+def compile_entry_task(job: W.CodegenJob, previous: Map<&2, Cached<W.EntryCode>>) -> Result<&2, &2, M.Diagnostic, PreparedEntry>:
+  +entry = job
+  compile_keyed_entry(KeyedEntry{entry, K.entry(entry)}, previous)
+
+def publish_compiled_entries(entries: List<&2, Result<&2, &2, M.Diagnostic, PreparedEntry>>, next: Map<&2, Cached<W.EntryCode>>, reversed: List<&2, W.EntryCode>, counts: Counts) -> Result<&2, &2, M.Diagnostic, CompiledEntries>:
+  match entries:
+    case Nil{}:
+      finish_entries(None{}, next, reversed, counts)
+    case Fail{error} <> tail:
+      Fail{error}
+    case Done{PreparedEntry{+name, key, Selected{+value, reused}}} <> tail:
+      W.EntryCode{found, code} = value
+      do Result<&2, &2, M.Diagnostic, CompiledEntries>:
+        valid : Unit <- W.matching_entry(M.name_equal(name, found), name)
+        publish_compiled_entries(tail, Map.set(&2, Cached<W.EntryCode>, next, name, Cached{[key], value}), value <> reversed, count(counts, reused))
+
+# Keying and cache-miss compilation share a worker. Ordered publication keeps
+# an earlier compilation error ahead of a later key error, despite speculation.
+def compile_weighted_entries(tasks: List<&2, B.Weighted<W.CodegenJob>>, previous: Map<&2, Cached<W.EntryCode>>, next: Map<&2, Cached<W.EntryCode>>, reversed: List<&2, W.EntryCode>, counts: Counts, staged: Bool) -> Result<&2, &2, M.Diagnostic, CompiledEntries>:
+  match staged:
+    case True{}:
+      keyed = B.execute(~W.CodegenJob, ~Unit, ~KeyedEntry, ~entry_key_task, B.plan(W.CodegenJob, tasks, 512n), Unit{})
+      compile_entry_plan(plan_entries(keyed, previous, EntryPlan{Nil{}, Nil{}, None{}}), next, reversed, counts)
+    case False{}:
+      compiled = B.execute(~W.CodegenJob, ~Map<&2, Cached<W.EntryCode>>, ~Result<&2, &2, M.Diagnostic, PreparedEntry>, ~compile_entry_task, B.plan(W.CodegenJob, tasks, 512n), previous)
+      publish_compiled_entries(compiled, next, reversed, counts)
+
 def compile_jobs(jobs: List<&2, W.CodegenJob>, previous: Map<&2, Cached<W.EntryCode>>, next: Map<&2, Cached<W.EntryCode>>, reversed: List<&2, W.EntryCode>, counts: Counts) -> Result<&2, &2, M.Diagnostic, CompiledEntries>:
-  compile_entry_plan(plan_entries(jobs, previous, EntryPlan{Nil{}, Nil{}, None{}}), next, reversed, counts)
+  +tasks = entry_key_tasks(jobs, Nil{})
+  staged = Nat.is_lt(B.total_cost(W.CodegenJob, tasks, 0n), Nat.mul(List.length(&2, B.Weighted<W.CodegenJob>, tasks), 256n))
+  compile_weighted_entries(tasks, previous, next, reversed, counts, staged)
 
 def stats(declarations: Counts, groups: Counts, constants: Counts, entries: Counts) -> Stats:
   Counts{dl, dr} = declarations
@@ -667,8 +943,8 @@ def finish_compiled(state: State, analysis: Main.Analysis, +prepared: W.Prepared
   State{prelude, scope_key, lowered, planning, checked, evaluated, previous} = state
   CompiledEntries{entries, values, entry_counts} = compiled
   do Result<&2, &2, M.Diagnostic, Completion>:
-    bytes : List<&2, U32> <- W.link(prepared, values)
-    return Completion{State{prelude, scope_key, lowered, planning, checked, evaluated, entries}, Compiled{Main.Artifact{analysis, bytes}}, stats(declarations, groups, constants, entry_counts)}
+    bytes : W.BytePlan <- W.link_plan(prepared, values)
+    return Completion{State{prelude, scope_key, lowered, planning, checked, evaluated, entries}, Compiled{Main.PlannedArtifact{analysis, bytes}}, stats(declarations, groups, constants, entry_counts)}
 
 def state_entries(state: State) -> Map<&2, Cached<W.EntryCode>>:
   State{prelude, scope_key, lowered, planning, checked, evaluated, entries} = state
@@ -698,16 +974,25 @@ def update_checked(state: State, mode: Mode, +module: M.Module, +completed: Chec
     evaluated : Evaluated <- evaluate_constants(Main.checked_constants(checked), steps, Main.const_context(module, checked), closures, base_keys, previous_constants, Map.new(&2, Cached<Const.Constants>), Nil{}, Counts{0n, 0n})
     update_evaluated(State{prelude, scope_key, declarations, planning, groups, Map.new(&2, Cached<Const.Constants>), entries}, mode, checked, evaluated, declaration_counts, group_counts)
 
-def update_lowered(state: State, mode: Mode, prelude_module: M.Module, scope_words: List<&2, U32>, lowered: Lowering, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
-  State{prelude, scope_key, declarations, planning, previous_groups, constants, entries} = state
-  Lowering{fragments, next_declarations, declaration_counts} = lowered
-  +module = combine_fragments(prelude_module <> fragments)
+def lowered_fragments(values: List<&2, Lowered>) -> List<&2, M.Module>:
+  match values:
+    case Nil{}:
+      Nil{}
+    case head <> tail:
+      lowered_fragment(head) <> lowered_fragments(tail)
+
+def update_lowered(state: State, mode: Mode, +prelude_module: M.Module, scope_words: List<&2, U32>, lowered: Lowering, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
+  State{+prelude, scope_key, declarations, planning, previous_groups, constants, entries} = state
+  Lowering{+values, +scans, declaration_counts} = lowered
+  +module = combine_fragments(prelude_module <> lowered_fragments(values))
   do Result<&2, &2, M.Diagnostic, Completion>:
-    +plan : G.Planning <- G.prepare_plan(module)
+    graph : List<&2, D.Node> <- Plan.graph(module, Plan.scan(prelude_module) <> scans)
+    +prepared : PreparedPlanning <- prepare_planning(module, prelude_module, values, graph, cache_nominal_scans(scans, 0n, 0n))
+    +plan : G.Planning = planning_value(prepared)
     +plan_key : List<&2, U32> <- K.planning(plan)
     +scheduled : InferencePlan <- select_plan(cached(InferencePlan, planning, [plan_key]), plan)
-    completed : CheckedGroups <- check_plan(scheduled, Scheduler.catalog(module), previous_groups, empty_checked())
-    update_checked(State{prelude, Some{scope_words}, next_declarations, Some{Cached{[plan_key], scheduled}}, Map.new(&2, Cached<G.CheckedGroup>), constants, entries}, mode, module, completed, declaration_counts, steps)
+    completed : CheckedGroups <- check_plan(scheduled, Scheduler.catalog_costs(module, Plan.collect_costs(scans, Map.new(&2, Nat))), previous_groups, empty_checked())
+    update_checked(State{prelude, Some{scope_words}, planning_declarations(prepared), Some{Cached{[plan_key], scheduled}}, Map.new(&2, Cached<G.CheckedGroup>), constants, entries}, mode, module, completed, declaration_counts, steps)
 
 def unique_identity(found: Maybe<&2, Unit>, identity: Nat) -> Result<&2, &2, M.Diagnostic, Unit>:
   match found:
@@ -747,7 +1032,7 @@ type ResolvedDeclarations is Data:
 
 def require_retained(found: Maybe<&2, Lowered>, identity: Nat) -> Result<&2, &2, M.Diagnostic, C.Cst>:
   match found:
-    case Some{Lowered{node, fuel, fragment}}:
+    case Some{Lowered{node, fuel, fragment, scanned, nominals}}:
       Done{node}
     case None{}:
       Fail{M.Diagnostic{"native_session", "offset:" ++ Nat.show(identity), "retained declaration is absent from the last successful revision"}}

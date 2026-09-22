@@ -1,5 +1,1093 @@
 # Concurrency review and benchmark report
 
+The [retained-memory diagnosis](MEMORY.md) identifies a native Bend 2.0.21
+code-generation defect at two sites accounting for all observed leaked
+allocations in the 200-edit workload. An isolated generated-C control reduces
+eight-core RSS from about 177 to 71 MiB and restores the exact empty-session
+allocation baseline after reset; no production repair has been applied yet.
+
+## Stopping point and remaining priorities (2026-09-22)
+
+This is a good stopping point for broad concurrency tuning. Keep the measured
+wins and use representative projects to identify the next bottleneck; the
+rejected experiments show that additional forks, parser workers, or native
+output machinery do not reliably improve elapsed time. A general dynamic ready
+queue would be a larger scheduler change without an established payoff here.
+
+The highest-priority remaining issue is the [native allocation leak](MEMORY.md).
+The pinned Bend 2.0.21 standalone reproducer was rerun during the commit review:
+Scalar still loses **16 bytes per call**, while Pair loses none, with both one
+and eight configured workers. Earlier whole-compiler accounting measured about
+**545 KiB leaked per edit** in the retained Balanced workload; that exact
+whole-compiler rate was not remeasured after the latest lookup changes. This
+should be repaired before relying on long-lived incremental processes.
+
+Some eager recursive lookup fallbacks remain in `operators.lookup`,
+`source_types.lookup_variable`, `infer.lookup_label`, `globals.lookup`, and
+`dependency.lookup`. These are candidates for a bounded follow-up, especially
+with unusually large scopes, but their contribution to real workloads has not
+been measured. They are not evidence that another broad optimization pass is
+needed now. True dependency joins, shared constant-evaluation fuel, canonical
+metadata and ordered publication also still limit scaling.
+
+## Short-circuit name lookup (2026-09-22)
+
+The next lever is avoiding work inside compiler tasks. `Bool.pick` eagerly
+evaluates both result arguments in Bend. Four lookup functions placed recursive
+searches in its fallback argument, so a hit still searched every remaining
+binding. The generated JavaScript confirms the recursive call executes before
+`Bool.pick`; all four old lookups also overflowed the host stack on a
+10,000-binding scope with a matching first binding.
+
+Wasm local lookup and constant-evaluator local, constant, and function lookup
+now carry a found value into a tail-recursive match, following the existing
+inference lookup pattern. They retain the first matching binding and the exact
+missing-name diagnostic. No inference or constant-evaluation fuel rules change.
+Four new regression tests cover shadowing, late hits, missing names and deep
+scopes; four laws/proofs protect stopping after a hit. All **502 compiler
+tests** pass with pinned Bend 2.0.21.
+
+The starting worktree, including all preceding uncommitted changes, is saved in
+`build/next-lever-baseline`; the selected lookup candidate is saved in
+`build/next-lever-lookups`. The new `lexical_256` CPU workload has eight
+exported functions with 256 consecutive local bindings each. Benchmarks use
+production `clang -O3` builds, physical-core affinity, alternating paired
+variants, separate fresh hosts and JS oracles, exact artifact comparisons, and
+Wasm execution. Builds and tests finish before timed measurements. Desktop
+applications remain active, so these are not isolated-machine measurements.
+
+### Lookup measurements
+
+Five paired samples per configuration; median milliseconds, **before → after**:
+
+| Workload                       | One physical core | Eight physical cores | Eight-core change |
+| :----------------------------- | ----------------: | -------------------: | ----------------: |
+| Long lexical scopes, clean     |   284.69 → 249.50 |      155.16 → 118.93 |            −23.4% |
+| Long lexical scopes, warm edit |     51.21 → 46.88 |        59.93 → 56.04 |             −6.5% |
+| Balanced 64, clean             |   408.55 → 394.55 |      120.91 → 118.98 |             −1.6% |
+| Balanced 64, warm edit         |     52.27 → 52.27 |        29.94 → 29.76 |             −0.6% |
+| Reader 64, clean               |     40.82 → 40.69 |        34.63 → 35.23 |             +1.8% |
+| Reader 64, warm edit           |     11.51 → 11.06 |        13.84 → 13.86 |             +0.1% |
+| Chain 64, warm edit            |       7.50 → 5.96 |        12.04 → 12.48 |             +3.7% |
+
+The long-scope clean sample ranges do not overlap: **278.49–290.36 →
+239.00–252.27 ms** at one core, and **154.16–158.06 → 118.18–120.74 ms** at
+eight cores. The one-core clean improvement is **12.4%**. The eight-core warm
+ranges are **57.73–60.86 → 54.79–56.67 ms**. The same clean fixture improves in
+JavaScript from **806.36 → 717.87 ms** (11.0%).
+
+The ordinary controls have overlapping ranges; the Chain eight-core median is
+3.7% slower, so this is not a universal speedup. Long-scope warm edits also
+remain slower with eight workers than with one. The gain comes from removing
+unnecessary searches inside tasks, not from adding concurrency or removing real
+dependency joins. Measurements cover one and eight physical cores.
+
+[Clean build measurements](../build/next-lever-lookups-clean.json),
+[warm edit measurements](../build/next-lever-lookups-warm.json),
+[compiler tests](../build/next-lever-lookups-tests.log),
+[proof check](../build/next-lever-lookups-proof.log).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/lookups-clean.json build/next-lever-baseline,. 5 1,8 lexical_256,balanced_64,reader_64 full
+deno run --allow-all compiler/cpu_scaling_bench.ts build/lookups-warm.json build/next-lever-baseline,. 5 1,8 lexical_256,balanced_64,reader_64,chain_64 incremental
+```
+
+### Rejected direct native byte writer
+
+A fresh diagnostic trace of the starting compiler measured a Balanced warm edit
+at eight cores with **6.61 ms wall / 7.02 ms CPU** in packing, versus **4.88 /
+15.44 ms** in inference. A prototype moved byte validation into the native
+response-buffer writer, removed packed-word allocation, withheld the whole frame
+until validation succeeded, and retained the previous session on failure. It
+passed byte-for-byte comparison with the pure encoder for 27 padding, size,
+invalid-byte, length-mismatch and recovery cases at one and eight workers, plus
+the existing native output tests.
+
+The first three-pair warm run suggested an 8.8% Balanced improvement at eight
+cores. Five-pair confirmation did not reproduce it: Balanced **30.72 → 30.34
+ms**, Reader **13.14 → 13.18 ms**, and shared-frontier diamonds **28.59 → 28.85
+ms**, with overlapping ranges. Clean controls were mixed as well. The additional
+native code was rejected and fully restored to the starting version. The
+prototype and its regression fixture remain in `build/next-lever-direct`.
+
+[Starting phase traces](../build/next-lever-events/),
+[initial direct-writer warm run](../build/next-lever-direct-warm.json),
+[confirmation](../build/next-lever-direct-confirm.json),
+[clean controls](../build/next-lever-direct-clean.json),
+[old-lookup stack-overflow reproduction](../build/next-lever-lookup-reproduction.log).
+
+## Further concurrency experiments (2026-09-22)
+
+Baseline: the entire preceding worktree, including its uncommitted changes, was
+saved in `build/concurrency-exhaustive-baseline`. The selected compiler is saved
+in `build/concurrency-selected`. Builds and measurements use pinned Bend 2.0.21
+and production `clang -O3`. The installed `bend` reports 2.0.24, so builds used
+the existing 2.0.21 binary under `build/bend-2.0.21-8imodn/bend/bin`.
+
+### Retained changes
+
+- **Independent module bodies.** Source-module scopes, imports and fixities are
+  prepared in dependency order. Bodies then lower in weighted Bend batches with
+  a 512-node grain. Imported name catalogs do not require completed bodies.
+  Ordered collection preserves the earlier module's diagnostic, including when
+  its body fails before a later module's scope preparation fails. Empty and
+  single-module projects bypass batching. A new law/proof protects first-error
+  collection; native tests cover one, two, four and eight workers.
+- **Independent SCC passes.** Value-dependency and nominal-type SCC discovery
+  fork when both graphs contain at least 32 nodes. Small graphs stay sequential.
+  Both results are consumed in the original diagnostic order. Recursive groups,
+  transitive summary dependencies, and inference joins retain their semantics.
+- **Bounded file reads.** The project loader reads up to four imported files
+  concurrently, deduplicating canonical URLs. Parsing, cycle detection and
+  module publication retain depth-first order. Prefetched failures remain values
+  until their original position is reached, and outstanding reads drain before
+  the frontend is disposed. A deferred-read test proves overlap and the
+  four-read limit without relying on timing.
+
+### Selected measurements
+
+Ryzen 7 7800X3D, physical CPU affinity, paired variants with alternating order,
+complete artifact equality and Wasm execution outside timing. No build, test or
+second benchmark ran during these measurements; desktop applications remained
+active. These are not isolated-machine measurements.
+
+The project driver starts a fresh native process for each configuration, with
+two warmups, but retains its host across samples. Projects are parsed before
+timing; compilation includes normalization, transport, checking, emission and
+response decoding. The module fixtures contain eight imported modules, either
+one 256-step body each or sixteen 96-term functions each. The raw-source CPU
+driver uses separate fresh hosts and JS-oracle processes, and includes parsing
+in its full-build times. Its new `nominal_256` fixture contains 256 nominal
+types, chains of sixteen payload dependencies, and 256 annotated functions.
+
+Median milliseconds, **before → after**:
+
+| Workload                                         | Samples | One physical core | Eight physical cores | Eight-core change |
+| :----------------------------------------------- | ------: | ----------------: | -------------------: | ----------------: |
+| Eight large module bodies                        |       5 |   177.80 → 181.10 |      195.77 → 158.53 |            −19.0% |
+| Eight wide modules                               |       3 | 1068.04 → 1068.47 |      280.02 → 268.04 |             −4.3% |
+| Nominal 256, raw-source clean build              |       5 |    95.27 → 101.66 |        80.82 → 62.07 |            −23.2% |
+| Balanced 64, raw-source clean build              |       5 |   417.61 → 408.05 |      121.40 → 122.53 |             +0.9% |
+| Reader 64, raw-source clean build                |       5 |     39.80 → 38.10 |        35.23 → 35.26 |             +0.1% |
+| Shared-frontier diamonds, raw-source clean build |       5 |   159.56 → 161.56 |      105.21 → 105.84 |             +0.6% |
+
+Eight-core ranges do not overlap for the target cases: large module bodies
+**194.85–201.71 → 154.59–169.37 ms**, wide modules **279.46–289.83 →
+265.28–274.72 ms**, and Nominal 256 **77.05–87.15 → 60.16–64.44 ms**. The
+single-core nominal median regresses **6.7%**, with overlapping ranges
+(**88.41–109.96 → 88.75–115.41 ms**). Large module bodies regress **1.9%** on
+one core. These tradeoffs remain; the changes favor substantial multicore work.
+The ordinary clean-build controls have overlapping ranges. Measurements cover
+one and eight cores, not a new two-through-seven-core sweep.
+
+[Module measurements, one core](../build/concurrency-selected-modules-1.json),
+[eight cores](../build/concurrency-selected-modules-8.json);
+[wide modules, one core](../build/concurrency-selected-wide-1.json),
+[eight cores](../build/concurrency-selected-wide-8.json);
+[fresh-host clean controls](../build/concurrency-selected-clean.json).
+
+Warm-edit controls also checked `nominal_256`, `balanced_64`, `reader_64`,
+`chain_64`, and `shared_frontier_diamonds_8`. The initial three-pair run had a
+noisy one-core Balanced median (**40.40 → 49.91 ms**). A five-pair repeat
+reversed that result (**55.67 → 49.84 ms**, ranges **44.45–57.76 → 43.40–60.07
+ms**), so neither run establishes a reliable change there. The repeated nominal
+one-core warm median was **34.23 → 34.71 ms**. A separate five-pair Reader
+eight-core repeat measured **13.27 → 13.40 ms**, also with overlapping ranges.
+These warm controls establish no consistent additional speedup or regression;
+the clean-build single-core tradeoffs above remain.
+[Initial warm controls](../build/concurrency-selected-warm.json),
+[one-core repeats](../build/concurrency-selected-warm-control.json),
+[Reader repeat](../build/concurrency-selected-reader-control.json).
+
+```sh
+# Build with the repository's pinned Bend before benchmarking.
+taskset -c 0,1,2,3,4,5,6,7 deno run --allow-all compiler/project_concurrency_bench.ts build/projects.json build/concurrency-exhaustive-baseline,. modules 5 8
+# Use taskset -c 0 and threads=1 for the matching one-core control.
+# wide_modules selects the already-parallel per-module control.
+deno run --allow-all compiler/cpu_scaling_bench.ts build/nominals.json build/concurrency-exhaustive-baseline,. 5 1,8 nominal_256 full
+```
+
+### Other candidates tried
+
+All rejected sources and binaries remain in the named local snapshots. The
+figures below describe combined experiments where several changes were tested
+together; they do not establish an isolated speedup or cost for every component.
+
+| Candidate                                                                                                 | Result                                                                                                                                                                                                                                                                                                                                                                                            |
+| :-------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Parallel canonical-table normalization, reachability indexes/filtering, and analysis/byte-packing overlap | The combined coarse-fork candidate regressed Balanced warm edits at eight cores **29.40 → 36.48 ms**. Not retained. [Report](../build/concurrency-coarse-forks.json), snapshot `build/concurrency-coarse-forks`.                                                                                                                                                                                  |
+| Parallel exact planning-key sections plus sized output groups                                             | Balanced warm edits regressed **33.35 → 35.78 ms**, diamonds **30.23 → 36.12 ms**, at eight cores. Aggregate size checks and serial error fallback preserved key semantics, but no performance win was established. [Report](../build/concurrency-sized-groups.json), snapshot `build/concurrency-sized-groups`.                                                                                  |
+| Preserve sized output groups, traverse directly, and pack by byte weight with serial keys                 | Balanced warm edits were essentially unchanged at eight cores, **29.57 → 29.46 ms**; small controls were mixed. The extra representation was not retained. [Report](../build/concurrency-direct-groups.json), snapshot `build/concurrency-direct-groups`.                                                                                                                                         |
+| Validate bytes in Bend, then copy raw chunks in native transport                                          | Passed all 498 compiler tests, but warm and clean controls remained mixed. Balanced clean one-core compilation regressed **397.32 → 421.85 ms** while eight-core time stayed flat. Original output/transport implementation restored. [Warm report](../build/concurrency-byte-transport.json), [clean report](../build/concurrency-byte-clean.json), snapshot `build/concurrency-byte-transport`. |
+| Parse large sibling modules in workers                                                                    | Exact CST and failure/lifetime checks passed. A pinned five-pair load test, including worker startup and materialized-CST transfer, regressed **1446.40 → 1629.24 ms** for eight large modules. Removed; code and replay script are preserved in `build/concurrency-direct-groups`. [Report](../build/concurrency-project-loader-pinned.json).                                                    |
+
+A separate SCC microbenchmark on two 257-node chains checked complete component
+lists after every sample. For 100 iterations, serial/parallel execution measured
+**367/344 ms at one worker** and **456/255 ms at eight workers**. This is a
+phase-only result; it does not explain all of the end-to-end nominal speedup.
+[Probe source](../build/concurrency-scc-probe.bend),
+[one-worker result](../build/concurrency-scc-1.txt),
+[eight-worker result](../build/concurrency-scc-8.txt).
+
+### Verification and limits
+
+The selected source passes **498 compiler tests**, the proof gate including the
+new module-ordering law, native ownership checks, TypeScript checks, and
+formatting checks. The original output representation, transport, cache-key
+encoding, reachability traversal, and parser-worker policy remain in place. The
+existing retained-memory issue is outside this change.
+
+This evaluates the identified concurrency candidates; it does not prove a global
+optimum. Real dependency joins, recursive inference components, fuel-accounted
+constant evaluation, canonical metadata, ordered publication, and serial
+transport/assembly still limit scaling. A general dynamic ready queue and
+parallel inference inside a single recursive component were not introduced.
+
+## Chunked native output (2026-09-21)
+
+Baseline: the complete preceding worktree saved in
+`build/cpu-before-chunked-output-VZNk3h`, including selective nominal caching,
+parallel relocation, and shared-frontier scheduling. Both variants use pinned
+Bend 2.0.21. This pass does not repair the upstream retained-memory defect.
+
+### Selected one-pass implementation: warm edits
+
+Five interleaved fresh-process samples, two warmups per sample, host/child
+pinned to one or eight physical Ryzen 7 7800X3D cores. Production binaries are
+built with `clang -O3`; startup and artifact validation are outside the timing.
+No other compiler build, test, or benchmark ran concurrently, but desktop
+applications remained active. Cores two through seven were not remeasured.
+
+Median milliseconds, **before → after**:
+
+| Workload                   | Native, one core | Native, eight cores |
+| :------------------------- | ---------------: | ------------------: |
+| Balanced 64                |    43.87 → 41.08 |       33.17 → 31.15 |
+| Reader 64                  |    11.15 → 11.49 |       14.13 → 13.49 |
+| Shared-frontier diamonds 8 |    33.60 → 32.99 |       28.85 → 27.71 |
+| Chain 64                   |      5.91 → 5.73 |       12.35 → 12.59 |
+
+Balanced improves **6.4% at one core and 6.1% at eight**, with nonoverlapping
+sample ranges: **42.99–44.59 → 40.73–42.24 ms**, and **32.85–33.85 → 30.27–31.65
+ms**. Its one-to-eight-core speedup remains approximately **1.32×**; this is a
+latency improvement, not a multicore-scaling breakthrough. Shared-frontier
+diamonds improve **3.9%** at eight cores. Reader's one-core median regresses
+**3.1%**, and Chain's eight-core median regresses **2.0%**; both have
+overlapping ranges. Reader also contains a 21.40 ms candidate outlier. No claim
+is made that all small workloads improve.
+[Selected warm-edit measurements](../build/cpu-output-grouped.json).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-output-grouped.json build/cpu-before-chunked-output-VZNk3h,. 5 1,8 balanced_64,reader_64,shared_frontier_diamonds_8,chain_64 incremental
+```
+
+The selected source passes **494 compiler tests**, the proof and native
+ownership build gates, entrypoint/build-script type checks, and formatting/diff
+checks. New tests cover exact protocol bytes at one/eight cores, padding across
+arbitrary chunk boundaries and grains, zero grain, invalid bytes, incorrect
+byte-plan lengths, and response-size/error precedence. Existing tests cover
+session rollback, mixed cache hits, examples, large arrays, and codegen at one,
+two, four, and eight threads.
+
+### Selected implementation: clean compilation
+
+Three paired fresh-process samples with the same affinity, warmup, validation,
+and desktop-noise caveats. Median milliseconds, **before → after**:
+
+| Workload                   |    JS, one core | Native, one core | Native, eight cores |
+| :------------------------- | --------------: | ---------------: | ------------------: |
+| Balanced 64                | 909.58 → 910.07 |  429.78 → 389.39 |     125.52 → 126.20 |
+| Reader 64                  | 171.05 → 167.80 |    47.52 → 48.66 |       37.25 → 36.26 |
+| Shared-frontier diamonds 8 | 486.78 → 510.13 |  162.67 → 164.48 |     113.32 → 106.15 |
+
+Shared-frontier diamonds improve **6.3%** at eight cores, with nonoverlapping
+sample ranges (**110.03–122.18 → 103.46–108.68 ms**). Balanced's eight-core
+median is effectively unchanged (**+0.5%**); its one-core median improves
+**9.4%**, but the ranges overlap. Reader regresses **2.4%** at one core and
+improves **2.7%** at eight. Shared-frontier diamonds regress **1.1%** at one
+core. These are mixed results, not evidence of a universal clean-compilation
+win.
+
+Selected native one-to-eight-core clean speedups are **3.09×** for Balanced,
+**1.34×** for Reader, and **1.55×** for shared-frontier diamonds. Native at
+eight cores is **7.21×**, **4.63×**, and **4.81×** faster than JS, respectively;
+backend differences contribute to those ratios as well as parallel execution.
+[Selected clean measurements](../build/cpu-output-grouped-clean.json).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-output-grouped-clean.json build/cpu-before-chunked-output-VZNk3h,. 3 1,8 balanced_64,reader_64,shared_frontier_diamonds_8 full
+```
+
+### Baseline profile and rejected packing strategies
+
+A fresh diagnostic trace of the selected baseline again identifies output
+encoding as substantial serial work. One sampled Balanced warm edit at eight
+cores measured **7.43 ms wall / 7.41 ms native CPU** in response encoding,
+versus **4.98 / 14.73 ms** in inference and **2.66 / 4.46 ms** in linking. The
+final native buffer copy measured about **0.09 ms**. These `clang -O2`
+instrumented intervals are exploratory samples, not production `-O3` timings.
+[Baseline trace run](../build/cpu-output-before-phases.json).
+
+The first prototype retained the Wasm byte plan and packed independent groups,
+but repeatedly split the chunk list with a 128-chunk grain and constructed a
+validation result per byte. Balanced contains **48,881 bytes in 16,915 chunks**;
+that policy creates many small tasks. Three paired warm-edit samples measured
+Balanced at eight cores **32.57 → 33.05 ms**, Reader **13.39 → 13.81 ms**,
+shared-frontier diamonds **28.56 → 28.97 ms**, and Chain **11.79 → 12.46 ms**.
+The trace measured packing at **8.63 ms wall / 11.90 ms CPU**, worse than the
+baseline's serial encoding despite doing some work concurrently. This version is
+not retained; its source and binaries are saved in
+`build/cpu-output-first-prototype-fdw2ox`.
+[First prototype](../build/cpu-output-candidate.json),
+[first prototype trace](../build/cpu-output-candidate-phases.json).
+
+A second prototype used a 2,048-chunk grain, consuming partitions, and an
+allocation-free per-byte validity flag. Five paired samples measured Balanced
+**33.31 → 31.54 ms**, Reader **13.77 → 13.17 ms**, shared-frontier diamonds
+**28.65 → 29.31 ms**, and Chain **12.21 → 12.62 ms**, all at eight cores. Its
+packing trace still showed only **7.15 ms wall / 7.90 ms CPU**. It is preserved
+in `build/cpu-output-coarse-prototype-koaMHz` for comparison with the one-pass
+grouped implementation. [Coarse prototype](../build/cpu-output-coarse.json),
+[coarse prototype trace](../build/cpu-output-coarse-phases.json).
+
+### Output representation
+
+The native path preserves `Wasm.BytePlan` through compilation and linking. It
+groups the outer chunk list once into coarse 2,048-chunk tasks and uses the
+existing balanced batch executor to pack bytes. Small inputs stay sequential;
+one indivisible large chunk is not split. This estimates work by chunk count,
+not exact byte weight, so unusually uneven chunks can still limit balance.
+
+Each block carries its exact byte length. The native writer copies packed words
+into one exactly sized buffer, removes intermediate block padding, and pads only
+the complete response. It validates internal lengths before writing any frame
+bytes. The pure encoder checks the response allowance and byte values before
+publishing candidate session state. Oversized output retains the old encoder's
+error ordering through an exceptional fallback; successful native output never
+flattens the complete Wasm byte list. The JS API still returns the same flat
+artifact, and the wire format remains protocol version 7.
+
+### Selected profile and remaining limits
+
+A sampled Balanced warm edit in the final diagnostic trace measured **1.87 ms
+wall / 3.47 ms CPU** in linking, **0.09 / 0.09 ms** preparing the response
+header, and **6.00 / 6.88 ms** from entering chunk packing to the native send.
+The corresponding baseline intervals were **2.66 / 4.46 ms** in linking and
+**7.43 / 7.41 ms** in response encoding. The final buffer copy remained about
+**0.09 ms**. One-core final packing measured **6.43 / 6.40 ms**. These are
+separate exploratory samples, not a controlled microbenchmark or a promise that
+all the removed serial work became parallel work.
+[Selected trace run](../build/cpu-output-grouped-phases.json).
+
+The CPU/wall ratio in output preparation remains low. Chunk grouping, section
+planning, analysis encoding, ordered result collection, and the native copy
+still include serial work; coarse packing does not keep eight cores busy
+throughout this interval. The observed improvement is primarily lower overall
+latency, not materially better whole-compiler scaling. Canonical metadata,
+reachability, true dependency joins, and single-miss warm edits remain limits.
+No fully dependency-ready scheduler or persistent output-delta protocol was
+introduced in this pass.
+
+## Nominal summaries, parallel relocation, and shared frontiers (2026-09-21)
+
+This pass compares against the complete preceding uncommitted state, frozen in
+`build/cpu-before-metadata-link-SDA6qt`. Both production binaries use the pinned
+Bend 2.0.21. No upstream memory repair or language change is included.
+
+1. **Reuse nominal metadata selectively.** Sessions averaging at least 256
+   cached lowering-work units per declaration retain nominal-usage summaries.
+   Changed declarations refresh in 512-unit weighted batches. An exact
+   type-catalog key invalidates summaries on constructor changes, including
+   moving a constructor between existing types without renaming it. Small
+   modules use direct analysis and discard retained summaries. Whole-module
+   validation and original diagnostic ordering remain intact. Prelude scans,
+   canonical keys, and reachability are not cached by this change.
+2. **Parallelize relocation.** Independent function bodies resolve against one
+   immutable symbol catalog in weighted batches. The 256-unit grain weights raw
+   byte chunks at one unit and symbolic relocations at eight, without walking
+   every byte just to estimate work. Ordered collection preserves the original
+   body order and name/relocation/count error precedence. Final Wasm assembly
+   and response encoding are still serial.
+3. **Release shared frontiers.** A connected graph with multiple initial roots
+   can split into independent regions after those roots complete. This is used
+   only when pending chains span further frontiers. Already-independent regions
+   retain their separate schedules, and a final single frontier keeps its
+   efficient batch. Actual dependency joins and recursive groups remain intact.
+   This extends static scheduling; it is not a general dependency-ready queue or
+   work-stealing implementation.
+
+### Profiling and the rejected scheduler candidate
+
+A separate instrumented, `clang -O2` trace of a warm Balanced edit at eight
+cores measured 5.29 ms wall / 16.08 ms native CPU in inference, versus 5.74 ms
+wall / 5.73 ms CPU in dependency-plan preparation, 3.10 / 3.08 ms in linking,
+and 7.88 / 7.84 ms in response encoding. These are exploratory single-sample
+phase intervals, not isolated function microbenchmarks or production timings.
+They show meaningful serial work outside inference; they do not prove that
+barrier waiting dominates.
+[Trace run](../build/cpu-metadata-before-phases.json).
+
+The first scheduler candidate split even a final frontier into independent
+regions. Three paired samples exposed a Reader regression: **11.12 → 22.33 ms**
+at one core and **14.09 → 25.90 ms** at eight. A follow-up trace localized it to
+inference: one-core native CPU rose from 2.43 to 12.61 ms; eight-core wall time
+rose from 2.42 to 12.90 ms. Linking and encoding stayed nearly unchanged. The
+final policy preserves the last frontier's batch instead of constructing many
+tiny region executions. A planner regression test enforces that choice.
+[Rejected candidate](../build/cpu-metadata-link-candidate.json),
+[Reader baseline trace](../build/cpu-reader-before-phases.json),
+[Reader candidate trace](../build/cpu-reader-candidate-phases.json).
+
+The first combined metadata-cache candidate also regressed small bodies. Three
+interleaved eight-core control samples compared the baseline, that candidate,
+the changes without metadata caching, and the changes without parallel linking.
+Reader measured **14.21 / 15.26 / 13.80 / 15.55 ms** respectively; Chain
+measured **12.56 / 15.09 / 12.27 / 15.31 ms**. Disabling the metadata changes
+removed the small-workload regression; disabling parallel linking did not.
+Balanced still benefited from metadata reuse. A size-based gate using cached
+lowering estimates, and a subsequent restoration of the uncached planner's
+original traversal, did not remove the regression. A subsequent prelude-only
+cache also reproduced it. Finally, removing just the prelude-cache wrapper from
+the selective nominal-cache implementation eliminated the small-body regression
+in a targeted control. The selected implementation therefore retains **selective
+nominal caching, not prelude caching**. The controls isolate the problematic
+change set, not a proven low-level allocator or code-generation mechanism. The
+combined prototype is preserved in `build/cpu-nominal-cache-prototype-KFhk76`.
+[Component controls](../build/cpu-metadata-link-controls.json),
+[size-gate experiment](../build/cpu-nominal-policy-256.json),
+[original-traversal experiment](../build/cpu-nominal-direct-control.json),
+[rejected unconditional-summary measurements](../build/cpu-metadata-link-final.json).
+
+Three interleaved eight-core samples compared baseline / parallel linking and
+shared-frontier scheduling without metadata caching / the selected nominal-only
+cache. Reader measured **13.64 / 13.66 / 13.93 ms**; Chain measured **12.08 /
+12.24 / 12.00 ms**; Balanced measured **39.37 / 38.77 / 33.30 ms**. The selected
+source is preserved in `build/cpu-nominals-without-prelude-k6O40E`. Reports with
+earlier `final` filenames are rejected candidates, not the selected
+implementation.
+[Nominal-only control](../build/cpu-nominal-without-prelude-control.json),
+[rejected prelude-only measurements](../build/cpu-frontier-link-final.json).
+
+### Selected-build verification and measurement method
+
+The selected native binary was compiled with pinned Bend 2.0.21 and `clang -O3`;
+all 39 compiler Bend/C/JS input files were compared byte-for-byte with the
+selected control before promoting its binary. JS artifacts were rebuilt from
+that source. The proof/build gate passes, TypeScript entrypoints check, and the
+full compiler suite passes **491 tests**. New coverage includes nominal
+constructor moves, crossing the cache-policy threshold, failures and recovery,
+ordered link errors, shared-root scheduling, and native/JS artifact parity.
+
+Final measurements use five interleaved fresh-process samples for warm edits and
+three for clean compilation, with two warmups per sample. The host and native
+child share affinity to one or eight physical Ryzen 7 7800X3D cores. Artifact
+checks and execution run outside the timed interval; native samples do not
+import the JS compiler. Startup is excluded. No compiler build, test, or second
+benchmark runs concurrently, but desktop applications remain active. This is not
+an isolated-machine result. Cores two through seven are not remeasured in this
+pass. The known retained-native memory issue is unchanged and is not subtracted
+from the measurements.
+
+### Selected-build warm edits
+
+Median of the five sample medians, milliseconds **before → after**:
+
+| Workload                   | Native, one core | Native, eight cores | Eight-core latency change |
+| :------------------------- | ---------------: | ------------------: | ------------------------: |
+| Balanced 64                |    53.52 → 53.35 |       44.89 → 37.27 |                    −17.0% |
+| Reader 64                  |    13.62 → 13.51 |       15.44 → 14.92 |                     −3.4% |
+| Diamonds 8                 |    38.04 → 37.82 |       33.55 → 31.13 |                     −7.2% |
+| Shared-root diamonds 8     |    39.73 → 38.73 |       34.25 → 32.87 |                     −4.0% |
+| Shared-frontier diamonds 8 |    38.35 → 33.70 |       39.68 → 28.41 |                    −28.4% |
+| Clustered 64               |    17.80 → 16.96 |       20.17 → 17.44 |                    −13.5% |
+| Chain 64                   |      6.02 → 5.92 |       12.11 → 12.68 |                     +4.7% |
+
+Balanced's one-to-eight-core speedup rises from **1.19× to 1.43×**. This is
+better, but still far from linear. Shared-frontier diamonds improve most at
+eight cores, with nonoverlapping sample ranges (**38.53–46.26 → 27.34–30.56
+ms**). Balanced also has nonoverlapping eight-core ranges (**44.38–47.24 →
+36.77–38.00 ms**). Reader and Chain have overlapping ranges; Chain's median
+regresses by 0.57 ms, and it remains much faster on one core. Small and serial
+workloads do not become faster merely by enabling more threads. These are
+combined change measurements, not an isolated speedup claim for every component.
+[Selected warm-edit report](../build/cpu-concurrency-verified.json).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-concurrency-verified.json build/cpu-before-metadata-link-SDA6qt,. 5 1,8 balanced_64,reader_64,diamonds_8,shared_root_diamonds_8,shared_frontier_diamonds_8,clustered_64,chain_64 incremental
+```
+
+### Selected-build clean compilation
+
+Median of three sample medians, milliseconds **before → after**:
+
+| Workload                   |     JS, one core | Native, one core | Native, eight cores |
+| :------------------------- | ---------------: | ---------------: | ------------------: |
+| Balanced 64                | 1038.64 → 988.95 |  403.14 → 444.44 |     140.28 → 144.08 |
+| Reader 64                  |  154.57 → 163.17 |    46.14 → 46.00 |       38.93 → 37.11 |
+| Shared-frontier diamonds 8 |  489.60 → 485.36 |  184.61 → 152.91 |     124.74 → 110.14 |
+
+Shared-frontier diamonds improve **11.7%** at eight cores; sample ranges do not
+overlap (**123.39–125.32 → 108.95–115.89 ms**). Balanced regresses **10.2%** at
+one core and **2.7%** at eight cores; Reader's eight-core median improves
+**4.7%**. These latter comparisons have overlapping ranges. The selected changes
+are not an across-the-board clean-compilation win, and the one-core Balanced
+regression remains a limitation rather than a resolved issue.
+
+On the selected build, native eight-core clean compilation is **6.86× faster
+than JS** for Balanced, **4.40×** for Reader, and **4.41×** for shared-frontier
+diamonds. Native one-to-eight-core scaling is **3.08×**, **1.24×**, and
+**1.39×**, respectively. JS/native speed ratios include backend differences, not
+just parallelism. Nominal-summary retention affects retained sessions, not this
+stateless path; linking and scheduling changes affect both.
+[Selected clean report](../build/cpu-concurrency-verified-clean.json).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-concurrency-verified-clean.json build/cpu-before-metadata-link-SDA6qt,. 3 1,8 balanced_64,reader_64,shared_frontier_diamonds_8 full
+```
+
+### Remaining limits
+
+This is not maximum possible concurrency. Lexing, canonical-key preparation,
+reachability, ordered publication, final Wasm assembly, and response encoding
+still include serial work. Constants share a sequential fuel budget; recursive
+groups and real dependency joins cannot simply be split. Shared-frontier release
+is a bounded static scheduling improvement, not a fully dynamic ready queue.
+
+## Lazy origins, codegen pipelining, and shared-root regions (2026-09-21)
+
+This pass starts from the previously uncommitted worktree, frozen in
+`build/cpu-before-serial-pipeline-gwXohO`. No allocator or upstream Bend repair
+is included.
+
+1. **Reduce serial host work.** Diagnostic origins retain immutable,
+   declaration-local identity-to-token tables. At 8,192 total origin entries,
+   the frontend switches from eager indexing to on-demand offset lookup, so a
+   successful warm edit does not rebuild a map for every reused syntax node.
+   Named-declaration offsets are also looked up only when needed. Saved
+   diagnostics preserve the original revision, including after disposal.
+2. **Pipeline codegen.** For jobs averaging at least 256 estimated work units,
+   each worker serializes its key, selects a cache hit, and compiles its miss
+   without waiting for other workers' keys. The existing 512-unit batch grain
+   remains. Cheap jobs keep staged preparation and balanced miss checking.
+   Ordered publication preserves first-error precedence, entry order, cache
+   counts, eviction, and success-only cache publication.
+3. **Release branches after a shared root.** The planner removes dependencies
+   satisfied by the completed shared root from the remaining region graph.
+   Independent branches can then advance through their own frontiers. Edges
+   between unfinished branches still connect their regions; genuine joins and
+   indivisible recursive groups remain. Clean and incremental paths share this
+   planner, and retained sessions cache its result. This is a bounded extension
+   of fork/join scheduling, not a general dependency-ready queue or work
+   stealing.
+
+### Rejected unconditional origin policy
+
+Always using lazy origins reduced large-module latency but regressed short
+Clustered sessions: the five-pair run measured **17.39 → 26.26 ms** at one core.
+A separate control using the _same old native binary for both hosts_ reproduced
+the regression, isolating it to the host change rather than native codegen. Two
+longer 40-edit controls improved after warmup, but that does not excuse the
+short-session regression. No claim is made that GC or JIT was its proven cause.
+The final size-based policy retains eager small-origin indexing; a three-pair
+targeted check measured **20.07 → 19.72 ms** for Clustered at one core and
+**20.70 → 20.76 ms** at eight cores.
+
+[Initial candidate](../build/cpu-serial-pipeline-candidate.json),
+[seven-pair Clustered confirmation](../build/cpu-serial-pipeline-cluster-confirm.json),
+[same-binary host control](../build/cpu-serial-host-control.json),
+[unconditional five-pair measurements](../build/cpu-serial-pipeline-final.json),
+[unconditional retained control](../build/cpu-serial-retained-control.json),
+[small-origin policy check](../build/cpu-origin-policy.json).
+
+### Clean compilation
+
+Three interleaved fresh-process samples, two warmups, shared host/child affinity
+on one/eight physical Ryzen 7 7800X3D cores. Every artifact matches the JS
+oracle and executes. Startup and validation are excluded. No other test, build,
+or benchmark ran concurrently, but desktop applications remained active; this is
+not an isolated-machine measurement. The native changes are identical to the
+final implementation; the later incremental-origin policy does not run on this
+stateless path.
+
+Median milliseconds, **before → after**:
+
+| Workload               |    JS, one core | Native, one core | Native, eight cores |
+| :--------------------- | --------------: | ---------------: | ------------------: |
+| Balanced 64            | 845.59 → 862.09 |  416.46 → 385.40 |     129.33 → 130.86 |
+| Reader 64              | 145.81 → 150.34 |    35.29 → 38.17 |       34.17 → 34.70 |
+| Shared-root diamonds 8 | 472.39 → 438.37 |  156.75 → 141.20 |     111.66 → 101.35 |
+
+Shared-root diamonds improve **9.2%** at eight cores. Balanced and Reader show
+mixed changes with overlapping sample ranges; these results do not establish an
+across-the-board clean-compilation improvement.
+[Clean compilation report](../build/cpu-serial-pipeline-clean.json).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-serial-pipeline-clean.json build/cpu-before-serial-pipeline-gwXohO,. 3 1,8 balanced_64,reader_64,shared_root_diamonds_8 full
+```
+
+### Final warm-edit measurements
+
+Five interleaved fresh-process samples per variant, two warmups, with the same
+affinity and desktop caveats as the clean run. Timings include frontend,
+transport, native compilation, and response decoding; process startup and
+artifact validation are excluded. Each edit matches the clean JS Wasm and
+function-signature oracle and executes; unchanged replies match the preceding
+complete artifact. These are the final size-based origin policy, codegen
+pipeline, and shared-root scheduler together, not isolated per-change effects.
+
+Median milliseconds, **before → after**:
+
+| Workload               | Native, one core | Native, eight cores |
+| :--------------------- | ---------------: | ------------------: |
+| Balanced 64            |    59.65 → 49.84 |       52.23 → 44.81 |
+| Reader 64              |    13.24 → 12.58 |       14.73 → 14.86 |
+| Diamonds 8             |    47.03 → 37.85 |       35.48 → 33.23 |
+| Shared-root diamonds 8 |    54.88 → 38.35 |       46.55 → 34.38 |
+| Clustered 64           |    21.72 → 21.89 |       21.23 → 21.73 |
+| Chain 64               |      7.41 → 7.90 |       14.96 → 14.30 |
+
+Eight-core edits improve **14.2%** for Balanced, **6.3%** for Diamonds, and
+**26.1%** for shared-root diamonds. Small-workload results remain mixed:
+Clustered is 0.8% slower at one core and 2.4% slower at eight, Reader is 0.9%
+slower at eight, and Chain is 6.7% slower at one core in this run. The large
+one-core Clustered regression from unconditional lazy origins is gone, but there
+is no demonstrated universal speedup. Balanced's eight-core frontend median
+drops **9.73 → 4.85 ms**; its end-to-end one-to-eight-core speedup is still only
+**1.11×**, so lower latency does not imply linear core scaling.
+[Final warm-edit report](../build/cpu-concurrency-final.json).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-concurrency-final.json build/cpu-before-serial-pipeline-gwXohO,. 5 1,8 balanced_64,reader_64,diamonds_8,shared_root_diamonds_8,clustered_64,chain_64 incremental
+```
+
+Two retained Clustered controls per variant alternate 40 edits after the first
+two requests, reversing variant order on the second run and checking complete
+artifact equality for every revision. Last-20 medians are **25.12–25.92 →
+22.78–23.40 ms** at one core and **23.62–23.83 → 23.08–23.26 ms** at eight.
+These longer sessions do not reproduce the short-run Clustered regression, but
+are separate diagnostics, not replacements for the fresh-process table above.
+[Final retained control](../build/cpu-concurrency-retained.json),
+[control script](../build/serial-latency-control.ts).
+
+```sh
+deno run --allow-all build/serial-latency-control.ts build/cpu-concurrency-retained.json
+```
+
+### Verification and remaining limits
+
+The final implementation passes **483 compiler tests**, including native/JS
+artifact parity, one/eight-worker edits and rollback, cached/mixed/reordered
+codegen results, key-versus-compilation failure ordering, shared-root aliases,
+real downstream joins, unknown-dependency rejection, and large lazy diagnostic
+tables retaining offsets across revisions and disposal. The Bend proof gate,
+native ownership regression, native/JS builds, formatting, and diff checks pass.
+Builds use the repository-pinned **Bend 2.0.21**, unpacked separately after
+verifying the official release digest; the globally installed 2.0.24 was not
+changed. Both benchmark variants use 2.0.21.
+
+Serial lexing, nominal-usage analysis, prelude scans, reachability, canonical
+key construction, ordered publication, linking, response encoding, and host
+assembly still contain work. Const evaluation keeps its shared fuel budget.
+Dependency chains and actual joins cannot be made independent by this change;
+more general dependency-ready scheduling remains future work. One session still
+owns an ordered request stream. Memory behavior was not repaired or subtracted
+from these measurements, and only one/eight-core endpoints were remeasured.
+
+## Cached scans and selective inference pipelining (2026-09-21)
+
+This implements the next three work areas against the preceding uncommitted
+state, frozen in `build/cpu-before-pipeline-T4Tqa8`. Comparisons in this section
+use that baseline, not `ceb1444` or the older snapshots below.
+
+1. **Reduce repeated work.** Reused lowered source declarations retain their
+   dependency/lambda scans and scheduling cost estimates. Changed declarations
+   recompute those summaries in their lowering worker. The cache has the same
+   source, scope, fuel, eviction, and success-only publication rules as
+   lowering. Whole-module validation still checks types, operations, names, and
+   duplicate lambda identities every revision. Scan errors remain values until
+   their original diagnostic phase; functions still precede constants.
+2. **Overlap independent stages.** Within sufficiently substantial frontiers,
+   each worker prepares a group's key and immediately checks its cache miss.
+   Checking no longer waits for all other workers to finish key preparation.
+   Workers read one immutable frontier snapshot, and ordered publication keeps
+   cache counts, interface dependencies, and first-error selection unchanged.
+3. **Improve scheduling.** Singleton chains bypass batch construction. Small
+   frontiers and cheap jobs retain staged preparation followed by balanced miss
+   checking. Broad frontiers pipeline only when average estimated group cost is
+   at least 256 units. Cold pipelines use the existing 128-unit inference grain;
+   sessions with prior caches use a 2,048-unit grain. Cached declaration costs
+   also avoid repeated body walks when weighting chains and regions. Missing
+   estimates fall back to the original traversal; cost never changes validation
+   fuel, and recursive groups remain indivisible.
+
+The threshold is based on workload estimates, not benchmark names. Reader's
+frontiers average about 223 and 216 units per group; Balanced averages 5,232 and
+Clustered 1,312. Source-group costs compose exactly for ordinary unsaturated
+groups. Per-declaration saturation can overestimate a large recursive group,
+which affects scheduling only.
+
+### Candidates retained for comparison
+
+Caching dependency scans alone produced modest one-core changes and little
+eight-core benefit. An unconditional 512-grain pipeline improved Clustered
+eight-core edits from 21.00 to 19.34 ms, but regressed Reader from 13.34 to
+15.98 ms. Coarser warm batching and cost caching alone still regressed Reader
+(13.35 to 15.27 ms). Neither unconditional pipeline is the final policy.
+[Scan-only measurements](../build/cpu-cached-scans.json),
+[512-grain candidate](../build/cpu-pipeline-candidate.json),
+[cost-cache/coarse candidate](../build/cpu-pipeline-costs.json).
+
+### Final paired incremental measurements
+
+Five interleaved fresh-process samples, two warmups, shared host/child affinity
+on one or eight physical cores of the Ryzen 7 7800X3D. No builds, tests, or
+other benchmarks ran concurrently. Unity and browser applications remained
+active, so this is not an isolated-machine result. Every artifact matches the
+clean JS Wasm/signature oracle and executes; unchanged replies retain full
+parity. Timings include the frontend and transport, but exclude process startup
+and artifact validation.
+
+Warm body-edit medians, milliseconds, **before → after**:
+
+| Workload     | Native, one core | Native, eight cores |
+| :----------- | ---------------: | ------------------: |
+| Balanced 64  |    62.80 → 65.58 |       55.16 → 53.12 |
+| Reader 64    |    14.09 → 14.07 |       15.06 → 15.38 |
+| Diamonds 8   |    50.59 → 50.18 |       36.61 → 36.09 |
+| Clustered 64 |    22.19 → 21.71 |       23.06 → 21.37 |
+| Chain 64     |      6.95 → 7.02 |       14.45 → 14.52 |
+
+Eight-core Balanced improves **3.7%** and Clustered **7.3%**. Reader's earlier
+pipeline regression is reduced to **2.2%**, not turned into a demonstrated win.
+Diamonds and Chain are approximately unchanged. One-core Balanced regresses
+**4.4%** in this run; its samples span 61.46–68.20 ms before and 59.38–70.74 ms
+after, so the busy-desktop control does not establish the size of that effect
+confidently. These results are mixed, not an across-the-board improvement.
+
+First session compilation at eight cores changes from 377.00 to 371.31 ms for
+Balanced, 62.25 to 61.35 ms for Reader, 211.80 to 207.90 ms for Diamonds, 117.68
+to 117.50 ms for Clustered, and 34.95 to 33.22 ms for Chain. Startup is
+excluded. This pass samples the one/eight-core endpoints, not all intervening
+core counts. [Final incremental report](../build/cpu-pipeline-final.json).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-pipeline-final.json build/cpu-before-pipeline-T4Tqa8,. 5 1,8 balanced_64,reader_64,diamonds_8,clustered_64,chain_64 incremental
+```
+
+### Clean-compilation guard
+
+Three paired fresh-process samples with two warmups also checked stateless
+compilation. These include shared planning refactors, but do not exercise the
+retained-session pipeline. The same non-isolated desktop and parity checks
+apply. Medians in milliseconds, **before → after**:
+
+| Workload    |    JS, one core | Native, one core | Native, eight cores |
+| :---------- | --------------: | ---------------: | ------------------: |
+| Balanced 64 | 954.19 → 994.33 |  478.50 → 427.65 |     138.23 → 136.61 |
+| Reader 64   | 165.08 → 179.93 |    40.54 → 42.26 |       39.87 → 39.73 |
+| Diamonds 8  | 476.59 → 531.52 |  174.20 → 168.95 |     115.51 → 111.04 |
+
+[Clean-compilation samples](../build/cpu-pipeline-clean.json).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-pipeline-clean.json build/cpu-before-pipeline-T4Tqa8,. 3 1,8 balanced_64,reader_64,diamonds_8 full
+```
+
+The apparent JS slowdowns prompted a separate five-pair confirmation, pinned to
+CPU 0, alternating variant order, with two warmups and artifact parity. Balanced
+measured **922.32 → 915.46 ms**, Reader **167.73 → 168.98 ms**, and Diamonds
+**508.67 → 471.49 ms**. The earlier slowdowns did not reproduce; neither run
+establishes a stable JS improvement or regression on this busy desktop.
+[JS confirmation samples](../build/cpu-pipeline-js-confirm.json).
+
+### Retained-session control
+
+Two 200-edit runs per variant alternated Balanced 64 revisions in
+baseline/new/new/baseline order, on eight pinned cores. Every full artifact for
+each revision matched, as did Wasm hashes across variants. Timing includes the
+public incremental API; validation and RSS sampling are outside timing, with no
+forced GC.
+
+Median latency after the first two requests improves from **75.32–76.49 ms** to
+**71.90–72.44 ms**. Last-20-request medians are **76.40–79.41 ms** before and
+**74.30–76.79 ms** after. The overall improvement is approximately 5%, but
+long-lived sessions still run slower than fresh-process warm edits.
+
+Native RSS starts near **46–47 MiB** and ends at **174.07–174.18 MiB** before
+versus **176.96–178.80 MiB** after. Both continue to grow by roughly 54–56 MiB
+between requests 100 and 200; the new cache/pipeline has not fixed this and has
+a small additional residency cost. Host RSS at request 200 is 342–355 MiB before
+and approximately 341 MiB after; ordinary GC variation prevents a strong
+host-memory conclusion. No allocator change was made.
+[Retained latency and memory samples](../build/incremental-pipeline-memory.json).
+
+### Verification and remaining limits
+
+Native and JS builds, the ownership gate, and `bend PROOF.bend` pass. The full
+test suite passes **478 tests**. New tests cover cached/uncached dependency
+planning equivalence, global and function-before-constant error precedence,
+duplicate lambda identities across fragments, cached scheduling costs and
+fallback, cost-based frontier routing, and staged/pipelined result equivalence.
+
+Nominal-usage analysis, prelude scans, canonical key construction, reachability,
+ordered publication, response encoding, and host assembly still contain serial
+work. Real dependency joins and codegen planning barriers remain. This is
+selective pipelining within the existing fork/join runtime, not work stealing or
+a general dependency-ready queue, and it does not exhaust the remaining work.
+
+## Parallel incremental cache preparation (2026-09-21)
+
+This pass starts from the preceding uncommitted improvements, frozen in
+`build/cpu-before-cache-phases-ckM7cZ`. That is a different baseline from
+`ceb1444` and the historical comparisons below.
+
+### Diagnosis and changes
+
+Instrumented Balanced 64 warm body edits showed substantial serial cache work
+even though only one group and one codegen entry missed their caches. Three
+fresh-process samples after two warmups gave these median native phase times:
+
+| Baseline phase                          | One core | Eight cores |
+| :-------------------------------------- | -------: | ----------: |
+| Inference/cache preparation and publish | 12.40 ms |    21.00 ms |
+| Codegen key construction and selection  |  7.21 ms |     9.70 ms |
+| Actual codegen for the miss             |  0.57 ms |     0.87 ms |
+
+CPU time approximately equaled wall time in the cache phases. Parallel
+projection, by contrast, used 4.09 ms of CPU in 1.68 ms wall time at eight
+cores. These are instrumented diagnostic intervals, not production headline
+timings. The multiworker runtime took longer on serial work; this does not
+isolate atomic operations as the cause.
+[Baseline phase summary](../build/cache-phase-events/summary.json).
+
+Inference-key preparation and codegen-key serialization now use the existing
+cost-balanced batch executor. Each inference task reads the same immutable
+frontier snapshot. Results are consumed in source order, and publication still
+requires a successful request. Canonical keys, dependency invalidation, resource
+limits, and diagnostic precedence are unchanged. An earlier codegen failure
+still wins over a later key-encoding failure.
+
+Frontiers of four or fewer groups skip AST cost estimation and do not fork. An
+initial version without this cutoff regressed eight-core Diamonds edits from
+34.58 to 38.14 ms; the final version does not show a consistent Diamonds change.
+The [initial measurements](../build/cpu-parallel-cache.json) are retained rather
+than silently discarded. No allocator intervention was promoted.
+
+### Paired production measurements
+
+Five interleaved fresh-process samples per variant, two warmups, Ryzen 7
+7800X3D, host and child sharing one/eight physical-core affinity. No builds,
+tests, or other benchmarks ran concurrently, but the desktop was not isolated:
+Unity and browser applications remained active. Startup and parity checks are
+outside timing. Every incremental Wasm/signature result matches a clean JS
+artifact and executes; unchanged replies match the preceding full artifact.
+
+Warm body-edit medians, **before → after**:
+
+| Workload    | Native, one core | Native, eight cores |
+| :---------- | ---------------: | ------------------: |
+| Balanced 64 |    57.15 → 57.15 |       77.68 → 53.13 |
+| Reader 64   |    12.88 → 21.86 |       18.51 → 14.82 |
+| Diamonds 8  |    45.09 → 45.20 |       35.97 → 36.72 |
+
+Eight-core Balanced improves **31.6%** and Reader **19.9%**. Balanced's
+one-to-eight-core edit speedup changes from **0.74× to 1.08×**: a reversal of
+negative scaling, but still far from good eight-core utilization. Diamonds is
+effectively unchanged. First session compilation at eight cores changes from
+385.11 to 362.89 ms (Balanced), 61.68 to 59.60 ms (Reader), and 208.07 to 199.99
+ms (Diamonds). These first-request numbers exclude native process startup.
+[Final paired report](../build/cpu-parallel-cache-final.json).
+
+A targeted eleven-sample follow-up confirms Reader's eight-core improvement
+(16.94 → 13.64 ms) and no clear Diamonds change (32.82 → 32.49 ms). It also
+repeats the one-core Reader short-run regression (12.16 → 23.99 ms), which must
+not be hidden. [Follow-up samples](../build/cpu-parallel-cache-confirm.json).
+
+A separate diagnostic of the same short benchmark, reading Linux `schedstat`
+around native requests, caught baseline spikes with **10.56–14.85 ms waiting
+runnable on the CPU**, while native CPU work stayed at **8.55–9.25 ms**. The new
+variant used 8.78–8.97 ms of native CPU in that probe. In two longer 40-edit
+runs per variant, one-core Reader medians were 11.18–11.20 ms before and
+11.41–11.65 ms after. These diagnostics show substantial scheduling
+interference, not proof that every production outlier has that cause. The
+one-core Reader end-to-end effect remains uncertain; small scheduling/key
+planning overhead is still present.
+[Short-run scheduler probe](../build/reader-sample-probe.json),
+[longer Reader probe](../build/reader-latency-probe.json).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-parallel-cache-final.json build/cpu-before-cache-phases-ckM7cZ,. 5 1,8 balanced_64,reader_64,diamonds_8 incremental
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-parallel-cache-confirm.json build/cpu-before-cache-phases-ckM7cZ,. 11 1,8 reader_64,diamonds_8 incremental
+```
+
+This pass changes the native incremental path. It does not remeasure stateless
+JS/native clean compilation or all intermediate core counts; the historical
+tables below are not measurements of this new incremental implementation.
+
+### Real editing sessions expose larger retained-memory growth
+
+Two 200-edit runs per variant, ordered baseline/new/new/baseline, alternated the
+two Balanced 64 source revisions through the public incremental API on eight
+pinned cores. Full artifacts for each revision were equal throughout, and Wasm
+hashes matched across variants. Validation and RSS sampling are outside timing;
+no forced GC ran.
+
+Overall medians after the first two edits fell from **129.80–130.20 ms** to
+**84.09–84.80 ms**. Last-20-edit medians were **129.45–150.22 ms** before and
+**86.39–88.62 ms** after. This is a retained-session improvement, but latency
+still exceeds the fresh-process warm measurements.
+
+Native RSS rose from approximately **46 to 182 MiB** before and **47 to 175
+MiB** after. Growth continued between edits 100 and 200, so neither variant
+demonstrates a plateau. Host RSS at edit 200 ranged from 261–275 MiB before and
+340–341 MiB after, with substantial GC-dependent variation during the runs. The
+change has not demonstrated a host-memory improvement.
+[Raw editing-session memory and latency](../build/incremental-memory-probe.json).
+
+The earlier description of only "small residual" native growth applied to
+repeated stateless/preencoded requests. It understates growth in actual
+incremental editing sessions. These RSS observations do not distinguish live
+cache retention from allocator residency; that requires further allocation
+accounting. No claim of bounded long-lived session memory is justified yet.
+
+### Verification and remaining limits
+
+Native and JS targets build, including the native ownership regression gate. The
+JS build also emits the pure native-session module for direct cache-planning
+tests. All **473 compiler tests**, `bend PROOF.bend`, targeted TypeScript
+checks, formatting, and diff whitespace checks pass. New tests cover uneven
+batch equivalence, empty/small frontiers, failure eligibility, stable ordering,
+and earlier-codegen-versus-later-key diagnostic precedence.
+
+Dependency joins remain, as do serial planning, reachability, ordered cache
+publication, response encoding, and parts of host assembly. Long-lived latency
+and memory residency remain important unresolved problems. Parallelism is not
+maximized, and additional forks alone will not address all of these limits.
+
+## Follow-up to `ceb1444` (2026-09-21)
+
+The preceding complete worktree was committed as `ceb1444`. This follow-up uses
+the frozen `build/cpu-before-ceb1444-Ciqs7c` snapshot of that commit as its
+baseline; it does not compare with the older controls below.
+
+Implemented:
+
+- Region partitioning uses union by rank and path compression instead of
+  constructing a symmetric graph, running two SCC traversals, and re-sorting
+  components. It preserves existing chain order, dependency closure, and
+  source-position diagnostic selection. Self-links and already-compressed parent
+  links do not rewrite the forest.
+- Incremental edits reuse validated lex/layout fragments from the previous
+  syntactically valid revision. Token fingerprints still allow CST reuse across
+  trivia edits. Token-offset indexes are constructed only when a fragment needs
+  parsing. The first edit warms this cache; ambiguous or rejected fragments use
+  the whole-file parser for canonical diagnostics. Removed fragments are
+  evicted, and failed edits do not publish partial caches.
+- Compact encoding no longer copies each fragment's complete source-offset array
+  through an obsolete range-encoding path. Dictionary packing and final
+  source-origin assembly still have serial work.
+
+### Final paired compilation control
+
+Five fresh-process samples per configuration after two warmups, with baseline
+and new variants interleaved and CPU affinity shared by host and child. Native
+settings use one or eight physical cores; JS is single-core. The Ryzen 7 7800X3D
+desktop was not otherwise isolated (Unity and browser applications were active),
+but no builds, tests, or other benchmarks ran concurrently. Startup and parity
+checks are excluded. Every clean artifact matches JS and executes; incremental
+artifacts match clean Wasm and signatures, with unchanged-revision parity too.
+
+Median milliseconds, **before → after**. Clean compilation:
+
+| Workload    |    JS, one core | Native, one core | Native, eight cores |
+| :---------- | --------------: | ---------------: | ------------------: |
+| Reader 64   | 175.63 → 171.96 |    44.44 → 43.09 |       43.43 → 40.01 |
+| Diamonds 8  | 551.36 → 493.36 |  180.73 → 178.47 |     115.71 → 109.79 |
+| Balanced 64 | 998.18 → 958.13 |  459.28 → 460.95 |     138.94 → 137.36 |
+
+Warm incremental body edits:
+
+| Workload    | Native, one core | Native, eight cores |
+| :---------- | ---------------: | ------------------: |
+| Reader 64   |    17.87 → 13.19 |       21.10 → 18.55 |
+| Diamonds 8  |   106.25 → 50.00 |       52.94 → 33.81 |
+| Balanced 64 |   137.99 → 58.87 |      126.41 → 77.41 |
+
+At eight cores, Reader clean compilation improves **7.9%** and Diamonds
+**5.1%**; Balanced clean compilation is effectively unchanged. Warm edits
+improve **12.1%, 36.1%, and 38.8%**, respectively. This is primarily less work,
+not proof of better parallel scaling: Balanced clean one-to-eight-core speedup
+is **3.36×**, and Reader/Balanced edits remain faster at one core than at eight.
+This pass remeasures the one/eight-core endpoints, not every intervening core
+count. Source and executable hashes and every sample are in the
+[final paired report](../build/cpu-ceb1444-final.json).
+
+```sh
+deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-ceb1444-final.json build/cpu-before-ceb1444-Ciqs7c,. 5 1,8 reader_64,diamonds_8,balanced_64 full,incremental
+```
+
+### Region-planner isolation
+
+On the final planner, a one-core JS microbenchmark of the actual workload chain
+graphs (20 warmups, 100 interleaved measurements per variant, identical
+component membership checked every time) reduced Reader 64 partitioning from
+**8.71 to 2.51 ms** and Diamonds 8 from **19.25 to 5.41 ms**, approximately
+71–72%. Reader has 129 chains in one region; Diamonds has 200 chains in eight
+regions. This isolates partitioning, not complete compilation or cold-JIT
+behavior. [Raw partition probe](../build/region-planner-probe.json).
+
+### Retained allocation: experiment rejected
+
+A free-list locality prototype sorted only known-free blocks within each
+existing lane/class/generation. Unlike the earlier global repacking experiment,
+it preserved each list's membership and count, left live values and compiler
+caches untouched, and unmapped its temporary scratch buffer. Maintenance ran
+before sending the response, so request timings include its cost.
+
+Two 200-request runs per executable, ordered
+baseline/prototype/prototype/baseline, used identical preencoded Balanced 64
+requests and eight pinned physical cores. Every decoded result matched. Overall
+medians were noisy: baseline **74.57–84.82 ms**, prototype **77.94–78.70 ms**.
+Late-session medians (last 20 requests) were consistently worse: baseline
+**75.67–77.51 ms**, prototype **78.34–79.44 ms**. Final native RSS was
+**47.53–47.64 MiB** versus **48.18–48.29 MiB**; both still stepped up by
+approximately 2 MiB during the run. This does not demonstrate a
+latency-and-memory win. The allocator prototype remains under ignored `build/`,
+not in production. [Raw allocator comparison](../build/lane-sort-compare.json).
+
+### Incremental frontend allocation probe
+
+A separate one-core, frontend-only diagnostic alternated two Balanced 64
+revisions for 102 preparations, in baseline/new/new/baseline order. Warm
+frontend medians fell from **71.53–82.11 ms** to **7.65–8.01 ms**. Each warm
+edit lexed **2,394 of 153,269 UTF-16 code units**, reusing the remaining
+150,875, and parsed one of 64 declarations. These are frontend timings, not
+total compile times.
+
+Explicit GC ran outside timing at requests 0, 1, 2, 25, 50, and 100 to inspect
+retained memory. Live JS heap at request 100 was approximately **54 MiB** in
+both variants; host RSS was **482–574 MiB** before versus **297 MiB** after.
+This diagnostic supports lower allocation churn, not a claim that ordinary
+sessions use exactly these RSS values or that all host memory growth is solved.
+[Raw frontend probe](../build/incremental-lex-probe.json).
+
+### Verification and remaining limits
+
+Both compiler targets rebuilt successfully, including the native constructor
+ownership regression gate. `bend PROOF.bend`, all **470 compiler tests**,
+`deno fmt --check`, and `git diff --check` pass. Tests cover region membership
+on generated DAGs, source-order failures and rollback, native/JS artifacts, warm
+fragment reuse, eviction, CRLF/reordering, and malformed-edit recovery.
+
+This reduces serial work and scheduling overhead; it does not remove real
+dependency joins or replace Bend's fork/join scheduler with a dynamic ready
+queue. Source-boundary scans, origin remapping, dictionary packing, and final
+assembly remain partly serial. The fragment cache has a first-edit warmup cost.
+Native retained-process latency and residual RSS growth remain unresolved; no
+allocator intervention was promoted. Small incremental requests can still be
+slower at eight cores than at one. This is progress, not maximal parallelism.
+
 ## Raw-source workers, dependency regions, and executable examples (2026-09-21)
 
 This pass uses `build/cpu-before-resolve-x13Mr9` as its baseline: the
