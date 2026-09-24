@@ -2,7 +2,10 @@ import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createNativeCompiler } from "../compiler/native.ts";
-import { loadSourceProject } from "../compiler/source_project.ts";
+import {
+  loadSourceProject,
+  type SourceInput,
+} from "../compiler/source_project.ts";
 
 // Compare two separately built native compilers. Run after the guarded
 // transformer has produced the candidate binary; this script builds neither.
@@ -36,7 +39,33 @@ const unicodeProject = await loadSourceProject(entry, {
     return Promise.resolve(source);
   },
 });
-const cases = [
+const witnessHelper = (body: string) => `
+const helper = fn () => ${body}
+const witness_matches_u32 = Type.eq (Type (helper ())) (Type 0)
+const answer = fn () => witness_matches_u32
+`;
+const providerRows = `
+type Left is effect = Unit -> U32
+type Right is effect = Unit -> U32
+const read_left = fn () => Left ()
+const read_right = fn () => Right ()
+const answer: Unit -> U32 = fn () => do (@effect.provider Left (fn () => 40)):
+  return do (@effect.provider Right (fn () => 2)):
+    use left <- read_left ()
+    use right <- read_right ()
+    return @u32.add left right
+`;
+const independentHelpers = `
+const first = fn () => @u32.add 40 1
+const second = fn () => @u32.add 1 0
+const answer = fn () => @u32.add (first ()) (second ())
+`;
+interface OracleCase {
+  name: string;
+  source: SourceInput;
+  expected?: "success" | "type_mismatch" | "effect_mismatch";
+}
+const cases: OracleCase[] = [
   { name: "shared prefix", source: prefixSource },
   {
     name: "long shared prefix",
@@ -69,6 +98,66 @@ const cases = [
   },
   { name: "records", source: await Deno.readTextFile("examples/records.blot") },
   { name: "arrays", source: await Deno.readTextFile("examples/arrays.blot") },
+  {
+    name: "distinct nominal type witnesses",
+    source: `
+type Count is data = Count U32
+type Other is data = Other U32
+const same = Type.eq (Type (Count 1)) (Type (Count 2))
+const different = Type.eq (Type (Count 1)) (Type (Other 2))
+const answer = fn () => case same, different of
+  True, False => 42
+  _, _ => 0
+`,
+    expected: "success",
+  },
+  // Adjacent revisions exercise one compiler process after its source changes.
+  {
+    name: "witness helper revision U32",
+    source: witnessHelper("1"),
+    expected: "success",
+  },
+  {
+    name: "witness helper revision F32",
+    source: witnessHelper("1.0"),
+    expected: "success",
+  },
+  {
+    name: "shared monomorphic argument conflict",
+    source: `
+const use_u32 = fn apply => @u32.add (apply 1) 1
+const use_bool = fn apply => case apply True of
+  True => 1
+  False => 0
+const answer = fn apply => @u32.add (use_u32 apply) (use_bool apply)
+`,
+    expected: "type_mismatch",
+  },
+  {
+    name: "ordered helper diagnostics",
+    source: independentHelpers.replace("@u32.add 40 1", "@u32.add True 1")
+      .replace("@u32.add 1 0", "@u32.add 1.0 0"),
+    expected: "type_mismatch",
+  },
+  {
+    name: "independent helpers recover",
+    source: independentHelpers,
+    expected: "success",
+  },
+  {
+    name: "distinct provider rows",
+    source: providerRows,
+    expected: "success",
+  },
+  {
+    name: "missing second provider",
+    source: providerRows.replace(
+      "return do (@effect.provider Right (fn () => 2)):",
+      "return do:",
+    ),
+    expected: "effect_mismatch",
+  },
+  { name: "provider rows recover", source: providerRows, expected: "success" },
 ];
 
 function failure(error: unknown) {
@@ -108,6 +197,21 @@ for (const threads of [1, 4]) {
             left,
             `${test.name}, repeat ${repetition}, ${method}, ${threads} threads`,
           );
+          if (test.expected !== undefined) {
+            const observed = left as {
+              success: boolean;
+              error?: { code?: unknown };
+            };
+            if (test.expected === "success") {
+              ok(observed.success, `${test.name} must compile successfully`);
+            } else {
+              equal(
+                observed.error?.code,
+                test.expected,
+                `${test.name} must report ${test.expected}`,
+              );
+            }
+          }
           if (
             method === "compile" && (right as { success?: boolean }).success
           ) {

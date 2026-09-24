@@ -3,6 +3,7 @@ import ./model.bend as M
 import ./infer.bend as I
 import ./types.bend as T
 import ./dependency.bend as D
+import ./global_bindings.bend as Bindings
 
 type Declaration is Data:
   FunctionDeclaration{value: M.Function}
@@ -48,12 +49,17 @@ def function_names(declarations: List<&2, Declaration>) -> List<&2, String>:
     case ConstantDeclaration{value} <> tail:
       function_names(tail)
 
-def lookup(declarations: List<&2, Declaration>, +name: String) -> Result<&2, &2, M.Diagnostic, Declaration>:
-  match declarations:
-    case Nil{}:
+def lookup_work(declarations: List<&2, Declaration>, +name: String, found: Maybe<&2, Declaration>) -> Result<&2, &2, M.Diagnostic, Declaration>:
+  match declarations found:
+    case _ Some{value}:
+      Done{value}
+    case Nil{} None{}:
       Fail{M.Diagnostic{"internal_error", name, "missing top-level declaration"}}
-    case +head <> tail:
-      Bool.pick(Result<&2, &2, M.Diagnostic, Declaration>, M.name_equal(declaration_name(head), name), Done{head}, lookup(tail, name))
+    case +head <> tail None{}:
+      lookup_work(tail, name, Bool.pick(Maybe<&2, Declaration>, M.name_equal(declaration_name(head), name), Some{head}, None{}))
+
+def lookup(declarations: List<&2, Declaration>, name: String) -> Result<&2, &2, M.Diagnostic, Declaration>:
+  lookup_work(declarations, name, None{})
 
 def initial_bindings(declarations: List<&2, Declaration>, +index: Nat) -> List<&2, I.Binding>:
   match declarations:
@@ -144,6 +150,18 @@ def declaration_bindings(name: String, body: M.Expr, bindings: List<&2, I.Bindin
     references : D.References <- D.references(Nat.mul(256n, 256n), D.Expression{body})
     return referenced_bindings(bindings, name <> D.names_of(references))
 
+def reference_bindings_prepared(index: Maybe<&2, Map<&2, List<&2, Bindings.Entry>>>, bindings: List<&2, I.Binding>, names: List<&2, String>) -> List<&2, I.Binding>:
+  match index:
+    case None{}:
+      referenced_bindings(bindings, names)
+    case Some{known}:
+      Bindings.referenced(known, names)
+
+def declaration_bindings_prepared(name: String, body: M.Expr, bindings: List<&2, I.Binding>, index: Maybe<&2, Map<&2, List<&2, Bindings.Entry>>>) -> Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
+  do Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
+    references : D.References <- D.references(Nat.mul(256n, 256n), D.Expression{body})
+    return reference_bindings_prepared(index, bindings, name <> D.names_of(references))
+
 def initializer_effect_code(value: M.Expr) -> String:
   match value:
     case M.RuntimeInitExpr{expression}:
@@ -151,7 +169,7 @@ def initializer_effect_code(value: M.Expr) -> String:
     case _:
       "const_effect"
 
-def infer_declaration(declaration: Declaration, +environment: Environment, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, functions: List<&2, String>) -> Result<&2, &2, M.Diagnostic, Environment>:
+def infer_declaration_prepared(declaration: Declaration, +environment: Environment, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, functions: List<&2, String>, index: Maybe<&2, Map<&2, List<&2, Bindings.Entry>>>) -> Result<&2, &2, M.Diagnostic, Environment>:
   match declaration:
     case FunctionDeclaration{M.Function{+name, exported, parameter, p, r, +body}}:
       +bindings = env_bindings(environment)
@@ -160,7 +178,7 @@ def infer_declaration(declaration: Declaration, +environment: Environment, +oper
         +param : M.Ty <- function_parameter(ty, name)
         +result : M.Ty <- function_result(ty, name)
         ambient : M.EffectRow <- function_effects(ty, name)
-        visible : List<&2, I.Binding> <- declaration_bindings(name, body, bindings)
+        visible : List<&2, I.Binding> <- declaration_bindings_prepared(name, body, bindings, index)
         +context : I.Context = I.Context{visible, Nil{}, Nil{}, types, operations, name, functions, ambient}
         s1 : I.State <- I.annotation(p, param, env_state(environment), context)
         s2 : I.State <- I.annotation(r, result, s1, context)
@@ -171,7 +189,7 @@ def infer_declaration(declaration: Declaration, +environment: Environment, +oper
       +bindings = env_bindings(environment)
       +ambient = {M.EffectRow{Nil{}, M.RowVariable{I.next_of(env_state(environment))}} : M.EffectRow}
       do Result<&2, &2, M.Diagnostic, Environment>:
-        visible : List<&2, I.Binding> <- declaration_bindings(name, value, bindings)
+        visible : List<&2, I.Binding> <- declaration_bindings_prepared(name, value, bindings, index)
         +context : I.Context = I.Context{visible, Nil{}, Nil{}, types, operations, name, functions, ambient}
         +ty : M.Ty <- binding_type(I.lookup_binding(bindings, name), name)
         s1 : I.State <- I.annotation(ann, ty, I.with_next(env_state(environment), 1n+I.next_of(env_state(environment))), context)
@@ -181,15 +199,28 @@ def infer_declaration(declaration: Declaration, +environment: Environment, +oper
         state : I.State <- I.require_pure(ambient, unified, name, effect_code)
         return Environment{bindings, I.Definition{name, definition_inference(I.inference_of(value), ty)} <> env_definitions(environment), I.clear_annotations(state)}
 
-def infer_component(names: List<&2, String>, +declarations: List<&2, Declaration>, environment: Environment, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, +functions: List<&2, String>) -> Result<&2, &2, M.Diagnostic, Environment>:
+def infer_declaration(declaration: Declaration, environment: Environment, operations: List<&2, M.Operation>, types: List<&2, M.DataType>, functions: List<&2, String>) -> Result<&2, &2, M.Diagnostic, Environment>:
+  infer_declaration_prepared(declaration, environment, operations, types, functions, None{})
+
+def component_bindings(names: List<&2, String>, bindings: List<&2, I.Binding>) -> Maybe<&2, Map<&2, List<&2, Bindings.Entry>>>:
+  match names:
+    case a <> b <> c <> d <> rest:
+      Some{Bindings.build(bindings, 0n, MTip{})}
+    case _:
+      None{}
+
+def infer_component_prepared(names: List<&2, String>, +declarations: List<&2, Declaration>, environment: Environment, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, +functions: List<&2, String>, +index: Maybe<&2, Map<&2, List<&2, Bindings.Entry>>>) -> Result<&2, &2, M.Diagnostic, Environment>:
   match names:
     case Nil{}:
       Done{environment}
     case head <> tail:
       do Result<&2, &2, M.Diagnostic, Environment>:
         declaration : Declaration <- lookup(declarations, head)
-        next : Environment <- infer_declaration(declaration, environment, operations, types, functions)
-        infer_component(tail, declarations, next, operations, types, functions)
+        next : Environment <- infer_declaration_prepared(declaration, environment, operations, types, functions, index)
+        infer_component_prepared(tail, declarations, next, operations, types, functions, index)
+
+def infer_component(+names: List<&2, String>, declarations: List<&2, Declaration>, +environment: Environment, operations: List<&2, M.Operation>, types: List<&2, M.DataType>, functions: List<&2, String>) -> Result<&2, &2, M.Diagnostic, Environment>:
+  infer_component_prepared(names, declarations, environment, operations, types, functions, component_bindings(names, env_bindings(environment)))
 
 def outside_indexed(bindings: List<&2, I.Binding>, +members: Set(), +references: Set()) -> List<&2, I.Binding>:
   match bindings:

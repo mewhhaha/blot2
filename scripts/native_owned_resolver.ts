@@ -76,6 +76,10 @@ const CASE_SHAPES: Record<string, string> = {
   FID_TYPES_RESOLVE_WORK:
     "1b73fe61dcf5a4932dc9ddc7339c71434c2c20ad1f51f7d4457a316a354fa259",
 };
+// Exact combined emission adds three pre-spin keeps because that spin now
+// sinks its arguments. The later owned entry runs before those keeps.
+const RESOLVE_PREKEEP_CASE_SHAPE =
+  "313c3b0fd978936fd6697504c5b03b558d6101ab10c9b3192fd78577ba28eec5";
 const PROBE_CASE_SHAPES: Record<string, string> = {
   FID_NAT_INDEX_FIND:
     "7c5fd09075c8cbc40693076efb5036c108814785629e298f6504b3c637f38e1b",
@@ -272,7 +276,12 @@ function verifyGenerated(source: string, probe = false): void {
   for (const [fid, expected] of Object.entries(CASE_SHAPES)) {
     symbol(source, "FID", fid.slice(4));
     const actual = shape(workCase(source, fid));
-    if (actual !== expected && (!probe || actual !== PROBE_CASE_SHAPES[fid])) {
+    if (
+      actual !== expected &&
+      !(fid === "FID_TYPES_RESOLVE_WORK" &&
+        actual === RESOLVE_PREKEEP_CASE_SHAPE) &&
+      (!probe || actual !== PROBE_CASE_SHAPES[fid])
+    ) {
       throw new Error(`Owned resolver generated field shape changed: ${fid}`);
     }
   }

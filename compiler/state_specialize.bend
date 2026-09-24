@@ -115,14 +115,19 @@ def contains_step(equal: Bool, remaining: Unit -> Bool) -> Bool:
     case False{}:
       remaining(Unit{})
 
-def contains(operations: List<&2, M.Operation>, +identity: M.TypeId) -> Bool:
-  match operations:
-    case Nil{}:
+def contains_work(operations: List<&2, M.Operation>, +identity: M.TypeId, found: Bool) -> Bool:
+  match operations found:
+    case _ True{}:
+      True{}
+    case Nil{} False{}:
       False{}
-    case M.Operation{found, parameter, result} <> tail:
-      contains_step(M.type_id_equal(found, identity), unit => contains(tail, identity))
-    case head <> tail:
-      contains(tail, identity)
+    case M.Operation{known, parameter, result} <> tail False{}:
+      contains_work(tail, identity, M.type_id_equal(known, identity))
+    case head <> tail False{}:
+      contains_work(tail, identity, False{})
+
+def contains(operations: List<&2, M.Operation>, identity: M.TypeId) -> Bool:
+  contains_work(operations, identity, False{})
 
 def concrete(operations: List<&2, M.Operation>) -> List<&2, M.Operation>:
   match operations:

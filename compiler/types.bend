@@ -3,6 +3,15 @@ import ./model.bend as M
 import ./effect_rows.bend as R
 import ./nat_index.bend as NatIndex
 
+def variable_contains_work(variables: List<&2, Nat>, +variable: Nat, found: Bool) -> Bool:
+  match variables found:
+    case _ True{}:
+      True{}
+    case Nil{} False{}:
+      False{}
+    case head <> tail False{}:
+      variable_contains_work(tail, variable, Nat.is_eq(head, variable))
+
 type Equation is Data:
   Equation{left: M.Ty, right: M.Ty, subject: String}
   RowEquation{left: M.EffectRow, right: M.EffectRow, subject: String}
@@ -525,12 +534,8 @@ def resolve(substitutions: Substitutions, ty: M.Ty) -> Result<&2, &2, M.Diagnost
     xs : List<&2, M.Ty> <- resolve_work(substitutions, Nat.mul(256n, 256n), OneType{ty})
     first_type(xs)
 
-def contains(variables: List<&2, Nat>, +variable: Nat) -> Bool:
-  match variables:
-    case Nil{}:
-      False{}
-    case head <> tail:
-      Bool.or(Nat.is_eq(head, variable), contains(tail, variable))
+def contains(variables: List<&2, Nat>, variable: Nat) -> Bool:
+  variable_contains_work(variables, variable, False{})
 
 def put(+variables: List<&2, Nat>, +variable: Nat) -> List<&2, Nat>:
   Bool.pick(List<&2, Nat>, contains(variables, variable), variables, variable <> variables)

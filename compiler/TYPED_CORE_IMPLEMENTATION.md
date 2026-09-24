@@ -15,14 +15,14 @@ checking boundaries, not the complete typed-IR/arena redesign.
 Five alternating fresh-process pairs against checkpoint `827175d`, with both
 binaries built using Bend 2.0.27, measured:
 
-| Median | Checkpoint | Integrated |
-| ------ | ---------: | ---------: |
-| Native compile call | 1,636 ms | 1,481 ms |
-| Native child CPU | 1,600 ms | 1,440 ms |
-| Startup + loading + compile | 1,725 ms | 1,572 ms |
+| Median                      | Checkpoint | Integrated |
+| --------------------------- | ---------: | ---------: |
+| Native compile call         |   1,636 ms |   1,481 ms |
+| Native child CPU            |   1,600 ms |   1,440 ms |
+| Startup + loading + compile |   1,725 ms |   1,572 ms |
 
-The compile-call reduction is 9.4%; the full measured path improves by 8.9%.
-All ten outputs have the same 192,168-byte Wasm hash. The 100–200 ms fresh
+The compile-call reduction is 9.4%; the full measured path improves by 8.9%. All
+ten outputs have the same 192,168-byte Wasm hash. The 100–200 ms fresh
 source-to-Wasm target remains unmet.
 
 Two alternating persistent-project session pairs measured initial compilation at
@@ -223,12 +223,12 @@ still falls far short of the 100–200 ms target.
 
 ### Flat type resolution
 
-The integrated resolver now uses an explicit stack of continuation frames instead
-of nested result continuations. It preserves chronological substitution cursors,
-each child's structural budget, and the order of effect labels and diagnostics.
-If its machine-step budget is exhausted, it restarts the original resolver with
-the original inputs. The original resolver remains available as a differential
-oracle; the public substitution representation is unchanged.
+The integrated resolver now uses an explicit stack of continuation frames
+instead of nested result continuations. It preserves chronological substitution
+cursors, each child's structural budget, and the order of effect labels and
+diagnostics. If its machine-step budget is exhausted, it restarts the original
+resolver with the original inputs. The original resolver remains available as a
+differential oracle; the public substitution representation is unchanged.
 
 The candidate matched 120,004 generated and 5,171 independently constructed
 cases, including self substitutions, repeated bindings, duplicate effect labels,
@@ -301,12 +301,12 @@ wall difference is too small here to establish a useful improvement. Every
 artifact matched, including a separate four-worker native run. The prototype is
 therefore **not integrated**. Its source, final generated outputs, oracles and
 `native_pairs.jsonl` remain in `build/type-core-implementation/generic-core/`
-and the surrounding investigation directory. Broader typed-body composition
-and an owned flat arena remain future work.
+and the surrounding investigation directory. Broader typed-body composition and
+an owned flat arena remain future work.
 
 The native profile of the retained-checking stage records about 68.5 million
 ownership releases, 35.2 million reference-field operations and 6.45 million
 name comparisons per gdev compile. This is evidence that the remaining work
-extends beyond unification.
-Instrumented profile percentages are not uninstrumented latency estimates; raw
-profile and call-site census are in `profile-run/`.
+extends beyond unification. Instrumented profile percentages are not
+uninstrumented latency estimates; raw profile and call-site census are in
+`profile-run/`.

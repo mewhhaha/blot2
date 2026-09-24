@@ -210,12 +210,17 @@ def contains_step(equal: Bool, remaining: Unit -> Bool) -> Bool:
     case False{}:
       remaining(Unit{})
 
-def contains(names: List<&2, String>, +name: String) -> Bool:
-  match names:
-    case Nil{}:
+def contains_work(names: List<&2, String>, +name: String, found: Bool) -> Bool:
+  match names found:
+    case _ True{}:
+      True{}
+    case Nil{} False{}:
       False{}
-    case head <> tail:
-      contains_step(M.name_equal(head, name), unit => contains(tail, name))
+    case head <> tail False{}:
+      contains_work(tail, name, M.name_equal(head, name))
+
+def contains(names: List<&2, String>, name: String) -> Bool:
+  contains_work(names, name, False{})
 
 def lookup(nodes: List<&2, Node>, +name: String) -> List<&2, String>:
   match nodes:

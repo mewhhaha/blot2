@@ -19,19 +19,26 @@ the fallback. JS emission is unchanged.
   changed nodes once. It preserves chronological versions and the original owned
   roots until every reused field has been acquired. Unsupported rows, fuel,
   layouts and unkeepable fields use the generated resolver.
+- `nat_index.c.inc`, applied by `../native_nat_index.ts` after the owned
+  resolver, replaces numeric Patricia lookup's branch closures with a consuming
+  loop. It retains Bend's Nat48 comparisons and zero-mask division behavior,
+  transfers the selected value and releases unselected paths. Shared snapshots
+  use the ordinary runtime ownership operations.
 
 The transformer pins the Bend version, relevant source definitions, all 16 Ty
 constructors, runtime ownership helpers and cancellation macros, the complete
 Index and resolve work-case shapes, and each generated free-work constructor
 projection branch. An update to source semantics or generated C layout must be
-reviewed before updating a contract. The C assets are native-only and use the
-original generated work cases as fallback; no global cache or RC bypass exists.
+reviewed before updating a contract. Bounded type kernels use the original
+generated cases as fallback. The direct index loops replace their complete
+guarded cases. No global cache or RC bypass exists.
 
 Run the fast transformer checks with:
 
 ```sh
 deno test --allow-read scripts/native_compiler_kernels.test.ts
 deno test --allow-read scripts/native_owned_resolver.test.ts
+deno test --allow-read scripts/native_nat_index.test.ts
 ```
 
 After building a baseline and candidate compiler, run the native API oracle:
@@ -64,3 +71,12 @@ deno run --allow-read --allow-write --allow-run scripts/native_kernels/probes/ru
 
 This checks final and non-final variable replacement, repeated chronology,
 low-fuel diagnostics, and at least three actual changed-path fast-path hits.
+
+The numeric index oracle covers empty/hit/missing lookups, high and maximum
+Nat48 keys, shared snapshots, nested payloads, malformed zero/nonpower branch
+masks, repeated parallel lookups, exact overflow diagnostics, and direct-path
+hit counts. Its candidate also runs under AddressSanitizer and UBSan:
+
+```sh
+deno run --allow-read --allow-write --allow-run scripts/native_kernels/probes/run_nat_index.ts
+```

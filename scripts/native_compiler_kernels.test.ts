@@ -24,6 +24,22 @@ const transform = (
   version = "bend 2.0.27",
 ) => optimizeNativeCompilerKernels(generated, inputs, version);
 
+// Two exact Bend 2.0.27 emissions are supported. The later one adds keeps
+// before a spin helper that consumes its inputs, retaining post-spin keeps.
+function prekeepResolveCase(generated: string): string {
+  const early = "    Term _v_0 = 0;\n    Term _v_1 = 0;";
+  const kept = "    _substitutions_0 = term_keep(e, _substitutions_0);\n" +
+    "    _substitutions_1 = term_keep(e, _substitutions_1);\n" +
+    "    _substitutions_2 = term_keep(e, _substitutions_2);\n";
+  const late = "    _work_1 = term_keep(e, _work_1);\n" + kept;
+  ok(generated.includes(early));
+  ok(generated.includes(late));
+  return generated.replace(
+    early,
+    "    Term _v_0 = 0;\n" + kept + "    Term _v_1 = 0;",
+  );
+}
+
 Deno.test("native compiler kernels retain native fallback and transfer owned results", async () => {
   const output = await transform();
   match(
@@ -55,6 +71,22 @@ Deno.test("native compiler kernels retain native fallback and transfer owned res
     1,
   );
   await rejects(() => transform(output), /already patched/);
+});
+
+Deno.test("native closed kernel accepts the exact pre-spin keep layout and rejects ownership drift", async () => {
+  const prekept = prekeepResolveCase(fixture);
+  const output = await transform(prekept);
+  match(output, /compact_closed_work\(e, _work_0, _work_1, _fuel_0\)/);
+  const keep = "    _substitutions_0 = term_keep(e, _substitutions_0);";
+  const altered = prekept.replace(
+    keep,
+    "    _substitutions_0 = _substitutions_0;",
+  );
+  ok(altered !== prekept);
+  await rejects(
+    () => transform(altered),
+    /resolve_work generated shape changed/,
+  );
 });
 
 Deno.test("native compiler kernels fail closed on Bend and semantic changes", async () => {

@@ -110,6 +110,12 @@ const PROBE_INDEX_CASE_SHAPE =
   "04ea8f63cde5b7d997dfaaeed42e1ef735bc81898d5ebce9716a3e06f41dff3d";
 const RESOLVE_CASE_SHAPE =
   "badd132037e1284813ea7eb4e810015ba020bae1f59ce3b4210d006982bc0208";
+// The combined compiler also keeps Substitutions' first three fields before
+// the first spin, whose helper now sinks those copies; its original post-spin
+// keeps remain for the continuation. The optimized entry runs before either
+// keep group and consumes the original owned fields exactly once.
+const RESOLVE_PREKEEP_CASE_SHAPE =
+  "b89399b41f87a40de7386060a29dfe9a7050fa9fe31a2262a2463b07a5430ba8";
 const PROBE_PROVIDER_BRANCH_SHAPE =
   "9e9eac13f5a7b4dd4442c54c3d79195daba636dfef0ff0323379985198007b85";
 const FREE_BRANCH_SHAPES: Record<string, string> = {
@@ -460,7 +466,8 @@ function freeKernel(source: string, helper: string, probe = false): string {
 
 function closedKernel(source: string, helper: string): string {
   const old = workCase(source, "TYPES_RESOLVE_WORK");
-  if (generatedShape(old.body) !== RESOLVE_CASE_SHAPE) {
+  const shape = generatedShape(old.body);
+  if (shape !== RESOLVE_CASE_SHAPE && shape !== RESOLVE_PREKEEP_CASE_SHAPE) {
     throw new Error("Native kernel resolve_work generated shape changed");
   }
   const match =

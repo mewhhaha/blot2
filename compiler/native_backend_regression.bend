@@ -4,6 +4,9 @@ import ./type_data.bend as D
 import ./residual_scheme_regression.bend as ResidualScheme
 import ./frontier_reuse_regression.bend as FrontierReuse
 import ./pending_cache_regression.bend as PendingCache
+import ./global_bindings_regression.bend as GlobalBindings
+import ./parallel_infer_regression.bend as ParallelInferRegression
+import ./staging_boundary_regression.bend as StagingBoundary
 import ./types.bend as Types
 
 def maybe_declaration() -> M.DataType:
@@ -79,8 +82,11 @@ def flat_resolver_valid() -> Bool:
 
 # Bend 2.0.5 sealed this polymorphic Some payload, then unboxed its record with
 # term_loc instead of ctr_take. Keep the actual constructor lookup as a guard.
+def check_existing() -> Bool:
+  Bool.and(GlobalBindings.valid(), Bool.and(FrontierReuse.valid(), Bool.and(PendingCache.valid(), Bool.and(flat_resolver_valid(), Bool.and(ResidualScheme.valid(), Bool.and(shared_records_valid(), Bool.and(String.eq(definition_text(D.constructor([maybe_declaration()], "Nothing")), "regression::Maybe params=1 payload=none"), Bool.and(String.eq(definition_text(D.constructor([maybe_declaration()], "Some")), "regression::Maybe params=1 payload='0"), instance_valid(D.instantiate(Some{D.ConstructorDefinition{M.TypeId{"regression", "Maybe"}, 1n, None{}}}, "Nothing", 7n, "native backend regression"))))))))))
+
 def check() -> Bool:
-  Bool.and(FrontierReuse.valid(), Bool.and(PendingCache.valid(), Bool.and(flat_resolver_valid(), Bool.and(ResidualScheme.valid(), Bool.and(shared_records_valid(), Bool.and(String.eq(definition_text(D.constructor([maybe_declaration()], "Nothing")), "regression::Maybe params=1 payload=none"), Bool.and(String.eq(definition_text(D.constructor([maybe_declaration()], "Some")), "regression::Maybe params=1 payload='0"), instance_valid(D.instantiate(Some{D.ConstructorDefinition{M.TypeId{"regression", "Maybe"}, 1n, None{}}}, "Nothing", 7n, "native backend regression")))))))))
+  Bool.and(StagingBoundary.valid(), Bool.and(ParallelInferRegression.valid(), check_existing()))
 
 def finish(valid: Bool) -> IO(Unit):
   match valid:

@@ -555,3 +555,47 @@ def Laws.empty_fresh_prefix_preserves_pending_tail(definitions, choices, rest):
 
 def Laws.invalid_pending_prefix_uses_full_scan(selected, count, prior_count, definitions, prior_needs, choices):
   {==}
+
+def Laws.global_binding_repeat_reference_keeps_selection(name, index, selection):
+  {==}
+
+def Laws.empty_global_references_select_no_bindings(index):
+  {==}
+
+def Laws.global_declaration_lookup_keeps_first_match(rest, name, declaration):
+  match rest:
+    case Nil{}:
+      {==}
+    case head <> tail:
+      {==}
+
+def Laws.dependency_membership_work_stops_after_hit(rest, name):
+  match rest:
+    case Nil{}:
+      {==}
+    case head <> tail:
+      {==}
+
+def Laws.state_membership_work_stops_after_hit(rest, identity):
+  match rest:
+    case Nil{}:
+      {==}
+    case M.Operation{known, parameter, result} <> tail:
+      {==}
+    case M.OperationTemplate{known, parameters, parameter, result} <> tail:
+      {==}
+    case M.OperationInstance{template, arguments} <> tail:
+      {==}
+
+def Laws.variable_membership_work_stops_after_hit(rest, variable):
+  match rest:
+    case Nil{}:
+      {==}
+    case head <> tail:
+      {==}
+
+def Laws.failed_parallel_commit_replays_serial_inference(declarations, environment, operations, types, functions, catalog):
+  {==}
+
+def Laws.rejected_staging_scheme_does_not_replay(scheme, clone, parsed, stride, environment):
+  {==}

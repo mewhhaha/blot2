@@ -18,6 +18,18 @@ const sources = {
 const transform = (c = fixture, input = sources, version = "bend 2.0.27") =>
   optimizeNativeOwnedResolver(c, input, version);
 
+function prekeepResolveCase(generated: string): string {
+  const early = "    Term _v_0 = 0;\n    Term _v_1 = 0;";
+  const kept = "    _substitutions_0 = term_keep(e, _substitutions_0);\n" +
+    "    _substitutions_1 = term_keep(e, _substitutions_1);\n" +
+    "    _substitutions_2 = term_keep(e, _substitutions_2);\n";
+  ok(generated.includes(early));
+  return generated.replace(
+    early,
+    "    Term _v_0 = 0;\n" + kept + "    Term _v_1 = 0;",
+  );
+}
+
 Deno.test("owned resolver inserts after closed path and transfers only certified owned results", async () => {
   const output = await transform();
   match(
@@ -36,6 +48,25 @@ Deno.test("owned resolver inserts after closed path and transfers only certified
   match(output, /return term_triv\(value\) \|\| term_rfc\(value\);/);
   ok(output.includes("WL_CASE(FID_TYPES_RESOLVE_WORK_K_TEST)"));
   await rejects(() => transform(output), /already patched/);
+});
+
+Deno.test("owned resolver accepts exact pre-spin keeps and rejects an altered owned field", async () => {
+  const prekept = prekeepResolveCase(fixture);
+  const output = await transform(prekept);
+  match(output, /OwnedTypePlan owned_plan_scratch/);
+  const keep = "    _substitutions_1 = term_keep(e, _substitutions_1);";
+  const marker = "#if !DEVICE\n  WL_CASE(FID_TYPES_RESOLVE_WORK)\n";
+  const at = prekept.indexOf(marker);
+  ok(at >= 0);
+  const altered = prekept.slice(0, at) + prekept.slice(at).replace(
+    keep,
+    "    _substitutions_1 = _substitutions_1;",
+  );
+  ok(altered !== prekept);
+  await rejects(
+    () => transform(altered),
+    /generated field shape changed: FID_TYPES_RESOLVE_WORK/,
+  );
 });
 
 Deno.test("owned resolver rejects semantic and runtime-domain changes", async () => {

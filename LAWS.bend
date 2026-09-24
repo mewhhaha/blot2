@@ -34,6 +34,11 @@ import ./compiler/core_compare.bend as CoreCompare
 import ./compiler/checked_core.bend as CheckedCore
 import ./compiler/nat_index.bend as NatIndex
 import ./compiler/frontier_alpha_compare.bend as FrontierAlpha
+import ./compiler/global_bindings.bend as GlobalBindings
+import ./compiler/globals.bend as Globals
+import ./compiler/state_specialize.bend as StateSpecialize
+import ./compiler/parallel_infer.bend as ParallelInfer
+import ./compiler/staging_scheme.bend as StagingScheme
 
 # An exported function-valued constant is called through its stored value.
 # Selecting exports after inference must never duplicate its initializer.
@@ -783,3 +788,55 @@ law invalid_pending_prefix_uses_full_scan:
   for prior_needs: List<&2, Infer.Coverage>
   for choices: Map<&2, Mono.Choice>
   {Mono.refresh_with_count(False{}, selected, count, prior_count, definitions, prior_needs, choices) == Mono.PendingCache{count, Mono.specialization_pending(selected)} : Mono.PendingCache}
+
+# Repeated references must not duplicate the binding environment. A name index
+# preserves source positions and every binding with that name, including shadows.
+law global_binding_repeat_reference_keeps_selection:
+  for name: String
+  for index: Map<&2, List<&2, GlobalBindings.Entry>>
+  for +selection: GlobalBindings.Selection
+  {GlobalBindings.select_name(True{}, name, index, selection) == selection : GlobalBindings.Selection}
+
+law empty_global_references_select_no_bindings:
+  for index: Map<&2, List<&2, GlobalBindings.Entry>>
+  {GlobalBindings.referenced(index, Nil{}) == Nil{} : List<&2, Infer.Binding>}
+
+law global_declaration_lookup_keeps_first_match:
+  for rest: List<&2, Globals.Declaration>
+  for name: String
+  for +declaration: Globals.Declaration
+  {Globals.lookup_work(rest, name, Some{declaration}) == Done{declaration} : Result<&2, &2, M.Diagnostic, Globals.Declaration>}
+
+law dependency_membership_work_stops_after_hit:
+  for rest: List<&2, String>
+  for name: String
+  {Dependency.contains_work(rest, name, True{}) == True{} : Bool}
+
+law state_membership_work_stops_after_hit:
+  for rest: List<&2, M.Operation>
+  for identity: M.TypeId
+  {StateSpecialize.contains_work(rest, identity, True{}) == True{} : Bool}
+
+law variable_membership_work_stops_after_hit:
+  for rest: List<&2, Nat>
+  for variable: Nat
+  {Substitutions.variable_contains_work(rest, variable, True{}) == True{} : Bool}
+
+# Failed speculation must use the original environment and declaration order.
+law failed_parallel_commit_replays_serial_inference:
+  for +declarations: List<&2, Globals.Declaration>
+  for +environment: Globals.Environment
+  for +operations: List<&2, M.Operation>
+  for +types: List<&2, M.DataType>
+  for +functions: List<&2, String>
+  for +catalog: Maybe<&2, Map<&2, List<&2, GlobalBindings.Entry>>>
+  {ParallelInfer.serial_or_committed(None{}, declarations, environment, operations, types, functions, catalog) == ParallelInfer.serial(declarations, environment, operations, types, functions, catalog) : Result<&2, &2, M.Diagnostic, Globals.Environment>}
+
+# Typed source evidence cannot be used after any eligibility guard fails.
+law rejected_staging_scheme_does_not_replay:
+  for scheme: StagingScheme.Scheme
+  for clone: M.Function
+  for parsed: StagingScheme.CloneName
+  for stride: Nat
+  for environment: Globals.Environment
+  {StagingScheme.replay_scheme(False{}, scheme, clone, parsed, stride, environment) == None{} : Maybe<&2, Globals.Environment>}
