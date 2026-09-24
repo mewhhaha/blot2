@@ -40,6 +40,28 @@ function sessionTest(
   });
 }
 
+sessionTest(
+  "native planner invalidates an operation-only nominal catalog revision",
+  async (session, clean) => {
+    const source = `type Box is data = Box U32
+type Wrap is data = Wrap U32
+effect Unused : Unit -> Box
+const answer = 7
+`;
+    const first = await session.compile(source);
+    equivalent(first.artifact, await clean.compile(source));
+    const changedSource = source.replace(
+      "effect Unused : Unit -> Box",
+      "effect Unused : Unit -> Wrap",
+    );
+    const changed = await session.compile(changedSource);
+    equivalent(changed.artifact, await clean.compile(changedSource));
+    ok(changed.stats.groups_checked > 0);
+    const recovered = await session.compile(source);
+    equivalent(recovered.artifact, await clean.compile(source));
+  },
+);
+
 function normalized(analysis: Analysis): Analysis {
   return {
     ...analysis,

@@ -599,3 +599,6 @@ def Laws.failed_parallel_commit_replays_serial_inference(declarations, environme
 
 def Laws.rejected_staging_scheme_does_not_replay(scheme, clone, parsed, stride, environment):
   {==}
+
+def Laws.shared_nominal_catalog_reuses_sorted_list(shared, common):
+  {==}

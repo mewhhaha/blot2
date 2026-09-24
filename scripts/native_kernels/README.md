@@ -24,6 +24,15 @@ the fallback. JS emission is unchanged.
   loop. It retains Bend's Nat48 comparisons and zero-mask division behavior,
   transfers the selected value and releases unselected paths. Shared snapshots
   use the ordinary runtime ownership operations.
+- `map_bit.c.inc` and `string_cmp.c.inc`, applied together by
+  `../native_borrowed_strings.ts` after NatIndex, borrow immutable String nodes
+  while retaining the original owned roots. Map.bit returns its key and the same
+  33-way trie bit; String.cmp returns both roots and unsigned U32 lexicographic
+  order. Both loops poll for cancellation. The device keeps the generated Bend
+  cases. This transform checks installed Base Map/String/Char definitions, all
+  five affected generated entries and continuations, their U32 helpers, and the
+  native term and atomic read layout. It stops the build if any reviewed
+  contract changes.
 
 The transformer pins the Bend version, relevant source definitions, all 16 Ty
 constructors, runtime ownership helpers and cancellation macros, the complete
@@ -39,6 +48,7 @@ Run the fast transformer checks with:
 deno test --allow-read scripts/native_compiler_kernels.test.ts
 deno test --allow-read scripts/native_owned_resolver.test.ts
 deno test --allow-read scripts/native_nat_index.test.ts
+deno test --allow-read scripts/native_borrowed_strings.test.ts
 ```
 
 After building a baseline and candidate compiler, run the native API oracle:
@@ -79,4 +89,14 @@ hit counts. Its candidate also runs under AddressSanitizer and UBSan:
 
 ```sh
 deno run --allow-read --allow-write --allow-run scripts/native_kernels/probes/run_nat_index.ts
+```
+
+The borrowed String direct probe exercises empty and prefix comparisons,
+distinct equal and shared strings, embedded NUL, Unicode and U32 boundary
+characters, Nat48 map positions, and exact overflow diagnostics at 1 and 4
+workers. It confirms both kernels execute, compares to generated Bend output,
+and runs the candidate under AddressSanitizer and UBSan:
+
+```sh
+deno run --allow-read --allow-write --allow-run scripts/native_kernels/probes/run_borrowed_strings.ts
 ```

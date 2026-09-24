@@ -445,8 +445,8 @@ def group_module(module: M.Module, operation_key: List<&2, U32>) -> Result<&2, &
     return List.append(&2, U32, body, operation_key)
 
 def planning(plan: G.Planning) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
-  G.Planning{nodes, usages, types} = plan
-  encode([DependencyNodes{nodes}, Usages{usages}, TypeDependencies{types}])
+  G.Planning{nodes, usages, types, shared} = plan
+  encode([DependencyNodes{nodes}, Usages{usages}, TypeDependencies{types}, Identities{shared}])
 
 def interfaces(values: List<&2, G.Interface>) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
   encode([Interfaces{values}])

@@ -19,8 +19,23 @@ const backend = compiled as unknown as {
     module: Node,
     operationKey: BendList<number>,
   ): Result<BendList<number>>;
+  "native_cache_keys.planning"(plan: Node): Result<BendList<number>>;
   "native_cache_keys.encode"(work: BendList<Node>): Result<BendList<number>>;
 };
+
+Deno.test("native planning keys include shared operation nominal requirements", () => {
+  const planning = (shared: readonly Node[]): Node => ({
+    $: "Planning",
+    nodes: bendList([]),
+    usages: bendList([]),
+    type_dependencies: bendList([]),
+    shared_operation_types: bendList(shared),
+  });
+  const key = (shared: readonly Node[]) =>
+    words(backend["native_cache_keys.planning"](planning(shared)));
+  notEqual(key([]), key([id("Box")]));
+  notEqual(key([id("Box")]), key([id("Wrap")]));
+});
 const id = (declaration: string): Node => ({
   $: "TypeId",
   module_name: "main",

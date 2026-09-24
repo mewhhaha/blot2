@@ -576,6 +576,21 @@ def type_set(identities: List<&2, M.TypeId>, found: TypeSet()) -> TypeSet():
     case +head <> tail:
       type_set(tail, Map.set(&2, M.TypeId, found, type_key(head), head))
 
+def type_set_excluding_found(present: Maybe<&2, M.TypeId>, head: M.TypeId, key: String, found: TypeSet()) -> TypeSet():
+  match present:
+    case Some{value}:
+      found
+    case None{}:
+      Map.set(&2, M.TypeId, found, key, head)
+
+def type_set_excluding(identities: List<&2, M.TypeId>, +excluded: TypeSet(), found: TypeSet()) -> TypeSet():
+  match identities:
+    case Nil{}:
+      found
+    case +head <> tail:
+      +key = type_key(head)
+      type_set_excluding(tail, excluded, type_set_excluding_found(Index.find(M.TypeId, excluded, key), head, key, found))
+
 def type_keys(identities: List<&2, M.TypeId>) -> List<&2, String>:
   match identities:
     case Nil{}:
@@ -603,12 +618,12 @@ def publish_summary(names: List<&2, String>, +summary: TypeSet(), summaries: Map
     case head <> tail:
       publish_summary(tail, summary, Map.set(&2, TypeSet(), summaries, head, summary))
 
-def usage_seeds(usages: List<&2, DeclarationUsage>, seeds: Map<&2, TypeSet()>) -> Map<&2, TypeSet()>:
+def usage_seeds(usages: List<&2, DeclarationUsage>, +shared: TypeSet(), seeds: Map<&2, TypeSet()>) -> Map<&2, TypeSet()>:
   match usages:
     case Nil{}:
       seeds
     case DeclarationUsage{name, Usage{nominals}} <> tail:
-      usage_seeds(tail, Map.set(&2, TypeSet(), seeds, name, type_set(nominals, Map.new(&2, M.TypeId))))
+      usage_seeds(tail, shared, Map.set(&2, TypeSet(), seeds, name, type_set_excluding(nominals, shared, Map.new(&2, M.TypeId))))
 
 def nominal_nodes(types: List<&2, TypeDependencies>) -> List<&2, D.Node>:
   match types:
@@ -649,7 +664,14 @@ def close_nominals(identities: List<&2, M.TypeId>, +summaries: Map<&2, TypeSet()
 
 # SCC interfaces include all nominal types reachable through their dependencies.
 # The dependency-first order shares those closures instead of rescanning bodies.
-def make_jobs(components: List<&2, List<&2, String>>, +edges: Map<&2, List<&2, String>>, +known: Set(), +seeds: Map<&2, TypeSet()>, +nominals: Map<&2, TypeSet()>, +summaries: Map<&2, TypeSet()>) -> List<&2, Job>:
+def required_for_summary(summary: TypeSet(), +shared: TypeSet(), common: List<&2, M.TypeId>) -> List<&2, M.TypeId>:
+  match summary:
+    case MTip{}:
+      common
+    case other:
+      List.sort(~M.TypeId, ~type_identity_le, Map.values(&2, M.TypeId, Map.union(&2, M.TypeId, shared, other)))
+
+def make_jobs(components: List<&2, List<&2, String>>, +edges: Map<&2, List<&2, String>>, +known: Set(), +seeds: Map<&2, TypeSet()>, +nominals: Map<&2, TypeSet()>, +shared: TypeSet(), +common: List<&2, M.TypeId>, +summaries: Map<&2, TypeSet()>) -> List<&2, Job>:
   match components:
     case Nil{}:
       Nil{}
@@ -658,11 +680,11 @@ def make_jobs(components: List<&2, List<&2, String>>, +edges: Map<&2, List<&2, S
       +own = combine_seeds(members, seeds, Map.new(&2, M.TypeId))
       closed = close_nominals(Map.values(&2, M.TypeId, own), nominals, own)
       +summary = combine_seeds(dependencies, summaries, closed)
-      required = List.sort(~M.TypeId, ~type_identity_le, Map.values(&2, M.TypeId, summary))
-      Job{members, dependencies, required} <> make_jobs(tail, edges, known, seeds, nominals, publish_summary(members, summary, summaries))
+      required = required_for_summary(summary, shared, common)
+      Job{members, dependencies, required} <> make_jobs(tail, edges, known, seeds, nominals, shared, common, publish_summary(members, summary, summaries))
 
 type Planning is Data:
-  Planning{nodes: List<&2, D.Node>, usages: List<&2, DeclarationUsage>, type_dependencies: List<&2, TypeDependencies>}
+  Planning{nodes: List<&2, D.Node>, usages: List<&2, DeclarationUsage>, type_dependencies: List<&2, TypeDependencies>, shared_operation_types: List<&2, M.TypeId>}
 
 def planning_nodes(nodes: List<&2, D.Node>) -> List<&2, D.Node>:
   match nodes:
@@ -699,7 +721,7 @@ def prepare_plan_usages(module: M.Module, graph: Result<&2, &2, M.Diagnostic, Li
     usages : List<&2, DeclarationUsage> <- scanned
     required : List<&2, M.TypeId> <- operation_types(operations, constructors)
     nominal_graph : List<&2, TypeDependencies> <- type_dependencies(types, constructors)
-    return Planning{planning_nodes(nodes), planning_usages(shared_operation_types(usages, required)), planning_types(nominal_graph)}
+    return Planning{planning_nodes(nodes), planning_usages(usages), planning_types(nominal_graph), List.sort(~M.TypeId, ~type_identity_le, required)}
 
 def prepare_plan_graph(module: M.Module, graph: Result<&2, &2, M.Diagnostic, List<&2, D.Node>>) -> Result<&2, &2, M.Diagnostic, Planning>:
   M.Module{constants, functions, +types, operations} = module
@@ -710,7 +732,7 @@ def prepare_plan_graph(module: M.Module, graph: Result<&2, &2, M.Diagnostic, Lis
     usages : List<&2, DeclarationUsage> <- declaration_usages(declarations, constructors)
     required : List<&2, M.TypeId> <- operation_types(operations, constructors)
     nominal_graph : List<&2, TypeDependencies> <- type_dependencies(types, constructors)
-    return Planning{planning_nodes(nodes), planning_usages(shared_operation_types(usages, required)), planning_types(nominal_graph)}
+    return Planning{planning_nodes(nodes), planning_usages(usages), planning_types(nominal_graph), List.sort(~M.TypeId, ~type_identity_le, required)}
 
 def prepare_plan(+module: M.Module) -> Result<&2, &2, M.Diagnostic, Planning>:
   prepare_plan_graph(module, Check.module_graph(module))
@@ -732,19 +754,21 @@ def component_pair(nodes: List<&2, D.Node>, nominals: List<&2, D.Node>, parallel
       values types = D.components(nodes) D.components(nominals)
       (values, types)
 
-def finish_components(pair: Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>> & Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>, +nodes: List<&2, D.Node>, usages: List<&2, DeclarationUsage>, nominal_graph: List<&2, TypeDependencies>, +nominal_graph_nodes: List<&2, D.Node>) -> Result<&2, &2, M.Diagnostic, List<&2, Job>>:
+def finish_components(pair: Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>> & Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>, +nodes: List<&2, D.Node>, usages: List<&2, DeclarationUsage>, nominal_graph: List<&2, TypeDependencies>, +nominal_graph_nodes: List<&2, D.Node>, +shared_operation_types: List<&2, M.TypeId>) -> Result<&2, &2, M.Diagnostic, List<&2, Job>>:
   (value_components, type_components) = pair
   do Result<&2, &2, M.Diagnostic, List<&2, Job>>:
     components : List<&2, List<&2, String>> <- value_components
     nominal_components : List<&2, List<&2, String>> <- type_components
-    closures : Map<&2, TypeSet()> = nominal_summaries(nominal_components, D.adjacency(nominal_graph_nodes, Map.new(&2, List<&2, String>)), nominal_seeds(nominal_graph, Map.new(&2, TypeSet())), Set.from_list(D.node_names(nominal_graph_nodes)), Map.new(&2, TypeSet()))
-    return make_jobs(components, D.adjacency(nodes, Map.new(&2, List<&2, String>)), Set.from_list(D.node_names(nodes)), usage_seeds(usages, Map.new(&2, TypeSet())), closures, Map.new(&2, TypeSet()))
+    +closures : Map<&2, TypeSet()> = nominal_summaries(nominal_components, D.adjacency(nominal_graph_nodes, Map.new(&2, List<&2, String>)), nominal_seeds(nominal_graph, Map.new(&2, TypeSet())), Set.from_list(D.node_names(nominal_graph_nodes)), Map.new(&2, TypeSet()))
+    +shared : TypeSet() = close_nominals(shared_operation_types, closures, type_set(shared_operation_types, Map.new(&2, M.TypeId)))
+    common : List<&2, M.TypeId> = List.sort(~M.TypeId, ~type_identity_le, Map.values(&2, M.TypeId, shared))
+    return make_jobs(components, D.adjacency(nodes, Map.new(&2, List<&2, String>)), Set.from_list(D.node_names(nodes)), usage_seeds(usages, shared, Map.new(&2, TypeSet())), closures, shared, common, Map.new(&2, TypeSet()))
 
 def finish_plan(planning: Planning) -> Result<&2, &2, M.Diagnostic, List<&2, Job>>:
-  Planning{+nodes, usages, +nominal_graph} = planning
+  Planning{+nodes, usages, +nominal_graph, shared_operation_types} = planning
   +nominal_graph_nodes = nominal_nodes(nominal_graph)
   pair = component_pair(nodes, nominal_graph_nodes, Bool.and(substantial_graph(nodes, 32n), substantial_graph(nominal_graph_nodes, 32n)))
-  finish_components(pair, nodes, usages, nominal_graph, nominal_graph_nodes)
+  finish_components(pair, nodes, usages, nominal_graph, nominal_graph_nodes, shared_operation_types)
 
 def plan(module: M.Module) -> Result<&2, &2, M.Diagnostic, List<&2, Job>>:
   do Result<&2, &2, M.Diagnostic, List<&2, Job>>:

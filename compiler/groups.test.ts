@@ -474,6 +474,64 @@ Deno.test("independent jobs retain nominal closures of all operation signatures"
   }
 });
 
+Deno.test("shared operation closure survives an unused operation and a recursive value group", () => {
+  const inner: DataType = {
+    identity: { $: "TypeId", module_name: "shared", declaration: "Inner" },
+    parameters: 0n,
+    constructors: [{ name: "Inner", payload: u32Type }],
+  };
+  const outer: DataType = {
+    identity: { $: "TypeId", module_name: "shared", declaration: "Outer" },
+    parameters: 0n,
+    constructors: [{
+      name: "Outer",
+      payload: { $: "AppliedTy", identity: inner.identity, arguments: [] },
+    }],
+  };
+  const unused = operation("unused", {
+    result: { $: "AppliedTy", identity: outer.identity, arguments: [] },
+  });
+  const source = module([
+    fn("number", call("left", integer(42))),
+    fn("truth", call("right", boolean(true))),
+    fn("left", {
+      $: "IfExpr",
+      condition: boolean(true),
+      consequent: call("identity", local("value")),
+      alternative: call("right", local("value")),
+    }, { parameter_type: null, exported: false }),
+    fn("right", call("left", local("value")), {
+      parameter_type: null,
+      exported: false,
+    }),
+    fn("identity", local("value"), { parameter_type: null, exported: false }),
+  ], { operations: [unused], data_types: [outer, inner] });
+  const prepared = unwrap(
+    groups["groups.prepare_plan"](wire(source, "Module")),
+  ) as {
+    shared_operation_types: List<TypeId>;
+    usages: List<{ usage: { nominals: List<TypeId> } }>;
+  };
+  equal(array(prepared.shared_operation_types).map(identityKey), [
+    identityKey(outer.identity),
+  ]);
+  equal(
+    array(prepared.usages).map((entry) => array(entry.usage.nominals).length),
+    [0, 0, 0, 0, 0],
+  );
+  const result = agrees(source);
+  equal(
+    result.jobs.map((job) => array(job.members).sort()).sort(),
+    [["identity"], ["left", "right"], ["number"], ["truth"]],
+  );
+  for (const job of result.jobs) {
+    equal(
+      new Set(array(job.type_dependencies).map(identityKey)),
+      new Set([inner.identity, outer.identity].map(identityKey)),
+    );
+  }
+});
+
 Deno.test("metadata catalogs follow inferred dependency results but exclude unrelated layouts", () => {
   const position = {
     $: "TypeId" as const,
@@ -899,6 +957,7 @@ function plannedSummaries(
       identity,
       references: list(references),
     }))),
+    shared_operation_types: list([]),
   })));
 }
 

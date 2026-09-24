@@ -840,3 +840,10 @@ law rejected_staging_scheme_does_not_replay:
   for stride: Nat
   for environment: Globals.Environment
   {StagingScheme.replay_scheme(False{}, scheme, clone, parsed, stride, environment) == None{} : Maybe<&2, Globals.Environment>}
+
+# Operation signatures contribute a transitive nominal catalog shared by every
+# checking job. Jobs without additional requirements reuse its sorted list.
+law shared_nominal_catalog_reuses_sorted_list:
+  for shared: Groups.TypeSet()
+  for +common: List<&2, M.TypeId>
+  {Groups.required_for_summary(MTip{}, shared, common) == common : List<&2, M.TypeId>}

@@ -4,6 +4,7 @@ import { optimizeNativeStringComparison } from "./native_string_compare.ts";
 import { optimizeNativeCompilerKernels } from "./native_compiler_kernels.ts";
 import { optimizeNativeOwnedResolver } from "./native_owned_resolver.ts";
 import { optimizeNativeNatIndex } from "./native_nat_index.ts";
+import { optimizeNativeBorrowedStrings } from "./native_borrowed_strings.ts";
 
 const environment = { BEND_NO_TELEMETRY: "1" };
 const decoder = new TextDecoder();
@@ -94,7 +95,17 @@ if (target !== "js") {
         new URL("../compiler/nat_index.bend", import.meta.url),
       ),
     }, nativeVersion);
-    await Deno.writeTextFile(generatedC, indexedSource);
+    const [baseMap, baseString, baseChar] = await Promise.all([
+      run("bend", ["base", "Map"]),
+      run("bend", ["base", "String"]),
+      run("bend", ["base", "Char"]),
+    ]);
+    const borrowedSource = await optimizeNativeBorrowedStrings(indexedSource, {
+      map: baseMap,
+      string: baseString,
+      char: baseChar,
+    }, nativeVersion);
+    await Deno.writeTextFile(generatedC, borrowedSource);
     await run("clang", [
       "-std=c11",
       "-O3",
@@ -106,7 +117,7 @@ if (target !== "js") {
       resolve(staging, "blotc"),
     ]);
     console.log(
-      `Enabled guarded native String comparison, compiler kernels, owned resolver and NatIndex for ${nativeVersion}`,
+      `Enabled guarded native String comparison, compiler kernels, owned resolver, NatIndex and borrowed String traversals for ${nativeVersion}`,
     );
     await Deno.rename(resolve(staging, "blotc"), new URL("blotc", output));
     console.log("Built generated/compiler/blotc (native CPU executable)");
