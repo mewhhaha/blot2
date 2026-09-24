@@ -602,3 +602,16 @@ def Laws.rejected_staging_scheme_does_not_replay(scheme, clone, parsed, stride, 
 
 def Laws.shared_nominal_catalog_reuses_sorted_list(shared, common):
   {==}
+
+
+def Laws.exhausted_schema_reduction_is_a_miss(work):
+  {==}
+
+def Laws.rejected_schema_source_is_a_miss(left, witness, proof):
+  {==}
+
+def Laws.schema_hit_still_validates_tail(fuel, tail, wanted, proof, answer):
+  {==}
+
+def Laws.missing_schema_choice_uses_ordinary_selection(need, left, right, specialization, configuration, shapes, schemes):
+  {==}

@@ -1,4 +1,5 @@
 import Base
+import ./compiler/schema_stage.bend as Schema
 import ./compiler/model.bend as M
 import ./compiler/effects.bend as Effects
 import ./compiler/const_eval.bend as Const
@@ -847,3 +848,33 @@ law shared_nominal_catalog_reuses_sorted_list:
   for shared: Groups.TypeSet()
   for +common: List<&2, M.TypeId>
   {Groups.required_for_summary(MTip{}, shared, common) == common : List<&2, M.TypeId>}
+
+# Optional schema reduction must fall back when evidence or bounded work fails.
+law exhausted_schema_reduction_is_a_miss:
+  for work: Schema.ChainWork
+  {Schema.decide_chain(0n, work) == None{} : Maybe<&2, Bool>}
+
+law rejected_schema_source_is_a_miss:
+  for left: M.Ty
+  for witness: M.Ty
+  for proof: Schema.Evidence
+  {Schema.decide_checked(False{}, left, witness, proof) == None{} : Maybe<&2, Bool>}
+
+# A true membership result cannot hide a malformed later head or tail.
+law schema_hit_still_validates_tail:
+  for +fuel: Nat
+  for +tail: M.Ty
+  for +wanted: String
+  for +proof: Schema.Evidence
+  for answer: Bool
+  {Schema.decide_chain(1n+fuel, Schema.Choose{True{}, tail, wanted, proof, answer}) == Schema.decide_chain(fuel, Schema.Walk{tail, wanted, proof, True{}}) : Maybe<&2, Bool>}
+
+law missing_schema_choice_uses_ordinary_selection:
+  for +need: Infer.Coverage
+  for +left: M.Ty
+  for +right: M.Ty
+  for +specialization: Mono.Specialization
+  for +configuration: Mono.Configuration
+  for +shapes: List<&2, Infer.Binding>
+  for +schemes: List<&2, StagingScheme.Scheme>
+  {Mono.select_method_staged(None{}, need, left, right, specialization, configuration, shapes, schemes) == Mono.select_method_original(need, left, right, specialization, configuration, shapes, schemes) : Result<&2, &2, M.Diagnostic, Mono.Specialization>}

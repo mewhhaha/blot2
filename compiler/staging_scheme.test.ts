@@ -235,6 +235,7 @@ function fixture() {
     constants: nil,
     family_templates: nil,
     step: 1n,
+    schema: nil,
   };
   const expanded = expand(
     65536n,

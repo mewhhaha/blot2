@@ -21,8 +21,8 @@ from [the preceding experiments](HIGH_COST_EXPERIMENTS.md).
   ownership regressions, plus the shared-catalog law in
   `LAWS.bend`/`PROOF.bend`.
 
-These changes preserve gdev's complete 3,360,009-byte analysis, including its
-821 checked functions and 23 constants. Analysis SHA-256:
+The String/catalog changes preserve gdev's complete 3,360,009-byte analysis,
+including its 821 checked functions and 23 constants. Analysis SHA-256:
 `dae40eb1448855bc156f9c9bb043a68329a33c8782adeef71ca1520d71015c32`. The
 192,168-byte Wasm remains byte-identical:
 `3acd6c59325af25370b39d7a5b6259ce7fd6314d944f2f3831f0ca1793c4cf9a`.
@@ -110,11 +110,9 @@ wall time substantially; use this profile for approximate attribution, not as an
 absolute latency comparison with the earlier profile. Raw phase events and
 adjacent uninstrumented controls are in `build/high-cost-integration/root/`.
 
-The next private experiment is a checked-source schema evaluator that avoids
-generating helper clones. Review requires complete chain validation even after a
-successful membership hit, exact nominal/source dependencies, ordinary
-field/method diagnostics, receiver/witness evaluation, and transactional
-fallback. Its production integration depends on full output/diagnostic parity
-and a measured native benefit.
+The follow-up [checked-source schema evaluator](SCHEMA_STAGING.md) removes 76
+checked functions from gdev and reduces four-worker compile time by another 9.6%
+in a separate paired window. It preserves Wasm, behavior, and tested
+diagnostics, with checked cache dependencies and ordinary fallback.
 
 The **100–200 ms target has not been reached**.
