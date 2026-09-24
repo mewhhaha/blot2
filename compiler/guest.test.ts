@@ -17,14 +17,14 @@ import { createSourceCompiler } from "./source.ts";
 
 const source = `
 effect Number.advance: U32 -> U32
-fn tick value => do:
+const tick = fn value => do:
   use next <- Number.advance value
   return next
-export fn main (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider Number.advance advance):
+const main = fn (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider Number.advance advance):
   use next <- tick 41
   return next
-export fn pure () => 7
-export const count = 12
+const pure = fn () => 7
+const count = 12
 `;
 
 async function compiled(text = source) {
@@ -67,7 +67,7 @@ Deno.test("explicit capabilities implement source effects, with no domain import
     equal(guest.call("pure", null), 7);
     equal(guest.read("count"), 12);
     equal(guest.abi, {
-      version: 1,
+      version: 2,
       functions: [
         {
           name: "main",
@@ -107,7 +107,7 @@ Deno.test("all sixteen scalar callback signatures use checked canonical values",
   };
   const definitions = types.flatMap((parameter) =>
     types.map((result) =>
-      `export fn invoke_${parameter.toLowerCase()}_${result.toLowerCase()} (io: ${parameter} -> ${result} ! {Foreign}) => do:
+      `const invoke_${parameter.toLowerCase()}_${result.toLowerCase()} = fn (io: ${parameter} -> ${result} ! {Foreign}) => do:
   use result <- io ${literals[parameter]}
   return result`
     )
@@ -310,14 +310,14 @@ Deno.test("same-instance reentry and disposal are rejected while another guest c
 
 Deno.test("scalar-only guests remain import-free and validate arguments and constants", async () => {
   const { bytes } = await compiled(`
-export fn integer (value: U32) => value
-export fn boolean (value: Bool) => value
-export fn float (value: F32) => value
-export fn unit () => ()
-export const flag = True
-export const maximum = 4_294_967_295
-export const fraction = 1.25
-export const nothing = ()
+const integer = fn (value: U32) => value
+const boolean = fn (value: Bool) => value
+const float = fn (value: F32) => value
+const unit = fn () => ()
+const flag = True
+const maximum = 4_294_967_295
+const fraction = 1.25
+const nothing = ()
 `);
   equal(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), []);
   const guest = await instantiateGuest(bytes);
@@ -379,29 +379,29 @@ function manifest(bytes: number[]): number[] {
 }
 
 Deno.test("ABI decoder rejects ambiguous, malformed, and unsupported manifests", async () => {
-  equal(readGuestAbi(wasm(manifest([1, 0, 0]))), {
-    version: 1,
+  equal(readGuestAbi(wasm(manifest([2, 0, 0]))), {
+    version: 2,
     functions: [],
     constants: [],
   });
   for (
     const module of [
       wasm(),
-      wasm(manifest([1, 0, 0]), manifest([1, 0, 0])),
+      wasm(manifest([2, 0, 0]), manifest([2, 0, 0])),
       ...[
         [],
-        [2, 0, 0],
-        [1, 0],
-        [1, 0, 0, 0],
-        [129, 0, 0, 0],
+        [1, 0, 0],
+        [2, 0],
+        [2, 0, 0, 0],
+        [130, 0, 0, 0],
         [255, 255, 255, 255, 16],
-        [1, 1, 255, 255, 255, 255, 15],
-        [1, 1, 1, 255, 0, 0, 0],
-        [1, 1, ...name("f"), 9, 0, 0],
-        [1, 1, ...name("f"), 4, 4, 0, 0, 0],
-        [1, 2, ...name("f"), 0, 0, ...name("f"), 0, 0, 0],
-        [1, 1, ...name("f"), 0, 0, 1, ...name("f"), 0],
-        [1, 1, ...name("missing"), 0, 0, 0],
+        [2, 1, 255, 255, 255, 255, 15],
+        [2, 1, 1, 255, 0, 0, 0],
+        [2, 1, ...name("f"), 9, 0, 0],
+        [2, 1, ...name("f"), 4, 4, 0, 0, 0],
+        [2, 2, ...name("f"), 0, 0, ...name("f"), 0, 0, 0],
+        [2, 1, ...name("f"), 0, 0, 1, ...name("f"), 0],
+        [2, 1, ...name("missing"), 0, 0, 0],
       ].map((bytes) => wasm(manifest(bytes))),
     ]
   ) {
@@ -414,7 +414,7 @@ Deno.test("ABI refuses any ambient or domain-specific import", () => {
   const module = wasm(
     section(1, [1, 96, 0, 0]),
     section(2, [1, ...name("window"), ...name("title"), 0, 0]),
-    manifest([1, 0, 0]),
+    manifest([2, 0, 0]),
   );
   throws(() => readGuestAbi(module), errorCode("invalid_abi"));
 });
@@ -447,7 +447,7 @@ Deno.test("even a Wasm module retaining a previous invocation reference cannot r
     section(6, [1, 111, 1, 208, 111, 11]),
     section(7, [1, ...name("main"), 0, 1]),
     section(10, [1, ...leb(instructions.length), ...instructions]),
-    manifest([1, 1, ...name("main"), 4, 1, 1, 1, 0]),
+    manifest([2, 1, ...name("main"), 4, 1, 1, 1, 0]),
   );
   const guest = await instantiateGuest(module);
   try {
@@ -459,6 +459,41 @@ Deno.test("even a Wasm module retaining a previous invocation reference cannot r
     equal(guest.call("main", capability), 42);
     throws(() => guest.call("main", capability), errorCode("stale_capability"));
     equal(calls, 1);
+  } finally {
+    guest.dispose();
+  }
+});
+
+Deno.test("array ABI rejects malformed guest pointers and length headers", async () => {
+  const module = wasm(
+    section(1, [1, 96, 1, 127, 1, 127]),
+    section(3, [3, 0, 0, 0]),
+    section(5, [1, 1, 1, ...leb(256)]),
+    section(7, [
+      4,
+      ...name("array"),
+      0,
+      0,
+      ...name("blot:allocate"),
+      0,
+      1,
+      ...name("blot:reset"),
+      0,
+      2,
+      ...name("blot:memory"),
+      2,
+      0,
+    ]),
+    section(10, [3, 4, 0, 32, 0, 11, 4, 0, 65, 4, 11, 4, 0, 65, 4, 11]),
+    section(11, [1, 0, 65, 4, 11, 4, 255, 255, 255, 255]),
+    manifest([2, 1, ...name("array"), 1, 5, 0]),
+  );
+  const guest = await instantiateGuest(module);
+  try {
+    for (const pointer of [0, 1, 4, 65536, 0xffffffff]) {
+      throws(() => guest.call("array", pointer), errorCode("invalid_abi"));
+    }
+    equal(guest.call("array", 8), new Uint32Array());
   } finally {
     guest.dispose();
   }

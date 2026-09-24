@@ -2,8 +2,10 @@
 
 This is the broader target API, not the current complete FFI. The compiler
 rejects game/GUI intrinsics and implements generic operations/providers, sealed
-`Foreign` effects and scalar host callbacks through [guest ABI 1](guest-abi.md).
-Cross-boundary records/arrays, runtime Text, persistent guest values and the
+`Foreign` effects and scalar host callbacks through [guest ABI 2](guest-abi.md).
+The ABI also copies `Array U32` and `Array F32` across ordinary export calls;
+gdev uses those buffers for source-defined state/render codecs. Cross-boundary
+records, general arrays, runtime Text, persistent guest handles and the
 record-bundle entrypoint adapter below still need implementation. See also
 [examples/host_capabilities.blot](../examples/host_capabilities.blot), now
 ported to the current scalar callback ABI. That executable port constructs
@@ -18,11 +20,11 @@ The compiler knows neither name and does not inject capabilities.
 
 ```blot
 data WindowIo = WindowIo {
-  set_title: Text -> Result Unit IoError ! {Foreign},
+  set_title: Text -> Result [Unit, IoError] ! {Foreign},
 }
 
 data RenderIo = RenderIo {
-  submit: RenderFrame -> Result Unit IoError ! {Foreign},
+  submit: RenderFrame -> Result [Unit, IoError] ! {Foreign},
 }
 
 data Io = Io {
@@ -30,7 +32,7 @@ data Io = Io {
   render: RenderIo,
 }
 
-export fn main (io: Io) => do:
+const main = fn (io: Io) => do:
   use titled <- io.window.set_title "Blot sandbox"
   return case titled of
     Err error => Err error
@@ -103,14 +105,14 @@ Explicit callback invocation is sufficient for simple code. A library can add
 named, source-declared effects when code should be independent of its provider:
 
 ```blot
-effect Window.set_title: Text -> Result Unit IoError
+effect Window.set_title: Text -> Result [Unit, IoError]
 
-fn window_provider (window_io: WindowIo) =>
+const window_provider = fn (window_io: WindowIo) =>
   @effect.provider Window.set_title window_io.set_title
 
-fn announce () => Window.set_title "Blot sandbox"
+const announce = fn () => Window.set_title "Blot sandbox"
 
-export fn configured (io: Io) => do (window_provider io.window):
+const configured = fn (io: Io) => do (window_provider io.window):
   use result <- announce ()
   return result
 ```

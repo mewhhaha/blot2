@@ -75,7 +75,7 @@ Deno.test("compact parallel frontend preserves exact request bytes, offsets, fue
       for (
         const source of [
           "",
-          "export fn tiny () => 42",
+          "const tiny = fn () => 42",
           `// Unicode 🙂\n${large}`,
           large.replaceAll("\n", "\r\n"),
           `import { external } from "./module"\n${large}`,
@@ -161,8 +161,8 @@ Deno.test("parallel frontend uses the full grammar's first diagnostic for reject
         `${large}\nimport * as late from "./late"`,
         large.replace("return value_63", "return @u32.add ) 1"),
         large.replace("let value_0", "let ="),
-        `${large}\n@attribute\nexport fn extra () => 1`,
-        `${large}\n  export fn indented () => 1`,
+        `${large}\n@attribute\nconst extra = fn () => 1`,
+        `${large}\n  const indented = fn () => 1`,
       ]
     ) {
       let expected: ReturnType<typeof diagnostic> | undefined;
@@ -216,7 +216,7 @@ Deno.test("frontend worker creation failures terminate siblings and never fall b
       postMessage() {}
     } as unknown as typeof Worker;
     // Small requests do not create workers at all.
-    const small = "export fn answer () => 42";
+    const small = "const answer = fn () => 42";
     equal(
       (await frontend.prepareNative(small)).encode("compile", 10000n),
       reference(frontend, small),

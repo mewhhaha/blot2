@@ -35,7 +35,7 @@ def opened(previous: Maybe<&2, Session.State>, result: Result<&2, &2, M.Diagnost
 
 def stat_fields(stats: Session.Stats, fields: List<&2, Response.Work>) -> List<&2, Response.Work>:
   Session.Stats{lowered, declarations_reused, checked, groups_reused, evaluated, constants_reused, compiled, entries_reused} = stats
-  Response.Word{1112297300} <> Response.Word{7} <> Response.Word{4} <> Response.Natural{lowered} <> Response.Natural{declarations_reused} <> Response.Natural{checked} <> Response.Natural{groups_reused} <> Response.Natural{evaluated} <> Response.Natural{constants_reused} <> Response.Natural{compiled} <> Response.Natural{entries_reused} <> fields
+  Response.Word{1112297300} <> Response.Word{Response.version()} <> Response.Word{4} <> Response.Natural{lowered} <> Response.Natural{declarations_reused} <> Response.Natural{checked} <> Response.Natural{groups_reused} <> Response.Natural{evaluated} <> Response.Natural{constants_reused} <> Response.Natural{compiled} <> Response.Natural{entries_reused} <> fields
 
 # Even a response-size failure must not publish the candidate cache state.
 def encoded(previous: Maybe<&2, Session.State>, state: Session.State, result: Result<&2, &2, M.Diagnostic, Output.Packet>) -> Reply:
@@ -112,6 +112,6 @@ def serve(fuel: Nat, state: Maybe<&2, Session.State>, incoming: Maybe<&1, Native
 def main() -> IO(Unit):
   do IO<Unit>:
     # Handshake lets the parent measure process startup separately from work.
-    NativeIO.send(2, [1112297300, 7], Nil{})
+    NativeIO.send(2, [1112297300, Response.version()], Nil{})
     first : Maybe<&1, NativeIO.Frame> <- NativeIO.receive()
     serve(Nat.read.max(), None{}, first)

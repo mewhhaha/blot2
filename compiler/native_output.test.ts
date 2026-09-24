@@ -2,7 +2,10 @@ import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import compiled from "../generated/compiler/native_output.js";
 import { bendArray, type BendList, bendList } from "./bend_list.ts";
 import { NativeProcess } from "./native_process.ts";
-import { encodeNativeRequest } from "./native_protocol.ts";
+import {
+  encodeNativeRequest,
+  nativeProtocolVersion,
+} from "./native_protocol.ts";
 import { createSourceFrontend } from "./source_frontend.ts";
 import { arithmeticSource } from "./benchmark_workloads.ts";
 
@@ -42,7 +45,7 @@ const backend = compiled as unknown as {
     steps: bigint,
   ): Result<Node>;
 };
-const fields: Node[] = [1112297300, 7, 2].map((value) => ({
+const fields: Node[] = [1112297300, nativeProtocolVersion, 2].map((value) => ({
   $: "Word",
   value,
 }));
@@ -161,7 +164,7 @@ Deno.test("native chunk writer matches the original complete response byte for b
       try {
         for (
           const source of [
-            "export fn answer () => 42\n",
+            "const answer = fn () => 42\n",
             arithmeticSource("balanced", false),
           ]
         ) {

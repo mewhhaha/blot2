@@ -50,13 +50,15 @@ function sourceError(code: string, start?: number) {
 
 Deno.test("native unchanged and trivia revisions skip transport and isolate public results", () =>
   withSession(async (compiler, requests, clean) => {
-    const source = `const saved = fn value => @u32.add value 1
+    const source =
+      `const saved = (fn offset => fn value => @u32.add value offset) 1
 const calculated = saved 41
-export fn answer () => calculated
+const answer = fn () => calculated
 `;
     equal(requests(), 1);
     const first = await compiler.compile(source);
     const expected = structuredClone(first.artifact);
+    const totalGroups = first.stats.groups_checked + first.stats.groups_reused;
     equal(first.artifact.bytes, clean.compile(source).bytes);
     equal(requests(), 2);
     first.artifact.bytes.fill(0);
@@ -67,7 +69,7 @@ export fn answer () => calculated
     equal(second.stats.result_reused, true);
     equal(second.stats.source_reused, true);
     equal(second.stats.parsed_ms, 0);
-    equal(second.stats.groups_reused, 3);
+    equal(second.stats.groups_reused, totalGroups);
     equal(requests(), 2);
     const saved = second.artifact.analysis.constants.find((entry) =>
       entry.name === "saved"
@@ -85,7 +87,7 @@ export fn answer () => calculated
     equal(third.stats.islands_reused, 3);
     equal(requests(), 2);
     equal(await answer(third.artifact.bytes), 42);
-    const edited = trivia.replace("value 1", "value 2");
+    const edited = trivia.replace("offset) 1", "offset) 2");
     const changed = await compiler.compile(edited);
     equal(changed.artifact.bytes, clean.compile(edited).bytes);
     equal(changed.stats.result_reused, false);
@@ -99,7 +101,7 @@ export fn answer () => calculated
 Deno.test("native unchanged cache keys include operation and const budget, with success-only publication", () =>
   withSession(async (compiler, requests, clean) => {
     const source =
-      "const value = @u32.add 40 2\nexport fn answer () => value\n";
+      "const value = @u32.add 40 2\nconst answer = fn () => value\n";
     const first = await compiler.compile(source, { const_steps: 100n });
     const sent = requests();
     await rejects(
@@ -146,7 +148,7 @@ Deno.test("native unchanged cache keys include operation and const budget, with 
 Deno.test("native cached replies preserve queued revision order, option snapshots and disposal", () =>
   withSession(async (compiler, requests, clean) => {
     const source =
-      "const value = @u32.add 40 1\nexport fn answer () => value\n";
+      "const value = @u32.add 40 1\nconst answer = fn () => value\n";
     await compiler.compile(source, { const_steps: 100n });
     const options = { const_steps: 100n };
     const ordered: string[] = [];
@@ -154,7 +156,7 @@ Deno.test("native cached replies preserve queued revision order, option snapshot
       ordered.push("unchanged");
       return result;
     });
-    const invalid = compiler.compile("fn broken () =>\n", options).then(
+    const invalid = compiler.compile("const broken = fn () =>\n", options).then(
       () => {
         throw new Error("Expected malformed source to fail");
       },

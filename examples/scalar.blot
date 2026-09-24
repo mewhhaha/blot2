@@ -1,25 +1,25 @@
 // Executable scalar slice: Baba parsing, Bend checking and Wasm emission.
-fn U32.increment value => @u32.add value 1
+const U32.increment = fn value => @u32.add value 1
 
-export const base: U32 = @u32.add 20 21
-export const max_value: U32 = 0xFFFF_FFFF
+const base: U32 = @u32.add 20 21
+const max_value: U32 = 0xFFFF_FFFF
 
-export fn answer () -> U32 => do:
+const answer = fn () -> U32 => do:
   let result: U32 = U32.increment base
   return result
 
 // use also accepts pure computations; it does not introduce an effect itself.
-export fn bound_answer () -> U32 => do:
+const bound_answer = fn () -> U32 => do:
   use result: U32 <- U32.increment base
   use ()
   return result
 
-export fn capped (value: U32) -> U32 => do:
+const capped = fn (value: U32) -> U32 => do:
   if @u32.lt value 42:
     return value
   return 42
 
-export fn choose (condition: Bool) -> U32 => do:
+const choose = fn (condition: Bool) -> U32 => do:
   if condition:
     return 20
   else:

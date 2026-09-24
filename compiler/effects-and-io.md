@@ -3,9 +3,10 @@
 ## Compiler boundary
 
 Compiler primitives are general language/machine operations: numeric operations,
-panic, generic effect installation/reflection, and typed foreign calls through
-explicit callbacks; checked memory operations remain future work. There are no
-`@ecs.*`, `@window.*`, `@render.*`, `@input.*`, or `@asset.*` primitives.
+panic, generic effect installation/reflection, scoped state, and typed foreign
+calls through explicit callbacks; checked memory operations remain future work.
+There are no `@ecs.*`, `@window.*`, `@render.*`, `@input.*`, or `@asset.*`
+primitives.
 
 ECS registration, storage, entity lifecycle, queries, scheduling, and render
 packet formats belong in Blot libraries. Source wrappers around compiler domain
@@ -14,21 +15,21 @@ hooks would not satisfy this boundary.
 ## Generic effects
 
 ```blot
-effect Reader.ask: Unit -> U32
+type Reader a is effect = { ask: Unit -> a }
 
-fn read_twice () => do:
-  use left <- Reader.ask ()
-  use right <- Reader.ask ()
+const read_twice = fn () => do:
+  use left <- Reader.ask U32 ()
+  use right <- Reader.ask U32 ()
   return left + right
 
-const reader = @effect.provider Reader.ask (fn () => 21)
+const reader = @effect.provider (Reader.ask U32) (fn () => 21)
 
-export fn answer () => do reader:
+const answer = fn () => do reader:
   use value <- read_twice ()
   return value
 
 const accesses = @effect.of read_twice
-const reads_reader = @effect.has accesses Reader.ask
+const reads_reader = @effect.has accesses (Reader.ask U32)
 const effect_count = @effect.count accesses
 ```
 
@@ -45,8 +46,97 @@ provider runs its implementation in the outer scope, so forwarding to an older
 provider does not recurse into itself. Escaping functions retain their effects
 and do not capture the provider chain.
 
-This is direct, result-returning handling. It supports Reader-style operations,
-not pure mutable State or continuation/resumption semantics.
+Ordinary providers return each operation result directly. A source-declared
+effect family gives each concrete state type its own read/write operations:
+
+```blot
+type State a is effect = {
+  get: Unit -> a
+  set: a -> Unit
+}
+
+const advance = fn initial => do:
+  let (next, previous) = do (@effect.state (State.get U32) (State.set U32) initial):
+    use value <- State.get U32 ()
+    use State.set U32 (value + 1)
+    return value
+  return (next, previous)
+```
+
+`State U32` names the concrete family instance; type application uses spaces
+throughout the language. Generic libraries infer the same source-declared
+operations from ordinary argument and result types, without naming the type
+argument in each function body. A typed getter can connect a constructor or
+function witness's result type to the operation's result type.
+
+`@effect.state read write initial` checks that the distinct operations have
+signatures `Unit -> S` and `S -> Unit`. Installing it creates fresh scoped state
+and returns `(successor_state, body_result)`. Writes do not mutate the initial
+value or earlier snapshots. Reusing a provider starts from its original value;
+nested providers shadow the same operations and forward unrelated effects.
+Closures use providers at their call site and never capture a state cell. State
+resolvers work during bounded const evaluation and in the guest. This does not
+add continuation/resumption semantics.
+
+Generic libraries can let monomorphization select a family instance:
+
+```blot
+type State a is effect = {
+  get: Unit -> a
+  set: a -> Unit
+}
+type Counter is data = Counter U32
+const get = fn (witness: p -> a) -> a => State.get ()
+const set = fn value => State.set value
+
+const advance = fn () => do:
+  use counter <- get Counter
+  let Counter value = counter
+  return set (Counter (value + 1))
+
+const answer = fn () => do:
+  let (Counter next, _) = @effect.run State.get State.set (Counter 41) advance
+  return next
+```
+
+`State.get ()` and `State.set value` are ordinary effect calls. The compiler
+infers their family arguments from the value argument and expected result type;
+there are no get/set selector intrinsics. The `get` wrapper annotates its
+witness as `p -> a` and its result as `a`, connecting a constructor's result to
+the operation's result without invoking the constructor. An unused witness
+without that annotation establishes no type relationship.
+
+The same inference supports arbitrary operation signatures, composite arguments,
+and curried families. Explicit arguments remain available, including shared free
+annotation variables. Operations specialize to closed nominal identities before
+const evaluation and Wasm emission, with no runtime type lookup.
+
+`@effect.run` requires both operations to belong to one family, installs fresh
+state, calls `action ()`, and returns `(successor, result)`. `@effect.reader`
+and `@effect.writer` install custom implementations through ordinary provider
+rules. These runner shortcuts require one plain family binder. Explicit
+providers can handle composite and curried families. Explicit polymorphic
+effect-row annotations such as `! {State a}` remain unsupported. Unhandled
+effects remain visible in function types; pure annotations and const evaluation
+reject unhandled calls.
+
+In the sibling gdev checkout, `src/ecs.blot` implements the source ECS using
+these operations. `insert_resource initial` and `register_component exemplar`
+compose nested state and access closures in a const builder. Duplicate types,
+including resource/component conflicts, fail during const evaluation.
+`ecs.build` removes the registration schema and returns a simulation containing
+initial state, scope and checkpoint closures. Component columns and their
+snapshots are runtime values whose types come from registration; there is no
+handwritten application World record or runtime type registry.
+
+The gdev library's `get`, `previous`, `components`, `previous_components`,
+column replacement and query functions require a unary constructor/function
+witness; use `(fn () => Idle)` for a nullary constructor. Component access
+requires `at entity action` or a query scope. Missing current components trap;
+individual `previous` falls back to the current component when no snapshot
+exists. Bulk `previous_components` preserves missing entries as `Nothing`, and
+bulk access masks removed entities. Queries are explicit library calls; system
+registration does not infer queries from a callback's effects.
 
 ## Compile-time descriptors
 
@@ -70,13 +160,13 @@ Host functions are passed explicitly to ordinary exported functions. The first
 implemented boundary accepts one scalar callback and returns a scalar:
 
 ```blot
-export fn main (advance: U32 -> U32 ! {Foreign}) => do:
+const main = fn (advance: U32 -> U32 ! {Foreign}) => do:
   use next <- advance 41
   return next
 ```
 
 Run `just demo-host`; [the executable example](../examples/host_io.blot) also
-forwards a source operation through that callback. [Guest ABI 1](guest-abi.md)
+forwards a source operation through that callback. [Guest ABI 2](guest-abi.md)
 defines the manifest, scalar codecs, opaque references, lifetime and failure
 rules. The compiler does not recognize `main`, `advance`, or any service name.
 
@@ -108,9 +198,8 @@ compiler must not recognize those operation names. Reload must keep persistent
 source state separate from transient host handles and reinstall explicit
 capabilities for the replacement program.
 
-Tuples, record construction/patterns, immutable arrays and file imports now
-execute inside the guest, but do not cross the scalar host boundary. Before
-reconnecting the sandbox: implement record field access and state resolvers,
-stabilize the composite capability/state ABI, implement the ECS in source, then
-restore render packets and transactional live reload. Do not restore the retired
-domain backend.
+Tuples, nominal data, immutable arrays, file imports, scoped state and generic
+source libraries execute inside the guest. Numeric arrays cross the host
+boundary as copied typed arrays, which gdev uses for transactional state and
+render packets. The ECS itself is source code; the compiler implements general
+state, effects, loops and specialization rather than domain operations.

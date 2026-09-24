@@ -105,12 +105,12 @@ effect Reader.ask: Unit -> U32
 const operation = Reader.ask
 const base = @effect.provider Reader.ask (fn () => 42)
 const forwarding = @effect.provider Reader.ask operation
-fn read () => operation ()
-export fn answer () => do base:
+const read = fn () => operation ()
+const answer = fn () => do base:
   return do forwarding:
     return do forwarding:
       return read ()
-export const expected = answer ()
+const expected = answer ()
 `;
     const { exports, analysis } = await compile(reference, native, source);
     equal(invoke(exports, "answer"), 42);
@@ -137,15 +137,15 @@ effect Reader.ask: Unit -> U32
 effect Computation.answer: Unit -> U32
 const base = @effect.provider Reader.ask (fn () => 40)
 const interference = @effect.provider Reader.ask (fn () => 999)
-fn delegated () => do:
+const delegated = fn () => do:
   use value <- Reader.ask ()
   return @u32.add value 2
 const computation = @effect.provider Computation.answer delegated
-export fn answer () => do base:
+const answer = fn () => do base:
   return do computation:
     return do interference:
       return Computation.answer ()
-export const expected = answer ()
+const expected = answer ()
 `;
     const { exports } = await compile(reference, native, source);
     equal(invoke(exports, "answer"), 42);
@@ -158,22 +158,22 @@ effectTest(
   async (reference, native) => {
     const source = `
 effect Reader.ask: Unit -> U32
-fn invoke work => work ()
-fn make extra => fn () => do:
+const invoke = fn work => work ()
+const make = fn extra => fn () => do:
   use value <- Reader.ask ()
   return @u32.add value extra
 const creation_provider = @effect.provider Reader.ask (fn () => 900)
 const delayed = do creation_provider:
   return make 2
-fn force () => invoke delayed
+const force = fn () => invoke delayed
 const call_provider = @effect.provider Reader.ask (fn () => 40)
-export fn answer () => do call_provider:
+const answer = fn () => do call_provider:
   return force ()
-export const expected = answer ()
+const expected = answer ()
 const creation_effects = @effect.of make
 const invocation_effects = @effect.of force
-export const creation_count = @effect.count creation_effects
-export const invocation_count = @effect.count invocation_effects
+const creation_count = @effect.count creation_effects
+const invocation_count = @effect.count invocation_effects
 `;
     const { exports } = await compile(reference, native, source);
     equal(invoke(exports, "answer"), 42);
@@ -189,21 +189,21 @@ effectTest(
     const source = `
 effect Seed.read: Unit -> U32
 effect Reader.ask: Unit -> U32
-fn build_reader () => do:
+const build_reader = fn () => do:
   use seed <- Seed.read ()
   return @effect.provider Reader.ask (fn () => seed)
 const seed_provider = @effect.provider Seed.read (fn () => 21)
-export fn answer () => do seed_provider:
+const answer = fn () => do seed_provider:
   use selected <- build_reader ()
   return do selected:
     use left <- Reader.ask ()
     use right <- Reader.ask ()
     return @u32.add left right
-export const expected = answer ()
+const expected = answer ()
 const creation = @effect.of build_reader
-export const creation_count = @effect.count creation
-export const needs_seed = @effect.has creation Seed.read
-export const needs_reader = @effect.has creation Reader.ask
+const creation_count = @effect.count creation
+const needs_seed = @effect.has creation Seed.read
+const needs_reader = @effect.has creation Reader.ask
 `;
     const { exports } = await compile(reference, native, source);
     equal(invoke(exports, "answer"), 42);
@@ -223,14 +223,14 @@ effect Boxes.wrap: U32 -> Box
 effect Numbers.double: F32 -> F32
 const boxes = @effect.provider Boxes.wrap Box
 const numbers = @effect.provider Numbers.double (fn value => @f32.mul value 2.0)
-export fn answer () => do boxes:
+const answer = fn () => do boxes:
   use wrapped <- Boxes.wrap 42
   return case wrapped of
     Box value => value
-export fn doubled (value: F32) => do numbers:
+const doubled = fn (value: F32) => do numbers:
   return Numbers.double value
-export const expected_box = answer ()
-export const expected_number = doubled 1.25
+const expected_box = answer ()
+const expected_number = doubled 1.25
 `;
     const { exports } = await compile(reference, native, source);
     equal(invoke(exports, "answer"), 42);
@@ -246,12 +246,12 @@ effectTest(
     const source = `
 effect Reader.ask: Unit -> U32
 const provider = @effect.provider Reader.ask (fn () => 21)
-fn twice () => do provider:
+const twice = fn () => do provider:
   use left <- Reader.ask ()
   use right <- Reader.ask ()
   return @u32.add left right
-export const answer = twice ()
-export const second = twice ()
+const answer = twice ()
+const second = twice ()
 `;
     const baseline = reference.analyze(source, { const_steps: 1000n });
     const used = 1000n - baseline.remaining_steps;
@@ -288,10 +288,11 @@ const delayed = do provider:
     await rejectSource(
       reference,
       native,
-      `${prefix}\nexport fn wrong () => delayed ()\n`,
+      `${prefix}\nconst wrong: Unit -> U32 = fn () => delayed ()\n`,
+      "effect_mismatch",
     );
     const valid = `${prefix}
-export fn answer () => do provider:
+const answer = fn () => do provider:
   return delayed ()
 `;
     equal(
@@ -306,13 +307,13 @@ effectTest(
   async (reference, native) => {
     const source = `
 effect Reader.ask: Unit -> U32
-fn bad_provider () => @panic "reader should not run"
+const bad_provider = fn () => @panic "reader should not run"
 const provider = @effect.provider Reader.ask bad_provider
-export fn answer () => do provider:
+const answer = fn () => do provider:
   if False:
     use Reader.ask ()
   return 42
-export const expected = answer ()
+const expected = answer ()
 `;
     const { exports } = await compile(reference, native, source);
     equal(invoke(exports, "answer"), 42);
@@ -347,21 +348,21 @@ effectTest(
     const source = `
 effect Reader.ask: Unit -> U32
 effect Other.ask: Unit -> U32
-fn read_twice () => do:
+const read_twice = fn () => do:
   use Reader.ask ()
   return Reader.ask ()
-fn count effects => @effect.count effects
-fn contains effects => fn operation => @effect.has effects operation
-fn same left => fn right => @effect.same left right
+const count = fn effects => @effect.count effects
+const contains = fn effects => fn operation => @effect.has effects operation
+const same = fn left => fn right => @effect.same left right
 const requirements = @effect.of read_twice
 const reader = @effect.descriptor Reader.ask
 const other = @effect.descriptor Other.ask
-export const total = count requirements
-export const includes_reader = contains requirements reader
-export const includes_other = contains requirements other
-export const equal_reader = same reader (@effect.descriptor Reader.ask)
-export const unequal_operations = same reader other
-export fn answer () => total
+const total = count requirements
+const includes_reader = contains requirements reader
+const includes_other = contains requirements other
+const equal_reader = same reader (@effect.descriptor Reader.ask)
+const unequal_operations = same reader other
+const answer = fn () => total
 `;
     const { analysis, exports } = await compile(reference, native, source);
     equal(constant(exports, "total"), 1);
@@ -390,27 +391,45 @@ effectTest(
     await rejectSource(
       reference,
       native,
-      "fn invoke work => work ()\nconst wrong = @effect.of invoke\n",
+      "const invoke = fn work => work ()\nconst wrong = @effect.of invoke\n",
       "open_effect_descriptor",
     );
     for (
       const body of [
-        "export fn wrong () => @effect.count requirements",
-        "fn count effects => @effect.count effects\nexport fn wrong () => count requirements",
-        "export const wrong = requirements",
+        "const wrong = fn () => @effect.count requirements",
+        "const count = fn effects => @effect.count effects\nconst wrong = fn () => count requirements",
       ]
     ) {
       await rejectSource(
         reference,
         native,
         `effect Reader.ask: Unit -> U32
-fn read () => Reader.ask ()
+const read = fn () => Reader.ask ()
 const requirements = @effect.of read
 ${body}
 `,
         "backend_const_only",
       );
     }
+    const descriptors = await compile(
+      reference,
+      native,
+      `
+effect Reader.ask: Unit -> U32
+const read = fn () => Reader.ask ()
+const requirements = @effect.of read
+const alias = requirements
+`,
+    );
+    equal(Object.keys(descriptors.exports), []);
+    equal(
+      descriptors.analysis.constants.find((constant) =>
+        constant.name === "alias"
+      )?.value,
+      descriptors.analysis.constants.find((constant) =>
+        constant.name === "requirements"
+      )?.value,
+    );
   },
 );
 
@@ -419,18 +438,18 @@ effectTest(
   async (reference, native) => {
     const source = `
 data Maybe a = Some a | Nothing
-fn classify left => fn right => fn enabled => case left, right, enabled of
+const classify = fn left => fn right => fn enabled => case left, right, enabled of
   Some (Some first), Some second, True => @u32.add first second
   Some (Some _), Some _, False => 1
   Some Nothing, _, _ => 2
   Nothing, _, _ => 3
   _, Nothing, _ => 4
-export fn answer () => classify (Some (Some 40)) (Some 2) True
-export fn disabled () => classify (Some (Some 40)) (Some 2) False
-export fn nested_missing () => classify (Some Nothing) Nothing True
-export fn left_missing () => classify Nothing (Some 2) False
-export fn right_missing () => classify (Some (Some 40)) Nothing True
-export const expected = answer ()
+const answer = fn () => classify (Some (Some 40)) (Some 2) True
+const disabled = fn () => classify (Some (Some 40)) (Some 2) False
+const nested_missing = fn () => classify (Some Nothing) Nothing True
+const left_missing = fn () => classify Nothing (Some 2) False
+const right_missing = fn () => classify (Some (Some 40)) Nothing True
+const expected = answer ()
 `;
     const { exports } = await compile(reference, native, source);
     equal(invoke(exports, "answer"), 42);
@@ -447,10 +466,10 @@ effectTest(
   async (reference, native) => {
     for (
       const source of [
-        "fn wrong left => fn right => case left, right of\n  True, True => 1\n  False, False => 0\n",
-        "fn wrong left => fn right => case left, right of\n  value => value\n",
-        "fn wrong left => fn right => case left, right of\n  value, value => value\n",
-        "fn wrong value => case value:\n  True => 1\n  False => 0\n",
+        "const wrong = fn left => fn right => case left, right of\n  True, True => 1\n  False, False => 0\n",
+        "const wrong = fn left => fn right => case left, right of\n  value => value\n",
+        "const wrong = fn left => fn right => case left, right of\n  value, value => value\n",
+        "const wrong = fn value => case value:\n  True => 1\n  False => 0\n",
       ]
     ) {
       await rejectSource(reference, native, source);
@@ -464,10 +483,10 @@ effectTest(
     const source = `
 effect Reader.ask: U32 -> U32
 const provider = @effect.provider Reader.ask (fn value => value)
-fn choose () => do provider:
+const choose = fn () => do provider:
   return case Reader.ask 40, Reader.ask 2 of
     first, second => @u32.add first second
-export const answer = choose ()
+const answer = choose ()
 `;
     const baseline = reference.analyze(source, { const_steps: 1000n });
     const used = 1000n - baseline.remaining_steps;

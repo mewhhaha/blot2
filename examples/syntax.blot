@@ -4,76 +4,76 @@
 infixl 60 `add`
 infixl 70 (><) = dot
 
-data Vec2 = Vec2 { x: F32, y: F32 }
-data Mode = Running | Paused
-data Event = Tick U32 | SetMode Mode | Reset
+type Vec2 is data = Vec2 { x: F32, y: F32 }
+type Mode is data = Running | Paused
+type Event is data = Tick U32 | SetMode Mode | Reset
 
-fn add left => fn right => U32.add left right
-fn dot left => fn right => do:
+const add = fn left => fn right => U32.add left right
+const dot = fn left => fn right => do:
   let Vec2 { x: lx, y: ly } = left
   let Vec2 { x: rx, y: ry } = right
-  return F32.add (F32.mul lx rx) (F32.mul ly ry)
+  return lx * rx + ly * ry
 
-fn Vec2.scaled value => fn factor => do:
+const Vec2.scaled = fn value => fn factor => do:
   let Vec2 { x, y } = value
-  return Vec2 { x: F32.mul x factor, y: F32.mul y factor }
+  return Vec2 { x: x * factor, y: y * factor }
 
 // Explicit thunks delay evaluation; they do not promise memoization.
-fn and_then left => fn right => case left of
+const and_then = fn left => fn right => case left of
   False => False
   True => right ()
 
-fn unwrap_or_else candidate => fn fallback => case candidate of
+const unwrap_or_else = fn candidate => fn fallback => case candidate of
   Some value => value
   Nothing => fallback ()
 
-export fn short_circuit () => do:
+const short_circuit = fn () => do:
   let empty: Array U32 = []
   return and_then False (fn () => (@array.get empty 0) > 0)
 
-export fn lazy_fallback () => do:
+const lazy_fallback = fn () => do:
   let empty: Array U32 = []
   return unwrap_or_else (Some 42) (fn () => @array.get empty 0)
 
-fn factorial value => do:
+const factorial = fn value => do:
   if value <= 1:
     return 1
   return value * factorial (value - 1)
 
-fn choose first => fn enabled => fn fallback => case first, enabled, fallback of
+const choose = fn first => fn enabled => fn fallback => case first, enabled, fallback of
   Some value, True, _ => value
   _, _, Some value => value
   _, _, _ => 0
 
-fn double_or_zero candidate => do:
+const double_or_zero = fn candidate => do:
   let Some(value) = candidate else:
     return 0
   return value * 2
 
-fn react event => fn ticks => case event of
+const react = fn event => fn ticks => case event of
   Tick count => ticks + count
   SetMode Running => ticks
   SetMode Paused => ticks
   Reset => 0
 
-export const operator_example = 1 `add` 2 * 3
-export fn recursive_example (value: U32) => factorial value
-export fn matching_example () => choose Nothing False (Some (double_or_zero (Some 21)))
-export fn event_example () => react (Tick 2) 40
+const operator_example = 1 `add` 2 * 3
+const recursive_example = fn (value: U32) => factorial value
+const matching_example = fn () => choose Nothing False (Some (double_or_zero (Some 21)))
+const event_example = fn () => react (Tick 2) 40
 
-export fn vector_example () => do:
+const vector_example = fn () => do:
   let position = Vec2 { x: 3.0, y: 4.0 }
   let scaled = Vec2.scaled position 2.0
   return position >< scaled
 
-export fn array_snapshot () => do:
+const array_snapshot = fn () => do:
   let original = [1, 2, 3]
   let next = @array.set original 1 20
   return (@array.get original 1) + (@array.get next 1)
 
-effect Counter.advance: U32 -> U32
-const local_counter = @effect.provider Counter.advance (fn value => value + 1)
+type Counter a is effect = { advance: a -> a }
+const local_counter = @effect.provider (Counter.advance U32) (fn value => value + 1)
 
-export fn provider_example () => do local_counter:
-  use next <- Counter.advance 41
+const provider_example = fn () => do local_counter:
+  use next <- Counter.advance U32 41
   return next

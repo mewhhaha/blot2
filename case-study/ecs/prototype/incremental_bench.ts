@@ -66,7 +66,7 @@ function replaceOnce(source: string, previous: string, next: string): string {
 
 const baseline = `data CompileMarker = CompileMarker U32
 const movement_offset = 1
-fn advance value => value + movement_offset
+const advance = fn value => value + movement_offset
 ${
   replaceOnce(
     ecsWorkload(16),
@@ -81,16 +81,16 @@ const edits = [
     name: "body",
     source: replaceOnce(
       baseline,
-      "fn advance value => value + movement_offset",
-      "fn advance value => value + movement_offset + 1",
+      "const advance = fn value => value + movement_offset",
+      "const advance = fn value => value + movement_offset + 1",
     ),
   },
   {
     name: "effect",
     source: replaceOnce(
       baseline,
-      "fn read_position_0 () => @ecs.get Position0",
-      `fn read_position_0 () => do:
+      "const read_position_0 = fn () => @ecs.get Position0",
+      `const read_position_0 = fn () => do:
   use @ecs.get Velocity1
   use position <- @ecs.get Position0
   return position`,

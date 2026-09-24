@@ -1,0 +1,25 @@
+const size = fn values => values.length
+// <- keyword.storage.type
+//    ^^^^ function
+//           ^^ keyword.function
+//              ^^^^^^ variable.parameter
+//                              ^^^^^^ variable.other.member
+
+const update = fn values => do:
+  values[0] := 6
+//^^^^^^ variable
+//      ^ punctuation.bracket
+//       ^ constant.numeric.integer
+//          ^^ operator
+  values[0].position.x := self + 1
+//          ^^^^^^^^ variable.other.member
+//                   ^ variable.other.member
+//                        ^^^^ variable.builtin
+  return values.get(0)
+//       ^^^^^^ variable
+//              ^^^ function.method
+
+const contains = fn tail => fn witness => tail.contains(witness)
+//                                            ^^^^^^^^ function.method
+const bound = fn tail => tail.contains
+//                           ^^^^^^^^ variable.other.member

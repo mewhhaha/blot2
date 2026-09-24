@@ -6,6 +6,53 @@ import ./compiler/types.bend as Substitutions
 import ./compiler/const_eval.bend as Const
 import ./compiler/native_session.bend as Session
 import ./compiler/wasm.bend as Wasm
+import ./compiler/patterns.bend as Patterns
+import ./compiler/monomorph.bend as Mono
+
+def Laws.checked_public_wrapper_calls_stored_constant(name, input, output, variables, row):
+  {==}
+
+def Laws.dependency_membership_hit_finishes(remaining):
+  {==}
+
+def Laws.mono_rename_keeps_first_found(tail, wanted, specialized):
+  match tail:
+    case Nil{}:
+      {==}
+    case Mono.Rename{original, renamed} <> rest:
+      {==}
+
+def Laws.mono_function_keeps_first_found(tail, wanted, function):
+  match tail:
+    case Nil{}:
+      {==}
+    case M.Function{name, exported, parameter, p, r, body} <> rest:
+      {==}
+
+def Laws.mono_constant_keeps_first_found(tail, wanted, constant):
+  match tail:
+    case Nil{}:
+      {==}
+    case M.Constant{name, exported, annotation, expression} <> rest:
+      {==}
+
+def Laws.mono_local_template_keeps_first_found(tail, wanted, value):
+  match tail:
+    case Nil{}:
+      {==}
+    case Mono.LocalTemplate{name, expression} <> rest:
+      {==}
+
+def Laws.mono_effect_family_keeps_first_found(tail, wanted, declaration):
+  match tail:
+    case Nil{}:
+      {==}
+    case M.Operation{identity, parameter, result} <> rest:
+      {==}
+    case M.OperationTemplate{identity, parameters, parameter, result} <> rest:
+      {==}
+    case M.OperationInstance{template, arguments} <> rest:
+      {==}
 
 def Laws.pipelined_codegen_keeps_first_failure(error, tail, next, reversed, counts):
   {==}
@@ -100,6 +147,9 @@ def Laws.pure_effect_metadata_is_empty():
 def Laws.zero_const_budget_fails(expression, context):
   {==}
 
+def Laws.runtime_initializers_preserve_const_budget(expression, steps, context):
+  {==}
+
 def Laws.unhandled_const_operations_fail(identity, argument, context):
   {==}
 
@@ -118,7 +168,7 @@ def Laws.let_rejects_any_runtime_effect(effect, rest, subject):
 
 def Laws.discard_preserves_source_scope(context, internal_name):
   match context:
-    case Lower.Context{globals, headers, fixities, locals, return_label}:
+    case Lower.Context{globals, headers, fixities, locals, return_label, annotation_variables}:
       {==}
 
 def Laws.block_return_skips_the_tail(value, next, context):
@@ -217,11 +267,15 @@ def Laws.empty_substitutions_preserve_type(ty, fuel):
       {==}
     case M.FunctionTy{parameter, result, effects} 1n+rest:
       {==}
+    case M.FreeTy{scope, name} 1n+rest:
+      {==}
     case M.ParameterTy{index} 1n+rest:
       {==}
     case M.VariableTy{index} 1n+rest:
       {==}
     case M.ProviderTy{identity, effects} 1n+rest:
+      {==}
+    case M.StateProviderTy{read, write, state} 1n+rest:
       {==}
     case M.EffectDescriptorTy{} 1n+rest:
       {==}
@@ -233,11 +287,9 @@ def Laws.final_substitution_does_not_rewrite_its_replacement(replacement, fuel):
 
 def Laws.substitutions_preserve_u32(substitutions, fuel):
   match substitutions:
-    case Nil{}:
+    case Substitutions.Substitutions{history, values, rows, 0n}:
       {==}
-    case Substitutions.Substitution{variable, replacement} <> tail:
-      {==}
-    case Substitutions.RowSubstitution{variable, replacement} <> tail:
+    case Substitutions.Substitutions{history, values, rows, 1n+count}:
       {==}
 
 def Laws.f32_arithmetic_has_f32_result():
@@ -374,3 +426,60 @@ def Laws.const_function_lookup_hit_finishes(functions, name, value):
       {==}
     case M.Function{declared, exported, parameter, parameter_type, result_type, body} <> tail:
       {==}
+
+def Laws.value_pattern_preserves_local_reference(name, node):
+  {==}
+
+def Laws.value_pattern_is_refutable(head, reference, tail):
+  match head:
+    case Patterns.UnitHead{}:
+      {==}
+    case Patterns.BoolHead{value}:
+      {==}
+    case Patterns.ConstructorHead{name, payload}:
+      match payload:
+        case True{}:
+          {==}
+        case False{}:
+          {==}
+    case Patterns.ProductHead{arity}:
+      {==}
+    case Patterns.DefaultHead{}:
+      {==}
+
+def Laws.empty_array_fill_preserves_budget(value, steps):
+  {==}
+
+def Laws.array_fill_rejects_oversized_count(count, value, steps):
+  {==}
+
+def Laws.empty_array_generation_skips_callback(steps, generator, context):
+  match steps:
+    case Const.Budget{0n, cells}:
+      {==}
+    case Const.Budget{1n+rest, cells}:
+      {==}
+
+def Laws.associated_left_precedence(left, right, name, other, subject, description):
+  {==}
+
+def Laws.associated_call_preserves_operands(name, member, left, right):
+  {==}
+
+def Laws.rebinding_self_uses_previous_local(core, context, node):
+  {==}
+
+def Laws.state_scope_returns_successor(current, result, steps, outer):
+  {==}
+
+def Laws.state_scope_preserves_nonlocal_return(current, result, label, steps, outer):
+  {==}
+
+def Laws.shared_array_is_not_consumed(last, end):
+  {==}
+
+def Laws.unknown_array_storage_is_not_owned(name, usages, end):
+  {==}
+
+def Laws.array_reuse_preserves_operand_order(array, index, value):
+  {==}

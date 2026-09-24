@@ -6,7 +6,7 @@ import { SourceError } from "./syntax.ts";
 function declarations(changed: ReadonlySet<number>) {
   return Array.from({ length: 64 }, (_, index) =>
     [
-      `export fn entry_${index} value => do:`,
+      `const entry_${index} = fn value => do:`,
       ...Array.from({ length: 8 }, (_, step) =>
         `  let value_${step} = @u32.add ${
           step === 0 ? "value" : `value_${step - 1}`

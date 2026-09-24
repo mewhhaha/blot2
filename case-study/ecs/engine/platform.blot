@@ -4,31 +4,31 @@ import { DecodeError } from "engine/snapshot"
 import { Bytes } from "std/bytes"
 import { IoError } from "std/host"
 
-export data Viewport = Viewport { width: F32, height: F32 }
-export data InputEvent = InputEvent {
+type Viewport is data = Viewport { width: F32, height: F32 }
+type InputEvent is data = InputEvent {
   kind: U32, key: U32, button: U32,
   pointer_x: F32, pointer_y: F32, wheel_delta: F32,
   picked: U32, pick_valid: U32, viewport: Viewport,
 }
-export data FrameInput = FrameInput {
+type FrameInput is data = FrameInput {
   seconds: F32, alpha: F32, viewport: Viewport,
 }
-export data WindowIo = WindowIo {
-  set_title: Text -> Result Unit IoError ! {Foreign},
+type WindowIo is data = WindowIo {
+  set_title: Text -> Result [Unit, IoError] ! {Foreign},
 }
-export data RenderIo = RenderIo {
-  submit: RenderFrame -> Result Unit IoError ! {Foreign},
+type RenderIo is data = RenderIo {
+  submit: RenderFrame -> Result [Unit, IoError] ! {Foreign},
 }
 // One host-authorized save slot, not arbitrary filesystem access.
-export data FileIo = FileIo {
-  read: Unit -> Result Bytes IoError ! {Foreign},
-  write: Bytes -> Result Unit IoError ! {Foreign},
+type FileIo is data = FileIo {
+  read: Unit -> Result [Bytes, IoError] ! {Foreign},
+  write: Bytes -> Result [Unit, IoError] ! {Foreign},
 }
-export data Io = Io { window: WindowIo, render: RenderIo, files: FileIo }
-export data ApplicationError = HostError IoError | InvalidSnapshot DecodeError
-export data Application world = Application {
+type Io is data = Io { window: WindowIo, render: RenderIo, files: FileIo }
+type ApplicationError is data = HostError IoError | InvalidSnapshot DecodeError
+type Application world is data = Application {
   create: Unit -> world,
-  event: world -> (InputEvent -> Result world ApplicationError ! {Foreign}),
+  event: world -> (InputEvent -> Result [world, ApplicationError] ! {Foreign}),
   update: world -> FrameInput -> world,
-  render: world -> (FrameInput -> Result Unit ApplicationError ! {Foreign}),
+  render: world -> (FrameInput -> Result [Unit, ApplicationError] ! {Foreign}),
 }

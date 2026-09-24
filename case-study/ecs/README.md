@@ -25,11 +25,13 @@ enums and flat multi-value matches replace scalar flags and nested dispatch.
 file callbacks receive bytes.
 
 This is not yet executable: the external ECS/render/asset/snapshot foundations,
-general language features, state resolvers and composite ABI are still missing.
-[The source API contract](source-api.md) documents those boundaries and the
-checks. The old TypeScript host still expects the retired four-export ABI and
-has not been reconnected. The sections below describe that historical prototype,
-not the updated entrypoint.
+some record and descriptor features, the proposed ECS scope, and composite ABI
+are still missing. Source-declared generic effect families and scoped state
+resolvers are available in the language; their syntax and the remaining ECS
+boundary are described in [the source API contract](source-api.md). The old
+TypeScript host still expects the retired four-export ABI and has not been
+reconnected. The sections below describe that historical prototype, not the
+updated entrypoint.
 
 The prior prototype was a live-reloading Blot/Wasm game with a Deno
 Desktop/WebGPU host. It follows `gdev`'s 3D sandbox/editor workflow, with ported

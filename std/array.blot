@@ -1,45 +1,32 @@
-export fn length values => @array.length values
-export fn is_empty values => length values == 0
+const generate = fn count => fn generator => @array.generate count generator
+const fill = fn count => fn value => @array.fill count value
+const length = fn values => Array.length values
+const is_empty = fn values => Array.is_empty values
 
 // at and replace trap on an invalid index; get and set return Nothing instead.
-export fn at index => fn values => @array.get values index
-export fn replace index => fn value => fn values => @array.set values index value
+const at = fn index => fn values => @array.get values index
+const replace = fn index => fn value => fn values => @array.set values index value
 
-export fn get index => fn values => do:
-  if index < length values:
-    return Some (at index values)
-  return Nothing
+const get = fn index => fn values => Array.get values index
+const set = fn index => fn value => fn values => Array.set values index value
 
-export fn set index => fn value => fn values => do:
-  if index < length values:
-    return Some (replace index value values)
-  return Nothing
+const fold_left = fn reduce => fn initial => fn values => do:
+  let state = initial
+  for value in values:
+    use next <- reduce state value
+    state := next
+  return state
 
-fn fold_from index => fn reduce => fn state => fn values => do:
-  if index == length values:
-    return state
-  use next <- reduce state (at index values)
-  return fold_from (index + 1) reduce next values
+const any = fn predicate => fn values => do:
+  for value in values:
+    use found <- predicate value
+    if found:
+      return True
+  return False
 
-export fn fold_left reduce => fn initial => fn values =>
-  fold_from 0 reduce initial values
-
-fn any_from index => fn predicate => fn values => do:
-  if index == length values:
-    return False
-  use found <- predicate (at index values)
-  if found:
-    return True
-  return any_from (index + 1) predicate values
-
-export fn any predicate => fn values => any_from 0 predicate values
-
-fn all_from index => fn predicate => fn values => do:
-  if index == length values:
-    return True
-  use accepted <- predicate (at index values)
-  if Bool.not accepted:
-    return False
-  return all_from (index + 1) predicate values
-
-export fn all predicate => fn values => all_from 0 predicate values
+const all = fn predicate => fn values => do:
+  for value in values:
+    use accepted <- predicate value
+    if Bool.not accepted:
+      return False
+  return True

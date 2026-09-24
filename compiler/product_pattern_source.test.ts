@@ -9,7 +9,7 @@ Deno.test("warm 8192-field tuple patterns compile through checked source with na
   const native = await createNativeCompiler({ prelude: "none", threads: 1 });
   try {
     for (const fields of [128, 8192]) {
-      const source = `export fn answer () => case (${
+      const source = `const answer = fn () => case (${
         Array(fields).fill("0").join(", ")
       }) of
   (${Array(fields).fill("_").join(", ")}) => 42
@@ -31,14 +31,14 @@ Deno.test("source tuple destructuring works in nested and grouped let patterns",
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compile(`
-export fn answer () => do:
+const answer = fn () => do:
   let (first, (second, third)) = (40, (1, 1))
   let (grouped) = first
   let () = ()
   return grouped + second + third
-fn pair_sum pair => case pair of
+const pair_sum = fn pair => case pair of
   (left, right) => left + right
-export const expected = pair_sum (40, 2)
+const expected = pair_sum (40, 2)
 `);
     const { instance } = await WebAssembly.instantiate(artifact.bytes);
     equal((instance.exports.answer as CallableFunction)(), 42);
@@ -52,15 +52,15 @@ Deno.test("source tuple patterns compose with constructors and correlated case c
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compile(`
-fn sum candidate => case candidate of
+const sum = fn candidate => case candidate of
   Some (left, (right, True)) => left + right
   Some (_, (_, False)) => 0
   Nothing => 0
-fn correlated pair => fn flag => case pair, flag of
+const correlated = fn pair => fn flag => case pair, flag of
   (True, True), True => 1
   (_, _), _ => 42
-export const expected = sum (Some (40, (2, True)))
-export fn answer () => correlated (True, False) True
+const expected = sum (Some (40, (2, True)))
+const answer = fn () => correlated (True, False) True
 `);
     const { instance } = await WebAssembly.instantiate(artifact.bytes);
     equal((instance.exports.expected as WebAssembly.Global).value, 42);
@@ -74,20 +74,20 @@ Deno.test("tuple let-else and if-let bind only the successful scope", async () =
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compile(`
-fn guard pair => do:
+const guard = fn pair => do:
   let value = 7
   let (Some value, True) = pair else:
     return value
   return value
-fn conditional pair => do:
+const conditional = fn pair => do:
   let value = 7
   if let (Some value, True) = pair:
     return value
   return value
-export fn accepted () => guard (Some 42, True)
-export fn rejected () => guard (Some 42, False)
-export fn matched () => conditional (Some 42, True)
-export fn unmatched () => conditional (Some 42, False)
+const accepted = fn () => guard (Some 42, True)
+const rejected = fn () => guard (Some 42, False)
+const matched = fn () => conditional (Some 42, True)
+const unmatched = fn () => conditional (Some 42, False)
 `);
     const { instance } = await WebAssembly.instantiate(artifact.bytes);
     for (const name of ["accepted", "matched"]) {
@@ -106,10 +106,10 @@ Deno.test("tuple matching evaluates an effectful scrutinee once", async () => {
   try {
     const artifact = compiler.compile(`
 effect Next: Unit -> U32
-fn pair () => do:
+const pair = fn () => do:
   use value <- Next ()
   return (value, 2)
-export fn answer (read: Unit -> U32 ! {Foreign}) => do (@effect.provider Next read):
+const answer = fn (read: Unit -> U32 ! {Foreign}) => do (@effect.provider Next read):
   return case pair () of
     (left, right) => left + right
 `);
@@ -141,10 +141,10 @@ Deno.test("record patterns support zero, one, reordered, omitted, and nested fie
 data Empty = Empty {}
 data One a = One { value: a }
 data Many a = Many { first: U32, payload: a, ignored: Bool }
-fn unpack candidate => case candidate of
+const unpack = fn candidate => case candidate of
   Many { payload: Some (One { value: (left, right) }), first } => first + left + right
   Many { payload: Nothing } => 0
-export fn answer () => do:
+const answer = fn () => do:
   let Empty {} = Empty {}
   let One {} = One { value: True }
   return unpack (Many { ignored: False, payload: Some (One { value: (20, 20) }), first: 2 })
@@ -161,13 +161,13 @@ Deno.test("record guards use declaration order and keep fallback bindings untouc
   try {
     const artifact = compiler.compile(`
 data Pair = Pair { value: Maybe U32, enabled: Bool }
-fn guarded pair => do:
+const guarded = fn pair => do:
   let value = 7
   let Pair { enabled: True, value: Some value } = pair else:
     return value
   return value
-export fn accepted () => guarded (Pair { enabled: True, value: Some 42 })
-export fn rejected () => guarded (Pair { value: Some 42, enabled: False })
+const accepted = fn () => guarded (Pair { enabled: True, value: Some 42 })
+const rejected = fn () => guarded (Pair { value: Some 42, enabled: False })
 `);
     const { instance } = await WebAssembly.instantiate(artifact.bytes);
     equal((instance.exports.accepted as CallableFunction)(), 42);
@@ -183,27 +183,27 @@ Deno.test("tuple patterns reject duplicate bindings, incomplete rows, arity mism
     for (
       const [source, code] of [
         [
-          "fn invalid value => case value of\n  (same, same) => 0\n",
+          "const invalid = fn value => case value of\n  (same, same) => 0\n",
           "duplicate_pattern_binding",
         ],
         [
-          "fn invalid value => case value of\n  (same, Some (same, _)) => 0\n",
+          "const invalid = fn value => case value of\n  (same, Some (same, _)) => 0\n",
           "duplicate_pattern_binding",
         ],
         [
-          "fn invalid value => do:\n  let (True, selected) = value\n  return selected\n",
+          "const invalid = fn value => do:\n  let (True, selected) = value\n  return selected\n",
           "non_exhaustive_match",
         ],
         [
-          "fn invalid value => case value of\n  (True, True) => 1\n  (False, False) => 0\n",
+          "const invalid = fn value => case value of\n  (True, True) => 1\n  (False, False) => 0\n",
           "non_exhaustive_match",
         ],
         [
-          "fn invalid () => do:\n  let (first, second, third) = (1, 2)\n  return first\n",
+          "const invalid = fn () => do:\n  let (first, second, third) = (1, 2)\n  return first\n",
           "product_arity",
         ],
         [
-          "fn invalid value => do:\n  if let (first, second) = value:\n    let ignored = first\n  return second\n",
+          "const invalid = fn value => do:\n  if let (first, second) = value:\n    let ignored = first\n  return second\n",
           "unknown_value",
         ],
       ]
@@ -225,19 +225,19 @@ Deno.test("record patterns reject unknown fields, duplicates and positional cons
     for (
       const [source, code] of [
         [
-          "data Pair = Pair { x: U32, y: U32 }\nfn invalid value => case value of\n  Pair { missing } => 0\n",
+          "data Pair = Pair { x: U32, y: U32 }\nconst invalid = fn value => case value of\n  Pair { missing } => 0\n",
           "unknown_record_field",
         ],
         [
-          "data Pair = Pair { x: U32, y: U32 }\nfn invalid value => case value of\n  Pair { x, x } => 0\n",
+          "data Pair = Pair { x: U32, y: U32 }\nconst invalid = fn value => case value of\n  Pair { x, x } => 0\n",
           "duplicate_record_field",
         ],
         [
-          "data Pair = Pair { x: U32, y: U32 }\nfn invalid value => case value of\n  Pair { x: same, y: same } => 0\n",
+          "data Pair = Pair { x: U32, y: U32 }\nconst invalid = fn value => case value of\n  Pair { x: same, y: same } => 0\n",
           "duplicate_pattern_binding",
         ],
         [
-          "data Pair = Pair U32\nfn invalid value => case value of\n  Pair {} => 0\n",
+          "data Pair = Pair U32\nconst invalid = fn value => case value of\n  Pair {} => 0\n",
           "record_constructor",
         ],
       ]

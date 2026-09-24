@@ -1,33 +1,33 @@
 // Operations and their providers are source-defined; no ECS or platform builtins.
-effect Reader.ask: Unit -> U32
-effect Other.ask: Unit -> U32
+type Reader a is effect = { ask: Unit -> a }
+type Other a is effect = { ask: Unit -> a }
 
-fn read () => Reader.ask ()
-fn invoke work => work ()
-fn reader value => @effect.provider Reader.ask (fn () => value)
+const read = fn () => Reader.ask U32 ()
+const invoke = fn work => work ()
+const reader = fn value => @effect.provider (Reader.ask U32) (fn () => value)
 
 const forty = reader 40
-fn increment_reader () => do:
-  use outer <- Reader.ask ()
+const increment_reader = fn () => do:
+  use outer <- Reader.ask U32 ()
   return @u32.add outer 1
-const increment = @effect.provider Reader.ask increment_reader
+const increment = @effect.provider (Reader.ask U32) increment_reader
 
-export fn answer () => do forty:
+const answer = fn () => do forty:
   return do increment:
     use value <- invoke read
     return @u32.add value 1
 
-export const const_answer = answer ()
+const const_answer = answer ()
 
 // These opaque descriptors are compile-time values, not runtime handles.
 const reads = @effect.of read
-export const effect_count = @effect.count reads
-export const reads_reader = @effect.has reads Reader.ask
-export const reads_other = @effect.has reads Other.ask
+const effect_count = @effect.count reads
+const reads_reader = @effect.has reads (Reader.ask U32)
+const reads_other = @effect.has reads (Other.ask U32)
 
 // Creating a closure is pure. Its call is handled where it is invoked.
 const delayed = do forty:
-  return fn () => Reader.ask ()
+  return fn () => Reader.ask U32 ()
 
-export fn deferred () => do (reader 7):
+const deferred = fn () => do (reader 7):
   return delayed ()

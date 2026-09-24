@@ -1,0 +1,166 @@
+type Listed [head, tail] is data = Listed (head, tail)
+// <- keyword.storage.type
+//   ^ type
+//          ^ punctuation.bracket
+//           ^ type.parameter
+//                 ^ type.parameter
+//                       ^ keyword.storage.type
+//                          ^ keyword.storage.type
+
+type Paired (head, tail) is data = Paired (head, tail)
+//          ^ punctuation.bracket
+//           ^ type.parameter
+//                 ^ type.parameter
+
+type Entry { head, tail } is data = Entry { head, tail }
+//         ^ punctuation.bracket
+//           ^ type.parameter
+//                 ^ type.parameter
+
+type Nested { pair: (a, b), rest: [c, d] } is data = Nested (a, b, c, d)
+//            ^ variable.other.member
+//                   ^ type.parameter
+//                      ^ type.parameter
+//                          ^ variable.other.member
+//                                 ^ type.parameter
+//                                    ^ type.parameter
+
+type Curried a => type [b, c] is data = Curried (a, b, c)
+//           ^ type.parameter
+//             ^ operator
+//                ^ keyword.storage.type
+//                      ^ type.parameter
+//                         ^ type.parameter
+
+type Exchange { input, output } is effect = input -> output
+//              ^ type.parameter
+//                     ^ type.parameter
+//                                 ^ keyword.storage.type
+//                                                ^ operator
+
+type CurriedEffect input => type output is effect = input -> output
+//                 ^ type.parameter
+//                       ^ operator
+//                          ^ keyword.storage.type
+//                               ^ type.parameter
+
+type State a is effect = { get: Unit -> a, set: a -> Unit }
+//         ^ type.parameter
+//                         ^ variable.other.member
+//                                         ^ variable.other.member
+
+type Empty () is data = Empty
+//         ^ punctuation.bracket
+//          ^ punctuation.bracket
+//            ^ keyword.storage.type
+
+type Ping [] is effect = Unit -> U32
+//        ^ punctuation.bracket
+//         ^ punctuation.bracket
+//              ^ keyword.storage.type
+
+const first = fn (entry: (Curried U32) [Bool, a]) => entry
+//                        ^ type
+//                                ^ type
+//                                      ^ type
+//                                                ^ operator
+
+const get = fn (witness: input -> a) -> a => State.get ()
+//    ^ function
+//          ^ keyword.function
+//              ^ variable.parameter
+//                                           ^ type
+//                                           ^ !function.builtin
+//                                                 ^ function.method
+
+const set = fn value => State.set value
+//    ^ function
+//          ^ keyword.function
+//             ^ variable.parameter
+//                      ^ type
+//                      ^ !function.builtin
+//                            ^ variable.other.member
+
+export
+// <- variable
+// <- !keyword.control.import
+// <- !keyword.storage.modifier
+
+publication
+// <- variable
+// <- !keyword.storage.modifier
+
+"pub type Pair [a, b] is data"
+// <- string
+// <- !keyword.storage.modifier
+//              ^ !type.parameter
+
+// pub type Pair [a, b] is data
+// ^ comment
+//                ^ !type.parameter
+
+pub
+// <- variable
+// <- !keyword.storage.modifier
+
+let project = fn (value: U32) => value
+// <- keyword.storage.type
+//  ^ function
+//            ^ keyword.function
+//                ^ variable.parameter
+
+let Vec2.project = fn value => value
+// <- keyword.storage.type
+//  ^ type
+//       ^ function
+//                 ^ keyword.function
+//                    ^ variable.parameter
+
+fn obsolete value => value
+// <- keyword.function
+// ^ variable.parameter
+// ^ !function
+//          ^ variable
+//          ^ !variable.parameter
+
+const increment: U32 -> U32 = fn value => value
+// <- keyword.storage.type
+//    ^ function
+//             ^ punctuation.delimiter
+//               ^ type
+//                   ^ operator
+//                      ^ type
+//                            ^ keyword.function
+//                               ^ variable.parameter
+
+let Counter.increment: Counter -> Counter = fn value => value
+// <- keyword.storage.type
+//  ^ type
+//          ^ function
+//                   ^ punctuation.delimiter
+//                     ^ type
+//                                          ^ keyword.function
+//                                             ^ variable.parameter
+
+const grouped = (fn value => value)
+//    ^ function
+//               ^ keyword.function
+//                  ^ variable.parameter
+//              ^ punctuation.bracket
+//                                ^ punctuation.bracket
+
+let nested: U32 -> U32 = ((fn value => value))
+//  ^ function
+//                         ^ keyword.function
+//                            ^ variable.parameter
+//                       ^ punctuation.bracket
+//                        ^ punctuation.bracket
+//                                          ^ punctuation.bracket
+//                                           ^ punctuation.bracket
+
+const Counter.project = (fn value => value)
+//            ^ function
+//                       ^ keyword.function
+//                          ^ variable.parameter
+//                      ^ punctuation.bracket
+//                                        ^ punctuation.bracket

@@ -1,0 +1,116 @@
+import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
+import { GuestError, instantiateGuest } from "./guest.ts";
+import { createNativeCompiler } from "./native.ts";
+import { createSourceCompiler } from "./source.ts";
+
+const source = `
+const integers = fn (values: Array U32) => values
+const floats = fn (values: Array F32) => values
+const change = fn (values: Array F32) => @array.set values 0 42.5
+const first = fn (values: Array F32) => @array.get values 0
+const filled = fn (count: U32) => @array.fill count 3.5
+const empty = fn () => @array.fill 0 0
+const constant = fn () => [1, 4_294_967_295]
+const callback = fn (io: U32 -> U32 ! {Foreign}) => do:
+  use value <- io 40
+  return value
+`;
+
+async function exercise(bytes: Uint8Array<ArrayBuffer>) {
+  const guest = await instantiateGuest(bytes);
+  try {
+    equal(guest.abi.version, 2);
+    equal(guest.abi.functions[0], {
+      name: "integers",
+      parameter: "Array U32",
+      result: "Array U32",
+    });
+    const integers = new Uint32Array([0, 42, 0xffffffff]);
+    const floats = new Float32Array([0, -0, 1.1, Infinity, -Infinity, NaN]);
+    for (
+      const [name, input] of [
+        ["integers", integers],
+        ["floats", floats],
+        ["integers", new Uint32Array()],
+        ["floats", new Float32Array()],
+      ] as const
+    ) {
+      const output = guest.call(name, input);
+      equal(output, input);
+      ok(output !== input);
+      ok(output instanceof Uint32Array || output instanceof Float32Array);
+      ok(output.buffer !== input.buffer);
+    }
+    const output = guest.call("change", floats);
+    equal(floats[0], 0);
+    ok(output instanceof Float32Array);
+    equal(output[0], 42.5);
+    output[0] = 999;
+    equal(guest.call("first", floats), 0);
+    equal(guest.call("empty", null), new Uint32Array());
+    equal(guest.call("constant", null), new Uint32Array([1, 0xffffffff]));
+    // Input allocation and the guest's copy each cross memory page boundaries.
+    const large = new Float32Array(70_000).fill(2.25);
+    const changed = guest.call("change", large);
+    ok(changed instanceof Float32Array);
+    equal(changed.length, large.length);
+    equal(changed[0], 42.5);
+    equal(changed[large.length - 1], 2.25);
+    for (let index = 0; index < 70; index++) {
+      equal(guest.call("filled", 70_000), new Float32Array(70_000).fill(3.5));
+    }
+    equal(changed[0], 42.5);
+    equal(large[0], 2.25);
+    for (
+      const invalid of [[], new Uint32Array(1), new Float64Array(1), null, 0]
+    ) {
+      throws(() => guest.call("floats", invalid), (error) => {
+        ok(error instanceof GuestError);
+        equal(error.code, "invalid_argument");
+        return true;
+      });
+    }
+    throws(() => guest.call("integers", new Float32Array(1)), GuestError);
+    throws(
+      () => guest.call("first", new Float32Array()),
+      WebAssembly.RuntimeError,
+    );
+    throws(() => guest.call("filled", 4_194_304), WebAssembly.RuntimeError);
+    equal(guest.call("first", new Float32Array([7])), 7);
+    equal(
+      guest.call(
+        "callback",
+        guest.capability({
+          parameter: "U32",
+          result: "U32",
+          call: (value) => value + 2,
+        }),
+      ),
+      42,
+    );
+  } finally {
+    guest.dispose();
+  }
+}
+
+Deno.test("JS numeric array ABI copies inputs/results and resets after growth and traps", async () => {
+  const compiler = await createSourceCompiler({ prelude: "none" });
+  try {
+    await exercise(compiler.compile(source).bytes);
+  } finally {
+    compiler.dispose();
+  }
+});
+
+Deno.test("native numeric array ABI matches JS and executes copied packets", async () => {
+  const js = await createSourceCompiler({ prelude: "none" });
+  const native = await createNativeCompiler({ prelude: "none" });
+  try {
+    const artifact = await native.compile(source);
+    equal(artifact.bytes, js.compile(source).bytes);
+    await exercise(artifact.bytes);
+  } finally {
+    js.dispose();
+    await native.dispose();
+  }
+});

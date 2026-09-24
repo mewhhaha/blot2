@@ -116,16 +116,16 @@ Deno.test("source Foreign annotations propagate through higher-order calls and r
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const analysis = compiler.analyze(`
-fn invoke action => action 7
-fn call (io: U32 -> U32 ! {Foreign}) => invoke io
-fn twice (io: U32 -> U32 ! {Foreign}) => do:
+const invoke = fn action => action 7
+const call = fn (io: U32 -> U32 ! {Foreign}) => invoke io
+const twice = fn (io: U32 -> U32 ! {Foreign}) => do:
   use first <- call io
   return io first
 const requirements = @effect.of twice
 const descriptor = @effect.descriptor Foreign
-export const count = @effect.count requirements
-export const has_foreign = @effect.has requirements Foreign
-export const same = @effect.same descriptor (@effect.descriptor Foreign)
+const count = @effect.count requirements
+const has_foreign = @effect.has requirements Foreign
+const same = @effect.same descriptor (@effect.descriptor Foreign)
 `);
     equal(signature(analysis, "call").effect_row, foreignRow);
     equal(signature(analysis, "twice").effect_row, foreignRow);
@@ -149,7 +149,7 @@ Deno.test("Foreign callback evaluation cannot hide in pure let, const, or pure-a
   try {
     const cases = [{
       code: "let_effect",
-      source: `fn bad (io: U32 -> U32 ! {Foreign}) => do:
+      source: `const bad = fn (io: U32 -> U32 ! {Foreign}) => do:
   let value = io 1
   return value
 `,
@@ -160,8 +160,8 @@ const denied = callback 1
 `,
     }, {
       code: "effect_mismatch",
-      source: `fn pure (callback: U32 -> U32) => callback 1
-fn bad (io: U32 -> U32 ! {Foreign}) => pure io
+      source: `const pure = fn (callback: U32 -> U32) => callback 1
+const bad = fn (io: U32 -> U32 ! {Foreign}) => pure io
 `,
     }];
     for (const { source, code } of cases) {
@@ -180,7 +180,7 @@ Deno.test("Foreign remains latent when a callback is retained in a returned clos
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const analysis = compiler.analyze(`
-fn retain (io: U32 -> U32 ! {Foreign}) => fn value => io value
+const retain = fn (io: U32 -> U32 ! {Foreign}) => fn value => io value
 `);
     const retained = signature(analysis, "retain");
     equal(retained.effect_row, emptyRow());
@@ -195,9 +195,9 @@ Deno.test("closed row suffixes annotate the outermost arrow unless grouped", asy
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const analysis = compiler.analyze(`
-fn outer (io: U32 -> U32 -> U32 ! {Foreign}) => ()
-fn inner (io: U32 -> (U32 -> U32 ! {Foreign})) => ()
-fn explicitly_pure (io: U32 -> U32 ! {}) => io 1
+const outer = fn (io: U32 -> U32 -> U32 ! {Foreign}) => ()
+const inner = fn (io: U32 -> (U32 -> U32 ! {Foreign})) => ()
+const explicitly_pure = fn (io: U32 -> U32 ! {}) => io 1
 `);
     const outer = signature(analysis, "outer").parameter;
     const inner = signature(analysis, "inner").parameter;
@@ -218,12 +218,12 @@ Deno.test("closed rows resolve declared operations, deduplicate sets, and preser
   try {
     const analysis = compiler.analyze(`
 effect Reader.ask: U32 -> U32
-fn mixed (callback: U32 -> U32 ! {Reader.ask, Foreign, Reader.ask}) => callback 1
+const mixed = fn (callback: U32 -> U32 ! {Reader.ask, Foreign, Reader.ask}) => callback 1
 const provider = @effect.provider Reader.ask (fn value => value)
-fn supplied (callback: U32 -> U32 ! {Reader.ask}) => do provider:
+const supplied = fn (callback: U32 -> U32 ! {Reader.ask}) => do provider:
   return callback 1
 data Callback = Callback (U32 -> U32 ! {Foreign})
-fn unwrap wrapped => case wrapped of
+const unwrap = fn wrapped => case wrapped of
   Callback io => io
 `);
     equal(signature(analysis, "mixed").effect_row.operations, [
@@ -252,10 +252,10 @@ Deno.test("source cannot shadow Foreign, provide it, or silently discard invalid
       source: "const denied = @effect.provider Foreign (fn () => 1)\n",
       code: "sealed_effect",
     }, {
-      source: "fn bad (value: U32 ! {Foreign}) => value\n",
+      source: "const bad = fn (value: U32 ! {Foreign}) => value\n",
       code: "invalid_effect_annotation",
     }, {
-      source: "fn bad (value: U32 -> U32 ! {Missing}) => value\n",
+      source: "const bad = fn (value: U32 -> U32 ! {Missing}) => value\n",
       code: "unknown_effect",
     }, {
       source: "effect Reader.ask: Unit -> U32 ! {Foreign}\n",
@@ -280,10 +280,10 @@ Deno.test("closed row annotation edits invalidate reflected constants without st
     for (const labels of ["", "Foreign", "Foreign, Reader.ask", ""]) {
       const source = `
 effect Reader.ask: U32 -> U32
-fn call (callback: U32 -> U32 ! {${labels}}) => callback 1
+const call = fn (callback: U32 -> U32 ! {${labels}}) => callback 1
 const requirements = @effect.of call
-export const count = @effect.count requirements
-export const has_foreign = @effect.has requirements Foreign
+const count = @effect.count requirements
+const has_foreign = @effect.has requirements Foreign
 `;
       const result = await incremental.compile(source);
       const expected = clean.compile(source);
@@ -291,6 +291,15 @@ export const has_foreign = @effect.has requirements Foreign
       equal(result.artifact.analysis.constants, expected.analysis.constants);
       const instance = new WebAssembly.Instance(
         new WebAssembly.Module(result.artifact.bytes),
+        {
+          "blot:host/1": {
+            call_u32_u32: () => {
+              throw new Error(
+                "Effect reflection must not invoke a host callback",
+              );
+            },
+          },
+        },
       );
       const count = instance.exports.count;
       const hasForeign = instance.exports.has_foreign;

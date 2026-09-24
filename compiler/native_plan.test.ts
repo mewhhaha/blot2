@@ -241,6 +241,7 @@ Deno.test("retained nominal summaries invalidate when constructor ownership chan
         parameters: 0n,
         constructors: bendList([{
           $: "Constructor",
+          fields: { $: "Nil" },
           name: "Carry",
           payload: { $: "Some", value: { $: "U32Ty" } },
         }]),

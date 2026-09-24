@@ -2,6 +2,24 @@ import type { CompactFrontendProgram } from "@mewhhaha/baba/runtime/webgpu";
 import schema from "../generated/wasm/cst-schema.json" with { type: "json" };
 import type { NativeCstChunk } from "./native_protocol.ts";
 
+// Adjacency is lexical information: incremental offsets become stable identities.
+// Record it before remapping positions, for both object and compact CST paths.
+export function postfixStarts(program: CompactFrontendProgram, source: string) {
+  const starts = new Set<number>();
+  let previousEnd = -1;
+  for (let token = 0; token < program.tokens.length; token += 4) {
+    const kind = schema.tokens[program.tokens[token + 3]];
+    if (kind === "WHITESPACE" || kind === "COMMENT") continue;
+    const start = program.tokens[token + 1];
+    if (
+      previousEnd === start &&
+      (source[start] === "[" || source[start] === "(")
+    ) starts.add(start);
+    previousEnd = program.tokens[token + 2];
+  }
+  return starts;
+}
+
 export interface EncodedSyntax {
   readonly cst: NativeCstChunk;
   readonly declarations: readonly (readonly [string, number])[];
@@ -18,6 +36,7 @@ export function encodeCompactCst(
   offsets: ArrayLike<number>,
   sourceBase: number,
 ): EncodedSyntax {
+  const adjacent = postfixStarts(program, source);
   let leaves = 0;
   for (let edge = 0; edge < program.edges.length; edge += 4) {
     if (program.edges[edge + 2] === 0) leaves++;
@@ -62,8 +81,11 @@ export function encodeCompactCst(
       if (rule === undefined) {
         throw new Error(`Unknown Baba rule ${program.nodes[base]}`);
       }
-      kind = rule;
-      offset = offsetAt(program.nodes[base + 2]);
+      const start = program.nodes[base + 2];
+      kind = rule === "atom" && field === "arguments" && adjacent.has(start)
+        ? "postfix_argument"
+        : rule;
+      offset = offsetAt(start);
       count = program.nodes[base + 5];
       for (let index = count - 1; index >= 0; index--) {
         const edge = (program.nodes[base + 4] + index) * 4;

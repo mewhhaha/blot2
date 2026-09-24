@@ -1,9 +1,11 @@
 import Base
 import ./model.bend as M
 import ./types.bend as T
+import ./index.bend as Index
 import ./type_data.bend as D
 import ./effect_rows.bend as R
 import ./dependency.bend as Graph
+import ./state_specialize.bend as TypedState
 
 type Binding is Data:
   Binding{name: String, inferred_type: M.Ty, variables: List<&2, Nat>}
@@ -18,13 +20,16 @@ type Reflection is Data:
   Reflection{callee: String, subject: String}
 
 type Coverage is Data:
+  OperationNeed{identity: Nat, template: M.TypeId, arguments: List<&2, M.Ty>, function_type: M.Ty, subject: String}
+  AssociatedNeed{identity: Nat, dispatch: M.Dispatch, member: String, templates: List<&2, M.TypeId>, left: M.Ty, right: M.Ty, result: M.Ty, ambient: M.EffectRow, subject: String}
+  ValuePatternType{inferred_type: M.Ty, subject: String}
   Coverage{inferred_types: List<&2, M.Ty>, patterns: List<&2, List<&2, M.Pattern>>, subject: String}
 
 type Inference is Data:
   Inference{inferred_type: M.Ty, coverage: List<&2, Coverage>, exits: List<&2, Nat>, reflections: List<&2, Reflection>}
 
 type State is Data:
-  State{substitutions: List<&2, T.Substitution>, next: Nat}
+  State{substitutions: T.Substitutions, next: Nat, annotations: Map<&2, M.Ty>}
 
 type Typing is Data:
   Typing{inference: Inference, state: State}
@@ -36,7 +41,7 @@ type SchemeInstance is Data:
   SchemeInstance{inferred_type: M.Ty, next: Nat}
 
 type PatternTyping is Data:
-  PatternTyping{bindings: List<&2, Binding>, state: State}
+  PatternTyping{bindings: List<&2, Binding>, state: State, constraints: List<&2, Coverage>}
 
 def inferred_type(inference: Inference) -> M.Ty:
   Inference{ty, coverage, exits, reflections} = inference
@@ -54,16 +59,16 @@ def type_of(typing: Typing) -> M.Ty:
   inferred_type(inference_of(typing))
 
 def next_of(state: State) -> Nat:
-  State{substitutions, next} = state
+  State{substitutions, next, annotations} = state
   next
 
-def substitutions_of(state: State) -> List<&2, T.Substitution>:
-  State{substitutions, next} = state
+def substitutions_of(state: State) -> T.Substitutions:
+  State{substitutions, next, annotations} = state
   substitutions
 
 def with_next(state: State, next: Nat) -> State:
-  State{substitutions, previous} = state
-  State{substitutions, next}
+  State{substitutions, previous, annotations} = state
+  State{substitutions, next, annotations}
 
 def pure(ty: M.Ty) -> Inference:
   Inference{ty, Nil{}, Nil{}, Nil{}}
@@ -122,21 +127,21 @@ def branch_type(left: M.Ty, right: M.Ty) -> M.Ty:
     case other:
       other
 
-def solved_state(solution: T.Solution) -> State:
+def solved_state(solution: T.Solution, annotations: Map<&2, M.Ty>) -> State:
   T.Solution{substitutions, next} = solution
-  State{substitutions, next}
+  State{substitutions, next, annotations}
 
 def unify(left: M.Ty, right: M.Ty, state: State, subject: String) -> Result<&2, &2, M.Diagnostic, State>:
-  State{substitutions, next} = state
+  State{substitutions, next, annotations} = state
   do Result<&2, &2, M.Diagnostic, State>:
     solved : T.Solution <- T.unify_at(left, right, substitutions, next, subject)
-    return solved_state(solved)
+    return solved_state(solved, annotations)
 
 def unify_rows(left: M.EffectRow, right: M.EffectRow, state: State, subject: String) -> Result<&2, &2, M.Diagnostic, State>:
-  State{substitutions, next} = state
+  State{substitutions, next, annotations} = state
   do Result<&2, &2, M.Diagnostic, State>:
     solved : T.Solution <- T.unify_rows_at(left, right, substitutions, next, subject)
-    return solved_state(solved)
+    return solved_state(solved, annotations)
 
 def context_subject(context: Context) -> String:
   Context{globals, locals, labels, types, operations, subject, functions, ambient} = context
@@ -221,24 +226,62 @@ def instance(variables: List<&2, Nat>, ty: M.Ty, +next: Nat) -> Result<&2, &2, M
         replaced : M.Ty <- T.replace(ty, head, M.VariableTy{next})
         instance(tail, replaced, 1n+next)
 
-def instance_typing(value: SchemeInstance, substitutions: List<&2, T.Substitution>) -> Result<&2, &2, M.Diagnostic, Typing>:
+def instance_typing(value: SchemeInstance, substitutions: T.Substitutions, annotations: Map<&2, M.Ty>) -> Result<&2, &2, M.Diagnostic, Typing>:
   SchemeInstance{ty, next} = value
   do Result<&2, &2, M.Diagnostic, Typing>:
     +opened : T.Opened <- T.open_covariant(ty, next)
-    return Typing{pure(T.opened_type(opened)), State{substitutions, T.opened_next(opened)}}
+    return Typing{pure(T.opened_type(opened)), State{substitutions, T.opened_next(opened), annotations}}
 
 def instantiate_binding(found: Maybe<&2, Binding>, state: State, name: String, subject: String) -> Result<&2, &2, M.Diagnostic, Typing>:
   match found:
     case None{}:
       Fail{M.Diagnostic{"unknown_name", subject, "unknown value " ++ name}}
     case Some{Binding{binding_name, ty, variables}}:
-      State{+substitutions, next} = state
+      State{+substitutions, next, annotations} = state
       do Result<&2, &2, M.Diagnostic, Typing>:
         resolved : M.Ty <- T.resolve(substitutions, ty)
         instantiated : SchemeInstance <- instance(variables, resolved, next)
-        instance_typing(instantiated, substitutions)
+        instance_typing(instantiated, substitutions, annotations)
 
-def binding_free(bindings: List<&2, Binding>, +substitutions: List<&2, T.Substitution>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+def associated_witness_shape(witness: M.Ty, result: M.Ty, state: State, subject: String) -> Result<&2, &2, M.Diagnostic, State>:
+  match witness:
+    case M.VariableTy{index}:
+      Done{state}
+    case M.ParameterTy{index}:
+      Done{state}
+    case other:
+      unify(result, other, state, subject)
+
+# Deferred state calls still have known value relationships before their
+# concrete operation identities are selected. Preserve these for callers.
+def associated_shape(same: Bool, request: Maybe<&2, TypedState.Request>, +left: M.Ty, +right: M.Ty, +result: M.Ty, +state: State, +subject: String) -> Result<&2, &2, M.Diagnostic, State>:
+  match same request:
+    case _ Some{TypedState.Write{}}:
+      unify(result, M.UnitTy{}, state, subject)
+    case True{} _:
+      unify(result, M.BoolTy{}, state, subject)
+    case _ Some{TypedState.Run{}}:
+      +body_result = {M.VariableTy{next_of(state)} : M.Ty}
+      +body_row = R.variable_row(1n+next_of(state))
+      do Result<&2, &2, M.Diagnostic, State>:
+        callback : State <- unify(right, M.FunctionTy{M.UnitTy{}, body_result, body_row}, with_next(state, 2n+next_of(state)), subject)
+        unify(result, M.ProductTy{[left, body_result]}, callback, subject)
+    case _ Some{TypedState.Reader{}}:
+      +implementation = {M.VariableTy{next_of(state)} : M.Ty}
+      +body_row = R.variable_row(1n+next_of(state))
+      unify(right, M.ProductTy{[implementation, M.FunctionTy{M.UnitTy{}, result, body_row}]}, with_next(state, 2n+next_of(state)), subject)
+    case _ Some{TypedState.Writer{}}:
+      +implementation = {M.VariableTy{next_of(state)} : M.Ty}
+      +body_row = R.variable_row(1n+next_of(state))
+      unify(right, M.ProductTy{[implementation, M.FunctionTy{M.UnitTy{}, result, body_row}]}, with_next(state, 2n+next_of(state)), subject)
+    case _ Some{TypedState.Read{}}:
+      do Result<&2, &2, M.Diagnostic, State>:
+        witnessed : M.Ty <- T.resolve(substitutions_of(state), left)
+        associated_witness_shape(TypedState.witness(65536n, witnessed), result, state, subject)
+    case _ _:
+      Done{state}
+
+def binding_free(bindings: List<&2, Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
   match bindings:
     case Nil{}:
       Done{Nil{}}
@@ -260,15 +303,54 @@ def environment_bindings(context: Context) -> List<&2, Binding>:
   Context{globals, locals, labels, types, operations, subject, functions, ambient} = context
   List.append(&2, Binding, globals, List.append(&2, Binding, locals, label_bindings(labels)))
 
+def annotation_bindings(types: List<&2, M.Ty>) -> List<&2, Binding>:
+  match types:
+    case Nil{}:
+      Nil{}
+    case ty <> rest:
+      Binding{"", ty, Nil{}} <> annotation_bindings(rest)
+
+def annotation_types(state: State) -> List<&2, M.Ty>:
+  State{substitutions, next, annotations} = state
+  Map.values(&2, M.Ty, annotations)
+
+def clear_annotations(state: State) -> State:
+  State{substitutions, next, annotations} = state
+  State{substitutions, next, MTip{}}
+
 def generalize(ty: M.Ty, +context: Context, +state: State, name: String) -> Result<&2, &2, M.Diagnostic, Binding>:
   do Result<&2, &2, M.Diagnostic, Binding>:
     +resolved : M.Ty <- T.resolve(substitutions_of(state), ty)
     free : List<&2, Nat> <- T.free(resolved)
-    excluded : List<&2, Nat> <- binding_free(environment_bindings(context), substitutions_of(state))
+    excluded : List<&2, Nat> <- binding_free(List.append(&2, Binding, environment_bindings(context), annotation_bindings(annotation_types(state))), substitutions_of(state))
     +variables : List<&2, Nat> = T.difference(free, T.union(excluded, T.row_free(T.resolve_row(substitutions_of(state), context_row(context)))))
     +closed : M.Ty <- T.close_generalized(resolved, variables)
     remaining : List<&2, Nat> <- T.free(closed)
     return Binding{name, closed, T.difference(variables, T.difference(variables, remaining))}
+
+def annotation_variable(found: Maybe<&2, M.Ty>, key: String, state: State) -> Typing:
+  match found:
+    case Some{ty}:
+      Typing{pure(ty), state}
+    case None{}:
+      State{substitutions, +next, annotations} = state
+      Typing{pure(M.VariableTy{next}), State{substitutions, 1n+next, Map.set(&2, M.Ty, annotations, key, M.VariableTy{next})}}
+
+def annotation_instance(parameters: List<&2, M.Ty>, ty: M.Ty, +state: State) -> Result<&2, &2, M.Diagnostic, Typing>:
+  match parameters:
+    case Nil{}:
+      Done{Typing{pure(ty), state}}
+    case M.FreeTy{+scope, +name} <> rest:
+      State{substitutions, next, annotations} = state
+      +key = Nat.show(String.length(scope)) ++ ":" ++ scope ++ name
+      +variable = {annotation_variable(Index.find(M.Ty, annotations, key), key, state) : Typing}
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        types : List<&2, M.Ty> <- T.rewrite(65536n, T.OneType{ty}, T.ReplaceFree{scope, name, type_of(variable)})
+        replaced : M.Ty <- T.first_type(types)
+        annotation_instance(rest, replaced, state_of(variable))
+
+    case other <> rest:
+      Fail{M.Diagnostic{"internal_error", "annotation", "free annotation name traversal returned a concrete type"}}
 
 def annotation(annotation: Maybe<&2, M.Ty>, ty: M.Ty, state: State, context: Context) -> Result<&2, &2, M.Diagnostic, State>:
   match annotation:
@@ -278,7 +360,64 @@ def annotation(annotation: Maybe<&2, M.Ty>, ty: M.Ty, state: State, context: Con
       Context{globals, locals, labels, types, operations, +subject, functions, ambient} = context
       do Result<&2, &2, M.Diagnostic, State>:
         valid : Unit <- D.annotation(Some{expected}, operations, types, subject)
-        unify(expected, ty, state, subject)
+        parameters : List<&2, M.Ty> <- T.annotation_names(65536n, T.OneType{expected})
+        +instantiated : Typing <- annotation_instance(parameters, expected, state)
+        unify(type_of(instantiated), ty, state_of(instantiated), subject)
+
+def operation_template(operations: List<&2, M.Operation>, +wanted: M.TypeId) -> Result<&2, &2, M.Diagnostic, M.Operation>:
+  match operations:
+    case Nil{}:
+      Fail{M.Diagnostic{"unknown_effect", M.type_id_show(wanted), "no declaration defines this generic effect operation"}}
+    case M.OperationTemplate{+identity, parameters, parameter, result} <> tail:
+      Bool.pick(Result<&2, &2, M.Diagnostic, M.Operation>, M.type_id_equal(identity, wanted), Done{M.OperationTemplate{identity, parameters, parameter, result}}, operation_template(tail, wanted))
+    case head <> tail:
+      operation_template(tail, wanted)
+
+def fresh_operation_arguments(count: Nat, +next: Nat) -> List<&2, M.Ty>:
+  match count:
+    case 0n:
+      Nil{}
+    case 1n+rest:
+      M.VariableTy{next} <> fresh_operation_arguments(rest, 1n+next)
+
+type OperationArguments is Data:
+  OperationArguments{types: List<&2, M.Ty>, state: State}
+
+def instantiate_operation_arguments(arguments: List<&2, M.Ty>, state: State, +context: Context, reversed: List<&2, M.Ty>) -> Result<&2, &2, M.Diagnostic, OperationArguments>:
+  match arguments:
+    case Nil{}:
+      Done{OperationArguments{List.reverse(&2, M.Ty, reversed), state}}
+    case +argument <> tail:
+      do Result<&2, &2, M.Diagnostic, OperationArguments>:
+        valid : Unit <- D.annotation(Some{argument}, context_operations(context), context_types(context), context_subject(context))
+        parameters : List<&2, M.Ty> <- T.annotation_names(65536n, T.OneType{argument})
+        +instantiated : Typing <- annotation_instance(parameters, argument, state)
+        instantiate_operation_arguments(tail, state_of(instantiated), context, type_of(instantiated) <> reversed)
+
+def operation_arguments(arguments: List<&2, M.Ty>, +count: Nat, +state: State, context: Context) -> Result<&2, &2, M.Diagnostic, OperationArguments>:
+  match arguments:
+    case Nil{}:
+      +start = next_of(state)
+      Done{OperationArguments{fresh_operation_arguments(count, start), with_next(state, Nat.add(start, count))}}
+    case arguments:
+      instantiate_operation_arguments(arguments, state, context, Nil{})
+
+def generic_operation_signature(identity: Nat, template: M.TypeId, parameter: M.Ty, result: M.Ty, arguments: OperationArguments, context: Context) -> Result<&2, &2, M.Diagnostic, Typing>:
+  OperationArguments{+types, +state} = arguments
+  do Result<&2, &2, M.Diagnostic, Typing>:
+    p : M.Ty <- T.parameters(types, 0n, parameter)
+    r : M.Ty <- T.parameters(types, 0n, result)
+    +signature : M.Ty = M.FunctionTy{p, r, R.variable_row(next_of(state))}
+    return Typing{Inference{signature, [OperationNeed{identity, template, types, signature, context_subject(context)}], Nil{}, Nil{}}, with_next(state, 1n+next_of(state))}
+
+def generic_operation(identity: Nat, +template: M.TypeId, declared: M.Operation, arguments: List<&2, M.Ty>, state: State, +context: Context) -> Result<&2, &2, M.Diagnostic, Typing>:
+  match declared:
+    case M.OperationTemplate{declared_identity, parameters, parameter, result}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        instantiated : OperationArguments <- operation_arguments(arguments, parameters, state, context)
+        generic_operation_signature(identity, template, parameter, result, instantiated, context)
+    case _:
+      Fail{M.Diagnostic{"internal_error", M.type_id_show(template), "generic operation requires a template declaration"}}
 
 def constructor_instance(name: String, +context: Context, +state: State) -> Result<&2, &2, M.Diagnostic, D.ConstructorType>:
   +constructor_name = name
@@ -318,12 +457,20 @@ def no_payload(payload: Maybe<&2, M.Ty>, subject: String) -> Result<&2, &2, M.Di
       Fail{M.Diagnostic{"constructor_arity", subject, "constructor requires a payload"}}
 
 def pattern_state(typing: PatternTyping) -> State:
-  PatternTyping{bindings, state} = typing
+  PatternTyping{bindings, state, constraints} = typing
   state
 
 def pattern_bindings(typing: PatternTyping) -> List<&2, Binding>:
-  PatternTyping{bindings, state} = typing
+  PatternTyping{bindings, state, constraints} = typing
   bindings
+
+def pattern_constraints(typing: PatternTyping) -> List<&2, Coverage>:
+  PatternTyping{bindings, state, constraints} = typing
+  constraints
+
+def with_pattern_constraints(inference: Inference, constraints: List<&2, Coverage>) -> Inference:
+  Inference{ty, coverage, exits, reflections} = inference
+  Inference{ty, List.append(&2, Coverage, constraints, coverage), exits, reflections}
 
 def require_new_binding(found: Maybe<&2, Binding>, subject: String, name: String) -> Result<&2, &2, M.Diagnostic, Unit>:
   match found:
@@ -336,58 +483,72 @@ type PatternWork is Data:
   PatternValue{pattern: M.Pattern, expected: M.Ty}
   PatternFields{patterns: List<&2, M.Pattern>, expected: List<&2, M.Ty>}
 
-def infer_pattern_work(fuel: Nat, pending: List<&2, PatternWork>, +context: Context, +state: State, +bindings: List<&2, Binding>) -> Result<&2, &2, M.Diagnostic, PatternTyping>:
+def value_reference_type(reference: M.ValueReference, +context: Context, state: State) -> Result<&2, &2, M.Diagnostic, Typing>:
+  match reference:
+    case M.LocalReference{+name}:
+      instantiate_binding(lookup_local(context, name), state, name, context_subject(context))
+    case M.ConstantReference{+name}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        valid : Unit <- valid_global_kind(context, name, False{})
+        instantiate_binding(lookup_global(context, name), state, name, context_subject(context))
+
+def infer_pattern_work(fuel: Nat, pending: List<&2, PatternWork>, +context: Context, +state: State, +bindings: List<&2, Binding>, +constraints: List<&2, Coverage>) -> Result<&2, &2, M.Diagnostic, PatternTyping>:
   match fuel pending:
     case _ Nil{}:
-      Done{PatternTyping{bindings, state}}
+      Done{PatternTyping{bindings, state, constraints}}
     case 0n _:
       Fail{M.Diagnostic{"pattern_complexity", context_subject(context), "pattern typing exceeds compiler traversal limit"}}
     case 1n+rest PatternValue{M.WildcardPattern{}, expected} <> tail:
-      infer_pattern_work(rest, tail, context, state, bindings)
+      infer_pattern_work(rest, tail, context, state, bindings, constraints)
     case 1n+rest PatternValue{M.BindingPattern{+name}, expected} <> tail:
       do Result<&2, &2, M.Diagnostic, PatternTyping>:
         fresh : Unit <- require_new_binding(lookup_binding(bindings, name), context_subject(context), name)
-        infer_pattern_work(rest, tail, context, state, Binding{name, expected, Nil{}} <> bindings)
+        infer_pattern_work(rest, tail, context, state, Binding{name, expected, Nil{}} <> bindings, constraints)
+    case 1n+rest PatternValue{M.ValuePattern{+reference}, +expected} <> tail:
+      do Result<&2, &2, M.Diagnostic, PatternTyping>:
+        +value : Typing <- value_reference_type(reference, context, state)
+        next : State <- unify(expected, type_of(value), state_of(value), context_subject(context))
+        infer_pattern_work(rest, tail, context, next, bindings, ValuePatternType{expected, context_subject(context)} <> constraints)
     case 1n+rest PatternValue{M.UnitPattern{}, expected} <> tail:
       do Result<&2, &2, M.Diagnostic, PatternTyping>:
         next : State <- unify(expected, M.UnitTy{}, state, context_subject(context))
-        infer_pattern_work(rest, tail, context, next, bindings)
+        infer_pattern_work(rest, tail, context, next, bindings, constraints)
     case 1n+rest PatternValue{M.U32Pattern{value}, expected} <> tail:
       do Result<&2, &2, M.Diagnostic, PatternTyping>:
         next : State <- unify(expected, M.U32Ty{}, state, context_subject(context))
-        infer_pattern_work(rest, tail, context, next, bindings)
+        infer_pattern_work(rest, tail, context, next, bindings, constraints)
     case 1n+rest PatternValue{M.BoolPattern{value}, expected} <> tail:
       do Result<&2, &2, M.Diagnostic, PatternTyping>:
         next : State <- unify(expected, M.BoolTy{}, state, context_subject(context))
-        infer_pattern_work(rest, tail, context, next, bindings)
+        infer_pattern_work(rest, tail, context, next, bindings, constraints)
     case 1n+rest PatternValue{M.ConstructorPattern{name, None{}}, expected} <> tail:
       do Result<&2, &2, M.Diagnostic, PatternTyping>:
         +ctor : D.ConstructorType <- constructor_instance(name, context, state)
         arity : Unit <- no_payload(constructor_payload(ctor), context_subject(context))
         next : State <- unify(expected, constructor_result(ctor), constructor_state(ctor, state), context_subject(context))
-        infer_pattern_work(rest, tail, context, next, bindings)
+        infer_pattern_work(rest, tail, context, next, bindings, constraints)
     case 1n+rest PatternValue{M.ConstructorPattern{name, Some{payload}}, expected} <> tail:
       do Result<&2, &2, M.Diagnostic, PatternTyping>:
         +ctor : D.ConstructorType <- constructor_instance(name, context, state)
         ty : M.Ty <- payload_type(constructor_payload(ctor), context_subject(context))
         next : State <- unify(expected, constructor_result(ctor), constructor_state(ctor, state), context_subject(context))
-        infer_pattern_work(rest, PatternValue{payload, ty} <> tail, context, next, bindings)
+        infer_pattern_work(rest, PatternValue{payload, ty} <> tail, context, next, bindings, constraints)
     case 1n+rest PatternValue{M.ProductPattern{+elements}, expected} <> tail:
       +count = List.length(&2, M.Pattern, elements)
       +fields = D.fresh_arguments(count, next_of(state))
       do Result<&2, &2, M.Diagnostic, PatternTyping>:
         arity : Unit <- D.require_product_arity(count, context_subject(context))
         next : State <- unify(expected, M.ProductTy{fields}, with_next(state, Nat.add(next_of(state), count)), context_subject(context))
-        infer_pattern_work(rest, PatternFields{elements, fields} <> tail, context, next, bindings)
+        infer_pattern_work(rest, PatternFields{elements, fields} <> tail, context, next, bindings, constraints)
     case 1n+rest PatternFields{Nil{}, Nil{}} <> tail:
-      infer_pattern_work(rest, tail, context, state, bindings)
+      infer_pattern_work(rest, tail, context, state, bindings, constraints)
     case 1n+rest PatternFields{pattern <> following, ty <> remaining} <> tail:
-      infer_pattern_work(rest, PatternValue{pattern, ty} <> PatternFields{following, remaining} <> tail, context, state, bindings)
+      infer_pattern_work(rest, PatternValue{pattern, ty} <> PatternFields{following, remaining} <> tail, context, state, bindings, constraints)
     case 1n+rest PatternFields{patterns, expected} <> tail:
       Fail{M.Diagnostic{"internal_error", context_subject(context), "product pattern fields lost their inferred types"}}
 
 def infer_pattern(value: M.Pattern, expected: M.Ty, context: Context, state: State) -> Result<&2, &2, M.Diagnostic, PatternTyping>:
-  infer_pattern_work(U32.to_nat(65536), [PatternValue{value, expected}], context, state, Nil{})
+  infer_pattern_work(U32.to_nat(65536), [PatternValue{value, expected}], context, state, Nil{}, Nil{})
 
 type Work is Data:
   Expression{value: M.Expr}
@@ -429,47 +590,71 @@ def merge_pattern_bindings(pending: List<&2, Binding>, +bindings: List<&2, Bindi
         fresh : Unit <- require_new_binding(lookup_binding(bindings, name), subject, name)
         merge_pattern_bindings(tail, Binding{name, ty, variables} <> bindings, subject)
 
-def infer_patterns(patterns: List<&2, M.Pattern>, expected: List<&2, M.Ty>, +context: Context, state: State, bindings: List<&2, Binding>) -> Result<&2, &2, M.Diagnostic, PatternTyping>:
+def infer_patterns(patterns: List<&2, M.Pattern>, expected: List<&2, M.Ty>, +context: Context, state: State, bindings: List<&2, Binding>, constraints: List<&2, Coverage>) -> Result<&2, &2, M.Diagnostic, PatternTyping>:
   match patterns expected:
     case Nil{} Nil{}:
-      Done{PatternTyping{bindings, state}}
+      Done{PatternTyping{bindings, state, constraints}}
     case pattern <> tail ty <> remaining:
       do Result<&2, &2, M.Diagnostic, PatternTyping>:
         +first : PatternTyping <- infer_pattern(pattern, ty, context, state)
         merged : List<&2, Binding> <- merge_pattern_bindings(pattern_bindings(first), bindings, context_subject(context))
-        infer_patterns(tail, remaining, context, pattern_state(first), merged)
+        infer_patterns(tail, remaining, context, pattern_state(first), merged, List.append(&2, Coverage, pattern_constraints(first), constraints))
     case _ _:
       Fail{M.Diagnostic{"match_arity", context_subject(context), "every pattern row must match the scrutinee count"}}
 
 def operation_type(declaration: M.Operation, next: Nat) -> M.Ty:
-  M.Operation{identity, parameter, result} = declaration
-  M.FunctionTy{parameter, result, R.singleton(identity, M.RowVariable{next})}
+  match declaration:
+    case M.Operation{identity, parameter, result}:
+      M.FunctionTy{parameter, result, R.singleton(identity, M.RowVariable{next})}
+    case _:
+      M.NeverTy{}
 
 def operation_parameter(declaration: M.Operation) -> M.Ty:
-  M.Operation{identity, parameter, result} = declaration
-  parameter
+  match declaration:
+    case M.Operation{identity, parameter, result}:
+      parameter
+    case _:
+      M.NeverTy{}
 
 def operation_result(declaration: M.Operation) -> M.Ty:
-  M.Operation{identity, parameter, result} = declaration
-  result
+  match declaration:
+    case M.Operation{identity, parameter, result}:
+      result
+    case _:
+      M.NeverTy{}
 
 type Provider is Data:
-  Provider{identity: M.TypeId, effects: M.EffectRow}
+  Provider{identities: List<&2, M.TypeId>, effects: M.EffectRow, state: Maybe<&2, M.Ty>}
 
 def require_provider(ty: M.Ty, subject: String) -> Result<&2, &2, M.Diagnostic, Provider>:
   match ty:
     case M.ProviderTy{identity, effects}:
-      Done{Provider{identity, effects}}
+      Done{Provider{[identity], effects, None{}}}
+    case M.StateProviderTy{read, write, state}:
+      Done{Provider{[read, write], M.empty_row(), Some{state}}}
     case other:
       Fail{M.Diagnostic{"invalid_provider", subject, "do requires a provider with a known nominal operation, got " ++ M.type_show(other)}}
 
-def provider_row(provider: Provider) -> M.EffectRow:
-  Provider{identity, effects} = provider
-  effects
+def prepare_provider(provider: Provider, +context: Context, state: State) -> Result<&2, &2, M.Diagnostic, State>:
+  match provider:
+    case Provider{identities, effects, None{}}:
+      unify_rows(effects, context_row(context), state, context_subject(context))
+    case Provider{identities, effects, Some{ty}}:
+      Done{state}
 
 def handled_context(+context: Context, provider: Provider) -> Context:
-  Provider{identity, effects} = provider
-  with_row(context, R.prepend([identity], context_row(context)))
+  Provider{identities, effects, state} = provider
+  with_row(context, R.prepend(identities, context_row(context)))
+
+def handled_result(provider: Provider, result: M.Ty) -> M.Ty:
+  match provider:
+    case Provider{identities, effects, None{}}:
+      result
+    case Provider{identities, effects, Some{state}}:
+      M.ProductTy{[state, result]}
+
+def state_operations_distinct(read: M.TypeId, write: M.TypeId, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
+  Bool.pick(Result<&2, &2, M.Diagnostic, Unit>, M.type_id_equal(read, write), Fail{M.Diagnostic{"invalid_state_provider", subject, "state read and write must be distinct operations"}}, Done{Unit{}})
 
 def product_element(elements: List<&2, M.Ty>, index: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, M.Ty>:
   match elements index:
@@ -490,6 +675,26 @@ def project_type(ty: M.Ty, index: Nat, subject: String) -> Result<&2, &2, M.Diag
       Fail{M.Diagnostic{"unknown_product_shape", subject, "projection requires a known product arity; annotate the parameter with a product type"}}
     case other:
       Fail{M.Diagnostic{"type_mismatch", subject, "projection requires a product, got " ++ M.type_show(other)}}
+
+# Deferred results retain their relationships to operation and operand types.
+# Generalizing a temporary result would sever those relationships before selection.
+def deferred_bindings(constraints: List<&2, Coverage>) -> List<&2, Binding>:
+  match constraints:
+    case Nil{}:
+      Nil{}
+    case OperationNeed{identity, template, arguments, function_type, subject} <> tail:
+      Binding{"$operation", M.ProductTy{function_type <> arguments}, Nil{}} <> deferred_bindings(tail)
+    case AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject} <> tail:
+      Binding{"$associated", M.ProductTy{[left, right, result]}, Nil{}} <> deferred_bindings(tail)
+    case head <> tail:
+      deferred_bindings(tail)
+
+def let_context(inference: Inference, context: Context) -> Context:
+  match inference:
+    case Inference{M.FunctionTy{parameter, result, row}, coverage, exits, reflections}:
+      context
+    case Inference{ty, coverage, exits, reflections}:
+      extend(context, deferred_bindings(coverage))
 
 def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Result<&2, &2, M.Diagnostic, Typing>:
   match fuel work:
@@ -517,6 +722,33 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
         return Typing{join(inference_of(v), pure(M.UnitTy{}), result), state_of(v)}
     case 1n+rest Expression{M.ArrayExpr{elements}}:
       expr_work(rest, ArrayValues{elements, M.VariableTy{next_of(state)}, pure(M.UnitTy{})}, context, with_next(state, 1n+next_of(state)))
+    case 1n+rest Expression{M.ForExpr{index, start, end, carried, initial, body}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        +a : Typing <- expr_work(rest, Expression{start}, context, state)
+        s1 : State <- unify(type_of(a), M.U32Ty{}, state_of(a), context_subject(context))
+        +b : Typing <- expr_work(rest, Expression{end}, context, s1)
+        s2 : State <- unify(type_of(b), M.U32Ty{}, state_of(b), context_subject(context))
+        +v : Typing <- expr_work(rest, Expression{initial}, context, s2)
+        +loop : Typing <- expr_work(rest, Expression{body}, extend(context, [Binding{index, M.U32Ty{}, Nil{}}, Binding{carried, type_of(v), Nil{}}]), state_of(v))
+        next : State <- unify(type_of(loop), type_of(v), state_of(loop), context_subject(context))
+        +result : M.Ty = flow(type_of(a), flow(type_of(b), type_of(v)))
+        return Typing{sequence(inference_of(a), sequence(inference_of(b), sequence(inference_of(v), inference_of(loop), result), result), result), next}
+    case 1n+rest Expression{M.ArrayGenerateExpr{count, generator}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        +c : Typing <- expr_work(rest, Expression{count}, context, state)
+        +g : Typing <- expr_work(rest, Expression{generator}, context, state_of(c))
+        +element : M.Ty = M.VariableTy{next_of(state_of(g))}
+        s1 : State <- unify(type_of(c), M.U32Ty{}, with_next(state_of(g), 1n+next_of(state_of(g))), context_subject(context))
+        next : State <- unify(type_of(g), M.FunctionTy{M.U32Ty{}, element, M.EffectRow{Nil{}, M.ClosedRow{}}}, s1, context_subject(context))
+        +result : M.Ty = flow(type_of(c), flow(type_of(g), M.ArrayTy{element}))
+        return Typing{sequence(inference_of(c), inference_of(g), result), next}
+    case 1n+rest Expression{M.ArrayFillExpr{count, value}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        +c : Typing <- expr_work(rest, Expression{count}, context, state)
+        +v : Typing <- expr_work(rest, Expression{value}, context, state_of(c))
+        next : State <- unify(type_of(c), M.U32Ty{}, state_of(v), context_subject(context))
+        +result : M.Ty = flow(type_of(c), flow(type_of(v), M.ArrayTy{type_of(v)}))
+        return Typing{sequence(inference_of(c), inference_of(v), result), next}
     case 1n+rest Expression{M.ArrayGetExpr{array, index}}:
       do Result<&2, &2, M.Diagnostic, Typing>:
         +a : Typing <- expr_work(rest, Expression{array}, context, state)
@@ -596,6 +828,14 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
         +result : M.Ty = M.VariableTy{next_of(state_of(arg))}
         next : State <- unify(type_of(fn), M.FunctionTy{type_of(arg), result, context_row(context)}, with_next(state_of(arg), 1n+next_of(state_of(arg))), context_subject(context))
         return Typing{join(inference_of(fn), inference_of(arg), flow(type_of(arg), result)), next}
+    case 1n+rest Expression{M.AssociatedExpr{identity, dispatch, +member, +templates, left, right}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        +l : Typing <- expr_work(rest, Expression{left}, context, state)
+        +r : Typing <- expr_work(rest, Expression{right}, context, state_of(l))
+        +result : M.Ty = M.VariableTy{next_of(state_of(r))}
+        +joined : Inference = sequence(inference_of(l), inference_of(r), flow(type_of(l), flow(type_of(r), result)))
+        shaped : State <- associated_shape(M.name_equal(member, "@type.same"), TypedState.request(member), type_of(l), type_of(r), result, with_next(state_of(r), 1n+next_of(state_of(r))), context_subject(context))
+        return Typing{with_pattern_constraints(joined, [AssociatedNeed{identity, dispatch, member, templates, type_of(l), type_of(r), result, context_row(context), context_subject(context)}]), shaped}
     case 1n+rest Expression{M.ScalarExpr{+operator, left, right}}:
       do Result<&2, &2, M.Diagnostic, Typing>:
         +l : Typing <- expr_work(rest, Expression{left}, context, state)
@@ -613,7 +853,7 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
       do Result<&2, &2, M.Diagnostic, Typing>:
         +v : Typing <- expr_work(rest, Expression{value}, with_row(context, row), with_next(state, 1n+next_of(state)))
         +pure_state : State <- require_pure(row, state_of(v), context_subject(context), "let_effect")
-        binding : Binding <- generalize(type_of(v), context, pure_state, name)
+        binding : Binding <- generalize(type_of(v), let_context(inference_of(v), context), pure_state, name)
         +b : Typing <- expr_work(rest, Expression{body}, extend(context, [binding]), pure_state)
         return Typing{sequence(inference_of(v), inference_of(b), flow(type_of(v), type_of(b))), state_of(b)}
     case 1n+rest Expression{M.UseExpr{name, value, body}}:
@@ -649,7 +889,7 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
         exit : Unit <- guard_exits(type_of(a), context_subject(context))
         +b : Typing <- expr_work(rest, Expression{body}, extend(context, pattern_bindings(bindings)), state_of(a))
         +result : M.Ty = flow(type_of(v), type_of(b))
-        return Typing{sequence(inference_of(v), join(inference_of(a), inference_of(b), result), result), state_of(b)}
+        return Typing{with_pattern_constraints(sequence(inference_of(v), join(inference_of(a), inference_of(b), result), result), pattern_constraints(bindings)), state_of(b)}
     case 1n+rest Expression{M.BlockExpr{+label, body}}:
       +result = {M.VariableTy{next_of(state)} : M.Ty}
       do Result<&2, &2, M.Diagnostic, Typing>:
@@ -662,16 +902,35 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
         +v : Typing <- expr_work(rest, Expression{value}, context, state)
         next : State <- unify(type_of(v), target, state_of(v), context_subject(context))
         return Typing{return_value(inference_of(v), label), next}
+    case 1n+rest Expression{M.RuntimeInitExpr{value}}:
+      expr_work(rest, Expression{value}, context, state)
     case 1n+rest Expression{M.SourceExpr{+offset, ann, value}}:
       +at = at_subject(context, "offset:" ++ Nat.show(offset))
       do Result<&2, &2, M.Diagnostic, Typing>:
         +v : Typing <- expr_work(rest, Expression{value}, at, state)
         next : State <- annotation(ann, type_of(v), state_of(v), at)
         return Typing{inference_of(v), next}
+    case 1n+rest Expression{M.GenericOperationExpr{identity, +template, arguments}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        declared : M.Operation <- operation_template(context_operations(context), template)
+        generic_operation(identity, template, declared, arguments, state, context)
     case 1n+rest Expression{M.OperationExpr{+identity}}:
       do Result<&2, &2, M.Diagnostic, Typing>:
         declared : M.Operation <- D.require_operation(D.operation(context_operations(context), identity), identity)
         return Typing{pure(operation_type(declared, next_of(state))), with_next(state, 1n+next_of(state))}
+    case 1n+rest Expression{M.SpecializeOperationExpr{template, arguments, body}}:
+      Fail{M.Diagnostic{"unspecialized_effect", "effect", "effect instance reached inference before specialization"}}
+    case 1n+rest Expression{M.StateProviderExpr{+read, +write, initial}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        distinct : Unit <- state_operations_distinct(read, write, context_subject(context))
+        +reader : M.Operation <- D.require_operation(D.operation(context_operations(context), read), read)
+        +writer : M.Operation <- D.require_operation(D.operation(context_operations(context), write), write)
+        +value : Typing <- expr_work(rest, Expression{initial}, context, state)
+        s1 : State <- unify(operation_parameter(reader), M.UnitTy{}, state_of(value), context_subject(context))
+        s2 : State <- unify(operation_result(writer), M.UnitTy{}, s1, context_subject(context))
+        s3 : State <- unify(operation_result(reader), operation_parameter(writer), s2, context_subject(context))
+        s4 : State <- unify(type_of(value), operation_result(reader), s3, context_subject(context))
+        return Typing{join(inference_of(value), pure(M.UnitTy{}), flow(type_of(value), M.StateProviderTy{read, write, operation_result(reader)})), s4}
     case 1n+rest Expression{M.ProviderExpr{+identity, implementation}}:
       do Result<&2, &2, M.Diagnostic, Typing>:
         +declared : M.Operation <- D.require_operation(D.operation(context_operations(context), identity), identity)
@@ -684,9 +943,9 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
         +p : Typing <- expr_work(rest, Expression{provider}, context, state)
         resolved : M.Ty <- T.resolve(substitutions_of(state_of(p)), type_of(p))
         +supplied : Provider <- require_provider(resolved, context_subject(context))
-        prepared : State <- unify_rows(provider_row(supplied), context_row(context), state_of(p), context_subject(context))
+        prepared : State <- prepare_provider(supplied, context, state_of(p))
         +b : Typing <- expr_work(rest, Expression{body}, handled_context(context, supplied), prepared)
-        return Typing{sequence(inference_of(p), inference_of(b), flow(type_of(p), type_of(b))), state_of(b)}
+        return Typing{sequence(inference_of(p), inference_of(b), flow(type_of(p), handled_result(supplied, type_of(b)))), state_of(b)}
     case 1n+rest Expression{M.OperationDescriptorExpr{+identity}}:
       do Result<&2, &2, M.Diagnostic, Typing>:
         known : Unit <- D.valid_effect_label(context_operations(context), identity)
@@ -740,11 +999,11 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
       Done{Typing{pure(M.NeverTy{}), state}}
     case 1n+rest MatchArms{M.MatchArm{patterns, body} <> tail, +scrutinees}:
       do Result<&2, &2, M.Diagnostic, Typing>:
-        +bindings : PatternTyping <- infer_patterns(patterns, scrutinees, context, state, Nil{})
+        +bindings : PatternTyping <- infer_patterns(patterns, scrutinees, context, state, Nil{}, Nil{})
         +b : Typing <- expr_work(rest, Expression{body}, extend(context, pattern_bindings(bindings)), pattern_state(bindings))
         +t : Typing <- expr_work(rest, MatchArms{tail, scrutinees}, context, state_of(b))
         next : State <- unify(type_of(b), type_of(t), state_of(t), context_subject(context))
-        return Typing{join(inference_of(b), inference_of(t), branch_type(type_of(b), type_of(t))), next}
+        return Typing{with_pattern_constraints(join(inference_of(b), inference_of(t), branch_type(type_of(b), type_of(t))), pattern_constraints(bindings)), next}
 
 
 def expr(expression: M.Expr, context: Context, state: State) -> Result<&2, &2, M.Diagnostic, Typing>:

@@ -15,6 +15,12 @@ import ./check_regions.bend as Regions
 import ./inference_batch.bend as B
 import ./native_plan.bend as Plan
 import ./dependency.bend as D
+import ./monomorph.bend as Mono
+import ./effect_families.bend as Families
+import ./check.bend as Check
+import ./source_modules.bend as Modules
+import ./shape_reuse.bend as ShapeReuse
+import ./catalog_versions.bend as CV
 
 type Mode is Data:
   AnalyzeMode{}
@@ -42,7 +48,9 @@ type State is Data:
     planning: Maybe<&2, Cached<InferencePlan>>,
     groups: Map<&2, Cached<G.CheckedGroup>>,
     constants: Map<&2, Cached<Const.Constants>>,
-    entries: Map<&2, Cached<W.EntryCode>>
+    entries: Map<&2, Cached<W.EntryCode>>,
+    specialization: Maybe<&2, Mono.Cache>,
+    catalog_version: Maybe<&2, CV.Revision>
   }
 
 type Output is Data:
@@ -121,7 +129,7 @@ def required(-V: Data, found: Maybe<&2, V>, name: String) -> Result<&2, &2, M.Di
 def open(prelude: C.Cst, fuel: Nat) -> Result<&2, &2, M.Diagnostic, State>:
   do Result<&2, &2, M.Diagnostic, State>:
     prepared : L.Prelude <- L.prepare_prelude(prelude, fuel)
-    return State{prepared, None{}, Map.new(&2, Lowered), None{}, Map.new(&2, Cached<G.CheckedGroup>), Map.new(&2, Cached<Const.Constants>), Map.new(&2, Cached<W.EntryCode>)}
+    return State{prepared, None{}, Map.new(&2, Lowered), None{}, Map.new(&2, Cached<G.CheckedGroup>), Map.new(&2, Cached<Const.Constants>), Map.new(&2, Cached<W.EntryCode>), None{}, None{}}
 
 type Lowering is Data:
   Lowering{values: List<&2, Lowered>, scans: List<&2, Plan.Scanned>, counts: Counts}
@@ -389,6 +397,19 @@ type CheckedGroups is Data:
     counts: Counts
   }
 
+# Each group contains only the exact body and short nominal-version tokens.
+# The revision catalog was compared once before checking any cached group.
+type CheckCatalog is Data:
+  CheckCatalog{catalog: Scheduler.Catalog, revision: CV.Revision}
+
+def check_catalog(value: CheckCatalog) -> Scheduler.Catalog:
+  CheckCatalog{catalog, revision} = value
+  catalog
+
+def check_revision(value: CheckCatalog) -> CV.Revision:
+  CheckCatalog{catalog, revision} = value
+  revision
+
 def empty_checked() -> CheckedGroups:
   CheckedGroups{Map.new(&2, Cached<G.CheckedGroup>), Map.new(&2, G.Interface), Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Map.new(&2, Set()), Map.new(&2, List<&2, U32>), Counts{0n, 0n}}
 
@@ -459,13 +480,13 @@ def select_group(found: Maybe<&2, G.CheckedGroup>, position: Nat, module: M.Modu
     case None{}:
       GroupMiss{Scheduler.Task{position, module, dependencies, cost}}
 
-def prepare_group(+position: Nat, job: G.Job, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups) -> Result<&2, &2, M.Diagnostic, PreparedGroup>:
+def prepare_group(+position: Nat, job: G.Job, +known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups) -> Result<&2, &2, M.Diagnostic, PreparedGroup>:
   G.Job{+members, +dependencies, types} = job
   CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, counts} = state
   do Result<&2, &2, M.Diagnostic, PreparedGroup>:
     +owner : String <- group_owner(List.sort(~String, ~String.is_le, members))
-    +subset : M.Module = Scheduler.group_module(known, G.Job{members, dependencies, types})
-    +base_key : List<&2, U32> <- K.module(subset)
+    +subset : M.Module = Scheduler.group_module(check_catalog(known), G.Job{members, dependencies, types})
+    +base_key : List<&2, U32> <- CV.group_key(subset, check_revision(known))
     +imports : List<&2, G.Interface> <- Scheduler.dependency_interfaces(dependencies, interfaces)
     imported_key : List<&2, U32> <- K.interfaces(imports)
     +keys : List<&2, List<&2, U32>> = [base_key, imported_key]
@@ -474,21 +495,21 @@ def prepare_group(+position: Nat, job: G.Job, known: Scheduler.Catalog, previous
     return PreparedGroup{position, owner, members, closure, base_key, keys, selection}
 
 type GroupPreparationContext is Data:
-  GroupPreparationContext{known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups}
+  GroupPreparationContext{known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups}
 
 def prepare_group_task(scheduled: Scheduler.Scheduled, context: GroupPreparationContext) -> GroupPreparation:
   Scheduler.Scheduled{+position, level, job} = scheduled
   GroupPreparationContext{known, previous, state} = context
   GroupPreparation{position, prepare_group(position, job, known, previous, state)}
 
-def group_preparation_cost(job: G.Job, known: Scheduler.Catalog, small: Bool) -> Nat:
+def group_preparation_cost(job: G.Job, known: CheckCatalog, small: Bool) -> Nat:
   match small:
     case True{}:
       0n
     case False{}:
-      Scheduler.group_cost(known, job)
+      Scheduler.group_cost(check_catalog(known), job)
 
-def group_preparation_tasks(ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, +failure: Maybe<&2, Scheduler.Failure>, +small: Bool, reversed: List<&2, B.Weighted<Scheduler.Scheduled>>, allowed: Bool) -> List<&2, B.Weighted<Scheduler.Scheduled>>:
+def group_preparation_tasks(ready: List<&2, Scheduler.Scheduled>, +known: CheckCatalog, +failure: Maybe<&2, Scheduler.Failure>, +small: Bool, reversed: List<&2, B.Weighted<Scheduler.Scheduled>>, allowed: Bool) -> List<&2, B.Weighted<Scheduler.Scheduled>>:
   match ready allowed:
     case Nil{} _:
       List.reverse(&2, B.Weighted<Scheduler.Scheduled>, reversed)
@@ -501,7 +522,7 @@ def group_preparation_tasks(ready: List<&2, Scheduler.Scheduled>, +known: Schedu
 # Key construction reads one immutable frontier snapshot. Results retain source
 # order; no candidate cache state is published by a worker. Small frontiers need
 # no cost traversal or extra forks inside an already-parallel dependency region.
-def prepare_groups(+ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups, +failure: Maybe<&2, Scheduler.Failure>) -> List<&2, GroupPreparation>:
+def prepare_groups(+ready: List<&2, Scheduler.Scheduled>, +known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups, +failure: Maybe<&2, Scheduler.Failure>) -> List<&2, GroupPreparation>:
   tasks = group_preparation_tasks(ready, known, failure, Nat.is_le(List.length(&2, Scheduler.Scheduled, ready), 4n), Nil{}, Scheduler.next_allowed(ready, failure))
   B.execute(~Scheduler.Scheduled, ~GroupPreparationContext, ~GroupPreparation, ~prepare_group_task, B.plan(Scheduler.Scheduled, tasks, 2048n), GroupPreparationContext{known, previous, state})
 
@@ -509,7 +530,7 @@ def complete_preparation(prepared: Result<&2, &2, M.Diagnostic, PreparedGroup>) 
   match prepared:
     case Done{PreparedGroup{position, owner, members, closure, base_key, keys, GroupMiss{Scheduler.Task{index, module, dependencies, cost}}}}:
       do Result<&2, &2, M.Diagnostic, PreparedGroup>:
-        checked : G.CheckedGroup <- G.check_group(module, dependencies)
+        checked : G.CheckedGroup <- G.check_group_planned(module, dependencies)
         return PreparedGroup{position, owner, members, closure, base_key, keys, GroupChecked{checked}}
     case other:
       other
@@ -530,7 +551,7 @@ def group_pipeline_grain(previous: Map<&2, Cached<G.CheckedGroup>>) -> Nat:
 
 # Each leaf can begin inference before another leaf finishes its cache keys.
 # Workers still read a single immutable frontier; publication remains ordered.
-def check_groups(+ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, +previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups, +failure: Maybe<&2, Scheduler.Failure>) -> List<&2, GroupPreparation>:
+def check_groups(+ready: List<&2, Scheduler.Scheduled>, +known: CheckCatalog, +previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups, +failure: Maybe<&2, Scheduler.Failure>) -> List<&2, GroupPreparation>:
   tasks = group_preparation_tasks(ready, known, failure, False{}, Nil{}, Scheduler.next_allowed(ready, failure))
   B.execute(~Scheduler.Scheduled, ~GroupPreparationContext, ~GroupPreparation, ~check_group_task, B.plan(Scheduler.Scheduled, tasks, group_pipeline_grain(previous)), GroupPreparationContext{known, previous, state})
 
@@ -579,38 +600,38 @@ def publish_prepared(prepared: List<&2, GroupPreparation>, outcomes: List<&2, Sc
     case GroupPreparation{+position, Done{PreparedGroup{index, owner, members, closure, base_key, keys, GroupMiss{task}}}} <> tail outcome <> remaining:
       publish_prepared(tail, remaining, publish_group_result(checked_outcome(outcome, position), progress, position, owner, members, closure, base_key, keys))
 
-def check_single_group(scheduled: Scheduler.Scheduled, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress, allowed: Bool) -> GroupProgress:
+def check_single_group(scheduled: Scheduler.Scheduled, known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress, allowed: Bool) -> GroupProgress:
   match progress allowed:
     case prior False{}:
       prior
     case GroupProgress{+state, failure} True{}:
       publish_prepared([check_group_task(scheduled, GroupPreparationContext{known, previous, state})], Nil{}, GroupProgress{state, failure})
 
-def check_frontier_sized(ready: List<&2, Scheduler.Scheduled>, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress, small: Bool) -> GroupProgress:
+def check_frontier_sized(ready: List<&2, Scheduler.Scheduled>, known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress, small: Bool) -> GroupProgress:
   match progress small:
     case GroupProgress{+state, +failure} True{}:
       +prepared = prepare_groups(ready, known, previous, state, failure)
-      publish_prepared(prepared, Scheduler.check_batch(group_tasks(prepared, Nil{})), GroupProgress{state, failure})
+      publish_prepared(prepared, Scheduler.check_batch_planned(group_tasks(prepared, Nil{})), GroupProgress{state, failure})
     case GroupProgress{+state, +failure} False{}:
       publish_prepared(check_groups(ready, known, previous, state, failure), Nil{}, GroupProgress{state, failure})
 
-def frontier_cost(ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, cost: Nat) -> Nat:
+def frontier_cost(ready: List<&2, Scheduler.Scheduled>, +known: CheckCatalog, cost: Nat) -> Nat:
   match ready:
     case Nil{}:
       cost
     case Scheduler.Scheduled{position, level, job} <> tail:
-      frontier_cost(tail, known, Nat.add(cost, Scheduler.group_cost(known, job)))
+      frontier_cost(tail, known, Nat.add(cost, Scheduler.group_cost(check_catalog(known), job)))
 
 # Tiny jobs benefit from collecting misses into their own balanced batch.
 # Fuse stages only when the average job amortizes the worker-local checking path.
-def staged_frontier(+ready: List<&2, Scheduler.Scheduled>, known: Scheduler.Catalog, small: Bool) -> Bool:
+def staged_frontier(+ready: List<&2, Scheduler.Scheduled>, known: CheckCatalog, small: Bool) -> Bool:
   match small:
     case True{}:
       True{}
     case False{}:
       Nat.is_lt(frontier_cost(ready, known, 0n), Nat.mul(List.length(&2, Scheduler.Scheduled, ready), 256n))
 
-def check_frontier(ready: List<&2, Scheduler.Scheduled>, +known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress) -> GroupProgress:
+def check_frontier(ready: List<&2, Scheduler.Scheduled>, +known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress) -> GroupProgress:
   match ready:
     case Nil{}:
       progress
@@ -629,7 +650,7 @@ def finish_groups(progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, Check
 
 # Only closed interfaces from completed frontiers enter the next one. A failed
 # later ready job cannot hide an earlier job waiting on an earlier frontier.
-def check_frontiers(fuel: Nat, frontier: Scheduler.Frontier, +known: Scheduler.Catalog, +previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, CheckedGroups>:
+def check_frontiers(fuel: Nat, frontier: Scheduler.Frontier, +known: CheckCatalog, +previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, CheckedGroups>:
   match fuel frontier:
     case _ Scheduler.Frontier{Nil{}, Nil{}}:
       finish_groups(progress)
@@ -646,7 +667,7 @@ def chain_allowed(jobs: List<&2, Chains.Job>, progress: GroupProgress) -> Bool:
       GroupProgress{state, failure} = progress
       Scheduler.precedes_failure(position, failure)
 
-def check_chain(jobs: List<&2, Chains.Job>, +known: Scheduler.Catalog, +previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress, allowed: Bool) -> GroupProgress:
+def check_chain(jobs: List<&2, Chains.Job>, +known: CheckCatalog, +previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress, allowed: Bool) -> GroupProgress:
   match jobs allowed:
     case Nil{} _:
       progress
@@ -658,7 +679,7 @@ def check_chain(jobs: List<&2, Chains.Job>, +known: Scheduler.Catalog, +previous
 
 type ChainContext is Data:
   ChainContext{
-    known: Scheduler.Catalog,
+    known: CheckCatalog,
     previous: Map<&2, Cached<G.CheckedGroup>>,
     interfaces: Map<&2, G.Interface>,
     closures: Map<&2, Set()>,
@@ -683,12 +704,12 @@ def merge_progress(chains: List<&2, GroupProgress>, progress: GroupProgress) -> 
       combined = {CheckedGroups{Map.union(&2, Cached<G.CheckedGroup>, groups, cg), Map.union(&2, G.Interface, interfaces, ci), Map.union(&2, M.CheckedFunction, functions, cf), Map.union(&2, M.CheckedConstant, constants, cc), Map.union(&2, Set(), closures, cl), Map.union(&2, List<&2, U32>, base_keys, ck), Counts{Nat.add(prior_fresh, fresh), Nat.add(prior_reused, reused)}} : CheckedGroups}
       merge_progress(tail, GroupProgress{combined, Scheduler.merge_failure(prior_failure, failure)})
 
-def check_parallel_chains(ready: List<&2, Chains.Chain>, +known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress) -> GroupProgress:
+def check_parallel_chains(ready: List<&2, Chains.Chain>, +known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress) -> GroupProgress:
   GroupProgress{CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, counts}, failure} = progress
-  outcomes = B.execute(~Chains.Chain, ~ChainContext, ~GroupProgress, ~run_chain, Scheduler.chain_batch(ready, known), ChainContext{known, previous, interfaces, closures, failure})
+  outcomes = B.execute(~Chains.Chain, ~ChainContext, ~GroupProgress, ~run_chain, Scheduler.chain_batch(ready, check_catalog(known)), ChainContext{known, previous, interfaces, closures, failure})
   merge_progress(outcomes, progress)
 
-def check_chain_frontier_planned(ready: List<&2, Chains.Chain>, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress, singletons: Maybe<&2, List<&2, Scheduler.Scheduled>>) -> GroupProgress:
+def check_chain_frontier_planned(ready: List<&2, Chains.Chain>, known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress, singletons: Maybe<&2, List<&2, Scheduler.Scheduled>>) -> GroupProgress:
   match ready singletons:
     case Chains.Chain{position, level, +jobs} <> Nil{} _:
       check_chain(jobs, known, previous, progress, chain_allowed(jobs, progress))
@@ -697,10 +718,10 @@ def check_chain_frontier_planned(ready: List<&2, Chains.Chain>, known: Scheduler
     case _ None{}:
       check_parallel_chains(ready, known, previous, progress)
 
-def check_chain_frontier(+ready: List<&2, Chains.Chain>, known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress) -> GroupProgress:
+def check_chain_frontier(+ready: List<&2, Chains.Chain>, known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress) -> GroupProgress:
   check_chain_frontier_planned(ready, known, previous, progress, Scheduler.singleton_jobs(ready))
 
-def check_chain_frontiers(fuel: Nat, frontier: Chains.Frontier, +known: Scheduler.Catalog, +previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, GroupProgress>:
+def check_chain_frontiers(fuel: Nat, frontier: Chains.Frontier, +known: CheckCatalog, +previous: Map<&2, Cached<G.CheckedGroup>>, progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, GroupProgress>:
   match fuel frontier:
     case _ Chains.Frontier{Nil{}, Nil{}}:
       Done{progress}
@@ -724,16 +745,16 @@ def merge_regions(outcomes: List<&2, Result<&2, &2, M.Diagnostic, GroupProgress>
     case Done{region} <> tail:
       merge_regions(tail, merge_progress([region], progress))
 
-def check_regions(regions: List<&2, Regions.Region>, +known: Scheduler.Catalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, GroupProgress>:
+def check_regions(regions: List<&2, Regions.Region>, +known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, +progress: GroupProgress) -> Result<&2, &2, M.Diagnostic, GroupProgress>:
   match regions:
     case Regions.Region{+chains} <> Nil{}:
       check_chain_frontiers(List.length(&2, Chains.Chain, chains), Chains.next_frontier(chains), known, previous, progress)
     case _:
       GroupProgress{CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, counts}, failure} = progress
-      outcomes = B.execute(~Regions.Region, ~ChainContext, ~Result<&2, &2, M.Diagnostic, GroupProgress>, ~run_region, Scheduler.region_batch(regions, known), ChainContext{known, previous, interfaces, closures, failure})
+      outcomes = B.execute(~Regions.Region, ~ChainContext, ~Result<&2, &2, M.Diagnostic, GroupProgress>, ~run_region, Scheduler.region_batch(regions, check_catalog(known)), ChainContext{known, previous, interfaces, closures, failure})
       merge_regions(outcomes, progress)
 
-def check_plan(plan: InferencePlan, +known: Scheduler.Catalog, +previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups) -> Result<&2, &2, M.Diagnostic, CheckedGroups>:
+def check_plan(plan: InferencePlan, +known: CheckCatalog, +previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups) -> Result<&2, &2, M.Diagnostic, CheckedGroups>:
   match plan:
     case IndependentPlan{group_count, scheduled}:
       check_frontiers(group_count, Scheduler.next_frontier(scheduled), known, previous, GroupProgress{state, None{}})
@@ -940,14 +961,14 @@ def stats(declarations: Counts, groups: Counts, constants: Counts, entries: Coun
   Stats{dl, dr, gc, gr, ce, cr, ec, er}
 
 def finish_compiled(state: State, analysis: Main.Analysis, +prepared: W.Prepared, compiled: CompiledEntries, declarations: Counts, groups: Counts, constants: Counts) -> Result<&2, &2, M.Diagnostic, Completion>:
-  State{prelude, scope_key, lowered, planning, checked, evaluated, previous} = state
+  State{prelude, scope_key, lowered, planning, checked, evaluated, previous, specialization, catalog_version} = state
   CompiledEntries{entries, values, entry_counts} = compiled
   do Result<&2, &2, M.Diagnostic, Completion>:
     bytes : W.BytePlan <- W.link_plan(prepared, values)
-    return Completion{State{prelude, scope_key, lowered, planning, checked, evaluated, entries}, Compiled{Main.PlannedArtifact{analysis, bytes}}, stats(declarations, groups, constants, entry_counts)}
+    return Completion{State{prelude, scope_key, lowered, planning, checked, evaluated, entries, specialization, catalog_version}, Compiled{Main.PlannedArtifact{analysis, bytes}}, stats(declarations, groups, constants, entry_counts)}
 
 def state_entries(state: State) -> Map<&2, Cached<W.EntryCode>>:
-  State{prelude, scope_key, lowered, planning, checked, evaluated, entries} = state
+  State{prelude, scope_key, lowered, planning, checked, evaluated, entries, specialization, catalog_version} = state
   entries
 
 def finish(mode: Mode, +state: State, +analysis: Main.Analysis, declarations: Counts, groups: Counts, constants: Counts) -> Result<&2, &2, M.Diagnostic, Completion>:
@@ -961,18 +982,18 @@ def finish(mode: Mode, +state: State, +analysis: Main.Analysis, declarations: Co
         finish_compiled(state, analysis, prepared, compiled, declarations, groups, constants)
 
 def update_evaluated(state: State, mode: Mode, checked: M.CheckedModule, evaluated: Evaluated, declaration_counts: Counts, group_counts: Counts) -> Result<&2, &2, M.Diagnostic, Completion>:
-  State{prelude, scope_key, declarations, planning, groups, previous_constants, entries} = state
+  State{prelude, scope_key, declarations, planning, groups, previous_constants, entries, specialization, catalog_version} = state
   Evaluated{constants, Const.Constants{bindings, remaining}, constant_counts} = evaluated
-  next = {State{prelude, scope_key, declarations, planning, groups, constants, entries} : State}
+  next = {State{prelude, scope_key, declarations, planning, groups, constants, entries, specialization, catalog_version} : State}
   finish(mode, next, Main.Analysis{checked, bindings, remaining}, declaration_counts, group_counts, constant_counts)
 
 def update_checked(state: State, mode: Mode, +module: M.Module, +completed: CheckedGroups, declaration_counts: Counts, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
-  State{prelude, scope_key, declarations, planning, previous_groups, previous_constants, entries} = state
+  State{prelude, scope_key, declarations, planning, previous_groups, previous_constants, entries, specialization, catalog_version} = state
   CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, group_counts} = completed
   do Result<&2, &2, M.Diagnostic, Completion>:
     +checked : M.CheckedModule <- assemble(module, completed)
     evaluated : Evaluated <- evaluate_constants(Main.checked_constants(checked), steps, Main.const_context(module, checked), closures, base_keys, previous_constants, Map.new(&2, Cached<Const.Constants>), Nil{}, Counts{0n, 0n})
-    update_evaluated(State{prelude, scope_key, declarations, planning, groups, Map.new(&2, Cached<Const.Constants>), entries}, mode, checked, evaluated, declaration_counts, group_counts)
+    update_evaluated(State{prelude, scope_key, declarations, planning, groups, Map.new(&2, Cached<Const.Constants>), entries, specialization, catalog_version}, mode, checked, evaluated, declaration_counts, group_counts)
 
 def lowered_fragments(values: List<&2, Lowered>) -> List<&2, M.Module>:
   match values:
@@ -981,18 +1002,102 @@ def lowered_fragments(values: List<&2, Lowered>) -> List<&2, M.Module>:
     case head <> tail:
       lowered_fragment(head) <> lowered_fragments(tail)
 
-def update_lowered(state: State, mode: Mode, +prelude_module: M.Module, scope_words: List<&2, U32>, lowered: Lowering, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
-  State{+prelude, scope_key, declarations, planning, previous_groups, constants, entries} = state
+def specialization_graph(specialized: Bool, module: M.Module, scans: List<&2, Plan.Scanned>) -> Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
+  match specialized:
+    case True{}:
+      Check.module_graph(module)
+    case False{}:
+      Plan.graph(module, scans)
+
+def function_count(module: M.Module) -> Nat:
+  M.Module{constants, functions, types, operations} = module
+  List.length(&2, M.Function, functions)
+
+def install_shape_seed(found: Maybe<&2, Cached<G.CheckedGroup>>, owner: String, keys: List<&2, List<&2, U32>>, checked: G.CheckedGroup, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
+  match found:
+    case Some{old}:
+      previous
+    case None{}:
+      Map.set(&2, Cached<G.CheckedGroup>, previous, owner, Cached{keys, checked})
+
+def install_shape_seeds(seeds: List<&2, ShapeReuse.Seed>, +previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
+  match seeds:
+    case Nil{}:
+      previous
+    case ShapeReuse.Seed{+owner, keys, checked} <> tail:
+      install_shape_seeds(tail, install_shape_seed(Index.find(Cached<G.CheckedGroup>, previous, owner), owner, keys, checked, previous))
+
+def shape_seed_result(result: Result<&2, &2, M.Diagnostic, List<&2, ShapeReuse.Seed>>, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
+  match result:
+    case Fail{diagnostic}:
+      previous
+    case Done{seeds}:
+      install_shape_seeds(seeds, previous)
+
+def seed_checked_original(checked: Maybe<&2, M.CheckedModule>, original: M.Module, revision: CV.Revision, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
+  match checked:
+    case None{}:
+      previous
+    case Some{typed}:
+      shape_seed_result(ShapeReuse.seed(original, typed, revision), previous)
+
+def seed_if_same_catalog(same: Bool, original: M.Module, checked: Maybe<&2, M.CheckedModule>, revision: CV.Revision, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
+  match same:
+    case True{}:
+      seed_checked_original(checked, original, revision, previous)
+    case False{}:
+      previous
+
+# The initial shape check has already validated these unchanged groups. On a
+# warm edit, the previous finalized group cache is more useful and needs no
+# additional planning or key work.
+def seed_first_revision(previous: Map<&2, Cached<G.CheckedGroup>>, +original: M.Module, checked: Maybe<&2, M.CheckedModule>, +revision: CV.Revision) -> Map<&2, Cached<G.CheckedGroup>>:
+  match previous:
+    case MTip{}:
+      seed_if_same_catalog(CV.original_matches(original, revision), original, checked, revision, previous)
+    case other:
+      other
+
+def groups_if_same_catalog(same: Bool, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
+  match same:
+    case True{}:
+      previous
+    case False{}:
+      Map.new(&2, Cached<G.CheckedGroup>)
+
+def constants_if_same_catalog(same: Bool, previous: Map<&2, Cached<Const.Constants>>) -> Map<&2, Cached<Const.Constants>>:
+  match same:
+    case True{}:
+      previous
+    case False{}:
+      Map.new(&2, Cached<Const.Constants>)
+
+def update_lowered_module(state: State, mode: Mode, entry: String, +prelude_module: M.Module, +raw_module: M.Module, scope_words: List<&2, U32>, lowered: Lowering, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
+  State{+prelude, scope_key, declarations, planning, previous_groups, constants, entries, specialization, catalog_version} = state
   Lowering{+values, +scans, declaration_counts} = lowered
-  +module = combine_fragments(prelude_module <> lowered_fragments(values))
+  +specialized = Bool.or(Mono.required(raw_module), Families.required(raw_module))
   do Result<&2, &2, M.Diagnostic, Completion>:
-    graph : List<&2, D.Node> <- Plan.graph(module, Plan.scan(prelude_module) <> scans)
-    +prepared : PreparedPlanning <- prepare_planning(module, prelude_module, values, graph, cache_nominal_scans(scans, 0n, 0n))
+    +family_module : M.Module <- Families.prepare(raw_module)
+    +specialization_result : Mono.Prepared <- Mono.prepare_cached(~K.module, family_module, entry, M.module_operations(raw_module), specialization)
+    +module : M.Module = Mono.prepared_module(specialization_result)
+    +expanded : Bool = Bool.or(specialized, Bool.not(Nat.is_eq(function_count(raw_module), function_count(module))))
+    graph : List<&2, D.Node> <- specialization_graph(expanded, module, Plan.scan(prelude_module) <> scans)
+    +prepared : PreparedPlanning <- prepare_planning(module, prelude_module, values, graph, Bool.and(Bool.not(expanded), cache_nominal_scans(scans, 0n, 0n)))
     +plan : G.Planning = planning_value(prepared)
     +plan_key : List<&2, U32> <- K.planning(plan)
     +scheduled : InferencePlan <- select_plan(cached(InferencePlan, planning, [plan_key]), plan)
-    completed : CheckedGroups <- check_plan(scheduled, Scheduler.catalog_costs(module, Plan.collect_costs(scans, Map.new(&2, Nat))), previous_groups, empty_checked())
-    update_checked(State{prelude, Some{scope_words}, planning_declarations(prepared), Some{Cached{[plan_key], scheduled}}, Map.new(&2, Cached<G.CheckedGroup>), constants, entries}, mode, module, completed, declaration_counts, steps)
+    +catalog : CV.Prepared <- CV.prepare(module_types(module), M.module_operations(module), catalog_version)
+    +revision : CV.Revision = CV.prepared_revision(catalog)
+    +same_catalog : Bool = CV.prepared_same_operations(catalog)
+    +previous_valid : Map<&2, Cached<G.CheckedGroup>> = groups_if_same_catalog(same_catalog, previous_groups)
+    +previous_with_shapes : Map<&2, Cached<G.CheckedGroup>> = seed_first_revision(previous_valid, family_module, Mono.prepared_typed_original(specialization_result), revision)
+    completed : CheckedGroups <- check_plan(scheduled, CheckCatalog{Scheduler.catalog_costs(module, Plan.collect_costs(scans, Map.new(&2, Nat))), revision}, previous_with_shapes, empty_checked())
+    update_checked(State{prelude, Some{scope_words}, planning_declarations(prepared), Some{Cached{[plan_key], scheduled}}, Map.new(&2, Cached<G.CheckedGroup>), constants_if_same_catalog(same_catalog, constants), entries, Some{Mono.prepared_cache(specialization_result)}, Some{revision}}, mode, module, completed, declaration_counts, steps)
+
+def update_lowered(state: State, mode: Mode, entry: String, +prelude_module: M.Module, scope_words: List<&2, U32>, lowered: Lowering, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
+  Lowering{+values, scans, counts} = lowered
+  +raw_module = combine_fragments(prelude_module <> lowered_fragments(values))
+  update_lowered_module(state, mode, entry, prelude_module, raw_module, scope_words, Lowering{values, scans, counts}, steps)
 
 def unique_identity(found: Maybe<&2, Unit>, identity: Nat) -> Result<&2, &2, M.Diagnostic, Unit>:
   match found:
@@ -1013,16 +1118,16 @@ def unique_declaration_ids(nodes: List<&2, C.Cst>, +seen: Set()) -> Result<&2, &
         unique_declaration_ids(tail, Set.add(seen, key))
 
 def update_source(+state: State, mode: Mode, source: L.SourcePlan, +fuel: Nat, steps: Nat, retained: Set()) -> Result<&2, &2, M.Diagnostic, Completion>:
-  State{prelude, scope_key, declarations, planning, groups, constants, entries} = state
+  State{prelude, scope_key, declarations, planning, groups, constants, entries, specialization, catalog_version} = state
   L.SourcePlan{prelude_module, +scope, +nodes} = source
   do Result<&2, &2, M.Diagnostic, Completion>:
     unique : Unit <- unique_declaration_ids(nodes, Set.new())
     +scope_words : List<&2, U32> <- K.scope(scope)
     lowered : Lowering <- lower_plan(plan_lowering(nodes, fuel, reusable_scope(scope_key, scope_words, declarations), retained, LoweringPlan{Nil{}, Nil{}}), scope, fuel)
-    update_lowered(state, mode, prelude_module, scope_words, lowered, steps)
+    update_lowered(state, mode, "main", prelude_module, scope_words, lowered, steps)
 
-def update(+state: State, mode: Mode, root: C.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
-  State{prelude, scope_key, declarations, planning, groups, constants, entries} = state
+def update_single(+state: State, mode: Mode, root: C.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
+  State{prelude, scope_key, declarations, planning, groups, constants, entries, specialization, catalog_version} = state
   do Result<&2, &2, M.Diagnostic, Completion>:
     source : L.SourcePlan <- L.prepare_source(root, prelude)
     update_source(state, mode, source, fuel, steps, Set.new())
@@ -1059,7 +1164,7 @@ def resolve_declarations(pending: List<&2, Declaration>, +previous: Map<&2, Lowe
         resolve_declarations(tail, previous, node <> reversed, retained)
 
 def update_resolved(+state: State, mode: Mode, resolved: ResolvedDeclarations, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
-  State{prelude, scope_key, declarations, planning, groups, constants, entries} = state
+  State{prelude, scope_key, declarations, planning, groups, constants, entries, specialization, catalog_version} = state
   ResolvedDeclarations{nodes, retained} = resolved
   do Result<&2, &2, M.Diagnostic, Completion>:
     source : L.SourcePlan <- L.prepare_source(C.Cst{"module", "", "", 0n, nodes}, prelude)
@@ -1069,7 +1174,177 @@ def update_resolved(+state: State, mode: Mode, resolved: ResolvedDeclarations, f
 # complete reconstructed source still passes scope, graph, type/effect, budget,
 # and backend checks; a patch is transport compression, not semantic authority.
 def update_patch(+state: State, mode: Mode, declarations: List<&2, Declaration>, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
-  State{prelude, scope_key, previous, planning, groups, constants, entries} = state
+  State{prelude, scope_key, previous, planning, groups, constants, entries, specialization, catalog_version} = state
   do Result<&2, &2, M.Diagnostic, Completion>:
     resolved : ResolvedDeclarations <- resolve_declarations(declarations, previous, Nil{}, Set.new())
     update_resolved(state, mode, resolved, fuel, steps)
+
+# Project patches retain declaration trees only from the acknowledged revision.
+# Import headers always travel with the request and rebuild their name scopes.
+def project_marker_valid(node: C.Cst) -> Bool:
+  C.Cst{kind, field, text, offset, children} = node
+  Bool.and(M.name_equal(field, "declarations"), Bool.and(M.name_equal(text, ""), Bool.not(C.present(children))))
+
+def project_retained(valid: Bool, node: C.Cst, previous: Map<&2, Lowered>) -> Result<&2, &2, M.Diagnostic, C.Cst>:
+  match valid:
+    case False{}:
+      Fail{C.diagnostic(node, "native_session", "retained declaration marker is malformed")}
+    case True{}:
+      +identity = C.offset_of(node)
+      require_retained(Index.find(Lowered, previous, Nat.show(identity)), identity)
+
+def project_node(retained: Bool, +node: C.Cst, previous: Map<&2, Lowered>) -> Result<&2, &2, M.Diagnostic, C.Cst>:
+  match retained:
+    case False{}:
+      Done{node}
+    case True{}:
+      project_retained(project_marker_valid(node), node, previous)
+
+def project_children(nodes: List<&2, C.Cst>, +previous: Map<&2, Lowered>) -> Result<&2, &2, M.Diagnostic, List<&2, C.Cst>>:
+  match nodes:
+    case Nil{}:
+      Done{Nil{}}
+    case +head <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, C.Cst>>:
+        first : C.Cst <- project_node(M.name_equal(C.kind_of(head), "retained_declaration"), head, previous)
+        rest : List<&2, C.Cst> <- project_children(tail, previous)
+        return first <> rest
+
+def project_body(body: C.Cst, previous: Map<&2, Lowered>) -> Result<&2, &2, M.Diagnostic, C.Cst>:
+  C.Cst{kind, field, text, offset, declarations} = body
+  do Result<&2, &2, M.Diagnostic, C.Cst>:
+    resolved : List<&2, C.Cst> <- project_children(declarations, previous)
+    return C.Cst{kind, field, text, offset, resolved}
+
+def project_modules(nodes: List<&2, C.Cst>, +previous: Map<&2, Lowered>) -> Result<&2, &2, M.Diagnostic, List<&2, C.Cst>>:
+  match nodes:
+    case Nil{}:
+      Done{Nil{}}
+    case C.Cst{kind, field, text, offset, children} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, C.Cst>>:
+        body : C.Cst <- C.one(C.fields(children, "body"))
+        resolved : C.Cst <- project_body(body, previous)
+        rest : List<&2, C.Cst> <- project_modules(tail, previous)
+        return C.Cst{kind, field, text, offset, [resolved]} <> rest
+
+def project_task_key(prepared: Result<&2, &2, M.Diagnostic, Modules.ModuleTask>) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+  match prepared:
+    case Fail{error}:
+      # A later scope error cannot mask an earlier module's body error.
+      Done{[0]}
+    case Done{Modules.ModuleTask{declarations, prefix, name, entry, scope}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+        header : List<&2, U32> <- K.encode([K.Field{R.Text{prefix}}, K.Field{R.Text{name}}, K.flag(entry)])
+        +words : List<&2, U32> <- K.scope(scope)
+        return List.append(&2, U32, header, U32.from_nat(List.length(&2, U32, words)) <> words)
+
+def project_scope_key(tasks: List<&2, B.Weighted<Result<&2, &2, M.Diagnostic, Modules.ModuleTask>>>) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+  match tasks:
+    case Nil{}:
+      Done{Nil{}}
+    case B.Weighted{task, cost} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+        +first : List<&2, U32> <- project_task_key(task)
+        rest : List<&2, U32> <- project_scope_key(tail)
+        return U32.from_nat(List.length(&2, U32, first)) <> List.append(&2, U32, first, rest)
+
+type ProjectContext is Data:
+  ProjectContext{previous: Map<&2, Lowered>, fuel: Nat}
+
+def lower_project_node(found: Maybe<&2, Lowered>, +node: C.Cst, task: Modules.ModuleTask, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, Lowered>:
+  match found:
+    case Some{value}:
+      Done{value}
+    case None{}:
+      Modules.ModuleTask{declarations, prefix, name, entry, scope} = task
+      do Result<&2, &2, M.Diagnostic, Lowered>:
+        +value : C.Cst <- C.one(C.field_values(node, "value"))
+        valid : Unit <- L.reject_attributes(C.field_values(node, "attributes"))
+        +fragment : M.Module <- L.declaration(L.classify(C.kind_of(value)), value, prefix, name, entry, M.Module{Nil{}, Nil{}, Nil{}, Nil{}}, fuel, scope)
+        return Lowered{node, fuel, fragment, Plan.scan(fragment), None{}}
+
+def lower_project_nodes(nodes: List<&2, C.Cst>, +task: Modules.ModuleTask, +context: ProjectContext, lowered: Lowering) -> Result<&2, &2, M.Diagnostic, Lowering>:
+  match nodes:
+    case Nil{}:
+      Done{lowered}
+    case +node <> tail:
+      ProjectContext{previous, +fuel} = context
+      Lowering{values, scans, counts} = lowered
+      +found = lower_hit(Index.find(Lowered, previous, Nat.show(C.offset_of(node))), node, fuel, False{})
+      do Result<&2, &2, M.Diagnostic, Lowering>:
+        +value : Lowered <- lower_project_node(found, node, task, fuel)
+        lower_project_nodes(tail, task, context, Lowering{value <> values, lowered_scan(value) <> scans, count(counts, Maybe.is_some(&2, Lowered, found))})
+
+type ProjectLowering is Data:
+  ProjectLowering{lowered: Lowering, module: M.Module}
+
+def project_module(lowered: Lowering, requests: List<&2, M.Operation>) -> M.Module:
+  Lowering{values, scans, counts} = lowered
+  L.add_operations(combine_fragments(lowered_fragments(values)), requests)
+
+def lower_project_ready(+task: Modules.ModuleTask, +context: ProjectContext) -> Result<&2, &2, M.Diagnostic, ProjectLowering>:
+  Modules.ModuleTask{+declarations, prefix, name, entry, scope} = task
+  ProjectContext{previous, fuel} = context
+  do Result<&2, &2, M.Diagnostic, ProjectLowering>:
+    valid : Unit <- L.validate_declaration_nodes(declarations)
+    +lowered : Lowering <- lower_project_nodes(List.reverse(&2, C.Cst, declarations), task, context, Lowering{Nil{}, Nil{}, Counts{0n, 0n}})
+    requests : List<&2, M.Operation> <- L.declarations_row_requests(declarations, fuel, scope, Nil{})
+    return ProjectLowering{lowered, project_module(lowered, requests)}
+
+def lower_project_task(prepared: Result<&2, &2, M.Diagnostic, Modules.ModuleTask>, context: ProjectContext) -> Result<&2, &2, M.Diagnostic, ProjectLowering>:
+  do Result<&2, &2, M.Diagnostic, ProjectLowering>:
+    task : Modules.ModuleTask <- prepared
+    lower_project_ready(task, context)
+
+def combine_project_lowering(first: Lowering, rest: Lowering) -> Lowering:
+  Lowering{a, sa, Counts{fa, ra}} = first
+  Lowering{b, sb, Counts{fb, rb}} = rest
+  Lowering{List.append(&2, Lowered, a, b), List.append(&2, Plan.Scanned, sa, sb), Counts{Nat.add(fa, fb), Nat.add(ra, rb)}}
+
+def combine_project_modules(first: ProjectLowering, rest: ProjectLowering) -> ProjectLowering:
+  ProjectLowering{a, ma} = first
+  ProjectLowering{b, mb} = rest
+  ProjectLowering{combine_project_lowering(a, b), L.combine_modules(ma, mb)}
+
+def collect_project_lowering(outcomes: List<&2, Result<&2, &2, M.Diagnostic, ProjectLowering>>) -> Result<&2, &2, M.Diagnostic, ProjectLowering>:
+  match outcomes:
+    case Nil{}:
+      Done{ProjectLowering{Lowering{Nil{}, Nil{}, Counts{0n, 0n}}, M.Module{Nil{}, Nil{}, Nil{}, Nil{}}}}
+    case head <> tail:
+      do Result<&2, &2, M.Diagnostic, ProjectLowering>:
+        first : ProjectLowering <- head
+        rest : ProjectLowering <- collect_project_lowering(tail)
+        return combine_project_modules(first, rest)
+
+def project_nodes(values: List<&2, Lowered>) -> List<&2, C.Cst>:
+  match values:
+    case Nil{}:
+      Nil{}
+    case Lowered{node, fuel, fragment, scanned, nominals} <> tail:
+      node <> project_nodes(tail)
+
+def update_project_lowered(state: State, mode: Mode, entry: String, +prelude_module: M.Module, key: List<&2, U32>, project: ProjectLowering, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
+  ProjectLowering{Lowering{+values, scans, counts}, module} = project
+  do Result<&2, &2, M.Diagnostic, Completion>:
+    unique : Unit <- unique_declaration_ids(project_nodes(values), Set.new())
+    update_lowered_module(state, mode, entry, prelude_module, L.combine_modules(prelude_module, module), key, Lowering{values, scans, counts}, steps)
+
+def update_project(+state: State, mode: Mode, +root: C.Cst, +fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
+  State{L.Prelude{prelude_module, +scope}, scope_key, +declarations, planning, groups, constants, entries, specialization, catalog_version} = state
+  do Result<&2, &2, M.Diagnostic, Completion>:
+    modules : List<&2, C.Cst> <- project_modules(C.field_values(root, "modules"), declarations)
+    +tasks : List<&2, B.Weighted<Result<&2, &2, M.Diagnostic, Modules.ModuleTask>>> = Modules.prepare_modules(modules, C.text_of(root), scope, MTip{})
+    +key : List<&2, U32> <- project_scope_key(tasks)
+    outcomes : List<&2, Result<&2, &2, M.Diagnostic, ProjectLowering>> = B.execute(~Result<&2, &2, M.Diagnostic, Modules.ModuleTask>, ~ProjectContext, ~Result<&2, &2, M.Diagnostic, ProjectLowering>, ~lower_project_task, B.plan(Result<&2, &2, M.Diagnostic, Modules.ModuleTask>, tasks, 512n), ProjectContext{reusable_scope(scope_key, key, declarations), fuel})
+    lowered : ProjectLowering <- collect_project_lowering(outcomes)
+    update_project_lowered(state, mode, C.text_of(root), prelude_module, key, lowered, steps)
+
+def update_kind(project: Bool, state: State, mode: Mode, root: C.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
+  match project:
+    case False{}:
+      update_single(state, mode, root, fuel, steps)
+    case True{}:
+      update_project(state, mode, root, fuel, steps)
+
+def update(state: State, mode: Mode, +root: C.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
+  update_kind(M.name_equal(C.kind_of(root), "source_project"), state, mode, root, fuel, steps)

@@ -1,5 +1,7 @@
 import Base
 import ./model.bend as M
+import ./monomorph.bend as Mono
+import ./effect_families.bend as Families
 import ./cst.bend as C
 import ./lower.bend as Lower
 import ./source_types.bend as Types
@@ -37,13 +39,30 @@ def import_global(found: Maybe<&2, Lower.Global>, alias: String, scope: Lower.Co
     case Some{Lower.Global{source, core, kind}}:
       Lower.add_global(scope, alias, core, kind, node)
 
+def import_family_members(members: List<&2, M.TypeId>, +source: String, +alias: String, +globals: Map<&2, Lower.Global>, scope: Lower.Context, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Lower.Context>:
+  match members:
+    case Nil{}:
+      Done{scope}
+    case M.TypeId{module_name, +declaration} <> rest:
+      do Result<&2, &2, M.Diagnostic, Lower.Context>:
+        +member_alias : String = alias ++ String.drop(declaration, String.length(source))
+        next : Lower.Context <- import_global(Lower.lookup_global(globals, declaration), member_alias, scope, node)
+        import_family_members(rest, source, alias, globals, next, node)
+
+def import_family(found: Maybe<&2, Lower.Global>, +globals: Map<&2, Lower.Global>, +source: String, +alias: String, scope: Lower.Context, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Lower.Context>:
+  match found:
+    case Some{Lower.Global{original, core, Lower.EffectFamilyName{members, parameters}}}:
+      import_family_members(members, source, alias, globals, scope, node)
+    case _:
+      Done{scope}
+
 def import_header(found: Maybe<&2, Types.Header>, +alias: String, +scope: Lower.Context, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Lower.Context>:
   match found:
     case None{}:
       Done{scope}
-    case Some{Types.Header{source, identity, arity}}:
-      Lower.Context{globals, headers, fixities, locals, label} = scope
-      Lower.add_header(Types.lookup_header(headers, alias), scope, Types.Header{alias, identity, arity}, node)
+    case Some{Types.Header{source, identity, parameters}}:
+      Lower.Context{globals, headers, fixities, locals, label, annotation_variables} = scope
+      Lower.add_header(Types.lookup_header(headers, alias), scope, Types.Header{alias, identity, parameters}, node)
 
 def namespace_globals(globals: Map<&2, Lower.Global>, +prefix: String, scope: Lower.Context, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Lower.Context>:
   match globals:
@@ -60,8 +79,8 @@ def namespace_headers(headers: Map<&2, Types.Header>, +prefix: String, scope: Lo
   match headers:
     case MTip{}:
       Done{scope}
-    case MLeaf{key, Types.Header{+source, identity, arity}}:
-      import_header(Some{Types.Header{source, identity, arity}}, prefix ++ source, scope, node)
+    case MLeaf{key, Types.Header{+source, identity, parameters}}:
+      import_header(Some{Types.Header{source, identity, parameters}}, prefix ++ source, scope, node)
     case MNode{position, left, right}:
       do Result<&2, &2, M.Diagnostic, Lower.Context>:
         next : Lower.Context <- namespace_headers(left, prefix, scope, node)
@@ -97,13 +116,14 @@ def named_imports(nodes: List<&2, C.Cst>, +globals: Map<&2, Lower.Global>, +head
         valid : Unit <- exported_name(global, header, node)
         available : Unit <- unique_namespace(namespace_present(namespaces, alias), node)
         with_global : Lower.Context <- import_global(global, alias, scope, node)
-        next : Lower.Context <- import_header(header, alias, with_global, node)
+        with_members : Lower.Context <- import_family(global, globals, name, alias, with_global, node)
+        next : Lower.Context <- import_header(header, alias, with_members, node)
         named_imports(tail, globals, headers, namespaces, next)
 
 def import_binding(namespace: Bool, +node: C.Cst, exported: Lower.Context, +scope: Lower.Context, +namespaces: Set()) -> Result<&2, &2, M.Diagnostic, Imported>:
   match namespace exported:
-    case True{} Lower.Context{globals, headers, fixities, locals, label}:
-      Lower.Context{own_globals, own_headers, own_fixities, own_locals, own_label} = scope
+    case True{} Lower.Context{globals, headers, fixities, locals, label, annotation_variables}:
+      Lower.Context{own_globals, own_headers, own_fixities, own_locals, own_label, own_annotation_variables} = scope
       do Result<&2, &2, M.Diagnostic, Imported>:
         alias : C.Cst <- C.one(C.field_values(node, "name"))
         +name : String <- Done{C.text_of(alias)}
@@ -112,7 +132,7 @@ def import_binding(namespace: Bool, +node: C.Cst, exported: Lower.Context, +scop
         with_globals : Lower.Context <- namespace_globals(globals, prefix, scope, node)
         next : Lower.Context <- namespace_headers(headers, prefix, with_globals, node)
         Done{Imported{next, Set.add(namespaces, name)}}
-    case False{} Lower.Context{globals, headers, fixities, locals, label}:
+    case False{} Lower.Context{globals, headers, fixities, locals, label, annotation_variables}:
       do Result<&2, &2, M.Diagnostic, Imported>:
         next : Lower.Context <- named_imports(C.field_values(node, "bindings"), globals, headers, namespaces, scope)
         Done{Imported{next, namespaces}}
@@ -143,17 +163,10 @@ def imported_scope(nodes: List<&2, C.Cst>, modules: Map<&2, Lower.Context>, scop
 # Imported scopes depend on declarations, not lowered bodies. Preserve errors
 # as task results so an earlier body failure still precedes a later scope failure.
 type ModuleTask is Data:
-  ModuleTask{declarations: List<&2, C.Cst>, prefix: String, name: String, entry: Bool, scope: Lower.Context, public: Result<&2, &2, M.Diagnostic, Lower.Context>}
+  ModuleTask{declarations: List<&2, C.Cst>, prefix: String, name: String, entry: Bool, scope: Lower.Context}
 
 type ModulePreparation is Data:
   ModulePreparation{task: ModuleTask, scopes: Map<&2, Lower.Context>}
-
-def publish_scope(public: Result<&2, &2, M.Diagnostic, Lower.Context>, name: String, scopes: Map<&2, Lower.Context>) -> Map<&2, Lower.Context>:
-  match public:
-    case Fail{error}:
-      scopes
-    case Done{scope}:
-      Map.set(&2, Lower.Context, scopes, name, scope)
 
 def prepare_module(+node: C.Cst, +entry: String, prelude_scope: Lower.Context, +scopes: Map<&2, Lower.Context>) -> Result<&2, &2, M.Diagnostic, ModulePreparation>:
   +name = C.text_of(node)
@@ -162,18 +175,17 @@ def prepare_module(+node: C.Cst, +entry: String, prelude_scope: Lower.Context, +
   do Result<&2, &2, M.Diagnostic, ModulePreparation>:
     +body : C.Cst <- C.one(C.field_values(node, "body"))
     +declarations : List<&2, C.Cst> = C.field_values(body, "declarations")
-    own : Lower.Context <- Lower.collect_names(declarations, prefix, name, False{})
+    +own : Lower.Context <- Lower.collect_names(declarations, prefix, name)
     imported : Lower.Context <- imported_scope(C.field_values(body, "imports"), scopes, own)
     +scope : Lower.Context = Lower.combine_context(imported, prelude_scope)
     fixities : List<&2, O.Fixity> <- Lower.collect_fixities(declarations, scope, False{})
-    +public : Result<&2, &2, M.Diagnostic, Lower.Context> = Lower.collect_names(declarations, prefix, name, True{})
-    return ModulePreparation{ModuleTask{declarations, prefix, name, is_entry, Lower.with_fixities(scope, fixities), public}, publish_scope(public, name, scopes)}
+    return ModulePreparation{ModuleTask{declarations, prefix, name, is_entry, Lower.with_fixities(scope, fixities)}, Map.set(&2, Lower.Context, scopes, name, own)}
 
 def module_weight(prepared: Result<&2, &2, M.Diagnostic, ModuleTask>) -> Nat:
   match prepared:
     case Fail{error}:
       1n
-    case Done{ModuleTask{declarations, prefix, name, entry, scope, public}}:
+    case Done{ModuleTask{declarations, prefix, name, entry, scope}}:
       Lower.declaration_cost(65536n, declarations, 1n)
 
 def prepared_task(prepared: Result<&2, &2, M.Diagnostic, ModulePreparation>) -> Result<&2, &2, M.Diagnostic, ModuleTask>:
@@ -200,11 +212,8 @@ def prepare_modules(nodes: List<&2, C.Cst>, +entry: String, +prelude_scope: Lowe
       B.Weighted{task, module_weight(task)} <> prepare_modules(tail, entry, prelude_scope, prepared_scopes(prepared))
 
 def lower_module_task(task: ModuleTask, fuel: Nat) -> Result<&2, &2, M.Diagnostic, M.Module>:
-  ModuleTask{declarations, prefix, name, entry, scope, public} = task
-  do Result<&2, &2, M.Diagnostic, M.Module>:
-    lowered : M.Module <- Lower.lower_declarations(declarations, prefix, name, entry, fuel, scope)
-    exported : Lower.Context <- public
-    return lowered
+  ModuleTask{declarations, prefix, name, entry, scope} = task
+  Lower.lower_declarations(declarations, prefix, name, entry, fuel, scope)
 
 def lower_module(prepared: Result<&2, &2, M.Diagnostic, ModuleTask>, fuel: Nat) -> Result<&2, &2, M.Diagnostic, M.Module>:
   do Result<&2, &2, M.Diagnostic, M.Module>:
@@ -244,6 +253,27 @@ def prepared_project(prepared: Result<&2, &2, M.Diagnostic, Lower.Prelude>, +roo
 def source_module(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, M.Module>:
   match project:
     case False{}:
-      Lower.source_module(root, prelude, fuel)
+      do Result<&2, &2, M.Diagnostic, M.Module>:
+        +module : M.Module <- Lower.source_module(root, prelude, fuel)
+        prepared : M.Module <- Families.prepare(module)
+        Mono.prepare(prepared, "main", M.module_operations(module))
     case True{}:
-      prepared_project(Lower.prepare_prelude(prelude, fuel), root, fuel)
+      do Result<&2, &2, M.Diagnostic, M.Module>:
+        +module : M.Module <- prepared_project(Lower.prepare_prelude(prelude, fuel), root, fuel)
+        prepared : M.Module <- Families.prepare(module)
+        Mono.prepare(prepared, C.text_of(root), M.module_operations(module))
+
+# Cold source compilation selects exports from the final checked signatures.
+# This avoids a separate all-affected inference pass merely to refresh exports.
+def source_module_deferred(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, M.Module>:
+  match project:
+    case False{}:
+      do Result<&2, &2, M.Diagnostic, M.Module>:
+        +module : M.Module <- Lower.source_module(root, prelude, fuel)
+        prepared : M.Module <- Families.prepare(module)
+        Mono.prepare_deferred(prepared, "main", M.module_operations(module))
+    case True{}:
+      do Result<&2, &2, M.Diagnostic, M.Module>:
+        +module : M.Module <- prepared_project(Lower.prepare_prelude(prelude, fuel), root, fuel)
+        prepared : M.Module <- Families.prepare(module)
+        Mono.prepare_deferred(prepared, C.text_of(root), M.module_operations(module))

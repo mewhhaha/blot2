@@ -69,8 +69,13 @@ const groups = compiled as unknown as {
     module: unknown,
     dependencies: List<Interface>,
   ): Result<CheckedGroup>;
+  "groups.check_group_planned"(
+    module: unknown,
+    dependencies: List<Interface>,
+  ): Result<CheckedGroup>;
   "groups.checked_group"(checked: unknown): Result<CheckedGroup>;
   "check.check_module"(module: unknown): Result<unknown>;
+  "check_scheduler.check_module"(module: unknown): Result<unknown>;
 };
 
 function list<A>(values: readonly A[]): List<A> {
@@ -113,6 +118,7 @@ function wire(value: unknown, tag?: string): unknown {
   if (Array.isArray(value)) return list(value.map((entry) => wire(entry, tag)));
   if (value === null || typeof value !== "object") return value;
   const record: Record<string, unknown> = tag ? { $: tag } : {};
+  if (tag === "Constructor") record.fields = list([]);
   for (const [field, child] of Object.entries(value)) {
     if (optional.has(field)) {
       record[field] = child === null
@@ -142,10 +148,13 @@ function grouped(source: CoreModule) {
       ok(dependency, `planned dependency ${name} must have a closed interface`);
       return dependency;
     });
-    const result = unwrap(groups["groups.check_group"](
-      unwrap(groups["groups.job_module"](module, job)),
-      list(dependencies),
-    ));
+    const subset = unwrap(groups["groups.job_module"](module, job));
+    const imports = list(dependencies);
+    const result = unwrap(groups["groups.check_group"](subset, imports));
+    equal(groups["groups.check_group_planned"](subset, imports), {
+      $: "Done",
+      value: result,
+    });
     checked.push(result);
     for (const signature of array(result.interfaces)) {
       interfaces.set(signature.name, signature);
@@ -651,6 +660,11 @@ function rejectsLikeWhole(source: CoreModule, code: string) {
   const baseline = groups["check.check_module"](wire(source, "Module"));
   ok(baseline.$ === "Fail");
   equal(baseline.error.code, code);
+  const scheduled = groups["check_scheduler.check_module"](
+    wire(source, "Module"),
+  );
+  ok(scheduled.$ === "Fail");
+  equal(scheduled.error.code, code);
   throws(
     () => grouped(source),
     (error) =>
@@ -717,6 +731,27 @@ Deno.test("planning validates unused declarations before selecting minimal catal
   rejectsLikeWhole(
     module([fn("unrelated", integer(1))], { data_types: [invalid] }),
     "invalid_annotation",
+  );
+  rejectsLikeWhole(
+    module([fn("unrelated", integer(1))], {
+      operations: [operation("unused", {
+        parameter: { $: "ParameterTy", index: 0n },
+      })],
+    }),
+    "invalid_annotation",
+  );
+  // The full planner must report the earlier type error before an unrelated
+  // operation error, even though planned group checks skip catalog validation.
+  const bothInvalid = module([fn("unrelated", integer(1))], {
+    data_types: [invalid],
+    operations: [operation("also_unused", {
+      parameter: { $: "ParameterTy", index: 0n },
+    })],
+  });
+  rejectsLikeWhole(bothInvalid, "invalid_annotation");
+  equal(
+    groups["check_scheduler.check_module"](wire(bothInvalid, "Module")),
+    groups["check.check_module"](wire(bothInvalid, "Module")),
   );
   rejectsLikeWhole(
     module([fn("duplicate", integer(1)), fn("duplicate", integer(2))]),

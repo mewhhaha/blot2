@@ -5,6 +5,14 @@ export type ScalarValue<T extends ScalarType = ScalarType> = T extends "Unit"
   : T extends "Bool" ? boolean
   : number;
 
+export type ArrayType = "Array U32" | "Array F32";
+export type ValueType = ScalarType | ArrayType;
+export type GuestValue = ScalarValue | Uint32Array | Float32Array;
+
+function isArrayType(type: ValueType): type is ArrayType {
+  return type === "Array U32" || type === "Array F32";
+}
+
 export interface CallbackType {
   readonly kind: "callback";
   readonly parameter: ScalarType;
@@ -13,8 +21,8 @@ export interface CallbackType {
 
 export interface GuestFunction {
   readonly name: string;
-  readonly parameter: ScalarType | CallbackType;
-  readonly result: ScalarType;
+  readonly parameter: ValueType | CallbackType;
+  readonly result: ValueType;
 }
 
 export interface GuestConstant {
@@ -23,7 +31,7 @@ export interface GuestConstant {
 }
 
 export interface GuestAbi {
-  readonly version: 1;
+  readonly version: 2;
   readonly functions: readonly GuestFunction[];
   readonly constants: readonly GuestConstant[];
 }
@@ -120,7 +128,13 @@ class AbiReader {
     return type;
   }
 
-  parameter(): ScalarType | CallbackType {
+  value(tag = this.byte()): ValueType {
+    if (tag === 5) return "Array U32";
+    if (tag === 6) return "Array F32";
+    return this.scalar(tag);
+  }
+
+  parameter(): ValueType | CallbackType {
     const tag = this.byte();
     return tag === 4
       ? Object.freeze({
@@ -128,7 +142,7 @@ class AbiReader {
         parameter: this.scalar(),
         result: this.scalar(),
       })
-      : this.scalar(tag);
+      : this.value(tag);
   }
 
   end(): void {
@@ -152,7 +166,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   const reader = new AbiReader(new Uint8Array(sections[0]));
   const version = reader.count();
-  if (version !== 1) {
+  if (version !== 2) {
     throw new GuestError(
       "invalid_abi",
       `Unsupported guest ABI version ${version}`,
@@ -160,9 +174,9 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   const functions: GuestFunction[] = [];
   const constants: GuestConstant[] = [];
-  const exports = new Map<string, "function" | "global">();
+  const exports = new Map<string, "function" | "global" | "memory">();
   const signatures = new Set<string>();
-  const declare = (name: string, kind: "function" | "global") => {
+  const declare = (name: string, kind: "function" | "global" | "memory") => {
     if (exports.has(name)) {
       throw new GuestError("invalid_abi", `Duplicate ABI export ${name}`);
     }
@@ -174,7 +188,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     declare(name, "function");
     const parameter = reader.parameter();
     if (typeof parameter !== "string") signatures.add(importName(parameter));
-    functions.push(Object.freeze({ name, parameter, result: reader.scalar() }));
+    functions.push(Object.freeze({ name, parameter, result: reader.value() }));
   }
   const constantCount = reader.count();
   for (let index = 0; index < constantCount; index++) {
@@ -183,6 +197,16 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     constants.push(Object.freeze({ name, type: reader.scalar() }));
   }
   reader.end();
+  if (
+    functions.some((fn) =>
+      (typeof fn.parameter === "string" && isArrayType(fn.parameter)) ||
+      isArrayType(fn.result)
+    )
+  ) {
+    declare("blot:memory", "memory");
+    declare("blot:allocate", "function");
+    declare("blot:reset", "function");
+  }
   const actualExports = WebAssembly.Module.exports(module);
   if (
     actualExports.length !== exports.size ||
@@ -261,6 +285,90 @@ function scalarFromWasm(type: ScalarType, value: unknown): ScalarValue {
   throw new GuestError("invalid_abi", `Non-canonical Wasm ${type} value`);
 }
 
+interface GuestArena {
+  readonly memory: WebAssembly.Memory;
+  readonly allocate: CallableFunction;
+  readonly reset: CallableFunction;
+}
+
+function arrayRange(
+  arena: GuestArena,
+  pointer: unknown,
+  length: number,
+): number {
+  if (
+    typeof pointer !== "number" || !Number.isInteger(pointer) || pointer < 4 ||
+    pointer % 4 !== 0 || pointer > arena.memory.buffer.byteLength - 4 ||
+    length > (arena.memory.buffer.byteLength - pointer - 4) / 4
+  ) {
+    throw new GuestError("invalid_abi", "Array lies outside the guest arena");
+  }
+  return pointer;
+}
+
+function arrayToWasm(
+  arena: GuestArena,
+  type: ArrayType,
+  argument: unknown,
+  name: string,
+): number {
+  if (
+    !(type === "Array U32"
+      ? argument instanceof Uint32Array
+      : argument instanceof Float32Array)
+  ) {
+    throw new GuestError(
+      "invalid_argument",
+      `${name} argument must be ${
+        type === "Array U32" ? "Uint32Array" : "Float32Array"
+      }`,
+    );
+  }
+  const values = argument as Uint32Array | Float32Array;
+  if (values.length >= 4_194_304) {
+    throw new GuestError(
+      "invalid_argument",
+      `${name} array exceeds the 16 MiB arena`,
+    );
+  }
+  const pointer = arrayRange(
+    arena,
+    arena.allocate((values.length + 1) * 4),
+    values.length,
+  );
+  // Allocation may grow memory, so acquire a fresh view only afterwards.
+  const view = new DataView(arena.memory.buffer);
+  view.setUint32(pointer, values.length, true);
+  for (let index = 0; index < values.length; index++) {
+    const offset = pointer + 4 + index * 4;
+    if (type === "Array U32") view.setUint32(offset, values[index], true);
+    else view.setFloat32(offset, values[index], true);
+  }
+  return pointer;
+}
+
+function arrayFromWasm(
+  arena: GuestArena,
+  type: ArrayType,
+  result: unknown,
+): Uint32Array | Float32Array {
+  const pointer = arrayRange(arena, result, 0);
+  // Guest execution may also grow memory; never retain the input view.
+  const view = new DataView(arena.memory.buffer);
+  const length = view.getUint32(pointer, true);
+  arrayRange(arena, pointer, length);
+  const values = type === "Array U32"
+    ? new Uint32Array(length)
+    : new Float32Array(length);
+  for (let index = 0; index < length; index++) {
+    const offset = pointer + 4 + index * 4;
+    values[index] = type === "Array U32"
+      ? view.getUint32(offset, true)
+      : view.getFloat32(offset, true);
+  }
+  return values;
+}
+
 interface Lifetime {
   disposed: boolean;
 }
@@ -276,7 +384,7 @@ export interface Guest {
   capability<P extends ScalarType, R extends ScalarType>(
     callback: HostCallback<P, R>,
   ): HostCapability;
-  call(name: string, argument: unknown): ScalarValue;
+  call(name: string, argument: unknown): GuestValue;
   read(name: string): ScalarValue;
   dispose(): void;
 }
@@ -355,7 +463,7 @@ export async function instantiateGuest(
       ) {
         const failure = new GuestError(
           "async_host_call",
-          `Host callback returned a Promise/thenable during ${invocation.exportName}; ABI 1 is synchronous`,
+          `Host callback returned a Promise/thenable during ${invocation.exportName}; ABI 2 is synchronous`,
         );
         // The intrinsic checks Promise identity across realms without calling
         // a user-supplied then/catch. Non-Promise thenables throw here; report
@@ -378,6 +486,20 @@ export async function instantiateGuest(
   const instance = await WebAssembly.instantiate(module, {
     "blot:host/1": imports,
   });
+
+  const memory = instance.exports["blot:memory"];
+  const allocate = instance.exports["blot:allocate"];
+  const reset = instance.exports["blot:reset"];
+  let arena: GuestArena | undefined;
+  if (memory !== undefined) {
+    if (
+      !(memory instanceof WebAssembly.Memory) ||
+      typeof allocate !== "function" || typeof reset !== "function"
+    ) {
+      throw new GuestError("invalid_abi", "Missing array arena exports");
+    }
+    arena = { memory, allocate, reset };
+  }
 
   return {
     abi,
@@ -426,7 +548,7 @@ export async function instantiateGuest(
       }
       let value: number | object;
       if (typeof fn.parameter === "string") {
-        value = scalarToWasm(
+        value = isArrayType(fn.parameter) ? 0 : scalarToWasm(
           fn.parameter,
           argument,
           "invalid_argument",
@@ -475,14 +597,26 @@ export async function instantiateGuest(
       }
       running = true;
       try {
+        arena?.reset(0);
+        if (typeof fn.parameter === "string" && isArrayType(fn.parameter)) {
+          if (!arena) throw new Error("Validated array export has no arena");
+          value = arrayToWasm(arena, fn.parameter, argument, name);
+        }
         const exported = instance.exports[name];
         if (typeof exported !== "function") {
           throw new Error("Validated function export disappeared");
         }
-        return scalarFromWasm(fn.result, exported(value));
+        const result = exported(value);
+        if (!isArrayType(fn.result)) return scalarFromWasm(fn.result, result);
+        if (!arena) throw new Error("Validated array export has no arena");
+        return arrayFromWasm(arena, fn.result, result);
       } finally {
-        active = undefined;
-        running = false;
+        try {
+          arena?.reset(0);
+        } finally {
+          active = undefined;
+          running = false;
+        }
       }
     },
     read(name) {

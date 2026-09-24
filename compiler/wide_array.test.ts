@@ -26,8 +26,8 @@ Deno.test("8,192-element source arrays compile and execute with native/JS parity
     const literals = Array.from({ length: count }, (_, index) => index).join(
       ",",
     );
-    const source = "fn values () => [" + literals +
-      "]\nexport fn answer () => @array.get (values ()) 8191\nexport fn at (index: U32) => @array.get (values ()) index\nexport fn count () => @array.length (values ())\n";
+    const source = "const values = fn () => [" + literals +
+      "]\nconst answer = fn () => @array.get (values ()) 8191\nconst at = fn (index: U32) => @array.get (values ()) index\nconst count = fn () => @array.length (values ())\n";
     const artifact = await native.compile(source);
     equal(artifact, compiler.compile(source));
     ok(WebAssembly.validate(artifact.bytes));

@@ -3,16 +3,16 @@ import { createNativeCompiler } from "./native.ts";
 import { createSourceCompiler } from "./source.ts";
 
 const source = `
-export const sine_half = F32.sin 0.5
-export const cosine_half = F32.cos 0.5
-export const tangent_half = F32.tan 0.5
-export const wrapped = F32.wrap 6.283185307 (-0.5)
-export const halfway = F32.lerp_angle 6.183185307 0.1 0.5
-export fn sine (angle: F32) => F32.sin angle
-export fn cosine (angle: F32) => F32.cos angle
-export fn tangent (angle: F32) => F32.tan angle
-export fn wrap (angle: F32) => F32.wrap 6.283185307 angle
-export fn halfway_angle (angle: F32) => F32.lerp_angle 6.183185307 angle 0.5
+const sine_half = F32.sin 0.5
+const cosine_half = F32.cos 0.5
+const tangent_half = F32.tan 0.5
+const wrapped = F32.wrap 6.283185307 (-0.5)
+const halfway = F32.lerp_angle 6.183185307 0.1 0.5
+const sine = fn (angle: F32) => F32.sin angle
+const cosine = fn (angle: F32) => F32.cos angle
+const tangent = fn (angle: F32) => F32.tan angle
+const wrap = fn (angle: F32) => F32.wrap 6.283185307 angle
+const halfway_angle = fn (angle: F32) => F32.lerp_angle 6.183185307 angle 0.5
 `;
 
 function near(actual: number, expected: number, tolerance = 1e-6) {

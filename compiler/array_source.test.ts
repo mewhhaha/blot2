@@ -37,16 +37,16 @@ Deno.test("source array literals handle multiline layout, nesting, early return,
   try {
     const artifact = compiler.compile(`
 const empty = []
-fn numbers (values: Array U32) => @array.length values
-fn truths (values: Array Bool) => @array.length values
-export const count = numbers empty + truths empty
-export fn answer () => do:
+const numbers = fn (values: Array U32) => @array.length values
+const truths = fn (values: Array Bool) => @array.length values
+const count = numbers empty + truths empty
+const answer = fn () => do:
   let values = [
     [1, 2],
     [40, 42],
   ]
   return @array.get (@array.get values 1) 1
-export fn returned () => do:
+const returned = fn () => do:
   let values = [do:
     return 42]
   return @array.get values 0
@@ -66,12 +66,12 @@ Deno.test("source arrays diagnose element, index, annotation, arity and const bo
     for (
       const [source, code] of [
         ["const values = [1, True]\n", "type_mismatch"],
-        ["fn invalid () => @array.get [1] False\n", "type_mismatch"],
-        ["fn invalid () => @array.set [1] 0 True\n", "type_mismatch"],
+        ["const invalid = fn () => @array.get [1] False\n", "type_mismatch"],
+        ["const invalid = fn () => @array.set [1] 0 True\n", "type_mismatch"],
         ["const values: Array = []\n", "type_arity"],
         ["const values: Array U32 Bool = []\n", "type_arity"],
         ["const value = @array.get [] 0\n", "array_bounds"],
-        ["fn invalid () => @array.length [] []\n", "call_arity"],
+        ["const invalid = fn () => @array.length [] []\n", "call_arity"],
       ]
     ) {
       throws(() => compiler.compile(source), (error) => {
@@ -92,20 +92,20 @@ Deno.test("std/array folds preserve effects and predicates stop before unused el
   const main = `import * as array from "./array"
 effect Visit : U32 -> U32
 const visit = @effect.provider Visit (fn value => value + 1)
-fn add_visit total => fn value => do:
+const add_visit = fn total => fn value => do:
   use next <- Visit value
   return total + next
-fn accepts value => do:
+const accepts = fn value => do:
   if value == 99:
     use @panic "unvisited predicate element"
   return value == 42
-export fn folded () => do visit:
+const folded = fn () => do visit:
   return array.fold_left add_visit 0 [20, 20]
-export fn found () => array.any accepts [42, 99]
-export fn rejected () => array.all accepts [0, 99]
-export fn vacuous () => array.all accepts []
-export fn absent () => array.any accepts []
-export fn unchanged () => do:
+const found = fn () => array.any accepts [42, 99]
+const rejected = fn () => array.all accepts [0, 99]
+const vacuous = fn () => array.all accepts []
+const absent = fn () => array.any accepts []
+const unchanged = fn () => do:
   let original = [2]
   let changed = Maybe.unwrap_or [] $ array.set 0 40 original
   return array.at 0 original + array.at 0 changed

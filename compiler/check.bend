@@ -97,7 +97,7 @@ def constructor_names(constructors: List<&2, M.Constructor>) -> List<&2, String>
   match constructors:
     case Nil{}:
       Nil{}
-    case M.Constructor{name, payload} <> tail:
+    case M.Constructor{name, payload, fields} <> tail:
       name <> constructor_names(tail)
 
 def all_constructor_names(types: List<&2, M.DataType>) -> List<&2, String>:
@@ -121,6 +121,8 @@ def operation_identities(operations: List<&2, M.Operation>) -> List<&2, M.TypeId
       Nil{}
     case M.Operation{identity, parameter, result} <> tail:
       identity <> operation_identities(tail)
+    case head <> tail:
+      operation_identities(tail)
 
 def validate_types_indexed(pending: List<&2, M.DataType>, +types: List<&2, M.DataType>, +operations: List<&2, M.Operation>, +repeated: IdentitySet()) -> Result<&2, &2, M.Diagnostic, Unit>:
   match pending:
@@ -148,6 +150,14 @@ def validate_operations_indexed(pending: List<&2, M.Operation>, +operations: Lis
         p : Unit <- TD.validate_template(parameter, None{}, operations, types, M.type_id_show(identity))
         r : Unit <- TD.validate_template(result, None{}, operations, types, M.type_id_show(identity))
         validate_operations_indexed(tail, operations, types, repeated)
+    case M.OperationTemplate{+identity, +parameters, parameter, result} <> tail:
+      do Result<&2, &2, M.Diagnostic, Unit>:
+        allowed : Unit <- TD.valid_operation_identity(identity)
+        p : Unit <- TD.validate_template(parameter, Some{parameters}, operations, types, M.type_id_show(identity))
+        r : Unit <- TD.validate_template(result, Some{parameters}, operations, types, M.type_id_show(identity))
+        validate_operations_indexed(tail, operations, types, repeated)
+    case head <> tail:
+      Fail{M.Diagnostic{"unspecialized_effect", "effect", "effect instances must be specialized before checking"}}
 
 def validate_operations(+operations: List<&2, M.Operation>, types: List<&2, M.DataType>) -> Result<&2, &2, M.Diagnostic, Unit>:
   repeated = repeated_identities(operation_identities(operations), Map.new(&2, Set()), Map.new(&2, Set()))
@@ -180,15 +190,22 @@ def validate_module(module: M.Module) -> Result<&2, &2, M.Diagnostic, Unit>:
     valid_operations : Unit <- validate_operations(operations, types)
     unique_names(List.append(&2, String, G.names(declarations), all_constructor_names(types)))
 
-def module_graph(+module: M.Module) -> Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
+# The planner calls module_graph before creating checking jobs. Its group
+# subsets retain the same declarations and catalog, so their dependency graphs
+# can be rebuilt without validating the full catalog for every group.
+def module_graph_validated(module: M.Module) -> Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
   M.Module{constants, functions, types, operations} = module
   do Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
-    valid : Unit <- validate_module(module)
     fns : List<&2, D.Node> <- D.function_nodes(functions)
     consts : List<&2, D.Node> <- D.constant_nodes(constants)
     +graph : List<&2, D.Node> = List.append(&2, D.Node, fns, consts)
     lambdas : Unit <- unique_lambdas(lambda_ids(graph))
     return graph
+
+def module_graph(+module: M.Module) -> Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
+  do Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
+    valid : Unit <- validate_module(module)
+    module_graph_validated(module)
 
 def checked_signature(ty: M.Ty, name: String, variables: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, M.Signature>:
   match ty:
@@ -197,7 +214,7 @@ def checked_signature(ty: M.Ty, name: String, variables: List<&2, Nat>) -> Resul
     case other:
       Fail{M.Diagnostic{"internal_error", name, "function does not have an arrow type"}}
 
-def resolve_binding(found: Maybe<&2, I.Binding>, substitutions: List<&2, T.Substitution>, subject: String) -> Result<&2, &2, M.Diagnostic, I.Binding>:
+def resolve_binding(found: Maybe<&2, I.Binding>, substitutions: T.Substitutions, subject: String) -> Result<&2, &2, M.Diagnostic, I.Binding>:
   match found:
     case None{}:
       Fail{M.Diagnostic{"internal_error", subject, "missing inferred binding"}}
@@ -214,7 +231,7 @@ def signature_effects(signature: M.Signature) -> List<&2, M.Effect>:
   M.Signature{name, parameter, result, variables, effects} = signature
   R.metadata(R.operation_set(effects))
 
-def function_results(functions: List<&2, M.Function>, +bindings: List<&2, I.Binding>, +substitutions: List<&2, T.Substitution>) -> Result<&2, &2, M.Diagnostic, List<&2, M.CheckedFunction>>:
+def function_results(functions: List<&2, M.Function>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, M.CheckedFunction>>:
   match functions:
     case Nil{}:
       Done{Nil{}}
@@ -229,7 +246,7 @@ def checked_constant(constant: M.Constant, binding: I.Binding) -> M.CheckedConst
   I.Binding{name, ty, variables} = binding
   M.CheckedConstant{constant, ty, variables}
 
-def constant_results(constants: List<&2, M.Constant>, +bindings: List<&2, I.Binding>, +substitutions: List<&2, T.Substitution>) -> Result<&2, &2, M.Diagnostic, List<&2, M.CheckedConstant>>:
+def constant_results(constants: List<&2, M.Constant>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, M.CheckedConstant>>:
   match constants:
     case Nil{}:
       Done{Nil{}}
@@ -266,7 +283,7 @@ def reflected_binding(binding: I.Binding, subject: String) -> Result<&2, &2, M.D
   I.Binding{name, ty, variables} = binding
   reflected_type(ty, subject)
 
-def check_reflections(reflections: List<&2, I.Reflection>, +bindings: List<&2, I.Binding>, +substitutions: List<&2, T.Substitution>) -> Result<&2, &2, M.Diagnostic, Unit>:
+def check_reflections(reflections: List<&2, I.Reflection>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, Unit>:
   match reflections:
     case Nil{}:
       Done{Unit{}}
@@ -288,7 +305,7 @@ def finish(module: M.Module, +environment: G.Environment) -> Result<&2, &2, M.Di
   do Result<&2, &2, M.Diagnostic, M.CheckedModule>:
     +definitions : List<&2, I.Definition> = G.env_definitions(environment)
     +bindings : List<&2, I.Binding> = G.env_bindings(environment)
-    +substitutions : List<&2, T.Substitution> = I.substitutions_of(G.env_state(environment))
+    +substitutions : T.Substitutions = I.substitutions_of(G.env_state(environment))
     coverage : Unit <- P.check(coverage_constraints(definitions), substitutions, types)
     reflection : Unit <- check_reflections(reflection_constraints(definitions), bindings, substitutions)
     checked_fns : List<&2, M.CheckedFunction> <- function_results(functions, bindings, substitutions)

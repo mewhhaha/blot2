@@ -9,7 +9,7 @@ for (const backend of ["native", "javascript"] as const) {
       ? await createNativeIncrementalCompiler({ prelude: "none" })
       : await createIncrementalCompiler({ prelude: "none" });
     try {
-      const source = "export fn answer () => 42\n";
+      const source = "const answer = fn () => 42\n";
       const previous = await compiler.compile(source);
       const invalid =
         '// keep the diagnostic local\nimport * as dependency from "./missing"\n' +

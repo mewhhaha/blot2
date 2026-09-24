@@ -7,13 +7,13 @@ import type { EcsArtifact } from "./host.ts";
 const source = (component: string) => `
 #[component] data Position = Position F32
 #[component] data Velocity = Velocity F32
-fn touch () => do:
+const touch = fn () => do:
   use value <- @ecs.previous ${component}
   return ()
-export fn start () => ()
-export fn event () => ()
-export fn update () => @ecs.run touch
-export fn render () => ()
+const start = fn () => ()
+const event = fn () => ()
+const update = fn () => @ecs.run touch
+const render = fn () => ()
 `;
 
 function registrations(artifact: EcsArtifact) {

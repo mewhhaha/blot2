@@ -10,19 +10,19 @@ const preludeExample = await Deno.readTextFile(
 const wideModule = [
   ...Array.from(
     { length: 130 },
-    (_, index) => `fn helper_${index} () => ${index}`,
+    (_, index) => `const helper_${index} = fn () => ${index}`,
   ),
-  "export fn answer () => helper_129 ()",
+  "const answer = fn () => helper_129 ()",
 ].join("\n");
 const dependencyChain = [
   ...Array.from(
     { length: 128 },
     (_, index) =>
-      `fn chain_${index} () => ${
+      `const chain_${index} = fn () => ${
         index === 127 ? "42" : `chain_${index + 1} ()`
       }`,
   ),
-  "export fn answer () => chain_0 ()",
+  "const answer = fn () => chain_0 ()",
 ].join("\n");
 
 for (

@@ -12,10 +12,10 @@ def datatype_slots(variants: List<&2, M.Constructor>, index: Nat) -> List<&2, Co
   match variants:
     case Nil{}:
       Nil{}
-    case M.Constructor{name, None{}} <> tail:
+    case M.Constructor{name, None{}, fields} <> tail:
       +tag = index
       ConstructorSlot{name, tag, False{}} <> datatype_slots(tail, 1n+tag)
-    case M.Constructor{name, Some{payload}} <> tail:
+    case M.Constructor{name, Some{payload}, fields} <> tail:
       +tag = index
       ConstructorSlot{name, tag, True{}} <> datatype_slots(tail, 1n+tag)
 

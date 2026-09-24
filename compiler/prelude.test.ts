@@ -70,13 +70,20 @@ preludeTest(
     equal(call(exports, "inspect", 0), 0);
     equal(call(exports, "recover", 1), 42);
     equal(call(exports, "recover", 0), 0);
+    equal(call(exports, "increment", 41), 42);
+    equal(call(exports, "doubled", 21), 42);
+    equal(call(exports, "transform", 20), 42);
     equal(Object.keys(exports).sort(), [
+      "add_two",
       "answer",
       "const_answer",
+      "doubled",
       "generic_identity",
+      "increment",
       "inspect",
       "named_operator",
       "recover",
+      "transform",
     ]);
   },
 );
@@ -87,10 +94,10 @@ preludeTest(
     const { exports } = await instantiate(
       compiler,
       `
-fn make_adder value => fn other => value + other
+const make_adder = fn value => fn other => value + other
 const add_forty = make_adder 40
-export const expected = add_forty 2
-export fn answer () => do:
+const expected = add_forty 2
+const answer = fn () => do:
   let value = 999
   let increment = make_adder 1
   let result = compose increment add_forty
@@ -113,12 +120,12 @@ preludeTest(
       compiler,
       `
 const stored = Some (U32.add 40)
-fn churn (remaining: U32) => do:
+const churn = fn (remaining: U32) => do:
   if remaining == 0:
     return ()
 ${allocations}
   use churn (remaining - 1)
-export fn answer () => do:
+const answer = fn () => do:
   use churn 256
   return case stored of
     Some add_forty => add_forty 2
@@ -138,8 +145,8 @@ preludeTest(
     const { analysis, exports } = await instantiate(
       compiler,
       `
-fn same value => value
-export fn answer () => do:
+const same = fn value => value
+const answer = fn () => do:
   let local_same = fn value => value
   let enabled = same (local_same True)
   if enabled:
@@ -162,16 +169,16 @@ preludeTest(
     const { exports } = await instantiate(
       compiler,
       `
-fn inspect candidate => case candidate of
+const inspect = fn candidate => case candidate of
   Ok (Some value) => value
   Ok Nothing => 1
   Err True => 2
   Err False => 3
-export fn some () => inspect (Ok (Some 42))
-export fn nothing () => inspect (Ok Nothing)
-export fn failed () => inspect (Err False)
-export fn mapped_error () => inspect (Result.map_error Bool.not (Err False))
-export fn bound () => Maybe.unwrap_or 0 (Maybe.bind (Some 41) (fn value => Some (value + 1)))
+const some = fn () => inspect (Ok (Some 42))
+const nothing = fn () => inspect (Ok Nothing)
+const failed = fn () => inspect (Err False)
+const mapped_error = fn () => inspect (Result.map_error Bool.not (Err False))
+const bound = fn () => Maybe.unwrap_or 0 (Maybe.bind (Some 41) (fn value => Some (value + 1)))
 `,
     );
     equal(call(exports, "some"), 42);
@@ -188,10 +195,10 @@ preludeTest(
     const { exports } = await instantiate(
       compiler,
       `
-const candidate: Maybe (Result U32 Bool) = Some (Ok 42)
-fn apply (transform: U32 -> U32) => transform 42
-export fn answer () => apply (fn value => value)
-export fn nested () => case candidate of
+const candidate: Maybe (Result [U32, Bool]) = Some (Ok 42)
+const apply = fn (transform: U32 -> U32) => transform 42
+const answer = fn () => apply (fn value => value)
+const nested = fn () => case candidate of
   Some (Ok value) => value
   Some (Err _) => 0
   Nothing => 0
@@ -210,14 +217,14 @@ preludeTest(
       `
 infixr 60 (++) = combine
 infixl 70 \`difference\`
-fn combine left => fn right => left * 10 + right
-fn difference left => fn right => left - right
-fn plus left => fn right => left + right
-export fn precedence () => 2 + 4 * 10
-export fn right_association () => 1 ++ 2 ++ 3
-export fn explicit_named () => 20 \`difference\` 3 \`difference\` 2
-export fn default_named () => 20 \`plus\` 22 * 2
-export fn applied_named () => identity 20 \`plus\` identity 22
+const combine = fn left => fn right => left * 10 + right
+const difference = fn left => fn right => left - right
+const plus = fn left => fn right => left + right
+const precedence = fn () => 2 + 4 * 10
+const right_association = fn () => 1 ++ 2 ++ 3
+const explicit_named = fn () => 20 \`difference\` 3 \`difference\` 2
+const default_named = fn () => 20 \`plus\` 22 * 2
+const applied_named = fn () => identity 20 \`plus\` identity 22
 `,
     );
     equal(call(exports, "precedence"), 42);
@@ -233,10 +240,10 @@ preludeTest(
   (compiler) => {
     rejects(
       compiler,
-      "export fn invalid () => 1 < 2 < 3\n",
+      "const invalid = fn () => 1 < 2 < 3\n",
       "operator_associativity",
     );
-    rejects(compiler, "export fn invalid () => 1 ^ 2\n", "unknown_operator");
+    rejects(compiler, "const invalid = fn () => 1 ^ 2\n", "unknown_operator");
   },
 );
 
@@ -246,9 +253,9 @@ preludeTest(
     const { exports } = await instantiate(
       compiler,
       `
-fn Bool.not value => value
-export fn local_not () => Bool.not True
-export fn prelude_not () => U32.ne 7 7
+const Bool.not = fn value => value
+const local_not = fn () => Bool.not True
+const prelude_not = fn () => U32.ne 7 7
 `,
     );
     equal(call(exports, "local_not"), 1);
@@ -263,10 +270,10 @@ preludeTest(
       compiler,
       `
 data Maybe a = Some a | Nothing
-export fn local_answer () => case Some 42 of
+const local_answer = fn () => case Some 42 of
   Some value => value
   Nothing => 0
-export fn prelude_answer () => Maybe.unwrap_or 0 (Maybe.pure 42)
+const prelude_answer = fn () => Maybe.unwrap_or 0 (Maybe.pure 42)
 `,
     );
     equal(call(exports, "local_answer"), 42);
@@ -275,7 +282,7 @@ export fn prelude_answer () => Maybe.unwrap_or 0 (Maybe.pure 42)
       compiler,
       `
 data Maybe a = Some a | Nothing
-export fn invalid () => case Maybe.pure 42 of
+const invalid = fn () => case Maybe.pure 42 of
   Some value => value
   Nothing => 0
 `,
@@ -290,7 +297,7 @@ preludeTest(
     rejects(
       compiler,
       `
-export fn invalid () => case Some 42 of
+const invalid = fn () => case Some 42 of
   Some => 0
   Nothing => 0
 `,
@@ -299,7 +306,7 @@ export fn invalid () => case Some 42 of
     rejects(
       compiler,
       `
-export fn invalid () => case Nothing of
+const invalid = fn () => case Nothing of
   Some _ => 0
   Nothing value => value
 `,
@@ -320,7 +327,7 @@ preludeTest(
     rejects(
       compiler,
       `
-fn invalid candidate => case candidate of
+const invalid = fn candidate => case candidate of
   Some (Some value) => value
   Nothing => 0
 `,
@@ -329,7 +336,7 @@ fn invalid candidate => case candidate of
     rejects(
       compiler,
       `
-fn invalid candidate => case candidate of
+const invalid = fn candidate => case candidate of
   Some True => 1
   Nothing => 0
 `,
@@ -344,7 +351,7 @@ preludeTest(
     rejects(
       compiler,
       `
-export fn invalid () => do:
+const invalid = fn () => do:
   let Some(value) = Some 42 else:
     0
   return value
@@ -354,7 +361,7 @@ export fn invalid () => do:
     rejects(
       compiler,
       `
-export fn invalid () => do:
+const invalid = fn () => do:
   let Some(value) = Some 42 else:
     do:
       return 0
@@ -365,7 +372,7 @@ export fn invalid () => do:
     rejects(
       compiler,
       `
-export fn invalid () => do:
+const invalid = fn () => do:
   let Some(value) = Some 42
   return value
 `,
@@ -377,6 +384,10 @@ export fn invalid () => do:
 preludeTest(
   "self-application fails the occurs check instead of inventing recursive types",
   (compiler) => {
-    rejects(compiler, "fn invalid value => value value\n", "infinite_type");
+    rejects(
+      compiler,
+      "const invalid = fn value => value value\n",
+      "infinite_type",
+    );
   },
 );

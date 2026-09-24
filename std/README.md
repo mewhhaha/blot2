@@ -2,11 +2,12 @@
 
 [prelude.blot](prelude.blot) is ordinary Blot source, implicitly available to
 source compiler sessions. It currently covers generic functions, `Maybe`,
-`Result`, Bool, U32, and F32. Root declarations can shadow prelude names; the
-prelude keeps its own scope and nominal identities. Only root exports become
-Wasm exports. Use `{ prelude: "none" }` when creating a compiler for a
-freestanding module. File imports are supported through the CLI or
-`loadSourceProject`; the CLI maps `std/` to this directory. Raw source-string
+`Result`, type witnesses, Bool, U32, and F32. Root declarations can shadow
+prelude names; the prelude keeps its own scope and nominal identities. Top-level
+bindings are public to other Blot modules; concrete root bindings that fit the
+guest ABI become Wasm exports. Use `{ prelude: "none" }` when creating a
+compiler for a freestanding module. File imports are supported through the CLI
+or `loadSourceProject`; the CLI maps `std/` to this directory. Raw source-string
 compilation does not load imports automatically. General module re-exports are
 not implemented yet.
 
@@ -28,13 +29,13 @@ two-argument function is written `fn left => fn right => ...` and called
 | `Bool.not value`            | Exchanges `True` and `False`              |
 
 ```blot
-fn increment value => value + 1
+const increment = fn value => value + 1
 const double = U32.mul 2
 const transform = compose double increment
 
-export fn answer () => transform 20
+const answer = fn () => transform 20
 
-export fn inferred () => do:
+const inferred = fn () => do:
   let same = fn value => value
   if same True:
     return same 42
@@ -50,13 +51,45 @@ unimplemented. See [effects and controlled IO](../compiler/effects-and-io.md).
 Plain `do:` blocks already return `()` when they fall through. No trailing
 `return ()` is needed, and their last expression statement is discarded. A
 non-unit result needs an explicit return on every reachable path. Expression
-bodies such as `fn answer () => 42` still return their expression.
+bodies such as `const answer = fn () => 42` still return their expression.
+
+## Type equality
+
+Wrap a value or constructor/function witness with `Type` to compare its concrete
+type using ordinary `==` and `!=`:
+
+```blot
+type Count is data = Count U32
+type Other is data = Other U32
+
+const same_value = 1 == 2                         // False
+const same_type = Type 1 == Type 2                // True
+const same_nominal = Type Count == Type (Count 42) // True
+const different = Type Count != Type Other       // True
+
+const compare = fn () => do:
+  let head = Type Count
+  let witness = Type (Count 0)
+  return head == witness
+```
+
+`Type` and its associated `eq`/`ne` functions are ordinary prelude declarations.
+`Type.eq` unwraps both witnesses and uses `@type.same`, which resolves during
+specialization. Comparisons include nominal module identity, generic arguments,
+and structural element types. Constructor/function witnesses describe their
+final result type and are never called by the comparison. Witness expressions
+still evaluate once, left to right.
+
+`Type` takes a value expression: use `Type 0` for U32 or a constructor witness
+such as `Type Count`; bare type names such as `U32` are only valid in type
+positions. Ordinary value equality continues to use the value type's own `eq`
+implementation.
 
 ## Maybe and Result
 
 ```blot
-data Maybe a = Some a | Nothing
-data Result value error = Ok value | Err error
+type Maybe a is data = Some a | Nothing
+type Result [value, error] is data = Ok value | Err error
 ```
 
 Those declarations describe the prelude's types; do not redeclare them unless
@@ -79,19 +112,19 @@ and `Some(value)` are equivalent in expressions and patterns.
 | `Result.to_maybe candidate`            | Keeps `Ok` as `Some`, discards `Err` as `Nothing`                |
 
 ```blot
-fn nonzero value => do:
+const nonzero = fn value => do:
   if value == 0:
     return Nothing
   return Some value
 
 const candidate = Maybe.bind (Some 40) nonzero
 
-export fn answer () => do:
+const answer = fn () => do:
   let Some(value) = Maybe.map (U32.add 2) candidate else:
     return 0
   return Result.unwrap_or 0 (Maybe.to_result False (Some value))
 
-export fn inspect () => case Some (Some 42) of
+const inspect = fn () => case Some (Some 42) of
   Some (Some value) => value
   Some Nothing => 0
   Nothing => 0
@@ -118,18 +151,45 @@ U32 literals are decimal or hexadecimal, optionally separated by underscores:
 | `U32.eq`, `ne`, `lt`, `le`, `gt`, `ge` | Binary comparisons to Bool |
 | `U32.to_f32 value`                     | Rounded numeric conversion |
 
-The prelude's `+`, `-`, `*`, `==`, `!=`, `<`, `<=`, `>`, and `>=` operators
-reference these U32 functions. They are not polymorphic numeric operators.
-`F32.add 1.0 2.0` works; `1.0 + 2.0` is a type error with the default fixities.
-There is no implicit conversion between U32 and F32, including under an
-annotation: write `42.0` or `U32.to_f32 42` for an F32 value.
+The prelude's arithmetic and comparison operators call generic functions such as
+`add`, `mul`, and `lt`. `1.0 + 2.0` selects `F32.add`; `1 + 2` selects
+`U32.add`. `/` currently has an F32 implementation. There is no implicit numeric
+conversion: use `42.0` or `U32.to_f32 42` when an F32 value is required.
+
+The generic functions use `@type.call "add" left right`. At compile time this
+tries `LeftType.add(left, right)`, then `RightType.add(left, right)` if the
+first function cannot accept both operands. Arguments keep their original order.
+The selected function determines the result type and effects. A matching left
+implementation takes precedence; an incompatible return annotation is an error,
+not a reason to switch to the right implementation.
+
+Nominal types can define associated functions in their owning module:
+
+```blot
+type Vec2 is data = Vec2 { x: F32, y: F32 }
+const Vec2.add = fn (a: Vec2) => fn (b: Vec2) => do:
+  let Vec2 { x: ax, y: ay } = a
+  let Vec2 { x: bx, y: by } = b
+  return Vec2 { x: ax + bx, y: ay + by }
+
+const twice = fn value => value + value
+const answer = fn (value: F32) => twice value
+```
+
+Generic functions that depend on associated dispatch are specialized for their
+uses before const evaluation and Wasm emission. This also works through
+closures, local function aliases, and recursive functions. No runtime member
+lookup is emitted. An exported function must have enough type information to
+select a concrete implementation; annotate an otherwise unconstrained export
+parameter. `@type.call` also accepts other literal member names, such as
+`"distance"`.
 
 Operators are source-defined aliases for functions, not compiler arithmetic
 special cases. Backticks also call a named function infix:
 
 ```blot
-fn plus left => fn right => U32.add left right
-export fn answer () => 20 `plus` 22
+const plus = fn left => fn right => U32.add left right
+const answer = fn () => 20 `plus` 22
 ```
 
 Custom fixity declarations belong before other declarations. Application binds
@@ -144,12 +204,12 @@ backtick operators. Unlike Haskell, Blot still evaluates ordinary arguments
 eagerly; `$` neither defers work nor handles effects.
 
 ```blot
-export fn answer () => U32.mul 2 $ U32.add 1 $ 20
-export fn discarded () => do:
+const answer = fn () => U32.mul 2 $ U32.add 1 $ 20
+const discarded = fn () => do:
   use identity $ 42
 
-fn invoke callback => callback 41
-export fn callback_example () => invoke $ fn value => value + 1
+const invoke = fn callback => callback 41
+const callback_example = fn () => invoke $ fn value => value + 1
 ```
 
 An infix RHS can also be a `do:` block or `case` expression without parentheses.
@@ -180,13 +240,13 @@ arguments: `F32.mul speed (-2.5)`.
 | `F32.sin`, `cos`, `tan`                    | Pure Blot trigonometric approximations      |
 
 ```blot
-export const negative_zero = -0.0
-export const rounded = F32.add 16_777_216.0 1.0
+const negative_zero = -0.0
+const rounded = F32.add 16_777_216.0 1.0
 
-export fn vector_length () => F32.length3 2.0 3.0 6.0
-export fn bounded_speed (value: F32) => F32.clamp 0.0 12.0 value
-export fn halfway (value: F32) => F32.lerp value 10.0 0.5
-export fn integer_part (value: F32) => F32.to_u32 value
+const vector_length = fn () => F32.length3 2.0 3.0 6.0
+const bounded_speed = fn (value: F32) => F32.clamp 0.0 12.0 value
+const halfway = fn (value: F32) => F32.lerp value 10.0 0.5
+const integer_part = fn (value: F32) => F32.to_u32 value
 ```
 
 `rounded` is 16,777,216, and `vector_length ()` is 7. Arithmetic rounds each
@@ -220,13 +280,24 @@ JavaScript numbers. There is no compiler-specific ECS storage ABI. See
 
 ## Immutable arrays
 
-Import [array.blot](array.blot) explicitly:
+Arrays expose prelude members without importing `std/array`: `values.length`,
+`values.is_empty`, `values.get(index)`, and `values.set(index)(replacement)`.
+The checked operations return `Maybe`. `values[index]` reads with a bounds
+check; `values[index] := replacement` rebinds an existing local while preserving
+earlier aliases. `self` denotes the old element. Paths such as
+`world.rows[row][column] := self + 1` are supported.
+
+Receiver members are ordinary receiver-first associated functions. For example,
+`values.get` is `Array.get values`, a function awaiting its index. Record fields
+use the same dot syntax and preserve their values during functional updates.
+
+Import [array.blot](array.blot) for additional collection functions:
 
 ```blot
 import * as array from "std/array"
 
 const values: Array U32 = [10, 20, 12]
-export fn answer () => array.fold_left U32.add 0 values
+const answer = fn () => array.fold_left U32.add 0 values
 ```
 
 - `length values` and `is_empty values` inspect length without visiting elements
@@ -235,6 +306,8 @@ export fn answer () => array.fold_left U32.add 0 values
   updated array. An invalid U32 index traps in Wasm or fails const evaluation.
 - `get index values` and `set index value values` return `Maybe` instead of
   trapping on an invalid index.
+- `fill count value` allocates an array with a repeated value;
+  `generate count generator` calls a pure generator for each index in order.
 - `fold_left reduce initial values` visits elements left-to-right.
 - `any predicate values` and `all predicate values` stop as soon as the result
   is known. Empty arrays return `False` for `any` and `True` for `all`.
@@ -245,29 +318,30 @@ tuples, nested arrays, constructors and closures. Empty arrays infer their
 element type from use. Tuples use `(42, True)` and `(U32, Bool)` syntax;
 `@product.get pair 0` requires a statically known tuple shape.
 
-The bootstrap array representation uses contiguous lanes and preserves old
-aliases. Every update currently copies the full array, so repeated updates are
-not yet suitable for high-throughput component columns. These source folds use
-recursion, not an optimized loop primitive. The const evaluator currently stores
-arrays as immutable lists, so const indexing/length also traverse elements;
-large const folds can be quadratic despite constant-time Wasm reads. The step
-budget counts source evaluation and array-copy work, not elapsed time.
-Indexing/update sugar, array spread/patterns, resizing and bulk builders remain
-unimplemented. Tuples and arrays cannot cross the current scalar host ABI.
+Wasm stores arrays in contiguous lanes and preserves old aliases. Updates reuse
+locally owned storage when its last reference is consumed, including a single
+array carried through a loop. Shared arrays and values whose ownership is
+unknown are copied. The source folds and predicates use loops.
+
+The const evaluator stores arrays as immutable lists, so const indexing/length
+traverse elements and updates copy them. Large const folds can be quadratic
+despite constant-time Wasm reads. The step budget counts source evaluation and
+array-copy work, not elapsed time. Array spread/patterns and resizing remain
+unimplemented. Numeric arrays cross the host ABI as copied `Uint32Array` or
+`Float32Array` values; tuples and other composite values remain internal.
 
 See [the executable array example](../examples/arrays.blot).
 
 ## Current boundary
 
 This prelude is a useful executable core, not the complete standard library. It
-does not yet provide record field access/update syntax, general text values,
-F64, SIMD, type-valued programming, or resumable handlers. The generic core
-supports closed source-declared operations, scoped providers, and compile-time
-effect descriptors. The [3D sandbox](../case-study/ecs/README.md) is paused
-while its compiler-specific backend is replaced by a source-defined ECS and
-explicit entrypoint IO capabilities. Literal strings are accepted as panic
-messages, not as general runtime `Text` values or privileged asset/window
-operations.
+does not yet provide array spread/pattern syntax, general text values, F64,
+SIMD, type-valued programming, or resumable handlers. The generic core supports
+closed source-declared operations, scoped providers, and compile-time effect
+descriptors. The [3D sandbox](../case-study/ecs/README.md) is paused while its
+compiler-specific backend is replaced by a source-defined ECS and explicit
+entrypoint IO capabilities. Literal strings are accepted as panic messages, not
+as general runtime `Text` values or privileged asset/window operations.
 
 For a complete small program, see
 [examples/prelude.blot](../examples/prelude.blot).

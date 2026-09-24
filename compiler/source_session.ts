@@ -83,8 +83,17 @@ export async function createSourceSession(options: SourceCompilerOptions) {
         };
         lowered = next;
         previousScope = scopeKey;
-        return {
+        const preparedModule = result<RawModule>(
+          "effect_families.prepare",
           module,
+        );
+        return {
+          module: result<RawModule>(
+            "monomorph.prepare",
+            preparedModule,
+            "main",
+            module.operations,
+          ),
           translate: parsed.translate,
           stats: {
             parsed_ms: parsed.parsed_ms,

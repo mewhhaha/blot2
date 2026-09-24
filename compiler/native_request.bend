@@ -3,6 +3,7 @@ import ./model.bend as M
 import ./cst.bend as Cst
 import ./native_session.bend as Session
 import ./native_io.bend as NativeIO
+import ./native_response.bend as Response
 
 type Operation is Data:
   Analyze{}
@@ -364,7 +365,7 @@ def decode_frame(frame: NativeIO.Frame) -> Result<&2, &1, ScanFailure, Request>:
   NativeIO.Frame{words, length} = frame
   +bound = U32.to_nat(length)
   bind(Unit, Request, expect(word(Cursor{words, 0n, bound, [SNil{} : String*1n], 0}, "protocol magic"), 1112297300, 0n, "invalid protocol magic; expected BLOT"), unit => cursor =>
-    bind(Unit, Request, expect(word(cursor, "protocol version"), 7, 1n, "unsupported native protocol version; expected 7"), unit => cursor =>
+    bind(Unit, Request, expect(word(cursor, "protocol version"), Response.version(), 1n, "unsupported native protocol version; expected " ++ U32.show(Response.version())), unit => cursor =>
       bind(U32, Request, word(cursor, "operation"), opcode => cursor => body(opcode, bound, cursor))))
 
 def decoded(result: Result<&2, &1, ScanFailure, Request>) -> Result<&2, &2, M.Diagnostic, Request>:

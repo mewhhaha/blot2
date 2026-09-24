@@ -4,8 +4,11 @@ import ./const_eval.bend as C
 import ./closures.bend as F
 import ./wasm_catalog.bend as E
 import ./codegen_ir.bend as I
+import ./array_reuse.bend as Reuse
 import ./index.bend as Index
 import ./runtime_reachable.bend as Reachable
+import ./runtime_initialization.bend as Init
+import ./public_exports.bend as Public
 import ./inference_batch.bend as B
 
 type Slot is Data:
@@ -23,12 +26,16 @@ type Location is Data:
 type Local is Data:
   Local{name: String, location: Location}
 
+type RuntimeGlobal is Data:
+  RuntimeGlobal{index: Nat, value_type: M.Ty}
+
 type Catalog is Data:
   Catalog{
     entries: Map<&2, Maybe<&2, Nat>>,
     constructors: Map<&2, Maybe<&2, E.ConstructorSlot>>,
     constants: Map<&2, Maybe<&2, Nat>>,
-    operations: Map<&2, Maybe<&2, Nat>>
+    operations: Map<&2, Maybe<&2, Nat>>,
+    runtime: Map<&2, RuntimeGlobal>
   }
 
 type StaticCatalog is Data:
@@ -106,7 +113,7 @@ type ExportedConstant is Data:
   ExportedConstant{name: String, scalar: M.Ty}
 
 type Prepared is Data:
-  Prepared{jobs: List<&2, CodegenJob>, catalog: Catalog, functions: List<&2, M.CheckedFunction>, names: List<&2, ExportedConstant>, heap: Heap}
+  Prepared{jobs: List<&2, CodegenJob>, catalog: Catalog, functions: List<&2, M.CheckedFunction>, names: List<&2, ExportedConstant>, heap: Heap, initializers: List<&2, Init.Initializer>}
 
 type Emission is Data:
   ExpressionWork{expression: I.Expr}
@@ -119,15 +126,20 @@ type AbiScalar is Data:
   BoolScalar{}
   F32Scalar{}
 
+type AbiValue is Data:
+  ScalarValue{scalar: AbiScalar}
+  U32ArrayValue{}
+  F32ArrayValue{}
+
 type Callback is Data:
   Callback{parameter: AbiScalar, result: AbiScalar}
 
 type AbiParameter is Data:
-  ScalarParameter{scalar: AbiScalar}
+  ValueParameter{value: AbiValue}
   CallbackParameter{signature: Callback}
 
 type AbiFunction is Data:
-  AbiFunction{name: String, parameter: AbiParameter, result: AbiScalar}
+  AbiFunction{name: String, parameter: AbiParameter, result: AbiValue}
 
 type AbiConstant is Data:
   AbiConstant{name: String, scalar: AbiScalar}
@@ -333,6 +345,8 @@ def operation_slots(operations: List<&2, M.Operation>, index: Nat) -> List<&2, S
     case M.Operation{identity, parameter, result} <> tail:
       +position = index
       Slot{I.operation_key(identity), position} <> operation_slots(tail, 1n+position)
+    case head <> tail:
+      operation_slots(tail, index)
 
 def required_symbol(found: Maybe<&2, Nat>, name: String) -> Result<&2, &2, M.Diagnostic, Nat>:
   match found:
@@ -345,20 +359,50 @@ def lookup_symbol(indexed: Map<&2, Maybe<&2, Nat>>, +name: String) -> Result<&2,
   required_symbol(Index.get(Maybe<&2, Nat>, indexed, name, None{}), name)
 
 def symbol_entries(symbols: Catalog) -> Map<&2, Maybe<&2, Nat>>:
-  Catalog{entries, constructors, constants, operations} = symbols
+  Catalog{entries, constructors, constants, operations, runtime} = symbols
   entries
 
 def symbol_constructors(symbols: Catalog) -> Map<&2, Maybe<&2, E.ConstructorSlot>>:
-  Catalog{entries, constructors, constants, operations} = symbols
+  Catalog{entries, constructors, constants, operations, runtime} = symbols
   constructors
 
 def symbol_constants(symbols: Catalog) -> Map<&2, Maybe<&2, Nat>>:
-  Catalog{entries, constructors, constants, operations} = symbols
+  Catalog{entries, constructors, constants, operations, runtime} = symbols
   constants
 
 def symbol_operations(symbols: Catalog) -> Map<&2, Maybe<&2, Nat>>:
-  Catalog{entries, constructors, constants, operations} = symbols
+  Catalog{entries, constructors, constants, operations, runtime} = symbols
   operations
+
+def runtime_global(symbols: Catalog, name: String) -> Maybe<&2, RuntimeGlobal>:
+  Catalog{entries, constructors, constants, operations, runtime} = symbols
+  Index.find(RuntimeGlobal, runtime, name)
+
+def global_index(index: Nat, imports: Nat) -> Nat:
+  Nat.add(index, Bool.pick(Nat, Nat.is_eq(imports, 0n), 0n, 1n))
+
+def runtime_from_word(ty: M.Ty) -> List<&2, U32>:
+  match ty:
+    case M.F32Ty{}:
+      [190]
+    case _:
+      Nil{}
+
+def runtime_to_word(ty: M.Ty) -> List<&2, U32>:
+  match ty:
+    case M.F32Ty{}:
+      [188]
+    case _:
+      Nil{}
+
+def constant_reference(found: Maybe<&2, RuntimeGlobal>, name: String, symbols: Catalog, imports: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+  match found:
+    case Some{RuntimeGlobal{index, ty}}:
+      Done{concat(35 <> unsigned_leb(global_index(index, imports)), runtime_to_word(ty))}
+    case None{}:
+      do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+        word : Nat <- lookup_symbol(symbol_constants(symbols), name)
+        return i32_constant(U32.from_nat(word))
 
 def context_locals(context: Context) -> List<&2, Local>:
   Context{locals, next_local, labels, provider} = context
@@ -602,6 +646,51 @@ def array_code(elements: Code, +count: Nat, size: U32, +first: Nat) -> Code:
     element_stores(count, pointer, first, 4n, Nil{})
   ])}]]), Nat.max(locals, 1n+pointer)}
 
+# Values occupy full words, so memory.fill cannot implement generic fills.
+# Validate the count before multiplication and skip the store loop for empties.
+def array_fill_code(+first: Nat) -> Code:
+  +value = {1n+first : Nat}
+  +pointer = {2n+first : Nat}
+  +index = {3n+first : Nat}
+  Code{[
+    Bytes{join([
+      local_get(first), i32_constant(4194303), [75, 4, 64, 0, 11],
+      local_get(first), [65, 1, 106, 65, 4, 108]
+    ])},
+    Allocate{},
+    Bytes{join([
+      34 <> unsigned_leb(pointer), local_get(first), [54, 2, 0],
+      [65, 0], 33 <> unsigned_leb(index), [2, 64, 3, 64],
+      local_get(index), local_get(first), [79, 13, 1],
+      local_get(pointer), local_get(index), [65, 4, 108, 106], local_get(value), [54, 2, 4],
+      local_get(index), [65, 1, 106], 33 <> unsigned_leb(index), [12, 0, 11, 11],
+      local_get(pointer)
+    ])}
+  ], 4n+first}
+
+# The destination is allocated once. Callback allocations share the arena but
+# cannot change existing addresses or the immutable values they return.
+def array_generate_code(+first: Nat, +provider: Nat) -> Code:
+  +generator = {1n+first : Nat}
+  +pointer = {2n+first : Nat}
+  +index = {3n+first : Nat}
+  Code{[
+    Bytes{join([
+      local_get(first), i32_constant(4194303), [75, 4, 64, 0, 11],
+      local_get(first), [65, 1, 106, 65, 4, 108]
+    ])},
+    Allocate{},
+    Bytes{join([
+      34 <> unsigned_leb(pointer), local_get(first), [54, 2, 0],
+      [65, 0], 33 <> unsigned_leb(index), [2, 64, 3, 64],
+      local_get(index), local_get(first), [79, 13, 1],
+      local_get(pointer), local_get(index), [65, 4, 108, 106],
+      local_get(generator), local_get(index), local_get(provider), local_get(generator), [40, 2, 0, 17, 0, 0, 54, 2, 4],
+      local_get(index), [65, 1, 106], 33 <> unsigned_leb(index), [12, 0, 11, 11],
+      local_get(pointer)
+    ])}
+  ], 4n+first}
+
 def array_get_code(+first: Nat) -> Code:
   +index = {1n+first : Nat}
   byte_code(join([
@@ -632,15 +721,62 @@ def array_set_code(+first: Nat) -> Code:
     ])}
   ], 5n+first}
 
+def array_reuse_code(+first: Nat) -> Code:
+  +index = {1n+first : Nat}
+  value = {2n+first : Nat}
+  byte_code(join([
+    local_get(index), local_get(first), [40, 2, 0, 79, 4, 64, 0, 11],
+    local_get(first), local_get(index), [65, 4, 108, 106], local_get(value), [54, 2, 4],
+    local_get(first)
+  ]), 3n+first)
+
 # Provider values contain no dynamic scope. Installing one creates a fresh frame;
 # the lexical context selects that frame only for the handled body.
-def install_provider(+slot: Nat, outer: Nat) -> Code:
+def state_provider_code(read: M.TypeId, write: M.TypeId, value: Code, +slot: Nat) -> Code:
+  Code{fragments, locals} = value
+  +pointer = {1n+slot : Nat}
+  Code{fragments_join([fragments, [Bytes{join([33 <> unsigned_leb(slot), i32_constant(16)])}, Allocate{},
+    Bytes{join([34 <> unsigned_leb(pointer), i32_constant(4294967295), [54, 2, 0], local_get(pointer)])},
+    OperationIndex{read}, Bytes{join([[54, 2, 4], local_get(pointer)])},
+    OperationIndex{write}, Bytes{join([[54, 2, 8], local_get(pointer), local_get(slot), [54, 2, 12], local_get(pointer)])}
+  ]]), Nat.max(locals, 2n+slot)}
+
+def install_provider(+slot: Nat, +outer: Nat) -> Code:
   +frame = {1n+slot : Nat}
-  Code{[Bytes{join([33 <> unsigned_leb(slot), i32_constant(12)])}, Allocate{}, Bytes{join([
-    34 <> unsigned_leb(frame), local_get(slot), [40, 2, 0, 54, 2, 0],
-    local_get(frame), local_get(slot), [40, 2, 4, 54, 2, 4],
-    local_get(frame), local_get(outer), [54, 2, 8]
-  ])}], 2n+slot}
+  +cell = {2n+slot : Nat}
+  Code{[
+    Bytes{join([33 <> unsigned_leb(slot), local_get(slot), [40, 2, 0], i32_constant(4294967295), [70, 4, 64], i32_constant(36)])}, Allocate{},
+    Bytes{join([
+      34 <> unsigned_leb(frame), [65, 32, 106], 33 <> unsigned_leb(cell),
+      local_get(cell), local_get(slot), [40, 2, 12, 54, 2, 0],
+      local_get(frame), local_get(slot), [40, 2, 4, 54, 2, 0],
+      local_get(frame), local_get(cell), [54, 2, 4],
+      local_get(frame), local_get(frame), [65, 16, 106, 54, 2, 8],
+      local_get(frame), [65, 1, 54, 2, 12],
+      local_get(frame), local_get(slot), [40, 2, 8, 54, 2, 16],
+      local_get(frame), local_get(cell), [54, 2, 20],
+      local_get(frame), local_get(outer), [54, 2, 24],
+      local_get(frame), [65, 2, 54, 2, 28, 5], i32_constant(16)
+    ])}, Allocate{}, Bytes{join([
+      34 <> unsigned_leb(frame), local_get(slot), [40, 2, 0, 54, 2, 0],
+      local_get(frame), local_get(slot), [40, 2, 4, 54, 2, 4],
+      local_get(frame), local_get(outer), [54, 2, 8],
+      local_get(frame), [65, 0, 54, 2, 12, 11]
+    ])}
+  ], 3n+slot}
+
+def complete_provider(+slot: Nat) -> Code:
+  +frame = {1n+slot : Nat}
+  +result = {2n+slot : Nat}
+  +tuple = {3n+slot : Nat}
+  Code{[
+    Bytes{join([33 <> unsigned_leb(result), local_get(slot), [40, 2, 0], i32_constant(4294967295), [70, 4, 127], i32_constant(8)])}, Allocate{},
+    Bytes{join([
+      34 <> unsigned_leb(tuple), local_get(frame), [40, 2, 4, 40, 2, 0, 54, 2, 0],
+      local_get(tuple), local_get(result), [54, 2, 4], local_get(tuple),
+      [5], local_get(result), [11]
+    ])}
+  ], 4n+slot}
 
 def invoke_operation(identity: M.TypeId, argument: Code, +slot: Nat, provider: Nat) -> Code:
   Code{fragments, locals} = argument
@@ -652,8 +788,12 @@ def invoke_operation(identity: M.TypeId, argument: Code, +slot: Nat, provider: N
     local_get(slot), [40, 2, 0]
   ])}, OperationIndex{identity}, Bytes{join([
     [70, 13, 1], local_get(slot), [40, 2, 8], 33 <> unsigned_leb(slot), [12, 0, 11, 11],
+    local_get(slot), [40, 2, 12, 69, 4, 127],
     local_get(slot), [40, 2, 4], 34 <> unsigned_leb(handler),
-    local_get(value), local_get(slot), [40, 2, 8], local_get(handler), [40, 2, 0, 17, 0, 0]
+    local_get(value), local_get(slot), [40, 2, 8], local_get(handler), [40, 2, 0, 17, 0, 0, 5],
+    local_get(slot), [40, 2, 12, 65, 1, 70, 4, 127],
+    local_get(slot), [40, 2, 4, 40, 2, 0, 5],
+    local_get(slot), [40, 2, 4], local_get(value), [54, 2, 0, 65, 0, 11, 11]
   ])}]]), Nat.max(locals, 3n+slot)}
 
 def constructor_tag(variant: E.ConstructorSlot) -> Nat:
@@ -664,7 +804,7 @@ def lambda_captures(lambda: F.Lambda) -> List<&2, String>:
   F.Lambda{identity, parameter, body, captures} = lambda
   captures
 
-def pattern_test_work(+fuel: Nat, work: PatternTestWork) -> Result<&2, &2, M.Diagnostic, List<&2, Fragment>>:
+def pattern_test_work(+fuel: Nat, work: PatternTestWork, +locals: List<&2, Local>) -> Result<&2, &2, M.Diagnostic, List<&2, Fragment>>:
   match fuel work:
     case 0n _:
       Fail{M.Diagnostic{"backend_limit", "pattern", "pattern tests exceeded their structural depth limit"}}
@@ -672,6 +812,12 @@ def pattern_test_work(+fuel: Nat, work: PatternTestWork) -> Result<&2, &2, M.Dia
       Done{[Bytes{[65, 1]}]}
     case 1n+rest PatternTest{M.BindingPattern{name}, location}:
       Done{[Bytes{[65, 1]}]}
+    case 1n+rest PatternTest{M.ValuePattern{M.LocalReference{name}}, location}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Fragment>>:
+        expected : Location <- lookup_local(locals, name)
+        return [Bytes{join([read_location(location), read_location(expected), [70]])}]
+    case 1n+rest PatternTest{M.ValuePattern{M.ConstantReference{name}}, location}:
+      Done{[Bytes{read_location(location)}, ConstantReference{name}, Bytes{[70]}]}
     case 1n+rest PatternTest{M.UnitPattern{}, location}:
       Done{[Bytes{[65, 1]}]}
     case 1n+rest PatternTest{M.U32Pattern{value}, location}:
@@ -682,26 +828,26 @@ def pattern_test_work(+fuel: Nat, work: PatternTestWork) -> Result<&2, &2, M.Dia
       Done{[Bytes{concat(read_location(location), [40, 2, 0])}, ConstructorIndex{constructor}, Bytes{[70]}]}
     case 1n+rest PatternTest{M.ConstructorPattern{constructor, Some{payload}}, +location}:
       do Result<&2, &2, M.Diagnostic, List<&2, Fragment>>:
-        nested : List<&2, Fragment> <- pattern_test_work(rest, PatternTest{payload, field_location(location, 4n)})
+        nested : List<&2, Fragment> <- pattern_test_work(rest, PatternTest{payload, field_location(location, 4n)}, locals)
         return fragments_join([[Bytes{concat(read_location(location), [40, 2, 0])}, ConstructorIndex{constructor}, Bytes{[70, 4, 127]}], nested, [Bytes{[5, 65, 0, 11]}]])
     case 1n+rest PatternTest{M.ProductPattern{+elements}, location}:
       do Result<&2, &2, M.Diagnostic, List<&2, Fragment>>:
         valid : Unit <- product_arity(List.length(&2, M.Pattern, elements))
-        pattern_test_work(rest, ProductTests{elements, location, 0n, [Bytes{[2, 127]}]})
+        pattern_test_work(rest, ProductTests{elements, location, 0n, [Bytes{[2, 127]}]}, locals)
     case 1n+rest ProductTests{Nil{}, location, offset, reversed}:
       Done{List.reverse.go(&2, Fragment, reversed, [Bytes{[65, 1, 11]}])}
     case 1n+rest ProductTests{head <> tail, +location, +offset, reversed}:
       do Result<&2, &2, M.Diagnostic, List<&2, Fragment>>:
-        test : List<&2, Fragment> <- pattern_test_work(rest, PatternTest{head, field_location(location, offset)})
+        test : List<&2, Fragment> <- pattern_test_work(rest, PatternTest{head, field_location(location, offset)}, locals)
         # One shared result block keeps flat products flat in Wasm too. Each
         # failed field branches with 0; successful fields discard that value.
-        pattern_test_work(rest, ProductTests{tail, location, 4n+offset, Bytes{[69, 13, 0, 26]} <> List.reverse.go(&2, Fragment, test, Bytes{[65, 0]} <> reversed)})
+        pattern_test_work(rest, ProductTests{tail, location, 4n+offset, Bytes{[69, 13, 0, 26]} <> List.reverse.go(&2, Fragment, test, Bytes{[65, 0]} <> reversed)}, locals)
     case 1n+rest RowTests{Nil{}, first}:
       Done{[Bytes{[65, 1]}]}
     case 1n+rest RowTests{head <> tail, +first}:
       do Result<&2, &2, M.Diagnostic, List<&2, Fragment>>:
-        test : List<&2, Fragment> <- pattern_test_work(rest, PatternTest{head, Location{first, Nil{}}})
-        remaining : List<&2, Fragment> <- pattern_test_work(rest, RowTests{tail, 1n+first})
+        test : List<&2, Fragment> <- pattern_test_work(rest, PatternTest{head, Location{first, Nil{}}}, locals)
+        remaining : List<&2, Fragment> <- pattern_test_work(rest, RowTests{tail, 1n+first}, locals)
         return fragments_join([test, [Bytes{[4, 127]}], remaining, [Bytes{[5, 65, 0, 11]}]])
 
 def next_scrutinee(values: List<&2, I.Expr>, +first: Nat, compiled: Code, reversed: List<&2, Fragment>, locals: Nat) -> Emission:
@@ -751,6 +897,23 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
             size : U32 <- array_size(count)
             values : Code <- emit_expr(rest, ScrutineesWork{elements, first, Nil{}, 0n}, reserve(context, 1n+count))
             return array_code(values, count, size, first)
+        case ExpressionWork{I.ForExpr{index, start, end, state, initial, body}}:
+          +first = context_next(context)
+          +nested = control(control(bind(bind(reserve(context, 3n), index, Location{first, Nil{}}), state, Location{2n+first, Nil{}}), None{}), None{})
+          do Result<&2, &2, M.Diagnostic, Code>:
+            operands : Code <- emit_expr(rest, ScrutineesWork{[start, end, initial], first, Nil{}, 0n}, reserve(context, 3n))
+            iteration : Code <- emit_expr(rest, ExpressionWork{body}, nested)
+            return require_locals(append_code(operands, iteration, join([[2, 64, 3, 64], local_get(first), local_get(1n+first), [79, 13, 1]]), join([33 <> unsigned_leb(2n+first), local_get(first), [65, 1, 106], 33 <> unsigned_leb(first), [12, 0, 11, 11], local_get(2n+first)])), 3n+first)
+        case ExpressionWork{I.ArrayGenerateExpr{count, generator}}:
+          +first = context_next(context)
+          do Result<&2, &2, M.Diagnostic, Code>:
+            operands : Code <- emit_expr(rest, ScrutineesWork{[count, generator], first, Nil{}, 0n}, reserve(context, 4n))
+            return append_code(operands, array_generate_code(first, context_provider(context)), Nil{}, Nil{})
+        case ExpressionWork{I.ArrayFillExpr{count, value}}:
+          +first = context_next(context)
+          do Result<&2, &2, M.Diagnostic, Code>:
+            operands : Code <- emit_expr(rest, ScrutineesWork{[count, value], first, Nil{}, 0n}, reserve(context, 4n))
+            return append_code(operands, array_fill_code(first), Nil{}, Nil{})
         case ExpressionWork{I.ArrayGetExpr{array, index}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
@@ -761,10 +924,19 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             operands : Code <- emit_expr(rest, ScrutineesWork{[array, index, value], first, Nil{}, 0n}, reserve(context, 5n))
             return append_code(operands, array_set_code(first), Nil{}, Nil{})
+        case ExpressionWork{I.ArrayReuseExpr{array, index, value}}:
+          +first = context_next(context)
+          do Result<&2, &2, M.Diagnostic, Code>:
+            operands : Code <- emit_expr(rest, ScrutineesWork{[array, index, value], first, Nil{}, 0n}, reserve(context, 3n))
+            return append_code(operands, array_reuse_code(first), Nil{}, Nil{})
         case ExpressionWork{I.ArrayLengthExpr{array}}:
           do Result<&2, &2, M.Diagnostic, Code>:
             value : Code <- emit_expr(rest, ExpressionWork{array}, context)
             return append_code(value, byte_code([40, 2, 0], 0n), Nil{}, Nil{})
+        case ExpressionWork{I.StateProviderExpr{read, write, initial}}:
+          do Result<&2, &2, M.Diagnostic, Code>:
+            value : Code <- emit_expr(rest, ExpressionWork{initial}, reserve(context, 2n))
+            return state_provider_code(read, write, value, context_next(context))
         case ExpressionWork{I.ProviderExpr{identity, implementation}}:
           do Result<&2, &2, M.Diagnostic, Code>:
             value : Code <- emit_expr(rest, ExpressionWork{implementation}, reserve(context, 2n))
@@ -772,9 +944,9 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
         case ExpressionWork{I.HandleExpr{provider, body}}:
           +slot = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
-            value : Code <- emit_expr(rest, ExpressionWork{provider}, reserve(context, 2n))
-            scoped : Code <- emit_expr(rest, ExpressionWork{body}, with_provider(reserve(context, 2n), 1n+slot))
-            return append_code(append_code(value, install_provider(slot, context_provider(context)), Nil{}, Nil{}), scoped, Nil{}, Nil{})
+            value : Code <- emit_expr(rest, ExpressionWork{provider}, reserve(context, 4n))
+            scoped : Code <- emit_expr(rest, ExpressionWork{body}, with_provider(reserve(context, 4n), 1n+slot))
+            return append_code(append_code(append_code(value, install_provider(slot, context_provider(context)), Nil{}, Nil{}), scoped, Nil{}, Nil{}), complete_provider(slot), Nil{}, Nil{})
         case ExpressionWork{I.InvokeOperationExpr{identity, argument}}:
           do Result<&2, &2, M.Diagnostic, Code>:
             value : Code <- emit_expr(rest, ExpressionWork{argument}, reserve(context, 3n))
@@ -832,7 +1004,7 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           +nested = control(reserve(context, 1n), None{})
           do Result<&2, &2, M.Diagnostic, Code>:
             v : Code <- emit_expr(rest, ExpressionWork{value}, reserve(context, 1n))
-            test : List<&2, Fragment> <- pattern_test_work(rest, PatternTest{pattern, Location{slot, Nil{}}})
+            test : List<&2, Fragment> <- pattern_test_work(rest, PatternTest{pattern, Location{slot, Nil{}}}, context_locals(context))
             bound : Context <- pattern_bindings_work(rest, OnePattern{pattern, Location{slot, Nil{}}}, nested)
             yes : Code <- emit_expr(rest, ExpressionWork{body}, bound)
             no : Code <- emit_expr(rest, ExpressionWork{alternative}, nested)
@@ -857,7 +1029,7 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
         case ArmsWork{M.MatchArm{+patterns, body} <> tail, +first}:
           +nested = control(context, None{})
           do Result<&2, &2, M.Diagnostic, Code>:
-            test : List<&2, Fragment> <- pattern_test_work(rest, RowTests{patterns, first})
+            test : List<&2, Fragment> <- pattern_test_work(rest, RowTests{patterns, first}, context_locals(context))
             bound : Context <- pattern_bindings_work(rest, RowPatterns{patterns, first}, nested)
             yes : Code <- emit_expr(rest, ExpressionWork{body}, bound)
             no : Code <- emit_expr(rest, ArmsWork{tail, first}, nested)
@@ -942,6 +1114,17 @@ def serialize(+fuel: Nat, work: Serialization, +catalog: StaticCatalog, heap: He
           do Result<&2, &2, M.Diagnostic, Serialized>:
             index : Nat <- lookup_slot(static_entries(catalog), I.operation_key(identity))
             heap_allocate([U32.from_nat(index)], heap)
+        case ValueWork{C.StateProviderValue{read, write, initial}}:
+          do Result<&2, &2, M.Diagnostic, Serialized>:
+            reader : Nat <- lookup_slot(static_operations(catalog), I.operation_key(read))
+            writer : Nat <- lookup_slot(static_operations(catalog), I.operation_key(write))
+            +value : Serialized <- serialize(rest, ValueWork{initial}, catalog, heap)
+            word : U32 <- only_word(serialized_words(value))
+            heap_allocate([4294967295, U32.from_nat(reader), U32.from_nat(writer), word], serialized_heap(value))
+        case ValueWork{C.StateReadValue{slot}}:
+          Fail{M.Diagnostic{"internal_error", "state", "a state reader escaped its resolver"}}
+        case ValueWork{C.StateWriteValue{slot}}:
+          Fail{M.Diagnostic{"internal_error", "state", "a state writer escaped its resolver"}}
         case ValueWork{C.ProviderValue{identity, implementation}}:
           do Result<&2, &2, M.Diagnostic, Serialized>:
             operation : Nat <- lookup_slot(static_operations(catalog), I.operation_key(identity))
@@ -986,6 +1169,8 @@ def serialize(+fuel: Nat, work: Serialization, +catalog: StaticCatalog, heap: He
             return result
         case ValueWork{C.ReturnValue{label, value}}:
           Fail{M.Diagnostic{"internal_error", "constant", "an unhandled return escaped constant evaluation"}}
+        case ValueWork{C.PatternBindingsValue{bindings}}:
+          Fail{M.Diagnostic{"internal_error", "constant", "internal pattern bindings escaped constant evaluation"}}
         case ValueWork{C.MatchValuesValue{values}}:
           Fail{M.Diagnostic{"internal_error", "constant", "a match scrutinee collection escaped constant evaluation"}}
         case ValuesWork{Nil{}}:
@@ -1058,6 +1243,17 @@ def abi_scalar(ty: M.Ty, name: String) -> Result<&2, &2, M.Diagnostic, AbiScalar
     case _:
       Fail{M.Diagnostic{"backend_type", name, "the host ABI accepts only Unit, U32, Bool, and F32 scalar values"}}
 
+def abi_value(ty: M.Ty, name: String) -> Result<&2, &2, M.Diagnostic, AbiValue>:
+  match ty:
+    case M.ArrayTy{M.U32Ty{}}:
+      Done{U32ArrayValue{}}
+    case M.ArrayTy{M.F32Ty{}}:
+      Done{F32ArrayValue{}}
+    case scalar:
+      do Result<&2, &2, M.Diagnostic, AbiValue>:
+        value : AbiScalar <- abi_scalar(scalar, name)
+        return ScalarValue{value}
+
 def callback_effects(row: M.EffectRow, name: String) -> Result<&2, &2, M.Diagnostic, Unit>:
   match row:
     case M.EffectRow{identity <> Nil{}, M.ClosedRow{}}:
@@ -1075,14 +1271,14 @@ def abi_parameter(ty: M.Ty, +name: String) -> Result<&2, &2, M.Diagnostic, AbiPa
         return CallbackParameter{Callback{input, output}}
     case scalar:
       do Result<&2, &2, M.Diagnostic, AbiParameter>:
-        value : AbiScalar <- abi_scalar(scalar, name)
-        return ScalarParameter{value}
+        value : AbiValue <- abi_value(scalar, name)
+        return ValueParameter{value}
 
 def function_abi(signature: M.Signature) -> Result<&2, &2, M.Diagnostic, AbiFunction>:
   M.Signature{+name, parameter, result, variables, effects} = signature
   do Result<&2, &2, M.Diagnostic, AbiFunction>:
     input : AbiParameter <- abi_parameter(parameter, name)
-    output : AbiScalar <- abi_scalar(result, name)
+    output : AbiValue <- abi_value(result, name)
     return AbiFunction{name, input, output}
 
 def check_signature(exported: Bool, signature: M.Signature) -> Result<&2, &2, M.Diagnostic, Unit>:
@@ -1184,6 +1380,8 @@ def codegen_weight_work(fuel: Nat, pending: List<&2, CodegenWeightWork>, weight:
       codegen_weight_work(rest, WeightExpression{body} <> tail, 1n+weight)
     case 1n+rest WeightExpression{I.ReturnExpr{label, value}} <> tail:
       codegen_weight_work(rest, WeightExpression{value} <> tail, 1n+weight)
+    case 1n+rest WeightExpression{I.StateProviderExpr{read, write, initial}} <> tail:
+      codegen_weight_work(rest, WeightExpression{initial} <> tail, 1n+weight)
     case 1n+rest WeightExpression{I.ProviderExpr{identity, implementation}} <> tail:
       codegen_weight_work(rest, WeightExpression{implementation} <> tail, 1n+weight)
     case 1n+rest WeightExpression{I.HandleExpr{provider, body}} <> tail:
@@ -1196,9 +1394,17 @@ def codegen_weight_work(fuel: Nat, pending: List<&2, CodegenWeightWork>, weight:
       codegen_weight_work(rest, WeightExpression{value} <> tail, 1n+weight)
     case 1n+rest WeightExpression{I.ArrayExpr{elements}} <> tail:
       codegen_weight_work(rest, WeightExpressions{elements} <> tail, 1n+weight)
+    case 1n+rest WeightExpression{I.ForExpr{index, start, end, state, initial, body}} <> tail:
+      codegen_weight_work(rest, WeightExpressions{[start, end, initial, body]} <> tail, 1n+weight)
+    case 1n+rest WeightExpression{I.ArrayGenerateExpr{count, generator}} <> tail:
+      codegen_weight_work(rest, WeightExpression{count} <> WeightExpression{generator} <> tail, 1n+weight)
+    case 1n+rest WeightExpression{I.ArrayFillExpr{count, value}} <> tail:
+      codegen_weight_work(rest, WeightExpression{count} <> WeightExpression{value} <> tail, 1n+weight)
     case 1n+rest WeightExpression{I.ArrayGetExpr{array, index}} <> tail:
       codegen_weight_work(rest, WeightExpression{array} <> WeightExpression{index} <> tail, 1n+weight)
     case 1n+rest WeightExpression{I.ArraySetExpr{array, index, value}} <> tail:
+      codegen_weight_work(rest, WeightExpression{array} <> WeightExpression{index} <> WeightExpression{value} <> tail, 1n+weight)
+    case 1n+rest WeightExpression{I.ArrayReuseExpr{array, index, value}} <> tail:
       codegen_weight_work(rest, WeightExpression{array} <> WeightExpression{index} <> WeightExpression{value} <> tail, 1n+weight)
     case 1n+rest WeightExpression{I.ArrayLengthExpr{array}} <> tail:
       codegen_weight_work(rest, WeightExpression{array} <> tail, 1n+weight)
@@ -1344,10 +1550,8 @@ def resolve_fragment(fragment: Fragment, +symbols: Catalog, imports: Nat) -> Res
       do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
         index : Nat <- lookup_symbol(symbol_entries(symbols), key)
         return i32_constant(U32.from_nat(index))
-    case ConstantReference{name}:
-      do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
-        word : Nat <- lookup_symbol(symbol_constants(symbols), name)
-        return i32_constant(U32.from_nat(word))
+    case ConstantReference{+name}:
+      constant_reference(runtime_global(symbols, name), name, symbols, imports)
     case ConstructorIndex{+name}:
       do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
         tag : Nat <- required_symbol(constructor_word(E.constructor_get(symbol_constructors(symbols), name)), name)
@@ -1515,7 +1719,7 @@ def callback_catalog(functions: List<&2, AbiFunction>, +reversed: List<&2, Callb
   match functions:
     case Nil{}:
       List.reverse(&2, Callback, reversed)
-    case AbiFunction{name, ScalarParameter{scalar}, result} <> tail:
+    case AbiFunction{name, ValueParameter{value}, result} <> tail:
       callback_catalog(tail, reversed)
     case AbiFunction{name, CallbackParameter{+signature}, result} <> tail:
       +found = callback_contains(reversed, signature)
@@ -1557,10 +1761,66 @@ def abi_callbacks(abi: Abi) -> List<&2, Callback>:
   Abi{functions, constants, callbacks} = abi
   callbacks
 
+def value_tag(value: AbiValue) -> U32:
+  match value:
+    case ScalarValue{scalar}:
+      scalar_tag(scalar)
+    case U32ArrayValue{}:
+      5
+    case F32ArrayValue{}:
+      6
+
+def value_from_word(value: AbiValue) -> List<&2, U32>:
+  match value:
+    case ScalarValue{scalar}:
+      abi_from_word(scalar)
+    case _:
+      Nil{}
+
+def value_to_word(value: AbiValue) -> List<&2, U32>:
+  match value:
+    case ScalarValue{scalar}:
+      abi_to_word(scalar)
+    case _:
+      Nil{}
+
+def value_is_array(value: AbiValue) -> Bool:
+  match value:
+    case ScalarValue{scalar}:
+      False{}
+    case _:
+      True{}
+
+def array_parameter(parameter: AbiParameter) -> Bool:
+  match parameter:
+    case ValueParameter{value}:
+      value_is_array(value)
+    case CallbackParameter{signature}:
+      False{}
+
+def array_exports(functions: List<&2, AbiFunction>) -> Bool:
+  match functions:
+    case Nil{}:
+      False{}
+    case AbiFunction{name, parameter, result} <> tail:
+      Bool.or(Bool.or(array_parameter(parameter), value_is_array(result)), array_exports(tail))
+
+# Array arguments are allocated by the host before entering the wrapper.
+def arena_floor(initialized: Bool, heap_start: Nat) -> List<&2, U32>:
+  match initialized:
+    case False{}:
+      i32_constant(U32.from_nat(heap_start))
+    case True{}:
+      [65, 0, 40, 2, 0]
+
+
+def wrapper_reset(parameter: AbiParameter, heap_start: Nat, initialized: Bool) -> List<&2, U32>:
+  Bool.pick(List<&2, U32>, array_parameter(parameter), Nil{}, concat(arena_floor(initialized, heap_start), [36, 0]))
+
 def abi_parameter_bytes(parameter: AbiParameter) -> List<&2, U32>:
   match parameter:
-    case ScalarParameter{scalar}:
-      [scalar_tag(scalar)]
+    case ValueParameter{value}:
+      [value_tag(value)]
     case CallbackParameter{Callback{input, output}}:
       [4, scalar_tag(input), scalar_tag(output)]
 
@@ -1569,7 +1829,7 @@ def abi_function_bytes(functions: List<&2, AbiFunction>) -> List<&2, List<&2, U3
     case Nil{}:
       Nil{}
     case AbiFunction{name, parameter, result} <> tail:
-      join([sized(utf8(name)), abi_parameter_bytes(parameter), [scalar_tag(result)]]) <> abi_function_bytes(tail)
+      join([sized(utf8(Public.export_name(name))), abi_parameter_bytes(parameter), [value_tag(result)]]) <> abi_function_bytes(tail)
 
 def abi_constant_bytes(constants: List<&2, AbiConstant>) -> List<&2, List<&2, U32>>:
   match constants:
@@ -1580,7 +1840,7 @@ def abi_constant_bytes(constants: List<&2, AbiConstant>) -> List<&2, List<&2, U3
 
 def abi_section(abi: Abi) -> BytePlan:
   Abi{functions, constants, callbacks} = abi
-  byte_plan(section(0, join([sized(utf8("blot:abi")), [1], vector(abi_function_bytes(functions)), vector(abi_constant_bytes(constants))])))
+  byte_plan(section(0, join([sized(utf8("blot:abi")), [2], vector(abi_function_bytes(functions)), vector(abi_constant_bytes(constants))])))
 
 def callback_slot(found: Bool, index: Nat, fallback: Unit -> Result<&2, &2, M.Diagnostic, Nat>) -> Result<&2, &2, M.Diagnostic, Nat>:
   match found:
@@ -1598,15 +1858,15 @@ def callback_index(callbacks: List<&2, Callback>, +wanted: Callback, +index: Nat
 
 def wrapper_type(function: AbiFunction) -> U32:
   match function:
-    case AbiFunction{name, CallbackParameter{signature}, F32Scalar{}}:
+    case AbiFunction{name, CallbackParameter{signature}, ScalarValue{F32Scalar{}}}:
       6
     case AbiFunction{name, CallbackParameter{signature}, result}:
       5
-    case AbiFunction{name, ScalarParameter{F32Scalar{}}, F32Scalar{}}:
+    case AbiFunction{name, ValueParameter{ScalarValue{F32Scalar{}}}, ScalarValue{F32Scalar{}}}:
       4
-    case AbiFunction{name, ScalarParameter{F32Scalar{}}, result}:
+    case AbiFunction{name, ValueParameter{ScalarValue{F32Scalar{}}}, result}:
       2
-    case AbiFunction{name, parameter, F32Scalar{}}:
+    case AbiFunction{name, parameter, ScalarValue{F32Scalar{}}}:
       3
     case _:
       1
@@ -1620,8 +1880,8 @@ def wrapper_types(functions: List<&2, AbiFunction>) -> List<&2, U32>:
 
 def wrapper_argument(parameter: AbiParameter, +callbacks: List<&2, Callback>, entries: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
   match parameter:
-    case ScalarParameter{scalar}:
-      return_bytes = join([[65, 0, 32, 0], abi_to_word(scalar)])
+    case ValueParameter{value}:
+      return_bytes = join([[65, 0, 32, 0], value_to_word(value)])
       Done{concat(Bool.pick(List<&2, U32>, List.is_empty(&2, Callback, callbacks), Nil{}, [208, 111, 36, 1]), return_bytes)}
     case CallbackParameter{signature}:
       +imports = List.length(&2, Callback, callbacks)
@@ -1629,24 +1889,24 @@ def wrapper_argument(parameter: AbiParameter, +callbacks: List<&2, Callback>, en
         slot : Nat <- callback_index(callbacks, signature, entries)
         return join([[32, 0, 36, 1, 65, 0, 65, 4, 16], unsigned_leb(imports), [34, 1], i32_constant(U32.from_nat(slot)), [54, 2, 0, 32, 1]])
 
-def wrapper_return(callbacks: List<&2, Callback>, result: AbiScalar) -> List<&2, U32>:
+def wrapper_return(callbacks: List<&2, Callback>, result: AbiValue) -> List<&2, U32>:
   match callbacks:
     case Nil{}:
-      abi_from_word(result)
+      value_from_word(result)
     case head <> tail:
-      concat([33, 1, 208, 111, 36, 1, 32, 1], abi_from_word(result))
+      concat([33, 1, 208, 111, 36, 1, 32, 1], value_from_word(result))
 
-def wrapper_bodies(functions: List<&2, AbiFunction>, +slots: Map<&2, Maybe<&2, Nat>>, +heap_start: Nat, +callbacks: List<&2, Callback>, +entries: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
+def wrapper_bodies(functions: List<&2, AbiFunction>, +slots: Map<&2, Maybe<&2, Nat>>, +heap_start: Nat, +callbacks: List<&2, Callback>, +entries: Nat, +initialized: Bool) -> Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
   match functions:
     case Nil{}:
       Done{Nil{}}
-    case AbiFunction{name, parameter, result} <> tail:
+    case AbiFunction{name, +parameter, result} <> tail:
       +imports = List.length(&2, Callback, callbacks)
       do Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
         index : Nat <- lookup_symbol(slots, "fn:" ++ name)
         argument : List<&2, U32> <- wrapper_argument(parameter, callbacks, entries)
-        rest : List<&2, BytePlan> <- wrapper_bodies(tail, slots, heap_start, callbacks, entries)
-        return byte_plan(body_bytes(join([i32_constant(U32.from_nat(heap_start)), [36, 0], argument, [65, 0, 16], unsigned_leb(1n+Nat.add(imports, index)), wrapper_return(callbacks, result)]), Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n), 1n)) <> rest
+        rest : List<&2, BytePlan> <- wrapper_bodies(tail, slots, heap_start, callbacks, entries, initialized)
+        return byte_plan(body_bytes(join([wrapper_reset(parameter, heap_start, initialized), argument, [65, 0, 16], unsigned_leb(1n+Nat.add(imports, index)), wrapper_return(callbacks, result)]), Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n), 1n)) <> rest
 
 def function_exports(functions: List<&2, AbiFunction>, index: Nat) -> List<&2, List<&2, U32>>:
   match functions:
@@ -1654,7 +1914,7 @@ def function_exports(functions: List<&2, AbiFunction>, index: Nat) -> List<&2, L
       Nil{}
     case AbiFunction{name, parameter, result} <> tail:
       +slot = index
-      concat(sized(utf8(name)), 0 <> unsigned_leb(slot)) <> function_exports(tail, 1n+slot)
+      concat(sized(utf8(Public.export_name(name))), 0 <> unsigned_leb(slot)) <> function_exports(tail, 1n+slot)
 
 def global_exports(names: List<&2, ExportedConstant>, index: Nat) -> List<&2, List<&2, U32>>:
   match names:
@@ -1664,22 +1924,32 @@ def global_exports(names: List<&2, ExportedConstant>, index: Nat) -> List<&2, Li
       +slot = index
       concat(sized(utf8(name)), 3 <> unsigned_leb(slot)) <> global_exports(tail, 1n+slot)
 
-def global_initializer(ty: M.Ty, word: U32) -> List<&2, U32>:
+def global_initializer(ty: M.Ty, word: U32, mutable: Bool) -> List<&2, U32>:
   match ty:
     case M.F32Ty{}:
-      join([[125, 0, 67], word_bytes(word), [11]])
+      join([[125, Bool.pick(U32, mutable, 1, 0), 67], word_bytes(word), [11]])
     case _:
-      join([[127, 0], i32_constant(word), [11]])
+      join([[127, Bool.pick(U32, mutable, 1, 0)], i32_constant(word), [11]])
 
-def globals(names: List<&2, ExportedConstant>, +constants: Map<&2, Maybe<&2, Nat>>) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
+def exported_initializer(runtime: Maybe<&2, RuntimeGlobal>, name: String, ty: M.Ty, symbols: Catalog) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+  match runtime:
+    case Some{slot}:
+      Done{global_initializer(ty, 0, True{})}
+    case None{}:
+      do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
+        value : Nat <- lookup_symbol(symbol_constants(symbols), name)
+        return global_initializer(ty, U32.from_nat(value), False{})
+
+def globals(names: List<&2, ExportedConstant>, +symbols: Catalog) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
   match names:
     case Nil{}:
       Done{Nil{}}
-    case ExportedConstant{name, value_type} <> tail:
+    case ExportedConstant{+name, value_type} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
-        value : Nat <- lookup_symbol(constants, name)
-        rest : List<&2, List<&2, U32>> <- globals(tail, constants)
-        return global_initializer(value_type, U32.from_nat(value)) <> rest
+        value : List<&2, U32> <- exported_initializer(runtime_global(symbols, name), name, value_type, symbols)
+        rest : List<&2, List<&2, U32>> <- globals(tail, symbols)
+        return value <> rest
+
 
 def table_indices(count: Nat, start: Nat) -> List<&2, U32>:
   match count:
@@ -1707,14 +1977,14 @@ def extra_types(callbacks: List<&2, Callback>) -> List<&2, List<&2, U32>>:
     case head <> tail:
       [96, 1, 111, 1, 127] <> [96, 1, 111, 1, 125] <> callback_types(head <> tail)
 
-def type_section(callbacks: List<&2, Callback>) -> BytePlan:
+def type_section(callbacks: List<&2, Callback>, initialized: Bool) -> BytePlan:
   byte_plan(section(1, vector(List.append(&2, List<&2, U32>, [
     [96, 3, 127, 127, 127, 1, 127],
     [96, 1, 127, 1, 127],
     [96, 1, 125, 1, 127],
     [96, 1, 127, 1, 125],
     [96, 1, 125, 1, 125]
-  ], extra_types(callbacks)))))
+  ], List.append(&2, List<&2, U32>, extra_types(callbacks), Bool.pick(List<&2, List<&2, U32>>, initialized, [[96, 0, 0]], Nil{}))))))
 
 def callback_imports(callbacks: List<&2, Callback>, index: Nat) -> List<&2, List<&2, U32>>:
   match callbacks:
@@ -1748,24 +2018,50 @@ def callback_globals(callbacks: List<&2, Callback>, values: List<&2, List<&2, U3
     case head <> tail:
       [111, 1, 208, 111, 11] <> values
 
-def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePlan>, names: List<&2, ExportedConstant>, values: List<&2, List<&2, U32>>, heap: Heap) -> BytePlan:
+def arena_exports(enabled: Bool, allocator_index: Nat, reset_index: Nat) -> List<&2, List<&2, U32>>:
+  match enabled:
+    case False{}:
+      Nil{}
+    case True{}:
+      [
+        concat(sized(utf8("blot:memory")), [2, 0]),
+        concat(sized(utf8("blot:allocate")), 0 <> unsigned_leb(allocator_index)),
+        concat(sized(utf8("blot:reset")), 0 <> unsigned_leb(reset_index))
+      ]
+
+
+def arena_reset_body(enabled: Bool, +heap_start: Nat, +initialized: Bool) -> List<&2, BytePlan>:
+  match enabled:
+    case False{}:
+      Nil{}
+    case True{}:
+      [byte_plan(body_bytes(join([arena_floor(initialized, heap_start), [36, 0], arena_floor(initialized, heap_start)]), 1n, 1n))]
+
+def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePlan>, names: List<&2, ExportedConstant>, values: List<&2, List<&2, U32>>, heap: Heap, +startup: List<&2, BytePlan>) -> BytePlan:
   Abi{+functions, constants, +callbacks} = abi
   Heap{+heap_start, chunks} = heap
   +count = List.length(&2, BytePlan, bodies)
   +imports = List.length(&2, Callback, callbacks)
   +wrapper_count = List.length(&2, BytePlan, wrappers)
+  +arrays = array_exports(functions)
+  +reset_count = Bool.pick(Nat, arrays, 1n, 0n)
+  +initialized = Bool.not(List.is_empty(&2, BytePlan, startup))
+  +start_count = List.length(&2, BytePlan, startup)
+  +start_type = Bool.pick(Nat, Nat.is_eq(imports, 0n), 5n, 7n+imports)
+  +start_index = {1n+Nat.add(imports, Nat.add(count, Nat.add(wrapper_count, reset_count))) : Nat}
   +pages = Nat.max(1n, U32.to_nat(U32.shrn(U32.add(U32.from_nat(heap_start), 65535), 16n)))
   plan_sequence([
     byte_plan([0, 97, 115, 109, 1, 0, 0, 0]),
-    type_section(callbacks),
+    type_section(callbacks, initialized),
     import_section(callbacks),
-    byte_plan(section(3, join([unsigned_leb(1n+Nat.add(count, wrapper_count)), [1], List.replicate(U32, count, 0), wrapper_types(functions)]))),
+    byte_plan(section(3, join([unsigned_leb(1n+Nat.add(count, Nat.add(wrapper_count, Nat.add(reset_count, start_count)))), [1], List.replicate(U32, count, 0), wrapper_types(functions), List.replicate(U32, reset_count, 1), Bool.pick(List<&2, U32>, initialized, unsigned_leb(start_type), Nil{})]))),
     byte_plan(section(4, join([[1, 112, 0], unsigned_leb(count)]))),
     byte_plan(section(5, join([[1, 1], unsigned_leb(pages), unsigned_leb(256n)]))),
     byte_plan(section(6, vector(join([[127, 1], i32_constant(U32.from_nat(heap_start)), [11]]) <> callback_globals(callbacks, values)))),
-    byte_plan(section(7, vector(List.append(&2, List<&2, U32>, function_exports(functions, 1n+Nat.add(imports, count)), global_exports(names, Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n)))))),
+    byte_plan(section(7, vector(List.append(&2, List<&2, U32>, function_exports(functions, 1n+Nat.add(imports, count)), List.append(&2, List<&2, U32>, global_exports(names, Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n)), arena_exports(arrays, imports, 1n+Nat.add(imports, Nat.add(count, wrapper_count)))))))),
+    byte_plan(Bool.pick(List<&2, U32>, initialized, section(8, unsigned_leb(start_index)), Nil{})),
     byte_plan(section(9, join([[1, 0, 65, 0, 11], unsigned_leb(count), table_indices(count, 1n+imports)]))),
-    plan_section(10, plan_vector(byte_plan(allocator()) <> List.append(&2, BytePlan, bodies, wrappers))),
+    plan_section(10, plan_vector(byte_plan(allocator()) <> List.append(&2, BytePlan, bodies, List.append(&2, BytePlan, wrappers, List.append(&2, BytePlan, arena_reset_body(arrays, heap_start, initialized), startup))))),
     data_section(Heap{heap_start, chunks}),
     abi_section(abi)
   ])
@@ -1821,6 +2117,8 @@ def preparation_weight(fuel: Nat, pending: List<&2, PreparationWeightWork>, weig
       preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.SourceExpr{offset, annotation, value}} <> tail:
       preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.StateProviderExpr{read, write, initial}} <> tail:
+      preparation_weight(rest, PreparationExpression{initial} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.ProviderExpr{identity, implementation}} <> tail:
       preparation_weight(rest, PreparationExpression{implementation} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.HandleExpr{provider, body}} <> tail:
@@ -1837,6 +2135,12 @@ def preparation_weight(fuel: Nat, pending: List<&2, PreparationWeightWork>, weig
       preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.ArrayExpr{elements}} <> tail:
       preparation_weight(rest, PreparationExpressions{elements} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ForExpr{index, start, end, state, initial, body}} <> tail:
+      preparation_weight(rest, PreparationExpressions{[start, end, initial, body]} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ArrayGenerateExpr{count, generator}} <> tail:
+      preparation_weight(rest, PreparationExpression{count} <> PreparationExpression{generator} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.ArrayFillExpr{count, value}} <> tail:
+      preparation_weight(rest, PreparationExpression{count} <> PreparationExpression{value} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.ArrayGetExpr{array, index}} <> tail:
       preparation_weight(rest, PreparationExpression{array} <> PreparationExpression{index} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.ArraySetExpr{array, index, value}} <> tail:
@@ -1860,7 +2164,8 @@ def prepare_job_leaf(entries: List<&2, WeightedEntry<Entry>>, +projection: I.Met
       Done{List.reverse(&2, CodegenJob, reversed)}
     case WeightedEntry{Entry{key, parameter, body, captures}, weight} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>:
-        prepared : I.Expr <- I.prepare(body, projection)
+        projected : I.Expr <- I.prepare(body, projection)
+        prepared : I.Expr <- Reuse.prepare(projected)
         prepare_job_leaf(tail, projection, CodegenJob{key, parameter, prepared, captures} <> reversed)
 
 def merge_prepared(left: Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>, right: Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>) -> Result<&2, &2, M.Diagnostic, List<&2, CodegenJob>>:
@@ -1904,6 +2209,8 @@ def operation_jobs(operations: List<&2, M.Operation>) -> List<&2, CodegenJob>:
       Nil{}
     case M.Operation{+identity, parameter, result} <> tail:
       CodegenJob{I.operation_key(identity), "$argument", I.InvokeOperationExpr{identity, I.LocalExpr{"$argument"}}, Nil{}} <> operation_jobs(tail)
+    case head <> tail:
+      operation_jobs(tail)
 
 def job_slots(jobs: List<&2, CodegenJob>, index: Nat) -> List<&2, Slot>:
   match jobs:
@@ -1913,20 +2220,100 @@ def job_slots(jobs: List<&2, CodegenJob>, index: Nat) -> List<&2, Slot>:
       +position = index
       Slot{key, position} <> job_slots(tail, 1n+position)
 
+def initializer_entries(initializers: List<&2, Init.Initializer>) -> List<&2, Entry>:
+  match initializers:
+    case Nil{}:
+      Nil{}
+    case Init.Initializer{name, value} <> tail:
+      Entry{"init:" ++ name, "$unit", value, Nil{}} <> initializer_entries(tail)
+
+def exported_global(names: List<&2, ExportedConstant>, +wanted: String, index: Nat) -> Maybe<&2, RuntimeGlobal>:
+  match names:
+    case Nil{}:
+      None{}
+    case ExportedConstant{name, ty} <> tail:
+      +slot = index
+      Bool.pick(Maybe<&2, RuntimeGlobal>, M.name_equal(name, wanted), Some{RuntimeGlobal{slot, ty}}, exported_global(tail, wanted, 1n+slot))
+
+def runtime_position(found: Maybe<&2, RuntimeGlobal>, fallback: Nat) -> RuntimeGlobal:
+  match found:
+    case Some{slot}:
+      slot
+    case None{}:
+      RuntimeGlobal{fallback, M.U32Ty{}}
+
+def runtime_global_index(global: RuntimeGlobal) -> Nat:
+  RuntimeGlobal{index, ty} = global
+  index
+
+def runtime_globals(initializers: List<&2, Init.Initializer>, +names: List<&2, ExportedConstant>, +next: Nat, indexed: Map<&2, RuntimeGlobal>) -> Map<&2, RuntimeGlobal>:
+  match initializers:
+    case Nil{}:
+      indexed
+    case Init.Initializer{+name, value} <> tail:
+      +global = runtime_position(exported_global(names, name, 1n), next)
+      runtime_globals(tail, names, Nat.add(next, Bool.pick(Nat, Nat.is_eq(runtime_global_index(global), next), 1n, 0n)), Map.set(&2, RuntimeGlobal, indexed, name, global))
+
+def required_runtime(found: Maybe<&2, RuntimeGlobal>, name: String) -> Result<&2, &2, M.Diagnostic, RuntimeGlobal>:
+  match found:
+    case None{}:
+      Fail{M.Diagnostic{"backend_link", name, "runtime initializer has no prepared global"}}
+    case Some{global}:
+      Done{global}
+
+def private_global(global: RuntimeGlobal, first: Nat, +rest: List<&2, List<&2, U32>>) -> List<&2, List<&2, U32>>:
+  RuntimeGlobal{index, ty} = global
+  Bool.pick(List<&2, List<&2, U32>>, Nat.is_ge(index, first), global_initializer(ty, 0, True{}) <> rest, rest)
+
+def private_globals(initializers: List<&2, Init.Initializer>, +symbols: Catalog, +first: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
+  match initializers:
+    case Nil{}:
+      Done{Nil{}}
+    case Init.Initializer{+name, value} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
+        global : RuntimeGlobal <- required_runtime(runtime_global(symbols, name), name)
+        rest : List<&2, List<&2, U32>> <- private_globals(tail, symbols, first)
+        return private_global(global, first, rest)
+
+def initializer_call(global: RuntimeGlobal, entry: Nat, +imports: Nat) -> List<&2, U32>:
+  RuntimeGlobal{index, ty} = global
+  join([[65, 0, 65, 0, 65, 0, 16], unsigned_leb(1n+Nat.add(imports, entry)), runtime_from_word(ty), [36], unsigned_leb(global_index(index, imports))])
+
+def initializer_calls(initializers: List<&2, Init.Initializer>, +symbols: Catalog, +imports: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
+  match initializers:
+    case Nil{}:
+      Done{[[65, 0, 35, 0, 54, 2, 0]]}
+    case Init.Initializer{+name, value} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
+        global : RuntimeGlobal <- required_runtime(runtime_global(symbols, name), name)
+        entry : Nat <- lookup_symbol(symbol_entries(symbols), "init:" ++ name)
+        rest : List<&2, List<&2, U32>> <- initializer_calls(tail, symbols, imports)
+        return initializer_call(global, entry, imports) <> rest
+
+def initializer_body(initializers: List<&2, Init.Initializer>, symbols: Catalog, imports: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
+  match initializers:
+    case Nil{}:
+      Done{Nil{}}
+    case initializers:
+      do Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
+        calls : List<&2, List<&2, U32>> <- initializer_calls(initializers, symbols, imports)
+        return [byte_plan(body_bytes(join(calls), 0n, 0n))]
+
 def prepare_catalog(runtime: Reachable.Runtime) -> Result<&2, &2, M.Diagnostic, Prepared>:
-  Reachable.Runtime{M.CheckedModule{checked_constants, +functions, types, +operations}, constants, +lambdas} = runtime
+  Reachable.Runtime{M.CheckedModule{+checked_constants, +functions, types, +operations}, constants, +lambdas} = runtime
   +declarations = E.type_catalog(types)
   entries = List.append(&2, Entry, function_entries(functions), List.append(&2, Entry, lambda_entries(lambdas), constructor_entries(E.catalog_variants(declarations))))
   +projection = I.metadata(lambdas, E.catalog_constructors(declarations))
   do Result<&2, &2, M.Diagnostic, Prepared>:
     supported : Unit <- check_functions(functions)
-    names : List<&2, ExportedConstant> <- exported_constants(checked_constants)
-    normal : List<&2, CodegenJob> <- prepare_jobs(entries, projection)
+    +names : List<&2, ExportedConstant> <- exported_constants(checked_constants)
+    +initializers : List<&2, Init.Initializer> <- Init.plan(Init.bindings(checked_constants), checked_constants, functions)
+    normal : List<&2, CodegenJob> <- prepare_jobs(List.append(&2, Entry, entries, initializer_entries(initializers)), projection)
     +jobs : List<&2, CodegenJob> = List.append(&2, CodegenJob, normal, operation_jobs(operations))
     +slots : Map<&2, Maybe<&2, Nat>> = slot_index(job_slots(jobs, 0n))
     +operation_ids : Map<&2, Maybe<&2, Nat>> = slot_index(operation_slots(operations, 0n))
     +serialized : StaticConstants <- serialize_constants(constants, StaticCatalog{slots, projection, operation_ids}, Heap{4n, [[0, 0, 0, 0]]})
-    return Prepared{jobs, Catalog{slots, E.catalog_constructors(declarations), slot_index(static_slots(serialized)), operation_ids}, functions, names, static_heap(serialized)}
+    return Prepared{jobs, Catalog{slots, E.catalog_constructors(declarations), slot_index(static_slots(serialized)), operation_ids, runtime_globals(initializers, names, 1n+List.length(&2, ExportedConstant, names), MTip{})}, functions, names, static_heap(serialized), initializers}
 
 def prepare(checked: M.CheckedModule, constants: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, Prepared>:
   do Result<&2, &2, M.Diagnostic, Prepared>:
@@ -1934,18 +2321,20 @@ def prepare(checked: M.CheckedModule, constants: List<&2, C.Binding<C.Value>>) -
     prepare_catalog(runtime)
 
 def prepared_jobs(prepared: Prepared) -> List<&2, CodegenJob>:
-  Prepared{jobs, catalog, functions, names, heap} = prepared
+  Prepared{jobs, catalog, functions, names, heap, initializers} = prepared
   jobs
 
 def link_plan(prepared: Prepared, entries: List<&2, EntryCode>) -> Result<&2, &2, M.Diagnostic, BytePlan>:
-  Prepared{jobs, +symbols, +functions, +names, +heap} = prepared
+  Prepared{jobs, +symbols, +functions, +names, +heap, +initializers} = prepared
   do Result<&2, &2, M.Diagnostic, BytePlan>:
     +abi : Abi <- module_abi(functions, names)
     +callbacks : List<&2, Callback> = abi_callbacks(abi)
     +bodies : List<&2, BytePlan> <- link_bodies(jobs, entries, symbols, List.length(&2, Callback, callbacks))
-    wrappers : List<&2, BytePlan> <- wrapper_bodies(abi_exports(abi), symbol_entries(symbols), heap_end(heap), callbacks, List.length(&2, BytePlan, bodies))
-    values : List<&2, List<&2, U32>> <- globals(names, symbol_constants(symbols))
-    return assemble(abi, List.append(&2, BytePlan, bodies, callback_bodies(callbacks, 0n)), wrappers, names, values, heap)
+    wrappers : List<&2, BytePlan> <- wrapper_bodies(abi_exports(abi), symbol_entries(symbols), heap_end(heap), callbacks, List.length(&2, BytePlan, bodies), Bool.not(List.is_empty(&2, Init.Initializer, initializers)))
+    values : List<&2, List<&2, U32>> <- globals(names, symbols)
+    hidden : List<&2, List<&2, U32>> <- private_globals(initializers, symbols, 1n+List.length(&2, ExportedConstant, names))
+    startup : List<&2, BytePlan> <- initializer_body(initializers, symbols, List.length(&2, Callback, callbacks))
+    return assemble(abi, List.append(&2, BytePlan, bodies, callback_bodies(callbacks, 0n)), wrappers, names, List.append(&2, List<&2, U32>, values, hidden), heap, startup)
 
 def link(prepared: Prepared, entries: List<&2, EntryCode>) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
   do Result<&2, &2, M.Diagnostic, List<&2, U32>>:

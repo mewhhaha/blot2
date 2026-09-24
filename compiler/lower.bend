@@ -1,9 +1,13 @@
 import Base
 import ./model.bend as M
+import ./types.bend as CoreTypes
 import ./cst.bend as C
+import ./postfix.bend as Postfix
 import ./source_types.bend as T
+import ./source_arguments.bend as A
 import ./operators.bend as O
 import ./index.bend as Index
+import ./effect_families.bend as Families
 
 type Local is Data:
   Local{source: String, core: String}
@@ -14,12 +18,14 @@ type GlobalKind is Data:
   ConstructorName{}
   RecordConstructorName{fields: List<&2, String>}
   OperationName{identity: M.TypeId}
+  OperationTemplateName{identity: M.TypeId, parameters: List<&2, A.Pattern>}
+  EffectFamilyName{members: List<&2, M.TypeId>, parameters: List<&2, A.Pattern>}
 
 type Global is Data:
   Global{source: String, core: String, kind: GlobalKind}
 
 type Context is Data:
-  Context{globals: Map<&2, Global>, headers: Map<&2, T.Header>, fixities: List<&2, O.Fixity>, locals: List<&2, Local>, return_label: Maybe<&2, Nat>}
+  Context{globals: Map<&2, Global>, headers: Map<&2, T.Header>, fixities: List<&2, O.Fixity>, locals: List<&2, Local>, return_label: Maybe<&2, Nat>, annotation_variables: List<&2, T.Variable>}
 
 type NodeKind is Data:
   Wrapper{}
@@ -30,21 +36,25 @@ type NodeKind is Data:
   Falsehood{}
   Name{}
   Intrinsic{}
-  FunctionNode{}
-  ConstantNode{}
+  ValueDeclaration{}
   DataNode{}
   EffectNode{}
+  EffectTypeNode{}
   SymbolicFixity{}
   NamedFixity{}
   GroupNode{}
   ArrayNode{}
   RecordNode{}
   ApplicationNode{}
+  MemberNode{}
+  IndexNode{}
   InfixNode{}
   LambdaNode{}
   CaseNode{}
   Block{}
   Binding{}
+  Rebinding{}
+  ForLoop{}
   EffectBinding{}
   Return{}
   Conditional{}
@@ -58,12 +68,17 @@ type NodeKind is Data:
   PatternElements{reversed: List<&2, M.Pattern>, locals: List<&2, Local>}
   PatternRecordFields{constructor: String, fields: List<&2, String>, patterns: Map<&2, M.Pattern>, locals: List<&2, Local>}
   PatternName{}
+  PatternValue{}
   Unsupported{}
 
 type Primitive is Data:
+  AssociatedPrimitive{}
+  DeferredPrimitive{member: String, arity: Nat}
+  EffectFamilyPrimitive{member: String, templates: Nat, operands: Nat}
   ScalarPrimitive{operator: M.ScalarOp}
   UnaryPrimitive{operator: M.UnaryOp}
   ProviderPrimitive{}
+  StateProviderPrimitive{}
   OperationDescriptorPrimitive{}
   FunctionEffectsPrimitive{}
   EffectHasPrimitive{}
@@ -71,6 +86,8 @@ type Primitive is Data:
   EffectSamePrimitive{}
   PanicPrimitive{}
   ProjectPrimitive{}
+  ArrayGeneratePrimitive{}
+  ArrayFillPrimitive{}
   ArrayGetPrimitive{}
   ArraySetPrimitive{}
   ArrayLengthPrimitive{}
@@ -81,6 +98,18 @@ type RecordTarget is Data:
 type RecordElement is Data:
   RecordElement{field: String, binding: String, value: M.Expr}
 
+type TypedArguments is Data:
+  TypedArguments{types: List<&2, M.Ty>, values: List<&2, C.Cst>}
+
+type TypedCall is Data:
+  TypedCall{callee: M.Expr, values: List<&2, C.Cst>}
+
+type TemplateReference is Data:
+  TemplateReference{identity: M.TypeId, parameters: List<&2, A.Pattern>}
+
+type OperationTarget is Data:
+  OperationTarget{identity: M.TypeId, template: Maybe<&2, M.TypeId>, arguments: List<&2, M.Ty>}
+
 type Work is Data:
   Expression{kind: NodeKind, node: C.Cst}
   Group{nodes: List<&2, C.Cst>, offset: Nat}
@@ -88,15 +117,22 @@ type Work is Data:
   ArrayElements{nodes: List<&2, C.Cst>, reversed: List<&2, M.Expr>, offset: Nat}
   RecordElements{constructor: String, fields: List<&2, String>, nodes: List<&2, C.Cst>, reversed: List<&2, RecordElement>, seen: Set(), node: C.Cst}
   Arguments{callee: M.Expr, nodes: List<&2, C.Cst>, offset: Nat}
+  UpdatePath{receiver: M.Expr, nodes: List<&2, C.Cst>, value: C.Cst, offset: Nat}
+  UpdateSelector{kind: String, receiver: M.Expr, node: C.Cst, tail: List<&2, C.Cst>, value: C.Cst, offset: Nat}
   ApplicationHead{kind: NodeKind, head: C.Cst, arguments: List<&2, C.Cst>, offset: Nat}
+  GroupedApplication{call: Maybe<&2, TypedCall>, kind: NodeKind, head: C.Cst, arguments: List<&2, C.Cst>, offset: Nat}
+  RecordApplication{template: Maybe<&2, TemplateReference>, head: C.Cst, fields: C.Cst, arguments: List<&2, C.Cst>, offset: Nat, node: C.Cst}
+  ApplicationTemplate{template: Maybe<&2, TemplateReference>, head: C.Cst, arguments: List<&2, C.Cst>, offset: Nat}
   PrimitiveCall{primitive: Primitive, head: C.Cst, arguments: List<&2, C.Cst>, offset: Nat}
+  DescriptorOperation{sealed: Bool, operation: C.Cst, offset: Nat}
   DescriptorArgument{sealed: Bool, node: C.Cst}
   InfixTails{head: M.Expr, nodes: List<&2, C.Cst>, tails: List<&2, O.Tail>}
   CaseValues{nodes: List<&2, C.Cst>, reversed: List<&2, M.Expr>, arms: List<&2, C.Cst>}
   Arms{values: List<&2, M.Expr>, nodes: List<&2, C.Cst>, arms: List<&2, M.MatchArm<M.Expr>>}
   ResolvedBlock{resolvers: List<&2, C.Cst>, body: M.Expr, offset: Nat}
-  Statements{nodes: List<&2, C.Cst>}
-  Statement{kind: NodeKind, node: C.Cst, tail: List<&2, C.Cst>}
+  ForRange{ends: List<&2, C.Cst>, pattern: M.Pattern, start: M.Expr, initial: M.Expr, body: M.Expr, prefix: String, offset: Nat}
+  Statements{nodes: List<&2, C.Cst>, carried: List<&2, Local>}
+  Statement{kind: NodeKind, node: C.Cst, tail: List<&2, C.Cst>, carried: List<&2, Local>}
 
 type Parameter is Data:
   Parameter{source: String, core: String, annotation: Maybe<&2, M.Ty>}
@@ -122,27 +158,31 @@ def classify_initial(initial: Char, +kind: String) -> NodeKind:
     case 'b':
       Bool.pick(NodeKind, M.name_equal(kind, "binding"), Binding{}, Unsupported{})
     case 'c':
-      Bool.pick(NodeKind, M.name_equal(kind, "constant"), ConstantNode{}, Bool.pick(NodeKind, M.name_equal(kind, "case_expression"), CaseNode{}, Bool.pick(NodeKind, M.name_equal(kind, "conditional"), Conditional{}, Bool.pick(NodeKind, M.name_equal(kind, "constructor_pattern"), PatternConstructor{}, Unsupported{}))))
+      Bool.pick(NodeKind, M.name_equal(kind, "call_expression"), ApplicationNode{}, Bool.pick(NodeKind, M.name_equal(kind, "case_expression"), CaseNode{}, Bool.pick(NodeKind, M.name_equal(kind, "conditional"), Conditional{}, Bool.pick(NodeKind, M.name_equal(kind, "constructor_pattern"), PatternConstructor{}, Unsupported{}))))
     case 'd':
       Bool.pick(NodeKind, M.name_equal(kind, "data_type"), DataNode{}, Bool.pick(NodeKind, M.name_equal(kind, "do_block"), Block{}, Unsupported{}))
     case 'e':
-      Bool.pick(NodeKind, M.name_equal(kind, "expression"), Wrapper{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_binding"), EffectBinding{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_step"), EffectBinding{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_declaration"), EffectNode{}, Unsupported{}))))
+      Bool.pick(NodeKind, M.name_equal(kind, "expression"), Wrapper{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_binding"), EffectBinding{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_step"), EffectBinding{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_declaration"), EffectNode{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_type"), EffectTypeNode{}, Unsupported{})))))
     case 'f':
-      Bool.pick(NodeKind, M.name_equal(kind, "function"), FunctionNode{}, Unsupported{})
+      Bool.pick(NodeKind, M.name_equal(kind, "for_statement"), ForLoop{}, Unsupported{})
     case 'g':
       Bool.pick(NodeKind, M.name_equal(kind, "group"), GroupNode{}, Unsupported{})
     case 'i':
-      Bool.pick(NodeKind, M.name_equal(kind, "infix_expression"), InfixNode{}, Unsupported{})
+      Bool.pick(NodeKind, M.name_equal(kind, "infix_expression"), InfixNode{}, Bool.pick(NodeKind, M.name_equal(kind, "index_expression"), IndexNode{}, Unsupported{}))
     case 'l':
       Bool.pick(NodeKind, M.name_equal(kind, "lambda"), LambdaNode{}, Unsupported{})
+    case 'm':
+      Bool.pick(NodeKind, M.name_equal(kind, "member_expression"), MemberNode{}, Unsupported{})
     case 'n':
       Bool.pick(NodeKind, M.name_equal(kind, "named_fixity"), NamedFixity{}, Unsupported{})
     case 'p':
       Bool.pick(NodeKind, M.name_equal(kind, "prefix_expression"), PrefixNode{}, Bool.pick(NodeKind, M.name_equal(kind, "pattern_conditional"), PatternConditional{}, Bool.pick(NodeKind, M.name_equal(kind, "pattern"), PatternWrapper{}, Bool.pick(NodeKind, M.name_equal(kind, "pattern_group"), PatternGroup{}, Unsupported{}))))
+    case 'v':
+      Bool.pick(NodeKind, M.name_equal(kind, "value_pattern"), PatternValue{}, Bool.pick(NodeKind, M.name_equal(kind, "value_declaration"), ValueDeclaration{}, Unsupported{}))
     case 'q':
       Bool.pick(NodeKind, M.name_equal(kind, "qualified_name"), Name{}, Unsupported{})
     case 'r':
-      Bool.pick(NodeKind, M.name_equal(kind, "record"), RecordNode{}, Bool.pick(NodeKind, M.name_equal(kind, "result"), Return{}, Unsupported{}))
+      Bool.pick(NodeKind, M.name_equal(kind, "record"), RecordNode{}, Bool.pick(NodeKind, M.name_equal(kind, "result"), Return{}, Bool.pick(NodeKind, M.name_equal(kind, "rebinding"), Rebinding{}, Unsupported{})))
     case 's':
       Bool.pick(NodeKind, M.name_equal(kind, "symbolic_fixity"), SymbolicFixity{}, Unsupported{})
     case _:
@@ -185,20 +225,301 @@ def global_value(found: Maybe<&2, Global>, +node: C.Cst) -> Result<&2, &2, M.Dia
       Done{M.ConstructorRefExpr{core}}
     case Some{Global{source, core, OperationName{identity}}}:
       Done{M.OperationExpr{identity}}
+    case Some{Global{source, core, OperationTemplateName{identity, parameters}}}:
+      Done{M.GenericOperationExpr{C.offset_of(node), identity, Nil{}}}
+    case Some{Global{source, core, EffectFamilyName{members, parameters}}}:
+      Fail{C.diagnostic(node, "effect_member", "effect family requires an operation member")}
     case None{}:
       Fail{C.diagnostic(node, "unknown_value", "unknown value: " ++ C.name_of(node))}
 
-def resolved(local: Maybe<&2, String>, globals: Map<&2, Global>, name: String, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
-  match local:
-    case Some{core}:
-      Done{M.LocalExpr{core}}
+def located(offset: Nat, value: M.Expr) -> M.Expr:
+  M.SourceExpr{offset, None{}, value}
+
+def member_path(nodes: List<&2, C.Cst>, receiver: M.Expr) -> M.Expr:
+  match nodes:
+    case Nil{}:
+      receiver
+    case C.Cst{kind, field, ".", offset, children} <> tail:
+      member_path(tail, receiver)
+    case C.Cst{kind, field, member, +offset, children} <> tail:
+      member_path(tail, located(offset, M.AssociatedExpr{offset, M.MemberDispatch{}, member, Nil{}, receiver, M.UnitExpr{}}))
+
+type GlobalPrefix is Data:
+  GlobalPrefix{global: Global, remaining: List<&2, C.Cst>}
+
+def prefix_candidate(found: Maybe<&2, Global>, tail: List<&2, C.Cst>, previous: Maybe<&2, GlobalPrefix>) -> Maybe<&2, GlobalPrefix>:
+  match found:
+    case Some{global}:
+      Some{GlobalPrefix{global, tail}}
     case None{}:
-      global_value(lookup_global(globals, name), node)
+      previous
+
+def global_prefix(nodes: List<&2, C.Cst>, +globals: Map<&2, Global>, prefix: String, best: Maybe<&2, GlobalPrefix>) -> Maybe<&2, GlobalPrefix>:
+  match nodes:
+    case Nil{}:
+      best
+    case C.Cst{kind, field, ".", offset, children} <> tail:
+      global_prefix(tail, globals, prefix ++ ".", best)
+    case C.Cst{kind, field, text, offset, children} <> +tail:
+      +name = prefix ++ text
+      global_prefix(tail, globals, name, prefix_candidate(lookup_global(globals, name), tail, best))
+
+def global_member(found: Maybe<&2, GlobalPrefix>, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match found:
+    case Some{GlobalPrefix{global, remaining}}:
+      do Result<&2, &2, M.Diagnostic, M.Expr>:
+        receiver : M.Expr <- global_value(Some{global}, node)
+        return member_path(remaining, receiver)
+    case None{}:
+      global_value(None{}, node)
+
+def resolve_root(found: Maybe<&2, String>, nodes: List<&2, C.Cst>, globals: Map<&2, Global>, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match found:
+    case Some{core}:
+      Done{member_path(nodes, M.LocalExpr{core})}
+    case None{}:
+      global_member(global_prefix(C.children_of(node), globals, "", None{}), node)
+
+def resolve_parts(nodes: List<&2, C.Cst>, context: Context, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match nodes context:
+    case root <> tail Context{globals, headers, fixities, locals, label, variables}:
+      resolve_root(lookup_local(locals, C.text_of(root)), tail, globals, node)
+    case _ _:
+      Fail{C.diagnostic(node, "internal_cst", "qualified name has no root")}
 
 def resolve(context: Context, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
-  Context{globals, headers, fixities, locals, label} = context
-  +name = C.name_of(node)
-  resolved(lookup_local(locals, name), globals, name, node)
+  resolve_parts(C.children_of(node), context, node)
+
+def template_reference(local: Maybe<&2, String>, found: Maybe<&2, Global>) -> Maybe<&2, TemplateReference>:
+  match local found:
+    case None{} Some{Global{source, core, OperationTemplateName{identity, parameters}}}:
+      Some{TemplateReference{identity, parameters}}
+    case _ _:
+      None{}
+
+def effect_template_found(found: Maybe<&2, Global>, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.TypeId>:
+  match found:
+    case Some{Global{source, core, OperationTemplateName{identity, A.Binding{parameter} <> Nil{}}}}:
+      Done{identity}
+    case Some{Global{source, core, OperationTemplateName{identity, parameters}}}:
+      Fail{C.diagnostic(node, "type_arity", "generic effect operation requires exactly one type parameter")}
+    case _:
+      Fail{C.diagnostic(node, "operation_target", "expected a declared parameterized effect operation")}
+
+def effect_template_child(children: List<&2, C.Cst>, +node: C.Cst, context: Context) -> Result<&2, &2, M.Diagnostic, M.TypeId>:
+  match children:
+    case +name <> Nil{}:
+      Context{globals, headers, fixities, locals, label, annotation_variables} = context
+      Bool.pick(Result<&2, &2, M.Diagnostic, M.TypeId>, M.name_equal(C.kind_of(name), "qualified_name"), effect_template_found(lookup_global(globals, C.name_of(name)), node), Fail{C.diagnostic(node, "operation_target", "expected a declared parameterized effect operation name")})
+    case _:
+      Fail{C.diagnostic(node, "operation_target", "expected a declared parameterized effect operation name")}
+
+def effect_template_name(+node: C.Cst, context: Context) -> Result<&2, &2, M.Diagnostic, M.TypeId>:
+  effect_template_child(C.children_of(node), node, context)
+
+def family_contains(members: List<&2, M.TypeId>, +wanted: M.TypeId) -> Bool:
+  match members:
+    case Nil{}:
+      False{}
+    case member <> rest:
+      Bool.or(M.type_id_equal(member, wanted), family_contains(rest, wanted))
+
+def family_pair(globals: List<&2, Global>, +reader: M.TypeId, +writer: M.TypeId) -> Bool:
+  match globals:
+    case Nil{}:
+      False{}
+    case Global{source, core, EffectFamilyName{+members, parameters}} <> rest:
+      Bool.or(Bool.and(family_contains(members, reader), family_contains(members, writer)), family_pair(rest, reader, writer))
+    case other <> rest:
+      family_pair(rest, reader, writer)
+
+def require_family_pair(context: Context, +reader: M.TypeId, +writer: M.TypeId, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Unit>:
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
+  Bool.pick(Result<&2, &2, M.Diagnostic, Unit>, family_pair(Map.values(&2, Global, globals), reader, writer), Done{Unit{}}, Fail{C.diagnostic(node, "effect_family", "read and write operations must belong to the same declared effect family")})
+
+def effect_member_instances(templates: List<&2, M.TypeId>, +arguments: List<&2, M.Ty>) -> Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+  match templates:
+    case Nil{}:
+      Done{Nil{}}
+    case template <> rest:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+        identity : M.TypeId <- Families.identity(template, arguments)
+        following : List<&2, M.TypeId> <- effect_member_instances(rest, arguments)
+        return identity <> following
+
+def lookup_effect_resolved(sealed: Bool, found: Maybe<&2, Global>, +name: String, values: List<&2, A.Value>, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+  match sealed found:
+    case True{} _:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+        arguments : List<&2, M.Ty> <- A.bind(Nil{}, values, node)
+        return [M.foreign_identity()]
+    case False{} Some{Global{source, core, OperationName{identity}}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+        arguments : List<&2, M.Ty> <- A.bind(Nil{}, values, node)
+        return [identity]
+    case False{} Some{Global{source, core, OperationTemplateName{identity, parameters}}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+        arguments : List<&2, M.Ty> <- A.bind(parameters, values, node)
+        concrete : M.TypeId <- Families.identity(identity, arguments)
+        return [concrete]
+    case False{} Some{Global{source, core, EffectFamilyName{members, parameters}}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+        arguments : List<&2, M.Ty> <- A.bind(parameters, values, node)
+        effect_member_instances(members, arguments)
+    case _ _:
+      Fail{M.Diagnostic{"unknown_effect", name, "effect rows require Foreign or a declared effect operation or family"}}
+
+def lookup_effect(globals: Map<&2, Global>, name: String, arguments: List<&2, A.Value>, node: C.Cst) -> Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+  +lookup_name = name
+  lookup_effect_resolved(M.name_equal(lookup_name, "Foreign"), lookup_global(globals, lookup_name), lookup_name, arguments, node)
+
+def type_value(fuel: Nat, node: C.Cst, context: Context) -> Result<&2, &2, M.Diagnostic, A.Value>:
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
+  do Result<&2, &2, M.Diagnostic, A.Value>:
+    values : List<&2, A.Value> <- T.evaluate(~Map<&2, Global>, ~lookup_effect, fuel, T.visit(node), headers, annotation_variables, globals)
+    T.one_value(values)
+
+def type_term(fuel: Nat, +node: C.Cst, context: Context) -> Result<&2, &2, M.Diagnostic, M.Ty>:
+  do Result<&2, &2, M.Diagnostic, M.Ty>:
+    value : A.Value <- type_value(fuel, node, context)
+    A.as_type(value, node)
+
+def typed_arguments(parameters: List<&2, A.Pattern>, nodes: List<&2, C.Cst>, +fuel: Nat, +context: Context, +reversed: List<&2, M.Ty>, +head: C.Cst) -> Result<&2, &2, M.Diagnostic, TypedArguments>:
+  match parameters nodes:
+    case Nil{} rest:
+      Done{TypedArguments{List.reverse(&2, M.Ty, reversed), rest}}
+    case pattern <> remaining Nil{}:
+      Fail{C.diagnostic(head, "type_arity", "effect operation requires another type argument")}
+    case pattern <> remaining +node <> rest:
+      do Result<&2, &2, M.Diagnostic, TypedArguments>:
+        value : A.Value <- type_value(fuel, node, context)
+        types : List<&2, M.Ty> <- A.match_argument(fuel, A.Argument{pattern, value}, node)
+        typed_arguments(remaining, rest, fuel, context, List.reverse.go(&2, M.Ty, types, reversed), head)
+
+def typed_operation(template: TemplateReference, nodes: List<&2, C.Cst>, fuel: Nat, context: Context, head: C.Cst) -> Result<&2, &2, M.Diagnostic, TypedArguments>:
+  TemplateReference{identity, parameters} = template
+  typed_arguments(parameters, nodes, fuel, context, Nil{}, head)
+
+def builtin_type_name(+name: String) -> Bool:
+  Bool.or(M.name_equal(name, "Unit"), Bool.or(M.name_equal(name, "U32"), Bool.or(M.name_equal(name, "F32"), Bool.or(M.name_equal(name, "Bool"), M.name_equal(name, "Array")))))
+
+def extra_type_argument_child(children: List<&2, C.Cst>, context: Context) -> Bool:
+  match children:
+    case +name <> Nil{}:
+      Context{globals, headers, fixities, locals, label, annotation_variables} = context
+      +source = C.type_name(name)
+      Bool.and(M.name_equal(C.kind_of(name), "qualified_name"), Bool.and(Bool.or(builtin_type_name(source), Maybe.is_some(&2, T.Header, T.lookup_header(headers, source))), Bool.not(Maybe.is_some(&2, Global, lookup_global(globals, source)))))
+    case _:
+      False{}
+
+def extra_type_argument(nodes: List<&2, C.Cst>, context: Context) -> Bool:
+  match nodes:
+    case Nil{}:
+      False{}
+    case +node <> tail:
+      extra_type_argument_child(C.children_of(node), context)
+
+def local_operation_argument(fuel: Nat, work: T.Work, +context: Context) -> Bool:
+  match fuel work:
+    case 1n+rest T.Node{T.Name{}, node}:
+      Context{globals, headers, fixities, locals, label, annotation_variables} = context
+      Maybe.is_some(&2, String, lookup_local(locals, C.type_name(node)))
+    case 1n+rest T.Node{T.Wrapper{}, node}:
+      local_operation_argument(rest, T.Nodes{C.children_of(node)}, context)
+    case 1n+rest T.Node{T.Group{}, node}:
+      local_operation_argument(rest, T.Nodes{C.field_values(node, "value")}, context)
+    case 1n+rest T.Node{T.Application{}, +node}:
+      local_operation_argument(rest, T.Nodes{List.append(&2, C.Cst, C.field_values(node, "head"), C.field_values(node, "arguments"))}, context)
+    case 1n+rest T.Node{T.ArrayNode{}, node}:
+      local_operation_argument(rest, T.Nodes{C.field_values(node, "elements")}, context)
+    case 1n+rest T.Node{T.RecordNode{}, node}:
+      local_operation_argument(rest, T.Nodes{C.field_values(node, "fields")}, context)
+    case 1n+rest T.Node{T.FieldNode{}, +node}:
+      local_operation_argument(rest, T.Field{node, C.field_values(node, "value")}, context)
+    case 1n+rest T.Field{node, Nil{}}:
+      local_operation_argument(rest, T.Nodes{C.field_values(node, "name")}, context)
+    case 1n+rest T.Field{node, values}:
+      local_operation_argument(rest, T.Nodes{values}, context)
+    case 1n+rest T.Node{T.InfixNode{}, +node}:
+      Bool.and(List.is_empty(&2, C.Cst, C.field_values(node, "tails")), local_operation_argument(rest, T.Nodes{C.field_values(node, "head")}, context))
+    case 1n+rest T.Node{T.PrefixNode{}, +node}:
+      Bool.and(List.is_empty(&2, C.Cst, C.field_values(node, "operator")), local_operation_argument(rest, T.Nodes{C.field_values(node, "value")}, context))
+    case 1n+ +rest T.Nodes{+node <> tail}:
+      Bool.or(local_operation_argument(rest, T.visit(node), context), local_operation_argument(rest, T.Nodes{tail}, context))
+    case _ _:
+      False{}
+
+def operation_argument_matches(matched: Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>) -> Bool:
+  match matched:
+    case Done{types}:
+      True{}
+    case Fail{diagnostic}:
+      False{}
+
+def operation_value_is_explicit(value: Result<&2, &2, M.Diagnostic, A.Value>, has_runtime_argument: Bool, parameters: List<&2, A.Pattern>, fuel: Nat, node: C.Cst) -> Bool:
+  match value parameters:
+    case Done{A.TupleValue{Nil{}}} _:
+      has_runtime_argument
+    case Done{value} pattern <> tail:
+      operation_argument_matches(A.match_argument(fuel, A.Argument{pattern, value}, node))
+    case _ _:
+      False{}
+
+def empty_operation_pattern(parameters: List<&2, A.Pattern>) -> Bool:
+  match parameters:
+    case A.TuplePattern{Nil{}} <> tail:
+      True{}
+    case _:
+      False{}
+
+def operation_arguments_explicit(arguments: List<&2, C.Cst>, +parameters: List<&2, A.Pattern>, +fuel: Nat, +context: Context) -> Bool:
+  match arguments:
+    case Nil{}:
+      False{}
+    case +head <> +tail:
+      +has_runtime_argument = Nat.is_ge(List.length(&2, C.Cst, tail), List.length(&2, A.Pattern, parameters))
+      Bool.and(Bool.or(has_runtime_argument, Bool.not(local_operation_argument(fuel, T.visit(head), context))), operation_value_is_explicit(type_value(fuel, head, context), Bool.or(empty_operation_pattern(parameters), has_runtime_argument), parameters, fuel, head))
+
+def specialized_operation_named(concrete: Bool, +identity: M.TypeId, +arguments: List<&2, M.Ty>, head: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match concrete:
+    case False{}:
+      Done{M.GenericOperationExpr{C.offset_of(head), identity, arguments}}
+    case True{}:
+      do Result<&2, &2, M.Diagnostic, M.Expr>:
+        concrete : M.TypeId <- Families.identity(identity, arguments)
+        return M.SpecializeOperationExpr{identity, arguments, M.OperationExpr{concrete}}
+
+def specialized_operation_value(identity: M.TypeId, +arguments: List<&2, M.Ty>, head: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  do Result<&2, &2, M.Diagnostic, M.Expr>:
+    names : List<&2, M.Ty> <- CoreTypes.annotation_names(65536n, CoreTypes.ManyTypes{arguments})
+    specialized_operation_named(List.is_empty(&2, M.Ty, names), identity, arguments, head)
+
+def typed_operation_parsed(parsed: TypedArguments, +identity: M.TypeId, context: Context, +head: C.Cst) -> Result<&2, &2, M.Diagnostic, TypedCall>:
+  match parsed:
+    case TypedArguments{+types, +values}:
+      do Result<&2, &2, M.Diagnostic, TypedCall>:
+        extra : Unit <- Bool.pick(Result<&2, &2, M.Diagnostic, Unit>, extra_type_argument(values, context), Fail{C.diagnostic(head, "type_arity", "too many effect type arguments")}, Done{Unit{}})
+        callee : M.Expr <- specialized_operation_value(identity, types, head)
+        return TypedCall{callee, values}
+
+def operation_application(explicit: Bool, +template: TemplateReference, arguments: List<&2, C.Cst>, fuel: Nat, +context: Context, +head: C.Cst) -> Result<&2, &2, M.Diagnostic, TypedCall>:
+  match explicit:
+    case False{}:
+      TemplateReference{identity, parameters} = template
+      Done{TypedCall{M.GenericOperationExpr{C.offset_of(head), identity, Nil{}}, arguments}}
+    case True{}:
+      TemplateReference{identity, parameters} = template
+      do Result<&2, &2, M.Diagnostic, TypedCall>:
+        parsed : TypedArguments <- typed_operation(template, arguments, fuel, context, head)
+        typed_operation_parsed(parsed, identity, context, head)
+
+def typed_operation_value(+template: TemplateReference, +arguments: List<&2, C.Cst>, +fuel: Nat, +context: Context, head: C.Cst) -> Result<&2, &2, M.Diagnostic, TypedCall>:
+  TemplateReference{identity, parameters} = template
+  operation_application(operation_arguments_explicit(arguments, parameters, fuel, context), template, arguments, fuel, context, head)
+
+def typed_call_work(typed: TypedCall, offset: Nat) -> Work:
+  TypedCall{callee, values} = typed
+  Arguments{callee, values, offset}
 
 def record_name(node: C.Cst) -> String:
   match node:
@@ -217,7 +538,7 @@ def record_global(local: Maybe<&2, String>, found: Maybe<&2, Global>, +node: C.C
       Fail{C.diagnostic(node, "record_constructor", "named fields require a declared record constructor")}
 
 def record_target(context: Context, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, RecordTarget>:
-  Context{globals, headers, fixities, locals, label} = context
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
   +name = record_name(node)
   record_global(lookup_local(locals, name), lookup_global(globals, name), node)
 
@@ -313,9 +634,9 @@ def record_elements(target: RecordTarget, fields: C.Cst, node: C.Cst) -> Work:
   RecordElements{constructor, names, C.field_values(fields, "fields"), Nil{}, MTip{}, node}
 
 def bind(+context: Context, target: Local) -> Context:
-  Context{+globals, +headers, +fixities, locals, +label} = context
+  Context{+globals, +headers, +fixities, locals, +label, +annotation_variables} = context
   Local{+source, core} = target
-  Bool.pick(Context, M.name_equal(source, "_"), context, Context{globals, headers, fixities, Local{source, core} <> locals, label})
+  Bool.pick(Context, M.name_equal(source, "_"), context, Context{globals, headers, fixities, Local{source, core} <> locals, label, annotation_variables})
 
 def bind_all(locals: List<&2, Local>, context: Context) -> Context:
   match locals:
@@ -324,22 +645,30 @@ def bind_all(locals: List<&2, Local>, context: Context) -> Context:
     case local <> rest:
       bind_all(rest, bind(context, local))
 
+def rebinding_scope(found: Maybe<&2, String>, context: Context, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Context>:
+  match found:
+    case Some{core}:
+      Done{bind(context, Local{"self", core})}
+    case None{}:
+      Fail{C.diagnostic(node, "unknown_rebinding", ":= requires an existing local binding: " ++ C.text_of(node))}
+
+def self_local(found: Maybe<&2, String>) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match found:
+    case Some{core}:
+      Done{M.LocalExpr{core}}
+    case None{}:
+      Fail{M.Diagnostic{"internal_error", "rebinding", "rebinding scope lost self"}}
+
+def self_value(context: Context) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  Context{globals, headers, fixities, locals, label, variables} = context
+  self_local(lookup_local(locals, "self"))
+
 def with_label(context: Context, label: Maybe<&2, Nat>) -> Context:
-  Context{globals, headers, fixities, locals, old_label} = context
-  Context{globals, headers, fixities, locals, label}
+  Context{globals, headers, fixities, locals, old_label, annotation_variables} = context
+  Context{globals, headers, fixities, locals, label, annotation_variables}
 
 def unique_name(+node: C.Cst) -> String:
   C.text_of(node) ++ "$" ++ Nat.show(C.offset_of(node))
-
-def effect_name(found: Maybe<&2, Global>) -> Maybe<&2, M.TypeId>:
-  match found:
-    case Some{Global{source, core, OperationName{identity}}}:
-      Some{identity}
-    case _:
-      None{}
-
-def lookup_effect(globals: Map<&2, Global>, name: String) -> Maybe<&2, M.TypeId>:
-  effect_name(lookup_global(globals, name))
 
 # Type traversal looks up only actual row labels in the existing indexed scope.
 def source_annotation(nodes: List<&2, C.Cst>, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, Maybe<&2, M.Ty>>:
@@ -347,8 +676,8 @@ def source_annotation(nodes: List<&2, C.Cst>, fuel: Nat, context: Context) -> Re
     case Nil{}:
       Done{None{}}
     case head <> tail:
-      Context{globals, headers, fixities, locals, label} = context
-      T.annotation(~Map<&2, Global>, ~lookup_effect, head <> tail, fuel, headers, Nil{}, globals)
+      Context{globals, headers, fixities, locals, label, annotation_variables} = context
+      T.annotation(~Map<&2, Global>, ~lookup_effect, head <> tail, fuel, headers, annotation_variables, globals)
 
 def parameter_fields(names: List<&2, C.Cst>, annotations: List<&2, C.Cst>, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, Parameter>:
   match names:
@@ -368,8 +697,6 @@ def bind_parameter(context: Context, param: Parameter) -> Context:
   Parameter{source, core, annotation} = param
   bind(context, Local{source, core})
 
-def located(offset: Nat, value: M.Expr) -> M.Expr:
-  M.SourceExpr{offset, None{}, value}
 
 def scalar_intrinsic(+name: String, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Primitive>:
   Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@u32.add"), Done{ScalarPrimitive{M.Add{}}},
@@ -398,18 +725,38 @@ def scalar_intrinsic(+name: String, node: C.Cst) -> Result<&2, &2, M.Diagnostic,
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@panic"), Done{PanicPrimitive{}},
       Fail{C.diagnostic(node, "unknown_intrinsic", "unknown compiler intrinsic " ++ name)}))))))))))))))))))))))))
 
-def intrinsic(+name: String, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Primitive>:
+def ordinary_intrinsic(+name: String, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Primitive>:
   Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@product.get"), Done{ProjectPrimitive{}},
+    Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@array.generate"), Done{ArrayGeneratePrimitive{}},
+    Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@array.fill"), Done{ArrayFillPrimitive{}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@array.get"), Done{ArrayGetPrimitive{}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@array.set"), Done{ArraySetPrimitive{}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@array.length"), Done{ArrayLengthPrimitive{}},
+    Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.state"), Done{StateProviderPrimitive{}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.provider"), Done{ProviderPrimitive{}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.descriptor"), Done{OperationDescriptorPrimitive{}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.of"), Done{FunctionEffectsPrimitive{}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.has"), Done{EffectHasPrimitive{}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.count"), Done{EffectCountPrimitive{}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.same"), Done{EffectSamePrimitive{}},
-      scalar_intrinsic(name, node)))))))))))
+      scalar_intrinsic(name, node))))))))))))))
+
+def effect_family_intrinsic(+name: String, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Primitive>:
+  Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.run"), Done{EffectFamilyPrimitive{name, 2n, 2n}},
+    Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.reader"), Done{EffectFamilyPrimitive{name, 1n, 3n}},
+    Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.writer"), Done{EffectFamilyPrimitive{name, 1n, 3n}}, ordinary_intrinsic(name, node))))
+
+def deferred_intrinsic(+name: String, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Primitive>:
+  Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@type.same"), Done{DeferredPrimitive{name, 2n}},
+    Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@state.get"), Done{DeferredPrimitive{name, 1n}},
+    Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@state.set"), Done{DeferredPrimitive{name, 1n}},
+    Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@state.run"), Done{DeferredPrimitive{name, 2n}},
+    Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@state.reader"), Done{DeferredPrimitive{name, 3n}},
+    Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@state.writer"), Done{DeferredPrimitive{name, 3n}}, effect_family_intrinsic(name, node)))))))
+
+def intrinsic(+name: String, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Primitive>:
+  Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@type.call"), Done{AssociatedPrimitive{}}, deferred_intrinsic(name, node))
+
 
 def projection_index_kind(valid: Bool, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Unit>:
   match valid:
@@ -445,12 +792,34 @@ def literal_children(children: List<&2, C.Cst>, node: C.Cst) -> Result<&2, &2, M
 def literal_argument(+node: C.Cst) -> Result<&2, &2, M.Diagnostic, String>:
   literal_children(C.children_of(node), node)
 
-def operation_reference(value: M.Expr, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.TypeId>:
+def operation_specialized_target(target: OperationTarget, template: M.TypeId, +arguments: List<&2, M.Ty>) -> OperationTarget:
+  match target:
+    case OperationTarget{identity, previous, old_arguments}:
+      OperationTarget{identity, Some{template}, arguments}
+
+def operation_reference(value: M.Expr, node: C.Cst) -> Result<&2, &2, M.Diagnostic, OperationTarget>:
   match value:
+    case M.SourceExpr{offset, annotation, inner}:
+      operation_reference(inner, node)
+    case M.SpecializeOperationExpr{template, arguments, body}:
+      do Result<&2, &2, M.Diagnostic, OperationTarget>:
+        target : OperationTarget <- operation_reference(body, node)
+        return operation_specialized_target(target, template, arguments)
     case M.OperationExpr{identity}:
-      Done{identity}
+      Done{OperationTarget{identity, None{}, Nil{}}}
     case _:
       Fail{C.diagnostic(node, "operation_target", "expected the name of a declared effect operation")}
+
+def operation_target_identity(target: OperationTarget) -> M.TypeId:
+  OperationTarget{identity, template, arguments} = target
+  identity
+
+def wrap_operation_target(target: OperationTarget, body: M.Expr) -> M.Expr:
+  match target:
+    case OperationTarget{identity, None{}, arguments}:
+      body
+    case OperationTarget{identity, Some{template}, arguments}:
+      M.SpecializeOperationExpr{template, arguments, body}
 
 def foreign_argument_children(nodes: List<&2, C.Cst>) -> Bool:
   match nodes:
@@ -462,28 +831,12 @@ def foreign_argument_children(nodes: List<&2, C.Cst>) -> Bool:
 def foreign_argument(node: C.Cst) -> Bool:
   foreign_argument_children(C.children_of(node))
 
-def operation_target(sealed: Bool, node: C.Cst, +context: Context) -> Result<&2, &2, M.Diagnostic, M.TypeId>:
+def require_unsealed_operation(sealed: Bool, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Unit>:
   match sealed:
     case True{}:
       Fail{C.diagnostic(node, "sealed_effect", "Foreign is a compiler effect label, not a callable or providable operation")}
     case False{}:
-      do Result<&2, &2, M.Diagnostic, M.TypeId>:
-        +target : C.Cst <- C.one(C.children_of(node))
-        value : M.Expr <- resolve(context, target)
-        operation_reference(value, target)
-
-def operation_name(+node: C.Cst, context: Context) -> Result<&2, &2, M.Diagnostic, M.TypeId>:
-  operation_target(foreign_argument(node), node, context)
-
-def descriptor_target(sealed: Bool, node: C.Cst, context: Context) -> Result<&2, &2, M.Diagnostic, M.TypeId>:
-  match sealed:
-    case True{}:
-      Done{M.foreign_identity()}
-    case False{}:
-      operation_name(node, context)
-
-def descriptor_name(+node: C.Cst, context: Context) -> Result<&2, &2, M.Diagnostic, M.TypeId>:
-  descriptor_target(foreign_argument(node), node, context)
+      Done{Unit{}}
 
 def function_reference(value: M.Expr, node: C.Cst) -> Result<&2, &2, M.Diagnostic, String>:
   match value:
@@ -518,6 +871,15 @@ def pattern_name(+node: C.Cst) -> PatternResult:
   +source = C.text_of(node)
   +core = unique_name(node)
   Bool.pick(PatternResult, M.name_equal(source, "_"), PatternResult{M.WildcardPattern{}, Nil{}}, PatternResult{M.BindingPattern{core}, [Local{source, core}]})
+
+def value_pattern(reference: M.Expr, node: C.Cst) -> Result<&2, &2, M.Diagnostic, PatternResult>:
+  match reference:
+    case M.LocalExpr{name}:
+      Done{PatternResult{M.ValuePattern{M.LocalReference{name}}, Nil{}}}
+    case M.ConstantExpr{name}:
+      Done{PatternResult{M.ValuePattern{M.ConstantReference{name}}, Nil{}}}
+    case _:
+      Fail{C.diagnostic(node, "value_pattern_reference", "a value pattern requires a constant, parameter, or existing let binding")}
 
 def pattern_constructor(constructor: String, result: PatternResult) -> PatternResult:
   PatternResult{pattern, locals} = result
@@ -619,6 +981,11 @@ def lower_pattern(+fuel: Nat, kind: NodeKind, +node: C.Cst, +context: Context) -
                 return pattern_constructor(constructor, result)
             case _:
               Fail{M.Diagnostic{"internal_cst", "parser", "invalid constructor pattern"}}
+        case PatternValue{}:
+          do Result<&2, &2, M.Diagnostic, PatternResult>:
+            name : C.Cst <- C.one(C.field_values(node, "name"))
+            reference : M.Expr <- resolve(context, name)
+            value_pattern(reference, node)
         case PatternName{}:
           Done{pattern_name(node)}
         case Integer{}:
@@ -689,6 +1056,8 @@ def descriptor_argument(+fuel: Nat, value: M.Expr) -> M.Expr:
   match fuel value:
     case 1n+rest M.SourceExpr{offset, annotation, inner}:
       M.SourceExpr{offset, annotation, descriptor_argument(rest, inner)}
+    case 1n+rest M.SpecializeOperationExpr{template, arguments, inner}:
+      M.SpecializeOperationExpr{template, arguments, descriptor_argument(rest, inner)}
     case _ M.OperationExpr{identity}:
       M.OperationDescriptorExpr{identity}
     case _ other:
@@ -724,7 +1093,7 @@ def require_plain_return(markers: List<&2, C.Cst>) -> Result<&2, &2, M.Diagnosti
 
 def returning(context: Context, value: M.Expr, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
   match context:
-    case Context{globals, headers, fixities, locals, Some{label}}:
+    case Context{globals, headers, fixities, locals, Some{label}, annotation_variables}:
       Done{M.ReturnExpr{label, value}}
     case _:
       Fail{C.diagnostic(node, "return_scope", "return requires an enclosing do block in this function")}
@@ -786,7 +1155,7 @@ def named_operator(found: Maybe<&2, O.Fixity>, target: M.Expr, offset: Nat) -> O
       O.Operator{80, O.Left{}, target, offset}
 
 def context_fixities(context: Context) -> List<&2, O.Fixity>:
-  Context{globals, headers, fixities, locals, label} = context
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
   fixities
 
 def source_operator(kind: NodeKind, +node: C.Cst, +context: Context) -> Result<&2, &2, M.Diagnostic, O.Operator>:
@@ -801,6 +1170,165 @@ def source_operator(kind: NodeKind, +node: C.Cst, +context: Context) -> Result<&
 
 def operator_kind(+node: C.Cst) -> NodeKind:
   Bool.pick(NodeKind, M.name_equal(C.kind_of(node), "named_operator"), NamedFixity{}, SymbolicFixity{})
+
+def pattern_locals(result: PatternResult) -> List<&2, Local>:
+  PatternResult{pattern, locals} = result
+  locals
+
+def shadow_names(locals: List<&2, Local>, shadowed: Set()) -> Set():
+  match locals:
+    case Nil{}:
+      shadowed
+    case Local{source, core} <> tail:
+      shadow_names(tail, Set.add(shadowed, source))
+
+def target_name(+name: String, +shadowed: Set(), +targets: Set()) -> Set():
+  Bool.pick(Set(), Maybe.is_some(&2, Unit, Index.find(Unit, shadowed, name)), targets, Set.add(targets, name))
+
+# Only successors in the loop's own suite escape an iteration. Ordinary nested
+# blocks and conditional suites retain their existing lexical shadowing rules.
+type LoopTargetsWork is Data:
+  LoopTargets{nodes: List<&2, C.Cst>}
+  LoopTarget{kind: NodeKind, node: C.Cst, tail: List<&2, C.Cst>}
+
+def loop_targets(+fuel: Nat, work: LoopTargetsWork, +context: Context, +shadowed: Set(), +targets: Set()) -> Result<&2, &2, M.Diagnostic, Set()>:
+  match fuel work:
+    case _ LoopTargets{Nil{}}:
+      Done{targets}
+    case 0n _:
+      Fail{M.Diagnostic{"expression_complexity", "for", "loop binding analysis exceeded its source-tree bound"}}
+    case 1n+rest LoopTargets{statement <> tail}:
+      do Result<&2, &2, M.Diagnostic, Set()>:
+        +node : C.Cst <- C.one(C.field_values(statement, "value"))
+        loop_targets(rest, LoopTarget{classify(C.kind_of(node)), node, tail}, context, shadowed, targets)
+    case 1n+rest LoopTarget{Rebinding{}, node, tail}:
+      do Result<&2, &2, M.Diagnostic, Set()>:
+        name : C.Cst <- C.one(C.field_values(node, "name"))
+        loop_targets(rest, LoopTargets{tail}, context, shadowed, target_name(C.text_of(name), shadowed, targets))
+    case 1n+rest LoopTarget{Binding{}, node, tail}:
+      do Result<&2, &2, M.Diagnostic, Set()>:
+        +pattern : C.Cst <- C.one(C.field_values(node, "pattern"))
+        +parsed : PatternResult <- lower_pattern(rest, classify(C.kind_of(pattern)), pattern, context)
+        loop_targets(rest, LoopTargets{tail}, pattern_scope(context, parsed), shadow_names(pattern_locals(parsed), shadowed), targets)
+    case 1n+rest LoopTarget{EffectBinding{}, +node, tail}:
+      do Result<&2, &2, M.Diagnostic, Set()>:
+        +target : Local <- effect_target(C.field_values(node, "name"), C.offset_of(node))
+        loop_targets(rest, LoopTargets{tail}, bind(context, target), shadow_names([target], shadowed), targets)
+    case 1n+rest LoopTarget{ForLoop{}, +node, tail}:
+      do Result<&2, &2, M.Diagnostic, Set()>:
+        +pattern : C.Cst <- C.one(C.field_values(node, "pattern"))
+        +parsed : PatternResult <- lower_pattern(rest, classify(C.kind_of(pattern)), pattern, context)
+        suite : C.Cst <- C.one(C.field_values(node, "body"))
+        nested : Set() <- loop_targets(rest, LoopTargets{statement_nodes(suite)}, pattern_scope(context, parsed), shadow_names(pattern_locals(parsed), shadowed), targets)
+        loop_targets(rest, LoopTargets{tail}, context, shadowed, nested)
+    case 1n+rest LoopTarget{kind, node, tail}:
+      loop_targets(rest, LoopTargets{tail}, context, shadowed, targets)
+
+def carried_locals(locals: List<&2, Local>, +targets: Set(), +seen: Set()) -> List<&2, Local>:
+  match locals:
+    case Nil{}:
+      Nil{}
+    case +local <> tail:
+      Local{+source, core} = local
+      +keep = Bool.and(Maybe.is_some(&2, Unit, Index.find(Unit, targets, source)), Bool.not(Maybe.is_some(&2, Unit, Index.find(Unit, seen, source))))
+      +rest = carried_locals(tail, targets, Set.add(seen, source))
+      Bool.pick(List<&2, Local>, keep, local <> rest, rest)
+
+def loop_locals(context: Context, targets: Set()) -> List<&2, Local>:
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
+  carried_locals(locals, targets, Set.new())
+
+def loop_value(elements: List<&2, M.Expr>) -> M.Expr:
+  match elements:
+    case Nil{}:
+      M.UnitExpr{}
+    case value <> Nil{}:
+      value
+    case elements:
+      M.ProductExpr{elements}
+
+def local_values(locals: List<&2, Local>) -> List<&2, M.Expr>:
+  match locals:
+    case Nil{}:
+      Nil{}
+    case Local{source, core} <> tail:
+      M.LocalExpr{core} <> local_values(tail)
+
+def loop_versions(locals: List<&2, Local>, +prefix: String) -> List<&2, Local>:
+  match locals:
+    case Nil{}:
+      Nil{}
+    case Local{+source, core} <> tail:
+      Local{source, prefix ++ source} <> loop_versions(tail, prefix)
+
+def loop_bindings(locals: List<&2, Local>, +state: String, +index: Nat, +single: Bool, body: M.Expr) -> M.Expr:
+  match locals:
+    case Nil{}:
+      body
+    case Local{source, core} <> tail:
+      M.UseExpr{core, Bool.pick(M.Expr, single, M.LocalExpr{state}, M.ProjectExpr{M.LocalExpr{state}, index}), loop_bindings(tail, state, 1n+index, single, body)}
+
+def successor_carried(carried: List<&2, Local>, +previous: Maybe<&2, String>, +next: String) -> List<&2, Local>:
+  match carried previous:
+    case Nil{} _:
+      Nil{}
+    case carried None{}:
+      carried
+    case Local{source, +core} <> tail Some{old}:
+      Local{source, Bool.pick(String, M.name_equal(core, old), next, core)} <> successor_carried(tail, previous, next)
+
+def loop_carried(originals: List<&2, Local>, versions: List<&2, Local>, carried: List<&2, Local>) -> List<&2, Local>:
+  match originals versions:
+    case Local{source, previous} <> old_tail Local{next_source, next} <> next_tail:
+      loop_carried(old_tail, next_tail, successor_carried(carried, Some{previous}, next))
+    case _ _:
+      carried
+
+def application_children(kind: NodeKind, +node: C.Cst) -> List<&2, C.Cst>:
+  match kind:
+    case Wrapper{}:
+      C.children_of(node)
+    case GroupNode{}:
+      C.field_values(node, "value")
+    case InfixNode{}:
+      Bool.pick(List<&2, C.Cst>, List.is_empty(&2, C.Cst, C.field_values(node, "tails")), C.field_values(node, "head"), Nil{})
+    case PrefixNode{}:
+      Bool.pick(List<&2, C.Cst>, List.is_empty(&2, C.Cst, C.field_values(node, "operator")), C.field_values(node, "value"), Nil{})
+    case _:
+      Nil{}
+
+type GroupedOperation is Data:
+  OperationHead{kind: NodeKind, node: C.Cst}
+  OperationChildren{nodes: List<&2, C.Cst>}
+  OperationTemplate{template: Maybe<&2, TemplateReference>, node: C.Cst}
+
+# Only type application crosses grouping here. Runtime calls keep their original
+# boundaries, including calls to functions returned by fixed-arity intrinsics.
+def grouped_operation(fuel: Nat, work: GroupedOperation, arguments: List<&2, C.Cst>, +context: Context) -> Result<&2, &2, M.Diagnostic, Maybe<&2, TypedCall>>:
+  match fuel work:
+    case 0n _:
+      Fail{M.Diagnostic{"type_argument", "parser", "effect application exceeds the source-tree limit"}}
+    case 1n+rest OperationHead{ApplicationNode{}, +node}:
+      grouped_operation(rest, OperationChildren{C.field_values(node, "head")}, List.append(&2, C.Cst, C.field_values(node, "arguments"), arguments), context)
+    case 1n+rest OperationHead{RecordNode{}, +node}:
+      do Result<&2, &2, M.Diagnostic, Maybe<&2, TypedCall>>:
+        fields : C.Cst <- C.one(C.field_values(node, "fields"))
+        grouped_operation(rest, OperationChildren{C.field_values(node, "name")}, fields <> arguments, context)
+    case 1n+rest OperationHead{Name{}, +node}:
+      Context{globals, headers, fixities, locals, label, annotation_variables} = context
+      grouped_operation(rest, OperationTemplate{template_reference(lookup_local(locals, C.name_of(node)), lookup_global(globals, C.name_of(node))), node}, arguments, context)
+    case 1n+rest OperationHead{kind, node}:
+      grouped_operation(rest, OperationChildren{application_children(kind, node)}, arguments, context)
+    case 1n+rest OperationChildren{+node <> Nil{}}:
+      grouped_operation(rest, OperationHead{classify(C.kind_of(node)), node}, arguments, context)
+    case 1n+rest OperationChildren{nodes}:
+      Done{None{}}
+    case 1n+rest OperationTemplate{None{}, node}:
+      Done{None{}}
+    case 1n+rest OperationTemplate{Some{template}, node}:
+      do Result<&2, &2, M.Diagnostic, Maybe<&2, TypedCall>>:
+        call : TypedCall <- typed_operation_value(template, arguments, rest, context, node)
+        return Some{call}
 
 # Expression and statement recursion share an explicit work type. Each branch
 # consumes source-tree fuel; block exits stay explicit rather than copying tails.
@@ -858,11 +1386,7 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             element : M.Expr <- lower(remaining, visit(head), context)
             lower(remaining, ArrayElements{tail, element <> reversed, offset}, context)
         case Expression{RecordNode{}, +node}:
-          do Result<&2, &2, M.Diagnostic, M.Expr>:
-            name : C.Cst <- C.one(C.field_values(node, "name"))
-            target : RecordTarget <- record_target(context, name)
-            fields : C.Cst <- C.one(C.field_values(node, "fields"))
-            lower(remaining, record_elements(target, fields, node), context)
+          lower(remaining, ApplicationHead{RecordNode{}, node, Nil{}, C.offset_of(node)}, context)
         case RecordElements{constructor, fields, Nil{}, +reversed, seen, +node}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             payload : List<&2, M.Expr> <- record_payload_elements(fields, reversed, node, Nil{})
@@ -876,15 +1400,90 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             value : M.Expr <- lower(remaining, visit(value_node), context)
             temporary : String <- Done{"$record$" ++ Nat.show(C.offset_of(field))}
             lower(remaining, RecordElements{constructor, fields, tail, RecordElement{name, temporary, value} <> reversed, Set.add(seen, name), node}, context)
+        case Expression{MemberNode{}, +node}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            receiver_node : C.Cst <- C.one(C.field_values(node, "receiver"))
+            +name : C.Cst <- C.one(C.field_values(node, "name"))
+            receiver : M.Expr <- lower(remaining, visit(receiver_node), context)
+            return located(C.offset_of(name), M.AssociatedExpr{C.offset_of(name), M.MemberDispatch{}, C.text_of(name), Nil{}, receiver, M.UnitExpr{}})
+        case Expression{IndexNode{}, +node}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            receiver_node : C.Cst <- C.one(C.field_values(node, "receiver"))
+            index_node : C.Cst <- C.one(C.field_values(node, "index"))
+            receiver : M.Expr <- lower(remaining, visit(receiver_node), context)
+            index : M.Expr <- lower(remaining, visit(index_node), context)
+            return located(C.offset_of(node), M.ArrayGetExpr{receiver, index})
         case Expression{ApplicationNode{}, +node}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
-            head : C.Cst <- C.one(C.field_values(node, "head"))
-            +target : C.Cst <- C.one(C.children_of(head))
-            lower(remaining, ApplicationHead{classify(C.kind_of(target)), target, C.field_values(node, "arguments"), C.offset_of(node)}, context)
+            +parts : Postfix.Parts <- Postfix.application(node)
+            +target : C.Cst <- C.one(C.children_of(Postfix.head(parts)))
+            lower(remaining, ApplicationHead{classify(C.kind_of(target)), target, Postfix.arguments(parts), C.offset_of(node)}, context)
+        case ApplicationHead{RecordNode{}, +node, arguments, offset}:
+          Context{globals, headers, fixities, locals, label, annotation_variables} = context
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            +name : C.Cst <- C.one(C.field_values(node, "name"))
+            fields : C.Cst <- C.one(C.field_values(node, "fields"))
+            lower(remaining, RecordApplication{template_reference(lookup_local(locals, C.name_of(name)), lookup_global(globals, C.name_of(name))), name, fields, arguments, offset, node}, context)
+        case RecordApplication{Some{operation}, head, fields, arguments, offset, node}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            typed : TypedCall <- typed_operation_value(operation, fields <> arguments, remaining, context, head)
+            lower(remaining, typed_call_work(typed, offset), context)
+        case RecordApplication{None{}, head, fields, arguments, offset, node}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            target : RecordTarget <- record_target(context, head)
+            value : M.Expr <- lower(remaining, record_elements(target, fields, node), context)
+            lower(remaining, Arguments{value, arguments, offset}, context)
         case ApplicationHead{Intrinsic{}, +head, arguments, offset}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             primitive : Primitive <- intrinsic(C.text_of(head), head)
             lower(remaining, PrimitiveCall{primitive, head, arguments, offset}, context)
+        case PrimitiveCall{AssociatedPrimitive{}, head, member <> left <> right <> Nil{}, +offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            name : String <- literal_argument(member)
+            l : M.Expr <- lower(remaining, visit(left), context)
+            r : M.Expr <- lower(remaining, visit(right), context)
+            return located(offset, M.AssociatedExpr{offset, M.BinaryDispatch{}, name, Nil{}, l, r})
+        case PrimitiveCall{AssociatedPrimitive{}, head, arguments, offset}:
+          Fail{C.diagnostic(head, "call_arity", "@type.call requires a literal member name and two operands")}
+        case PrimitiveCall{EffectFamilyPrimitive{member, 1n, 1n}, head, operation <> operand <> Nil{}, +offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            template : M.TypeId <- effect_template_name(operation, context)
+            value : M.Expr <- lower(remaining, visit(operand), context)
+            return located(offset, M.AssociatedExpr{offset, M.BinaryDispatch{}, member, [template], value, M.UnitExpr{}})
+        case PrimitiveCall{EffectFamilyPrimitive{member, 2n, 2n}, head, read <> write <> initial <> action <> Nil{}, +offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            +reader : M.TypeId <- effect_template_name(read, context)
+            +writer : M.TypeId <- effect_template_name(write, context)
+            valid : Unit <- require_family_pair(context, reader, writer, head)
+            value : M.Expr <- lower(remaining, visit(initial), context)
+            body : M.Expr <- lower(remaining, visit(action), context)
+            return located(offset, M.AssociatedExpr{offset, M.BinaryDispatch{}, member, [reader, writer], value, body})
+        case PrimitiveCall{EffectFamilyPrimitive{member, 1n, 3n}, head, operation <> witness <> implementation <> action <> Nil{}, +offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            template : M.TypeId <- effect_template_name(operation, context)
+            subject : M.Expr <- lower(remaining, visit(witness), context)
+            provider : M.Expr <- lower(remaining, visit(implementation), context)
+            body : M.Expr <- lower(remaining, visit(action), context)
+            return located(offset, M.AssociatedExpr{offset, M.BinaryDispatch{}, member, [template], subject, M.ProductExpr{[provider, body]}})
+        case PrimitiveCall{EffectFamilyPrimitive{member, templates, operands}, head, arguments, offset}:
+          Fail{C.diagnostic(head, "call_arity", member ++ " requires " ++ Nat.show(Nat.add(templates, operands)) ++ " arguments")}
+        case PrimitiveCall{DeferredPrimitive{member, 1n}, head, left <> Nil{}, +offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            value : M.Expr <- lower(remaining, visit(left), context)
+            return located(offset, M.AssociatedExpr{offset, M.BinaryDispatch{}, member, Nil{}, value, M.UnitExpr{}})
+        case PrimitiveCall{DeferredPrimitive{member, 2n}, head, left <> right <> Nil{}, +offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            a : M.Expr <- lower(remaining, visit(left), context)
+            b : M.Expr <- lower(remaining, visit(right), context)
+            return located(offset, M.AssociatedExpr{offset, M.BinaryDispatch{}, member, Nil{}, a, b})
+        case PrimitiveCall{DeferredPrimitive{member, 3n}, head, witness <> implementation <> action <> Nil{}, +offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            w : M.Expr <- lower(remaining, visit(witness), context)
+            i : M.Expr <- lower(remaining, visit(implementation), context)
+            a : M.Expr <- lower(remaining, visit(action), context)
+            return located(offset, M.AssociatedExpr{offset, M.BinaryDispatch{}, member, Nil{}, w, M.ProductExpr{[i, a]}})
+        case PrimitiveCall{DeferredPrimitive{member, arity}, head, arguments, offset}:
+          Fail{C.diagnostic(head, "call_arity", member ++ " requires " ++ Nat.show(arity) ++ " arguments")}
         case PrimitiveCall{ScalarPrimitive{operation}, head, left <> right <> Nil{}, offset}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             l : M.Expr <- lower(remaining, visit(left), context)
@@ -903,6 +1502,16 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             value : M.Expr <- lower(remaining, visit(argument), context)
             index : Nat <- projection_index_children(C.children_of(index_node), index_node)
             return located(offset, M.ProjectExpr{value, index})
+        case PrimitiveCall{ArrayGeneratePrimitive{}, head, count_node <> generator_node <> Nil{}, offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            count : M.Expr <- lower(remaining, visit(count_node), context)
+            generator : M.Expr <- lower(remaining, visit(generator_node), context)
+            return located(offset, M.ArrayGenerateExpr{count, generator})
+        case PrimitiveCall{ArrayFillPrimitive{}, head, count_node <> value_node <> Nil{}, offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            count : M.Expr <- lower(remaining, visit(count_node), context)
+            value : M.Expr <- lower(remaining, visit(value_node), context)
+            return located(offset, M.ArrayFillExpr{count, value})
         case PrimitiveCall{ArrayGetPrimitive{}, head, array_node <> index_node <> Nil{}, offset}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             array : M.Expr <- lower(remaining, visit(array_node), context)
@@ -918,15 +1527,32 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             array : M.Expr <- lower(remaining, visit(array_node), context)
             return located(offset, M.ArrayLengthExpr{array})
-        case PrimitiveCall{ProviderPrimitive{}, head, operation <> implementation <> Nil{}, offset}:
+        case PrimitiveCall{StateProviderPrimitive{}, head, +read <> +write <> initial <> Nil{}, offset}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
-            identity : M.TypeId <- operation_name(operation, context)
+            valid_read : Unit <- require_unsealed_operation(foreign_argument(read), read)
+            valid_write : Unit <- require_unsealed_operation(foreign_argument(write), write)
+            read_value : M.Expr <- lower(remaining, visit(read), context)
+            write_value : M.Expr <- lower(remaining, visit(write), context)
+            +reader : OperationTarget <- operation_reference(read_value, read)
+            +writer : OperationTarget <- operation_reference(write_value, write)
+            value : M.Expr <- lower(remaining, visit(initial), context)
+            return located(offset, wrap_operation_target(reader, wrap_operation_target(writer, M.StateProviderExpr{operation_target_identity(reader), operation_target_identity(writer), value})))
+        case PrimitiveCall{ProviderPrimitive{}, head, +operation <> implementation <> Nil{}, offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            valid : Unit <- require_unsealed_operation(foreign_argument(operation), operation)
+            operation_value : M.Expr <- lower(remaining, visit(operation), context)
+            +target : OperationTarget <- operation_reference(operation_value, operation)
             value : M.Expr <- lower(remaining, visit(implementation), context)
-            return located(offset, M.ProviderExpr{identity, value})
-        case PrimitiveCall{OperationDescriptorPrimitive{}, head, operation <> Nil{}, offset}:
+            return located(offset, wrap_operation_target(target, M.ProviderExpr{operation_target_identity(target), value}))
+        case PrimitiveCall{OperationDescriptorPrimitive{}, head, +operation <> Nil{}, offset}:
+          lower(remaining, DescriptorOperation{foreign_argument(operation), operation, offset}, context)
+        case DescriptorOperation{True{}, operation, offset}:
+          Done{located(offset, M.OperationDescriptorExpr{M.foreign_identity()})}
+        case DescriptorOperation{False{}, +operation, offset}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
-            identity : M.TypeId <- descriptor_name(operation, context)
-            return located(offset, M.OperationDescriptorExpr{identity})
+            operation_value : M.Expr <- lower(remaining, visit(operation), context)
+            +target : OperationTarget <- operation_reference(operation_value, operation)
+            return located(offset, wrap_operation_target(target, M.OperationDescriptorExpr{operation_target_identity(target)}))
         case PrimitiveCall{FunctionEffectsPrimitive{}, head, target <> Nil{}, offset}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             callee : String <- function_name(target, context)
@@ -959,11 +1585,24 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
           Fail{C.diagnostic(head, "call_arity", "@panic requires exactly one literal message")}
         case PrimitiveCall{primitive, +head, arguments, offset}:
           Fail{C.diagnostic(head, "call_arity", "wrong number of arguments to compiler primitive " ++ C.text_of(head))}
-        case ApplicationHead{Name{}, head, arguments, offset}:
+        case ApplicationHead{Name{}, +head, arguments, offset}:
+          Context{globals, headers, fixities, locals, label, annotation_variables} = context
+          lower(remaining, ApplicationTemplate{template_reference(lookup_local(locals, C.name_of(head)), lookup_global(globals, C.name_of(head))), head, arguments, offset}, context)
+        case ApplicationTemplate{Some{operation}, head, arguments, offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            typed : TypedCall <- typed_operation_value(operation, arguments, remaining, context, head)
+            lower(remaining, typed_call_work(typed, offset), context)
+        case ApplicationTemplate{None{}, head, arguments, offset}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             callee : M.Expr <- resolve(context, head)
             lower(remaining, Arguments{callee, arguments, offset}, context)
-        case ApplicationHead{kind, head, arguments, offset}:
+        case ApplicationHead{+kind, +head, +arguments, offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            call : Maybe<&2, TypedCall> <- grouped_operation(remaining, OperationHead{kind, head}, arguments, context)
+            lower(remaining, GroupedApplication{call, kind, head, arguments, offset}, context)
+        case GroupedApplication{Some{call}, kind, head, arguments, offset}:
+          lower(remaining, typed_call_work(call, offset), context)
+        case GroupedApplication{None{}, kind, head, arguments, offset}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             callee : M.Expr <- lower(remaining, Expression{kind, head}, context)
             lower(remaining, Arguments{callee, arguments, offset}, context)
@@ -1017,7 +1656,7 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
         case Expression{Block{}, +node}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             suite : C.Cst <- C.one(C.field_values(node, "body"))
-            body : M.Expr <- lower(remaining, Statements{statement_nodes(suite)}, with_label(context, Some{C.offset_of(node)}))
+            body : M.Expr <- lower(remaining, Statements{statement_nodes(suite), Nil{}}, with_label(context, Some{C.offset_of(node)}))
             lower(remaining, ResolvedBlock{C.field_values(node, "resolver"), body, C.offset_of(node)}, context)
         case ResolvedBlock{Nil{}, body, +offset}:
           Done{located(offset, M.BlockExpr{offset, body})}
@@ -1029,13 +1668,13 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
           Fail{M.Diagnostic{"internal_cst", "parser", "invalid do resolver field"}}
         case Expression{kind, node}:
           Fail{C.diagnostic(node, "unsupported_expression", "expression is not implemented in the executable core")}
-        case Statements{Nil{}}:
-          Done{M.UnitExpr{}}
-        case Statements{statement <> tail}:
+        case Statements{Nil{}, carried}:
+          Done{loop_value(local_values(carried))}
+        case Statements{statement <> tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             +node : C.Cst <- C.one(C.field_values(statement, "value"))
-            lower(remaining, Statement{classify(C.kind_of(node)), node, tail}, context)
-        case Statement{Binding{}, +node, tail}:
+            lower(remaining, Statement{classify(C.kind_of(node)), node, tail, carried}, context)
+        case Statement{Binding{}, +node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             +pattern_node : C.Cst <- C.one(C.field_values(node, "pattern"))
             +pat : PatternResult <- lower_pattern(remaining, classify(C.kind_of(pattern_node)), pattern_node, context)
@@ -1043,18 +1682,79 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             value_node : C.Cst <- C.one(C.field_values(node, "value"))
             value : M.Expr <- lower(remaining, visit(value_node), context)
             otherwise : List<&2, C.Cst> <- else_statements(C.field_values(node, "fallback"))
-            alternative : M.Expr <- lower(remaining, Statements{otherwise}, context)
-            body : M.Expr <- lower(remaining, Statements{tail}, pattern_scope(context, pat))
+            alternative : M.Expr <- lower(remaining, Statements{otherwise, Nil{}}, context)
+            body : M.Expr <- lower(remaining, Statements{tail, carried}, pattern_scope(context, pat))
             return located(C.offset_of(node), binding(C.present(C.field_values(node, "fallback")), pattern_of(pat), M.SourceExpr{C.offset_of(node), ty, value}, alternative, body, C.offset_of(node)))
-        case Statement{EffectBinding{}, +node, tail}:
+        case Statement{ForLoop{}, +node, tail, carried}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            +pattern_node : C.Cst <- C.one(C.field_values(node, "pattern"))
+            +pat : PatternResult <- lower_pattern(remaining, classify(C.kind_of(pattern_node)), pattern_node, context)
+            +suite : C.Cst <- C.one(C.field_values(node, "body"))
+            targets : Set() <- loop_targets(remaining, LoopTargets{statement_nodes(suite)}, context, shadow_names(pattern_locals(pat), Set.new()), Set.new())
+            +originals : List<&2, Local> <- Done{loop_locals(context, targets)}
+            +prefix : String <- Done{"$for$" ++ Nat.show(C.offset_of(node)) ++ "$"}
+            +versions : List<&2, Local> <- Done{loop_versions(originals, prefix)}
+            +scope : Context <- Done{bind_all(versions, context)}
+            +successors : List<&2, Local> <- Done{loop_versions(originals, prefix ++ "next$")}
+            start_node : C.Cst <- C.one(C.field_values(node, "start"))
+            start : M.Expr <- lower(remaining, visit(start_node), context)
+            body : M.Expr <- lower(remaining, Statements{statement_nodes(suite), versions}, pattern_scope(scope, pat))
+            next : M.Expr <- lower(remaining, Statements{tail, loop_carried(originals, successors, carried)}, bind_all(successors, context))
+            +single : Bool <- Done{Nat.is_eq(List.length(&2, Local, versions), 1n)}
+            loop : M.Expr <- lower(remaining, ForRange{C.field_values(node, "end"), pattern_of(pat), start, loop_value(local_values(originals)), loop_bindings(versions, prefix ++ "state", 0n, single, body), prefix, C.offset_of(node)}, context)
+            return located(C.offset_of(node), M.UseExpr{prefix ++ "result", loop, loop_bindings(successors, prefix ++ "result", 0n, single, next)})
+        case ForRange{Nil{}, pattern, array, initial, body, +prefix, offset}:
+          Done{M.UseExpr{prefix ++ "array", array, M.ForExpr{prefix ++ "index", M.U32Expr{0}, M.ArrayLengthExpr{M.LocalExpr{prefix ++ "array"}}, prefix ++ "state", initial, plain_binding(pattern, M.ArrayGetExpr{M.LocalExpr{prefix ++ "array"}, M.LocalExpr{prefix ++ "index"}}, body, offset)}}}
+        case ForRange{end_node <> Nil{}, pattern, start, initial, body, +prefix, offset}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            end : M.Expr <- lower(remaining, visit(end_node), context)
+            return M.ForExpr{prefix ++ "index", start, end, prefix ++ "state", initial, plain_binding(pattern, M.LocalExpr{prefix ++ "index"}, body, offset)}
+        case ForRange{nodes, pattern, start, initial, body, prefix, offset}:
+          Fail{M.Diagnostic{"internal_cst", "for", "invalid range endpoint"}}
+        case Statement{Rebinding{}, +node, tail, carried}:
+          Context{globals, headers, fixities, locals, label, annotation_variables} = context
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            +name : C.Cst <- C.one(C.field_values(node, "name"))
+            +scope : Context <- rebinding_scope(lookup_local(locals, C.text_of(name)), context, name)
+            value_node : C.Cst <- C.one(C.field_values(node, "value"))
+            receiver : M.Expr <- self_value(scope)
+            value : M.Expr <- lower(remaining, UpdatePath{receiver, C.field_values(node, "path"), value_node, C.offset_of(node)}, scope)
+            body : M.Expr <- lower(remaining, Statements{tail, successor_carried(carried, lookup_local(locals, C.text_of(name)), unique_name(name))}, bind(context, Local{C.text_of(name), unique_name(name)}))
+            return located(C.offset_of(node), M.LetExpr{unique_name(name), value, body})
+        case UpdatePath{M.LocalExpr{core}, Nil{}, value_node, offset}:
+          lower(remaining, visit(value_node), bind(context, Local{"self", core}))
+        case UpdatePath{receiver, Nil{}, value_node, offset}:
+          +name = "$update$self$" ++ Nat.show(offset)
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            value : M.Expr <- lower(remaining, visit(value_node), bind(context, Local{"self", name}))
+            return M.UseExpr{name, receiver, value}
+        case UpdatePath{receiver, +node <> tail, value, offset}:
+          lower(remaining, UpdateSelector{C.kind_of(node), receiver, node, tail, value, offset}, context)
+        case UpdateSelector{"member_access", receiver, +node, tail, value_node, offset}:
+          +parent = "$update$parent$" ++ Nat.show(C.offset_of(node))
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            +name : C.Cst <- C.one(C.field_values(node, "name"))
+            value : M.Expr <- lower(remaining, UpdatePath{M.AssociatedExpr{C.offset_of(name), M.MemberDispatch{}, C.text_of(name), Nil{}, M.LocalExpr{parent}, M.UnitExpr{}}, tail, value_node, offset}, context)
+            return M.UseExpr{parent, receiver, located(C.offset_of(node), M.AssociatedExpr{C.offset_of(node), M.FieldUpdateDispatch{}, C.text_of(name), Nil{}, M.LocalExpr{parent}, value})}
+        case UpdateSelector{"index_access", receiver, +node, tail, value_node, offset}:
+          +parent = "$update$parent$" ++ Nat.show(C.offset_of(node))
+          +index_name = "$update$index$" ++ Nat.show(C.offset_of(node))
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            index_node : C.Cst <- C.one(C.field_values(node, "index"))
+            index : M.Expr <- lower(remaining, visit(index_node), context)
+            value : M.Expr <- lower(remaining, UpdatePath{M.ArrayGetExpr{M.LocalExpr{parent}, M.LocalExpr{index_name}}, tail, value_node, offset}, context)
+            return M.UseExpr{parent, receiver, M.UseExpr{index_name, index, located(C.offset_of(node), M.ArraySetExpr{M.LocalExpr{parent}, M.LocalExpr{index_name}, value})}}
+        case UpdateSelector{kind, receiver, node, tail, value, offset}:
+          Fail{C.diagnostic(node, "internal_cst", "unknown update selector")}
+        case Statement{EffectBinding{}, +node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             +target : Local <- effect_target(C.field_values(node, "name"), C.offset_of(node))
             ty : Maybe<&2, M.Ty> <- source_annotation(C.field_values(node, "annotation"), remaining, context)
             value_node : C.Cst <- C.one(C.field_values(node, "value"))
             value : M.Expr <- lower(remaining, visit(value_node), context)
-            body : M.Expr <- lower(remaining, Statements{tail}, bind(context, target))
+            body : M.Expr <- lower(remaining, Statements{tail, carried}, bind(context, target))
             return located(C.offset_of(node), effect_binding(target, M.SourceExpr{C.offset_of(node), ty, value}, body))
-        case Statement{Return{}, +node, tail}:
+        case Statement{Return{}, +node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             valid : Unit <- reachable(tail)
             plain : Unit <- require_plain_return(C.field_values(node, "forwarding"))
@@ -1062,17 +1762,17 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             value : M.Expr <- lower(remaining, visit(value_node), context)
             result : M.Expr <- returning(context, value, node)
             return located(C.offset_of(node), result)
-        case Statement{Conditional{}, +node, tail}:
+        case Statement{Conditional{}, +node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             test : C.Cst <- C.one(C.field_values(node, "condition"))
             yes : C.Cst <- C.one(C.field_values(node, "consequence"))
             no : List<&2, C.Cst> <- else_statements(C.field_values(node, "fallback"))
             condition : M.Expr <- lower(remaining, visit(test), context)
-            consequent : M.Expr <- lower(remaining, Statements{statement_nodes(yes)}, context)
-            alternative : M.Expr <- lower(remaining, Statements{no}, context)
-            next : M.Expr <- lower(remaining, Statements{tail}, context)
+            consequent : M.Expr <- lower(remaining, Statements{statement_nodes(yes), Nil{}}, context)
+            alternative : M.Expr <- lower(remaining, Statements{no, Nil{}}, context)
+            next : M.Expr <- lower(remaining, Statements{tail, carried}, context)
             return M.SequenceExpr{located(C.offset_of(node), M.IfExpr{condition, consequent, alternative}), next}
-        case Statement{PatternConditional{}, +node, tail}:
+        case Statement{PatternConditional{}, +node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             +pattern_node : C.Cst <- C.one(C.field_values(node, "pattern"))
             +pat : PatternResult <- lower_pattern(remaining, classify(C.kind_of(pattern_node)), pattern_node, context)
@@ -1080,15 +1780,15 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             yes : C.Cst <- C.one(C.field_values(node, "consequence"))
             no : List<&2, C.Cst> <- else_statements(C.field_values(node, "fallback"))
             value : M.Expr <- lower(remaining, visit(value_node), context)
-            consequent : M.Expr <- lower(remaining, Statements{statement_nodes(yes)}, pattern_scope(context, pat))
-            alternative : M.Expr <- lower(remaining, Statements{no}, context)
-            next : M.Expr <- lower(remaining, Statements{tail}, context)
+            consequent : M.Expr <- lower(remaining, Statements{statement_nodes(yes), Nil{}}, pattern_scope(context, pat))
+            alternative : M.Expr <- lower(remaining, Statements{no, Nil{}}, context)
+            next : M.Expr <- lower(remaining, Statements{tail, carried}, context)
             +temporary : String <- Done{"$if$" ++ Nat.show(C.offset_of(node))}
             return M.SequenceExpr{located(C.offset_of(node), M.LetExpr{temporary, value, M.MatchExpr{[M.LocalExpr{temporary}], [M.MatchArm{[pattern_of(pat)], consequent}, M.MatchArm{[M.WildcardPattern{}], alternative}]}}), next}
-        case Statement{kind, node, tail}:
+        case Statement{kind, node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             first : M.Expr <- lower(remaining, Expression{kind, node}, context)
-            next : M.Expr <- lower(remaining, Statements{tail}, context)
+            next : M.Expr <- lower(remaining, Statements{tail, carried}, context)
             return M.SequenceExpr{first, next}
 
 def declaration_name(node: C.Cst) -> Result<&2, &2, M.Diagnostic, String>:
@@ -1098,21 +1798,30 @@ def declaration_name(node: C.Cst) -> Result<&2, &2, M.Diagnostic, String>:
 
 def require_fresh(found: Maybe<&2, Global>, context: Context, global: Global, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Context>:
   match found context global:
-    case None{} Context{globals, headers, fixities, locals, label} Global{+source, core, kind}:
-      Done{Context{Map.set(&2, Global, globals, source, Global{source, core, kind}), headers, fixities, locals, label}}
+    case None{} Context{globals, headers, fixities, locals, label, annotation_variables} Global{+source, core, kind}:
+      Done{Context{Map.set(&2, Global, globals, source, Global{source, core, kind}), headers, fixities, locals, label, annotation_variables}}
     case _ _ _:
       Fail{C.diagnostic(node, "duplicate_name", "duplicate value or constructor declaration")}
 
 def add_global(+context: Context, +source: String, core: String, kind: GlobalKind, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Context>:
-  Context{globals, headers, fixities, locals, label} = context
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
   require_fresh(lookup_global(globals, source), context, Global{source, core, kind}, node)
 
 def add_header(found: Maybe<&2, T.Header>, context: Context, header: T.Header, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Context>:
   match found context header:
-    case None{} Context{globals, headers, fixities, locals, label} T.Header{+source, identity, arity}:
-      Done{Context{globals, Map.set(&2, T.Header, headers, source, T.Header{source, identity, arity}), fixities, locals, label}}
+    case None{} Context{globals, headers, fixities, locals, label, annotation_variables} T.Header{+source, identity, parameters}:
+      Done{Context{globals, Map.set(&2, T.Header, headers, source, T.Header{source, identity, parameters}), fixities, locals, label, annotation_variables}}
     case _ _ _:
       Fail{C.diagnostic(node, "duplicate_type", "duplicate type declaration")}
+
+# The same record syntax describes a constructor payload and a type argument.
+# Only a record directly at the payload root declares named constructor fields.
+def constructor_fields(fuel: Nat, nodes: List<&2, C.Cst>) -> List<&2, C.Cst>:
+  match fuel nodes:
+    case 1n+rest +node <> Nil{}:
+      Bool.pick(List<&2, C.Cst>, M.name_equal(C.kind_of(node), "type_record"), [node], constructor_fields(rest, C.children_of(node)))
+    case _ _:
+      Nil{}
 
 def collect_constructors(nodes: List<&2, C.Cst>, +prefix: String, context: Context) -> Result<&2, &2, M.Diagnostic, Context>:
   match nodes:
@@ -1121,9 +1830,58 @@ def collect_constructors(nodes: List<&2, C.Cst>, +prefix: String, context: Conte
     case +node <> rest:
       do Result<&2, &2, M.Diagnostic, Context>:
         +name : String <- declaration_name(node)
-        kind : GlobalKind <- record_kind(C.field_values(node, "fields"))
+        kind : GlobalKind <- record_kind(constructor_fields(65536n, C.field_values(node, "payload")))
         next : Context <- add_global(context, name, prefix ++ name, kind, node)
         collect_constructors(rest, prefix, next)
+
+def effect_member_nodes(nodes: List<&2, C.Cst>) -> List<&2, C.Cst>:
+  match nodes:
+    case Nil{}:
+      Nil{}
+    case group <> Nil{}:
+      C.field_values(group, "fields")
+    case _:
+      Nil{}
+
+def effect_member_identities(nodes: List<&2, C.Cst>, +family: String, +module_name: String) -> Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+  match nodes:
+    case Nil{}:
+      Done{Nil{}}
+    case +node <> rest:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+        +name : String <- declaration_name(node)
+        +following : List<&2, M.TypeId> <- effect_member_identities(rest, family, module_name)
+        return M.TypeId{module_name, family ++ "." ++ name} <> following
+
+def operation_kind(identity: M.TypeId, parameters: List<&2, A.Pattern>) -> GlobalKind:
+  match parameters:
+    case Nil{}:
+      OperationName{identity}
+    case _:
+      OperationTemplateName{identity, parameters}
+
+def collect_effect_members(nodes: List<&2, C.Cst>, +family: String, +prefix: String, +module_name: String, +parameters: List<&2, A.Pattern>, context: Context) -> Result<&2, &2, M.Diagnostic, Context>:
+  match nodes:
+    case Nil{}:
+      Done{context}
+    case +node <> rest:
+      do Result<&2, &2, M.Diagnostic, Context>:
+        +name : String <- declaration_name(node)
+        +source : String <- Done{family ++ "." ++ name}
+        +identity : M.TypeId <- Done{M.TypeId{module_name, source}}
+        next : Context <- add_global(context, source, prefix ++ source, operation_kind(identity, parameters), node)
+        collect_effect_members(rest, family, prefix, module_name, parameters, next)
+
+def collect_effect_type_body(groups: List<&2, C.Cst>, +name: String, +prefix: String, +module_name: String, +parameters: List<&2, A.Pattern>, +node: C.Cst, with_header: Context) -> Result<&2, &2, M.Diagnostic, Context>:
+  match groups:
+    case Nil{}:
+      add_global(with_header, name, prefix ++ name, operation_kind(M.TypeId{module_name, name}, parameters), node)
+    case groups:
+      do Result<&2, &2, M.Diagnostic, Context>:
+        +members : List<&2, C.Cst> <- Done{effect_member_nodes(groups)}
+        identities : List<&2, M.TypeId> <- effect_member_identities(members, name, module_name)
+        with_family : Context <- add_global(with_header, name, prefix ++ name, EffectFamilyName{identities, parameters}, node)
+        collect_effect_members(members, name, prefix, module_name, parameters, with_family)
 
 def valid_effect_name(reserved: Bool, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Unit>:
   match reserved:
@@ -1132,51 +1890,80 @@ def valid_effect_name(reserved: Bool, node: C.Cst) -> Result<&2, &2, M.Diagnosti
     case False{}:
       Done{Unit{}}
 
+def collect_effect_type(+node: C.Cst, +prefix: String, +module_name: String, +context: Context) -> Result<&2, &2, M.Diagnostic, Context>:
+  Context{globals, +headers, fixities, locals, label, annotation_variables} = context
+  do Result<&2, &2, M.Diagnostic, Context>:
+    +name : String <- declaration_name(node)
+    valid : Unit <- valid_effect_name(M.name_equal(name, "Foreign"), node)
+    +parameters : List<&2, A.Pattern> <- A.parameters(node)
+    +identity : M.TypeId <- Done{M.TypeId{module_name, name}}
+    with_header : Context <- add_header(T.lookup_header(headers, name), context, T.Header{name, identity, parameters}, node)
+    collect_effect_type_body(C.field_values(node, "operations"), name, prefix, module_name, parameters, node, with_header)
+
+def declaration_lambda_children(kind: NodeKind, +node: C.Cst) -> List<&2, C.Cst>:
+  match kind:
+    case ApplicationNode{}:
+      Bool.pick(List<&2, C.Cst>, List.is_empty(&2, C.Cst, C.field_values(node, "arguments")), C.field_values(node, "head"), Nil{})
+    case kind:
+      application_children(kind, node)
+
+type DeclarationInitializer is Data:
+  InitializerNode{kind: NodeKind, node: C.Cst}
+  InitializerChildren{nodes: List<&2, C.Cst>}
+
+def declaration_lambda(fuel: Nat, work: DeclarationInitializer) -> Result<&2, &2, M.Diagnostic, Maybe<&2, C.Cst>>:
+  match fuel work:
+    case 0n _:
+      Fail{M.Diagnostic{"internal_cst", "parser", "value initializer exceeds the source-tree limit"}}
+    case 1n+rest InitializerNode{LambdaNode{}, node}:
+      Done{Some{node}}
+    case 1n+rest InitializerNode{kind, node}:
+      declaration_lambda(rest, InitializerChildren{declaration_lambda_children(kind, node)})
+    case 1n+rest InitializerChildren{+node <> Nil{}}:
+      declaration_lambda(rest, InitializerNode{classify(C.kind_of(node)), node})
+    case _ _:
+      Done{None{}}
+
 def named_declaration(kind: NodeKind, +node: C.Cst, +prefix: String, module_name: String, +context: Context) -> Result<&2, &2, M.Diagnostic, Context>:
   match kind:
-    case FunctionNode{}:
+    case ValueDeclaration{}:
       do Result<&2, &2, M.Diagnostic, Context>:
         +name : String <- declaration_name(node)
-        add_global(context, name, prefix ++ name, FunctionName{}, node)
-    case ConstantNode{}:
-      do Result<&2, &2, M.Diagnostic, Context>:
-        +name : String <- declaration_name(node)
-        add_global(context, name, prefix ++ name, ConstantName{}, node)
+        +initializer : C.Cst <- C.one(C.field_values(node, "value"))
+        function : Maybe<&2, C.Cst> <- declaration_lambda(65536n, InitializerChildren{[initializer]})
+        kind : GlobalKind = Bool.pick(GlobalKind, Maybe.is_some(&2, C.Cst, function), FunctionName{}, ConstantName{})
+        add_global(context, name, prefix ++ name, kind, node)
     case EffectNode{}:
       do Result<&2, &2, M.Diagnostic, Context>:
         +name : String <- declaration_name(node)
         valid : Unit <- valid_effect_name(M.name_equal(name, "Foreign"), node)
         add_global(context, name, prefix ++ name, OperationName{M.TypeId{module_name, name}}, node)
+    case EffectTypeNode{}:
+      collect_effect_type(node, prefix, module_name, context)
     case DataNode{}:
-      Context{globals, +headers, fixities, locals, label} = context
+      Context{globals, +headers, fixities, locals, label, annotation_variables} = context
       do Result<&2, &2, M.Diagnostic, Context>:
         +name : String <- declaration_name(node)
-        next : Context <- add_header(T.lookup_header(headers, name), context, T.Header{name, M.TypeId{module_name, name}, List.length(&2, C.Cst, C.field_values(node, "parameters"))}, node)
+        parameters : List<&2, A.Pattern> <- A.parameters(node)
+        next : Context <- add_header(T.lookup_header(headers, name), context, T.Header{name, M.TypeId{module_name, name}, parameters}, node)
         collect_constructors(C.field_values(node, "constructors"), prefix, next)
     case _:
       Done{context}
 
-def visible_declaration(visible: Bool, +node: C.Cst, prefix: String, module_name: String, context: Context) -> Result<&2, &2, M.Diagnostic, Context>:
-  match visible:
-    case False{}:
-      Done{context}
-    case True{}:
-      named_declaration(classify(C.kind_of(node)), node, prefix, module_name, context)
-
-def collect_names(nodes: List<&2, C.Cst>, +prefix: String, +module_name: String, +public_only: Bool) -> Result<&2, &2, M.Diagnostic, Context>:
+def collect_names(nodes: List<&2, C.Cst>, +prefix: String, +module_name: String) -> Result<&2, &2, M.Diagnostic, Context>:
   match nodes:
     case Nil{}:
-      Done{Context{MTip{}, MTip{}, Nil{}, Nil{}, None{}}}
-    case +head <> tail:
+      Done{Context{MTip{}, MTip{}, Nil{}, Nil{}, None{}, Nil{}}}
+    case head <> tail:
       do Result<&2, &2, M.Diagnostic, Context>:
-        node : C.Cst <- C.one(C.field_values(head, "value"))
-        rest : Context <- collect_names(tail, prefix, module_name, public_only)
-        visible_declaration(Bool.or(Bool.not(public_only), C.present(C.field_values(head, "exported"))), node, prefix, module_name, rest)
+        +node : C.Cst <- C.one(C.field_values(head, "value"))
+        rest : Context <- collect_names(tail, prefix, module_name)
+        named_declaration(classify(C.kind_of(node)), node, prefix, module_name, rest)
 
 def combine_context(own: Context, inherited: Context) -> Context:
-  Context{globals, headers, fixities, locals, label} = own
-  Context{base_globals, base_headers, base_fixities, base_locals, base_label} = inherited
-  Context{Map.union(&2, Global, base_globals, globals), Map.union(&2, T.Header, base_headers, headers), List.append(&2, O.Fixity, fixities, base_fixities), locals, label}
+  Context{globals, headers, fixities, locals, label, annotation_variables} = own
+  Context{base_globals, base_headers, base_fixities, base_locals, base_label, base_annotation_variables} = inherited
+  Context{Map.union(&2, Global, base_globals, globals), Map.union(&2, T.Header, base_headers, headers), List.append(&2, O.Fixity, fixities, base_fixities), locals, label, annotation_variables}
 
 def require_header_order(seen_value: Bool, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Unit>:
   match seen_value:
@@ -1247,12 +2034,18 @@ def collect_fixities(nodes: List<&2, C.Cst>, +context: Context, +seen_value: Boo
         collect_header(header, node, seen_value, context, rest)
 
 def with_fixities(context: Context, fixities: List<&2, O.Fixity>) -> Context:
-  Context{globals, headers, base_fixities, locals, label} = context
-  Context{globals, headers, List.append(&2, O.Fixity, fixities, base_fixities), locals, label}
+  Context{globals, headers, base_fixities, locals, label, annotation_variables} = context
+  Context{globals, headers, List.append(&2, O.Fixity, fixities, base_fixities), locals, label, annotation_variables}
 
 def function_value(name: String, exported: Bool, param: Parameter, result: Maybe<&2, M.Ty>, body: M.Expr) -> M.Function:
   Parameter{source, core, annotation} = param
   M.Function{name, exported, core, annotation, result, body}
+
+def annotation_scope(node: C.Cst, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, Context>:
+  Context{globals, headers, fixities, locals, label, previous} = context
+  do Result<&2, &2, M.Diagnostic, Context>:
+    variables : List<&2, T.Variable> <- T.free_variables(node, scope)
+    return Context{globals, headers, fixities, locals, label, variables}
 
 def lower_function(+node: C.Cst, name: String, exported: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Function>:
   do Result<&2, &2, M.Diagnostic, M.Function>:
@@ -1263,12 +2056,37 @@ def lower_function(+node: C.Cst, name: String, exported: Bool, +fuel: Nat, +cont
     body : M.Expr <- lower(fuel, visit(body_node), bind_parameter(context, param))
     return function_value(name, exported, param, result, body)
 
-def lower_constant(+node: C.Cst, name: String, exported: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Constant>:
+def lower_constant(+node: C.Cst, +name: String, exported: Bool, +fuel: Nat, base_context: Context) -> Result<&2, &2, M.Diagnostic, M.Constant>:
   do Result<&2, &2, M.Diagnostic, M.Constant>:
+    +context : Context <- annotation_scope(node, base_context, name)
     ty : Maybe<&2, M.Ty> <- source_annotation(C.field_values(node, "annotation"), fuel, context)
     value_node : C.Cst <- C.one(C.field_values(node, "value"))
-    value : M.Expr <- lower(fuel, visit(value_node), context)
-    return M.Constant{name, exported, ty, value}
+    +value : M.Expr <- lower(fuel, visit(value_node), context)
+    keyword : C.Cst <- C.one(C.field_values(node, "kind"))
+    return M.Constant{name, exported, ty, Bool.pick(M.Expr, M.name_equal(C.text_of(keyword), "let"), M.RuntimeInitExpr{value}, value)}
+
+def annotated_function(annotation: Maybe<&2, M.Ty>, function: M.Function, +node: C.Cst) -> M.Function:
+  match annotation function:
+    case None{} function:
+      function
+    case Some{ty} M.Function{name, exported, +parameter, p, r, body}:
+      +offset = C.offset_of(node)
+      M.Function{name, exported, parameter, None{}, None{}, M.ApplyExpr{M.SourceExpr{offset, Some{ty}, M.LambdaExpr{offset, parameter, p, r, body}}, M.LocalExpr{parameter}}}
+
+def value_function_phase(runtime: Bool, function: M.Function) -> M.Function:
+  match runtime function:
+    case False{} function:
+      function
+    case True{} M.Function{name, exported, parameter, p, r, body}:
+      M.Function{name, exported, parameter, p, r, M.RuntimeInitExpr{body}}
+
+def lower_value_function(+binding: C.Cst, node: C.Cst, +name: String, exported: Bool, +fuel: Nat, base_context: Context) -> Result<&2, &2, M.Diagnostic, M.Function>:
+  do Result<&2, &2, M.Diagnostic, M.Function>:
+    +context : Context <- annotation_scope(binding, base_context, name)
+    annotation : Maybe<&2, M.Ty> <- source_annotation(C.field_values(binding, "annotation"), fuel, context)
+    function : M.Function <- lower_function(node, name, exported, fuel, context)
+    keyword : C.Cst <- C.one(C.field_values(binding, "kind"))
+    return value_function_phase(M.name_equal(C.text_of(keyword), "let"), annotated_function(annotation, function, binding))
 
 def require_parameter(found: Maybe<&2, M.Ty>, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Unit>:
   match found:
@@ -1277,23 +2095,36 @@ def require_parameter(found: Maybe<&2, M.Ty>, node: C.Cst) -> Result<&2, &2, M.D
     case _:
       Fail{C.diagnostic(node, "duplicate_type_parameter", "duplicate type parameter")}
 
-def type_variables(nodes: List<&2, C.Cst>, +index: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:
-  match nodes:
+def named_type_variables(names: List<&2, String>, +index: Nat, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:
+  match names:
     case Nil{}:
       Done{Nil{}}
-    case +head <> tail:
+    case +name <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:
-        +rest : List<&2, T.Variable> <- type_variables(tail, 1n+index)
-        valid : Unit <- require_parameter(T.lookup_variable(rest, C.text_of(head)), head)
-        return T.Variable{C.text_of(head), index} <> rest
+        +rest : List<&2, T.Variable> <- named_type_variables(tail, 1n+index, node)
+        valid : Unit <- require_parameter(T.lookup_variable(rest, name), node)
+        return T.Variable{name, M.ParameterTy{index}} <> rest
+
+def type_variables(+node: C.Cst) -> Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:
+  do Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:
+    patterns : List<&2, A.Pattern> <- A.parameters(node)
+    names : List<&2, String> <- A.binding_names(65536n, patterns)
+    named_type_variables(names, 0n, node)
+
+def record_annotation(nodes: List<&2, C.Cst>, node: C.Cst) -> Result<&2, &2, M.Diagnostic, C.Cst>:
+  match nodes:
+    case Nil{}:
+      C.one(C.field_values(node, "name"))
+    case nodes:
+      C.one(nodes)
 
 def lower_record_types(nodes: List<&2, C.Cst>, reversed: List<&2, M.Ty>, +fuel: Nat, +headers: Map<&2, T.Header>, +variables: List<&2, T.Variable>, +globals: Map<&2, Global>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
   match nodes:
     case Nil{}:
       Done{List.reverse(&2, M.Ty, reversed)}
-    case node <> rest:
+    case +node <> rest:
       do Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
-        ty_node : C.Cst <- C.one(C.field_values(node, "annotation"))
+        ty_node : C.Cst <- record_annotation(C.field_values(node, "value"), node)
         types : List<&2, M.Ty> <- T.lower(~Map<&2, Global>, ~lookup_effect, fuel, T.visit(ty_node), headers, variables, globals)
         ty : M.Ty <- T.one(types)
         lower_record_types(rest, ty <> reversed, fuel, headers, variables, globals)
@@ -1318,6 +2149,15 @@ def constructor_payload(nodes: List<&2, C.Cst>, payload: List<&2, C.Cst>, fuel: 
     case _:
       Fail{M.Diagnostic{"internal_cst", "parser", "invalid record declaration fields"}}
 
+def constructor_field_names(nodes: List<&2, C.Cst>) -> Result<&2, &2, M.Diagnostic, List<&2, String>>:
+  match nodes:
+    case Nil{}:
+      Done{Nil{}}
+    case node <> Nil{}:
+      record_field_names(C.field_values(node, "fields"), Set.new(), Nil{})
+    case _:
+      Fail{M.Diagnostic{"internal_cst", "record", "invalid constructor record fields"}}
+
 def lower_constructors(nodes: List<&2, C.Cst>, +prefix: String, +fuel: Nat, +headers: Map<&2, T.Header>, +variables: List<&2, T.Variable>, +globals: Map<&2, Global>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Constructor>>:
   match nodes:
     case Nil{}:
@@ -1325,21 +2165,26 @@ def lower_constructors(nodes: List<&2, C.Cst>, +prefix: String, +fuel: Nat, +hea
     case +node <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, M.Constructor>>:
         name : String <- declaration_name(node)
-        payload : Maybe<&2, M.Ty> <- constructor_payload(C.field_values(node, "fields"), C.field_values(node, "payload"), fuel, headers, variables, globals)
+        payload : Maybe<&2, M.Ty> <- constructor_payload(constructor_fields(65536n, C.field_values(node, "payload")), C.field_values(node, "payload"), fuel, headers, variables, globals)
+        fields : List<&2, String> <- constructor_field_names(constructor_fields(65536n, C.field_values(node, "payload")))
         rest : List<&2, M.Constructor> <- lower_constructors(tail, prefix, fuel, headers, variables, globals)
-        return M.Constructor{prefix ++ name, payload} <> rest
+        return M.Constructor{prefix ++ name, payload, fields} <> rest
 
 def lower_data(+node: C.Cst, name: String, prefix: String, module_name: String, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.DataType>:
-  Context{globals, headers, fixities, locals, label} = context
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
   do Result<&2, &2, M.Diagnostic, M.DataType>:
-    variables : List<&2, T.Variable> <- type_variables(C.field_values(node, "parameters"), 0n)
+    +variables : List<&2, T.Variable> <- type_variables(node)
     constructors : List<&2, M.Constructor> <- lower_constructors(C.field_values(node, "constructors"), prefix, fuel, headers, variables, globals)
-    return M.DataType{M.TypeId{module_name, name}, List.length(&2, C.Cst, C.field_values(node, "parameters")), constructors}
+    return M.DataType{M.TypeId{module_name, name}, List.length(&2, T.Variable, variables), constructors}
 
-def operation_signature(signature: Maybe<&2, M.Ty>, identity: M.TypeId, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Operation>:
+def operation_signature(signature: Maybe<&2, M.Ty>, identity: M.TypeId, parameters: Maybe<&2, Nat>, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Operation>:
   match signature:
     case Some{M.FunctionTy{parameter, result, M.EffectRow{Nil{}, M.ClosedRow{}}}}:
-      Done{M.Operation{identity, parameter, result}}
+      match parameters:
+        case None{}:
+          Done{M.Operation{identity, parameter, result}}
+        case Some{count}:
+          Done{M.OperationTemplate{identity, count, parameter, result}}
     case Some{M.FunctionTy{parameter, result, row}}:
       Fail{C.diagnostic(node, "operation_signature", "an operation declaration specifies parameter and result types, not an outer latent effect row")}
     case _:
@@ -1348,11 +2193,54 @@ def operation_signature(signature: Maybe<&2, M.Ty>, identity: M.TypeId, node: C.
 def lower_operation(+node: C.Cst, identity: M.TypeId, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Operation>:
   do Result<&2, &2, M.Diagnostic, M.Operation>:
     signature : Maybe<&2, M.Ty> <- source_annotation(C.field_values(node, "signature"), fuel, context)
-    operation_signature(signature, identity, node)
+    operation_signature(signature, identity, None{}, node)
+
+def lower_effect_signature(+node: C.Cst, identity: M.TypeId, +variables: List<&2, T.Variable>, fuel: Nat, context: Context, parameters: Maybe<&2, Nat>) -> Result<&2, &2, M.Diagnostic, M.Operation>:
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
+  do Result<&2, &2, M.Diagnostic, M.Operation>:
+    signature : Maybe<&2, M.Ty> <- T.annotation(~Map<&2, Global>, ~lookup_effect, C.field_values(node, "signature"), fuel, headers, variables, globals)
+    operation_signature(signature, identity, parameters, node)
+
+def lower_effect_members(nodes: List<&2, C.Cst>, +family: String, +module_name: String, +variables: List<&2, T.Variable>, +fuel: Nat, +context: Context, +parameters: Maybe<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+  match nodes:
+    case Nil{}:
+      Done{Nil{}}
+    case +node <> rest:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+        +name : String <- declaration_name(node)
+        operation : M.Operation <- lower_effect_signature(node, M.TypeId{module_name, family ++ "." ++ name}, variables, fuel, context, parameters)
+        following : List<&2, M.Operation> <- lower_effect_members(rest, family, module_name, variables, fuel, context, parameters)
+        return operation <> following
+
+def lower_effect_type_members(members: List<&2, C.Cst>, node: C.Cst, name: String, module_name: String, variables: List<&2, T.Variable>, fuel: Nat, context: Context, parameters: Maybe<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+  match members:
+    case Nil{}:
+      Fail{C.diagnostic(node, "empty_effect", "an effect group requires at least one operation")}
+    case _:
+      lower_effect_members(members, name, module_name, variables, fuel, context, parameters)
+
+def lower_effect_type_body(groups: List<&2, C.Cst>, +node: C.Cst, name: String, module_name: String, variables: List<&2, T.Variable>, fuel: Nat, context: Context, parameters: Maybe<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+  match groups:
+    case Nil{}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+        operation : M.Operation <- lower_effect_signature(node, M.TypeId{module_name, name}, variables, fuel, context, parameters)
+        return [operation]
+    case _:
+      lower_effect_type_members(effect_member_nodes(groups), node, name, module_name, variables, fuel, context, parameters)
+
+def lower_effect_type(+node: C.Cst, +name: String, +module_name: String, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+  do Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+    +variables : List<&2, T.Variable> <- type_variables(node)
+    parameters : Maybe<&2, Nat> = Bool.pick(Maybe<&2, Nat>, C.present(C.field_values(node, "parameters")), Some{List.length(&2, T.Variable, variables)}, None{})
+    lower_effect_type_body(C.field_values(node, "operations"), node, name, module_name, variables, fuel, context, parameters)
 
 def add_operation(module: M.Module, operation: M.Operation) -> M.Module:
   M.Module{constants, functions, data_types, operations} = module
   M.Module{constants, functions, data_types, operation <> operations}
+
+def add_operations(module: M.Module, incoming: List<&2, M.Operation>) -> M.Module:
+  M.Module{constants, functions, data_types, operations} = module
+  M.Module{constants, functions, data_types, List.append(&2, M.Operation, incoming, operations)}
 
 def add_function(module: M.Module, fn: M.Function) -> M.Module:
   M.Module{constants, functions, data_types, operations} = module
@@ -1366,23 +2254,35 @@ def add_data(module: M.Module, ty: M.DataType) -> M.Module:
   M.Module{constants, functions, data_types, operations} = module
   M.Module{constants, functions, ty <> data_types, operations}
 
-def declaration(kind: NodeKind, +node: C.Cst, +prefix: String, module_name: String, exported: Bool, rest: M.Module, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
-  match kind:
-    case FunctionNode{}:
+def lower_value_declaration(function: Maybe<&2, C.Cst>, node: C.Cst, name: String, exported: Bool, rest: M.Module, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
+  match function:
+    case Some{lambda}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
-        name : String <- declaration_name(node)
-        fn : M.Function <- lower_function(node, prefix ++ name, exported, fuel, context)
-        return add_function(rest, fn)
-    case ConstantNode{}:
+        value : M.Function <- lower_value_function(node, lambda, name, exported, fuel, context)
+        return add_function(rest, value)
+    case None{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
-        name : String <- declaration_name(node)
-        value : M.Constant <- lower_constant(node, prefix ++ name, exported, fuel, context)
+        value : M.Constant <- lower_constant(node, name, exported, fuel, context)
         return add_constant(rest, value)
+
+def declaration(kind: NodeKind, +node: C.Cst, +prefix: String, module_name: String, exported: Bool, rest: M.Module, +fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
+  match kind:
+    case ValueDeclaration{}:
+      do Result<&2, &2, M.Diagnostic, M.Module>:
+        +name : String <- declaration_name(node)
+        initializer : C.Cst <- C.one(C.field_values(node, "value"))
+        function : Maybe<&2, C.Cst> <- declaration_lambda(fuel, InitializerChildren{[initializer]})
+        lower_value_declaration(function, node, prefix ++ name, exported, rest, fuel, context)
     case EffectNode{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
         name : String <- declaration_name(node)
         operation : M.Operation <- lower_operation(node, M.TypeId{module_name, name}, fuel, context)
         return add_operation(rest, operation)
+    case EffectTypeNode{}:
+      do Result<&2, &2, M.Diagnostic, M.Module>:
+        name : String <- declaration_name(node)
+        operations : List<&2, M.Operation> <- lower_effect_type(node, name, module_name, fuel, context)
+        return add_operations(rest, operations)
     case DataNode{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
         name : String <- declaration_name(node)
@@ -1407,7 +2307,7 @@ def lower_declarations_sequential(nodes: List<&2, C.Cst>, +prefix: String, +modu
         +node : C.Cst <- C.one(C.field_values(head, "value"))
         rest : M.Module <- lower_declarations_sequential(tail, prefix, module_name, allow_exports, fuel, context)
         valid : Unit <- reject_attributes(C.field_values(head, "attributes"))
-        declaration(classify(C.kind_of(node)), node, prefix, module_name, Bool.and(allow_exports, C.present(C.field_values(head, "exported"))), rest, fuel, context)
+        declaration(classify(C.kind_of(node)), node, prefix, module_name, allow_exports, rest, fuel, context)
 
 def combine_modules(prelude: M.Module, module: M.Module) -> M.Module:
   M.Module{pc, pf, pt, po} = prelude
@@ -1550,12 +2450,96 @@ def validate_declaration_nodes(nodes: List<&2, C.Cst>) -> Result<&2, &2, M.Diagn
         node : C.Cst <- C.one(C.field_values(head, "value"))
         validate_declaration_nodes(tail)
 
-def lower_declarations(+nodes: List<&2, C.Cst>, prefix: String, module_name: String, allow_exports: Bool, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
+def effect_member_requests(templates: List<&2, M.TypeId>, +arguments: List<&2, M.Ty>) -> List<&2, M.Operation>:
+  match templates:
+    case Nil{}:
+      Nil{}
+    case template <> rest:
+      M.OperationInstance{template, arguments} <> effect_member_requests(rest, arguments)
+
+def row_label_requests_found(found: Maybe<&2, Global>, arguments: List<&2, M.Ty>) -> List<&2, M.Operation>:
+  match found:
+    case Some{Global{source, core, OperationTemplateName{identity, parameters}}}:
+      [M.OperationInstance{identity, arguments}]
+    case Some{Global{source, core, EffectFamilyName{members, parameters}}}:
+      effect_member_requests(members, arguments)
+    case _:
+      Nil{}
+
+def row_arguments(found: Maybe<&2, Global>, values: List<&2, A.Value>, node: C.Cst) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+  match found:
+    case Some{Global{source, core, OperationTemplateName{identity, parameters}}}:
+      A.bind(parameters, values, node)
+    case Some{Global{source, core, EffectFamilyName{members, parameters}}}:
+      A.bind(parameters, values, node)
+    case _:
+      A.bind(Nil{}, values, node)
+
+def row_label_requests(application: T.RowLabel, fuel: Nat, context: Context, variables: List<&2, T.Variable>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+  T.RowLabel{name, nodes, node} = application
+  Context{+globals, headers, fixities, locals, label, annotation_variables} = context
+  do Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+    values : List<&2, A.Value> <- T.evaluate(~Map<&2, Global>, ~lookup_effect, fuel, T.Nodes{nodes}, headers, variables, globals)
+    +found : Maybe<&2, Global> <- Done{lookup_global(globals, name)}
+    arguments : List<&2, M.Ty> <- row_arguments(found, values, node)
+    return row_label_requests_found(found, arguments)
+
+def row_labels_requests(nodes: List<&2, C.Cst>, +fuel: Nat, +context: Context, +variables: List<&2, T.Variable>, +reversed: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+  match nodes:
+    case Nil{}:
+      Done{List.reverse(&2, M.Operation, reversed)}
+    case +node <> rest:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+        application : T.RowLabel <- T.row_label(fuel, T.visit(node), Nil{}, node)
+        requests : List<&2, M.Operation> <- row_label_requests(application, fuel, context, variables)
+        row_labels_requests(rest, fuel, context, variables, List.reverse.go(&2, M.Operation, requests, reversed))
+
+def row_requests_of(is_row: Bool, node: C.Cst, fuel: Nat, context: Context, variables: List<&2, T.Variable>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+  match is_row:
+    case True{}:
+      row_labels_requests(C.field_values(node, "labels"), fuel, context, variables, Nil{})
+    case False{}:
+      Done{Nil{}}
+
+def declaration_row_requests(fuel: Nat, nodes: List<&2, C.Cst>, +context: Context, +variables: List<&2, T.Variable>, +reversed: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+  match fuel nodes:
+    case 0n _:
+      Fail{M.Diagnostic{"internal_cst", "parser", "effect-row source tree exhausted its node-count bound"}}
+    case 1n+rest Nil{}:
+      Done{List.reverse(&2, M.Operation, reversed)}
+    case 1n+ +rest +node <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+        requests : List<&2, M.Operation> <- row_requests_of(M.name_equal(C.kind_of(node), "effect_row"), node, rest, context, variables)
+        declaration_row_requests(rest, List.reverse.go(&2, C.Cst, List.reverse(&2, C.Cst, C.children_of(node)), tail), context, variables, List.reverse.go(&2, M.Operation, requests, reversed))
+
+def declaration_type_variables(kind: NodeKind, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:
+  match kind:
+    case DataNode{}:
+      type_variables(node)
+    case EffectTypeNode{}:
+      type_variables(node)
+    case _:
+      T.free_variables(node, "")
+
+def declarations_row_requests(nodes: List<&2, C.Cst>, +fuel: Nat, +context: Context, +reversed: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+  match nodes:
+    case Nil{}:
+      Done{List.reverse(&2, M.Operation, reversed)}
+    case head <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Operation>>:
+        +node : C.Cst <- C.one(C.field_values(head, "value"))
+        variables : List<&2, T.Variable> <- declaration_type_variables(classify(C.kind_of(node)), node)
+        first : List<&2, M.Operation> <- declaration_row_requests(fuel, [node], context, variables, Nil{})
+        declarations_row_requests(tail, fuel, context, List.reverse.go(&2, M.Operation, first, reversed))
+
+def lower_declarations(+nodes: List<&2, C.Cst>, prefix: String, module_name: String, allow_exports: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
   +count = List.length(&2, C.Cst, nodes)
   do Result<&2, &2, M.Diagnostic, M.Module>:
     # Structural failures precede semantic failures in the serial traversal.
     valid : Unit <- validate_declaration_nodes(nodes)
-    lower_declaration_batch(declaration_batches(48n, nodes, count, Nat.is_le(count, 4n)), prefix, module_name, allow_exports, fuel, context)
+    module : M.Module <- lower_declaration_batch(declaration_batches(48n, nodes, count, Nat.is_le(count, 4n)), prefix, module_name, allow_exports, fuel, context)
+    requests : List<&2, M.Operation> <- declarations_row_requests(nodes, fuel, context, Nil{})
+    return add_operations(module, requests)
 
 type Prelude is Data:
   Prelude{module: M.Module, scope: Context}
@@ -1566,11 +2550,10 @@ type SourcePlan is Data:
 def prepare_prelude(prelude: C.Cst, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, Prelude>:
   +prelude_nodes = C.field_values(prelude, "declarations")
   do Result<&2, &2, M.Diagnostic, Prelude>:
-    +prelude_scope : Context <- collect_names(prelude_nodes, "$prelude.", "std/prelude", False{})
+    +prelude_scope : Context <- collect_names(prelude_nodes, "$prelude.", "std/prelude")
     +prelude_fixities : List<&2, O.Fixity> <- collect_fixities(prelude_nodes, prelude_scope, False{})
     prelude_module : M.Module <- lower_declarations(prelude_nodes, "$prelude.", "std/prelude", False{}, fuel, with_fixities(prelude_scope, prelude_fixities))
-    public_scope : Context <- collect_names(prelude_nodes, "$prelude.", "std/prelude", True{})
-    return Prelude{prelude_module, with_fixities(public_scope, prelude_fixities)}
+    return Prelude{prelude_module, with_fixities(prelude_scope, prelude_fixities)}
 
 def require_resolved_imports(nodes: List<&2, C.Cst>) -> Result<&2, &2, M.Diagnostic, Unit>:
   match nodes:
@@ -1584,7 +2567,7 @@ def prepare_source(+root: C.Cst, prepared: Prelude) -> Result<&2, &2, M.Diagnost
   +nodes = C.field_values(root, "declarations")
   do Result<&2, &2, M.Diagnostic, SourcePlan>:
     imports : Unit <- require_resolved_imports(C.field_values(root, "imports"))
-    local_scope : Context <- collect_names(nodes, "", "main", False{})
+    local_scope : Context <- collect_names(nodes, "", "main")
     +scope : Context <- Done{combine_context(local_scope, public_scope)}
     fixities : List<&2, O.Fixity> <- collect_fixities(nodes, scope, False{})
     return SourcePlan{prelude_module, with_fixities(scope, fixities), nodes}

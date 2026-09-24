@@ -4,7 +4,7 @@ import { CompilationFailure } from "./compile_protocol.ts";
 
 const source = `#[resource]
 data Clock = Clock U32
-export fn tick () => do:
+const tick = fn () => do:
   use wrapped <- @ecs.get Clock
   let Clock value = wrapped
   use @ecs.set (Clock (value + 1))
@@ -17,7 +17,7 @@ Deno.test("background parser/native compiler keeps host timers running and survi
     const first = await compiler.compile(source);
     ok(first.artifact.bytes.length > 0);
     const larger = source + Array.from({ length: 64 }, (_, index) => `
-export fn system_${index} () => do:
+const system_${index} = fn () => do:
   use wrapped <- @ecs.get Clock
   let Clock value = wrapped
   use @ecs.set (Clock (value + ${index}))
@@ -35,7 +35,7 @@ export fn system_${index} () => do:
       `host timers ran only ${ticks} times during background compilation`,
     );
     await rejects(
-      compiler.compile("export fn broken () => missing\n", "live-edit.blot"),
+      compiler.compile("const broken = fn () => missing\n", "live-edit.blot"),
       (error) =>
         error instanceof CompilationFailure && error.diagnostic &&
         error.message.includes("live-edit.blot:1:"),

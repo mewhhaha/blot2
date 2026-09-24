@@ -55,6 +55,7 @@ Deno.test("nominal collection preserves recursive merge order and duplicate elim
       parameters: 0n,
       constructors: bendList([{
         $: "Constructor",
+        fields: { $: "Nil" },
         name,
         payload: { $: "None" },
       }]),

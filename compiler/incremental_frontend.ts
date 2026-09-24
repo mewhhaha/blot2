@@ -22,7 +22,7 @@ export interface IncrementalSyntaxStats {
   readonly characters_reused: number;
 }
 
-interface OriginSegment {
+export interface OriginSegment {
   readonly offsets: ReadonlyMap<bigint, bigint>;
   readonly offsetAt: (offset: bigint) => number;
   readonly prelude: boolean;
@@ -33,7 +33,7 @@ interface Origin {
   readonly prelude: boolean;
 }
 
-function originLookup(segments: readonly OriginSegment[]) {
+export function originLookup(segments: readonly OriginSegment[]) {
   const count = segments.reduce(
     (count, segment) => count + segment.offsets.size,
     0,
@@ -95,13 +95,24 @@ function frozenList(children: readonly Cst[]): Cst["children"] {
 
 // Declaration-local identities survive unrelated edits. Offsets remain in the
 // origin map, not in cache keys, lambda identities, or resolved local names.
-class SourceIdentities {
-  #next = 1n;
+export class SourceIdentities {
+  #next: bigint;
+  #limit: bigint;
+  #allocate: (() => bigint) | undefined;
   #owners = new Map<string, bigint[]>();
   #normalized = new WeakMap<Cst, {
     readonly declaration: Cst;
     readonly offsets: ReadonlyMap<bigint, bigint>;
   }>();
+
+  constructor(first = 1n, limit = 0xFFFF_FFFF_FFFFn, allocate?: () => bigint) {
+    if (first < 1n || first > limit || limit > 0xFFFF_FFFF_FFFFn) {
+      throw new RangeError("Invalid source identity range");
+    }
+    this.#next = first;
+    this.#limit = limit;
+    this.#allocate = allocate;
+  }
 
   normalize(
     root: Cst,
@@ -126,8 +137,10 @@ class SourceIdentities {
         let identity = offsets.get(node.offset);
         if (identity === undefined) {
           const index = offsets.size;
-          identity = identities[index] ??= this.#next++;
-          if (identity > 0xFFFF_FFFF_FFFFn) {
+          identity = identities[index] ??= this.#allocate
+            ? this.#allocate()
+            : this.#next++;
+          if (identity > this.#limit) {
             throw new RangeError(
               "Source identity space exhausted; restart session",
             );
@@ -174,13 +187,18 @@ type ParsedIsland = ReturnType<
 // parse. In particular, NEWLINE before INDENT starts a suite, not a declaration.
 function islandRanges(prepared: PreparedSource): IslandRange[] | undefined {
   return declarationRanges(prepared)?.map(({ start, end }) => {
-    const fingerprint: string[] = [];
+    const fingerprint: (string | boolean)[] = [];
     for (let index = start; index < end; index++) {
       const token = prepared.tokens[index];
       fingerprint.push(
         token.type === "named" ? token.kind : token.type,
         token.text,
       );
+      if (token.text === "[" || token.text === "(") {
+        fingerprint.push(
+          index > 0 && prepared.tokens[index - 1].span.end === token.span.start,
+        );
+      }
     }
     return { start, end, key: JSON.stringify(fingerprint) };
   });

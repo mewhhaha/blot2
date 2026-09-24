@@ -29,11 +29,23 @@ for (const threads of [1, 4]) {
         guest.dispose();
       }
       for (
+        const library of [
+          "const main = fn (io: U32 -> U32) => io 0\n",
+          "effect Reader.ask: Unit -> U32\nconst main = fn (io: U32 -> U32 ! {Foreign}) => Reader.ask ()\n",
+        ]
+      ) {
+        const artifact = await native.compile(library);
+        equal(artifact, js.compile(library));
+        equal(
+          WebAssembly.Module.exports(new WebAssembly.Module(artifact.bytes)),
+          [],
+        );
+      }
+      for (
         const invalid of [
           "effect Foreign: U32 -> U32\n",
-          "export fn main (io: U32 -> U32 ! {Foreign}) => do:\n  let value = io 0\n  return value\n",
-          "export fn main (io: U32 -> U32) => io 0\n",
-          "effect Reader.ask: Unit -> U32\nexport fn main (io: U32 -> U32 ! {Foreign}) => Reader.ask ()\n",
+          "const main = fn (io: U32 -> U32 ! {Foreign}) => do:\n  let value = io 0\n  return value\n",
+          "effect Reader.ask: Unit -> U32\nconst main: (U32 -> U32 ! {Foreign}) -> U32 = fn io => Reader.ask ()\n",
         ]
       ) {
         let expected: SourceError | undefined;
@@ -76,19 +88,19 @@ Deno.test("native cached bodies relink when callback imports appear, reorder, an
   const scalar = `
 data Maybe a = Some a | Nothing
 const saved = Some 7
-fn compute value => @u32.add value 1
-export fn pure () => case saved of
+const compute = fn value => @u32.add value 1
+const pure = fn () => case saved of
   Some value => compute value
   Nothing => 0
-export const count = 12
+const count = 12
 `;
   const integer = (value: number) => `
-export fn main (io: U32 -> U32 ! {Foreign}) => do:
+const main = fn (io: U32 -> U32 ! {Foreign}) => do:
   use next <- io (compute ${value})
   return next
 `;
   const float = `
-export fn float (io: F32 -> F32 ! {Foreign}) => do:
+const float = fn (io: F32 -> F32 ! {Foreign}) => do:
   use next <- io 1.5
   return next
 `;
@@ -114,7 +126,7 @@ export fn float (io: F32 -> F32 ! {Foreign}) => do:
       try {
         equal(guest.call("pure", null), 8);
         equal(guest.read("count"), 12);
-        if (source.includes("fn main")) {
+        if (source.includes("const main = fn")) {
           const callback = guest.capability({
             parameter: "U32",
             result: "U32",
@@ -125,7 +137,7 @@ export fn float (io: F32 -> F32 ! {Foreign}) => do:
             source.includes("compute 41") ? 43 : 42,
           );
         }
-        if (source.includes("fn float")) {
+        if (source.includes("const float = fn")) {
           const callback = guest.capability({
             parameter: "F32",
             result: "F32",
@@ -138,7 +150,7 @@ export fn float (io: F32 -> F32 ! {Foreign}) => do:
       }
       await rejects(
         () =>
-          session.compile(`${source}\nexport fn bad () => @render.clear 0\n`),
+          session.compile(`${source}\nconst bad = fn () => @render.clear 0\n`),
         (error) =>
           error instanceof SourceError && error.code === "unknown_intrinsic",
       );

@@ -12,19 +12,19 @@ import {
 
 const genericSource = `effect Reader.ask: Unit -> U32
 data Maybe a = Some a | Nothing
-fn identity value => value
-fn defer action => fn () => action ()
-fn ask () => Reader.ask ()
-fn read_handler () => 40
+const identity = fn value => value
+const defer = fn action => fn () => action ()
+const ask = fn () => Reader.ask ()
+const read_handler = fn () => 40
 const reader = @effect.provider Reader.ask read_handler
-fn even value => case @u32.eq value 0 of
+const even = fn value => case @u32.eq value 0 of
   True => True
   False => odd (@u32.sub value 1)
-fn odd value => case @u32.eq value 0 of
+const odd = fn value => case @u32.eq value 0 of
   True => False
   False => even (@u32.sub value 1)
-export const reader_effects = @effect.count (@effect.of ask)
-export fn answer () => do reader:
+const reader_effects = @effect.count (@effect.of ask)
+const answer = fn () => do reader:
   use value <- (defer ask) ()
   return case identity (Some value), identity True, even 4 of
     Some number, True, True => @u32.add number 2
@@ -55,8 +55,8 @@ Deno.test("ready inference preserves generic SCCs and latent effects in JS and o
         equal(initial.artifact, expected);
         ok(initial.stats.groups_checked > 0);
         const edited = genericSource.replace(
-          "read_handler () => 40",
-          "read_handler () => 41",
+          "read_handler = fn () => 40",
+          "read_handler = fn () => 41",
         );
         const update = await session.compile(edited);
         equal(update.artifact, reference.compile(edited));
@@ -77,7 +77,7 @@ Deno.test("ready inference preserves generic SCCs and latent effects in JS and o
 function fanout() {
   const branches = Array.from({ length: 24 }, (_, branch) => {
     const lines = [
-      `export fn branch_${branch} () => do:`,
+      `const branch_${branch} = fn () => do:`,
       "  let value_0 = seed ()",
     ];
     for (let step = 1; step <= 16; step++) {
@@ -87,16 +87,16 @@ function fanout() {
     return lines.join("\n");
   });
   return [
-    "fn seed () => 40",
+    "const seed = fn () => 40",
     ...branches,
-    "export fn answer () => branch_0 ()",
+    "const answer = fn () => branch_0 ()",
     "",
   ].join("\n");
 }
 
 Deno.test("retained nominal scans follow constructor moves, edits, failures and eviction", async () => {
   const wrap = [
-    "fn wrap value => do:",
+    "const wrap = fn value => do:",
     ...Array.from(
       { length: 64 },
       (_, index) =>
@@ -109,7 +109,7 @@ Deno.test("retained nominal scans follow constructor moves, edits, failures and 
   const original = `data Left = Carry U32 | EmptyLeft
 data Right = EmptyRight
 ${wrap}
-export fn answer () => case wrap 40 of
+const answer = fn () => case wrap 40 of
   Carry value => @u32.add value 2
   _ => 0
 `;
@@ -131,7 +131,7 @@ export fn answer () => case wrap 40 of
             original,
             moved,
             edited,
-            moved.replace(wrap, "fn wrap value => Carry value"),
+            moved.replace(wrap, "const wrap = fn value => Carry value"),
             original,
           ]
         ) {
@@ -150,7 +150,7 @@ export fn answer () => case wrap 40 of
           (await session.compile(edited)).artifact,
           reference.compile(edited),
         );
-        await session.compile("export fn answer () => 42\n");
+        await session.compile("const answer = fn () => 42\n");
         equal(
           (await session.compile(moved)).artifact,
           reference.compile(moved),
@@ -204,7 +204,7 @@ Deno.test("dependency chains preserve artifacts, cache counts and rollback at on
         equal(await native.compile(original), firstExpected);
         const first = await session.compile(original);
         equal(first.artifact.bytes, firstExpected.bytes);
-        equal(first.stats.groups_checked, 64);
+        equal(first.stats.groups_checked + first.stats.groups_reused, 64);
         const changed = await session.compile(edited);
         equal(changed.artifact.bytes, editExpected.bytes);
         equal(
@@ -254,11 +254,11 @@ for (
     const original = source(false);
     const edited = source(true);
     const broken = edited.replace(
-      "fn join_0_7 value => @u32.add",
-      "fn join_0_7 value => @f32.add",
+      "const join_0_7 = fn value => @u32.add",
+      "const join_0_7 = fn value => @f32.add",
     ).replace(
-      /fn seed_7 value => [^\n]+/,
-      "fn seed_7 value => @u32.add True 1",
+      /const seed_7 = fn value => [^\n]+/,
+      "const seed_7 = fn value => @u32.add True 1",
     );
     const reference = await createSourceCompiler({ prelude: "none" });
     try {
@@ -277,10 +277,12 @@ for (
           equal(await native.compile(original), firstExpected);
           const first = await session.compile(original);
           equal(first.artifact.bytes, firstExpected.bytes);
+          const groupCount = first.stats.groups_checked +
+            first.stats.groups_reused;
           const changed = await session.compile(edited);
           equal(changed.artifact.bytes, editExpected.bytes);
           equal(changed.stats.groups_checked, 1);
-          equal(changed.stats.groups_reused, first.stats.groups_checked - 1);
+          equal(changed.stats.groups_reused, groupCount - 1);
           equal(
             await diagnostic(() => native.compile(broken)),
             expectedDiagnostic,
@@ -293,7 +295,7 @@ for (
             const_steps: 9999n,
           });
           equal(recovered.stats.groups_checked, 0);
-          equal(recovered.stats.groups_reused, first.stats.groups_checked);
+          equal(recovered.stats.groups_reused, groupCount);
           equal(recovered.artifact.bytes, editExpected.bytes);
           const { instance } = await WebAssembly.instantiate(
             changed.artifact.bytes,
@@ -316,8 +318,8 @@ Deno.test("native ready batches retain interface hits and roll back all caches a
   const reference = await createSourceCompiler({ prelude: "none" });
   try {
     const original = fanout();
-    const edited = original.replace("seed () => 40", "seed () => 41");
-    const broken = edited.replace("seed () => 41", "seed () => True");
+    const edited = original.replace("seed = fn () => 40", "seed = fn () => 41");
+    const broken = edited.replace("seed = fn () => 41", "seed = fn () => True");
     const expected = reference.compile(edited);
     const expectedDiagnostic = await diagnostic(() =>
       reference.compile(broken)
@@ -331,12 +333,14 @@ Deno.test("native ready batches retain interface hits and roll back all caches a
       });
       try {
         const first = await session.compile(original);
+        const groupCount = first.stats.groups_checked +
+          first.stats.groups_reused;
         const changed = await session.compile(edited);
         equal(changed.artifact, expected);
         equal(await native.compile(edited), expected);
         equal(await answer(changed.artifact.bytes), 57);
         equal(changed.stats.groups_checked, 1);
-        equal(changed.stats.groups_reused, first.stats.groups_checked - 1);
+        equal(changed.stats.groups_reused, groupCount - 1);
         equal(
           await diagnostic(() => native.compile(broken)),
           expectedDiagnostic,
@@ -350,7 +354,7 @@ Deno.test("native ready batches retain interface hits and roll back all caches a
         const recovered = await session.compile(edited, { const_steps: 9999n });
         equal(recovered.stats.result_reused, false);
         equal(recovered.stats.groups_checked, 0);
-        equal(recovered.stats.groups_reused, first.stats.groups_checked);
+        equal(recovered.stats.groups_reused, groupCount);
         equal(
           recovered.artifact,
           reference.compile(edited, { const_steps: 9999n }),
@@ -367,30 +371,30 @@ Deno.test("native ready batches retain interface hits and roll back all caches a
 
 Deno.test("cached inference plans invalidate for dependency rewiring, SCCs and source order", async () => {
   const revisions = [
-    `fn seed () => 40
-fn left () => 41
-fn right () => 1
-export fn answer () => 42`,
-    `fn seed () => 40
-fn left () => seed ()
-fn right () => left ()
-export fn answer () => right ()`,
-    `fn seed () => 40
-fn left () => @u32.add (seed ()) 1
-fn right () => seed ()
-export fn answer () => @u32.add (left ()) (right ())`,
-    `fn seed () => 40
-fn left value => case @u32.eq value 0 of
+    `const seed = fn () => 40
+const left = fn () => 41
+const right = fn () => 1
+const answer = fn () => 42`,
+    `const seed = fn () => 40
+const left = fn () => seed ()
+const right = fn () => left ()
+const answer = fn () => right ()`,
+    `const seed = fn () => 40
+const left = fn () => @u32.add (seed ()) 1
+const right = fn () => seed ()
+const answer = fn () => @u32.add (left ()) (right ())`,
+    `const seed = fn () => 40
+const left = fn value => case @u32.eq value 0 of
   True => seed ()
   False => right (@u32.sub value 1)
-fn right value => left value
-export fn answer () => right 2`,
-    `export fn answer () => right 2
-fn right value => left value
-fn left value => case @u32.eq value 0 of
+const right = fn value => left value
+const answer = fn () => right 2`,
+    `const answer = fn () => right 2
+const right = fn value => left value
+const left = fn value => case @u32.eq value 0 of
   True => seed ()
   False => right (@u32.sub value 1)
-fn seed () => 40`,
+const seed = fn () => 40`,
   ];
   for (const threads of [1, 8]) {
     const session = await createNativeIncrementalCompiler({

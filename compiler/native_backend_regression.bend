@@ -3,7 +3,7 @@ import ./model.bend as M
 import ./type_data.bend as D
 
 def maybe_declaration() -> M.DataType:
-  M.DataType{M.TypeId{"regression", "Maybe"}, 1n, [M.Constructor{"Some", Some{M.ParameterTy{0n}}}, M.Constructor{"Nothing", None{}}]}
+  M.DataType{M.TypeId{"regression", "Maybe"}, 1n, [M.Constructor{"Some", Some{M.ParameterTy{0n}}, Nil{}}, M.Constructor{"Nothing", None{}, Nil{}}]}
 
 def payload_text(payload: Maybe<&2, M.Ty>) -> String:
   match payload:

@@ -55,10 +55,10 @@ Deno.test("one rank-1 callback helper instantiates separately for distinct effec
     const analysis = compiler.analyze(`
 effect Reader.ask: Unit -> U32
 effect Clock.now: Unit -> U32
-fn invoke action => action ()
-fn read_reader () => invoke Reader.ask
-fn read_clock () => invoke Clock.now
-fn pure () => invoke (fn () => 42)
+const invoke = fn action => action ()
+const read_reader = fn () => invoke Reader.ask
+const read_clock = fn () => invoke Clock.now
+const pure = fn () => invoke (fn () => 42)
 `);
     equal(labels(signature(analysis, "read_reader").effect_row), [
       "Reader.ask",
@@ -85,9 +85,9 @@ Deno.test("curried composition joins distinct callback effects without effecting
     const analysis = compiler.analyze(`
 effect Reader.adjust: U32 -> U32
 effect Clock.advance: U32 -> U32
-fn compose left => fn right => fn value => left (right value)
-fn partial () => compose Reader.adjust Clock.advance
-fn both value => compose Reader.adjust Clock.advance value
+const compose = fn left => fn right => fn value => left (right value)
+const partial = fn () => compose Reader.adjust Clock.advance
+const both = fn value => compose Reader.adjust Clock.advance value
 `);
     equal(labels(signature(analysis, "both").effect_row), [
       "Clock.advance",
@@ -107,7 +107,7 @@ Deno.test("pure let generalizes latent rows without coupling independent uses", 
   try {
     const analysis = compiler.analyze(`
 effect Reader.ask: Unit -> U32
-fn answer () => do:
+const answer = fn () => do:
   let invoke = fn action => action ()
   use value <- invoke Reader.ask
   let unrelated = invoke (fn () => True)
@@ -127,8 +127,8 @@ Deno.test("returned closures preserve rows shared with an outer callback paramet
   try {
     const source = `
 effect Reader.ask: Unit -> U32
-fn defer action => fn () => action ()
-export fn read () => (defer Reader.ask) ()
+const defer = fn action => fn () => action ()
+const read = fn () => (defer Reader.ask) ()
 `;
     const analysis = compiler.analyze(source);
     const defer = signature(analysis, "defer");
@@ -137,10 +137,16 @@ export fn read () => (defer Reader.ask) ()
     equal(defer.parameter.effects.tail, defer.result.effects.tail);
     ok(defer.result.effects.tail.$ === "RowVariable");
     equal(labels(signature(analysis, "read").effect_row), ["Reader.ask"]);
+    equal(
+      WebAssembly.Module.exports(
+        new WebAssembly.Module(compiler.compile(source).bytes),
+      ),
+      [],
+    );
     throws(
-      () => compiler.compile(source),
+      () => compiler.compile(source + "\nconst invalid: Unit -> U32 = read\n"),
       (error) =>
-        error instanceof SourceError && error.code === "backend_effect",
+        error instanceof SourceError && error.code === "effect_mismatch",
     );
   } finally {
     compiler.dispose();
@@ -152,9 +158,9 @@ Deno.test("returned providers preserve handler effects shared with their constru
   try {
     const source = `
 effect Reader.ask: Unit -> U32
-fn forward action => @effect.provider Reader.ask action
+const forward = fn action => @effect.provider Reader.ask action
 const provider = forward Reader.ask
-export fn missing () => do provider:
+const missing = fn () => do provider:
   return Reader.ask ()
 `;
     const analysis = compiler.analyze(source);
@@ -164,10 +170,17 @@ export fn missing () => do provider:
     equal(forward.parameter.effects.tail, forward.result.effects.tail);
     ok(forward.result.effects.tail.$ === "RowVariable");
     equal(labels(signature(analysis, "missing").effect_row), ["Reader.ask"]);
+    equal(
+      WebAssembly.Module.exports(
+        new WebAssembly.Module(compiler.compile(source).bytes),
+      ),
+      [],
+    );
     throws(
-      () => compiler.compile(source),
+      () =>
+        compiler.compile(source + "\nconst invalid: Unit -> U32 = missing\n"),
       (error) =>
-        error instanceof SourceError && error.code === "backend_effect",
+        error instanceof SourceError && error.code === "effect_mismatch",
     );
   } finally {
     compiler.dispose();

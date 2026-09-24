@@ -1,77 +1,94 @@
 // The bootstrap prelude is ordinary Blot source. @u32.* and @f32.* are primitives.
-// Numeric operators are U32-specific until static associated dispatch exists.
+// Operators use ordinary functions with compile-time associated dispatch.
 infixr 0 ($) = apply
-infix 30 (==) = U32.eq
-infix 30 (!=) = U32.ne
-infix 30 (<) = U32.lt
-infix 30 (<=) = U32.le
-infix 30 (>) = U32.gt
-infix 30 (>=) = U32.ge
-infixl 60 (+) = U32.add
-infixl 60 (-) = U32.sub
-infixl 70 (*) = U32.mul
+infix 30 (==) = eq
+infix 30 (!=) = ne
+infix 30 (<) = lt
+infix 30 (<=) = le
+infix 30 (>) = gt
+infix 30 (>=) = ge
+infixl 60 (+) = add
+infixl 60 (-) = sub
+infixl 70 (*) = mul
+infixl 70 (/) = div
 
-export data Maybe a = Some a | Nothing
-export data Result value error = Ok value | Err error
+const add = fn left => fn right => @type.call "add" left right
+const sub = fn left => fn right => @type.call "sub" left right
+const mul = fn left => fn right => @type.call "mul" left right
+const div = fn left => fn right => @type.call "div" left right
+const eq = fn left => fn right => @type.call "eq" left right
+const ne = fn left => fn right => @type.call "ne" left right
+const lt = fn left => fn right => @type.call "lt" left right
+const le = fn left => fn right => @type.call "le" left right
+const gt = fn left => fn right => @type.call "gt" left right
+const ge = fn left => fn right => @type.call "ge" left right
 
-export fn identity value => value
-export fn apply function => fn value => function value
-export fn always value => fn ignored => value
-export fn compose outer => fn inner => fn value => outer (inner value)
-export fn flip combine => fn right => fn left => combine left right
-export fn on combine => fn project => fn left => fn right =>
+type Maybe a is data = Some a | Nothing
+type Result [value, error] is data = Ok value | Err error
+type Type witness is data = Type witness
+
+const identity = fn value => value
+const apply = fn function => fn value => function value
+const always = fn value => fn ignored => value
+const compose = fn outer => fn inner => fn value => outer (inner value)
+const flip = fn combine => fn right => fn left => combine left right
+const on = fn combine => fn project => fn left => fn right =>
   combine (project left) (project right)
 
-export fn Bool.not value => case value of
+const Bool.not = fn value => case value of
   True => False
   False => True
 
-export fn U32.add left => fn right => @u32.add left right
-export fn U32.sub left => fn right => @u32.sub left right
-export fn U32.mul left => fn right => @u32.mul left right
-export fn U32.eq left => fn right => @u32.eq left right
-export fn U32.lt left => fn right => @u32.lt left right
-export fn U32.ne left => fn right => Bool.not (U32.eq left right)
-export fn U32.le left => fn right => Bool.not (U32.lt right left)
-export fn U32.gt left => fn right => U32.lt right left
-export fn U32.ge left => fn right => Bool.not (U32.lt left right)
-export fn U32.to_f32 value => @u32.to_f32 value
+const Type.eq = fn left => fn right => case left, right of
+  Type a, Type b => @type.same a b
+const Type.ne = fn left => fn right => Bool.not (Type.eq left right)
 
-export fn F32.add left => fn right => @f32.add left right
-export fn F32.sub left => fn right => @f32.sub left right
-export fn F32.mul left => fn right => @f32.mul left right
-export fn F32.div left => fn right => @f32.div left right
-export fn F32.eq left => fn right => @f32.eq left right
-export fn F32.ne left => fn right => @f32.ne left right
-export fn F32.lt left => fn right => @f32.lt left right
-export fn F32.le left => fn right => @f32.le left right
-export fn F32.gt left => fn right => @f32.gt left right
-export fn F32.ge left => fn right => @f32.ge left right
-export fn F32.neg value => @f32.neg value
-export fn F32.abs value => @f32.abs value
-export fn F32.sqrt value => @f32.sqrt value
-export fn F32.floor value => @f32.floor value
-export fn F32.ceil value => @f32.ceil value
-export fn F32.trunc value => @f32.trunc value
+const U32.add = fn left => fn right => @u32.add left right
+const U32.sub = fn left => fn right => @u32.sub left right
+const U32.mul = fn left => fn right => @u32.mul left right
+const U32.eq = fn left => fn right => @u32.eq left right
+const U32.lt = fn left => fn right => @u32.lt left right
+const U32.ne = fn left => fn right => Bool.not (U32.eq left right)
+const U32.le = fn left => fn right => Bool.not (U32.lt right left)
+const U32.gt = fn left => fn right => U32.lt right left
+const U32.ge = fn left => fn right => Bool.not (U32.lt left right)
+const U32.to_f32 = fn value => @u32.to_f32 value
+
+const F32.add = fn left => fn right => @f32.add left right
+const F32.sub = fn left => fn right => @f32.sub left right
+const F32.mul = fn left => fn right => @f32.mul left right
+const F32.div = fn left => fn right => @f32.div left right
+const F32.eq = fn left => fn right => @f32.eq left right
+const F32.ne = fn left => fn right => @f32.ne left right
+const F32.lt = fn left => fn right => @f32.lt left right
+const F32.le = fn left => fn right => @f32.le left right
+const F32.gt = fn left => fn right => @f32.gt left right
+const F32.ge = fn left => fn right => @f32.ge left right
+const F32.neg = fn value => @f32.neg value
+const F32.abs = fn value => @f32.abs value
+const F32.sqrt = fn value => @f32.sqrt value
+const F32.floor = fn value => @f32.floor value
+const F32.ceil = fn value => @f32.ceil value
+const F32.trunc = fn value => @f32.trunc value
 // Truncates toward zero and saturates; NaN/negative values become zero.
-export fn F32.to_u32 value => @f32.to_u32 value
-export fn F32.min left => fn right => case F32.lt left right of
+const F32.to_u32 = fn value => @f32.to_u32 value
+const F32.min = fn left => fn right => case F32.lt left right of
   True => left
   False => right
-export fn F32.max left => fn right => case F32.gt left right of
+const F32.max = fn left => fn right => case F32.gt left right of
   True => left
   False => right
-export fn F32.clamp low => fn high => fn value =>
+const F32.clamp = fn low => fn high => fn value =>
   F32.min high (F32.max low value)
-export fn F32.lerp left => fn right => fn weight =>
+const F32.lerp = fn left => fn right => fn weight =>
   F32.add left (F32.mul (F32.sub right left) weight)
-export fn F32.square value => F32.mul value value
-export fn F32.length3 x => fn y => fn z =>
+const F32.square = fn value => F32.mul value value
+const F32.length3 = fn x => fn y => fn z =>
   F32.sqrt (F32.add (F32.add (F32.square x) (F32.square y)) (F32.square z))
-export fn F32.is_finite value => F32.le (F32.abs value) 3.402823466e38
+const F32.is_finite = fn value => F32.le (F32.abs value) 3.402823466e38
 
 // A positive finite period wraps finite values into [0, period).
-export fn F32.wrap period => fn value => do:
+const F32.wrap = fn period => fn value => do:
   let wrapped = F32.sub value (F32.mul period (F32.floor (F32.div value period)))
   if F32.ge wrapped period:
     return 0.0
@@ -79,20 +96,20 @@ export fn F32.wrap period => fn value => do:
     return F32.add wrapped period
   return wrapped
 
-export fn F32.lerp_angle left => fn right => fn weight => do:
+const F32.lerp_angle = fn left => fn right => fn weight => do:
   let difference = F32.sub (F32.wrap 6.283185307 (F32.add (F32.sub right left) 3.141592654)) 3.141592654
   return F32.add left (F32.mul difference weight)
 
 // Split 2*pi keeps range reduction accurate for |radians| <= 8192.
 // Outside that explicit range, trig returns NaN instead of inaccurate geometry.
-fn f32_reduced_radians value => do:
+const f32_reduced_radians = fn value => do:
   if F32.gt (F32.abs value) 8192.0:
     return F32.div 0.0 0.0
   let turns = F32.floor (F32.add (F32.mul value 0.15915494309189535) 0.5)
   return F32.sub (F32.sub value (F32.mul turns 6.28125)) (F32.mul turns 0.001935307179586477)
 
 // Fold to [-pi/2, pi/2], then evaluate the degree-11 Taylor polynomial.
-export fn F32.sin value => do:
+const F32.sin = fn value => do:
   let angle = f32_reduced_radians value
   let x = case F32.gt angle 1.570796327 of
     True => F32.sub 3.141592654 angle
@@ -106,7 +123,7 @@ export fn F32.sin value => do:
   let term_3 = F32.add (-1.666666666666667e-1) (F32.mul square term_5)
   return F32.mul x (F32.add 1.0 (F32.mul square term_3))
 
-export fn F32.cos value => do:
+const F32.cos = fn value => do:
   let angle = F32.abs (f32_reduced_radians value)
   let outside = F32.gt angle 1.570796327
   let x = case outside of
@@ -124,38 +141,49 @@ export fn F32.cos value => do:
     False => result
 
 // Like division, tan is unbounded near odd multiples of pi/2.
-export fn F32.tan value => F32.div (F32.sin value) (F32.cos value)
+const F32.tan = fn value => F32.div (F32.sin value) (F32.cos value)
 
-export fn Maybe.pure value => Some value
-export fn Maybe.map transform => fn candidate => case candidate of
+const Maybe.pure = fn value => Some value
+const Maybe.map = fn transform => fn candidate => case candidate of
   Some value => Some (transform value)
   Nothing => Nothing
-export fn Maybe.bind candidate => fn next => case candidate of
+const Maybe.bind = fn candidate => fn next => case candidate of
   Some value => next value
   Nothing => Nothing
-export fn Maybe.unwrap_or fallback => fn candidate => case candidate of
+const Maybe.unwrap_or = fn fallback => fn candidate => case candidate of
   Some value => value
   Nothing => fallback
-export fn Maybe.is_some candidate => case candidate of
+const Maybe.is_some = fn candidate => case candidate of
   Some _ => True
   Nothing => False
-export fn Maybe.to_result error => fn candidate => case candidate of
+const Maybe.to_result = fn error => fn candidate => case candidate of
   Some value => Ok value
   Nothing => Err error
 
-export fn Result.pure value => Ok value
-export fn Result.map transform => fn candidate => case candidate of
+const Result.pure = fn value => Ok value
+const Result.map = fn transform => fn candidate => case candidate of
   Ok value => Ok (transform value)
   Err error => Err error
-export fn Result.map_error transform => fn candidate => case candidate of
+const Result.map_error = fn transform => fn candidate => case candidate of
   Ok value => Ok value
   Err error => Err (transform error)
-export fn Result.bind candidate => fn next => case candidate of
+const Result.bind = fn candidate => fn next => case candidate of
   Ok value => next value
   Err error => Err error
-export fn Result.unwrap_or fallback => fn candidate => case candidate of
+const Result.unwrap_or = fn fallback => fn candidate => case candidate of
   Ok value => value
   Err _ => fallback
-export fn Result.to_maybe candidate => case candidate of
+const Result.to_maybe = fn candidate => case candidate of
   Ok value => Some value
   Err _ => Nothing
+
+const Array.length = fn values => @array.length values
+const Array.is_empty = fn values => Array.length values == 0
+const Array.get = fn values => fn index => do:
+  if index < Array.length values:
+    return Some (@array.get values index)
+  return Nothing
+const Array.set = fn values => fn index => fn value => do:
+  if index < Array.length values:
+    return Some (@array.set values index value)
+  return Nothing

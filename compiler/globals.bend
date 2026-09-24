@@ -1,6 +1,7 @@
 import Base
 import ./model.bend as M
 import ./infer.bend as I
+import ./types.bend as T
 import ./dependency.bend as D
 
 type Declaration is Data:
@@ -116,32 +117,69 @@ def definition_inference(value: I.Inference, ty: M.Ty) -> I.Inference:
   I.Inference{old, coverage, exits, reflections} = value
   I.Inference{ty, coverage, exits, reflections}
 
+def reference_set(names: List<&2, String>, found: Set()) -> Set():
+  match names:
+    case Nil{}:
+      found
+    case head <> tail:
+      reference_set(tail, Set.add(found, head))
+
+def referenced_bindings_indexed(bindings: List<&2, I.Binding>, +names: Set()) -> List<&2, I.Binding>:
+  match bindings:
+    case Nil{}:
+      Nil{}
+    case +binding <> tail:
+      I.Binding{name, ty, variables} = binding
+      +rest = referenced_bindings_indexed(tail, names)
+      Bool.pick(List<&2, I.Binding>, D.member(names, name), binding <> rest, rest)
+
+def referenced_bindings(bindings: List<&2, I.Binding>, names: List<&2, String>) -> List<&2, I.Binding>:
+  referenced_bindings_indexed(bindings, reference_set(names, Set.new()))
+
+# Local generalization must exclude shared variables from referenced globals.
+# Unrelated declarations have no path to those variables; retaining every
+# expanded declaration here makes each local binding rescan the entire program.
+def declaration_bindings(name: String, body: M.Expr, bindings: List<&2, I.Binding>) -> Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
+  do Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
+    references : D.References <- D.references(Nat.mul(256n, 256n), D.Expression{body})
+    return referenced_bindings(bindings, name <> D.names_of(references))
+
+def initializer_effect_code(value: M.Expr) -> String:
+  match value:
+    case M.RuntimeInitExpr{expression}:
+      "initializer_effect"
+    case _:
+      "const_effect"
+
 def infer_declaration(declaration: Declaration, +environment: Environment, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, functions: List<&2, String>) -> Result<&2, &2, M.Diagnostic, Environment>:
   match declaration:
-    case FunctionDeclaration{M.Function{+name, exported, parameter, p, r, body}}:
+    case FunctionDeclaration{M.Function{+name, exported, parameter, p, r, +body}}:
       +bindings = env_bindings(environment)
       do Result<&2, &2, M.Diagnostic, Environment>:
         +ty : M.Ty <- binding_type(I.lookup_binding(bindings, name), name)
         +param : M.Ty <- function_parameter(ty, name)
         +result : M.Ty <- function_result(ty, name)
         ambient : M.EffectRow <- function_effects(ty, name)
-        +context : I.Context = I.Context{bindings, Nil{}, Nil{}, types, operations, name, functions, ambient}
+        visible : List<&2, I.Binding> <- declaration_bindings(name, body, bindings)
+        +context : I.Context = I.Context{visible, Nil{}, Nil{}, types, operations, name, functions, ambient}
         s1 : I.State <- I.annotation(p, param, env_state(environment), context)
         s2 : I.State <- I.annotation(r, result, s1, context)
         +value : I.Typing <- I.expr(body, I.extend(context, [I.Binding{parameter, param, Nil{}}]), s2)
         state : I.State <- I.unify(I.type_of(value), result, I.state_of(value), name)
-        return Environment{bindings, I.Definition{name, definition_inference(I.inference_of(value), ty)} <> env_definitions(environment), state}
-    case ConstantDeclaration{M.Constant{+name, exported, ann, value}}:
+        return Environment{bindings, I.Definition{name, definition_inference(I.inference_of(value), ty)} <> env_definitions(environment), I.clear_annotations(state)}
+    case ConstantDeclaration{M.Constant{+name, exported, ann, +value}}:
       +bindings = env_bindings(environment)
       +ambient = {M.EffectRow{Nil{}, M.RowVariable{I.next_of(env_state(environment))}} : M.EffectRow}
-      +context = {I.Context{bindings, Nil{}, Nil{}, types, operations, name, functions, ambient} : I.Context}
       do Result<&2, &2, M.Diagnostic, Environment>:
+        visible : List<&2, I.Binding> <- declaration_bindings(name, value, bindings)
+        +context : I.Context = I.Context{visible, Nil{}, Nil{}, types, operations, name, functions, ambient}
         +ty : M.Ty <- binding_type(I.lookup_binding(bindings, name), name)
         s1 : I.State <- I.annotation(ann, ty, I.with_next(env_state(environment), 1n+I.next_of(env_state(environment))), context)
+        effect_code : String = initializer_effect_code(value)
         +value : I.Typing <- I.expr(value, context, s1)
         unified : I.State <- I.unify(I.type_of(value), ty, I.state_of(value), name)
-        state : I.State <- I.require_pure(ambient, unified, name, "const_effect")
-        return Environment{bindings, I.Definition{name, definition_inference(I.inference_of(value), ty)} <> env_definitions(environment), state}
+        state : I.State <- I.require_pure(ambient, unified, name, effect_code)
+        return Environment{bindings, I.Definition{name, definition_inference(I.inference_of(value), ty)} <> env_definitions(environment), I.clear_annotations(state)}
 
 def infer_component(names: List<&2, String>, +declarations: List<&2, Declaration>, environment: Environment, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, +functions: List<&2, String>) -> Result<&2, &2, M.Diagnostic, Environment>:
   match names:
@@ -207,14 +245,14 @@ def infer_groups(groups: List<&2, List<&2, String>>, +nodes: List<&2, D.Node>, +
         infer_groups(tail, nodes, declarations, generalized, operations, types, functions)
 
 def infer_with(declarations: List<&2, Declaration>, +nodes: List<&2, D.Node>, operations: List<&2, M.Operation>, types: List<&2, M.DataType>, imported: Environment, imported_functions: List<&2, String>) -> Result<&2, &2, M.Diagnostic, Environment>:
-  Environment{external_bindings, external_definitions, I.State{substitutions, +start}} = imported
+  Environment{external_bindings, external_definitions, I.State{substitutions, +start, annotations}} = imported
   +decls = declarations
   created = initial_bindings(decls, start)
   next = initial_next(decls, start)
   +bindings = List.append(&2, I.Binding, created, external_bindings)
   do Result<&2, &2, M.Diagnostic, Environment>:
     groups : List<&2, List<&2, String>> <- D.components(nodes)
-    infer_groups(groups, nodes, decls, Environment{bindings, external_definitions, I.State{substitutions, next}}, operations, types, List.append(&2, String, function_names(decls), imported_functions))
+    infer_groups(groups, nodes, decls, Environment{bindings, external_definitions, I.State{substitutions, next, annotations}}, operations, types, List.append(&2, String, function_names(decls), imported_functions))
 
 def infer(declarations: List<&2, Declaration>, nodes: List<&2, D.Node>, operations: List<&2, M.Operation>, types: List<&2, M.DataType>) -> Result<&2, &2, M.Diagnostic, Environment>:
-  infer_with(declarations, nodes, operations, types, Environment{Nil{}, Nil{}, I.State{Nil{}, 0n}}, Nil{})
+  infer_with(declarations, nodes, operations, types, Environment{Nil{}, Nil{}, I.State{T.empty(), 0n, MTip{}}}, Nil{})

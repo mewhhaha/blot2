@@ -26,7 +26,7 @@ for (const prelude of ["none", "default"] as const) {
       for (const newline of ["\n", "\r", "\r\n"]) {
         const source = [
           "// Unicode 🙂",
-          "export fn answer () => do:",
+          "const answer = fn () => do:",
           "  let value = 40",
           "  return @u32.add value 2",
         ].join(newline);

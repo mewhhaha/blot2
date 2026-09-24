@@ -21,12 +21,12 @@ data DeltaTime = DeltaTime U32
 #[resource]
 data Counter = Counter U32
 
-fn read_position () => @ecs.get Position
-fn write_position value => @ecs.set value
+const read_position = fn () => @ecs.get Position
+const write_position = fn value => @ecs.set value
 
 // Query: Position + Velocity. DeltaTime is world-level, not an entity filter.
 // The getter/setter helpers retain their inferred effects.
-export fn move () => do:
+const move = fn () => do:
   use position <- read_position ()
   use velocity <- @ecs.get Velocity
   use time <- @ecs.get DeltaTime
@@ -36,7 +36,7 @@ export fn move () => do:
   use write_position (Position (current + speed * seconds))
   return ()
 
-export fn visit () => do:
+const visit = fn () => do:
   use read_position ()
   use visits <- @ecs.get Visits
   let Visits count = visits
@@ -44,29 +44,29 @@ export fn visit () => do:
   return ()
 
 // A write alone requires presence; it does not attach Velocity to other entities.
-export fn reset_velocity () => @ecs.set (Velocity 2)
+const reset_velocity = fn () => @ecs.set (Velocity 2)
 
 // Resource-only systems run once per update, including in an empty world.
-export fn increment () => do:
+const increment = fn () => do:
   use counter <- @ecs.get Counter
   let Counter count = counter
   use @ecs.set (Counter (count + 1))
   return ()
 
-export fn double () => do:
+const double = fn () => do:
   use counter <- @ecs.get Counter
   let Counter count = counter
   use @ecs.set (Counter (count * 2))
   return ()
 
 // Query: Position, not Ghost. Insertion is a structural scheduling barrier.
-export fn add_ghost () => do:
+const add_ghost = fn () => do:
   use read_position ()
   use @ecs.insert (Ghost 4)
   return ()
 
 // This later query sees the newly inserted component in the successor world.
-export fn tick_ghost () => do:
+const tick_ghost = fn () => do:
   use ghost <- @ecs.get Ghost
   let Ghost remaining = ghost
   if remaining == 0:

@@ -66,13 +66,13 @@ for (const prelude of ["none", "default"] as const) {
 Deno.test("native const values preserve closures, captures, and nested ADTs", async () => {
   const source = `
 data Maybe a = Some a | Nothing
-fn identity value => value
+const identity = fn value => value
 const empty = Nothing
 const nested = Some (Some 42)
 const reference = identity
 const constructor = Some
 const closure = (fn captured => fn value => @u32.add captured value) 2
-export fn answer () => closure 40
+const answer = fn () => closure 40
 `;
   const js = await createSourceCompiler({ prelude: "none" });
   const native = await createNativeCompiler({ prelude: "none" });
@@ -89,10 +89,10 @@ Deno.test("native diagnostics retain source offsets, budgets, and recovery", asy
   const js = await createSourceCompiler({ prelude: "none" });
   try {
     const cases = [
-      { source: "// 😀\r\nexport fn answer () => missing\r\n" },
-      { source: "export fn answer () => @u32.add True 1\n" },
+      { source: "// 😀\r\nconst answer = fn () => missing\r\n" },
+      { source: "const answer = fn () => @u32.add True 1\n" },
       { source: "const answer = 42\n", const_steps: 0n },
-      { source: "export fn answer () => do:\n  return 42\n" },
+      { source: "const answer = fn () => do:\n  return 42\n" },
     ];
     for (const entry of cases) {
       let expected;

@@ -135,12 +135,12 @@ def coverage(+fuel: Nat, work: Work, +types: List<&2, M.DataType>) -> Result<&2,
       coverage(rest, Constructors{constructors, arguments, remaining, rows}, types)
     case 1n+rest Constructors{Nil{}, arguments, remaining, rows}:
       Done{True{}}
-    case 1n+rest Constructors{M.Constructor{name, None{}} <> tail, +arguments, +remaining, +rows}:
+    case 1n+rest Constructors{M.Constructor{name, None{}, fields} <> tail, +arguments, +remaining, +rows}:
       do Result<&2, &2, M.Diagnostic, Bool>:
         current : Bool <- coverage(rest, Cover{remaining, specialize(rows, ConstructorHead{name, False{}})}, types)
         following : Bool <- coverage(rest, Constructors{tail, arguments, remaining, rows}, types)
         return Bool.and(current, following)
-    case 1n+rest Constructors{M.Constructor{name, Some{payload}} <> tail, +arguments, +remaining, +rows}:
+    case 1n+rest Constructors{M.Constructor{name, Some{payload}, fields} <> tail, +arguments, +remaining, +rows}:
       do Result<&2, &2, M.Diagnostic, Bool>:
         ty : M.Ty <- T.parameters(arguments, 0n, payload)
         current : Bool <- coverage(rest, Cover{ty <> remaining, specialize(rows, ConstructorHead{name, True{}})}, types)
@@ -163,10 +163,29 @@ def require(complete: Bool, types: List<&2, M.Ty>, subject: String) -> Result<&2
     case False{}:
       Fail{M.Diagnostic{"non_exhaustive_match", subject, "pattern rows do not cover every value of (" ++ types_show(types) ++ ")"}}
 
-def check(constraints: List<&2, I.Coverage>, +substitutions: List<&2, T.Substitution>, +types: List<&2, M.DataType>) -> Result<&2, &2, M.Diagnostic, Unit>:
+def value_pattern_type(ty: M.Ty, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match ty:
+    case M.U32Ty{}:
+      Done{Unit{}}
+    case M.BoolTy{}:
+      Done{Unit{}}
+    case _:
+      Fail{M.Diagnostic{"value_pattern_type", subject, "value patterns require U32 or Bool; annotate an otherwise unconstrained parameter"}}
+
+def check(constraints: List<&2, I.Coverage>, +substitutions: T.Substitutions, +types: List<&2, M.DataType>) -> Result<&2, &2, M.Diagnostic, Unit>:
   match constraints:
     case Nil{}:
       Done{Unit{}}
+    case I.OperationNeed{identity, template, arguments, function_type, subject} <> tail:
+      check(tail, substitutions, types)
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject} <> tail:
+      # Monomorphization discharges these; this pass checks pattern coverage.
+      check(tail, substitutions, types)
+    case I.ValuePatternType{inferred, subject} <> tail:
+      do Result<&2, &2, M.Diagnostic, Unit>:
+        resolved : M.Ty <- T.resolve(substitutions, inferred)
+        valid : Unit <- value_pattern_type(resolved, subject)
+        check(tail, substitutions, types)
     case I.Coverage{inferred, patterns, subject} <> tail:
       do Result<&2, &2, M.Diagnostic, Unit>:
         +resolved : List<&2, M.Ty> <- T.resolve_work(substitutions, U32.to_nat(65536), T.ManyTypes{inferred})

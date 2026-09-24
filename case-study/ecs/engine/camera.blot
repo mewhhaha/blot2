@@ -8,22 +8,22 @@ import { Input, FocusLost, PointerDown, PointerUp, Secondary, PointerMoved, Scro
 import { Vec3, wrap_angle } from "./spatial"
 
 #[resource]
-export data OrbitCamera = OrbitCamera { yaw: F32, pitch: F32, distance: F32 }
+type OrbitCamera is data = OrbitCamera { yaw: F32, pitch: F32, distance: F32 }
 #[resource]
-data Orbiting = Orbiting Bool
+type Orbiting is data = Orbiting Bool
 #[resource]
-export data OrbitControls = OrbitControls {
+type OrbitControls is data = OrbitControls {
   left: U32, right: U32, inward: U32, outward: U32, speed: F32,
 }
 
 const half_fov_tangent = F32.tan 0.5235987756
 
-fn axis keys => fn negative => fn positive => case input.held keys negative, input.held keys positive of
+const axis = fn keys => fn negative => fn positive => case input.held keys negative, input.held keys positive of
   True, False => -1.0
   False, True => 1.0
   _, _ => 0.0
 
-fn receive () => do:
+const receive = fn () => do:
   use controls <- ecs.get Input
   use orbiting_value <- ecs.get Orbiting
   use camera <- ecs.get OrbitCamera
@@ -34,19 +34,19 @@ fn receive () => do:
     PointerUp Secondary, _ => (camera, False)
     Scrolled wheel, _ => do:
       let next = camera
-      next.distance := F32.clamp 3.0 24.0 (F32.add self (F32.mul wheel 0.005))
+      next.distance := F32.clamp 3.0 24.0 (self + wheel * 0.005)
       return (next, orbiting)
     PointerMoved, True => do:
       let next = camera
-      next.yaw := wrap_angle (F32.sub self (F32.mul controls.delta.x 0.006))
-      next.pitch := F32.clamp 0.15 1.35 (F32.add self (F32.mul controls.delta.y 0.005))
+      next.yaw := wrap_angle (self - controls.delta.x * 0.006)
+      next.pitch := F32.clamp 0.15 1.35 (self + controls.delta.y * 0.005)
       return (next, True)
     _, _ => (camera, orbiting)
   use ecs.set next
   use ecs.set (Orbiting active)
   return ()
 
-fn tick () => do:
+const tick = fn () => do:
   use frame_value <- ecs.get Frame
   use controls <- ecs.get OrbitControls
   use keys <- ecs.get Input
@@ -55,13 +55,13 @@ fn tick () => do:
   let turn = axis keys.held controls.left controls.right
   let zoom = axis keys.held controls.inward controls.outward
   let next = camera
-  next.yaw := wrap_angle (F32.add self (F32.mul (F32.mul turn frame.seconds) controls.speed))
-  next.distance := F32.clamp 3.0 24.0 (F32.add self (F32.mul (F32.mul zoom frame.seconds) 6.0))
+  next.yaw := wrap_angle (self + turn * frame.seconds * controls.speed)
+  next.distance := F32.clamp 3.0 24.0 (self + zoom * frame.seconds * 6.0)
   use ecs.set next
   return ()
 
 // No hit includes a minimized viewport, a parallel ray or a plane behind the eye.
-export fn ground_point camera => fn viewport => fn pointer => fn ground_height => do:
+const ground_point = fn camera => fn viewport => fn pointer => fn ground_height => do:
   if Bool.not (F32.gt viewport.width 0.0):
     return Nothing
   if Bool.not (F32.gt viewport.height 0.0):
@@ -70,30 +70,30 @@ export fn ground_point camera => fn viewport => fn pointer => fn ground_height =
   let cos_yaw = F32.cos camera.yaw
   let sin_pitch = F32.sin camera.pitch
   let cos_pitch = F32.cos camera.pitch
-  let back_x = F32.mul sin_yaw cos_pitch
-  let back_z = F32.mul cos_yaw cos_pitch
-  let eye_x = F32.mul back_x camera.distance
-  let eye_y = F32.mul sin_pitch camera.distance
-  let eye_z = F32.mul back_z camera.distance
-  let x = F32.mul (F32.mul (F32.sub (F32.div (F32.mul 2.0 pointer.x) viewport.width) 1.0) half_fov_tangent) (F32.div viewport.width viewport.height)
-  let y = F32.mul (F32.sub 1.0 (F32.div (F32.mul 2.0 pointer.y) viewport.height)) half_fov_tangent
-  let direction_x = F32.sub (F32.sub (F32.mul cos_yaw x) back_x) (F32.mul (F32.mul sin_yaw sin_pitch) y)
-  let direction_y = F32.sub (F32.mul cos_pitch y) sin_pitch
-  let direction_z = F32.sub (F32.sub (F32.neg back_z) (F32.mul sin_yaw x)) (F32.mul (F32.mul cos_yaw sin_pitch) y)
+  let back_x = sin_yaw * cos_pitch
+  let back_z = cos_yaw * cos_pitch
+  let eye_x = back_x * camera.distance
+  let eye_y = sin_pitch * camera.distance
+  let eye_z = back_z * camera.distance
+  let x = ((2.0 * pointer.x / viewport.width - 1.0) * half_fov_tangent) * (viewport.width / viewport.height)
+  let y = (1.0 - 2.0 * pointer.y / viewport.height) * half_fov_tangent
+  let direction_x = cos_yaw * x - back_x - sin_yaw * sin_pitch * y
+  let direction_y = cos_pitch * y - sin_pitch
+  let direction_z = (F32.neg back_z) - sin_yaw * x - cos_yaw * sin_pitch * y
   if F32.lt (F32.abs direction_y) 1e-6:
     return Nothing
-  let length = F32.div (F32.sub ground_height eye_y) direction_y
+  let length = (ground_height - eye_y) / direction_y
   if F32.le length 0.0:
     return Nothing
-  let ground_x = F32.add eye_x (F32.mul direction_x length)
-  let ground_z = F32.add eye_z (F32.mul direction_z length)
+  let ground_x = eye_x + direction_x * length
+  let ground_z = eye_z + direction_z * length
   if Bool.not (F32.is_finite ground_x):
     return Nothing
   if Bool.not (F32.is_finite ground_z):
     return Nothing
   return Some (Vec3 { x: ground_x, y: ground_height, z: ground_z })
 
-fn project () => do:
+const project = fn () => do:
   use frame_value <- ecs.get Frame
   use current <- ecs.get OrbitCamera
   use previous <- ecs.previous OrbitCamera
@@ -117,23 +117,23 @@ fn project () => do:
   let cos_pitch = F32.cos pitch
   let right_x = cos_yaw
   let right_z = F32.neg sin_yaw
-  let up_x = F32.neg (F32.mul sin_yaw sin_pitch)
+  let up_x = F32.neg (sin_yaw * sin_pitch)
   let up_y = cos_pitch
-  let up_z = F32.neg (F32.mul cos_yaw sin_pitch)
-  let back_x = F32.mul sin_yaw cos_pitch
+  let up_z = F32.neg (cos_yaw * sin_pitch)
+  let back_x = sin_yaw * cos_pitch
   let back_y = sin_pitch
-  let back_z = F32.mul cos_yaw cos_pitch
+  let back_z = cos_yaw * cos_pitch
   use render.view [
     right_x, up_x, back_x, 0.0,
     0.0, up_y, back_y, 0.0,
     right_z, up_z, back_z, 0.0,
     0.0, 0.0, F32.neg distance, 1.0,
   ]
-  let tangent = F32.div 1.0 half_fov_tangent
-  let depth = F32.div 100.0 (F32.sub 0.1 100.0)
-  let translation = F32.div 10.0 (F32.sub 0.1 100.0)
+  let tangent = 1.0 / half_fov_tangent
+  let depth = 100.0 / (0.1 - 100.0)
+  let translation = 10.0 / (0.1 - 100.0)
   use render.projection [
-    F32.div (F32.mul tangent height) width, 0.0, 0.0, 0.0,
+    tangent * height / width, 0.0, 0.0, 0.0,
     0.0, tangent, 0.0, 0.0,
     0.0, 0.0, depth, -1.0,
     0.0, 0.0, translation, 0.0,
@@ -141,7 +141,7 @@ fn project () => do:
   return ()
 
 // Install after input.plugin; game bindings and initial camera are explicit.
-export fn plugin initial => fn controls => fn builder => do:
+const plugin = fn initial => fn controls => fn builder => do:
   let next = app.insert_resource initial builder
   next := app.insert_resource controls self
   next := app.insert_resource (Orbiting False) self

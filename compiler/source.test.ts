@@ -87,7 +87,7 @@ sourceTest(
     equal(call(exports, "capped", 100), 42);
     equal(call(exports, "choose", 1), 20);
     equal(call(exports, "choose", 0), 22);
-    equal(exports["U32.increment"], undefined);
+    equal(call(exports, "U32.increment", 41), 42);
     ok(exports.base instanceof WebAssembly.Global);
     equal(exports.base.value, 41);
     throws(() => {
@@ -103,10 +103,10 @@ sourceTest(
     const { analysis, exports } = await instantiate(
       compiler,
       `
-export const answer = twice 21
-fn twice value => @u32.mul value 2
-export fn entry () => identity answer
-fn identity value => value
+const answer = twice 21
+const twice = fn value => @u32.mul value 2
+const entry = fn () => identity answer
+const identity = fn value => value
 `,
     );
     equal(call(exports, "entry"), 42);
@@ -122,14 +122,14 @@ sourceTest(
   async (compiler) => {
     const { analysis, exports } = await instantiate(
       compiler,
-      `fn next value => @u32.add value 1
-export const answer = do:
+      `const next = fn value => @u32.add value 1
+const answer = do:
   use start: U32 <- 20
   use _ <- next start
   use result <-
     @u32.add start 22
   return result
-export fn twice_next (value: U32) => do:
+const twice_next = fn (value: U32) => do:
   use value <- next value
   if True:
     use value <- 0
@@ -148,7 +148,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `export fn choose (condition: Bool) => do:
+      `const choose = fn (condition: Bool) => do:
   use base <- do:
     if condition:
       return 20
@@ -165,8 +165,8 @@ sourceTest(
 sourceTest(
   "bare use compiles exactly like an explicit discard binding",
   async (compiler) => {
-    const source = `fn U32.increment value => @u32.add value 1
-export fn discard (value: U32) => do:
+    const source = `const U32.increment = fn value => @u32.add value 1
+const discard = fn (value: U32) => do:
   use value
   use U32.increment value
   use (U32.increment value)
@@ -189,10 +189,10 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `export const answer = do:
+      `const answer = do:
   use @u32.add 20 22
   return 42
-export fn nested (condition: Bool) => do:
+const nested = fn (condition: Bool) => do:
   let value = 42
   use do:
     if condition:
@@ -204,13 +204,16 @@ export fn nested (condition: Bool) => do:
     equal((exports.answer as WebAssembly.Global).value, 42);
     equal(call(exports, "nested", 0), 42);
     equal(call(exports, "nested", 1), 42);
-    const discarded = "fn bad () => do:\n  use 42\n  return _";
+    const discarded = "const bad = fn () => do:\n  use 42\n  return _";
     rejects(compiler, discarded, "unknown_value", discarded.lastIndexOf("_"));
-    const unknown = "fn bad () => do:\n  use missing\n  return 42";
+    const unknown = "const bad = fn () => do:\n  use missing\n  return 42";
     rejects(compiler, unknown, "unknown_value", unknown.indexOf("missing"));
     for (const statement of ["use", "use value: U32", "use <- 42"]) {
       throws(
-        () => compiler.compile(`fn bad () => do:\n  ${statement}\n  return 42`),
+        () =>
+          compiler.compile(
+            `const bad = fn () => do:\n  ${statement}\n  return 42`,
+          ),
         SourceError,
       );
     }
@@ -221,7 +224,7 @@ sourceTest(
   "discarding a use result still evaluates its RHS",
   (compiler) => {
     for (const discard of ["use _ <-", "use"]) {
-      const source = `fn forever () -> U32 => forever ()
+      const source = `const forever = fn () -> U32 => forever ()
 const bad = do:
   ${discard} forever ()
   return 42
@@ -239,26 +242,29 @@ sourceTest(
   "use enforces annotations and scope, and discard is not a binding",
   (compiler) => {
     const annotated =
-      "fn bad () => do:\n  use value: Bool <- 42\n  return value";
+      "const bad = fn () => do:\n  use value: Bool <- 42\n  return value";
     rejects(compiler, annotated, "type_mismatch", annotated.indexOf("use"));
-    const recursive = "fn bad () => do:\n  use value <- value\n  return value";
+    const recursive =
+      "const bad = fn () => do:\n  use value <- value\n  return value";
     rejects(
       compiler,
       recursive,
       "unknown_value",
       recursive.indexOf("<- value") + 3,
     );
-    const discarded = "fn bad () => do:\n  use _ <- 42\n  return _";
+    const discarded = "const bad = fn () => do:\n  use _ <- 42\n  return _";
     rejects(compiler, discarded, "unknown_value", discarded.lastIndexOf("_"));
     rejects(
       compiler,
-      "fn bad () => do:\n  if True:\n    use hidden <- 42\n  return hidden",
+      "const bad = fn () => do:\n  if True:\n    use hidden <- 42\n  return hidden",
       "unknown_value",
     );
     for (const binding of ["use value = 42", "let value <- 42"]) {
       throws(
         () =>
-          compiler.compile(`fn bad () => do:\n  ${binding}\n  return value`),
+          compiler.compile(
+            `const bad = fn () => do:\n  ${binding}\n  return value`,
+          ),
         SourceError,
       );
     }
@@ -270,7 +276,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `export fn scope (condition: Bool) -> U32 => do:
+      `const scope = fn (condition: Bool) -> U32 => do:
   let value = 40
   if condition:
     let value = 2
@@ -287,7 +293,7 @@ sourceTest(
   "fallthrough conditionals do not duplicate the rest of the function",
   async (compiler) => {
     const sourceWith = (branches: number) =>
-      "export fn entry (condition: Bool) => do:\n" +
+      "const entry = fn (condition: Bool) => do:\n" +
       "  if condition:\n    ()\n".repeat(branches) + "  return 42\n";
     const source = sourceWith(30);
     const { exports, bytes } = await instantiate(compiler, source);
@@ -306,7 +312,7 @@ sourceTest(
   "early-return branches have linear code growth",
   async (compiler) => {
     const sourceWith = (branches: number) =>
-      "export fn entry (condition: Bool) => do:\n" +
+      "const entry = fn (condition: Bool) => do:\n" +
       "  if condition:\n    return 7\n".repeat(branches) + "  return 42\n";
     const { exports, bytes } = await instantiate(compiler, sourceWith(30));
     equal(call(exports, "entry", 1), 7);
@@ -322,7 +328,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `export fn nested (value: U32) => do:
+      `const nested = fn (value: U32) => do:
   let base = do:
     return 40
   if @u32.lt value 2:
@@ -344,12 +350,12 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `fn count value => do:
+      `const count = fn value => do:
   if @u32.eq value 0:
     return 42
   return count (@u32.sub value 1)
-export const answer = count 5
-export fn entry () => count 5
+const answer = count 5
+const entry = fn () => count 5
 `,
     );
     equal(call(exports, "entry"), (exports.answer as WebAssembly.Global).value);
@@ -361,7 +367,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `export fn answer () => @u32.add (do:
+      `const answer = fn () => @u32.add (do:
   return 20
 ) (do:
   if False:
@@ -378,7 +384,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `// header\r\nexport const truth = True\r\nexport const nothing = ()\r\nexport fn answer () => (@u32.add\r\n  20\r\n  22) // end`,
+      `// header\r\nconst truth = True\r\nconst nothing = ()\r\nconst answer = fn () => (@u32.add\r\n  20\r\n  22) // end`,
     );
     equal(call(exports, "answer"), 42);
     equal((exports.truth as WebAssembly.Global).value, 1);
@@ -393,12 +399,12 @@ sourceTest(
     for (const literal of ["4294967295", "0xFFFF_FFFF", "4_294_967_295"]) {
       const { exports } = await instantiate(
         compiler,
-        `export fn max () => ${literal}`,
+        `const max = fn () => ${literal}`,
       );
       equal(call(exports, "max") >>> 0, 0xFFFF_FFFF);
     }
     for (const literal of ["4294967296", "0x1_0000_0000", "9".repeat(70)]) {
-      const source = `export const bad = ${literal}`;
+      const source = `const bad = ${literal}`;
       rejects(compiler, source, "integer_range", source.indexOf(literal));
     }
   },
@@ -409,13 +415,13 @@ sourceTest(
   (compiler) => {
     rejects(
       compiler,
-      "export fn bad (value: Bool) => @u32.add value 1",
+      "const bad = fn (value: Bool) => @u32.add value 1",
       "type_mismatch",
     );
     const source =
-      "export fn bad () => do:\n  let value: Bool = 1\n  return value\n";
+      "const bad = fn () => do:\n  let value: Bool = 1\n  return value\n";
     rejects(compiler, source, "type_mismatch", source.indexOf("let"));
-    rejects(compiler, "export fn bad () -> Bool => 1", "type_mismatch");
+    rejects(compiler, "const bad = fn () -> Bool => 1", "type_mismatch");
     rejects(compiler, "const bad: F32 = 1", "type_mismatch");
     rejects(compiler, "const bad: F64 = 1", "unsupported_type");
   },
@@ -424,27 +430,31 @@ sourceTest(
 sourceTest(
   "name resolution respects scope and accepts first-class functions",
   (compiler) => {
-    rejects(compiler, "fn bad () => missing", "unknown_value", 13);
-    rejects(compiler, "fn bad () => missing ()", "unknown_value", 13);
+    for (const expression of ["missing", "missing ()"]) {
+      const source = `const bad = fn () => ${expression}`;
+      rejects(compiler, source, "unknown_value", source.indexOf("missing"));
+    }
     equal(
-      compiler.analyze("fn f value => value\nfn reference () => f")
+      compiler.analyze(
+        "const f = fn value => value\nconst reference = fn () => f",
+      )
         .functions.find((fn) => fn.name === "reference")?.result.$,
       "FunctionTy",
     );
     equal(
-      compiler.analyze("fn f value => value\nfn apply f => f 1")
+      compiler.analyze("const f = fn value => value\nconst apply = fn f => f 1")
         .functions.find((fn) => fn.name === "apply")?.parameter.$,
       "FunctionTy",
     );
-    rejects(compiler, "fn f () => 1\nconst f = 2", "duplicate_name");
+    rejects(compiler, "const f = fn () => 1\nconst f = 2", "duplicate_name");
     rejects(
       compiler,
-      "fn f () => do:\n  if True:\n    let hidden = 1\n  return hidden",
+      "const f = fn () => do:\n  if True:\n    let hidden = 1\n  return hidden",
       "unknown_value",
     );
     rejects(
       compiler,
-      "fn f () => do:\n  let value = value\n  return value",
+      "const f = fn () => do:\n  let value = value\n  return value",
       "unknown_value",
     );
   },
@@ -453,12 +463,12 @@ sourceTest(
 sourceTest(
   "source rejects unsupported intrinsics, arity, and dead statements",
   (compiler) => {
-    rejects(compiler, "fn f () => @u32.div 1 2", "unknown_intrinsic");
-    rejects(compiler, "fn f () => @u32.add 1", "call_arity");
-    rejects(compiler, "fn f () => @u32.add 1 2 3", "call_arity");
+    rejects(compiler, "const f = fn () => @u32.div 1 2", "unknown_intrinsic");
+    rejects(compiler, "const f = fn () => @u32.add 1", "call_arity");
+    rejects(compiler, "const f = fn () => @u32.add 1 2 3", "call_arity");
     rejects(
       compiler,
-      "fn f () => do:\n  return 1\n  return 2",
+      "const f = fn () => do:\n  return 1\n  return 2",
       "unreachable_statement",
     );
   },
@@ -469,12 +479,12 @@ sourceTest(
   (compiler) => {
     rejects(
       compiler,
-      "fn example () => do absent:\n  return 42",
+      "const example = fn () => do absent:\n  return 42",
       "unknown_value",
     );
     rejects(
       compiler,
-      "fn example () => do 7:\n  return 42",
+      "const example = fn () => do 7:\n  return 42",
       "invalid_provider",
     );
   },
@@ -501,7 +511,11 @@ sourceTest(
         "@asset.mesh",
       ]
     ) {
-      rejects(compiler, `fn example () => ${name} ()`, "unknown_intrinsic");
+      rejects(
+        compiler,
+        `const example = fn () => ${name} ()`,
+        "unknown_intrinsic",
+      );
     }
     rejects(
       compiler,
@@ -523,7 +537,7 @@ sourceTest(
       compiler,
       `effect window.title: U32 -> Unit
 const test_window = @effect.provider window.title (fn _ => ())
-export fn answer () => do test_window:
+const answer = fn () => do test_window:
   use window.title 7
   return 42
 `,
@@ -538,10 +552,10 @@ sourceTest(
   (compiler) => {
     for (
       const source of [
-        "const try = 0\nfn example () => do try:\n  return 42",
+        "const try = 0\nconst example = fn () => do try:\n  return 42",
         "const try = 0\nconst example = do try:\n  return 42",
-        "const try = 0\nfn example () => do:\n  let result = do try:\n    return 42\n  return result",
-        "const try = 0\nfn example () => do:\n  if False:\n    use do try:\n      return 42\n  return 0",
+        "const try = 0\nconst example = fn () => do:\n  let result = do try:\n    return 42\n  return result",
+        "const try = 0\nconst example = fn () => do:\n  if False:\n    use do try:\n      return 42\n  return 0",
       ]
     ) {
       rejects(
@@ -558,18 +572,18 @@ sourceTest(
   (compiler) => {
     for (
       const source of [
-        "fn example () => do:\n  return $ 42",
-        "fn example () => do:\n  if True:\n    return $ 42\n  return 0",
-        "fn example () => do:\n  use do:\n    return $ 42\n  return 0",
+        "const example = fn () => do:\n  return $ 42",
+        "const example = fn () => do:\n  if True:\n    return $ 42\n  return 0",
+        "const example = fn () => do:\n  use do:\n    return $ 42\n  return 0",
       ]
     ) {
       rejects(compiler, source, "resolver_required", source.indexOf("$"));
     }
     for (
       const source of [
-        "fn example () => do:\n  return $",
-        "fn example () => $ 42",
-        "fn example () => do:\n  use $ 42\n  return 0",
+        "const example = fn () => do:\n  return $",
+        "const example = fn () => $ 42",
+        "const example = fn () => do:\n  use $ 42\n  return 0",
       ]
     ) {
       throws(() => compiler.compile(source), SourceError);
@@ -582,7 +596,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      "fn monad value => value\nconst try = 42\nexport fn answer () => monad try",
+      "const monad = fn value => value\nconst try = 42\nconst answer = fn () => monad try",
     );
     equal(call(exports, "answer"), 42);
   },
@@ -593,11 +607,10 @@ sourceTest(
   (compiler) => {
     for (
       const source of [
-        "data Position = Position { x: U32 }\nfn coordinate value => value.x",
         'import { get } from "engine/ecs"',
         "type Scalar = U32",
-        "fn f x:\n  return x",
-        "export fn f () => 1 + 2",
+        "const f = fn x:\n  return x",
+        "const f = fn () => 1 + 2",
         "const value = 1 garbage",
       ]
     ) {
@@ -609,16 +622,16 @@ sourceTest(
 sourceTest(
   "layout diagnoses tabs, unexpected indent, bad dedent, and missing suite",
   (compiler) => {
-    rejects(compiler, "fn f () => do:\n\treturn 1", "layout_tab");
-    rejects(compiler, "  fn f () => 1", "layout_indent");
+    rejects(compiler, "const f = fn () => do:\n\treturn 1", "layout_tab");
+    rejects(compiler, "  const f = fn () => 1", "layout_indent");
     rejects(
       compiler,
-      "fn f () => do:\n  let a = 1\n return a",
+      "const f = fn () => do:\n  let a = 1\n return a",
       "layout_dedent",
     );
-    rejects(compiler, "fn f () => do:\nreturn 1", "layout_suite");
-    rejects(compiler, "fn f () =>\n  do:\n  return 1", "layout_suite");
-    rejects(compiler, "fn f () => \uE000", "reserved_layout");
+    rejects(compiler, "const f = fn () => do:\nreturn 1", "layout_suite");
+    rejects(compiler, "const f = fn () =>\n  do:\n  return 1", "layout_suite");
+    rejects(compiler, "const f = fn () => \uE000", "reserved_layout");
   },
 );
 
@@ -626,7 +639,7 @@ sourceTest(
   "parser reuse does not retain definitions and errors report original source positions",
   (compiler) => {
     compiler.compile("const old = 1");
-    const source = "// comment\nexport fn entry () => do:\n  return old\n";
+    const source = "// comment\nconst entry = fn () => do:\n  return old\n";
     try {
       compiler.compile(source);
       throw new Error("expected failure");

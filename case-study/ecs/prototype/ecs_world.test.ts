@@ -32,7 +32,7 @@ data Position = Position U32
 data Velocity = Velocity U32
 #[resource]
 data Time = Time U32
-export fn move () => do:
+const move = fn () => do:
   use wrapped_position <- @ecs.get Position
   use wrapped_velocity <- @ecs.get Velocity
   use wrapped_time <- @ecs.get Time

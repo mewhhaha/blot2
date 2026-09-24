@@ -6,18 +6,18 @@ import * as snapshot from "engine/snapshot"
 import { Io, FileIo, WindowIo, RenderIo, Application, HostError, InvalidSnapshot, FrameInput, Viewport, InputEvent } from "./platform"
 
 #[resource]
-export data Frame = Frame FrameInput
+type Frame is data = Frame FrameInput
 #[resource]
-export data PendingInput = PendingInput (Maybe InputEvent)
+type PendingInput is data = PendingInput (Maybe InputEvent)
 #[resource]
-export data Title = Title Text
+type Title is data = Title Text
 #[resource]
-export data SnapshotRequest = Idle | Save | Load
+type SnapshotRequest is data = Idle | Save | Load
 
 // Descriptor values exist at const time; they are not boxed runtime systems.
-data Builder = Builder { registrations: Array ecs.Descriptor }
+type Builder is data = Builder { registrations: Array ecs.Descriptor }
 
-export fn new title => Builder {
+const new = fn title => Builder {
   registrations: [
     ecs.resource (Title title),
     ecs.resource Idle,
@@ -28,7 +28,7 @@ export fn new title => Builder {
   ],
 }
 
-export fn insert_resource value => fn builder => do:
+const insert_resource = fn value => fn builder => do:
   let next = builder
   next.registrations := [...self, ecs.resource value]
   return next
@@ -36,20 +36,20 @@ export fn insert_resource value => fn builder => do:
 // Register before erasing into Descriptor: an array of callbacks could unify
 // their distinct effect rows and lose each system's individual query accesses.
 // Registration order within a stage is explicit, not inferred from conflicts.
-export fn add_system stage => fn (const system) => fn builder => do:
+const add_system = fn stage => fn (const system) => fn builder => do:
   let next = builder
   next.registrations := [...self, ecs.system (stage, system)]
   return next
 
-export fn build (const builder: Builder) => ecs.build builder.registrations
+const build = fn (const builder: Builder) => ecs.build builder.registrations
 
-fn create_world (const simulation) => fn () => do:
+const create_world = fn (const simulation) => fn () => do:
   let (world, ()) = do ecs.scope (simulation.create ()):
     use simulation.run Start
     return ()
   return ecs.checkpoint world
 
-fn advance_world (const simulation) => fn world => fn frame => do:
+const advance_world = fn (const simulation) => fn world => fn frame => do:
   if Bool.not (F32.is_finite frame.seconds):
     use @panic "Delta time must be finite"
   if F32.lt frame.seconds 0.0:
@@ -62,7 +62,7 @@ fn advance_world (const simulation) => fn world => fn frame => do:
     return ()
   return next_world
 
-fn apply_event (const simulation) => fn (files: FileIo) => fn world => fn event => do:
+const apply_event = fn (const simulation) => fn (files: FileIo) => fn world => fn event => do:
   let (next_world, request) = do ecs.scope world:
     use ecs.set (PendingInput (Some event))
     use simulation.run Event
@@ -83,7 +83,7 @@ fn apply_event (const simulation) => fn (files: FileIo) => fn world => fn event 
         Ok bytes => Result.map ecs.checkpoint
           (Result.map_error InvalidSnapshot (snapshot.decode (simulation.schema, bytes)))
 
-fn render_frame (const simulation) => fn (window: WindowIo) => fn (renderer: RenderIo) => fn world => fn frame => do:
+const render_frame = fn (const simulation) => fn (window: WindowIo) => fn (renderer: RenderIo) => fn world => fn frame => do:
   if Bool.not (F32.is_finite frame.alpha):
     use @panic "Interpolation alpha must be finite"
   if F32.lt frame.alpha 0.0:
@@ -105,7 +105,7 @@ fn render_frame (const simulation) => fn (window: WindowIo) => fn (renderer: Ren
   return Result.map_error HostError submitted
 
 // create is first-launch only. Reload rebinds capabilities around retained state.
-export fn bind (const simulation) => fn (io: Io) => Application {
+const bind = fn (const simulation) => fn (io: Io) => Application {
   create: create_world simulation,
   event: apply_event simulation io.files,
   update: advance_world simulation,

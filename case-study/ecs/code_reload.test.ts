@@ -16,19 +16,19 @@ const clock: TypeId = {
 const source = (amount: number, initial = 10) =>
   `#[resource]
 data Clock = Clock U32
-fn tick () => do:
+const tick = fn () => do:
   use wrapped <- @ecs.get Clock
   let Clock value = wrapped
   use @ecs.set (Clock (value + ${amount}))
   return ()
-export fn start () => do:
+const start = fn () => do:
   use @ecs.set (Clock ${initial})
   return ()
-export fn event () => ()
-export fn update () => do:
+const event = fn () => ()
+const update = fn () => do:
   use @ecs.run tick
   return ()
-export fn render () => ()
+const render = fn () => ()
 `;
 
 Deno.test("reload transfers the latest live state; errors and bad first frames publish nothing", async () => {
@@ -72,7 +72,7 @@ Deno.test("reload transfers the latest live state; errors and bad first frames p
 
     for (
       const bad of [
-        "export fn broken () => missing\n",
+        "const broken = fn () => missing\n",
         source(10).replaceAll("U32", "F32").replace(
           "value + 10",
           "F32.add value 10.0",

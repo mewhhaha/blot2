@@ -26,6 +26,58 @@ import ./compiler/native_plan.bend as NativePlan
 import ./compiler/dependency.bend as Dependency
 import ./compiler/runtime_reachable.bend as Reachable
 import ./compiler/source_modules.bend as SourceModules
+import ./compiler/monomorph.bend as Mono
+import ./compiler/infer.bend as Infer
+import ./compiler/array_reuse.bend as Reuse
+import ./compiler/public_exports.bend as Public
+
+# An exported function-valued constant is called through its stored value.
+# Selecting exports after inference must never duplicate its initializer.
+law checked_public_wrapper_calls_stored_constant:
+  for +name: String
+  for +input: M.Ty
+  for +output: M.Ty
+  for variables: List<&2, Nat>
+  for row: M.EffectRow
+  {Public.unchecked_functions([Public.checked_wrapper(name, input, output, variables, row)]) == [M.Function{"$public:" ++ name, True{}, "$argument", Some{input}, Some{output}, M.ApplyExpr{M.ConstantExpr{name}, M.LocalExpr{"$argument"}}}] : List<&2, M.Function>}
+
+# Membership stops after a hit. The remaining scan is a thunk so an eager
+# backend does not evaluate a recursive Boolean argument before selecting it.
+law dependency_membership_hit_finishes:
+  for remaining: Unit -> Bool
+  {Dependency.contains_step(True{}, remaining) == True{} : Bool}
+
+# Once a specialization lookup finds its first binding, later bindings cannot
+# change the result, including a duplicate of the same name.
+law mono_rename_keeps_first_found:
+  for tail: List<&2, Mono.Rename>
+  for wanted: String
+  for specialized: String
+  {Mono.renamed_work(tail, wanted, Some{specialized}) == Some{specialized} : Maybe<&2, String>}
+
+law mono_function_keeps_first_found:
+  for tail: List<&2, M.Function>
+  for wanted: String
+  for function: M.Function
+  {Mono.lookup_work(tail, wanted, Some{function}) == Done{function} : Result<&2, &2, M.Diagnostic, M.Function>}
+
+law mono_constant_keeps_first_found:
+  for tail: List<&2, M.Constant>
+  for wanted: String
+  for constant: M.Constant
+  {Mono.lookup_constant_work(tail, wanted, Some{constant}) == Some{constant} : Maybe<&2, M.Constant>}
+
+law mono_local_template_keeps_first_found:
+  for tail: List<&2, Mono.LocalTemplate>
+  for wanted: String
+  for value: M.Expr
+  {Mono.local_template_work(tail, wanted, Some{value}) == Some{value} : Maybe<&2, M.Expr>}
+
+law mono_effect_family_keeps_first_found:
+  for tail: List<&2, M.Operation>
+  for wanted: M.TypeId
+  for declaration: M.Operation
+  {Mono.family_declaration_work(tail, wanted, Some{declaration}) == Done{declaration} : Result<&2, &2, M.Diagnostic, M.Operation>}
 
 # Parallel compilation keeps source-order diagnostics and a sequential leaf
 # below the scheduling grain. Neither rule depends on worker completion order.
@@ -36,7 +88,7 @@ law cached_scan_preserves_first_failure:
 
 law blocked_single_group_preserves_progress:
   for scheduled: Scheduler.Scheduled
-  for known: Scheduler.Catalog
+  for known: Session.CheckCatalog
   for previous: Map<&2, Session.Cached<Groups.CheckedGroup>>
   for +progress: Session.GroupProgress
   {Session.check_single_group(scheduled, known, previous, progress, False{}) == progress : Session.GroupProgress}
@@ -49,7 +101,7 @@ law cached_group_cost_skips_body_traversal:
 
 law small_frontier_skips_pipeline_cost_traversal:
   for ready: List<&2, Scheduler.Scheduled>
-  for known: Scheduler.Catalog
+  for known: Session.CheckCatalog
   {Session.staged_frontier(ready, known, True{}) == True{} : Bool}
 
 law inference_union_same_root_preserves_forest:
@@ -87,7 +139,7 @@ law completed_dependency_does_not_join_pending_regions:
 
 law session_small_frontier_skips_cost_traversal:
   for job: Groups.Job
-  for known: Scheduler.Catalog
+  for known: Session.CheckCatalog
   {Session.group_preparation_cost(job, known, True{}) == 0n : Nat}
 
 law inference_single_frontier_keeps_its_parallel_batch:
@@ -280,7 +332,7 @@ law native_trailing_words_fail:
   {Result.is_done(&2, &1, NativeRequest.ScanFailure, Unit, NativeRequest.end(NativeRequest.Cursor{words, offset, 1n+remaining, [SNil{} : String*1n], 0})) == False{} : Bool}
 
 law native_response_failure_keeps_protocol_version:
-  {List.take(&2, U32, NativeResponse.finish(Fail{M.Diagnostic{"native_protocol", "native_response", "response exceeds 16M words"}}), 3n) == [1112297300, 7, 0] : List<&2, U32>}
+  {List.take(&2, U32, NativeResponse.finish(Fail{M.Diagnostic{"native_protocol", "native_response", "response exceeds 16M words"}}), 3n) == [1112297300, 11, 0] : List<&2, U32>}
 
 # Metadata reads never invent entries in an empty index.
 law empty_index_is_absent:
@@ -301,6 +353,12 @@ law zero_const_budget_fails:
   for expression: M.Expr
   for context: Const.Context
   {Result.is_done(&2, &2, M.Diagnostic, Const.Evaluation, Const.evaluate(0n, 0n, expression, context)) == False{} : Bool}
+
+law runtime_initializers_preserve_const_budget:
+  for expression: M.Expr
+  for +steps: Nat
+  for context: Const.Context
+  {Const.evaluate_constants([M.CheckedConstant{M.Constant{"runtime", False{}, None{}, M.RuntimeInitExpr{expression}}, M.U32Ty{}, Nil{}}], steps, context) == Done{Const.Constants{Nil{}, steps}} : Result<&2, &2, M.Diagnostic, Const.Constants>}
 
 law unhandled_const_operations_fail:
   for identity: M.TypeId
@@ -334,76 +392,76 @@ law block_return_skips_the_tail:
   for value: U32
   for next: M.Expr
   for context: Const.Context
-  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.SequenceExpr{M.ReturnExpr{0n, M.U32Expr{value}}, next}}, context) == Done{Const.Evaluation{Const.U32Value{value}, 0n}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.SequenceExpr{M.ReturnExpr{0n, M.U32Expr{value}}, next}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 # Matching evaluates each column only if preceding columns complete normally.
 law match_return_skips_remaining_scrutinees:
   for value: U32
   for next: M.Expr
   for context: Const.Context
-  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.MatchExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next], Nil{}}}, context) == Done{Const.Evaluation{Const.U32Value{value}, 0n}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.MatchExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next], Nil{}}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law product_projection_selects_first:
   for first: Const.Value
   for second: Const.Value
-  for steps: Nat
+  for steps: Const.Budget
   {Const.project(Const.ProductValue{[first, second]}, 0n, steps) == Done{Const.Evaluation{first, steps}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law product_projection_selects_second:
   for first: Const.Value
   for second: Const.Value
-  for steps: Nat
+  for steps: Const.Budget
   {Const.project(Const.ProductValue{[first, second]}, 1n, steps) == Done{Const.Evaluation{second, steps}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law product_projection_rejects_length_index:
   for elements: List<&2, Const.Value>
-  for steps: Nat
+  for steps: Const.Budget
   {Result.is_done(&2, &2, M.Diagnostic, Const.Evaluation, Const.project(Const.ProductValue{elements}, List.length(&2, Const.Value, elements), steps)) == False{} : Bool}
 
 law product_retains_mixed_fields:
   for number: U32
   for flag: Bool
   for context: Const.Context
-  {Const.evaluate(3n, 3n, M.ProductExpr{[M.U32Expr{number}, M.BoolExpr{flag}]}, context) == Done{Const.Evaluation{Const.ProductValue{[Const.U32Value{number}, Const.BoolValue{flag}]}, 0n}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.evaluate(3n, 3n, M.ProductExpr{[M.U32Expr{number}, M.BoolExpr{flag}]}, context) == Done{Const.Evaluation{Const.ProductValue{[Const.U32Value{number}, Const.BoolValue{flag}]}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law product_return_skips_remaining_elements:
   for value: U32
   for next: M.Expr
   for context: Const.Context
-  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.ProductExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next]}}, context) == Done{Const.Evaluation{Const.U32Value{value}, 0n}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.ProductExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next]}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law empty_array_length_is_zero:
-  for steps: Nat
+  for steps: Const.Budget
   {Const.array_length(Const.ArrayValue{Nil{}}, steps) == Done{Const.Evaluation{Const.U32Value{0}, steps}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law array_read_selects_first:
   for first: Const.Value
   for tail: List<&2, Const.Value>
-  for steps: Nat
+  for steps: Const.Budget
   {Const.array_get(Const.ArrayValue{first <> tail}, Const.U32Value{0}, steps) == Done{Const.Evaluation{first, steps}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law array_read_rejects_length_index:
   for elements: List<&2, Const.Value>
-  for steps: Nat
+  for steps: Const.Budget
   {Result.is_done(&2, &2, M.Diagnostic, Const.Evaluation, Const.array_get_elements(elements, List.length(&2, Const.Value, elements), steps)) == False{} : Bool}
 
 law array_set_preserves_other_elements:
   for first: Const.Value
   for second: Const.Value
   for replacement: Const.Value
-  {Const.array_set(Const.ArrayValue{[first, second]}, Const.U32Value{0}, replacement, 2n) == Done{Const.Evaluation{Const.ArrayValue{[replacement, second]}, 0n}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.array_set(Const.ArrayValue{[first, second]}, Const.U32Value{0}, replacement, Const.Budget{2n, Nil{}}) == Done{Const.Evaluation{Const.ArrayValue{[replacement, second]}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law array_copy_requires_per_element_budget:
   for first: Const.Value
   for second: Const.Value
   for replacement: Const.Value
-  {Result.is_done(&2, &2, M.Diagnostic, Const.Evaluation, Const.array_set(Const.ArrayValue{[first, second]}, Const.U32Value{0}, replacement, 1n)) == False{} : Bool}
+  {Result.is_done(&2, &2, M.Diagnostic, Const.Evaluation, Const.array_set(Const.ArrayValue{[first, second]}, Const.U32Value{0}, replacement, Const.Budget{1n, Nil{}})) == False{} : Bool}
 
 law array_return_skips_remaining_elements:
   for value: U32
   for next: M.Expr
   for context: Const.Context
-  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.ArrayExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next]}}, context) == Done{Const.Evaluation{Const.U32Value{value}, 0n}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.ArrayExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next]}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law tuple_pattern_binds_fields_in_order:
   for first: Const.Value
@@ -449,16 +507,16 @@ law record_fields_keep_written_evaluation_order:
 law empty_substitutions_preserve_type:
   for +ty: M.Ty
   for fuel: Nat
-  {Substitutions.resolve_work(Nil{}, fuel, Substitutions.OneType{ty}) == Done{[ty]} : Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>}
+  {Substitutions.resolve_work(Substitutions.empty(), fuel, Substitutions.OneType{ty}) == Done{[ty]} : Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>}
 
 # A sequential substitution does not apply itself inside the inserted type.
 law final_substitution_does_not_rewrite_its_replacement:
   for +replacement: M.Ty
   for fuel: Nat
-  {Substitutions.resolve_work([Substitutions.Substitution{0n, replacement}], 1n+fuel, Substitutions.OneType{M.VariableTy{0n}}) == Done{[replacement]} : Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>}
+  {Substitutions.resolve_work(Substitutions.from_list([Substitutions.Substitution{0n, replacement}]), 1n+fuel, Substitutions.OneType{M.VariableTy{0n}}) == Done{[replacement]} : Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>}
 
 law substitutions_preserve_u32:
-  for substitutions: List<&2, Substitutions.Substitution>
+  for substitutions: Substitutions.Substitutions
   for fuel: Nat
   {Substitutions.resolve_work(substitutions, 1n+fuel, Substitutions.OneType{M.U32Ty{}}) == Done{[M.U32Ty{}]} : Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>}
 
@@ -520,3 +578,92 @@ law const_function_lookup_hit_finishes:
   for name: String
   for +value: M.Function
   {Const.lookup_function_work(functions, name, Some{value}) == Done{value} : Result<&2, &2, M.Diagnostic, M.Function>}
+
+# A pin reads the surrounding scope and contributes no new pattern bindings.
+law value_pattern_preserves_local_reference:
+  for +name: String
+  for node: Cst.Cst
+  {Lower.value_pattern(M.LocalExpr{name}, node) == Done{Lower.PatternResult{M.ValuePattern{M.LocalReference{name}}, Nil{}}} : Result<&2, &2, M.Diagnostic, Lower.PatternResult>}
+
+# Runtime references cannot establish exhaustive coverage of a finite type.
+law value_pattern_is_refutable:
+  for head: Patterns.Head
+  for reference: M.ValueReference
+  for tail: List<&2, M.Pattern>
+  {Patterns.select_head(head, M.ValuePattern{reference}, tail) == None{} : Maybe<&2, List<&2, M.Pattern>>}
+
+# Filling zero slots preserves the step budget and never creates an element.
+law empty_array_fill_preserves_budget:
+  for value: Const.Value
+  for +steps: Const.Budget
+  {Const.array_fill_elements(0n, value, Nil{}, steps) == Done{Const.Evaluation{Const.ArrayValue{Nil{}}, steps}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+law array_fill_rejects_oversized_count:
+  for count: U32
+  for value: Const.Value
+  for steps: Const.Budget
+  {Const.array_fill_checked(False{}, count, value, steps) == Fail{M.Diagnostic{"backend_limit", "array", "array length exceeds the 16 MiB bootstrap arena"}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+# A zero-length generation never invokes the callback or spends its budget.
+law empty_array_generation_skips_callback:
+  for +steps: Const.Budget
+  for generator: Const.Value
+  for context: Const.Context
+  {Const.evaluate_work(1n, 0n, Nil{}, steps, Const.GenerateElements{generator, 0, Nil{}}, context) == Done{Const.Evaluation{Const.ArrayValue{Nil{}}, steps}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+# Associated dispatch preserves left precedence and operand order at compile time.
+law associated_left_precedence:
+  for left: Infer.Typing
+  for right: Result<&2, &2, M.Diagnostic, Infer.Typing>
+  for +name: String
+  for other: Maybe<&2, String>
+  for subject: String
+  for description: String
+  {Mono.chosen(Done{left}, Some{name}, right, other, subject, description) == Done{name} : Result<&2, &2, M.Diagnostic, String>}
+
+law associated_call_preserves_operands:
+  for +name: String
+  for member: String
+  for +left: M.Expr
+  for +right: M.Expr
+  {Mono.selected_call(Some{Mono.FunctionChoice{name}}, member, left, right) == Done{M.UseExpr{"$associated.left", left, M.UseExpr{"$associated.right", right, M.ApplyExpr{M.ApplyExpr{M.FunctionExpr{name}, M.LocalExpr{"$associated.left"}}, M.LocalExpr{"$associated.right"}}}}} : Result<&2, &2, M.Diagnostic, M.Expr>}
+
+law rebinding_self_uses_previous_local:
+  for +core: String
+  for +context: Lower.Context
+  for node: Cst.Cst
+  {Lower.rebinding_scope(Some{core}, context, node) == Done{Lower.bind(context, Lower.Local{"self", core})} : Result<&2, &2, M.Diagnostic, Lower.Context>}
+
+# State cells are scoped; finishing a resolver exposes a successor without mutating its input.
+law state_scope_returns_successor:
+  for current: Const.Value
+  for result: U32
+  for steps: Nat
+  for outer: List<&2, Const.StateCell>
+  {Const.finish_state_scope(Const.Evaluation{Const.U32Value{result}, Const.Budget{steps, Const.StateCell{0n, current} <> outer}}, 0n) == Done{Const.Evaluation{Const.ProductValue{[current, Const.U32Value{result}]}, Const.Budget{steps, outer}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+law state_scope_preserves_nonlocal_return:
+  for current: Const.Value
+  for result: Const.Value
+  for label: Nat
+  for steps: Nat
+  for outer: List<&2, Const.StateCell>
+  {Const.finish_state_scope(Const.Evaluation{Const.ReturnValue{label, result}, Const.Budget{steps, Const.StateCell{0n, current} <> outer}}, 0n) == Done{Const.Evaluation{Const.ReturnValue{label, result}, Const.Budget{steps, outer}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+# Multiple escaping references require a copy, even after the last read.
+law shared_array_is_not_consumed:
+  for last: Nat
+  for end: Nat
+  {Reuse.consumed(Reuse.Usage{2n, last}, end) == False{} : Bool}
+
+law unknown_array_storage_is_not_owned:
+  for name: String
+  for usages: Map<&2, Reuse.Usage>
+  for end: Nat
+  {Reuse.transferable(name, Map.new(&2, Bool), usages, end) == False{} : Bool}
+
+law array_reuse_preserves_operand_order:
+  for +array: Codegen.Expr
+  for +index: Codegen.Expr
+  for +value: Codegen.Expr
+  {Reuse.children(Codegen.ArrayReuseExpr{array, index, value}) == [array, index, value] : List<&2, Codegen.Expr>}

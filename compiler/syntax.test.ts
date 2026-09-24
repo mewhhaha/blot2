@@ -20,12 +20,61 @@ function normalizedNodes(root: Cst, source: string) {
   return nodes;
 }
 
+Deno.test("kinded declarations and applied effect rows preserve their CST shape", async () => {
+  const frontend = await createFrontend();
+  try {
+    const root = frontend.parse(`
+data Old a = Old a
+type Maybe a is data = Some a | Nothing
+type Get a is effect = Unit -> a
+type State a is effect = {
+  get: Unit -> a,
+  set: a -> Unit,
+}
+type Store a is effect = {
+  get: Unit -> a
+  set: a -> Unit
+}
+const use_state = fn (unit: Unit) -> U32 ! {State U32, Reader.ask} => 1
+`).root;
+    const pending = [root];
+    const nodes: Cst[] = [];
+    for (let node = pending.pop(); node; node = pending.pop()) {
+      nodes.push(node);
+      pending.push(...bendArray(node.children));
+    }
+    equal(nodes.filter((node) => node.kind === "data_type").length, 2);
+    equal(nodes.filter((node) => node.kind === "effect_type").length, 3);
+    equal(
+      nodes.filter((node) =>
+        node.kind === "effect_operation" &&
+        node.field === "fields"
+      ).length,
+      4,
+    );
+    const row = nodes.find((node) => node.kind === "effect_row");
+    ok(row);
+    const labels = bendArray(row.children).filter((node) =>
+      node.kind === "type_application" && node.field === "labels"
+    );
+    equal(labels.length, 2);
+    equal(
+      bendArray(labels[0].children).filter((node) =>
+        node.kind === "type_atom" && node.field === "arguments"
+      ).length,
+      1,
+    );
+  } finally {
+    frontend.dispose();
+  }
+});
+
 Deno.test("layout line indexing preserves CST origins across LF, CRLF, CR and mixed endings", async () => {
   const frontend = await createFrontend();
   const lines = [
     "// leading comment",
-    "fn before () => 1",
-    "export fn answer (condition: Bool) => do:",
+    "const before = fn () => 1",
+    "const answer = fn (condition: Bool) => do:",
     "  let value = do:",
     "    if condition:",
     "      return 40",

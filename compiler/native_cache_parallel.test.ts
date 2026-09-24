@@ -66,6 +66,11 @@ const backend = compiled as unknown as {
   ): Result<Node>;
   "keyed_entries"(jobs: BendList<Job>): BendList<KeyedEntry>;
   "native_cache_keys.entry"(job: Job): Result<BendList<number>>;
+  "catalog_versions.prepare"(
+    types: BendList<Node>,
+    operations: BendList<Node>,
+    previous: Node,
+  ): Result<{ readonly revision: Node }>;
   "empty_checked"(): Node & { readonly groups: Node };
   "check_scheduler.catalog"(module: Node): Node;
   "prepare_group"(
@@ -133,6 +138,20 @@ const job = (key: string, body: Node): Job => ({
   body,
   captures: bendList([]),
 });
+
+function checkCatalog(module: Node): Node {
+  const prepared = backend["catalog_versions.prepare"](
+    module.data_types as BendList<Node>,
+    module.operations as BendList<Node>,
+    { $: "None" },
+  );
+  ok(prepared.$ === "Done");
+  return {
+    $: "CheckCatalog",
+    catalog: backend["check_scheduler.catalog"](module),
+    revision: prepared.value.revision,
+  };
+}
 
 Deno.test("pipelined codegen preserves cold, mixed-hit, reordered and evicted caches", () => {
   const jobs = Array.from(
@@ -256,7 +275,7 @@ Deno.test("frontier routing keeps tiny jobs staged and pipelines substantial gro
         }
         : { $: "U32Expr", value: 1 },
     }));
-    const known = backend["check_scheduler.catalog"]({
+    const known = checkCatalog({
       $: "Module",
       functions: bendList(functions),
       constants: bendList([]),
@@ -284,7 +303,7 @@ Deno.test("frontier routing keeps tiny jobs staged and pipelines substantial gro
 
 Deno.test("pipelined frontiers and singleton fast paths equal ordered two-stage checking", () => {
   const names = Array.from({ length: 48 }, (_, index) => `work_${index}`);
-  const catalog = backend["check_scheduler.catalog"]({
+  const catalog = checkCatalog({
     $: "Module",
     constants: bendList([]),
     data_types: bendList([]),

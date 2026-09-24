@@ -6,7 +6,7 @@ Deno.test("source partitions keep attributes, delimiters, escaped strings and co
   const second =
     "#[component]\n// attached attribute\n#[other]\ndata Pair = Pair {\n  first: U32,\n  second: U32,\n}\n";
   const third =
-    "export fn answer () => do:\n  let values = [\n    1, // )\n    2,\n  ]\n  return 42\n";
+    "const answer = fn () => do:\n  let values = [\n    1, // )\n    2,\n  ]\n  return 42\n";
   for (const ending of ["\n", "\r\n", "\r"]) {
     const chunks = [first, second, third].map((chunk) =>
       chunk.replaceAll("\n", ending)
@@ -24,9 +24,9 @@ Deno.test("source partitions keep attributes, delimiters, escaped strings and co
 Deno.test("source partitions defer malformed delimiters and unterminated strings to the full parser", () => {
   for (
     const source of [
-      'const text = "open\nfn next () => 1',
-      "fn bad () => (1]\nfn next () => 2",
-      "const bad = [1\nfn next () => 2",
+      'const text = "open\nconst next = fn () => 1',
+      "const bad = fn () => (1]\nconst next = fn () => 2",
+      "const bad = [1\nconst next = fn () => 2",
     ]
   ) {
     equal(sourceDeclarationRanges(source), undefined);
@@ -34,7 +34,7 @@ Deno.test("source partitions defer malformed delimiters and unterminated strings
 });
 
 Deno.test("empty and indivisible sources stay local", () => {
-  for (const source of ["", "// comment", "fn answer () => 42\n"]) {
+  for (const source of ["", "// comment", "const answer = fn () => 42\n"]) {
     equal(sourceDeclarationRanges(source), [{ start: 0, end: source.length }]);
   }
 });

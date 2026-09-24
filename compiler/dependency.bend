@@ -9,6 +9,7 @@ type Work is Data:
   Expression{value: M.Expr}
   Arms{values: List<&2, M.MatchArm<M.Expr>>}
   Expressions{values: List<&2, M.Expr>}
+  Patterns{values: List<&2, M.Pattern>}
 
 type References is Data:
   References{names: List<&2, String>, lambdas: List<&2, Nat>}
@@ -64,6 +65,8 @@ def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, 
       Done{ReferenceStep{PendingReference{rest, Expression{body}} <> pending, reference_lambda(identity, reversed)}}
     case 1n+rest Expression{M.ApplyExpr{callee, argument}}:
       Done{ReferenceStep{PendingReference{rest, Expression{callee}} <> PendingReference{rest, Expression{argument}} <> pending, reversed}}
+    case 1n+rest Expression{M.AssociatedExpr{identity, dispatch, member, templates, left, right}}:
+      Done{ReferenceStep{PendingReference{rest, Expression{left}} <> PendingReference{rest, Expression{right}} <> pending, reversed}}
     case 1n+rest Expression{M.ScalarExpr{operator, left, right}}:
       Done{ReferenceStep{PendingReference{rest, Expression{left}} <> PendingReference{rest, Expression{right}} <> pending, reversed}}
     case 1n+rest Expression{M.UnaryExpr{operator, value}}:
@@ -79,7 +82,7 @@ def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, 
     case 1n+rest Expression{M.MatchExpr{values, arms}}:
       Done{ReferenceStep{PendingReference{rest, Expressions{values}} <> PendingReference{rest, Arms{arms}} <> pending, reversed}}
     case 1n+rest Expression{M.GuardExpr{pattern, value, alternative, body}}:
-      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> PendingReference{rest, Expression{alternative}} <> PendingReference{rest, Expression{body}} <> pending, reversed}}
+      Done{ReferenceStep{PendingReference{rest, Patterns{[pattern]}} <> PendingReference{rest, Expression{value}} <> PendingReference{rest, Expression{alternative}} <> PendingReference{rest, Expression{body}} <> pending, reversed}}
     case 1n+rest Expression{M.ConstructExpr{constructor, payload}}:
       Done{ReferenceStep{PendingReference{rest, Expression{payload_expression(payload)}} <> pending, reversed}}
     case 1n+rest Expression{M.ProductExpr{elements}}:
@@ -88,6 +91,12 @@ def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, 
       Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.ArrayExpr{elements}}:
       Done{ReferenceStep{PendingReference{rest, Expressions{elements}} <> pending, reversed}}
+    case 1n+rest Expression{M.ForExpr{index, start, end, state, initial, body}}:
+      Done{ReferenceStep{PendingReference{rest, Expressions{[start, end, initial, body]}} <> pending, reversed}}
+    case 1n+rest Expression{M.ArrayGenerateExpr{count, generator}}:
+      Done{ReferenceStep{PendingReference{rest, Expressions{[count, generator]}} <> pending, reversed}}
+    case 1n+rest Expression{M.ArrayFillExpr{count, value}}:
+      Done{ReferenceStep{PendingReference{rest, Expressions{[count, value]}} <> pending, reversed}}
     case 1n+rest Expression{M.ArrayGetExpr{array, index}}:
       Done{ReferenceStep{PendingReference{rest, Expressions{[array, index]}} <> pending, reversed}}
     case 1n+rest Expression{M.ArraySetExpr{array, index, value}}:
@@ -98,8 +107,12 @@ def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, 
       Done{ReferenceStep{PendingReference{rest, Expression{body}} <> pending, reversed}}
     case 1n+rest Expression{M.ReturnExpr{label, value}}:
       Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
+    case 1n+rest Expression{M.RuntimeInitExpr{value}}:
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.SourceExpr{offset, annotation, value}}:
       Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
+    case 1n+rest Expression{M.StateProviderExpr{read, write, initial}}:
+      Done{ReferenceStep{PendingReference{rest, Expression{initial}} <> pending, reversed}}
     case 1n+rest Expression{M.ProviderExpr{identity, implementation}}:
       Done{ReferenceStep{PendingReference{rest, Expression{implementation}} <> pending, reversed}}
     case 1n+rest Expression{M.HandleExpr{provider, body}}:
@@ -122,8 +135,12 @@ def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, 
       Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.ConstructorRefExpr{name}}:
       Done{ReferenceStep{pending, reversed}}
+    case 1n+rest Expression{M.GenericOperationExpr{identity, template, arguments}}:
+      Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.OperationExpr{identity}}:
       Done{ReferenceStep{pending, reversed}}
+    case 1n+rest Expression{M.SpecializeOperationExpr{template, arguments, body}}:
+      Done{ReferenceStep{PendingReference{rest, Expression{body}} <> pending, reversed}}
     case 1n+rest Expression{M.OperationDescriptorExpr{identity}}:
       Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expression{M.PanicExpr{message}}:
@@ -131,7 +148,17 @@ def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, 
     case 1n+rest Arms{Nil{}}:
       Done{ReferenceStep{pending, reversed}}
     case 1n+rest Arms{M.MatchArm{patterns, body} <> tail}:
-      Done{ReferenceStep{PendingReference{rest, Expression{body}} <> PendingReference{rest, Arms{tail}} <> pending, reversed}}
+      Done{ReferenceStep{PendingReference{rest, Patterns{patterns}} <> PendingReference{rest, Expression{body}} <> PendingReference{rest, Arms{tail}} <> pending, reversed}}
+    case 1n+rest Patterns{Nil{}}:
+      Done{ReferenceStep{pending, reversed}}
+    case 1n+rest Patterns{M.ValuePattern{reference} <> tail}:
+      Done{ReferenceStep{PendingReference{rest, Expression{M.reference_expr(reference)}} <> PendingReference{rest, Patterns{tail}} <> pending, reversed}}
+    case 1n+rest Patterns{M.ConstructorPattern{name, Some{payload}} <> tail}:
+      Done{ReferenceStep{PendingReference{rest, Patterns{payload <> tail}} <> pending, reversed}}
+    case 1n+rest Patterns{M.ProductPattern{elements} <> tail}:
+      Done{ReferenceStep{PendingReference{rest, Patterns{elements}} <> PendingReference{rest, Patterns{tail}} <> pending, reversed}}
+    case 1n+rest Patterns{pattern <> tail}:
+      Done{ReferenceStep{PendingReference{rest, Patterns{tail}} <> pending, reversed}}
     case 1n+rest Expressions{Nil{}}:
       Done{ReferenceStep{pending, reversed}}
     case 1n+rest Expressions{head <> tail}:
@@ -176,12 +203,19 @@ def constant_nodes(constants: List<&2, M.Constant>) -> Result<&2, &2, M.Diagnost
         rest : List<&2, Node> <- constant_nodes(tail)
         return Node{name, names_of(refs), lambdas_of(refs)} <> rest
 
+def contains_step(equal: Bool, remaining: Unit -> Bool) -> Bool:
+  match equal:
+    case True{}:
+      True{}
+    case False{}:
+      remaining(Unit{})
+
 def contains(names: List<&2, String>, +name: String) -> Bool:
   match names:
     case Nil{}:
       False{}
     case head <> tail:
-      Bool.or(M.name_equal(head, name), contains(tail, name))
+      contains_step(M.name_equal(head, name), unit => contains(tail, name))
 
 def lookup(nodes: List<&2, Node>, +name: String) -> List<&2, String>:
   match nodes:

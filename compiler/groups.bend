@@ -76,7 +76,7 @@ def valid_interface_kind(kind: InterfaceKind, template: M.Ty, parameters: Nat, e
 def import_interfaces(interfaces: List<&2, Interface>, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, +start: Nat) -> Result<&2, &2, M.Diagnostic, G.Environment>:
   match interfaces:
     case Nil{}:
-      Done{G.Environment{Nil{}, Nil{}, I.State{Nil{}, start}}}
+      Done{G.Environment{Nil{}, Nil{}, I.State{T.empty(), start, MTip{}}}}
     case Interface{+name, +kind, +template, +parameters, +effects} <> tail:
       do Result<&2, &2, M.Diagnostic, G.Environment>:
         valid : Unit <- TD.validate_template(template, Some{parameters}, operations, types, name)
@@ -105,6 +105,11 @@ def canonical_work(+fuel: Nat, work: T.TypeWork) -> Result<&2, &2, M.Diagnostic,
         p : M.Ty <- T.first_type(ps)
         r : M.Ty <- T.first_type(rs)
         return [M.FunctionTy{p, r, R.canonical(effects)}]
+    case 1n+rest T.OneType{M.StateProviderTy{read, write, state}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+        values : List<&2, M.Ty> <- canonical_work(rest, T.OneType{state})
+        value : M.Ty <- T.first_type(values)
+        return [M.StateProviderTy{read, write, value}]
     case 1n+rest T.OneType{M.ProviderTy{identity, effects}}:
       Done{[M.ProviderTy{identity, R.canonical(effects)}]}
     case 1n+rest T.OneType{M.AppliedTy{identity, arguments}}:
@@ -174,16 +179,24 @@ def checked_group(+checked: M.CheckedModule) -> Result<&2, &2, M.Diagnostic, Che
     consts : List<&2, Interface> <- constant_interfaces(constants)
     return CheckedGroup{checked, List.append(&2, Interface, fns, consts)}
 
-def check_group(+module: M.Module, +dependencies: List<&2, Interface>) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
+def check_group_graph(+module: M.Module, +dependencies: List<&2, Interface>, graph_result: Result<&2, &2, M.Diagnostic, List<&2, D.Node>>) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
   M.Module{constants, functions, +types, +operations} = module
   +declarations = List.append(&2, G.Declaration, G.function_declarations(functions), G.constant_declarations(constants))
   do Result<&2, &2, M.Diagnostic, CheckedGroup>:
-    graph : List<&2, D.Node> <- Check.module_graph(module)
+    graph : List<&2, D.Node> <- graph_result
     unique : Unit <- Check.unique_names(List.append(&2, String, interface_names(dependencies), List.append(&2, String, G.names(declarations), Check.all_constructor_names(types))))
     imported : G.Environment <- import_interfaces(dependencies, operations, types, 0n)
     environment : G.Environment <- G.infer_with(declarations, graph, operations, types, imported, interface_functions(dependencies))
     checked : M.CheckedModule <- Check.finish(module, environment)
     checked_group(checked)
+
+def check_group(+module: M.Module, +dependencies: List<&2, Interface>) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
+  check_group_graph(module, dependencies, Check.module_graph(module))
+
+# Only scheduler jobs derived from a successful whole-module graph may use this
+# path. Keep imported-interface validation and local inference/coverage checks.
+def check_group_planned(+module: M.Module, +dependencies: List<&2, Interface>) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
+  check_group_graph(module, dependencies, Check.module_graph_validated(module))
 
 type Usage is Data:
   Usage{nominals: List<&2, M.TypeId>}
@@ -238,7 +251,7 @@ def constructor_index_entries(constructors: List<&2, M.Constructor>, +identity: 
   match constructors:
     case Nil{}:
       index
-    case M.Constructor{name, payload} <> tail:
+    case M.Constructor{name, payload, fields} <> tail:
       constructor_index_entries(tail, identity, Map.set(&2, M.TypeId, index, name, identity))
 
 def constructor_index(types: List<&2, M.DataType>, index: Map<&2, M.TypeId>) -> Map<&2, M.TypeId>:
@@ -312,10 +325,20 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
       usage(rest, ExpressionUsage{value}, types)
     case 1n+rest ExpressionUsage{M.ArrayExpr{elements}}:
       usage(rest, ExpressionsUsage{elements}, types)
+    case 1n+rest ExpressionUsage{M.ForExpr{index, start, end, state, initial, body}}:
+      usage(rest, ExpressionsUsage{[start, end, initial, body]}, types)
+    case 1n+rest ExpressionUsage{M.ArrayGenerateExpr{count, generator}}:
+      usage(rest, ExpressionsUsage{[count, generator]}, types)
+    case 1n+rest ExpressionUsage{M.ArrayFillExpr{count, value}}:
+      usage(rest, ExpressionsUsage{[count, value]}, types)
     case 1n+rest ExpressionUsage{M.ArrayGetExpr{array, index}}:
       usage(rest, ExpressionsUsage{[array, index]}, types)
     case 1n+rest ExpressionUsage{M.ArraySetExpr{array, index, value}}:
       usage(rest, ExpressionsUsage{[array, index, value]}, types)
+    case 1n+rest ExpressionUsage{M.AssociatedExpr{identity, dispatch, member, templates, left, right}}:
+      usage(rest, ExpressionsUsage{[left, right]}, types)
+    case 1n+rest ExpressionUsage{M.GenericOperationExpr{identity, template, arguments}}:
+      usage(rest, TypesUsage{arguments}, types)
     case 1n+rest ExpressionUsage{M.ArrayLengthExpr{array}}:
       usage(rest, ExpressionUsage{array}, types)
     case 1n+rest ExpressionUsage{M.LambdaExpr{identity, parameter, p, r, body}}:
@@ -330,6 +353,8 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
         return combine_usage(a, b)
     case 1n+rest ExpressionUsage{M.CallExpr{callee, argument}}:
       usage(rest, ExpressionUsage{argument}, types)
+    case 1n+rest ExpressionUsage{M.StateProviderExpr{read, write, initial}}:
+      usage(rest, ExpressionUsage{initial}, types)
     case 1n+rest ExpressionUsage{M.ProviderExpr{identity, implementation}}:
       usage(rest, ExpressionUsage{implementation}, types)
     case 1n+rest ExpressionUsage{M.HandleExpr{provider, body}}:
@@ -384,6 +409,8 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
       usage(rest, ExpressionUsage{body}, types)
     case 1n+rest ExpressionUsage{M.ReturnExpr{label, value}}:
       usage(rest, ExpressionUsage{value}, types)
+    case 1n+rest ExpressionUsage{M.RuntimeInitExpr{value}}:
+      usage(rest, ExpressionUsage{value}, types)
     case 1n+rest ExpressionUsage{M.SourceExpr{offset, annotation, value}}:
       do Result<&2, &2, M.Diagnostic, Usage>:
         a : Usage <- usage(rest, TypeUsage{optional_type(annotation)}, types)
@@ -410,6 +437,8 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
         return combine_usage(Usage{[identity]}, nested)
     case 1n+rest TypeUsage{M.ProductTy{elements}}:
       usage(rest, TypesUsage{elements}, types)
+    case 1n+rest TypeUsage{M.StateProviderTy{read, write, state}}:
+      usage(rest, TypeUsage{state}, types)
     case 1n+rest TypeUsage{M.ArrayTy{element}}:
       usage(rest, TypeUsage{element}, types)
     case 1n+rest TypeUsage{M.FunctionTy{parameter, result, effects}}:
@@ -470,6 +499,13 @@ def operation_types(operations: List<&2, M.Operation>, +types: Map<&2, M.TypeId>
         found : Usage <- usage(Nat.mul(256n, 256n), TypesUsage{[parameter, result]}, types)
         rest : List<&2, M.TypeId> <- operation_types(tail, types)
         return union_types(usage_types(found), rest)
+    case M.OperationTemplate{identity, parameters, parameter, result} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
+        found : Usage <- usage(Nat.mul(256n, 256n), TypesUsage{[parameter, result]}, types)
+        rest : List<&2, M.TypeId> <- operation_types(tail, types)
+        return union_types(usage_types(found), rest)
+    case head <> tail:
+      Fail{M.Diagnostic{"unspecialized_effect", "effect", "effect instances must be specialized before dependency analysis"}}
 
 # Each job validates the shared operation catalog, including unused signatures.
 def shared_operation_types(usages: List<&2, DeclarationUsage>, +required: List<&2, M.TypeId>) -> List<&2, DeclarationUsage>:
@@ -483,7 +519,7 @@ def constructor_types(constructors: List<&2, M.Constructor>, +types: Map<&2, M.T
   match constructors:
     case Nil{}:
       Done{Nil{}}
-    case M.Constructor{name, payload} <> tail:
+    case M.Constructor{name, payload, fields} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, M.TypeId>>:
         found : Usage <- usage(Nat.mul(256n, 256n), TypeUsage{optional_type(payload)}, types)
         rest : List<&2, M.TypeId> <- constructor_types(tail, types)

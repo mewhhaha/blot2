@@ -70,23 +70,23 @@ applicationTest(
       reference,
       native,
       `
-fn combine left => fn right => left + right
-fn with_answer transform => transform 42
-export const answer = U32.mul 2 $ U32.add 1 $ 20
-export fn arithmetic () => identity $ 2 + 4 * 10
-export fn named () => identity $ 20 \`combine\` 22
-export fn generic () => Maybe.unwrap_or 0 $ Maybe.map identity $ Some $ 42
-export fn partial () => apply (U32.add 40) 2
-export fn eager (enabled: Bool) => always 42 $ do:
+const combine = fn left => fn right => left + right
+const with_answer = fn transform => transform 42
+const answer = U32.mul 2 $ U32.add 1 $ 20
+const arithmetic = fn () => identity $ 2 + 4 * 10
+const named = fn () => identity $ 20 \`combine\` 22
+const generic = fn () => Maybe.unwrap_or 0 $ Maybe.map identity $ Some $ 42
+const partial = fn () => apply (U32.add 40) 2
+const eager = fn (enabled: Bool) => always 42 $ do:
   if enabled:
     use @panic "eager argument"
   return 0
-export fn lambda () => with_answer $ fn value => value + 1
-export fn block (enabled: Bool) => identity $ do:
+const lambda = fn () => with_answer $ fn value => value + 1
+const block = fn (enabled: Bool) => identity $ do:
   if enabled:
     return 42
   return 7
-export fn matched (enabled: Bool) => identity $ case enabled of
+const matched = fn (enabled: Bool) => identity $ case enabled of
   True => 42
   False => 7
 `,
@@ -113,15 +113,15 @@ applicationTest(
       native,
       `
 infixr 0 ($) = choose_right
-fn choose_right ignored => fn value => value
-export const answer = 0 $ 42
+const choose_right = fn ignored => fn value => value
+const answer = 0 $ 42
 `,
     );
     equal((exports.answer as WebAssembly.Global).value, 42);
     await rejectSource(
       reference,
       native,
-      "export fn answer () => 0 $ 42",
+      "const answer = fn () => 0 $ 42",
       "unknown_operator",
     );
   },
@@ -134,17 +134,17 @@ applicationTest(
     const declarations = `
 effect Reader.ask: Unit -> U32
 const reader = @effect.provider Reader.ask (fn () => 42)
-fn read () => Reader.ask ()
-fn call_read () => read $ ()
-export const reads = @effect.has (@effect.of call_read) Reader.ask
+const read = fn () => Reader.ask ()
+const call_read = fn () => read $ ()
+const reads = @effect.has (@effect.of call_read) Reader.ask
 `;
     const { exports } = await compile(
       reference,
       native,
       declarations + `
-export fn answer () => do reader:
+const answer = fn () => do reader:
   return call_read $ ()
-export const expected = answer ()
+const expected = answer ()
 `,
     );
     equal((exports.reads as WebAssembly.Global).value, 1);
@@ -153,14 +153,14 @@ export const expected = answer ()
     await rejectSource(
       reference,
       native,
-      declarations + "export fn answer () => call_read $ ()",
-      "backend_effect",
+      declarations + "const answer: Unit -> U32 = fn () => call_read $ ()",
+      "effect_mismatch",
     );
     await rejectSource(
       reference,
       native,
       declarations + `
-export fn answer () => do reader:
+const answer = fn () => do reader:
   let result = read $ ()
   return result
 `,
@@ -176,23 +176,23 @@ applicationTest(
       reference,
       native,
       `
-export fn discard () => do:
+const discard = fn () => do:
   use identity $ 42
-export fn last_expression () => do:
+const last_expression = fn () => do:
   42
-export fn early (enabled: Bool) => do:
+const early = fn (enabled: Bool) => do:
   if enabled:
     return ()
   use 42
-export fn expression_body () => 42
-export fn discarded_panic (enabled: Bool) => do:
+const expression_body = fn () => 42
+const discarded_panic = fn (enabled: Bool) => do:
   if enabled:
     use @panic "discarded does not mean skipped"
-export fn nested () => do:
+const nested = fn () => do:
   use do:
     return 7
   use identity $ 42
-export const unit = discard ()
+const unit = discard ()
 `,
     );
     for (const name of ["discard", "last_expression", "early", "nested"]) {
@@ -208,8 +208,8 @@ export const unit = discard ()
     equal((exports.unit as WebAssembly.Global).value, 0);
     for (
       const source of [
-        "export fn missing () -> U32 => do:\n  use 42",
-        "export fn mixed (enabled: Bool) => do:\n  if enabled:\n    return 42\n  use ()",
+        "const missing = fn () -> U32 => do:\n  use 42",
+        "const mixed = fn (enabled: Bool) => do:\n  if enabled:\n    return 42\n  use ()",
       ]
     ) {
       await rejectSource(reference, native, source, "type_mismatch");
@@ -223,14 +223,14 @@ applicationTest(
     await rejectSource(
       reference,
       native,
-      "fn invalid () => do:\n  return $ identity $ 42",
+      "const invalid = fn () => do:\n  return $ identity $ 42",
       "resolver_required",
     );
     const { exports } = await compile(
       reference,
       native,
       `
-export fn valid () => do:
+const valid = fn () => do:
   return identity $ 42
 `,
     );

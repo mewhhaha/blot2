@@ -17,10 +17,10 @@ function source(path: string): string {
 }
 function body(path: string, name: string): string {
   const text = source(path);
-  const start = text.search(new RegExp(`^(?:export )?fn ${name}\\b`, "m"));
+  const start = text.search(new RegExp(`^(?:const|let) ${name} = fn\\b`, "m"));
   ok(start >= 0, `Missing function ${path}:${name}`);
   const next = text.slice(start + 1).search(
-    /^(?:export )?(?:fn|const|type|data) |^#\[/m,
+    /^(?:const|let|type|data) |^#\[/m,
   );
   return next < 0 ? text.slice(start) : text.slice(start, start + 1 + next);
 }
@@ -86,9 +86,7 @@ Deno.test("game and engine modules reserve intrinsics for compiler primitives", 
 
 Deno.test("game composes an application from plugins, resources and ordered systems", () => {
   const game = source("game.blot");
-  equal([...game.matchAll(/^export fn (\w+)/gm)].map((match) => match[1]), [
-    "main",
-  ]);
+  ok(/^const main = fn /m.test(game));
   ok(body("game.blot", "main").includes("(io: Io) => app.bind sandbox io"));
   ok(game.includes('let application = app.new "Blot — PLAY"'));
   ok(game.includes("application := input.plugin self"));
@@ -149,8 +147,8 @@ Deno.test("lifecycle scopes successor worlds and narrows captured host capabilit
   equal([...source(app).matchAll(/renderer\.submit/g)].length, 1);
   const platform = source("engine/platform.blot");
   equal([...platform.matchAll(/! \{Foreign\}/g)].length, 6);
-  ok(platform.includes("read: Unit -> Result Bytes IoError"));
-  ok(platform.includes("write: Bytes -> Result Unit IoError"));
+  ok(platform.includes("read: Unit -> Result [Bytes, IoError]"));
+  ok(platform.includes("write: Bytes -> Result [Unit, IoError]"));
 });
 
 Deno.test("input edges, selection and edit commands use typed state and flat matches", () => {
@@ -214,7 +212,7 @@ Deno.test("camera and model matrices preserve column-major frame layouts", () =>
     "1.0",
   ]);
   equal(matrix(camera, "render.projection ["), [
-    "F32.div (F32.mul tangent height) width",
+    "tangent * height / width",
     "0.0",
     "0.0",
     "0.0",
@@ -232,17 +230,17 @@ Deno.test("camera and model matrices preserve column-major frame layouts", () =>
     "0.0",
   ]);
   equal(matrix(body("engine/spatial.blot", "matrix"), "return ["), [
-    "F32.mul cosine transform.scale.x",
+    "cosine * transform.scale.x",
     "0.0",
-    "F32.neg (F32.mul sine transform.scale.x)",
+    "F32.neg (sine * transform.scale.x)",
     "0.0",
     "0.0",
     "transform.scale.y",
     "0.0",
     "0.0",
-    "F32.mul sine transform.scale.z",
+    "sine * transform.scale.z",
     "0.0",
-    "F32.mul cosine transform.scale.z",
+    "cosine * transform.scale.z",
     "0.0",
     "transform.position.x",
     "transform.position.y",

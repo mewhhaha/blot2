@@ -7,6 +7,7 @@ import ./wasm.bend as Wasm
 import ./source_modules.bend as SourceModules
 import ./groups.bend as Groups
 import ./cst.bend as Cst
+import ./public_exports.bend as Public
 
 type Analysis is Data:
   Analysis{checked: M.CheckedModule, constants: List<&2, Const.Binding<Const.Value>>, remaining_steps: Nat}
@@ -65,15 +66,21 @@ def compile(module: M.Module, steps: Nat) -> Result<&2, &2, M.Diagnostic, Artifa
 # Keep intermediate compiler terms inside Bend; the host only receives results.
 def analyze_source(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Analysis>:
   do Result<&2, &2, M.Diagnostic, Analysis>:
-    module : M.Module <- SourceModules.source_module(M.name_equal(Cst.kind_of(root), "source_project"), root, prelude, fuel)
-    analyze(module, steps)
+    module : M.Module <- SourceModules.source_module_deferred(M.name_equal(Cst.kind_of(root), "source_project"), root, prelude, fuel)
+    inferred : M.CheckedModule <- CheckScheduler.check_module(module)
+    +checked : M.CheckedModule = Public.select_checked(inferred)
+    raw : M.Module = Public.unchecked_module(checked)
+    constants : Const.Constants <- Const.evaluate_constants(checked_constants(checked), steps, const_context(raw, checked))
+    return finish_analysis(checked, constants)
 
 def compile_source(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Artifact>:
   do Result<&2, &2, M.Diagnostic, Artifact>:
-    module : M.Module <- SourceModules.source_module(M.name_equal(Cst.kind_of(root), "source_project"), root, prelude, fuel)
-    compile(module, steps)
+    +analysis : Analysis <- analyze_source(root, prelude, fuel, steps)
+    bytes : Wasm.BytePlan <- Wasm.emit_plan(analysis_checked(analysis), analysis_constants(analysis))
+    return flatten_artifact(PlannedArtifact{analysis, bytes})
 
 def compile_source_plan(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, PlannedArtifact>:
   do Result<&2, &2, M.Diagnostic, PlannedArtifact>:
-    module : M.Module <- SourceModules.source_module(M.name_equal(Cst.kind_of(root), "source_project"), root, prelude, fuel)
-    compile_plan(module, steps)
+    +analysis : Analysis <- analyze_source(root, prelude, fuel, steps)
+    bytes : Wasm.BytePlan <- Wasm.emit_plan(analysis_checked(analysis), analysis_constants(analysis))
+    return PlannedArtifact{analysis, bytes}

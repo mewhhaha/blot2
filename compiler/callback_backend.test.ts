@@ -225,7 +225,7 @@ function metadata(module: WebAssembly.Module) {
   equal(sections.length, 1);
   const bytes = new Uint8Array(sections[0]);
   const reader = readerAt(bytes);
-  equal(reader.word(), 1);
+  equal(reader.word(), 2);
   const functions = Array.from({ length: reader.word() }, () => {
     const name = reader.text();
     const parameter = [reader.word()];

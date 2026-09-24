@@ -206,7 +206,11 @@ Deno.test("a failed tuple field skips an invalid later constructor pointer", () 
     return result;
   }
   const backend = generated as unknown as {
-    "wasm.pattern_test_work"(fuel: bigint, work: RawPattern):
+    "wasm.pattern_test_work"(
+      fuel: bigint,
+      work: RawPattern,
+      locals: List<unknown>,
+    ):
       | { readonly $: "Done"; readonly value: List<Fragment> }
       | { readonly $: "Fail"; readonly error: unknown };
   };
@@ -233,7 +237,7 @@ Deno.test("a failed tuple field skips an invalid later constructor pointer", () 
         },
       ]),
     },
-  });
+  }, list([]));
   ok(result.$ === "Done");
   const instructions = array(result.value).flatMap((fragment) => {
     if (fragment.$ === "Bytes") return array(fragment.bytes);

@@ -14,6 +14,7 @@ interface Context {
   readonly headers: unknown;
   readonly fixities: unknown;
   readonly locals: unknown;
+  readonly annotation_variables: unknown;
   readonly return_label: unknown;
 }
 
@@ -41,6 +42,7 @@ function empty(): Context {
     fixities: { $: "Nil" },
     locals: { $: "Nil" },
     return_label: { $: "None" },
+    annotation_variables: { $: "Nil" },
   };
 }
 
@@ -82,6 +84,10 @@ Deno.test("read-only indexes agree with Base.Map-built scopes for prefixes, Unic
     "🦆",
     "🦆x",
     "日本語",
+    ...Array.from(
+      { length: 128 },
+      (_, index) => `${"qualified/module/path/🦆/".repeat(8)}symbol_${index}`,
+    ),
     ...Array.from(
       { length: 512 },
       (_, index) => `module_${index % 13}.system_${index}`,

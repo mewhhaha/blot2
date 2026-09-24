@@ -25,7 +25,7 @@ export interface NativeIncrementalStats
   readonly total_ms: number;
 }
 
-function sameDeclaration(left: Cst, right: Cst): boolean {
+export function sameDeclaration(left: Cst, right: Cst): boolean {
   if (left === right) return true;
   const pending: [Cst, Cst][] = [[left, right]];
   for (let pair = pending.pop(); pair; pair = pending.pop()) {

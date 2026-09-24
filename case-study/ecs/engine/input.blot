@@ -5,43 +5,43 @@ import { PendingInput } from "./app"
 import { Viewport } from "./platform"
 import { Vec2 } from "./spatial"
 
-export data Button = Primary | Secondary | Other U32
-export data EventKind = KeyPressed U32 | KeyReleased U32 | FocusLost
+type Button is data = Primary | Secondary | Other U32
+type EventKind is data = KeyPressed U32 | KeyReleased U32 | FocusLost
   | PointerDown Button | PointerUp Button | PointerMoved | Scrolled F32 | Ignored
 
 #[resource]
-export data Input = Input {
+type Input is data = Input {
   event: EventKind, held: Array U32, pointer: Vec2, delta: Vec2,
   picked: Maybe ecs.EntityId, viewport: Viewport,
 }
 
-fn button code => case code of
+const button = fn code => case code of
   0 => Primary
   2 => Secondary
   _ => Other code
 
 // Legacy host events carry character codes. Fold ASCII case before tracking
 // holds so releasing Shift before a letter cannot leave that letter stuck.
-fn key code => do:
+const key = fn code => do:
   if code >= 97:
     if code <= 122:
       return code - 32
   return code
 
-export fn held keys => fn code => do:
+const held = fn keys => fn code => do:
   for pressed in keys:
     if pressed == code:
       return True
   return False
 
-fn without keys => fn code => do:
+const without = fn keys => fn code => do:
   let remaining = []
   for pressed in keys:
     if pressed != code:
       remaining := [...self, pressed]
   return remaining
 
-fn receive () => do:
+const receive = fn () => do:
   use pending <- ecs.get PendingInput
   let PendingInput (Some event) = pending else:
     return ()
@@ -70,13 +70,13 @@ fn receive () => do:
     if event.kind <= 7:
       next.pointer := Vec2 { x: event.pointer_x, y: event.pointer_y }
       next.delta := Vec2 {
-        x: F32.sub next.pointer.x previous.pointer.x,
-        y: F32.sub next.pointer.y previous.pointer.y,
+        x: next.pointer.x - previous.pointer.x,
+        y: next.pointer.y - previous.pointer.y,
       }
   use ecs.set next
   return ()
 
-export fn plugin builder => do:
+const plugin = fn builder => do:
   let next = app.insert_resource (Input {
     event: Ignored, held: [], picked: Nothing,
     pointer: Vec2 { x: 0.0, y: 0.0 }, delta: Vec2 { x: 0.0, y: 0.0 },

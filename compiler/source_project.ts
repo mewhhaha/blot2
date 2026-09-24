@@ -32,6 +32,22 @@ function field(node: Cst, label: string): Cst {
   return found;
 }
 
+// Parsed trees are retained across loads. Freeze them once when parsed so a
+// caller editing a returned project cannot change the loader's cached syntax.
+function freezeParsed(root: Cst): void {
+  const pending = [root];
+  for (let node = pending.pop(); node; node = pending.pop()) {
+    let list = node.children;
+    while (list.$ === "Con") {
+      pending.push(list.head);
+      Object.freeze(list);
+      list = list.tail;
+    }
+    Object.freeze(list);
+    Object.freeze(node);
+  }
+}
+
 function localFileUrl(url: URL): URL {
   if (url.protocol !== "file:" || url.search || url.hash) {
     throw new Error(
@@ -64,16 +80,19 @@ function dependency(
   );
 }
 
-export async function loadSourceProject(
+async function loadProject(
   entry: string | URL,
-  options: ProjectOptions = {},
+  options: ProjectOptions,
+  parse: (
+    url: URL,
+    source: string,
+  ) => ReturnType<Awaited<ReturnType<typeof createFrontend>>["parse"]>,
 ): Promise<SourceProject> {
   const entryUrl = localFileUrl(
     entry instanceof URL ? entry : pathToFileURL(resolve(entry)),
   );
   const directory = dirname(fileURLToPath(entryUrl));
   const readSource = options.readSource ?? Deno.readTextFile;
-  const frontend = await createFrontend();
   const modules = new Map<string, SourceModule>();
   const visiting: string[] = [];
   const reads = new Map<string, Promise<PromiseSettledResult<string>>>();
@@ -112,7 +131,7 @@ export async function loadSourceProject(
     const source = read.value;
     visiting.push(url.href);
     try {
-      const parsed = frontend.parse(source);
+      const parsed = parse(url, source);
       const imports = bendArray(parsed.root.children).filter((node) =>
         node.field === "imports"
       );
@@ -206,6 +225,59 @@ export async function loadSourceProject(
     };
   } finally {
     await Promise.all(reads.values());
-    frontend.dispose();
+  }
+}
+
+/** Retain validated per-file syntax while re-reading the import graph each load. */
+export async function createSourceProjectLoader(options: ProjectOptions = {}) {
+  const configured: ProjectOptions = {
+    ...options,
+    imports: options.imports && Object.fromEntries(
+      Object.entries(options.imports).map(([prefix, url]) => [
+        prefix,
+        new URL(url),
+      ]),
+    ),
+  };
+  const frontend = await createFrontend();
+  type Parsed = ReturnType<typeof frontend.parse>;
+  let cached = new Map<string, { source: string; parsed: Parsed }>();
+  let closed = false;
+  return {
+    async load(entry: string | URL): Promise<SourceProject> {
+      if (closed) throw new Error("Source project loader is disposed");
+      const next = new Map<string, { source: string; parsed: Parsed }>();
+      const project = await loadProject(entry, configured, (url, source) => {
+        if (closed) throw new Error("Source project loader is disposed");
+        const previous = cached.get(url.href);
+        const value = previous?.source === source
+          ? previous
+          : { source, parsed: frontend.parse(source) };
+        if (value !== previous) freezeParsed(value.parsed.root);
+        next.set(url.href, value);
+        return value.parsed;
+      });
+      if (closed) throw new Error("Source project loader is disposed");
+      cached = next;
+      return project;
+    },
+    dispose() {
+      if (closed) return;
+      closed = true;
+      cached.clear();
+      frontend.dispose();
+    },
+  };
+}
+
+export async function loadSourceProject(
+  entry: string | URL,
+  options: ProjectOptions = {},
+): Promise<SourceProject> {
+  const loader = await createSourceProjectLoader(options);
+  try {
+    return await loader.load(entry);
+  } finally {
+    loader.dispose();
   }
 }

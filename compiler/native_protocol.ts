@@ -17,7 +17,7 @@ import type {
 import type { Cst, CstList } from "./syntax.ts";
 
 export const nativeProtocolMagic = 0x424C4F54;
-export const nativeProtocolVersion = 7;
+export const nativeProtocolVersion = 11;
 export const nativeProtocolMaxWords = 16 * 1024 * 1024;
 const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
@@ -611,8 +611,17 @@ class WordReader {
       "EffectSetTy",
       "ProductTy",
       "ArrayTy",
+      "StateProviderTy",
+      "FreeTy",
     ]);
     switch ($) {
+      case "StateProviderTy":
+        this.fields(
+          [this.identity, this.identity, this.type],
+          (read, write, state) => ({ $, read, write, state }),
+          receive,
+        );
+        return;
       case "UnitTy":
       case "U32Ty":
       case "BoolTy":
@@ -653,6 +662,9 @@ class WordReader {
           receive,
         );
         return;
+      case "FreeTy":
+        receive({ $, scope: this.string(), name: this.string() });
+        return;
       case "ParameterTy":
       case "VariableTy":
         receive({ $, index: this.nat() });
@@ -668,6 +680,7 @@ class WordReader {
       "BoolPattern",
       "ConstructorPattern",
       "ProductPattern",
+      "ValuePattern",
     ]);
     switch ($) {
       case "WildcardPattern":
@@ -689,6 +702,15 @@ class WordReader {
           (constructor, payload) => ({ $, constructor, payload }),
           receive,
         );
+        return;
+      case "ValuePattern":
+        receive({
+          $,
+          reference: {
+            $: this.tag(["LocalReference", "ConstantReference"]),
+            name: this.string(),
+          },
+        });
         return;
       case "ProductPattern":
         this.fields(
@@ -781,8 +803,22 @@ class WordReader {
       "ArrayGetExpr",
       "ArraySetExpr",
       "ArrayLengthExpr",
+      "ArrayFillExpr",
+      "ArrayGenerateExpr",
+      "UnresolvedAssociatedExpr",
+      "ForExpr",
+      "StateProviderExpr",
+      "UnresolvedGenericOperationExpr",
+      "RuntimeInitExpr",
     ]);
     switch ($) {
+      case "StateProviderExpr":
+        this.fields(
+          [this.identity, this.identity, this.expression],
+          (read, write, initial) => ({ $, read, write, initial }),
+          receive,
+        );
+        return;
       case "UnitExpr":
         receive({ $ });
         return;
@@ -791,6 +827,50 @@ class WordReader {
         this.fields(
           [this.array(this.expression)],
           (elements) => ({ $, elements }),
+          receive,
+        );
+        return;
+      case "UnresolvedAssociatedExpr":
+        throw new NativeProtocolError(
+          "Unresolved associated call in compiler response",
+        );
+      case "UnresolvedGenericOperationExpr":
+        throw new NativeProtocolError(
+          "Unresolved generic effect operation in compiler response",
+        );
+      case "ForExpr":
+        this.fields(
+          [
+            this.readString,
+            this.expression,
+            this.expression,
+            this.readString,
+            this.expression,
+            this.expression,
+          ],
+          (index, start, end, state, initial, body) => ({
+            $,
+            index,
+            start,
+            end,
+            state,
+            initial,
+            body,
+          }),
+          receive,
+        );
+        return;
+      case "ArrayGenerateExpr":
+        this.fields(
+          [this.expression, this.expression],
+          (count, generator) => ({ $, count, generator }),
+          receive,
+        );
+        return;
+      case "ArrayFillExpr":
+        this.fields(
+          [this.expression, this.expression],
+          (count, value) => ({ $, count, value }),
           receive,
         );
         return;
@@ -951,6 +1031,9 @@ class WordReader {
           receive,
         );
         return;
+      case "RuntimeInitExpr":
+        this.fields([this.expression], (value) => ({ $, value }), receive);
+        return;
       case "SourceExpr":
         this.fields(
           [this.readNat, this.optional(this.type), this.expression],
@@ -1031,8 +1114,16 @@ class WordReader {
       "EffectSetValue",
       "ProductValue",
       "ArrayValue",
+      "StateProviderValue",
     ]);
     switch ($) {
+      case "StateProviderValue":
+        this.fields(
+          [this.identity, this.identity, this.value],
+          (read, write, initial) => ({ $, read, write, initial }),
+          receive,
+        );
+        return;
       case "UnitValue":
         receive({ $ });
         return;

@@ -1,5 +1,153 @@
 # Concurrency review and benchmark report
 
+## Receiver members and array updates (2026-09-23)
+
+Gdev's schema calls now use `tail.contains(witness)` and
+`schema.contains(value)`. Receiver dispatch selects an associated function from
+the receiver's type. Record accessors are generated only for fields actually
+used. Array indexing and path updates lower to the existing array operations;
+storage reuse is selected during each independent Wasm preparation job.
+
+The ownership pass tracks escaping uses and last reads with indexed maps. It
+reuses fresh local arrays and single-array loop state when the old value is
+consumed. Parameters, globals, captures, projections, unknown call results, and
+shared arrays retain copying semantics. Wide child lists use an explicit work
+stack; the 8,192-element array regression passes in both compiler backends.
+
+After builds and tests finished, three stateless native requests per retained
+process measured the following times for the same 15-module gdev project and
+100,000-step const budget:
+
+| Threads | Median |       Range |
+| ------- | -----: | ----------: |
+| 1       | 2.62 s | 2.38–2.77 s |
+| 8       | 2.40 s | 2.22–2.52 s |
+
+These unpaired desktop samples overlap the previous checkpoint's ranges and do
+not isolate the cost of this feature. Loading, parser creation, frontend
+preparation, and encoding took 123 ms, 24 ms, 4 ms, and 16 ms respectively,
+outside the native timings. Startup took under 3 ms and decoding took 5–8 ms.
+
+All six requests produced the same valid 172,575-byte Wasm as the type-equality
+checkpoint, with SHA-256
+`a1a8097a51f3ef25781ea6f0c87c9a2c613876221ec1979f380ed291bb8ba8c5`. Analysis
+contains 658 functions and 23 constants.
+
+Validation passed: all 638 compiler tests, all 24 gdev tests, Bend proofs,
+native ownership checks at one and four threads, formatting, 437 highlighting
+assertions, six editor-installation tests, and seven case-study source checks.
+The updated Helix grammar and queries are installed.
+
+## Prelude type equality follow-up (2026-09-23)
+
+The prelude now supplies ordinary `Type` witnesses with `==` and `!=`, backed by
+the existing `@type.same` specialization. Gdev's schema comparison uses
+`Type head == Type witness`. No compiler implementation changed for this
+addition.
+
+After all 626 compiler tests and 24 gdev tests passed, three native requests at
+each thread count measured a median of 2.48 s at one thread (2.36–2.55 s) and
+2.25 s at eight threads (2.13–2.31 s), using the same method as below. These
+desktop samples show no compile-time regression; they are not a paired
+measurement of an optimization.
+
+All six requests produced identical, valid 172,575-byte Wasm with SHA-256
+`a1a8097a51f3ef25781ea6f0c87c9a2c613876221ec1979f380ed291bb8ba8c5`. Analysis
+contains 657 functions and 23 constants; the native executable is the same one
+used for the public-bindings measurements below.
+
+## Public bindings and ordinary effects in gdev (2026-09-23)
+
+The completed language rewrite keeps the indexed substitutions and parallel
+specialization described below. Functions use top-level `const` or `let`
+bindings, declarations are public by default, and generic effect operations
+infer their family arguments through ordinary function types. `const`
+initializers run during compilation; `let` initializers run at Wasm startup.
+
+Independent specialization can infer a caller against a dependency's earlier
+shape. Affected declarations now refresh their interfaces together against the
+completed specializations before selecting Wasm exports. This also refreshes
+callers that already have a provisional interface: otherwise an overloaded
+operator inside a callback can leave an effectful helper incorrectly marked as
+pure. The gdev builder-plugin fixture and a reduced compiler regression cover
+this case.
+
+Final native measurements used three stateless requests per retained process,
+the same 15-module project, default prelude, and 100,000-step const budget. All
+builds and tests finished before timing. As in the initial comparison below,
+these are desktop measurements on the Ryzen 7 7800X3D with Bend 2.0.24; timing
+includes native compilation and response transport.
+
+| Threads | Median |       Range |
+| ------- | -----: | ----------: |
+| 1       | 2.76 s | 2.60–2.85 s |
+| 8       | 2.49 s | 2.34–2.56 s |
+
+Frontend project loading, parser creation, preparation, and encoding took 143
+ms, 32 ms, 6 ms, and 19 ms respectively, outside those native measurements.
+Native startup took under 3 ms and response decoding took 4–9 ms.
+
+Every request produced valid, identical 172,535-byte Wasm with 629 functions and
+23 constants, including identical output across thread counts. SHA-256:
+`1255452311af98df1bb7bccaa661751af06351aedde6b3b984465c728fcb893c`. This final
+artifact differs from the 189,867-byte output at the earlier language checkpoint
+below.
+
+Validation passed: all 623 compiler tests, all 24 gdev tests (including WebGPU
+rendering and 1,200-frame reload), Bend proofs, native ownership checks at one
+and four threads, TypeScript and formatting checks, 421 highlighting assertions,
+six editor-installation tests, and seven case-study source checks. Updated Helix
+grammar and queries are installed.
+
+## Initial specialization comparison in gdev (2026-09-23)
+
+The starting changeset's new monomorphization pass caused most of the reported
+six-second compile. An instrumented native request spent 4,759 ms in
+specialization, 1,427 ms in final analysis, 29 ms lowering, and 54 ms emitting
+Wasm. The application grew from 221 lowered functions to 798 specialized
+functions. Parsing, transport encoding, and process startup were small by
+comparison.
+
+The initial rewrite indexed type and row substitutions while preserving
+chronological replacement semantics. It retained the inferred interfaces of
+specialized constants, reducing whole-module checks from three to two and group
+checks from 1,543 to 1,065 at that checkpoint. Independent specialization units
+run in weighted batches with separate inference states and disjoint,
+deterministic identity sequences. Dependent constants remain ordered.
+
+Another bottleneck was merging a branch's entire inherited interface environment
+after it finished. Checker branches now publish only interfaces they produced.
+Reference-backend profiling attributed about 3.24 s to those merges before this
+change and 0.061 s afterward; these are JavaScript diagnostic measurements, not
+native phase timings.
+
+The initial native comparison alternated the saved starting compiler/source and
+the updated compiler/source, using three stateless requests in each retained
+process at each thread count. Requests used the same 15-module application,
+default prelude, and 100,000-step const budget. Timing covers native compilation
+and response transport, excluding frontend preparation, startup, and response
+decoding. The machine was an AMD Ryzen 7 7800X3D running Bend 2.0.24.
+
+| Threads | Starting median | Updated median | Starting range | Updated range |
+| ------- | --------------: | -------------: | -------------: | ------------: |
+| 1       |          8.56 s |         2.74 s |    7.41–9.13 s |   2.56–2.85 s |
+| 8       |          8.41 s |         2.39 s |    7.59–8.91 s |   2.25–2.45 s |
+
+Earlier starting-worktree requests measured 6.3–7.9 s. These desktop timings are
+observations rather than isolated-core guarantees. They compare the working
+changeset before and after this rewrite; the older, reportedly fast gdev
+revision targeted a different compiler and language surface.
+
+Every request in that comparison produced valid, byte-identical 189,867-byte
+Wasm, with SHA-256
+`07de45395785bbbb5ca3f149cd68268b0fb452cf7656b8409b9ad32e3a746531`. The matching
+builds passed all 597 compiler tests, all 24 gdev tests, Bend proofs, native
+ownership checks at one/four threads, TypeScript checks, and editor checks. The
+source migration at that checkpoint covered structural type/effect arguments,
+explicit currying, inferred annotation names, and the subsequently removed `pub`
+keyword. Current executable syntax is documented in the
+[language guide](guide.md).
+
 The [retained-memory diagnosis](MEMORY.md) identifies a native Bend 2.0.21
 code-generation defect at two sites accounting for all observed leaked
 allocations in the 200-edit workload. An isolated generated-C control reduces

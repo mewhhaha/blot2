@@ -5,12 +5,16 @@ import { SourceError } from "./syntax.ts";
 import { loadSourceProject } from "./source_project.ts";
 
 const [command, filename, output, ...extra] = Deno.args;
+if (command === "guide" && Deno.args.length === 1) {
+  console.log(await Deno.readTextFile(new URL("./guide.md", import.meta.url)));
+  Deno.exit(0);
+}
 if (
   (command !== "check" && command !== "build") || !filename || extra.length ||
   (command === "check" && output)
 ) {
   console.error(
-    "Usage: deno task blot check <source.blot> | build <source.blot> [build/output.wasm]",
+    "Usage: deno task blot guide | check <source.blot> | build <source.blot> [build/output.wasm]",
   );
   Deno.exit(2);
 }

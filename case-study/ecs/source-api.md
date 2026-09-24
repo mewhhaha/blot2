@@ -3,14 +3,18 @@
 [game.blot](game.blot) contains scene/editor policy and a const-time application
 builder. Reusable Blot modules now live in [engine/](engine/). This is a
 **source design specimen, not a runnable game**: declaration transforms, record
-field access/update, array spread/indexing sugar, successor rebinding, loops,
-type-valued descriptors, state resolvers and the composite guest ABI still need
-implementation.
+field access/update, array spread/indexing sugar, runtime text, type-valued
+descriptors, the proposed composite host boundary and the foundation packages
+below still need implementation.
 
 Relative and explicitly mapped imports, tuple values/patterns, named record
 construction/patterns, and immutable homogeneous arrays now compile and execute
-in the generic core. They are prerequisites, not a source ECS implementation;
-array updates still copy and the host ABI remains scalar-only.
+in the generic core. Const composition, `:=` shadowing, `for` loops, scoped
+state and numeric-array guest ABI 2 are also executable. The sibling gdev
+checkout now implements a source ECS with const-derived storage and effect-based
+access; this specimen retains a broader proposed API. Array updates still copy.
+See the [executable guide](../../compiler/guide.md) and
+[state/effect boundary](../../compiler/effects-and-io.md) for current support.
 
 The local modules contain source bodies, not wrappers over retired compiler
 hooks. The external `engine/ecs`, `engine/render`, `engine/assets`,
@@ -68,7 +72,7 @@ const sandbox = do:
   application := app.add_system Render boxes.draw_mesh self
   return app.build application
 
-export fn main (io: Io) => app.bind sandbox io
+const main = fn (io: Io) => app.bind sandbox io
 ```
 
 This abbreviated example omits camera and scene/selection rendering
@@ -76,13 +80,18 @@ registration; the complete builder is at the bottom of `game.blot`. A plugin is
 an ordinary builder-to-builder function, not a special compiler mechanism. `:=`
 creates an immutable successor binding and `self` means the previous value.
 
-Each system is registered separately **before** its function becomes an
-`ecs.Descriptor`. An array of differently effectful callbacks could otherwise
-unify their rows or lose the per-system access information required for queries.
-The descriptor array is const-time metadata, not a runtime callback vtable.
-`ecs.build` derives a schema/world type and stage runners from those
-descriptors. It must retain callback identity, component/resource effects, query
-boundaries and explicit ordering.
+In this proposed descriptor API, each system is registered separately **before**
+its function becomes an `ecs.Descriptor`. An array of differently effectful
+callbacks could otherwise unify their rows or lose the per-system access
+information required for queries. The descriptor array is const-time metadata,
+not a runtime callback vtable. `ecs.build` derives a schema/world type and stage
+runners from those descriptors. It must retain callback identity,
+component/resource effects, query boundaries and explicit ordering.
+
+Executable gdev instead composes resource/component state directly, discards
+registration metadata in `ecs.build`, and stores a runtime array of ordered
+system callbacks. It uses explicit `query`/`query_pair` calls. The descriptor
+inspection and automatic query derivation described here are not implemented.
 
 The proposed foundation operations used by the local builder are:
 
@@ -127,8 +136,42 @@ effects continue to the enclosing provider.
 
 `ecs.checkpoint` preserves the previous fixed-step values. Inserted components
 initialize both current/previous values; `ecs.previous` supports interpolation
-without advancing the world. These requirements exceed the currently implemented
-Reader-style providers.
+without advancing the world. General scoped-state resolvers now provide the
+state foundation, but these exact foundation APIs remain proposed. Executable
+gdev's individual previous-component reads fall back to current values when a
+snapshot is missing; bulk previous columns preserve `Nothing` for missing
+snapshots so rendering can choose its fallback explicitly.
+
+Source-declared effect families can express a reusable state contract today:
+
+```blot
+type State a is effect = {
+  get: Unit -> a
+  set: a -> Unit
+}
+
+const increase = fn () => do:
+  use count <- State.get U32 ()
+  use State.set U32 (count + 1)
+  return count
+
+const read = fn (witness: input -> a) -> a => State.get ()
+```
+
+`State U32` names the concrete family instance; an explicit `! {State U32}` row
+includes both operations. `State.get U32` and `State.set U32` can be supplied by
+a scoped provider. Type application uses spaces, as it does for `Maybe U32`.
+Generic helpers infer the family instance from ordinary argument and result
+types. The `read` wrapper links the result of a constructor/function witness to
+the result of `State.get`. The proposed `ecs.scope` additionally needs
+entity/query selection, storage derivation and world checkpointing. Explicit
+generic effect rows such as `! {State a}` are not yet supported inside
+polymorphic functions.
+
+The specimen also uses type-valued names such as `ecs.get Surface`. Current
+typed selectors take constructor/function witnesses instead: for
+`type Surface is data = Brass | Blue`, use `read (fn () => Brass)`. A type name
+without a same-named constructor is not a value witness.
 
 `render.collect callback` handles source packet-building effects and returns
 `(RenderFrame, callback_result)`, forwarding ECS effects to the enclosing scope.
@@ -144,12 +187,12 @@ additional host entrypoints. The host drives:
 
 - `create () -> World`: initializes registered resources and runs Start, once on
   first launch. It checkpoints the seeded world.
-- `event world input -> Result World ApplicationError ! {Foreign}`: supplies
+- `event world input -> Result [World, ApplicationError] ! {Foreign}`: supplies
   PendingInput, runs Event, clears the request resources, then handles
   Save/Load. It captures only file authority.
 - `update world frame -> World`: validates time, checkpoints the previous tick,
   supplies Frame and runs Update. It captures no host capability.
-- `render world frame -> Result Unit ApplicationError ! {Foreign}`: supplies
+- `render world frame -> Result [Unit, ApplicationError] ! {Foreign}`: supplies
   Frame, runs Render into one packet, reads Title, then calls window/render
   capabilities. Render-scope state is discarded, not committed to simulation.
 
@@ -163,6 +206,12 @@ restore.
 Host callbacks still require `Foreign`. The only compiler intrinsic in these
 modules is `@panic`. ECS, assets, window services, rendering and persistence are
 never compiler primitives.
+
+Key codes live in [`engine/keys.blot`](engine/keys.blot), using the numeric
+values from the guest ABI. Action patterns use `^keys.tab`, `^keys.p`, and
+similar names; the caret compares an existing value instead of introducing a
+binding. Orbit controls use the same constants as ordinary expressions. The host
+encoding and input module's ASCII case folding remain the ABI boundary.
 
 ## Reload boundary and verification
 

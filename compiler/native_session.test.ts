@@ -118,10 +118,10 @@ async function answer(artifact: Artifact) {
 sessionTest(
   "native tuple-pattern edits invalidate retained closures without losing field patterns",
   async (session, clean) => {
-    const source = `const choose = fn pair => case pair of
+    const source = `const choose = (fn fallback => fn pair => case pair of
   (True, value) => value
-  (False, _) => 0
-export fn answer () => choose (True, 42)
+  (False, _) => fallback) 0
+const answer = fn () => choose (True, 42)
 `;
     for (
       const [revision, expected] of [
@@ -172,13 +172,13 @@ sessionTest(
   "native session preserves product and array constants, type rows, and expression keys",
   async (session, clean) => {
     const source =
-      `fn select (pair: (Array U32, U32)) => @array.get (@product.get pair 0) (@product.get pair 1)
+      `const select = fn (pair: (Array U32, U32)) => @array.get (@product.get pair 0) (@product.get pair 1)
 const values = [40, 42]
 const bundle = (values, 1)
-const saved = fn state => @array.set state 0 99
+const saved = (fn replacement => fn state => @array.set state 0 replacement) 99
 const changed = saved values
-export fn answer () => select bundle
-export fn edited () => @array.get changed 0
+const answer = fn () => select bundle
+const edited = fn () => @array.get changed 0
 `;
     const withoutSavedClosure = (artifact: Artifact): Artifact => ({
       ...artifact,
@@ -202,7 +202,7 @@ export fn edited () => @array.get changed 0
           [source.replace("[40, 42]", "[40, 43]"), 43],
           [source.replace("(values, 1)", "(values, 0)"), 40],
           [
-            source.replace("@array.set state 0 99", "@array.set state 1 99"),
+            source.replace("@array.set state 0", "@array.set state 1"),
             42,
           ],
           [source, 42],
@@ -240,7 +240,16 @@ export fn edited () => @array.get changed 0
           $: "U32Expr",
           value: revision.includes("@array.set state 1") ? 1 : 0,
         });
-        equal(withoutSource(body.value), { $: "U32Expr", value: 99 });
+        const replacement = withoutSource(body.value);
+        ok(replacement.$ === "LocalExpr");
+        equal(
+          saved.environment.find((entry) => entry.name === replacement.name)
+            ?.value,
+          {
+            $: "U32Value",
+            value: 99,
+          },
+        );
         const { instance } = await WebAssembly.instantiate(
           compiled.artifact.bytes,
         );
@@ -261,7 +270,7 @@ sessionTest(
   "native session retains prelude and reuses trivia-only revisions",
   async (session, clean) => {
     const source =
-      "export fn answer () => Maybe.unwrap_or 0 (Some (identity 42))\n";
+      "const answer = fn () => Maybe.unwrap_or 0 (Some (identity 42))\n";
     const first = await session.compile(source);
     equivalent(first.artifact, await clean.compile(source));
     const js = await createSourceCompiler();
@@ -281,7 +290,10 @@ sessionTest(
       equal(next.stats.declarations_lowered, 0);
       equal(next.stats.groups_checked, 0);
       equal(next.stats.entries_compiled, 0);
-      equal(next.stats.groups_reused, first.stats.groups_checked);
+      equal(
+        next.stats.groups_reused,
+        first.stats.groups_checked + first.stats.groups_reused,
+      );
       equal(next.stats.entries_reused, first.stats.entries_compiled);
       equal(await answer(next.artifact), 42);
     }
@@ -290,10 +302,40 @@ sessionTest(
 );
 
 sessionTest(
+  "native session reuses the initial checked groups and still validates coverage",
+  async (session, clean) => {
+    const source = `const classify = fn (flag: Bool) => case flag of
+  True => 1
+  False => 0
+const answer = fn () => classify True
+`;
+    const first = await session.compile(source);
+    equivalent(first.artifact, await clean.compile(source));
+    ok(first.stats.groups_reused > 0);
+    equal(await answer(first.artifact), 1);
+
+    const invalid = source.replace("  False => 0\n", "");
+    await rejects(
+      () => session.compile(invalid),
+      diagnostic("non_exhaustive_match"),
+    );
+    await rejects(
+      () => clean.compile(invalid),
+      diagnostic("non_exhaustive_match"),
+    );
+
+    const restored = await session.compile(source);
+    equivalent(restored.artifact, await clean.compile(source));
+    equal(restored.stats.groups_checked, 0);
+    equal(await answer(restored.artifact), 1);
+  },
+);
+
+sessionTest(
   "native session leaf edits recheck one group and regenerate one code entry",
   async (session, clean) => {
     const source =
-      "fn increment value => @u32.add value 1\nexport fn answer () => increment 40\n";
+      "const increment = fn value => @u32.add value 1\nconst answer = fn () => increment 40\n";
     const first = await session.compile(source);
     const revision = source.replace("value 1", "value 2");
     const next = await session.compile(revision);
@@ -312,11 +354,11 @@ sessionTest(
 sessionTest(
   "native session const cache tracks transitive function bodies and entering budgets",
   async (session, clean) => {
-    const source = `fn increment value => @u32.add value 1
-fn calculate value => increment value
+    const source = `const increment = fn value => @u32.add value 1
+const calculate = fn value => increment value
 const first = calculate 40
 const second = first
-export fn answer () => second
+const answer = fn () => second
 `;
     const first = await session.compile(source, { const_steps: 100n });
     const revision = source.replace("value 1", "value 2");
@@ -360,22 +402,25 @@ sessionTest(
   "native session failures do not publish type, lowering, or backend caches",
   async (session, clean) => {
     const source =
-      "fn transform value => @u32.add value 1\nexport fn answer () => @u32.add (transform 41) 0\n";
+      "const transform = fn value => @u32.add value 1\nconst answer = fn () => @u32.add (transform 41) 0\n";
     await session.compile(source);
     await rejects(
       () => session.compile(source.replace("@u32.add value 1", "True")),
       diagnostic("type_mismatch"),
     );
     await rejects(
-      () => session.compile(source + "fn unused () => missing\n"),
+      () => session.compile(source + "const unused = fn () => missing\n"),
       diagnostic("unknown_value"),
     );
     await rejects(
-      () => session.compile(source + "fn unused value => @u32.add True 1\n"),
+      () =>
+        session.compile(
+          source + "const unused = fn value => @u32.add True 1\n",
+        ),
       diagnostic("type_mismatch"),
     );
     const invalid =
-      "export fn answer () => do:\n  let value: Bool = 1\n  return value\n";
+      "const answer = fn () => do:\n  let value: Bool = 1\n  return value\n";
     for (const revision of [invalid, "// shifted\n" + invalid]) {
       await rejects(
         () => session.compile(revision),
@@ -384,8 +429,11 @@ sessionTest(
     }
     await rejects(
       () =>
-        session.compile("data Box = Box U32\nexport fn answer () => Box 42\n"),
-      diagnostic("backend_type"),
+        session.compile(
+          source +
+            "const metadata = fn () => @effect.count (@effect.of transform)\n",
+        ),
+      diagnostic("backend_const_only"),
     );
     const recovered = await session.compile(source);
     equivalent(recovered.artifact, await clean.compile(source));
@@ -399,11 +447,11 @@ sessionTest(
   "native session stable lambdas survive insertion and changed captured constants",
   async (session, clean) => {
     const source = `const captured = 40
-fn capture value => fn extra => @u32.add value extra
-export fn answer () => capture captured 2
+const capture = fn value => fn extra => @u32.add value extra
+const answer = fn () => capture captured 2
 `;
     const first = await session.compile(source);
-    const inserted = "fn unrelated ignored => 7\n" + source;
+    const inserted = "const unrelated = fn ignored => 7\n" + source;
     const next = await session.compile(inserted);
     equivalent(next.artifact, await clean.compile(inserted));
     equal(next.stats.entries_compiled, 0);
@@ -413,9 +461,10 @@ export fn answer () => capture captured 2
     equivalent(changed.artifact, await clean.compile(changedSource));
     equal(changed.stats.entries_compiled, 0);
     equal(await answer(changed.artifact), 43);
-    const closureSource = `fn capture value => fn extra => @u32.add value extra
+    const closureSource =
+      `const capture = fn value => fn extra => @u32.add value extra
 const closure = capture 40
-export fn answer () => closure 2
+const answer = fn () => closure 2
 `;
     await session.compile(closureSource);
     const closureRevision = closureSource.replace(
@@ -433,7 +482,7 @@ sessionTest(
   "native session F32 keys preserve signed zero and changed unary operators",
   async (session, clean) => {
     const source =
-      "const offset = 0.0\nexport fn answer () => @f32.add offset 1.5\n";
+      "const offset = 0.0\nconst answer = fn () => @f32.add offset 1.5\n";
     await session.compile(source);
     for (
       const revision of [
@@ -457,26 +506,26 @@ sessionTest(
   async (session, clean) => {
     const source = `effect Position.read: Unit -> F32
 effect Velocity.read: Unit -> F32
-fn read_position () => Position.read ()
-fn read_velocity () => Velocity.read ()
-fn move () => do:
+const read_position = fn () => Position.read ()
+const read_velocity = fn () => Velocity.read ()
+const move = fn () => do:
   use value <- read_position ()
   return @f32.add value 1.0
-fn position_value () => 1.25
-fn velocity_value () => 0.25
+const position_value = fn () => 1.25
+const velocity_value = fn () => 0.25
 const position = @effect.provider Position.read position_value
 const velocity = @effect.provider Velocity.read velocity_value
 const requirements = @effect.of move
-export const effect_count = @effect.count requirements
-export fn answer () => do position:
+const effect_count = @effect.count requirements
+const answer = fn () => do position:
   return do velocity:
     return move ()
 `;
     const first = await session.compile(source);
     equivalent(first.artifact, await clean.compile(source));
     const effect = source.replace(
-      "fn read_position () => Position.read ()",
-      `fn read_position () => do:
+      "const read_position = fn () => Position.read ()",
+      `const read_position = fn () => do:
   use read_velocity ()
   return Position.read ()`,
     );
@@ -507,8 +556,8 @@ export fn answer () => do position:
       "return do position:",
     );
     await rejects(
-      () => session.compile(invalid),
-      diagnostic("backend_effect"),
+      () => session.compile(invalid + "let initialized = answer ()\n"),
+      diagnostic("initializer_effect"),
     );
     const recovered = await session.compile(reorderedSource);
     equivalent(recovered.artifact, await clean.compile(reorderedSource));
@@ -520,7 +569,7 @@ export fn answer () => do position:
 sessionTest(
   "native session queued revisions, mode changes, and public mutation cannot corrupt caches",
   async (session, clean) => {
-    const source = "const value = 41\nexport fn answer () => value\n";
+    const source = "const value = 41\nconst answer = fn () => value\n";
     const [first, second] = await Promise.all([
       session.compile(source),
       session.compile(source.replace("41", "42")),
@@ -547,9 +596,9 @@ sessionTest(
   "native session queued failed edits retain only the last acknowledged declarations",
   async (session, clean) => {
     const source =
-      "fn increment value => @u32.add value 1\nexport fn answer () => increment 41\n";
+      "const increment = fn value => @u32.add value 1\nconst answer = fn () => increment 41\n";
     const changed = source.replace("value 1", "value 2");
-    const invalid = changed + "fn unused () => missing\n";
+    const invalid = changed + "const unused = fn () => missing\n";
     const recovered = changed.replace("increment 41", "increment 40");
     const results = await Promise.allSettled([
       session.compile(source),
@@ -573,7 +622,7 @@ sessionTest(
   "native session snapshots queued compile options before awaiting an earlier edit",
   async (session) => {
     const source =
-      "const value = @u32.add 40 2\nexport fn answer () => value\n";
+      "const value = @u32.add 40 2\nconst answer = fn () => value\n";
     const options = { const_steps: 100n };
     const first = session.compile(source, options);
     const second = session.compile(source, options);
@@ -593,7 +642,7 @@ sessionTest(
 sessionTest(
   "native session disposal rejects queued work before parsing or sending it",
   async (session) => {
-    const first = session.compile("export fn answer () => 42\n");
+    const first = session.compile("const answer = fn () => 42\n");
     const second = session.compile("fn");
     const settled = Promise.allSettled([first, second]);
     await session.dispose();
@@ -612,7 +661,7 @@ Deno.test("native declaration references reject invalid revisions and preserve t
   const native = await NativeProcess.start({ threads: 1 });
   const clean = await createNativeCompiler({ prelude: "none", threads: 1 });
   try {
-    const source = "fn first () => 1\nexport fn answer () => 42\n";
+    const source = "const first = fn () => 1\nconst answer = fn () => 42\n";
     const parsed = frontend.prepare(source);
     const nodes = bendArray(parsed.root.children);
     const replaced = nodes.map((node) => ({ kind: "replaced" as const, node }));
@@ -693,9 +742,12 @@ Deno.test("native declaration references reject invalid revisions and preserve t
     ok("result" in reordered && reordered.result.operation === "compile");
     equivalent(
       reordered.result.artifact,
-      await clean.compile("export fn answer () => 42\nfn first () => 1\n", {
-        const_steps: request.const_steps,
-      }),
+      await clean.compile(
+        "const answer = fn () => 42\nconst first = fn () => 1\n",
+        {
+          const_steps: request.const_steps,
+        },
+      ),
     );
     equal(reordered.stats.entries_compiled, 0);
   } finally {
@@ -719,7 +771,7 @@ Deno.test("native session lower-fuel decreases do not bypass traversal limits af
       ),
     );
     equal(opened, { operation: "open" });
-    const parsed = frontend.prepare("export fn answer () => @u32.add 40 2\n");
+    const parsed = frontend.prepare("const answer = fn () => @u32.add 40 2\n");
     const request = {
       operation: "compile" as const,
       root: parsed.root,

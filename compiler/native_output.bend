@@ -142,4 +142,4 @@ def encode_artifact(result: Result<&2, &2, M.Diagnostic, Main.PlannedArtifact>) 
     case Fail{diagnostic}:
       words(R.encode_diagnostic(diagnostic))
     case Done{Main.PlannedArtifact{analysis, plan}}:
-      finish(encode_plan([R.Word{1112297300}, R.Word{7}, R.Word{2}, R.Analysis{analysis}], plan, U32.to_nat(16777216), 2048n))
+      finish(encode_plan([R.Word{1112297300}, R.Word{R.version()}, R.Word{2}, R.Analysis{analysis}], plan, U32.to_nat(16777216), 2048n))

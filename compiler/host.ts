@@ -35,6 +35,12 @@ export type Type =
       | "EffectSetTy";
   }
   | {
+    readonly $: "StateProviderTy";
+    readonly read: TypeId;
+    readonly write: TypeId;
+    readonly state: Type;
+  }
+  | {
     readonly $: "ProviderTy";
     readonly identity: TypeId;
     readonly effects: EffectRow;
@@ -52,6 +58,7 @@ export type Type =
     readonly result: Type;
     readonly effects: EffectRow;
   }
+  | { readonly $: "FreeTy"; readonly scope: string; readonly name: string }
   | { readonly $: "ParameterTy" | "VariableTy"; readonly index: bigint };
 export type InferredType = Type;
 export type ScalarOp = {
@@ -99,12 +106,19 @@ export interface DataType {
   readonly constructors: readonly {
     readonly name: string;
     readonly payload: Type | null;
+    readonly fields?: readonly string[];
   }[];
 }
+
+export type ValueReference = {
+  readonly $: "LocalReference" | "ConstantReference";
+  readonly name: string;
+};
 
 export type Pattern =
   | { readonly $: "WildcardPattern" | "UnitPattern" }
   | { readonly $: "BindingPattern"; readonly name: string }
+  | { readonly $: "ValuePattern"; readonly reference: ValueReference }
   | { readonly $: "U32Pattern"; readonly value: number }
   | { readonly $: "BoolPattern"; readonly value: boolean }
   | {
@@ -182,6 +196,7 @@ export type Expr =
   }
   | { readonly $: "BlockExpr"; readonly label: bigint; readonly body: Expr }
   | { readonly $: "ReturnExpr"; readonly label: bigint; readonly value: Expr }
+  | { readonly $: "RuntimeInitExpr"; readonly value: Expr }
   | {
     readonly $: "SourceExpr";
     readonly offset: bigint;
@@ -192,6 +207,12 @@ export type Expr =
   | {
     readonly $: "OperationExpr" | "OperationDescriptorExpr";
     readonly identity: TypeId;
+  }
+  | {
+    readonly $: "StateProviderExpr";
+    readonly read: TypeId;
+    readonly write: TypeId;
+    readonly initial: Expr;
   }
   | {
     readonly $: "ProviderExpr";
@@ -210,6 +231,21 @@ export type Expr =
   | { readonly $: "ProductExpr"; readonly elements: readonly Expr[] }
   | { readonly $: "ProjectExpr"; readonly value: Expr; readonly index: bigint }
   | { readonly $: "ArrayExpr"; readonly elements: readonly Expr[] }
+  | {
+    readonly $: "ForExpr";
+    readonly index: string;
+    readonly start: Expr;
+    readonly end: Expr;
+    readonly state: string;
+    readonly initial: Expr;
+    readonly body: Expr;
+  }
+  | {
+    readonly $: "ArrayGenerateExpr";
+    readonly count: Expr;
+    readonly generator: Expr;
+  }
+  | { readonly $: "ArrayFillExpr"; readonly count: Expr; readonly value: Expr }
   | { readonly $: "ArrayGetExpr"; readonly array: Expr; readonly index: Expr }
   | {
     readonly $: "ArraySetExpr";
@@ -267,6 +303,12 @@ export type ConstantValue =
   | {
     readonly $: "OperationValue" | "EffectDescriptorValue";
     readonly identity: TypeId;
+  }
+  | {
+    readonly $: "StateProviderValue";
+    readonly read: TypeId;
+    readonly write: TypeId;
+    readonly initial: ConstantValue;
   }
   | {
     readonly $: "ProviderValue";
@@ -332,12 +374,19 @@ type WireType =
         | "AppliedTy"
         | "FunctionTy"
         | "ProviderTy"
+        | "StateProviderTy"
         | "ProductTy"
         | "ArrayTy";
     }
   >
   | { readonly $: "ProductTy"; readonly elements: List<WireType> }
   | { readonly $: "ArrayTy"; readonly element: WireType }
+  | {
+    readonly $: "StateProviderTy";
+    readonly read: TypeId;
+    readonly write: TypeId;
+    readonly state: WireType;
+  }
   | {
     readonly $: "ProviderTy";
     readonly identity: TypeId;
@@ -367,6 +416,25 @@ type WirePattern =
 type WireExpr =
   | { readonly $: "ProductExpr"; readonly elements: List<WireExpr> }
   | { readonly $: "ArrayExpr"; readonly elements: List<WireExpr> }
+  | {
+    readonly $: "ForExpr";
+    readonly index: string;
+    readonly start: WireExpr;
+    readonly end: WireExpr;
+    readonly state: string;
+    readonly initial: WireExpr;
+    readonly body: WireExpr;
+  }
+  | {
+    readonly $: "ArrayGenerateExpr";
+    readonly count: WireExpr;
+    readonly generator: WireExpr;
+  }
+  | {
+    readonly $: "ArrayFillExpr";
+    readonly count: WireExpr;
+    readonly value: WireExpr;
+  }
   | {
     readonly $: "ArrayGetExpr";
     readonly array: WireExpr;
@@ -474,11 +542,18 @@ type WireExpr =
     readonly label: bigint;
     readonly value: WireExpr;
   }
+  | { readonly $: "RuntimeInitExpr"; readonly value: WireExpr }
   | {
     readonly $: "SourceExpr";
     readonly offset: bigint;
     readonly annotation: Maybe<WireType>;
     readonly value: WireExpr;
+  }
+  | {
+    readonly $: "StateProviderExpr";
+    readonly read: TypeId;
+    readonly write: TypeId;
+    readonly initial: WireExpr;
   }
   | {
     readonly $: "ProviderExpr";
@@ -510,6 +585,7 @@ interface WireDataType {
     readonly $: "Constructor";
     readonly name: string;
     readonly payload: Maybe<WireType>;
+    readonly fields: List<string>;
   }>;
 }
 
@@ -522,6 +598,7 @@ type WireValue =
         | "DataValue"
         | "ClosureValue"
         | "ProviderValue"
+        | "StateProviderValue"
         | "EffectSetValue"
         | "ProductValue"
         | "ArrayValue";
@@ -529,6 +606,12 @@ type WireValue =
   >
   | { readonly $: "ProductValue"; readonly elements: List<WireValue> }
   | { readonly $: "ArrayValue"; readonly elements: List<WireValue> }
+  | {
+    readonly $: "StateProviderValue";
+    readonly read: TypeId;
+    readonly write: TypeId;
+    readonly initial: WireValue;
+  }
   | {
     readonly $: "ProviderValue";
     readonly identity: TypeId;
@@ -707,6 +790,13 @@ function encodeType(type: Type): WireType {
     case "EffectDescriptorTy":
     case "EffectSetTy":
       return { $: type.$ };
+    case "StateProviderTy":
+      return {
+        $: type.$,
+        read: encodeIdentity(type.read),
+        write: encodeIdentity(type.write),
+        state: encodeType(type.state),
+      };
     case "ProviderTy":
       return {
         $: type.$,
@@ -730,6 +820,8 @@ function encodeType(type: Type): WireType {
         result: encodeType(type.result),
         effects: encodeRow(type.effects),
       };
+    case "FreeTy":
+      return { $: type.$, scope: type.scope, name: type.name };
     case "ParameterTy":
     case "VariableTy":
       return { $: type.$, index: nat(type.index, `${type.$} index`) };
@@ -742,6 +834,8 @@ function encodeType(type: Type): WireType {
 
 function decodeType(type: WireType): Type {
   switch (type.$) {
+    case "StateProviderTy":
+      return { ...type, state: decodeType(type.state) };
     case "ProviderTy":
       return { ...type, effects: decodeRow(type.effects) };
     case "AppliedTy":
@@ -772,6 +866,14 @@ function decodeOptionalType(type: Maybe<WireType>): Type | null {
 
 function encodePattern(pattern: Pattern): WirePattern {
   switch (pattern.$) {
+    case "ValuePattern":
+      return {
+        $: pattern.$,
+        reference: {
+          $: pattern.reference.$,
+          name: unicode(pattern.reference.name, "Value pattern reference"),
+        },
+      };
     case "WildcardPattern":
     case "UnitPattern":
       return { $: pattern.$ };
@@ -830,6 +932,26 @@ function encodeExpr(expression: Expr): WireExpr {
       return {
         $: expression.$,
         elements: list(expression.elements.map(encodeExpr)),
+      };
+    case "ForExpr":
+      return {
+        ...expression,
+        start: encodeExpr(expression.start),
+        end: encodeExpr(expression.end),
+        initial: encodeExpr(expression.initial),
+        body: encodeExpr(expression.body),
+      };
+    case "ArrayGenerateExpr":
+      return {
+        $: expression.$,
+        count: encodeExpr(expression.count),
+        generator: encodeExpr(expression.generator),
+      };
+    case "ArrayFillExpr":
+      return {
+        $: expression.$,
+        count: encodeExpr(expression.count),
+        value: encodeExpr(expression.value),
       };
     case "ArrayGetExpr":
       return {
@@ -1009,6 +1131,13 @@ function encodeExpr(expression: Expr): WireExpr {
         $: expression.$,
         callee: unicode(expression.callee, "Reflected function name"),
       };
+    case "StateProviderExpr":
+      return {
+        $: expression.$,
+        read: encodeIdentity(expression.read),
+        write: encodeIdentity(expression.write),
+        initial: encodeExpr(expression.initial),
+      };
     case "ProviderExpr":
       return {
         $: expression.$,
@@ -1035,6 +1164,8 @@ function encodeExpr(expression: Expr): WireExpr {
         left: encodeExpr(expression.left),
         right: encodeExpr(expression.right),
       };
+    case "RuntimeInitExpr":
+      return { $: expression.$, value: encodeExpr(expression.value) };
     case "SourceExpr":
       return {
         $: expression.$,
@@ -1058,6 +1189,26 @@ function decodeExpr(expression: WireExpr): Expr {
       return {
         ...expression,
         elements: array(expression.elements).map(decodeExpr),
+      };
+    case "ForExpr":
+      return {
+        ...expression,
+        start: decodeExpr(expression.start),
+        end: decodeExpr(expression.end),
+        initial: decodeExpr(expression.initial),
+        body: decodeExpr(expression.body),
+      };
+    case "ArrayGenerateExpr":
+      return {
+        ...expression,
+        count: decodeExpr(expression.count),
+        generator: decodeExpr(expression.generator),
+      };
+    case "ArrayFillExpr":
+      return {
+        ...expression,
+        count: decodeExpr(expression.count),
+        value: decodeExpr(expression.value),
       };
     case "ArrayGetExpr":
       return {
@@ -1159,6 +1310,8 @@ function decodeExpr(expression: WireExpr): Expr {
     case "ReturnExpr":
     case "UnaryExpr":
       return { ...expression, value: decodeExpr(expression.value) };
+    case "StateProviderExpr":
+      return { ...expression, initial: decodeExpr(expression.initial) };
     case "ProviderExpr":
       return {
         ...expression,
@@ -1184,6 +1337,8 @@ function decodeExpr(expression: WireExpr): Expr {
         left: decodeExpr(expression.left),
         right: decodeExpr(expression.right),
       };
+    case "RuntimeInitExpr":
+      return { $: expression.$, value: decodeExpr(expression.value) };
     case "SourceExpr":
       return {
         ...expression,
@@ -1209,6 +1364,8 @@ function decodeValue(value: WireValue): ConstantValue {
     case "OperationValue":
     case "EffectDescriptorValue":
       return value;
+    case "StateProviderValue":
+      return { ...value, initial: decodeValue(value.initial) };
     case "ProviderValue":
       return { ...value, implementation: decodeValue(value.implementation) };
     case "EffectSetValue":
@@ -1277,6 +1434,11 @@ function marshal(module: CoreModule): WireModule {
         $: "Constructor" as const,
         name: unicode(constructor.name, "Constructor name"),
         payload: encodeOptionalType(constructor.payload),
+        fields: list(
+          (constructor.fields ?? []).map((field) =>
+            unicode(field, "Record field")
+          ),
+        ),
       }))),
     }))),
   };

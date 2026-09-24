@@ -225,7 +225,7 @@ Deno.test("runtime rejects invalid source, layout, and first-frame values withou
     test.tick(select);
     const owner = test.runtime.game.runtime;
     const invalid = test.next("failed");
-    await test.edit("export fn broken () => missing\n");
+    await test.edit("const broken = fn () => missing\n");
     const sourceFailure = await invalid;
     assert.equal(sourceFailure.kind, "failed");
     assert.equal(test.runtime.game.runtime, owner);

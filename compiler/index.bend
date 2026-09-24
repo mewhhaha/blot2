@@ -25,14 +25,21 @@ def selected(-V: Data, high: Bool, right: Unit -> Maybe<&2, V>, left: Unit -> Ma
     case False{}:
       left(Unit{})
 
-def find(-V: Data, index: Map<&2, V>, +name: String) -> Maybe<&2, V>:
+# Patricia branch positions increase down the tree. Keep the suffix already
+# reached instead of walking a long qualified name from its start at each hop.
+def find_work(-V: Data, index: Map<&2, V>, +name: String, remaining: String, cursor: Nat) -> Maybe<&2, V>:
   match index:
     case MTip{}:
       None{}
     case MLeaf{key, value}:
       Bool.pick(Maybe<&2, V>, M.name_equal(key, name), Some{value}, None{})
     case MNode{+position, left, right}:
-      selected(V, string_bit(name, Nat.div(position, 33n), Nat.mod(position, 33n)), unit => find(V, right, name), unit => find(V, left, name))
+      +character = Nat.div(position, 33n)
+      +suffix = String.drop(remaining, Nat.sub(character, cursor))
+      selected(V, string_bit(suffix, 0n, Nat.mod(position, 33n)), unit => find_work(V, right, name, suffix, character), unit => find_work(V, left, name, suffix, character))
+
+def find(-V: Data, index: Map<&2, V>, +name: String) -> Maybe<&2, V>:
+  find_work(V, index, name, name, 0n)
 
 def fallback(-V: Data, found: Maybe<&2, V>, otherwise: V) -> V:
   match found:

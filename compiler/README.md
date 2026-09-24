@@ -17,20 +17,27 @@ just bench-native
 just bench-cpu
 ```
 
-Builds require Bend 2.0.21, Deno, and clang 14+ on POSIX. Every compiler build
-runs `bend PROOF.bend`. Source-only iterations reuse the compiled executable.
+Builds require Bend, Deno, and clang 14+ on POSIX. Every compiler build runs
+`bend PROOF.bend`. Source-only iterations reuse the compiled executable.
 `build:compiler:js` builds the JavaScript reference; `build:compiler:all` builds
 both backends for parity checks. The JS build also requires Bun. Its first build
-downloads four matching upstream loader files into
-`generated/compiler/bend-2.0.21/`; subsequent builds reuse them offline. Both
-downloaded and cached files are verified against pinned SHA-256 hashes. The JS
-build also emits `generated/compiler/native_session.js` for direct regression
-tests of the native session's pure cache-planning logic.
+for each installed Bend version downloads four upstream loader files from that
+version's release tag into `generated/compiler/bend-<version>/`; subsequent
+builds reuse them offline. Release tags must be available upstream for JS
+builds. The JS build also emits `generated/compiler/native_session.js` for
+direct regression tests of the native session's pure cache-planning logic.
 
-The native build uses stock Bend 2.0.21. Its runtime passes the ownership
-regression that required an isolated emitter patch on 2.0.5, so that obsolete
-patch has been removed. The build still compiles and runs
-[the regression](native_backend_regression.bend) at 1 and 4 threads before
+The optimized native build currently requires Bend 2.0.24. It applies a guarded
+String comparison optimization to the generated C: both owned input roots stay
+alive during a read-only traversal and are released once afterward. The build
+checks the source definition, generated ownership code, and runtime helpers; it
+refuses an unknown version or code shape. See
+[the transformer](../scripts/native_string_compare.ts) and
+[cold-compilation results](COLD_COMPILE_RESULTS.md). The
+[scaling plan](COLD_COMPILE_PLAN.md) records the remaining gap to 500 ms. Bend
+2.0.24 passes the ownership regression that required an isolated emitter patch
+on 2.0.5, so that obsolete patch has been removed. The build still compiles and
+runs [the regression](native_backend_regression.bend) at 1 and 4 threads before
 publishing the binary. The native transport uses the new runtime's
 constructor-sealing interface; the installed Bend is never modified.
 
@@ -57,6 +64,21 @@ Wasm function bodies. Only changed declarations cross the pipe; retained source
 identities keep unchanged lambdas/local names stable. Cache keys encode complete
 structure, including nominal operation identities and latent effect rows.
 Reflection references are inference/const dependencies, not runtime calls.
+
+Associated operators and generic effect selectors specialize before final
+checking. Type and row substitutions use persistent indexes instead of scanning
+the entire substitution history on every lookup. Each index retains replacement
+order, including repeated bindings; occurs checks and traversal limits still
+apply. Specializing a shared constant retains its generalized interfaces rather
+than rechecking the enlarged module to recover them.
+
+Independent specialization units run in weighted Bend batches. Each unit owns
+its inference state and a disjoint sequence of generated identities; collecting
+results in declaration order preserves deterministic output and diagnostics.
+Constants with unresolved caller-dependent dispatch remain in a shared inference
+scope. Checker branches inherit dependency interfaces for lookup and publish
+only interfaces they produce, avoiding repeated merges of the shared
+environment.
 
 Both clean builds and native sessions infer dependency-ready groups in balanced
 Bend batches. Single-consumer dependency chains advance on their own lane after
@@ -151,12 +173,12 @@ not create this pool. The first large compilation overlaps worker startup with
 caller-side parsing; warmed timings exclude startup.
 
 At CPU request boundaries, the native transport clears drained Bend task queues
-and resets their positions. Otherwise Bend 2.0.21's slot-major queues gradually
+and resets their positions. Otherwise Bend 2.0.24's slot-major queues gradually
 touch their full reserved region even when the live heap stays constant. This
 version-specific cleanup asserts that every queue is empty, clears publication
 bits as well as cursors, and leaves the compiler heap and session caches intact.
-The build remains pinned to Bend 2.0.21. It does not apply this cleanup to GPU
-runs. Run `deno run --allow-all compiler/native_memory_bench.ts` on Linux for a
+This cleanup does not apply to GPU runs. Run
+`deno run --allow-all compiler/native_memory_bench.ts` on Linux for a
 200-request artifact-parity and memory-mapping report (default eight threads).
 
 Clean source lowering also splits declarations into cost-balanced fork trees. A
@@ -174,7 +196,7 @@ cost-balanced partitioner, with a separate 512-unit grain, sequential tiny
 batches and first-entry error priority. Its bounded work estimate skips nested
 lambda bodies, which have their own entries. Lowering, inference, projection and
 codegen expose up to eight branches together; this spreads work across Bend
-2.0.21's coarse CPU task lanes. Native request scanning consumes a single-owner
+2.0.24's coarse CPU task lanes. Native request scanning consumes a single-owner
 contiguous word buffer with flat loops; diagnostic formatting stays outside the
 hot loops so Bend can optimize them. Per-request string dictionaries reduce
 transport and allocation without bypassing Unicode validation or frame limits.
@@ -264,16 +286,16 @@ relocation is repeated against the current catalog; cached code contains no live
 table indices or runtime pointers. The JS worker-pool implementation remains a
 separate reference with the same compiler semantics.
 
-The binary native protocol is version **7**. Its bounded little-endian frames
+The binary native protocol is version **11**. Its bounded little-endian frames
 contain at most 16M words (64 MiB), per-request dictionaries of Unicode scalar
 strings, and 48-bit Nats. CST kind/field/text values reference dictionary IDs;
 IDs are assigned in first-seen preorder across all trees in the request. The
 native decoder owns a contiguous word buffer and checks every access against the
 valid frame length, including dictionary IDs and allocation counts. Rebuild the
-executable with the host: version 6 is not accepted. Stdout is reserved for
-frames; stderr carries process diagnostics. Framing or process failures are
-fatal; checked language diagnostics leave a session usable. No native error
-triggers a silent JS fallback.
+executable with the host: older protocol versions are not accepted. Stdout is
+reserved for frames; stderr carries process diagnostics. Framing or process
+failures are fatal; checked language diagnostics leave a session usable. No
+native error triggers a silent JS fallback.
 
 ## Source modules
 
@@ -284,16 +306,18 @@ imports work, including aliases:
 ```blot
 import * as array from "std/array"
 import { Point as Position, coordinate } from "./geometry"
-export fn answer () => array.fold_left U32.add 0 [10, 20, 12]
+const answer = fn () => array.fold_left U32.add 0 [10, 20, 12]
 ```
 
 Programmatic callers use `loadSourceProject(entry, { imports })` from
 [source_project.ts](source_project.ts), then pass that project to either
 compiler's `analyze` or `compile` method. The loader reads each dependency once,
 diagnoses cycles, and retains per-file diagnostic locations. Bend resolves
-exports, private module scopes, nominal type/effect identities, and qualified
-type annotations. Only entry-module exports become Wasm exports. Importing a
-type does not implicitly import constructors with different names. Imported
+public declarations, module scopes, nominal type/effect identities, and
+qualified type annotations. Top-level declarations are importable by default.
+Only entry-module bindings with concrete guest ABI-compatible types become Wasm
+exports. Generic and structural helpers remain importable Blot values. Importing
+a type does not implicitly import constructors with different names. Imported
 operator functions need a local fixity declaration; prelude fixities are
 available in every module.
 
@@ -306,20 +330,70 @@ records both multicore gains and the measured single-core tradeoffs. For
 prepared-project benchmarks, use `compiler/project_concurrency_bench.ts`;
 `nominal_256` in the standard CPU benchmark covers large type graphs.
 
-This first project API performs clean compilation; declaration-incremental
-sessions still accept single-file source only. Passing imports to a raw string
-compiler is an error, not an implicit filesystem read or ignored declaration.
+For repeated project edits, use `createNativeProjectCompiler` from
+[native_project.ts](native_project.ts):
+
+```ts
+const project = await createNativeProjectCompiler({
+  imports: { "std/": new URL("./std/", import.meta.url) },
+});
+try {
+  const { artifact, stats } = await project.compile("./src/main.blot");
+} finally {
+  await project.dispose();
+}
+```
+
+A project session rereads the import graph, reuses unchanged parsed modules,
+assigns stable declaration identities, and transmits changed declaration trees.
+Bend retains successful lowering, specialization, checking, constant evaluation
+and code generation work. Scope or schema changes invalidate conservatively;
+failed edits preserve the acknowledged native revision. An unchanged normalized
+project and const budget reuse a private result without native IPC. Returned
+artifacts are independent copies. `stats` reports declaration, checking,
+constant and code reuse plus loading/preparation and total request times.
+Checking counts describe the final group cache; specialization can still run
+inference, so a high hit count does not imply a proportionate latency reduction.
+See the [current gdev measurements](COLD_COMPILE_RESULTS.md) for startup and
+edit tradeoffs. Gdev currently uses the faster stateless path for changed
+source, retaining parsed modules and its last successful artifact in the host.
+
+The project API recycles its native process after 16 native analyze/compile
+attempts by default (`maxRevisions` sets another positive limit). This bounds
+per-process growth from the [documented Bend boxing leak](MEMORY.md). An
+unchanged or trivia-only result reuses the last successful artifact locally and
+does not consume a revision. After recycling, the next native request resends
+all declarations; `stats.session_restarted` identifies that request. Failed
+native edits count toward the limit, while the previous successful result stays
+available for recovery.
+
+The stateless project API remains available as a clean-build oracle. Passing
+imports to a raw string compiler is an error, not an implicit filesystem read or
+ignored declaration.
 
 ## Executable language
 
-- Nominal `data` types with nullary/unary constructors, generic parameters,
-  constructor functions, and nested patterns.
-- Named record constructors, such as `data Vec2 = Vec2 { x: F32, y: F32 }`.
-  Construction requires every field exactly once; shorthand `{ x, y }` uses
-  lexical bindings. Fields evaluate once in written order, even when reordered
-  relative to the declaration. Named patterns can reorder or omit fields, with
-  omitted fields acting as wildcards. Zero/one/many fields lower to ordinary
-  nullary/unary/tuple constructor payloads, not a separate runtime record kind.
+`deno task blot guide` prints the [compact language guide](guide.md), including
+complete checked examples. It does not start or build the native compiler.
+
+- Nominal `type ... is data` declarations with nullary/unary constructors and
+  nested patterns. Types and effects take one argument pattern per stage:
+  `[left, right]`, `(left, right)`, and `{ head, tail }` can bind several type
+  values. Currying requires `=> type`, and partial constructors survive
+  grouping. Free lowercase annotation names are inferred within their
+  declaration.
+- Top-level functions are ordinary `const name = fn ...` or `let name = fn ...`
+  bindings. Every top-level declaration is public; concrete entry values that
+  fit the guest ABI become Wasm exports. `const` evaluates at compile time;
+  `let` initializes once at runtime when the module starts.
+- Named record constructors, such as
+  `type Vec2 is data = Vec2 { x: F32, y: F32 }`. Construction requires every
+  field exactly once; shorthand `{ x, y }` uses lexical bindings. Fields
+  evaluate once in written order, even when reordered relative to the
+  declaration. Named patterns can reorder or omit fields, with omitted fields
+  acting as wildcards. Dot access reads fields shared by every constructor of
+  the type. Zero/one/many fields lower to ordinary nullary/unary/tuple
+  constructor payloads, not a separate runtime record kind.
 - Heterogeneous tuples `(42, True)` with annotations `(U32, Bool)` and static
   `@product.get value 0` projection. Parenthesized single values stay ordinary
   values; Unit stays `()`. Projection needs a known tuple shape, from a value or
@@ -327,9 +401,16 @@ compiler is an error, not an implicit filesystem read or ignored declaration.
   records and algebraic constructors. Matching preserves correlations between
   tuple fields as well as between multiple scrutinees.
 - Homogeneous immutable arrays, including empty/nested literals and `Array T`
-  annotations. `@array.length`, `@array.get`, and `@array.set` are generic
-  memory primitives; [std/array.blot](../std/array.blot) supplies checked
-  access, folds, and short-circuit predicates in source.
+  annotations, direct indexing with `values[index]`, and prelude members
+  `.length`, `.is_empty`, `.get(index)`, and `.set(index)(replacement)`.
+  `@array.fill count value`, `@array.generate count generator`, `@array.length`,
+  `@array.get`, and `@array.set` are generic memory primitives;
+  [std/array.blot](../std/array.blot) supplies checked access, construction,
+  folds, and short-circuit predicates in source. Fills evaluate their value once
+  and preserve immutable sharing. Generation allocates once and calls a pure
+  `U32 -> T` function for each index in ascending order; zero skips the
+  callback. Both reject counts that exceed the 16 MiB runtime arena before
+  computing an allocation size.
 - Curried named functions/lambdas, immutable lexical capture, rank-1 inference,
   pure/closed-effect annotations, and inferred higher-order effect rows.
 - `case value of` and `case a, b, c of`; every row has the same arity. Inputs
@@ -340,6 +421,12 @@ compiler is an error, not an implicit filesystem read or ignored declaration.
 - `do:` expressions and nearest-block `return`. Falling through yields Unit.
   `let` requires a pure RHS; `use name <- expression` permits effects.
   `use expression` is a discard binding, not a handler or boxed action.
+- Whole-binding shadowing with `name := expression`. The target must already be
+  a local or parameter; `self` names its old value only within the RHS. The new
+  binding is pure and can change type; previous aliases and captures keep their
+  original values. Field/index paths such as
+  `grid.rows[row][column] := self + 1` rebuild the local root, with `self` bound
+  to the selected old leaf.
 - Closed source operations, provider values, `do provider:`, and const effect
   descriptors. See [the full contract](effects-and-io.md).
 - Unit, Bool, U32, and F32 scalar values. U32 arithmetic wraps at 32 bits.
@@ -351,16 +438,29 @@ compiler is an error, not an implicit filesystem read or ignored declaration.
   reports its message as a diagnostic. It supplies no IO authority.
 - Explicit host callbacks with a sealed `Foreign` effect, scalar signatures,
   opaque invocation-scoped references, and a versioned generic adapter. See
-  [guest ABI 1](guest-abi.md) and
+  [guest ABI 2](guest-abi.md) and
   [the executable example](../examples/host_io.blot).
 
 ## Prelude and operators
 
+Numeric operators use the prelude's generic `add`, `sub`, `mul`, `div`, and
+comparison functions. Their `@type.call "member" left right` expressions resolve
+against the operands' owning types at compile time, with a compatible left
+implementation taking precedence over the right. Arguments are never swapped.
+Generic callers are specialized before ordinary checking, constant evaluation,
+and code generation; unresolved dispatch cannot reach Wasm. See
+[associated dispatch](../std/README.md#u32-and-operators) for examples.
+
 [std/prelude.blot](../std/prelude.blot) is ordinary source, loaded once per
 frontend session. `{ prelude: "none" }` selects a freestanding module. Prelude
 exports become visible source names, but only root exports become Wasm exports.
-Qualified functions such as `Maybe.map` are statically resolved names, not
-implicit receivers or type-directed dispatch.
+Direct qualified calls such as `Maybe.map` resolve to that named function.
+`@type.call` requests associated dispatch explicitly.
+
+Receiver syntax resolves from the receiver's type: `tail.contains(x)` applies an
+ordinary associated function, and `tail.contains` partially applies it. Lookup
+does not fall back to the argument's type. Named record fields use the same dot
+syntax; a field and associated function sharing a name are ambiguous.
 
 Symbolic operators have source fixity declarations; backticks use ordinary
 functions, e.g. `a \`combine\` b`. No operator implies a game-specific
@@ -389,26 +489,43 @@ binding. Closures capture locals, not active providers: invoking an escaped
 closure uses the caller's provider scope. A provider implementation sees the
 outer chain, excluding the selected provider and younger frames.
 
-Export wrappers accept Unit/Bool/U32/F32 or one scalar callback with exactly
-`! {Foreign}`, and return scalars. Callback parameters use `externref` and
-signature-specific `blot:host/1` imports. Scalar-only artifacts stay
-import-free. Every module describes its exports in `blot:abi`; the adapter
-validates this manifest and scopes supplied callbacks to the current invocation.
-Ordinary unhandled source operations still fail instead of acquiring ambient IO.
+Export wrappers accept Unit/Bool/U32/F32, Array U32/F32, or one scalar callback
+with exactly `! {Foreign}`, and return scalars or numeric arrays. The adapter
+copies typed-array inputs and outputs so hosts can retain state across reloads.
+Callback parameters use `externref` and signature-specific `blot:host/1`
+imports. Scalar-only artifacts stay import-free. Every module describes its
+exports in `blot:abi`; the adapter validates this manifest and scopes supplied
+callbacks to the current invocation. Ordinary unhandled source operations still
+fail instead of acquiring ambient IO.
 
 Arrays have a length header and contiguous machine-word elements; tuples have
 fixed-size contiguous fields. Nested values and closures occupy reference lanes,
 not recursive list nodes. Elements evaluate once left-to-right. Indexes are
 checked unsigned U32 values; invalid const accesses report `array_bounds`, and
-runtime accesses trap. Updates allocate and copy the full array, preserving
-existing aliases. Const updates charge one extra step per copied element. Array
-size arithmetic is checked before allocation; the private arena is bounded to 16
-MiB. Bulk builders and uniqueness-based in-place optimization remain future
-work, so repeated per-element updates currently have quadratic copying cost.
+runtime accesses trap, including inside range guards. The prelude's checked
+`Array.get` and `Array.set` return `Maybe` instead.
+
+Updates preserve existing aliases. The ownership pass scans each instruction job
+for consumed local allocations and can reuse their storage, including a single
+array carried through a loop. Parameters, captures, module values, and projected
+arrays remain conservative copy cases. Shared or unknown storage is copied in
+full, so repeated updates can still have quadratic copying cost. Const updates
+always copy and charge one extra step per copied element. Array size arithmetic
+is checked before allocation; the private arena is bounded to 16 MiB.
+
+Value patterns use `^name` or `^module.name` to compare a `U32` or `Bool`
+against an existing constant, parameter, or lexical binding. Pins introduce no
+bindings; all references resolve in the surrounding scope before the pattern's
+bindings are added. They work in case rows, nested constructor/record/tuple
+patterns, `if let`, and `let … else`. Coverage treats pins as refutable,
+including constant references. Inference checks the referenced type after
+solving the declaration; unconstrained pins need a scalar annotation. Both
+evaluation and Wasm matching short-circuit failed patterns. Pins perform scalar
+equality without allocating.
 
 Internal closures and data values stay inside the module. Multi-value matches
-use locals rather than heap-allocated tuples. Each export resets its arena; the
-adapter rejects same-instance reentry and callback/ADT return values cannot
+use locals rather than heap-allocated tuples. Each invocation resets its arena;
+the adapter rejects same-instance reentry and callback/ADT return values cannot
 escape as persistent handles.
 
 Wasm uses binary format version 1, also used by newer Wasm standards; a
@@ -417,15 +534,18 @@ emitter does not yet require newer proposals, SIMD, or Wasm-GC.
 
 ## Deliberate limits
 
-Record field access/update syntax, indexing/update sugar, array patterns,
-destructuring function parameters, general Text/F64, SIMD, parameterized
-operation identities, effect-group syntax, demand parameters, type-valued
-consts, and resumptions are not implemented. `do monad Maybe:`/`return $` remain
-design syntax, not implemented monad resolution. An unconstrained provider
-parameter cannot infer an unknown operation identity in this first closed-label
-slice.
+Array patterns, spread syntax, destructuring function parameters, general
+Text/F64, SIMD, inferred generic effect-family labels in explicit polymorphic
+rows, demand parameters, type-valued consts, and resumptions are not
+implemented. `do monad Maybe:`/`return $` remain design syntax, not implemented
+monad resolution. An unconstrained provider parameter cannot infer an unknown
+operation identity in this first closed-label slice.
 
-[Controlled host IO](effects-and-io.md#controlled-host-io) now works for scalar
-callbacks. Composite host values, persistent values and a Blot-source ECS come
-next. The removed compiler-coupled sandbox is preserved only as a
+[Controlled host IO](effects-and-io.md#controlled-host-io) uses explicit
+callbacks and the [guest adapter](guest-abi.md). Generic libraries can declare
+`type State a is effect` and call its operations normally. Their type arguments
+are inferred from arguments and result context, then resolved to closed effects
+during monomorphization. `@effect.run` supplies scoped state handlers. Constant
+source builders can compose their storage and scoped access functions. The
+removed compiler-coupled sandbox is preserved only as a
 [prototype reference](../case-study/ecs/prototype/README.md).

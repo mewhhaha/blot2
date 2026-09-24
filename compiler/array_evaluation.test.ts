@@ -18,6 +18,16 @@ import {
 } from "./fixtures.ts";
 
 const array = (...elements: Expr[]): Expr => ({ $: "ArrayExpr", elements });
+const fill = (count: Expr, value: Expr): Expr => ({
+  $: "ArrayFillExpr",
+  count,
+  value,
+});
+const generate = (count: Expr, generator: Expr): Expr => ({
+  $: "ArrayGenerateExpr",
+  count,
+  generator,
+});
 const get = (array: Expr, index: Expr): Expr => ({
   $: "ArrayGetExpr",
   array,
@@ -192,6 +202,10 @@ Deno.test("array returns skip pending operands and copy charges", () => {
   for (
     const [value, steps] of [
       [array(returning, skipped), 4n],
+      [fill(returning, skipped), 4n],
+      [generate(returning, panic("unreachable generator")), 4n],
+      [generate(integer(2), returning), 5n],
+      [fill(integer(2), returning), 5n],
       [get(returning, skipped), 4n],
       [get(array(integer(1)), returning), 6n],
       [set(returning, skipped, skipped), 4n],
@@ -300,6 +314,10 @@ Deno.test("const and Wasm agree on returns from every array operand", async () =
   for (
     const value of [
       array(returning, skipped),
+      fill(returning, skipped),
+      generate(returning, panic("unreachable generator")),
+      generate(integer(2), returning),
+      fill(integer(2), returning),
       get(returning, skipped),
       get(array(integer(1)), returning),
       set(returning, skipped, skipped),

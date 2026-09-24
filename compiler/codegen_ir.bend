@@ -51,14 +51,19 @@ type Expr is Data:
   F32Expr{value: F32}
   UnaryExpr{operator: M.UnaryOp, value: Expr}
   ProviderExpr{identity: M.TypeId, implementation: Expr}
+  StateProviderExpr{read: M.TypeId, write: M.TypeId, initial: Expr}
   HandleExpr{provider: Expr, body: Expr}
   InvokeOperationExpr{identity: M.TypeId, argument: Expr}
   PanicExpr{message: String}
   ProductExpr{elements: List<&2, Expr>}
   ProjectExpr{value: Expr, index: Nat}
   ArrayExpr{elements: List<&2, Expr>}
+  ForExpr{index: String, start: Expr, end: Expr, state: String, initial: Expr, body: Expr}
+  ArrayGenerateExpr{count: Expr, generator: Expr}
+  ArrayFillExpr{count: Expr, value: Expr}
   ArrayGetExpr{array: Expr, index: Expr}
   ArraySetExpr{array: Expr, index: Expr, value: Expr}
+  ArrayReuseExpr{array: Expr, index: Expr, value: Expr}
   ArrayLengthExpr{array: Expr}
 
 type Work is Data:
@@ -127,6 +132,8 @@ def rebuild(original: M.Expr, children: List<&2, Expr>) -> Result<&2, &2, M.Diag
       Done{ClosureExpr{"fn:" ++ name, Nil{}}}
     case M.OperationExpr{identity} Nil{}:
       Done{ClosureExpr{operation_key(identity), Nil{}}}
+    case M.StateProviderExpr{read, write, initial} value <> Nil{}:
+      Done{StateProviderExpr{read, write, value}}
     case M.ProviderExpr{identity, implementation} value <> Nil{}:
       Done{ProviderExpr{identity, value}}
     case M.HandleExpr{provider, body} p <> b <> Nil{}:
@@ -139,6 +146,12 @@ def rebuild(original: M.Expr, children: List<&2, Expr>) -> Result<&2, &2, M.Diag
       Done{ProjectExpr{child, index}}
     case M.ArrayExpr{elements} children:
       Done{ArrayExpr{children}}
+    case M.ForExpr{index, start, end, state, initial, body} a <> b <> c <> d <> Nil{}:
+      Done{ForExpr{index, a, b, state, c, d}}
+    case M.ArrayGenerateExpr{count, generator} c <> v <> Nil{}:
+      Done{ArrayGenerateExpr{c, v}}
+    case M.ArrayFillExpr{count, value} c <> v <> Nil{}:
+      Done{ArrayFillExpr{c, v}}
     case M.ArrayGetExpr{array, index} a <> i <> Nil{}:
       Done{ArrayGetExpr{a, i}}
     case M.ArraySetExpr{array, index, value} a <> i <> v <> Nil{}:
@@ -193,6 +206,8 @@ def lower(+fuel: Nat, work: Work, +projection: Metadata) -> Result<&2, &2, M.Dia
   match fuel work:
     case 0n _:
       Fail{M.Diagnostic{"backend_limit", "codegen", "runtime projection exceeded its structural depth limit"}}
+    case 1n+rest ExpressionWork{M.RuntimeInitExpr{value}}:
+      lower(rest, ExpressionWork{value}, projection)
     case 1n+rest ExpressionWork{M.SourceExpr{offset, annotation, value}}:
       lower(rest, ExpressionWork{value}, projection)
     case 1n+rest ExpressionWork{M.LambdaExpr{+identity, parameter, parameter_type, result_type, body}}:

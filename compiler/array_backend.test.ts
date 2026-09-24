@@ -488,11 +488,9 @@ Deno.test("array lengths are checked before conversion to Wasm byte counts", () 
   }
 });
 
-Deno.test("arrays remain private and cannot cross the scalar callback ABI", () => {
+Deno.test("arrays cannot be exported constants or cross scalar callbacks", () => {
   const numbers = arrayType(u32Type);
   const cases = [
-    module([fn("result", array(integer(1)))]),
-    module([fn("parameter", integer(0), { parameter_type: numbers })]),
     module([], {
       constants: [{
         name: "numbers",

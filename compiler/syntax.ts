@@ -8,7 +8,7 @@ import {
   type Token,
 } from "../generated/wasm/mod.ts";
 import schema from "../generated/wasm/cst-schema.json" with { type: "json" };
-import { encodeCompactCst } from "./compact_cst.ts";
+import { encodeCompactCst, postfixStarts } from "./compact_cst.ts";
 
 export type CstList = { readonly $: "Nil" } | {
   readonly $: "Con";
@@ -134,6 +134,7 @@ export function layout(source: string, lexer: ParserInstance) {
   const insertions = new Map<number, string>();
   const frames = [{ indent: 0, depth: 0 }];
   let depth = 0;
+  let effectOperationsDepth = -1;
   // Searching backward for an absent CR on every LF line is quadratic.
   // Index both terminators once, including mixed-ending sources.
   const lineStarts = [0];
@@ -187,6 +188,11 @@ export function layout(source: string, lexer: ParserInstance) {
         }
       }
       insertions.set(token.span.start, markers);
+    } else if (brokenLine && depth === effectOperationsDepth) {
+      // Without this boundary, a signature's type application consumes the next member name.
+      if (previous.text !== ":" && previous.text !== "->") {
+        insertions.set(token.span.start, newline);
+      }
     } else if (brokenLine) {
       const frame = frames.at(-1)!;
       const suite = previous.text === ":" || previous.text === "of";
@@ -227,8 +233,16 @@ export function layout(source: string, lexer: ParserInstance) {
         }
       }
     }
+    if (
+      token.text === "{" && previous?.text === "=" &&
+      tokens[index - 2]?.text === "effect" &&
+      tokens[index - 3]?.text === "is"
+    ) {
+      effectOperationsDepth = depth + 1;
+    }
     if (["(", "[", "{"].includes(token.text)) depth++;
     if ([")", "]", "}"].includes(token.text)) depth--;
+    if (depth < effectOperationsDepth) effectOperationsDepth = -1;
   }
   // End a trailing line comment before inserting the synthetic final newline.
   if (tokens.length) {
@@ -266,6 +280,7 @@ function materialize(
   const ruleNames = new Map(
     frontend.plan.islands.map((island) => [island.ruleId, island.ruleName]),
   );
+  const adjacent = postfixStarts(program, source);
   let count = 0;
   function node(id: number, field: string): Cst {
     count++;
@@ -305,7 +320,9 @@ function materialize(
     }
     return {
       $: "Cst",
-      kind,
+      kind: kind === "atom" && field === "arguments" && adjacent.has(start)
+        ? "postfix_argument"
+        : kind,
       field,
       text: "",
       offset: offsetAt(start),

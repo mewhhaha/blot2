@@ -211,23 +211,23 @@ Deno.test("F32 primitive traversal preserves latent operation effects on functio
 });
 
 const sourceMath = `
-fn make_offset captured => fn value => F32.add captured value
+const make_offset = fn captured => fn value => F32.add captured value
 const offset = make_offset (-0.25)
 const nested = Some (Some 0.125)
-export const rounded = F32.add 16_777_216.0 1.0
-export const negative_zero = -0.0
-export const infinity = F32.div 1.0 0.0
-export const not_a_number = F32.div 0.0 0.0
-export fn negative (value: F32) => -value
-export fn length () => F32.length3 2.0 3.0 6.0
-export fn partial (value: F32) => offset (identity value)
-export fn extract () => case nested of
+const rounded = F32.add 16_777_216.0 1.0
+const negative_zero = -0.0
+const infinity = F32.div 1.0 0.0
+const not_a_number = F32.div 0.0 0.0
+const negative = fn (value: F32) => -value
+const length = fn () => F32.length3 2.0 3.0 6.0
+const partial = fn (value: F32) => offset (identity value)
+const extract = fn () => case nested of
   Some (Some value) => value
   _ => 0.0
-export fn decimal () => 1_2.5_0e-1
-export fn integer (value: F32) => F32.to_u32 value
-export fn floating (value: U32) => U32.to_f32 value
-export fn finite (value: F32) => F32.is_finite value
+const decimal = fn () => 1_2.5_0e-1
+const integer = fn (value: F32) => F32.to_u32 value
+const floating = fn (value: U32) => U32.to_f32 value
+const finite = fn (value: F32) => F32.is_finite value
 `;
 
 Deno.test("F32 source literals, negative values, prelude math and generic closures execute", async () => {
@@ -249,11 +249,11 @@ Deno.test("F32 source literals, negative values, prelude math and generic closur
     equal((exports.negative_zero as WebAssembly.Global).value, -0);
     for (
       const [source, code] of [
-        ["export const bad = 3.5e38", "float_range"],
-        ["export const bad = @f32.add 1 2.0", "type_mismatch"],
-        ["export const bad = @f32.sqrt 4.0 2.0", "call_arity"],
-        ["export const bad = @f32.add 1.0", "call_arity"],
-        ["export const bad = @f32.missing 1.0", "unknown_intrinsic"],
+        ["const bad = 3.5e38", "float_range"],
+        ["const bad = @f32.add 1 2.0", "type_mismatch"],
+        ["const bad = @f32.sqrt 4.0 2.0", "call_arity"],
+        ["const bad = @f32.add 1.0", "call_arity"],
+        ["const bad = @f32.missing 1.0", "unknown_intrinsic"],
       ]
     ) {
       throws(
@@ -277,13 +277,13 @@ Deno.test("F32 native analysis, closures and Wasm match the JS reference", async
     equal(actual, expected);
     equal(call(await exportsOf(actual.bytes), "partial", 2), 1.75);
     await rejects(
-      () => native.compile("export const bad = 3.5e38"),
+      () => native.compile("const bad = 3.5e38"),
       (error) => error instanceof SourceError && error.code === "float_range",
     );
     equal(
       call(
         await exportsOf(
-          (await native.compile("export fn ok () => 0.125")).bytes,
+          (await native.compile("const ok = fn () => 0.125")).bytes,
         ),
         "ok",
       ),
@@ -342,7 +342,7 @@ Deno.test("F32 decimal literals round once, ties-to-even, including subnormal an
   try {
     const finite = cases.filter(({ expected }) => Number.isFinite(expected));
     const source = finite.map(({ text }, index) =>
-      `export const value_${index} = ${text}`
+      `const value_${index} = ${text}`
     ).join("\n");
     const expected = reference.compile(source);
     const actual = await native.compile(source);

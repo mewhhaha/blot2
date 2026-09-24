@@ -94,7 +94,8 @@ Deno.test("frontend body edits parse one island and preserve untouched syntax id
   withFrontends((incremental, _clean, equivalent) => {
     const source = Array.from(
       { length: 64 },
-      (_, index) => `fn value_${index} input => @u32.add input ${index}\n`,
+      (_, index) =>
+        `const value_${index} = fn input => @u32.add input ${index}\n`,
     ).join("");
     const first = equivalent(source);
     equal(first.syntax.full_parses, 1);
@@ -129,11 +130,11 @@ Deno.test("frontend body edits parse one island and preserve untouched syntax id
 
 Deno.test("frontend reuses tokens across trivia, CRLF, insertion, removal, and reorder", () =>
   withFrontends((_incremental, _clean, equivalent) => {
-    const left = "fn left value => @u32.add value 1\n";
-    const right = "fn right value => @u32.add value 2\n";
+    const left = "const left = fn value => @u32.add value 1\n";
+    const right = "const right = fn value => @u32.add value 2\n";
     const first = equivalent(left + right);
     const trivia = equivalent(
-      "// Unicode 🙂 and keywords fn const of are trivia.\r\n\r\n" +
+      "// Unicode 🙂 and declarations const ignored = fn x => x are trivia.\r\n\r\n" +
         (left + right).replaceAll("value =>", "value  =>").replaceAll(
           "\n",
           "\r\n",
@@ -155,8 +156,8 @@ Deno.test("frontend reuses tokens across trivia, CRLF, insertion, removal, and r
 
 Deno.test("warm frontend lexes only changed fragments and evicts removed fragments", () =>
   withFrontends((incremental, clean, equivalent) => {
-    const left = "fn left value => @u32.add value 1\r\n";
-    const right = "fn right value => @u32.add value 2\r\n";
+    const left = "const left = fn value => @u32.add value 1\r\n";
+    const right = "const right = fn value => @u32.add value 2\r\n";
     const warm = left.replace("value 1", "value 3");
     equivalent(left + right);
     equivalent(warm + right);
@@ -185,8 +186,8 @@ Deno.test("warm frontend lexes only changed fragments and evicts removed fragmen
 Deno.test("frontend islands retain nested suites, delimiters, records and token spellings", () =>
   withFrontends((_incremental, _clean, equivalent) => {
     const source = `data Pair = Pair { left: U32, right: U32 }
-const text = "fn fake () => [case value of] // still text"
-fn choose input => do:
+const text = "const fake = fn () => [case value of] // still text"
+const choose = fn input => do:
   let values = [
     Pair { left: 1, right: 2 },
     Pair { left: 3, right: 4 },
@@ -196,7 +197,7 @@ fn choose input => do:
       (True, number) => number
       (False, _) => 0
   return @array.length values
-export fn answer () => choose (True, 41)
+const answer = fn () => choose (True, 41)
 `;
     equivalent(source);
     for (
@@ -216,23 +217,23 @@ export fn answer () => choose (True, 41)
 
 Deno.test("frontend malformed layout and boundaries retain exact clean diagnostics", () =>
   withFrontends((incremental, clean, equivalent) => {
-    const valid = "fn first () => 1\nexport fn answer () => 42\n";
+    const valid = "const first = fn () => 1\nconst answer = fn () => 42\n";
     equivalent(valid);
     for (
       const malformed of [
-        " fn first () => 1\n",
-        "fn first () => do:\n\treturn 1\n",
-        "fn first () => do:\nreturn 1\n",
-        "fn first () => do:\n  if True:\n    return 1\n return 2\n",
-        "fn first () => (1\nexport fn answer () => 42\n",
-        "fn first () => [1)\nexport fn answer () => 42\n",
-        "fn first () => 1 export fn answer () => 42\n",
-        "fn first () => case True of\n  True => 1\n  False =>\n",
-        'fn first () => "unfinished\n',
-        "fn first () => 1\n#[tag]\n",
-        "fn first () => 1\n\uE000",
-        "fn first () => 1\n@\n",
-        'fn first () => 1\nimport * as imported from "./other"\n',
+        " const first = fn () => 1\n",
+        "const first = fn () => do:\n\treturn 1\n",
+        "const first = fn () => do:\nreturn 1\n",
+        "const first = fn () => do:\n  if True:\n    return 1\n return 2\n",
+        "const first = fn () => (1\nconst answer = fn () => 42\n",
+        "const first = fn () => [1)\nconst answer = fn () => 42\n",
+        "const first = fn () => 1 const answer = fn () => 42\n",
+        "const first = fn () => case True of\n  True => 1\n  False =>\n",
+        'const first = fn () => "unfinished\n',
+        "const first = fn () => 1\n#[tag]\n",
+        "const first = fn () => 1\n\uE000",
+        "const first = fn () => 1\n@\n",
+        'const first = fn () => 1\nimport * as imported from "./other"\n',
       ]
     ) {
       for (const revision of [malformed, "// shift 🙂\r\n" + malformed]) {
@@ -251,18 +252,19 @@ Deno.test("frontend malformed layout and boundaries retain exact clean diagnosti
 
 Deno.test("frontend attribute boundaries fall back to the complete grammar", () =>
   withFrontends((_incremental, _clean, equivalent) => {
-    const source = "#[first]\n#[second]\nexport fn answer () => 41\n";
+    const source = "#[first]\n#[second]\nconst answer = fn () => 41\n";
     equivalent(source);
     const changed = equivalent(source.replace("41", "42"));
     equal(changed.syntax.full_parses, 1);
-    const removed = equivalent("export fn answer () => 42\n");
+    const removed = equivalent("const answer = fn () => 42\n");
     equal(removed.syntax.islands_parsed, 1);
     equal(removed.syntax.full_parses, 0);
   }));
 
 Deno.test("frontend origins belong to their source revision and imports cannot enter caches", () =>
   withFrontends((incremental, _clean, equivalent) => {
-    const source = "fn capture value => fn extra => @u32.add value extra\n";
+    const source =
+      "const capture = fn value => fn extra => @u32.add value extra\n";
     const first = equivalent(source);
     const firstDeclaration = bendArray(first.root.children)[0];
     const prefix = "// shifted 😀\r\n\r\n";
@@ -297,7 +299,7 @@ Deno.test("frontend origins belong to their source revision and imports cannot e
 Deno.test("large lazy origin tables retain deep offsets across revisions and disposal", async () => {
   const incremental = await createIncrementalFrontend({ prelude: "none" });
   try {
-    const source = "fn values () => [" +
+    const source = "const values = fn () => [" +
       Array.from({ length: 8192 }, (_, index) => index).join(",") + "]\n";
     const first = incremental.prepare(source);
     const pending = [first.root];
@@ -328,3 +330,16 @@ Deno.test("large lazy origin tables retain deep offsets across revisions and dis
     incremental.dispose();
   }
 });
+
+Deno.test("frontend cache distinguishes postfix adjacency from spaced arguments", () =>
+  withFrontends((_incremental, _clean, equivalent) => {
+    const spaced = "const run = fn () => consume [42]\n";
+    equivalent(spaced);
+    const indexed = equivalent(spaced.replace("consume [", "consume["));
+    equal(indexed.syntax.islands_parsed, 1);
+    const restored = equivalent(spaced);
+    equal(restored.syntax.islands_parsed, 1);
+    equivalent("const run = fn () => outer inner(42).value\n");
+    const grouped = equivalent("const run = fn () => outer inner (42).value\n");
+    equal(grouped.syntax.islands_parsed, 1);
+  }));

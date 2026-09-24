@@ -82,6 +82,7 @@ Deno.test("metadata scans preserve first-match binding and nominal identity sema
     parameters: BigInt(index),
     constructors: list([{
       $: "Constructor",
+      fields: { $: "Nil" },
       name: `Variant${index % identities.length}`,
       payload: { $: "None" },
     }]),

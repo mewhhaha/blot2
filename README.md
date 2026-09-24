@@ -1,24 +1,27 @@
 # Blot 2
 
-A native compiler written in Bend 2.0.21, with Deno tooling and Baba 9.0.1
+A native compiler written in Bend, with Deno tooling and Baba 9.0.1
 lexing/parsing. The executable core targets Wasm and includes a source prelude,
 rank-1 type/effect inference, closures, algebraic data, multi-value matching,
 tuples, named record constructors, immutable arrays, file imports, bounded const
 evaluation, and source-defined operators.
 
 The compiler has no ECS, game, window, input, or rendering primitives. Effects
-are source-declared operations; providers supply implementations. Host functions
-are explicit callable capabilities passed into ordinary exports, not ambient
-services. See [effects and controlled IO](compiler/effects-and-io.md).
+are source-declared operations, including type-applied families such as
+`State U32`; providers supply implementations. Host functions are explicit
+callable capabilities passed into ordinary exports, not ambient services. See
+[effects and controlled IO](compiler/effects-and-io.md).
 
 ## Work with the compiler
 
-Requires Deno 2, Bend **2.0.21**, and clang 14+ on a POSIX system. Building the
-JavaScript reference additionally needs Bun and network access on its first
-build to fetch integrity-pinned upstream loader sources.
+Requires Deno 2, Bend, and clang 14+ on a POSIX system. Builds use the installed
+Bend without a version restriction. Building the JavaScript reference
+additionally needs Bun and network access on the first build for each Bend
+version to fetch loader sources from its matching upstream release tag.
 
 ```sh
 just build       # native generated/compiler/blotc
+just guide       # compact language reference for people and LLMs
 just demo        # execute the generic-prelude Wasm example
 just demo-host   # execute an explicit host callback and source effect adapter
 just compile     # reuse the native compiler; no Bend rebuild
@@ -32,10 +35,12 @@ deno task blot check examples/generic_effects.blot
 Deno supplies parsing and a persistent subprocess transport; Bend owns lowering,
 inference, const evaluation, and Wasm generation. Native failures never silently
 fall back to JavaScript. The reference JavaScript compiler exists for parity
-checks. Builds run `bend PROOF.bend`; important rules live in `LAWS.bend`. Stock
-Bend 2.0.21 passes the retained native ownership regression without an emitter
-patch; see [compiler details](compiler/README.md).
+checks. Builds run `bend PROOF.bend`; important rules live in `LAWS.bend`. The
+optimized native build uses Bend 2.0.24 with a guarded String-comparison change
+to its generated C; see [compiler details](compiler/README.md).
 
+Read [the CLI guide](compiler/guide.md) for the executable syntax and language
+rules in one pass, or print it with `deno task blot guide` without rebuilding.
 Start with [the executable prelude example](examples/prelude.blot),
 [generic effects and descriptors](examples/generic_effects.blot), and
 [explicit host callbacks](examples/host_io.blot). The
@@ -44,8 +49,8 @@ executes through `just compile examples/arrays.blot`. See also
 [record construction and destructuring](examples/records.blot) and
 [the source prelude](std/README.md). The [syntax showcase](examples/syntax.blot)
 and [ECS example](examples/ecs.blot) also compile and execute on the current
-language. The ECS uses immutable component columns, explicit queries, and
-source-defined system scheduling; `just study` runs it headlessly.
+language. The ECS composes component columns at const time and accesses them
+through scoped state effects; `just study` runs it headlessly.
 
 [The host-capability example](examples/host_capabilities.blot) constructs
 guest-side records from a scalar host callback, with no game intrinsics. See
@@ -56,27 +61,56 @@ the broader proposal are not implemented yet.
 
 ## Current boundary
 
-`effect Reader.ask: Unit -> U32`, `@effect.provider Reader.ask implementation`,
-and `do provider:` form the generic effect core. Function values retain latent
-effect requirements; creating one is pure, invoking it need not be.
-`@effect.of`, `@effect.descriptor`, `@effect.has`, `@effect.count`, and
-`@effect.same` support closed compile-time descriptors. Closed annotations such
-as `U32 -> U32 ! {Foreign}` describe callback effects. `Foreign` cannot be
-declared or handled as a source operation. Runtime descriptors, unhandled source
-operations at executable exports, and implicit host access are rejected.
+`type Reader a is effect = { ask: Unit -> a }`,
+`@effect.provider (Reader.ask U32) implementation`, and `do provider:` form the
+generic effect core. Function values retain latent effect requirements; creating
+one is pure, invoking it need not be. `@effect.of`, `@effect.descriptor`,
+`@effect.has`, `@effect.count`, and `@effect.same` support closed compile-time
+descriptors. Closed annotations such as `U32 -> U32 ! {Foreign}` describe
+callback effects. `Foreign` cannot be declared or handled as a source operation.
+Runtime descriptors, unhandled source operations at executable exports, and
+implicit host access are rejected.
 
 Matching uses `case a, b, c of` with comma-separated pattern rows. Single-value
-matches use `case value of` too. The inputs evaluate once, left to right.
+matches use `case value of` too. The inputs evaluate once, left to right. A
+plain name in a pattern binds a value; `^name` compares against an existing
+constant, parameter, or `let` binding. Qualified references work too:
+
+```blot
+const tab = 0x110104
+const key_action = fn code => case code of
+  ^tab => True
+  _ => False
+
+const matches = fn (expected: U32) => fn actual => case actual of
+  ^expected => True
+  _ => False
+```
+
+Value patterns currently support `U32` and `Bool`, including nested patterns
+such as `Some ^expected` and imported names such as `^keys.tab`. The referenced
+binding comes from the surrounding scope, never a sibling pattern. Its type must
+match the scrutinee. Value patterns are refutable even when naming a constant,
+so other arms must cover the remaining values. They also work in `if let` and
+`let … else`. Arbitrary expressions, floats, and structural equality are not
+supported in value patterns. Annotate parameters whose scalar type is otherwise
+unconstrained.
 
 File imports, tuple values/patterns, named record construction/patterns, and
-homogeneous immutable arrays now compile to Wasm. Array updates currently copy;
-composite values remain private to a guest invocation. Project-wide incremental
-compilation is not connected yet.
+homogeneous immutable arrays compile to Wasm. Records support field reads and
+updates; arrays support `.length`, checked `.get(index)`, `a[index]`, and
+`a[index] := value`. Updates preserve aliases and reuse locally owned array
+storage when safe. Receiver methods such as `tail.contains(witness)` select
+ordinary associated functions. Numeric arrays cross the host boundary as copied
+`Uint32Array`/`Float32Array` values; records and other composite values remain
+private to a guest invocation. Project-wide incremental compilation is not
+connected yet.
 
-Record field access/update syntax, SIMD, parameterized effect identities,
+SIMD, explicit polymorphic effect-row annotations such as `! {State a}`,
 type-valued const programming, resumptions, capability bundles, and persistent
-state transfer remain future work. Host exports currently accept a scalar or one
-scalar callback and return a scalar.
+guest handles remain future work. Host exports accept scalars, numeric arrays,
+or one scalar callback and return a scalar or numeric array. Source libraries
+can serialize application state into numeric arrays for save/load and reload.
 
 ## Helix highlighting
 
@@ -86,6 +120,13 @@ the wider language proposals; highlighting does not imply the compiler
 implements every form.
 
 ## Sandbox status
+
+The sibling [gdev application](../gdev/README.md) runs on this compiler with a
+source-defined ECS, a Deno Desktop/WebGPU host, editor controls, save/load and
+state-preserving source reload. Run `cd ../gdev && just run`. Its source derives
+typed component columns at const time and selects source-declared state effects
+for generic ECS access. Its numeric state/render codec is an application
+protocol, not a compiler primitive.
 
 The [3D sandbox/editor](case-study/ecs/README.md) is paused. Its
 compiler-coupled ECS/render backend and `compileEcs`/`compileApp` APIs have been

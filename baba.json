@@ -19,14 +19,34 @@
       },
       {
         "rule": "import_declaration",
-        "boundary": { "kind": "terminated", "terminal": "LAYOUT_NEWLINE" }
+        "boundary": {
+          "kind": "terminated",
+          "terminal": "LAYOUT_NEWLINE"
+        }
       },
-      { "rule": "namespace_import", "boundary": { "kind": "root" } },
-      { "rule": "named_import", "boundary": { "kind": "root" } },
-      { "rule": "import_binding", "boundary": { "kind": "root" } },
+      {
+        "rule": "namespace_import",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "named_import",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "import_binding",
+        "boundary": {
+          "kind": "root"
+        }
+      },
       {
         "rule": "declaration_attribute",
-        "boundary": { "kind": "root" }
+        "boundary": {
+          "kind": "root"
+        }
       },
       {
         "rule": "attribute_name",
@@ -37,13 +57,7 @@
         }
       },
       {
-        "rule": "function",
-        "boundary": {
-          "kind": "root"
-        }
-      },
-      {
-        "rule": "constant",
+        "rule": "value_declaration",
         "boundary": {
           "kind": "root"
         }
@@ -61,27 +75,65 @@
         }
       },
       {
+        "rule": "effect_type",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "effect_operations",
+        "boundary": {
+          "kind": "paired",
+          "open": "{",
+          "close": "}"
+        }
+      },
+      {
+        "rule": "effect_operation",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
         "rule": "constructor",
         "boundary": {
           "kind": "root"
         }
       },
       {
-        "rule": "record_fields",
-        "boundary": { "kind": "paired", "open": "{", "close": "}" }
+        "rule": "record",
+        "boundary": {
+          "kind": "root"
+        }
       },
-      { "rule": "record_field", "boundary": { "kind": "root" } },
-      { "rule": "record", "boundary": { "kind": "root" } },
       {
         "rule": "record_values",
-        "boundary": { "kind": "paired", "open": "{", "close": "}" }
+        "boundary": {
+          "kind": "paired",
+          "open": "{",
+          "close": "}"
+        }
       },
-      { "rule": "record_value", "boundary": { "kind": "root" } },
+      {
+        "rule": "record_value",
+        "boundary": {
+          "kind": "root"
+        }
+      },
       {
         "rule": "record_pattern",
-        "boundary": { "kind": "paired", "open": "{", "close": "}" }
+        "boundary": {
+          "kind": "paired",
+          "open": "{",
+          "close": "}"
+        }
       },
-      { "rule": "record_pattern_field", "boundary": { "kind": "root" } },
+      {
+        "rule": "record_pattern_field",
+        "boundary": {
+          "kind": "root"
+        }
+      },
       {
         "rule": "symbolic_fixity",
         "boundary": {
@@ -102,6 +154,28 @@
       },
       {
         "rule": "parameter",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "type_array",
+        "boundary": {
+          "kind": "paired",
+          "open": "[",
+          "close": "]"
+        }
+      },
+      {
+        "rule": "type_record",
+        "boundary": {
+          "kind": "paired",
+          "open": "{",
+          "close": "}"
+        }
+      },
+      {
+        "rule": "type_field",
         "boundary": {
           "kind": "root"
         }
@@ -196,7 +270,11 @@
       },
       {
         "rule": "array",
-        "boundary": { "kind": "paired", "open": "[", "close": "]" }
+        "boundary": {
+          "kind": "paired",
+          "open": "[",
+          "close": "]"
+        }
       },
       {
         "rule": "do_block",
@@ -236,7 +314,18 @@
           "kind": "root"
         }
       },
-      { "rule": "qualified_constructor", "boundary": { "kind": "root" } },
+      {
+        "rule": "value_pattern",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "qualified_constructor",
+        "boundary": {
+          "kind": "root"
+        }
+      },
       {
         "rule": "pattern_group",
         "boundary": {
@@ -267,6 +356,18 @@
       },
       {
         "rule": "binding_else",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "rebinding",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "for_statement",
         "boundary": {
           "kind": "root"
         }
@@ -305,6 +406,38 @@
         "rule": "else_clause",
         "boundary": {
           "kind": "root"
+        }
+      },
+      {
+        "rule": "effect_signature",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "effect_signature_application",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "effect_signature_atom",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "member_access",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "index_access",
+        "boundary": {
+          "kind": "paired",
+          "open": "[",
+          "close": "]"
         }
       }
     ],

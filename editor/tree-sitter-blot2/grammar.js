@@ -7,19 +7,24 @@ export default grammar({
   extras: ($) => [/\s+/, $.comment],
   word: ($) => $.identifier,
 
+  conflicts: ($) => [[$.function_binding, $._syntax]],
+
   rules: {
     source_file: ($) => repeat($._syntax),
 
     _syntax: ($) =>
       choice(
-        $.function_header,
+        $.function_binding,
         $.lambda_header,
+        $.type_header,
+        $.curried_type_header,
         $.infix_function,
         $.forward_return,
         $.declaration_tag,
         $.parenthesized,
         $.bracketed,
         $.braced,
+        $.method_call,
         $.member,
         $.text_literal,
         $.intrinsic,
@@ -27,6 +32,7 @@ export default grammar({
         $.integer,
         $.boolean,
         $.self,
+        $.binding_keyword,
         $.keyword,
         $.identifier,
         $.type_identifier,
@@ -34,14 +40,24 @@ export default grammar({
         $.separator,
       ),
 
-    function_header: ($) =>
-      prec(
+    function_binding: ($) =>
+      prec.dynamic(
         2,
         seq(
-          "fn",
+          $.binding_keyword,
           field("name", choice($.identifier, $.qualified_function_name)),
-          field("parameter", $._parameter),
+          optional($.binding_annotation),
+          alias("=", $.operator),
+          choice($.lambda_header, $.grouped_lambda),
         ),
+      ),
+
+    grouped_lambda: ($) =>
+      seq(
+        "(",
+        choice($.lambda_header, $.grouped_lambda),
+        repeat($._syntax),
+        ")",
       ),
 
     qualified_function_name: ($) =>
@@ -75,6 +91,60 @@ export default grammar({
 
     deferred_parameter: ($) => seq("~", $.identifier),
 
+    binding_keyword: (_) => choice("const", "let"),
+
+    binding_annotation: ($) =>
+      seq(
+        alias(":", $.separator),
+        repeat1(choice(
+          $.identifier,
+          $.type_identifier,
+          $.parenthesized,
+          $.bracketed,
+          $.braced,
+          $.member,
+          alias("->", $.operator),
+          alias("!", $.operator),
+        )),
+      ),
+
+    type_header: ($) =>
+      prec.right(
+        2,
+        seq(
+          choice("type", "data"),
+          field("name", $.type_identifier),
+          optional(field("parameter", $._type_parameter)),
+        ),
+      ),
+
+    curried_type_header: ($) =>
+      prec(1, seq("=>", "type", field("parameter", $._type_parameter))),
+
+    _type_parameter: ($) =>
+      choice(
+        alias($.identifier, $.type_parameter),
+        $.type_parameter_tuple,
+        $.type_parameter_array,
+        $.type_parameter_record,
+      ),
+
+    type_parameter_tuple: ($) =>
+      seq("(", commaSeparated($._type_parameter), ")"),
+    type_parameter_array: ($) =>
+      seq("[", commaSeparated($._type_parameter), "]"),
+    type_parameter_record: ($) =>
+      seq(
+        "{",
+        commaSeparated(choice(
+          $.type_parameter_field,
+          alias($.identifier, $.type_parameter),
+        )),
+        "}",
+      ),
+    type_parameter_field: ($) =>
+      seq(field("name", $.identifier), ":", $._type_parameter),
+
     infix_function: ($) =>
       seq(
         "`",
@@ -95,6 +165,8 @@ export default grammar({
     bracketed: ($) => seq("[", repeat($._syntax), "]"),
     braced: ($) => seq("{", repeat(choice($.record_field, $._syntax)), "}"),
     record_field: ($) => prec(1, seq(field("name", $.identifier), ":")),
+    method_call: ($) =>
+      prec(2, seq(".", field("name", $.identifier), $.parenthesized)),
     member: ($) =>
       seq(
         ".",
@@ -126,23 +198,21 @@ export default grammar({
     intrinsic: (_) => token(/@[a-z_][A-Za-z0-9_]*(\.[a-z_][A-Za-z0-9_]*)*/),
     identifier: (_) => /[a-z_][A-Za-z0-9_]*/,
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
-    operator: (_) => choice(":=", "..", "...", /[+\-*\/%=!<>|&^~?$]+/),
+    operator: (_) => choice(":=", "=>", "..", "...", /[+\-*\/%=!<>|&^~?$]+/),
     separator: (_) => choice(":", ",", ";"),
     keyword: (_) =>
       choice(
         "import",
-        "export",
         "from",
         "as",
         "data",
         "type",
+        "is",
         "infixl",
         "infixr",
         "infix",
         "prefix",
         "effect",
-        "const",
-        "let",
         "use",
         "rec",
         "do",
@@ -160,3 +230,7 @@ export default grammar({
     comment: (_) => token(/\/\/[^\r\n]*/),
   },
 });
+
+function commaSeparated(rule) {
+  return optional(seq(rule, repeat(seq(",", rule)), optional(",")));
+}

@@ -1,21 +1,20 @@
-export fn identity value => value
-// <- keyword.control.import
-//     ^ keyword.function
-//        ^ function
-//                 ^ variable.parameter
-//                       ^ operator
+const identity = fn value => value
+//               ^ keyword.function
+//    ^ function
+//                  ^ variable.parameter
+//                        ^ operator
 
-fn Vec2.scaled (value: Vec2) => fn factor => value
-// <- keyword.function
-// ^ type
-//      ^ function
-//              ^ variable.parameter
-//                     ^ type
-//                                 ^ variable.parameter
+const Vec2.scaled = fn (value: Vec2) => fn factor => value
+//                  ^ keyword.function
+//    ^ type
+//         ^ function
+//                      ^ variable.parameter
+//                             ^ type
+//                                         ^ variable.parameter
 
 const identity = fn value => value
 // <- keyword.storage.type
-//    ^ variable
+//    ^ function
 //               ^ keyword.function
 //                  ^ variable.parameter
 
@@ -24,6 +23,25 @@ data Maybe a = Some a | Nothing
 //   ^ type
 //             ^ type
 //                    ^ operator
+
+type Maybe a is data = Some a | Nothing
+// <- keyword.storage.type
+//   ^ type
+//           ^ keyword.storage.type
+//              ^ keyword.storage.type
+
+type State a is effect = { get: Unit -> a, set: a -> Unit }
+// <- keyword.storage.type
+//   ^ type
+//           ^ keyword.storage.type
+//              ^ keyword.storage.type
+//                         ^ variable.other.member
+
+type Get a is effect = Unit -> a
+// <- keyword.storage.type
+//   ^ type
+//         ^ keyword.storage.type
+//            ^ keyword.storage.type
 
 type Positions = Array Vec2
 // <- keyword.storage.type
@@ -37,13 +55,13 @@ type Reading = F64 | Text
 //                 ^ operator
 //                   ^ type
 
-fn read_score (ready: Bool) -> F64 | Text => do:
-// <- keyword.function
-// ^ function
-//             ^ variable.parameter
-//                             ^ type
-//                                 ^ operator
-//                                   ^ type
+const read_score = fn (ready: Bool) -> F64 | Text => do:
+//                 ^ keyword.function
+//    ^ function
+//                     ^ variable.parameter
+//                                     ^ type
+//                                         ^ operator
+//                                           ^ type
 
 if let Some(x) = y:
 // <- keyword.control.conditional
@@ -156,35 +174,35 @@ prefix 90 (!) = not
 // <- keyword.directive
 //         ^ operator
 
-fn add left => fn right => (@type.of left).add left right
-//                          ^ function.builtin
-//                                   ^ variable
-//                                         ^ variable.other.member
+const add = fn left => fn right => (@type.of left).add left right
+//                                  ^ function.builtin
+//                                           ^ variable
+//                                                 ^ variable.other.member
 
-fn Int.add (left: Int) => fn (right: Int) => @int.add left right
-// <- keyword.function
-// ^ type
-//     ^ function
-//                                           ^ function.builtin
+const Int.add = fn (left: Int) => fn (right: Int) => @int.add left right
+//              ^ keyword.function
+//    ^ type
+//        ^ function
+//                                                   ^ function.builtin
 
 @f32.sqrt value
 // <- function.builtin
 
-fn or left => fn ~right => do:
-// <- keyword.function
-// ^ function
-//               ^ operator
-//                ^ variable.parameter
+const or = fn left => fn ~right => do:
+//         ^ keyword.function
+//    ^ function
+//                       ^ operator
+//                        ^ variable.parameter
   if left:
     return True
   return @force right
 //       ^ function.builtin
 
-fn force ~value => @force value
-// ^ function
-//       ^ operator
-//        ^ variable.parameter
-//                 ^ function.builtin
+const force = fn ~value => @force value
+//    ^ function
+//               ^ operator
+//                ^ variable.parameter
+//                         ^ function.builtin
 
 let point = Vec2 { x: 1.0, y: 2.0 }
 // <- keyword.storage.type
@@ -209,7 +227,7 @@ use _ <- ecs.set next
 use ecs.insert (Ghost { remaining: 1.0 })
 // <- keyword.storage.type
 //  ^ variable
-//      ^ variable.other.member
+//      ^ function.method
 //              ^ type
 //                      ^ variable.other.member
 //                                 ^ constant.numeric.float

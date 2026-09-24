@@ -1,101 +1,137 @@
-// Executable, source-defined ECS using immutable component columns.
+// Executable source ECS with component columns chosen by const-time registration.
 // Entity IDs are column indices; Nothing means that component is absent.
 // Worlds stay inside the guest. The current host ABI exchanges only scalars.
 
-data Position = Position { x: F32, y: F32 }
-data Velocity = Velocity { x: F32, y: F32 }
-data Ghost = Ghost { remaining: F32 }
-data Time = Time { seconds: F32 }
-data World = World {
-  positions: Array (Maybe Position),
-  velocities: Array (Maybe Velocity),
-  ghosts: Array (Maybe Ghost),
-  time: Time,
+type Position is data = Position { x: F32, y: F32 }
+type Velocity is data = Velocity { x: F32, y: F32 }
+type Ghost is data = Ghost { remaining: F32 }
+type Time is data = Time { seconds: F32 }
+type Column component is data = Column (Array (Maybe component))
+type Builder [world, scope] is data = Builder { initial: world, scope: world -> scope }
+type Simulation [world, scope] is data = Simulation { initial: world, scope: world -> scope }
+type State a is effect = {
+  get: Unit -> a
+  set: a -> Unit
 }
 
-fn create () => World {
-  positions: [Some (Position { x: 0.0, y: 0.0 }), Some (Position { x: 10.0, y: 20.0 }), Nothing, Some (Position { x: 1.0, y: 2.0 })],
-  velocities: [Some (Velocity { x: 2.0, y: 4.0 }), Nothing, Some (Velocity { x: 1.0, y: 1.0 }), Some (Velocity { x: 4.0, y: 2.0 })],
-  ghosts: [Nothing, Nothing, Nothing, Nothing],
-  time: Time { seconds: 0.5 },
-}
+const empty = fn () => do:
+  let scope = fn world => fn action => do:
+    use result <- action ()
+    return (world, result)
+  return Builder { initial: (), scope }
 
-fn move_position position => fn velocity => fn seconds =>
+const insert_cell = fn initial => fn builder => do:
+  let Builder { initial: previous_initial, scope: previous_scope } = builder
+  let scope = fn world => fn action => do:
+    let (current, previous) = world
+    use outcome <- @effect.run State.get State.set current (fn () => previous_scope previous action)
+    let (next, (previous_next, result)) = outcome
+    return ((next, previous_next), result)
+  return Builder { initial: (initial, previous_initial), scope }
+
+const build = fn builder => do:
+  let Builder { initial, scope } = builder
+  return Simulation { initial, scope }
+
+const run_scoped = fn simulation => fn world => fn action => do:
+  let Simulation { scope } = simulation
+  return scope world action
+
+const get = fn (witness: p -> a) -> a => State.get ()
+const set = fn value => State.set value
+const get_column = fn exemplar => get (fn () => Column [Some exemplar])
+
+const simulation = do:
+  let builder = empty ()
+  builder := insert_cell (Time { seconds: 0.5 }) self
+  builder := insert_cell (Column [
+    Some (Position { x: 0.0, y: 0.0 }),
+    Some (Position { x: 10.0, y: 20.0 }),
+    Nothing,
+    Some (Position { x: 1.0, y: 2.0 }),
+  ]) self
+  builder := insert_cell (Column [
+    Some (Velocity { x: 2.0, y: 4.0 }),
+    Nothing,
+    Some (Velocity { x: 1.0, y: 1.0 }),
+    Some (Velocity { x: 4.0, y: 2.0 }),
+  ]) self
+  builder := insert_cell (Column (@array.generate 4 (fn index -> Maybe Ghost => Nothing))) self
+  return build builder
+
+const move_position = fn position => fn velocity => fn seconds =>
   case position, velocity of
     Some (Position { x, y }), Some (Velocity { x: vx, y: vy }) =>
-      Some (Position {
-        x: F32.add x (F32.mul vx seconds),
-        y: F32.add y (F32.mul vy seconds),
-      })
+      Some (Position { x: x + vx * seconds, y: y + vy * seconds })
     _, _ => position
 
-// This query requires Position and Velocity, but Time is a world resource.
-fn move_columns positions => fn velocities => fn seconds => fn index => do:
-  if index >= @array.length positions:
-    return positions
-  let next = move_position (@array.get positions index) (@array.get velocities index) seconds
-  return move_columns (@array.set positions index next) velocities seconds (index + 1)
-
-fn move world => do:
-  let World { positions, velocities, ghosts, time } = world
+const move = fn () => do:
+  use stored_positions <- get_column (Position { x: 0.0, y: 0.0 })
+  use stored_velocities <- get_column (Velocity { x: 0.0, y: 0.0 })
+  use time <- get Time
+  let Column positions = stored_positions
+  let Column velocities = stored_velocities
   let Time { seconds } = time
-  return World {
-    positions: move_columns positions velocities seconds 0,
-    velocities,
-    ghosts,
-    time,
-  }
+  let next = positions
+  for index in 0..(@array.length positions):
+    next := @array.set self index (move_position (@array.get positions index) (@array.get velocities index) seconds)
+  use set (Column next)
+  return ()
 
-fn insert_ghosts ghosts => fn index => do:
-  if index >= @array.length ghosts:
-    return ghosts
-  return insert_ghosts (@array.set ghosts index (Some (Ghost { remaining: 1.0 }))) (index + 1)
+const add_ghost = fn () => do:
+  use stored <- get_column (Ghost { remaining: 1.0 })
+  let Column ghosts = stored
+  let next = ghosts
+  for index in 0..(@array.length ghosts):
+    next := @array.set self index (Some (Ghost { remaining: 1.0 }))
+  use set (Column next)
+  return ()
 
-// Insertion does not require the component to have been present beforehand.
-fn add_ghost world => do:
-  let World { positions, velocities, ghosts, time } = world
-  return World { positions, velocities, ghosts: insert_ghosts ghosts 0, time }
+const update = fn () => do:
+  for system in [move, add_ghost]:
+    use system ()
+  return ()
 
-fn run_systems systems => fn world => fn index => do:
-  if index >= @array.length systems:
-    return world
-  let next = (@array.get systems index) world
-  return run_systems systems next (index + 1)
+const create = fn () => do:
+  let Simulation { initial } = simulation
+  return initial
 
-fn update world => run_systems [move, add_ghost] world 0
+const simulate = fn ticks => fn world => do:
+  let next = world
+  for tick in 0..ticks:
+    let (updated, _) = run_scoped simulation next update
+    next := updated
+  return next
 
-fn simulate ticks => fn world => do:
-  if ticks == 0:
-    return world
-  return simulate (ticks - 1) (update world)
+const checksum_scoped = fn () => do:
+  use stored <- get_column (Position { x: 0.0, y: 0.0 })
+  let Column positions = stored
+  let total = 0.0
+  for position in positions:
+    total := case position of
+      Nothing => self
+      Some (Position { x, y }) => self + x + y
+  return total
 
-fn sum_positions positions => fn index => fn total => do:
-  if index >= @array.length positions:
-    return total
-  let next = case @array.get positions index of
-    Nothing => total
-    Some (Position { x, y }) => F32.add total (F32.add x y)
-  return sum_positions positions (index + 1) next
+const checksum = fn world => do:
+  let (_, total) = run_scoped simulation world checksum_scoped
+  return total
 
-fn checksum world => do:
-  let World { positions } = world
-  return sum_positions positions 0 0.0
+const count_ghosts = fn world => do:
+  let (_, count) = run_scoped simulation world (fn () => do:
+    use stored <- get_column (Ghost { remaining: 1.0 })
+    let Column ghosts = stored
+    let count = 0
+    for ghost in ghosts:
+      count := case ghost of
+        Nothing => self
+        Some _ => self + 1
+    return count)
+  return count
 
-fn count_ghosts ghosts => fn index => fn count => do:
-  if index >= @array.length ghosts:
-    return count
-  let next = case @array.get ghosts index of
-    Nothing => count
-    Some _ => count + 1
-  return count_ghosts ghosts (index + 1) next
-
-export fn run (ticks: U32) -> F32 => checksum (simulate ticks (create ()))
-
-export fn ghost_count (ticks: U32) -> U32 => do:
-  let World { ghosts } = simulate ticks (create ())
-  return count_ghosts ghosts 0 0
-
-export fn snapshot () -> F32 => do:
+const run = fn (ticks: U32) -> F32 => checksum (simulate ticks (create ()))
+const ghost_count = fn (ticks: U32) -> U32 => count_ghosts (simulate ticks (create ()))
+const snapshot = fn () -> F32 => do:
   let original = create ()
-  let next = update original
-  return F32.sub (checksum next) (checksum original)
+  let next = simulate 1 original
+  return checksum next - checksum original

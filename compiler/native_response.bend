@@ -3,7 +3,10 @@ import ./model.bend as M
 import ./const_eval.bend as Const
 import ./main.bend as Main
 
-# This is the version-7 word protocol paired with native_protocol.ts. Fields
+def version() -> U32:
+  11
+
+# This is the version-11 word protocol paired with native_protocol.ts. Fields
 # follow public Analysis order; compiler-only checked declarations stay native.
 type Work is Data:
   Word{value: U32}
@@ -119,6 +122,8 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{2} <> Natural{index} <> tail, room, reversed)
     case 1n+rest Operation{M.Operation{identity, parameter, result}} <> tail room:
       encode_work(rest, Identity{identity} <> TypeValue{parameter} <> TypeValue{result} <> tail, room, reversed)
+    case 1n+rest Operation{other} <> tail room:
+      Fail{protocol_error("unspecialized effect operation reached response encoding")}
     case 1n+rest Operations{+values} <> tail room:
       encode_work(rest, Length{List.length(&2, M.Operation, values)} <> OperationEntries{values} <> tail, room, reversed)
     case 1n+rest OperationEntries{Nil{}} <> tail room:
@@ -143,6 +148,8 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{3} <> Identity{identity} <> Types{arguments} <> tail, room, reversed)
     case 1n+rest TypeValue{M.FunctionTy{parameter, result, effects}} <> tail room:
       encode_work(rest, Word{4} <> TypeValue{parameter} <> TypeValue{result} <> Row{effects} <> tail, room, reversed)
+    case 1n+rest TypeValue{M.FreeTy{scope, name}} <> tail room:
+      encode_work(rest, Word{15} <> Text{scope} <> Text{name} <> tail, room, reversed)
     case 1n+rest TypeValue{M.ParameterTy{index}} <> tail room:
       encode_work(rest, Word{5} <> Natural{index} <> tail, room, reversed)
     case 1n+rest TypeValue{M.VariableTy{index}} <> tail room:
@@ -151,6 +158,8 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{7} <> tail, room, reversed)
     case 1n+rest TypeValue{M.F32Ty{}} <> tail room:
       encode_work(rest, Word{8} <> tail, room, reversed)
+    case 1n+rest TypeValue{M.StateProviderTy{read, write, state}} <> tail room:
+      encode_work(rest, Word{14} <> Identity{read} <> Identity{write} <> TypeValue{state} <> tail, room, reversed)
     case 1n+rest TypeValue{M.ProviderTy{identity, effects}} <> tail room:
       encode_work(rest, Word{9} <> Identity{identity} <> Row{effects} <> tail, room, reversed)
     case 1n+rest TypeValue{M.EffectDescriptorTy{}} <> tail room:
@@ -191,6 +200,10 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{5} <> Text{constructor} <> OptionalPattern{payload} <> tail, room, reversed)
     case 1n+rest Pattern{M.ProductPattern{elements}} <> tail room:
       encode_work(rest, Word{6} <> Patterns{elements} <> tail, room, reversed)
+    case 1n+rest Pattern{M.ValuePattern{M.LocalReference{name}}} <> tail room:
+      encode_work(rest, Word{7} <> Word{0} <> Text{name} <> tail, room, reversed)
+    case 1n+rest Pattern{M.ValuePattern{M.ConstantReference{name}}} <> tail room:
+      encode_work(rest, Word{7} <> Word{1} <> Text{name} <> tail, room, reversed)
     case 1n+rest OptionalPattern{None{}} <> tail room:
       encode_work(rest, Word{0} <> tail, room, reversed)
     case 1n+rest OptionalPattern{Some{value}} <> tail room:
@@ -281,6 +294,8 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{18} <> Natural{label} <> Expression{body} <> tail, room, reversed)
     case 1n+rest Expression{M.ReturnExpr{label, value}} <> tail room:
       encode_work(rest, Word{19} <> Natural{label} <> Expression{value} <> tail, room, reversed)
+    case 1n+rest Expression{M.RuntimeInitExpr{value}} <> tail room:
+      encode_work(rest, Word{44} <> Expression{value} <> tail, room, reversed)
     case 1n+rest Expression{M.SourceExpr{offset, annotation, value}} <> tail room:
       encode_work(rest, Word{20} <> Natural{offset} <> OptionalType{annotation} <> Expression{value} <> tail, room, reversed)
     case 1n+rest Expression{M.F32Expr{value}} <> tail room:
@@ -291,6 +306,10 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{23} <> Text{message} <> tail, room, reversed)
     case 1n+rest Expression{M.OperationExpr{identity}} <> tail room:
       encode_work(rest, Word{24} <> Identity{identity} <> tail, room, reversed)
+    case 1n+rest Expression{M.SpecializeOperationExpr{template, arguments, body}} <> tail room:
+      Fail{protocol_error("unspecialized effect expression reached response encoding")}
+    case 1n+rest Expression{M.StateProviderExpr{read, write, initial}} <> tail room:
+      encode_work(rest, Word{42} <> Identity{read} <> Identity{write} <> Expression{initial} <> tail, room, reversed)
     case 1n+rest Expression{M.ProviderExpr{identity, implementation}} <> tail room:
       encode_work(rest, Word{25} <> Identity{identity} <> Expression{implementation} <> tail, room, reversed)
     case 1n+rest Expression{M.HandleExpr{provider, body}} <> tail room:
@@ -311,10 +330,20 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{33} <> Expression{value} <> Natural{index} <> tail, room, reversed)
     case 1n+rest Expression{M.ArrayExpr{elements}} <> tail room:
       encode_work(rest, Word{34} <> Expressions{elements} <> tail, room, reversed)
+    case 1n+rest Expression{M.ForExpr{index, start, end, state, initial, body}} <> tail room:
+      encode_work(rest, Word{41} <> Text{index} <> Expression{start} <> Expression{end} <> Text{state} <> Expression{initial} <> Expression{body} <> tail, room, reversed)
+    case 1n+rest Expression{M.ArrayGenerateExpr{count, generator}} <> tail room:
+      encode_work(rest, Word{39} <> Expression{count} <> Expression{generator} <> tail, room, reversed)
+    case 1n+rest Expression{M.ArrayFillExpr{count, value}} <> tail room:
+      encode_work(rest, Word{38} <> Expression{count} <> Expression{value} <> tail, room, reversed)
     case 1n+rest Expression{M.ArrayGetExpr{array, index}} <> tail room:
       encode_work(rest, Word{35} <> Expression{array} <> Expression{index} <> tail, room, reversed)
     case 1n+rest Expression{M.ArraySetExpr{array, index, value}} <> tail room:
       encode_work(rest, Word{36} <> Expression{array} <> Expression{index} <> Expression{value} <> tail, room, reversed)
+    case 1n+rest Expression{M.AssociatedExpr{identity, dispatch, member, templates, left, right}} <> tail room:
+      encode_work(rest, Word{40} <> Natural{identity} <> Text{member} <> Expression{left} <> Expression{right} <> tail, room, reversed)
+    case 1n+rest Expression{M.GenericOperationExpr{identity, template, arguments}} <> tail room:
+      encode_work(rest, Word{43} <> Natural{identity} <> Identity{template} <> Types{arguments} <> tail, room, reversed)
     case 1n+rest Expression{M.ArrayLengthExpr{array}} <> tail room:
       encode_work(rest, Word{37} <> Expression{array} <> tail, room, reversed)
     case 1n+rest Expressions{+values} <> tail room:
@@ -353,6 +382,12 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{7} <> Word{F32.bits(value)} <> tail, room, reversed)
     case 1n+rest Value{Const.OperationValue{identity}} <> tail room:
       encode_work(rest, Word{8} <> Identity{identity} <> tail, room, reversed)
+    case 1n+rest Value{Const.StateProviderValue{read, write, initial}} <> tail room:
+      encode_work(rest, Word{14} <> Identity{read} <> Identity{write} <> Value{initial} <> tail, room, reversed)
+    case 1n+rest Value{Const.StateReadValue{slot}} <> tail room:
+      Fail{M.Diagnostic{"internal_error", "state", "a state reader escaped its resolver"}}
+    case 1n+rest Value{Const.StateWriteValue{slot}} <> tail room:
+      Fail{M.Diagnostic{"internal_error", "state", "a state writer escaped its resolver"}}
     case 1n+rest Value{Const.ProviderValue{identity, implementation}} <> tail room:
       encode_work(rest, Word{9} <> Identity{identity} <> Value{implementation} <> tail, room, reversed)
     case 1n+rest Value{Const.EffectDescriptorValue{identity}} <> tail room:
@@ -369,6 +404,8 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, tail, room, reversed)
     case 1n+rest ValueEntries{head <> following} <> tail room:
       encode_work(rest, Value{head} <> ValueEntries{following} <> tail, room, reversed)
+    case 1n+rest Value{Const.PatternBindingsValue{bindings}} <> tail room:
+      Fail{M.Diagnostic{"internal_error", "const", "A checked constant leaked internal pattern bindings"}}
     case 1n+rest Value{Const.MatchValuesValue{values}} <> tail room:
       Fail{M.Diagnostic{"internal_error", "const", "A checked constant leaked internal match values"}}
     case 1n+rest OptionalValue{None{}} <> tail room:
@@ -439,10 +476,10 @@ def finish(result: Result<&2, &2, M.Diagnostic, List<&2, U32>>) -> List<&2, U32>
     case Done{words}:
       words
     case Fail{M.Diagnostic{code, subject, message}}:
-      1112297300 <> 7 <> 0 <> text_words(code, text_words(subject, text_words(message, Nil{})))
+      1112297300 <> version() <> 0 <> text_words(code, text_words(subject, text_words(message, Nil{})))
 
 def encode(kind: U32, fields: List<&2, Work>) -> List<&2, U32>:
-  finish(encode_work(Nat.read.max(), Word{1112297300} <> Word{7} <> Word{kind} <> fields, U32.to_nat(16777216), Nil{}))
+  finish(encode_work(Nat.read.max(), Word{1112297300} <> Word{version()} <> Word{kind} <> fields, U32.to_nat(16777216), Nil{}))
 
 def encode_diagnostic(diagnostic: M.Diagnostic) -> List<&2, U32>:
   encode(0, [Diagnostic{diagnostic}])

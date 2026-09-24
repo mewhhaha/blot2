@@ -1,6 +1,7 @@
 import Base
 import ./model.bend as M
 import ./types.bend as T
+import ./index.bend as Index
 
 type ConstructorType is Data:
   ConstructorType{result: M.Ty, payload: Maybe<&2, M.Ty>, next: Nat}
@@ -26,7 +27,7 @@ def constructor_in_work(constructors: List<&2, M.Constructor>, +name: String, +i
       Some{declaration}
     case Nil{} None{}:
       None{}
-    case M.Constructor{declared, payload} <> tail None{}:
+    case M.Constructor{declared, payload, fields} <> tail None{}:
       constructor_in_work(tail, name, identity, parameters, Bool.pick(Maybe<&2, ConstructorDefinition>, M.name_equal(declared, name), Some{ConstructorDefinition{identity, parameters, payload}}, None{}))
 
 def constructor_in(constructors: List<&2, M.Constructor>, name: String, identity: M.TypeId, parameters: Nat) -> Maybe<&2, ConstructorDefinition>:
@@ -81,6 +82,8 @@ def operation_work(operations: List<&2, M.Operation>, +identity: M.TypeId, found
       None{}
     case M.Operation{+declared, parameter, result} <> tail None{}:
       operation_work(tail, identity, Bool.pick(Maybe<&2, M.Operation>, M.type_id_equal(declared, identity), Some{M.Operation{declared, parameter, result}}, None{}))
+    case head <> tail None{}:
+      operation_work(tail, identity, None{})
 
 def operation(operations: List<&2, M.Operation>, identity: M.TypeId) -> Maybe<&2, M.Operation>:
   operation_work(operations, identity, None{})
@@ -175,6 +178,13 @@ def require_product_arity(count: Nat, subject: String) -> Result<&2, &2, M.Diagn
     case 2n+rest:
       Done{Unit{}}
 
+def free_annotation(parameters: Maybe<&2, Nat>, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match parameters:
+    case None{}:
+      Done{Unit{}}
+    case Some{count}:
+      Fail{M.Diagnostic{"invalid_annotation", subject, "free annotation names cannot escape into quantified type declarations"}}
+
 def validate_work(+fuel: Nat, work: T.TypeWork, +parameters: Maybe<&2, Nat>, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, +subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
   match fuel work:
     case 0n _:
@@ -183,6 +193,8 @@ def validate_work(+fuel: Nat, work: T.TypeWork, +parameters: Maybe<&2, Nat>, +op
       Fail{M.Diagnostic{"invalid_annotation", subject, "inference variables are compiler-owned"}}
     case 1n+rest T.OneType{M.NeverTy{}}:
       Fail{M.Diagnostic{"invalid_annotation", subject, "Never is an internal control-flow type"}}
+    case 1n+rest T.OneType{M.FreeTy{scope, name}}:
+      free_annotation(parameters, subject)
     case 1n+rest T.OneType{M.ParameterTy{index}}:
       require(valid_parameter(parameters, index), subject, "type parameter index is outside its data declaration")
     case 1n+rest T.OneType{M.AppliedTy{identity, +arguments}}:
@@ -200,6 +212,11 @@ def validate_work(+fuel: Nat, work: T.TypeWork, +parameters: Maybe<&2, Nat>, +op
         row : Unit <- validate_row(effects, parameters, operations, subject)
         p : Unit <- validate_work(rest, T.OneType{parameter}, parameters, operations, types, subject)
         validate_work(rest, T.OneType{result}, parameters, operations, types, subject)
+    case 1n+rest T.OneType{M.StateProviderTy{+read, +write, state}}:
+      do Result<&2, &2, M.Diagnostic, Unit>:
+        reader : M.Operation <- require_operation(operation(operations, read), read)
+        writer : M.Operation <- require_operation(operation(operations, write), write)
+        validate_work(rest, T.OneType{state}, parameters, operations, types, subject)
     case 1n+rest T.OneType{M.ProviderTy{+identity, effects}}:
       do Result<&2, &2, M.Diagnostic, Unit>:
         known : M.Operation <- require_operation(operation(operations, identity), identity)
@@ -233,14 +250,38 @@ def datatype_parameter_kinds(kinds: T.ParameterKinds, subject: String) -> Result
     case T.ParameterKinds{types, head <> tail}:
       Fail{M.Diagnostic{"kind_mismatch", subject, "data declaration parameters are value types, not effect rows"}}
 
+def field_shape(fields: List<&2, String>, payload: Maybe<&2, M.Ty>) -> Bool:
+  match fields payload:
+    case Nil{} _:
+      True{}
+    case name <> Nil{} Some{ty}:
+      True{}
+    case +fields Some{M.ProductTy{elements}}:
+      Nat.is_eq(List.length(&2, String, fields), List.length(&2, M.Ty, elements))
+    case _ _:
+      False{}
+
+def unique_fields(fields: List<&2, String>, +subject: String, +seen: Set()) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match fields:
+    case Nil{}:
+      Done{Unit{}}
+    case +head <> +tail:
+      do Result<&2, &2, M.Diagnostic, Unit>:
+        valid : Unit <- require(Bool.not(Maybe.is_some(&2, Unit, Index.find(Unit, seen, head))), subject, "record field names must be unique")
+        unique_fields(tail, subject, Set.add(seen, head))
+
 def validate_constructors(constructors: List<&2, M.Constructor>, +parameters: Nat, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>) -> Result<&2, &2, M.Diagnostic, Unit>:
   match constructors:
     case Nil{}:
       Done{Unit{}}
-    case M.Constructor{name, None{}} <> tail:
-      validate_constructors(tail, parameters, operations, types)
-    case M.Constructor{+name, Some{+payload}} <> tail:
+    case M.Constructor{+name, None{}, fields} <> tail:
       do Result<&2, &2, M.Diagnostic, Unit>:
+        valid : Unit <- require(field_shape(fields, None{}), name, "record fields require a payload")
+        validate_constructors(tail, parameters, operations, types)
+    case M.Constructor{+name, Some{+payload}, +fields} <> tail:
+      do Result<&2, &2, M.Diagnostic, Unit>:
+        shape : Unit <- require(field_shape(fields, Some{payload}), name, "record fields must match the constructor payload")
+        unique : Unit <- unique_fields(fields, name, Set.new())
         valid : Unit <- validate_work(U32.to_nat(65536), T.OneType{payload}, Some{parameters}, operations, types, name)
         kinds : T.ParameterKinds <- T.parameter_kinds(U32.to_nat(65536), T.OneType{payload})
         values : Unit <- datatype_parameter_kinds(kinds, name)

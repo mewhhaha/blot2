@@ -14,8 +14,8 @@ export function ecsWorkload(systemCount: number): string {
 data Position${index} = Position${index} U32
 #[component]
 data Velocity${index} = Velocity${index} U32
-fn read_position_${index} () => @ecs.get Position${index}
-export fn move_${index} () => do:
+const read_position_${index} = fn () => @ecs.get Position${index}
+const move_${index} = fn () => do:
   use position <- read_position_${index} ()
   use velocity <- @ecs.get Velocity${index}
   use time <- @ecs.get DeltaTime

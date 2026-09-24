@@ -142,6 +142,7 @@ const dataType = (name: string, constructors: readonly Node[]) =>
   });
 const variant = (name: string, payload: Node | null = null) =>
   node("Constructor", {
+    fields: list([]),
     name,
     payload: payload === null ? none : some(payload),
   });

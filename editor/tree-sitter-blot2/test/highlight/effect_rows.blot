@@ -1,11 +1,11 @@
-fn call (io: U32 -> U32 ! {Foreign}) => io 7
-// <- keyword.function
-// ^ function
-//           ^ type
-//               ^ operator
-//                      ^ operator
-//                        ^ punctuation.bracket
-//                         ^ type
+const call = fn (io: U32 -> U32 ! {Foreign}) => io 7
+//           ^ keyword.function
+//    ^ function
+//                   ^ type
+//                       ^ operator
+//                              ^ operator
+//                                ^ punctuation.bracket
+//                                 ^ type
 
 effect Reader.ask: Unit -> U32
 // <- keyword.storage.type
@@ -14,11 +14,11 @@ effect Reader.ask: Unit -> U32
 //                 ^ type
 //                      ^ operator
 
-fn mixed (io: U32 -> U32 ! {Reader.ask, Foreign}) => io 7
-//            ^ type
-//                       ^ operator
-//                          ^ type
-//                                      ^ type
+const mixed = fn (io: U32 -> U32 ! {Reader.ask, Foreign}) => io 7
+//                    ^ type
+//                               ^ operator
+//                                  ^ type
+//                                              ^ type
 
 const descriptor = @effect.descriptor Foreign
 // <- keyword.storage.type

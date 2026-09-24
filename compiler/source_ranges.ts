@@ -39,7 +39,7 @@ export function sourceDeclarationRanges(
       const prefix = source.slice(at, at + 40);
       const tagged = /^#[ \t]*\[/.test(prefix);
       const header =
-        /^(?:export[ \t]+)?(?:fn|const|data|effect|type|infixl|infixr|infix|import)[ \t]/
+        /^(?:const|let|data|effect|type|infixl|infixr|infix|import)[ \t]/
           .test(prefix);
       if (tagged || header) {
         if (declaration && !attribute) starts.push(at);

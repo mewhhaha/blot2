@@ -8,10 +8,10 @@ import { Vec3, Transform } from "./spatial"
 import { Frame } from "./app"
 
 #[component]
-export data Mesh = Mesh { geometry: GeometryRef, material: MaterialRef }
-data Axis = X | Y | Z
+type Mesh is data = Mesh { geometry: GeometryRef, material: MaterialRef }
+type Axis is data = X | Y | Z
 
-export fn draw mesh => fn transform => fn pick_entity => do:
+const draw = fn mesh => fn transform => fn pick_entity => do:
   let pickable = case pick_entity of
     Some _ => True
     Nothing => False
@@ -22,7 +22,7 @@ export fn draw mesh => fn transform => fn pick_entity => do:
   })
   return ()
 
-export fn interpolated () => do:
+const interpolated = fn () => do:
   use frame_value <- ecs.get Frame
   use current <- ecs.get Transform
   use previous <- ecs.previous Transform
@@ -35,7 +35,7 @@ export fn interpolated () => do:
     use @panic "Transform scale must be positive"
   return spatial.interpolate previous current frame.alpha
 
-export fn draw_mesh () => do:
+const draw_mesh = fn () => do:
   use entity <- ecs.entity ()
   use mesh <- ecs.get Mesh
   use transform <- interpolated ()
@@ -44,18 +44,18 @@ export fn draw_mesh () => do:
 
 // Four signs per axis describe all twelve edges, without sentinel edge IDs.
 // The same cube geometry is reused; dimensions are half-extents, not diameters.
-export fn outline mesh => fn transform => fn entity => do:
-  let x = F32.mul transform.scale.x 1.025
-  let y = F32.mul transform.scale.y 1.025
-  let z = F32.mul transform.scale.z 1.025
+const outline = fn mesh => fn transform => fn entity => do:
+  let x = transform.scale.x * 1.025
+  let y = transform.scale.y * 1.025
+  let z = transform.scale.z * 1.025
   for axis in [X, Y, Z]:
     for (first, second) in [(-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)]:
       let (local, extent) = case axis of
-        X => (Vec3 { x: 0.0, y: F32.mul first y, z: F32.mul second z },
+        X => (Vec3 { x: 0.0, y: first * y, z: second * z },
           Vec3 { x: x, y: 0.018, z: 0.018 })
-        Y => (Vec3 { x: F32.mul second x, y: 0.0, z: F32.mul first z },
+        Y => (Vec3 { x: second * x, y: 0.0, z: first * z },
           Vec3 { x: 0.018, y: y, z: 0.018 })
-        Z => (Vec3 { x: F32.mul first x, y: F32.mul second y, z: 0.0 },
+        Z => (Vec3 { x: first * x, y: second * y, z: 0.0 },
           Vec3 { x: 0.018, y: 0.018, z: z })
       use draw mesh (Transform {
         position: spatial.offset transform local, scale: extent, yaw: transform.yaw,

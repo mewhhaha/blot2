@@ -23,19 +23,27 @@ type Ty is Data:
   NeverTy{}
   F32Ty{}
   ProviderTy{identity: TypeId, effects: EffectRow}
+  StateProviderTy{read: TypeId, write: TypeId, state: Ty}
   EffectDescriptorTy{}
   EffectSetTy{}
   ProductTy{elements: List<&2, Ty>}
   ArrayTy{element: Ty}
+  FreeTy{scope: String, name: String}
 
 type Operation is Data:
   Operation{identity: TypeId, parameter: Ty, result: Ty}
+  OperationTemplate{identity: TypeId, parameters: Nat, parameter: Ty, result: Ty}
+  OperationInstance{template: TypeId, arguments: List<&2, Ty>}
 
 type Constructor is Data:
-  Constructor{name: String, payload: Maybe<&2, Ty>}
+  Constructor{name: String, payload: Maybe<&2, Ty>, fields: List<&2, String>}
 
 type DataType is Data:
   DataType{identity: TypeId, parameters: Nat, constructors: List<&2, Constructor>}
+
+type ValueReference is Data:
+  LocalReference{name: String}
+  ConstantReference{name: String}
 
 type Pattern is Data:
   WildcardPattern{}
@@ -43,6 +51,7 @@ type Pattern is Data:
   UnitPattern{}
   U32Pattern{value: U32}
   BoolPattern{value: Bool}
+  ValuePattern{reference: ValueReference}
   ConstructorPattern{constructor: String, payload: Maybe<&2, Pattern>}
   ProductPattern{elements: List<&2, Pattern>}
 
@@ -76,6 +85,11 @@ type UnaryOp is Data:
   U32ToF32{}
   F32ToU32{}
 
+type Dispatch is Data:
+  BinaryDispatch{}
+  MemberDispatch{}
+  FieldUpdateDispatch{}
+
 # This is resolved core, not a second spelling of the surface grammar.
 type Expr is Data:
   UnitExpr{}
@@ -99,10 +113,13 @@ type Expr is Data:
   BlockExpr{label: Nat, body: Expr}
   ReturnExpr{label: Nat, value: Expr}
   SourceExpr{offset: Nat, annotation: Maybe<&2, Ty>, value: Expr}
+  RuntimeInitExpr{value: Expr}
   F32Expr{value: F32}
   UnaryExpr{operator: UnaryOp, value: Expr}
   OperationExpr{identity: TypeId}
+  SpecializeOperationExpr{template: TypeId, arguments: List<&2, Ty>, body: Expr}
   ProviderExpr{identity: TypeId, implementation: Expr}
+  StateProviderExpr{read: TypeId, write: TypeId, initial: Expr}
   HandleExpr{provider: Expr, body: Expr}
   OperationDescriptorExpr{identity: TypeId}
   FunctionEffectsExpr{callee: String}
@@ -113,9 +130,14 @@ type Expr is Data:
   ProductExpr{elements: List<&2, Expr>}
   ProjectExpr{value: Expr, index: Nat}
   ArrayExpr{elements: List<&2, Expr>}
+  ForExpr{index: String, start: Expr, end: Expr, state: String, initial: Expr, body: Expr}
+  ArrayGenerateExpr{count: Expr, generator: Expr}
+  ArrayFillExpr{count: Expr, value: Expr}
   ArrayGetExpr{array: Expr, index: Expr}
   ArraySetExpr{array: Expr, index: Expr, value: Expr}
   ArrayLengthExpr{array: Expr}
+  AssociatedExpr{identity: Nat, dispatch: Dispatch, member: String, templates: List<&2, TypeId>, left: Expr, right: Expr}
+  GenericOperationExpr{identity: Nat, template: TypeId, arguments: List<&2, Ty>}
 
 type Function is Data:
   Function{
@@ -137,6 +159,10 @@ type Module is Data:
     data_types: List<&2, DataType>,
     operations: List<&2, Operation>
   }
+
+def module_operations(module: Module) -> List<&2, Operation>:
+  Module{constants, functions, data_types, operations} = module
+  operations
 
 type Diagnostic is Data:
   Diagnostic{code: String, subject: String, message: String}
@@ -244,6 +270,8 @@ def type_display(+depth: Nat, display: TypeDisplay) -> String:
       type_id_show(identity) ++ type_display(rest, DisplayArguments{arguments})
     case 1n+rest DisplayType{FunctionTy{parameter, result, effects}}:
       "(" ++ type_display(rest, DisplayType{parameter}) ++ " -> " ++ type_display(rest, DisplayType{result}) ++ row_show(effects) ++ ")"
+    case 1n+rest DisplayType{StateProviderTy{read, write, state}}:
+      "StateProvider " ++ type_id_show(read) ++ " " ++ type_id_show(write) ++ " (" ++ type_display(rest, DisplayType{state}) ++ ")"
     case 1n+rest DisplayType{ProviderTy{identity, effects}}:
       "Provider " ++ type_id_show(identity) ++ row_show(effects)
     case 1n+rest DisplayType{EffectDescriptorTy{}}:
@@ -254,6 +282,8 @@ def type_display(+depth: Nat, display: TypeDisplay) -> String:
       "(" ++ type_display(rest, DisplayElements{elements}) ++ ")"
     case 1n+rest DisplayType{ArrayTy{element}}:
       "Array (" ++ type_display(rest, DisplayType{element}) ++ ")"
+    case 1n+rest DisplayType{FreeTy{scope, name}}:
+      name
     case 1n+rest DisplayType{ParameterTy{index}}:
       "'" ++ Nat.show(index)
     case 1n+rest DisplayType{VariableTy{index}}:
@@ -325,3 +355,10 @@ def unary_result(operator: UnaryOp) -> Ty:
       U32Ty{}
     case _:
       F32Ty{}
+
+def reference_expr(reference: ValueReference) -> Expr:
+  match reference:
+    case LocalReference{name}:
+      LocalExpr{name}
+    case ConstantReference{name}:
+      ConstantExpr{name}

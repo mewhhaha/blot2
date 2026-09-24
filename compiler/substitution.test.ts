@@ -70,19 +70,22 @@ type Result<A> =
     };
   };
 
+type Substitutions = { readonly $: "Substitutions" };
+
 const types = compiled as unknown as {
-  "types.resolve"(substitutions: List<Substitution>, ty: Ty): Result<Ty>;
+  "types.from_list"(entries: List<Substitution>): Substitutions;
+  "types.resolve"(substitutions: Substitutions, ty: Ty): Result<Ty>;
   "types.resolve_work"(
-    substitutions: List<Substitution>,
+    substitutions: Substitutions,
     fuel: bigint,
     work: { readonly $: "OneType"; readonly value: Ty },
   ): Result<List<Ty>>;
   "types.unify"(
     left: Ty,
     right: Ty,
-    substitutions: List<Substitution>,
+    substitutions: Substitutions,
     subject: string,
-  ): Result<List<Substitution>>;
+  ): Result<Substitutions>;
   "types.pair_arguments"(
     left: List<Ty>,
     right: List<Ty>,
@@ -158,7 +161,7 @@ const complexity = {
 
 Deno.test("type substitution resolves wide product fields without recursive sibling frames", () => {
   const width = 8192;
-  const result = types["types.resolve"](list([substitution(0, boolean)]), {
+  const result = types["types.resolve"](indexed([substitution(0, boolean)]), {
     $: "ProductTy",
     elements: list(
       Array.from(
@@ -327,7 +330,7 @@ Deno.test("substitution resolution preserves order, repeated entries and replace
     [[substitution(0, u32)], provider(row([identity]))],
   ];
   for (const [entries, ty] of cases) {
-    equal(types["types.resolve"](list(entries), ty), oracle(entries, ty));
+    equal(types["types.resolve"](indexed(entries), ty), oracle(entries, ty));
   }
 });
 
@@ -343,7 +346,7 @@ Deno.test("effect row substitution preserves scoped duplicates and distinct vari
     substitution(100, u32),
     rowSubstitution(101, row([identity])),
   ];
-  equal(types["types.resolve"](list(entries), ty), {
+  equal(types["types.resolve"](indexed(entries), ty), {
     $: "Done",
     value: arrow(
       u32,
@@ -352,11 +355,11 @@ Deno.test("effect row substitution preserves scoped duplicates and distinct vari
     ),
   });
   equal(
-    types["types.resolve"](list([...entries].reverse()), ty),
+    types["types.resolve"](indexed([...entries].reverse()), ty),
     oracle([...entries].reverse(), ty),
   );
   const parameter = provider(row([], { $: "RowParameter", index: 100n }));
-  equal(types["types.resolve"](list(entries), parameter), {
+  equal(types["types.resolve"](indexed(entries), parameter), {
     $: "Done",
     value: parameter,
   });
@@ -428,7 +431,7 @@ Deno.test("variable-directed resolution agrees with sequential whole-type rewrit
           : substitution(random(5), generate(3)),
     );
     equal(
-      types["types.resolve"](list(entries), ty),
+      types["types.resolve"](indexed(entries), ty),
       oracle(entries, ty),
       `substitution sequence ${trial}`,
     );
@@ -436,7 +439,7 @@ Deno.test("variable-directed resolution agrees with sequential whole-type rewrit
       const expected = oracle(entries, ty, fuel);
       equal(
         types["types.resolve_work"](
-          list(entries),
+          indexed(entries),
           BigInt(fuel),
           { $: "OneType", value: ty },
         ),
@@ -453,7 +456,7 @@ Deno.test("substitution optimization retains occurs checks and unification diagn
   const recursive = types["types.unify"](
     variable(0),
     arrow(u32, variable(0)),
-    list([]),
+    indexed([]),
     "recursive",
   );
   equal(recursive, {
@@ -468,7 +471,7 @@ Deno.test("substitution optimization retains occurs checks and unification diagn
   const mismatch = types["types.unify"](
     variable(0),
     boolean,
-    list([substitution(0, variable(1)), substitution(1, u32)]),
+    indexed([substitution(0, variable(1)), substitution(1, u32)]),
     "annotation",
   );
   equal(mismatch, {
@@ -481,3 +484,7 @@ Deno.test("substitution optimization retains occurs checks and unification diagn
     },
   });
 });
+
+function indexed(entries: readonly Substitution[]): Substitutions {
+  return types["types.from_list"](list(entries));
+}

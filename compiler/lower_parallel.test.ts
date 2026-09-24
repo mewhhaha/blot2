@@ -41,8 +41,7 @@ Deno.test("lowering classification retains exact labels and rejects prefix colli
     False: "Falsehood",
     qualified_name: "Name",
     INTRINSIC: "Intrinsic",
-    function: "FunctionNode",
-    constant: "ConstantNode",
+    value_declaration: "ValueDeclaration",
     data_type: "DataNode",
     symbolic_fixity: "SymbolicFixity",
     named_fixity: "NamedFixity",
@@ -102,7 +101,7 @@ Deno.test("parallel lowering agrees with serial lowering across batch boundaries
       const source = Array.from(
         { length: count },
         (_, index) =>
-          `export fn entry_${index} value => @u32.add value ${index}`,
+          `const entry_${index} = fn value => @u32.add value ${index}`,
       ).join("\n");
       for (const invalid of [false, true]) {
         const prepared = frontend.prepare(
@@ -157,7 +156,7 @@ Deno.test("parallel lowering agrees with serial lowering across batch boundaries
 Deno.test("native lowering preserves ordered artifacts and diagnostics at 1/2/4/8 threads", async () => {
   const source = Array.from(
     { length: 33 },
-    (_, index) => `export fn entry_${index} value => @u32.add value ${index}`,
+    (_, index) => `const entry_${index} = fn value => @u32.add value ${index}`,
   ).join("\n");
   const invalid = source.replaceAll("@u32.add", "@missing.operation");
   const js = await createSourceCompiler({ prelude: "none" });

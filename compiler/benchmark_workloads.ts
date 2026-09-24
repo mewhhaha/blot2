@@ -8,7 +8,7 @@ export function arithmeticSource(
       ? 64
       : 8;
     return [
-      `export fn entry_${index} value => do:`,
+      `const entry_${index} = fn value => do:`,
       ...Array.from(
         { length: steps },
         (_, step) =>
@@ -25,25 +25,30 @@ export function readerSource(count: number, changed: boolean): string {
   return [
     "effect Reader.ask: Unit -> U32",
     "const reader = @effect.provider Reader.ask (fn () => 1)",
-    ...Array.from({ length: count }, (_, index) =>
-      `fn work_${index} () => do:
+    ...Array.from(
+      { length: count },
+      (_, index) =>
+        `const work_${index} = fn () => do:
   use value <- Reader.ask ()
   return @u32.add value ${changed && index === 0 ? 2 : 1}
-export fn entry_${index} () => do reader:
+const entry_${index} = fn () => do reader:
   use value <- work_${index} ()
-  return value`),
+  return value`,
+    ),
   ].join("\n");
 }
 
 export function chainSource(changed: boolean): string {
   return [
-    `fn work_0 value => @u32.add value ${changed ? 2 : 1}`,
+    `const work_0 = fn value => @u32.add value ${changed ? 2 : 1}`,
     ...Array.from(
       { length: 63 },
       (_, index) =>
-        `fn work_${index + 1} value => @u32.add (work_${index} value) 1`,
+        `const work_${
+          index + 1
+        } = fn value => @u32.add (work_${index} value) 1`,
     ),
-    "export fn entry_0 value => work_63 value",
+    "const entry_0 = fn value => work_63 value",
   ].join("\n");
 }
 
@@ -54,8 +59,8 @@ export function staggeredSource(changed: boolean): string {
       Array.from({ length: 8 }, (_, chain) => {
         const steps = depth === chain ? 64 : 2;
         const declaration = depth === 7
-          ? `export fn entry_${chain}`
-          : `fn work_${chain}_${depth}`;
+          ? `const entry_${chain} = fn`
+          : `const work_${chain}_${depth} = fn`;
         const input = depth === 0
           ? "value"
           : `(work_${chain}_${depth - 1} value)`;
@@ -73,7 +78,7 @@ export function staggeredSource(changed: boolean): string {
 
 export function diamondSource(changed: boolean): string {
   return Array.from({ length: 8 }, (_, region) => {
-    const declarations = [`fn seed_${region} value => value`];
+    const declarations = [`const seed_${region} = fn value => value`];
     for (let depth = 0; depth < 8; depth++) {
       const input = depth === 0
         ? `seed_${region}`
@@ -81,7 +86,7 @@ export function diamondSource(changed: boolean): string {
       for (const branch of ["left", "right"]) {
         const steps = depth === region ? 64 : 2;
         declarations.push([
-          `fn ${branch}_${region}_${depth} value => do:`,
+          `const ${branch}_${region}_${depth} = fn value => do:`,
           `  let initial = ${input} value`,
           ...Array.from(
             { length: steps },
@@ -99,28 +104,29 @@ export function diamondSource(changed: boolean): string {
         ].join("\n"));
       }
       declarations.push(
-        `fn join_${region}_${depth} value => @u32.add (left_${region}_${depth} value) (right_${region}_${depth} value)`,
+        `const join_${region}_${depth} = fn value => @u32.add (left_${region}_${depth} value) (right_${region}_${depth} value)`,
       );
     }
     declarations.push(
-      `export fn entry_${region} value => join_${region}_7 value`,
+      `const entry_${region} = fn value => join_${region}_7 value`,
     );
     return declarations.join("\n");
   }).join("\n");
 }
 
 export function sharedRootDiamondSource(changed: boolean): string {
-  return "fn shared_seed value => value\n" + diamondSource(changed).replaceAll(
-    /fn seed_(\d+) value => value/g,
-    "fn seed_$1 value => shared_seed value",
-  );
+  return "const shared_seed = fn value => value\n" +
+    diamondSource(changed).replaceAll(
+      /const seed_(\d+) = fn value => value/g,
+      "const seed_$1 = fn value => shared_seed value",
+    );
 }
 
 export function sharedFrontierDiamondSource(changed: boolean): string {
-  return "fn shared_left value => value\nfn shared_right value => 0\n" +
+  return "const shared_left = fn value => value\nconst shared_right = fn value => 0\n" +
     diamondSource(changed).replaceAll(
-      /fn seed_(\d+) value => value/g,
-      "fn seed_$1 value => @u32.add (shared_left value) (shared_right value)",
+      /const seed_(\d+) = fn value => value/g,
+      "const seed_$1 = fn value => @u32.add (shared_left value) (shared_right value)",
     );
 }
 
@@ -130,15 +136,17 @@ export function nominalSource(changed: boolean): string {
     (_, index) =>
       `data T${index} = C${index} ${
         index % 16 ? `T${index - 1}` : "U32"
-      }\nfn f${index} (value: T${index}) => value`,
+      }\nconst f${index} = fn (value: T${index}) => value`,
   ).join("\n") +
-    `\nexport fn entry_0 (value: U32) => @u32.add value ${changed ? 43 : 42}\n`;
+    `\nconst entry_0 = fn (value: U32) => @u32.add value ${
+      changed ? 43 : 42
+    }\n`;
 }
 
 export function lexicalScopeSource(changed: boolean): string {
   return Array.from({ length: 8 }, (_, index) =>
     [
-      `export fn entry_${index} value => do:`,
+      `const entry_${index} = fn value => do:`,
       ...Array.from({ length: 256 }, (_, step) =>
         `  let value_${step} = @u32.add ${
           step ? `value_${step - 1}` : "value"

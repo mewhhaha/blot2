@@ -32,36 +32,36 @@ const application = `
 const cube: MeshAsset = @asset.mesh "models/cube.mesh.json"
 const brass: MaterialAsset = @asset.material "materials/brass.json"
 
-fn store value => @ecs.set value
-fn move () => do:
+const store = fn value => @ecs.set value
+const move = fn () => do:
   use position <- @ecs.get Position
   use store position
   return ()
-fn draw () => do:
+const draw = fn () => do:
   use previous <- @ecs.previous Position
   use velocity <- @ecs.get Velocity
   use entity <- @ecs.entity ()
   use @render.draw cube brass True entity ${matrix}
   return ()
-export fn start () => do:
+const start = fn () => do:
   use @window.title "Blot guest"
   use entity <- @ecs.spawn ()
   use @ecs.at entity initialize
   return ()
-fn initialize () => do:
+const initialize = fn () => do:
   use @ecs.insert (Position 1.0)
   use @ecs.insert (Velocity 2.0)
   use @ecs.set (Counter 0)
   return ()
-export fn event () => do:
+const event = fn () => do:
   use kind <- @input.event_kind ()
   use @window.save ()
   use @window.load ()
   return ()
-export fn update () => do:
+const update = fn () => do:
   use @ecs.run move
   return ()
-export fn render () => do:
+const render = fn () => do:
   use @render.clear 0.1 0.2 0.3 1.0
   use @render.ambient 0.2 0.2 0.2
   use @render.light_direction 0.0 1.0 0.0
@@ -172,7 +172,7 @@ Deno.test("typed engine intrinsics expose capabilities without fake storage regi
     ];
     for (const [field, type] of fields) {
       const actual = compiler.analyze(
-        `export fn value () => @input.${field} ()\n`,
+        `const value = fn () => @input.${field} ()\n`,
       );
       equal(actual.functions[0].result, { $: type });
       equal(actual.functions[0].effects, [{
@@ -189,10 +189,10 @@ Deno.test("literal asset references remain typed pure constants and preserve Uni
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const checked = compiler.analyze(String.raw`
-fn identity value => value
-export const mesh: MeshAsset = identity (@asset.mesh "models/猫//cube\"name.mesh.json")
-export const material: MaterialAsset = @asset.material "materials/brass.json"
-export fn title () => @window.title "Game\n\t\"guest\""
+const identity = fn value => value
+const mesh: MeshAsset = identity (@asset.mesh "models/猫//cube\"name.mesh.json")
+const material: MaterialAsset = @asset.material "materials/brass.json"
+const title = fn () => @window.title "Game\n\t\"guest\""
 `);
     equal(checked.constants, [
       {
@@ -224,48 +224,63 @@ Deno.test("engine operations cannot escape purity or typed static dispatch bound
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const failures: readonly (readonly [string, string])[] = [
-      ["fn f () => do:\n  let x = @ecs.spawn ()\n  return x", "let_effect"],
-      ["const x = @input.key ()", "const_effect"],
-      ["fn f () => fn value => @input.key ()", "effectful_function_value"],
       [
-        "fn effect () => @input.key ()\nconst f = effect",
+        "const f = fn () => do:\n  let x = @ecs.spawn ()\n  return x",
+        "let_effect",
+      ],
+      ["const x = @input.key ()", "const_effect"],
+      [
+        "const f = fn () => fn value => @input.key ()",
         "effectful_function_value",
       ],
-      ["fn effect () => ()\nconst x = @ecs.run effect", "const_effect"],
       [
-        "fn effect () => ()\nfn f () => do:\n  let x = @ecs.run effect\n  return ()",
+        "const effect = fn () => @input.key ()\nconst f = effect",
+        "effectful_function_value",
+      ],
+      ["const effect = fn () => ()\nconst x = @ecs.run effect", "const_effect"],
+      [
+        "const effect = fn () => ()\nconst f = fn () => do:\n  let x = @ecs.run effect\n  return ()",
         "let_effect",
       ],
       [
-        "fn effect (x: U32) => ()\nfn f () => @ecs.run effect",
+        "const effect = fn (x: U32) => ()\nconst f = fn () => @ecs.run effect",
         "system_signature",
       ],
-      ["fn effect () => 1\nfn f () => @ecs.run effect", "system_signature"],
-      ["fn identity x => x\nfn f () => @ecs.run identity", "system_signature"],
-      ["const effect = 1\nfn f () => @ecs.run effect", "system_target"],
-      ["fn f () => @ecs.run (fn x => x)", "system_target"],
-      ["fn effect () => ()\nfn f () => @ecs.at 1.0 effect", "type_mismatch"],
-      ["fn f () => @input.key", "call_arity"],
-      ["fn f () => @input.key 1", "call_arity"],
-      ["fn f () => @ecs.despawn ()", "type_mismatch"],
-      ["fn f () => @render.clear 1.0 1.0 1.0", "call_arity"],
-      ["fn f () => @render.clear 1 1.0 1.0 1.0", "type_mismatch"],
+      [
+        "const effect = fn () => 1\nconst f = fn () => @ecs.run effect",
+        "system_signature",
+      ],
+      [
+        "const identity = fn x => x\nconst f = fn () => @ecs.run identity",
+        "system_signature",
+      ],
+      ["const effect = 1\nconst f = fn () => @ecs.run effect", "system_target"],
+      ["const f = fn () => @ecs.run (fn x => x)", "system_target"],
+      [
+        "const effect = fn () => ()\nconst f = fn () => @ecs.at 1.0 effect",
+        "type_mismatch",
+      ],
+      ["const f = fn () => @input.key", "call_arity"],
+      ["const f = fn () => @input.key 1", "call_arity"],
+      ["const f = fn () => @ecs.despawn ()", "type_mismatch"],
+      ["const f = fn () => @render.clear 1.0 1.0 1.0", "call_arity"],
+      ["const f = fn () => @render.clear 1 1.0 1.0 1.0", "type_mismatch"],
       ["const path = 1\nconst mesh = @asset.mesh path", "literal_required"],
       ['const mesh: MaterialAsset = @asset.mesh "cube"', "type_mismatch"],
       [
-        `fn f () => @render.draw (@asset.material "x") (@asset.mesh "x") True 0 ${matrix}`,
+        `const f = fn () => @render.draw (@asset.material "x") (@asset.mesh "x") True 0 ${matrix}`,
         "type_mismatch",
       ],
       [
-        "data Position = Position F32\nfn f () => @ecs.previous Position",
+        "data Position = Position F32\nconst f = fn () => @ecs.previous Position",
         "unknown_storage",
       ],
       [
-        'fn f () => do:\n  use @panic "broken"\n  let x = @input.key ()\n  return ()',
+        'const f = fn () => do:\n  use @panic "broken"\n  let x = @input.key ()\n  return ()',
         "let_effect",
       ],
       [
-        "fn unused () => @render.clear True 0.0 0.0 1.0\nexport fn start () => ()",
+        "const unused = fn () => @render.clear True 0.0 0.0 1.0\nconst start = fn () => ()",
         "type_mismatch",
       ],
     ];
@@ -287,11 +302,11 @@ Deno.test("panic joins branches as Never and does not fake a return value", asyn
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const checked = compiler.analyze(`
-fn validate value => do:
+const validate = fn value => do:
   if value:
     use @panic "invalid value"
   return 42
-export fn answer () => validate False
+const answer = fn () => validate False
 `);
     equal(checked.functions[0].result, { $: "U32Ty" });
     equal(checked.functions[1].result, { $: "U32Ty" });

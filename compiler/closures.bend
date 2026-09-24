@@ -7,6 +7,7 @@ type Lambda is Data:
 type FreeWork is Data:
   ExpressionWork{expression: M.Expr, bound: List<&2, String>}
   ExpressionsWork{expressions: List<&2, M.Expr>, bound: List<&2, String>}
+  PatternReferences{patterns: List<&2, M.Pattern>, bound: List<&2, String>}
   ArmsWork{arms: List<&2, M.MatchArm<M.Expr>>, bound: List<&2, String>}
 
 type PatternWork is Data:
@@ -72,6 +73,12 @@ def children(expression: M.Expr) -> List<&2, M.Expr>:
       [value]
     case M.ArrayExpr{elements}:
       elements
+    case M.ForExpr{index, start, end, state, initial, body}:
+      [start, end, initial, body]
+    case M.ArrayGenerateExpr{count, generator}:
+      [count, generator]
+    case M.ArrayFillExpr{count, value}:
+      [count, value]
     case M.ArrayGetExpr{array, index}:
       [array, index]
     case M.ArraySetExpr{array, index, value}:
@@ -84,6 +91,8 @@ def children(expression: M.Expr) -> List<&2, M.Expr>:
       [callee, argument]
     case M.CallExpr{callee, argument}:
       [argument]
+    case M.AssociatedExpr{identity, dispatch, member, templates, left, right}:
+      [left, right]
     case M.ScalarExpr{operator, left, right}:
       [left, right]
     case M.UnaryExpr{operator, value}:
@@ -104,8 +113,14 @@ def children(expression: M.Expr) -> List<&2, M.Expr>:
       [body]
     case M.ReturnExpr{label, value}:
       [value]
+    case M.RuntimeInitExpr{value}:
+      [value]
     case M.SourceExpr{offset, annotation, value}:
       [value]
+    case M.SpecializeOperationExpr{template, arguments, body}:
+      [body]
+    case M.StateProviderExpr{read, write, initial}:
+      [initial]
     case M.ProviderExpr{identity, implementation}:
       [implementation]
     case M.HandleExpr{provider, body}:
@@ -134,6 +149,11 @@ def free(+fuel: Nat, work: FreeWork) -> Result<&2, &2, M.Diagnostic, List<&2, St
             a : List<&2, String> <- free(rest, ExpressionWork{value, bound})
             b : List<&2, String> <- free(rest, ExpressionWork{body, name <> bound})
             return union(a, b)
+        case ExpressionWork{M.ForExpr{index, start, end, state, initial, body}, +bound}:
+          do Result<&2, &2, M.Diagnostic, List<&2, String>>:
+            a : List<&2, String> <- free(rest, ExpressionsWork{[start, end, initial], bound})
+            b : List<&2, String> <- free(rest, ExpressionWork{body, index <> state <> bound})
+            return union(a, b)
         case ExpressionWork{M.UseExpr{name, value, body}, +bound}:
           do Result<&2, &2, M.Diagnostic, List<&2, String>>:
             a : List<&2, String> <- free(rest, ExpressionWork{value, bound})
@@ -144,12 +164,13 @@ def free(+fuel: Nat, work: FreeWork) -> Result<&2, &2, M.Diagnostic, List<&2, St
             a : List<&2, String> <- free(rest, ExpressionsWork{values, bound})
             b : List<&2, String> <- free(rest, ArmsWork{arms, bound})
             return union(a, b)
-        case ExpressionWork{M.GuardExpr{pattern, value, alternative, body}, +bound}:
+        case ExpressionWork{M.GuardExpr{+pattern, value, alternative, body}, +bound}:
           do Result<&2, &2, M.Diagnostic, List<&2, String>>:
+            refs : List<&2, String> <- free(rest, PatternReferences{[pattern], bound})
             a : List<&2, String> <- free(rest, ExpressionsWork{[value, alternative], bound})
             names : List<&2, String> <- pattern_names(pattern)
             b : List<&2, String> <- free(rest, ExpressionWork{body, List.append(&2, String, names, bound)})
-            return union(a, b)
+            return union(refs, union(a, b))
         case ExpressionWork{expression, bound}:
           free(rest, ExpressionsWork{children(expression), bound})
         case ExpressionsWork{Nil{}, bound}:
@@ -159,14 +180,28 @@ def free(+fuel: Nat, work: FreeWork) -> Result<&2, &2, M.Diagnostic, List<&2, St
             a : List<&2, String> <- free(rest, ExpressionWork{head, bound})
             b : List<&2, String> <- free(rest, ExpressionsWork{tail, bound})
             return union(a, b)
+        case PatternReferences{Nil{}, bound}:
+          Done{Nil{}}
+        case PatternReferences{M.ValuePattern{reference} <> tail, +bound}:
+          do Result<&2, &2, M.Diagnostic, List<&2, String>>:
+            a : List<&2, String> <- free(rest, ExpressionWork{M.reference_expr(reference), bound})
+            b : List<&2, String> <- free(rest, PatternReferences{tail, bound})
+            return union(a, b)
+        case PatternReferences{M.ConstructorPattern{name, Some{payload}} <> tail, bound}:
+          free(rest, PatternReferences{payload <> tail, bound})
+        case PatternReferences{M.ProductPattern{elements} <> tail, bound}:
+          free(rest, PatternReferences{List.append(&2, M.Pattern, elements, tail), bound})
+        case PatternReferences{pattern <> tail, bound}:
+          free(rest, PatternReferences{tail, bound})
         case ArmsWork{Nil{}, bound}:
           Done{Nil{}}
-        case ArmsWork{M.MatchArm{patterns, body} <> tail, +bound}:
+        case ArmsWork{M.MatchArm{+patterns, body} <> tail, +bound}:
           do Result<&2, &2, M.Diagnostic, List<&2, String>>:
+            refs : List<&2, String> <- free(rest, PatternReferences{patterns, bound})
             names : List<&2, String> <- row_names(patterns)
             a : List<&2, String> <- free(rest, ExpressionWork{body, List.append(&2, String, names, bound)})
             b : List<&2, String> <- free(rest, ArmsWork{tail, bound})
-            return union(a, b)
+            return union(refs, union(a, b))
 
 def lambda(expression: M.Expr) -> Result<&2, &2, M.Diagnostic, List<&2, Lambda>>:
   match expression:

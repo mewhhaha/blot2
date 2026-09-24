@@ -6,6 +6,10 @@ install:
 build:
   deno task build:compiler
 
+# Print the compact executable-language reference for people and LLMs.
+guide:
+  deno task blot guide
+
 # Compile and execute the headless source-defined ECS example.
 study:
   deno task study:ecs

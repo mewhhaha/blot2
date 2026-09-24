@@ -223,6 +223,10 @@ def check_task(task: Task, context: Unit) -> Outcome:
   Task{position, module, dependencies, cost} = task
   Outcome{position, G.check_group(module, dependencies)}
 
+def check_task_planned(task: Task, context: Unit) -> Outcome:
+  Task{position, module, dependencies, cost} = task
+  Outcome{position, G.check_group_planned(module, dependencies)}
+
 def weighted_tasks(tasks: List<&2, Task>) -> List<&2, B.Weighted<Task>>:
   match tasks:
     case Nil{}:
@@ -238,6 +242,10 @@ def check_batch_with_grain(tasks: List<&2, Task>, grain: Nat) -> List<&2, Outcom
 
 def check_batch(tasks: List<&2, Task>) -> List<&2, Outcome>:
   check_batch_with_grain(tasks, inference_grain())
+
+# The parent planner has already validated the complete module and graph.
+def check_batch_planned(tasks: List<&2, Task>) -> List<&2, Outcome>:
+  B.execute(~Task, ~Unit, ~Outcome, ~check_task_planned, task_batch(tasks, inference_grain()), Unit{})
 
 type Frontier is Data:
   Frontier{ready: List<&2, Scheduled>, pending: List<&2, Scheduled>}
@@ -317,10 +325,14 @@ def expression_cost(fuel: Nat, pending: List<&2, CostWork>, total: Nat) -> Nat:
       expression_cost(rest, ExpressionCost{body} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.ReturnExpr{label, value}} <> tail:
       expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
+    case 1n+rest ExpressionCost{M.RuntimeInitExpr{value}} <> tail:
+      expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.SourceExpr{offset, annotation, value}} <> tail:
       expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.UnaryExpr{operator, value}} <> tail:
       expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
+    case 1n+rest ExpressionCost{M.StateProviderExpr{read, write, initial}} <> tail:
+      expression_cost(rest, ExpressionCost{initial} <> tail, Nat.add(total, 16n))
     case 1n+rest ExpressionCost{M.ProviderExpr{identity, implementation}} <> tail:
       expression_cost(rest, ExpressionCost{implementation} <> tail, Nat.add(total, 16n))
     case 1n+rest ExpressionCost{M.HandleExpr{provider, body}} <> tail:
@@ -337,6 +349,12 @@ def expression_cost(fuel: Nat, pending: List<&2, CostWork>, total: Nat) -> Nat:
       expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.ArrayExpr{elements}} <> tail:
       expression_cost(rest, ExpressionsCost{elements} <> tail, Nat.add(total, 8n))
+    case 1n+rest ExpressionCost{M.ForExpr{index, start, end, state, initial, body}} <> tail:
+      expression_cost(rest, ExpressionsCost{[start, end, initial, body]} <> tail, Nat.add(total, 8n))
+    case 1n+rest ExpressionCost{M.ArrayGenerateExpr{count, generator}} <> tail:
+      expression_cost(rest, ExpressionCost{count} <> ExpressionCost{generator} <> tail, Nat.add(total, 8n))
+    case 1n+rest ExpressionCost{M.ArrayFillExpr{count, value}} <> tail:
+      expression_cost(rest, ExpressionCost{count} <> ExpressionCost{value} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.ArrayGetExpr{array, index}} <> tail:
       expression_cost(rest, ExpressionCost{array} <> ExpressionCost{index} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.ArraySetExpr{array, index, value}} <> tail:
@@ -392,6 +410,7 @@ type Completed is Data:
     interfaces: Map<&2, G.Interface>,
     functions: Map<&2, M.CheckedFunction>,
     constants: Map<&2, M.CheckedConstant>,
+    published: List<&2, G.Interface>,
     failure: Maybe<&2, Failure>
   }
 
@@ -400,11 +419,11 @@ def publish_outcomes(outcomes: List<&2, Outcome>, completed: Completed) -> Compl
     case Nil{}:
       completed
     case Outcome{position, Fail{diagnostic}} <> tail:
-      Completed{interfaces, functions, constants, failure} = completed
-      publish_outcomes(tail, Completed{interfaces, functions, constants, first_failure(failure, Failure{position, diagnostic})})
-    case Outcome{position, Done{G.CheckedGroup{M.CheckedModule{cs, fs, types, operations}, exported}}} <> tail:
-      Completed{interfaces, functions, constants, failure} = completed
-      publish_outcomes(tail, Completed{publish_interfaces(exported, interfaces), publish_functions(fs, functions), publish_constants(cs, constants), failure})
+      Completed{interfaces, functions, constants, published, failure} = completed
+      publish_outcomes(tail, Completed{interfaces, functions, constants, published, first_failure(failure, Failure{position, diagnostic})})
+    case Outcome{position, Done{G.CheckedGroup{M.CheckedModule{cs, fs, types, operations}, +exported}}} <> tail:
+      Completed{interfaces, functions, constants, published, failure} = completed
+      publish_outcomes(tail, Completed{publish_interfaces(exported, interfaces), publish_functions(fs, functions), publish_constants(cs, constants), List.reverse.go(&2, G.Interface, exported, published), failure})
 
 type Preparation is Data:
   Preparation{tasks: List<&2, Task>, failures: List<&2, Outcome>}
@@ -446,7 +465,7 @@ def outcome_le(left: Outcome, right: Outcome) -> Bool:
 
 def assembled(module: M.Module, completed: Completed) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
   M.Module{constants, functions, types, operations} = module
-  Completed{interfaces, checked_functions, checked_constants, failure} = completed
+  Completed{interfaces, checked_functions, checked_constants, published, failure} = completed
   match failure:
     case Some{Failure{position, diagnostic}}:
       Fail{diagnostic}
@@ -465,12 +484,12 @@ def next_frontier(scheduled: List<&2, Scheduled>) -> Frontier:
 
 def publish_preparation(preparation: Preparation, completed: Completed) -> Completed:
   Preparation{tasks, failures} = preparation
-  outcomes = check_batch(List.reverse(&2, Task, tasks))
+  outcomes = check_batch_planned(List.reverse(&2, Task, tasks))
   ordered = List.sort(~Outcome, ~outcome_le, List.reverse.go(&2, Outcome, failures, outcomes))
   publish_outcomes(ordered, completed)
 
 def check_frontier(+ready: List<&2, Scheduled>, known: Catalog, +completed: Completed) -> Completed:
-  Completed{interfaces, functions, constants, +failure} = completed
+  Completed{interfaces, functions, constants, published, +failure} = completed
   publish_preparation(prepare_tasks(ready, known, interfaces, failure, Preparation{Nil{}, Nil{}}, next_allowed(ready, failure)), completed)
 
 def check_frontiers(fuel: Nat, frontier: Frontier, +known: Catalog, completed: Completed) -> Result<&2, &2, M.Diagnostic, Completed>:
@@ -505,7 +524,7 @@ def chain_allowed(jobs: List<&2, Chains.Job>, completed: Completed) -> Bool:
     case Nil{}:
       False{}
     case Chains.Job{position, job} <> tail:
-      Completed{interfaces, functions, constants, failure} = completed
+      Completed{interfaces, functions, constants, published, failure} = completed
       precedes_failure(position, failure)
 
 def check_chain(jobs: List<&2, Chains.Job>, +known: Catalog, completed: Completed, allowed: Bool) -> Completed:
@@ -524,7 +543,7 @@ type ChainContext is Data:
 def run_chain(chain: Chains.Chain, context: ChainContext) -> Completed:
   Chains.Chain{position, level, +jobs} = chain
   ChainContext{known, interfaces, failure} = context
-  +initial = {Completed{interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), failure} : Completed}
+  +initial = {Completed{interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, failure} : Completed}
   check_chain(jobs, known, initial, chain_allowed(jobs, initial))
 
 def merge_failure(previous: Maybe<&2, Failure>, candidate: Maybe<&2, Failure>) -> Maybe<&2, Failure>:
@@ -534,16 +553,18 @@ def merge_failure(previous: Maybe<&2, Failure>, candidate: Maybe<&2, Failure>) -
     case Some{failure}:
       first_failure(previous, failure)
 
+# Branches inherit interfaces for lookup, but publish only their own results.
+# Merging inherited environments repeats the shared prefix for every branch.
 def merge_completed(chains: List<&2, Completed>, completed: Completed) -> Completed:
   match chains:
     case Nil{}:
       completed
-    case Completed{ci, cf, cc, failure} <> tail:
-      Completed{interfaces, functions, constants, previous} = completed
-      merge_completed(tail, Completed{Map.union(&2, G.Interface, interfaces, ci), Map.union(&2, M.CheckedFunction, functions, cf), Map.union(&2, M.CheckedConstant, constants, cc), merge_failure(previous, failure)})
+    case Completed{ci, cf, cc, +published, failure} <> tail:
+      Completed{interfaces, functions, constants, prior_published, previous} = completed
+      merge_completed(tail, Completed{publish_interfaces(published, interfaces), Map.union(&2, M.CheckedFunction, functions, cf), Map.union(&2, M.CheckedConstant, constants, cc), List.reverse.go(&2, G.Interface, published, prior_published), merge_failure(previous, failure)})
 
 def check_parallel_chains(ready: List<&2, Chains.Chain>, +known: Catalog, +completed: Completed) -> Completed:
-  Completed{interfaces, functions, constants, failure} = completed
+  Completed{interfaces, functions, constants, published, failure} = completed
   outcomes = B.execute(~Chains.Chain, ~ChainContext, ~Completed, ~run_chain, chain_batch(ready, known), ChainContext{known, interfaces, failure})
   merge_completed(outcomes, completed)
 
@@ -603,7 +624,7 @@ def region_batch(regions: List<&2, Regions.Region>, known: Catalog) -> B.Batch<R
 def run_region(region: Regions.Region, context: ChainContext) -> Result<&2, &2, M.Diagnostic, Completed>:
   Regions.Region{+chains} = region
   ChainContext{known, interfaces, failure} = context
-  initial = {Completed{interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), failure} : Completed}
+  initial = {Completed{interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, failure} : Completed}
   check_chain_frontiers(List.length(&2, Chains.Chain, chains), Chains.next_frontier(chains), known, initial)
 
 def merge_regions(outcomes: List<&2, Result<&2, &2, M.Diagnostic, Completed>>, completed: Completed) -> Result<&2, &2, M.Diagnostic, Completed>:
@@ -620,7 +641,7 @@ def check_regions(regions: List<&2, Regions.Region>, +known: Catalog, +completed
     case Regions.Region{+chains} <> Nil{}:
       check_chain_frontiers(List.length(&2, Chains.Chain, chains), Chains.next_frontier(chains), known, completed)
     case _:
-      Completed{interfaces, functions, constants, failure} = completed
+      Completed{interfaces, functions, constants, published, failure} = completed
       outcomes = B.execute(~Regions.Region, ~ChainContext, ~Result<&2, &2, M.Diagnostic, Completed>, ~run_region, region_batch(regions, known), ChainContext{known, interfaces, failure})
       merge_regions(outcomes, completed)
 
@@ -639,5 +660,5 @@ def check_jobs(+jobs: List<&2, G.Job>, +known: Catalog, completed: Completed, de
 def check_module(+module: M.Module) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
   do Result<&2, &2, M.Diagnostic, M.CheckedModule>:
     +jobs : List<&2, G.Job> <- G.plan(module)
-    completed : Completed <- check_jobs(jobs, catalog(module), Completed{Map.new(&2, G.Interface), Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), None{}}, has_dependencies(jobs))
+    completed : Completed <- check_jobs(jobs, catalog(module), Completed{Map.new(&2, G.Interface), Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, None{}}, has_dependencies(jobs))
     assembled(module, completed)

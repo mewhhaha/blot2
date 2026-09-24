@@ -116,7 +116,7 @@ incrementalTest(
   "incremental no-op and trivia edits preserve prelude artifacts without rechecking",
   async (session, clean) => {
     const source =
-      "export fn answer () => Maybe.unwrap_or 0 (Some (identity 42))\n";
+      "const answer = fn () => Maybe.unwrap_or 0 (Some (identity 42))\n";
     const first = await session.compile(source);
     equivalent(first.artifact, clean.compile(source));
     equal(await answer(first.artifact), 42);
@@ -139,7 +139,7 @@ incrementalTest(
   "incremental leaf-body edits reuse caller types and regenerate one code entry",
   async (session, clean) => {
     const source =
-      "fn increment value => @u32.add value 1\nexport fn answer () => increment 40\n";
+      "const increment = fn value => @u32.add value 1\nconst answer = fn () => increment 40\n";
     const first = await session.compile(source);
     const revision = source.replace("value 1", "value 2");
     const next = await session.compile(revision);
@@ -156,10 +156,10 @@ incrementalTest(
 incrementalTest(
   "incremental const dependencies observe same-interface body edits without caller rechecking",
   async (session, clean) => {
-    const source = `fn calculate value => @u32.add value 1
+    const source = `const calculate = fn value => @u32.add value 1
 const computed = calculate 40
 const copied = computed
-export fn answer () => copied
+const answer = fn () => copied
 `;
     const first = await session.compile(source);
     const revision = source.replace("value 1", "value 2");
@@ -181,7 +181,7 @@ incrementalTest(
   "incremental interface changes reject stale callers and failed revisions do not poison recovery",
   async (session, clean) => {
     const source =
-      "fn transform value => @u32.add value 1\nexport fn answer () => @u32.add (transform 41) 0\n";
+      "const transform = fn value => @u32.add value 1\nconst answer = fn () => @u32.add (transform 41) 0\n";
     const first = await session.compile(source);
     const invalid = source.replace("@u32.add value 1", "True");
     await rejects(() => session.compile(invalid), diagnostic("type_mismatch"));
@@ -198,14 +198,14 @@ incrementalTest(
   async (session, clean) => {
     const source = `effect Reader.ask: Unit -> U32
 effect Clock.ask: Unit -> U32
-fn reader_value () => 20
-fn clock_value () => 22
+const reader_value = fn () => 20
+const clock_value = fn () => 22
 const reader = @effect.provider Reader.ask reader_value
 const clock = @effect.provider Clock.ask clock_value
-fn read () => Reader.ask ()
+const read = fn () => Reader.ask ()
 const requirements = @effect.of read
-export const requirement_count = @effect.count requirements
-export fn answer () => do reader:
+const requirement_count = @effect.count requirements
+const answer = fn () => do reader:
   use value <- do clock:
     use number <- read ()
     return number
@@ -221,8 +221,8 @@ export fn answer () => do reader:
       { $: "U32Value", value: 1 },
     );
     const changedSource = source.replace(
-      "fn read () => Reader.ask ()",
-      `fn read () => do:
+      "const read = fn () => Reader.ask ()",
+      `const read = fn () => do:
   use left <- Reader.ask ()
   use right <- Clock.ask ()
   return @u32.add left right`,
@@ -258,10 +258,10 @@ export fn answer () => do reader:
 incrementalTest(
   "incremental source identities keep unchanged lambdas and locals stable after unrelated insertion",
   async (session, clean) => {
-    const source = `fn capture value => fn extra => do:
+    const source = `const capture = fn value => fn extra => do:
   let result = @u32.add value extra
   return result
-export fn answer () => capture 40 2
+const answer = fn () => capture 40 2
 `;
     const shifted = "const unrelated = 7\n" + source;
     const frontend = await createSourceSession({ prelude: "none" });
@@ -285,7 +285,7 @@ export fn answer () => capture 40 2
 incrementalTest(
   "incremental budgets and diagnostic offsets survive trivia and failed revisions",
   async (session, clean) => {
-    const source = "const value = 42\nexport fn answer () => value\n";
+    const source = "const value = 42\nconst answer = fn () => value\n";
     const options = { const_steps: 100n };
     const first = await session.compile(source, options);
     await rejects(
@@ -300,7 +300,7 @@ incrementalTest(
       first.artifact.analysis.remaining_steps,
     );
     const invalid =
-      "export fn answer () => do:\n  let value: Bool = 1\n  return value\n";
+      "const answer = fn () => do:\n  let value: Bool = 1\n  return value\n";
     for (const revision of [invalid, "// Diagnostic shifts.\n" + invalid]) {
       await rejects(
         () => session.compile(revision),
@@ -317,7 +317,7 @@ incrementalTest(
 incrementalTest(
   "incremental public artifact and stats mutations cannot change cached results",
   async (session, clean) => {
-    const source = "const value = 42\nexport fn answer () => value\n";
+    const source = "const value = 42\nconst answer = fn () => value\n";
     const first = await session.compile(source);
     const counts = { ...first.stats };
     first.artifact.bytes.fill(0);
@@ -344,12 +344,12 @@ incrementalTest(
   "incremental queued requests snapshot options and recover in source order",
   async (session, clean) => {
     const source = (value: number) =>
-      `const value = ${value}\nexport fn answer () => value\n`;
+      `const value = ${value}\nconst answer = fn () => value\n`;
     const options = { const_steps: 100n };
     const first = session.compile(source(40), options);
     options.const_steps = 0n;
     const second = session.compile(source(41));
-    const failed = session.compile("export fn answer () => missing\n");
+    const failed = session.compile("const answer = fn () => missing\n");
     const final = session.compile(source(42));
     const results = await Promise.allSettled([first, second, failed, final]);
     equal(results.map((result) => result.status), [
@@ -414,13 +414,13 @@ Deno.test("incremental disposal rejects startup jobs, queued revisions and later
     prelude: "none",
     workers: 2,
   });
-  const queued = session.compile("export fn answer () => 42\n");
+  const queued = session.compile("const answer = fn () => 42\n");
   const rejected = rejects(queued, /disposed/);
   await Promise.resolve();
   session.dispose();
   await rejected;
   await rejects(
-    () => session.compile("export fn answer () => 42\n"),
+    () => session.compile("const answer = fn () => 42\n"),
     /disposed/,
   );
   session.dispose();

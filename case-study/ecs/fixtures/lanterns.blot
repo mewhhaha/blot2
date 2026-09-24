@@ -1,34 +1,34 @@
 // RETIRED compiler-coupled fixture; its game intrinsics are not supported.
 // Former independent application for the same launcher and renderer.
 #[component]
-data OrbitX = OrbitX F32
+type OrbitX is data = OrbitX F32
 #[component]
-data LumenTint = LumenTint U32
+type LumenTint is data = LumenTint U32
 #[resource]
-data Pulses = Pulses U32
+type Pulses is data = Pulses U32
 #[resource]
-data Retired = Retired U32
+type Retired is data = Retired U32
 
 const lantern = @asset.mesh "lantern.mesh.json"
 const ember = @asset.material "lantern.material.json"
 const azure = @asset.material "blue.material.json"
 
-fn plant_left () => do:
+const plant_left = fn () => do:
   use @ecs.insert (OrbitX (-0.6))
   use @ecs.insert (LumenTint 0)
   return ()
 
-fn plant_middle () => do:
+const plant_middle = fn () => do:
   use @ecs.insert (OrbitX 0.0)
   use @ecs.insert (LumenTint 1)
   return ()
 
-fn plant_right () => do:
+const plant_right = fn () => do:
   use @ecs.insert (OrbitX 0.6)
   use @ecs.insert (LumenTint 0)
   return ()
 
-export fn start () => do:
+const start = fn () => do:
   use @ecs.set (Pulses 2)
   use @ecs.set (Retired 0)
   use left <- @ecs.spawn ()
@@ -40,34 +40,34 @@ export fn start () => do:
   use @window.title "Lantern laboratory"
   return ()
 
-fn increment_pulses () => do:
+const increment_pulses = fn () => do:
   use wrapped <- @ecs.get Pulses
   let Pulses value = wrapped
   use @ecs.set (Pulses (value + 1))
   return ()
 
-fn double_pulses () => do:
+const double_pulses = fn () => do:
   use wrapped <- @ecs.get Pulses
   let Pulses value = wrapped
   use @ecs.set (Pulses (value * 2))
   return ()
 
-fn drift_lanterns () => do:
+const drift_lanterns = fn () => do:
   use wrapped <- @ecs.get OrbitX
   use seconds <- @input.delta_time ()
   let OrbitX x = wrapped
-  let moved = F32.add x (F32.mul seconds 0.1)
-  use @ecs.set (OrbitX (F32.sub (F32.wrap 2.0 (F32.add moved 1.0)) 1.0))
+  let moved = x + seconds * 0.1
+  use @ecs.set (OrbitX ((F32.wrap 2.0 (moved + 1.0)) - 1.0))
   return ()
 
-export fn update () => do:
+const update = fn () => do:
   // Explicit registration order differs from declaration order.
   use @ecs.run double_pulses
   use @ecs.run increment_pulses
   use @ecs.run drift_lanterns
   return ()
 
-export fn event () => do:
+const event = fn () => do:
   use kind <- @input.event_kind ()
   if kind != 1:
     return ()
@@ -87,7 +87,7 @@ export fn event () => do:
     use @window.load ()
   return ()
 
-fn draw_lantern () => do:
+const draw_lantern = fn () => do:
   use location <- @ecs.get OrbitX
   use previous_location <- @ecs.previous OrbitX
   use tint_value <- @ecs.get LumenTint
@@ -97,14 +97,14 @@ fn draw_lantern () => do:
   let OrbitX previous_x = previous_location
   let LumenTint tint = tint_value
   let x = F32.lerp previous_x current_x alpha
-  let y = F32.mul (F32.sin (F32.mul x 3.0)) 0.25
+  let y = (F32.sin (x * 3.0)) * 0.25
   let material = case tint:
     0 => ember
     _ => azure
   use @render.draw lantern material True entity 0.12 0.0 0.0 0.0 0.0 0.2 0.0 0.0 0.0 0.0 0.12 0.0 x y 0.5 1.0
   return ()
 
-export fn render () => do:
+const render = fn () => do:
   use @render.clear 0.015 0.025 0.045 1.0
   use @render.ambient 0.7 0.7 0.7
   use @render.light_direction (-0.5) (-1.0) (-0.5)

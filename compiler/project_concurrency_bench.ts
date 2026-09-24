@@ -32,7 +32,7 @@ sources.set(
     { length: 8 },
     (_, index) => `import * as part${index} from "./part${index}"`,
   ).join("\n") +
-    "\nexport fn answer value => " +
+    "\nconst answer = fn value => " +
     Array.from({ length: 8 }, (_, index) => `part${index}.f0 value`).join(
       " + ",
     ) +
@@ -42,7 +42,7 @@ for (let index = 0; index < 8; index++) {
   sources.set(
     `part${index}.blot`,
     shape === "modules"
-      ? `export fn f0 value => do:\n${
+      ? `const f0 = fn value => do:\n${
         Array.from(
           { length: 256 },
           (_, step) =>
@@ -52,7 +52,7 @@ for (let index = 0; index < 8; index++) {
       : Array.from(
         { length: 16 },
         (_, fn) =>
-          `export fn f${fn} value => ${
+          `const f${fn} = fn value => ${
             Array.from({ length: 96 }, () => "value").join(" + ")
           }\n`,
       ).join(""),

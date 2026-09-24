@@ -8,6 +8,7 @@ import * as app from "./engine/app"
 import { Frame, Title, Save, Load } from "./engine/app"
 import { Io } from "./engine/platform"
 import * as input from "./engine/input"
+import * as keys from "./engine/keys"
 import { Input, KeyPressed, FocusLost, PointerDown, PointerUp, PointerMoved, Primary, Secondary } from "./engine/input"
 import * as camera from "./engine/camera"
 import { OrbitCamera, OrbitControls } from "./engine/camera"
@@ -17,15 +18,15 @@ import * as boxes from "./engine/boxes"
 import { Mesh } from "./engine/boxes"
 
 #[component]
-data Spin = Spin F32
+type Spin is data = Spin F32
 #[component]
-data Surface = Brass | Blue | Checker
-data Mode = Play | Edit
+type Surface is data = Brass | Blue | Checker
+type Mode is data = Play | Edit
 #[resource]
-data Editor = Editor {
+type Editor is data = Editor {
   mode: Mode, selected: Maybe ecs.EntityId, grab_offset: Maybe Vec2,
 }
-data Action = ToggleMode | Place | Remove | Resize F32 | Rotate | CycleMaterial
+type Action is data = ToggleMode | Place | Remove | Resize F32 | Rotate | CycleMaterial
   | SaveScene | LoadScene | NoAction
 
 const camera_speed = 1.4
@@ -38,25 +39,25 @@ const checker = assets.material "checker.material.json"
 const ground = assets.material "ground.material.json"
 const highlight = assets.material "highlight.material.json"
 
-fn material surface => case surface of
+const material = fn surface => case surface of
   Brass => brass
   Blue => blue
   Checker => checker
 
-fn key_action code => case code of
-  0x110104 => ToggleMode
-  80 => Place
-  88 => Remove
-  61 => Resize 1.1
-  43 => Resize 1.1
-  45 => Resize 0.9
-  82 => Rotate
-  77 => CycleMaterial
-  0x110206 => SaveScene
-  0x110209 => LoadScene
+const key_action = fn code => case code of
+  ^keys.tab => ToggleMode
+  ^keys.p => Place
+  ^keys.x => Remove
+  ^keys.equals => Resize 1.1
+  ^keys.plus => Resize 1.1
+  ^keys.minus => Resize 0.9
+  ^keys.r => Rotate
+  ^keys.m => CycleMaterial
+  ^keys.f6 => SaveScene
+  ^keys.f9 => LoadScene
   _ => NoAction
 
-fn spawn_box transform => fn spin => fn surface => do:
+const spawn_box = fn transform => fn spin => fn surface => do:
   use entity <- ecs.spawn ()
   use ecs.at entity $ fn () => do:
     use ecs.insert transform
@@ -65,7 +66,7 @@ fn spawn_box transform => fn spin => fn surface => do:
     use ecs.insert $ Mesh { geometry: cube, material: material surface }
   return entity
 
-fn seed_scene () => do:
+const seed_scene = fn () => do:
   use spawn_box (Transform {
     position: Vec3 { x: -1.4, y: -0.4, z: 0.0 }, scale: spatial.one, yaw: 0.0,
   }) 1.0 Brass
@@ -74,21 +75,21 @@ fn seed_scene () => do:
     scale: Vec3 { x: 0.7, y: 1.3, z: 0.7 }, yaw: 0.6,
   }) (-1.0) Blue
 
-fn resize factor => fn () => do:
+const resize = fn factor => fn () => do:
   use transform <- ecs.get Transform
   let next = transform
-  next.scale.x := F32.clamp 0.1 4.0 (F32.mul self factor)
-  next.scale.y := F32.clamp 0.1 4.0 (F32.mul self factor)
-  next.scale.z := F32.clamp 0.1 4.0 (F32.mul self factor)
+  next.scale.x := F32.clamp 0.1 4.0 (self * factor)
+  next.scale.y := F32.clamp 0.1 4.0 (self * factor)
+  next.scale.z := F32.clamp 0.1 4.0 (self * factor)
   use ecs.set next
 
-fn rotate () => do:
+const rotate = fn () => do:
   use transform <- ecs.get Transform
   let next = transform
-  next.yaw := spatial.wrap_angle (F32.add self 0.2617993878)
+  next.yaw := spatial.wrap_angle (self + 0.2617993878)
   use ecs.set next
 
-fn cycle_material () => do:
+const cycle_material = fn () => do:
   use surface <- ecs.get Surface
   let next = case surface of
     Brass => Blue
@@ -98,7 +99,7 @@ fn cycle_material () => do:
   use ecs.set $ Mesh { geometry: cube, material: material next }
 
 // Match independent conditions together; entity effects remain explicitly scoped.
-fn apply_action action => fn editor => fn ground_point =>
+const apply_action = fn action => fn editor => fn ground_point =>
   case action, editor.mode, editor.selected, ground_point of
     SaveScene, _, _, _ => ecs.set Save
     LoadScene, _, _, _ => ecs.set Load
@@ -132,28 +133,28 @@ fn apply_action action => fn editor => fn ground_point =>
     CycleMaterial, Edit, Some entity, _ => ecs.at entity cycle_material
     _, _, _, _ => ()
 
-fn select controls => fn editor => fn ground_point => do:
+const select = fn controls => fn editor => fn ground_point => do:
   let next = editor
   next.selected := controls.picked
   use grab_offset <- case controls.picked, ground_point of
     Some entity, Some point => do:
       use transform <- ecs.at entity (fn () => ecs.get Transform)
       return Some (Vec2 {
-        x: F32.sub transform.position.x point.x,
-        y: F32.sub transform.position.z point.z,
+        x: transform.position.x - point.x,
+        y: transform.position.z - point.z,
       })
     _, _ => Nothing
   next.grab_offset := grab_offset
   use ecs.set next
 
-fn drag point => fn grab => fn () => do:
+const drag = fn point => fn grab => fn () => do:
   use transform <- ecs.get Transform
   let next = transform
-  next.position.x := F32.add point.x grab.x
-  next.position.z := F32.add point.z grab.y
+  next.position.x := point.x + grab.x
+  next.position.z := point.z + grab.y
   use ecs.set next
 
-fn edit_scene () => do:
+const edit_scene = fn () => do:
   use controls <- ecs.get Input
   use editor <- ecs.get Editor
   use orbit <- ecs.get OrbitCamera
@@ -174,7 +175,7 @@ fn edit_scene () => do:
     _, _, _, _ => ()
 
 // Editing freezes animation so dragging and inspection stay predictable.
-fn animate () => do:
+const animate = fn () => do:
   use editor <- ecs.get Editor
   let Play = editor.mode else:
     return ()
@@ -184,20 +185,20 @@ fn animate () => do:
   let Frame frame = frame_value
   let Spin spin = spin_value
   let next = transform
-  next.yaw := spatial.wrap_angle (F32.add self (F32.mul (F32.mul spin spin_speed) frame.seconds))
+  next.yaw := spatial.wrap_angle (self + spin * spin_speed * frame.seconds)
   use ecs.set next
 
-fn draw_scene () => do:
+const draw_scene = fn () => do:
   use render.clear [0.065, 0.08, 0.105, 1.0]
   use render.ambient [0.3, 0.3, 0.34]
   use render.light_direction [-0.5, -1.0, -0.35]
   use render.light_color [0.85, 0.81, 0.72]
   use boxes.draw (Mesh { geometry: cube, material: ground }) (Transform {
-    position: Vec3 { x: 0.0, y: F32.sub ground_height 0.1, z: 0.0 },
+    position: Vec3 { x: 0.0, y: ground_height - 0.1, z: 0.0 },
     scale: Vec3 { x: 5.0, y: 0.1, z: 4.0 }, yaw: 0.0,
   }) Nothing
 
-fn draw_selection () => do:
+const draw_selection = fn () => do:
   use editor <- ecs.get Editor
   return case editor.mode, editor.selected of
     Edit, Some entity => do:
@@ -206,7 +207,7 @@ fn draw_selection () => do:
         use boxes.outline (Mesh { geometry: cube, material: highlight }) transform entity
     _, _ => ()
 
-fn describe_mode () => do:
+const describe_mode = fn () => do:
   use editor <- ecs.get Editor
   let title = case editor.mode of
     Play => "Blot — PLAY"
@@ -221,7 +222,7 @@ const sandbox = do:
   application := camera.plugin
     (OrbitCamera { yaw: 0.4, pitch: 0.45, distance: 8.0 })
     (OrbitControls {
-      left: 0x110100, right: 0x110101, inward: 0x110102, outward: 0x110103,
+      left: keys.left, right: keys.right, inward: keys.up, outward: keys.down,
       speed: camera_speed,
     }) self
   application := app.insert_resource (Editor {
@@ -236,4 +237,4 @@ const sandbox = do:
   application := app.add_system Render describe_mode self
   return app.build application
 
-export fn main (io: Io) => app.bind sandbox io
+const main = fn (io: Io) => app.bind sandbox io

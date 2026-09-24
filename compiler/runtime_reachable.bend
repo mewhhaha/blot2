@@ -4,9 +4,10 @@ import ./const_eval.bend as C
 import ./closures.bend as F
 import ./codegen_ir.bend as I
 import ./index.bend as Index
+import ./runtime_initialization.bend as Init
 
 type Catalog is Data:
-  Catalog{functions: Map<&2, Maybe<&2, M.CheckedFunction>>, constants: Map<&2, Maybe<&2, C.Value>>}
+  Catalog{functions: Map<&2, Maybe<&2, M.CheckedFunction>>, constants: Map<&2, Maybe<&2, C.Value>>, initializers: Map<&2, Init.Initializer>}
 
 type State is Data:
   State{visited: Map<&2, Bool>, lambda_ids: Map<&2, Bool>, lambdas: List<&2, F.Lambda>}
@@ -16,6 +17,8 @@ type Work is Data:
   ConstantWork{name: String}
   ExpressionWork{expression: M.Expr}
   ExpressionsWork{expressions: List<&2, M.Expr>}
+  PatternWork{patterns: List<&2, M.Pattern>}
+  PatternArms{arms: List<&2, M.MatchArm<M.Expr>>}
   ValueWork{value: C.Value}
   ValuesWork{values: List<&2, C.Value>}
 
@@ -57,11 +60,11 @@ def add_lambda(state: State, lambda: F.Lambda) -> State:
   State{visited, Map.set(&2, Bool, lambda_ids, Nat.show(identity), True{}), F.Lambda{identity, parameter, body, captures} <> lambdas}
 
 def function_value(catalog: Catalog, name: String) -> Maybe<&2, M.CheckedFunction>:
-  Catalog{functions, constants} = catalog
+  Catalog{functions, constants, initializers} = catalog
   Index.get(Maybe<&2, M.CheckedFunction>, functions, name, None{})
 
 def constant_value(catalog: Catalog, name: String) -> Maybe<&2, C.Value>:
-  Catalog{functions, constants} = catalog
+  Catalog{functions, constants, initializers} = catalog
   Index.get(Maybe<&2, C.Value>, constants, name, None{})
 
 def visit_function(visited: Bool, found: Maybe<&2, M.CheckedFunction>, name: String, state: State) -> Result<&2, &2, M.Diagnostic, Step>:
@@ -73,14 +76,20 @@ def visit_function(visited: Bool, found: Maybe<&2, M.CheckedFunction>, name: Str
     case False{} Some{M.CheckedFunction{M.Function{found_name, exported, parameter, parameter_type, result_type, body}, signature, effects}}:
       Done{Step{[ExpressionWork{body}], mark(state, "fn:" ++ name)}}
 
-def visit_constant(visited: Bool, found: Maybe<&2, C.Value>, name: String, state: State) -> Result<&2, &2, M.Diagnostic, Step>:
-  match visited found:
-    case True{} _:
+def visit_constant(visited: Bool, found: Maybe<&2, C.Value>, initializer: Maybe<&2, Init.Initializer>, name: String, state: State) -> Result<&2, &2, M.Diagnostic, Step>:
+  match visited found initializer:
+    case True{} _ _:
       Done{Step{Nil{}, state}}
-    case False{} None{}:
-      Fail{M.Diagnostic{"internal_error", name, "runtime reachability lost an evaluated constant"}}
-    case False{} Some{value}:
+    case False{} Some{value} _:
       Done{Step{[ValueWork{value}], mark(state, "const:" ++ name)}}
+    case False{} None{} Some{Init.Initializer{declared, value}}:
+      Done{Step{[ExpressionWork{value}], mark(state, "const:" ++ name)}}
+    case False{} None{} None{}:
+      Fail{M.Diagnostic{"internal_error", name, "runtime reachability lost a checked value"}}
+
+def initializer_value(catalog: Catalog, name: String) -> Maybe<&2, Init.Initializer>:
+  Catalog{functions, constants, initializers} = catalog
+  Index.find(Init.Initializer, initializers, name)
 
 def captured_values(names: List<&2, String>, +environment: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, List<&2, C.Value>>:
   match names:
@@ -134,7 +143,7 @@ def walk_steps(fuel: Nat, step: Result<&2, &2, M.Diagnostic, Step>, +catalog: Ca
     case 1n+rest Done{Step{FunctionWork{+name} <> pending, +state}}:
       walk_steps(rest, expanded_step(visit_function(seen(state, "fn:" ++ name), function_value(catalog, name), name, state), pending), catalog)
     case 1n+rest Done{Step{ConstantWork{+name} <> pending, +state}}:
-      walk_steps(rest, expanded_step(visit_constant(seen(state, "const:" ++ name), constant_value(catalog, name), name, state), pending), catalog)
+      walk_steps(rest, expanded_step(visit_constant(seen(state, "const:" ++ name), constant_value(catalog, name), initializer_value(catalog, name), name, state), pending), catalog)
     case 1n+rest Done{Step{ExpressionWork{M.FunctionExpr{name}} <> pending, state}}:
       walk_steps(rest, Done{Step{FunctionWork{name} <> pending, state}}, catalog)
     case 1n+rest Done{Step{ExpressionWork{M.CallExpr{callee, argument}} <> pending, state}}:
@@ -153,6 +162,24 @@ def walk_steps(fuel: Nat, step: Result<&2, &2, M.Diagnostic, Step>, +catalog: Ca
       Fail{I.const_only()}
     case 1n+rest Done{Step{ExpressionWork{M.EffectSameExpr{left, right}} <> pending, state}}:
       Fail{I.const_only()}
+    case 1n+rest Done{Step{ExpressionWork{M.MatchExpr{values, +arms}} <> pending, state}}:
+      walk_steps(rest, Done{Step{PatternArms{arms} <> ExpressionsWork{F.children(M.MatchExpr{values, arms})} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ExpressionWork{M.GuardExpr{+pattern, value, alternative, body}} <> pending, state}}:
+      walk_steps(rest, Done{Step{PatternWork{[pattern]} <> ExpressionsWork{[value, alternative, body]} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{PatternArms{Nil{}} <> pending, state}}:
+      walk_steps(rest, Done{Step{pending, state}}, catalog)
+    case 1n+rest Done{Step{PatternArms{M.MatchArm{patterns, body} <> tail} <> pending, state}}:
+      walk_steps(rest, Done{Step{PatternWork{patterns} <> PatternArms{tail} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{PatternWork{Nil{}} <> pending, state}}:
+      walk_steps(rest, Done{Step{pending, state}}, catalog)
+    case 1n+rest Done{Step{PatternWork{M.ValuePattern{reference} <> tail} <> pending, state}}:
+      walk_steps(rest, Done{Step{ExpressionWork{M.reference_expr(reference)} <> PatternWork{tail} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{PatternWork{M.ConstructorPattern{name, Some{payload}} <> tail} <> pending, state}}:
+      walk_steps(rest, Done{Step{PatternWork{payload <> tail} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{PatternWork{M.ProductPattern{elements} <> tail} <> pending, state}}:
+      walk_steps(rest, Done{Step{PatternWork{elements} <> PatternWork{tail} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{PatternWork{pattern <> tail} <> pending, state}}:
+      walk_steps(rest, Done{Step{PatternWork{tail} <> pending, state}}, catalog)
     case 1n+rest Done{Step{ExpressionWork{expression} <> pending, state}}:
       walk_steps(rest, Done{Step{ExpressionsWork{F.children(expression)} <> pending, state}}, catalog)
     case 1n+rest Done{Step{ExpressionsWork{Nil{}} <> pending, state}}:
@@ -169,6 +196,8 @@ def walk_steps(fuel: Nat, step: Result<&2, &2, M.Diagnostic, Step>, +catalog: Ca
       walk_steps(rest, Done{Step{ValuesWork{elements} <> pending, state}}, catalog)
     case 1n+rest Done{Step{ValueWork{C.ArrayValue{elements}} <> pending, state}}:
       walk_steps(rest, Done{Step{ValuesWork{elements} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.StateProviderValue{read, write, initial}} <> pending, state}}:
+      walk_steps(rest, Done{Step{ValueWork{initial} <> pending, state}}, catalog)
     case 1n+rest Done{Step{ValueWork{C.ProviderValue{identity, implementation}} <> pending, state}}:
       walk_steps(rest, Done{Step{ValueWork{implementation} <> pending, state}}, catalog)
     case 1n+rest Done{Step{ValueWork{C.EffectDescriptorValue{identity}} <> pending, state}}:
@@ -177,6 +206,8 @@ def walk_steps(fuel: Nat, step: Result<&2, &2, M.Diagnostic, Step>, +catalog: Ca
       Fail{I.const_only()}
     case 1n+rest Done{Step{ValueWork{C.ReturnValue{label, value}} <> pending, state}}:
       Fail{M.Diagnostic{"internal_error", "constant", "runtime reachability received an unhandled return"}}
+    case 1n+rest Done{Step{ValueWork{C.PatternBindingsValue{bindings}} <> pending, state}}:
+      Fail{M.Diagnostic{"internal_error", "constant", "runtime reachability received internal pattern bindings"}}
     case 1n+rest Done{Step{ValueWork{C.MatchValuesValue{values}} <> pending, state}}:
       Fail{M.Diagnostic{"internal_error", "constant", "runtime reachability received a match scrutinee collection"}}
     case 1n+rest Done{Step{ValueWork{value} <> pending, state}}:
@@ -202,6 +233,8 @@ def constant_roots(constants: List<&2, M.CheckedConstant>) -> List<&2, Work>:
   match constants:
     case Nil{}:
       Nil{}
+    case M.CheckedConstant{M.Constant{name, exported, annotation, M.RuntimeInitExpr{value}}, ty, variables} <> tail:
+      ConstantWork{name} <> constant_roots(tail)
     case M.CheckedConstant{M.Constant{name, True{}, annotation, value}, ty, variables} <> tail:
       ConstantWork{name} <> constant_roots(tail)
     case head <> tail:
@@ -237,7 +270,7 @@ def reached_lambdas(state: State) -> List<&2, F.Lambda>:
 
 def prepare(checked: M.CheckedModule, +bindings: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, Runtime>:
   M.CheckedModule{+constants, +functions, types, operations} = checked
-  +catalog = {Catalog{function_index(functions, Map.new(&2, Maybe<&2, M.CheckedFunction>)), constant_index(bindings, Map.new(&2, Maybe<&2, C.Value>))} : Catalog}
+  +catalog = {Catalog{function_index(functions, Map.new(&2, Maybe<&2, M.CheckedFunction>)), constant_index(bindings, Map.new(&2, Maybe<&2, C.Value>)), Init.index(Init.bindings(constants), MTip{})} : Catalog}
   do Result<&2, &2, M.Diagnostic, Runtime>:
     +state : State <- walk(U32.to_nat(1048576), List.append(&2, Work, function_roots(functions), constant_roots(constants)), catalog, State{Map.new(&2, Bool), Map.new(&2, Bool), Nil{}})
     return Runtime{M.CheckedModule{keep_constants(constants, state), keep_functions(functions, state), types, operations}, keep_bindings(bindings, state), reached_lambdas(state)}

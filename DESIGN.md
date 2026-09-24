@@ -21,13 +21,15 @@ The proposed effect declarations also use `PascalCase`.
 
 ## Functions and blocks
 
-Anonymous functions use `fn pattern => expression`. Top-level definitions add a
-name: `fn name pattern => expression`. Both produce ordinary function values.
+Functions use `fn pattern => expression`. Bind them at the top level with
+`const name = fn pattern => expression` or
+`let name = fn pattern => expression`. Both forms bind ordinary function values
+and are public by default.
 
 ```blot
-fn identity value => value
-fn add_pair (left, right) => left + right
-fn curried_add left => fn right => left + right
+const identity = fn value => value
+const add_pair = fn (left, right) => left + right
+const curried_add = fn left => fn right => left + right
 
 const increment = fn value => value + 1
 const add_ten = curried_add 10
@@ -37,14 +39,14 @@ The parameter is one pattern. A tuple pattern accepts a tuple; currying uses
 another explicit function. Type annotations use `:`.
 
 ```blot
-fn squared (value: F32) -> F32 => value * value
+const squared = fn (value: F32) -> F32 => value * value
 ```
 
 `do:` makes a statement suite into an expression. A function with statements is
 written with `=> do:`; there is no `fn pattern:` block-function form.
 
 ```blot
-fn squared (value: F32) => do:
+const squared = fn (value: F32) => do:
   let result = value * value
   return result
 
@@ -70,7 +72,7 @@ another is a type error; no optional/union result is invented.
 `use name <- expression` to bind the result of a possibly effectful computation:
 
 ```blot
-fn move () => do:
+const move = fn () => do:
   use velocity <- ecs.get Velocity
   use position <- ecs.get Position
   let next = advance (position, velocity)
@@ -110,7 +112,7 @@ around that expression are optional; named const values work the same way:
 ```blot
 const try = monad Maybe
 
-fn chain_maybe (my_maybe, my_other_maybe) => do:
+const chain_maybe = fn (my_maybe, my_other_maybe) => do:
   let smth = do try:
     use value <- my_maybe
     return $ my_other_maybe value
@@ -172,12 +174,12 @@ execution; it does not special-case `Maybe` or aliases such as `try`.
 `~` marks a demand-driven parameter, available to any function:
 
 ```blot
-fn unwrap_or_else value => fn ~fallback =>
+const unwrap_or_else = fn value => fn ~fallback =>
   case value of
     Some found => found
     Nothing => @force fallback
 
-fn duplicate_if enabled => fn ~value =>
+const duplicate_if = fn enabled => fn ~value =>
   case enabled of
     False => Nothing
     True => Some (@force value, @force value)
@@ -199,16 +201,22 @@ deferred bindings, and their ownership/lifetime rules remain to be specified.
 
 ## Modules
 
-Imports are static declarations at the top of the module. Exports are explicit,
-using JavaScript-style spelling.
+Imports are static declarations at the top of the module. Top-level `const`,
+`let`, type, constructor, and effect declarations are public by default.
+
+An optional adjacent declaration file, such as `math.d.blot` for `math.blot`,
+can describe the API presented by autocomplete and documentation. This is a
+tooling convention planned for future editor support; the compiler does not
+consume declaration files yet. Omitted bindings remain accessible by explicit
+name. Declaration files curate discoverability and never restrict access.
 
 ```blot
 import { Vec2 } from "./math.blot"
 import { clamp as clamp_value } from "./numeric.blot"
 import * as render from "engine/render"
 
-export const origin = Vec2 { x: 0.0, y: 0.0 }
-export fn identity value => value
+const origin = Vec2 { x: 0.0, y: 0.0 }
+const identity = fn value => value
 ```
 
 An import is not a value-producing expression. A module does not export its
@@ -221,11 +229,11 @@ struct is the one-constructor case. Separate `struct` and `enum` declarations
 are unnecessary.
 
 ```blot
-export data Vec2 = Vec2 { x: F32, y: F32 }
+data Vec2 = Vec2 { x: F32, y: F32 }
 
-export data Maybe a = Some a | Nothing
+data Maybe a = Some a | Nothing
 
-export data Result value error = Ok value | Err error
+type Result [value, error] is data = Ok value | Err error
 
 data EntityId = EntityId U32
 
@@ -244,6 +252,20 @@ let selected = Some position
 
 Uppercase constructor names replace the old `#Some` spelling. Generic type
 application uses forms such as `Maybe Vec2` and `Array (Maybe Vec2)`.
+
+Types and effects accept at most one argument at each application stage, like
+functions. A list, tuple, or record can bind several type values:
+
+```blot
+type Pair [left, right] is data = Pair (left, right)
+type Entry { head, tail } is data = Entry { head, tail }
+type Curried left => type right is data = Curried (left, right)
+```
+
+These argument shapes can nest. Record arguments match by field name.
+`Pair [U32, a]` infers `a`; free lowercase annotation names share the enclosing
+declaration's scope. Currying is explicit: `Curried U32` remains a constructor
+until another argument is supplied, as in `(Curried U32) Bool`.
 
 `type` names an existing type expression without creating another identity or
 constructor. There is no `type alias` form or separate `alias` keyword.
@@ -271,7 +293,7 @@ Use `of` to introduce the pattern suite, with one or more comma-separated
 inputs. Single-input cases also use `of`, not `:`.
 
 ```blot
-fn choose first => fn enabled => fn fallback =>
+const choose = fn first => fn enabled => fn fallback =>
   case first, enabled, fallback of
     Some value, True, _ => value
     _, _, Some value => value
@@ -291,13 +313,13 @@ the successful branch. `Some(x)` and `Some x` spell the same constructor
 pattern; parentheses group its payload, not a new multi-argument calling form.
 
 ```blot
-fn double_if_present (candidate: Maybe U32) -> U32 => do:
+const double_if_present = fn (candidate: Maybe U32) -> U32 => do:
   if let Some(value) = candidate:
     return value * 2
   else:
     return 0
 
-fn double_or_zero (candidate: Maybe U32) -> U32 => do:
+const double_or_zero = fn (candidate: Maybe U32) -> U32 => do:
   let Some(value) = candidate else:
     return 0
   return value * 2
@@ -347,12 +369,12 @@ static. Unlike a nominal `data` declaration, it needs no named constructors:
 ```blot
 type Reading = F64 | Text
 
-fn read_score (ready: Bool) -> Reading => do:
+const read_score = fn (ready: Bool) -> Reading => do:
   if ready:
     return 42.0
   return "pending"
 
-fn reading_label (value: Reading) -> Text => do:
+const reading_label = fn (value: Reading) -> Text => do:
   if let (number: F64) = value:
     return "Score: ${number}"
   return value
@@ -424,10 +446,10 @@ numbers.
 A top-level function name can be qualified by a type:
 
 ```blot
-fn Vec2.magnitude (value: Vec2) -> F32 =>
+const Vec2.magnitude = fn (value: Vec2) -> F32 =>
   sqrt (value.x * value.x + value.y * value.y)
 
-fn Vec2.scaled (value: Vec2) => fn (factor: F32) -> Vec2 =>
+const Vec2.scaled = fn (value: Vec2) => fn (factor: F32) -> Vec2 =>
   Vec2 { x: value.x * factor, y: value.y * factor }
 
 let distance = Vec2.magnitude position
@@ -435,13 +457,12 @@ let enlarged = Vec2.scaled position 2.0
 ```
 
 The receiver is an explicit parameter, not an implicit `self`. Qualifying a name
-does not by itself define generic dispatch. Ordinary exports use
-`export fn Vec2.scaled ...`; the precise import surface for associated functions
-remains open.
+does not by itself define generic dispatch. Associated bindings use
+`const Vec2.scaled = fn ...` and are public like other top-level bindings.
 
-### Proposal: statically checked duck typing
+### Statically checked receiver dispatch
 
-Use receiver-first application as the only member-call sugar:
+The executable compiler supports receiver-first application:
 `position.scaled 2.0` means `Vec2.scaled position 2.0`. This binds one argument;
 it does not unpack tuples or insert a `()` argument. Consequently,
 `position.magnitude` means `Vec2.magnitude position`, and `position.scaled` is a
@@ -449,8 +470,8 @@ function awaiting its factor. Definitions needing another argument use an
 explicit nested `fn`, just like ordinary curried functions.
 
 ```blot
-// PROPOSAL: infer a requirement for a type-preserving scaled operation.
-fn scale_twice value => do:
+// Infer a requirement for the receiver's scaled operation.
+const scale_twice = fn value => do:
   let factor: F32 = 2.0
   let next = value
   next := self.scaled factor
@@ -463,28 +484,17 @@ inheritance from `Vec2`. Both `Vec2` and another type with a compatible `scaled`
 operation could satisfy it without an explicit implementation declaration. The
 rebindings require the operation to preserve the receiver's type.
 
-Recommended boundaries for this proposal:
+The current compiler resolves associated operations in the module that owns the
+receiver's nominal type. It does not search unrelated namespaces. A field and
+method with the same name are ambiguous; function-valued record fields can be
+called with the same syntax. Shared fields must exist on every constructor of a
+type, while variant-specific fields require matching first.
 
-- Define associated operations in the module that owns the type initially. Do
-  not search unrelated modules for same-named functions or allow foreign
-  extensions in the first version.
-- Resolve members through the receiver type's declared, visible operations.
-  Reject collisions with record fields rather than changing a field's meaning.
-  Whether function-valued fields can satisfy the same generic requirements
-  remains open.
-- Carry inferred operation signatures, including effects, in generic interfaces.
-  Check callers against those requirements rather than re-type-checking a body
-  for every concrete type. Reject incompatible or missing operations at compile
-  time; there is no runtime name lookup.
-- Keep explicit qualified calls available. The member sugar only applies when
-  the associated function's first parameter is the receiver type.
-
-Explicit protocols and implementation declarations are an alternative, with more
-named contracts but more ceremony. Unrestricted lookup of same-named functions
-would make meaning depend on unrelated imports. The bounded proposal above
-favors inference and predictable lookup; dictionary passing versus
-specialization, recursive constraints, and explicit bound syntax are separate
-compiler-design choices still to settle.
+Generic receiver operations specialize at their uses, including recursive calls
+and partial applications. Inference preserves their effects. Missing or
+incompatible operations fail at compile time, and there is no runtime name
+lookup. Explicit qualified calls remain available. Explicit protocols, bound
+syntax, and dictionary passing remain possible future extensions.
 
 ## Compiler primitives and source-defined operators
 
@@ -503,7 +513,7 @@ host import. See [the controlled IO contract](compiler/effects-and-io.md).
 ```blot
 // Standard-library source, in the module owning Int.
 // PROPOSAL: exact primitive names; integer representation remains open.
-fn Int.add (left: Int) => fn (right: Int) -> Int =>
+const Int.add = fn (left: Int) => fn (right: Int) -> Int =>
   @int.add left right
 ```
 
@@ -518,8 +528,8 @@ infixl 60 (+) = add
 infixl 70 (><) = dot
 
 // PROPOSAL: exact static-type lookup spelling.
-fn add left => fn right => (@type.of left).add left right
-fn dot left => fn right => (@type.of left).dot left right
+const add = fn left => fn right => (@type.of left).add left right
+const dot = fn left => fn right => (@type.of left).dot left right
 ```
 
 `infixl` associates left, `infixr` associates right, and `infix` rejects
@@ -533,9 +543,9 @@ The executable prelude defines low-precedence function application in source:
 
 ```blot
 infixr 0 ($) = apply
-fn apply function => fn value => function value
+const apply = fn function => fn value => function value
 
-fn answer () => U32.mul 2 $ U32.add 1 $ 20
+const answer = fn () => U32.mul 2 $ U32.add 1 $ 20
 ```
 
 `f $ g $ x` means `f (g x)`. Precedence 0 is below arithmetic, comparisons and
@@ -562,12 +572,12 @@ knowledge of particular operator spellings:
 infixr 22 (||) = or
 infixr 24 (&&) = and
 
-fn and (left: Bool) => fn ~right => do:
+const and = fn (left: Bool) => fn ~right => do:
   if left:
     return @force right
   return False
 
-fn or (left: Bool) => fn ~right => do:
+const or = fn (left: Bool) => fn ~right => do:
   if left:
     return True
   return @force right
@@ -625,7 +635,7 @@ infixl 60 `add`
 infixr 24 `and`
 infixl 10 `on`
 
-fn on combine => fn project => fn left => fn right =>
+const on = fn combine => fn project => fn left => fn right =>
   combine (project left) (project right)
 
 const closer_to_origin = lt `on` Vec2.magnitude
@@ -661,8 +671,8 @@ with no additional runtime dispatch mechanism.
 Double-quoted text supports `${expression}` interpolation:
 
 ```blot
-fn greet (world: Text) -> Text => "Hello ${world}"
-fn quoted_greeting (world: Text) -> Text => "Message: ${greet world}"
+const greet = fn (world: Text) -> Text => "Hello ${world}"
+const quoted_greeting = fn (world: Text) -> Text => "Message: ${greet world}"
 ```
 
 Evaluate embedded expressions once, from left to right. Braces and quoted text
@@ -675,8 +685,8 @@ associated-operation mechanism without implicit conversion elsewhere:
 
 ```blot
 // PROPOSAL: numeric and user-defined interpolation conversions.
-fn Vec2.to_text (value: Vec2) -> Text => "(${value.x}, ${value.y})"
-fn position_label (position: Vec2) -> Text => "Position: ${position}"
+const Vec2.to_text = fn (value: Vec2) -> Text => "(${value.x}, ${value.y})"
+const position_label = fn (position: Vec2) -> Text => "Position: ${position}"
 ```
 
 Missing conversions would be compile-time errors. Embedded-expression and
@@ -747,20 +757,20 @@ must preserve it. Updating a flat contiguous array may then require copying.
 Game update functions produce the next world:
 
 ```blot
-export data Particle = Particle {
+data Particle = Particle {
   position: Vec2,
   velocity: Vec2,
 }
 
-export data World = World { particles: Array Particle }
+data World = World { particles: Array Particle }
 
-fn advance (particle: Particle, dt: F32) => do:
+const advance = fn (particle: Particle, dt: F32) => do:
   let next = particle
   next.position.x := self + particle.velocity.x * dt
   next.position.y := self + particle.velocity.y * dt
   return next
 
-export fn update (world: World, dt: F32) => do:
+const update = fn (world: World, dt: F32) => do:
   let next = world
   next.particles := array.map (fn particle => advance (particle, dt), self)
   return next
@@ -795,7 +805,7 @@ descriptors do not imply runtime reflection or runtime allocation.
 Proposed const-parameter spelling:
 
 ```blot
-fn vector_type (const element: Type) => fn (const lanes: U32) -> Type =>
+const vector_type = fn (const element: Type) => fn (const lanes: U32) -> Type =>
   @type.simd (element, lanes)
 
 type F32x4 = vector_type F32 4
@@ -823,8 +833,8 @@ namespace resolution for a type and its same-named constructor remain open.
 ## ECS as a type/effect test case
 
 The ECS design below remains a proposal. The executable
-[ECS example](examples/ecs.blot) instead uses explicit source-defined component
-columns, queries, and state threading on the current language.
+[ECS example](examples/ecs.blot) uses const-composed world storage, generic
+component columns, scoped state effects, and explicit system iteration.
 
 In the proposed design, systems infer component/resource use through ordinary
 helpers. A const-time `ecs.build` inspects **checked, closed effects**, not
@@ -841,11 +851,11 @@ entity/world. This does not change the immutability of ordinary values.
 The proposed scoped runner receives that context explicitly:
 
 ```blot
-fn read_velocity () => do:
+const read_velocity = fn () => do:
   use velocity <- ecs.get Velocity
   return velocity
 
-fn sample_velocity (world, entity) =>
+const sample_velocity = fn (world, entity) =>
   ecs.run (world, entity, read_velocity)
 ```
 
@@ -888,8 +898,8 @@ ask a world generated from its own unfinished effects to supply those effects.
 Code-only reloads may reuse compatible schemas/query plans while updating system
 implementations. Layout/ABI changes still require explicit migration or reset.
 The generic compiler kernel supports scoped providers and const effect
-descriptors; it does not yet implement declaration transforms, world generation,
-or the source ECS.
+descriptors; it does not yet implement declaration transforms or the proposed
+effect-descriptor-derived world and query generation.
 
 ## SIMD boundary
 
@@ -926,8 +936,8 @@ These are not settled by the baseline above:
 - Explicit demand-mode signatures, escaping deferred bindings, and their
   ownership/lifetime rules.
 - Named-function recursion, forward references, and any local named definitions.
-- Associated-function receiver inference and import visibility; whether to adopt
-  the proposed member-call sugar and inferred operation constraints.
+- Further associated-function receiver inference and import visibility beyond
+  the implemented static member calls and inferred operation constraints.
 - Interpolation conversions, literal interpolation escaping, and formatting.
 
 Predicate refinement solving, unrestricted compile-time effects, general
@@ -950,30 +960,30 @@ A separate, permissive Tree-sitter grammar supports Helix highlighting of the
 showcase, including proposals. It is editor support, not a validating compiler
 frontend; see the [Helix setup](README.md#helix-highlighting).
 
-| Area                    | Current status                                                                            |
-| ----------------------- | ----------------------------------------------------------------------------------------- |
-| Deno and Baba           | Generated lexer, general CPU parser, compact-CST schema, and binding checks.              |
-| Helix highlighting      | Separate editor grammar covers the syntax showcase.                                       |
-| Annotations             | Scalars, tuples, arrays, concrete applied nominal types, and effect-annotated arrows.     |
-| Modules                 | Implicit prelude; relative/explicitly mapped file imports; private scopes; entry exports. |
-| Data declarations       | Generic `data`, including named record construction/patterns; no `type` aliases yet.      |
-| Pattern narrowing       | Single/multi-value `case … of`, nested tuple/record patterns, `if let`, guarded `let`.    |
-| Closed unions           | Design/editor examples only; no union inference or runtime representation.                |
-| Operators and demand    | Source fixities/operators backed by ordinary functions; demands remain future.            |
-| Backtick calls          | Ordinary curried function calls with source fixity/default left precedence 80.            |
-| Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.              |
-| Text interpolation      | Target design only; literal strings currently serve generic panic messages.               |
-| `self`                  | No successor binding semantics yet.                                                       |
-| Layout and AST          | Host layout/source mapping and Baba CST; Bend name resolution and core lowering.          |
-| Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                |
-| Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                |
-| Resolver blocks         | Scoped effect providers execute; monad resolvers and `return $` remain future.            |
-| Scheduling              | Source-library responsibility; no compiler-generated ECS scheduler.                       |
-| Const evaluation        | Scalars, tuples, arrays, data, closures, and matching with one shared evaluation budget.  |
-| Tags and const types    | Closed const effect descriptors; no tag transforms or type-valued consts.                 |
-| Arrays and SIMD         | Immutable homogeneous arrays, checked indexing, full-copy updates; SIMD remains future.   |
-| Wasm compilation        | Private arena; scalar exports/constants and explicit scalar callbacks via guest ABI 1.    |
-| Game runtime and reload | Sandbox paused pending source ECS, capability bundles and persistent-state ABI.           |
+| Area                    | Current status                                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Deno and Baba           | Generated lexer, general CPU parser, compact-CST schema, and binding checks.                                |
+| Helix highlighting      | Separate editor grammar covers the syntax showcase.                                                         |
+| Annotations             | Scalars, tuples, arrays, concrete applied nominal types, and effect-annotated arrows.                       |
+| Modules                 | Implicit prelude; relative/explicitly mapped file imports; module scopes; public top-level bindings.        |
+| Data declarations       | Generic `data`, including named record construction/patterns; no `type` aliases yet.                        |
+| Pattern narrowing       | Single/multi-value `case … of`, nested tuple/record patterns, `if let`, guarded `let`.                      |
+| Closed unions           | Design/editor examples only; no union inference or runtime representation.                                  |
+| Operators and demand    | Source fixities/operators backed by ordinary functions; demands remain future.                              |
+| Backtick calls          | Ordinary curried function calls with source fixity/default left precedence 80.                              |
+| Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.                                |
+| Text interpolation      | Target design only; literal strings currently serve generic panic messages.                                 |
+| `self`                  | Previous value of a local binding or field/index path during immutable rebinding.                           |
+| Layout and AST          | Host layout/source mapping and Baba CST; Bend name resolution and core lowering.                            |
+| Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                                  |
+| Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                                  |
+| Resolver blocks         | Scoped effect providers execute; monad resolvers and `return $` remain future.                              |
+| Scheduling              | Source-library responsibility; no compiler-generated ECS scheduler.                                         |
+| Const evaluation        | Scalars, tuples, arrays, data, closures, and matching with one shared evaluation budget.                    |
+| Tags and const types    | Closed const effect descriptors; no tag transforms or type-valued consts.                                   |
+| Arrays and SIMD         | Immutable arrays, checked indexing, alias-preserving updates with local storage reuse; SIMD remains future. |
+| Wasm compilation        | Private arena; scalars, copied numeric arrays, and explicit scalar callbacks via guest ABI 2.               |
+| Game runtime and reload | Sandbox paused pending source ECS, capability bundles and persistent-state ABI.                             |
 
 `generated/wasm` belongs to Baba's lexer/parser tooling. Separately, `just demo`
 compiles [examples/prelude.blot](examples/prelude.blot) and executes it as Wasm.
@@ -984,8 +994,7 @@ and cache reuse; historical ECS numbers do not describe this new boundary.
 
 [Explicit host callbacks](examples/host_io.blot) execute with a sealed `Foreign`
 effect; `just demo-host` tests a host-backed provider and a pure source mock.
-[Guest ABI 1](compiler/guest-abi.md) scopes opaque callback references to one
-instance and invocation. Composite host values/buffers, parameterized effect
-descriptors and the machinery for a fully source-defined ECS come next. This
-scalar/callback export ABI does not settle persistent game state, array storage,
-or hot-reload schema migration.
+[Guest ABI 2](compiler/guest-abi.md) scopes opaque callback references to one
+instance and invocation and copies numeric arrays across the host boundary.
+Other composite host values and persistent guest handles remain future work. The
+ABI does not settle persistent game state or hot-reload schema migration.

@@ -127,17 +127,18 @@ export type LiteralKind =
   | "{"
   | ","
   | "}"
-  | "export"
   | "#"
   | "["
   | "]"
-  | "fn"
-  | "->"
-  | "=>"
   | "const"
+  | "let"
   | ":"
   | "="
   | "effect"
+  | "type"
+  | "=>"
+  | "is"
+  | "->"
   | "data"
   | "|"
   | "infixl"
@@ -145,16 +146,21 @@ export type LiteralKind =
   | "infix"
   | "("
   | "$"
+  | "^"
   | ")"
   | "`"
   | "."
   | "!"
+  | "fn"
   | "True"
   | "False"
   | "do"
   | "case"
   | "of"
-  | "let"
+  | ":="
+  | "for"
+  | "in"
+  | ".."
   | "else"
   | "use"
   | "<-"
@@ -226,17 +232,23 @@ export type RuleName =
   | "declaration"
   | "declaration_attribute"
   | "attribute_name"
-  | "function"
-  | "constant"
+  | "value_declaration"
   | "effect_declaration"
+  | "effect_type"
+  | "effect_signature"
+  | "effect_signature_application"
+  | "effect_signature_atom"
+  | "effect_operations"
+  | "effect_operation"
   | "data_type"
   | "constructor"
-  | "record_fields"
-  | "record_field"
   | "symbolic_fixity"
   | "named_fixity"
   | "qualified_name"
   | "parameter"
+  | "type_array"
+  | "type_record"
+  | "type_field"
   | "type_expression"
   | "effect_row"
   | "type_application"
@@ -249,6 +261,7 @@ export type RuleName =
   | "prefix_expression"
   | "named_operator"
   | "application"
+  | "member_access"
   | "atom"
   | "record"
   | "record_values"
@@ -260,6 +273,7 @@ export type RuleName =
   | "case_suite"
   | "case_arm"
   | "pattern"
+  | "value_pattern"
   | "constructor_pattern"
   | "qualified_constructor"
   | "pattern_group"
@@ -268,6 +282,9 @@ export type RuleName =
   | "suite"
   | "statement"
   | "binding"
+  | "rebinding"
+  | "index_access"
+  | "for_statement"
   | "binding_else"
   | "effect_binding"
   | "effect_step"
@@ -343,8 +360,7 @@ export interface ImportBindingCursor extends RuleCursorBase<"import_binding"> {
 
 export interface DeclarationCursor extends RuleCursorBase<"declaration"> {
   field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor>;
-  field(name: "exported"): TokenCursor<"literal", "export"> | null;
-  field(name: "value"): ConstantCursor | DataTypeCursor | EffectDeclarationCursor | FunctionCursor | NamedFixityCursor | SymbolicFixityCursor;
+  field(name: "value"): DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | NamedFixityCursor | SymbolicFixityCursor | ValueDeclarationCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -361,18 +377,10 @@ export interface AttributeNameCursor extends RuleCursorBase<"attribute_name"> {
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
-export interface FunctionCursor extends RuleCursorBase<"function"> {
-  field(name: "body"): ExpressionCursor;
-  field(name: "name"): QualifiedNameCursor;
-  field(name: "parameter"): ParameterCursor;
-  field(name: "result"): readonly [TokenCursor<"literal", "->">, TypeExpressionCursor] | null;
-  field(name: string): CursorFieldValue | undefined;
-  fieldArray(name: string): readonly CursorFieldValue[];
-}
-
-export interface ConstantCursor extends RuleCursorBase<"constant"> {
+export interface ValueDeclarationCursor extends RuleCursorBase<"value_declaration"> {
   field(name: "annotation"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
-  field(name: "name"): TokenCursor<"named", "IDENT">;
+  field(name: "kind"): TokenCursor<"literal", "const"> | TokenCursor<"literal", "let">;
+  field(name: "name"): QualifiedNameCursor;
   field(name: "value"): ExpressionCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -385,33 +393,61 @@ export interface EffectDeclarationCursor extends RuleCursorBase<"effect_declarat
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
+export interface EffectTypeCursor extends RuleCursorBase<"effect_type"> {
+  field(name: "name"): TokenCursor<"named", "TYPE_IDENT">;
+  field(name: "operations"): EffectOperationsCursor | null;
+  field(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
+  field(name: "signature"): EffectSignatureCursor | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface EffectSignatureCursor extends RuleCursorBase<"effect_signature"> {
+  field(name: "effects"): EffectRowCursor | null;
+  field(name: "head"): EffectSignatureApplicationCursor;
+  field(name: "results"): ReadonlyArray<readonly [TokenCursor<"literal", "->">, TypeApplicationCursor]>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface EffectSignatureApplicationCursor extends RuleCursorBase<"effect_signature_application"> {
+  field(name: "arguments"): ReadonlyArray<TypeAtomCursor>;
+  field(name: "head"): EffectSignatureAtomCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface EffectSignatureAtomCursor extends RuleCursorBase<"effect_signature_atom"> {
+}
+
+export interface EffectOperationsCursor extends RuleCursorBase<"effect_operations"> {
+  field(name: "fields"): ReadonlyArray<EffectOperationCursor>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "fields"): ReadonlyArray<EffectOperationCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface EffectOperationCursor extends RuleCursorBase<"effect_operation"> {
+  field(name: "name"): TokenCursor<"named", "IDENT">;
+  field(name: "signature"): TypeExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
 export interface DataTypeCursor extends RuleCursorBase<"data_type"> {
   field(name: "constructors"): ReadonlyArray<ConstructorCursor>;
   field(name: "name"): TokenCursor<"named", "TYPE_IDENT">;
-  field(name: "parameters"): ReadonlyArray<TokenCursor<"named", "IDENT">>;
+  field(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: "constructors"): ReadonlyArray<ConstructorCursor>;
+  fieldArray(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
 export interface ConstructorCursor extends RuleCursorBase<"constructor"> {
-  field(name: "fields"): RecordFieldsCursor | null;
   field(name: "name"): TokenCursor<"named", "TYPE_IDENT">;
   field(name: "payload"): TypeExpressionCursor | null;
-  field(name: string): CursorFieldValue | undefined;
-  fieldArray(name: string): readonly CursorFieldValue[];
-}
-
-export interface RecordFieldsCursor extends RuleCursorBase<"record_fields"> {
-  field(name: "fields"): ReadonlyArray<RecordFieldCursor>;
-  field(name: string): CursorFieldValue | undefined;
-  fieldArray(name: "fields"): ReadonlyArray<RecordFieldCursor>;
-  fieldArray(name: string): readonly CursorFieldValue[];
-}
-
-export interface RecordFieldCursor extends RuleCursorBase<"record_field"> {
-  field(name: "annotation"): TypeExpressionCursor;
-  field(name: "name"): TokenCursor<"named", "IDENT">;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -419,7 +455,7 @@ export interface RecordFieldCursor extends RuleCursorBase<"record_field"> {
 export interface SymbolicFixityCursor extends RuleCursorBase<"symbolic_fixity"> {
   field(name: "associativity"): TokenCursor<"literal", "infix"> | TokenCursor<"literal", "infixl"> | TokenCursor<"literal", "infixr">;
   field(name: "precedence"): TokenCursor<"named", "INTEGER">;
-  field(name: "symbol"): TokenCursor<"literal", "$"> | TokenCursor<"literal", "*"> | TokenCursor<"named", "SYMBOL">;
+  field(name: "symbol"): TokenCursor<"literal", "$"> | TokenCursor<"literal", "*"> | TokenCursor<"literal", "^"> | TokenCursor<"named", "SYMBOL">;
   field(name: "target"): QualifiedNameCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -447,6 +483,27 @@ export interface ParameterCursor extends RuleCursorBase<"parameter"> {
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
+export interface TypeArrayCursor extends RuleCursorBase<"type_array"> {
+  field(name: "elements"): ReadonlyArray<TypeExpressionCursor>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "elements"): ReadonlyArray<TypeExpressionCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface TypeRecordCursor extends RuleCursorBase<"type_record"> {
+  field(name: "fields"): ReadonlyArray<TypeFieldCursor>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "fields"): ReadonlyArray<TypeFieldCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface TypeFieldCursor extends RuleCursorBase<"type_field"> {
+  field(name: "name"): TokenCursor<"named", "IDENT">;
+  field(name: "value"): TypeExpressionCursor | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
 export interface TypeExpressionCursor extends RuleCursorBase<"type_expression"> {
   field(name: "effects"): EffectRowCursor | null;
   field(name: "head"): TypeApplicationCursor;
@@ -456,9 +513,9 @@ export interface TypeExpressionCursor extends RuleCursorBase<"type_expression"> 
 }
 
 export interface EffectRowCursor extends RuleCursorBase<"effect_row"> {
-  field(name: "labels"): ReadonlyArray<QualifiedNameCursor>;
+  field(name: "labels"): ReadonlyArray<TypeApplicationCursor>;
   field(name: string): CursorFieldValue | undefined;
-  fieldArray(name: "labels"): ReadonlyArray<QualifiedNameCursor>;
+  fieldArray(name: "labels"): ReadonlyArray<TypeApplicationCursor>;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
@@ -502,13 +559,13 @@ export interface InfixExpressionCursor extends RuleCursorBase<"infix_expression"
 
 export interface InfixTailCursor extends RuleCursorBase<"infix_tail"> {
   field(name: "argument"): CaseExpressionCursor | DoBlockCursor | LambdaCursor | PrefixExpressionCursor;
-  field(name: "operator"): TokenCursor<"literal", "$"> | TokenCursor<"literal", "*"> | NamedOperatorCursor | TokenCursor<"named", "SYMBOL">;
+  field(name: "operator"): TokenCursor<"literal", "$"> | TokenCursor<"literal", "*"> | TokenCursor<"literal", "^"> | NamedOperatorCursor | TokenCursor<"named", "SYMBOL">;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
 export interface PrefixExpressionCursor extends RuleCursorBase<"prefix_expression"> {
-  field(name: "operator"): TokenCursor<"literal", "*"> | TokenCursor<"named", "SYMBOL"> | null;
+  field(name: "operator"): TokenCursor<"literal", "*"> | TokenCursor<"literal", "^"> | TokenCursor<"named", "SYMBOL"> | null;
   field(name: "value"): ApplicationCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -521,8 +578,14 @@ export interface NamedOperatorCursor extends RuleCursorBase<"named_operator"> {
 }
 
 export interface ApplicationCursor extends RuleCursorBase<"application"> {
-  field(name: "arguments"): ReadonlyArray<AtomCursor>;
+  field(name: "arguments"): ReadonlyArray<AtomCursor | MemberAccessCursor>;
   field(name: "head"): AtomCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface MemberAccessCursor extends RuleCursorBase<"member_access"> {
+  field(name: "name"): TokenCursor<"named", "IDENT"> | TokenCursor<"named", "TYPE_IDENT">;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -597,6 +660,12 @@ export interface CaseArmCursor extends RuleCursorBase<"case_arm"> {
 export interface PatternCursor extends RuleCursorBase<"pattern"> {
 }
 
+export interface ValuePatternCursor extends RuleCursorBase<"value_pattern"> {
+  field(name: "name"): QualifiedNameCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
 export interface ConstructorPatternCursor extends RuleCursorBase<"constructor_pattern"> {
   field(name: "fields"): RecordPatternCursor | null;
   field(name: "name"): TokenCursor<"named", "TYPE_IDENT"> | QualifiedConstructorCursor;
@@ -636,7 +705,7 @@ export interface SuiteCursor extends RuleCursorBase<"suite"> {
 }
 
 export interface StatementCursor extends RuleCursorBase<"statement"> {
-  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | ExpressionCursor | PatternConditionalCursor | ResultCursor;
+  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | ExpressionCursor | ForStatementCursor | PatternConditionalCursor | RebindingCursor | ResultCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -646,6 +715,29 @@ export interface BindingCursor extends RuleCursorBase<"binding"> {
   field(name: "fallback"): BindingElseCursor | null;
   field(name: "pattern"): PatternCursor;
   field(name: "value"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface RebindingCursor extends RuleCursorBase<"rebinding"> {
+  field(name: "name"): TokenCursor<"named", "IDENT">;
+  field(name: "path"): ReadonlyArray<IndexAccessCursor | MemberAccessCursor>;
+  field(name: "value"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface IndexAccessCursor extends RuleCursorBase<"index_access"> {
+  field(name: "index"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ForStatementCursor extends RuleCursorBase<"for_statement"> {
+  field(name: "body"): SuiteCursor;
+  field(name: "end"): ExpressionCursor | null;
+  field(name: "pattern"): PatternCursor;
+  field(name: "start"): ExpressionCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -709,17 +801,23 @@ export type AnyRuleCursor =
   | DeclarationCursor
   | DeclarationAttributeCursor
   | AttributeNameCursor
-  | FunctionCursor
-  | ConstantCursor
+  | ValueDeclarationCursor
   | EffectDeclarationCursor
+  | EffectTypeCursor
+  | EffectSignatureCursor
+  | EffectSignatureApplicationCursor
+  | EffectSignatureAtomCursor
+  | EffectOperationsCursor
+  | EffectOperationCursor
   | DataTypeCursor
   | ConstructorCursor
-  | RecordFieldsCursor
-  | RecordFieldCursor
   | SymbolicFixityCursor
   | NamedFixityCursor
   | QualifiedNameCursor
   | ParameterCursor
+  | TypeArrayCursor
+  | TypeRecordCursor
+  | TypeFieldCursor
   | TypeExpressionCursor
   | EffectRowCursor
   | TypeApplicationCursor
@@ -732,6 +830,7 @@ export type AnyRuleCursor =
   | PrefixExpressionCursor
   | NamedOperatorCursor
   | ApplicationCursor
+  | MemberAccessCursor
   | AtomCursor
   | RecordCursor
   | RecordValuesCursor
@@ -743,6 +842,7 @@ export type AnyRuleCursor =
   | CaseSuiteCursor
   | CaseArmCursor
   | PatternCursor
+  | ValuePatternCursor
   | ConstructorPatternCursor
   | QualifiedConstructorCursor
   | PatternGroupCursor
@@ -751,6 +851,9 @@ export type AnyRuleCursor =
   | SuiteCursor
   | StatementCursor
   | BindingCursor
+  | RebindingCursor
+  | IndexAccessCursor
+  | ForStatementCursor
   | BindingElseCursor
   | EffectBindingCursor
   | EffectStepCursor

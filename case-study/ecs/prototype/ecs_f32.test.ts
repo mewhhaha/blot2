@@ -19,7 +19,7 @@ data Position = Position F32
 data Velocity = Velocity F32
 #[resource]
 data Time = Time F32
-export fn move () => do:
+const move = fn () => do:
   use wrapped_position <- @ecs.get Position
   use wrapped_velocity <- @ecs.get Velocity
   use wrapped_time <- @ecs.get Time
@@ -103,7 +103,7 @@ Deno.test("reload rejects scalar reinterpretation and accepts explicit F32 resou
     const expanded = compiler.compileEcs(`${source}
 #[resource]
 data Bias = Bias F32
-fn retain_bias () => do:
+const retain_bias = fn () => do:
   use _ <- @ecs.get Bias
   return ()
 `);

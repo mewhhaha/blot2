@@ -58,6 +58,11 @@ missing language machinery.
 
 - [x] Closed operations, inferred higher-order effect rows, source providers and
       explicit scalar host capabilities execute independently of ECS.
+- [x] Source-declared effect families use space-applied types such as
+      `State U32`; concrete instances are monomorphized with distinct
+      operations.
+- [x] Const composition, `:=` shadowing, `for` loops and scoped state resolvers
+      execute in the generic core.
 - [x] Tuples and homogeneous immutable arrays work across inference, bounded
       const evaluation, native transport, caches and Wasm. Array updates
       preserve aliases by copying; there is no uniqueness optimization yet.
@@ -65,9 +70,8 @@ missing language machinery.
       and per-file diagnostics. `std/array` is an executable source module.
 - [x] Named record construction/patterns and nested tuple patterns lower into
       ordinary algebraic data/products, including generic fields and captures.
-- [ ] Record field access/update, array builders and loops.
-- [ ] Parameterized/type-valued descriptors and source-interpreted state
-      effects.
+- [ ] Record field access/update and array builders.
+- [ ] Parameterized/type-valued descriptors and source-interpreted ECS effects.
 - [ ] Composite capability bundles and a stable data-only state-transfer ABI.
 - [ ] Source ECS/render libraries and project-wide incremental compilation.
 - [ ] Reconnect the desktop host, restore `just study`, and exercise live
