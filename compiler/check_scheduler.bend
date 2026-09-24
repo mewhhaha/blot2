@@ -5,6 +5,9 @@ import ./index.bend as Index
 import ./inference_batch.bend as B
 import ./check_chain_plan.bend as Chains
 import ./check_regions.bend as Regions
+import ./checked_core.bend as Core
+import ./frontier_alpha_compare.bend as AlphaCompare
+import ./nat_index.bend as NatIndex
 
 def required(-V: Data, found: Maybe<&2, V>, name: String) -> Result<&2, &2, M.Diagnostic, V>:
   match found:
@@ -22,7 +25,9 @@ type Catalog is Data:
     constants: Map<&2, Positioned<M.Constant>>,
     types: Map<&2, Positioned<M.DataType>>,
     operations: List<&2, M.Operation>,
-    costs: Map<&2, Nat>
+    costs: Map<&2, Nat>,
+    core: Map<&2, List<&2, Core.Certificate>>,
+    evidence: Bool
   }
 
 def index_functions(values: List<&2, M.Function>, +position: Nat, found: Map<&2, Positioned<M.Function>>) -> Map<&2, Positioned<M.Function>>:
@@ -48,10 +53,29 @@ def index_types(values: List<&2, M.DataType>, +position: Nat, found: Map<&2, Pos
 
 def catalog_costs(module: M.Module, costs: Map<&2, Nat>) -> Catalog:
   M.Module{constants, functions, types, operations} = module
-  Catalog{index_functions(functions, 0n, Map.new(&2, Positioned<M.Function>)), index_constants(constants, 0n, Map.new(&2, Positioned<M.Constant>)), index_types(types, 0n, Map.new(&2, Positioned<M.DataType>)), operations, costs}
+  Catalog{index_functions(functions, 0n, Map.new(&2, Positioned<M.Function>)), index_constants(constants, 0n, Map.new(&2, Positioned<M.Constant>)), index_types(types, 0n, Map.new(&2, Positioned<M.DataType>)), operations, costs, Map.new(&2, List<&2, Core.Certificate>), False{}}
 
 def catalog(module: M.Module) -> Catalog:
   catalog_costs(module, Map.new(&2, Nat))
+
+def with_core(known: Catalog, module: M.Module, certificates: List<&2, Core.Certificate>) -> Catalog:
+  Catalog{functions, constants, types, operations, costs, core, evidence} = known
+  Catalog{functions, constants, types, operations, costs, Core.index_for(module, certificates), evidence}
+
+def with_evidence(known: Catalog) -> Catalog:
+  Catalog{functions, constants, types, operations, costs, core, evidence} = known
+  Catalog{functions, constants, types, operations, costs, core, True{}}
+
+def collecting(known: Catalog) -> Bool:
+  Catalog{functions, constants, types, operations, costs, core, evidence} = known
+  evidence
+
+def core_index(known: Catalog) -> Map<&2, List<&2, Core.Certificate>>:
+  Catalog{functions, constants, types, operations, costs, core, evidence} = known
+  core
+
+def retained_group(known: Catalog, job: G.Job, subset: M.Module, imports: List<&2, G.Interface>) -> Maybe<&2, G.CheckedGroup>:
+  Core.lookup(core_index(known), job, subset, imports)
 
 def selected_position(-V: Data, found: Maybe<&2, Positioned<V>>, rest: List<&2, Positioned<V>>) -> List<&2, Positioned<V>>:
   match found:
@@ -89,7 +113,7 @@ def type_position_le(left: Positioned<M.DataType>, right: Positioned<M.DataType>
   position_le(M.DataType, left, right)
 
 def group_module(known: Catalog, job: G.Job) -> M.Module:
-  Catalog{functions, constants, types, operations, costs} = known
+  Catalog{functions, constants, types, operations, costs, core, evidence} = known
   G.Job{+members, dependencies, required_types} = job
   +nominals = G.type_keys(required_types)
   cs = positioned_values(M.Constant, List.sort(~Positioned<M.Constant>, ~constant_position_le, select_positions(M.Constant, members, constants)))
@@ -153,9 +177,12 @@ type Scheduled is Data:
 
 type Task is Data:
   Task{position: Nat, module: M.Module, dependencies: List<&2, G.Interface>, cost: Nat}
+  EvidenceTask{position: Nat, module: M.Module, dependencies: List<&2, G.Interface>, cost: Nat}
+  RetainedTask{position: Nat, checked: G.CheckedGroup}
 
 type Outcome is Data:
   Outcome{position: Nat, checked: Result<&2, &2, M.Diagnostic, G.CheckedGroup>}
+  EvidenceOutcome{position: Nat, module: M.Module, imports: List<&2, G.Interface>, checked: Result<&2, &2, M.Diagnostic, G.CheckedGroup>}
 
 type Failure is Data:
   Failure{position: Nat, diagnostic: M.Diagnostic}
@@ -220,12 +247,22 @@ def inference_grain() -> Nat:
   128n
 
 def check_task(task: Task, context: Unit) -> Outcome:
-  Task{position, module, dependencies, cost} = task
-  Outcome{position, G.check_group(module, dependencies)}
+  match task:
+    case Task{position, module, dependencies, cost}:
+      Outcome{position, G.check_group(module, dependencies)}
+    case EvidenceTask{position, +module, +dependencies, cost}:
+      EvidenceOutcome{position, module, dependencies, G.check_group(module, dependencies)}
+    case RetainedTask{position, checked}:
+      Outcome{position, Done{checked}}
 
 def check_task_planned(task: Task, context: Unit) -> Outcome:
-  Task{position, module, dependencies, cost} = task
-  Outcome{position, G.check_group_planned(module, dependencies)}
+  match task:
+    case Task{position, module, dependencies, cost}:
+      Outcome{position, G.check_group_planned(module, dependencies)}
+    case EvidenceTask{position, +module, +dependencies, cost}:
+      EvidenceOutcome{position, module, dependencies, G.check_group_planned(module, dependencies)}
+    case RetainedTask{position, checked}:
+      Outcome{position, Done{checked}}
 
 def weighted_tasks(tasks: List<&2, Task>) -> List<&2, B.Weighted<Task>>:
   match tasks:
@@ -233,6 +270,10 @@ def weighted_tasks(tasks: List<&2, Task>) -> List<&2, B.Weighted<Task>>:
       Nil{}
     case Task{position, module, dependencies, +cost} <> tail:
       B.Weighted{Task{position, module, dependencies, cost}, cost} <> weighted_tasks(tail)
+    case EvidenceTask{position, module, dependencies, +cost} <> tail:
+      B.Weighted{EvidenceTask{position, module, dependencies, cost}, cost} <> weighted_tasks(tail)
+    case RetainedTask{position, checked} <> tail:
+      B.Weighted{RetainedTask{position, checked}, 0n} <> weighted_tasks(tail)
 
 def task_batch(tasks: List<&2, Task>, grain: Nat) -> B.Batch<Task>:
   B.plan(Task, weighted_tasks(tasks), grain)
@@ -243,9 +284,214 @@ def check_batch_with_grain(tasks: List<&2, Task>, grain: Nat) -> List<&2, Outcom
 def check_batch(tasks: List<&2, Task>) -> List<&2, Outcome>:
   check_batch_with_grain(tasks, inference_grain())
 
+# A frontier has one immutable operation catalog. A successful independent
+# singleton check can certify another clone only when its complete input is
+# equal up to the uniform shift used for lambda and return-label identities.
+# The candidate stores source origin, full function, exact imported interfaces
+# and nominal declarations. Operations are shared by the publish_preparation
+# caller; the generic mixed-catalog batch entry below never coalesces.
+type FrontierCandidate is Data:
+  FrontierCandidate{position: Nat, origin: String, function: M.Function, types: List<&2, M.DataType>, imports: List<&2, G.Interface>}
+
+def clone_origin(name: String) -> String:
+  match name:
+    case SCon{Chr{93}, SCon{Chr{46}, tail}}:
+      tail
+    case SCon{character, tail}:
+      clone_origin(tail)
+    case SNil{}:
+      SNil{}
+
+def candidate_parts(position: Nat, constants: List<&2, M.Constant>, functions: List<&2, M.Function>, types: List<&2, M.DataType>, imports: List<&2, G.Interface>) -> Maybe<&2, FrontierCandidate>:
+  match constants functions:
+    case Nil{} M.Function{+name, exported, parameter, p, r, body} <> Nil{}:
+      Bool.pick(Maybe<&2, FrontierCandidate>, String.starts_with(name, "$mono["), Some{FrontierCandidate{position, clone_origin(name), M.Function{"$self", exported, parameter, p, r, body}, types, imports}}, None{})
+    case _ _:
+      None{}
+
+def task_candidate(task: Task) -> Maybe<&2, FrontierCandidate>:
+  match task:
+    case Task{position, M.Module{constants, functions, types, operations}, imports, cost}:
+      candidate_parts(position, constants, functions, types, imports)
+    case EvidenceTask{position, M.Module{constants, functions, types, operations}, imports, cost}:
+      candidate_parts(position, constants, functions, types, imports)
+    case RetainedTask{position, checked}:
+      None{}
+
+def same_candidate(left: FrontierCandidate, right: FrontierCandidate) -> Bool:
+  FrontierCandidate{left_position, left_origin, left_function, left_types, left_imports} = left
+  FrontierCandidate{right_position, right_origin, right_function, right_types, right_imports} = right
+  Bool.and(M.name_equal(left_origin, right_origin), Bool.and(Core.same_imports(left_imports, right_imports), AlphaCompare.same_alpha_module(M.Module{Nil{}, [left_function], left_types, Nil{}}, M.Module{Nil{}, [right_function], right_types, Nil{}})))
+
+def candidate_position(candidate: FrontierCandidate) -> Nat:
+  FrontierCandidate{position, origin, function, types, imports} = candidate
+  position
+
+def find_candidate(prior: List<&2, FrontierCandidate>, +current: FrontierCandidate, found: Maybe<&2, Nat>) -> Maybe<&2, Nat>:
+  match prior found:
+    case _ Some{position}:
+      Some{position}
+    case Nil{} None{}:
+      None{}
+    case +earlier <> tail None{}:
+      find_candidate(tail, current, Bool.pick(Maybe<&2, Nat>, same_candidate(earlier, current), Some{candidate_position(earlier)}, None{}))
+
+type BatchState is Data:
+  BatchState{known: Map<&2, List<&2, FrontierCandidate>>, originals: List<&2, Task>, representatives: List<&2, Task>, followers: NatIndex.Index<Nat>}
+
+type PlannedBatch is Data:
+  PlannedBatch{originals: List<&2, Task>, representatives: List<&2, Task>, followers: NatIndex.Index<Nat>}
+
+def plan_found(found: Maybe<&2, Nat>, prior: List<&2, FrontierCandidate>, candidate: FrontierCandidate, +task: Task, state: BatchState) -> BatchState:
+  match found:
+    case None{}:
+      FrontierCandidate{position, +origin, function, types, imports} = candidate
+      BatchState{known, originals, representatives, followers} = state
+      BatchState{Map.set(&2, List<&2, FrontierCandidate>, known, origin, FrontierCandidate{position, origin, function, types, imports} <> prior), task <> originals, task <> representatives, followers}
+    case Some{representative}:
+      BatchState{known, originals, representatives, followers} = state
+      BatchState{known, task <> originals, representatives, NatIndex.set(Nat, followers, candidate_position(candidate), representative)}
+
+def plan_prior(prior: Maybe<&2, List<&2, FrontierCandidate>>, +candidate: FrontierCandidate, task: Task, state: BatchState) -> BatchState:
+  match prior:
+    case None{}:
+      plan_found(None{}, Nil{}, candidate, task, state)
+    case Some{+previous}:
+      plan_found(find_candidate(previous, candidate, None{}), previous, candidate, task, state)
+
+def plan_candidate(candidate: Maybe<&2, FrontierCandidate>, +task: Task, state: BatchState) -> BatchState:
+  match candidate:
+    case None{}:
+      BatchState{known, originals, representatives, followers} = state
+      BatchState{known, task <> originals, task <> representatives, followers}
+    case Some{value}:
+      FrontierCandidate{position, +origin, function, types, imports} = value
+      BatchState{+known, originals, representatives, followers} = state
+      plan_prior(Index.find(List<&2, FrontierCandidate>, known, origin), FrontierCandidate{position, origin, function, types, imports}, task, BatchState{known, originals, representatives, followers})
+
+def finish_plan(state: BatchState) -> PlannedBatch:
+  BatchState{known, originals, representatives, followers} = state
+  PlannedBatch{List.reverse(&2, Task, originals), List.reverse(&2, Task, representatives), followers}
+
+def plan_batch(remaining: List<&2, Task>, state: BatchState) -> PlannedBatch:
+  match remaining:
+    case Nil{}:
+      finish_plan(state)
+    case +task <> tail:
+      plan_batch(tail, plan_candidate(task_candidate(task), task, state))
+
+def batch_outcome_position(outcome: Outcome) -> Nat:
+  match outcome:
+    case Outcome{position, checked}:
+      position
+    case EvidenceOutcome{position, module, imports, checked}:
+      position
+
+def index_outcomes(outcomes: List<&2, Outcome>, known: NatIndex.Index<Outcome>) -> NatIndex.Index<Outcome>:
+  match outcomes:
+    case Nil{}:
+      known
+    case +outcome <> tail:
+      index_outcomes(tail, NatIndex.set(Outcome, known, batch_outcome_position(outcome), outcome))
+
+def outcome_checked(outcome: Outcome) -> Result<&2, &2, M.Diagnostic, G.CheckedGroup>:
+  match outcome:
+    case Outcome{position, checked}:
+      checked
+    case EvidenceOutcome{position, module, imports, checked}:
+      checked
+
+def replay_parts(old_constants: List<&2, M.CheckedConstant>, old_functions: List<&2, M.CheckedFunction>, old_interfaces: List<&2, G.Interface>, constants: List<&2, M.Constant>, functions: List<&2, M.Function>, types: List<&2, M.DataType>, operations: List<&2, M.Operation>) -> Maybe<&2, G.CheckedGroup>:
+  match old_constants old_functions old_interfaces constants functions:
+    case Nil{} M.CheckedFunction{old_function, M.Signature{old_name, parameter, result, variables, row}, effects} <> Nil{} G.Interface{interface_name, G.FunctionInterface{}, template, parameters, interface_effects} <> Nil{} Nil{} M.Function{+current_name, exported, argument, p, r, body} <> Nil{}:
+      Bool.pick(Maybe<&2, G.CheckedGroup>, M.name_equal(old_name, interface_name), Some{G.CheckedGroup{M.CheckedModule{Nil{}, [M.CheckedFunction{M.Function{current_name, exported, argument, p, r, body}, M.Signature{current_name, parameter, result, variables, row}, effects}], types, operations}, [G.Interface{current_name, G.FunctionInterface{}, template, parameters, interface_effects}]}}, None{})
+    case _ _ _ _ _:
+      None{}
+
+def replay_for_task(prior: G.CheckedGroup, task: Task) -> Maybe<&2, G.CheckedGroup>:
+  G.CheckedGroup{M.CheckedModule{old_constants, old_functions, old_types, old_operations}, old_interfaces} = prior
+  match task:
+    case Task{position, M.Module{constants, functions, types, operations}, imports, cost}:
+      replay_parts(old_constants, old_functions, old_interfaces, constants, functions, types, operations)
+    case EvidenceTask{position, M.Module{constants, functions, types, operations}, imports, cost}:
+      replay_parts(old_constants, old_functions, old_interfaces, constants, functions, types, operations)
+    case RetainedTask{position, checked}:
+      None{}
+
+def replay_outcome(task: Task, checked: G.CheckedGroup) -> Outcome:
+  match task:
+    case Task{position, module, imports, cost}:
+      Outcome{position, Done{checked}}
+    case EvidenceTask{position, module, imports, cost}:
+      EvidenceOutcome{position, module, imports, Done{checked}}
+    case RetainedTask{position, prior}:
+      Outcome{position, Done{prior}}
+
+def replay_found(replayed: Maybe<&2, G.CheckedGroup>, task: Task) -> Outcome:
+  match replayed:
+    case None{}:
+      check_task_planned(task, Unit{})
+    case Some{checked}:
+      replay_outcome(task, checked)
+
+def representative_found(result: Result<&2, &2, M.Diagnostic, G.CheckedGroup>, +task: Task) -> Outcome:
+  match result:
+    case Fail{diagnostic}:
+      check_task_planned(task, Unit{})
+    case Done{checked}:
+      replay_found(replay_for_task(checked, task), task)
+
+def follower_found(prior: Maybe<&2, Outcome>, task: Task) -> Outcome:
+  match prior:
+    case None{}:
+      check_task_planned(task, Unit{})
+    case Some{outcome}:
+      representative_found(outcome_checked(outcome), task)
+
+def task_position(task: Task) -> Nat:
+  match task:
+    case Task{position, module, imports, cost}:
+      position
+    case EvidenceTask{position, module, imports, cost}:
+      position
+    case RetainedTask{position, checked}:
+      position
+
+def original_found(prior: Maybe<&2, Outcome>, task: Task) -> Outcome:
+  match prior:
+    case None{}:
+      check_task_planned(task, Unit{})
+    case Some{outcome}:
+      outcome
+
+def restore_found(representative: Maybe<&2, Nat>, +task: Task, outcomes: NatIndex.Index<Outcome>) -> Outcome:
+  match representative:
+    case None{}:
+      original_found(NatIndex.find(Outcome, outcomes, task_position(task)), task)
+    case Some{position}:
+      follower_found(NatIndex.find(Outcome, outcomes, position), task)
+
+def restore_batch(tasks: List<&2, Task>, +representatives: NatIndex.Index<Outcome>, +followers: NatIndex.Index<Nat>, reversed: List<&2, Outcome>) -> List<&2, Outcome>:
+  match tasks:
+    case Nil{}:
+      List.reverse(&2, Outcome, reversed)
+    case +task <> tail:
+      restore_batch(tail, representatives, followers, restore_found(NatIndex.find(Nat, followers, task_position(task)), task, representatives) <> reversed)
+
+def execute_planned_batch(plan: PlannedBatch) -> List<&2, Outcome>:
+  PlannedBatch{originals, representatives, followers} = plan
+  checked = B.execute(~Task, ~Unit, ~Outcome, ~check_task_planned, task_batch(representatives, inference_grain()), Unit{})
+  restore_batch(originals, index_outcomes(checked, NatIndex.new(Outcome)), followers, Nil{})
+
 # The parent planner has already validated the complete module and graph.
+# Generic callers may mix operation catalogs, so this entry keeps every task.
 def check_batch_planned(tasks: List<&2, Task>) -> List<&2, Outcome>:
   B.execute(~Task, ~Unit, ~Outcome, ~check_task_planned, task_batch(tasks, inference_grain()), Unit{})
+
+# publish_preparation creates every task from one Catalog and one dependency
+# frontier. Its operation catalog is therefore identical for all candidates.
+def check_batch_same_catalog(tasks: List<&2, Task>) -> List<&2, Outcome>:
+  execute_planned_batch(plan_batch(tasks, BatchState{Map.new(&2, List<&2, FrontierCandidate>), Nil{}, Nil{}, NatIndex.new(Nat)}))
 
 type Frontier is Data:
   Frontier{ready: List<&2, Scheduled>, pending: List<&2, Scheduled>}
@@ -401,7 +647,7 @@ def group_cost_found(found: Maybe<&2, Nat>, known: Catalog, job: G.Job) -> Nat:
 # Cost is scheduling metadata, not a validation budget. Per-declaration
 # saturation may overestimate a large SCC; that SCC still remains indivisible.
 def group_cost(+known: Catalog, +job: G.Job) -> Nat:
-  Catalog{functions, constants, types, operations, costs} = known
+  Catalog{functions, constants, types, operations, costs, core, evidence} = known
   G.Job{members, dependencies, required_types} = job
   group_cost_found(cached_cost(members, costs, 64n), known, job)
 
@@ -411,19 +657,35 @@ type Completed is Data:
     functions: Map<&2, M.CheckedFunction>,
     constants: Map<&2, M.CheckedConstant>,
     published: List<&2, G.Interface>,
-    failure: Maybe<&2, Failure>
+    failure: Maybe<&2, Failure>,
+    certificates: List<&2, Core.Certificate>
   }
+
+def publish_checked(checked: G.CheckedGroup, completed: Completed) -> Completed:
+  G.CheckedGroup{M.CheckedModule{cs, fs, types, operations}, +exported} = checked
+  Completed{interfaces, functions, constants, published, failure, certificates} = completed
+  Completed{publish_interfaces(exported, interfaces), publish_functions(fs, functions), publish_constants(cs, constants), List.reverse.go(&2, G.Interface, exported, published), failure, certificates}
+
+def publish_failure(position: Nat, diagnostic: M.Diagnostic, completed: Completed) -> Completed:
+  Completed{interfaces, functions, constants, published, failure, certificates} = completed
+  Completed{interfaces, functions, constants, published, first_failure(failure, Failure{position, diagnostic}), certificates}
+
+def publish_certificate(module: M.Module, checked: G.CheckedGroup, imports: List<&2, G.Interface>, completed: Completed) -> Completed:
+  Completed{interfaces, functions, constants, published, failure, certificates} = completed
+  Completed{interfaces, functions, constants, published, failure, Core.Certificate{module, checked, imports} <> certificates}
 
 def publish_outcomes(outcomes: List<&2, Outcome>, completed: Completed) -> Completed:
   match outcomes:
     case Nil{}:
       completed
     case Outcome{position, Fail{diagnostic}} <> tail:
-      Completed{interfaces, functions, constants, published, failure} = completed
-      publish_outcomes(tail, Completed{interfaces, functions, constants, published, first_failure(failure, Failure{position, diagnostic})})
-    case Outcome{position, Done{G.CheckedGroup{M.CheckedModule{cs, fs, types, operations}, +exported}}} <> tail:
-      Completed{interfaces, functions, constants, published, failure} = completed
-      publish_outcomes(tail, Completed{publish_interfaces(exported, interfaces), publish_functions(fs, functions), publish_constants(cs, constants), List.reverse.go(&2, G.Interface, exported, published), failure})
+      publish_outcomes(tail, publish_failure(position, diagnostic, completed))
+    case Outcome{position, Done{checked}} <> tail:
+      publish_outcomes(tail, publish_checked(checked, completed))
+    case EvidenceOutcome{position, module, imports, Fail{diagnostic}} <> tail:
+      publish_outcomes(tail, publish_failure(position, diagnostic, completed))
+    case EvidenceOutcome{position, module, imports, Done{+checked}} <> tail:
+      publish_outcomes(tail, publish_certificate(module, checked, imports, publish_checked(checked, completed)))
 
 type Preparation is Data:
   Preparation{tasks: List<&2, Task>, failures: List<&2, Outcome>}
@@ -435,12 +697,30 @@ def prepare_result(position: Nat, result: Result<&2, &2, M.Diagnostic, Task>, pr
     case Fail{diagnostic} Preparation{tasks, failures}:
       Preparation{tasks, Outcome{position, Fail{diagnostic}} <> failures}
 
-def prepare_task(position: Nat, +job: G.Job, known: Catalog, interfaces: Map<&2, G.Interface>) -> Result<&2, &2, M.Diagnostic, Task>:
+def source_task(ready: Bool, position: Nat, +subset: M.Module, imports: List<&2, G.Interface>) -> Task:
+  match ready:
+    case True{}:
+      EvidenceTask{position, subset, imports, module_cost(subset)}
+    case False{}:
+      Task{position, subset, imports, module_cost(subset)}
+
+def selected_task(found: Maybe<&2, G.CheckedGroup>, evidence: Bool, position: Nat, +subset: M.Module, imports: List<&2, G.Interface>) -> Task:
+  match found:
+    case Some{checked}:
+      RetainedTask{position, checked}
+    case None{}:
+      match evidence:
+        case True{}:
+          source_task(Core.source_ready(subset), position, subset, imports)
+        case False{}:
+          Task{position, subset, imports, module_cost(subset)}
+
+def prepare_task(position: Nat, +job: G.Job, +known: Catalog, interfaces: Map<&2, G.Interface>) -> Result<&2, &2, M.Diagnostic, Task>:
   G.Job{members, dependencies, types} = job
   +subset = group_module(known, job)
   do Result<&2, &2, M.Diagnostic, Task>:
-    imports : List<&2, G.Interface> <- dependency_interfaces(dependencies, interfaces)
-    return Task{position, subset, imports, module_cost(subset)}
+    +imports : List<&2, G.Interface> <- dependency_interfaces(dependencies, interfaces)
+    return selected_task(retained_group(known, job, subset, imports), collecting(known), position, subset, imports)
 
 def next_allowed(ready: List<&2, Scheduled>, failure: Maybe<&2, Failure>) -> Bool:
   match ready:
@@ -458,14 +738,19 @@ def prepare_tasks(ready: List<&2, Scheduled>, +known: Catalog, +interfaces: Map<
     case Scheduled{+position, level, job} <> +tail True{}:
       prepare_tasks(tail, known, interfaces, failure, prepare_result(position, prepare_task(position, job, known, interfaces), preparation), next_allowed(tail, failure))
 
+def outcome_position(outcome: Outcome) -> Nat:
+  match outcome:
+    case Outcome{position, checked}:
+      position
+    case EvidenceOutcome{position, module, imports, checked}:
+      position
+
 def outcome_le(left: Outcome, right: Outcome) -> Bool:
-  Outcome{a, x} = left
-  Outcome{b, y} = right
-  Nat.is_le(a, b)
+  Nat.is_le(outcome_position(left), outcome_position(right))
 
 def assembled(module: M.Module, completed: Completed) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
   M.Module{constants, functions, types, operations} = module
-  Completed{interfaces, checked_functions, checked_constants, published, failure} = completed
+  Completed{interfaces, checked_functions, checked_constants, published, failure, certificates} = completed
   match failure:
     case Some{Failure{position, diagnostic}}:
       Fail{diagnostic}
@@ -484,12 +769,12 @@ def next_frontier(scheduled: List<&2, Scheduled>) -> Frontier:
 
 def publish_preparation(preparation: Preparation, completed: Completed) -> Completed:
   Preparation{tasks, failures} = preparation
-  outcomes = check_batch_planned(List.reverse(&2, Task, tasks))
+  outcomes = check_batch_same_catalog(List.reverse(&2, Task, tasks))
   ordered = List.sort(~Outcome, ~outcome_le, List.reverse.go(&2, Outcome, failures, outcomes))
   publish_outcomes(ordered, completed)
 
 def check_frontier(+ready: List<&2, Scheduled>, known: Catalog, +completed: Completed) -> Completed:
-  Completed{interfaces, functions, constants, published, +failure} = completed
+  Completed{interfaces, functions, constants, published, +failure, certificates} = completed
   publish_preparation(prepare_tasks(ready, known, interfaces, failure, Preparation{Nil{}, Nil{}}, next_allowed(ready, failure)), completed)
 
 def check_frontiers(fuel: Nat, frontier: Frontier, +known: Catalog, completed: Completed) -> Result<&2, &2, M.Diagnostic, Completed>:
@@ -524,7 +809,7 @@ def chain_allowed(jobs: List<&2, Chains.Job>, completed: Completed) -> Bool:
     case Nil{}:
       False{}
     case Chains.Job{position, job} <> tail:
-      Completed{interfaces, functions, constants, published, failure} = completed
+      Completed{interfaces, functions, constants, published, failure, certificates} = completed
       precedes_failure(position, failure)
 
 def check_chain(jobs: List<&2, Chains.Job>, +known: Catalog, completed: Completed, allowed: Bool) -> Completed:
@@ -543,7 +828,7 @@ type ChainContext is Data:
 def run_chain(chain: Chains.Chain, context: ChainContext) -> Completed:
   Chains.Chain{position, level, +jobs} = chain
   ChainContext{known, interfaces, failure} = context
-  +initial = {Completed{interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, failure} : Completed}
+  +initial = {Completed{interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, failure, Nil{}} : Completed}
   check_chain(jobs, known, initial, chain_allowed(jobs, initial))
 
 def merge_failure(previous: Maybe<&2, Failure>, candidate: Maybe<&2, Failure>) -> Maybe<&2, Failure>:
@@ -559,12 +844,12 @@ def merge_completed(chains: List<&2, Completed>, completed: Completed) -> Comple
   match chains:
     case Nil{}:
       completed
-    case Completed{ci, cf, cc, +published, failure} <> tail:
-      Completed{interfaces, functions, constants, prior_published, previous} = completed
-      merge_completed(tail, Completed{publish_interfaces(published, interfaces), Map.union(&2, M.CheckedFunction, functions, cf), Map.union(&2, M.CheckedConstant, constants, cc), List.reverse.go(&2, G.Interface, published, prior_published), merge_failure(previous, failure)})
+    case Completed{ci, cf, cc, +published, failure, certificates} <> tail:
+      Completed{interfaces, functions, constants, prior_published, previous, prior_certificates} = completed
+      merge_completed(tail, Completed{publish_interfaces(published, interfaces), Map.union(&2, M.CheckedFunction, functions, cf), Map.union(&2, M.CheckedConstant, constants, cc), List.reverse.go(&2, G.Interface, published, prior_published), merge_failure(previous, failure), List.reverse.go(&2, Core.Certificate, certificates, prior_certificates)})
 
 def check_parallel_chains(ready: List<&2, Chains.Chain>, +known: Catalog, +completed: Completed) -> Completed:
-  Completed{interfaces, functions, constants, published, failure} = completed
+  Completed{interfaces, functions, constants, published, failure, certificates} = completed
   outcomes = B.execute(~Chains.Chain, ~ChainContext, ~Completed, ~run_chain, chain_batch(ready, known), ChainContext{known, interfaces, failure})
   merge_completed(outcomes, completed)
 
@@ -609,6 +894,17 @@ def has_dependencies(jobs: List<&2, G.Job>) -> Bool:
     case head <> tail:
       True{}
 
+def mono_singletons(jobs: List<&2, G.Job>, +count: Nat) -> Nat:
+  match jobs:
+    case Nil{}:
+      count
+    case G.Job{members, dependencies, types} <> tail:
+      match members:
+        case name <> Nil{}:
+          mono_singletons(tail, Bool.pick(Nat, String.starts_with(name, "$mono["), 1n+count, count))
+        case _:
+          mono_singletons(tail, count)
+
 def weighted_regions(regions: List<&2, Regions.Region>, +known: Catalog) -> List<&2, B.Weighted<Regions.Region>>:
   match regions:
     case Nil{}:
@@ -624,7 +920,7 @@ def region_batch(regions: List<&2, Regions.Region>, known: Catalog) -> B.Batch<R
 def run_region(region: Regions.Region, context: ChainContext) -> Result<&2, &2, M.Diagnostic, Completed>:
   Regions.Region{+chains} = region
   ChainContext{known, interfaces, failure} = context
-  initial = {Completed{interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, failure} : Completed}
+  initial = {Completed{interfaces, Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, failure, Nil{}} : Completed}
   check_chain_frontiers(List.length(&2, Chains.Chain, chains), Chains.next_frontier(chains), known, initial)
 
 def merge_regions(outcomes: List<&2, Result<&2, &2, M.Diagnostic, Completed>>, completed: Completed) -> Result<&2, &2, M.Diagnostic, Completed>:
@@ -641,9 +937,21 @@ def check_regions(regions: List<&2, Regions.Region>, +known: Catalog, +completed
     case Regions.Region{+chains} <> Nil{}:
       check_chain_frontiers(List.length(&2, Chains.Chain, chains), Chains.next_frontier(chains), known, completed)
     case _:
-      Completed{interfaces, functions, constants, published, failure} = completed
+      Completed{interfaces, functions, constants, published, failure, certificates} = completed
       outcomes = B.execute(~Regions.Region, ~ChainContext, ~Result<&2, &2, M.Diagnostic, Completed>, ~run_region, region_batch(regions, known), ChainContext{known, interfaces, failure})
       merge_regions(outcomes, completed)
+
+def check_dependent_jobs(flat: Bool, +jobs: List<&2, G.Job>, +known: Catalog, completed: Completed) -> Result<&2, &2, M.Diagnostic, Completed>:
+  match flat:
+    case True{}:
+      do Result<&2, &2, M.Diagnostic, Completed>:
+        scheduled : List<&2, Scheduled> <- schedule(jobs)
+        check_frontiers(List.length(&2, G.Job, jobs), next_frontier(scheduled), known, completed)
+    case False{}:
+      do Result<&2, &2, M.Diagnostic, Completed>:
+        chains : List<&2, Chains.Chain> <- Chains.plan(jobs)
+        +rooted : Regions.RootedPlan <- Regions.rooted_plan(chains)
+        check_regions(Regions.branches(rooted), known, check_chain_frontier(Regions.prefix(rooted), known, completed))
 
 def check_jobs(+jobs: List<&2, G.Job>, +known: Catalog, completed: Completed, dependent: Bool) -> Result<&2, &2, M.Diagnostic, Completed>:
   match dependent:
@@ -652,13 +960,41 @@ def check_jobs(+jobs: List<&2, G.Job>, +known: Catalog, completed: Completed, de
         scheduled : List<&2, Scheduled> <- schedule(jobs)
         check_frontiers(List.length(&2, G.Job, jobs), next_frontier(scheduled), known, completed)
     case True{}:
-      do Result<&2, &2, M.Diagnostic, Completed>:
-        chains : List<&2, Chains.Chain> <- Chains.plan(jobs)
-        +rooted : Regions.RootedPlan <- Regions.rooted_plan(chains)
-        check_regions(Regions.branches(rooted), known, check_chain_frontier(Regions.prefix(rooted), known, completed))
+      # The chain route separates most generated singleton siblings. At eight
+      # or more such jobs, dependency-level frontiers expose complete groups
+      # for one independent check per exact clone class.
+      check_dependent_jobs(Nat.is_le(8n, mono_singletons(jobs, 0n)), jobs, known, completed)
 
-def check_module(+module: M.Module) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
+def check_module_core(+module: M.Module, certificates: List<&2, Core.Certificate>) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
   do Result<&2, &2, M.Diagnostic, M.CheckedModule>:
     +jobs : List<&2, G.Job> <- G.plan(module)
-    completed : Completed <- check_jobs(jobs, catalog(module), Completed{Map.new(&2, G.Interface), Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, None{}}, has_dependencies(jobs))
+    completed : Completed <- check_jobs(jobs, with_core(catalog(module), module, certificates), Completed{Map.new(&2, G.Interface), Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, None{}, Nil{}}, has_dependencies(jobs))
     assembled(module, completed)
+
+type Initial is Data:
+  Initial{checked: M.CheckedModule, certificates: List<&2, Core.Certificate>}
+
+def initial_checked(initial: Initial) -> M.CheckedModule:
+  Initial{checked, certificates} = initial
+  checked
+
+def initial_certificates(initial: Initial) -> List<&2, Core.Certificate>:
+  Initial{checked, certificates} = initial
+  certificates
+
+def assembled_initial(module: M.Module, +completed: Completed) -> Result<&2, &2, M.Diagnostic, Initial>:
+  Completed{interfaces, functions, constants, published, failure, +certificates} = completed
+  do Result<&2, &2, M.Diagnostic, Initial>:
+    checked : M.CheckedModule <- assembled(module, completed)
+    return Initial{checked, List.reverse(&2, Core.Certificate, certificates)}
+
+# Only the source shape pass asks for principal, exact-SCC evidence.
+def check_module_evidenced(+module: M.Module) -> Result<&2, &2, M.Diagnostic, Initial>:
+  do Result<&2, &2, M.Diagnostic, Initial>:
+    +jobs : List<&2, G.Job> <- G.plan(module)
+    completed : Completed <- check_jobs(jobs, with_evidence(catalog(module)), Completed{Map.new(&2, G.Interface), Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, None{}, Nil{}}, has_dependencies(jobs))
+    assembled_initial(module, completed)
+
+# Direct IR checking and warm shape passes use the ordinary checker.
+def check_module(module: M.Module) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
+  check_module_core(module, Nil{})

@@ -1,6 +1,8 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { optimizeNativeStringComparison } from "./native_string_compare.ts";
+import { optimizeNativeCompilerKernels } from "./native_compiler_kernels.ts";
+import { optimizeNativeOwnedResolver } from "./native_owned_resolver.ts";
 
 const environment = { BEND_NO_TELEMETRY: "1" };
 const decoder = new TextDecoder();
@@ -52,14 +54,41 @@ if (target !== "js") {
       "-o",
       generatedC,
     ])).trim());
+    const nativeVersion = (await run("bend", ["version"])).trim();
+    const modelSource = await Deno.readTextFile(
+      new URL("../compiler/model.bend", import.meta.url),
+    );
     const specialized = optimizeNativeStringComparison(
       await Deno.readTextFile(generatedC),
-      await Deno.readTextFile(
-        new URL("../compiler/model.bend", import.meta.url),
-      ),
-      await run("bend", ["version"]),
+      modelSource,
+      nativeVersion,
     );
-    await Deno.writeTextFile(generatedC, specialized.source);
+    const typesSource = await Deno.readTextFile(
+      new URL("../compiler/types.bend", import.meta.url),
+    );
+    const kernelSource = await optimizeNativeCompilerKernels(
+      specialized.source,
+      {
+        index: await Deno.readTextFile(
+          new URL("../compiler/index.bend", import.meta.url),
+        ),
+        types: typesSource,
+        model: modelSource,
+      },
+      nativeVersion,
+    );
+    const ownedSource = await optimizeNativeOwnedResolver(
+      kernelSource,
+      {
+        types: typesSource,
+        natIndex: await Deno.readTextFile(
+          new URL("../compiler/nat_index.bend", import.meta.url),
+        ),
+        model: modelSource,
+      },
+      nativeVersion,
+    );
+    await Deno.writeTextFile(generatedC, ownedSource);
     await run("clang", [
       "-std=c11",
       "-O3",
@@ -70,7 +99,9 @@ if (target !== "js") {
       "-o",
       resolve(staging, "blotc"),
     ]);
-    console.log("Enabled guarded native String comparison for Bend 2.0.24");
+    console.log(
+      `Enabled guarded native String comparison, compiler kernels and owned resolver for ${nativeVersion}`,
+    );
     await Deno.rename(resolve(staging, "blotc"), new URL("blotc", output));
     console.log("Built generated/compiler/blotc (native CPU executable)");
   } finally {
@@ -117,29 +148,29 @@ const loader = new URL("main.ts", backend);
 // Bun runs the upstream TypeScript loader. The emitted pure module
 // runs in Deno; its host performs no Blot typing, const evaluation, or codegen.
 // The separate session module exposes pure cache planning to regression tests.
-for (
-  const [module, filename] of [["main", "compiler"], [
+await Promise.all(
+  ([["main", "compiler"], [
     "native_session",
     "native_session",
   ], [
     "native_output",
     "native_output",
-  ]]
-) {
-  const entry = new URL(`../compiler/${module}.bend`, import.meta.url);
-  const javascript = await run("bun", [
-    "--eval",
-    `const { load } = await import(process.argv[1]);
+  ]] as const).map(async ([module, filename]) => {
+    const entry = new URL(`../compiler/${module}.bend`, import.meta.url);
+    const javascript = await run("bun", [
+      "--eval",
+      `const { load } = await import(process.argv[1]);
 const result = await load(process.argv[2], {}, () => {
   throw new Error("Bend loader did not recognize the compiler entry");
 });
 process.stdout.write(result.source);`,
-    loader.href,
-    entry.href,
-  ]);
-  await Deno.writeTextFile(
-    new URL(`${filename}.js`, output),
-    `// Generated from compiler/${module}.bend with ${version}. Do not edit.\n${javascript}`,
-  );
-  console.log(`Built generated/compiler/${filename}.js`);
-}
+      loader.href,
+      entry.href,
+    ]);
+    await Deno.writeTextFile(
+      new URL(`${filename}.js`, output),
+      `// Generated from compiler/${module}.bend with ${version}. Do not edit.\n${javascript}`,
+    );
+    console.log(`Built generated/compiler/${filename}.js`);
+  }),
+);

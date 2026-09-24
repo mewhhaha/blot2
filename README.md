@@ -36,8 +36,9 @@ Deno supplies parsing and a persistent subprocess transport; Bend owns lowering,
 inference, const evaluation, and Wasm generation. Native failures never silently
 fall back to JavaScript. The reference JavaScript compiler exists for parity
 checks. Builds run `bend PROOF.bend`; important rules live in `LAWS.bend`. The
-optimized native build uses Bend 2.0.24 with a guarded String-comparison change
-to its generated C; see [compiler details](compiler/README.md).
+optimized native build requires Bend 2.0.27 and applies guarded String, index,
+and type-traversal changes to its generated C; see
+[compiler details](compiler/README.md).
 
 Read [the CLI guide](compiler/guide.md) for the executable syntax and language
 rules in one pass, or print it with `deno task blot guide` without rebuilding.

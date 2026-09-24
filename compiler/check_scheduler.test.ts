@@ -496,7 +496,9 @@ Deno.test("a later ready inference error cannot hide an earlier blocked group er
       interfaces: { $: "MTip" },
       functions: { $: "MTip" },
       constants: { $: "MTip" },
+      published: bendList([]),
       failure: { $: "None" },
+      certificates: bendList([]),
     },
   ));
   const actual = scheduler["check_scheduler.assembled"](source, completed);
@@ -511,7 +513,9 @@ Deno.test("a later ready inference error cannot hide an earlier blocked group er
       interfaces: { $: "MTip" },
       functions: { $: "MTip" },
       constants: { $: "MTip" },
+      published: bendList([]),
       failure: { $: "None" },
+      certificates: bendList([]),
     },
     true,
   ));

@@ -30,6 +30,10 @@ import ./compiler/monomorph.bend as Mono
 import ./compiler/infer.bend as Infer
 import ./compiler/array_reuse.bend as Reuse
 import ./compiler/public_exports.bend as Public
+import ./compiler/core_compare.bend as CoreCompare
+import ./compiler/checked_core.bend as CheckedCore
+import ./compiler/nat_index.bend as NatIndex
+import ./compiler/frontier_alpha_compare.bend as FrontierAlpha
 
 # An exported function-valued constant is called through its stored value.
 # Selecting exports after inference must never duplicate its initializer.
@@ -520,6 +524,14 @@ law substitutions_preserve_u32:
   for fuel: Nat
   {Substitutions.resolve_work(substitutions, 1n+fuel, Substitutions.OneType{M.U32Ty{}}) == Done{[M.U32Ty{}]} : Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>}
 
+# The explicit continuation machine has a finite step budget. Crossing it
+# restarts the unchanged resolver with the original history, fuel, and work.
+law flat_resolver_step_exhaustion_restarts_reference:
+  for substitutions: Substitutions.Substitutions
+  for fuel: Nat
+  for work: Substitutions.TypeWork
+  {Substitutions.flat_result(None{}, substitutions, fuel, work) == Substitutions.resolve_work_reference(substitutions, fuel, work) : Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>}
+
 # Cached code refers to constants symbolically, never to their current values.
 law constant_code_is_relocatable:
   for +key: String
@@ -667,3 +679,107 @@ law array_reuse_preserves_operand_order:
   for +index: Codegen.Expr
   for +value: Codegen.Expr
   {Reuse.children(Codegen.ArrayReuseExpr{array, index, value}) == [array, index, value] : List<&2, Codegen.Expr>}
+
+# A failed or exhausted structural comparison never certifies a body.
+law retained_core_comparison_stops_on_mismatch:
+  for fuel: Nat
+  for pending: List<&2, CoreCompare.Work>
+  {CoreCompare.compare(fuel, pending, False{}) == False{} : Bool}
+
+law retained_core_comparison_exhaustion_is_a_miss:
+  for head: CoreCompare.Work
+  for tail: List<&2, CoreCompare.Work>
+  {CoreCompare.compare(0n, head <> tail, True{}) == False{} : Bool}
+
+law retained_group_skips_reinference:
+  for +position: Nat
+  for +checked: Groups.CheckedGroup
+  {Scheduler.check_task_planned(Scheduler.RetainedTask{position, checked}, Unit{}) == Scheduler.Outcome{position, Done{checked}} : Scheduler.Outcome}
+
+law ordinary_catalog_does_not_collect_certificates:
+  for module: M.Module
+  {Scheduler.collecting(Scheduler.catalog(module)) == False{} : Bool}
+
+law evidenced_group_keeps_exact_source_and_imports:
+  for +position: Nat
+  for +module: M.Module
+  for +imports: List<&2, Groups.Interface>
+  for cost: Nat
+  {Scheduler.check_task_planned(Scheduler.EvidenceTask{position, module, imports, cost}, Unit{}) == Scheduler.EvidenceOutcome{position, module, imports, Groups.check_group_planned(module, imports)} : Scheduler.Outcome}
+
+# Alpha-renaming changes the shared value/row variable domain, while ordered
+# operation identities (including duplicates) remain part of the checked type.
+law residual_renaming_preserves_operation_labels:
+  for +operations: List<&2, M.TypeId>
+  for tail: M.RowTail
+  for mapping: NatIndex.Index<Nat>
+  {Substitutions.rename_row(M.EffectRow{operations, tail}, mapping) == M.EffectRow{operations, Substitutions.rename_tail(tail, mapping)} : M.EffectRow}
+
+law parameter_mapping_keeps_first_binder:
+  for previous: Nat
+  for head: Nat
+  for index: Nat
+  for +mapping: NatIndex.Index<Nat>
+  {Substitutions.parameter_mapping_next(Some{previous}, head, index, mapping) == mapping : NatIndex.Index<Nat>}
+
+law empty_generic_scheme_needs_no_traversal:
+  for +ty: M.Ty
+  for +next: Nat
+  {Infer.instance(Nil{}, ty, next) == Done{Infer.SchemeInstance{ty, next}} : Result<&2, &2, M.Diagnostic, Infer.SchemeInstance>}
+
+# A successful group check is reused as a whole dependency component. Dropping
+# declarations cannot turn a larger certificate into a proof for a smaller one.
+law retained_group_cannot_discard_all_functions:
+  for function: M.Function
+  for rest: List<&2, M.Function>
+  {CheckedCore.same_declarations(M.Module{Nil{}, function <> rest, Nil{}, Nil{}}, M.Module{Nil{}, Nil{}, Nil{}, Nil{}}) == False{} : Bool}
+
+# Frontier reuse fails closed and never reinterprets an already retained group.
+law frontier_comparison_stops_on_mismatch:
+  for fuel: Nat
+  for pending: List<&2, FrontierAlpha.Work>
+  for delta: Maybe<&2, FrontierAlpha.Offset>
+  {FrontierAlpha.compare_work(fuel, False{}, pending, delta) == False{} : Bool}
+
+law frontier_comparison_exhaustion_is_a_miss:
+  for head: FrontierAlpha.Work
+  for tail: List<&2, FrontierAlpha.Work>
+  for delta: Maybe<&2, FrontierAlpha.Offset>
+  {FrontierAlpha.compare_work(0n, True{}, head <> tail, delta) == False{} : Bool}
+
+law frontier_failure_checks_the_current_task:
+  for diagnostic: M.Diagnostic
+  for +task: Scheduler.Task
+  {Scheduler.representative_found(Fail{diagnostic}, task) == Scheduler.check_task_planned(task, Unit{}) : Scheduler.Outcome}
+
+law frontier_reuse_excludes_retained_tasks:
+  for position: Nat
+  for checked: Groups.CheckedGroup
+  {Scheduler.task_candidate(Scheduler.RetainedTask{position, checked}) == None{} : Maybe<&2, Scheduler.FrontierCandidate>}
+
+# Pending caches retain raw requirements in order; current substitutions still
+# determine their readiness. An invalid prefix count uses the complete scan.
+law pending_cache_preserves_requirements:
+  for count: Nat
+  for +needs: List<&2, Infer.Coverage>
+  {Mono.cached_needs(Mono.PendingCache{count, needs}) == needs : List<&2, Infer.Coverage>}
+
+law empty_coverage_preserves_pending_tail:
+  for choices: Map<&2, Mono.Choice>
+  for +rest: List<&2, Infer.Coverage>
+  {Mono.unresolved_coverage_with_tail(Nil{}, choices, rest) == rest : List<&2, Infer.Coverage>}
+
+law empty_fresh_prefix_preserves_pending_tail:
+  for definitions: List<&2, Infer.Definition>
+  for choices: Map<&2, Mono.Choice>
+  for +rest: List<&2, Infer.Coverage>
+  {Mono.fresh_unresolved(Mono.FreshWork{0n, definitions}, choices, rest) == Some{rest} : Maybe<&2, List<&2, Infer.Coverage>>}
+
+law invalid_pending_prefix_uses_full_scan:
+  for +selected: Mono.Specialization
+  for +count: Nat
+  for prior_count: Nat
+  for definitions: List<&2, Infer.Definition>
+  for prior_needs: List<&2, Infer.Coverage>
+  for choices: Map<&2, Mono.Choice>
+  {Mono.refresh_with_count(False{}, selected, count, prior_count, definitions, prior_needs, choices) == Mono.PendingCache{count, Mono.specialization_pending(selected)} : Mono.PendingCache}

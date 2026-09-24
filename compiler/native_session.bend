@@ -19,7 +19,6 @@ import ./monomorph.bend as Mono
 import ./effect_families.bend as Families
 import ./check.bend as Check
 import ./source_modules.bend as Modules
-import ./shape_reuse.bend as ShapeReuse
 import ./catalog_versions.bend as CV
 
 type Mode is Data:
@@ -480,7 +479,16 @@ def select_group(found: Maybe<&2, G.CheckedGroup>, position: Nat, module: M.Modu
     case None{}:
       GroupMiss{Scheduler.Task{position, module, dependencies, cost}}
 
-def prepare_group(+position: Nat, job: G.Job, +known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups) -> Result<&2, &2, M.Diagnostic, PreparedGroup>:
+# A retained independent checking result is considered only after the finalized
+# incremental cache misses. Its exact body, dependencies and catalog must match.
+def select_retained_group(found: Maybe<&2, G.CheckedGroup>, known: CheckCatalog, job: G.Job, +subset: M.Module, +imports: List<&2, G.Interface>, position: Nat, cost: Nat) -> GroupSelection:
+  match found:
+    case Some{value}:
+      GroupHit{value}
+    case None{}:
+      select_group(Scheduler.retained_group(check_catalog(known), job, subset, imports), position, subset, imports, cost)
+
+def prepare_group(+position: Nat, +job: G.Job, +known: CheckCatalog, previous: Map<&2, Cached<G.CheckedGroup>>, state: CheckedGroups) -> Result<&2, &2, M.Diagnostic, PreparedGroup>:
   G.Job{+members, +dependencies, types} = job
   CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, counts} = state
   do Result<&2, &2, M.Diagnostic, PreparedGroup>:
@@ -490,7 +498,7 @@ def prepare_group(+position: Nat, job: G.Job, +known: CheckCatalog, previous: Ma
     +imports : List<&2, G.Interface> <- Scheduler.dependency_interfaces(dependencies, interfaces)
     imported_key : List<&2, U32> <- K.interfaces(imports)
     +keys : List<&2, List<&2, U32>> = [base_key, imported_key]
-    selection : GroupSelection = select_group(cached(G.CheckedGroup, Index.find(Cached<G.CheckedGroup>, previous, owner), keys), position, subset, imports, List.length(&2, U32, base_key))
+    selection : GroupSelection = select_retained_group(cached(G.CheckedGroup, Index.find(Cached<G.CheckedGroup>, previous, owner), keys), known, job, subset, imports, position, List.length(&2, U32, base_key))
     closure : Set() <- dependency_closure(dependencies, closures, Set.add(Set.new(), owner))
     return PreparedGroup{position, owner, members, closure, base_key, keys, selection}
 
@@ -580,8 +588,11 @@ def publish_group_result(result: Result<&2, &2, M.Diagnostic, G.CheckedGroup>, p
       group_success(progress, owner, members, closure, base_key, keys, Selected{checked, False{}})
 
 def checked_outcome(outcome: Scheduler.Outcome, expected: Nat) -> Result<&2, &2, M.Diagnostic, G.CheckedGroup>:
-  Scheduler.Outcome{position, checked} = outcome
-  Bool.pick(Result<&2, &2, M.Diagnostic, G.CheckedGroup>, Nat.is_eq(position, expected), checked, Fail{M.Diagnostic{"internal_error", "native_session", "inference batch changed declaration group order"}})
+  match outcome:
+    case Scheduler.Outcome{position, checked}:
+      Bool.pick(Result<&2, &2, M.Diagnostic, G.CheckedGroup>, Nat.is_eq(position, expected), checked, Fail{M.Diagnostic{"internal_error", "native_session", "inference batch changed declaration group order"}})
+    case Scheduler.EvidenceOutcome{position, module, imports, checked}:
+      Bool.pick(Result<&2, &2, M.Diagnostic, G.CheckedGroup>, Nat.is_eq(position, expected), checked, Fail{M.Diagnostic{"internal_error", "native_session", "inference batch changed declaration group order"}})
 
 def publish_prepared(prepared: List<&2, GroupPreparation>, outcomes: List<&2, Scheduler.Outcome>, progress: GroupProgress) -> GroupProgress:
   match prepared outcomes:
@@ -1013,57 +1024,19 @@ def function_count(module: M.Module) -> Nat:
   M.Module{constants, functions, types, operations} = module
   List.length(&2, M.Function, functions)
 
-def install_shape_seed(found: Maybe<&2, Cached<G.CheckedGroup>>, owner: String, keys: List<&2, List<&2, U32>>, checked: G.CheckedGroup, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
-  match found:
-    case Some{old}:
-      previous
-    case None{}:
-      Map.set(&2, Cached<G.CheckedGroup>, previous, owner, Cached{keys, checked})
-
-def install_shape_seeds(seeds: List<&2, ShapeReuse.Seed>, +previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
-  match seeds:
-    case Nil{}:
-      previous
-    case ShapeReuse.Seed{+owner, keys, checked} <> tail:
-      install_shape_seeds(tail, install_shape_seed(Index.find(Cached<G.CheckedGroup>, previous, owner), owner, keys, checked, previous))
-
-def shape_seed_result(result: Result<&2, &2, M.Diagnostic, List<&2, ShapeReuse.Seed>>, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
-  match result:
-    case Fail{diagnostic}:
-      previous
-    case Done{seeds}:
-      install_shape_seeds(seeds, previous)
-
-def seed_checked_original(checked: Maybe<&2, M.CheckedModule>, original: M.Module, revision: CV.Revision, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
-  match checked:
-    case None{}:
-      previous
-    case Some{typed}:
-      shape_seed_result(ShapeReuse.seed(original, typed, revision), previous)
-
-def seed_if_same_catalog(same: Bool, original: M.Module, checked: Maybe<&2, M.CheckedModule>, revision: CV.Revision, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
-  match same:
-    case True{}:
-      seed_checked_original(checked, original, revision, previous)
-    case False{}:
-      previous
-
-# The initial shape check has already validated these unchanged groups. On a
-# warm edit, the previous finalized group cache is more useful and needs no
-# additional planning or key work.
-def seed_first_revision(previous: Map<&2, Cached<G.CheckedGroup>>, +original: M.Module, checked: Maybe<&2, M.CheckedModule>, +revision: CV.Revision) -> Map<&2, Cached<G.CheckedGroup>>:
-  match previous:
-    case MTip{}:
-      seed_if_same_catalog(CV.original_matches(original, revision), original, checked, revision, previous)
-    case other:
-      other
-
 def groups_if_same_catalog(same: Bool, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
   match same:
     case True{}:
       previous
     case False{}:
       Map.new(&2, Cached<G.CheckedGroup>)
+
+def retain_initial(previous: Map<&2, Cached<G.CheckedGroup>>) -> Bool:
+  match previous:
+    case MTip{}:
+      True{}
+    case _:
+      False{}
 
 def constants_if_same_catalog(same: Bool, previous: Map<&2, Cached<Const.Constants>>) -> Map<&2, Cached<Const.Constants>>:
   match same:
@@ -1073,12 +1046,12 @@ def constants_if_same_catalog(same: Bool, previous: Map<&2, Cached<Const.Constan
       Map.new(&2, Cached<Const.Constants>)
 
 def update_lowered_module(state: State, mode: Mode, entry: String, +prelude_module: M.Module, +raw_module: M.Module, scope_words: List<&2, U32>, lowered: Lowering, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
-  State{+prelude, scope_key, declarations, planning, previous_groups, constants, entries, specialization, catalog_version} = state
+  State{+prelude, scope_key, declarations, planning, +previous_groups, constants, entries, specialization, catalog_version} = state
   Lowering{+values, +scans, declaration_counts} = lowered
   +specialized = Bool.or(Mono.required(raw_module), Families.required(raw_module))
   do Result<&2, &2, M.Diagnostic, Completion>:
     +family_module : M.Module <- Families.prepare(raw_module)
-    +specialization_result : Mono.Prepared <- Mono.prepare_cached(~K.module, family_module, entry, M.module_operations(raw_module), specialization)
+    +specialization_result : Mono.Prepared <- Mono.prepare_cached_evidenced(~K.module, family_module, entry, M.module_operations(raw_module), specialization, retain_initial(previous_groups))
     +module : M.Module = Mono.prepared_module(specialization_result)
     +expanded : Bool = Bool.or(specialized, Bool.not(Nat.is_eq(function_count(raw_module), function_count(module))))
     graph : List<&2, D.Node> <- specialization_graph(expanded, module, Plan.scan(prelude_module) <> scans)
@@ -1090,8 +1063,7 @@ def update_lowered_module(state: State, mode: Mode, entry: String, +prelude_modu
     +revision : CV.Revision = CV.prepared_revision(catalog)
     +same_catalog : Bool = CV.prepared_same_operations(catalog)
     +previous_valid : Map<&2, Cached<G.CheckedGroup>> = groups_if_same_catalog(same_catalog, previous_groups)
-    +previous_with_shapes : Map<&2, Cached<G.CheckedGroup>> = seed_first_revision(previous_valid, family_module, Mono.prepared_typed_original(specialization_result), revision)
-    completed : CheckedGroups <- check_plan(scheduled, CheckCatalog{Scheduler.catalog_costs(module, Plan.collect_costs(scans, Map.new(&2, Nat))), revision}, previous_with_shapes, empty_checked())
+    completed : CheckedGroups <- check_plan(scheduled, CheckCatalog{Scheduler.with_core(Scheduler.catalog_costs(module, Plan.collect_costs(scans, Map.new(&2, Nat))), module, Mono.prepared_certificates(specialization_result)), revision}, previous_valid, empty_checked())
     update_checked(State{prelude, Some{scope_words}, planning_declarations(prepared), Some{Cached{[plan_key], scheduled}}, Map.new(&2, Cached<G.CheckedGroup>), constants_if_same_catalog(same_catalog, constants), entries, Some{Mono.prepared_cache(specialization_result)}, Some{revision}}, mode, module, completed, declaration_counts, steps)
 
 def update_lowered(state: State, mode: Mode, entry: String, +prelude_module: M.Module, scope_words: List<&2, U32>, lowered: Lowering, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:

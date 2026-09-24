@@ -191,13 +191,16 @@ def infer_component(names: List<&2, String>, +declarations: List<&2, Declaration
         next : Environment <- infer_declaration(declaration, environment, operations, types, functions)
         infer_component(tail, declarations, next, operations, types, functions)
 
-def outside(bindings: List<&2, I.Binding>, +members: List<&2, String>, +references: List<&2, String>) -> List<&2, I.Binding>:
+def outside_indexed(bindings: List<&2, I.Binding>, +members: Set(), +references: Set()) -> List<&2, I.Binding>:
   match bindings:
     case Nil{}:
       Nil{}
     case I.Binding{+name, +ty, +variables} <> tail:
-      +rest = outside(tail, members, references)
-      Bool.pick(List<&2, I.Binding>, Bool.and(D.contains(references, name), Bool.not(D.contains(members, name))), I.Binding{name, ty, variables} <> rest, rest)
+      +rest = outside_indexed(tail, members, references)
+      Bool.pick(List<&2, I.Binding>, Bool.and(D.member(references, name), Bool.not(D.member(members, name))), I.Binding{name, ty, variables} <> rest, rest)
+
+def outside(bindings: List<&2, I.Binding>, members: List<&2, String>, references: List<&2, String>) -> List<&2, I.Binding>:
+  outside_indexed(bindings, reference_set(members, Set.new()), reference_set(references, Set.new()))
 
 def external_names(members: List<&2, String>, +nodes: List<&2, D.Node>) -> List<&2, String>:
   match members:
@@ -214,24 +217,29 @@ def generalize_member(member: Bool, binding: I.Binding, context: I.Context, stat
       I.Binding{name, ty, variables} = binding
       I.generalize(ty, context, state, name)
 
-def generalize_bindings(bindings: List<&2, I.Binding>, +members: List<&2, String>, +context: I.Context, +state: I.State) -> Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
+def generalize_bindings_indexed(bindings: List<&2, I.Binding>, +members: Set(), +context: I.Context, +state: I.State) -> Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
   match bindings:
     case Nil{}:
       Done{Nil{}}
     case I.Binding{+name, ty, variables} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
-        head : I.Binding <- generalize_member(D.contains(members, name), I.Binding{name, ty, variables}, context, state)
-        rest : List<&2, I.Binding> <- generalize_bindings(tail, members, context, state)
+        head : I.Binding <- generalize_member(D.member(members, name), I.Binding{name, ty, variables}, context, state)
+        rest : List<&2, I.Binding> <- generalize_bindings_indexed(tail, members, context, state)
         return head <> rest
+
+def generalize_bindings(bindings: List<&2, I.Binding>, members: List<&2, String>, context: I.Context, state: I.State) -> Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
+  generalize_bindings_indexed(bindings, reference_set(members, Set.new()), context, state)
 
 def generalize_component(environment: Environment, +members: List<&2, String>, operations: List<&2, M.Operation>, types: List<&2, M.DataType>, nodes: List<&2, D.Node>) -> Result<&2, &2, M.Diagnostic, Environment>:
   Environment{+bindings, +definitions, +state} = environment
   # A closed top-level component can share metavariables only with referenced
   # globals. Unrelated declarations have disjoint fresh variables; scanning
   # their entire types here would make independent modules cubic to infer.
-  +context = {I.Context{outside(bindings, members, external_names(members, nodes)), Nil{}, Nil{}, types, operations, "module", Nil{}, M.empty_row()} : I.Context}
+  +member_names = reference_set(members, Set.new())
+  referenced_names = reference_set(external_names(members, nodes), Set.new())
+  +context = {I.Context{outside_indexed(bindings, member_names, referenced_names), Nil{}, Nil{}, types, operations, "module", Nil{}, M.empty_row()} : I.Context}
   do Result<&2, &2, M.Diagnostic, Environment>:
-    next : List<&2, I.Binding> <- generalize_bindings(bindings, members, context, state)
+    next : List<&2, I.Binding> <- generalize_bindings_indexed(bindings, member_names, context, state)
     return Environment{next, definitions, state}
 
 def infer_groups(groups: List<&2, List<&2, String>>, +nodes: List<&2, D.Node>, +declarations: List<&2, Declaration>, environment: Environment, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, +functions: List<&2, String>) -> Result<&2, &2, M.Diagnostic, Environment>:

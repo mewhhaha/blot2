@@ -8,6 +8,7 @@ import ./source_types.bend as Types
 import ./index.bend as Index
 import ./operators.bend as O
 import ./inference_batch.bend as B
+import ./checked_core.bend as Core
 
 type Linked is Data:
   Linked{module: M.Module, scopes: Map<&2, Lower.Context>}
@@ -277,3 +278,17 @@ def source_module_deferred(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: N
         +module : M.Module <- prepared_project(Lower.prepare_prelude(prelude, fuel), root, fuel)
         prepared : M.Module <- Families.prepare(module)
         Mono.prepare_deferred(prepared, C.text_of(root), M.module_operations(module))
+
+# Retain the solved specialization evidence until the final group check.
+def source_module_core(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
+  match project:
+    case False{}:
+      do Result<&2, &2, M.Diagnostic, Core.Prepared>:
+        +module : M.Module <- Lower.source_module(root, prelude, fuel)
+        prepared : M.Module <- Families.prepare(module)
+        Mono.prepare_deferred_core(prepared, "main", M.module_operations(module))
+    case True{}:
+      do Result<&2, &2, M.Diagnostic, Core.Prepared>:
+        +module : M.Module <- prepared_project(Lower.prepare_prelude(prelude, fuel), root, fuel)
+        prepared : M.Module <- Families.prepare(module)
+        Mono.prepare_deferred_core(prepared, C.text_of(root), M.module_operations(module))

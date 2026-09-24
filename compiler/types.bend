@@ -180,6 +180,153 @@ def replace(ty: M.Ty, variable: Nat, replacement: M.Ty) -> Result<&2, &2, M.Diag
     xs : List<&2, M.Ty> <- rewrite(Nat.mul(256n, 256n), OneType{ty}, ReplaceVariable{variable, replacement})
     first_type(xs)
 
+# A scheme's quantified variables are allocated below its next fresh variable.
+# Keeping that invariant, and rejecting repeated binders, makes simultaneous
+# renaming observationally equal to the former left-to-right replace loop:
+# none of the fresh targets can itself be a later replacement key.
+type Renaming is Data:
+  Renaming{mapping: NatIndex.Index<Nat>, next: Nat, simultaneous: Bool}
+
+def renaming_work(variables: List<&2, Nat>, +start: Nat, +next: Nat, +mapping: NatIndex.Index<Nat>, +simultaneous: Bool) -> Renaming:
+  match variables:
+    case Nil{}:
+      Renaming{mapping, next, simultaneous}
+    case +head <> tail:
+      +unused = Maybe.is_none(&2, Nat, NatIndex.find(Nat, mapping, head))
+      +safe = Bool.and(simultaneous, Bool.and(Nat.is_lt(head, start), unused))
+      renaming_work(tail, start, 1n+next, NatIndex.set(Nat, mapping, head, next), safe)
+
+def renaming(variables: List<&2, Nat>, +next: Nat) -> Renaming:
+  renaming_work(variables, next, next, NatIndex.new(Nat), True{})
+
+def renamed_next(value: Renaming) -> Nat:
+  Renaming{mapping, next, simultaneous} = value
+  next
+
+def renaming_is_simultaneous(value: Renaming) -> Bool:
+  Renaming{mapping, next, simultaneous} = value
+  simultaneous
+
+def renamed_variable(+mapping: NatIndex.Index<Nat>, +original: Nat) -> Nat:
+  NatIndex.get(Nat, mapping, original, original)
+
+type VariableKind is Data:
+  FreshVariables{}
+  SchemeParameters{}
+
+def renamed_type_found(found: Maybe<&2, Nat>, index: Nat, kind: VariableKind) -> M.Ty:
+  match found kind:
+    case None{} _:
+      M.VariableTy{index}
+    case Some{fresh} FreshVariables{}:
+      M.VariableTy{fresh}
+    case Some{parameter} SchemeParameters{}:
+      M.ParameterTy{parameter}
+
+def renamed_type(+index: Nat, mapping: NatIndex.Index<Nat>, kind: VariableKind) -> M.Ty:
+  renamed_type_found(NatIndex.find(Nat, mapping, index), index, kind)
+
+def renamed_tail_found(found: Maybe<&2, Nat>, index: Nat, kind: VariableKind) -> M.RowTail:
+  match found kind:
+    case None{} _:
+      M.RowVariable{index}
+    case Some{fresh} FreshVariables{}:
+      M.RowVariable{fresh}
+    case Some{parameter} SchemeParameters{}:
+      M.RowParameter{parameter}
+
+def rename_tail_kind(tail: M.RowTail, +mapping: NatIndex.Index<Nat>, kind: VariableKind) -> M.RowTail:
+  match tail:
+    case M.RowVariable{+index}:
+      renamed_tail_found(NatIndex.find(Nat, mapping, index), index, kind)
+    case other:
+      other
+
+def rename_tail(tail: M.RowTail, mapping: NatIndex.Index<Nat>) -> M.RowTail:
+  rename_tail_kind(tail, mapping, FreshVariables{})
+
+def rename_row_kind(row: M.EffectRow, mapping: NatIndex.Index<Nat>, kind: VariableKind) -> M.EffectRow:
+  M.EffectRow{operations, tail} = row
+  M.EffectRow{operations, rename_tail_kind(tail, mapping, kind)}
+
+def rename_row(row: M.EffectRow, mapping: NatIndex.Index<Nat>) -> M.EffectRow:
+  rename_row_kind(row, mapping, FreshVariables{})
+
+# The row's ordered labels and nominal identities are immutable under alpha
+# renaming. Only VariableTy and RowVariable use the quantified variable domain.
+def rename_work(+fuel: Nat, work: TypeWork, +mapping: NatIndex.Index<Nat>, +kind: VariableKind) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+  match fuel work:
+    case 0n _:
+      Fail{complexity()}
+    case 1n+rest OneType{M.VariableTy{index}}:
+      Done{[renamed_type(index, mapping, kind)]}
+    case 1n+rest OneType{M.FunctionTy{parameter, result, effects}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+        ps : List<&2, M.Ty> <- rename_work(rest, OneType{parameter}, mapping, kind)
+        rs : List<&2, M.Ty> <- rename_work(rest, OneType{result}, mapping, kind)
+        p : M.Ty <- first_type(ps)
+        r : M.Ty <- first_type(rs)
+        return [M.FunctionTy{p, r, rename_row_kind(effects, mapping, kind)}]
+    case 1n+rest OneType{M.StateProviderTy{read, write, state}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+        values : List<&2, M.Ty> <- rename_work(rest, OneType{state}, mapping, kind)
+        value : M.Ty <- first_type(values)
+        return [M.StateProviderTy{read, write, value}]
+    case 1n+rest OneType{M.ProviderTy{identity, effects}}:
+      Done{[M.ProviderTy{identity, rename_row_kind(effects, mapping, kind)}]}
+    case 1n+rest OneType{M.AppliedTy{identity, arguments}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+        xs : List<&2, M.Ty> <- rename_work(rest, ManyTypes{arguments}, mapping, kind)
+        return [M.AppliedTy{identity, xs}]
+    case 1n+rest OneType{M.ProductTy{elements}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+        xs : List<&2, M.Ty> <- rename_work(rest, ManyTypes{elements}, mapping, kind)
+        return [M.ProductTy{xs}]
+    case 1n+rest OneType{M.ArrayTy{element}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+        xs : List<&2, M.Ty> <- rename_work(rest, OneType{element}, mapping, kind)
+        value : M.Ty <- first_type(xs)
+        return [M.ArrayTy{value}]
+    case 1n+rest OneType{other}:
+      Done{[other]}
+    case 1n+rest ManyTypes{Nil{}}:
+      Done{Nil{}}
+    case 1n+rest ManyTypes{head <> tail}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+        hs : List<&2, M.Ty> <- rename_work(rest, OneType{head}, mapping, kind)
+        h : M.Ty <- first_type(hs)
+        ts : List<&2, M.Ty> <- rename_work(rest, ManyTypes{tail}, mapping, kind)
+        return h <> ts
+
+def rename_type(ty: M.Ty, mapping: NatIndex.Index<Nat>) -> Result<&2, &2, M.Diagnostic, M.Ty>:
+  do Result<&2, &2, M.Diagnostic, M.Ty>:
+    xs : List<&2, M.Ty> <- rename_work(Nat.mul(256n, 256n), OneType{ty}, mapping, FreshVariables{})
+    first_type(xs)
+
+# Parameter targets inhabit a different constructor, so only the first
+# occurrence of a repeated source ID is effective in the former replace loop.
+def parameter_mapping_next(found: Maybe<&2, Nat>, head: Nat, index: Nat, mapping: NatIndex.Index<Nat>) -> NatIndex.Index<Nat>:
+  match found:
+    case Some{previous}:
+      mapping
+    case None{}:
+      NatIndex.set(Nat, mapping, head, index)
+
+def parameter_mapping_work(variables: List<&2, Nat>, +index: Nat, +mapping: NatIndex.Index<Nat>) -> NatIndex.Index<Nat>:
+  match variables:
+    case Nil{}:
+      mapping
+    case +head <> tail:
+      parameter_mapping_work(tail, 1n+index, parameter_mapping_next(NatIndex.find(Nat, mapping, head), head, index, mapping))
+
+def parameter_mapping(variables: List<&2, Nat>, index: Nat) -> NatIndex.Index<Nat>:
+  parameter_mapping_work(variables, index, NatIndex.new(Nat))
+
+def parameterize_type(ty: M.Ty, mapping: NatIndex.Index<Nat>) -> Result<&2, &2, M.Diagnostic, M.Ty>:
+  do Result<&2, &2, M.Diagnostic, M.Ty>:
+    xs : List<&2, M.Ty> <- rename_work(Nat.mul(256n, 256n), OneType{ty}, mapping, SchemeParameters{})
+    first_type(xs)
+
 def parameters(arguments: List<&2, M.Ty>, +index: Nat, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
   match arguments:
     case Nil{}:
@@ -269,8 +416,109 @@ def resolve_accumulated(+fuel: Nat, +links: Nat, exhausted: Bool, +substitutions
         resolve_accumulated(rest, links, False{}, substitutions, cursor, ManyTypes{tail}, h <> reversed)
 
 
-def resolve_work(+substitutions: Substitutions, fuel: Nat, work: TypeWork) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+def resolve_work_reference(+substitutions: Substitutions, fuel: Nat, work: TypeWork) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
   resolve_accumulated(fuel, substitution_count(substitutions), Nat.is_eq(substitution_count(substitutions), 0n), substitutions, 0n, work, Nil{})
+
+type FlatFrame is Data:
+  AfterFunctionParameter{result: M.Ty, effects: M.EffectRow, fuel: Nat, links: Nat, cursor: Nat}
+  AfterFunctionResult{parameter: M.Ty, effects: M.EffectRow, cursor: Nat}
+  AfterStateProvider{read: M.TypeId, write: M.TypeId}
+  AfterProviderArguments{identity: M.TypeId}
+  AfterProductElements{}
+  AfterArrayElement{}
+  AfterManyHead{tail: List<&2, M.Ty>, reversed: List<&2, M.Ty>, fuel: Nat, links: Nat, cursor: Nat}
+
+type FlatValue is Data:
+  FlatOne{value: M.Ty}
+  FlatMany{values: List<&2, M.Ty>}
+
+type FlatControl is Data:
+  FlatVisit{fuel: Nat, links: Nat, exhausted: Bool, cursor: Nat, work: TypeWork, reversed: List<&2, M.Ty>, frames: List<&2, FlatFrame>}
+  FlatReturn{value: FlatValue, frames: List<&2, FlatFrame>}
+
+def malformed_flat() -> M.Diagnostic:
+  M.Diagnostic{"internal_error", "inference", "type rewrite did not produce exactly one type"}
+
+def flat_variable(found: Maybe<&2, Version<M.Ty>>, index: Nat, fuel: Nat, remaining: Nat, +substitutions: Substitutions, frames: List<&2, FlatFrame>) -> FlatControl:
+  match found:
+    case None{}:
+      FlatReturn{FlatOne{M.VariableTy{index}}, frames}
+    case Some{Version{+position, replacement}}:
+      +next_cursor = {1n+position : Nat}
+      FlatVisit{fuel, remaining, Nat.is_ge(next_cursor, substitution_count(substitutions)), next_cursor, OneType{replacement}, Nil{}, frames}
+
+def flat_function(+fuel: Nat, +links: Nat, +cursor: Nat, parameter: M.Ty, result: M.Ty, effects: M.EffectRow, frames: List<&2, FlatFrame>) -> FlatControl:
+  FlatVisit{fuel, links, False{}, cursor, OneType{parameter}, Nil{}, AfterFunctionParameter{result, effects, fuel, links, cursor} <> frames}
+
+def flat_many(+fuel: Nat, +links: Nat, +cursor: Nat, head: M.Ty, tail: List<&2, M.Ty>, reversed: List<&2, M.Ty>, frames: List<&2, FlatFrame>) -> FlatControl:
+  FlatVisit{fuel, links, False{}, cursor, OneType{head}, Nil{}, AfterManyHead{tail, reversed, fuel, links, cursor} <> frames}
+
+def flat_step(steps: Nat, +substitutions: Substitutions, control: FlatControl) -> Maybe<&2, Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>>:
+  match steps control:
+    case 0n _:
+      None{}
+    case 1n+rest FlatReturn{FlatOne{value}, Nil{}}:
+      Some{Done{[value]}}
+    case 1n+rest FlatReturn{FlatMany{values}, Nil{}}:
+      Some{Done{values}}
+    case 1n+rest FlatReturn{FlatOne{parameter}, AfterFunctionParameter{result, effects, fuel, links, +cursor} <> frames}:
+      flat_step(rest, substitutions, FlatVisit{fuel, links, False{}, cursor, OneType{result}, Nil{}, AfterFunctionResult{parameter, effects, cursor} <> frames})
+    case 1n+rest FlatReturn{FlatOne{result}, AfterFunctionResult{parameter, effects, cursor} <> frames}:
+      flat_step(rest, substitutions, FlatReturn{FlatOne{M.FunctionTy{parameter, result, resolve_row_at(substitutions, effects, cursor)}}, frames})
+    case 1n+rest FlatReturn{FlatOne{state}, AfterStateProvider{read, write} <> frames}:
+      flat_step(rest, substitutions, FlatReturn{FlatOne{M.StateProviderTy{read, write, state}}, frames})
+    case 1n+rest FlatReturn{FlatMany{arguments}, AfterProviderArguments{identity} <> frames}:
+      flat_step(rest, substitutions, FlatReturn{FlatOne{M.AppliedTy{identity, arguments}}, frames})
+    case 1n+rest FlatReturn{FlatMany{elements}, AfterProductElements{} <> frames}:
+      flat_step(rest, substitutions, FlatReturn{FlatOne{M.ProductTy{elements}}, frames})
+    case 1n+rest FlatReturn{FlatOne{element}, AfterArrayElement{} <> frames}:
+      flat_step(rest, substitutions, FlatReturn{FlatOne{M.ArrayTy{element}}, frames})
+    case 1n+rest FlatReturn{FlatOne{head}, AfterManyHead{tail, reversed, fuel, links, cursor} <> frames}:
+      flat_step(rest, substitutions, FlatVisit{fuel, links, False{}, cursor, ManyTypes{tail}, head <> reversed, frames})
+    case 1n+rest FlatReturn{value, frames}:
+      Some{Fail{malformed_flat()}}
+    case 1n+rest FlatVisit{fuel, links, True{}, cursor, OneType{ty}, reversed, frames}:
+      flat_step(rest, substitutions, FlatReturn{FlatOne{ty}, frames})
+    case 1n+rest FlatVisit{fuel, links, True{}, cursor, ManyTypes{types}, reversed, frames}:
+      flat_step(rest, substitutions, FlatReturn{FlatMany{List.append(&2, M.Ty, List.reverse(&2, M.Ty, reversed), types)}, frames})
+    case 1n+rest FlatVisit{0n, links, False{}, cursor, work, reversed, frames}:
+      Some{Fail{complexity()}}
+    case 1n+rest FlatVisit{1n+fuel, 0n, False{}, cursor, OneType{M.VariableTy{index}}, reversed, frames}:
+      Some{Fail{M.Diagnostic{"internal_error", "substitution", "indexed substitution exceeded its chronological bound"}}}
+    case 1n+rest FlatVisit{1n+fuel, 1n+links, False{}, cursor, OneType{M.VariableTy{+index}}, reversed, frames}:
+      flat_step(rest, substitutions, flat_variable(value_version(substitutions, index, cursor), index, 1n+fuel, links, substitutions, frames))
+    case 1n+rest FlatVisit{1n+fuel, +links, False{}, +cursor, OneType{M.FunctionTy{parameter, result, effects}}, reversed, frames}:
+      flat_step(rest, substitutions, flat_function(fuel, links, cursor, parameter, result, effects, frames))
+    case 1n+rest FlatVisit{1n+fuel, links, False{}, cursor, OneType{M.StateProviderTy{read, write, state}}, reversed, frames}:
+      flat_step(rest, substitutions, FlatVisit{fuel, links, False{}, cursor, OneType{state}, Nil{}, AfterStateProvider{read, write} <> frames})
+    case 1n+rest FlatVisit{1n+fuel, links, False{}, cursor, OneType{M.ProviderTy{identity, effects}}, reversed, frames}:
+      flat_step(rest, substitutions, FlatReturn{FlatOne{M.ProviderTy{identity, resolve_row_at(substitutions, effects, cursor)}}, frames})
+    case 1n+rest FlatVisit{1n+fuel, links, False{}, cursor, OneType{M.AppliedTy{identity, arguments}}, reversed, frames}:
+      flat_step(rest, substitutions, FlatVisit{fuel, links, False{}, cursor, ManyTypes{arguments}, Nil{}, AfterProviderArguments{identity} <> frames})
+    case 1n+rest FlatVisit{1n+fuel, links, False{}, cursor, OneType{M.ProductTy{elements}}, reversed, frames}:
+      flat_step(rest, substitutions, FlatVisit{fuel, links, False{}, cursor, ManyTypes{elements}, Nil{}, AfterProductElements{} <> frames})
+    case 1n+rest FlatVisit{1n+fuel, links, False{}, cursor, OneType{M.ArrayTy{element}}, reversed, frames}:
+      flat_step(rest, substitutions, FlatVisit{fuel, links, False{}, cursor, OneType{element}, Nil{}, AfterArrayElement{} <> frames})
+    case 1n+rest FlatVisit{1n+fuel, links, False{}, cursor, OneType{other}, reversed, frames}:
+      flat_step(rest, substitutions, FlatReturn{FlatOne{other}, frames})
+    case 1n+rest FlatVisit{1n+fuel, links, False{}, cursor, ManyTypes{Nil{}}, reversed, frames}:
+      flat_step(rest, substitutions, FlatReturn{FlatMany{List.reverse(&2, M.Ty, reversed)}, frames})
+    case 1n+rest FlatVisit{1n+fuel, +links, False{}, +cursor, ManyTypes{head <> tail}, reversed, frames}:
+      flat_step(rest, substitutions, flat_many(fuel, links, cursor, head, tail, reversed, frames))
+
+def flat_result(found: Maybe<&2, Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>>, +substitutions: Substitutions, fuel: Nat, work: TypeWork) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+  match found:
+    case Some{result}:
+      result
+    case None{}:
+      resolve_work_reference(substitutions, fuel, work)
+
+def resolve_work_flat(+substitutions: Substitutions, +fuel: Nat, +work: TypeWork) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+  +links = substitution_count(substitutions)
+  flat_result(flat_step(1048576n, substitutions, FlatVisit{fuel, links, Nat.is_eq(links, 0n), 0n, work, Nil{}, Nil{}}), substitutions, fuel, work)
+
+def resolve_work(substitutions: Substitutions, fuel: Nat, work: TypeWork) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+  resolve_work_flat(substitutions, fuel, work)
 
 def resolve(substitutions: Substitutions, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
   do Result<&2, &2, M.Diagnostic, M.Ty>:

@@ -217,14 +217,35 @@ def return_type(context: Context, identity: Nat) -> Result<&2, &2, M.Diagnostic,
   Context{globals, locals, labels, types, operations, subject, functions, ambient} = context
   lookup_label(labels, identity, subject)
 
-def instance(variables: List<&2, Nat>, ty: M.Ty, +next: Nat) -> Result<&2, &2, M.Diagnostic, SchemeInstance>:
+def instance_sequential(variables: List<&2, Nat>, ty: M.Ty, +next: Nat) -> Result<&2, &2, M.Diagnostic, SchemeInstance>:
   match variables:
     case Nil{}:
       Done{SchemeInstance{ty, next}}
     case head <> tail:
       do Result<&2, &2, M.Diagnostic, SchemeInstance>:
         replaced : M.Ty <- T.replace(ty, head, M.VariableTy{next})
-        instance(tail, replaced, 1n+next)
+        instance_sequential(tail, replaced, 1n+next)
+
+def instance_mapped(renaming: T.Renaming, binders: List<&2, Nat>, ty: M.Ty, next: Nat) -> Result<&2, &2, M.Diagnostic, SchemeInstance>:
+  match renaming:
+    case T.Renaming{mapping, fresh_next, True{}}:
+      do Result<&2, &2, M.Diagnostic, SchemeInstance>:
+        renamed : M.Ty <- T.rename_type(ty, mapping)
+        return SchemeInstance{renamed, fresh_next}
+    case T.Renaming{mapping, fresh_next, False{}}:
+      instance_sequential(binders, ty, next)
+
+def instance(variables: List<&2, Nat>, ty: M.Ty, +next: Nat) -> Result<&2, &2, M.Diagnostic, SchemeInstance>:
+  match variables:
+    case Nil{}:
+      Done{SchemeInstance{ty, next}}
+    case head <> Nil{}:
+      do Result<&2, &2, M.Diagnostic, SchemeInstance>:
+        renamed : M.Ty <- T.replace(ty, head, M.VariableTy{next})
+        return SchemeInstance{renamed, 1n+next}
+    case +head <> +tail:
+      +binders : List<&2, Nat> = head <> tail
+      instance_mapped(T.renaming(binders, next), binders, ty, next)
 
 def instance_typing(value: SchemeInstance, substitutions: T.Substitutions, annotations: Map<&2, M.Ty>) -> Result<&2, &2, M.Diagnostic, Typing>:
   SchemeInstance{ty, next} = value

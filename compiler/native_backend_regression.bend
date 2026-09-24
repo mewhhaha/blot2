@@ -1,6 +1,10 @@
 import Base
 import ./model.bend as M
 import ./type_data.bend as D
+import ./residual_scheme_regression.bend as ResidualScheme
+import ./frontier_reuse_regression.bend as FrontierReuse
+import ./pending_cache_regression.bend as PendingCache
+import ./types.bend as Types
 
 def maybe_declaration() -> M.DataType:
   M.DataType{M.TypeId{"regression", "Maybe"}, 1n, [M.Constructor{"Some", Some{M.ParameterTy{0n}}, Nil{}}, M.Constructor{"Nothing", None{}, Nil{}}]}
@@ -57,17 +61,33 @@ def shared_records_valid() -> Bool:
   +copies = repeat(Maybe<&2, NestedRecord>, 3n, Some{NestedRecord{identity, Some{identity}}})
   Bool.and(nested_list_valid(copies), nested_list_valid(copies))
 
+# Exercise nested continuation frames and ordered duplicate effect labels in
+# the native backend. The final result consumes both saved siblings and rows.
+def flat_resolver_result(result: Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>, +get: M.TypeId, put: M.TypeId) -> Bool:
+  match result:
+    case Done{M.FunctionTy{M.U32Ty{}, M.ProductTy{M.ArrayTy{M.BoolTy{}} <> M.AppliedTy{M.TypeId{"regression", "Box"}, M.U32Ty{} <> Nil{}} <> Nil{}}, M.EffectRow{first <> second <> third <> Nil{}, M.ClosedRow{}}} <> Nil{}}:
+      Bool.and(M.type_id_equal(first, get), Bool.and(M.type_id_equal(second, get), M.type_id_equal(third, put)))
+    case _:
+      False{}
+
+def flat_resolver_valid() -> Bool:
+  +get = {M.TypeId{"regression", "get"} : M.TypeId}
+  +put = {M.TypeId{"regression", "put"} : M.TypeId}
+  +substitutions = Types.from_list([Types.Substitution{0n, M.U32Ty{}}, Types.Substitution{1n, M.BoolTy{}}, Types.RowSubstitution{7n, M.EffectRow{[put], M.ClosedRow{}}}])
+  +source = {M.FunctionTy{M.VariableTy{0n}, M.ProductTy{[M.ArrayTy{M.VariableTy{1n}}, M.AppliedTy{M.TypeId{"regression", "Box"}, [M.VariableTy{0n}]}]}, M.EffectRow{[get, get], M.RowVariable{7n}}} : M.Ty}
+  flat_resolver_result(Types.resolve_work(substitutions, 64n, Types.OneType{source}), get, put)
+
 # Bend 2.0.5 sealed this polymorphic Some payload, then unboxed its record with
 # term_loc instead of ctr_take. Keep the actual constructor lookup as a guard.
 def check() -> Bool:
-  Bool.and(shared_records_valid(), Bool.and(String.eq(definition_text(D.constructor([maybe_declaration()], "Nothing")), "regression::Maybe params=1 payload=none"), Bool.and(String.eq(definition_text(D.constructor([maybe_declaration()], "Some")), "regression::Maybe params=1 payload='0"), instance_valid(D.instantiate(Some{D.ConstructorDefinition{M.TypeId{"regression", "Maybe"}, 1n, None{}}}, "Nothing", 7n, "native backend regression")))))
+  Bool.and(FrontierReuse.valid(), Bool.and(PendingCache.valid(), Bool.and(flat_resolver_valid(), Bool.and(ResidualScheme.valid(), Bool.and(shared_records_valid(), Bool.and(String.eq(definition_text(D.constructor([maybe_declaration()], "Nothing")), "regression::Maybe params=1 payload=none"), Bool.and(String.eq(definition_text(D.constructor([maybe_declaration()], "Some")), "regression::Maybe params=1 payload='0"), instance_valid(D.instantiate(Some{D.ConstructorDefinition{M.TypeId{"regression", "Maybe"}, 1n, None{}}}, "Nothing", 7n, "native backend regression")))))))))
 
 def finish(valid: Bool) -> IO(Unit):
   match valid:
     case True{}:
       IO.pure(Unit, Unit{})
     case False{}:
-      IO.die(Unit, 1, "native backend regression: shared constructor records were corrupted")
+      IO.die(Unit, 1, "native backend regression: ownership, resolver, frontier reuse, or pending cache check failed")
 
 def main() -> IO(Unit):
   finish(check())

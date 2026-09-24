@@ -27,14 +27,24 @@ builds reuse them offline. Release tags must be available upstream for JS
 builds. The JS build also emits `generated/compiler/native_session.js` for
 direct regression tests of the native session's pure cache-planning logic.
 
-The optimized native build currently requires Bend 2.0.24. It applies a guarded
-String comparison optimization to the generated C: both owned input roots stay
-alive during a read-only traversal and are released once afterward. The build
-checks the source definition, generated ownership code, and runtime helpers; it
-refuses an unknown version or code shape. See
-[the transformer](../scripts/native_string_compare.ts) and
+The optimized native build requires Bend 2.0.27. It applies guarded String
+comparison, consuming index lookup, borrowed free-variable collection,
+closed-type resolution, and a bounded resolver for active substitutions to the
+generated C. These kernels preserve the runtime's ownership and reclamation
+operations. Bounded type scans fall back to the Bend implementation when they
+cannot certify a result. The build checks the source definitions, generated
+field layouts, ownership code, and runtime helpers; it refuses an unknown
+version or code shape. See
+[the String transformer](../scripts/native_string_compare.ts),
+[the compiler kernels](../scripts/native_kernels/README.md), and
 [cold-compilation results](COLD_COMPILE_RESULTS.md). The
-[scaling plan](COLD_COMPILE_PLAN.md) records the remaining gap to 500 ms. Bend
+[scaling plan](COLD_COMPILE_PLAN.md) records the remaining gap to 500 ms. The
+[type-system redesign study](TYPE_SYSTEM_REDESIGN_STUDY.md) investigates the
+broader changes needed for a 100–200 ms source-to-Wasm target. The
+[retained-checking implementation](TYPED_CORE_IMPLEMENTATION.md) records the
+implemented reuse boundaries, correctness checks, and measured limits. The
+[allocation and checking follow-up](TYPE_KERNEL_IMPLEMENTATION.md) implements
+the subsequent measured kernels and avoids repeated checking and scans. Bend
 2.0.24 passes the ownership regression that required an isolated emitter patch
 on 2.0.5, so that obsolete patch has been removed. The build still compiles and
 runs [the regression](native_backend_regression.bend) at 1 and 4 threads before
@@ -80,11 +90,19 @@ scope. Checker branches inherit dependency interfaces for lookup and publish
 only interfaces they produce, avoiding repeated merges of the shared
 environment.
 
+The specialization solver keeps an ordered list of unresolved operation and
+associated requirements. After it selects an implementation, it filters the
+previous list against the new choices and prepends requirements from newly
+inferred definitions. Definitions remain in the same order as the full scan;
+type arguments are resolved against the current substitution state when each
+requirement is consumed. If the number of definitions shrinks unexpectedly, the
+solver repeats the full scan.
+
 Both clean builds and native sessions infer dependency-ready groups in balanced
-Bend batches. Single-consumer dependency chains advance on their own lane after
-each checked interface closes, without waiting for unrelated chains. Recursive
-components still check separately and stay indivisible. Fan-outs and joins
-remain separate frontiers: this is structured fork/join scheduling, not a
+Bend batches. Ordinarily, single-consumer dependency chains advance on their own
+lane after each checked interface closes, without waiting for unrelated chains.
+Recursive components still check separately and stay indivisible. Fan-outs and
+joins remain separate frontiers: this is structured fork/join scheduling, not a
 general ready queue or work stealing. Cache deltas and counters are lane-local
 and publish only after a successful request. Wasm emission batches independent
 cache misses. Small batches use sequential loops; completion order never chooses
@@ -122,6 +140,20 @@ treatment when the remaining work spans several frontiers. A final single
 frontier keeps its batch, and already-independent regions never gain a shared
 prefix barrier. Native sessions cache this schedule; it is still static
 fork/join, not an arbitrary dependency-ready queue.
+
+For a final module with at least eight singleton generated specialization
+groups, the checker uses dependency-level frontiers. Within a frontier it checks
+one representative of each equivalent singleton group, then attaches that
+independently checked signature and interface to each follower's current body
+and name. Equivalence requires the same source origin, complete body and
+annotations, exact imported interfaces and nominal declarations. Local lambda,
+block and return identities may differ by one uniform numeric offset; source
+offsets and associated implementation identities must match exactly. The
+operation catalog is shared within this final-checker call. Generic batch
+callers that may mix catalogs keep independent checks. A failed representative,
+comparison budget miss or unsuitable checked result runs the follower's normal
+checker. Source certificates still take priority, and resulting failures and
+certificates publish in original group order.
 
 Sessions averaging at least 256 cached lowering-work units per declaration also
 retain nominal-usage summaries. Changed declarations refresh in weighted

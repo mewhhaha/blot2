@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 
-// Bend 2.0.24 emits model.name_equal as a consuming String traversal. This
+// Bend 2.0.24 and 2.0.27 emit model.name_equal as a consuming String traversal. This
 // guarded native-only specialization keeps both owned roots alive, borrows
 // their immutable nodes, and releases each root exactly once at the end.
 // Unknown compiler versions or code shapes fail closed.
-const SUPPORTED_BEND_VERSION = "bend 2.0.24";
+const SUPPORTED_BEND_VERSIONS = ["bend 2.0.24", "bend 2.0.27"];
 const EXPECTED_MODEL =
   `def name_equal_tail(left: String, right: String, same: Bool) -> Bool:
   match left right same:
@@ -107,11 +107,11 @@ function spins(source: string): Spin[] {
 function shape(body: string): string {
   const names = new Map<string, string>();
   const canonical = body.replace(
-    /\b[a-zA-Z][a-zA-Z0-9]*_\d+\b/g,
-    (name) => {
+    /\b_?([a-zA-Z][a-zA-Z0-9]*_\d+)\b/g,
+    (name, unprefixed: string) => {
       let symbol = names.get(name);
       if (symbol === undefined) {
-        symbol = `${name.replace(/_\d+$/, "")}_N${names.size}`;
+        symbol = `${unprefixed.replace(/_\d+$/, "")}_N${names.size}`;
         names.set(name, symbol);
       }
       return symbol;
@@ -157,9 +157,11 @@ function verifyRuntime(source: string): void {
 }
 
 function verifySource(modelSource: string, bendVersion: string): void {
-  if (bendVersion.trim() !== SUPPORTED_BEND_VERSION) {
+  if (!SUPPORTED_BEND_VERSIONS.includes(bendVersion.trim())) {
     throw new Error(
-      `Native String comparison specialization requires ${SUPPORTED_BEND_VERSION}; got ${bendVersion.trim()}`,
+      `Native String comparison specialization requires ${
+        SUPPORTED_BEND_VERSIONS.join(" or ")
+      }; got ${bendVersion.trim()}`,
     );
   }
   const first = modelSource.indexOf("def name_equal_tail(");
@@ -229,14 +231,14 @@ export function optimizeNativeStringComparison(
       wrapper.parameters !== "Term r0, Term r1" ||
       shape(wrapper.body) !== WRAPPER_SHAPE
     ) return [];
-    const helperName = /if \((spin_\d+)\(e, o_\d+, \w+, \w+, 1\) == 0\)/
+    const helperName = /if \((spin_\d+)\(e, _?o_\d+, \w+, \w+, 1\) == 0\)/
       .exec(wrapper.body)?.[1];
     const helper = helperName && byName.get(helperName);
     if (
       !helper || helper.parameters !== "Term r0, Term r1, u32 r2" ||
       shape(helper.body) !== TAIL_SHAPE
     ) return [];
-    const charName = /if \((spin_\d+)\(e, o_\d+, f_\d+, f_\d+\) == 0\)/
+    const charName = /if \((spin_\d+)\(e, _?o_\d+, _?f_\d+, _?f_\d+\) == 0\)/
       .exec(helper.body)?.[1];
     const charEqual = charName && byName.get(charName);
     return charEqual && charEqual.parameters === "u32 r0, u32 r1" &&

@@ -292,6 +292,9 @@ def Laws.substitutions_preserve_u32(substitutions, fuel):
     case Substitutions.Substitutions{history, values, rows, 1n+count}:
       {==}
 
+def Laws.flat_resolver_step_exhaustion_restarts_reference(substitutions, fuel, work):
+  {==}
+
 def Laws.f32_arithmetic_has_f32_result():
   {==}
 
@@ -482,4 +485,73 @@ def Laws.unknown_array_storage_is_not_owned(name, usages, end):
   {==}
 
 def Laws.array_reuse_preserves_operand_order(array, index, value):
+  {==}
+
+def Laws.retained_core_comparison_stops_on_mismatch(fuel, pending):
+  match fuel pending:
+    case 0n Nil{}:
+      {==}
+    case 0n head <> tail:
+      {==}
+    case 1n+rest Nil{}:
+      {==}
+    case 1n+rest head <> tail:
+      {==}
+
+def Laws.retained_core_comparison_exhaustion_is_a_miss(head, tail):
+  {==}
+
+def Laws.retained_group_skips_reinference(position, checked):
+  {==}
+
+def Laws.ordinary_catalog_does_not_collect_certificates(module):
+  match module:
+    case M.Module{constants, functions, types, operations}:
+      {==}
+
+def Laws.evidenced_group_keeps_exact_source_and_imports(position, module, imports, cost):
+  {==}
+
+def Laws.residual_renaming_preserves_operation_labels(operations, tail, mapping):
+  {==}
+
+def Laws.parameter_mapping_keeps_first_binder(previous, head, index, mapping):
+  {==}
+
+def Laws.empty_generic_scheme_needs_no_traversal(ty, next):
+  {==}
+
+def Laws.retained_group_cannot_discard_all_functions(function, rest):
+  {==}
+
+def Laws.frontier_comparison_stops_on_mismatch(fuel, pending, delta):
+  match fuel pending:
+    case 0n Nil{}:
+      {==}
+    case 0n head <> tail:
+      {==}
+    case 1n+rest Nil{}:
+      {==}
+    case 1n+rest head <> tail:
+      {==}
+
+def Laws.frontier_comparison_exhaustion_is_a_miss(head, tail, delta):
+  {==}
+
+def Laws.frontier_failure_checks_the_current_task(diagnostic, task):
+  {==}
+
+def Laws.frontier_reuse_excludes_retained_tasks(position, checked):
+  {==}
+
+def Laws.pending_cache_preserves_requirements(count, needs):
+  {==}
+
+def Laws.empty_coverage_preserves_pending_tail(choices, rest):
+  {==}
+
+def Laws.empty_fresh_prefix_preserves_pending_tail(definitions, choices, rest):
+  {==}
+
+def Laws.invalid_pending_prefix_uses_full_scan(selected, count, prior_count, definitions, prior_needs, choices):
   {==}

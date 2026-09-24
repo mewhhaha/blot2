@@ -8,6 +8,44 @@ const model = await Deno.readTextFile(
   new URL("../compiler/model.bend", import.meta.url),
 );
 const version = "bend 2.0.24";
+const currentFixture = await Deno.readTextFile(
+  new URL("./fixtures/native_string_compare_2_0_27.c", import.meta.url),
+);
+
+Deno.test("native String specialization accepts the verified Bend 2.0.27 emission", () => {
+  const { source, wrapper, helper } = optimizeNativeStringComparison(
+    currentFixture,
+    model,
+    "bend 2.0.27",
+  );
+  equal(wrapper, "spin_13");
+  equal(helper, "spin_14");
+  ok(source.includes("Loc left_loc = term_peek(e, left);"));
+  ok(source.includes("term_sink(e, r0);\n  term_sink(e, r1);"));
+  ok(!source.includes("spin_14(e, _o_1, _left_0, _right_0, 1)"));
+});
+
+Deno.test("Bend 2.0.27 specialization still rejects altered ownership and equality", () => {
+  for (
+    const altered of [
+      currentFixture.replace("term_sink(e, _f_7);", ""),
+      currentFixture.replace(
+        "U32_BIN(_a_0, ==, _b_0)",
+        "U32_BIN(_a_0, !=, _b_0)",
+      ),
+    ]
+  ) {
+    ok(altered !== currentFixture);
+    throws(
+      () => optimizeNativeStringComparison(altered, model, "bend 2.0.27"),
+      /Expected one generated model\.name_equal/,
+    );
+  }
+  throws(
+    () => optimizeNativeStringComparison(currentFixture, model, "bend 2.0.28"),
+    /requires bend 2\.0\.24 or bend 2\.0\.27/,
+  );
+});
 
 Deno.test("native String specialization selects the generated String comparator by shape", () => {
   const { source, wrapper, helper } = optimizeNativeStringComparison(

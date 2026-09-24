@@ -133,13 +133,20 @@ def concrete(operations: List<&2, M.Operation>) -> List<&2, M.Operation>:
     case head <> tail:
       concrete(tail)
 
+def merge_operation(present: Bool, operations: List<&2, M.Operation>, operation: M.Operation) -> List<&2, M.Operation>:
+  match present:
+    case True{}:
+      operations
+    case False{}:
+      List.append(&2, M.Operation, operations, [operation])
+
 def merge(incoming: List<&2, M.Operation>, +operations: List<&2, M.Operation>) -> List<&2, M.Operation>:
   match incoming:
     case Nil{}:
       operations
     case M.Operation{+identity, parameter, result} <> tail:
       +operation : M.Operation = M.Operation{identity, parameter, result}
-      merge(tail, Bool.pick(List<&2, M.Operation>, contains(operations, identity), operations, List.append(&2, M.Operation, operations, [operation])))
+      merge(tail, merge_operation(contains(operations, identity), operations, operation))
     case head <> tail:
       merge(tail, operations)
 

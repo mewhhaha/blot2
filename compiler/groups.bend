@@ -85,14 +85,23 @@ def import_interfaces(interfaces: List<&2, Interface>, +operations: List<&2, M.O
         +rest : G.Environment <- import_interfaces(tail, operations, types, Nat.add(start, parameters))
         return G.Environment{I.Binding{name, ty, indices(parameters, start)} <> G.env_bindings(rest), I.Definition{name, I.pure(ty)} <> G.env_definitions(rest), G.env_state(rest)}
 
-def template_type(variables: List<&2, Nat>, +index: Nat, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
+def template_type_sequential(variables: List<&2, Nat>, +index: Nat, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
   match variables:
     case Nil{}:
       Done{ty}
     case head <> tail:
       do Result<&2, &2, M.Diagnostic, M.Ty>:
         replaced : M.Ty <- T.replace(ty, head, M.ParameterTy{index})
-        template_type(tail, 1n+index, replaced)
+        template_type_sequential(tail, 1n+index, replaced)
+
+def template_type(variables: List<&2, Nat>, index: Nat, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
+  match variables:
+    case Nil{}:
+      Done{ty}
+    case head <> Nil{}:
+      T.replace(ty, head, M.ParameterTy{index})
+    case head <> tail:
+      T.parameterize_type(ty, T.parameter_mapping(head <> tail, index))
 
 def canonical_work(+fuel: Nat, work: T.TypeWork) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
   match fuel work:
