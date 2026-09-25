@@ -188,16 +188,163 @@ def checked_group(+checked: M.CheckedModule) -> Result<&2, &2, M.Diagnostic, Che
     consts : List<&2, Interface> <- constant_interfaces(constants)
     return CheckedGroup{checked, List.append(&2, Interface, fns, consts)}
 
-def check_group_graph(+module: M.Module, +dependencies: List<&2, Interface>, graph_result: Result<&2, &2, M.Diagnostic, List<&2, D.Node>>) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
+# The deferred dispatch requirements of one checked group. Their types are
+# resolved against the group's final substitution; every variable they still
+# mention is numbered below `next`, and variables are shared only within the
+# group (an SCC is inferred with one state).
+type Resolution is Data:
+  Resolution{declaration: String, identity: Nat, dispatch: M.Dispatch, member: String, templates: List<&2, M.TypeId>, left: M.Ty, right: M.Ty, result: M.Ty, ambient: M.EffectRow}
+
+# `members` holds the group's own declaration types under the same numbering,
+# so a resolution can tell whether its unifications refine an interface.
+# `generalized` holds the variables local lets generalized that a requirement
+# mentions: binding one would change a local scheme, which no interface shows.
+type GroupNeeds is Data:
+  GroupNeeds{next: Nat, needs: List<&2, Resolution>, members: List<&2, I.Binding>, generalized: List<&2, Nat>}
+
+type Resolving is Data:
+  Resolving{group: CheckedGroup, needs: List<&2, GroupNeeds>}
+
+def resolving_group(value: Resolving) -> CheckedGroup:
+  Resolving{group, needs} = value
+  group
+
+# A closed type mentions no inference, generalized, annotation or row variable,
+# so no caller can instantiate it differently.
+def closed_types(fuel: Nat, pending: List<&2, M.Ty>) -> Bool:
+  match fuel pending:
+    case _ Nil{}:
+      True{}
+    case 0n _:
+      False{}
+    case 1n+rest M.VariableTy{index} <> tail:
+      False{}
+    case 1n+rest M.ParameterTy{index} <> tail:
+      False{}
+    case 1n+rest M.FreeTy{scope, name} <> tail:
+      False{}
+    case 1n+rest M.FunctionTy{parameter, result, M.EffectRow{operations, M.ClosedRow{}}} <> tail:
+      closed_types(rest, parameter <> result <> tail)
+    case 1n+rest M.FunctionTy{parameter, result, row} <> tail:
+      False{}
+    case 1n+rest M.ProviderTy{identity, M.EffectRow{operations, M.ClosedRow{}}} <> tail:
+      closed_types(rest, tail)
+    case 1n+rest M.ProviderTy{identity, row} <> tail:
+      False{}
+    case 1n+rest M.StateProviderTy{read, write, state} <> tail:
+      closed_types(rest, state <> tail)
+    case 1n+rest M.AppliedTy{identity, arguments} <> tail:
+      closed_types(rest, List.append(&2, M.Ty, arguments, tail))
+    case 1n+rest M.ProductTy{elements} <> tail:
+      closed_types(rest, List.append(&2, M.Ty, elements, tail))
+    case 1n+rest M.ArrayTy{element} <> tail:
+      closed_types(rest, element <> tail)
+    case 1n+rest head <> tail:
+      closed_types(rest, tail)
+
+def resolved_need(left: Result<&2, &2, M.Diagnostic, M.Ty>, right: Result<&2, &2, M.Diagnostic, M.Ty>, result: Result<&2, &2, M.Diagnostic, M.Ty>, declaration: String, identity: Nat, dispatch: M.Dispatch, member: String, templates: List<&2, M.TypeId>, ambient: M.EffectRow, rest: List<&2, Resolution>) -> List<&2, Resolution>:
+  match left right result:
+    case Done{l} Done{r} Done{value}:
+      Resolution{declaration, identity, dispatch, member, templates, l, r, value, ambient} <> rest
+    case _ _ _:
+      rest
+
+def coverage_needs(coverage: List<&2, I.Coverage>, +declaration: String, +substitutions: T.Substitutions, reversed: List<&2, Resolution>) -> List<&2, Resolution>:
+  match coverage:
+    case Nil{}:
+      List.reverse(&2, Resolution, reversed)
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject} <> tail:
+      coverage_needs(tail, declaration, substitutions, resolved_need(T.resolve(substitutions, left), T.resolve(substitutions, right), T.resolve(substitutions, result), declaration, identity, dispatch, member, templates, T.resolve_row(substitutions, ambient), reversed))
+    case head <> tail:
+      coverage_needs(tail, declaration, substitutions, reversed)
+
+def definition_needs(definitions: List<&2, I.Definition>, +substitutions: T.Substitutions) -> List<&2, Resolution>:
+  match definitions:
+    case Nil{}:
+      Nil{}
+    case I.Definition{name, I.Inference{ty, coverage, exits, reflections}} <> tail:
+      List.append(&2, Resolution, coverage_needs(coverage, name, substitutions, Nil{}), definition_needs(tail, substitutions))
+
+def member_binding(member: Bool, name: String, resolved: Result<&2, &2, M.Diagnostic, M.Ty>, rest: List<&2, I.Binding>) -> List<&2, I.Binding>:
+  match member resolved:
+    case True{} Done{ty}:
+      I.Binding{name, ty, Nil{}} <> rest
+    case _ _:
+      rest
+
+# Member types before generalization: generalization closes unconstrained
+# rows, which would hide an effect a resolved call adds to the interface.
+def member_bindings(definitions: List<&2, I.Definition>, +members: Set(), +substitutions: T.Substitutions) -> List<&2, I.Binding>:
+  match definitions:
+    case Nil{}:
+      Nil{}
+    case I.Definition{+name, I.Inference{ty, coverage, exits, reflections}} <> tail:
+      +rest = member_bindings(tail, members, substitutions)
+      member_binding(D.member(members, name), name, T.resolve(substitutions, ty), rest)
+
+# The let-generalized variables under the group's final substitution. A
+# witness that cannot be resolved leaves the group without requirements, so
+# resolution never rewrites a group whose local schemes it cannot see.
+def witness_variables(free: Result<&2, &2, M.Diagnostic, List<&2, Nat>>, found: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+  do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+    variables : List<&2, Nat> <- free
+    return T.union(variables, found)
+
+def coverage_generalized(coverage: List<&2, I.Coverage>, +substitutions: T.Substitutions, found: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+  match coverage:
+    case Nil{}:
+      Done{found}
+    case I.LetGeneralized{witness} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+        resolved : M.Ty <- T.resolve(substitutions, witness)
+        variables : List<&2, Nat> <- witness_variables(T.free(resolved), found)
+        coverage_generalized(tail, substitutions, variables)
+    case head <> tail:
+      coverage_generalized(tail, substitutions, found)
+
+def definition_generalized(definitions: List<&2, I.Definition>, +substitutions: T.Substitutions, found: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+  match definitions:
+    case Nil{}:
+      Done{found}
+    case I.Definition{name, I.Inference{ty, coverage, exits, reflections}} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+        variables : List<&2, Nat> <- coverage_generalized(coverage, substitutions, found)
+        definition_generalized(tail, substitutions, variables)
+
+def group_needs(needs: List<&2, Resolution>, next: Nat, members: List<&2, I.Binding>, generalized: Result<&2, &2, M.Diagnostic, List<&2, Nat>>) -> List<&2, GroupNeeds>:
+  match needs generalized:
+    case Nil{} _:
+      Nil{}
+    case _ Fail{diagnostic}:
+      Nil{}
+    case head <> tail Done{variables}:
+      [GroupNeeds{next, head <> tail, members, variables}]
+
+def environment_needs(collect: Bool, environment: G.Environment, names: List<&2, String>) -> List<&2, GroupNeeds>:
+  match collect:
+    case False{}:
+      Nil{}
+    case True{}:
+      G.Environment{bindings, +definitions, +state} = environment
+      +substitutions = I.substitutions_of(state)
+      group_needs(definition_needs(definitions, substitutions), I.next_of(state), member_bindings(definitions, Set.from_list(names), substitutions), definition_generalized(definitions, substitutions, Nil{}))
+
+def check_group_resolving_graph(+module: M.Module, +dependencies: List<&2, Interface>, graph_result: Result<&2, &2, M.Diagnostic, List<&2, D.Node>>, collect: Bool) -> Result<&2, &2, M.Diagnostic, Resolving>:
   M.Module{constants, functions, +types, +operations} = module
   +declarations = List.append(&2, G.Declaration, G.function_declarations(functions), G.constant_declarations(constants))
-  do Result<&2, &2, M.Diagnostic, CheckedGroup>:
+  do Result<&2, &2, M.Diagnostic, Resolving>:
     graph : List<&2, D.Node> <- graph_result
     unique : Unit <- Check.unique_names(List.append(&2, String, interface_names(dependencies), List.append(&2, String, G.names(declarations), Check.all_constructor_names(types))))
     imported : G.Environment <- import_interfaces(dependencies, operations, types, 0n)
-    environment : G.Environment <- G.infer_with(declarations, graph, operations, types, imported, interface_functions(dependencies))
+    +environment : G.Environment <- G.infer_with(declarations, graph, operations, types, imported, interface_functions(dependencies))
     checked : M.CheckedModule <- Check.finish(module, environment)
-    checked_group(checked)
+    group : CheckedGroup <- checked_group(checked)
+    return Resolving{group, environment_needs(collect, environment, G.names(declarations))}
+
+def check_group_graph(+module: M.Module, +dependencies: List<&2, Interface>, graph_result: Result<&2, &2, M.Diagnostic, List<&2, D.Node>>) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
+  do Result<&2, &2, M.Diagnostic, CheckedGroup>:
+    resolved : Resolving <- check_group_resolving_graph(module, dependencies, graph_result, False{})
+    return resolving_group(resolved)
 
 def check_group(+module: M.Module, +dependencies: List<&2, Interface>) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
   check_group_graph(module, dependencies, Check.module_graph(module))
@@ -206,6 +353,13 @@ def check_group(+module: M.Module, +dependencies: List<&2, Interface>) -> Result
 # path. Keep imported-interface validation and local inference/coverage checks.
 def check_group_planned(+module: M.Module, +dependencies: List<&2, Interface>) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
   check_group_graph(module, dependencies, Check.module_graph_validated(module))
+
+# Dispatch resolution also asks for the closed requirements left in the group.
+def check_group_resolving(+module: M.Module, +dependencies: List<&2, Interface>) -> Result<&2, &2, M.Diagnostic, Resolving>:
+  check_group_resolving_graph(module, dependencies, Check.module_graph(module), True{})
+
+def check_group_resolving_planned(+module: M.Module, +dependencies: List<&2, Interface>) -> Result<&2, &2, M.Diagnostic, Resolving>:
+  check_group_resolving_graph(module, dependencies, Check.module_graph_validated(module), True{})
 
 type Usage is Data:
   Usage{nominals: List<&2, M.TypeId>}

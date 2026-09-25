@@ -89,7 +89,7 @@ export async function createSourceSession(options: SourceCompilerOptions) {
         );
         return {
           module: result<RawModule>(
-            "monomorph.prepare",
+            "dispatch_resolution.prepare",
             preparedModule,
             "main",
             module.operations,

@@ -499,6 +499,7 @@ Deno.test("a later ready inference error cannot hide an earlier blocked group er
       published: bendList([]),
       failure: { $: "None" },
       certificates: bendList([]),
+      needs: bendList([]),
     },
   ));
   const actual = scheduler["check_scheduler.assembled"](source, completed);
@@ -516,6 +517,7 @@ Deno.test("a later ready inference error cannot hide an earlier blocked group er
       published: bendList([]),
       failure: { $: "None" },
       certificates: bendList([]),
+      needs: bendList([]),
     },
     true,
   ));

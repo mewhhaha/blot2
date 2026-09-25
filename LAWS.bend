@@ -41,6 +41,7 @@ import ./compiler/state_specialize.bend as StateSpecialize
 import ./compiler/parallel_infer.bend as ParallelInfer
 import ./compiler/staging_scheme.bend as StagingScheme
 import ./compiler/main.bend as Main
+import ./compiler/dispatch_resolution.bend as Resolution
 
 # An exported function-valued constant is called through its stored value.
 # Selecting exports after inference must never duplicate its initializer.
@@ -725,7 +726,7 @@ law evidenced_group_keeps_exact_source_and_imports:
   for +module: M.Module
   for +imports: List<&2, Groups.Interface>
   for cost: Nat
-  {Scheduler.check_task_planned(Scheduler.EvidenceTask{position, module, imports, cost}, Unit{}) == Scheduler.EvidenceOutcome{position, module, imports, Groups.check_group_planned(module, imports)} : Scheduler.Outcome}
+  {Scheduler.check_task_planned(Scheduler.EvidenceTask{position, module, imports, cost}, Unit{}) == Scheduler.EvidenceOutcome{position, module, imports, Groups.check_group_resolving_planned(module, imports)} : Scheduler.Outcome}
 
 # Alpha-renaming changes the shared value/row variable domain, while ordered
 # operation identities (including duplicates) remain part of the checked type.
@@ -892,3 +893,217 @@ law missing_schema_choice_uses_ordinary_selection:
   for +shapes: List<&2, Infer.Binding>
   for +schemes: List<&2, StagingScheme.Scheme>
   {Mono.select_method_staged(None{}, need, left, right, specialization, configuration, shapes, schemes) == Mono.select_method_original(need, left, right, specialization, configuration, shapes, schemes) : Result<&2, &2, M.Diagnostic, Mono.Specialization>}
+
+# Concrete dispatch resolution. A requirement is closed only when no caller can
+# instantiate its types differently: inference, generalized and row variables
+# all keep a site deferred.
+law dispatch_inference_variable_is_open:
+  for fuel: Nat
+  for index: Nat
+  for tail: List<&2, M.Ty>
+  {Groups.closed_types(1n+fuel, M.VariableTy{index} <> tail) == False{} : Bool}
+
+law dispatch_generalized_variable_is_open:
+  for fuel: Nat
+  for index: Nat
+  for tail: List<&2, M.Ty>
+  {Groups.closed_types(1n+fuel, M.ParameterTy{index} <> tail) == False{} : Bool}
+
+law dispatch_open_effect_row_is_open:
+  for fuel: Nat
+  for parameter: M.Ty
+  for result: M.Ty
+  for operations: List<&2, M.TypeId>
+  for index: Nat
+  for tail: List<&2, M.Ty>
+  {Groups.closed_types(1n+fuel, M.FunctionTy{parameter, result, M.EffectRow{operations, M.RowVariable{index}}} <> tail) == False{} : Bool}
+
+# Type identity requests keep their own compile-time specialization.
+law dispatch_type_identity_is_not_plain:
+  {Resolution.plain_member("@type.same") == False{} : Bool}
+
+# Receiver selection waits until the receiver's nominal head is known; a
+# requirement that cannot be selected leaves the group solver untouched.
+law dispatch_unknown_receiver_waits:
+  for index: Nat
+  {Resolution.receiver_known(M.VariableTy{index}) == False{} : Bool}
+
+law dispatch_dropped_requirement_changes_nothing:
+  for need: Groups.Resolution
+  for +solving: Resolution.Solving
+  {Resolution.settle(Resolution.Dropped{}, need, solving) == solving : Resolution.Solving}
+
+# A site without a unique planned choice stays deferred, so specialization
+# still owns its diagnostics (ambiguity, missing members, clashes).
+law dispatch_unplanned_site_stays_deferred:
+  for identity: Nat
+  for dispatch: M.Dispatch
+  for member: String
+  for templates: List<&2, M.TypeId>
+  for left: M.Expr
+  for right: M.Expr
+  {Resolution.resolved_call(None{}, identity, dispatch, member, templates, left, right) == Done{M.AssociatedExpr{identity, dispatch, member, templates, left, right}} : Result<&2, &2, M.Diagnostic, M.Expr>}
+
+law dispatch_conflicting_requirements_rewrite_neither:
+  for choice: Mono.Choice
+  {Resolution.choice_entry(True{}, choice) == None{} : Maybe<&2, Mono.Choice>}
+
+# A resolved binary site is exactly specialization's call: both operands are
+# evaluated once, left to right, before the selected implementation is applied.
+law dispatch_binary_site_calls_selected_implementation:
+  for identity: Nat
+  for member: String
+  for templates: List<&2, M.TypeId>
+  for left: M.Expr
+  for right: M.Expr
+  for name: String
+  {Resolution.resolved_call(Some{Some{Mono.FunctionChoice{name}}}, identity, M.BinaryDispatch{}, member, templates, left, right) == Done{M.UseExpr{"$associated.left", left, M.UseExpr{"$associated.right", right, M.ApplyExpr{M.ApplyExpr{M.FunctionExpr{name}, M.LocalExpr{"$associated.left"}}, M.LocalExpr{"$associated.right"}}}}} : Result<&2, &2, M.Diagnostic, M.Expr>}
+
+law dispatch_receiver_site_applies_selected_member:
+  for identity: Nat
+  for member: String
+  for templates: List<&2, M.TypeId>
+  for receiver: M.Expr
+  for unit: M.Expr
+  for name: String
+  {Resolution.resolved_call(Some{Some{Mono.ReceiverChoice{name}}}, identity, M.MemberDispatch{}, member, templates, receiver, unit) == Done{M.ApplyExpr{M.FunctionExpr{name}, receiver}} : Result<&2, &2, M.Diagnostic, M.Expr>}
+
+# The resolved call contains no deferred dispatch, so its declaration is no
+# longer a template seed.
+law dispatch_resolved_site_is_not_a_seed:
+  for left: String
+  for right: String
+  for name: String
+  {Mono.has_deferred(16n, [M.UseExpr{"$associated.left", M.LocalExpr{left}, M.UseExpr{"$associated.right", M.LocalExpr{right}, M.ApplyExpr{M.ApplyExpr{M.FunctionExpr{name}, M.LocalExpr{"$associated.left"}}, M.LocalExpr{"$associated.right"}}}}]) == False{} : Bool}
+
+# One accessor per (receiver nominal type, field): the name depends on nothing
+# else, so every site and every specialization unit shares it.
+law dispatch_field_accessor_is_shared:
+  for +owner: String
+  for +member: String
+  {Mono.accessor_name(owner, member, M.MemberDispatch{}) == "$member[" ++ owner ++ "]." ++ member : String}
+
+law dispatch_field_update_accessor_is_shared:
+  for +owner: String
+  for +member: String
+  {Mono.accessor_name(owner, member, M.FieldUpdateDispatch{}) == "$member.set[" ++ owner ++ "]." ++ member : String}
+
+law dispatch_duplicate_accessor_keeps_first:
+  for function: M.Function
+  for +reversed: List<&2, M.Function>
+  {Mono.kept_accessor(True{}, function, reversed) == reversed : List<&2, M.Function>}
+
+# Resolution never reports a diagnostic: a failed round, or no resolution at
+# all, specializes the original module exactly as before.
+law dispatch_failed_round_abandons_resolution:
+  for fuel: Nat
+  for module: M.Module
+  for diagnostic: M.Diagnostic
+  for next: Nat
+  for proofs: Maybe<&2, List<&2, Schema.Evidence>>
+  for cache: Map<&2, Resolution.Accessor>
+  for budget: Nat
+  for entry: String
+  {Resolution.rounds(1n+fuel, Resolution.CheckedRound{module, Fail{diagnostic}, next, proofs, cache, budget}, entry) == None{} : Maybe<&2, Resolution.Resolved>}
+
+law dispatch_unchanged_round_keeps_its_check:
+  for fuel: Nat
+  for +initial: Scheduler.Initial
+  for +module: M.Module
+  for certificates: List<&2, CheckedCore.Certificate>
+  for next: Nat
+  for cache: Map<&2, Resolution.Accessor>
+  for stable: Bool
+  for proofs: List<&2, Schema.Evidence>
+  for budget: Nat
+  for entry: String
+  {Resolution.rounds(1n+fuel, Resolution.RewrittenRound{initial, Resolution.Rewrite{module, certificates, next, cache, False{}, stable}, proofs, budget}, entry) == Some{Resolution.Resolved{module, initial}} : Maybe<&2, Resolution.Resolved>}
+
+# A rewrite that leaves every interface unchanged is not checked again.
+law dispatch_stable_rewrite_skips_verification:
+  for fuel: Nat
+  for initial: Scheduler.Initial
+  for module: M.Module
+  for +certificates: List<&2, CheckedCore.Certificate>
+  for next: Nat
+  for cache: Map<&2, Resolution.Accessor>
+  for proofs: List<&2, Schema.Evidence>
+  for budget: Nat
+  for entry: String
+  {Resolution.rounds(1n+fuel, Resolution.RewrittenRound{initial, Resolution.Rewrite{module, certificates, next, cache, True{}, True{}}, proofs, budget}, entry) == Some{Resolution.Resolved{module, Resolution.extended_initial(initial, certificates)}} : Maybe<&2, Resolution.Resolved>}
+
+law dispatch_group_without_resolutions_is_stable:
+  for state: Infer.State
+  for waiting: List<&2, Groups.Resolution>
+  for progress: Bool
+  for members: List<&2, Infer.Binding>
+  for generalized: List<&2, Nat>
+  for next: Nat
+  {Resolution.solved_group(Resolution.Solving{state, Nil{}, waiting, progress}, members, generalized, next) == Resolution.Solved{Nil{}, True{}} : Resolution.Solved}
+
+# A local let's scheme is invisible in every interface. A round whose solver
+# binds a variable some let generalized, or binds a group variable to a type
+# that mentions one, changes that let at its uses, so it is checked again
+# (and abandoned if the check fails) however unchanged its interfaces are.
+law dispatch_changed_local_scheme_is_checked_again:
+  for unchanged: Bool
+  {Resolution.stable_group(False{}, False{}, unchanged) == False{} : Bool}
+
+law dispatch_let_generalized_binding_changes_its_scheme:
+  for group: Bool
+  for replacement: Bool
+  {Resolution.binding_untouched(True{}, group, replacement) == False{} : Bool}
+
+law dispatch_group_variable_must_not_name_let_generalized:
+  for replacement: Bool
+  {Resolution.binding_untouched(False{}, True{}, replacement) == replacement : Bool}
+
+# A fresh variable of a selected implementation's instance may name a
+# let-generalized variable: the rewritten direct call instantiates the same way.
+law dispatch_fresh_instance_may_name_let_generalized:
+  for replacement: Bool
+  {Resolution.binding_untouched(False{}, False{}, replacement) == True{} : Bool}
+
+law dispatch_group_without_let_generalization_keeps_schemes:
+  for substitutions: Substitutions.Substitutions
+  for next: Nat
+  {Resolution.schemes_untouched(substitutions, Nil{}, next) == True{} : Bool}
+
+law dispatch_unchanged_schemes_defer_to_interfaces:
+  for unchanged: Bool
+  {Resolution.stable_group(False{}, True{}, unchanged) == unchanged : Bool}
+
+# Let-generalization evidence only informs resolution: pattern checking and
+# specialization's requirements ignore it, and a let that generalizes nothing
+# records none.
+law let_generalization_evidence_is_not_a_pattern_constraint:
+  for witness: M.Ty
+  for +tail: List<&2, Infer.Coverage>
+  for +substitutions: Substitutions.Substitutions
+  for +types: List<&2, M.DataType>
+  {Patterns.check(Infer.LetGeneralized{witness} <> tail, substitutions, types) == Patterns.check(tail, substitutions, types) : Result<&2, &2, M.Diagnostic, Unit>}
+
+law let_generalization_evidence_is_not_a_requirement:
+  for witness: M.Ty
+  for +tail: List<&2, Infer.Coverage>
+  {Mono.requirements(Infer.LetGeneralized{witness} <> tail) == Mono.requirements(tail) : List<&2, Infer.Coverage>}
+
+law let_without_generalization_records_no_evidence:
+  for coverage: List<&2, Infer.Coverage>
+  for substitutions: Substitutions.Substitutions
+  {Infer.let_generalized(Nil{}, coverage, substitutions) == Done{Nil{}} : Result<&2, &2, M.Diagnostic, List<&2, Infer.Coverage>>}
+
+law dispatch_unresolved_module_specializes_original:
+  for +module: M.Module
+  for +entry: String
+  for +family_templates: List<&2, M.Operation>
+  {Resolution.prepare_deferred_resolved(None{}, module, entry, family_templates) == Mono.prepare_deferred_core(module, entry, family_templates) : Result<&2, &2, M.Diagnostic, CheckedCore.Prepared>}
+
+# Resolution rounds retain unchanged groups and certify them again, so the last
+# round's certificates cover every group of the module it returns.
+law evidence_check_certifies_retained_groups:
+  for +position: Nat
+  for +subset: M.Module
+  for +imports: List<&2, Groups.Interface>
+  for +checked: Groups.CheckedGroup
+  {Scheduler.selected_task(Some{checked}, True{}, position, subset, imports) == Scheduler.RetainedEvidenceTask{position, subset, imports, checked} : Scheduler.Task}

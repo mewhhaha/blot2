@@ -146,11 +146,11 @@ def evidence_certificates(certificates: List<&2, Core.Certificate>) -> Bool:
       False{}
 
 def evidence_completed(completed: Scheduler.Completed) -> Bool:
-  Scheduler.Completed{interfaces, functions, constants, published, failure, certificates} = completed
+  Scheduler.Completed{interfaces, functions, constants, published, failure, certificates, needs} = completed
   evidence_certificates(certificates)
 
 def evidence_check(outcomes: List<&2, Scheduler.Outcome>) -> Bool:
-  +empty : Scheduler.Completed = Scheduler.Completed{Map.new(&2, Groups.Interface), Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, None{}, Nil{}}
+  +empty : Scheduler.Completed = Scheduler.empty_completed()
   evidence_completed(Scheduler.publish_outcomes(outcomes, empty))
 
 def retained_result(found: Maybe<&2, Scheduler.FrontierCandidate>) -> Bool:

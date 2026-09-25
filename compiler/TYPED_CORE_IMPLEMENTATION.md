@@ -56,8 +56,12 @@ transactional publication remain ahead of this fallback.
 
 The scheduler captures these results as the initial check finishes each group.
 There is no second source dependency plan or scan to reconstruct checked groups.
-Warm sessions with a finalized group cache skip this source-certificate capture.
-Certificates are published only with a successful complete initial check.
+Warm sessions with a finalized group cache skip this source-certificate capture
+when [concrete dispatch resolution](README.md) does not run (no dispatch site)
+or is abandoned. Otherwise its own evidence check replaces the warm shape check,
+and its ready certificates reach the final check behind the session's group
+cache, as on a first revision. Certificates are published only with a successful
+complete initial check.
 
 Comparison uses a bounded structural worklist. It preserves nominal identities,
 float bit patterns, annotations, source offsets, and duplicate, ordered effect

@@ -1,6 +1,6 @@
 import Base
 import ./model.bend as M
-import ./monomorph.bend as Mono
+import ./dispatch_resolution.bend as Resolution
 import ./effect_families.bend as Families
 import ./cst.bend as C
 import ./lower.bend as Lower
@@ -257,12 +257,12 @@ def source_module(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: Nat) -> Re
       do Result<&2, &2, M.Diagnostic, M.Module>:
         +module : M.Module <- Lower.source_module(root, prelude, fuel)
         prepared : M.Module <- Families.prepare(module)
-        Mono.prepare(prepared, "main", M.module_operations(module))
+        Resolution.prepare(prepared, "main", M.module_operations(module))
     case True{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
         +module : M.Module <- prepared_project(Lower.prepare_prelude(prelude, fuel), root, fuel)
         prepared : M.Module <- Families.prepare(module)
-        Mono.prepare(prepared, C.text_of(root), M.module_operations(module))
+        Resolution.prepare(prepared, C.text_of(root), M.module_operations(module))
 
 # Cold source compilation selects exports from the final checked signatures.
 # This avoids a separate all-affected inference pass merely to refresh exports.
@@ -272,12 +272,12 @@ def source_module_deferred(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: N
       do Result<&2, &2, M.Diagnostic, M.Module>:
         +module : M.Module <- Lower.source_module(root, prelude, fuel)
         prepared : M.Module <- Families.prepare(module)
-        Mono.prepare_deferred(prepared, "main", M.module_operations(module))
+        Resolution.prepare_deferred(prepared, "main", M.module_operations(module))
     case True{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
         +module : M.Module <- prepared_project(Lower.prepare_prelude(prelude, fuel), root, fuel)
         prepared : M.Module <- Families.prepare(module)
-        Mono.prepare_deferred(prepared, C.text_of(root), M.module_operations(module))
+        Resolution.prepare_deferred(prepared, C.text_of(root), M.module_operations(module))
 
 # Retain the solved specialization evidence until the final group check.
 def source_module_core(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
@@ -286,9 +286,9 @@ def source_module_core(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: Nat) 
       do Result<&2, &2, M.Diagnostic, Core.Prepared>:
         +module : M.Module <- Lower.source_module(root, prelude, fuel)
         prepared : M.Module <- Families.prepare(module)
-        Mono.prepare_deferred_core(prepared, "main", M.module_operations(module))
+        Resolution.prepare_deferred_core(prepared, "main", M.module_operations(module))
     case True{}:
       do Result<&2, &2, M.Diagnostic, Core.Prepared>:
         +module : M.Module <- prepared_project(Lower.prepare_prelude(prelude, fuel), root, fuel)
         prepared : M.Module <- Families.prepare(module)
-        Mono.prepare_deferred_core(prepared, C.text_of(root), M.module_operations(module))
+        Resolution.prepare_deferred_core(prepared, C.text_of(root), M.module_operations(module))

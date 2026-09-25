@@ -118,11 +118,66 @@ structure, including nominal operation identities and latent effect rows.
 Reflection references are inference/const dependencies, not runtime calls.
 
 Associated operators and generic effect selectors specialize before final
-checking. Type and row substitutions use persistent indexes instead of scanning
-the entire substitution history on every lookup. Each index retains replacement
-order, including repeated bindings; occurs checks and traversal limits still
-apply. Specializing a shared constant retains its generalized interfaces rather
-than rechecking the enlarged module to recover them.
+checking. Before any declaration is templated,
+[concrete dispatch resolution](dispatch_resolution.bend) removes the dispatch
+that does not depend on a caller. Saturated operator calls (`a + b` calls the
+prelude forwarder `add`) are first inlined as the forwarder's `@type.call` site,
+keeping the operator's source offset as the site's identity; that is the call
+specialization would build anyway. The initial shape check then reports, for
+each declaration group it infers, every associated, receiver-method and field
+requirement with its types in the group's own variable numbering. A per-group
+solver selects a site once its operands (binary dispatch) are closed, i.e. their
+types contain no inference, generalized or row variable, or once its receiver's
+nominal head is known (member and field access select from the owner type
+alone). Selection uses specialization's own functions and is validated by the
+same unification against the requirement's result and effect row; the solver
+keeps those unifications, so a result one selection fixes closes the
+requirements that consume it in the same pass. Every such selection is what
+every specialization of the declaration would choose, so the site is rewritten
+into exactly the call specialization would substitute. Ambiguous members,
+field/method clashes, missing members or fields, type identity and typed-state
+requests, linked-schema methods and failed validations stay deferred, so
+specialization still owns their diagnostics. A rewrite that refines a rewritten
+declaration's interface is checked again: groups whose declarations and imported
+interfaces are unchanged are retained from certificates, and requirements that
+the more precise interfaces close are resolved in the next round (at most 32). A
+rewrite that leaves every interface and every local `let` scheme unchanged needs
+no further check; the final check re-infers only the rewritten groups. Inference
+records, per `let`, the variables its generalization quantified (or whose rows
+its scheme closed) that a deferred requirement of the bound value mentions. A
+round whose solver binds such a variable, or binds a variable of the group to a
+type that mentions one, would change what the `let` means at its uses (for
+example `let helper = fn (x: U32) => x + 1` stops being generic in its result),
+so it is checked again like an interface refinement. Only a fresh variable of a
+selected implementation's instance may name one, which is how the rewritten
+direct call instantiates inside the `let`. Any failed round abandons resolution
+and the original module is specialized unchanged, so resolution never reports a
+diagnostic of its own; a module that fails to check is therefore checked twice,
+once by resolution and once for the original diagnostic. Incremental sessions
+resolve every revision afresh: the resolution check replaces the warm shape
+check, and its ready certificates reach the final check behind the session's
+group cache (paired gdev body edits still used 7-18% less native CPU per warm
+revision than before resolution). A declaration without remaining deferred
+dispatch is no longer a template seed: a helper such as
+`leaf = fn value => @u32.add value 1 + 0` compiles once instead of once per
+caller path, and `Array.get`'s bounds comparison no longer clones `Array.get` at
+every use. Dispatch on operand types a caller supplies is still specialized per
+reference.
+
+Field access uses one shared accessor per receiver nominal type and field,
+`$member[<owner>].<field>` (reads) and `$member.set[<owner>].<field>` (updates),
+instead of one per access site. Its body depends only on the type's constructors
+and its independently checked interface is generic in the type's arguments, so
+resolution and every specialization unit reuse the same function; parallel units
+that both create it keep the first copy in source order. An accessor that fails
+its independent check falls back to the per-site `$member[<n>]` helper, which
+reports the diagnostic exactly as before.
+
+Type and row substitutions use persistent indexes instead of scanning the entire
+substitution history on every lookup. Each index retains replacement order,
+including repeated bindings; occurs checks and traversal limits still apply.
+Specializing a shared constant retains its generalized interfaces rather than
+rechecking the enlarged module to recover them.
 
 Independent specialization units run in weighted Bend batches. Each unit owns
 its inference state and a disjoint sequence of generated identities; collecting

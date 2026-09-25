@@ -90,6 +90,10 @@ def rewrite_coverage(value: I.Coverage, +rewrite: Rewrite) -> Result<&2, &2, M.D
       do Result<&2, &2, M.Diagnostic, I.Coverage>:
         types : List<&2, M.Ty> <- rewrite_types(inferred_types, rewrite)
         return I.Coverage{types, patterns, subject}
+    case I.LetGeneralized{witness}:
+      do Result<&2, &2, M.Diagnostic, I.Coverage>:
+        ty : M.Ty <- rewrite_type(witness, rewrite)
+        return I.LetGeneralized{ty}
 
 def rewrite_coverages(values: List<&2, I.Coverage>, +rewrite: Rewrite) -> Result<&2, &2, M.Diagnostic, List<&2, I.Coverage>>:
   match values:
@@ -174,6 +178,8 @@ def coverage_free(value: I.Coverage) -> Result<&2, &2, M.Diagnostic, List<&2, Na
       T.free(inferred_type)
     case I.Coverage{inferred_types, patterns, subject}:
       types_free(inferred_types)
+    case I.LetGeneralized{witness}:
+      T.free(witness)
 
 def coverages_free(values: List<&2, I.Coverage>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
   match values:

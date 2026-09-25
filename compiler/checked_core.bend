@@ -56,6 +56,16 @@ def source_ready(module: M.Module) -> Bool:
   M.Module{constants, functions, types, operations} = module
   Bool.not(Bool.or(deferred_functions(functions), deferred_constants(constants)))
 
+# Final-check reuse accepts only groups whose source needs no specialization.
+def ready_certificates(certificates: List<&2, Certificate>) -> List<&2, Certificate>:
+  match certificates:
+    case Nil{}:
+      Nil{}
+    case +certificate <> tail:
+      Certificate{module, checked, imports} = certificate
+      +rest = ready_certificates(tail)
+      Bool.pick(List<&2, Certificate>, source_ready(module), certificate <> rest, rest)
+
 def type_identity(ty: M.DataType) -> M.TypeId:
   M.DataType{identity, parameters, constructors} = ty
   identity

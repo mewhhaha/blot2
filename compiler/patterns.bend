@@ -181,6 +181,8 @@ def check(constraints: List<&2, I.Coverage>, +substitutions: T.Substitutions, +t
     case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject} <> tail:
       # Monomorphization discharges these; this pass checks pattern coverage.
       check(tail, substitutions, types)
+    case I.LetGeneralized{witness} <> tail:
+      check(tail, substitutions, types)
     case I.ValuePatternType{inferred, subject} <> tail:
       do Result<&2, &2, M.Diagnostic, Unit>:
         resolved : M.Ty <- T.resolve(substitutions, inferred)

@@ -177,12 +177,14 @@ const answer = fn (value: F32) => twice value
 ```
 
 Generic functions that depend on associated dispatch are specialized for their
-uses before const evaluation and Wasm emission. This also works through
-closures, local function aliases, and recursive functions. No runtime member
-lookup is emitted. An exported function must have enough type information to
-select a concrete implementation; annotate an otherwise unconstrained export
-parameter. `@type.call` also accepts other literal member names, such as
-`"distance"`.
+uses before const evaluation and Wasm emission. Dispatch whose operand types the
+function itself already fixes, such as `Array.get`'s bounds comparison of a
+`U32` index, resolves once inside the function and needs no per-use copy. This
+also works through closures, local function aliases, and recursive functions. No
+runtime member lookup is emitted. An exported function must have enough type
+information to select a concrete implementation; annotate an otherwise
+unconstrained export parameter. `@type.call` also accepts other literal member
+names, such as `"distance"`.
 
 Operators are source-defined aliases for functions, not compiler arithmetic
 special cases. Backticks also call a named function infix:

@@ -311,6 +311,8 @@ def coverage_free(coverage: I.Coverage) -> Result<&2, &2, M.Diagnostic, List<&2,
       T.free(inferred_type)
     case I.Coverage{inferred_types, patterns, subject}:
       types_free(inferred_types)
+    case I.LetGeneralized{witness}:
+      T.free(witness)
 
 def coverages_free(coverages: List<&2, I.Coverage>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
   match coverages:
@@ -363,6 +365,10 @@ def rename_coverage(coverage: I.Coverage, +mapping: NatIndex.Index<Nat>) -> Resu
       do Result<&2, &2, M.Diagnostic, I.Coverage>:
         tys : List<&2, M.Ty> <- rename_types(inferred_types, mapping)
         return I.Coverage{tys, patterns, subject}
+    case I.LetGeneralized{witness}:
+      do Result<&2, &2, M.Diagnostic, I.Coverage>:
+        ty : M.Ty <- T.rename_type(witness, mapping)
+        return I.LetGeneralized{ty}
 
 def rename_coverages(coverages: List<&2, I.Coverage>, +mapping: NatIndex.Index<Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, I.Coverage>>:
   match coverages:

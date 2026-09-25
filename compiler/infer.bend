@@ -19,11 +19,19 @@ type Context is Data:
 type Reflection is Data:
   Reflection{callee: String, subject: String}
 
+# LetGeneralized records the variables a local let generalized (or whose rows
+# its scheme closed) that a deferred associated requirement of its value
+# mentions. Selecting that requirement before specialization must not bind
+# them: the let's scheme, and so every use of the let, would change. Each
+# variable appears both as a parameter type and as a row tail (one index space,
+# one kind per index), so every renaming and resolution of types and rows
+# carries it along.
 type Coverage is Data:
   OperationNeed{identity: Nat, template: M.TypeId, arguments: List<&2, M.Ty>, function_type: M.Ty, subject: String}
   AssociatedNeed{identity: Nat, dispatch: M.Dispatch, member: String, templates: List<&2, M.TypeId>, left: M.Ty, right: M.Ty, result: M.Ty, ambient: M.EffectRow, subject: String}
   ValuePatternType{inferred_type: M.Ty, subject: String}
   Coverage{inferred_types: List<&2, M.Ty>, patterns: List<&2, List<&2, M.Pattern>>, subject: String}
+  LetGeneralized{witness: M.Ty}
 
 type Inference is Data:
   Inference{inferred_type: M.Ty, coverage: List<&2, Coverage>, exits: List<&2, Nat>, reflections: List<&2, Reflection>}
@@ -46,6 +54,10 @@ type PatternTyping is Data:
 def inferred_type(inference: Inference) -> M.Ty:
   Inference{ty, coverage, exits, reflections} = inference
   ty
+
+def inference_coverage(inference: Inference) -> List<&2, Coverage>:
+  Inference{ty, coverage, exits, reflections} = inference
+  coverage
 
 def inference_of(typing: Typing) -> Inference:
   Typing{inference, state} = typing
@@ -339,15 +351,76 @@ def clear_annotations(state: State) -> State:
   State{substitutions, next, annotations} = state
   State{substitutions, next, MTip{}}
 
-def generalize(ty: M.Ty, +context: Context, +state: State, name: String) -> Result<&2, &2, M.Diagnostic, Binding>:
-  do Result<&2, &2, M.Diagnostic, Binding>:
+# A scheme and every variable its generalization quantified, including the
+# row variables the scheme closed.
+type Generalization is Data:
+  Generalization{binding: Binding, variables: List<&2, Nat>}
+
+def generalization_binding(generalized: Generalization) -> Binding:
+  Generalization{binding, variables} = generalized
+  binding
+
+def generalization_variables(generalized: Generalization) -> List<&2, Nat>:
+  Generalization{binding, variables} = generalized
+  variables
+
+def generalization(ty: M.Ty, +context: Context, +state: State, name: String) -> Result<&2, &2, M.Diagnostic, Generalization>:
+  do Result<&2, &2, M.Diagnostic, Generalization>:
     +resolved : M.Ty <- T.resolve(substitutions_of(state), ty)
     free : List<&2, Nat> <- T.free(resolved)
     excluded : List<&2, Nat> <- binding_free(List.append(&2, Binding, environment_bindings(context), annotation_bindings(annotation_types(state))), substitutions_of(state))
     +variables : List<&2, Nat> = T.difference(free, T.union(excluded, T.row_free(T.resolve_row(substitutions_of(state), context_row(context)))))
     +closed : M.Ty <- T.close_generalized(resolved, variables)
     remaining : List<&2, Nat> <- T.free(closed)
-    return Binding{name, closed, T.difference(variables, T.difference(variables, remaining))}
+    return Generalization{Binding{name, closed, T.difference(variables, T.difference(variables, remaining))}, variables}
+
+def generalize(ty: M.Ty, +context: Context, +state: State, name: String) -> Result<&2, &2, M.Diagnostic, Binding>:
+  do Result<&2, &2, M.Diagnostic, Binding>:
+    generalized : Generalization <- generalization(ty, context, state, name)
+    return generalization_binding(generalized)
+
+# The variables the deferred associated requirements of `coverage` mention,
+# under the current substitution.
+def associated_free(coverage: List<&2, Coverage>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+  match coverage:
+    case Nil{}:
+      Done{Nil{}}
+    case AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+        resolved : List<&2, M.Ty> <- T.resolve_work(substitutions, U32.to_nat(65536), T.ManyTypes{[left, right, result]})
+        free : List<&2, Nat> <- T.free(M.ProductTy{resolved})
+        rest : List<&2, Nat> <- associated_free(tail, substitutions)
+        return T.union(T.row_free(T.resolve_row(substitutions, ambient)), T.union(free, rest))
+    case head <> tail:
+      associated_free(tail, substitutions)
+
+def generalized_witness(variables: List<&2, Nat>) -> List<&2, M.Ty>:
+  match variables:
+    case Nil{}:
+      Nil{}
+    case +variable <> tail:
+      M.FunctionTy{M.VariableTy{variable}, M.UnitTy{}, R.variable_row(variable)} <> generalized_witness(tail)
+
+def generalized_evidence(variables: List<&2, Nat>) -> List<&2, Coverage>:
+  match variables:
+    case Nil{}:
+      Nil{}
+    case head <> tail:
+      [LetGeneralized{M.ProductTy{generalized_witness(head <> tail)}}]
+
+def mentioned_generalized(+variables: List<&2, Nat>, mentioned: Result<&2, &2, M.Diagnostic, List<&2, Nat>>) -> Result<&2, &2, M.Diagnostic, List<&2, Coverage>>:
+  do Result<&2, &2, M.Diagnostic, List<&2, Coverage>>:
+    free : List<&2, Nat> <- mentioned
+    return generalized_evidence(T.difference(variables, T.difference(variables, free)))
+
+# Evidence for the variables a let generalized that its value's deferred
+# associated requirements mention; a let that generalizes nothing records none.
+def let_generalized(variables: List<&2, Nat>, coverage: List<&2, Coverage>, substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, Coverage>>:
+  match variables:
+    case Nil{}:
+      Done{Nil{}}
+    case head <> tail:
+      mentioned_generalized(head <> tail, associated_free(coverage, substitutions))
 
 def annotation_variable(found: Maybe<&2, M.Ty>, key: String, state: State) -> Typing:
   match found:
@@ -874,9 +947,10 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
       do Result<&2, &2, M.Diagnostic, Typing>:
         +v : Typing <- expr_work(rest, Expression{value}, with_row(context, row), with_next(state, 1n+next_of(state)))
         +pure_state : State <- require_pure(row, state_of(v), context_subject(context), "let_effect")
-        binding : Binding <- generalize(type_of(v), let_context(inference_of(v), context), pure_state, name)
-        +b : Typing <- expr_work(rest, Expression{body}, extend(context, [binding]), pure_state)
-        return Typing{sequence(inference_of(v), inference_of(b), flow(type_of(v), type_of(b))), state_of(b)}
+        +generalized : Generalization <- generalization(type_of(v), let_context(inference_of(v), context), pure_state, name)
+        evidence : List<&2, Coverage> <- let_generalized(generalization_variables(generalized), inference_coverage(inference_of(v)), substitutions_of(pure_state))
+        +b : Typing <- expr_work(rest, Expression{body}, extend(context, [generalization_binding(generalized)]), pure_state)
+        return Typing{with_pattern_constraints(sequence(inference_of(v), inference_of(b), flow(type_of(v), type_of(b))), evidence), state_of(b)}
     case 1n+rest Expression{M.UseExpr{name, value, body}}:
       do Result<&2, &2, M.Diagnostic, Typing>:
         +v : Typing <- expr_work(rest, Expression{value}, context, state)

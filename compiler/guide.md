@@ -225,7 +225,13 @@ with plain `:=`, the replacement must be pure; use `use` first for effects.
 
 Generic functions depending on dispatch monomorphize at their uses before const
 evaluation and Wasm emission, including closures and recursion. No runtime
-member lookup. For type identity, use the prelude's ordinary `Type` wrapper:
+member lookup. Dispatch whose operand types (for members and fields: the
+receiver's type constructor, such as `Array` or `Point`) are already fixed
+inside the function by annotations, literals, primitives or other calls resolves
+once at the function itself, so the function compiles once instead of once per
+caller; only dispatch on types a caller supplies is specialized per use. Each
+field access through the same nominal type and field shares one accessor. For
+type identity, use the prelude's ordinary `Type` wrapper:
 `Type head == Type witness` or `Type head != Type witness`. When both bindings
 already contain wrapped witnesses, `head == witness` works directly. `Type.eq`
 uses `@type.same left_witness right_witness` to compare concrete types at

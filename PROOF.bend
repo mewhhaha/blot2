@@ -624,3 +624,91 @@ def Laws.schema_hit_still_validates_tail(fuel, tail, wanted, proof, answer):
 
 def Laws.missing_schema_choice_uses_ordinary_selection(need, left, right, specialization, configuration, shapes, schemes):
   {==}
+
+def Laws.dispatch_inference_variable_is_open(fuel, index, tail):
+  {==}
+
+def Laws.dispatch_generalized_variable_is_open(fuel, index, tail):
+  {==}
+
+def Laws.dispatch_open_effect_row_is_open(fuel, parameter, result, operations, index, tail):
+  {==}
+
+def Laws.dispatch_type_identity_is_not_plain():
+  {==}
+
+def Laws.dispatch_unknown_receiver_waits(index):
+  {==}
+
+def Laws.dispatch_dropped_requirement_changes_nothing(need, solving):
+  {==}
+
+def Laws.dispatch_unplanned_site_stays_deferred(identity, dispatch, member, templates, left, right):
+  {==}
+
+def Laws.dispatch_conflicting_requirements_rewrite_neither(choice):
+  {==}
+
+def Laws.dispatch_binary_site_calls_selected_implementation(identity, member, templates, left, right, name):
+  {==}
+
+def Laws.dispatch_receiver_site_applies_selected_member(identity, member, templates, receiver, unit, name):
+  {==}
+
+def Laws.dispatch_resolved_site_is_not_a_seed(left, right, name):
+  {==}
+
+def Laws.dispatch_field_accessor_is_shared(owner, member):
+  {==}
+
+def Laws.dispatch_field_update_accessor_is_shared(owner, member):
+  {==}
+
+def Laws.dispatch_duplicate_accessor_keeps_first(function, reversed):
+  {==}
+
+def Laws.dispatch_failed_round_abandons_resolution(fuel, module, diagnostic, next, proofs, cache, budget, entry):
+  {==}
+
+def Laws.dispatch_unchanged_round_keeps_its_check(fuel, initial, module, certificates, next, cache, stable, proofs, budget, entry):
+  {==}
+
+def Laws.dispatch_stable_rewrite_skips_verification(fuel, initial, module, certificates, next, cache, proofs, budget, entry):
+  {==}
+
+def Laws.dispatch_group_without_resolutions_is_stable(state, waiting, progress, members, generalized, next):
+  {==}
+
+def Laws.dispatch_changed_local_scheme_is_checked_again(unchanged):
+  {==}
+
+def Laws.dispatch_let_generalized_binding_changes_its_scheme(group, replacement):
+  {==}
+
+def Laws.dispatch_group_variable_must_not_name_let_generalized(replacement):
+  {==}
+
+def Laws.dispatch_fresh_instance_may_name_let_generalized(replacement):
+  {==}
+
+def Laws.dispatch_group_without_let_generalization_keeps_schemes(substitutions, next):
+  {==}
+
+def Laws.dispatch_unchanged_schemes_defer_to_interfaces(unchanged):
+  {==}
+
+def Laws.let_generalization_evidence_is_not_a_pattern_constraint(witness, tail, substitutions, types):
+  {==}
+
+def Laws.let_generalization_evidence_is_not_a_requirement(witness, tail):
+  {==}
+
+def Laws.let_without_generalization_records_no_evidence(coverage, substitutions):
+  {==}
+
+def Laws.dispatch_unresolved_module_specializes_original(module, entry, family_templates):
+  {==}
+
+def Laws.evidence_check_certifies_retained_groups(position, subset, imports, checked):
+  {==}
+

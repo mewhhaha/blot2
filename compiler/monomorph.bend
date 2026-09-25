@@ -138,29 +138,19 @@ def constant_seeds(constants: List<&2, M.Constant>) -> List<&2, String>:
       +rest = constant_seeds(tail)
       Bool.pick(List<&2, String>, has_deferred(65536n, [value]), name <> rest, rest)
 
-def intersects(names: List<&2, String>, +wanted: List<&2, String>) -> Bool:
-  match names:
-    case Nil{}:
-      False{}
-    case +head <> +tail:
-      Bool.or(D.contains(wanted, head), intersects(tail, wanted))
+# Every transitive caller of a template seed is a template too: the closure is
+# reverse reachability from the seeds. A traversal failure keeps every
+# declaration a template, which only costs specialization time.
+def closure_found(found: Result<&2, &2, M.Diagnostic, D.Reachability>, names: List<&2, String>) -> List<&2, String>:
+  match found:
+    case Done{reached}:
+      List.reverse(&2, String, D.reached_members(reached))
+    case Fail{diagnostic}:
+      names
 
-def dependent_templates(nodes: List<&2, D.Node>, +templates: List<&2, String>) -> List<&2, String>:
-  match nodes:
-    case Nil{}:
-      templates
-    case D.Node{+name, references, lambdas} <> tail:
-      dependent_templates(tail, Bool.pick(List<&2, String>, Bool.and(Bool.not(D.contains(templates, name)), intersects(references, templates)), name <> templates, templates))
-
-def template_closure(fuel: Nat, +nodes: List<&2, D.Node>, +templates: List<&2, String>, stable: Bool) -> List<&2, String>:
-  match fuel stable:
-    case _ True{}:
-      templates
-    case 0n _:
-      templates
-    case 1n+rest False{}:
-      +expanded = dependent_templates(nodes, templates)
-      template_closure(rest, nodes, expanded, Nat.is_eq(List.length(&2, String, templates), List.length(&2, String, expanded)))
+def template_closure(+nodes: List<&2, D.Node>, seeds: List<&2, String>) -> List<&2, String>:
+  +names = D.node_names(nodes)
+  closure_found(D.reachable(1n+Nat.add(List.length(&2, String, names), D.edge_count(nodes)), seeds, D.transpose(nodes, Map.new(&2, List<&2, String>)), Set.from_list(names), Set.new(), Nil{}), names)
 
 def rebuild_arms(arms: List<&2, M.MatchArm<M.Expr>>, bodies: List<&2, M.Expr>) -> List<&2, M.MatchArm<M.Expr>>:
   match arms bodies:
@@ -515,11 +505,6 @@ def shape_bindings(checked: M.CheckedModule) -> G.Environment:
   M.CheckedModule{constants, functions, types, operations} = checked
   G.Environment{List.append(&2, I.Binding, function_bindings(functions), constant_bindings(constants)), Nil{}, I.State{T.empty(), 0n, MTip{}}}
 
-def shape_environment(module: M.Module) -> Result<&2, &2, M.Diagnostic, G.Environment>:
-  do Result<&2, &2, M.Diagnostic, G.Environment>:
-    checked : M.CheckedModule <- Scheduler.check_module(module)
-    return shape_bindings(checked)
-
 def resolved_bindings(bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
   match bindings:
     case Nil{}:
@@ -746,16 +731,20 @@ def member_name(owner: Maybe<&2, String>, member: String) -> Maybe<&2, String>:
     case Some{prefix}:
       Some{prefix ++ "." ++ member}
 
+# An implementation is a candidate when it accepts both operands in order.
+def candidate_binding(found: Maybe<&2, I.Binding>, name: String, left: M.Ty, right: M.Ty, state: I.State, +subject: String) -> Result<&2, &2, M.Diagnostic, I.Typing>:
+  do Result<&2, &2, M.Diagnostic, I.Typing>:
+    +fn : I.Typing <- I.instantiate_binding(found, state, name, subject)
+    +next : Nat = I.next_of(I.state_of(fn))
+    s1 : I.State <- I.unify(I.type_of(fn), M.FunctionTy{left, M.FunctionTy{right, M.VariableTy{next}, M.EffectRow{Nil{}, M.RowVariable{1n+next}}}, M.EffectRow{Nil{}, M.RowVariable{2n+next}}}, I.with_next(I.state_of(fn), 3n+next), subject)
+    return I.Typing{I.pure(M.VariableTy{next}), s1}
+
 def candidate(name: Maybe<&2, String>, +bindings: List<&2, I.Binding>, left: M.Ty, right: M.Ty, state: I.State, +subject: String) -> Result<&2, &2, M.Diagnostic, I.Typing>:
   match name:
     case None{}:
       Fail{M.Diagnostic{"unknown_associated_type", subject, "operand type is not yet known"}}
     case Some{+name}:
-      do Result<&2, &2, M.Diagnostic, I.Typing>:
-        +fn : I.Typing <- I.instantiate_binding(I.lookup_binding(bindings, name), state, name, subject)
-        +next : Nat = I.next_of(I.state_of(fn))
-        s1 : I.State <- I.unify(I.type_of(fn), M.FunctionTy{left, M.FunctionTy{right, M.VariableTy{next}, M.EffectRow{Nil{}, M.RowVariable{1n+next}}}, M.EffectRow{Nil{}, M.RowVariable{2n+next}}}, I.with_next(I.state_of(fn), 3n+next), subject)
-        return I.Typing{I.pure(M.VariableTy{next}), s1}
+      candidate_binding(I.lookup_binding(bindings, name), name, left, right, state, subject)
 
 def candidate_error(candidate: Result<&2, &2, M.Diagnostic, I.Typing>) -> String:
   match candidate:
@@ -1049,7 +1038,7 @@ def infer_field(+function: M.Function, +receiver: M.Ty, environment: G.Environme
     case other:
       field_fallback(function, environment, operations, types, names)
 
-def select_field(need: I.Coverage, +left: M.Ty, right: M.Ty, specialization: Specialization, configuration: Configuration) -> Result<&2, &2, M.Diagnostic, Specialization>:
+def select_field_site(need: I.Coverage, +left: M.Ty, right: M.Ty, specialization: Specialization, configuration: Configuration) -> Result<&2, &2, M.Diagnostic, Specialization>:
   match need specialization:
     case I.AssociatedNeed{identity, +dispatch, member, templates, old_left, old_right, result, ambient, +subject} Specialization{M.Module{constants, +functions, +types, +operations}, environment, choices, +counter, certificates}:
       Configuration{+originals, templates, entry, locals, affected, stride, constant_values, family_templates, step, schema} = configuration
@@ -1064,6 +1053,118 @@ def select_field(need: I.Coverage, +left: M.Ty, right: M.Ty, specialization: Spe
         unified : I.State <- I.unify(I.type_of(target), receiver_signature(dispatch, left, right, result, ambient), I.state_of(target), subject)
         return Specialization{M.Module{constants, all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Map.set(&2, Choice, choices, Nat.show(identity), receiver_choice(dispatch, name)), Nat.add(counter, step), List.append(&2, Core.Certificate, new_certificates, certificates)}
     case _ _:
+      Fail{M.Diagnostic{"internal_error", "field", "selection expected a field requirement"}}
+
+# One accessor serves every access to a field through the same nominal
+# receiver type: its body depends only on that type's constructors, and its
+# independently checked interface is generic in the type's arguments.
+def accessor_name(owner: String, member: String, dispatch: M.Dispatch) -> String:
+  match dispatch:
+    case M.FieldUpdateDispatch{}:
+      "$member.set[" ++ owner ++ "]." ++ member
+    case _:
+      "$member[" ++ owner ++ "]." ++ member
+
+def accessor_owner(found: Maybe<&2, String>) -> String:
+  match found:
+    case Some{prefix}:
+      prefix
+    case None{}:
+      ""
+
+def function_name(function: M.Function) -> String:
+  M.Function{name, exported, parameter, p, r, body} = function
+  name
+
+def function_exists(found: Result<&2, &2, M.Diagnostic, M.Function>) -> Bool:
+  match found:
+    case Done{function}:
+      True{}
+    case Fail{diagnostic}:
+      False{}
+
+def reuse_field(+name: String, need: I.Coverage, +left: M.Ty, right: M.Ty, specialization: Specialization, configuration: Configuration) -> Result<&2, &2, M.Diagnostic, Specialization>:
+  match need specialization:
+    case I.AssociatedNeed{identity, +dispatch, member, templates, old_left, old_right, result, ambient, +subject} Specialization{module, +environment, choices, +counter, certificates}:
+      Configuration{originals, configured, entry, locals, affected, stride, constant_values, family_templates, step, schema} = configuration
+      do Result<&2, &2, M.Diagnostic, Specialization>:
+        +target : I.Typing <- I.instantiate_binding(I.lookup_binding(G.env_bindings(environment), name), G.env_state(environment), name, subject)
+        unified : I.State <- I.unify(I.type_of(target), receiver_signature(dispatch, left, right, result, ambient), I.state_of(target), subject)
+        return Specialization{module, G.Environment{G.env_bindings(environment), G.env_definitions(environment), unified}, Map.set(&2, Choice, choices, Nat.show(identity), receiver_choice(dispatch, name)), Nat.add(counter, step), certificates}
+    case _ _:
+      Fail{M.Diagnostic{"internal_error", "field", "selection expected a field requirement"}}
+
+# Independent evidence for a shared accessor, or None when the owner is not in
+# the catalog or the accessor alone does not check. The per-site path then owns
+# the diagnostic exactly as before sharing existed.
+def shared_field_import(imported: Result<&2, &2, M.Diagnostic, G.Environment>, +module: M.Module, +checked: Groups.CheckedGroup, environment: G.Environment) -> Maybe<&2, FieldEvidence>:
+  match imported:
+    case Fail{diagnostic}:
+      None{}
+    case Done{G.Environment{new_bindings, new_definitions, imported_state}}:
+      G.Environment{bindings, definitions, state} = environment
+      Some{FieldEvidence{G.Environment{List.append(&2, I.Binding, new_bindings, bindings), List.append(&2, I.Definition, new_definitions, definitions), I.with_next(state, I.next_of(imported_state))}, [Core.Certificate{module, checked, Nil{}}]}}
+
+def shared_field_checked(result: Result<&2, &2, M.Diagnostic, Groups.CheckedGroup>, +module: M.Module, +environment: G.Environment, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>) -> Maybe<&2, FieldEvidence>:
+  match result:
+    case Fail{diagnostic}:
+      None{}
+    case Done{Groups.CheckedGroup{checked_module, +interfaces}}:
+      shared_field_import(Groups.import_interfaces(interfaces, operations, types, I.next_of(G.env_state(environment))), module, Groups.CheckedGroup{checked_module, interfaces}, environment)
+
+def shared_field_owner(found: Maybe<&2, M.DataType>, function: M.Function, environment: G.Environment, operations: List<&2, M.Operation>, types: List<&2, M.DataType>) -> Maybe<&2, FieldEvidence>:
+  match found:
+    case None{}:
+      None{}
+    case Some{owner}:
+      +module : M.Module = M.Module{Nil{}, [function], [owner], Nil{}}
+      shared_field_checked(Groups.check_group_planned(module, Nil{}), module, environment, operations, types)
+
+def shared_field_evidence(function: M.Function, receiver: M.Ty, environment: G.Environment, operations: List<&2, M.Operation>, +types: List<&2, M.DataType>) -> Maybe<&2, FieldEvidence>:
+  match receiver:
+    case M.AppliedTy{identity, arguments}:
+      shared_field_owner(TD.lookup(types, identity), function, environment, operations, types)
+    case other:
+      None{}
+
+def create_field(found: Maybe<&2, FieldEvidence>, +generated: M.Function, need: I.Coverage, +left: M.Ty, right: M.Ty, specialization: Specialization, configuration: Configuration) -> Result<&2, &2, M.Diagnostic, Specialization>:
+  match found need specialization:
+    case None{} need specialization:
+      select_field_site(need, left, right, specialization, configuration)
+    case Some{+field} I.AssociatedNeed{identity, +dispatch, member, templates, old_left, old_right, result, ambient, +subject} Specialization{M.Module{constants, functions, types, operations}, environment, choices, +counter, certificates}:
+      Configuration{originals, configured, entry, locals, affected, stride, constant_values, family_templates, step, schema} = configuration
+      +name = function_name(generated)
+      +inferred : G.Environment = field_environment(field)
+      do Result<&2, &2, M.Diagnostic, Specialization>:
+        +target : I.Typing <- I.instantiate_binding(I.lookup_binding(G.env_bindings(inferred), name), G.env_state(inferred), name, subject)
+        unified : I.State <- I.unify(I.type_of(target), receiver_signature(dispatch, left, right, result, ambient), I.state_of(target), subject)
+        return Specialization{M.Module{constants, List.append(&2, M.Function, functions, [generated]), types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Map.set(&2, Choice, choices, Nat.show(identity), receiver_choice(dispatch, name)), Nat.add(counter, step), List.append(&2, Core.Certificate, field_certificates(field), certificates)}
+    case _ _ _:
+      Fail{M.Diagnostic{"internal_error", "field", "selection expected a field requirement"}}
+
+def generate_field(+name: String, +need: I.Coverage, +left: M.Ty, right: M.Ty, +specialization: Specialization, +configuration: Configuration) -> Result<&2, &2, M.Diagnostic, Specialization>:
+  match need specialization:
+    case I.AssociatedNeed{identity, +dispatch, +member, templates, old_left, old_right, result, ambient, subject} Specialization{M.Module{constants, functions, +types, +operations}, +environment, choices, +counter, certificates}:
+      Configuration{originals, configured, entry, locals, affected, +stride, constant_values, family_templates, step, schema} = configuration
+      do Result<&2, &2, M.Diagnostic, Specialization>:
+        +generated : M.Function <- Members.function(Members.constructors(left, types), dispatch, member, name, Nat.mul(counter, stride))
+        create_field(shared_field_evidence(generated, left, environment, operations, types), generated, need, left, right, specialization, configuration)
+    case _ _:
+      Fail{M.Diagnostic{"internal_error", "field", "selection expected a field requirement"}}
+
+def select_field_shared(exists: Bool, +name: String, need: I.Coverage, left: M.Ty, right: M.Ty, specialization: Specialization, configuration: Configuration) -> Result<&2, &2, M.Diagnostic, Specialization>:
+  match exists:
+    case True{}:
+      reuse_field(name, need, left, right, specialization, configuration)
+    case False{}:
+      generate_field(name, need, left, right, specialization, configuration)
+
+def select_field(+need: I.Coverage, +left: M.Ty, right: M.Ty, +specialization: Specialization, +configuration: Configuration) -> Result<&2, &2, M.Diagnostic, Specialization>:
+  match need specialization configuration:
+    case I.AssociatedNeed{identity, +dispatch, +member, templates, old_left, old_right, result, ambient, subject} Specialization{M.Module{constants, functions, types, operations}, environment, choices, counter, certificates} Configuration{originals, configured, +entry, locals, affected, stride, constant_values, family_templates, step, schema}:
+      +name = accessor_name(accessor_owner(owner(left, entry)), member, dispatch)
+      select_field_shared(Bool.or(function_exists(lookup(originals, name)), function_exists(lookup(functions, name))), name, need, left, right, specialization, configuration)
+    case _ _ _:
       Fail{M.Diagnostic{"internal_error", "field", "selection expected a field requirement"}}
 
 def select_receiver_found(field: Bool, method: Result<&2, &2, M.Diagnostic, String>, dispatch: M.Dispatch, member: String, subject: String, need: I.Coverage, left: M.Ty, right: M.Ty, specialization: Specialization, configuration: Configuration, shapes: List<&2, I.Binding>, schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, Specialization>:
@@ -2138,13 +2239,44 @@ def collect_cached(runs: List<&2, Batch.Weighted<TaskRun>>, outcomes: List<&2, R
     case _ _:
       Fail{M.Diagnostic{"internal_error", "monomorphization", "specialization task outcome count mismatch"}}
 
+# Parallel units can each create the same shared accessor. Every copy has the
+# same body up to its unit-local lambda identity, so keep the first in source
+# order; references name the accessor, never a particular copy.
+def kept_accessor(duplicate: Bool, function: M.Function, reversed: List<&2, M.Function>) -> List<&2, M.Function>:
+  match duplicate:
+    case True{}:
+      reversed
+    case False{}:
+      function <> reversed
+
+def distinct_accessors_work(functions: List<&2, M.Function>, +seen: Set(), reversed: List<&2, M.Function>) -> List<&2, M.Function>:
+  match functions:
+    case Nil{}:
+      List.reverse(&2, M.Function, reversed)
+    case +function <> tail:
+      M.Function{+name, exported, parameter, p, r, body} = function
+      distinct_accessors_work(tail, Set.add(seen, name), kept_accessor(Bool.and(String.starts_with(name, "$member"), D.member(seen, name)), function, reversed))
+
+def distinct_accessors(functions: List<&2, M.Function>) -> List<&2, M.Function>:
+  distinct_accessors_work(functions, Set.new(), Nil{})
+
+def distinct_expansion(expanded: ExpandedModule) -> ExpandedModule:
+  ExpandedModule{M.Module{constants, functions, types, operations}, next, bindings, certificates} = expanded
+  ExpandedModule{M.Module{constants, distinct_accessors(functions), types, operations}, next, bindings, certificates}
+
+def distinct_cached(compiled: CachedExpansion) -> CachedExpansion:
+  CachedExpansion{value, tasks} = compiled
+  CachedExpansion{distinct_expansion(value), tasks}
+
 def specialize_declarations_cached(+declarations: List<&2, G.Declaration>, configuration: Configuration, shapes: List<&2, I.Binding>, +types: List<&2, M.DataType>, +operations: List<&2, M.Operation>, +counter: Nat, +nodes: List<&2, D.Node>, +previous: List<&2, CachedTask>, +old: Map<&2, List<&2, U32>>, +current: Map<&2, List<&2, U32>>) -> Result<&2, &2, M.Diagnostic, CachedExpansion>:
   +width = Nat.max(1n, List.length(&2, G.Declaration, declarations))
   +stepped = with_step(configuration, width)
   +runs = cached_tasks(declarations, task_index(previous, Map.new(&2, CachedTask)), old, current, counter)
   context : SpecializationContext = SpecializationContext{stepped, shapes, types, operations, Nil{}}
   outcomes = Batch.execute(~TaskRun, ~SpecializationContext, ~Result<&2, &2, M.Diagnostic, ExpandedModule>, ~run_task, Batch.plan(TaskRun, runs, 2048n), context)
-  collect_cached(runs, outcomes, nodes, types, operations, counter)
+  do Result<&2, &2, M.Diagnostic, CachedExpansion>:
+    collected : CachedExpansion <- collect_cached(runs, outcomes, nodes, types, operations, counter)
+    return distinct_cached(collected)
 
 def collect_specializations(outcomes: List<&2, Result<&2, &2, M.Diagnostic, ExpandedModule>>, types: List<&2, M.DataType>, operations: List<&2, M.Operation>, counter: Nat) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
   match outcomes:
@@ -2163,7 +2295,9 @@ def specialize_declarations(+declarations: List<&2, G.Declaration>, configuratio
   tasks = specialization_tasks(declarations, counter)
   context : SpecializationContext = SpecializationContext{with_step(configuration, width), shapes, types, operations, schemes}
   outcomes = Batch.execute(~SpecializationTask, ~SpecializationContext, ~Result<&2, &2, M.Diagnostic, ExpandedModule>, ~specialize_task, Batch.plan(SpecializationTask, tasks, 2048n), context)
-  collect_specializations(outcomes, types, operations, counter)
+  do Result<&2, &2, M.Diagnostic, ExpandedModule>:
+    collected : ExpandedModule <- collect_specializations(outcomes, types, operations, counter)
+    return distinct_expansion(collected)
 
 def stale_interfaces(functions: List<&2, M.Function>, +affected: List<&2, String>, +computed: Map<&2, I.Binding>, +shapes: Map<&2, I.Binding>) -> List<&2, M.Function>:
   match functions:
@@ -2343,15 +2477,26 @@ def concrete_module(module: M.Module) -> M.Module:
   M.Module{constants, functions, types, operations} = module
   M.Module{constants, functions, types, State.concrete(operations)}
 
-def prepare(+module: M.Module, entry: String, +family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, M.Module>:
+def prepare_shaped(+module: M.Module, entry: String, +family_templates: List<&2, M.Operation>, +nodes: List<&2, D.Node>, checked: M.CheckedModule) -> Result<&2, &2, M.Diagnostic, M.Module>:
   M.Module{constants, +functions, types, operations} = module
+  +shape = shape_bindings(checked)
   do Result<&2, &2, M.Diagnostic, M.Module>:
-    +nodes : List<&2, D.Node> <- Check.module_graph(module)
-    +shape : G.Environment <- shape_environment(module)
     +shapes : List<&2, I.Binding> <- resolved_bindings(G.env_bindings(shape), I.substitutions_of(G.env_state(shape)))
     selected : M.Module <- Public.select(module, shapes, Public.Candidates{})
-    prepared : M.Module <- prepare_templates(template_closure(List.length(&2, D.Node, nodes), nodes, List.append(&2, String, seeds(functions), constant_seeds(constants)), False{}), selected, shapes, entry, family_templates)
+    prepared : M.Module <- prepare_templates(template_closure(nodes, List.append(&2, String, seeds(functions), constant_seeds(constants))), selected, shapes, entry, family_templates)
     return concrete_module(prepared)
+
+def prepare(+module: M.Module, entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, M.Module>:
+  do Result<&2, &2, M.Diagnostic, M.Module>:
+    +nodes : List<&2, D.Node> <- Check.module_graph(module)
+    checked : M.CheckedModule <- Scheduler.check_module(module)
+    prepare_shaped(module, entry, family_templates, nodes, checked)
+
+# Dispatch resolution has already checked this exact module.
+def prepare_checked(+module: M.Module, entry: String, family_templates: List<&2, M.Operation>, checked: M.CheckedModule) -> Result<&2, &2, M.Diagnostic, M.Module>:
+  do Result<&2, &2, M.Diagnostic, M.Module>:
+    +nodes : List<&2, D.Node> <- Check.module_graph(module)
+    prepare_shaped(module, entry, family_templates, nodes, checked)
 
 # Cold compilation checks the expanded module after specialization. Defer the
 # final export/effect refresh to that check instead of inferring all affected
@@ -2403,6 +2548,20 @@ def prepare_templates_deferred(templates: List<&2, String>, +module: M.Module, +
         shared : SharedConstants <- share_constants(ordered_constants(groups, candidates), SharedConstants{module, shapes, Nil{}, 1n, Nil{}}, head <> tail, entry, stride, family_templates, schemes, schema)
         prepare_shared_deferred(head <> tail, shared, entry, stride, family_templates, schemes, schema)
 
+# Only groups without deferred dispatch can certify a final-check group.
+def prepare_initial_templates(templates: List<&2, String>, +module: M.Module, entry: String, family_templates: List<&2, M.Operation>, initial: Scheduler.Initial) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
+  match templates:
+    case Nil{}:
+      Done{Core.Prepared{concrete_module(module), Core.ready_certificates(Scheduler.initial_certificates(initial))}}
+    case head <> tail:
+      Scheduler.Initial{+checked, certificates, needs} = initial
+      +shape = shape_bindings(checked)
+      do Result<&2, &2, M.Diagnostic, Core.Prepared>:
+        +shapes : List<&2, I.Binding> <- resolved_bindings(G.env_bindings(shape), I.substitutions_of(G.env_state(shape)))
+        selected : M.Module <- Public.select(module, shapes, Public.Candidates{})
+        +prepared : ExpandedModule <- prepare_templates_deferred(head <> tail, selected, shapes, entry, family_templates, checked)
+        return Core.Prepared{concrete_module(expanded_module(prepared)), List.append(&2, Core.Certificate, Core.ready_certificates(certificates), expanded_certificates(prepared))}
+
 def prepare_deferred_templates(templates: List<&2, String>, +module: M.Module, entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
   match templates:
     case Nil{}:
@@ -2411,25 +2570,25 @@ def prepare_deferred_templates(templates: List<&2, String>, +module: M.Module, e
       Done{Core.Prepared{concrete_module(module), Nil{}}}
     case head <> tail:
       do Result<&2, &2, M.Diagnostic, Core.Prepared>:
-        +initial : Scheduler.Initial <- Scheduler.check_module_evidenced(module)
-        +checked : M.CheckedModule = Scheduler.initial_checked(initial)
-        certificates : List<&2, Core.Certificate> = Scheduler.initial_certificates(initial)
-        +shape : G.Environment = shape_bindings(checked)
-        +shapes : List<&2, I.Binding> <- resolved_bindings(G.env_bindings(shape), I.substitutions_of(G.env_state(shape)))
-        selected : M.Module <- Public.select(module, shapes, Public.Candidates{})
-        +prepared : ExpandedModule <- prepare_templates_deferred(head <> tail, selected, shapes, entry, family_templates, checked)
-        return Core.Prepared{concrete_module(expanded_module(prepared)), List.append(&2, Core.Certificate, certificates, expanded_certificates(prepared))}
+        initial : Scheduler.Initial <- Scheduler.check_module_evidenced(module)
+        prepare_initial_templates(head <> tail, module, entry, family_templates, initial)
+
+def module_templates(module: M.Module, +nodes: List<&2, D.Node>) -> List<&2, String>:
+  M.Module{constants, functions, types, operations} = module
+  template_closure(nodes, List.append(&2, String, seeds(functions), constant_seeds(constants)))
 
 def prepare_deferred_core(+module: M.Module, entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
-  M.Module{constants, functions, types, operations} = module
   do Result<&2, &2, M.Diagnostic, Core.Prepared>:
     +nodes : List<&2, D.Node> <- Check.module_graph(module)
-    prepare_deferred_templates(template_closure(List.length(&2, D.Node, nodes), nodes, List.append(&2, String, seeds(functions), constant_seeds(constants)), False{}), module, entry, family_templates)
+    prepare_deferred_templates(module_templates(module, nodes), module, entry, family_templates)
 
-def prepare_deferred(module: M.Module, entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, M.Module>:
-  do Result<&2, &2, M.Diagnostic, M.Module>:
-    prepared : Core.Prepared <- prepare_deferred_core(module, entry, family_templates)
-    return Core.prepared_module(prepared)
+# Dispatch resolution has already checked this exact module; its certificates
+# cover every group, so the final check also reuses the ready ones when no
+# template is left.
+def prepare_deferred_initial(+module: M.Module, entry: String, family_templates: List<&2, M.Operation>, initial: Scheduler.Initial) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
+  do Result<&2, &2, M.Diagnostic, Core.Prepared>:
+    +nodes : List<&2, D.Node> <- Check.module_graph(module)
+    prepare_initial_templates(module_templates(module, nodes), module, entry, family_templates, initial)
 
 def finish_cached(compiled: CachedExpansion, +context_key: List<&2, U32>, +sources: Map<&2, List<&2, U32>>, +shapes: List<&2, I.Binding>, +configuration: Configuration) -> Result<&2, &2, M.Diagnostic, Prepared>:
   CachedExpansion{expansion, tasks} = compiled
@@ -2517,20 +2676,25 @@ def source_check(module: M.Module, retain: Bool) -> Result<&2, &2, M.Diagnostic,
     case False{}:
       do Result<&2, &2, M.Diagnostic, Scheduler.Initial>:
         checked : M.CheckedModule <- Scheduler.check_module(module)
-        return Scheduler.Initial{checked, Nil{}}
+        return Scheduler.Initial{checked, Nil{}, Nil{}}
 
-def prepare_cached_evidenced(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, entry: String, +family_templates: List<&2, M.Operation>, previous: Maybe<&2, Cache>, retain: Bool) -> Result<&2, &2, M.Diagnostic, Prepared>:
-  M.Module{constants, +functions, types, operations} = module
+def prepare_cached_nodes(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, entry: String, +family_templates: List<&2, M.Operation>, +nodes: List<&2, D.Node>, previous: Maybe<&2, Cache>, initial: Scheduler.Initial) -> Result<&2, &2, M.Diagnostic, Prepared>:
+  Scheduler.Initial{+checked, certificates, needs} = initial
+  +shape = shape_bindings(checked)
   do Result<&2, &2, M.Diagnostic, Prepared>:
-    +nodes : List<&2, D.Node> <- Check.module_graph(module)
-    +initial : Scheduler.Initial <- source_check(module, retain)
-    +checked : M.CheckedModule = Scheduler.initial_checked(initial)
-    certificates : List<&2, Core.Certificate> = Scheduler.initial_certificates(initial)
-    +shape : G.Environment = shape_bindings(checked)
     +shapes : List<&2, I.Binding> <- resolved_bindings(G.env_bindings(shape), I.substitutions_of(G.env_state(shape)))
     selected : M.Module <- Public.select(module, shapes, Public.Candidates{})
-    prepared : Prepared <- prepare_templates_cached(~key, template_closure(List.length(&2, D.Node, nodes), nodes, List.append(&2, String, seeds(functions), constant_seeds(constants)), False{}), selected, shapes, entry, family_templates, nodes, previous, checked)
-    return with_prepared_certificates(concrete_prepared(prepared), certificates)
+    prepared : Prepared <- prepare_templates_cached(~key, module_templates(module, nodes), selected, shapes, entry, family_templates, nodes, previous, checked)
+    return with_prepared_certificates(concrete_prepared(prepared), Core.ready_certificates(certificates))
 
-def prepare_cached(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, module: M.Module, entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Cache>) -> Result<&2, &2, M.Diagnostic, Prepared>:
-  prepare_cached_evidenced(~key, module, entry, family_templates, previous, True{})
+def prepare_cached_evidenced(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Cache>, retain: Bool) -> Result<&2, &2, M.Diagnostic, Prepared>:
+  do Result<&2, &2, M.Diagnostic, Prepared>:
+    +nodes : List<&2, D.Node> <- Check.module_graph(module)
+    initial : Scheduler.Initial <- source_check(module, retain)
+    prepare_cached_nodes(~key, module, entry, family_templates, nodes, previous, initial)
+
+# Dispatch resolution has already checked this exact module.
+def prepare_cached_initial(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Cache>, initial: Scheduler.Initial) -> Result<&2, &2, M.Diagnostic, Prepared>:
+  do Result<&2, &2, M.Diagnostic, Prepared>:
+    +nodes : List<&2, D.Node> <- Check.module_graph(module)
+    prepare_cached_nodes(~key, module, entry, family_templates, nodes, previous, initial)

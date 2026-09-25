@@ -16,6 +16,7 @@ import ./inference_batch.bend as B
 import ./native_plan.bend as Plan
 import ./dependency.bend as D
 import ./monomorph.bend as Mono
+import ./dispatch_resolution.bend as Resolution
 import ./effect_families.bend as Families
 import ./check.bend as Check
 import ./source_modules.bend as Modules
@@ -592,7 +593,7 @@ def checked_outcome(outcome: Scheduler.Outcome, expected: Nat) -> Result<&2, &2,
     case Scheduler.Outcome{position, checked}:
       Bool.pick(Result<&2, &2, M.Diagnostic, G.CheckedGroup>, Nat.is_eq(position, expected), checked, Fail{M.Diagnostic{"internal_error", "native_session", "inference batch changed declaration group order"}})
     case Scheduler.EvidenceOutcome{position, module, imports, checked}:
-      Bool.pick(Result<&2, &2, M.Diagnostic, G.CheckedGroup>, Nat.is_eq(position, expected), checked, Fail{M.Diagnostic{"internal_error", "native_session", "inference batch changed declaration group order"}})
+      Bool.pick(Result<&2, &2, M.Diagnostic, G.CheckedGroup>, Nat.is_eq(position, expected), Scheduler.resolving_checked(checked), Fail{M.Diagnostic{"internal_error", "native_session", "inference batch changed declaration group order"}})
 
 def publish_prepared(prepared: List<&2, GroupPreparation>, outcomes: List<&2, Scheduler.Outcome>, progress: GroupProgress) -> GroupProgress:
   match prepared outcomes:
@@ -1051,7 +1052,7 @@ def update_lowered_module(state: State, mode: Mode, entry: String, +prelude_modu
   +specialized = Bool.or(Mono.required(raw_module), Families.required(raw_module))
   do Result<&2, &2, M.Diagnostic, Completion>:
     +family_module : M.Module <- Families.prepare(raw_module)
-    +specialization_result : Mono.Prepared <- Mono.prepare_cached_evidenced(~K.module, family_module, entry, M.module_operations(raw_module), specialization, retain_initial(previous_groups))
+    +specialization_result : Mono.Prepared <- Resolution.prepare_cached_evidenced(~K.module, family_module, entry, M.module_operations(raw_module), specialization, retain_initial(previous_groups))
     +module : M.Module = Mono.prepared_module(specialization_result)
     +expanded : Bool = Bool.or(specialized, Bool.not(Nat.is_eq(function_count(raw_module), function_count(module))))
     graph : List<&2, D.Node> <- specialization_graph(expanded, module, Plan.scan(prelude_module) <> scans)
