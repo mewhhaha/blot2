@@ -54,3 +54,34 @@ Deno.test("entry declarations start work ranges, while entry elsewhere does not"
     chunks,
   );
 });
+
+Deno.test("expression tags and same-line entry declarations stay in one work range", () => {
+  const chunks = [
+    "const decorate = fn amount => fn value => value + amount\n",
+    "#[decorate 1]\n#[fn value => value * 2] entry const answer = 20\n",
+    "#[decorate 2] entry let runtime = 40\n",
+    "entry const other = 42\n",
+  ];
+  const source = chunks.join("");
+  equal(
+    sourceDeclarationRanges(source)?.map((range) =>
+      source.slice(range.start, range.end)
+    ),
+    chunks,
+  );
+});
+
+Deno.test("adjacent same-line tagged declarations split after nested tag brackets", () => {
+  const chunks = [
+    "#[fn value => [value][0]] entry const first = 41\n",
+    "#[fn value => value + 1] entry const second = 41\n",
+    "entry const third = 42\n",
+  ];
+  const source = chunks.join("");
+  equal(
+    sourceDeclarationRanges(source)?.map((range) =>
+      source.slice(range.start, range.end)
+    ),
+    chunks,
+  );
+});

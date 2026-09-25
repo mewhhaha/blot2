@@ -139,6 +139,7 @@ type Expr is Data:
   ArrayLengthExpr{array: Expr}
   AssociatedExpr{identity: Nat, dispatch: Dispatch, member: String, templates: List<&2, TypeId>, left: Expr, right: Expr}
   GenericOperationExpr{identity: Nat, template: TypeId, arguments: List<&2, Ty>}
+  TagExpr{offset: Nat, callee: Expr, argument: Expr}
 
 type Function is Data:
   Function{

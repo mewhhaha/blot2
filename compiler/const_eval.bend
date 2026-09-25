@@ -721,6 +721,27 @@ def value_pattern(value: Value) -> Result<&2, &2, M.Diagnostic, M.Pattern>:
 # Pattern references share the expression evaluator and its step budget.
 # Pattern bookkeeping has separate fuel so it does not consume expression depth.
 # A mismatch discards partial bindings before evaluating any later reference.
+def tag_evaluation(result: Result<&2, &2, M.Diagnostic, Evaluation>, offset: Nat) -> Result<&2, &2, M.Diagnostic, Evaluation>:
+  match result:
+    case Done{value}:
+      Done{value}
+    case Fail{M.Diagnostic{code, subject, message}}:
+      Fail{M.Diagnostic{code, "offset:" ++ Nat.show(offset), message}}
+
+def tag_application(result: Result<&2, &2, M.Diagnostic, Application>, offset: Nat) -> Result<&2, &2, M.Diagnostic, Application>:
+  match result:
+    case Done{value}:
+      Done{value}
+    case Fail{M.Diagnostic{code, subject, message}}:
+      Fail{M.Diagnostic{code, "offset:" ++ Nat.show(offset), message}}
+
+def budget_diagnostic(expression: M.Expr) -> M.Diagnostic:
+  match expression:
+    case M.TagExpr{offset, callee, argument}:
+      M.Diagnostic{"const_budget", "offset:" ++ Nat.show(offset), "compile-time evaluation exhausted its step budget"}
+    case _:
+      M.Diagnostic{"const_budget", "const", "compile-time evaluation exhausted its step budget"}
+
 def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +steps: Budget, work: EvaluationWork, +context: Context) -> Result<&2, &2, M.Diagnostic, Evaluation>:
   match depth matching_fuel pending steps work:
     case _ 1n+scope_rest _ Budget{remaining, +cells} HandleValue{StateProviderValue{read, write, initial}, body}:
@@ -816,9 +837,9 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
             collected : Evaluation <- evaluate_work(depth, matching_fuel, tail, next_steps, CollectValues{}, context)
             continue_value(collected, values => remaining => prepend_collected_value(value, values, remaining)))
     case 0n _ _ _ Expression{expression}:
-      Fail{M.Diagnostic{"const_budget", "const", "compile-time evaluation exhausted its step budget"}}
+      Fail{budget_diagnostic(expression)}
     case _ _ _ Budget{0n, cells} Expression{expression}:
-      Fail{M.Diagnostic{"const_budget", "const", "compile-time evaluation exhausted its step budget"}}
+      Fail{budget_diagnostic(expression)}
     case 1n+limit _ _ Budget{1n+remaining, cells} Expression{expression}:
       match expression:
         # Budget guards must reduce without inspecting symbolic expressions in proofs.
@@ -1050,6 +1071,20 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
           do Result<&2, &2, M.Diagnostic, Evaluation>:
             checked : Evaluation <- evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), Expression{value}, context)
             continue_value(checked, value => next_steps => Done{Evaluation{ReturnValue{label, value}, next_steps}})
+        case M.TagExpr{+offset, callee, argument}:
+          do Result<&2, &2, M.Diagnostic, Evaluation>:
+            checked : Evaluation <- tag_evaluation(evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), Expression{callee}, context), offset)
+            continue_value(checked, function => argument_steps =>
+              do Result<&2, &2, M.Diagnostic, Evaluation>:
+                applied : Evaluation <- evaluate_work(limit, U32.to_nat(65536), Nil{}, argument_steps, Expression{argument}, context)
+                continue_value(applied, value => call_steps =>
+                  do Result<&2, &2, M.Diagnostic, Evaluation>:
+                    call : Application <- tag_application(application(function, value, context), offset)
+                    resolved : Application <- tag_application(resolve_application(context_providers(context), call, context), offset)
+                    tag_evaluation(complete_application(resolved, call_steps, body => scope => body_steps =>
+                      do Result<&2, &2, M.Diagnostic, Evaluation>:
+                        result : Evaluation <- evaluate_work(limit, U32.to_nat(65536), Nil{}, body_steps, Expression{body}, scope)
+                        complete_definition(result)), offset)))
         case M.SourceExpr{offset, annotation, value}:
           evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), Expression{value}, context)
 

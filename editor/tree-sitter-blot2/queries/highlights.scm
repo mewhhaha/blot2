@@ -38,7 +38,8 @@
 (type_parameter_field name: (identifier) @variable.other.member)
 (member name: (_) @variable.other.member)
 (method_call name: (identifier) @function.method)
-(declaration_tag name: (identifier) @attribute)
+(declaration_tag callee: (tag_callee (identifier) @attribute))
+(declaration_tag callee: (tag_callee (type_identifier) @attribute))
 "#" @punctuation.special
 (forward_return "$" @punctuation.special)
 

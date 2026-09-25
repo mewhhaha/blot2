@@ -224,6 +224,8 @@ def compare_work(fuel: Nat, matching: Bool, pending: List<&2, Work>, delta: Mayb
       compare_work(rest, True{}, AlphaNatPair{a0, b0} <> ExprPair{a1, b1} <> tail, delta)
     case 1n+rest True{} ExprPair{M.SourceExpr{a0, a1, a2}, M.SourceExpr{b0, b1, b2}} <> tail:
       compare_work(rest, True{}, NatPair{a0, b0} <> TyMaybePair{a1, b1} <> ExprPair{a2, b2} <> tail, delta)
+    case 1n+rest True{} ExprPair{M.TagExpr{a0, a1, a2}, M.TagExpr{b0, b1, b2}} <> tail:
+      compare_work(rest, True{}, NatPair{a0, b0} <> ExprPair{a1, b1} <> ExprPair{a2, b2} <> tail, delta)
     case 1n+rest True{} ExprPair{M.RuntimeInitExpr{a0}, M.RuntimeInitExpr{b0}} <> tail:
       compare_work(rest, True{}, ExprPair{a0, b0} <> tail, delta)
     case 1n+rest True{} ExprPair{M.F32Expr{a0}, M.F32Expr{b0}} <> tail:

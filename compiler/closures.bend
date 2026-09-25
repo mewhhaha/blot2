@@ -91,6 +91,8 @@ def children(expression: M.Expr) -> List<&2, M.Expr>:
       [body]
     case M.ApplyExpr{callee, argument}:
       [callee, argument]
+    case M.TagExpr{offset, callee, argument}:
+      [callee, argument]
     case M.CallExpr{callee, argument}:
       [argument]
     case M.AssociatedExpr{identity, dispatch, member, templates, left, right}:

@@ -274,6 +274,8 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{8} <> Natural{identity} <> Text{parameter} <> OptionalType{parameter_type} <> OptionalType{result_type} <> Expression{body} <> tail, room, reversed)
     case 1n+rest Expression{M.ApplyExpr{callee, argument}} <> tail room:
       encode_work(rest, Word{9} <> Expression{callee} <> Expression{argument} <> tail, room, reversed)
+    case 1n+rest Expression{M.TagExpr{offset, callee, argument}} <> tail room:
+      encode_work(rest, Word{45} <> Natural{offset} <> Expression{callee} <> Expression{argument} <> tail, room, reversed)
     case 1n+rest Expression{M.CallExpr{callee, argument}} <> tail room:
       encode_work(rest, Word{10} <> Text{callee} <> Expression{argument} <> tail, room, reversed)
     case 1n+rest Expression{M.ScalarExpr{operator, left, right}} <> tail room:

@@ -581,6 +581,11 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
         a : Usage <- usage(rest, TypeUsage{optional_type(annotation)}, types)
         b : Usage <- usage(rest, ExpressionUsage{value}, types)
         return combine_usage(a, b)
+    case 1n+rest ExpressionUsage{M.TagExpr{offset, callee, argument}}:
+      do Result<&2, &2, M.Diagnostic, Usage>:
+        a : Usage <- usage(rest, ExpressionUsage{callee}, types)
+        b : Usage <- usage(rest, ExpressionUsage{argument}, types)
+        return combine_usage(a, b)
     case 1n+rest ArmsUsage{M.MatchArm{patterns, body} <> tail}:
       do Result<&2, &2, M.Diagnostic, Usage>:
         found_patterns : Usage <- usage(rest, PatternsUsage{patterns}, types)

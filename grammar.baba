@@ -21,7 +21,7 @@ named_import = ("{" (bindings:import_binding ("," bindings:import_binding)* ","?
 import_binding = (name:(IDENT | TYPE_IDENT) alias:("as" (IDENT | TYPE_IDENT))?) ;
 declaration = (attributes:declaration_attribute* value:(value_declaration | data_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
 declaration_attribute = ("#" body:attribute_name LAYOUT_NEWLINE?) ;
-attribute_name = ("[" name:qualified_name "]") ;
+attribute_name = ("[" value:expression "]") ;
 value_declaration = (modifier:IDENT? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? "=" value:expression) ;
 effect_declaration = ("effect" name:qualified_name ":" signature:type_expression) ;
 effect_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" "effect" "=" (operations:effect_operations | signature:effect_signature)) ;

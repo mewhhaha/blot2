@@ -255,6 +255,8 @@ def lower(+fuel: Nat, work: Work, +projection: Metadata, +arrays: Set(), +isolat
       lower(rest, ExpressionWork{value}, projection, arrays, isolated)
     case 1n+rest ExpressionWork{M.SourceExpr{offset, annotation, value}}:
       lower(rest, ExpressionWork{value}, projection, arrays, isolated)
+    case 1n+rest ExpressionWork{M.TagExpr{offset, callee, argument}}:
+      lower(rest, ExpressionWork{M.ApplyExpr{callee, argument}}, projection, arrays, isolated)
     case 1n+rest ExpressionWork{M.LambdaExpr{+identity, parameter, parameter_type, result_type, body}}:
       do Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
         reference : Expr <- closure_reference(lambda_get(metadata_lambdas(projection), identity), identity)

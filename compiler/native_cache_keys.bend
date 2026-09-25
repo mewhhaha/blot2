@@ -186,6 +186,8 @@ def flatten(fuel: Nat, pending: List<&2, Work>, reversed: List<&2, R.Work>) -> R
       flatten(rest, Field{R.Word{8}} <> Field{R.Natural{identity}} <> Field{R.Text{parameter}} <> Field{R.OptionalType{parameter_type}} <> Field{R.OptionalType{result_type}} <> Expression{body} <> tail, reversed)
     case 1n+rest Expression{M.ApplyExpr{callee, argument}} <> tail:
       flatten(rest, Field{R.Word{9}} <> Expression{callee} <> Expression{argument} <> tail, reversed)
+    case 1n+rest Expression{M.TagExpr{offset, callee, argument}} <> tail:
+      flatten(rest, Field{R.Word{47}} <> Field{R.Natural{offset}} <> Expression{callee} <> Expression{argument} <> tail, reversed)
     case 1n+rest Expression{M.CallExpr{callee, argument}} <> tail:
       flatten(rest, Field{R.Word{10}} <> Field{R.Text{callee}} <> Expression{argument} <> tail, reversed)
     case 1n+rest Expression{M.ScalarExpr{operator, left, right}} <> tail:

@@ -45,6 +45,25 @@ import ./compiler/dispatch_resolution.bend as Resolution
 import ./compiler/entry_points.bend as Entries
 import ./compiler/loop_memory.bend as LoopMemory
 
+# A declaration tag records the exact source origin and both dependencies.
+law declaration_tag_preserves_origin_and_operands:
+  for offset: Nat
+  for function: M.Expr
+  for value: M.Expr
+  {Lower.tag_application(offset, function, value) == M.TagExpr{offset, function, value} : M.Expr}
+
+law declaration_tag_reachability_includes_both_operands:
+  for offset: Nat
+  for function: M.Expr
+  for value: M.Expr
+  {Closures.children(M.TagExpr{offset, function, value}) == [function, value] : List<&2, M.Expr>}
+
+law empty_declaration_tags_preserve_initializer:
+  for value: M.Expr
+  for fuel: Nat
+  for scope: Lower.Context
+  {Lower.apply_tags(Nil{}, value, fuel, scope) == Done{value} : Result<&2, &2, M.Diagnostic, M.Expr>}
+
 # An exported function-valued constant is called through its stored value.
 # Selecting exports after inference must never duplicate its initializer.
 law checked_public_wrapper_calls_stored_constant:

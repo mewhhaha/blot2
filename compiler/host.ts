@@ -198,6 +198,12 @@ export type Expr =
   | { readonly $: "ReturnExpr"; readonly label: bigint; readonly value: Expr }
   | { readonly $: "RuntimeInitExpr"; readonly value: Expr }
   | {
+    readonly $: "TagExpr";
+    readonly offset: bigint;
+    readonly callee: Expr;
+    readonly argument: Expr;
+  }
+  | {
     readonly $: "SourceExpr";
     readonly offset: bigint;
     readonly annotation: Maybe<Type>;
@@ -562,6 +568,12 @@ type WireExpr =
     readonly value: WireExpr;
   }
   | { readonly $: "RuntimeInitExpr"; readonly value: WireExpr }
+  | {
+    readonly $: "TagExpr";
+    readonly offset: bigint;
+    readonly callee: WireExpr;
+    readonly argument: WireExpr;
+  }
   | {
     readonly $: "SourceExpr";
     readonly offset: bigint;
@@ -1191,6 +1203,13 @@ function encodeExpr(expression: Expr): WireExpr {
       };
     case "RuntimeInitExpr":
       return { $: expression.$, value: encodeExpr(expression.value) };
+    case "TagExpr":
+      return {
+        $: expression.$,
+        offset: nat(expression.offset, "Tag offset"),
+        callee: encodeExpr(expression.callee),
+        argument: encodeExpr(expression.argument),
+      };
     case "SourceExpr":
       return {
         $: expression.$,
@@ -1370,6 +1389,12 @@ function decodeExpr(expression: WireExpr): Expr {
       };
     case "RuntimeInitExpr":
       return { $: expression.$, value: decodeExpr(expression.value) };
+    case "TagExpr":
+      return {
+        ...expression,
+        callee: decodeExpr(expression.callee),
+        argument: decodeExpr(expression.argument),
+      };
     case "SourceExpr":
       return {
         ...expression,

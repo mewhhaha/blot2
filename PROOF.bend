@@ -9,6 +9,15 @@ import ./compiler/wasm.bend as Wasm
 import ./compiler/patterns.bend as Patterns
 import ./compiler/monomorph.bend as Mono
 
+def Laws.declaration_tag_preserves_origin_and_operands(offset, function, value):
+  {==}
+
+def Laws.declaration_tag_reachability_includes_both_operands(offset, function, value):
+  {==}
+
+def Laws.empty_declaration_tags_preserve_initializer(value, fuel, scope):
+  {==}
+
 def Laws.checked_public_wrapper_calls_stored_constant(name, input, output, variables, row):
   {==}
 

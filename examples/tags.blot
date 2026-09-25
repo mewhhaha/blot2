@@ -1,0 +1,20 @@
+// Tags apply functions to the following value, nearest tag first.
+const add = fn amount => fn value => value + amount
+const twice = fn value => value * 2
+
+#[add 1]
+#[twice]
+entry const answer: U32 = 20
+
+#[fn value => @u32.eq value 42] entry const truth: Bool = 42
+
+// A let tag runs once when the module starts.
+#[add 1] entry let initialized: U32 = 41
+
+// The annotation describes the decorated function.
+#[fn function => fn value => function value + 1]
+entry const next: U32 -> U32 = fn (value: U32) => value
+
+// A syntactic lambda can become a scalar after decoration.
+#[fn function => function 41]
+entry const reduced: U32 = fn (value: U32) => value + 1

@@ -8,6 +8,7 @@ import ./source_arguments.bend as A
 import ./operators.bend as O
 import ./index.bend as Index
 import ./effect_families.bend as Families
+import ./dependency.bend as D
 
 type Local is Data:
   Local{source: String, core: String}
@@ -1937,14 +1938,14 @@ def declaration_lambda(fuel: Nat, work: DeclarationInitializer) -> Result<&2, &2
     case _ _:
       Done{None{}}
 
-def named_declaration(kind: NodeKind, +node: C.Cst, +prefix: String, module_name: String, +context: Context) -> Result<&2, &2, M.Diagnostic, Context>:
+def named_declaration(kind: NodeKind, +node: C.Cst, attributes: List<&2, C.Cst>, +prefix: String, module_name: String, +context: Context) -> Result<&2, &2, M.Diagnostic, Context>:
   match kind:
     case ValueDeclaration{}:
       do Result<&2, &2, M.Diagnostic, Context>:
         +name : String <- declaration_name(node)
         +initializer : C.Cst <- C.one(C.field_values(node, "value"))
         function : Maybe<&2, C.Cst> <- declaration_lambda(65536n, InitializerChildren{[initializer]})
-        kind : GlobalKind = Bool.pick(GlobalKind, Maybe.is_some(&2, C.Cst, function), FunctionName{}, ConstantName{})
+        kind : GlobalKind = Bool.pick(GlobalKind, Bool.and(Maybe.is_some(&2, C.Cst, function), List.is_empty(&2, C.Cst, attributes)), FunctionName{}, ConstantName{})
         add_global(context, name, prefix ++ name, kind, node)
     case EffectNode{}:
       do Result<&2, &2, M.Diagnostic, Context>:
@@ -1967,11 +1968,11 @@ def collect_names(nodes: List<&2, C.Cst>, +prefix: String, +module_name: String)
   match nodes:
     case Nil{}:
       Done{Context{MTip{}, MTip{}, Nil{}, Nil{}, None{}, Nil{}}}
-    case head <> tail:
+    case +head <> tail:
       do Result<&2, &2, M.Diagnostic, Context>:
         +node : C.Cst <- C.one(C.field_values(head, "value"))
         rest : Context <- collect_names(tail, prefix, module_name)
-        named_declaration(classify(C.kind_of(node)), node, prefix, module_name, rest)
+        named_declaration(classify(C.kind_of(node)), node, C.field_values(head, "attributes"), prefix, module_name, rest)
 
 def combine_context(own: Context, inherited: Context) -> Context:
   Context{globals, headers, fixities, locals, label, annotation_variables} = own
@@ -2069,12 +2070,69 @@ def lower_function(+node: C.Cst, name: String, exported: Bool, +fuel: Nat, +cont
     body : M.Expr <- lower(fuel, visit(body_node), bind_parameter(context, param))
     return function_value(name, exported, param, result, body)
 
-def lower_constant(+node: C.Cst, +name: String, exported: Bool, +fuel: Nat, base_context: Context) -> Result<&2, &2, M.Diagnostic, M.Constant>:
+def tag_lowered(value: Result<&2, &2, M.Diagnostic, M.Expr>, tag: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match value:
+    case Done{expression}:
+      Done{expression}
+    case Fail{M.Diagnostic{code, subject, message}}:
+      Fail{C.diagnostic(tag, code, message)}
+
+def tag_body(value: Result<&2, &2, M.Diagnostic, C.Cst>, tag: C.Cst, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match value:
+    case Fail{error}:
+      Fail{error}
+    case Done{expression}:
+      tag_lowered(lower(fuel, visit(expression), context), tag)
+
+def tag_expression_body(value: Result<&2, &2, M.Diagnostic, C.Cst>, tag: C.Cst, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match value:
+    case Fail{error}:
+      Fail{error}
+    case Done{body}:
+      tag_body(C.one(C.field_values(body, "value")), tag, fuel, context)
+
+def tag_expression(+tag: C.Cst, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  tag_expression_body(C.one(C.field_values(tag, "body")), tag, fuel, context)
+
+# Recurse through the source-ordered list first: the nearest tag runs first.
+# TagExpr carries an explicit origin through inference and const evaluation.
+def tag_application(offset: Nat, function: M.Expr, value: M.Expr) -> M.Expr:
+  M.TagExpr{offset, function, value}
+
+def apply_tags(tags: List<&2, C.Cst>, value: M.Expr, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match tags:
+    case Nil{}:
+      Done{value}
+    case +tag <> tail:
+      do Result<&2, &2, M.Diagnostic, M.Expr>:
+        inner : M.Expr <- apply_tags(tail, value, fuel, context)
+        function : M.Expr <- tag_expression(tag, fuel, context)
+        return tag_application(C.offset_of(tag), function, inner)
+
+def reject_recursive_tag_found(found: Bool, tag: C.Cst) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match found:
+    case True{}:
+      Fail{C.diagnostic(tag, "recursive_tag", "a tagged declaration cannot refer to its own bound name")}
+    case False{}:
+      Done{Unit{}}
+
+def reject_recursive_tag(tags: List<&2, C.Cst>, name: String, value: M.Expr) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match tags:
+    case Nil{}:
+      Done{Unit{}}
+    case tag <> tail:
+      do Result<&2, &2, M.Diagnostic, Unit>:
+        refs : D.References <- D.references(65536n, D.Expression{value})
+        reject_recursive_tag_found(D.contains(D.names_of(refs), name), tag)
+
+def lower_constant(+node: C.Cst, +attributes: List<&2, C.Cst>, +name: String, exported: Bool, +fuel: Nat, base_context: Context) -> Result<&2, &2, M.Diagnostic, M.Constant>:
   do Result<&2, &2, M.Diagnostic, M.Constant>:
     +context : Context <- annotation_scope(node, base_context, name)
     ty : Maybe<&2, M.Ty> <- source_annotation(C.field_values(node, "annotation"), fuel, context)
     value_node : C.Cst <- C.one(C.field_values(node, "value"))
-    +value : M.Expr <- lower(fuel, visit(value_node), context)
+    +initial : M.Expr <- lower(fuel, visit(value_node), context)
+    +value : M.Expr <- apply_tags(attributes, initial, fuel, context)
+    valid : Unit <- reject_recursive_tag(attributes, name, value)
     keyword : C.Cst <- C.one(C.field_values(node, "kind"))
     return M.Constant{name, exported, ty, Bool.pick(M.Expr, M.name_equal(C.text_of(keyword), "let"), M.RuntimeInitExpr{value}, value)}
 
@@ -2267,7 +2325,7 @@ def add_data(module: M.Module, ty: M.DataType) -> M.Module:
   M.Module{constants, functions, data_types, operations} = module
   M.Module{constants, functions, ty <> data_types, operations}
 
-def lower_value_declaration(function: Maybe<&2, C.Cst>, node: C.Cst, name: String, exported: Bool, rest: M.Module, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
+def lower_value_declaration(function: Maybe<&2, C.Cst>, node: C.Cst, attributes: List<&2, C.Cst>, name: String, exported: Bool, rest: M.Module, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
   match function:
     case Some{lambda}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
@@ -2275,7 +2333,7 @@ def lower_value_declaration(function: Maybe<&2, C.Cst>, node: C.Cst, name: Strin
         return add_function(rest, value)
     case None{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
-        value : M.Constant <- lower_constant(node, name, exported, fuel, context)
+        value : M.Constant <- lower_constant(node, attributes, name, exported, fuel, context)
         return add_constant(rest, value)
 
 # `entry` is a contextual keyword: the grammar accepts any identifier before
@@ -2300,7 +2358,14 @@ def declaration_modifier(modifiers: List<&2, C.Cst>, entry_module: Bool) -> Resu
     case node <> tail:
       Fail{C.diagnostic(node, "internal_cst", "a declaration has at most one modifier")}
 
-def declaration(kind: NodeKind, +node: C.Cst, +prefix: String, module_name: String, entry_module: Bool, rest: M.Module, +fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
+def reject_attributes(attributes: List<&2, C.Cst>) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match attributes:
+    case Nil{}:
+      Done{Unit{}}
+    case node <> tail:
+      Fail{C.diagnostic(node, "unsupported_attribute", "expression tags apply only to const and let declarations")}
+
+def declaration(kind: NodeKind, +node: C.Cst, +attributes: List<&2, C.Cst>, +prefix: String, module_name: String, entry_module: Bool, rest: M.Module, +fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
   match kind:
     case ValueDeclaration{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
@@ -2308,31 +2373,30 @@ def declaration(kind: NodeKind, +node: C.Cst, +prefix: String, module_name: Stri
         entry : Bool <- declaration_modifier(C.field_values(node, "modifier"), entry_module)
         initializer : C.Cst <- C.one(C.field_values(node, "value"))
         function : Maybe<&2, C.Cst> <- declaration_lambda(fuel, InitializerChildren{[initializer]})
-        lower_value_declaration(function, node, prefix ++ name, entry, rest, fuel, context)
+        lower_value_declaration(Bool.pick(Maybe<&2, C.Cst>, List.is_empty(&2, C.Cst, attributes), function, None{}), node, attributes, prefix ++ name, entry, rest, fuel, context)
     case EffectNode{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
+        valid : Unit <- reject_attributes(attributes)
         name : String <- declaration_name(node)
         operation : M.Operation <- lower_operation(node, M.TypeId{module_name, name}, fuel, context)
         return add_operation(rest, operation)
     case EffectTypeNode{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
+        valid : Unit <- reject_attributes(attributes)
         name : String <- declaration_name(node)
         operations : List<&2, M.Operation> <- lower_effect_type(node, name, module_name, fuel, context)
         return add_operations(rest, operations)
     case DataNode{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
+        valid : Unit <- reject_attributes(attributes)
         name : String <- declaration_name(node)
         ty : M.DataType <- lower_data(node, name, prefix, module_name, fuel, context)
         return add_data(rest, ty)
     case _:
-      Done{rest}
+      do Result<&2, &2, M.Diagnostic, M.Module>:
+        valid : Unit <- reject_attributes(attributes)
+        return rest
 
-def reject_attributes(attributes: List<&2, C.Cst>) -> Result<&2, &2, M.Diagnostic, Unit>:
-  match attributes:
-    case Nil{}:
-      Done{Unit{}}
-    case node <> tail:
-      Fail{C.diagnostic(node, "unsupported_attribute", "source declaration transforms are not implemented yet")}
 
 def lower_declarations_sequential(nodes: List<&2, C.Cst>, +prefix: String, +module_name: String, +entry_module: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
   match nodes:
@@ -2342,8 +2406,7 @@ def lower_declarations_sequential(nodes: List<&2, C.Cst>, +prefix: String, +modu
       do Result<&2, &2, M.Diagnostic, M.Module>:
         +node : C.Cst <- C.one(C.field_values(head, "value"))
         rest : M.Module <- lower_declarations_sequential(tail, prefix, module_name, entry_module, fuel, context)
-        valid : Unit <- reject_attributes(C.field_values(head, "attributes"))
-        declaration(classify(C.kind_of(node)), node, prefix, module_name, entry_module, rest, fuel, context)
+        declaration(classify(C.kind_of(node)), node, C.field_values(head, "attributes"), prefix, module_name, entry_module, rest, fuel, context)
 
 def combine_modules(prelude: M.Module, module: M.Module) -> M.Module:
   M.Module{pc, pf, pt, po} = prelude

@@ -597,6 +597,8 @@ def expression_cost(fuel: Nat, pending: List<&2, CostWork>, total: Nat) -> Nat:
       expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.SourceExpr{offset, annotation, value}} <> tail:
       expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
+    case 1n+rest ExpressionCost{M.TagExpr{offset, callee, argument}} <> tail:
+      expression_cost(rest, ExpressionCost{callee} <> ExpressionCost{argument} <> tail, Nat.add(total, 16n))
     case 1n+rest ExpressionCost{M.UnaryExpr{operator, value}} <> tail:
       expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.StateProviderExpr{read, write, initial}} <> tail:

@@ -1235,7 +1235,7 @@ def scalar_type(ty: M.Ty) -> Bool:
 def export_type(exported: Bool, supported: Bool, name: String) -> Result<&2, &2, M.Diagnostic, Unit>:
   match exported supported:
     case True{} False{}:
-      Fail{M.Diagnostic{"backend_type", name, "Wasm export results and constants require Unit, U32, F32, or Bool; parameters may also be scalar callbacks with the closed Foreign effect"}}
+      Fail{M.Diagnostic{"backend_type", name, "Wasm export constants require Unit, U32, F32, or Bool; function boundaries accept scalar or numeric-array values and callbacks with the closed Foreign effect"}}
     case _ _:
       Done{Unit{}}
 
@@ -2169,6 +2169,8 @@ def preparation_weight(fuel: Nat, pending: List<&2, PreparationWeightWork>, weig
       preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.SourceExpr{offset, annotation, value}} <> tail:
       preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.TagExpr{offset, callee, argument}} <> tail:
+      preparation_weight(rest, PreparationExpression{callee} <> PreparationExpression{argument} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.StateProviderExpr{read, write, initial}} <> tail:
       preparation_weight(rest, PreparationExpression{initial} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.ProviderExpr{identity, implementation}} <> tail:

@@ -170,7 +170,21 @@ export default grammar({
     forward_return: (_) => seq("return", "$"),
 
     declaration_tag: ($) =>
-      seq("#", "[", field("name", $.identifier), repeat($._syntax), "]"),
+      seq(
+        "#",
+        "[",
+        optional(field("callee", $.tag_callee)),
+        repeat($._syntax),
+        "]",
+      ),
+    tag_callee: ($) =>
+      prec.right(
+        3,
+        seq(
+          choice($.identifier, $.type_identifier),
+          repeat(seq(".", choice($.identifier, $.type_identifier))),
+        ),
+      ),
 
     parenthesized: ($) => seq("(", repeat($._syntax), ")"),
     bracketed: ($) => seq("[", repeat($._syntax), "]"),

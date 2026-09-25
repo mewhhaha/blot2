@@ -35,14 +35,16 @@ export function sourceDeclarationRanges(
       else if (char === '"') quoted = false;
       continue;
     }
-    if (lineStart && pending.length === 0) {
+    if (pending.length === 0 && (lineStart || attribute)) {
       const prefix = source.slice(at, at + 40);
-      const tagged = /^#[ \t]*\[/.test(prefix);
+      // An attribute remains pending until its declaration header, including
+      // when the header follows one or more tags on the same line.
+      const tagged = lineStart && /^#[ \t]*\[/.test(prefix);
       const header =
         /^(?:(?:entry[ \t]+)?(?:const|let)|data|effect|type|infixl|infixr|infix|import)[ \t]/
           .test(prefix);
       if (tagged || header) {
-        if (declaration && !attribute) starts.push(at);
+        if (lineStart && declaration && !attribute) starts.push(at);
         declaration = true;
         attribute = tagged;
       }

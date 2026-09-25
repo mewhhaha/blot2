@@ -448,6 +448,11 @@ otherwise). Everywhere else `entry` is an ordinary identifier: a parameter, a
 `let` or pattern binding, a record field or a declaration name. The editor
 grammar highlights it only as the modifier of a `const`/`let` on the same line.
 
+An expression tag `#[f args]` decorates a value declaration as `(f args) value`.
+Several tags compose nearest first, and an annotation constrains the decorated
+result. Tags on `const` run at compile time; tags on `let` run at startup. Their
+expression dependencies enter reachability and incremental cache keys.
+
 Only the entry module reaches the host, so `entry` in any other module, the
 prelude included, is `entry_outside_entry_module`. `entry` never affects Blot
 visibility: every declaration of every module stays importable exactly as

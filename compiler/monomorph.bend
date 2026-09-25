@@ -200,6 +200,8 @@ def rebuild(original: M.Expr, children: List<&2, M.Expr>, +base: Nat) -> Result<
         return M.LambdaExpr{identity(base, old), parameter, parameter_type, result_type, a}
     case M.ApplyExpr{callee, argument} a <> b <> Nil{}:
       Done{M.ApplyExpr{a, b}}
+    case M.TagExpr{offset, callee, argument} a <> b <> Nil{}:
+      Done{M.TagExpr{offset, a, b}}
     case M.CallExpr{callee, argument} a <> Nil{}:
       Done{M.CallExpr{callee, a}}
     case M.ScalarExpr{operator, left, right} a <> b <> Nil{}:
@@ -1879,6 +1881,8 @@ def retained_specializations(constants: List<&2, M.Constant>, +templates: List<&
 
 def expression_identity(expression: M.Expr) -> Nat:
   match expression:
+    case M.TagExpr{offset, callee, argument}:
+      offset
     case M.SourceExpr{offset, annotation, value}:
       offset
     case M.LambdaExpr{identity, parameter, p, r, body}:

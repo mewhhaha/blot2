@@ -65,6 +65,8 @@ def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, 
       Done{ReferenceStep{PendingReference{rest, Expression{body}} <> pending, reference_lambda(identity, reversed)}}
     case 1n+rest Expression{M.ApplyExpr{callee, argument}}:
       Done{ReferenceStep{PendingReference{rest, Expression{callee}} <> PendingReference{rest, Expression{argument}} <> pending, reversed}}
+    case 1n+rest Expression{M.TagExpr{offset, callee, argument}}:
+      Done{ReferenceStep{PendingReference{rest, Expression{callee}} <> PendingReference{rest, Expression{argument}} <> pending, reversed}}
     case 1n+rest Expression{M.AssociatedExpr{identity, dispatch, member, templates, left, right}}:
       Done{ReferenceStep{PendingReference{rest, Expression{left}} <> PendingReference{rest, Expression{right}} <> pending, reversed}}
     case 1n+rest Expression{M.ScalarExpr{operator, left, right}}:

@@ -816,19 +816,25 @@ clock, network, or randomness. Cache keys must track every observed dependency.
 Reflection on unsolved type/effect variables is not allowed; cyclic dependencies
 between inference and const-generated declarations must receive a diagnostic.
 
-Declaration tags use `#[...]`:
+Value declaration tags use `#[expression]` and apply an ordinary function to the
+declaration's initializer:
 
 ```blot
-import { component } from "engine/ecs"
-
-#[component]
-data Position = Position { x: F32, y: F32 }
+const add = fn amount => fn value => value + amount
+#[add 1]
+#[fn value => value * 2]
+entry const answer: U32 = 20 // add 1 (multiply 2 20) = 41
 ```
 
-A tag names an imported const-time operation on a declaration descriptor, with
-typed metadata and controlled generated definitions. `component` is a library
-name, not a reserved compiler keyword. The precise declaration-transform API and
-namespace resolution for a type and its same-named constructor remain open.
+Tags may appear on separate lines or the declaration line. The nearest tag
+applies first, and an annotation constrains the final decorated value. Tag
+expressions resolve in the declaration's module scope, including named and
+qualified imports. A tagged `const` runs its decorators at compile time under
+the normal budget; a tagged `let` runs them once at module startup. Tag and
+initializer references participate in reachability and incremental keys. Direct
+self-reference in a tagged declaration is rejected explicitly. Tags on types,
+effects, and fixity declarations still receive `unsupported_attribute`;
+declaration-descriptor transforms and generated definitions remain a proposal.
 
 ## ECS as a type/effect test case
 
@@ -960,30 +966,30 @@ A separate, permissive Tree-sitter grammar supports Helix highlighting of the
 showcase, including proposals. It is editor support, not a validating compiler
 frontend; see the [Helix setup](README.md#helix-highlighting).
 
-| Area                    | Current status                                                                                              |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Deno and Baba           | Generated lexer, general CPU parser, compact-CST schema, and binding checks.                                |
-| Helix highlighting      | Separate editor grammar covers the syntax showcase.                                                         |
-| Annotations             | Scalars, tuples, arrays, concrete applied nominal types, and effect-annotated arrows.                       |
-| Modules                 | Implicit prelude; relative/explicitly mapped file imports; module scopes; public top-level bindings.        |
-| Data declarations       | Generic `data`, including named record construction/patterns; no `type` aliases yet.                        |
-| Pattern narrowing       | Single/multi-value `case … of`, nested tuple/record patterns, `if let`, guarded `let`.                      |
-| Closed unions           | Design/editor examples only; no union inference or runtime representation.                                  |
-| Operators and demand    | Source fixities/operators backed by ordinary functions; demands remain future.                              |
-| Backtick calls          | Ordinary curried function calls with source fixity/default left precedence 80.                              |
-| Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.                                |
-| Text interpolation      | Target design only; literal strings currently serve generic panic messages.                                 |
-| `self`                  | Previous value of a local binding or field/index path during immutable rebinding.                           |
-| Layout and AST          | Host layout/source mapping and Baba CST; Bend name resolution and core lowering.                            |
-| Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                                  |
-| Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                                  |
-| Resolver blocks         | Scoped effect providers execute; monad resolvers and `return $` remain future.                              |
-| Scheduling              | Source-library responsibility; no compiler-generated ECS scheduler.                                         |
-| Const evaluation        | Scalars, tuples, arrays, data, closures, and matching with one shared evaluation budget.                    |
-| Tags and const types    | Closed const effect descriptors; no tag transforms or type-valued consts.                                   |
-| Arrays and SIMD         | Immutable arrays, checked indexing, alias-preserving updates with local storage reuse; SIMD remains future. |
-| Wasm compilation        | Private arena; scalars, copied numeric arrays, and explicit scalar callbacks via guest ABI 2.               |
-| Game runtime and reload | Sandbox paused pending source ECS, capability bundles and persistent-state ABI.                             |
+| Area                    | Current status                                                                                                                               |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deno and Baba           | Generated lexer, general CPU parser, compact-CST schema, and binding checks.                                                                 |
+| Helix highlighting      | Separate editor grammar covers the syntax showcase.                                                                                          |
+| Annotations             | Scalars, tuples, arrays, concrete applied nominal types, and effect-annotated arrows.                                                        |
+| Modules                 | Implicit prelude; relative/explicitly mapped file imports; module scopes; public top-level bindings.                                         |
+| Data declarations       | Generic `data`, including named record construction/patterns; no `type` aliases yet.                                                         |
+| Pattern narrowing       | Single/multi-value `case … of`, nested tuple/record patterns, `if let`, guarded `let`.                                                       |
+| Closed unions           | Design/editor examples only; no union inference or runtime representation.                                                                   |
+| Operators and demand    | Source fixities/operators backed by ordinary functions; demands remain future.                                                               |
+| Backtick calls          | Ordinary curried function calls with source fixity/default left precedence 80.                                                               |
+| Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.                                                                 |
+| Text interpolation      | Target design only; literal strings currently serve generic panic messages.                                                                  |
+| `self`                  | Previous value of a local binding or field/index path during immutable rebinding.                                                            |
+| Layout and AST          | Host layout/source mapping and Baba CST; Bend name resolution and core lowering.                                                             |
+| Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                                                                   |
+| Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                                                                   |
+| Resolver blocks         | Scoped effect providers execute; monad resolvers and `return $` remain future.                                                               |
+| Scheduling              | Source-library responsibility; no compiler-generated ECS scheduler.                                                                          |
+| Const evaluation        | Scalars, tuples, arrays, data, closures, and matching with one shared evaluation budget.                                                     |
+| Tags and const types    | Expression tags transform `const`/`let` values; closed const effect descriptors; no declaration-descriptor transforms or type-valued consts. |
+| Arrays and SIMD         | Immutable arrays, checked indexing, alias-preserving updates with local storage reuse; SIMD remains future.                                  |
+| Wasm compilation        | Private arena; scalars, copied numeric arrays, and explicit scalar callbacks via guest ABI 2.                                                |
+| Game runtime and reload | Sandbox paused pending source ECS, capability bundles and persistent-state ABI.                                                              |
 
 `generated/wasm` belongs to Baba's lexer/parser tooling. Separately, `just demo`
 compiles [examples/prelude.blot](examples/prelude.blot) and executes it as Wasm.

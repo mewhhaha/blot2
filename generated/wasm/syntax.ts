@@ -375,7 +375,7 @@ export interface DeclarationAttributeCursor extends RuleCursorBase<"declaration_
 }
 
 export interface AttributeNameCursor extends RuleCursorBase<"attribute_name"> {
-  field(name: "name"): QualifiedNameCursor;
+  field(name: "value"): ExpressionCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }

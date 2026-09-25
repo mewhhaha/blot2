@@ -1244,8 +1244,7 @@ def lower_project_node(found: Maybe<&2, Lowered>, +node: C.Cst, task: Modules.Mo
       Modules.ModuleTask{declarations, prefix, name, entry, scope} = task
       do Result<&2, &2, M.Diagnostic, Lowered>:
         +value : C.Cst <- C.one(C.field_values(node, "value"))
-        valid : Unit <- L.reject_attributes(C.field_values(node, "attributes"))
-        +fragment : M.Module <- L.declaration(L.classify(C.kind_of(value)), value, prefix, name, entry, M.Module{Nil{}, Nil{}, Nil{}, Nil{}}, fuel, scope)
+        +fragment : M.Module <- L.declaration(L.classify(C.kind_of(value)), value, C.field_values(node, "attributes"), prefix, name, entry, M.Module{Nil{}, Nil{}, Nil{}, Nil{}}, fuel, scope)
         return Lowered{node, fuel, fragment, Plan.scan(fragment), None{}}
 
 def lower_project_nodes(nodes: List<&2, C.Cst>, +task: Modules.ModuleTask, +context: ProjectContext, lowered: Lowering) -> Result<&2, &2, M.Diagnostic, Lowering>:

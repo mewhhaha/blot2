@@ -459,6 +459,28 @@ checkpoint closures. Storage values remain runtime state. Its `get`, `previous`,
 column and query helpers require a unary constructor/function witness; wrap a
 nullary constructor as `(fn () => Idle)`.
 
+## Expression tags
+
+Put `#[expression]` before a top-level `const` or `let` to apply the expression
+as a function to the initializer. A tag can use local names, named imports,
+qualified imports, and function arguments. It may share the declaration line.
+With several tags, the nearest runs first: `#[f] #[g] const x = value` binds
+`f (g value)`. The declaration's type annotation constrains the result of all
+tags, including when the initializer is a function.
+
+```blot
+const add = fn amount => fn value => value + amount
+#[add 1]
+#[fn value => value * 2] entry const answer: U32 = 20
+#[add 1] entry let started: U32 = 41
+```
+
+`const` decorators execute at compile time under the usual step budget; `let`
+decorators execute once at module startup. Unreachable tagged declarations are
+type checked but not evaluated. A direct reference to the tagged declaration's
+own bound name receives `recursive_tag`; tags on types, effects, and fixities
+receive `unsupported_attribute`.
+
 ## Modules, constants, current limits
 
 Imports precede declarations: `import * as math from "./math"` or

@@ -790,6 +790,36 @@ def let_context(inference: Inference, context: Context) -> Context:
     case Inference{ty, coverage, exits, reflections}:
       extend(context, deferred_bindings(coverage))
 
+def tag_coverage(needs: List<&2, Coverage>, +subject: String) -> List<&2, Coverage>:
+  match needs:
+    case Nil{}:
+      Nil{}
+    case OperationNeed{identity, template, arguments, function_type, old_subject} <> tail:
+      OperationNeed{identity, template, arguments, function_type, subject} <> tag_coverage(tail, subject)
+    case AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, old_subject} <> tail:
+      AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject} <> tag_coverage(tail, subject)
+    case ValuePatternType{inferred_type, old_subject} <> tail:
+      ValuePatternType{inferred_type, subject} <> tag_coverage(tail, subject)
+    case Coverage{inferred_types, patterns, old_subject} <> tail:
+      Coverage{inferred_types, patterns, subject} <> tag_coverage(tail, subject)
+    case head <> tail:
+      head <> tag_coverage(tail, subject)
+
+def tag_reflections(reflections: List<&2, Reflection>, +subject: String) -> List<&2, Reflection>:
+  match reflections:
+    case Nil{}:
+      Nil{}
+    case Reflection{callee, old_subject} <> tail:
+      Reflection{callee, subject} <> tag_reflections(tail, subject)
+
+def tag_typing(result: Result<&2, &2, M.Diagnostic, Typing>, offset: Nat) -> Result<&2, &2, M.Diagnostic, Typing>:
+  match result:
+    case Done{Typing{Inference{ty, coverage, exits, reflections}, state}}:
+      +subject = "offset:" ++ Nat.show(offset)
+      Done{Typing{Inference{ty, tag_coverage(coverage, subject), exits, tag_reflections(reflections, subject)}, state}}
+    case Fail{M.Diagnostic{code, subject, message}}:
+      Fail{M.Diagnostic{code, "offset:" ++ Nat.show(offset), message}}
+
 def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Result<&2, &2, M.Diagnostic, Typing>:
   match fuel work:
     case 0n _:
@@ -920,6 +950,14 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
         +arg : Typing <- expr_work(rest, Expression{argument}, context, state_of(fn))
         +result : M.Ty = M.VariableTy{next_of(state_of(arg))}
         next : State <- unify(type_of(fn), M.FunctionTy{type_of(arg), result, context_row(context)}, with_next(state_of(arg), 1n+next_of(state_of(arg))), context_subject(context))
+        return Typing{sequence(inference_of(fn), inference_of(arg), flow(type_of(fn), flow(type_of(arg), result))), next}
+    case 1n+rest Expression{M.TagExpr{+offset, callee, argument}}:
+      +at = at_subject(context, "offset:" ++ Nat.show(offset))
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        +fn : Typing <- tag_typing(expr_work(rest, Expression{callee}, at, state), offset)
+        +arg : Typing <- expr_work(rest, Expression{argument}, context, state_of(fn))
+        +result : M.Ty = M.VariableTy{next_of(state_of(arg))}
+        next : State <- unify(type_of(fn), M.FunctionTy{type_of(arg), result, context_row(context)}, with_next(state_of(arg), 1n+next_of(state_of(arg))), context_subject(at))
         return Typing{sequence(inference_of(fn), inference_of(arg), flow(type_of(fn), flow(type_of(arg), result))), next}
     case 1n+rest Expression{M.CallExpr{+callee, argument}}:
       do Result<&2, &2, M.Diagnostic, Typing>:

@@ -62,6 +62,10 @@ reload boundaries. Scalar and numeric-array callbacks are executable through the
 [guest ABI](compiler/guest-abi.md). Long-lived `main(host)` invocations can
 retain guest state; record capability bundles remain outside the ABI.
 
+[Expression tags](examples/tags.blot) apply ordinary functions to top-level
+`const` and `let` values with `#[expression]`. Tags may stack, use arguments or
+imports, and precede an `entry` declaration.
+
 ## Current boundary
 
 `type Reader a is effect = { ask: Unit -> a }`,
