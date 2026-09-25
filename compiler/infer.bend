@@ -827,6 +827,13 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
         next : State <- unify(type_of(loop), type_of(v), state_of(loop), context_subject(context))
         +result : M.Ty = flow(type_of(a), flow(type_of(b), type_of(v)))
         return Typing{sequence(inference_of(a), sequence(inference_of(b), sequence(inference_of(v), inference_of(loop), result), result), result), next}
+    case 1n+rest Expression{M.ForeverExpr{carried, initial, body}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        +v : Typing <- expr_work(rest, Expression{initial}, context, state)
+        +loop : Typing <- expr_work(rest, Expression{body}, extend(context, [Binding{carried, type_of(v), Nil{}}]), state_of(v))
+        next : State <- unify(type_of(loop), type_of(v), state_of(loop), context_subject(context))
+        +result : M.Ty = M.NeverTy{}
+        return Typing{sequence(inference_of(v), inference_of(loop), result), next}
     case 1n+rest Expression{M.ArrayGenerateExpr{count, generator}}:
       do Result<&2, &2, M.Diagnostic, Typing>:
         +c : Typing <- expr_work(rest, Expression{count}, context, state)

@@ -4,12 +4,13 @@
 source compiler sessions. It currently covers generic functions, `Maybe`,
 `Result`, type witnesses, Bool, U32, and F32. Root declarations can shadow
 prelude names; the prelude keeps its own scope and nominal identities. Top-level
-bindings are public to other Blot modules; concrete root bindings that fit the
-guest ABI become Wasm exports. Use `{ prelude: "none" }` when creating a
-compiler for a freestanding module. File imports are supported through the CLI
-or `loadSourceProject`; the CLI maps `std/` to this directory. Raw source-string
-compilation does not load imports automatically. General module re-exports are
-not implemented yet.
+bindings are public to other Blot modules. Only the root module's `entry const`
+and `entry let` declarations become Wasm exports; they must fit the guest ABI,
+and compilation keeps only the prelude and library declarations they reach. Use
+`{ prelude: "none" }` when creating a compiler for a freestanding module. File
+imports are supported through the CLI or `loadSourceProject`; the CLI maps
+`std/` to this directory. Raw source-string compilation does not load imports
+automatically. General module re-exports are not implemented yet.
 
 All examples below use the default prelude. Values/functions use `snake_case`;
 types and constructors use `PascalCase`. Functions are explicitly curried: a
@@ -33,9 +34,9 @@ const increment = fn value => value + 1
 const double = U32.mul 2
 const transform = compose double increment
 
-const answer = fn () => transform 20
+entry const answer = fn () => transform 20
 
-const inferred = fn () => do:
+entry const inferred = fn () => do:
   let same = fn value => value
   if same True:
     return same 42
@@ -62,12 +63,12 @@ type using ordinary `==` and `!=`:
 type Count is data = Count U32
 type Other is data = Other U32
 
-const same_value = 1 == 2                         // False
-const same_type = Type 1 == Type 2                // True
-const same_nominal = Type Count == Type (Count 42) // True
-const different = Type Count != Type Other       // True
+entry const same_value = 1 == 2                         // False
+entry const same_type = Type 1 == Type 2                // True
+entry const same_nominal = Type Count == Type (Count 42) // True
+entry const different = Type Count != Type Other       // True
 
-const compare = fn () => do:
+entry const compare = fn () => do:
   let head = Type Count
   let witness = Type (Count 0)
   return head == witness
@@ -119,12 +120,12 @@ const nonzero = fn value => do:
 
 const candidate = Maybe.bind (Some 40) nonzero
 
-const answer = fn () => do:
+entry const answer = fn () => do:
   let Some(value) = Maybe.map (U32.add 2) candidate else:
     return 0
   return Result.unwrap_or 0 (Maybe.to_result False (Some value))
 
-const inspect = fn () => case Some (Some 42) of
+entry const inspect = fn () => case Some (Some 42) of
   Some (Some value) => value
   Some Nothing => 0
   Nothing => 0
@@ -173,7 +174,7 @@ const Vec2.add = fn (a: Vec2) => fn (b: Vec2) => do:
   return Vec2 { x: ax + bx, y: ay + by }
 
 const twice = fn value => value + value
-const answer = fn (value: F32) => twice value
+entry const answer = fn (value: F32) => twice value
 ```
 
 Generic functions that depend on associated dispatch are specialized for their
@@ -181,17 +182,19 @@ uses before const evaluation and Wasm emission. Dispatch whose operand types the
 function itself already fixes, such as `Array.get`'s bounds comparison of a
 `U32` index, resolves once inside the function and needs no per-use copy. This
 also works through closures, local function aliases, and recursive functions. No
-runtime member lookup is emitted. An exported function must have enough type
+runtime member lookup is emitted. An entry function must have enough type
 information to select a concrete implementation; annotate an otherwise
-unconstrained export parameter. `@type.call` also accepts other literal member
-names, such as `"distance"`.
+unconstrained entry parameter. Dispatch is selected while specializing reachable
+code, so a call with no implementation (`True + False`) in a declaration no
+entry reaches is type checked but not reported. `@type.call` also accepts other
+literal member names, such as `"distance"`.
 
 Operators are source-defined aliases for functions, not compiler arithmetic
 special cases. Backticks also call a named function infix:
 
 ```blot
 const plus = fn left => fn right => U32.add left right
-const answer = fn () => 20 `plus` 22
+entry const answer = fn () => 20 `plus` 22
 ```
 
 Custom fixity declarations belong before other declarations. Application binds
@@ -206,12 +209,12 @@ backtick operators. Unlike Haskell, Blot still evaluates ordinary arguments
 eagerly; `$` neither defers work nor handles effects.
 
 ```blot
-const answer = fn () => U32.mul 2 $ U32.add 1 $ 20
-const discarded = fn () => do:
+entry const answer = fn () => U32.mul 2 $ U32.add 1 $ 20
+entry const discarded = fn () => do:
   use identity $ 42
 
 const invoke = fn callback => callback 41
-const callback_example = fn () => invoke $ fn value => value + 1
+entry const callback_example = fn () => invoke $ fn value => value + 1
 ```
 
 An infix RHS can also be a `do:` block or `case` expression without parentheses.
@@ -242,13 +245,13 @@ arguments: `F32.mul speed (-2.5)`.
 | `F32.sin`, `cos`, `tan`                    | Pure Blot trigonometric approximations      |
 
 ```blot
-const negative_zero = -0.0
-const rounded = F32.add 16_777_216.0 1.0
+entry const negative_zero = -0.0
+entry const rounded = F32.add 16_777_216.0 1.0
 
-const vector_length = fn () => F32.length3 2.0 3.0 6.0
-const bounded_speed = fn (value: F32) => F32.clamp 0.0 12.0 value
-const halfway = fn (value: F32) => F32.lerp value 10.0 0.5
-const integer_part = fn (value: F32) => F32.to_u32 value
+entry const vector_length = fn () => F32.length3 2.0 3.0 6.0
+entry const bounded_speed = fn (value: F32) => F32.clamp 0.0 12.0 value
+entry const halfway = fn (value: F32) => F32.lerp value 10.0 0.5
+entry const integer_part = fn (value: F32) => F32.to_u32 value
 ```
 
 `rounded` is 16,777,216, and `vector_length ()` is 7. Arithmetic rounds each
@@ -299,7 +302,7 @@ Import [array.blot](array.blot) for additional collection functions:
 import * as array from "std/array"
 
 const values: Array U32 = [10, 20, 12]
-const answer = fn () => array.fold_left U32.add 0 values
+entry const answer = fn () => array.fold_left U32.add 0 values
 ```
 
 - `length values` and `is_empty values` inspect length without visiting elements

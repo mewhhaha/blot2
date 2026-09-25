@@ -22,7 +22,7 @@ import_binding = (name:(IDENT | TYPE_IDENT) alias:("as" (IDENT | TYPE_IDENT))?) 
 declaration = (attributes:declaration_attribute* value:(value_declaration | data_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
 declaration_attribute = ("#" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" name:qualified_name "]") ;
-value_declaration = (kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? "=" value:expression) ;
+value_declaration = (modifier:IDENT? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? "=" value:expression) ;
 effect_declaration = ("effect" name:qualified_name ":" signature:type_expression) ;
 effect_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" "effect" "=" (operations:effect_operations | signature:effect_signature)) ;
 // A bare record declares operations; signatures start with a type name or group.
@@ -73,11 +73,13 @@ pattern_group = ("(" (value:pattern ("," value:pattern)*)? ")") ;
 record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_field)* ","?)? "}") ;
 record_pattern_field = (name:IDENT (":" value:pattern)?) ;
 suite = (LAYOUT_NEWLINE LAYOUT_INDENT statements:statement* LAYOUT_DEDENT) ;
-statement = (value:(binding | rebinding | effect_binding | effect_step | result | pattern_conditional | conditional | for_statement | expression) LAYOUT_NEWLINE) ;
+statement = (value:(binding | rebinding | effect_binding | effect_step | result | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
 binding = ("let" pattern:pattern annotation:(":" type_expression)? "=" value:expression fallback:binding_else?) ;
 rebinding = (name:IDENT path:(member_access | index_access)* ":=" value:expression) ;
 index_access = ("[" index:expression "]") ;
-for_statement = ("for" pattern:pattern "in" start:expression (".." end:expression)? ":" body:suite) ;
+for_statement = ("for" "let"? pattern:pattern "in" start:expression (".." end:expression)? ":" body:suite) ;
+range_statement = ("for" start:expression ".." end:expression ":" body:suite) ;
+ever_statement = ("for" "ever" ":" body:suite) ;
 binding_else = ("else" ":" alternative:suite) ;
 // Separate islands avoid Baba's equal-length IDENT/expression transition tie.
 effect_binding = ("use" name:IDENT annotation:(":" type_expression)? "<-" value:expression) ;

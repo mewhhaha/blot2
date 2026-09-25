@@ -30,21 +30,23 @@ for (const threads of [1, 4]) {
       }
       for (
         const library of [
-          "const main = fn (io: U32 -> U32) => io 0\n",
-          "effect Reader.ask: Unit -> U32\nconst main = fn (io: U32 -> U32 ! {Foreign}) => Reader.ask ()\n",
+          "const main = fn (io: U32 -> U32) => io 0\nentry const answer = fn () => 42\n",
+          "effect Reader.ask: Unit -> U32\nconst main = fn (io: U32 -> U32 ! {Foreign}) => Reader.ask ()\nentry const answer = fn () => 42\n",
         ]
       ) {
+        // Values outside the guest ABI stay library code: only entries export.
         const artifact = await native.compile(library);
         equal(artifact, js.compile(library));
         equal(
-          WebAssembly.Module.exports(new WebAssembly.Module(artifact.bytes)),
-          [],
+          WebAssembly.Module.exports(new WebAssembly.Module(artifact.bytes))
+            .map((item) => item.name),
+          ["answer"],
         );
       }
       for (
         const invalid of [
           "effect Foreign: U32 -> U32\n",
-          "const main = fn (io: U32 -> U32 ! {Foreign}) => do:\n  let value = io 0\n  return value\n",
+          "entry const main = fn (io: U32 -> U32 ! {Foreign}) => do:\n  let value = io 0\n  return value\n",
           "effect Reader.ask: Unit -> U32\nconst main: (U32 -> U32 ! {Foreign}) -> U32 = fn io => Reader.ask ()\n",
         ]
       ) {
@@ -88,19 +90,19 @@ Deno.test("native cached bodies relink when callback imports appear, reorder, an
   const scalar = `
 data Maybe a = Some a | Nothing
 const saved = Some 7
-const compute = fn value => @u32.add value 1
-const pure = fn () => case saved of
+entry const compute = fn value => @u32.add value 1
+entry const pure = fn () => case saved of
   Some value => compute value
   Nothing => 0
-const count = 12
+entry const count = 12
 `;
   const integer = (value: number) => `
-const main = fn (io: U32 -> U32 ! {Foreign}) => do:
+entry const main = fn (io: U32 -> U32 ! {Foreign}) => do:
   use next <- io (compute ${value})
   return next
 `;
   const float = `
-const float = fn (io: F32 -> F32 ! {Foreign}) => do:
+entry const float = fn (io: F32 -> F32 ! {Foreign}) => do:
   use next <- io 1.5
   return next
 `;

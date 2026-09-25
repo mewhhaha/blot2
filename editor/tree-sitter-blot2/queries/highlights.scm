@@ -1,10 +1,12 @@
 "fn" @keyword.function
 ["import" "from" "as"] @keyword.control.import
 ["data" "type" "is" "effect" "const" "let" "use"] @keyword.storage.type
+(entry_binding) @keyword.storage.modifier
 ["infixl" "infixr" "infix" "prefix"] @keyword.directive
 "rec" @keyword.storage.modifier
 ["if" "else" "case" "of"] @keyword.control.conditional
 ["for" "in" "continue"] @keyword.control.repeat
+(ever_loop "ever" @keyword.control.repeat)
 ["return" "break"] @keyword.control.return
 ["do" "test"] @keyword.control
 

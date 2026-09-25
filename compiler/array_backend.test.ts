@@ -488,7 +488,7 @@ Deno.test("array lengths are checked before conversion to Wasm byte counts", () 
   }
 });
 
-Deno.test("arrays cannot be exported constants or cross scalar callbacks", () => {
+Deno.test("array constants and nonnumeric array callbacks are rejected", () => {
   const numbers = arrayType(u32Type);
   const cases = [
     module([], {
@@ -500,10 +500,13 @@ Deno.test("arrays cannot be exported constants or cross scalar callbacks", () =>
       }],
     }),
     module([fn("callback_argument", integer(0), {
-      parameter_type: { ...callbackType, parameter: numbers },
+      parameter_type: {
+        ...callbackType,
+        parameter: arrayType({ $: "BoolTy" }),
+      },
     })]),
     module([fn("callback_result", integer(0), {
-      parameter_type: { ...callbackType, result: numbers },
+      parameter_type: { ...callbackType, result: arrayType(numbers) },
     })]),
   ];
   for (const source of cases) {

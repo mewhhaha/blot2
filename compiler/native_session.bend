@@ -21,6 +21,7 @@ import ./effect_families.bend as Families
 import ./check.bend as Check
 import ./source_modules.bend as Modules
 import ./catalog_versions.bend as CV
+import ./entry_points.bend as Entries
 
 type Mode is Data:
   AnalyzeMode{}
@@ -989,6 +990,7 @@ def finish(mode: Mode, +state: State, +analysis: Main.Analysis, declarations: Co
       Done{Completion{state, Analyzed{analysis}, stats(declarations, groups, constants, Counts{0n, 0n})}}
     case CompileMode{}:
       do Result<&2, &2, M.Diagnostic, Completion>:
+        exports : Unit <- Entries.require_exports(Main.analysis_checked(analysis))
         +prepared : W.Prepared <- W.prepare(Main.analysis_checked(analysis), Main.analysis_constants(analysis))
         compiled : CompiledEntries <- compile_jobs(W.prepared_jobs(prepared), state_entries(state), Map.new(&2, Cached<W.EntryCode>), Nil{}, Counts{0n, 0n})
         finish_compiled(state, analysis, prepared, compiled, declarations, groups, constants)
@@ -999,11 +1001,12 @@ def update_evaluated(state: State, mode: Mode, checked: M.CheckedModule, evaluat
   next = {State{prelude, scope_key, declarations, planning, groups, constants, entries, specialization, catalog_version} : State}
   finish(mode, next, Main.Analysis{checked, bindings, remaining}, declaration_counts, group_counts, constant_counts)
 
-def update_checked(state: State, mode: Mode, +module: M.Module, +completed: CheckedGroups, declaration_counts: Counts, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
+def update_checked(state: State, mode: Mode, +module: M.Module, +completed: CheckedGroups, declaration_counts: Counts, steps: Nat, hosts: List<&2, Entries.Entry>) -> Result<&2, &2, M.Diagnostic, Completion>:
   State{prelude, scope_key, declarations, planning, previous_groups, previous_constants, entries, specialization, catalog_version} = state
   CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, group_counts} = completed
   do Result<&2, &2, M.Diagnostic, Completion>:
     +checked : M.CheckedModule <- assemble(module, completed)
+    valid : Unit <- Entries.verify(hosts, checked)
     evaluated : Evaluated <- evaluate_constants(Main.checked_constants(checked), steps, Main.const_context(module, checked), closures, base_keys, previous_constants, Map.new(&2, Cached<Const.Constants>), Nil{}, Counts{0n, 0n})
     update_evaluated(State{prelude, scope_key, declarations, planning, groups, Map.new(&2, Cached<Const.Constants>), entries, specialization, catalog_version}, mode, checked, evaluated, declaration_counts, group_counts)
 
@@ -1024,6 +1027,15 @@ def specialization_graph(specialized: Bool, module: M.Module, scans: List<&2, Pl
 def function_count(module: M.Module) -> Nat:
   M.Module{constants, functions, types, operations} = module
   List.length(&2, M.Function, functions)
+
+def constant_count(module: M.Module) -> Nat:
+  M.Module{constants, functions, types, operations} = module
+  List.length(&2, M.Constant, constants)
+
+# Specialization or dead-code elimination changed the declarations, so the
+# lowered scans no longer describe the module.
+def reshaped(specialized: Bool, +raw_module: M.Module, +module: M.Module) -> Bool:
+  Bool.or(specialized, Bool.or(Bool.not(Nat.is_eq(function_count(raw_module), function_count(module))), Bool.not(Nat.is_eq(constant_count(raw_module), constant_count(module)))))
 
 def groups_if_same_catalog(same: Bool, previous: Map<&2, Cached<G.CheckedGroup>>) -> Map<&2, Cached<G.CheckedGroup>>:
   match same:
@@ -1054,7 +1066,7 @@ def update_lowered_module(state: State, mode: Mode, entry: String, +prelude_modu
     +family_module : M.Module <- Families.prepare(raw_module)
     +specialization_result : Mono.Prepared <- Resolution.prepare_cached_evidenced(~K.module, family_module, entry, M.module_operations(raw_module), specialization, retain_initial(previous_groups))
     +module : M.Module = Mono.prepared_module(specialization_result)
-    +expanded : Bool = Bool.or(specialized, Bool.not(Nat.is_eq(function_count(raw_module), function_count(module))))
+    +expanded : Bool = reshaped(specialized, raw_module, module)
     graph : List<&2, D.Node> <- specialization_graph(expanded, module, Plan.scan(prelude_module) <> scans)
     +prepared : PreparedPlanning <- prepare_planning(module, prelude_module, values, graph, Bool.and(Bool.not(expanded), cache_nominal_scans(scans, 0n, 0n)))
     +plan : G.Planning = planning_value(prepared)
@@ -1065,7 +1077,7 @@ def update_lowered_module(state: State, mode: Mode, entry: String, +prelude_modu
     +same_catalog : Bool = CV.prepared_same_operations(catalog)
     +previous_valid : Map<&2, Cached<G.CheckedGroup>> = groups_if_same_catalog(same_catalog, previous_groups)
     completed : CheckedGroups <- check_plan(scheduled, CheckCatalog{Scheduler.with_core(Scheduler.catalog_costs(module, Plan.collect_costs(scans, Map.new(&2, Nat))), module, Mono.prepared_certificates(specialization_result)), revision}, previous_valid, empty_checked())
-    update_checked(State{prelude, Some{scope_words}, planning_declarations(prepared), Some{Cached{[plan_key], scheduled}}, Map.new(&2, Cached<G.CheckedGroup>), constants_if_same_catalog(same_catalog, constants), entries, Some{Mono.prepared_cache(specialization_result)}, Some{revision}}, mode, module, completed, declaration_counts, steps)
+    update_checked(State{prelude, Some{scope_words}, planning_declarations(prepared), Some{Cached{[plan_key], scheduled}}, Map.new(&2, Cached<G.CheckedGroup>), constants_if_same_catalog(same_catalog, constants), entries, Some{Mono.prepared_cache(specialization_result)}, Some{revision}}, mode, module, completed, declaration_counts, steps, Entries.entries(raw_module))
 
 def update_lowered(state: State, mode: Mode, entry: String, +prelude_module: M.Module, scope_words: List<&2, U32>, lowered: Lowering, steps: Nat) -> Result<&2, &2, M.Diagnostic, Completion>:
   Lowering{+values, scans, counts} = lowered

@@ -140,7 +140,7 @@ export async function createIncrementalCompiler(
       return { artifact, stats };
     }
     const preparedSource = frontend.prepare(source);
-    const { module } = preparedSource;
+    const { module, entries: entryPoints } = preparedSource;
     const stats = {
       ...preparedSource.stats,
       checked_ms: 0,
@@ -287,6 +287,7 @@ export async function createIncrementalCompiler(
         operations: module.operations,
       };
       stats.checked_ms = performance.now() - checkStart;
+      result<unknown>("entry_points.verify", entryPoints, checked);
 
       const constStart = performance.now();
       const context = invoke<unknown>("const_context", module, checked);
@@ -339,6 +340,7 @@ export async function createIncrementalCompiler(
       stats.constants_ms = performance.now() - constStart;
 
       const codeStart = performance.now();
+      result<unknown>("entry_points.require_exports", checked);
       const prepared = result<Prepared>(
         "wasm.prepare",
         checked,

@@ -31,7 +31,7 @@ Deno.test("record fields evaluate once in source order, independent of declarati
   try {
     const artifact = compiler.compile(
       `data Pair = Pair { first: U32, second: U32 }
-const answer = fn (io: U32 -> U32 ! {Foreign}) => do:
+entry const answer = fn (io: U32 -> U32 ! {Foreign}) => do:
   use pair <- Pair { second: io 1, first: io 2 }
   let Pair { first, second } = pair
   return @u32.add (@u32.mul first 10) second
@@ -66,7 +66,7 @@ Deno.test("record shorthand retains lexical scope and function-valued fields", a
 const apply = fn action => case action of
   Action { run, enabled: True } => run 40
   Action { enabled: False } => 0
-const answer = fn () => do:
+entry const answer = fn () => do:
   let increment = 2
   let run = fn value => value + increment
   let enabled = True
@@ -128,7 +128,7 @@ Deno.test("record field metadata follows namespace and named constructor imports
 import { Point as Position } from "./geometry"
 const sum = fn point => case point of
   Position { y, x } => @u32.add x y
-const answer = fn () => sum (geometry.Point { y: 2, x: 40 })
+entry const answer = fn () => sum (geometry.Point { y: 2, x: 40 })
 `,
   };
   const project = await loadSourceProject(
@@ -156,7 +156,7 @@ Deno.test("record field reordering invalidates source lowering in native and JS 
   const clean = await createSourceCompiler({ prelude: "none" });
   const source = `data Pair = Pair { x: U32, y: U32 }
 const make = fn () => Pair { x: 40, y: 2 }
-const answer = fn () => case make () of
+entry const answer = fn () => case make () of
   Pair payload => @product.get payload 0
 `;
   try {

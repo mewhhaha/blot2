@@ -9,13 +9,13 @@ function workload(edited: boolean, reversed: boolean): string {
     const last = index + (edited && index % 2 === 0 ? 100 : 0);
     const width = index < 8 ? 1024 : 160;
     const fields = [...Array(width - 1).fill("0"), String(last)].join(", ");
-    return `const ${name} = fn () => @array.get [${fields}] ${width - 1}`;
+    return `entry const ${name} = fn () => @array.get [${fields}] ${width - 1}`;
   });
   let answer = "0";
   for (const name of names) answer = `@u32.add (${name} ()) (${answer})`;
   return [
     ...(reversed ? declarations.toReversed() : declarations),
-    `const answer = fn () => ${answer}`,
+    `entry const answer = fn () => ${answer}`,
     "",
   ].join("\n");
 }

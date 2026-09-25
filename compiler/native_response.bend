@@ -332,6 +332,8 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{34} <> Expressions{elements} <> tail, room, reversed)
     case 1n+rest Expression{M.ForExpr{index, start, end, state, initial, body}} <> tail room:
       encode_work(rest, Word{41} <> Text{index} <> Expression{start} <> Expression{end} <> Text{state} <> Expression{initial} <> Expression{body} <> tail, room, reversed)
+    case 1n+rest Expression{M.ForeverExpr{state, initial, body}} <> tail room:
+      encode_work(rest, Word{46} <> Text{state} <> Expression{initial} <> Expression{body} <> tail, room, reversed)
     case 1n+rest Expression{M.ArrayGenerateExpr{count, generator}} <> tail room:
       encode_work(rest, Word{39} <> Expression{count} <> Expression{generator} <> tail, room, reversed)
     case 1n+rest Expression{M.ArrayFillExpr{count, value}} <> tail room:

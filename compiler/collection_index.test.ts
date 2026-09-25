@@ -9,8 +9,8 @@ const programs = [
     name:
       "checked collection members and direct indexing work in constants and Wasm",
     source: `
-const folded = [40, 42][1]
-const run = fn () => do:
+entry const folded = [40, 42][1]
+entry const run = fn () => do:
   let a = [40, 2]
   let Some first = a.get(0) else:
     return 0
@@ -23,11 +23,11 @@ const run = fn () => do:
   if 1 < changed.length:
     return changed[1]
   return 0
-const precedence = fn () => do:
+entry const precedence = fn () => do:
   let sum = fn a => fn b => a + b
   let identity = fn a => a
   return sum identity([40])[0] [2][0]
-const empty = fn () => do:
+entry const empty = fn () => do:
   let a: Array U32 = []
   return a.is_empty
 `,
@@ -38,14 +38,14 @@ const empty = fn () => do:
       "nested array and record updates preserve aliases and bind self to the old leaf",
     source: `
 type Grid a is data = Grid { rows: Array (Array a), count: U32 }
-const run = fn () => do:
+entry const run = fn () => do:
   let grid = Grid { rows: [[1, 2], [3, 4]], count: 0 }
   let old = grid
   let row = grid.rows[0]
   grid.rows[0][1] := self + 40
   grid.count := self + 1
   return old.rows[0][1] * 1000 + row[1] * 100 + grid.rows[0][1] + grid.count
-const single = fn () => do:
+entry const single = fn () => do:
   let pair = Pair { values: (40, 2) }
   let old = pair
   pair.values := (41, 1)
@@ -53,7 +53,7 @@ const single = fn () => do:
   let (x, y) = old.values
   return a + b + x + y
 type Pair is data = Pair { values: (U32, U32) }
-const common = fn () => do:
+entry const common = fn () => do:
   let count = High { value: 40, tag: 0 }
   count.value := self + 2
   return count.value
@@ -66,33 +66,33 @@ type Count is data = Low { value: U32 } | High { value: U32, tag: U32 }
       "array reuse preserves aliases, closures, parameters, and persistent globals",
     source: `
 let persistent = [1, 2]
-const change = fn values => do:
+entry const change = fn values => do:
   values[0] := 42
   return values[0]
-const run = fn () => do:
+entry const run = fn () => do:
   let a = [1, 2]
   let old = a
   a[0] := 42
   return old[0] * 100 + a[0]
-const capture = fn () => do:
+entry const capture = fn () => do:
   let a = [1, 2]
   let saved = fn () => a[0]
   a[0] := 42
   return saved() * 100 + a[0]
-const repeated = fn () => do:
+entry const repeated = fn () => do:
   let a = [0]
   a[0] := 40
   let old = a
   a[0] := self + 2
   return old[0] * 100 + a[0]
-const parameter = fn () => do:
+entry const parameter = fn () => do:
   let a = [1]
   let next = change(a)
   return a[0] * 100 + next
-const global = fn () => do:
+entry const global = fn () => do:
   let next = change(persistent)
   return persistent[0] * 100 + next
-const loop_alias = fn () => do:
+entry const loop_alias = fn () => do:
   let original = [1]
   let result = original
   for index in 0..3:
@@ -112,12 +112,12 @@ const loop_alias = fn () => do:
     name:
       "consumed local arrays reuse storage across loops within the bounded guest heap",
     source: `
-const run = fn () => do:
+entry const run = fn () => do:
   let a = @array.fill 1024 0
   for index in 0..10000:
     a[0] := self + 1
   return a[0]
-const unchanged = fn () => do:
+entry const unchanged = fn () => do:
   let a = [42]
   for index in 0..0:
     a[0] := 0
@@ -153,12 +153,12 @@ for (const { name, source, calls } of programs) {
 
 Deno.test("direct indexing and updates retain bounds checks including overflowing indices", async () => {
   const source = `
-const read = fn (index: U32) => [1, 2][index]
-const update = fn (index: U32) => do:
+entry const read = fn (index: U32) => [1, 2][index]
+entry const update = fn (index: U32) => do:
   let a = [1, 2]
   a[index] := 42
   return a[0]
-const empty = fn () => do:
+entry const empty = fn () => do:
   let a: Array U32 = []
   return a[0]
 `;
@@ -181,12 +181,12 @@ const empty = fn () => do:
     }
     for (
       const [source, code] of [
-        ["const invalid = [1][1]", "array_bounds"],
+        ["entry const invalid = [1][1]", "array_bounds"],
         ["const run = fn () => [1][0.0]", "type_mismatch"],
         ["const run = fn () => [1][]", "index_arity"],
         ["const run = fn () => [1][0, 1]", "index_arity"],
         [
-          "const run = fn () => do:\n  missing[0] := 42\n  return 0",
+          "entry const run = fn () => do:\n  missing[0] := 42\n  return 0",
           "unknown_rebinding",
         ],
       ] as const
@@ -210,7 +210,7 @@ Deno.test("index adjacency survives incremental identities and invalidates spaci
   const js = await createIncrementalCompiler();
   const native = await createNativeIncrementalCompiler();
   const source = `const consume = fn values => values[0]
-const run = fn () => consume [42]
+entry const run = fn () => consume [42]
 `;
   try {
     for (const session of [js, native]) {

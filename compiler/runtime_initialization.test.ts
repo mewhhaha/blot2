@@ -1,3 +1,4 @@
+import { reachedSource } from "./fixtures.ts";
 import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import { createNativeCompiler } from "./native.ts";
 import { createIncrementalCompiler } from "./incremental.ts";
@@ -5,17 +6,27 @@ import { createNativeIncrementalCompiler } from "./native_incremental.ts";
 import { createSourceCompiler } from "./source.ts";
 import { SourceError } from "./syntax.ts";
 
-Deno.test("top-level let initializers run at instantiation, including unused values", async () => {
+Deno.test("top-level let initializers run at instantiation when entries reach them", async () => {
   const reference = await createSourceCompiler({ prelude: "none" });
   const native = await createNativeCompiler({ prelude: "none" });
   try {
-    const source = 'let failure = @panic "startup"\n';
+    const source =
+      'let failure: U32 = @panic "startup"\nentry const read = fn () => failure\n';
     const artifact = reference.compile(source, { const_steps: 1n });
     equal(await native.compile(source, { const_steps: 1n }), artifact);
     const module = new WebAssembly.Module(artifact.bytes);
     throws(() => new WebAssembly.Instance(module), WebAssembly.RuntimeError);
+    // Unreachable initializers never run.
+    const unused =
+      'let failure: U32 = @panic "startup"\nentry const answer = fn () => 42\n';
+    const skipped = reference.compile(unused, { const_steps: 1n });
+    equal(await native.compile(unused, { const_steps: 1n }), skipped);
+    ok(new WebAssembly.Instance(new WebAssembly.Module(skipped.bytes)));
     throws(
-      () => reference.compile('const failure = @panic "compile"\n'),
+      () =>
+        reference.compile(
+          'const failure: U32 = @panic "compile"\nentry const read = fn () => failure\n',
+        ),
       (error) => error instanceof SourceError && error.code === "const_panic",
     );
   } finally {
@@ -29,11 +40,11 @@ Deno.test("runtime initialization orders dependencies and runs once per instance
   const native = await createNativeCompiler({ prelude: "none", threads: 8 });
   try {
     const source = `
-let answer = @u32.add base 2
-let fraction = @f32.add 1.25 0.5
-let base = @u32.add 20 20
-const read = fn () => answer
-const read_fraction = fn () => fraction
+entry let answer = @u32.add base 2
+entry let fraction = @f32.add 1.25 0.5
+entry let base = @u32.add 20 20
+entry const read = fn () => answer
+entry const read_fraction = fn () => fraction
 `;
     const artifact = reference.compile(source);
     equal(await native.compile(source), artifact);
@@ -64,11 +75,11 @@ Deno.test("runtime arrays and factory closures survive subsequent call arena res
     const source = `
 const factory = fn captured => fn value => @u32.add captured value
 let values = @array.fill 4 42
-let add = factory 40
-const disturb = fn () => @array.get (@array.fill 100 0) 0
-const read = fn () => @array.get values 3
-const retained = fn () => values
-const answer = fn () => add 2
+entry let add = factory 40
+entry const disturb = fn () => @array.get (@array.fill 100 0) 0
+entry const read = fn () => @array.get values 3
+entry const retained = fn () => values
+entry const answer = fn () => add 2
 `;
     const artifact = reference.compile(source, { const_steps: 1n });
     equal(await native.compile(source, { const_steps: 1n }), artifact);
@@ -96,8 +107,8 @@ Deno.test("runtime startup and globals coexist with host callback imports", asyn
   const native = await createNativeCompiler({ prelude: "none" });
   try {
     const source = `
-let base = @u32.add 20 20
-const answer = fn (callback: U32 -> U32 ! {Foreign}) => do:
+entry let base = @u32.add 20 20
+entry const answer = fn (callback: U32 -> U32 ! {Foreign}) => do:
   use extra <- callback 1
   return @u32.add base extra
 `;
@@ -130,14 +141,17 @@ Deno.test("const evaluation cannot read runtime values or let functions", async 
       ]
     ) {
       throws(
-        () => compiler.compile(source),
+        () => compiler.compile(reachedSource(source)),
         (error) =>
           error instanceof SourceError &&
           error.code === "const_runtime_dependency",
       );
     }
     throws(
-      () => compiler.compile("let first = second\nlet second = first\n"),
+      () =>
+        compiler.compile(
+          reachedSource("let first = second\nlet second = first\n"),
+        ),
       (error) =>
         error instanceof SourceError && error.code === "initialization_cycle",
     );
@@ -173,23 +187,29 @@ for (const backend of ["native", "javascript"] as const) {
     const reference = await createSourceCompiler({ prelude: "none" });
     try {
       const revisions: [string, number][] = [
-        ["const value = 40\nconst read = fn () => value\n", 40],
-        ["let value = 40\nconst read = fn () => value\n", 40],
-        ["let value = @u32.add 40 2\nconst read = fn () => value\n", 42],
-        ["let value = @f32.add 1.25 0.5\nconst read = fn () => value\n", 1.75],
+        ["entry const value = 40\nentry const read = fn () => value\n", 40],
+        ["entry let value = 40\nentry const read = fn () => value\n", 40],
+        [
+          "entry let value = @u32.add 40 2\nentry const read = fn () => value\n",
+          42,
+        ],
+        [
+          "entry let value = @f32.add 1.25 0.5\nentry const read = fn () => value\n",
+          1.75,
+        ],
         [
           `const factory = fn array => fn index => @array.get array index
 let values = @array.fill 4 41
-let lookup = factory values
-const read = fn () => lookup 3
+entry let lookup = factory values
+entry const read = fn () => lookup 3
 `,
           41,
         ],
         [
           `const factory = fn array => fn index => @array.get array index
 let values = @array.fill 4 42
-let lookup = factory values
-const read = fn () => lookup 3
+entry let lookup = factory values
+entry const read = fn () => lookup 3
 `,
           42,
         ],

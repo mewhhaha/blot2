@@ -42,6 +42,8 @@ import ./compiler/parallel_infer.bend as ParallelInfer
 import ./compiler/staging_scheme.bend as StagingScheme
 import ./compiler/main.bend as Main
 import ./compiler/dispatch_resolution.bend as Resolution
+import ./compiler/entry_points.bend as Entries
+import ./compiler/loop_memory.bend as LoopMemory
 
 # An exported function-valued constant is called through its stored value.
 # Selecting exports after inference must never duplicate its initializer.
@@ -1107,3 +1109,125 @@ law evidence_check_certifies_retained_groups:
   for +imports: List<&2, Groups.Interface>
   for +checked: Groups.CheckedGroup
   {Scheduler.selected_task(Some{checked}, True{}, position, subset, imports) == Scheduler.RetainedEvidenceTask{position, subset, imports, checked} : Scheduler.Task}
+
+# Entry declarations. `entry` is a contextual declaration modifier: any other
+# identifier before `const`/`let` is rejected, `entry` outside the entry module
+# is rejected, and only `entry` in the entry module sets the export flag.
+law entry_modifier_rejects_other_identifiers:
+  for entry_module: Bool
+  for node: Cst.Cst
+  {Result.is_done(&2, &2, M.Diagnostic, Bool, Lower.entry_modifier(False{}, entry_module, node)) == False{} : Bool}
+
+law entry_outside_entry_module_is_rejected:
+  for node: Cst.Cst
+  {Result.is_done(&2, &2, M.Diagnostic, Bool, Lower.entry_modifier(True{}, False{}, node)) == False{} : Bool}
+
+law entry_in_entry_module_is_exported:
+  for node: Cst.Cst
+  {Lower.entry_modifier(True{}, True{}, node) == Done{True{}} : Result<&2, &2, M.Diagnostic, Bool>}
+
+law declaration_without_modifier_is_not_exported:
+  for entry_module: Bool
+  {Lower.declaration_modifier(Nil{}, entry_module) == Done{False{}} : Result<&2, &2, M.Diagnostic, Bool>}
+
+# The export flag of a lowered declaration is its entry declaration.
+law exported_function_is_an_entry:
+  for name: String
+  for parameter: String
+  for p: Maybe<&2, M.Ty>
+  for r: Maybe<&2, M.Ty>
+  for +body: M.Expr
+  {Entries.function_entries([M.Function{name, True{}, parameter, p, r, body}]) == [Entries.Entry{name, Entries.runtime_value(body)}] : List<&2, Entries.Entry>}
+
+law runtime_constant_is_an_entry_let:
+  for name: String
+  for annotation: Maybe<&2, M.Ty>
+  for value: M.Expr
+  {Entries.constant_entries([M.Constant{name, True{}, annotation, M.RuntimeInitExpr{value}}]) == [Entries.Entry{name, True{}}] : List<&2, Entries.Entry>}
+
+law non_entry_constant_is_not_an_entry:
+  for name: String
+  for annotation: Maybe<&2, M.Ty>
+  for value: M.Expr
+  {Entries.constant_entries([M.Constant{name, False{}, annotation, value}]) == Nil{} : List<&2, Entries.Entry>}
+
+# Dead-code elimination drops what the entries do not reach, keeps nominal
+# types and operations, and associated implementations are owned exactly as
+# specialization owns them.
+law unreached_function_is_pruned:
+  for name: String
+  for exported: Bool
+  for parameter: String
+  for p: Maybe<&2, M.Ty>
+  for r: Maybe<&2, M.Ty>
+  for body: M.Expr
+  {Entries.keep_functions([M.Function{name, exported, parameter, p, r, body}], Set.new()) == Nil{} : List<&2, M.Function>}
+
+law unreached_constant_is_pruned:
+  for name: String
+  for exported: Bool
+  for annotation: Maybe<&2, M.Ty>
+  for value: M.Expr
+  {Entries.keep_constants([M.Constant{name, exported, annotation, value}], Set.new()) == Nil{} : List<&2, M.Constant>}
+
+law pruning_keeps_operations:
+  for constants: List<&2, M.Constant>
+  for functions: List<&2, M.Function>
+  for types: List<&2, M.DataType>
+  for operations: List<&2, M.Operation>
+  for +seen: Set()
+  {M.module_operations(Entries.keep_module(M.Module{constants, functions, types, operations}, seen)) == operations : List<&2, M.Operation>}
+
+law entry_owner_prefix_matches_specialization:
+  for identity: M.TypeId
+  for +entry: String
+  {Entries.owner_prefix(identity, entry) == Mono.nominal_prefix(identity, entry) : String}
+
+# A failed initial check or reachability walk abandons resolution; the original
+# module is then checked, pruned and specialized unchanged.
+law dispatch_failed_initial_check_abandons_resolution:
+  for diagnostic: M.Diagnostic
+  for +module: M.Module
+  for next: Nat
+  for +entry: String
+  {Resolution.first_round(Fail{diagnostic}, module, next, entry) == None{} : Maybe<&2, Resolution.Resolved>}
+
+law dispatch_failed_pruning_abandons_resolution:
+  for diagnostic: M.Diagnostic
+  for next: Nat
+  for +entry: String
+  {Resolution.pruned_round(Fail{diagnostic}, next, entry) == None{} : Maybe<&2, Resolution.Resolved>}
+
+# Builds need an entry; a module without exports fails with no_entry.
+law build_without_entries_fails:
+  for types: List<&2, M.DataType>
+  for operations: List<&2, M.Operation>
+  {Result.is_done(&2, &2, M.Diagnostic, Unit, Entries.require_exports(M.CheckedModule{Nil{}, Nil{}, types, operations})) == False{} : Bool}
+
+law no_entries_verify:
+  for checked: M.CheckedModule
+  {Entries.verify(Nil{}, checked) == Done{Unit{}} : Result<&2, &2, M.Diagnostic, Unit>}
+
+# Catalog declarations remain available for checking and layout, but an
+# unused concrete effect operation has no runtime wrapper job.
+law unused_operation_has_no_wasm_job:
+  for identity: M.TypeId
+  for parameter: M.Ty
+  for result: M.Ty
+  {Wasm.used_operations([M.Operation{identity, parameter, result}], Set.new()) == Nil{} : List<&2, M.Operation>}
+
+# Recycling a loop arena requires a closed effect boundary: source state
+# operations could otherwise retain pointers not represented by the carry.
+law loop_memory_pure_closed_row_is_isolated:
+  {LoopMemory.isolated(M.EffectRow{Nil{}, M.ClosedRow{}}) == True{} : Bool}
+
+law loop_memory_foreign_closed_row_is_isolated:
+  {LoopMemory.isolated(M.EffectRow{[M.foreign_identity()], M.ClosedRow{}}) == True{} : Bool}
+
+law loop_memory_open_row_is_not_isolated:
+  for operations: List<&2, M.TypeId>
+  for index: Nat
+  {LoopMemory.isolated(M.EffectRow{operations, M.RowVariable{index}}) == False{} : Bool}
+
+law loop_memory_source_state_is_not_isolated:
+  {LoopMemory.isolated(M.EffectRow{[M.TypeId{"game", "State.write"}], M.ClosedRow{}}) == False{} : Bool}

@@ -241,6 +241,12 @@ export type Expr =
     readonly body: Expr;
   }
   | {
+    readonly $: "ForeverExpr";
+    readonly state: string;
+    readonly initial: Expr;
+    readonly body: Expr;
+  }
+  | {
     readonly $: "ArrayGenerateExpr";
     readonly count: Expr;
     readonly generator: Expr;
@@ -428,6 +434,12 @@ type WireExpr =
     readonly index: string;
     readonly start: WireExpr;
     readonly end: WireExpr;
+    readonly state: string;
+    readonly initial: WireExpr;
+    readonly body: WireExpr;
+  }
+  | {
+    readonly $: "ForeverExpr";
     readonly state: string;
     readonly initial: WireExpr;
     readonly body: WireExpr;
@@ -948,6 +960,12 @@ function encodeExpr(expression: Expr): WireExpr {
         initial: encodeExpr(expression.initial),
         body: encodeExpr(expression.body),
       };
+    case "ForeverExpr":
+      return {
+        ...expression,
+        initial: encodeExpr(expression.initial),
+        body: encodeExpr(expression.body),
+      };
     case "ArrayGenerateExpr":
       return {
         $: expression.$,
@@ -1202,6 +1220,12 @@ function decodeExpr(expression: WireExpr): Expr {
         ...expression,
         start: decodeExpr(expression.start),
         end: decodeExpr(expression.end),
+        initial: decodeExpr(expression.initial),
+        body: decodeExpr(expression.body),
+      };
+    case "ForeverExpr":
+      return {
+        ...expression,
         initial: decodeExpr(expression.initial),
         body: decodeExpr(expression.body),
       };

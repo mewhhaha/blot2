@@ -55,7 +55,7 @@ data Right = Right F32
 ${left}
 const Right.add = fn (left: Left) => fn (right: Right) => 20.0
 const combine = fn left => fn right => left + right
-const run = fn (value: F32) => combine (Left value) (Right value)
+entry const run = fn (value: F32) => combine (Left value) (Right value)
 `;
   await checkRevisions([
     {
@@ -83,7 +83,7 @@ data Second = Second F32
 const First.distance = fn (left: First) => fn (right: First) => 10.0
 const Second.distance = fn (left: Second) => fn (right: Second) => 20.0
 const distance = fn left => fn right => @type.call "distance" left right
-const run = fn (value: F32) => ${
+entry const run = fn (value: F32) => ${
     both
       ? "distance (First value) (First value) + distance (Second value) (Second value)"
       : `distance (${owner} value) (${owner} value)`
@@ -105,7 +105,7 @@ const first = @effect.provider First.ask (fn () => 11)
 const second = @effect.provider Second.ask (fn () => 22)
 const chosen = ${chosen}.ask
 const invoke = fn operation => operation ()
-const run = fn () => do first:
+entry const run = fn () => do first:
   return do second:
     return invoke chosen
 `;
@@ -120,7 +120,7 @@ Deno.test("typed evidence follows captured constants with unchanged function typ
   const source = (captured: string) => `
 const make = fn captured => fn value => value + captured
 const saved = make ${captured}
-const run = fn (value: F32) => saved value
+entry const run = fn (value: F32) => saved value
 `;
   await checkRevisions([
     { source: source("2.0"), export: "run", expected: 6 },
@@ -134,8 +134,8 @@ Deno.test("typed evidence follows annotation rows and effect reflection", async 
 effect Reader.ask: U32 -> U32
 const call = fn (callback: U32 -> U32 ! {${row}}) => callback 1
 const requirements = @effect.of call
-const count = @effect.count requirements
-const has_foreign = @effect.has requirements Foreign
+entry const count = @effect.count requirements
+entry const has_foreign = @effect.has requirements Foreign
 `;
   await checkRevisions([
     { source: source(""), export: "count", expected: 0 },
@@ -150,10 +150,10 @@ Deno.test("failed typed-evidence edits keep exact diagnostics and recover", asyn
   const session = await createNativeIncrementalCompiler(options);
   const clean = await createNativeCompiler(options);
   const independent = await createSourceCompiler(options);
-  const valid = `const classify = fn (flag: Bool) => case flag of
+  const valid = `entry const classify = fn (flag: Bool) => case flag of
   True => 1
   False => 0
-const run = fn () => classify True
+entry const run = fn () => classify True
 `;
   const invalid = valid.replace("  False => 0\n", "");
   const detail = (error: unknown) => {
@@ -196,7 +196,7 @@ Deno.test("failed associated selection after a catalog edit cannot reuse a solve
 data Box = Box F32
 ${implementation}
 const combine = fn left => fn right => left + right
-const run = fn (value: F32) => combine (Box value) (Box value)
+entry const run = fn (value: F32) => combine (Box value) (Box value)
 `;
   const valid = source(
     "const Box.add = fn (left: Box) => fn (right: Box) => 42.0",

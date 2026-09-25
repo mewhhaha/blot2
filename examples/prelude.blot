@@ -1,23 +1,23 @@
 // This file is executable: just compile examples/prelude.blot
 // std/prelude.blot supplies Maybe, Result, combinators, and numeric operators.
 
-const increment = fn value => value + 1
-const doubled = fn value => value * 2
+entry const increment = fn value => value + 1
+entry const doubled = fn value => value * 2
 
 // A closure captures its immutable argument; functions are ordinary values.
-const add_two = U32.add 2
-const transform = compose doubled increment
+entry const add_two = U32.add 2
+entry const transform = compose doubled increment
 
-const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ Some 20
+entry const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ Some 20
 
-const answer = fn () => do:
+entry const answer = fn () => do:
   let candidate = Maybe.map add_two (Some 40)
   let Some(value) = candidate else:
     return 0
   return Result.unwrap_or 0 $ Result.map identity $ Ok value
 
 // One generic function and one local lambda each work at distinct types.
-const generic_identity = fn () => do:
+entry const generic_identity = fn () => do:
   let same = fn value => value
   let enabled = same (identity True)
   if enabled:
@@ -26,9 +26,9 @@ const generic_identity = fn () => do:
 
 // Backticks call source functions; application binds more tightly.
 const plus = fn left => fn right => left + right
-const named_operator = fn () => 20 `plus` 22
+entry const named_operator = fn () => 20 `plus` 22
 
-const inspect = fn (enabled: Bool) => do:
+entry const inspect = fn (enabled: Bool) => do:
   let candidate = do:
     if enabled:
       return Some (Some 42)
@@ -38,7 +38,7 @@ const inspect = fn (enabled: Bool) => do:
     Some Nothing => 0
     Nothing => 0
 
-const recover = fn (enabled: Bool) => do:
+entry const recover = fn (enabled: Bool) => do:
   let candidate = do:
     if enabled:
       return Ok 42

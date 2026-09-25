@@ -32,6 +32,8 @@ export default grammar({
         $.integer,
         $.boolean,
         $.self,
+        $.entry_binding,
+        $.ever_loop,
         $.binding_keyword,
         $.keyword,
         $.identifier,
@@ -44,7 +46,7 @@ export default grammar({
       prec.dynamic(
         2,
         seq(
-          $.binding_keyword,
+          choice($.binding_keyword, $.entry_binding),
           field("name", choice($.identifier, $.qualified_function_name)),
           optional($.binding_annotation),
           alias("=", $.operator),
@@ -92,6 +94,15 @@ export default grammar({
     deferred_parameter: ($) => seq("~", $.identifier),
 
     binding_keyword: (_) => choice("const", "let"),
+
+    // `entry` is contextual: a declaration modifier only when `const` or `let`
+    // follows on the same line, and an ordinary identifier everywhere else.
+    // One token keeps `fn entry => entry` and a trailing `entry` before the
+    // next declaration's line out of it.
+    entry_binding: (_) =>
+      token(prec(1, seq("entry", /[ \t]+/, choice("const", "let")))),
+
+    ever_loop: ($) => seq("for", "ever", alias(":", $.separator)),
 
     binding_annotation: ($) =>
       seq(

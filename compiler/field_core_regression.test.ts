@@ -1,3 +1,4 @@
+import { reachedSource } from "./fixtures.ts";
 import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
 import { bendArray, type BendList, bendList } from "./bend_list.ts";
@@ -20,6 +21,7 @@ const api = compiled as unknown as {
     prelude: unknown,
     fuel: bigint,
   ): Result<Node>;
+  "source_modules.sourced_prepared"(sourced: Node): Node;
   "checked_core.prepared_module"(prepared: Node): Node;
   "checked_core.prepared_certificates"(prepared: Node): BendList<Node>;
   "checked_core.index_for"(module: Node, certificates: BendList<Node>): Node;
@@ -59,7 +61,7 @@ const cases = [
   {
     name: "type changing generic setter",
     source: `type Box a is data = Box { value: a }
-const run = fn () => do:
+entry const run = fn () => do:
   let box = Box { value: 40 }
   box.value := True
   return case box.value of
@@ -71,14 +73,14 @@ const run = fn () => do:
     name: "nested nominal field",
     source: `type Inner a is data = Inner { value: a }
 type Outer a is data = Outer { inner: Inner a }
-const run = fn () => (Outer { inner: Inner { value: 42 } }).inner.value
+entry const run = fn () => (Outer { inner: Inner { value: 42 } }).inner.value
 `,
   },
   {
     name: "shared field across variants",
     source:
       `type Choice a is data = Low { value: a } | High { value: a, tag: U32 }
-const run = fn () => do:
+entry const run = fn () => do:
   let item = High { value: 40, tag: 1 }
   item.value := @u32.add self 2
   return item.value
@@ -90,7 +92,7 @@ const run = fn () => do:
 type Holder is data = Holder { callback: Unit -> U32 ! {Reader.ask} }
 const read = fn holder => holder.callback
 const provider = @effect.provider Reader.ask (fn () => 42)
-const run = fn () => do provider:
+entry const run = fn () => do provider:
   return (read (Holder { callback: fn () => Reader.ask () })) ()
 `,
   },
@@ -111,9 +113,11 @@ Deno.test("field helpers retain principal checked groups across generic, nominal
       );
       equal(prepared.$, "Done", fixture.name);
       if (prepared.$ !== "Done") continue;
-      const module = api["checked_core.prepared_module"](prepared.value);
+      const module = api["checked_core.prepared_module"](
+        api["source_modules.sourced_prepared"](prepared.value),
+      );
       const certificates = api["checked_core.prepared_certificates"](
-        prepared.value,
+        api["source_modules.sourced_prepared"](prepared.value),
       );
       const helperNames = bendArray(module.functions as BendList<Node>)
         .map((fn) => fn.name as string)
@@ -319,13 +323,14 @@ const test = run (Left { value: 42 })
           {
             $: "Diagnostic",
             code: "type_mismatch",
-            subject: "$member[2]",
+            // The retaining entry also references `run`, adding one instance.
+            subject: "$member[3]",
             message: "cannot unify U32 with Bool",
           },
         ],
       ] as const
     ) {
-      const input = frontend.prepare(source);
+      const input = frontend.prepare(reachedSource(source));
       const result = api.compile_source(
         input.root,
         input.prelude,

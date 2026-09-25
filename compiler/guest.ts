@@ -7,7 +7,11 @@ export type ScalarValue<T extends ScalarType = ScalarType> = T extends "Unit"
 
 export type ArrayType = "Array U32" | "Array F32";
 export type ValueType = ScalarType | ArrayType;
-export type GuestValue = ScalarValue | Uint32Array | Float32Array;
+export type ValueOf<T extends ValueType> = T extends "Array U32" ? Uint32Array
+  : T extends "Array F32" ? Float32Array
+  : T extends ScalarType ? ScalarValue<T>
+  : never;
+export type GuestValue = ValueOf<ValueType>;
 
 function isArrayType(type: ValueType): type is ArrayType {
   return type === "Array U32" || type === "Array F32";
@@ -15,8 +19,8 @@ function isArrayType(type: ValueType): type is ArrayType {
 
 export interface CallbackType {
   readonly kind: "callback";
-  readonly parameter: ScalarType;
-  readonly result: ScalarType;
+  readonly parameter: ValueType;
+  readonly result: ValueType;
 }
 
 export interface GuestFunction {
@@ -39,14 +43,20 @@ export interface GuestAbi {
 const capabilityBrand = Symbol("HostCapability");
 export interface HostCapability {
   readonly [capabilityBrand]: true;
-  readonly parameter: ScalarType;
-  readonly result: ScalarType;
+  readonly parameter: ValueType;
+  readonly result: ValueType;
 }
 
-export interface HostCallback<P extends ScalarType, R extends ScalarType> {
+export interface HostCallback<P extends ValueType, R extends ValueType> {
   readonly parameter: P;
   readonly result: R;
-  readonly call: (value: ScalarValue<P>) => ScalarValue<R>;
+  readonly call: (value: ValueOf<P>) => ValueOf<R>;
+}
+
+export interface AsyncHostCallback<P extends ValueType, R extends ValueType> {
+  readonly parameter: P;
+  readonly result: R;
+  readonly call: (value: ValueOf<P>) => ValueOf<R> | PromiseLike<ValueOf<R>>;
 }
 
 export type GuestErrorCode =
@@ -59,6 +69,7 @@ export type GuestErrorCode =
   | "host_exception"
   | "host_result"
   | "async_host_call"
+  | "unsupported_async"
   | "reentrant_call"
   | "disposed_guest"
   | "unknown_export";
@@ -139,8 +150,8 @@ class AbiReader {
     return tag === 4
       ? Object.freeze({
         kind: "callback",
-        parameter: this.scalar(),
-        result: this.scalar(),
+        parameter: this.value(),
+        result: this.value(),
       })
       : this.value(tag);
   }
@@ -153,7 +164,9 @@ class AbiReader {
 }
 
 function importName(signature: CallbackType): string {
-  return `call_${signature.parameter.toLowerCase()}_${signature.result.toLowerCase()}`;
+  return `call_${signature.parameter.toLowerCase().replaceAll(" ", "_")}_${
+    signature.result.toLowerCase().replaceAll(" ", "_")
+  }`;
 }
 
 export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
@@ -200,7 +213,10 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   if (
     functions.some((fn) =>
       (typeof fn.parameter === "string" && isArrayType(fn.parameter)) ||
-      isArrayType(fn.result)
+      isArrayType(fn.result) ||
+      (typeof fn.parameter !== "string" &&
+        (isArrayType(fn.parameter.parameter) ||
+          isArrayType(fn.parameter.result)))
     )
   ) {
     declare("blot:memory", "memory");
@@ -311,6 +327,7 @@ function arrayToWasm(
   type: ArrayType,
   argument: unknown,
   name: string,
+  code: "invalid_argument" | "host_result" = "invalid_argument",
 ): number {
   if (
     !(type === "Array U32"
@@ -318,7 +335,7 @@ function arrayToWasm(
       : argument instanceof Float32Array)
   ) {
     throw new GuestError(
-      "invalid_argument",
+      code,
       `${name} argument must be ${
         type === "Array U32" ? "Uint32Array" : "Float32Array"
       }`,
@@ -327,7 +344,7 @@ function arrayToWasm(
   const values = argument as Uint32Array | Float32Array;
   if (values.length >= 4_194_304) {
     throw new GuestError(
-      "invalid_argument",
+      code,
       `${name} array exceeds the 16 MiB arena`,
     );
   }
@@ -375,23 +392,38 @@ interface Lifetime {
 interface CapabilityOwner {
   readonly lifetime: Lifetime;
   readonly signature: CallbackType;
+  readonly asynchronous: boolean;
 }
 const capabilityOwners = new WeakMap<object, CapabilityOwner>();
-type InvokeCallback = (value: ScalarValue) => unknown;
+type InvokeCallback = (value: GuestValue) => unknown;
 
 export interface Guest {
   readonly abi: GuestAbi;
-  capability<P extends ScalarType, R extends ScalarType>(
+  capability<P extends ValueType, R extends ValueType>(
     callback: HostCallback<P, R>,
   ): HostCapability;
+  capabilityAsync<P extends ValueType, R extends ValueType>(
+    callback: AsyncHostCallback<P, R>,
+  ): HostCapability;
   call(name: string, argument: unknown): GuestValue;
+  callAsync(name: string, argument: unknown): Promise<GuestValue>;
   read(name: string): ScalarValue;
   dispose(): void;
 }
 
-/** Synchronous, invocation-scoped ABI. No instance, memory, or handles escape. */
+// JSPI is optional for synchronous guests. Keep this structural definition until
+// TypeScript's WebAssembly declarations include the standardized API.
+interface PromiseIntegration {
+  Suspending: new (callback: CallableFunction) => WebAssembly.ImportValue;
+  promising: (
+    exported: CallableFunction,
+  ) => (value: unknown) => Promise<unknown>;
+}
+
+/** Invocation-scoped capabilities. Async invocations retain memory while suspended. */
 export async function instantiateGuest(
   bytes: Uint8Array<ArrayBuffer> | WebAssembly.Module,
+  options: { readonly asynchronous?: boolean } = {},
 ): Promise<Guest> {
   const module = bytes instanceof WebAssembly.Module
     ? bytes
@@ -401,6 +433,17 @@ export async function instantiateGuest(
   const constants = new Map(
     abi.constants.map((constant) => [constant.name, constant]),
   );
+  const jspi = WebAssembly as unknown as Partial<PromiseIntegration>;
+  function requireAsync(): PromiseIntegration {
+    if (!jspi.Suspending || !jspi.promising) {
+      throw new GuestError(
+        "unsupported_async",
+        "Async guests require WebAssembly.Suspending and WebAssembly.promising",
+      );
+    }
+    return jspi as PromiseIntegration;
+  }
+  if (options.asynchronous) requireAsync();
   const lifetime: Lifetime = { disposed: false };
   let callbacks = new WeakMap<object, InvokeCallback>();
   let active: {
@@ -408,6 +451,7 @@ export async function instantiateGuest(
     readonly signature: CallbackType;
     readonly invoke: InvokeCallback;
     readonly exportName: string;
+    readonly asynchronous: boolean;
   } | undefined;
   let running = false;
 
@@ -423,12 +467,32 @@ export async function instantiateGuest(
     }
   }
 
-  const imports: Record<string, (reference: unknown, value: number) => number> =
-    {};
+  let arena: GuestArena | undefined;
+  function fromWasm(type: ValueType, value: unknown): GuestValue {
+    if (!isArrayType(type)) return scalarFromWasm(type, value);
+    if (!arena) {
+      throw new GuestError("invalid_abi", "Array callback requires an arena");
+    }
+    return arrayFromWasm(arena, type, value);
+  }
+  function hostResult(type: ValueType, value: unknown, name: string): number {
+    const label = `Host callback result during ${name}`;
+    if (!isArrayType(type)) {
+      return scalarToWasm(type, value, "host_result", label);
+    }
+    if (!arena) {
+      throw new GuestError("invalid_abi", "Array callback requires an arena");
+    }
+    return arrayToWasm(arena, type, value, label, "host_result");
+  }
+  const imports: Record<string, WebAssembly.ImportValue> = {};
   for (const fn of abi.functions) {
     if (typeof fn.parameter === "string") continue;
     const signature = fn.parameter;
-    imports[importName(signature)] = (reference, value) => {
+    const invokeImport = (
+      reference: unknown,
+      value: number,
+    ): number | Promise<number> => {
       const invocation = active;
       if (!invocation || reference !== invocation.reference) {
         throw new GuestError(
@@ -445,7 +509,7 @@ export async function instantiateGuest(
           "Host call signature does not match its capability",
         );
       }
-      const argument = scalarFromWasm(signature.parameter, value);
+      const argument = fromWasm(signature.parameter, value);
       let result: unknown;
       try {
         result = invocation.invoke(argument);
@@ -461,9 +525,22 @@ export async function instantiateGuest(
           typeof result === "function") &&
         "then" in result
       ) {
+        if (invocation.asynchronous) {
+          return Promise.resolve(result).then(
+            (value) =>
+              hostResult(signature.result, value, invocation.exportName),
+            (cause) => {
+              throw new GuestError(
+                "host_exception",
+                `Host callback rejected during ${invocation.exportName}`,
+                { cause },
+              );
+            },
+          );
+        }
         const failure = new GuestError(
           "async_host_call",
-          `Host callback returned a Promise/thenable during ${invocation.exportName}; ABI 2 is synchronous`,
+          `Host callback returned a Promise/thenable during ${invocation.exportName}; use capabilityAsync() and callAsync()`,
         );
         // The intrinsic checks Promise identity across realms without calling
         // a user-supplied then/catch. Non-Promise thenables throw here; report
@@ -475,13 +552,11 @@ export async function instantiateGuest(
         }
         throw failure;
       }
-      return scalarToWasm(
-        signature.result,
-        result,
-        "host_result",
-        `Host callback result during ${invocation.exportName}`,
-      );
+      return hostResult(signature.result, result, invocation.exportName);
     };
+    imports[importName(signature)] = options.asynchronous
+      ? new (requireAsync().Suspending)(invokeImport)
+      : invokeImport;
   }
   const instance = await WebAssembly.instantiate(module, {
     "blot:host/1": imports,
@@ -490,7 +565,6 @@ export async function instantiateGuest(
   const memory = instance.exports["blot:memory"];
   const allocate = instance.exports["blot:allocate"];
   const reset = instance.exports["blot:reset"];
-  let arena: GuestArena | undefined;
   if (memory !== undefined) {
     if (
       !(memory instanceof WebAssembly.Memory) ||
@@ -501,122 +575,179 @@ export async function instantiateGuest(
     arena = { memory, allocate, reset };
   }
 
-  return {
-    abi,
-    capability<P extends ScalarType, R extends ScalarType>(
-      definition: HostCallback<P, R>,
-    ): HostCapability {
-      idle();
-      if (typeof definition !== "object" || definition === null) {
+  const valueTypes: readonly ValueType[] = [
+    ...scalarTypes,
+    "Array U32",
+    "Array F32",
+  ];
+  function createCapability<P extends ValueType, R extends ValueType>(
+    definition: AsyncHostCallback<P, R>,
+    asynchronous: boolean,
+  ): HostCapability {
+    idle();
+    if (typeof definition !== "object" || definition === null) {
+      throw new GuestError(
+        "invalid_capability",
+        "Expected a callback definition",
+      );
+    }
+    const { parameter, result, call } = definition;
+    if (
+      !valueTypes.includes(parameter) || !valueTypes.includes(result) ||
+      typeof call !== "function"
+    ) {
+      throw new GuestError(
+        "invalid_capability",
+        "A capability needs supported value types and a callable",
+      );
+    }
+    const signature: CallbackType = Object.freeze({
+      kind: "callback",
+      parameter,
+      result,
+    });
+    const capability: HostCapability = Object.freeze({
+      [capabilityBrand]: true as const,
+      parameter,
+      result,
+    });
+    capabilityOwners.set(capability, { lifetime, signature, asynchronous });
+    callbacks.set(capability, (value) => call(value as ValueOf<P>));
+    return capability;
+  }
+
+  function begin(
+    name: string,
+    argument: unknown,
+    asynchronous: boolean,
+  ): { fn: GuestFunction; value: unknown; exported: CallableFunction } {
+    idle();
+    const fn = functions.get(name);
+    if (!fn) {
+      throw new GuestError(
+        "unknown_export",
+        `Unknown function export ${name}`,
+      );
+    }
+    let value: number | object;
+    if (typeof fn.parameter === "string") {
+      value = isArrayType(fn.parameter) ? 0 : scalarToWasm(
+        fn.parameter,
+        argument,
+        "invalid_argument",
+        `${name} argument`,
+      );
+    } else {
+      const owner = typeof argument === "object" && argument !== null
+        ? capabilityOwners.get(argument)
+        : undefined;
+      if (!owner) {
         throw new GuestError(
           "invalid_capability",
-          "Expected a callback definition",
+          `${name} requires a capability created by guest.capability()`,
         );
       }
-      const { parameter, result, call } = definition;
+      if (owner.lifetime.disposed) {
+        throw new GuestError(
+          "stale_capability",
+          `${name} received a disposed instance's capability`,
+        );
+      }
+      if (owner.lifetime !== lifetime) {
+        throw new GuestError(
+          "foreign_capability",
+          `${name} received another instance's capability`,
+        );
+      }
       if (
-        !scalarTypes.includes(parameter) || !scalarTypes.includes(result) ||
-        typeof call !== "function"
+        owner.signature.parameter !== fn.parameter.parameter ||
+        owner.signature.result !== fn.parameter.result
       ) {
         throw new GuestError(
-          "invalid_capability",
-          "A capability needs scalar parameter/result types and a callable",
+          "capability_signature",
+          `${name} requires ${fn.parameter.parameter} -> ${fn.parameter.result}`,
         );
       }
-      const signature: CallbackType = Object.freeze({
-        kind: "callback",
-        parameter,
-        result,
-      });
-      const capability: HostCapability = Object.freeze({
-        [capabilityBrand]: true as const,
-        parameter,
-        result,
-      });
-      capabilityOwners.set(capability, { lifetime, signature });
-      callbacks.set(capability, (value) => call(value as ScalarValue<P>));
-      return capability;
+      if (owner.asynchronous && !asynchronous) {
+        throw new GuestError(
+          "async_host_call",
+          `${name} requires callAsync() for this capability`,
+        );
+      }
+      const invoke = callbacks.get(argument as object);
+      if (!invoke) throw new Error("Live capability has no callback binding");
+      value = Object.freeze({});
+      active = {
+        reference: value,
+        signature: owner.signature,
+        invoke,
+        exportName: name,
+        asynchronous: asynchronous && owner.asynchronous,
+      };
+    }
+    running = true;
+    try {
+      arena?.reset(0);
+      if (typeof fn.parameter === "string" && isArrayType(fn.parameter)) {
+        if (!arena) throw new Error("Validated array export has no arena");
+        value = arrayToWasm(arena, fn.parameter, argument, name);
+      }
+      const exported = instance.exports[name];
+      if (typeof exported !== "function") {
+        throw new Error("Validated function export disappeared");
+      }
+      return { fn, value, exported };
+    } catch (cause) {
+      finish();
+      throw cause;
+    }
+  }
+  function finish(): void {
+    try {
+      arena?.reset(0);
+    } finally {
+      active = undefined;
+      running = false;
+    }
+  }
+
+  return {
+    abi,
+    capability: (definition) => createCapability(definition, false),
+    capabilityAsync: (definition) => {
+      requireAsync();
+      if (!options.asynchronous) {
+        throw new GuestError(
+          "unsupported_async",
+          "Create the guest with { asynchronous: true } to bind async capabilities",
+        );
+      }
+      return createCapability(definition, true);
     },
     call(name, argument) {
-      idle();
-      const fn = functions.get(name);
-      if (!fn) {
+      if (options.asynchronous) {
         throw new GuestError(
-          "unknown_export",
-          `Unknown function export ${name}`,
+          "async_host_call",
+          "An asynchronous guest requires callAsync()",
         );
       }
-      let value: number | object;
-      if (typeof fn.parameter === "string") {
-        value = isArrayType(fn.parameter) ? 0 : scalarToWasm(
-          fn.parameter,
-          argument,
-          "invalid_argument",
-          `${name} argument`,
-        );
-      } else {
-        const owner = typeof argument === "object" && argument !== null
-          ? capabilityOwners.get(argument)
-          : undefined;
-        if (!owner) {
-          throw new GuestError(
-            "invalid_capability",
-            `${name} requires a capability created by guest.capability()`,
-          );
-        }
-        if (owner.lifetime.disposed) {
-          throw new GuestError(
-            "stale_capability",
-            `${name} received a disposed instance's capability`,
-          );
-        }
-        if (owner.lifetime !== lifetime) {
-          throw new GuestError(
-            "foreign_capability",
-            `${name} received another instance's capability`,
-          );
-        }
-        if (
-          owner.signature.parameter !== fn.parameter.parameter ||
-          owner.signature.result !== fn.parameter.result
-        ) {
-          throw new GuestError(
-            "capability_signature",
-            `${name} requires ${fn.parameter.parameter} -> ${fn.parameter.result}`,
-          );
-        }
-        const invoke = callbacks.get(argument as object);
-        if (!invoke) throw new Error("Live capability has no callback binding");
-        value = Object.freeze({});
-        active = {
-          reference: value,
-          signature: owner.signature,
-          invoke,
-          exportName: name,
-        };
-      }
-      running = true;
+      const { fn, value, exported } = begin(name, argument, false);
       try {
-        arena?.reset(0);
-        if (typeof fn.parameter === "string" && isArrayType(fn.parameter)) {
-          if (!arena) throw new Error("Validated array export has no arena");
-          value = arrayToWasm(arena, fn.parameter, argument, name);
-        }
-        const exported = instance.exports[name];
-        if (typeof exported !== "function") {
-          throw new Error("Validated function export disappeared");
-        }
-        const result = exported(value);
-        if (!isArrayType(fn.result)) return scalarFromWasm(fn.result, result);
-        if (!arena) throw new Error("Validated array export has no arena");
-        return arrayFromWasm(arena, fn.result, result);
+        return fromWasm(fn.result, exported(value));
       } finally {
-        try {
-          arena?.reset(0);
-        } finally {
-          active = undefined;
-          running = false;
-        }
+        finish();
+      }
+    },
+    async callAsync(name, argument) {
+      const integration = requireAsync();
+      const { fn, value, exported } = begin(name, argument, true);
+      try {
+        return fromWasm(
+          fn.result,
+          await integration.promising(exported)(value),
+        );
+      } finally {
+        finish();
       }
     },
     read(name) {

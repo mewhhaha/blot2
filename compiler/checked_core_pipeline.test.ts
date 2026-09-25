@@ -18,6 +18,7 @@ const api = compiled as unknown as {
     prelude: unknown,
     fuel: bigint,
   ): Result<Node>;
+  "source_modules.sourced_prepared"(sourced: Node): Node;
   "checked_core.prepared_module"(prepared: Node): Node;
   "checked_core.prepared_certificates"(prepared: Node): BendList<Node>;
   "checked_core.index_for"(module: Node, certificates: BendList<Node>): Node;
@@ -42,18 +43,18 @@ Deno.test("real specialization certificates produce checked groups with the same
   const cases = [
     `const untouched = fn (value: U32) => @u32.add value 1
 const twice = fn value => value + value
-const run = fn (value: F32) => do:
+entry const run = fn (value: F32) => do:
   let ignored = untouched 42
   return twice value
 `,
     `data Cell = Cell U32
 const pick = fn values => @array.get values 0
-const run = fn () => case pick [Cell 42] of
+entry const run = fn () => case pick [Cell 42] of
   Cell answer => answer
 `,
     `data Cell = Cell U32
 const read = fn witness => @state.get witness
-const run = fn () => do:
+entry const run = fn () => do:
   let (_, Cell answer) = @state.run (Cell 42) (fn () => read Cell)
   return answer
 `,
@@ -71,9 +72,11 @@ const run = fn () => do:
       );
       equal(lowered.$, "Done", source);
       if (lowered.$ !== "Done") continue;
-      const module = api["checked_core.prepared_module"](lowered.value);
+      const module = api["checked_core.prepared_module"](
+        api["source_modules.sourced_prepared"](lowered.value),
+      );
       const certificates = api["checked_core.prepared_certificates"](
-        lowered.value,
+        api["source_modules.sourced_prepared"](lowered.value),
       );
       const retained = api["check_scheduler.check_module_core"](
         module,

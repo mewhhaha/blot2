@@ -212,22 +212,22 @@ Deno.test("F32 primitive traversal preserves latent operation effects on functio
 
 const sourceMath = `
 const make_offset = fn captured => fn value => F32.add captured value
-const offset = make_offset (-0.25)
+entry const offset = make_offset (-0.25)
 const nested = Some (Some 0.125)
-const rounded = F32.add 16_777_216.0 1.0
-const negative_zero = -0.0
-const infinity = F32.div 1.0 0.0
-const not_a_number = F32.div 0.0 0.0
-const negative = fn (value: F32) => -value
-const length = fn () => F32.length3 2.0 3.0 6.0
-const partial = fn (value: F32) => offset (identity value)
-const extract = fn () => case nested of
+entry const rounded = F32.add 16_777_216.0 1.0
+entry const negative_zero = -0.0
+entry const infinity = F32.div 1.0 0.0
+entry const not_a_number = F32.div 0.0 0.0
+entry const negative = fn (value: F32) => -value
+entry const length = fn () => F32.length3 2.0 3.0 6.0
+entry const partial = fn (value: F32) => offset (identity value)
+entry const extract = fn () => case nested of
   Some (Some value) => value
   _ => 0.0
-const decimal = fn () => 1_2.5_0e-1
-const integer = fn (value: F32) => F32.to_u32 value
-const floating = fn (value: U32) => U32.to_f32 value
-const finite = fn (value: F32) => F32.is_finite value
+entry const decimal = fn () => 1_2.5_0e-1
+entry const integer = fn (value: F32) => F32.to_u32 value
+entry const floating = fn (value: U32) => U32.to_f32 value
+entry const finite = fn (value: F32) => F32.is_finite value
 `;
 
 Deno.test("F32 source literals, negative values, prelude math and generic closures execute", async () => {
@@ -283,7 +283,7 @@ Deno.test("F32 native analysis, closures and Wasm match the JS reference", async
     equal(
       call(
         await exportsOf(
-          (await native.compile("const ok = fn () => 0.125")).bytes,
+          (await native.compile("entry const ok = fn () => 0.125")).bytes,
         ),
         "ok",
       ),
@@ -342,7 +342,7 @@ Deno.test("F32 decimal literals round once, ties-to-even, including subnormal an
   try {
     const finite = cases.filter(({ expected }) => Number.isFinite(expected));
     const source = finite.map(({ text }, index) =>
-      `const value_${index} = ${text}`
+      `entry const value_${index} = ${text}`
     ).join("\n");
     const expected = reference.compile(source);
     const actual = await native.compile(source);

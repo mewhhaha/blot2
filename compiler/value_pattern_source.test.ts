@@ -19,17 +19,17 @@ Deno.test("value patterns match constants, parameters and lexical bindings in JS
   const js = await createSourceCompiler();
   const native = await createNativeCompiler({ threads: 4 });
   const source = `
-const tab = @u32.add 0x110100 4
+entry const tab = @u32.add 0x110100 4
 data Event = Event { key: U32 }
 const record = fn actual => do:
   let expected = 7
   return case actual of
     Event { key: ^expected } => 42
     _ => 0
-const key_action = fn code => case code of
+entry const key_action = fn code => case code of
   ^tab => 42
   _ => 0
-const inferred = fn expected => case 7 of
+entry const inferred = fn expected => case 7 of
   ^expected => 42
   _ => 0
 const compare = fn (expected: U32) => fn actual => case actual of
@@ -53,36 +53,36 @@ const conditional = fn actual => do:
 const make_matcher = fn (expected: U32) => fn actual => case actual of
   ^expected => 42
   _ => 0
-const captured = make_matcher 7
-const boolean = fn (actual: Bool) => do:
+entry const captured = make_matcher 7
+entry const boolean = fn (actual: Bool) => do:
   let expected = True
   return case actual of
     ^expected => 42
     _ => 0
-const correlated = fn actual => do:
+entry const correlated = fn actual => do:
   let expected = 7
   return case actual, actual of
     ^expected, 8 => 0
     _, ^expected => 42
     _, _ => 0
-const evaluated_record = record (Event { key: 7 })
-const evaluated = key_action tab
-const evaluated_capture = captured 7
-const evaluated_nested = nested (Some (42, 7))
-const evaluated_miss = nested (Some (7, 42))
-const evaluated_guard = guarded (Some 7)
-const evaluated_bool = boolean False
-const record_key = fn code => record (Event { key: code })
-const inferred_key = fn code => inferred code
-const key = fn code => key_action code
-const parameter = fn actual => compare 7 actual
-const shadow = fn actual => nested (Some (42, actual))
-const guard = fn actual => guarded (Some actual)
-const condition = fn actual => conditional (Some actual)
-const closure = fn actual => (make_matcher 7) actual
-const const_closure = fn actual => captured actual
-const flag = fn actual => boolean (actual == 7)
-const row = fn actual => correlated actual
+entry const evaluated_record = record (Event { key: 7 })
+entry const evaluated = key_action tab
+entry const evaluated_capture = captured 7
+entry const evaluated_nested = nested (Some (42, 7))
+entry const evaluated_miss = nested (Some (7, 42))
+entry const evaluated_guard = guarded (Some 7)
+entry const evaluated_bool = boolean False
+entry const record_key = fn code => record (Event { key: code })
+entry const inferred_key = fn code => inferred code
+entry const key = fn code => key_action code
+entry const parameter = fn actual => compare 7 actual
+entry const shadow = fn actual => nested (Some (42, actual))
+entry const guard = fn actual => guarded (Some actual)
+entry const condition = fn actual => conditional (Some actual)
+entry const closure = fn actual => (make_matcher 7) actual
+entry const const_closure = fn actual => captured actual
+entry const flag = fn actual => boolean (actual == 7)
+entry const row = fn actual => correlated actual
 `;
   try {
     const artifact = js.compile(source);
@@ -193,11 +193,11 @@ Deno.test("imported and incremental value patterns track changed constants", asy
               url.pathname.endsWith("keys.blot")
                 ? `const tab = @u32.add 0 ${expected}\n`
                 : `import * as keys from "./keys"
-const matches = fn code => case code of
+entry const matches = fn code => case code of
   ^keys.tab => 42
   _ => 0
-const folded = matches 7
-const answer = fn code => matches code
+entry const folded = matches 7
+entry const answer = fn code => matches code
 `,
             );
           },
@@ -206,11 +206,11 @@ const answer = fn code => matches code
       const artifact = js.compile(project);
       equal(await native.compile(project), artifact);
       const local = `const tab = ${expected}
-const matches = fn code => case code of
+entry const matches = fn code => case code of
   ^tab => 42
   _ => 0
-const folded = matches 7
-const answer = fn code => matches code
+entry const folded = matches 7
+entry const answer = fn code => matches code
 `;
       equal((await session.compile(local)).artifact, js.compile(local));
       const exports = await exportsOf(artifact.bytes);
@@ -222,9 +222,9 @@ const answer = fn code => matches code
       );
     }
     for (const reference of ["first", "second", "first"]) {
-      const source = `const first = 7
-const second = 8
-const answer = fn code => case code of
+      const source = `entry const first = 7
+entry const second = 8
+entry const answer = fn code => case code of
   ^${reference} => 42
   _ => 0
 `;
@@ -248,8 +248,8 @@ Deno.test("caret remains available as an infix operator beside value patterns", 
   try {
     const artifact = compiler.compile(`infixl 60 (^) = add
 const add = fn left => fn right => @u32.add left right
-const expected = 40 ^ 2
-const answer = fn x => case x of
+entry const expected = 40 ^ 2
+entry const answer = fn x => case x of
   ^expected => 42
   _ => 0
 `);
@@ -271,7 +271,7 @@ Deno.test("tuple value patterns preserve lexical captures across many fields", a
       `const matcher = fn (expected: U32) => fn candidate => case candidate of
   (${["^expected", ...Array(width - 1).fill("_")].join(", ")}) => 42
   _ => 0
-const answer = fn () => (matcher 7) (${
+entry const answer = fn () => (matcher 7) (${
         ["7", ...Array(width - 1).fill("0")].join(", ")
       })
 `;

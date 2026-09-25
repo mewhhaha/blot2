@@ -94,7 +94,7 @@ Deno.test({
       const expected = [7, 42, 0xFFFF_FFFF];
       const payloads = expected.map((answer) => {
         const prepared = frontend.prepare(
-          `const answer = fn () => ${answer}\n`,
+          `entry const answer = fn () => ${answer}\n`,
         );
         return encodeNativeRequest({
           operation: "compile",

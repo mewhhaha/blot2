@@ -5,15 +5,15 @@ const tick = fn value => do:
   use next <- Counter.advance U32 value
   return next
 
-const main = fn (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider (Counter.advance U32) advance):
+entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider (Counter.advance U32) advance):
   use next <- tick 41
   return next
 
 // Reflection describes the requirement; it does not create a capability.
-const uses_host = @effect.has (@effect.of main) Foreign
+entry const uses_host = @effect.has (@effect.of main) Foreign
 
 // Tests can handle the same source effect without any host authority.
 const local_counter = @effect.provider (Counter.advance U32) (fn value => value + 1)
-const mocked = fn () => do local_counter:
+entry const mocked = fn () => do local_counter:
   use next <- tick 41
   return next

@@ -9,6 +9,7 @@ import ./groups.bend as Groups
 import ./cst.bend as Cst
 import ./public_exports.bend as Public
 import ./checked_core.bend as Core
+import ./entry_points.bend as Entries
 
 type Analysis is Data:
   Analysis{checked: M.CheckedModule, constants: List<&2, Const.Binding<Const.Value>>, remaining_steps: Nat}
@@ -65,11 +66,17 @@ def compile(module: M.Module, steps: Nat) -> Result<&2, &2, M.Diagnostic, Artifa
     return flatten_artifact(artifact)
 
 # Keep intermediate compiler terms inside Bend; the host only receives results.
+# Only declarations the entries reach are finally checked, const-evaluated and
+# emitted; every declaration still passed the initial check. An analysis
+# without entry declarations therefore reports nothing but succeeds when the
+# program checks.
 def analyze_source(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Analysis>:
   do Result<&2, &2, M.Diagnostic, Analysis>:
-    +prepared : Core.Prepared <- SourceModules.source_module_core(M.name_equal(Cst.kind_of(root), "source_project"), root, prelude, fuel)
+    +sourced : SourceModules.Sourced <- SourceModules.source_module_core(M.name_equal(Cst.kind_of(root), "source_project"), root, prelude, fuel)
+    +prepared : Core.Prepared = SourceModules.sourced_prepared(sourced)
     inferred : M.CheckedModule <- CheckScheduler.check_module_core(Core.prepared_module(prepared), Core.prepared_certificates(prepared))
     +checked : M.CheckedModule = Public.select_checked(inferred)
+    valid : Unit <- Entries.verify(SourceModules.sourced_entries(sourced), checked)
     raw : M.Module = Public.unchecked_module(checked)
     constants : Const.Constants <- Const.evaluate_constants(checked_constants(checked), steps, const_context(raw, checked))
     return finish_analysis(checked, constants)
@@ -77,11 +84,13 @@ def analyze_source(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> R
 def compile_source(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, Artifact>:
   do Result<&2, &2, M.Diagnostic, Artifact>:
     +analysis : Analysis <- analyze_source(root, prelude, fuel, steps)
+    exports : Unit <- Entries.require_exports(analysis_checked(analysis))
     bytes : Wasm.BytePlan <- Wasm.emit_plan(analysis_checked(analysis), analysis_constants(analysis))
     return flatten_artifact(PlannedArtifact{analysis, bytes})
 
 def compile_source_plan(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> Result<&2, &2, M.Diagnostic, PlannedArtifact>:
   do Result<&2, &2, M.Diagnostic, PlannedArtifact>:
     +analysis : Analysis <- analyze_source(root, prelude, fuel, steps)
+    exports : Unit <- Entries.require_exports(analysis_checked(analysis))
     bytes : Wasm.BytePlan <- Wasm.emit_plan(analysis_checked(analysis), analysis_constants(analysis))
     return PlannedArtifact{analysis, bytes}

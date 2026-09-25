@@ -1,0 +1,19 @@
+entry const create = fn () => 1
+// <- keyword.storage.modifier
+//          ^ function
+
+entry let count: U32 = 2
+// <- keyword.storage.modifier
+//        ^ variable
+
+const entry = fn entry => entry
+// <- keyword.storage.type
+//    ^ function
+//               ^ variable.parameter
+//                        ^ variable
+
+const read = fn value => do:
+  let entry = value
+//    ^ variable
+  return entry
+//       ^ variable

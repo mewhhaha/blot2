@@ -4,14 +4,14 @@ import { createNativeCompiler } from "./native.ts";
 import { createSourceCompiler } from "./source.ts";
 
 const source = `
-const integers = fn (values: Array U32) => values
-const floats = fn (values: Array F32) => values
-const change = fn (values: Array F32) => @array.set values 0 42.5
-const first = fn (values: Array F32) => @array.get values 0
-const filled = fn (count: U32) => @array.fill count 3.5
-const empty = fn () => @array.fill 0 0
-const constant = fn () => [1, 4_294_967_295]
-const callback = fn (io: U32 -> U32 ! {Foreign}) => do:
+entry const integers = fn (values: Array U32) => values
+entry const floats = fn (values: Array F32) => values
+entry const change = fn (values: Array F32) => @array.set values 0 42.5
+entry const first = fn (values: Array F32) => @array.get values 0
+entry const filled = fn (count: U32) => @array.fill count 3.5
+entry const empty = fn () => @array.fill 0 0
+entry const constant = fn () => [1, 4_294_967_295]
+entry const callback = fn (io: U32 -> U32 ! {Foreign}) => do:
   use value <- io 40
   return value
 `;

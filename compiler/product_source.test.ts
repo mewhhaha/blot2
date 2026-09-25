@@ -9,8 +9,8 @@ const first = fn (pair: (U32, Bool)) => @product.get pair 0
 const unwrap = fn value => case value of
   Payload pair => first pair
 const stored = Payload (40, True)
-const expected = unwrap stored + 2
-const answer = fn () => do:
+entry const expected = unwrap stored + 2
+entry const answer = fn () => do:
   let captured = (unwrap stored, False)
   let select = fn () => first captured
   return select () + 2

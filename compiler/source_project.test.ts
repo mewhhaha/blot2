@@ -98,7 +98,7 @@ Deno.test("source projects resolve diamond imports once and keep local names in 
   const { loaded, reads } = project({
     "main.blot": `import * as left from "./left"
 import { result as right_result } from "./right.blot"
-const answer = fn () => left.result () + right_result ()
+entry const answer = fn () => left.result () + right_result ()
 `,
     "left.blot": `import { twice } from "library/arithmetic"
 const hidden = fn value => twice value
@@ -139,7 +139,7 @@ Deno.test("source projects canonicalize equivalent file URL spellings before loa
 import { Box as EscapedBox } from "./%6cibrary%2Eblot"
 const unpack = fn (value: direct.Box) => case value of
   EscapedBox inner => inner
-const answer = fn () => unpack (EscapedBox 42)
+entry const answer = fn () => unpack (EscapedBox 42)
 `,
     "library.blot": "data Box = Box U32\n",
   }, new URL("file:///blot-project/%6dain.blot"));
@@ -175,7 +175,7 @@ Deno.test("source project imports preserve nominal types and constructor payload
 import { Point as Position, make, coordinate } from "./geometry"
 const x = fn (point: geometry.Point) => coordinate point
 const y = fn (point: Position) => x point
-const answer = fn () => y (make 42)
+entry const answer = fn () => y (make 42)
 `,
     "geometry.blot": `data Point = Point U32
 const make = fn value => Point value
@@ -204,7 +204,7 @@ const guard_point = fn point => do:
   if let geometry.Point copied = point:
     return @u32.add value copied
   return 0
-const answer = fn () => @u32.add (case_point (geometry.Point 14)) (guard_point (geometry.Point 14))
+entry const answer = fn () => @u32.add (case_point (geometry.Point 14)) (guard_point (geometry.Point 14))
 `,
     "geometry.blot": "data Point = Point U32\n",
   });
@@ -222,7 +222,7 @@ Deno.test("source project operation identities survive namespace imports and pro
   const { loaded } = project({
     "main.blot": `import * as operation from "./operation"
 const provider = @effect.provider operation.read (fn value => value + 2)
-const answer = fn () => do provider:
+entry const answer = fn () => do provider:
   return operation.compute 40
 `,
     "operation.blot": `effect read : U32 -> U32
@@ -246,7 +246,7 @@ Deno.test("source projects import bindings by default and reject missing exports
   try {
     const publicBindings = await project({
       "main.blot":
-        'import { value } from "./library"\nconst answer = fn () => value\n',
+        'import { value } from "./library"\nentry const answer = fn () => value\n',
       "library.blot": "const value = 42\n",
     }).loaded;
     const artifact = compiler.compile(publicBindings);
@@ -458,7 +458,8 @@ Deno.test("large independent module bodies preserve native artifacts and nominal
   sources["main.blot"] = Array.from(
     { length: 8 },
     (_, index) => `import * as part${index} from "./part${index}"`,
-  ).join("\n") + "\nconst answer = fn (value: U32) => part0.answer value\n";
+  ).join("\n") +
+    "\nentry const answer = fn (value: U32) => part0.answer value\n";
   for (let module = 0; module < 8; module++) {
     sources[`part${module}.blot`] = Array.from({ length: 8 }, (_, index) =>
       `data T${index} = C${index} ${

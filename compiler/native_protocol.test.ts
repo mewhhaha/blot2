@@ -618,7 +618,7 @@ Deno.test("native emit replies carry exactly the compile reply's Wasm and nothin
   const frontend = await createSourceFrontend({ prelude: "none" });
   try {
     const prepared = frontend.prepare(
-      "const base = 40\nconst answer = fn () => @u32.add base 2\n",
+      "const base = 40\nentry const answer = fn () => @u32.add base 2\n",
     );
     const request = {
       root: prepared.root,

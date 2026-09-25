@@ -18,24 +18,24 @@ const built = do:
   application := append 2 self
   application := append 3 self
   return application
-const composed = fn () => case built of
+entry const composed = fn () => case built of
   Builder value => value
-const captures = fn (value: U32) => do:
+entry const captures = fn (value: U32) => do:
   let before = fn () => value
   value := self + 1
   let after = fn () => value
   value := value + self
   return before () * 100 + after () * 10 + value
-const different_type = fn () => do:
+entry const different_type = fn () => do:
   let value = 21
   value := U32.to_f32 self
   value := self * 2.0
   return value
-const captured_self = fn () => do:
+entry const captured_self = fn () => do:
   let value = 20
   value := fn amount => self + amount
   return value 22
-const nested = fn () => do:
+entry const nested = fn () => do:
   let self = 100
   let value = 1
   value := do:
@@ -43,7 +43,7 @@ const nested = fn () => do:
     inner := self + 3
     return self + inner
   return self + value
-const local_scope = fn () => do:
+entry const local_scope = fn () => do:
   let value = 1
   if True:
     value := self + 1

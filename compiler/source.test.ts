@@ -103,9 +103,9 @@ sourceTest(
     const { analysis, exports } = await instantiate(
       compiler,
       `
-const answer = twice 21
-const twice = fn value => @u32.mul value 2
-const entry = fn () => identity answer
+entry const answer = twice 21
+entry const twice = fn value => @u32.mul value 2
+entry const entry = fn () => identity answer
 const identity = fn value => value
 `,
     );
@@ -122,14 +122,14 @@ sourceTest(
   async (compiler) => {
     const { analysis, exports } = await instantiate(
       compiler,
-      `const next = fn value => @u32.add value 1
-const answer = do:
+      `entry const next = fn value => @u32.add value 1
+entry const answer = do:
   use start: U32 <- 20
   use _ <- next start
   use result <-
     @u32.add start 22
   return result
-const twice_next = fn (value: U32) => do:
+entry const twice_next = fn (value: U32) => do:
   use value <- next value
   if True:
     use value <- 0
@@ -148,7 +148,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `const choose = fn (condition: Bool) => do:
+      `entry const choose = fn (condition: Bool) => do:
   use base <- do:
     if condition:
       return 20
@@ -165,8 +165,8 @@ sourceTest(
 sourceTest(
   "bare use compiles exactly like an explicit discard binding",
   async (compiler) => {
-    const source = `const U32.increment = fn value => @u32.add value 1
-const discard = fn (value: U32) => do:
+    const source = `entry const U32.increment = fn value => @u32.add value 1
+entry const discard = fn (value: U32) => do:
   use value
   use U32.increment value
   use (U32.increment value)
@@ -189,10 +189,10 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `const answer = do:
+      `entry const answer = do:
   use @u32.add 20 22
   return 42
-const nested = fn (condition: Bool) => do:
+entry const nested = fn (condition: Bool) => do:
   let value = 42
   use do:
     if condition:
@@ -225,7 +225,7 @@ sourceTest(
   (compiler) => {
     for (const discard of ["use _ <-", "use"]) {
       const source = `const forever = fn () -> U32 => forever ()
-const bad = do:
+entry const bad = do:
   ${discard} forever ()
   return 42
 `;
@@ -276,7 +276,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `const scope = fn (condition: Bool) -> U32 => do:
+      `entry const scope = fn (condition: Bool) -> U32 => do:
   let value = 40
   if condition:
     let value = 2
@@ -293,7 +293,7 @@ sourceTest(
   "fallthrough conditionals do not duplicate the rest of the function",
   async (compiler) => {
     const sourceWith = (branches: number) =>
-      "const entry = fn (condition: Bool) => do:\n" +
+      "entry const entry = fn (condition: Bool) => do:\n" +
       "  if condition:\n    ()\n".repeat(branches) + "  return 42\n";
     const source = sourceWith(30);
     const { exports, bytes } = await instantiate(compiler, source);
@@ -312,7 +312,7 @@ sourceTest(
   "early-return branches have linear code growth",
   async (compiler) => {
     const sourceWith = (branches: number) =>
-      "const entry = fn (condition: Bool) => do:\n" +
+      "entry const entry = fn (condition: Bool) => do:\n" +
       "  if condition:\n    return 7\n".repeat(branches) + "  return 42\n";
     const { exports, bytes } = await instantiate(compiler, sourceWith(30));
     equal(call(exports, "entry", 1), 7);
@@ -328,7 +328,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `const nested = fn (value: U32) => do:
+      `entry const nested = fn (value: U32) => do:
   let base = do:
     return 40
   if @u32.lt value 2:
@@ -350,12 +350,12 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `const count = fn value => do:
+      `entry const count = fn value => do:
   if @u32.eq value 0:
     return 42
   return count (@u32.sub value 1)
-const answer = count 5
-const entry = fn () => count 5
+entry const answer = count 5
+entry const entry = fn () => count 5
 `,
     );
     equal(call(exports, "entry"), (exports.answer as WebAssembly.Global).value);
@@ -367,7 +367,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `const answer = fn () => @u32.add (do:
+      `entry const answer = fn () => @u32.add (do:
   return 20
 ) (do:
   if False:
@@ -384,12 +384,13 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `// header\r\nconst truth = True\r\nconst nothing = ()\r\nconst answer = fn () => (@u32.add\r\n  20\r\n  22) // end`,
+      `// header\r\nentry const truth = True\r\nentry const nothing = ()\r\nentry const answer = fn () => (@u32.add\r\n  20\r\n  22) // end`,
     );
     equal(call(exports, "answer"), 42);
     equal((exports.truth as WebAssembly.Global).value, 1);
     equal((exports.nothing as WebAssembly.Global).value, 0);
-    equal(compiler.compile("// empty").analysis.functions, []);
+    equal(compiler.analyze("// empty").functions, []);
+    rejects(compiler, "// empty", "no_entry");
   },
 );
 
@@ -399,7 +400,7 @@ sourceTest(
     for (const literal of ["4294967295", "0xFFFF_FFFF", "4_294_967_295"]) {
       const { exports } = await instantiate(
         compiler,
-        `const max = fn () => ${literal}`,
+        `entry const max = fn () => ${literal}`,
       );
       equal(call(exports, "max") >>> 0, 0xFFFF_FFFF);
     }
@@ -436,13 +437,15 @@ sourceTest(
     }
     equal(
       compiler.analyze(
-        "const f = fn value => value\nconst reference = fn () => f",
+        "const f = fn value => value\nconst reference = fn () => f\nentry const probe = fn () => do:\n  let kept = reference\n  return 0\n",
       )
         .functions.find((fn) => fn.name === "reference")?.result.$,
       "FunctionTy",
     );
     equal(
-      compiler.analyze("const f = fn value => value\nconst apply = fn f => f 1")
+      compiler.analyze(
+        "const f = fn value => value\nconst apply = fn f => f 1\nentry const probe = fn () => do:\n  let kept = apply\n  return 0\n",
+      )
         .functions.find((fn) => fn.name === "apply")?.parameter.$,
       "FunctionTy",
     );
@@ -537,7 +540,7 @@ sourceTest(
       compiler,
       `effect window.title: U32 -> Unit
 const test_window = @effect.provider window.title (fn _ => ())
-const answer = fn () => do test_window:
+entry const answer = fn () => do test_window:
   use window.title 7
   return 42
 `,
@@ -596,7 +599,7 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      "const monad = fn value => value\nconst try = 42\nconst answer = fn () => monad try",
+      "const monad = fn value => value\nentry const try = 42\nentry const answer = fn () => monad try",
     );
     equal(call(exports, "answer"), 42);
   },
@@ -638,7 +641,7 @@ sourceTest(
 sourceTest(
   "parser reuse does not retain definitions and errors report original source positions",
   (compiler) => {
-    compiler.compile("const old = 1");
+    compiler.compile("entry const old = 1");
     const source = "// comment\nconst entry = fn () => do:\n  return old\n";
     try {
       compiler.compile(source);

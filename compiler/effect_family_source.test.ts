@@ -15,7 +15,7 @@ type State a is effect = {
 }
 type Get a is effect = Unit -> a
 
-const combined = fn () => do:
+entry const combined = fn () => do:
   let (count, (fraction, observed)) = do (@effect.state (State.get U32) (State.set U32) 40):
     return do (@effect.state (State.get F32) (State.set F32) 1.25):
       use old_count <- State.get U32 ()
@@ -27,16 +27,16 @@ const combined = fn () => do:
 
 const integer_get = @effect.provider (Get U32) (fn () => 7)
 const fraction_get = @effect.provider (Get F32) (fn () => 0.5)
-const read_both = fn () => do integer_get:
+entry const read_both = fn () => do integer_get:
   return do fraction_get:
     use integer <- Get U32 ()
     use fraction <- Get F32 ()
     return @f32.add (@u32.to_f32 integer) fraction
 
-const state = fn () => combined ()
-const state_at_compile_time = combined ()
-const single = fn () => read_both ()
-const single_at_compile_time = read_both ()
+entry const state = fn () => combined ()
+entry const state_at_compile_time = combined ()
+entry const single = fn () => read_both ()
+entry const single_at_compile_time = read_both ()
 `;
 
 Deno.test("effect families specialize grouped and single operations by type", async () => {

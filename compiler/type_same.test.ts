@@ -11,12 +11,12 @@ data Count = Count U32
 data Other = Other U32
 data Cell value = Cell value
 const same = fn left => fn right => @type.same left right
-const constructor = same Count (Count 42)
-const nominal = same Count Other
-const generic = same (Cell 1) (Cell 1.0)
-const array = same [1, 2] [42]
-const product = same (1, True) (1.0, True)
-const run = fn () => same (Cell 42) (fn () -> Cell U32 => @panic "witness was called")
+entry const constructor = same Count (Count 42)
+entry const nominal = same Count Other
+entry const generic = same (Cell 1) (Cell 1.0)
+entry const array = same [1, 2] [42]
+entry const product = same (1, True) (1.0, True)
+entry const run = fn () => same (Cell 42) (fn () -> Cell U32 => @panic "witness was called")
 `;
 
 Deno.test("type comparison specializes concrete nominal, generic and structural witnesses", async () => {
@@ -54,7 +54,7 @@ effect Trace: U32 -> U32
 const witness = fn index => do:
   use Trace index
   return fn () -> Count => @panic "witness was called"
-const run = fn (probe: U32 -> U32 ! {Foreign}) => do (@effect.provider Trace probe):
+entry const run = fn (probe: U32 -> U32 ! {Foreign}) => do (@effect.provider Trace probe):
   return @type.same (witness 1) (witness 2)
 `);
     const guest = await instantiateGuest(artifact.bytes);
@@ -82,7 +82,7 @@ Deno.test("type comparison preserves nominal module ownership", async () => {
   const files: Record<string, string> = {
     "file:///types/main.blot": `import { Box as Left } from "./left"
 import { Box as Right } from "./right"
-const run = fn () => @type.same Left Right`,
+entry const run = fn () => @type.same Left Right`,
     "file:///types/left.blot": "data Box = Box U32",
     "file:///types/right.blot": "data Box = Box U32",
   };
@@ -129,7 +129,7 @@ const registered = do:
   builder := register (Cell 3) self
   builder := register (Cell 4.0) self
   return builder
-const run = fn () => do:
+entry const run = fn () => do:
   let Builder { schema } = registered
   return schema.contains(Count)
 `;
@@ -147,7 +147,9 @@ Deno.test("value schemas reject duplicate resource types during const compositio
     throws(
       () =>
         compiler.compile(
-          schemaProgram + "\nconst duplicate = register (Count 9) registered",
+          schemaProgram +
+            "\nconst duplicate = register (Count 9) registered" +
+            "\nentry const probe = fn () => @array.length [duplicate]",
         ),
       (error: unknown) => {
         ok(error instanceof SourceError);
@@ -156,12 +158,14 @@ Deno.test("value schemas reject duplicate resource types during const compositio
         return true;
       },
     );
+    // A generic comparison is library code: only the entry is exported.
     const generic = compiler.compile(
-      "const compare = fn value => @type.same value 1",
+      "const compare = fn value => @type.same value 1\nentry const same = fn () => compare 2",
     );
     equal(
-      WebAssembly.Module.exports(new WebAssembly.Module(generic.bytes)),
-      [],
+      WebAssembly.Module.exports(new WebAssembly.Module(generic.bytes))
+        .map((item) => item.name),
+      ["same"],
     );
   } finally {
     compiler.dispose();
@@ -178,7 +182,7 @@ Deno.test("type comparison updates incremental specialization after a witness ch
       ]] as const
     ) {
       const { artifact } = await compiler.compile(
-        `const run = fn () => @type.same 0 ${witness}`,
+        `entry const run = fn () => @type.same 0 ${witness}`,
       );
       const guest = await instantiateGuest(artifact.bytes);
       try {

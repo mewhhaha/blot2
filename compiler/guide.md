@@ -16,8 +16,10 @@ deno task blot check examples/syntax.blot    # check a source project
 deno task blot build examples/syntax.blot build/example.wasm
 ```
 
-Blot compiles to Wasm; a host loads the module and calls exports. In the sibling
-gdev checkout, `just run` starts Deno Desktop/WebGPU with source hot reload.
+Blot compiles to Wasm; a host loads the module and calls its entrypoints, the
+`entry const` and `entry let` declarations of the file you compile. In the
+sibling gdev checkout, `just run` starts Deno Desktop/WebGPU with source hot
+reload.
 
 ## Layout, names, values, functions
 
@@ -40,14 +42,14 @@ until called with `()`, without memoization. Recursion is supported.
 ```blot
 const twice = fn value => value + value
 const apply_twice = fn transform => fn value => transform (transform value)
-const factorial = fn (value: U32) -> U32 => do:
+entry const factorial = fn (value: U32) -> U32 => do:
   if value <= 1:
     return 1
   return value * factorial (value - 1)
 
-const offset = fn value => value + 1.0
-const answer = fn (value: F32) -> F32 => apply_twice offset (twice value)
-let delayed = fn () => (fn () => factorial 5) ()
+entry const offset = fn value => value + 1.0
+entry const answer = fn (value: F32) -> F32 => apply_twice offset (twice value)
+entry let delayed = fn () => (fn () => factorial 5) ()
 ```
 
 Function inputs and results start as fresh unknown types. Uses constrain them;
@@ -89,7 +91,7 @@ const application = do:
   builder := add_step 12 self
   return builder
 
-const answer = fn () => case application of
+entry const answer = fn () => case application of
   Builder value => value
 ```
 
@@ -102,6 +104,10 @@ Prefer `for` for iteration; reserve recursion for recursive structures and
 algorithms. `for index in start..end:` uses U32 bounds and excludes `end`.
 Reversed/equal bounds run zero iterations. `for pattern in values:` iterates an
 array with an irrefutable pattern. Bounds/the array evaluate once.
+`for let value in values:` spells the binding explicitly. `for start..end:`
+discards the range index. `for ever:` repeats without a bound; the body must
+eventually suspend through a host callback, return from its enclosing `do`, or
+continue running.
 
 An outer local rebound directly in the loop with `:=` carries its new value to
 the next iteration and after the loop. Its type must stay the same across
@@ -112,17 +118,23 @@ local shadowing; put a conditional expression on a carried rebinding's RHS.
 is no `break` or `continue` yet.
 
 ```blot
-const sum_to = fn (end: U32) => do:
+entry const sum_to = fn (end: U32) => do:
   let total = 0
   for index in 0..end:
     total := self + index
   return total
 
-const weighted = fn () => do:
+entry const weighted = fn () => do:
   let total = 0
   for (value, weight) in [(2, 3), (4, 5)]:
     total := self + value * weight
   return total
+
+entry const first_five = fn () => do:
+  let count = 0
+  for 0..5:
+    count := self + 1
+  return count
 ```
 
 ## Data, records, tuples, patterns
@@ -148,7 +160,7 @@ const first = fn (entry: Entry { head: U32, tail: a }) -> U32 => do:
 const number = fn (pair: (Curried U32) Bool) => do:
   let Curried (value, flag) = pair
   return value
-const answer = fn () => first (Entry { head: 42, tail: True })
+entry const answer = fn () => first (Entry { head: 42, tail: True })
 ```
 
 Currying is explicit in the declaration. `Curried U32` remains a constructor;
@@ -172,7 +184,7 @@ failure branch.
 
 ```blot
 type Vec2 is data = Vec2 { x: F32, y: F32 }
-const selected = 7
+entry const selected = 7
 const length = fn position => do:
   let Vec2 { x, y } = position
   return F32.sqrt (x * x + y * y)
@@ -181,11 +193,11 @@ const unpack = fn candidate => do:
     return 0
   return value
 
-const distance = fn () => length (Vec2 { y: 4.0, x: 3.0 })
-const classify = fn (key: U32) => case key, True of
+entry const distance = fn () => length (Vec2 { y: 4.0, x: 3.0 })
+entry const classify = fn (key: U32) => case key, True of
   ^selected, True => unpack (Some 42)
   _, _ => 0
-const conditional = fn () => do:
+entry const conditional = fn () => do:
   if let Some (number, True) = Some (42, True):
     return number
   return 0
@@ -248,11 +260,11 @@ supports F32. Bool/record equality is not automatically derived.
 ```blot
 type Count is data = Count U32
 type Other is data = Other U32
-const same_value = 1 == 2
-const same_type = Type 1 == Type 2
-const same_nominal = Type Count == Type (Count 42)
-const different = Type Count != Type Other
-const compare = fn () => do:
+entry const same_value = 1 == 2
+entry const same_type = Type 1 == Type 2
+entry const same_nominal = Type Count == Type (Count 42)
+entry const different = Type Count != Type Other
+entry const compare = fn () => do:
   let head = Type Count
   let witness = Type (Count 0)
   return head == witness
@@ -263,7 +275,7 @@ type Box a is data = Box a
 const Box.add = fn left => fn right => case left, right of
   Box a, Box b => Box (a + b)
 const twice = fn value => value + value
-const answer = fn (value: F32) => case twice (Box value) of
+entry const answer = fn (value: F32) => case twice (Box value) of
   Box result => result
 ```
 
@@ -307,8 +319,8 @@ Import `std/array` for `generate`, `fill`, `length`, `is_empty`,
 import * as array from "std/array"
 
 const squares = array.generate 4 (fn index => index * index)
-const total = fn () => array.fold_left U32.add 0 squares
-const snapshot = fn () => do:
+entry const total = fn () => array.fold_left U32.add 0 squares
+entry const snapshot = fn () => do:
   let values = [1, 2]
   let original = values
   values[0] := self + 40
@@ -346,15 +358,15 @@ const read_twice = fn () => do:
   return first + second
 
 const reader = @effect.provider (Reader.ask U32) (fn () => 21)
-const mocked = fn () => do reader:
+entry const mocked = fn () => do reader:
   use answer <- read_twice ()
   return answer
 
-const main = fn (read: Unit -> U32 ! {Foreign}) => do (@effect.provider (Reader.ask U32) read):
+entry const main = fn (read: Unit -> U32 ! {Foreign}) => do (@effect.provider (Reader.ask U32) read):
   use answer <- read_twice ()
   return answer
 
-const uses_host = @effect.has (@effect.of main) Foreign
+entry const uses_host = @effect.has (@effect.of main) Foreign
 ```
 
 Const reflection: `@effect.of named_function`, `@effect.descriptor Operation`,
@@ -380,13 +392,13 @@ const increment = fn () => do:
   use State.set U32 (count + 1)
   return count
 
-const counted = fn () => do:
+entry const counted = fn () => do:
   let (next, previous) = do (@effect.state (State.get U32) (State.set U32) 41):
     return increment ()
   return next + previous
 
 const fixed = @effect.provider (Get U32) (fn () => 7)
-const read_fixed = fn () => do fixed:
+entry const read_fixed = fn () => do fixed:
   return Get U32 ()
 ```
 
@@ -418,7 +430,7 @@ const increment = fn () => do:
   let Counter value = counter
   return set (Counter (value + 1))
 
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (Counter next, _) = @effect.run State.get State.set (Counter 41) increment
   return next
 ```
@@ -452,19 +464,43 @@ nullary constructor as `(fn () => Idle)`.
 Imports precede declarations: `import * as math from "./math"` or
 `import { Point as Position, distance } from "./geometry"`. Relative paths may
 omit `.blot`; the CLI maps `std/` to the source library. Cycles are errors.
-Top-level declarations are public by default. Entry bindings become Wasm exports
-when their concrete types fit the guest ABI; generic and structural helpers stay
-available to other Blot modules. Importing a type does not import differently
-named constructors. Imported operator functions need local fixity declarations.
+Top-level declarations are public by default: every declaration of every module
+stays importable. Importing a type does not import differently named
+constructors. Imported operator functions need local fixity declarations.
+
+`entry const` and `entry let` mark host entrypoints. Exactly the entry module's
+entry declarations become Wasm exports, under their own names; a build needs at
+least one, and nothing else is exported. An entry's final type must fit the
+guest ABI: functions over Unit, U32, F32, Bool, Array U32 or Array F32 (or one
+scalar `! {Foreign}` callback) that handle every other effect, and Unit, U32,
+F32 or Bool values. A generic entry, an `Array` value or a function that leaves
+an effect unhandled is an error. Only the entry module reaches the host, so a
+module it imports cannot declare entries. `entry` is contextual: it is a
+modifier only before `const` or `let` at the start of a top-level declaration
+and an ordinary name everywhere else (`fn entry => entry` is fine).
+
+```blot
+const helper = fn (value: U32) => value + 1
+entry const answer = fn () => helper 41
+entry let started: U32 = helper 1
+```
+
+Compilation keeps only what the entries reach. Every declaration is type
+checked, but unreachable ones are never specialized, const-evaluated, run at
+startup or emitted: an unused constant that would panic or exhaust the step
+budget no longer fails the build. Associated dispatch is selected while
+specializing, so a missing implementation such as `True + False` is reported
+only in reachable code.
 
 Functions are ordinary values: write `const name = fn argument => body` or
 `let name = fn argument => body` at the top level. `const name = expression`
 evaluates at compile time under a step budget. `let name = expression`
-initializes once at runtime when the module starts. Compile-time expressions can
-build immutable values, closures, and builders, but cannot do foreign IO.
-`@panic "message"` fails const evaluation or traps in Wasm. Strings currently
-serve literal intrinsic arguments (panic messages/member names), not runtime
-text. There is no general type-valued/comptime reflection beyond the intrinsics.
+initializes once at runtime when the module starts, if an entry reaches it.
+Compile-time expressions can build immutable values, closures, and builders, but
+cannot do foreign IO. `@panic "message"` fails const evaluation or traps in
+Wasm. Strings currently serve literal intrinsic arguments (panic messages/member
+names), not runtime text. There is no general type-valued/comptime reflection
+beyond the intrinsics.
 
 Startup orders `let` initializers by their dependencies and rejects cycles.
 Dependency analysis includes referenced function bodies, even when a function is
@@ -487,8 +523,9 @@ record fields/patterns, array functions, thunks, and `Maybe.bind`/`Result.bind`
 instead.
 
 Hosts use `compiler/guest.ts` and guest ABI 2. Numeric arrays cross as copied
-typed arrays; host callbacks are explicit scalar capabilities. Records, general
-arrays and persistent guest handles are not host ABI values yet. There are no
-implicit window/filesystem/network imports. For details read
-`compiler/guest-abi.md`, `compiler/effects-and-io.md`, `compiler/README.md`, and
-`std/README.md`.
+typed arrays; host callbacks are explicit scalar or numeric-array capabilities.
+Async capabilities suspend a guest invocation without discarding its local
+state. Records, general arrays and persistent guest handles are not host ABI
+values yet. There are no implicit window/filesystem/network imports. For details
+read `compiler/guest-abi.md`, `compiler/effects-and-io.md`,
+`compiler/README.md`, and `std/README.md`.

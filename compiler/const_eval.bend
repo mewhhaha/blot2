@@ -69,6 +69,7 @@ type EvaluationWork is Data:
   Expression{expression: M.Expr}
   ForBounds{index: String, start: Value, end: Value, state: String, initial: Value, body: M.Expr}
   ForIterations{index: String, current: U32, state: String, value: Value, body: M.Expr}
+  ForeverIterations{state: String, value: Value, body: M.Expr}
   GenerateElements{generator: Value, index: U32, reversed: List<&2, Value>}
   CollectValues{}
   MatchArms{arms: List<&2, M.MatchArm<M.Expr>>, values: List<&2, Value>}
@@ -747,6 +748,16 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
         checked : Evaluation <- evaluate_work(depth, rest, Nil{}, remaining, Expression{body}, with_local(with_local(context, index, U32Value{current}), state, value))
         continue_value(checked, successor => next_steps =>
           evaluate_work(depth, rest, Nil{}, next_steps, ForIterations{index, (current + 1 : U32), state, successor, body}, context))
+    case _ _ _ Budget{0n, cells} ForeverIterations{state, value, body}:
+      Fail{M.Diagnostic{"const_budget", "for ever", "compile-time evaluation exhausted its step budget in an unbounded loop"}}
+    case 1n+limit _ _ Budget{1n+remaining, cells} ForeverIterations{+state, value, +body}:
+      remaining = {Budget{remaining, cells} : Budget}
+      do Result<&2, &2, M.Diagnostic, Evaluation>:
+        checked : Evaluation <- evaluate_work(limit, matching_fuel, Nil{}, remaining, Expression{body}, with_local(context, state, value))
+        continue_value(checked, successor => next_steps =>
+          evaluate_work(limit, matching_fuel, Nil{}, next_steps, ForeverIterations{state, successor, body}, context))
+    case 0n _ _ _ ForeverIterations{state, value, body}:
+      Fail{M.Diagnostic{"const_budget", "for ever", "compile-time evaluation exhausted its structural depth in an unbounded loop"}}
     case _ 0n _ _ GenerateElements{generator, index, reversed}:
       Done{Evaluation{ArrayValue{List.reverse(&2, Value, reversed)}, steps}}
     case _ 1n+rest _ Budget{0n, cells} GenerateElements{generator, index, reversed}:
@@ -880,6 +891,11 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
                     prepared : Evaluation <- evaluate_work(limit, U32.to_nat(65536), Nil{}, initial_steps, Expression{initial}, context)
                     continue_value(prepared, value => next_steps =>
                       evaluate_work(limit, U32.to_nat(65536), Nil{}, next_steps, ForBounds{index, first, last, state, value, body}, context))))
+        case M.ForeverExpr{state, initial, body}:
+          do Result<&2, &2, M.Diagnostic, Evaluation>:
+            prepared : Evaluation <- evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), Expression{initial}, context)
+            continue_value(prepared, value => next_steps =>
+              evaluate_work(limit, U32.to_nat(65536), Nil{}, next_steps, ForeverIterations{state, value, body}, context))
         case M.ArrayGenerateExpr{count, generator}:
           do Result<&2, &2, M.Diagnostic, Evaluation>:
             checked : Evaluation <- evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), Expression{count}, context)

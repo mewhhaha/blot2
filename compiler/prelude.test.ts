@@ -95,9 +95,9 @@ preludeTest(
       compiler,
       `
 const make_adder = fn value => fn other => value + other
-const add_forty = make_adder 40
-const expected = add_forty 2
-const answer = fn () => do:
+entry const add_forty = make_adder 40
+entry const expected = add_forty 2
+entry const answer = fn () => do:
   let value = 999
   let increment = make_adder 1
   let result = compose increment add_forty
@@ -120,12 +120,12 @@ preludeTest(
       compiler,
       `
 const stored = Some (U32.add 40)
-const churn = fn (remaining: U32) => do:
+entry const churn = fn (remaining: U32) => do:
   if remaining == 0:
     return ()
 ${allocations}
   use churn (remaining - 1)
-const answer = fn () => do:
+entry const answer = fn () => do:
   use churn 256
   return case stored of
     Some add_forty => add_forty 2
@@ -146,7 +146,7 @@ preludeTest(
       compiler,
       `
 const same = fn value => value
-const answer = fn () => do:
+entry const answer = fn () => do:
   let local_same = fn value => value
   let enabled = same (local_same True)
   if enabled:
@@ -174,11 +174,11 @@ const inspect = fn candidate => case candidate of
   Ok Nothing => 1
   Err True => 2
   Err False => 3
-const some = fn () => inspect (Ok (Some 42))
-const nothing = fn () => inspect (Ok Nothing)
-const failed = fn () => inspect (Err False)
-const mapped_error = fn () => inspect (Result.map_error Bool.not (Err False))
-const bound = fn () => Maybe.unwrap_or 0 (Maybe.bind (Some 41) (fn value => Some (value + 1)))
+entry const some = fn () => inspect (Ok (Some 42))
+entry const nothing = fn () => inspect (Ok Nothing)
+entry const failed = fn () => inspect (Err False)
+entry const mapped_error = fn () => inspect (Result.map_error Bool.not (Err False))
+entry const bound = fn () => Maybe.unwrap_or 0 (Maybe.bind (Some 41) (fn value => Some (value + 1)))
 `,
     );
     equal(call(exports, "some"), 42);
@@ -197,8 +197,8 @@ preludeTest(
       `
 const candidate: Maybe (Result [U32, Bool]) = Some (Ok 42)
 const apply = fn (transform: U32 -> U32) => transform 42
-const answer = fn () => apply (fn value => value)
-const nested = fn () => case candidate of
+entry const answer = fn () => apply (fn value => value)
+entry const nested = fn () => case candidate of
   Some (Ok value) => value
   Some (Err _) => 0
   Nothing => 0
@@ -220,11 +220,11 @@ infixl 70 \`difference\`
 const combine = fn left => fn right => left * 10 + right
 const difference = fn left => fn right => left - right
 const plus = fn left => fn right => left + right
-const precedence = fn () => 2 + 4 * 10
-const right_association = fn () => 1 ++ 2 ++ 3
-const explicit_named = fn () => 20 \`difference\` 3 \`difference\` 2
-const default_named = fn () => 20 \`plus\` 22 * 2
-const applied_named = fn () => identity 20 \`plus\` identity 22
+entry const precedence = fn () => 2 + 4 * 10
+entry const right_association = fn () => 1 ++ 2 ++ 3
+entry const explicit_named = fn () => 20 \`difference\` 3 \`difference\` 2
+entry const default_named = fn () => 20 \`plus\` 22 * 2
+entry const applied_named = fn () => identity 20 \`plus\` identity 22
 `,
     );
     equal(call(exports, "precedence"), 42);
@@ -254,8 +254,8 @@ preludeTest(
       compiler,
       `
 const Bool.not = fn value => value
-const local_not = fn () => Bool.not True
-const prelude_not = fn () => U32.ne 7 7
+entry const local_not = fn () => Bool.not True
+entry const prelude_not = fn () => U32.ne 7 7
 `,
     );
     equal(call(exports, "local_not"), 1);
@@ -270,10 +270,10 @@ preludeTest(
       compiler,
       `
 data Maybe a = Some a | Nothing
-const local_answer = fn () => case Some 42 of
+entry const local_answer = fn () => case Some 42 of
   Some value => value
   Nothing => 0
-const prelude_answer = fn () => Maybe.unwrap_or 0 (Maybe.pure 42)
+entry const prelude_answer = fn () => Maybe.unwrap_or 0 (Maybe.pure 42)
 `,
     );
     equal(call(exports, "local_answer"), 42);

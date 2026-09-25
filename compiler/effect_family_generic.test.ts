@@ -1,3 +1,4 @@
+import { reachedSource } from "./fixtures.ts";
 import {
   deepStrictEqual as equal,
   ok,
@@ -31,24 +32,24 @@ const advance = fn () => do:
   use set (Box (@f32.add amount 0.5))
   return count
 
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (Box count, (Box amount, previous)) = run (Box 40) (fn () =>
     run (Box 1.0) advance)
   return @f32.add (@f32.add (@u32.to_f32 count) amount) (@u32.to_f32 previous)
 
-const custom_reader = fn () => @effect.reader Cell.get (fn () => Box 0) (fn () => Box 7) (fn () => do:
+entry const custom_reader = fn () => @effect.reader Cell.get (fn () => Box 0) (fn () => Box 7) (fn () => do:
   use boxed <- get (fn () => Box 0)
   let Box value = boxed
   return value)
 
-const custom_writer = fn () => do:
+entry const custom_writer = fn () => do:
   let (Box written, answer) = run (Box 0) (fn () =>
     @effect.writer Cell.set (fn () => Box 0) (fn value => set value) (fn () => do:
       use set (Box 42)
       return 42))
   return @u32.add answer written
 
-const constant_answer = answer ()
+entry const constant_answer = answer ()
 `;
 
 Deno.test("generic effect operations infer state arguments from ordinary wrappers", async () => {
@@ -110,13 +111,13 @@ const answer: Unit -> U32 = fn () => Cell ()`,
       ] as const
     ) {
       let expected: SourceError | undefined;
-      throws(() => reference.compile(invalid), (error) => {
+      throws(() => reference.compile(reachedSource(invalid)), (error) => {
         ok(error instanceof SourceError, String(error));
         equal(error.code, code);
         expected = error;
         return true;
       });
-      await rejects(() => native.compile(invalid), (error) => {
+      await rejects(() => native.compile(reachedSource(invalid)), (error) => {
         ok(error instanceof SourceError, String(error));
         ok(expected);
         equal(
@@ -138,7 +139,7 @@ Deno.test("generic effect bridge preserves imported operation identity", async (
       `import { Cell as LocalCell } from "./cell"
 const get = fn (witness: a) -> a => LocalCell.get ()
 const run = fn initial => fn action => @effect.run LocalCell.get LocalCell.set initial action
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (next, previous) = run 41 (fn () => get 0)
   return @u32.add next previous
 `,
@@ -187,7 +188,7 @@ Deno.test("hot reload invalidates edited generic effect signatures", async () =>
   set: a -> Unit
 }
 const get = fn (witness: a) -> a => Cell.get ()
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (next, previous) = @effect.run Cell.get Cell.set 41 (fn () => get 0)
   return @u32.add next previous
 `;

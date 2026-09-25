@@ -93,6 +93,8 @@ def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, 
       Done{ReferenceStep{PendingReference{rest, Expressions{elements}} <> pending, reversed}}
     case 1n+rest Expression{M.ForExpr{index, start, end, state, initial, body}}:
       Done{ReferenceStep{PendingReference{rest, Expressions{[start, end, initial, body]}} <> pending, reversed}}
+    case 1n+rest Expression{M.ForeverExpr{state, initial, body}}:
+      Done{ReferenceStep{PendingReference{rest, Expressions{[initial, body]}} <> pending, reversed}}
     case 1n+rest Expression{M.ArrayGenerateExpr{count, generator}}:
       Done{ReferenceStep{PendingReference{rest, Expressions{[count, generator]}} <> pending, reversed}}
     case 1n+rest Expression{M.ArrayFillExpr{count, value}}:

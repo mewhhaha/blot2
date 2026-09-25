@@ -17,12 +17,12 @@ const Entry.contains = fn entry => fn witness => do:
 const schema = Entry { head: True, tail: Entry { head: 7, tail: End } }
 `;
 const main = `import * as s from "./schema"
-const answer_bool = s.schema.contains(True)
-const answer_u32 = s.schema.contains(7)
-const answer_f32 = s.schema.contains(1.0)
-const ask_bool = fn () => answer_bool
-const ask_u32 = fn () => answer_u32
-const ask_f32 = fn () => answer_f32
+entry const answer_bool = s.schema.contains(True)
+entry const answer_u32 = s.schema.contains(7)
+entry const answer_f32 = s.schema.contains(1.0)
+entry const ask_bool = fn () => answer_bool
+entry const ask_u32 = fn () => answer_u32
+entry const ask_f32 = fn () => answer_f32
 `;
 const edit = (before: string, after: string) => {
   ok(schema.includes(before));
@@ -102,7 +102,7 @@ for (const threads of [1, 4]) {
       equal(await answers(same.artifact.bytes), [1, 1, 0]);
 
       // A no-template project exercises the direct selection fast path.
-      files.set(entry.href, "const answer = fn () => 7\n");
+      files.set(entry.href, "entry const answer = fn () => 7\n");
       equal(
         (await session.compile(entry)).artifact.bytes,
         (await clean()).bytes,

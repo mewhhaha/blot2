@@ -27,7 +27,7 @@ const launch = fn io => do:
 
 // The single host callback uses disjoint scalar command ranges. The wrappers
 // grant only the specific operations needed by each guest capability record.
-const main = fn (dispatch: U32 -> U32 ! {Foreign}) => do:
+entry const main = fn (dispatch: U32 -> U32 ! {Foreign}) => do:
   let set_title = fn title_id => do:
     if title_id >= 1000:
       return 1
@@ -44,7 +44,7 @@ const main = fn (dispatch: U32 -> U32 ! {Foreign}) => do:
   })
   return status
 
-const render_only = fn (submit: U32 -> U32 ! {Foreign}) =>
+entry const render_only = fn (submit: U32 -> U32 ! {Foreign}) =>
   render_frame (RenderIo { submit }) 42
 
-const uses_host = @effect.has (@effect.of main) Foreign
+entry const uses_host = @effect.has (@effect.of main) Foreign

@@ -75,6 +75,8 @@ def children(expression: M.Expr) -> List<&2, M.Expr>:
       elements
     case M.ForExpr{index, start, end, state, initial, body}:
       [start, end, initial, body]
+    case M.ForeverExpr{state, initial, body}:
+      [initial, body]
     case M.ArrayGenerateExpr{count, generator}:
       [count, generator]
     case M.ArrayFillExpr{count, value}:
@@ -153,6 +155,11 @@ def free(+fuel: Nat, work: FreeWork) -> Result<&2, &2, M.Diagnostic, List<&2, St
           do Result<&2, &2, M.Diagnostic, List<&2, String>>:
             a : List<&2, String> <- free(rest, ExpressionsWork{[start, end, initial], bound})
             b : List<&2, String> <- free(rest, ExpressionWork{body, index <> state <> bound})
+            return union(a, b)
+        case ExpressionWork{M.ForeverExpr{state, initial, body}, +bound}:
+          do Result<&2, &2, M.Diagnostic, List<&2, String>>:
+            a : List<&2, String> <- free(rest, ExpressionWork{initial, bound})
+            b : List<&2, String> <- free(rest, ExpressionWork{body, state <> bound})
             return union(a, b)
         case ExpressionWork{M.UseExpr{name, value, body}, +bound}:
           do Result<&2, &2, M.Diagnostic, List<&2, String>>:

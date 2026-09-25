@@ -26,6 +26,7 @@
     "index",
     "kind",
     "labels",
+    "modifier",
     "name",
     "operations",
     "operator",

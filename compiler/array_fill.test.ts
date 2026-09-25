@@ -4,24 +4,28 @@ import { createNativeIncrementalCompiler } from "./native_incremental.ts";
 import { createSourceCompiler } from "./source.ts";
 import { SourceError } from "./syntax.ts";
 
+// Const evaluation only runs for declarations an entry reaches.
+const probe = (name: string) =>
+  `entry const probe = fn () => do:\n  let kept = ${name}\n  return 0\n`;
+
 const source = `
-const seed = 20
+entry const seed = 20
 const filled = @array.fill 3 seed
 const callbacks = @array.fill 2 (fn value => value + 2)
-const count = @array.length filled
-const constant = (@array.get callbacks 1) 40
-const empty = fn () => @array.length (@array.fill 0 True)
-const high = fn (count: U32) => @array.get (@array.fill count 4294967295) 0
-const size = fn (count: U32) => @array.length (@array.fill count 7)
-const closures = fn () => do:
+entry const count = @array.length filled
+entry const constant = (@array.get callbacks 1) 40
+entry const empty = fn () => @array.length (@array.fill 0 True)
+entry const high = fn (count: U32) => @array.get (@array.fill count 4294967295) 0
+entry const size = fn (count: U32) => @array.length (@array.fill count 7)
+entry const closures = fn () => do:
   let offset = 2
   let functions = @array.fill 2 (fn value => value + offset)
   return (@array.get functions 1) 40
-const unchanged = fn () => do:
+entry const unchanged = fn () => do:
   let original = @array.fill 2 (@array.fill 2 seed)
   let changed = @array.set (@array.get original 0) 1 22
   return @array.get (@array.get original 1) 1 + @array.get changed 1
-const float = fn () => @array.get (@array.fill 2 1.25) 1
+entry const float = fn () => @array.get (@array.fill 2 1.25) 1
 `;
 
 async function exercise(bytes: Uint8Array<ArrayBuffer>) {
@@ -99,16 +103,19 @@ Deno.test("array fill validates counts, arity, limits and const budgets", async 
         ['const invalid = @array.fill 0 (@panic "eager value")', "const_panic"],
       ]
     ) {
-      throws(() => compiler.compile(`${text}\n`), (error) => {
-        ok(error instanceof SourceError, String(error));
-        equal(error.code, code, error.message);
-        if (text.includes("count first")) {
-          ok(error.message.includes("count first"));
-        }
-        return true;
-      });
+      throws(
+        () => compiler.compile(`${text}\n${probe("invalid")}`),
+        (error) => {
+          ok(error instanceof SourceError, String(error));
+          equal(error.code, code, error.message);
+          if (text.includes("count first")) {
+            ok(error.message.includes("count first"));
+          }
+          return true;
+        },
+      );
     }
-    const fill = "const filled = @array.fill 3 42\n";
+    const fill = "const filled = @array.fill 3 42\n" + probe("filled");
     const result = compiler.analyze(fill, { const_steps: 9n });
     equal(result.remaining_steps, 0n);
     throws(() => compiler.analyze(fill, { const_steps: 8n }), (error) => {

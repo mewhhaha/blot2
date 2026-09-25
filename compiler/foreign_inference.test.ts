@@ -27,6 +27,14 @@ const foreignRow = {
   tail: { $: "ClosedRow" as const },
 };
 
+// Analysis lists what an entry reaches; the probe keeps the inspected
+// declarations reachable without calling them.
+function keep(...names: string[]) {
+  return "entry const probe = fn () => do:\n" +
+    names.map((name, index) => `  let kept_${index} = ${name}\n`).join("") +
+    "  return 0\n";
+}
+
 function signature(analysis: Analysis, name: string) {
   const found = analysis.functions.find((fn) => fn.name === name);
   ok(found, `missing function ${name}`);
@@ -123,9 +131,9 @@ const twice = fn (io: U32 -> U32 ! {Foreign}) => do:
   return io first
 const requirements = @effect.of twice
 const descriptor = @effect.descriptor Foreign
-const count = @effect.count requirements
-const has_foreign = @effect.has requirements Foreign
-const same = @effect.same descriptor (@effect.descriptor Foreign)
+entry const count = @effect.count requirements
+entry const has_foreign = @effect.has requirements Foreign
+entry const same = @effect.same descriptor (@effect.descriptor Foreign)
 `);
     equal(signature(analysis, "call").effect_row, foreignRow);
     equal(signature(analysis, "twice").effect_row, foreignRow);
@@ -156,7 +164,7 @@ Deno.test("Foreign callback evaluation cannot hide in pure let, const, or pure-a
     }, {
       code: "const_effect",
       source: `const callback: U32 -> U32 ! {Foreign} = fn value => value
-const denied = callback 1
+entry const denied = callback 1
 `,
     }, {
       code: "effect_mismatch",
@@ -181,7 +189,7 @@ Deno.test("Foreign remains latent when a callback is retained in a returned clos
   try {
     const analysis = compiler.analyze(`
 const retain = fn (io: U32 -> U32 ! {Foreign}) => fn value => io value
-`);
+${keep("retain")}`);
     const retained = signature(analysis, "retain");
     equal(retained.effect_row, emptyRow());
     ok(retained.result.$ === "FunctionTy");
@@ -198,7 +206,7 @@ Deno.test("closed row suffixes annotate the outermost arrow unless grouped", asy
 const outer = fn (io: U32 -> U32 -> U32 ! {Foreign}) => ()
 const inner = fn (io: U32 -> (U32 -> U32 ! {Foreign})) => ()
 const explicitly_pure = fn (io: U32 -> U32 ! {}) => io 1
-`);
+${keep("outer", "inner", "explicitly_pure")}`);
     const outer = signature(analysis, "outer").parameter;
     const inner = signature(analysis, "inner").parameter;
     ok(outer.$ === "FunctionTy" && outer.result.$ === "FunctionTy");
@@ -225,7 +233,7 @@ const supplied = fn (callback: U32 -> U32 ! {Reader.ask}) => do provider:
 data Callback = Callback (U32 -> U32 ! {Foreign})
 const unwrap = fn wrapped => case wrapped of
   Callback io => io
-`);
+${keep("mixed", "supplied", "unwrap")}`);
     equal(signature(analysis, "mixed").effect_row.operations, [
       foreign,
       { $: "TypeId", module_name: "main", declaration: "Reader.ask" },
@@ -282,8 +290,8 @@ Deno.test("closed row annotation edits invalidate reflected constants without st
 effect Reader.ask: U32 -> U32
 const call = fn (callback: U32 -> U32 ! {${labels}}) => callback 1
 const requirements = @effect.of call
-const count = @effect.count requirements
-const has_foreign = @effect.has requirements Foreign
+entry const count = @effect.count requirements
+entry const has_foreign = @effect.has requirements Foreign
 `;
       const result = await incremental.compile(source);
       const expected = clean.compile(source);

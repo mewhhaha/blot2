@@ -5,7 +5,7 @@ import ./wasm_catalog.bend as E
 import ./index.bend as Index
 
 type Metadata is Data:
-  Metadata{lambdas: Map<&2, Maybe<&2, F.Lambda>>, constructors: Map<&2, Maybe<&2, E.ConstructorSlot>>}
+  Metadata{lambdas: Map<&2, Maybe<&2, F.Lambda>>, constructors: Map<&2, Maybe<&2, E.ConstructorSlot>>, safe_loops: Set()}
 
 def lambda_index_go(lambdas: List<&2, F.Lambda>, indexed: Map<&2, Maybe<&2, F.Lambda>>) -> Map<&2, Maybe<&2, F.Lambda>>:
   match lambdas:
@@ -15,15 +15,23 @@ def lambda_index_go(lambdas: List<&2, F.Lambda>, indexed: Map<&2, Maybe<&2, F.La
       lambda_index_go(tail, Map.set(&2, Maybe<&2, F.Lambda>, indexed, Nat.show(identity), Some{F.Lambda{identity, parameter, body, captures}}))
 
 def metadata(lambdas: List<&2, F.Lambda>, constructors: Map<&2, Maybe<&2, E.ConstructorSlot>>) -> Metadata:
-  Metadata{lambda_index_go(List.reverse(&2, F.Lambda, lambdas), Map.new(&2, Maybe<&2, F.Lambda>)), constructors}
+  Metadata{lambda_index_go(List.reverse(&2, F.Lambda, lambdas), Map.new(&2, Maybe<&2, F.Lambda>)), constructors, Set.new()}
 
 def metadata_lambdas(projection: Metadata) -> Map<&2, Maybe<&2, F.Lambda>>:
-  Metadata{lambdas, constructors} = projection
+  Metadata{lambdas, constructors, safe_loops} = projection
   lambdas
 
 def metadata_constructors(projection: Metadata) -> Map<&2, Maybe<&2, E.ConstructorSlot>>:
-  Metadata{lambdas, constructors} = projection
+  Metadata{lambdas, constructors, safe_loops} = projection
   constructors
+
+def with_safe_loops(projection: Metadata, entries: Set()) -> Metadata:
+  Metadata{lambdas, constructors, previous} = projection
+  Metadata{lambdas, constructors, entries}
+
+def safe_loop_entry(projection: Metadata, key: String) -> Bool:
+  Metadata{lambdas, constructors, safe_loops} = projection
+  Maybe.is_some(&2, Unit, Index.find(Unit, safe_loops, key))
 
 def lambda_get(indexed: Map<&2, Maybe<&2, F.Lambda>>, identity: Nat) -> Maybe<&2, F.Lambda>:
   Index.get(Maybe<&2, F.Lambda>, indexed, Nat.show(identity), None{})
@@ -59,6 +67,7 @@ type Expr is Data:
   ProjectExpr{value: Expr, index: Nat}
   ArrayExpr{elements: List<&2, Expr>}
   ForExpr{index: String, start: Expr, end: Expr, state: String, initial: Expr, body: Expr}
+  ForeverExpr{state: String, initial: Expr, body: Expr, compact: Bool}
   ArrayGenerateExpr{count: Expr, generator: Expr}
   ArrayFillExpr{count: Expr, value: Expr}
   ArrayGetExpr{array: Expr, index: Expr}
@@ -148,6 +157,8 @@ def rebuild(original: M.Expr, children: List<&2, Expr>) -> Result<&2, &2, M.Diag
       Done{ArrayExpr{children}}
     case M.ForExpr{index, start, end, state, initial, body} a <> b <> c <> d <> Nil{}:
       Done{ForExpr{index, a, b, state, c, d}}
+    case M.ForeverExpr{state, initial, body} a <> b <> Nil{}:
+      Done{ForeverExpr{state, a, b, False{}}}
     case M.ArrayGenerateExpr{count, generator} c <> v <> Nil{}:
       Done{ArrayGenerateExpr{c, v}}
     case M.ArrayFillExpr{count, value} c <> v <> Nil{}:
@@ -202,14 +213,48 @@ def rebuild(original: M.Expr, children: List<&2, Expr>) -> Result<&2, &2, M.Diag
     case _ _:
       Fail{invalid()}
 
-def lower(+fuel: Nat, work: Work, +projection: Metadata) -> Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
+# Explicit checked array annotations provide the carry representation without
+# leaking source annotations into codegen cache keys. Other loop state shapes
+# keep the ordinary allocator behavior.
+def flat_annotation(fuel: Nat, expression: M.Expr) -> Bool:
+  match fuel expression:
+    case 0n _:
+      False{}
+    case 1n+rest M.SourceExpr{offset, Some{M.ArrayTy{M.F32Ty{}}}, value}:
+      True{}
+    case 1n+rest M.SourceExpr{offset, Some{M.ArrayTy{M.U32Ty{}}}, value}:
+      True{}
+    case 1n+rest M.SourceExpr{offset, annotation, value}:
+      flat_annotation(rest, value)
+    case _ _:
+      False{}
+
+def flat_carry(fuel: Nat, expression: M.Expr, +arrays: Set()) -> Bool:
+  match fuel expression:
+    case 0n _:
+      False{}
+    case 1n+rest M.LocalExpr{name}:
+      Maybe.is_some(&2, Unit, Index.find(Unit, arrays, name))
+    case 1n+rest M.SourceExpr{offset, annotation, value}:
+      flat_carry(rest, value, arrays)
+    case _ _:
+      False{}
+
+def provider_free(expression: M.Expr) -> Bool:
+  match expression:
+    case M.HandleExpr{provider, body}:
+      False{}
+    case _:
+      True{}
+
+def lower(+fuel: Nat, work: Work, +projection: Metadata, +arrays: Set(), +isolated: Bool) -> Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
   match fuel work:
     case 0n _:
       Fail{M.Diagnostic{"backend_limit", "codegen", "runtime projection exceeded its structural depth limit"}}
     case 1n+rest ExpressionWork{M.RuntimeInitExpr{value}}:
-      lower(rest, ExpressionWork{value}, projection)
+      lower(rest, ExpressionWork{value}, projection, arrays, isolated)
     case 1n+rest ExpressionWork{M.SourceExpr{offset, annotation, value}}:
-      lower(rest, ExpressionWork{value}, projection)
+      lower(rest, ExpressionWork{value}, projection, arrays, isolated)
     case 1n+rest ExpressionWork{M.LambdaExpr{+identity, parameter, parameter_type, result_type, body}}:
       do Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
         reference : Expr <- closure_reference(lambda_get(metadata_lambdas(projection), identity), identity)
@@ -218,20 +263,41 @@ def lower(+fuel: Nat, work: Work, +projection: Metadata) -> Result<&2, &2, M.Dia
       do Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
         reference : Expr <- constructor_reference(E.constructor_get(metadata_constructors(projection), constructor), constructor)
         return [reference]
-    case 1n+rest ExpressionWork{+expression}:
+    case 1n+rest ExpressionWork{M.LetExpr{+name, +value, body}}:
+      +nested = Bool.pick(Set(), flat_annotation(16384n, value), Set.add(arrays, name), arrays)
       do Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
-        children : List<&2, Expr> <- lower(rest, ExpressionsWork{F.children(expression), Nil{}}, projection)
+        values : List<&2, Expr> <- lower(rest, ExpressionWork{value}, projection, arrays, isolated)
+        v : Expr <- one(values)
+        bodies : List<&2, Expr> <- lower(rest, ExpressionWork{body}, projection, nested, isolated)
+        b : Expr <- one(bodies)
+        return [LetExpr{name, v, b}]
+    case 1n+rest ExpressionWork{M.ForeverExpr{state, +initial, body}}:
+      +compact = Bool.and(isolated, flat_carry(16384n, initial, arrays))
+      do Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
+        values : List<&2, Expr> <- lower(rest, ExpressionWork{initial}, projection, arrays, isolated)
+        v : Expr <- one(values)
+        bodies : List<&2, Expr> <- lower(rest, ExpressionWork{body}, projection, arrays, isolated)
+        b : Expr <- one(bodies)
+        return [ForeverExpr{state, v, b, compact}]
+    case 1n+rest ExpressionWork{+expression}:
+      # State providers can retain iteration allocations independently of carry.
+      +safe = Bool.and(isolated, provider_free(expression))
+      do Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
+        children : List<&2, Expr> <- lower(rest, ExpressionsWork{F.children(expression), Nil{}}, projection, arrays, safe)
         prepared : Expr <- rebuild(expression, children)
         return [prepared]
     case 1n+rest ExpressionsWork{Nil{}, reversed}:
       Done{List.reverse(&2, Expr, reversed)}
     case 1n+rest ExpressionsWork{head <> tail, reversed}:
       do Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
-        first : List<&2, Expr> <- lower(rest, ExpressionWork{head}, projection)
+        first : List<&2, Expr> <- lower(rest, ExpressionWork{head}, projection, arrays, isolated)
         prepared : Expr <- one(first)
-        lower(rest, ExpressionsWork{tail, prepared <> reversed}, projection)
+        lower(rest, ExpressionsWork{tail, prepared <> reversed}, projection, arrays, isolated)
+
+def prepare_scoped(expression: M.Expr, projection: Metadata, isolated: Bool) -> Result<&2, &2, M.Diagnostic, Expr>:
+  do Result<&2, &2, M.Diagnostic, Expr>:
+    result : List<&2, Expr> <- lower(U32.to_nat(16384), ExpressionWork{expression}, projection, Set.new(), isolated)
+    one(result)
 
 def prepare(expression: M.Expr, projection: Metadata) -> Result<&2, &2, M.Diagnostic, Expr>:
-  do Result<&2, &2, M.Diagnostic, Expr>:
-    result : List<&2, Expr> <- lower(U32.to_nat(16384), ExpressionWork{expression}, projection)
-    one(result)
+  prepare_scoped(expression, projection, False{})

@@ -61,7 +61,7 @@ def result(ty: M.Ty, selection: Selection) -> Bool:
 def parameter(ty: M.Ty, selection: Selection) -> Bool:
   match ty selection:
     case M.FunctionTy{input, output, row} Resolved{}:
-      Bool.and(callback_row(row), Bool.and(scalar(input), scalar(output)))
+      Bool.and(callback_row(row), Bool.and(value(input), value(output)))
     case M.FunctionTy{input, output, row} Candidates{}:
       Bool.and(result(input, Candidates{}), result(output, Candidates{}))
     case other mode:

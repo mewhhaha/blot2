@@ -9,14 +9,14 @@ const programs = [
     source: `
 effect Value.read: Unit -> F32
 effect Value.write: F32 -> Unit
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (next, previous) = do (@effect.state Value.read Value.write 1.25):
     use value <- Value.read ()
     use Value.write (@f32.add value 2.5)
     return value
   return @f32.add next previous
-const run = fn () => answer ()
-const expected = answer ()
+entry const run = fn () => answer ()
+entry const expected = answer ()
 `,
     expected: 5,
   },
@@ -34,12 +34,12 @@ const twice = fn action => do:
   use first <- action ()
   use second <- action ()
   return @u32.add first second
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (next, total) = do counter:
     return twice increment
   return @u32.add next total
-const run = fn () => answer ()
-const expected = answer ()
+entry const run = fn () => answer ()
+entry const expected = answer ()
 `,
     expected: 33,
   },
@@ -50,7 +50,7 @@ effect Counter.read: Unit -> U32
 effect Counter.write: U32 -> Unit
 effect Other.read: Unit -> U32
 effect Other.write: U32 -> Unit
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (outer, (other, inner)) = do (@effect.state Counter.read Counter.write 10):
     return do (@effect.state Other.read Other.write 20):
       use nested_result <- do (@effect.state Counter.read Counter.write 1):
@@ -64,8 +64,8 @@ const answer = fn () => do:
       use Counter.write (@u32.add current 4)
       return @u32.add nested observed
   return @u32.add outer (@u32.add other inner)
-const run = fn () => answer ()
-const expected = answer ()
+entry const run = fn () => answer ()
+entry const expected = answer ()
 `,
     expected: 59,
   },
@@ -80,7 +80,7 @@ const doubled = fn () => do:
   return @u32.mul value 2
 const doubling = @effect.provider Counter.read doubled
 const input = @effect.provider Input.read (fn () => 3)
-const answer = fn () => do input:
+entry const answer = fn () => do input:
   use completed <- do (@effect.state Counter.read Counter.write 5):
     use observed <- do doubling:
       use value <- Counter.read ()
@@ -91,8 +91,8 @@ const answer = fn () => do input:
     return @u32.add current observed
   let (state, result) = completed
   return @u32.add state result
-const run = fn () => answer ()
-const expected = answer ()
+entry const run = fn () => answer ()
+entry const expected = answer ()
 `,
     expected: 36,
   },
@@ -107,14 +107,14 @@ const replace = fn () => do:
   use before <- Values.read ()
   use Values.write (@array.set before 0 99)
   return @array.get before 0
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (next, before) = do values:
     return replace ()
   let (fresh, ignored) = do values:
     return ()
   return @u32.add (@array.get next 0) (@u32.add before (@array.get fresh 0))
-const run = fn () => answer ()
-const expected = answer ()
+entry const run = fn () => answer ()
+entry const expected = answer ()
 `,
     expected: 119,
   },
@@ -123,7 +123,7 @@ const expected = answer ()
     source: `
 effect Counter.read: Unit -> U32
 effect Counter.write: U32 -> Unit
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (ignored, delayed) = do (@effect.state Counter.read Counter.write 999):
     return fn () => Counter.read ()
   let (next, result) = do (@effect.state Counter.read Counter.write 1):
@@ -132,8 +132,8 @@ const answer = fn () => do:
       use Counter.write (@u32.add value index)
     return delayed ()
   return @u32.add next result
-const run = fn () => answer ()
-const expected = answer ()
+entry const run = fn () => answer ()
+entry const expected = answer ()
 `,
     expected: 14,
   },

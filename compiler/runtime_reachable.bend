@@ -10,7 +10,7 @@ type Catalog is Data:
   Catalog{functions: Map<&2, Maybe<&2, M.CheckedFunction>>, constants: Map<&2, Maybe<&2, C.Value>>, initializers: Map<&2, Init.Initializer>}
 
 type State is Data:
-  State{visited: Map<&2, Bool>, lambda_ids: Map<&2, Bool>, lambdas: List<&2, F.Lambda>}
+  State{visited: Map<&2, Bool>, lambda_ids: Map<&2, Bool>, lambdas: List<&2, F.Lambda>, constructors: Set(), operations: Set()}
 
 type Work is Data:
   FunctionWork{name: String}
@@ -26,7 +26,7 @@ type Step is Data:
   Step{pending: List<&2, Work>, state: State}
 
 type Runtime is Data:
-  Runtime{checked: M.CheckedModule, constants: List<&2, C.Binding<C.Value>>, lambdas: List<&2, F.Lambda>}
+  Runtime{checked: M.CheckedModule, constants: List<&2, C.Binding<C.Value>>, lambdas: List<&2, F.Lambda>, constructors: Set(), operations: Set()}
 
 def function_index(functions: List<&2, M.CheckedFunction>, indexed: Map<&2, Maybe<&2, M.CheckedFunction>>) -> Map<&2, Maybe<&2, M.CheckedFunction>>:
   match functions:
@@ -43,21 +43,29 @@ def constant_index(constants: List<&2, C.Binding<C.Value>>, indexed: Map<&2, May
       constant_index(tail, Map.set(&2, Maybe<&2, C.Value>, indexed, name, Some{value}))
 
 def seen(state: State, name: String) -> Bool:
-  State{visited, lambda_ids, lambdas} = state
+  State{visited, lambda_ids, lambdas, constructors, operations} = state
   Index.get(Bool, visited, name, False{})
 
 def mark(state: State, name: String) -> State:
-  State{visited, lambda_ids, lambdas} = state
-  State{Map.set(&2, Bool, visited, name, True{}), lambda_ids, lambdas}
+  State{visited, lambda_ids, lambdas, constructors, operations} = state
+  State{Map.set(&2, Bool, visited, name, True{}), lambda_ids, lambdas, constructors, operations}
 
 def lambda_seen(state: State, identity: Nat) -> Bool:
-  State{visited, lambda_ids, lambdas} = state
+  State{visited, lambda_ids, lambdas, constructors, operations} = state
   Index.get(Bool, lambda_ids, Nat.show(identity), False{})
 
 def add_lambda(state: State, lambda: F.Lambda) -> State:
-  State{visited, lambda_ids, lambdas} = state
+  State{visited, lambda_ids, lambdas, constructors, operations} = state
   F.Lambda{+identity, parameter, body, captures} = lambda
-  State{visited, Map.set(&2, Bool, lambda_ids, Nat.show(identity), True{}), F.Lambda{identity, parameter, body, captures} <> lambdas}
+  State{visited, Map.set(&2, Bool, lambda_ids, Nat.show(identity), True{}), F.Lambda{identity, parameter, body, captures} <> lambdas, constructors, operations}
+
+def use_constructor(state: State, name: String) -> State:
+  State{visited, lambda_ids, lambdas, constructors, operations} = state
+  State{visited, lambda_ids, lambdas, Set.add(constructors, name), operations}
+
+def use_operation(state: State, identity: M.TypeId) -> State:
+  State{visited, lambda_ids, lambdas, constructors, operations} = state
+  State{visited, lambda_ids, lambdas, constructors, Set.add(operations, I.operation_key(identity))}
 
 def function_value(catalog: Catalog, name: String) -> Maybe<&2, M.CheckedFunction>:
   Catalog{functions, constants, initializers} = catalog
@@ -150,6 +158,14 @@ def walk_steps(fuel: Nat, step: Result<&2, &2, M.Diagnostic, Step>, +catalog: Ca
       walk_steps(rest, Done{Step{FunctionWork{callee} <> ExpressionWork{argument} <> pending, state}}, catalog)
     case 1n+rest Done{Step{ExpressionWork{M.ConstantExpr{name}} <> pending, state}}:
       walk_steps(rest, Done{Step{ConstantWork{name} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ExpressionWork{M.ConstructorRefExpr{name}} <> pending, state}}:
+      walk_steps(rest, Done{Step{pending, use_constructor(state, name)}}, catalog)
+    case 1n+rest Done{Step{ExpressionWork{M.OperationExpr{identity}} <> pending, state}}:
+      walk_steps(rest, Done{Step{pending, use_operation(state, identity)}}, catalog)
+    case 1n+rest Done{Step{ExpressionWork{M.ProviderExpr{identity, implementation}} <> pending, state}}:
+      walk_steps(rest, Done{Step{ExpressionWork{implementation} <> pending, use_operation(state, identity)}}, catalog)
+    case 1n+rest Done{Step{ExpressionWork{M.StateProviderExpr{read, write, initial}} <> pending, state}}:
+      walk_steps(rest, Done{Step{ExpressionWork{initial} <> pending, use_operation(use_operation(state, read), write)}}, catalog)
     case 1n+rest Done{Step{ExpressionWork{M.LambdaExpr{+identity, parameter, parameter_type, result_type, body}} <> pending, +state}}:
       walk_steps(rest, expanded_step(visit_lambda(lambda_seen(state, identity), identity, parameter, body, None{}, state), pending), catalog)
     case 1n+rest Done{Step{ExpressionWork{M.OperationDescriptorExpr{identity}} <> pending, state}}:
@@ -188,6 +204,10 @@ def walk_steps(fuel: Nat, step: Result<&2, &2, M.Diagnostic, Step>, +catalog: Ca
       walk_steps(rest, Done{Step{ExpressionWork{head} <> ExpressionsWork{tail} <> pending, state}}, catalog)
     case 1n+rest Done{Step{ValueWork{C.FunctionValue{name}} <> pending, state}}:
       walk_steps(rest, Done{Step{FunctionWork{name} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.ConstructorFunctionValue{name}} <> pending, state}}:
+      walk_steps(rest, Done{Step{pending, use_constructor(state, name)}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.OperationValue{identity}} <> pending, state}}:
+      walk_steps(rest, Done{Step{pending, use_operation(state, identity)}}, catalog)
     case 1n+rest Done{Step{ValueWork{C.ClosureValue{+identity, parameter, body, environment}} <> pending, +state}}:
       walk_steps(rest, expanded_step(visit_lambda(lambda_seen(state, identity), identity, parameter, body, Some{environment}, state), pending), catalog)
     case 1n+rest Done{Step{ValueWork{C.DataValue{constructor, Some{payload}}} <> pending, state}}:
@@ -197,9 +217,9 @@ def walk_steps(fuel: Nat, step: Result<&2, &2, M.Diagnostic, Step>, +catalog: Ca
     case 1n+rest Done{Step{ValueWork{C.ArrayValue{elements}} <> pending, state}}:
       walk_steps(rest, Done{Step{ValuesWork{elements} <> pending, state}}, catalog)
     case 1n+rest Done{Step{ValueWork{C.StateProviderValue{read, write, initial}} <> pending, state}}:
-      walk_steps(rest, Done{Step{ValueWork{initial} <> pending, state}}, catalog)
+      walk_steps(rest, Done{Step{ValueWork{initial} <> pending, use_operation(use_operation(state, read), write)}}, catalog)
     case 1n+rest Done{Step{ValueWork{C.ProviderValue{identity, implementation}} <> pending, state}}:
-      walk_steps(rest, Done{Step{ValueWork{implementation} <> pending, state}}, catalog)
+      walk_steps(rest, Done{Step{ValueWork{implementation} <> pending, use_operation(state, identity)}}, catalog)
     case 1n+rest Done{Step{ValueWork{C.EffectDescriptorValue{identity}} <> pending, state}}:
       Fail{I.const_only()}
     case 1n+rest Done{Step{ValueWork{C.EffectSetValue{operations}} <> pending, state}}:
@@ -265,12 +285,20 @@ def keep_bindings(constants: List<&2, C.Binding<C.Value>>, +state: State) -> Lis
       Bool.pick(List<&2, C.Binding<C.Value>>, seen(state, "const:" ++ name), C.Binding{name, value} <> remaining, remaining)
 
 def reached_lambdas(state: State) -> List<&2, F.Lambda>:
-  State{visited, lambda_ids, lambdas} = state
+  State{visited, lambda_ids, lambdas, constructors, operations} = state
   List.reverse(&2, F.Lambda, lambdas)
+
+def used_constructors(state: State) -> Set():
+  State{visited, lambda_ids, lambdas, constructors, operations} = state
+  constructors
+
+def used_operations(state: State) -> Set():
+  State{visited, lambda_ids, lambdas, constructors, operations} = state
+  operations
 
 def prepare(checked: M.CheckedModule, +bindings: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, Runtime>:
   M.CheckedModule{+constants, +functions, types, operations} = checked
   +catalog = {Catalog{function_index(functions, Map.new(&2, Maybe<&2, M.CheckedFunction>)), constant_index(bindings, Map.new(&2, Maybe<&2, C.Value>)), Init.index(Init.bindings(constants), MTip{})} : Catalog}
   do Result<&2, &2, M.Diagnostic, Runtime>:
-    +state : State <- walk(U32.to_nat(1048576), List.append(&2, Work, function_roots(functions), constant_roots(constants)), catalog, State{Map.new(&2, Bool), Map.new(&2, Bool), Nil{}})
-    return Runtime{M.CheckedModule{keep_constants(constants, state), keep_functions(functions, state), types, operations}, keep_bindings(bindings, state), reached_lambdas(state)}
+    +state : State <- walk(U32.to_nat(1048576), List.append(&2, Work, function_roots(functions), constant_roots(constants)), catalog, State{Map.new(&2, Bool), Map.new(&2, Bool), Nil{}, Set.new(), Set.new()})
+    return Runtime{M.CheckedModule{keep_constants(constants, state), keep_functions(functions, state), types, operations}, keep_bindings(bindings, state), reached_lambdas(state), used_constructors(state), used_operations(state)}

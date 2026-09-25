@@ -18,7 +18,7 @@ const invoke_state = fn (callback: Unit -> U32 ! {State U32}) => callback ()
 const invoke_get = fn (callback: Unit -> U32 ! {Get U32}) => callback ()
 const annotation_only = fn (callback: Unit -> U32 ! {State F32, Get F32}) => 0
 
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (next, previous) = do (@effect.state (State.get U32) (State.set U32) 41):
     return invoke_state update
   let provider = @effect.provider (Get U32) (fn () => next)
@@ -26,8 +26,12 @@ const answer = fn () => do:
     return invoke_get fetch
   return @u32.add previous current
 
-const run = fn () => answer ()
-const expected = answer ()
+entry const run = fn () => answer ()
+entry const expected = answer ()
+// Keeps the annotation-only helper reachable for its analysis.
+entry const probe = fn () => do:
+  let kept = annotation_only
+  return 0
 `;
 
 function labels(

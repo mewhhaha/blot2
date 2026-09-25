@@ -23,7 +23,7 @@ const create = fn builder => fn action => do:
   let Builder { initial } = builder
   return scoped builder initial action
 const application = insert_resource (Counter 40) (new ())
-const run = fn () => do:
+entry const run = fn () => do:
   let (initial, _) = create application (fn () => ())
   let (next, integer) = scoped application initial (fn () => do:
     use counter <- @state.get Counter
@@ -35,12 +35,12 @@ const run = fn () => do:
     let Counter value = counter
     return U32.to_f32 value + 0.5)
   return U32.to_f32 integer + floating
-const folded = run ()
+entry const folded = run ()
 `;
 
 const sharedBuilder =
   typedBuilder.replace("scope: scope", "scope: world -> scope") + `
-const callback = fn (probe: Unit -> F32 ! {Foreign}) => do:
+entry const callback = fn (probe: Unit -> F32 ! {Foreign}) => do:
   use outcome <- create application probe
   let (_, result) = outcome
   return result
@@ -89,7 +89,7 @@ const doubled = Box (fn value => value + value)
 const double = fn value => do:
   let Box apply = doubled
   return apply value
-const run = fn () => U32.to_f32 (double 20) + double 1.25
+entry const run = fn () => U32.to_f32 (double 20) + double 1.25
 `);
     const guest = await instantiateGuest(artifact.bytes);
     try {
@@ -114,7 +114,7 @@ const scope = Scope (fn action => (40 + 2, action ()))
 const invoke = fn action => do:
   let Scope apply = wrapped
   return apply action
-const run = fn () => do:
+entry const run = fn () => do:
   let (_, ignored) = invoke (fn () => ())
   let (count, result) = invoke (fn () => 1.5)
   return U32.to_f32 count + result
@@ -136,7 +136,8 @@ const run = fn () => do:
   }
 });
 
-Deno.test("const callable fields validate unused resolved initializers", async () => {
+// Only initializers an entry reaches are specialized and evaluated.
+Deno.test("const callable fields validate reached resolved initializers", async () => {
   const compiler = await createSourceCompiler();
   try {
     for (
@@ -157,7 +158,7 @@ Deno.test("const callable fields validate unused resolved initializers", async (
       throws(
         () =>
           compiler.compile(
-            `data Scope action = Scope action\nconst invalid = ${body}`,
+            `data Scope action = Scope action\nconst invalid = ${body}\nentry const probe = fn () => do:\n  let kept = invalid\n  return 0\n`,
           ),
         (error: unknown) => {
           ok(error instanceof SourceError);
@@ -203,7 +204,7 @@ const scope = Scope (fn action => (40 + 2, action ()))
 const invoke = fn action => do:
   let Scope call = scope
   return call action
-const run = fn () => do:
+entry const run = fn () => do:
   let (_, ignored) = invoke (fn () => ())
   let (count, result) = invoke (fn () => 1.5)
   return U32.to_f32 count + result
@@ -231,7 +232,7 @@ const invoke = fn action => do:
   let Scope call = scope
   use result <- call action
   return result
-const run = fn (probe: Unit -> F32 ! {Foreign}) => do:
+entry const run = fn (probe: Unit -> F32 ! {Foreign}) => do:
   use first <- invoke (fn () => ())
   use second <- invoke probe
   let (count, result) = second

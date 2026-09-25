@@ -10,7 +10,7 @@ for (const threads of [1, 4]) {
     const files = new Map([
       [
         entry.href,
-        'import * as first from "./café"\nimport * as second from "./café"\nconst answer = fn () => @u32.add (first.value ()) (second.value ())\n',
+        'import * as first from "./café"\nimport * as second from "./café"\nentry const answer = fn () => @u32.add (first.value ()) (second.value ())\n',
       ],
       [new URL("./café.blot", entry).href, "const value = fn () => 17\n"],
       [new URL("./café.blot", entry).href, "const value = fn () => 25\n"],
@@ -25,10 +25,10 @@ for (const threads of [1, 4]) {
       },
     });
     const sharedPrefixSource =
-      `const ${prefix}x = fn () => 17\nconst ${prefix}y = fn () => 25\nconst answer = fn () => @u32.add (${prefix}x ()) (${prefix}y ())\n`;
+      `entry const ${prefix}x = fn () => 17\nentry const ${prefix}y = fn () => 25\nentry const answer = fn () => @u32.add (${prefix}x ()) (${prefix}y ())\n`;
     const sources = [
       sharedPrefixSource,
-      "const identity = fn (x: U32) => x\nconst answer = fn () => identity (identity 42)\n",
+      "entry const identity = fn (x: U32) => x\nentry const answer = fn () => identity (identity 42)\n",
       project,
     ];
     const native = await createNativeCompiler({ threads, prelude: "none" });

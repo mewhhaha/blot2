@@ -17,7 +17,7 @@ const built = do:
   let builder = Builder { run: fn value => value, version: 0 }
 ${Array.from({ length: layers }, () => "  builder := extend self").join("\n")}
   return builder
-const run = fn (value: U32) => do:
+entry const run = fn (value: U32) => do:
   let Builder { run } = built
   return run value
 `;
@@ -57,8 +57,8 @@ const make = fn (expected: U32) => do:
   return fn value => do:
     let expected = 99
     return matches value
-const check = make 42
-const run = fn (value: U32) => check value
+entry const check = make 42
+entry const run = fn (value: U32) => check value
 `);
     const instance = new WebAssembly.Instance(
       new WebAssembly.Module(artifact.bytes),

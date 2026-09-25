@@ -120,7 +120,7 @@ incrementalTest(
   "incremental no-op and trivia edits preserve prelude artifacts without rechecking",
   async (session, clean) => {
     const source =
-      "const answer = fn () => Maybe.unwrap_or 0 (Some (identity 42))\n";
+      "entry const answer = fn () => Maybe.unwrap_or 0 (Some (identity 42))\n";
     const first = await session.compile(source);
     equivalent(first.artifact, clean.compile(source));
     equal(await answer(first.artifact), 42);
@@ -143,7 +143,7 @@ incrementalTest(
   "incremental leaf-body edits reuse caller types and regenerate one code entry",
   async (session, clean) => {
     const source =
-      "const increment = fn value => @u32.add value 1\nconst answer = fn () => increment 40\n";
+      "entry const increment = fn value => @u32.add value 1\nentry const answer = fn () => increment 40\n";
     const first = await session.compile(source);
     const revision = source.replace("value 1", "value 2");
     const next = await session.compile(revision);
@@ -160,10 +160,10 @@ incrementalTest(
 incrementalTest(
   "incremental const dependencies observe same-interface body edits without caller rechecking",
   async (session, clean) => {
-    const source = `const calculate = fn value => @u32.add value 1
-const computed = calculate 40
-const copied = computed
-const answer = fn () => copied
+    const source = `entry const calculate = fn value => @u32.add value 1
+entry const computed = calculate 40
+entry const copied = computed
+entry const answer = fn () => copied
 `;
     const first = await session.compile(source);
     const revision = source.replace("value 1", "value 2");
@@ -185,7 +185,7 @@ incrementalTest(
   "incremental interface changes reject stale callers and failed revisions do not poison recovery",
   async (session, clean) => {
     const source =
-      "const transform = fn value => @u32.add value 1\nconst answer = fn () => @u32.add (transform 41) 0\n";
+      "entry const transform = fn value => @u32.add value 1\nentry const answer = fn () => @u32.add (transform 41) 0\n";
     const first = await session.compile(source);
     const invalid = source.replace("@u32.add value 1", "True");
     await rejects(() => session.compile(invalid), diagnostic("type_mismatch"));
@@ -202,14 +202,14 @@ incrementalTest(
   async (session, clean) => {
     const source = `effect Reader.ask: Unit -> U32
 effect Clock.ask: Unit -> U32
-const reader_value = fn () => 20
-const clock_value = fn () => 22
+entry const reader_value = fn () => 20
+entry const clock_value = fn () => 22
 const reader = @effect.provider Reader.ask reader_value
 const clock = @effect.provider Clock.ask clock_value
 const read = fn () => Reader.ask ()
 const requirements = @effect.of read
-const requirement_count = @effect.count requirements
-const answer = fn () => do reader:
+entry const requirement_count = @effect.count requirements
+entry const answer = fn () => do reader:
   use value <- do clock:
     use number <- read ()
     return number
@@ -265,9 +265,9 @@ incrementalTest(
     const source = `const capture = fn value => fn extra => do:
   let result = @u32.add value extra
   return result
-const answer = fn () => capture 40 2
+entry const answer = fn () => capture 40 2
 `;
-    const shifted = "const unrelated = 7\n" + source;
+    const shifted = "entry const unrelated = 7\n" + source;
     const frontend = await createSourceSession({ prelude: "none" });
     try {
       const original = bendArray(frontend.prepare(source).module.functions);
@@ -289,7 +289,8 @@ const answer = fn () => capture 40 2
 incrementalTest(
   "incremental budgets and diagnostic offsets survive trivia and failed revisions",
   async (session, clean) => {
-    const source = "const value = 42\nconst answer = fn () => value\n";
+    const source =
+      "entry const value = 42\nentry const answer = fn () => value\n";
     const options = { const_steps: 100n };
     const first = await session.compile(source, options);
     await rejects(
@@ -321,7 +322,8 @@ incrementalTest(
 incrementalTest(
   "incremental public artifact and stats mutations cannot change cached results",
   async (session, clean) => {
-    const source = "const value = 42\nconst answer = fn () => value\n";
+    const source =
+      "entry const value = 42\nentry const answer = fn () => value\n";
     const first = await session.compile(source);
     const counts = { ...first.stats };
     first.artifact.bytes.fill(0);
@@ -348,7 +350,7 @@ incrementalTest(
   "incremental queued requests snapshot options and recover in source order",
   async (session, clean) => {
     const source = (value: number) =>
-      `const value = ${value}\nconst answer = fn () => value\n`;
+      `const value = ${value}\nentry const answer = fn () => value\n`;
     const options = { const_steps: 100n };
     const first = session.compile(source(40), options);
     options.const_steps = 0n;
@@ -418,13 +420,13 @@ Deno.test("incremental disposal rejects startup jobs, queued revisions and later
     prelude: "none",
     workers: 2,
   });
-  const queued = session.compile("const answer = fn () => 42\n");
+  const queued = session.compile("entry const answer = fn () => 42\n");
   const rejected = rejects(queued, /disposed/);
   await Promise.resolve();
   session.dispose();
   await rejected;
   await rejects(
-    () => session.compile("const answer = fn () => 42\n"),
+    () => session.compile("entry const answer = fn () => 42\n"),
     /disposed/,
   );
   session.dispose();
@@ -433,7 +435,7 @@ Deno.test("incremental disposal rejects startup jobs, queued revisions and later
 incrementalTest(
   "incremental Wasm-only compiles return the cached artifact's bytes",
   async (session, clean) => {
-    const source = "const answer = fn () => @u32.add 40 2\n";
+    const source = "entry const answer = fn () => @u32.add 40 2\n";
     const full = await session.compile(source);
     const wasm = await session.compile(source, { analysis: false });
     equal(wasm.artifact, { bytes: full.artifact.bytes });

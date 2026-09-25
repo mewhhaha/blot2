@@ -14,6 +14,14 @@ function signature(analysis: Analysis, name: string) {
   return found;
 }
 
+// Analysis lists what an entry reaches; the probe keeps the inspected
+// declarations reachable without calling them.
+function keep(...names: string[]) {
+  return "entry const probe = fn () => do:\n" +
+    names.map((name, index) => `  let kept_${index} = ${name}\n`).join("") +
+    "  return 0\n";
+}
+
 function labels(row: EffectRow) {
   return row.operations.map((identity) => identity.declaration).sort();
 }
@@ -59,7 +67,7 @@ const invoke = fn action => action ()
 const read_reader = fn () => invoke Reader.ask
 const read_clock = fn () => invoke Clock.now
 const pure = fn () => invoke (fn () => 42)
-`);
+${keep("read_reader", "read_clock", "pure", "invoke")}`);
     equal(labels(signature(analysis, "read_reader").effect_row), [
       "Reader.ask",
     ]);
@@ -88,7 +96,7 @@ effect Clock.advance: U32 -> U32
 const compose = fn left => fn right => fn value => left (right value)
 const partial = fn () => compose Reader.adjust Clock.advance
 const both = fn value => compose Reader.adjust Clock.advance value
-`);
+${keep("partial", "both")}`);
     equal(labels(signature(analysis, "both").effect_row), [
       "Clock.advance",
       "Reader.adjust",
@@ -114,7 +122,7 @@ const answer = fn () => do:
   if unrelated:
     return value
   return 0
-`);
+${keep("answer")}`);
     equal(labels(signature(analysis, "answer").effect_row), ["Reader.ask"]);
     equal(signature(analysis, "answer").result, { $: "U32Ty" });
   } finally {
@@ -129,7 +137,7 @@ Deno.test("returned closures preserve rows shared with an outer callback paramet
 effect Reader.ask: Unit -> U32
 const defer = fn action => fn () => action ()
 const read = fn () => (defer Reader.ask) ()
-`;
+${keep("defer", "read")}`;
     const analysis = compiler.analyze(source);
     const defer = signature(analysis, "defer");
     ok(defer.parameter.$ === "FunctionTy");
@@ -141,7 +149,7 @@ const read = fn () => (defer Reader.ask) ()
       WebAssembly.Module.exports(
         new WebAssembly.Module(compiler.compile(source).bytes),
       ),
-      [],
+      [{ kind: "function", name: "probe" }],
     );
     throws(
       () => compiler.compile(source + "\nconst invalid: Unit -> U32 = read\n"),
@@ -162,7 +170,7 @@ const forward = fn action => @effect.provider Reader.ask action
 const provider = forward Reader.ask
 const missing = fn () => do provider:
   return Reader.ask ()
-`;
+${keep("forward", "missing")}`;
     const analysis = compiler.analyze(source);
     const forward = signature(analysis, "forward");
     ok(forward.parameter.$ === "FunctionTy");
@@ -174,7 +182,7 @@ const missing = fn () => do provider:
       WebAssembly.Module.exports(
         new WebAssembly.Module(compiler.compile(source).bytes),
       ),
-      [],
+      [{ kind: "function", name: "probe" }],
     );
     throws(
       () =>

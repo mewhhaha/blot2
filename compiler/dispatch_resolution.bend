@@ -17,6 +17,7 @@ import ./inference_batch.bend as Batch
 import ./public_exports.bend as Public
 import ./dependency.bend as D
 import ./core_compare.bend as Compare
+import ./entry_points.bend as Entries
 
 # Concrete dispatch resolution runs after the initial shape check and before
 # templating. A dispatch site whose operands (binary dispatch) are closed, or
@@ -897,14 +898,31 @@ def rounds(fuel: Nat, work: RoundWork, +entry: String) -> Maybe<&2, Resolved>:
     case 1n+rest RewrittenRound{initial, Rewrite{module, certificates, next, cache, True{}, False{}}, proofs, budget}:
       rounds(rest, CheckRound{module, List.append(&2, Core.Certificate, certificates, Scheduler.initial_certificates(initial)), next, Some{proofs}, cache, budget}, entry)
 
-def resolve_scanned(scan: DispatchScan, limit: Result<&2, &2, M.Diagnostic, Nat>, module: M.Module, entry: String) -> Maybe<&2, Resolved>:
+# Dead-code elimination follows the first round's check, the initial check of
+# every declaration: later rounds, specialization and the final check see only
+# what the entry declarations reach.
+def pruned_round(pruned: Result<&2, &2, M.Diagnostic, Entries.Pruned>, next: Nat, +entry: String) -> Maybe<&2, Resolved>:
+  match pruned:
+    case Fail{diagnostic}:
+      None{}
+    case Done{Entries.Pruned{module, initial}}:
+      rounds(Nat.mul(3n, 2n+round_budget()), CheckedRound{module, Done{initial}, next, None{}, Map.new(&2, Accessor), round_budget()}, entry)
+
+def first_round(checked: Result<&2, &2, M.Diagnostic, Scheduler.Initial>, +module: M.Module, next: Nat, +entry: String) -> Maybe<&2, Resolved>:
+  match checked:
+    case Fail{diagnostic}:
+      None{}
+    case Done{initial}:
+      pruned_round(Entries.prune_initial(module, initial, entry), next, entry)
+
+def resolve_scanned(scan: DispatchScan, limit: Result<&2, &2, M.Diagnostic, Nat>, +module: M.Module, entry: String) -> Maybe<&2, Resolved>:
   match scan limit:
     case DispatchScan{0n, seen, unique} _:
       None{}
     case DispatchScan{count, seen, False{}} _:
       None{}
     case DispatchScan{count, seen, True{}} Done{next}:
-      rounds(Nat.mul(3n, 2n+round_budget()), CheckRound{module, Nil{}, next, None{}, Map.new(&2, Accessor), round_budget()}, entry)
+      first_round(Scheduler.check_module_resolving(module, Nil{}), module, next, entry)
     case _ Fail{diagnostic}:
       None{}
 

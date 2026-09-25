@@ -72,21 +72,21 @@ applicationTest(
       `
 const combine = fn left => fn right => left + right
 const with_answer = fn transform => transform 42
-const answer = U32.mul 2 $ U32.add 1 $ 20
-const arithmetic = fn () => identity $ 2 + 4 * 10
-const named = fn () => identity $ 20 \`combine\` 22
-const generic = fn () => Maybe.unwrap_or 0 $ Maybe.map identity $ Some $ 42
-const partial = fn () => apply (U32.add 40) 2
-const eager = fn (enabled: Bool) => always 42 $ do:
+entry const answer = U32.mul 2 $ U32.add 1 $ 20
+entry const arithmetic = fn () => identity $ 2 + 4 * 10
+entry const named = fn () => identity $ 20 \`combine\` 22
+entry const generic = fn () => Maybe.unwrap_or 0 $ Maybe.map identity $ Some $ 42
+entry const partial = fn () => apply (U32.add 40) 2
+entry const eager = fn (enabled: Bool) => always 42 $ do:
   if enabled:
     use @panic "eager argument"
   return 0
-const lambda = fn () => with_answer $ fn value => value + 1
-const block = fn (enabled: Bool) => identity $ do:
+entry const lambda = fn () => with_answer $ fn value => value + 1
+entry const block = fn (enabled: Bool) => identity $ do:
   if enabled:
     return 42
   return 7
-const matched = fn (enabled: Bool) => identity $ case enabled of
+entry const matched = fn (enabled: Bool) => identity $ case enabled of
   True => 42
   False => 7
 `,
@@ -114,7 +114,7 @@ applicationTest(
       `
 infixr 0 ($) = choose_right
 const choose_right = fn ignored => fn value => value
-const answer = 0 $ 42
+entry const answer = 0 $ 42
 `,
     );
     equal((exports.answer as WebAssembly.Global).value, 42);
@@ -136,15 +136,15 @@ effect Reader.ask: Unit -> U32
 const reader = @effect.provider Reader.ask (fn () => 42)
 const read = fn () => Reader.ask ()
 const call_read = fn () => read $ ()
-const reads = @effect.has (@effect.of call_read) Reader.ask
+entry const reads = @effect.has (@effect.of call_read) Reader.ask
 `;
     const { exports } = await compile(
       reference,
       native,
       declarations + `
-const answer = fn () => do reader:
+entry const answer = fn () => do reader:
   return call_read $ ()
-const expected = answer ()
+entry const expected = answer ()
 `,
     );
     equal((exports.reads as WebAssembly.Global).value, 1);
@@ -160,7 +160,7 @@ const expected = answer ()
       reference,
       native,
       declarations + `
-const answer = fn () => do reader:
+entry const answer = fn () => do reader:
   let result = read $ ()
   return result
 `,
@@ -176,23 +176,23 @@ applicationTest(
       reference,
       native,
       `
-const discard = fn () => do:
+entry const discard = fn () => do:
   use identity $ 42
-const last_expression = fn () => do:
+entry const last_expression = fn () => do:
   42
-const early = fn (enabled: Bool) => do:
+entry const early = fn (enabled: Bool) => do:
   if enabled:
     return ()
   use 42
-const expression_body = fn () => 42
-const discarded_panic = fn (enabled: Bool) => do:
+entry const expression_body = fn () => 42
+entry const discarded_panic = fn (enabled: Bool) => do:
   if enabled:
     use @panic "discarded does not mean skipped"
-const nested = fn () => do:
+entry const nested = fn () => do:
   use do:
     return 7
   use identity $ 42
-const unit = discard ()
+entry const unit = discard ()
 `,
     );
     for (const name of ["discard", "last_expression", "early", "nested"]) {
@@ -230,7 +230,7 @@ applicationTest(
       reference,
       native,
       `
-const valid = fn () => do:
+entry const valid = fn () => do:
   return identity $ 42
 `,
     );

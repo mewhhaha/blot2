@@ -13,21 +13,37 @@ import { SourceError } from "./syntax.ts";
 
 const programs = [
   {
+    name: "unnamed ranges, explicit iterator bindings, and unbounded loops",
+    source: `
+entry const run = fn () => do:
+  let total = 0
+  for 0..5:
+    total := self + 1
+  for let value in [2, 3]:
+    total := self + value
+  for ever:
+    total := self + 1
+    if total == 13:
+      return total
+`,
+    exports: [["run", 13]],
+  },
+  {
     name: "ranges carry immutable successors in const evaluation and Wasm",
     source: `
-const sum = fn limit => do:
+entry const sum = fn limit => do:
   let total = 0
   for index in 0..limit:
     total := self + index
   return total
-const folded = sum 10
-const run = fn (limit: U32) => sum limit
-const reversed = fn () => do:
+entry const folded = sum 10
+entry const run = fn (limit: U32) => sum limit
+entry const reversed = fn () => do:
   let total = 42
   for index in 9..2:
     total := self + index
   return total
-const maximum = fn () => do:
+entry const maximum = fn () => do:
   let total = 0
   for index in 4294967294..4294967295:
     total := self + 1
@@ -46,46 +62,46 @@ const total = fn values => do:
   for index in 1..(@array.length values):
     sum := self + @array.get values index
   return sum
-const folded = total [1.5, 2.5, 3.0]
-const run = fn () => do:
+entry const folded = total [1.5, 2.5, 3.0]
+entry const run = fn () => do:
   let count = 0
   let sum = 0.0
   for (amount, weight) in [(2, 1.5), (3, 2.0)]:
     count := self + amount
     sum := self + U32.to_f32 amount * weight
   return U32.to_f32 count + sum + total [1.0, 2.0]
-const integers = fn () => total [10, 20, 12]
+entry const integers = fn () => total [10, 20, 12]
 `,
     exports: [["folded", 7], ["run", 17], ["integers", 42]],
   },
   {
     name: "nested loops preserve lexical scope and captured iteration values",
     source: `
-const run = fn () => do:
+entry const run = fn () => do:
   let total = 0
   for row in 0..3:
     for column in 0..4:
       total := self + row * 10 + column
   return total
-const captured = fn () => do:
+entry const captured = fn () => do:
   let callbacks = @array.fill 3 (fn () => 0)
   for index in 0..3:
     callbacks := @array.set self index (fn () => index)
   return (@array.get callbacks 0) () * 100 + (@array.get callbacks 1) () * 10 + (@array.get callbacks 2) ()
-const scoped = fn () => do:
+entry const scoped = fn () => do:
   let total = 42
   for index in [1, 2]:
     let total = index
     total := self + 1
   return total
-const shadow_after_successor = fn () => do:
+entry const shadow_after_successor = fn () => do:
   let total = 0
   for index in 0..3:
     total := self + 1
     let total = 99
     total := self + 1
   return total
-const nested_do = fn () => do:
+entry const nested_do = fn () => do:
   let total = 0
   for index in 0..3:
     let amount = do:
@@ -101,15 +117,15 @@ const nested_do = fn () => do:
   {
     name: "return inside for exits the enclosing do block",
     source: `
-const first = fn values => do:
+entry const first = fn values => do:
   for value in values:
     if value > 10:
       return value
   return 0
-const folded = first [1, 42, 99]
-const run = fn () => first [2, 12, 42]
-const empty = fn () => first []
-const nested = fn () => do:
+entry const folded = first [1, 42, 99]
+entry const run = fn () => first [2, 12, 42]
+entry const empty = fn () => first []
+entry const nested = fn () => do:
   for outer in 0..4:
     for inner in 0..3:
       if outer + inner == 3:
@@ -157,7 +173,7 @@ effect Read : U32 -> U32
 const numbers = fn () => do:
   use value <- Read 4
   return [value, value + 1]
-const run = fn (probe: U32 -> U32 ! {Foreign}) => do (@effect.provider Read probe):
+entry const run = fn (probe: U32 -> U32 ! {Foreign}) => do (@effect.provider Read probe):
   for index in (Read 0)..(Read 3):
     use Read (index + 10)
   for value in (numbers ()):
@@ -189,17 +205,17 @@ Deno.test("for loops use constant stack and enforce the const step budget", asyn
   const compiler = await createSourceCompiler();
   try {
     const source = `
-const sum = fn limit => do:
+entry const sum = fn limit => do:
   let total = 0
   for index in 0..limit:
     total := @u32.add self index
   return total
-const run = fn () => sum 100000
+entry const run = fn () => sum 100000
 `;
     await exercise(compiler.compile(source).bytes, [["run", 704982704]]);
     throws(
       () =>
-        compiler.compile(source + "\nconst costly = sum 100000", {
+        compiler.compile(source + "\nentry const costly = sum 100000", {
           const_steps: 50n,
         }),
       (error: unknown) => {
@@ -227,15 +243,15 @@ Deno.test("for loops reject invalid iterables, bounds, escaping locals and state
       ...invalidPrograms.map((
         [loop, code],
       ) => [
-        `const run = fn () => do:\n  ${loop}\n    use ()\n  return 0`,
+        `entry const run = fn () => do:\n  ${loop}\n    use ()\n  return 0`,
         code,
       ]),
       [
-        "const run = fn () => do:\n  for index in 0..3:\n    use ()\n  return index",
+        "entry const run = fn () => do:\n  for index in 0..3:\n    use ()\n  return index",
         "unknown_value",
       ],
       [
-        "const run = fn () => do:\n  let total = 0\n  for index in 0..3:\n    total := True\n  return total",
+        "entry const run = fn () => do:\n  let total = 0\n  for index in 0..3:\n    total := True\n  return total",
         "type_mismatch",
       ],
     ];
@@ -256,7 +272,7 @@ Deno.test("for loops update JavaScript incremental caches after bound changes", 
   try {
     for (const endpoint of [3, 5, 1]) {
       const source =
-        `const run = fn () => do:\n  let total = 0\n  for index in 0..${endpoint}:\n    total := self + index\n  return total`;
+        `entry const run = fn () => do:\n  let total = 0\n  for index in 0..${endpoint}:\n    total := self + index\n  return total`;
       const result = await compiler.compile(source);
       await exercise(result.artifact.bytes, [[
         "run",
@@ -279,7 +295,7 @@ Deno.test("for loops retain native compiler and incremental cache parity", async
     }
     for (const endpoint of [3, 5, 1]) {
       const source =
-        `const run = fn () => do:\n  let total = 0\n  for index in 0..${endpoint}:\n    total := self + index\n  return total`;
+        `entry const run = fn () => do:\n  let total = 0\n  for index in 0..${endpoint}:\n    total := self + index\n  return total`;
       const expected = await incremental.compile(source);
       const actual = await nativeIncremental.compile(source);
       equal(actual.artifact, expected.artifact);
@@ -290,7 +306,7 @@ Deno.test("for loops retain native compiler and incremental cache parity", async
     }
     await rejects(
       native.compile(
-        "const run = fn () => do:\n  for index in 0.0..3:\n    use ()\n  return 0",
+        "entry const run = fn () => do:\n  for index in 0.0..3:\n    use ()\n  return 0",
       ),
       (error: unknown) => {
         ok(error instanceof SourceError);

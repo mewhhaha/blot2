@@ -156,18 +156,19 @@ interface changes. Runtime-reachable descriptor operations are a diagnostic.
 
 ## Controlled host IO
 
-Host functions are passed explicitly to ordinary exported functions. The first
-implemented boundary accepts one scalar callback and returns a scalar:
+Host functions are passed explicitly to entry functions (`entry const`), the
+module's only exports. The boundary accepts one scalar or numeric-array callback
+and returns a scalar or numeric array. For example:
 
 ```blot
-const main = fn (advance: U32 -> U32 ! {Foreign}) => do:
+entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do:
   use next <- advance 41
   return next
 ```
 
 Run `just demo-host`; [the executable example](../examples/host_io.blot) also
 forwards a source operation through that callback. [Guest ABI 2](guest-abi.md)
-defines the manifest, scalar codecs, opaque references, lifetime and failure
+defines the manifest, value codecs, opaque references, lifetime and failure
 rules. The compiler does not recognize `main`, `advance`, or any service name.
 
 `Foreign` is a sealed, generic effect label, not an operation or authority

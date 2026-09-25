@@ -73,12 +73,39 @@ const nested = Some (Some 42)
 const reference = identity
 const constructor = Some
 const closure = (fn captured => fn value => @u32.add captured value) 2
-const answer = fn () => closure 40
+entry const answer = fn () => closure 40
+entry const probe = fn () => do:
+  let kept = (empty, nested, reference, constructor)
+  return 0
+`;
+  const js = await createSourceCompiler({ prelude: "none" });
+  const native = await createNativeCompiler({ prelude: "none" });
+  try {
+    const analysis = js.analyze(source);
+    equal(analysis.constants.length, 5);
+    equal(await native.analyze(source), analysis);
+  } finally {
+    js.dispose();
+    await native.dispose();
+  }
+});
+
+Deno.test("native analysis decodes a retained closure containing for ever", async () => {
+  const source = `
+const saved = [fn () => do:
+  for ever:
+    return 42
+]
+entry const answer = fn () => (@array.get saved 0) ()
 `;
   const js = await createSourceCompiler({ prelude: "none" });
   const native = await createNativeCompiler({ prelude: "none" });
   try {
     equal(await native.analyze(source), js.analyze(source));
+    const artifact = js.compile(source);
+    equal(await native.compile(source), artifact);
+    const { instance } = await WebAssembly.instantiate(artifact.bytes);
+    equal((instance.exports.answer as () => number)(), 42);
   } finally {
     js.dispose();
     await native.dispose();
@@ -93,7 +120,7 @@ Deno.test("native diagnostics retain source offsets, budgets, and recovery", asy
       { source: "// 😀\r\nconst answer = fn () => missing\r\n" },
       { source: "const answer = fn () => @u32.add True 1\n" },
       { source: "const answer = 42\n", const_steps: 0n },
-      { source: "const answer = fn () => do:\n  return 42\n" },
+      { source: "entry const answer = fn () => do:\n  return 42\n" },
     ];
     for (const entry of cases) {
       let expected;

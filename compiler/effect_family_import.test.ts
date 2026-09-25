@@ -8,7 +8,7 @@ Deno.test("imported effect families preserve operation identities across aliases
     "file:///effect-family/main.blot": `import { State as Cell } from "./state"
 import * as state from "./state"
 
-const combined = fn () => do:
+entry const combined = fn () => do:
   let (count, (fraction, observed)) = do (@effect.state (Cell.get U32) (Cell.set U32) 40):
     return do (@effect.state (state.State.get F32) (state.State.set F32) 1.25):
       use old_count <- state.read_count ()
@@ -18,8 +18,8 @@ const combined = fn () => do:
       return @f32.add (@u32.to_f32 old_count) old_fraction
   return @f32.add (@u32.to_f32 count) (@f32.add fraction observed)
 
-const answer = fn () => combined ()
-const expected = combined ()
+entry const answer = fn () => combined ()
+entry const expected = combined ()
 `,
     "file:///effect-family/state.blot": `type State a is effect = {
   get: Unit -> a

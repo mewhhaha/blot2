@@ -9,6 +9,7 @@ import ./index.bend as Index
 import ./operators.bend as O
 import ./inference_batch.bend as B
 import ./checked_core.bend as Core
+import ./entry_points.bend as Entries
 
 type Linked is Data:
   Linked{module: M.Module, scopes: Map<&2, Lower.Context>}
@@ -279,16 +280,31 @@ def source_module_deferred(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: N
         prepared : M.Module <- Families.prepare(module)
         Resolution.prepare_deferred(prepared, C.text_of(root), M.module_operations(module))
 
-# Retain the solved specialization evidence until the final group check.
-def source_module_core(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
+# Retain the solved specialization evidence until the final group check. The
+# entry declarations travel with it: export selection narrows the exported
+# flags, so the final check verifies each entry against its final type.
+type Sourced is Data:
+  Sourced{prepared: Core.Prepared, entries: List<&2, Entries.Entry>}
+
+def sourced_prepared(sourced: Sourced) -> Core.Prepared:
+  Sourced{prepared, entries} = sourced
+  prepared
+
+def sourced_entries(sourced: Sourced) -> List<&2, Entries.Entry>:
+  Sourced{prepared, entries} = sourced
+  entries
+
+def source_module_core(project: Bool, +root: C.Cst, prelude: C.Cst, +fuel: Nat) -> Result<&2, &2, M.Diagnostic, Sourced>:
   match project:
     case False{}:
-      do Result<&2, &2, M.Diagnostic, Core.Prepared>:
+      do Result<&2, &2, M.Diagnostic, Sourced>:
         +module : M.Module <- Lower.source_module(root, prelude, fuel)
         prepared : M.Module <- Families.prepare(module)
-        Resolution.prepare_deferred_core(prepared, "main", M.module_operations(module))
+        core : Core.Prepared <- Resolution.prepare_deferred_core(prepared, "main", M.module_operations(module))
+        return Sourced{core, Entries.entries(module)}
     case True{}:
-      do Result<&2, &2, M.Diagnostic, Core.Prepared>:
+      do Result<&2, &2, M.Diagnostic, Sourced>:
         +module : M.Module <- prepared_project(Lower.prepare_prelude(prelude, fuel), root, fuel)
         prepared : M.Module <- Families.prepare(module)
-        Resolution.prepare_deferred_core(prepared, C.text_of(root), M.module_operations(module))
+        core : Core.Prepared <- Resolution.prepare_deferred_core(prepared, C.text_of(root), M.module_operations(module))
+        return Sourced{core, Entries.entries(module)}

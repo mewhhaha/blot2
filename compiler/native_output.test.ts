@@ -164,7 +164,7 @@ Deno.test("native chunk writer matches the original complete response byte for b
       try {
         for (
           const source of [
-            "const answer = fn () => 42\n",
+            "entry const answer = fn () => 42\n",
             arithmeticSource("balanced", false),
           ]
         ) {
@@ -220,7 +220,7 @@ Deno.test("native Wasm-only responses match the reference encoder without the an
       try {
         for (
           const source of [
-            "const answer = fn () => 42\n",
+            "entry const answer = fn () => 42\n",
             arithmeticSource("balanced", false),
           ]
         ) {

@@ -129,9 +129,9 @@ const count_ghosts = fn world => do:
     return count)
   return count
 
-const run = fn (ticks: U32) -> F32 => checksum (simulate ticks (create ()))
-const ghost_count = fn (ticks: U32) -> U32 => count_ghosts (simulate ticks (create ()))
-const snapshot = fn () -> F32 => do:
+entry const run = fn (ticks: U32) -> F32 => checksum (simulate ticks (create ()))
+entry const ghost_count = fn (ticks: U32) -> U32 => count_ghosts (simulate ticks (create ()))
+entry const snapshot = fn () -> F32 => do:
   let original = create ()
   let next = simulate 1 original
   return checksum next - checksum original

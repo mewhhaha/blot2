@@ -490,6 +490,8 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
       usage(rest, ExpressionsUsage{elements}, types)
     case 1n+rest ExpressionUsage{M.ForExpr{index, start, end, state, initial, body}}:
       usage(rest, ExpressionsUsage{[start, end, initial, body]}, types)
+    case 1n+rest ExpressionUsage{M.ForeverExpr{state, initial, body}}:
+      usage(rest, ExpressionsUsage{[initial, body]}, types)
     case 1n+rest ExpressionUsage{M.ArrayGenerateExpr{count, generator}}:
       usage(rest, ExpressionsUsage{[count, generator]}, types)
     case 1n+rest ExpressionUsage{M.ArrayFillExpr{count, value}}:

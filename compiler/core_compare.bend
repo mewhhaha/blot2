@@ -255,6 +255,8 @@ def compare_work(fuel: Nat, matching: Bool, pending: List<&2, Work>) -> Bool:
       compare_work(rest, True{}, ExprListPair{a0, b0} <> tail)
     case 1n+rest True{} ExprPair{M.ForExpr{a0, a1, a2, a3, a4, a5}, M.ForExpr{b0, b1, b2, b3, b4, b5}} <> tail:
       compare_work(rest, True{}, StringPair{a0, b0} <> ExprPair{a1, b1} <> ExprPair{a2, b2} <> StringPair{a3, b3} <> ExprPair{a4, b4} <> ExprPair{a5, b5} <> tail)
+    case 1n+rest True{} ExprPair{M.ForeverExpr{a0, a1, a2}, M.ForeverExpr{b0, b1, b2}} <> tail:
+      compare_work(rest, True{}, StringPair{a0, b0} <> ExprPair{a1, b1} <> ExprPair{a2, b2} <> tail)
     case 1n+rest True{} ExprPair{M.ArrayGenerateExpr{a0, a1}, M.ArrayGenerateExpr{b0, b1}} <> tail:
       compare_work(rest, True{}, ExprPair{a0, b0} <> ExprPair{a1, b1} <> tail)
     case 1n+rest True{} ExprPair{M.ArrayFillExpr{a0, a1}, M.ArrayFillExpr{b0, b1}} <> tail:

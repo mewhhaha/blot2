@@ -25,7 +25,7 @@ Deno.test("top-level const, let, type, constructor and effect bindings are impor
   const sources: Record<string, string> = {
     "/public/main.blot": `
 import { offset, started, Box, unwrap, Read } from "./library"
-const answer = fn () => do (@effect.provider Read (fn () => started)):
+entry const answer = fn () => do (@effect.provider Read (fn () => started)):
   use value <- Read ()
   return unwrap (Box (@u32.add offset value))
 `,
@@ -54,7 +54,7 @@ const add = fn left => fn right => @u32.add left right
 const boxed = Box 40
 const unwrap = fn (value: Box) => case value of
   Box number => number
-const answer = fn () => add (identity (unwrap boxed)) 2
+entry const answer = fn () => add (identity (unwrap boxed)) 2
 `);
   equal(Object.keys(exports), ["answer"]);
   equal((exports.answer as CallableFunction)(), 42);
@@ -62,11 +62,11 @@ const answer = fn () => add (identity (unwrap boxed)) 2
 
 Deno.test("public grouped, aliased and partially applied function values preserve their callable exports", async () => {
   const exports = await compileBoth(`
-const grouped = (fn (value: U32) => @u32.add value 1)
-const alias = grouped
+entry const grouped = (fn (value: U32) => @u32.add value 1)
+entry const alias = grouped
 const make = fn offset => fn (value: U32) => @u32.add offset value
-const chosen = make 40
-const answer = fn () => alias (chosen 1)
+entry const chosen = make 40
+entry const answer = fn () => alias (chosen 1)
 `);
   equal(Object.keys(exports).sort(), ["alias", "answer", "chosen", "grouped"]);
   equal((exports.grouped as CallableFunction)(41), 42);
@@ -80,7 +80,7 @@ Deno.test("a generic public effect helper resolves its family at a concrete hand
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 const read = fn () => State.get ()
 const again = fn () => read ()
-const answer = fn () => do (@effect.provider (State.get U32) (fn () => 41)):
+entry const answer = fn () => do (@effect.provider (State.get U32) (fn () => 41)):
   use value <- again ()
   return @u32.add value 1
 `);
@@ -91,10 +91,10 @@ const answer = fn () => do (@effect.provider (State.get U32) (fn () => 41)):
 Deno.test("public input types constrained by associated equality retain their callable entry", async () => {
   const exports = await compileBoth(
     `
-const boolean = fn (value: Bool) => case value of
+entry const boolean = fn (value: Bool) => case value of
   True => 42
   False => 0
-const flag = fn actual => boolean (actual == 7)
+entry const flag = fn actual => boolean (actual == 7)
 `,
     { prelude: "default" },
   );
@@ -108,7 +108,7 @@ Deno.test("concrete effect requirements propagate through public helper interfac
 type Read a is effect = Unit -> a
 const get = fn () -> U32 => Read ()
 const update = fn () => get ()
-const answer = fn () => do (@effect.provider (Read U32) (fn () => 42)):
+entry const answer = fn () => do (@effect.provider (Read U32) (fn () => 42)):
   return update ()
 `);
   equal(Object.keys(exports), ["answer"]);
@@ -122,7 +122,7 @@ type Box is data = Box U32
 const Box.offset = fn (box: Box) => fn amount => case box of
   Box value => @u32.add value amount
 const offset = fn value => @type.call "offset" value 1
-const answer = fn () => offset (Box 41)
+entry const answer = fn () => offset (Box 41)
 `,
     { prelude: "default" },
   );
@@ -133,8 +133,8 @@ const answer = fn () => offset (Box 41)
 Deno.test("exported runtime factory closures retain captured startup allocations across host calls", async () => {
   const exports = await compileBoth(`
 const make = fn values => fn (increment: U32) => @u32.add (@array.get values 0) increment
-let chosen = make [40]
-const churn = fn () => @array.get [7, 8, 9, 10] 0
+entry let chosen = make [40]
+entry const churn = fn () => @array.get [7, 8, 9, 10] 0
 `);
   equal(Object.keys(exports).sort(), ["chosen", "churn"]);
   equal((exports.chosen as CallableFunction)(2), 42);
@@ -154,7 +154,7 @@ const edit = fn transform => do:
   let Input x = input
   return set (Input (transform x))
 const first = fn () => edit (fn x => x + 4.0)
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (Input value, _) = do (@effect.state (State.get Input) (State.set Input) (Input 38.0)):
     return first ()
   return value

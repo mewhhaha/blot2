@@ -821,6 +821,8 @@ class WordReader {
       "StateProviderExpr",
       "UnresolvedGenericOperationExpr",
       "RuntimeInitExpr",
+      "_ReservedExpr45",
+      "ForeverExpr",
     ]);
     switch ($) {
       case "StateProviderExpr":
@@ -849,6 +851,10 @@ class WordReader {
         throw new NativeProtocolError(
           "Unresolved generic effect operation in compiler response",
         );
+      case "_ReservedExpr45":
+        throw new NativeProtocolError(
+          "Reserved expression tag 45 in compiler response",
+        );
       case "ForExpr":
         this.fields(
           [
@@ -868,6 +874,13 @@ class WordReader {
             initial,
             body,
           }),
+          receive,
+        );
+        return;
+      case "ForeverExpr":
+        this.fields(
+          [this.readString, this.expression, this.expression],
+          (state, initial, body) => ({ $, state, initial, body }),
           receive,
         );
         return;

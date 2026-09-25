@@ -1,3 +1,4 @@
+import { reachedSource } from "./fixtures.ts";
 import { deepStrictEqual as equal, ok, rejects } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
 import { createNativeCompiler } from "./native.ts";
@@ -39,12 +40,12 @@ function copies(names: readonly string[], origin: string) {
 }
 
 Deno.test("dispatch on operand types a helper already fixes compiles the helper once", async () => {
-  const source = `const leaf = fn value => @u32.add value 1 + 0
-const mid0 = fn value => leaf (leaf (value))
-const mid1 = fn value => leaf (leaf (value))
-const top0 = fn value => mid1 (mid0 (value))
-const top1 = fn value => mid1 (mid0 (value))
-const main = fn (value: U32) -> U32 => top1 (top0 (value))
+  const source = `entry const leaf = fn value => @u32.add value 1 + 0
+entry const mid0 = fn value => leaf (leaf (value))
+entry const mid1 = fn value => leaf (leaf (value))
+entry const top0 = fn value => mid1 (mid0 (value))
+entry const top1 = fn value => mid1 (mid0 (value))
+entry const main = fn (value: U32) -> U32 => top1 (top0 (value))
 `;
   const reference = await createSourceCompiler();
   const native = await createNativeCompiler();
@@ -69,7 +70,7 @@ Deno.test("a generic helper whose comparison operands are closed is not cloned",
   return Nothing
 const mid0 = fn values => fn i => leaf values i
 const mid1 = fn values => fn i => leaf values i
-const pick = fn (i: U32) -> U32 => do:
+entry const pick = fn (i: U32) -> U32 => do:
   let integers = [1, 2, 3]
   let floats = [1.0, 2.0]
   let a = mid0 integers i
@@ -96,7 +97,7 @@ const pick = fn (i: U32) -> U32 => do:
 
 Deno.test("receiver members resolve once the receiver's nominal head is known", async () => {
   const source = `const count = fn (values: Array a) => values.length + 1
-const run = fn () -> U32 => count [1, 2] + count [1.0]
+entry const run = fn () -> U32 => count [1, 2] + count [1.0]
 `;
   const reference = await createSourceCompiler();
   const native = await createNativeCompiler();
@@ -124,7 +125,7 @@ const moved = fn (p: Point) -> Point => do:
   q.x := self + 1.0
   q.x := self + 1.0
   return q
-const run = fn (value: F32) -> F32 => sum (Point { x: value, y: 2.0 }) + other (Point { x: 1.0, y: value }) + get_x (moved (Point { x: 3.0, y: 0.0 }))
+entry const run = fn (value: F32) -> F32 => sum (Point { x: value, y: 2.0 }) + other (Point { x: 1.0, y: value }) + get_x (moved (Point { x: 3.0, y: 0.0 }))
 `;
   const reference = await createSourceCompiler();
   const native = await createNativeCompiler();
@@ -153,7 +154,7 @@ const Box.pick = fn receiver => fn index => receiver.values[index]
 const make = fn (probe: U32 -> U32 ! {Foreign}) => do:
   use probe 1
   return Box { values: [40, 42] }
-const run = fn (probe: U32 -> U32 ! {Foreign}) => probe(5) - probe(3) + make(probe).pick(probe(2) - 1) - 2
+entry const run = fn (probe: U32 -> U32 ! {Foreign}) => probe(5) - probe(3) + make(probe).pick(probe(2) - 1) - 2
 `;
   const reference = await createSourceCompiler();
   const native = await createNativeCompiler();
@@ -387,7 +388,8 @@ Deno.test("dispatch diagnostics keep their code, position and message", async ()
   };
   try {
     for (const expected of diagnostics) {
-      const input = frontends[expected.prelude].prepare(expected.source);
+      const source = reachedSource(expected.source);
+      const input = frontends[expected.prelude].prepare(source);
       const offset = (expected.prelude === "none" ? 1 : preludeBase) +
         expected.at;
       equal(
@@ -409,7 +411,7 @@ Deno.test("dispatch diagnostics keep their code, position and message", async ()
         expected.name,
       );
       await rejects(
-        natives[expected.prelude].compile(expected.source),
+        natives[expected.prelude].compile(source),
         (error: unknown) => {
           ok(error instanceof SourceError, expected.name);
           equal(
@@ -440,21 +442,21 @@ Deno.test("sites inside local lets resolve without changing what the let means",
     {
       prelude: "default",
       source:
-        "const run = fn () -> U32 => do:\n  let helper = fn (x: U32) => x + 1\n  return helper 1 + 2\n",
+        "entry const run = fn () -> U32 => do:\n  let helper = fn (x: U32) => x + 1\n  return helper 1 + 2\n",
       run: "run",
       expected: 4,
     },
     {
       prelude: "none",
       source:
-        "type Box a is data = Box a\nconst Box.get = fn (box: Box U32) => 7\nconst g = fn () -> U32 => do:\n  let f = fn b => (Box b).get\n  return f 1\n",
+        "type Box a is data = Box a\nconst Box.get = fn (box: Box U32) => 7\nentry const g = fn () -> U32 => do:\n  let f = fn b => (Box b).get\n  return f 1\n",
       run: "g",
       expected: 7,
     },
     {
       prelude: "none",
       source: localPing +
-        "const run = fn () => do (@effect.provider Ping (fn () => 40)):\n  let f = fn (b: Box) => b.ping\n  use value <- f (Box { value: 1 })\n  return value\n",
+        "entry const run = fn () => do (@effect.provider Ping (fn () => 40)):\n  let f = fn (b: Box) => b.ping\n  use value <- f (Box { value: 1 })\n  return value\n",
       run: "run",
       expected: 40,
     },
@@ -465,7 +467,7 @@ Deno.test("sites inside local lets resolve without changing what the let means",
     {
       prelude: "default",
       source:
-        "const scale = fn value => do:\n  let square = fn (x: F32) -> F32 => x * x\n  return (value, square 3.0)\nconst run = fn () -> F32 => do:\n  let (a, b) = scale 1\n  let (c, d) = scale 1.0\n  return b + d\n",
+        "const scale = fn value => do:\n  let square = fn (x: F32) -> F32 => x * x\n  return (value, square 3.0)\nentry const run = fn () -> F32 => do:\n  let (a, b) = scale 1\n  let (c, d) = scale 1.0\n  return b + d\n",
       run: "run",
       expected: 18,
       origin: "scale",
@@ -477,7 +479,7 @@ Deno.test("sites inside local lets resolve without changing what the let means",
     {
       prelude: "none",
       source:
-        "type Box a is data = Box a\nconst Box.size = fn (box: Box a) => 0\nconst run = fn () -> U32 => do:\n  let f = fn b => @u32.add (Box b).size 1\n  return @u32.add (f 1) (f 2.0)\n",
+        "type Box a is data = Box a\nconst Box.size = fn (box: Box a) => 0\nentry const run = fn () -> U32 => do:\n  let f = fn b => @u32.add (Box b).size 1\n  return @u32.add (f 1) (f 2.0)\n",
       run: "run",
       expected: 2,
       origin: "run",
@@ -488,7 +490,7 @@ Deno.test("sites inside local lets resolve without changing what the let means",
     {
       prelude: "none",
       source: localPair +
-        "const run = fn x => do:\n  let f = fn b => @u32.add (Pair (x, b)).same 1\n  return @u32.add (f 1) (f 2)\nconst go = fn () -> U32 => run 1\n",
+        "entry const run = fn x => do:\n  let f = fn b => @u32.add (Pair (x, b)).same 1\n  return @u32.add (f 1) (f 2)\nentry const go = fn () -> U32 => run 1\n",
       run: "go",
       expected: 2,
       origin: "run",
@@ -530,7 +532,7 @@ Deno.test("a lexical receiver still shadows a same-named namespace when resolved
     "/members/count.blot":
       "type Count is data = Count { value: U32 }\nconst Count.add = fn receiver => fn amount => Count { value: receiver.value + amount }\nconst seed = Count { value: 40 }\nconst extra = 2\n",
     "/members/main.blot":
-      'import * as counter from "./count"\nconst run = fn () => do:\n  let counter = counter.seed\n  return counter.extra\n',
+      'import * as counter from "./count"\nentry const run = fn () => do:\n  let counter = counter.seed\n  return counter.extra\n',
   };
   const project = await loadSourceProject(
     new URL("file:///members/main.blot"),

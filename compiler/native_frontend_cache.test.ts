@@ -51,9 +51,9 @@ function sourceError(code: string, start?: number) {
 Deno.test("native unchanged and trivia revisions skip transport and isolate public results", () =>
   withSession(async (compiler, requests, clean) => {
     const source =
-      `const saved = (fn offset => fn value => @u32.add value offset) 1
-const calculated = saved 41
-const answer = fn () => calculated
+      `entry const saved = (fn offset => fn value => @u32.add value offset) 1
+entry const calculated = saved 41
+entry const answer = fn () => calculated
 `;
     equal(requests(), 1);
     const first = await compiler.compile(source);
@@ -101,7 +101,7 @@ const answer = fn () => calculated
 Deno.test("native unchanged cache keys include operation and const budget, with success-only publication", () =>
   withSession(async (compiler, requests, clean) => {
     const source =
-      "const value = @u32.add 40 2\nconst answer = fn () => value\n";
+      "entry const value = @u32.add 40 2\nentry const answer = fn () => value\n";
     const first = await compiler.compile(source, { const_steps: 100n });
     const sent = requests();
     await rejects(
@@ -148,7 +148,7 @@ Deno.test("native unchanged cache keys include operation and const budget, with 
 Deno.test("native cached replies preserve queued revision order, option snapshots and disposal", () =>
   withSession(async (compiler, requests, clean) => {
     const source =
-      "const value = @u32.add 40 1\nconst answer = fn () => value\n";
+      "entry const value = @u32.add 40 1\nentry const answer = fn () => value\n";
     await compiler.compile(source, { const_steps: 100n });
     const options = { const_steps: 100n };
     const ordered: string[] = [];

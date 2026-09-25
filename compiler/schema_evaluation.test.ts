@@ -18,6 +18,7 @@ const api = compiled as unknown as {
     prelude: unknown,
     fuel: bigint,
   ): Result<Node>;
+  "source_modules.sourced_prepared"(sourced: Node): Node;
   "checked_core.prepared_module"(prepared: Node): Node;
 };
 
@@ -38,7 +39,7 @@ const schema = Entry { head: True, tail: Entry { head: 7, tail: End } }
 
 const query = `import * as s from "./schema"
 const answer = s.schema.contains(True)
-const read_answer = fn () => answer
+entry const read_answer = fn () => answer
 `;
 
 function project(main: string, imported = schema) {
@@ -68,7 +69,9 @@ Deno.test("schema selection evaluates typed receiver and witness operands and ch
       );
       equal(lowered.$, "Done", Deno.inspect(lowered));
       if (lowered.$ !== "Done") return [];
-      const module = api["checked_core.prepared_module"](lowered.value);
+      const module = api["checked_core.prepared_module"](
+        api["source_modules.sourced_prepared"](lowered.value),
+      );
       return bendArray(module.functions as BendList<Node>)
         .map((fn) => fn.name as string)
         .filter((name) => name.startsWith("$schema["));
@@ -85,7 +88,7 @@ Deno.test("schema selection evaluates typed receiver and witness operands and ch
       const [source, message] of [
         [
           `import * as s from "./schema"
-const answer = do:
+entry const answer = do:
   let witness = do:
     if True:
       return @panic "witness operand reached"
@@ -96,7 +99,7 @@ const answer = do:
         ],
         [
           `import * as s from "./schema"
-const answer = do:
+entry const answer = do:
   let receiver = do:
     if True:
       return @panic "receiver operand reached"

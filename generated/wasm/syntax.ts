@@ -161,6 +161,7 @@ export type LiteralKind =
   | "for"
   | "in"
   | ".."
+  | "ever"
   | "else"
   | "use"
   | "<-"
@@ -285,6 +286,8 @@ export type RuleName =
   | "rebinding"
   | "index_access"
   | "for_statement"
+  | "range_statement"
+  | "ever_statement"
   | "binding_else"
   | "effect_binding"
   | "effect_step"
@@ -380,6 +383,7 @@ export interface AttributeNameCursor extends RuleCursorBase<"attribute_name"> {
 export interface ValueDeclarationCursor extends RuleCursorBase<"value_declaration"> {
   field(name: "annotation"): readonly [TokenCursor<"literal", ":">, TypeExpressionCursor] | null;
   field(name: "kind"): TokenCursor<"literal", "const"> | TokenCursor<"literal", "let">;
+  field(name: "modifier"): TokenCursor<"named", "IDENT"> | null;
   field(name: "name"): QualifiedNameCursor;
   field(name: "value"): ExpressionCursor;
   field(name: string): CursorFieldValue | undefined;
@@ -705,7 +709,7 @@ export interface SuiteCursor extends RuleCursorBase<"suite"> {
 }
 
 export interface StatementCursor extends RuleCursorBase<"statement"> {
-  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | ExpressionCursor | ForStatementCursor | PatternConditionalCursor | RebindingCursor | ResultCursor;
+  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ResultCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -738,6 +742,20 @@ export interface ForStatementCursor extends RuleCursorBase<"for_statement"> {
   field(name: "end"): ExpressionCursor | null;
   field(name: "pattern"): PatternCursor;
   field(name: "start"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface RangeStatementCursor extends RuleCursorBase<"range_statement"> {
+  field(name: "body"): SuiteCursor;
+  field(name: "end"): ExpressionCursor;
+  field(name: "start"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface EverStatementCursor extends RuleCursorBase<"ever_statement"> {
+  field(name: "body"): SuiteCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -854,6 +872,8 @@ export type AnyRuleCursor =
   | RebindingCursor
   | IndexAccessCursor
   | ForStatementCursor
+  | RangeStatementCursor
+  | EverStatementCursor
   | BindingElseCursor
   | EffectBindingCursor
   | EffectStepCursor

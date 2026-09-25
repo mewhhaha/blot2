@@ -38,3 +38,19 @@ Deno.test("empty and indivisible sources stay local", () => {
     equal(sourceDeclarationRanges(source), [{ start: 0, end: source.length }]);
   }
 });
+
+Deno.test("entry declarations start work ranges, while entry elsewhere does not", () => {
+  const chunks = [
+    "const entry = fn entry => entry\n",
+    "#[tagged]\nentry const create = fn () => 1\n",
+    "entry let count: U32 = 2\n",
+    "const read = fn value => do:\n  let entry = value\n  return entry\n",
+  ];
+  const source = chunks.join("");
+  equal(
+    sourceDeclarationRanges(source)?.map((range) =>
+      source.slice(range.start, range.end)
+    ),
+    chunks,
+  );
+});

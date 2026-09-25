@@ -17,11 +17,11 @@ const programs = [
     name: "numeric operators specialize generic wrappers in const and Wasm",
     source: `
 const twice = fn value => value + value
-const integer = twice 21
-const floating = twice 1.25
-const integer_run = fn (value: U32) => twice value
-const run = fn (value: F32) => (twice value * 3.0 - 2.0) / 2.0
-const compare = fn (value: F32) => value >= 4.0
+entry const integer = twice 21
+entry const floating = twice 1.25
+entry const integer_run = fn (value: U32) => twice value
+entry const run = fn (value: F32) => (twice value * 3.0 - 2.0) / 2.0
+entry const compare = fn (value: F32) => value >= 4.0
 `,
     expected: 11,
   },
@@ -31,7 +31,7 @@ const compare = fn (value: F32) => value >= 4.0
 data Box = Box F32
 const Box.add = fn (left: Box) => fn (right: Box) => case (left, right) of
   (Box a, Box b) => Box (a + b)
-const run = fn (value: F32) => case Box value + Box 3.0 of
+entry const run = fn (value: F32) => case Box value + Box 3.0 of
   Box answer => answer
 `,
     expected: 7,
@@ -43,7 +43,7 @@ const run = fn (value: F32) => case Box value + Box 3.0 of
 data Box = Box F32
 const Box.add = fn (left: F32) => fn (right: Box) => case right of
   Box value => left - value
-const run = fn (value: F32) => value + Box 3.0
+entry const run = fn (value: F32) => value + Box 3.0
 `,
     expected: 1,
   },
@@ -54,7 +54,7 @@ data Left = Left F32
 data Right = Right F32
 const Left.add = fn (left: Left) => fn (right: Right) => 10.0
 const Right.add = fn (left: Left) => fn (right: Right) => 20.0
-const run = fn (value: F32) => Left value + Right value
+entry const run = fn (value: F32) => Left value + Right value
 `,
     expected: 10,
   },
@@ -65,7 +65,7 @@ data Box = Box F32
 const Box.distance = fn (left: Box) => fn (right: Box) => case (left, right) of
   (Box a, Box b) => F32.abs (a - b)
 const distance = fn left => fn right => @type.call "distance" left right
-const run = fn (value: F32) => distance (Box value) (Box 9.0)
+entry const run = fn (value: F32) => distance (Box value) (Box 9.0)
 `,
     expected: 5,
   },
@@ -73,18 +73,18 @@ const run = fn (value: F32) => distance (Box value) (Box 9.0)
     name:
       "specialization preserves recursion and higher-order partial applications",
     source: `
-const sum = fn count => case count of
+entry const sum = fn count => case count of
   0 => 0
   _ => count + sum (count - 1)
 const twice = fn transform => fn value => transform (transform value)
-const run = fn (value: F32) => twice (add value) (U32.to_f32 (sum 4))
+entry const run = fn (value: F32) => twice (add value) (U32.to_f32 (sum 4))
 `,
     expected: 18,
   },
   {
     name: "local function aliases and lambdas instantiate independently",
     source: `
-const run = fn (value: F32) => do:
+entry const run = fn (value: F32) => do:
   let combine = add
   let twice = fn x => combine x x
   let integer = twice 3
@@ -98,7 +98,7 @@ const run = fn (value: F32) => do:
     source: `
 const combine = add
 const twice = fn value => combine value value
-const run = fn (value: F32) => U32.to_f32 (twice 3) + twice value
+entry const run = fn (value: F32) => U32.to_f32 (twice 3) + twice value
 `,
     expected: 14,
   },
@@ -106,7 +106,7 @@ const run = fn (value: F32) => U32.to_f32 (twice 3) + twice value
     name:
       "associated results retain their operand constraints through local temporaries",
     source: `
-const run = fn (value: F32) => do:
+entry const run = fn (value: F32) => do:
   let square = value * value
   let scaled = square * 2.0
   return scaled - square
@@ -119,7 +119,7 @@ const run = fn (value: F32) => do:
 data Box value = Box value
 const Box.add = fn left => fn right => case (left, right) of
   (Box a, Box b) => Box (a + b)
-const run = fn (value: F32) => case Box value + Box 3.0 of
+entry const run = fn (value: F32) => case Box value + Box 3.0 of
   Box answer => answer
 `,
     expected: 7,
@@ -127,7 +127,7 @@ const run = fn (value: F32) => case Box value + Box 3.0 of
   {
     name: "associated lookup also resolves nominal prelude types",
     source: `
-const run = fn (value: F32) => Maybe.unwrap_or 0.0 (@type.call "map" (fn x => x + 1.0) (Some value))
+entry const run = fn (value: F32) => Maybe.unwrap_or 0.0 (@type.call "map" (fn x => x + 1.0) (Some value))
 `,
     expected: 5,
   },
@@ -167,23 +167,27 @@ Deno.test("generic associated helpers stay importable while unsupported calls fa
   const reference = await createSourceCompiler();
   const native = await createNativeCompiler();
   try {
-    const genericSource = "const run = fn value => value + value";
+    const genericSource =
+      "const run = fn value => value + value\nentry const answer = fn () => run 21";
     const genericArtifact = reference.compile(genericSource);
     equal(await native.compile(genericSource), genericArtifact);
     equal(
-      WebAssembly.Module.exports(new WebAssembly.Module(genericArtifact.bytes)),
-      [],
+      WebAssembly.Module.exports(new WebAssembly.Module(genericArtifact.bytes))
+        .map((item) => item.name),
+      ["answer"],
     );
+    // Dispatch is selected while specializing reachable code, so these calls
+    // are entries: an unreachable call is only type checked.
     for (
       const [source, code] of [
-        ["const run = fn () => True + False", "missing_associated"],
-        ["const run = fn () => 1 + 2.0", "missing_associated"],
+        ["entry const run = fn () => True + False", "missing_associated"],
+        ["entry const run = fn () => 1 + 2.0", "missing_associated"],
         [
           `data Left = Left F32
 data Right = Right F32
 const Left.add = fn (left: Left) => fn (right: Right) => 10
 const Right.add = fn (left: Left) => fn (right: Right) => 20.0
-const run = fn (value: F32) => F32.add (Left value + Right value) 0.0`,
+entry const run = fn (value: F32) => F32.add (Left value + Right value) 0.0`,
           "type_mismatch",
         ],
       ]
@@ -205,7 +209,7 @@ const run = fn (value: F32) => F32.add (Left value + Right value) 0.0`,
 Deno.test("associated calls follow nominal type ownership across imports", async () => {
   const files: Record<string, string> = {
     "file:///dispatch/main.blot": `import { Box as Renamed } from "./box"
-const run = fn (value: F32) => case Renamed value + Renamed 3.0 of
+entry const run = fn (value: F32) => case Renamed value + Renamed 3.0 of
   Renamed answer => answer`,
     "file:///dispatch/box.blot": `data Box = Box F32
 const Box.add = fn (left: Box) => fn (right: Box) => case (left, right) of
@@ -236,7 +240,7 @@ Deno.test("incremental compilation replaces operand specializations after a type
   try {
     for (const literal of ["2", "2.0", "3.5"]) {
       const source = `const twice = fn value => value + value
-const run = fn () => twice ${literal}`;
+entry const run = fn () => twice ${literal}`;
       const expected = await reference.compile(source);
       const actual = await native.compile(source);
       equal(actual.artifact, expected.artifact);
@@ -266,7 +270,7 @@ data Right = Right F32
 ${implementation}
 const Right.add = fn (left: Left) => fn (right: Right) => 20.0
 const combine = fn left => fn right => left + right
-const run = fn (value: F32) => combine (Left value) (Right value)`;
+entry const run = fn (value: F32) => combine (Left value) (Right value)`;
       const expected = await reference.compile(source);
       const actual = await native.compile(source);
       equal(actual.artifact, expected.artifact);
@@ -293,7 +297,7 @@ const Box.add = fn (left: Box) => do:
     let Box a = left
     let Box b = right
     return a * 10.0 + b + first + second
-const run = fn (probe: U32 -> F32 ! {Foreign}) => do (@effect.provider Read probe):
+entry const run = fn (probe: U32 -> F32 ! {Foreign}) => do (@effect.provider Read probe):
   return read 1 + read 2
 `;
   const reference = await createSourceCompiler();

@@ -29,27 +29,27 @@ Deno.test("deferred cold checking matches legacy specialization across effects a
     `const offset = 2
 const make = fn value => fn extra => @u32.add value extra
 const saved = make offset
-const answer = fn () => saved 40
+entry const answer = fn () => saved 40
 `,
     `effect Reader.ask: Unit -> U32
 const ask = fn () => Reader.ask ()
 const handler = fn () => 42
 const reader = @effect.provider Reader.ask handler
-const requirement_count = @effect.count (@effect.of ask)
-const answer = fn () => do reader:
+entry const requirement_count = @effect.count (@effect.of ask)
+entry const answer = fn () => do reader:
   return ask ()
 `,
     `data Maybe a = Some a | Nothing
 const identity = fn value => value
-const answer = fn () => case identity (Some 42) of
+entry const answer = fn () => case identity (Some 42) of
   Some number => number
   Nothing => 0
 `,
-    `const answer = fn (flag: Bool) => case flag of
+    `entry const answer = fn (flag: Bool) => case flag of
   True => 1
 `,
     `const transform = fn value => @u32.add value 1
-const metadata = fn () => @effect.count (@effect.of transform)
+entry const metadata = fn () => @effect.count (@effect.of transform)
 `,
   ];
   try {

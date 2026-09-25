@@ -20,6 +20,7 @@ import ./schema_stage.bend as Schema
 import ./core_compare.bend as Compare
 import ./global_bindings.bend as Bindings
 import ./parallel_infer.bend as ParallelInfer
+import ./entry_points.bend as Entries
 
 type Rename is Data:
   Rename{original: String, specialized: String}
@@ -245,6 +246,8 @@ def rebuild(original: M.Expr, children: List<&2, M.Expr>, +base: Nat) -> Result<
       Done{M.EffectSameExpr{a, b}}
     case M.ForExpr{index, start, end, state, initial, body} a <> b <> c <> d <> Nil{}:
       Done{M.ForExpr{index, a, b, state, c, d}}
+    case M.ForeverExpr{state, initial, body} a <> b <> Nil{}:
+      Done{M.ForeverExpr{state, a, b}}
     case M.ArrayGenerateExpr{count, generator} a <> b <> Nil{}:
       Done{M.ArrayGenerateExpr{a, b}}
     case M.ArrayFillExpr{count, value} a <> b <> Nil{}:
@@ -2486,11 +2489,14 @@ def prepare_shaped(+module: M.Module, entry: String, +family_templates: List<&2,
     prepared : M.Module <- prepare_templates(template_closure(nodes, List.append(&2, String, seeds(functions), constant_seeds(constants))), selected, shapes, entry, family_templates)
     return concrete_module(prepared)
 
-def prepare(+module: M.Module, entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, M.Module>:
+# Every declaration passes this initial check; only what the entry
+# declarations reach is specialized.
+def prepare(+module: M.Module, +entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, M.Module>:
   do Result<&2, &2, M.Diagnostic, M.Module>:
-    +nodes : List<&2, D.Node> <- Check.module_graph(module)
     checked : M.CheckedModule <- Scheduler.check_module(module)
-    prepare_shaped(module, entry, family_templates, nodes, checked)
+    +pruned : Entries.Pruned <- Entries.prune_checked(module, checked, entry)
+    +nodes : List<&2, D.Node> <- Check.module_graph(Entries.pruned_module(pruned))
+    prepare_shaped(Entries.pruned_module(pruned), entry, family_templates, nodes, Scheduler.initial_checked(Entries.pruned_initial(pruned)))
 
 # Dispatch resolution has already checked this exact module.
 def prepare_checked(+module: M.Module, entry: String, family_templates: List<&2, M.Operation>, checked: M.CheckedModule) -> Result<&2, &2, M.Diagnostic, M.Module>:
@@ -2562,25 +2568,9 @@ def prepare_initial_templates(templates: List<&2, String>, +module: M.Module, en
         +prepared : ExpandedModule <- prepare_templates_deferred(head <> tail, selected, shapes, entry, family_templates, checked)
         return Core.Prepared{concrete_module(expanded_module(prepared)), List.append(&2, Core.Certificate, Core.ready_certificates(certificates), expanded_certificates(prepared))}
 
-def prepare_deferred_templates(templates: List<&2, String>, +module: M.Module, entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
-  match templates:
-    case Nil{}:
-      # Without deferred dispatch there is nothing to specialize. The final
-      # checker supplies the types used by checked-driven export selection.
-      Done{Core.Prepared{concrete_module(module), Nil{}}}
-    case head <> tail:
-      do Result<&2, &2, M.Diagnostic, Core.Prepared>:
-        initial : Scheduler.Initial <- Scheduler.check_module_evidenced(module)
-        prepare_initial_templates(head <> tail, module, entry, family_templates, initial)
-
 def module_templates(module: M.Module, +nodes: List<&2, D.Node>) -> List<&2, String>:
   M.Module{constants, functions, types, operations} = module
   template_closure(nodes, List.append(&2, String, seeds(functions), constant_seeds(constants)))
-
-def prepare_deferred_core(+module: M.Module, entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
-  do Result<&2, &2, M.Diagnostic, Core.Prepared>:
-    +nodes : List<&2, D.Node> <- Check.module_graph(module)
-    prepare_deferred_templates(module_templates(module, nodes), module, entry, family_templates)
 
 # Dispatch resolution has already checked this exact module; its certificates
 # cover every group, so the final check also reuses the ready ones when no
@@ -2589,6 +2579,15 @@ def prepare_deferred_initial(+module: M.Module, entry: String, family_templates:
   do Result<&2, &2, M.Diagnostic, Core.Prepared>:
     +nodes : List<&2, D.Node> <- Check.module_graph(module)
     prepare_initial_templates(module_templates(module, nodes), module, entry, family_templates, initial)
+
+# The initial check covers every declaration, even when nothing needs
+# specialization; its certificates let the final check retain the groups that
+# need none. Dead-code elimination follows it.
+def prepare_deferred_core(+module: M.Module, +entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
+  do Result<&2, &2, M.Diagnostic, Core.Prepared>:
+    initial : Scheduler.Initial <- Scheduler.check_module_evidenced(module)
+    +pruned : Entries.Pruned <- Entries.prune_initial(module, initial, entry)
+    prepare_deferred_initial(Entries.pruned_module(pruned), entry, family_templates, Entries.pruned_initial(pruned))
 
 def finish_cached(compiled: CachedExpansion, +context_key: List<&2, U32>, +sources: Map<&2, List<&2, U32>>, +shapes: List<&2, I.Binding>, +configuration: Configuration) -> Result<&2, &2, M.Diagnostic, Prepared>:
   CachedExpansion{expansion, tasks} = compiled
@@ -2687,11 +2686,12 @@ def prepare_cached_nodes(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2,
     prepared : Prepared <- prepare_templates_cached(~key, module_templates(module, nodes), selected, shapes, entry, family_templates, nodes, previous, checked)
     return with_prepared_certificates(concrete_prepared(prepared), Core.ready_certificates(certificates))
 
-def prepare_cached_evidenced(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Cache>, retain: Bool) -> Result<&2, &2, M.Diagnostic, Prepared>:
+def prepare_cached_evidenced(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, +entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Cache>, retain: Bool) -> Result<&2, &2, M.Diagnostic, Prepared>:
   do Result<&2, &2, M.Diagnostic, Prepared>:
-    +nodes : List<&2, D.Node> <- Check.module_graph(module)
     initial : Scheduler.Initial <- source_check(module, retain)
-    prepare_cached_nodes(~key, module, entry, family_templates, nodes, previous, initial)
+    +pruned : Entries.Pruned <- Entries.prune_initial(module, initial, entry)
+    +nodes : List<&2, D.Node> <- Check.module_graph(Entries.pruned_module(pruned))
+    prepare_cached_nodes(~key, Entries.pruned_module(pruned), entry, family_templates, nodes, previous, Entries.pruned_initial(pruned))
 
 # Dispatch resolution has already checked this exact module.
 def prepare_cached_initial(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Cache>, initial: Scheduler.Initial) -> Result<&2, &2, M.Diagnostic, Prepared>:

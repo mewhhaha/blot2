@@ -48,6 +48,8 @@ def children(expression: I.Expr) -> List<&2, I.Expr>:
       [value]
     case I.ForExpr{index, start, end, state, initial, body}:
       [start, end, initial, body]
+    case I.ForeverExpr{state, initial, body, compact}:
+      [initial, body]
     case I.ArrayGenerateExpr{count, generator}:
       [count, generator]
     case I.ArrayFillExpr{count, value}:
@@ -126,6 +128,8 @@ def rebuild(original: I.Expr, children: List<&2, I.Expr>) -> Result<&2, &2, M.Di
       Done{I.ProjectExpr{value_new, index}}
     case I.ForExpr{index, start, end, state, initial, body} start_new <> end_new <> initial_new <> body_new <> Nil{}:
       Done{I.ForExpr{index, start_new, end_new, state, initial_new, body_new}}
+    case I.ForeverExpr{state, initial, body, compact} initial_new <> body_new <> Nil{}:
+      Done{I.ForeverExpr{state, initial_new, body_new, compact}}
     case I.ArrayGenerateExpr{count, generator} count_new <> generator_new <> Nil{}:
       Done{I.ArrayGenerateExpr{count_new, generator_new}}
     case I.ArrayFillExpr{count, value} count_new <> value_new <> Nil{}:
@@ -278,6 +282,15 @@ def rewrite(fuel: Nat, work: Work, +ownership: Map<&2, Bool>, +usages: Map<&2, U
         +b : Edited <- rewrite(rest, Expression{body}, Map.set(&2, Bool, Map.new(&2, Bool), state, owned(i)), usages, next(i))
         body : I.Expr <- one(expressions(b))
         return Edited{[I.ForExpr{index, start, end, state, initial, body}], Bool.and(owned(i), owned(b)), next(b)}
+    case 1n+ +rest Expression{I.ForeverExpr{+state, initial, body, compact}}:
+      do Result<&2, &2, M.Diagnostic, Edited>:
+        +i : Edited <- rewrite(rest, Expression{initial}, ownership, usages, 1n+position)
+        prepared : I.Expr <- one(expressions(i))
+        # The backedge may select a borrowed array even when the initial value
+        # is fresh. Ownership needs an invariant across every iteration.
+        +b : Edited <- rewrite(rest, Expression{body}, Map.set(&2, Bool, Map.new(&2, Bool), state, False{}), usages, next(i))
+        rewritten : I.Expr <- one(expressions(b))
+        return Edited{[I.ForeverExpr{state, prepared, rewritten, compact}], Bool.and(owned(i), owned(b)), next(b)}
     case 1n+ +rest Expression{I.ArraySetExpr{+array, index, value}}:
       do Result<&2, &2, M.Diagnostic, Edited>:
         +a : Edited <- rewrite(rest, Expression{array}, ownership, usages, 1n+position)

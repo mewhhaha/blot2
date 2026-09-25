@@ -431,6 +431,74 @@ compile behind `analysis: false`. Response kinds are 0 diagnostic, 1 analysis, 2
 artifact (analysis and Wasm), 3 opened, 4 cached (eight counters and an inner
 kind 1, 2 or 5), and 5 Wasm only.
 
+## Entry declarations and dead-code elimination
+
+`entry const` and `entry let` mark host entrypoints:
+
+```blot
+entry const create = fn () => host.create sandbox state_schema ()
+entry const frame = fn (packet: Array F32) => host.frame sandbox state_schema packet
+entry const state_schema: U32 = 2
+```
+
+`entry` is a contextual keyword. The grammar accepts an optional identifier
+before `const` or `let` at the start of a top-level declaration (after any
+`#[...]` tags), and lowering accepts only `entry` there (`unknown_modifier`
+otherwise). Everywhere else `entry` is an ordinary identifier: a parameter, a
+`let` or pattern binding, a record field or a declaration name. The editor
+grammar highlights it only as the modifier of a `const`/`let` on the same line.
+
+Only the entry module reaches the host, so `entry` in any other module, the
+prelude included, is `entry_outside_entry_module`. `entry` never affects Blot
+visibility: every declaration of every module stays importable exactly as
+before, and an entry declaration is referenced like any other constant. A module
+that declares entries is therefore an application, not a library: a second build
+that imports it reports the same diagnostic, so share code through a library
+module instead.
+
+Exactly the entry module's entry declarations become Wasm exports, under their
+own names; several are allowed and nothing is exported implicitly. Lowering sets
+the declaration's `exported` flag from the modifier and nothing else sets it.
+Export selection keeps an entry only when its final type fits the guest ABI, and
+the final check then verifies every entry: an entry that does not fit (for
+example a generic function, an `Array` constant or an unhandled effect) is
+`entry_type`, or `entry_let_type` for a runtime-initialized `entry let` value
+(the ABI exports runtime values only as scalar globals or functions). Analysis
+reports these too. A Wasm build (`compile` and the Wasm-only `emit`) without any
+entry declaration is `no_entry`; `analyze` accepts it, still checks every
+declaration and reports nothing reachable.
+
+The entries are also the only dead-code roots. Every declaration passes the
+initial check, so type errors in unused code are still reported. Right after
+that check (the first round of
+[concrete dispatch resolution](dispatch_resolution.bend), or the specialization
+fallbacks when resolution does not apply),
+[entry_points.bend](entry_points.bend) computes the declarations the entries
+reach over the lowered dependency graph: function, constant and `let`
+references, value-pattern pins and reflection targets. A deferred dispatch site
+cannot know its implementation before specialization, so a reachable site with
+member `m` keeps every declared `<owner>.m`, where the owner is a data type or
+builtin nominal prefix exactly as specialization names implementations. Nominal
+type and operation metadata stays available for checking and constructor layout.
+The backend emits constructor-function and operation wrappers only when runtime
+code or retained constant values reach them. Declarations are scanned in
+parallel Bend batches of 64; the walk itself is one flat work queue. Resolution
+rounds, specialization, the final check, const evaluation, runtime
+initialization and code generation then see only reachable declarations, and the
+initial check's certificates, shapes and group requirements are pruned alike.
+When nothing reachable needs specialization, the final check retains every group
+from those certificates, so the code is still inferred once. Consequently an
+unreachable constant is never evaluated (a panic or an exhausted step budget
+there no longer fails the build), an unreachable `let` initializer never runs at
+startup, and diagnostics that specialization owns, such as `missing_associated`
+for `True + False`, appear only in reachable code. The analysis lists reachable
+declarations only.
+
+Native sessions and project sessions key lowered declarations by their complete
+syntax, so adding or removing `entry` invalidates exactly that declaration and
+the specialization, check, constant and code caches that depend on its export
+flag.
+
 ## Source modules
 
 The CLI loads relative file imports and the explicit `std/` directory mapping.
@@ -448,9 +516,10 @@ Programmatic callers use `loadSourceProject(entry, { imports })` from
 compiler's `analyze` or `compile` method. The loader reads each dependency once,
 diagnoses cycles, and retains per-file diagnostic locations. Bend resolves
 public declarations, module scopes, nominal type/effect identities, and
-qualified type annotations. Top-level declarations are importable by default.
-Only entry-module bindings with concrete guest ABI-compatible types become Wasm
-exports. Generic and structural helpers remain importable Blot values. Importing
+qualified type annotations. Top-level declarations are importable by default,
+entry declarations included. Only the entry module's `entry const` and
+`entry let` declarations become Wasm exports (see
+[entry declarations](#entry-declarations-and-dead-code-elimination)). Importing
 a type does not implicitly import constructors with different names. Imported
 operator functions need a local fixity declaration; prelude fixities are
 available in every module.
@@ -517,9 +586,10 @@ complete checked examples. It does not start or build the native compiler.
   grouping. Free lowercase annotation names are inferred within their
   declaration.
 - Top-level functions are ordinary `const name = fn ...` or `let name = fn ...`
-  bindings. Every top-level declaration is public; concrete entry values that
-  fit the guest ABI become Wasm exports. `const` evaluates at compile time;
-  `let` initializes once at runtime when the module starts.
+  bindings. Every top-level declaration is public; `entry const` and `entry let`
+  declarations of the entry module are its Wasm exports. `const` evaluates at
+  compile time; `let` initializes once at runtime when the module starts, when
+  an entry reaches it.
 - Named record constructors, such as
   `type Vec2 is data = Vec2 { x: F32, y: F32 }`. Construction requires every
   field exactly once; shorthand `{ x, y }` uses lexical bindings. Fields
@@ -570,8 +640,10 @@ complete checked examples. It does not start or build the native compiler.
   parenthesize negative call arguments.
 - Generic `@panic "message"` produces Never and traps in Wasm; const evaluation
   reports its message as a diagnostic. It supplies no IO authority.
-- Explicit host callbacks with a sealed `Foreign` effect, scalar signatures,
-  opaque invocation-scoped references, and a versioned generic adapter. See
+- Explicit host callbacks with a sealed `Foreign` effect, scalar or
+  numeric-array signatures, opaque invocation-scoped references, and a versioned
+  generic adapter. Async capabilities can suspend a running guest while
+  retaining its locals and exclusive invocation ownership. See
   [guest ABI 2](guest-abi.md) and
   [the executable example](../examples/host_io.blot).
 
@@ -587,9 +659,10 @@ and code generation; unresolved dispatch cannot reach Wasm. See
 
 [std/prelude.blot](../std/prelude.blot) is ordinary source, loaded once per
 frontend session. `{ prelude: "none" }` selects a freestanding module. Prelude
-exports become visible source names, but only root exports become Wasm exports.
-Direct qualified calls such as `Maybe.map` resolve to that named function.
-`@type.call` requests associated dispatch explicitly.
+declarations become visible source names; only the root module's entry
+declarations become Wasm exports, and only the prelude declarations they reach
+are compiled. Direct qualified calls such as `Maybe.map` resolve to that named
+function. `@type.call` requests associated dispatch explicitly.
 
 Receiver syntax resolves from the receiver's type: `tail.contains(x)` applies an
 ordinary associated function, and `tail.contains` partially applies it. Lookup
@@ -623,14 +696,14 @@ binding. Closures capture locals, not active providers: invoking an escaped
 closure uses the caller's provider scope. A provider implementation sees the
 outer chain, excluding the selected provider and younger frames.
 
-Export wrappers accept Unit/Bool/U32/F32, Array U32/F32, or one scalar callback
-with exactly `! {Foreign}`, and return scalars or numeric arrays. The adapter
-copies typed-array inputs and outputs so hosts can retain state across reloads.
-Callback parameters use `externref` and signature-specific `blot:host/1`
-imports. Scalar-only artifacts stay import-free. Every module describes its
-exports in `blot:abi`; the adapter validates this manifest and scopes supplied
-callbacks to the current invocation. Ordinary unhandled source operations still
-fail instead of acquiring ambient IO.
+Export wrappers accept Unit/Bool/U32/F32, Array U32/F32, or one
+scalar/numeric-array callback with exactly `! {Foreign}`, and return scalars or
+numeric arrays. The adapter copies typed-array inputs and outputs so hosts can
+retain state across reloads. Callback parameters use `externref` and
+signature-specific `blot:host/1` imports. Artifacts without host callbacks stay
+import-free. Every module describes its exports in `blot:abi`; the adapter
+validates this manifest and scopes supplied callbacks to the current invocation.
+Ordinary unhandled source operations still fail instead of acquiring ambient IO.
 
 Arrays have a length header and contiguous machine-word elements; tuples have
 fixed-size contiguous fields. Nested values and closures occupy reference lanes,

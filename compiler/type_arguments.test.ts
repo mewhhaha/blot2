@@ -28,7 +28,7 @@ const entry = fn (value: Entry { tail: a, head: U32 }) => do:
 const nested = fn (value: Nested { rest: [Bool, Unit], pair: (U32, F32) }) => do:
   let Nested (first, second, third, fourth) = value
   return first
-const answer = fn () => @u32.add (listed (Listed (10, True))) (@u32.add (paired (Paired (10, 0.5))) (@u32.add (entry (Entry { tail: (), head: 10 })) (nested (Nested (12, 0.5, True, ())))))
+entry const answer = fn () => @u32.add (listed (Listed (10, True))) (@u32.add (paired (Paired (10, 0.5))) (@u32.add (entry (Entry { tail: (), head: 10 })) (nested (Nested (12, 0.5, True, ())))))
 `;
   try {
     const artifact = reference.compile(source);
@@ -51,7 +51,7 @@ type Curried a => type [b, c] is data = Curried (a, b, c)
 const unpack = fn (value: (Curried U32) [Bool, a]) => do:
   let Curried (first, second, third) = value
   return first
-const answer = fn () => unpack (Curried (42, True, ()))
+entry const answer = fn () => unpack (Curried (42, True, ()))
 `;
   try {
     const artifact = reference.compile(source);
@@ -78,8 +78,8 @@ const add = fn (left: a) => fn (right: a) -> a => left + right
 const same = fn (value: Pair [a, a]) -> a => do:
   let Pair (first, second) = value
   return identity first
-const number = fn () => add (same (Pair (40, 1))) (identity 2)
-const fraction = fn () => add (identity 1.25) (identity 0.5)
+entry const number = fn () => add (same (Pair (40, 1))) (identity 2)
+entry const fraction = fn () => add (identity 1.25) (identity 0.5)
 `;
   try {
     const artifact = reference.compile(source);
@@ -117,7 +117,7 @@ const record_call: Unit -> Bool ! {Named { output: Bool, input: U32 }} = fn () =
 const curried_call: Unit -> Bool ! {(Curried U32) Bool} = fn () => do:
   use result <- (Curried U32) Bool 2
   return result
-const answer = fn () => do (@effect.provider (Exchange [U32, Bool]) (fn value => True)):
+entry const answer = fn () => do (@effect.provider (Exchange [U32, Bool]) (fn value => True)):
   return do (@effect.provider ((Curried U32) Bool) (fn value => True)):
     return do (@effect.provider (Named { input: U32, output: Bool }) (fn value => True)):
       use first <- list_call ()
@@ -148,7 +148,7 @@ Deno.test("empty argument patterns still require explicit type and effect applic
 type Token () is data = Token
 type Ping () is effect = Unit -> U32
 const token = fn (value: Token ()) => value
-const answer = fn () => do (@effect.provider (Ping ()) (fn value => 42)):
+entry const answer = fn () => do (@effect.provider (Ping ()) (fn value => 42)):
   let value = token Token
   use result <- Ping () ()
   return result
@@ -252,7 +252,7 @@ const use_entry = fn (entry: entry_type { head: U32, tail: Bool }) => first entr
 const use_pair = fn (pair: (Curried U32) Bool) => do:
   let Curried (first, second) = pair
   return first
-const answer = fn () => @u32.add (use_entry (entry_type { tail: True, head: 40 })) (use_pair (Curried (2, True)))
+entry const answer = fn () => @u32.add (use_entry (entry_type { tail: True, head: 40 })) (use_pair (Curried (2, True)))
 `,
     ],
   ]);
@@ -294,7 +294,7 @@ type Pair [a, b] is data = Pair (a, b)
 const first = fn (pair: Pair [U32, Bool]) => do:
   let Pair (first, second) = pair
   return first
-const answer = fn () => first (Pair (42, True))
+entry const answer = fn () => first (Pair (42, True))
 `;
   try {
     const before = await compiler.compile(source);

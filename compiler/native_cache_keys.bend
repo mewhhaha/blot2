@@ -250,6 +250,8 @@ def flatten(fuel: Nat, pending: List<&2, Work>, reversed: List<&2, R.Work>) -> R
       flatten(rest, Field{R.Word{40}} <> Field{R.Natural{identity}} <> Dispatch{dispatch} <> Field{R.Text{member}} <> Identities{templates} <> Expression{left} <> Expression{right} <> tail, reversed)
     case 1n+rest Expression{M.ForExpr{index, start, end, state, initial, body}} <> tail:
       flatten(rest, Field{R.Word{41}} <> Field{R.Text{index}} <> Expression{start} <> Expression{end} <> Field{R.Text{state}} <> Expression{initial} <> Expression{body} <> tail, reversed)
+    case 1n+rest Expression{M.ForeverExpr{state, initial, body}} <> tail:
+      flatten(rest, Field{R.Word{46}} <> Field{R.Text{state}} <> Expression{initial} <> Expression{body} <> tail, reversed)
     case 1n+rest Expression{M.StateProviderExpr{read, write, initial}} <> tail:
       flatten(rest, Field{R.Word{42}} <> Field{R.Identity{read}} <> Field{R.Identity{write}} <> Expression{initial} <> tail, reversed)
     case 1n+rest Expression{M.GenericOperationExpr{identity, template, arguments}} <> tail:
@@ -352,6 +354,8 @@ def flatten(fuel: Nat, pending: List<&2, Work>, reversed: List<&2, R.Work>) -> R
       flatten(rest, Field{R.Word{25}} <> Runtimes{elements} <> tail, reversed)
     case 1n+rest Runtime{I.ForExpr{index, start, end, state, initial, body}} <> tail:
       flatten(rest, Field{R.Word{31}} <> Field{R.Text{index}} <> Runtime{start} <> Runtime{end} <> Field{R.Text{state}} <> Runtime{initial} <> Runtime{body} <> tail, reversed)
+    case 1n+rest Runtime{I.ForeverExpr{state, initial, body, compact}} <> tail:
+      flatten(rest, Field{R.Word{34}} <> Field{R.Text{state}} <> Runtime{initial} <> Runtime{body} <> flag(compact) <> tail, reversed)
     case 1n+rest Runtime{I.ArrayGenerateExpr{count, generator}} <> tail:
       flatten(rest, Field{R.Word{30}} <> Runtime{count} <> Runtime{generator} <> tail, reversed)
     case 1n+rest Runtime{I.ArrayFillExpr{count, value}} <> tail:

@@ -373,6 +373,18 @@
         }
       },
       {
+        "rule": "range_statement",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "ever_statement",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
         "rule": "effect_binding",
         "boundary": {
           "kind": "root"

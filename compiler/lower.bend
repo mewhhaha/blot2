@@ -130,6 +130,7 @@ type Work is Data:
   CaseValues{nodes: List<&2, C.Cst>, reversed: List<&2, M.Expr>, arms: List<&2, C.Cst>}
   Arms{values: List<&2, M.Expr>, nodes: List<&2, C.Cst>, arms: List<&2, M.MatchArm<M.Expr>>}
   ResolvedBlock{resolvers: List<&2, C.Cst>, body: M.Expr, offset: Nat}
+  ForStart{ever: Bool, node: C.Cst, pattern: M.Pattern, initial: M.Expr, body: M.Expr, prefix: String}
   ForRange{ends: List<&2, C.Cst>, pattern: M.Pattern, start: M.Expr, initial: M.Expr, body: M.Expr, prefix: String, offset: Nat}
   Statements{nodes: List<&2, C.Cst>, carried: List<&2, Local>}
   Statement{kind: NodeKind, node: C.Cst, tail: List<&2, C.Cst>, carried: List<&2, Local>}
@@ -162,7 +163,7 @@ def classify_initial(initial: Char, +kind: String) -> NodeKind:
     case 'd':
       Bool.pick(NodeKind, M.name_equal(kind, "data_type"), DataNode{}, Bool.pick(NodeKind, M.name_equal(kind, "do_block"), Block{}, Unsupported{}))
     case 'e':
-      Bool.pick(NodeKind, M.name_equal(kind, "expression"), Wrapper{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_binding"), EffectBinding{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_step"), EffectBinding{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_declaration"), EffectNode{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_type"), EffectTypeNode{}, Unsupported{})))))
+      Bool.pick(NodeKind, M.name_equal(kind, "ever_statement"), ForLoop{}, Bool.pick(NodeKind, M.name_equal(kind, "expression"), Wrapper{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_binding"), EffectBinding{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_step"), EffectBinding{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_declaration"), EffectNode{}, Bool.pick(NodeKind, M.name_equal(kind, "effect_type"), EffectTypeNode{}, Unsupported{}))))))
     case 'f':
       Bool.pick(NodeKind, M.name_equal(kind, "for_statement"), ForLoop{}, Unsupported{})
     case 'g':
@@ -182,7 +183,7 @@ def classify_initial(initial: Char, +kind: String) -> NodeKind:
     case 'q':
       Bool.pick(NodeKind, M.name_equal(kind, "qualified_name"), Name{}, Unsupported{})
     case 'r':
-      Bool.pick(NodeKind, M.name_equal(kind, "record"), RecordNode{}, Bool.pick(NodeKind, M.name_equal(kind, "result"), Return{}, Bool.pick(NodeKind, M.name_equal(kind, "rebinding"), Rebinding{}, Unsupported{})))
+      Bool.pick(NodeKind, M.name_equal(kind, "range_statement"), ForLoop{}, Bool.pick(NodeKind, M.name_equal(kind, "record"), RecordNode{}, Bool.pick(NodeKind, M.name_equal(kind, "result"), Return{}, Bool.pick(NodeKind, M.name_equal(kind, "rebinding"), Rebinding{}, Unsupported{}))))
     case 's':
       Bool.pick(NodeKind, M.name_equal(kind, "symbolic_fixity"), SymbolicFixity{}, Unsupported{})
     case _:
@@ -1136,6 +1137,15 @@ def pattern_of(result: PatternResult) -> M.Pattern:
   PatternResult{pattern, locals} = result
   pattern
 
+def loop_pattern(fuel: Nat, nodes: List<&2, C.Cst>, context: Context) -> Result<&2, &2, M.Diagnostic, PatternResult>:
+  match nodes:
+    case Nil{}:
+      Done{PatternResult{M.WildcardPattern{}, Nil{}}}
+    case +node <> Nil{}:
+      lower_pattern(fuel, classify(C.kind_of(node)), node, context)
+    case _:
+      Fail{M.Diagnostic{"internal_cst", "for", "invalid loop pattern"}}
+
 def pattern_scope(context: Context, result: PatternResult) -> Context:
   PatternResult{pattern, locals} = result
   bind_all(locals, context)
@@ -1216,8 +1226,7 @@ def loop_targets(+fuel: Nat, work: LoopTargetsWork, +context: Context, +shadowed
         loop_targets(rest, LoopTargets{tail}, bind(context, target), shadow_names([target], shadowed), targets)
     case 1n+rest LoopTarget{ForLoop{}, +node, tail}:
       do Result<&2, &2, M.Diagnostic, Set()>:
-        +pattern : C.Cst <- C.one(C.field_values(node, "pattern"))
-        +parsed : PatternResult <- lower_pattern(rest, classify(C.kind_of(pattern)), pattern, context)
+        +parsed : PatternResult <- loop_pattern(rest, C.field_values(node, "pattern"), context)
         suite : C.Cst <- C.one(C.field_values(node, "body"))
         nested : Set() <- loop_targets(rest, LoopTargets{statement_nodes(suite)}, pattern_scope(context, parsed), shadow_names(pattern_locals(parsed), shadowed), targets)
         loop_targets(rest, LoopTargets{tail}, context, shadowed, nested)
@@ -1687,8 +1696,7 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             return located(C.offset_of(node), binding(C.present(C.field_values(node, "fallback")), pattern_of(pat), M.SourceExpr{C.offset_of(node), ty, value}, alternative, body, C.offset_of(node)))
         case Statement{ForLoop{}, +node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
-            +pattern_node : C.Cst <- C.one(C.field_values(node, "pattern"))
-            +pat : PatternResult <- lower_pattern(remaining, classify(C.kind_of(pattern_node)), pattern_node, context)
+            +pat : PatternResult <- loop_pattern(remaining, C.field_values(node, "pattern"), context)
             +suite : C.Cst <- C.one(C.field_values(node, "body"))
             targets : Set() <- loop_targets(remaining, LoopTargets{statement_nodes(suite)}, context, shadow_names(pattern_locals(pat), Set.new()), Set.new())
             +originals : List<&2, Local> <- Done{loop_locals(context, targets)}
@@ -1696,13 +1704,18 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             +versions : List<&2, Local> <- Done{loop_versions(originals, prefix)}
             +scope : Context <- Done{bind_all(versions, context)}
             +successors : List<&2, Local> <- Done{loop_versions(originals, prefix ++ "next$")}
-            start_node : C.Cst <- C.one(C.field_values(node, "start"))
-            start : M.Expr <- lower(remaining, visit(start_node), context)
             body : M.Expr <- lower(remaining, Statements{statement_nodes(suite), versions}, pattern_scope(scope, pat))
             next : M.Expr <- lower(remaining, Statements{tail, loop_carried(originals, successors, carried)}, bind_all(successors, context))
             +single : Bool <- Done{Nat.is_eq(List.length(&2, Local, versions), 1n)}
-            loop : M.Expr <- lower(remaining, ForRange{C.field_values(node, "end"), pattern_of(pat), start, loop_value(local_values(originals)), loop_bindings(versions, prefix ++ "state", 0n, single, body), prefix, C.offset_of(node)}, context)
+            loop : M.Expr <- lower(remaining, ForStart{M.name_equal(C.kind_of(node), "ever_statement"), node, pattern_of(pat), loop_value(local_values(originals)), loop_bindings(versions, prefix ++ "state", 0n, single, body), prefix}, context)
             return located(C.offset_of(node), M.UseExpr{prefix ++ "result", loop, loop_bindings(successors, prefix ++ "result", 0n, single, next)})
+        case ForStart{True{}, node, pattern, initial, body, +prefix}:
+          Done{M.ForeverExpr{prefix ++ "state", initial, body}}
+        case ForStart{False{}, +node, pattern, initial, body, +prefix}:
+          do Result<&2, &2, M.Diagnostic, M.Expr>:
+            start_node : C.Cst <- C.one(C.field_values(node, "start"))
+            start : M.Expr <- lower(remaining, visit(start_node), context)
+            lower(remaining, ForRange{C.field_values(node, "end"), pattern, start, initial, body, prefix, C.offset_of(node)}, context)
         case ForRange{Nil{}, pattern, array, initial, body, +prefix, offset}:
           Done{M.UseExpr{prefix ++ "array", array, M.ForExpr{prefix ++ "index", M.U32Expr{0}, M.ArrayLengthExpr{M.LocalExpr{prefix ++ "array"}}, prefix ++ "state", initial, plain_binding(pattern, M.ArrayGetExpr{M.LocalExpr{prefix ++ "array"}, M.LocalExpr{prefix ++ "index"}}, body, offset)}}}
         case ForRange{end_node <> Nil{}, pattern, start, initial, body, +prefix, offset}:
@@ -2265,14 +2278,37 @@ def lower_value_declaration(function: Maybe<&2, C.Cst>, node: C.Cst, name: Strin
         value : M.Constant <- lower_constant(node, name, exported, fuel, context)
         return add_constant(rest, value)
 
-def declaration(kind: NodeKind, +node: C.Cst, +prefix: String, module_name: String, exported: Bool, rest: M.Module, +fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
+# `entry` is a contextual keyword: the grammar accepts any identifier before
+# `const` or `let`, and only `entry` is a declaration modifier. It marks a host
+# entrypoint (a Wasm export and a dead-code root), so it belongs to the entry
+# module; it never changes which declarations other Blot modules may import.
+def entry_modifier(entry: Bool, entry_module: Bool, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Bool>:
+  match entry entry_module:
+    case False{} _:
+      Fail{C.diagnostic(node, "unknown_modifier", "only `entry` may precede `const` or `let`")}
+    case True{} True{}:
+      Done{True{}}
+    case True{} False{}:
+      Fail{C.diagnostic(node, "entry_outside_entry_module", "`entry` marks a host entrypoint and is only allowed in the entry module; other modules' declarations stay importable without it")}
+
+def declaration_modifier(modifiers: List<&2, C.Cst>, entry_module: Bool) -> Result<&2, &2, M.Diagnostic, Bool>:
+  match modifiers:
+    case Nil{}:
+      Done{False{}}
+    case +node <> Nil{}:
+      entry_modifier(M.name_equal(C.text_of(node), "entry"), entry_module, node)
+    case node <> tail:
+      Fail{C.diagnostic(node, "internal_cst", "a declaration has at most one modifier")}
+
+def declaration(kind: NodeKind, +node: C.Cst, +prefix: String, module_name: String, entry_module: Bool, rest: M.Module, +fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
   match kind:
     case ValueDeclaration{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
         +name : String <- declaration_name(node)
+        entry : Bool <- declaration_modifier(C.field_values(node, "modifier"), entry_module)
         initializer : C.Cst <- C.one(C.field_values(node, "value"))
         function : Maybe<&2, C.Cst> <- declaration_lambda(fuel, InitializerChildren{[initializer]})
-        lower_value_declaration(function, node, prefix ++ name, exported, rest, fuel, context)
+        lower_value_declaration(function, node, prefix ++ name, entry, rest, fuel, context)
     case EffectNode{}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
         name : String <- declaration_name(node)
@@ -2298,16 +2334,16 @@ def reject_attributes(attributes: List<&2, C.Cst>) -> Result<&2, &2, M.Diagnosti
     case node <> tail:
       Fail{C.diagnostic(node, "unsupported_attribute", "source declaration transforms are not implemented yet")}
 
-def lower_declarations_sequential(nodes: List<&2, C.Cst>, +prefix: String, +module_name: String, +allow_exports: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
+def lower_declarations_sequential(nodes: List<&2, C.Cst>, +prefix: String, +module_name: String, +entry_module: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
   match nodes:
     case Nil{}:
       Done{M.Module{Nil{}, Nil{}, Nil{}, Nil{}}}
     case +head <> tail:
       do Result<&2, &2, M.Diagnostic, M.Module>:
         +node : C.Cst <- C.one(C.field_values(head, "value"))
-        rest : M.Module <- lower_declarations_sequential(tail, prefix, module_name, allow_exports, fuel, context)
+        rest : M.Module <- lower_declarations_sequential(tail, prefix, module_name, entry_module, fuel, context)
         valid : Unit <- reject_attributes(C.field_values(head, "attributes"))
-        declaration(classify(C.kind_of(node)), node, prefix, module_name, allow_exports, rest, fuel, context)
+        declaration(classify(C.kind_of(node)), node, prefix, module_name, entry_module, rest, fuel, context)
 
 def combine_modules(prelude: M.Module, module: M.Module) -> M.Module:
   M.Module{pc, pf, pt, po} = prelude
@@ -2425,20 +2461,20 @@ def merge_declarations(left: Result<&2, &2, M.Diagnostic, M.Module>, right: Resu
         a : M.Module <- left
         return combine_modules(a, b)
 
-def lower_declaration_batch(batch: DeclarationBatch, +prefix: String, +module_name: String, +allow_exports: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
+def lower_declaration_batch(batch: DeclarationBatch, +prefix: String, +module_name: String, +entry_module: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
   match batch:
     case DeclarationLeaf{nodes}:
-      lower_declarations_sequential(nodes, prefix, module_name, allow_exports, fuel, context)
+      lower_declarations_sequential(nodes, prefix, module_name, entry_module, fuel, context)
     # Bend 2.0.21 drains 16 contiguous lanes per worker. Expose eight balanced
     # branches so a small binary tree does not occupy only two worker chunks.
     case DeclarationFork{DeclarationFork{DeclarationFork{a, b}, DeclarationFork{c, d}}, DeclarationFork{DeclarationFork{e, f}, DeclarationFork{g, h}}}:
-      ra rb rc rd re rf rg rh = lower_declaration_batch(a, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(b, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(c, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(d, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(e, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(f, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(g, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(h, prefix, module_name, allow_exports, fuel, context)
+      ra rb rc rd re rf rg rh = lower_declaration_batch(a, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(b, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(c, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(d, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(e, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(f, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(g, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(h, prefix, module_name, entry_module, fuel, context)
       merge_declarations(merge_declarations(merge_declarations(ra, rb), merge_declarations(rc, rd)), merge_declarations(merge_declarations(re, rf), merge_declarations(rg, rh)))
     case DeclarationFork{DeclarationFork{a, b}, DeclarationFork{c, d}}:
-      ra rb rc rd = lower_declaration_batch(a, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(b, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(c, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(d, prefix, module_name, allow_exports, fuel, context)
+      ra rb rc rd = lower_declaration_batch(a, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(b, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(c, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(d, prefix, module_name, entry_module, fuel, context)
       merge_declarations(merge_declarations(ra, rb), merge_declarations(rc, rd))
     case DeclarationFork{left, right}:
-      a b = lower_declaration_batch(left, prefix, module_name, allow_exports, fuel, context) lower_declaration_batch(right, prefix, module_name, allow_exports, fuel, context)
+      a b = lower_declaration_batch(left, prefix, module_name, entry_module, fuel, context) lower_declaration_batch(right, prefix, module_name, entry_module, fuel, context)
       merge_declarations(a, b)
 
 def validate_declaration_nodes(nodes: List<&2, C.Cst>) -> Result<&2, &2, M.Diagnostic, Unit>:
@@ -2532,12 +2568,12 @@ def declarations_row_requests(nodes: List<&2, C.Cst>, +fuel: Nat, +context: Cont
         first : List<&2, M.Operation> <- declaration_row_requests(fuel, [node], context, variables, Nil{})
         declarations_row_requests(tail, fuel, context, List.reverse.go(&2, M.Operation, first, reversed))
 
-def lower_declarations(+nodes: List<&2, C.Cst>, prefix: String, module_name: String, allow_exports: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
+def lower_declarations(+nodes: List<&2, C.Cst>, prefix: String, module_name: String, entry_module: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Module>:
   +count = List.length(&2, C.Cst, nodes)
   do Result<&2, &2, M.Diagnostic, M.Module>:
     # Structural failures precede semantic failures in the serial traversal.
     valid : Unit <- validate_declaration_nodes(nodes)
-    module : M.Module <- lower_declaration_batch(declaration_batches(48n, nodes, count, Nat.is_le(count, 4n)), prefix, module_name, allow_exports, fuel, context)
+    module : M.Module <- lower_declaration_batch(declaration_batches(48n, nodes, count, Nat.is_le(count, 4n)), prefix, module_name, entry_module, fuel, context)
     requests : List<&2, M.Operation> <- declarations_row_requests(nodes, fuel, context, Nil{})
     return add_operations(module, requests)
 

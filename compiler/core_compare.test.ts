@@ -244,7 +244,7 @@ Deno.test("certificate module comparison covers every expression, type and opera
   );
   for (
     const [type, count] of [
-      ["Expr", 46],
+      ["Expr", 47],
       ["Ty", 16],
       ["Pattern", 8],
       ["Operation", 3],

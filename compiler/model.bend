@@ -131,6 +131,7 @@ type Expr is Data:
   ProjectExpr{value: Expr, index: Nat}
   ArrayExpr{elements: List<&2, Expr>}
   ForExpr{index: String, start: Expr, end: Expr, state: String, initial: Expr, body: Expr}
+  ForeverExpr{state: String, initial: Expr, body: Expr}
   ArrayGenerateExpr{count: Expr, generator: Expr}
   ArrayFillExpr{count: Expr, value: Expr}
   ArrayGetExpr{array: Expr, index: Expr}

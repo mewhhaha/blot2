@@ -1,3 +1,4 @@
+import { reachedSource } from "./fixtures.ts";
 import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import { createSourceCompiler } from "./source.ts";
 import { createNativeCompiler } from "./native.ts";
@@ -16,10 +17,10 @@ const advance = fn () => do:
   use current <- get Count
   let Count answer = current
   return answer
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (Count next, result) = @state.run (Count 41) advance
   return next + result
-const independent = fn () => do:
+entry const independent = fn () => do:
   let (Count next, (Position moved, result)) = @state.run (Count 41) (fn () =>
     @state.run (Position 1.0) (fn () => do:
       use count <- advance ()
@@ -28,11 +29,11 @@ const independent = fn () => do:
       use set (Position (value + U32.to_f32 count))
       return count))
   return [U32.to_f32 next, moved, U32.to_f32 result]
-const custom = fn () => @state.reader Count (fn () => Count 7) (fn () => do:
+entry const custom = fn () => @state.reader Count (fn () => Count 7) (fn () => do:
   use count <- get Count
   let Count answer = count
   return answer)
-const nested_witness = fn () => do:
+entry const nested_witness = fn () => do:
   let (_, Count answer) = @state.run (Count 42) (fn () => nested_get Count)
   return answer
 `;
@@ -59,8 +60,8 @@ Deno.test("typed state rejects an unhandled operation in a pure binding", async 
   const compiler = await createSourceCompiler();
   try {
     throws(() =>
-      compiler.compile(`data Count = Count U32
-const run: Unit -> Count = fn () => @state.get Count`), (error: unknown) => {
+      compiler.compile(reachedSource(`data Count = Count U32
+const run: Unit -> Count = fn () => @state.get Count`)), (error: unknown) => {
       ok(error instanceof Error);
       ok(/effect|unhandled/.test(error.message), error.message);
       return true;
@@ -81,13 +82,13 @@ const advance = fn () => do:
   use @state.set (Cell (count + 1))
   use @state.set (Cell (amount + 0.5))
   return count
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (Cell count, (Cell amount, previous)) = @state.run (Cell 40) (fn () =>
     @state.run (Cell 1.0) advance)
   return U32.to_f32 count + amount + U32.to_f32 previous
-const run = fn () => answer ()
-const expected = answer ()
-const witness = fn () => do:
+entry const run = fn () => answer ()
+entry const expected = answer ()
+entry const witness = fn () => do:
   let (_, result) = @state.run (Cell 42) (fn () => do:
     use cell <- @state.get (fn () -> Cell U32 => @panic "a type witness must never be called")
     let Cell answer = cell

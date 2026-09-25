@@ -9,7 +9,9 @@ evaluation, and source-defined operators.
 The compiler has no ECS, game, window, input, or rendering primitives. Effects
 are source-declared operations, including type-applied families such as
 `State U32`; providers supply implementations. Host functions are explicit
-callable capabilities passed into ordinary exports, not ambient services. See
+callable capabilities passed into entrypoints, not ambient services. A module's
+host entrypoints are its `entry const` and `entry let` declarations: they are
+its only Wasm exports and the roots from which compilation keeps code. See
 [effects and controlled IO](compiler/effects-and-io.md).
 
 ## Work with the compiler
@@ -56,9 +58,9 @@ through scoped state effects; `just study` runs it headlessly.
 [The host-capability example](examples/host_capabilities.blot) constructs
 guest-side records from a scalar host callback, with no game intrinsics. See
 [the source/host contract](compiler/host-api-proposal.md) for ABI, effects and
-reload boundaries. Scalar callbacks are executable through
-[guest ABI 1](compiler/guest-abi.md); record bundles and persistent worlds in
-the broader proposal are not implemented yet.
+reload boundaries. Scalar and numeric-array callbacks are executable through the
+[guest ABI](compiler/guest-abi.md). Long-lived `main(host)` invocations can
+retain guest state; record capability bundles remain outside the ABI.
 
 ## Current boundary
 
@@ -69,8 +71,8 @@ one is pure, invoking it need not be. `@effect.of`, `@effect.descriptor`,
 `@effect.has`, `@effect.count`, and `@effect.same` support closed compile-time
 descriptors. Closed annotations such as `U32 -> U32 ! {Foreign}` describe
 callback effects. `Foreign` cannot be declared or handled as a source operation.
-Runtime descriptors, unhandled source operations at executable exports, and
-implicit host access are rejected.
+Runtime descriptors, unhandled source operations at entrypoints, and implicit
+host access are rejected.
 
 Matching uses `case a, b, c of` with comma-separated pattern rows. Single-value
 matches use `case value of` too. The inputs evaluate once, left to right. A
@@ -107,11 +109,19 @@ ordinary associated functions. Numeric arrays cross the host boundary as copied
 private to a guest invocation. Project-wide incremental compilation is not
 connected yet.
 
+`for let value in values:` iterates an array, `for let index in 0..5:` binds a
+range index, and `for 0..5:` discards it. `for ever:` repeats until a return or
+failure; it does not suspend by itself. A long-lived `main(host)` can suspend
+through an asynchronous host callback. See the
+[guest ABI](compiler/guest-abi.md) for callback setup and bounded numeric-array
+loop state.
+
 SIMD, explicit polymorphic effect-row annotations such as `! {State a}`,
 type-valued const programming, resumptions, capability bundles, and persistent
-guest handles remain future work. Host exports accept scalars, numeric arrays,
-or one scalar callback and return a scalar or numeric array. Source libraries
-can serialize application state into numeric arrays for save/load and reload.
+guest handles remain future work. Entry functions accept scalars, numeric
+arrays, or one scalar/numeric-array callback and return a scalar or numeric
+array. Source libraries can serialize application state into numeric arrays for
+save/load and reload.
 
 ## Helix highlighting
 

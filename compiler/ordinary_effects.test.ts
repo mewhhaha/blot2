@@ -1,3 +1,4 @@
+import { reachedSource } from "./fixtures.ts";
 import {
   deepStrictEqual as equal,
   ok,
@@ -17,7 +18,7 @@ const convert = fn value => Convert value
 const explicit = fn (value: a) -> b => Named { input: a, output: b } value
 const curried = Curried
 const invoke = fn operation => operation 10
-const answer = fn () => do (@effect.provider (Convert [U32, F32]) (fn value => @u32.to_f32 value)):
+entry const answer = fn () => do (@effect.provider (Convert [U32, F32]) (fn value => @u32.to_f32 value)):
   return do (@effect.provider ((Curried U32) F32) (fn value => @u32.to_f32 value)):
     return do (@effect.provider (Named { input: U32, output: F32 }) (fn value => @u32.to_f32 value)):
       use first <- convert 20
@@ -53,7 +54,7 @@ type Right a is effect = Unit -> a
 const read_left = fn (witness: p -> a) -> a => Left ()
 const read_right = fn () -> U32 => Right ()
 type Box is data = Box U32
-const answer = fn () => do (@effect.provider (Left Box) (fn () => Box 40)):
+entry const answer = fn () => do (@effect.provider (Left Box) (fn () => Box 40)):
   return do (@effect.provider (Right U32) (fn () => 2)):
     use boxed <- read_left Box
     let Box left = boxed
@@ -76,7 +77,7 @@ const answer = fn () => do (@effect.provider (Left Box) (fn () => Box 40)):
 Deno.test("an explicit Unit type argument remains distinct from a unit value argument", async () => {
   const source = `
 type Identity a is effect = a -> a
-const answer = fn () => do (@effect.provider (Identity Unit) (fn value => value)):
+entry const answer = fn () => do (@effect.provider (Identity Unit) (fn value => value)):
   use Identity ()
   return 42
 `;
@@ -100,7 +101,7 @@ type Inspect a is effect = Array a -> a
 const read = fn (witness: p -> a) -> a => Cell.get a ()
 const write = fn (a: a) => Cell.set a
 const write_array = fn (a: a) => Cell.set [a]
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (next, result) = @effect.run Cell.get Cell.set 0 (fn () => do:
     use write 42
     return read (fn () => 0))
@@ -141,11 +142,11 @@ Deno.test("removed selectors are rejected and ordinary effects respect pure anno
       ] as const
     ) {
       throws(
-        () => reference.compile(source),
+        () => reference.compile(reachedSource(source)),
         (error) => error instanceof SourceError && error.code === code,
       );
       await rejects(
-        () => native.compile(source),
+        () => native.compile(reachedSource(source)),
         (error) => error instanceof SourceError && error.code === code,
       );
     }

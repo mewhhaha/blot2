@@ -33,7 +33,7 @@ Deno.test("native project session reuses imported declarations and isolates retu
     new Map([
       [
         entry.href,
-        'import * as lib from "./lib"\nconst answer = fn () => @u32.add (lib.value ()) 1\n',
+        'import * as lib from "./lib"\nentry const answer = fn () => @u32.add (lib.value ()) 1\n',
       ],
       [
         library.href,
@@ -91,7 +91,7 @@ Deno.test("native project session rolls back invalid imported edits and const bu
     new Map([
       [
         entry.href,
-        'import * as lib from "./lib"\nconst answer = fn () => @u32.add (lib.value ()) 1\n',
+        'import * as lib from "./lib"\nentry const answer = fn () => @u32.add (lib.value ()) 1\n',
       ],
       [library.href, valid],
     ]),
@@ -142,7 +142,7 @@ Deno.test("native project session rolls back invalid imported edits and const bu
 
 Deno.test("native project session invalidates schema and import-target changes", async () => {
   const main =
-    'import * as lib from "./lib"\nconst answer = fn () => lib.read (lib.make ())\n';
+    'import * as lib from "./lib"\nentry const answer = fn () => lib.read (lib.make ())\n';
   const firstLibrary = `type Box is data = Box U32
 const make = fn () => Box 40
 const read = fn (box: Box) => case box of
@@ -221,7 +221,7 @@ Deno.test("project load timing excludes time waiting for an earlier compile", as
         reportRead();
         await holdRead;
       }
-      return "const answer = fn () => 42\n";
+      return "entry const answer = fn () => 42\n";
     },
   });
   try {
@@ -257,7 +257,7 @@ const both = fn () => do:
       [
         entry.href,
         `import { Ping, Get, both } from "./lib"
-const answer = fn () => do (@effect.provider Ping (fn () => 40)):
+entry const answer = fn () => do (@effect.provider Ping (fn () => 40)):
   return do (@effect.provider (Get U32) (fn () => 2)):
     return both ()
 `,
@@ -314,7 +314,7 @@ Deno.test("native project process recycling resends complete revisions and keeps
     new Map([
       [
         entry.href,
-        'import * as lib from "./lib"\nconst answer = fn () => lib.value ()\n',
+        'import * as lib from "./lib"\nentry const answer = fn () => lib.value ()\n',
       ],
       [library.href, "const value = fn () => 40\nconst spare = fn () => 99\n"],
     ]),
@@ -378,7 +378,7 @@ Deno.test("native project revision limit counts analyze requests and disposal st
   let blocked = false;
   const { files, readSource } = virtualProject(
     new Map([
-      [entry.href, "const answer = fn () => 40\n"],
+      [entry.href, "entry const answer = fn () => 40\n"],
     ]),
   );
   const session = await createNativeProjectCompiler({
@@ -397,7 +397,7 @@ Deno.test("native project revision limit counts analyze requests and disposal st
     equal(first.stats.session_restarted, false);
     const analyzed = await session.analyze(entry);
     equal(analyzed.stats.session_restarted, false);
-    files.set(entry.href, "const answer = fn () => 41\n");
+    files.set(entry.href, "entry const answer = fn () => 41\n");
     const changed = await session.compile(entry);
     equal(changed.stats.session_restarted, true);
     equal(changed.stats.declarations_sent, 1);
@@ -405,7 +405,7 @@ Deno.test("native project revision limit counts analyze requests and disposal st
     equal(await answer(changed.artifact.bytes), 41);
 
     blocked = true;
-    files.set(entry.href, "const answer = fn () => 42\n");
+    files.set(entry.href, "entry const answer = fn () => 42\n");
     const pending = session.compile(entry);
     await reading;
     const disposal = session.dispose();
@@ -446,7 +446,7 @@ Deno.test("disposing during process restart reaps the replacement before returni
   };
   const { files, readSource } = virtualProject(
     new Map([
-      [entry.href, "const answer = fn () => 40\n"],
+      [entry.href, "entry const answer = fn () => 40\n"],
     ]),
   );
   let session:
@@ -459,7 +459,7 @@ Deno.test("disposing during process restart reaps the replacement before returni
       readSource,
     });
     await session.compile(entry);
-    files.set(entry.href, "const answer = fn () => 41\n");
+    files.set(entry.href, "entry const answer = fn () => 41\n");
     const pending = session.compile(entry);
     await restarting;
     const disposal = session.dispose();
@@ -480,7 +480,7 @@ Deno.test("native project Wasm-only compiles return the full compile's bytes wit
     new Map([
       [
         entry.href,
-        'import * as lib from "./lib"\nconst answer = fn () => @u32.add (lib.value ()) 1\n',
+        'import * as lib from "./lib"\nentry const answer = fn () => @u32.add (lib.value ()) 1\n',
       ],
       [library.href, "const value = fn () => 40\n"],
     ]),

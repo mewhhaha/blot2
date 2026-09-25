@@ -30,9 +30,11 @@ try {
   const compiler = await createNativeCompiler();
   try {
     if (command === "check") {
+      // Every declaration is type checked; the analysis lists what the
+      // entry declarations reach.
       const analysis = await compiler.analyze(project);
       console.log(
-        `${filename}: checked ${analysis.functions.length} functions, ${analysis.constants.length} constants`,
+        `${filename}: checked; entries reach ${analysis.functions.length} functions, ${analysis.constants.length} constants`,
       );
     } else {
       const artifact = await compiler.compile(project, { analysis: false });

@@ -86,3 +86,25 @@ export const scalarExample = module([
     value: add(integer(20), integer(21)),
   }],
 });
+
+/**
+ * Appends an entry that keeps every top-level `const`/`let` of `source`
+ * reachable without calling it. Singleton array lengths consume the references
+ * without constraining their element types; unused local lets would be erased
+ * by lowering before reachability. Only reachable declarations are specialized,
+ * const-evaluated and emitted, so diagnostics from those phases need one; the
+ * probe goes last so existing source offsets stay put.
+ */
+export function reachedSource(source: string): string {
+  const names = [
+    ...source.matchAll(
+      /^(?:entry )?(?:const|let) ([A-Za-z_][A-Za-z0-9_.]*)/gm,
+    ),
+  ].map((match) => match[1]);
+  return `${source}${source.endsWith("\n") ? "" : "\n"}` +
+    "entry const probe = fn () => " +
+    names.reduceRight(
+      (rest, name) => `@u32.add (@array.length [${name}]) (${rest})`,
+      "0",
+    ) + "\n";
+}

@@ -15,16 +15,16 @@ data Maybe a = Some a | Nothing
 const identity = fn value => value
 const defer = fn action => fn () => action ()
 const ask = fn () => Reader.ask ()
-const read_handler = fn () => 40
+entry const read_handler = fn () => 40
 const reader = @effect.provider Reader.ask read_handler
-const even = fn value => case @u32.eq value 0 of
+entry const even = fn value => case @u32.eq value 0 of
   True => True
   False => odd (@u32.sub value 1)
-const odd = fn value => case @u32.eq value 0 of
+entry const odd = fn value => case @u32.eq value 0 of
   True => False
   False => even (@u32.sub value 1)
-const reader_effects = @effect.count (@effect.of ask)
-const answer = fn () => do reader:
+entry const reader_effects = @effect.count (@effect.of ask)
+entry const answer = fn () => do reader:
   use value <- (defer ask) ()
   return case identity (Some value), identity True, even 4 of
     Some number, True, True => @u32.add number 2
@@ -53,7 +53,9 @@ Deno.test("ready inference preserves generic SCCs and latent effects in JS and o
         equal(await native.compile(genericSource), expected);
         const initial = await session.compile(genericSource);
         equal(initial.artifact, expected);
-        ok(initial.stats.groups_checked > 0);
+        // Export flags no longer change after the initial check, so its
+        // certificates can retain every group of the first revision.
+        ok(initial.stats.groups_checked + initial.stats.groups_reused > 0);
         const edited = genericSource.replace(
           "read_handler = fn () => 40",
           "read_handler = fn () => 41",
@@ -77,7 +79,7 @@ Deno.test("ready inference preserves generic SCCs and latent effects in JS and o
 function fanout() {
   const branches = Array.from({ length: 24 }, (_, branch) => {
     const lines = [
-      `const branch_${branch} = fn () => do:`,
+      `entry const branch_${branch} = fn () => do:`,
       "  let value_0 = seed ()",
     ];
     for (let step = 1; step <= 16; step++) {
@@ -87,9 +89,9 @@ function fanout() {
     return lines.join("\n");
   });
   return [
-    "const seed = fn () => 40",
+    "entry const seed = fn () => 40",
     ...branches,
-    "const answer = fn () => branch_0 ()",
+    "entry const answer = fn () => branch_0 ()",
     "",
   ].join("\n");
 }
@@ -109,7 +111,7 @@ Deno.test("retained nominal scans follow constructor moves, edits, failures and 
   const original = `data Left = Carry U32 | EmptyLeft
 data Right = EmptyRight
 ${wrap}
-const answer = fn () => case wrap 40 of
+entry const answer = fn () => case wrap 40 of
   Carry value => @u32.add value 2
   _ => 0
 `;
@@ -150,7 +152,7 @@ const answer = fn () => case wrap 40 of
           (await session.compile(edited)).artifact,
           reference.compile(edited),
         );
-        await session.compile("const answer = fn () => 42\n");
+        await session.compile("entry const answer = fn () => 42\n");
         equal(
           (await session.compile(moved)).artifact,
           reference.compile(moved),
@@ -371,30 +373,30 @@ Deno.test("native ready batches retain interface hits and roll back all caches a
 
 Deno.test("cached inference plans invalidate for dependency rewiring, SCCs and source order", async () => {
   const revisions = [
-    `const seed = fn () => 40
-const left = fn () => 41
-const right = fn () => 1
-const answer = fn () => 42`,
-    `const seed = fn () => 40
-const left = fn () => seed ()
-const right = fn () => left ()
-const answer = fn () => right ()`,
-    `const seed = fn () => 40
-const left = fn () => @u32.add (seed ()) 1
-const right = fn () => seed ()
-const answer = fn () => @u32.add (left ()) (right ())`,
-    `const seed = fn () => 40
-const left = fn value => case @u32.eq value 0 of
+    `entry const seed = fn () => 40
+entry const left = fn () => 41
+entry const right = fn () => 1
+entry const answer = fn () => 42`,
+    `entry const seed = fn () => 40
+entry const left = fn () => seed ()
+entry const right = fn () => left ()
+entry const answer = fn () => right ()`,
+    `entry const seed = fn () => 40
+entry const left = fn () => @u32.add (seed ()) 1
+entry const right = fn () => seed ()
+entry const answer = fn () => @u32.add (left ()) (right ())`,
+    `entry const seed = fn () => 40
+entry const left = fn value => case @u32.eq value 0 of
   True => seed ()
   False => right (@u32.sub value 1)
-const right = fn value => left value
-const answer = fn () => right 2`,
-    `const answer = fn () => right 2
-const right = fn value => left value
-const left = fn value => case @u32.eq value 0 of
+entry const right = fn value => left value
+entry const answer = fn () => right 2`,
+    `entry const answer = fn () => right 2
+entry const right = fn value => left value
+entry const left = fn value => case @u32.eq value 0 of
   True => seed ()
   False => right (@u32.sub value 1)
-const seed = fn () => 40`,
+entry const seed = fn () => 40`,
   ];
   for (const threads of [1, 8]) {
     const session = await createNativeIncrementalCompiler({

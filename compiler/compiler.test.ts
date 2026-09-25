@@ -50,6 +50,16 @@ Deno.test("Bend infers a parameter, evaluates a const, and emits executable Wasm
   }]);
 });
 
+Deno.test("core module marshalling accepts a for ever expression", () => {
+  const source = module([fn("loop", {
+    $: "ForeverExpr",
+    state: "state",
+    initial: integer(0),
+    body: add(local("state"), integer(1)),
+  }, { exported: false })]);
+  equal(analyze(source).functions[0].name, "loop");
+});
+
 Deno.test("forward calls instantiate generic parameters and results", async () => {
   const compiled = await instantiate(module([
     fn("entry", call("identity", integer(42))),

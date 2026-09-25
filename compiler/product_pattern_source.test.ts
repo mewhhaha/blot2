@@ -9,7 +9,7 @@ Deno.test("warm 8192-field tuple patterns compile through checked source with na
   const native = await createNativeCompiler({ prelude: "none", threads: 1 });
   try {
     for (const fields of [128, 8192]) {
-      const source = `const answer = fn () => case (${
+      const source = `entry const answer = fn () => case (${
         Array(fields).fill("0").join(", ")
       }) of
   (${Array(fields).fill("_").join(", ")}) => 42
@@ -31,14 +31,14 @@ Deno.test("source tuple destructuring works in nested and grouped let patterns",
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compile(`
-const answer = fn () => do:
+entry const answer = fn () => do:
   let (first, (second, third)) = (40, (1, 1))
   let (grouped) = first
   let () = ()
   return grouped + second + third
 const pair_sum = fn pair => case pair of
   (left, right) => left + right
-const expected = pair_sum (40, 2)
+entry const expected = pair_sum (40, 2)
 `);
     const { instance } = await WebAssembly.instantiate(artifact.bytes);
     equal((instance.exports.answer as CallableFunction)(), 42);
@@ -59,8 +59,8 @@ const sum = fn candidate => case candidate of
 const correlated = fn pair => fn flag => case pair, flag of
   (True, True), True => 1
   (_, _), _ => 42
-const expected = sum (Some (40, (2, True)))
-const answer = fn () => correlated (True, False) True
+entry const expected = sum (Some (40, (2, True)))
+entry const answer = fn () => correlated (True, False) True
 `);
     const { instance } = await WebAssembly.instantiate(artifact.bytes);
     equal((instance.exports.expected as WebAssembly.Global).value, 42);
@@ -84,10 +84,10 @@ const conditional = fn pair => do:
   if let (Some value, True) = pair:
     return value
   return value
-const accepted = fn () => guard (Some 42, True)
-const rejected = fn () => guard (Some 42, False)
-const matched = fn () => conditional (Some 42, True)
-const unmatched = fn () => conditional (Some 42, False)
+entry const accepted = fn () => guard (Some 42, True)
+entry const rejected = fn () => guard (Some 42, False)
+entry const matched = fn () => conditional (Some 42, True)
+entry const unmatched = fn () => conditional (Some 42, False)
 `);
     const { instance } = await WebAssembly.instantiate(artifact.bytes);
     for (const name of ["accepted", "matched"]) {
@@ -109,7 +109,7 @@ effect Next: Unit -> U32
 const pair = fn () => do:
   use value <- Next ()
   return (value, 2)
-const answer = fn (read: Unit -> U32 ! {Foreign}) => do (@effect.provider Next read):
+entry const answer = fn (read: Unit -> U32 ! {Foreign}) => do (@effect.provider Next read):
   return case pair () of
     (left, right) => left + right
 `);
@@ -144,7 +144,7 @@ data Many a = Many { first: U32, payload: a, ignored: Bool }
 const unpack = fn candidate => case candidate of
   Many { payload: Some (One { value: (left, right) }), first } => first + left + right
   Many { payload: Nothing } => 0
-const answer = fn () => do:
+entry const answer = fn () => do:
   let Empty {} = Empty {}
   let One {} = One { value: True }
   return unpack (Many { ignored: False, payload: Some (One { value: (20, 20) }), first: 2 })
@@ -166,8 +166,8 @@ const guarded = fn pair => do:
   let Pair { enabled: True, value: Some value } = pair else:
     return value
   return value
-const accepted = fn () => guarded (Pair { enabled: True, value: Some 42 })
-const rejected = fn () => guarded (Pair { value: Some 42, enabled: False })
+entry const accepted = fn () => guarded (Pair { enabled: True, value: Some 42 })
+entry const rejected = fn () => guarded (Pair { value: Some 42, enabled: False })
 `);
     const { instance } = await WebAssembly.instantiate(artifact.bytes);
     equal((instance.exports.accepted as CallableFunction)(), 42);

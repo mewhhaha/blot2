@@ -1,0 +1,15 @@
+entry const main = fn host => do:
+  let ever = 0
+//    ^ variable
+  for 0..5:
+//^ keyword.control.repeat
+  for let value in [1, 2]:
+//^ keyword.control.repeat
+//    ^ keyword.storage.type
+  for evermore in [1, 2]:
+//    ^ variable
+  for ever:
+//^ keyword.control.repeat
+//    ^ keyword.control.repeat
+    return ever
+//         ^ variable

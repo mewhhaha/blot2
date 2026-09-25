@@ -8,8 +8,8 @@ Deno.test("wide arrays compile with an unused effect family", async () => {
       ",",
     );
     const source = "type Get a is effect = Unit -> a\n" +
-      "const values = fn () => [" + literals + "]\n" +
-      "const answer = fn () => @array.get (values ()) 8191\n";
+      "entry const values = fn () => [" + literals + "]\n" +
+      "entry const answer = fn () => @array.get (values ()) 8191\n";
     const artifact = compiler.compile(source);
     ok(WebAssembly.validate(artifact.bytes));
     const answer = new WebAssembly.Instance(

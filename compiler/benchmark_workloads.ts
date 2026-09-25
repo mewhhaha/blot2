@@ -8,7 +8,7 @@ export function arithmeticSource(
       ? 64
       : 8;
     return [
-      `const entry_${index} = fn value => do:`,
+      `entry const entry_${index} = fn value => do:`,
       ...Array.from(
         { length: steps },
         (_, step) =>
@@ -31,7 +31,7 @@ export function readerSource(count: number, changed: boolean): string {
         `const work_${index} = fn () => do:
   use value <- Reader.ask ()
   return @u32.add value ${changed && index === 0 ? 2 : 1}
-const entry_${index} = fn () => do reader:
+entry const entry_${index} = fn () => do reader:
   use value <- work_${index} ()
   return value`,
     ),
@@ -48,7 +48,7 @@ export function chainSource(changed: boolean): string {
           index + 1
         } = fn value => @u32.add (work_${index} value) 1`,
     ),
-    "const entry_0 = fn value => work_63 value",
+    "entry const entry_0 = fn value => work_63 value",
   ].join("\n");
 }
 
@@ -59,7 +59,7 @@ export function staggeredSource(changed: boolean): string {
       Array.from({ length: 8 }, (_, chain) => {
         const steps = depth === chain ? 64 : 2;
         const declaration = depth === 7
-          ? `const entry_${chain} = fn`
+          ? `entry const entry_${chain} = fn`
           : `const work_${chain}_${depth} = fn`;
         const input = depth === 0
           ? "value"
@@ -108,7 +108,7 @@ export function diamondSource(changed: boolean): string {
       );
     }
     declarations.push(
-      `const entry_${region} = fn value => join_${region}_7 value`,
+      `entry const entry_${region} = fn value => join_${region}_7 value`,
     );
     return declarations.join("\n");
   }).join("\n");
@@ -138,7 +138,7 @@ export function nominalSource(changed: boolean): string {
         index % 16 ? `T${index - 1}` : "U32"
       }\nconst f${index} = fn (value: T${index}) => value`,
   ).join("\n") +
-    `\nconst entry_0 = fn (value: U32) => @u32.add value ${
+    `\nentry const entry_0 = fn (value: U32) => @u32.add value ${
       changed ? 43 : 42
     }\n`;
 }
@@ -146,7 +146,7 @@ export function nominalSource(changed: boolean): string {
 export function lexicalScopeSource(changed: boolean): string {
   return Array.from({ length: 8 }, (_, index) =>
     [
-      `const entry_${index} = fn value => do:`,
+      `entry const entry_${index} = fn value => do:`,
       ...Array.from({ length: 256 }, (_, step) =>
         `  let value_${step} = @u32.add ${
           step ? `value_${step - 1}` : "value"

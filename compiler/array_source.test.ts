@@ -37,16 +37,16 @@ Deno.test("source array literals handle multiline layout, nesting, early return,
   try {
     const artifact = compiler.compile(`
 const empty = []
-const numbers = fn (values: Array U32) => @array.length values
+entry const numbers = fn (values: Array U32) => @array.length values
 const truths = fn (values: Array Bool) => @array.length values
-const count = numbers empty + truths empty
-const answer = fn () => do:
+entry const count = numbers empty + truths empty
+entry const answer = fn () => do:
   let values = [
     [1, 2],
     [40, 42],
   ]
   return @array.get (@array.get values 1) 1
-const returned = fn () => do:
+entry const returned = fn () => do:
   let values = [do:
     return 42]
   return @array.get values 0
@@ -70,7 +70,10 @@ Deno.test("source arrays diagnose element, index, annotation, arity and const bo
         ["const invalid = fn () => @array.set [1] 0 True\n", "type_mismatch"],
         ["const values: Array = []\n", "type_arity"],
         ["const values: Array U32 Bool = []\n", "type_arity"],
-        ["const value = @array.get [] 0\n", "array_bounds"],
+        [
+          "const value = @array.get [] 0\nentry const probe = fn () => do:\n  let kept = value\n  return 0\n",
+          "array_bounds",
+        ],
         ["const invalid = fn () => @array.length [] []\n", "call_arity"],
       ]
     ) {
@@ -95,17 +98,17 @@ const visit = @effect.provider Visit (fn value => value + 1)
 const add_visit = fn total => fn value => do:
   use next <- Visit value
   return total + next
-const accepts = fn value => do:
+entry const accepts = fn value => do:
   if value == 99:
     use @panic "unvisited predicate element"
   return value == 42
-const folded = fn () => do visit:
+entry const folded = fn () => do visit:
   return array.fold_left add_visit 0 [20, 20]
-const found = fn () => array.any accepts [42, 99]
-const rejected = fn () => array.all accepts [0, 99]
-const vacuous = fn () => array.all accepts []
-const absent = fn () => array.any accepts []
-const unchanged = fn () => do:
+entry const found = fn () => array.any accepts [42, 99]
+entry const rejected = fn () => array.all accepts [0, 99]
+entry const vacuous = fn () => array.all accepts []
+entry const absent = fn () => array.any accepts []
+entry const unchanged = fn () => do:
   let original = [2]
   let changed = Maybe.unwrap_or [] $ array.set 0 40 original
   return array.at 0 original + array.at 0 changed

@@ -4,26 +4,30 @@ import { createNativeIncrementalCompiler } from "./native_incremental.ts";
 import { createSourceCompiler } from "./source.ts";
 import { SourceError } from "./syntax.ts";
 
+// Const evaluation only runs for declarations an entry reaches.
+const probe = (name: string) =>
+  `entry const probe = fn () => do:\n  let kept = ${name}\n  return 0\n`;
+
 const source = `
-const indexed = fn index => do:
+entry const indexed = fn index => do:
   return index + 40
-const named = fn () => @array.get (@array.generate 3 indexed) 2
-const offset = 40
+entry const named = fn () => @array.get (@array.generate 3 indexed) 2
+entry const offset = 40
 const generated = @array.generate 3 (fn index => index + offset)
 const functions = @array.generate 3 (fn index => fn value => index + value)
-const constant = @array.get generated 2
-const callback = (@array.get functions 2) 40
-const skipped = @array.length (@array.generate 0 (fn index => @panic "unused"))
-const empty = fn () => @array.length (@array.generate 0 (fn index => @panic "unused"))
-const at = fn (index: U32) => @array.get (@array.generate 32768 (fn lane => lane + 7)) index
-const count = fn (size: U32) => @array.length (@array.generate size (fn lane => lane))
-const high = fn () => @array.get (@array.generate 2 (fn index => 4294967295 - index)) 0
-const float = fn () => @array.get (@array.generate 2 (fn index => 1.25)) 1
-const closure = fn () => do:
+entry const constant = @array.get generated 2
+entry const callback = (@array.get functions 2) 40
+entry const skipped = @array.length (@array.generate 0 (fn index => @panic "unused"))
+entry const empty = fn () => @array.length (@array.generate 0 (fn index => @panic "unused"))
+entry const at = fn (index: U32) => @array.get (@array.generate 32768 (fn lane => lane + 7)) index
+entry const count = fn (size: U32) => @array.length (@array.generate size (fn lane => lane))
+entry const high = fn () => @array.get (@array.generate 2 (fn index => 4294967295 - index)) 0
+entry const float = fn () => @array.get (@array.generate 2 (fn index => 1.25)) 1
+entry const closure = fn () => do:
   let delta = 40
   let callbacks = @array.generate 3 (fn index => fn value => delta + index + value)
   return (@array.get callbacks 2) 0
-const unchanged = fn () => do:
+entry const unchanged = fn () => do:
   let original = @array.fill 2 20
   let copies = @array.generate 2 (fn index => original)
   let changed = @array.set (@array.get copies 0) 1 22
@@ -127,14 +131,17 @@ Deno.test("array generate rejects invalid counts, callbacks, effects, limits and
         ],
       ]
     ) {
-      throws(() => compiler.compile(`${source}\n`), (error) => {
-        ok(error instanceof SourceError, String(error));
-        equal(error.code, code, error.message);
-        if (source.includes("count first")) {
-          ok(error.message.includes("count first"));
-        }
-        return true;
-      });
+      throws(
+        () => compiler.compile(`${source}\n${probe("invalid")}`),
+        (error) => {
+          ok(error instanceof SourceError, String(error));
+          equal(error.code, code, error.message);
+          if (source.includes("count first")) {
+            ok(error.message.includes("count first"));
+          }
+          return true;
+        },
+      );
     }
     throws(() =>
       compiler.compile(`effect Read : U32 -> U32
@@ -144,7 +151,8 @@ const invalid = fn () => @array.generate 2 (fn index => Read index)
       equal(error.code, "effect_mismatch", error.message);
       return true;
     });
-    const source = "const generated = @array.generate 3 (fn index => index)\n";
+    const source = "const generated = @array.generate 3 (fn index => index)\n" +
+      probe("generated");
     const ample = compiler.analyze(source, { const_steps: 100n });
     const required = 100n - ample.remaining_steps;
     equal(

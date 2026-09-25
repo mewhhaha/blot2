@@ -619,6 +619,8 @@ def expression_cost(fuel: Nat, pending: List<&2, CostWork>, total: Nat) -> Nat:
       expression_cost(rest, ExpressionsCost{elements} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.ForExpr{index, start, end, state, initial, body}} <> tail:
       expression_cost(rest, ExpressionsCost{[start, end, initial, body]} <> tail, Nat.add(total, 8n))
+    case 1n+rest ExpressionCost{M.ForeverExpr{state, initial, body}} <> tail:
+      expression_cost(rest, ExpressionsCost{[initial, body]} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.ArrayGenerateExpr{count, generator}} <> tail:
       expression_cost(rest, ExpressionCost{count} <> ExpressionCost{generator} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.ArrayFillExpr{count, value}} <> tail:

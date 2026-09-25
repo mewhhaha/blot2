@@ -1,6 +1,7 @@
 import {
   bendArray,
   bendList,
+  invoke,
   type RawModule,
   result,
   structuralKey,
@@ -94,6 +95,9 @@ export async function createSourceSession(options: SourceCompilerOptions) {
             "main",
             module.operations,
           ),
+          // Export selection narrows the flags; entries are verified against
+          // the final checked module.
+          entries: invoke<unknown>("entry_points.entries", module),
           translate: parsed.translate,
           stats: {
             parsed_ms: parsed.parsed_ms,

@@ -712,3 +712,71 @@ def Laws.dispatch_unresolved_module_specializes_original(module, entry, family_t
 def Laws.evidence_check_certifies_retained_groups(position, subset, imports, checked):
   {==}
 
+
+def Laws.entry_modifier_rejects_other_identifiers(entry_module, node):
+  match entry_module:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.entry_outside_entry_module_is_rejected(node):
+  {==}
+
+def Laws.entry_in_entry_module_is_exported(node):
+  {==}
+
+def Laws.declaration_without_modifier_is_not_exported(entry_module):
+  {==}
+
+def Laws.exported_function_is_an_entry(name, parameter, p, r, body):
+  {==}
+
+def Laws.runtime_constant_is_an_entry_let(name, annotation, value):
+  {==}
+
+def Laws.non_entry_constant_is_not_an_entry(name, annotation, value):
+  {==}
+
+def Laws.unreached_function_is_pruned(name, exported, parameter, p, r, body):
+  {==}
+
+def Laws.unreached_constant_is_pruned(name, exported, annotation, value):
+  {==}
+
+def Laws.pruning_keeps_operations(constants, functions, types, operations, seen):
+  {==}
+
+def Laws.entry_owner_prefix_matches_specialization(identity, entry):
+  match identity:
+    case M.TypeId{module_name, declaration}:
+      {==}
+
+def Laws.dispatch_failed_initial_check_abandons_resolution(diagnostic, module, next, entry):
+  {==}
+
+def Laws.dispatch_failed_pruning_abandons_resolution(diagnostic, next, entry):
+  {==}
+
+def Laws.build_without_entries_fails(types, operations):
+  {==}
+
+def Laws.no_entries_verify(checked):
+  match checked:
+    case M.CheckedModule{constants, functions, types, operations}:
+      {==}
+
+def Laws.unused_operation_has_no_wasm_job(identity, parameter, result):
+  {==}
+
+def Laws.loop_memory_pure_closed_row_is_isolated():
+  {==}
+
+def Laws.loop_memory_foreign_closed_row_is_isolated():
+  {==}
+
+def Laws.loop_memory_open_row_is_not_isolated(operations, index):
+  {==}
+
+def Laws.loop_memory_source_state_is_not_isolated():
+  {==}

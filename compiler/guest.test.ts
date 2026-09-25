@@ -20,11 +20,11 @@ effect Number.advance: U32 -> U32
 const tick = fn value => do:
   use next <- Number.advance value
   return next
-const main = fn (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider Number.advance advance):
+entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do (@effect.provider Number.advance advance):
   use next <- tick 41
   return next
-const pure = fn () => 7
-const count = 12
+entry const pure = fn () => 7
+entry const count = 12
 `;
 
 async function compiled(text = source) {
@@ -107,7 +107,7 @@ Deno.test("all sixteen scalar callback signatures use checked canonical values",
   };
   const definitions = types.flatMap((parameter) =>
     types.map((result) =>
-      `const invoke_${parameter.toLowerCase()}_${result.toLowerCase()} = fn (io: ${parameter} -> ${result} ! {Foreign}) => do:
+      `entry const invoke_${parameter.toLowerCase()}_${result.toLowerCase()} = fn (io: ${parameter} -> ${result} ! {Foreign}) => do:
   use result <- io ${literals[parameter]}
   return result`
     )
@@ -310,14 +310,14 @@ Deno.test("same-instance reentry and disposal are rejected while another guest c
 
 Deno.test("scalar-only guests remain import-free and validate arguments and constants", async () => {
   const { bytes } = await compiled(`
-const integer = fn (value: U32) => value
-const boolean = fn (value: Bool) => value
-const float = fn (value: F32) => value
-const unit = fn () => ()
-const flag = True
-const maximum = 4_294_967_295
-const fraction = 1.25
-const nothing = ()
+entry const integer = fn (value: U32) => value
+entry const boolean = fn (value: Bool) => value
+entry const float = fn (value: F32) => value
+entry const unit = fn () => ()
+entry const flag = True
+entry const maximum = 4_294_967_295
+entry const fraction = 1.25
+entry const nothing = ()
 `);
   equal(WebAssembly.Module.imports(new WebAssembly.Module(bytes)), []);
   const guest = await instantiateGuest(bytes);

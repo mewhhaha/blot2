@@ -27,15 +27,15 @@ const unwrap_or_else = fn candidate => fn fallback => case candidate of
   Some value => value
   Nothing => fallback ()
 
-const short_circuit = fn () => do:
+entry const short_circuit = fn () => do:
   let empty: Array U32 = []
   return and_then False (fn () => (@array.get empty 0) > 0)
 
-const lazy_fallback = fn () => do:
+entry const lazy_fallback = fn () => do:
   let empty: Array U32 = []
   return unwrap_or_else (Some 42) (fn () => @array.get empty 0)
 
-const factorial = fn value => do:
+entry const factorial = fn value => do:
   if value <= 1:
     return 1
   return value * factorial (value - 1)
@@ -56,17 +56,17 @@ const react = fn event => fn ticks => case event of
   SetMode Paused => ticks
   Reset => 0
 
-const operator_example = 1 `add` 2 * 3
-const recursive_example = fn (value: U32) => factorial value
-const matching_example = fn () => choose Nothing False (Some (double_or_zero (Some 21)))
-const event_example = fn () => react (Tick 2) 40
+entry const operator_example = 1 `add` 2 * 3
+entry const recursive_example = fn (value: U32) => factorial value
+entry const matching_example = fn () => choose Nothing False (Some (double_or_zero (Some 21)))
+entry const event_example = fn () => react (Tick 2) 40
 
-const vector_example = fn () => do:
+entry const vector_example = fn () => do:
   let position = Vec2 { x: 3.0, y: 4.0 }
   let scaled = Vec2.scaled position 2.0
   return position >< scaled
 
-const array_snapshot = fn () => do:
+entry const array_snapshot = fn () => do:
   let original = [1, 2, 3]
   let next = @array.set original 1 20
   return (@array.get original 1) + (@array.get next 1)
@@ -74,6 +74,6 @@ const array_snapshot = fn () => do:
 type Counter a is effect = { advance: a -> a }
 const local_counter = @effect.provider (Counter.advance U32) (fn value => value + 1)
 
-const provider_example = fn () => do local_counter:
+entry const provider_example = fn () => do local_counter:
   use next <- Counter.advance U32 41
   return next

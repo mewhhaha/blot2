@@ -36,7 +36,7 @@ def deferred(fuel: Nat, pending: List<&2, M.Expr>) -> Bool:
     case 1n+rest M.SpecializeOperationExpr{template, arguments, body} <> tail:
       True{}
     case 1n+rest head <> tail:
-      deferred(rest, List.append(&2, M.Expr, Closures.children(head), tail))
+      deferred(rest, List.reverse.go(&2, M.Expr, List.reverse(&2, M.Expr, Closures.children(head)), tail))
 
 def deferred_functions(functions: List<&2, M.Function>) -> Bool:
   match functions:
