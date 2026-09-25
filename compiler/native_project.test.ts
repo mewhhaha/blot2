@@ -474,3 +474,41 @@ Deno.test("disposing during process restart reaps the replacement before returni
     await session?.dispose();
   }
 });
+
+Deno.test("native project Wasm-only compiles return the full compile's bytes without the analysis", async () => {
+  const { files, readSource } = virtualProject(
+    new Map([
+      [
+        entry.href,
+        'import * as lib from "./lib"\nconst answer = fn () => @u32.add (lib.value ()) 1\n',
+      ],
+      [library.href, "const value = fn () => 40\n"],
+    ]),
+  );
+  const session = await createNativeProjectCompiler({
+    prelude: "none",
+    threads: 1,
+    readSource,
+  });
+  try {
+    const full = await session.compile(entry);
+    const wasm = await session.compile(entry, { analysis: false });
+    equal(wasm.artifact, { bytes: full.artifact.bytes });
+    ok(!("analysis" in wasm.artifact));
+    equal(wasm.stats.result_reused, false);
+    equal(wasm.stats.declarations_sent, 0);
+    equal(wasm.stats.groups_checked, 0);
+    files.set(
+      library.href,
+      files.get(library.href)!.replace("() => 40", "() => 41"),
+    );
+    const changed = await session.compile(entry, { analysis: false });
+    equal(changed.stats.declarations_sent, 1);
+    equal(await answer(changed.artifact.bytes), 42);
+    const analyzed = await session.compile(entry);
+    equal(analyzed.stats.declarations_sent, 0);
+    equal(changed.artifact, { bytes: analyzed.artifact.bytes });
+  } finally {
+    await session.dispose();
+  }
+});

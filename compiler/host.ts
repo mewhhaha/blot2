@@ -342,9 +342,16 @@ export interface Analysis {
   readonly remaining_steps: bigint;
 }
 
+/** A compiled guest module. Its Wasm carries the guest ABI (`blot:abi`). */
 export interface Artifact {
-  readonly analysis: Analysis;
   readonly bytes: Uint8Array<ArrayBuffer>;
+  /** Absent when compiled with `analysis: false`. */
+  readonly analysis?: Analysis;
+}
+
+/** An artifact compiled with its analysis (the default). */
+export interface AnalyzedArtifact extends Artifact {
+  readonly analysis: Analysis;
 }
 
 type List<A> = { readonly $: "Nil" } | {
@@ -1473,17 +1480,49 @@ export interface CompileOptions {
   readonly const_steps?: bigint;
 }
 
+/** Options for `compile`. */
+export interface ArtifactOptions extends CompileOptions {
+  /**
+   * `false` returns only the Wasm bytes; guests read their ABI from them.
+   * The native compiler then neither encodes nor sends the analysis.
+   */
+  readonly analysis?: boolean;
+}
+
+/** `compile` options that keep the analysis (the default). */
+export type AnalyzedArtifactOptions = CompileOptions & {
+  readonly analysis?: true;
+};
+
 export function constSteps(options: CompileOptions): bigint {
   return nat(options.const_steps ?? 10_000n, "const_steps");
 }
 
+/** Whether `compile` returns the analysis beside the Wasm bytes. */
+export function includesAnalysis(options: ArtifactOptions): boolean {
+  if (options.analysis === undefined) return true;
+  if (typeof options.analysis !== "boolean") {
+    throw new TypeError("analysis must be a boolean");
+  }
+  return options.analysis;
+}
+
+interface WireArtifact {
+  readonly analysis: WireAnalysis;
+  readonly bytes: List<number>;
+}
+
+function decodeArtifact(artifact: WireArtifact, analysis: boolean): Artifact {
+  const bytes = Uint8Array.from(array(artifact.bytes));
+  return analysis
+    ? { analysis: decodeAnalysis(artifact.analysis), bytes }
+    : { bytes };
+}
+
 // Internal pipeline boundary: intermediate Bend terms stay opaque until the
 // final artifact, avoiding repeated traversal of every expression between jobs.
-export function decodePipelineArtifact(value: unknown): Artifact {
-  const artifact = value as {
-    readonly analysis: WireAnalysis;
-    readonly bytes: List<number>;
-  };
+export function decodePipelineArtifact(value: unknown): AnalyzedArtifact {
+  const artifact = value as WireArtifact;
   return {
     analysis: decodeAnalysis(artifact.analysis),
     bytes: Uint8Array.from(array(artifact.bytes)),
@@ -1498,18 +1537,21 @@ export function analyze(
   return decodeAnalysis(unwrap(result as Result<WireAnalysis>));
 }
 
-export function compile(module: CoreModule, options: CompileOptions = {}) {
+export function compile(
+  module: CoreModule,
+  options?: AnalyzedArtifactOptions,
+): AnalyzedArtifact;
+export function compile(
+  module: CoreModule,
+  options?: ArtifactOptions,
+): Artifact;
+export function compile(
+  module: CoreModule,
+  options: ArtifactOptions = {},
+): Artifact {
+  const analysis = includesAnalysis(options);
   const result = bend.compile(marshal(module), constSteps(options));
-  const artifact = unwrap(
-    result as Result<{
-      readonly analysis: WireAnalysis;
-      readonly bytes: List<number>;
-    }>,
-  );
-  return {
-    analysis: decodeAnalysis(artifact.analysis),
-    bytes: Uint8Array.from(array(artifact.bytes)),
-  };
+  return decodeArtifact(unwrap(result as Result<WireArtifact>), analysis);
 }
 
 export function analyzeSourceTree(
@@ -1531,22 +1573,26 @@ export function compileSourceTree(
   root: Cst,
   nodeCount: bigint,
   preludeRoot: Cst,
-  options: CompileOptions = {},
-) {
+  options?: AnalyzedArtifactOptions,
+): AnalyzedArtifact;
+export function compileSourceTree(
+  root: Cst,
+  nodeCount: bigint,
+  preludeRoot: Cst,
+  options?: ArtifactOptions,
+): Artifact;
+export function compileSourceTree(
+  root: Cst,
+  nodeCount: bigint,
+  preludeRoot: Cst,
+  options: ArtifactOptions = {},
+): Artifact {
+  const analysis = includesAnalysis(options);
   const result = bend.compile_source(
     root,
     preludeRoot,
     nat(nodeCount, "CST node count"),
     constSteps(options),
   );
-  const artifact = unwrap(
-    result as Result<{
-      readonly analysis: WireAnalysis;
-      readonly bytes: List<number>;
-    }>,
-  );
-  return {
-    analysis: decodeAnalysis(artifact.analysis),
-    bytes: Uint8Array.from(array(artifact.bytes)),
-  };
+  return decodeArtifact(unwrap(result as Result<WireArtifact>), analysis);
 }

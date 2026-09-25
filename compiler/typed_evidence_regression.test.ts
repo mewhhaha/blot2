@@ -8,10 +8,7 @@ import { createNativeCompiler } from "./native.ts";
 import { createNativeIncrementalCompiler } from "./native_incremental.ts";
 import { createSourceCompiler } from "./source.ts";
 import { SourceError } from "./syntax.ts";
-
-type Artifact = Awaited<
-  ReturnType<Awaited<ReturnType<typeof createNativeCompiler>>["compile"]>
->;
+import type { AnalyzedArtifact as Artifact } from "./host.ts";
 
 async function observed(artifact: Artifact, name: string, argument = 0) {
   const { instance } = await WebAssembly.instantiate(artifact.bytes, {

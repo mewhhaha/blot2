@@ -1,3 +1,94 @@
+#ifdef __linux__
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sched.h>
+#include <string.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+
+// Desktop schedulers often demote the Deno host that launches blotc (for
+// example ananicy-cpp's deno rule applies SCHED_IDLE, nice 16 and idle IO), and
+// a child inherits that. Compiles are interactive work, so blotc restores
+// normal scheduling before the runtime starts its worker threads. Linux keeps
+// policy, nice and IO priority per thread: every current task is reset and
+// later threads inherit the result. This is best effort; EPERM (RLIMIT_NICE
+// below 20) keeps the inherited setting. `--inherit-priority` opts out.
+#define BLOT_NATIVE_IOPRIO_WHO_PROCESS 1
+#define BLOT_NATIVE_IOPRIO_CLASS_SHIFT 13
+#define BLOT_NATIVE_IOPRIO_CLASS_BE 2
+#define BLOT_NATIVE_IOPRIO_CLASS_IDLE 3
+#define BLOT_NATIVE_IOPRIO_NORMAL \
+  (BLOT_NATIVE_IOPRIO_CLASS_BE << BLOT_NATIVE_IOPRIO_CLASS_SHIFT | 4)
+
+static bool blot_native_inherits_priority(void) {
+  char arguments[4096];
+  size_t length = 0;
+  int file = open("/proc/self/cmdline", O_RDONLY | O_CLOEXEC);
+  if (file < 0) return false;
+  while (length < sizeof arguments) {
+    ssize_t count = read(file, arguments + length, sizeof arguments - length);
+    if (count < 0 && errno == EINTR) continue;
+    if (count <= 0) break;
+    length += (size_t)count;
+  }
+  close(file);
+  // Skip argv[0]. Runtime options precede `--`; the rest are IO.args.
+  size_t offset = strnlen(arguments, length) + 1;
+  while (offset < length) {
+    const char* argument = arguments + offset;
+    size_t size = strnlen(argument, length - offset);
+    if (size == 2 && memcmp(argument, "--", 2) == 0) return false;
+    if (size == 18 && memcmp(argument, "--inherit-priority", 18) == 0) {
+      return true;
+    }
+    offset += size + 1;
+  }
+  return false;
+}
+
+static void blot_native_restore_priority(pid_t task) {
+  int policy = sched_getscheduler(task);
+  if (policy < 0) return;
+  policy &= ~SCHED_RESET_ON_FORK;
+  errno = 0;
+  int nice = getpriority(PRIO_PROCESS, (id_t)task);
+  bool cpu = policy == SCHED_IDLE ||
+    ((policy == SCHED_OTHER || policy == SCHED_BATCH) && errno == 0 &&
+      nice > 0);
+  long io = syscall(SYS_ioprio_get, BLOT_NATIVE_IOPRIO_WHO_PROCESS, (int)task);
+  bool idle_io = io >= 0 &&
+    (io >> BLOT_NATIVE_IOPRIO_CLASS_SHIFT) == BLOT_NATIVE_IOPRIO_CLASS_IDLE;
+  if (cpu) {
+    struct sched_param normal = { .sched_priority = 0 };
+    (void)sched_setscheduler(task, SCHED_OTHER, &normal);
+    (void)setpriority(PRIO_PROCESS, (id_t)task, 0);
+  }
+  if (cpu || idle_io) {
+    (void)syscall(SYS_ioprio_set, BLOT_NATIVE_IOPRIO_WHO_PROCESS, (int)task,
+      BLOT_NATIVE_IOPRIO_NORMAL);
+  }
+}
+
+static void __attribute__((constructor)) blot_native_priority_use(void) {
+  if (blot_native_inherits_priority()) return;
+  DIR* tasks = opendir("/proc/self/task");
+  if (tasks == NULL) {
+    blot_native_restore_priority(0);
+    return;
+  }
+  for (struct dirent* entry = readdir(tasks); entry; entry = readdir(tasks)) {
+    char* end = NULL;
+    long task = strtol(entry->d_name, &end, 10);
+    if (end != entry->d_name && *end == '\0' && task > 0) {
+      blot_native_restore_priority((pid_t)task);
+    }
+  }
+  closedir(tasks);
+}
+#endif
+
 #define BLOT_NATIVE_MAX_WORDS 16777216u
 
 static void blot_native_read_exact(uint8_t* bytes, size_t length) {

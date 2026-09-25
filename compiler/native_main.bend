@@ -19,13 +19,6 @@ def packet_of(reply: Reply) -> Output.Packet:
   Reply{state, packet} = reply
   packet
 
-def mode(operation: Request.Operation) -> Session.Mode:
-  match operation:
-    case Request.Analyze{}:
-      Session.AnalyzeMode{}
-    case Request.Compile{}:
-      Session.CompileMode{}
-
 def opened(previous: Maybe<&2, Session.State>, result: Result<&2, &2, M.Diagnostic, Session.State>) -> Reply:
   match result:
     case Fail{diagnostic}:
@@ -50,28 +43,28 @@ def encode_analysis(fields: List<&2, Response.Work>) -> Result<&2, &2, M.Diagnos
     words : List<&2, U32> <- Response.encode_work(Nat.read.max(), fields, U32.to_nat(16777216), Nil{})
     return Output.words(words)
 
-def completed(previous: Maybe<&2, Session.State>, result: Result<&2, &2, M.Diagnostic, Session.Completion>) -> Reply:
+def completed(previous: Maybe<&2, Session.State>, contents: Output.Contents, result: Result<&2, &2, M.Diagnostic, Session.Completion>) -> Reply:
   match result:
     case Fail{diagnostic}:
       Reply{previous, Output.words(Response.encode_diagnostic(diagnostic))}
     case Done{Session.Completion{state, Session.Analyzed{analysis}, stats}}:
       encoded(previous, state, encode_analysis(stat_fields(stats, [Response.Word{1}, Response.Analysis{analysis}])))
     case Done{Session.Completion{state, Session.Compiled{Compiler.PlannedArtifact{analysis, plan}}, stats}}:
-      encoded(previous, state, Output.encode_plan(stat_fields(stats, [Response.Word{2}, Response.Analysis{analysis}]), plan, U32.to_nat(16777216), 2048n))
+      encoded(previous, state, Output.encode_plan(stat_fields(stats, Output.artifact_fields(contents, analysis)), plan, U32.to_nat(16777216), 2048n))
 
-def cached(previous: Maybe<&2, Session.State>, operation: Request.Operation, root: Cst.Cst, fuel: Nat, steps: Nat) -> Reply:
+def cached(previous: Maybe<&2, Session.State>, +operation: Request.Operation, root: Cst.Cst, fuel: Nat, steps: Nat) -> Reply:
   match previous:
     case None{}:
       Reply{None{}, Output.words(Response.encode_diagnostic(M.Diagnostic{"native_session", "session", "open a session before updating it"}))}
     case Some{+state}:
-      completed(Some{state}, Session.update(state, mode(operation), root, fuel, steps))
+      completed(Some{state}, Request.contents(operation), Session.update(state, Request.mode(operation), root, fuel, steps))
 
-def patched(previous: Maybe<&2, Session.State>, operation: Request.Operation, declarations: List<&2, Session.Declaration>, fuel: Nat, steps: Nat) -> Reply:
+def patched(previous: Maybe<&2, Session.State>, +operation: Request.Operation, declarations: List<&2, Session.Declaration>, fuel: Nat, steps: Nat) -> Reply:
   match previous:
     case None{}:
       Reply{None{}, Output.words(Response.encode_diagnostic(M.Diagnostic{"native_session", "session", "open a session before updating it"}))}
     case Some{+state}:
-      completed(Some{state}, Session.update_patch(state, mode(operation), declarations, fuel, steps))
+      completed(Some{state}, Request.contents(operation), Session.update_patch(state, Request.mode(operation), declarations, fuel, steps))
 
 def respond(state: Maybe<&2, Session.State>, request: Result<&2, &2, M.Diagnostic, Request.Request>) -> Reply:
   match request:
@@ -80,7 +73,9 @@ def respond(state: Maybe<&2, Session.State>, request: Result<&2, &2, M.Diagnosti
     case Done{Request.Request{Request.Analyze{}, fuel, steps, root, prelude}}:
       Reply{state, Output.words(Response.encode_analysis(Compiler.analyze_source(root, prelude, fuel, steps)))}
     case Done{Request.Request{Request.Compile{}, fuel, steps, root, prelude}}:
-      Reply{state, Output.encode_artifact(Compiler.compile_source_plan(root, prelude, fuel, steps))}
+      Reply{state, Output.encode_artifact(Output.FullArtifact{}, Compiler.compile_source_plan(root, prelude, fuel, steps))}
+    case Done{Request.Request{Request.Emit{}, fuel, steps, root, prelude}}:
+      Reply{state, Output.encode_artifact(Output.WasmOnly{}, Compiler.compile_source_plan(root, prelude, fuel, steps))}
     case Done{Request.OpenSession{prelude, fuel}}:
       opened(state, Session.open(prelude, fuel))
     case Done{Request.SessionRequest{operation, fuel, steps, root}}:

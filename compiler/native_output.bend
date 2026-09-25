@@ -137,9 +137,23 @@ def finish(result: Result<&2, &2, M.Diagnostic, Packet>) -> Packet:
     case Done{packet}:
       packet
 
-def encode_artifact(result: Result<&2, &2, M.Diagnostic, Main.PlannedArtifact>) -> Packet:
+# What a compiled reply carries beside its Wasm bytes. A Wasm-only reply
+# (response kind 5) drops the analysis without encoding it: guests read their
+# ABI from the module's blot:abi section.
+type Contents is Data:
+  FullArtifact{}
+  WasmOnly{}
+
+def artifact_fields(contents: Contents, analysis: Main.Analysis) -> List<&2, R.Work>:
+  match contents:
+    case FullArtifact{}:
+      [R.Word{2}, R.Analysis{analysis}]
+    case WasmOnly{}:
+      [R.Word{5}]
+
+def encode_artifact(contents: Contents, result: Result<&2, &2, M.Diagnostic, Main.PlannedArtifact>) -> Packet:
   match result:
     case Fail{diagnostic}:
       words(R.encode_diagnostic(diagnostic))
     case Done{Main.PlannedArtifact{analysis, plan}}:
-      finish(encode_plan([R.Word{1112297300}, R.Word{R.version()}, R.Word{2}, R.Analysis{analysis}], plan, U32.to_nat(16777216), 2048n))
+      finish(encode_plan(R.Word{1112297300} <> R.Word{R.version()} <> artifact_fields(contents, analysis), plan, U32.to_nat(16777216), 2048n))

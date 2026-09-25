@@ -14,6 +14,7 @@ import {
   NativeProtocolError,
 } from "./native_protocol.ts";
 import { createSourceFrontend } from "./source_frontend.ts";
+import { instantiateGuest } from "./guest.ts";
 
 function diagnostic(error: unknown) {
   if (!(error instanceof SourceError)) throw error;
@@ -142,6 +143,72 @@ for (const threads of [1, 4]) {
       ok(typeof deferred === "function");
       equal(answer(0), 42);
       equal(deferred(0), 7);
+    } finally {
+      await native.dispose();
+      js.dispose();
+    }
+  });
+}
+
+for (const threads of [1, 4]) {
+  Deno.test(`native ${threads}-thread Wasm-only compiles return the full compile's bytes`, async () => {
+    const native = await createNativeCompiler({ threads });
+    const js = await createSourceCompiler();
+    try {
+      for (const name of ["scalar", "prelude", "generic_effects", "arrays"]) {
+        const source = await Deno.readTextFile(
+          new URL(`../examples/${name}.blot`, import.meta.url),
+        );
+        let full;
+        try {
+          full = await native.compile(source);
+        } catch (error) {
+          const expected = diagnostic(error);
+          await rejects(
+            () => native.compile(source, { analysis: false }),
+            (actual) => {
+              equal(diagnostic(actual), expected, name);
+              return true;
+            },
+          );
+          continue;
+        }
+        const wasm = await native.compile(source, { analysis: false });
+        equal(wasm, { bytes: full.bytes }, name);
+        ok(!("analysis" in wasm), name);
+        equal(js.compile(source, { analysis: false }), wasm, name);
+        // Guests need only the bytes: the ABI travels in blot:abi.
+        const guest = await instantiateGuest(wasm.bytes);
+        try {
+          ok(guest.abi.functions.length + guest.abi.constants.length > 0);
+        } finally {
+          guest.dispose();
+        }
+      }
+      const invalid = "const answer = fn () => @u32.add True 1\n";
+      const expected = await native.compile(invalid).then(
+        () => undefined,
+        diagnostic,
+      );
+      ok(expected);
+      await rejects(
+        () => native.compile(invalid, { analysis: false }),
+        (actual) => {
+          equal(diagnostic(actual), expected);
+          return true;
+        },
+      );
+      for (const analysis of [0, "false", null]) {
+        await rejects(
+          () =>
+            native.compile("", { analysis: analysis as unknown as boolean }),
+          TypeError,
+        );
+        throws(
+          () => js.compile("", { analysis: analysis as unknown as boolean }),
+          TypeError,
+        );
+      }
     } finally {
       await native.dispose();
       js.dispose();

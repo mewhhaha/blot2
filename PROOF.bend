@@ -132,6 +132,15 @@ def Laws.native_trailing_words_fail(words, remaining, offset):
 def Laws.native_response_failure_keeps_protocol_version():
   {==}
 
+def Laws.native_emit_compiles_like_compile():
+  {==}
+
+def Laws.native_emit_replies_wasm_only():
+  {==}
+
+def Laws.native_wasm_only_reply_omits_analysis(analysis):
+  {==}
+
 def Laws.empty_index_is_absent(V, name):
   {==}
 

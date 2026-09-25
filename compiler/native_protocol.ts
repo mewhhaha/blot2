@@ -17,11 +17,27 @@ import type {
 import type { Cst, CstList } from "./syntax.ts";
 
 export const nativeProtocolMagic = 0x424C4F54;
-export const nativeProtocolVersion = 11;
+export const nativeProtocolVersion = 12;
 export const nativeProtocolMaxWords = 16 * 1024 * 1024;
 const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
-export type NativeOperation = "analyze" | "compile";
+/** `emit` compiles like `compile` but replies with the Wasm bytes only. */
+export type NativeOperation = "analyze" | "compile" | "emit";
+
+const statelessOpcodes = { analyze: 0, compile: 1, emit: 7 } as const;
+const sessionOpcodes = { analyze: 3, compile: 4, emit: 8 } as const;
+const patchOpcodes = { analyze: 5, compile: 6, emit: 9 } as const;
+
+function opcode(
+  opcodes: Readonly<Record<NativeOperation, number>>,
+  operation: NativeOperation,
+  label: string,
+): number {
+  if (!Object.hasOwn(opcodes, operation)) {
+    throw new NativeProtocolError(`Unknown ${label}: ${operation}`);
+  }
+  return opcodes[operation];
+}
 
 export interface NativeRequest {
   readonly operation: NativeOperation;
@@ -70,7 +86,8 @@ export type NativeResponse =
       readonly analysis: Analysis;
       readonly bytes: Uint8Array<ArrayBuffer>;
     };
-  };
+  }
+  | { readonly operation: "emit"; readonly bytes: Uint8Array<ArrayBuffer> };
 
 export class NativeProtocolError extends Error {
   constructor(message: string) {
@@ -82,13 +99,15 @@ export class NativeProtocolError extends Error {
 // Payload words are little-endian U32s; the process transport owns framing.
 // Strings contain scalar counts followed by Unicode scalars. Nat uses low32,
 // high16 words. Lists use U32 counts; optionals and Booleans use 0/1 tags.
-// Response kinds: 0 diagnostic, 1 analysis, 2 artifact, 3 opened, 4 cached.
-// Requests: 0/1 stateless analyze/compile, 2 open, 3/4 full session,
-// 5/6 declaration patches. After the scalar request header: dictionary count,
+// Response kinds: 0 diagnostic, 1 analysis, 2 artifact, 3 opened, 4 cached,
+// 5 Wasm only. Requests: 0/1 stateless analyze/compile, 2 open, 3/4 full
+// session, 5/6 declaration patches, 7/8/9 emit (stateless, full session,
+// patch). Emit compiles like compile and replies with kind 5: the Wasm bytes
+// without the analysis. After the scalar request header: dictionary count,
 // scalar strings, then the CST/patch body. CST strings are dictionary IDs.
 // Dictionary IDs are first-seen preorder across the whole request.
 // Cached results carry eight Nat counts and an inner
-// kind 1/2. Core tags match native_response.bend (not constructor order).
+// kind 1/2/5. Core tags match native_response.bend (not constructor order).
 // Wasm is a byte count followed by packed words, with zero final padding.
 class WordWriter {
   #bytes = new Uint8Array(4096);
@@ -268,19 +287,15 @@ function childrenOf(node: Cst): Cst[] {
 export function encodeNativeRequest(
   request: NativeRequest,
 ): Uint8Array<ArrayBuffer> {
-  const operations = {
-    analyze: 0,
-    compile: 1,
-  } as const;
-  if (!Object.hasOwn(operations, request.operation)) {
-    throw new NativeProtocolError(
-      `Unknown native operation: ${request.operation}`,
-    );
-  }
+  const operation = opcode(
+    statelessOpcodes,
+    request.operation,
+    "native operation",
+  );
   const writer = new WordWriter();
   writer.word(nativeProtocolMagic);
   writer.word(nativeProtocolVersion);
-  writer.word(operations[request.operation]);
+  writer.word(operation);
   writer.nat(request.fuel, "Lowering fuel");
   writer.nat(request.const_steps, "Const steps");
   writer.beginBody();
@@ -301,11 +316,11 @@ export function encodeNativeChunks(request: {
   readonly prelude: NativeCstChunk;
   readonly const_steps: bigint;
 }): Uint8Array<ArrayBuffer> {
-  if (request.operation !== "analyze" && request.operation !== "compile") {
-    throw new NativeProtocolError(
-      `Unknown native operation: ${request.operation}`,
-    );
-  }
+  const operation = opcode(
+    statelessOpcodes,
+    request.operation,
+    "native operation",
+  );
   if (!request.chunks.length) {
     throw new NativeProtocolError("Missing source CST");
   }
@@ -316,7 +331,7 @@ export function encodeNativeChunks(request: {
   );
   writer.word(nativeProtocolMagic);
   writer.word(nativeProtocolVersion);
-  writer.word(request.operation === "analyze" ? 0 : 1);
+  writer.word(operation);
   writer.nat(
     BigInt(sourceNodes + request.prelude.words.length / 6 + 4),
     "Lowering fuel",
@@ -346,15 +361,11 @@ export function encodeNativeSessionRequest(
     writer.beginBody();
     writeTrees(writer, [request.prelude]);
   } else {
-    const operations = "declarations" in request
-      ? { analyze: 5, compile: 6 } as const
-      : { analyze: 3, compile: 4 } as const;
-    if (!Object.hasOwn(operations, request.operation)) {
-      throw new NativeProtocolError(
-        `Unknown session operation: ${request.operation}`,
-      );
-    }
-    writer.word(operations[request.operation]);
+    writer.word(opcode(
+      "declarations" in request ? patchOpcodes : sessionOpcodes,
+      request.operation,
+      "session operation",
+    ));
     writer.nat(request.fuel, "Lowering fuel");
     writer.nat(request.const_steps, "Const steps");
     writer.beginBody();
@@ -1266,6 +1277,7 @@ class WordReader {
       "compile",
       "open",
       "cached",
+      "emit",
     ]);
     switch (kind) {
       case "diagnostic":
@@ -1274,6 +1286,8 @@ class WordReader {
         return { operation: kind, analysis: this.read(this.analysis) };
       case "compile":
         return { operation: kind, artifact: this.read(this.artifact) };
+      case "emit":
+        return { operation: kind, bytes: this.bytes() };
       case "open":
       case "cached":
         throw new NativeProtocolError(

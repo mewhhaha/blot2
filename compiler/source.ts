@@ -1,5 +1,9 @@
 import {
+  type AnalyzedArtifact,
+  type AnalyzedArtifactOptions,
   analyzeSourceTree,
+  type Artifact,
+  type ArtifactOptions,
   type CompileOptions,
   compileSourceTree,
 } from "./host.ts";
@@ -33,6 +37,18 @@ export async function createSourceCompiler(
       return prepared.translate(error);
     }
   }
+  function compile(
+    source: SourceInput,
+    options?: AnalyzedArtifactOptions,
+  ): AnalyzedArtifact;
+  function compile(source: SourceInput, options?: ArtifactOptions): Artifact;
+  function compile(source: SourceInput, options: ArtifactOptions = {}) {
+    return run(
+      source,
+      (root, count, prelude) =>
+        compileSourceTree(root, count, prelude, options),
+    );
+  }
   return {
     analyze(source: SourceInput, options: CompileOptions = {}) {
       return run(
@@ -41,13 +57,7 @@ export async function createSourceCompiler(
           analyzeSourceTree(root, count, prelude, options),
       );
     },
-    compile(source: SourceInput, options: CompileOptions = {}) {
-      return run(
-        source,
-        (root, count, prelude) =>
-          compileSourceTree(root, count, prelude, options),
-      );
-    },
+    compile,
     dispose() {
       frontend.dispose();
     },

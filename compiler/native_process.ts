@@ -8,6 +8,14 @@ import {
 export interface NativeProcessOptions {
   readonly executable?: string | URL;
   readonly threads?: number;
+  /**
+   * `"normal"` (default): on Linux, blotc moves every thread that runs under
+   * SCHED_IDLE, at a positive nice value, or in the idle IO class to
+   * SCHED_OTHER, nice 0 and best-effort IO before it starts work (best
+   * effort). `"inherit"` keeps the launcher's scheduling
+   * (`--inherit-priority`). See compiler/README.md, "Scheduling".
+   */
+  readonly priority?: "normal" | "inherit";
 }
 
 // One process owns one ordered request stream. Concurrent callers are queued;
@@ -47,13 +55,21 @@ export class NativeProcess {
     if (!Number.isInteger(threads) || threads < 1 || threads > 64) {
       throw new RangeError("threads must be an integer from 1 to 64");
     }
+    const priority = options.priority ?? "normal";
+    if (priority !== "normal" && priority !== "inherit") {
+      throw new RangeError('priority must be "normal" or "inherit"');
+    }
     const executable = options.executable ??
       new URL("../generated/compiler/blotc", import.meta.url);
     const process = new NativeProcess(
       new Deno.Command(
         executable instanceof URL ? fileURLToPath(executable) : executable,
         {
-          args: ["--threads", String(threads)],
+          args: [
+            "--threads",
+            String(threads),
+            ...priority === "inherit" ? ["--inherit-priority"] : [],
+          ],
           // The owned compiler needs no ambient environment. In particular,
           // a desktop libxdo shim must not change its loader or require broad run permissions.
           clearEnv: true,

@@ -9,7 +9,7 @@ const start = performance.now();
 const compiler = await createNativeCompiler({ threads: 8 });
 let artifact;
 try {
-  artifact = await compiler.compile(source);
+  artifact = await compiler.compile(source, { analysis: false });
 } finally {
   await compiler.dispose();
 }

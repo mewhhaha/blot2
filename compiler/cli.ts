@@ -35,7 +35,7 @@ try {
         `${filename}: checked ${analysis.functions.length} functions, ${analysis.constants.length} constants`,
       );
     } else {
-      const artifact = await compiler.compile(project);
+      const artifact = await compiler.compile(project, { analysis: false });
       const destination = output ?? `build/${basename(filename, ".blot")}.wasm`;
       await Deno.mkdir(dirname(destination), { recursive: true });
       await Deno.writeFile(destination, artifact.bytes);

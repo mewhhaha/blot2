@@ -8,11 +8,15 @@ import { createSourceSession } from "./source_session.ts";
 import { SourceError } from "./syntax.ts";
 import { CompilerWorkers } from "./worker_pool.ts";
 import { bendArray, bendList, structuralKey } from "./pipeline.ts";
-import type { Analysis, EffectRow, Type } from "./host.ts";
+import type {
+  Analysis,
+  AnalyzedArtifact as Artifact,
+  EffectRow,
+  Type,
+} from "./host.ts";
 
 type Session = Awaited<ReturnType<typeof createIncrementalCompiler>>;
 type CleanCompiler = Awaited<ReturnType<typeof createSourceCompiler>>;
-type Artifact = Awaited<ReturnType<Session["compile"]>>["artifact"];
 
 function incrementalTest(
   name: string,
@@ -425,3 +429,20 @@ Deno.test("incremental disposal rejects startup jobs, queued revisions and later
   );
   session.dispose();
 });
+
+incrementalTest(
+  "incremental Wasm-only compiles return the cached artifact's bytes",
+  async (session, clean) => {
+    const source = "const answer = fn () => @u32.add 40 2\n";
+    const full = await session.compile(source);
+    const wasm = await session.compile(source, { analysis: false });
+    equal(wasm.artifact, { bytes: full.artifact.bytes });
+    ok(!("analysis" in wasm.artifact));
+    equal(wasm.stats.groups_checked, 0);
+    equal(clean.compile(source, { analysis: false }), wasm.artifact);
+    await rejects(
+      () => session.compile(source, { analysis: 1 as unknown as boolean }),
+      TypeError,
+    );
+  },
+);

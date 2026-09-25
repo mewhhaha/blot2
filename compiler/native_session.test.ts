@@ -16,11 +16,16 @@ import {
 import { CompilerError } from "./diagnostics.ts";
 import { bendArray } from "./bend_list.ts";
 import { SourceError } from "./syntax.ts";
-import type { Analysis, EffectRow, Expr, Type } from "./host.ts";
+import type {
+  Analysis,
+  AnalyzedArtifact as Artifact,
+  EffectRow,
+  Expr,
+  Type,
+} from "./host.ts";
 
 type Session = Awaited<ReturnType<typeof createNativeIncrementalCompiler>>;
 type Clean = Awaited<ReturnType<typeof createNativeCompiler>>;
-type Artifact = Awaited<ReturnType<Session["compile"]>>["artifact"];
 
 function sessionTest(
   name: string,
@@ -823,3 +828,36 @@ Deno.test("native session lower-fuel decreases do not bypass traversal limits af
     await native.dispose();
   }
 });
+
+sessionTest(
+  "native session Wasm-only compiles share compile caches and omit the analysis",
+  async (session, clean) => {
+    const source = `const captured = 40
+const answer = fn () => @u32.add captured 2
+`;
+    const first = await session.compile(source);
+    equivalent(first.artifact, await clean.compile(source));
+    // Emit is a different operation, so it reaches the native session; the
+    // session serves it from the caches the full compile filled.
+    const wasm = await session.compile(source, { analysis: false });
+    equal(wasm.artifact, { bytes: first.artifact.bytes });
+    ok(!("analysis" in wasm.artifact));
+    equal(wasm.stats.result_reused, false);
+    equal(wasm.stats.declarations_lowered, 0);
+    equal(wasm.stats.groups_checked, 0);
+    equal(wasm.stats.entries_compiled, 0);
+    equal(wasm.stats.entries_reused, first.stats.entries_compiled);
+    const changedSource = source.replace("captured = 40", "captured = 41");
+    const changed = await session.compile(changedSource, { analysis: false });
+    const fresh = await clean.compile(changedSource);
+    equal(changed.artifact, { bytes: fresh.bytes });
+    equal(await answer(fresh), 43);
+    const repeated = await session.compile(changedSource, { analysis: false });
+    equal(repeated.stats.result_reused, true);
+    equal(repeated.artifact, changed.artifact);
+    await rejects(
+      () => session.compile(source, { analysis: 0 as unknown as boolean }),
+      TypeError,
+    );
+  },
+);

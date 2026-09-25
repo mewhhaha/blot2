@@ -1,5 +1,12 @@
 import { bendArray, bendList } from "./bend_list.ts";
-import type { CompileOptions } from "./host.ts";
+import {
+  type AnalyzedArtifact,
+  type AnalyzedArtifactOptions,
+  type Artifact,
+  type ArtifactOptions,
+  type CompileOptions,
+  includesAnalysis,
+} from "./host.ts";
 import { sameDeclaration } from "./native_incremental.ts";
 import type { NativeCompilerOptions } from "./native.ts";
 import { NativeProcess } from "./native_process.ts";
@@ -46,6 +53,7 @@ export async function createNativeProjectCompiler(
       ? new URL(options.executable)
       : options.executable,
     threads: options.threads,
+    priority: options.priority,
   };
   const frontend = await createProjectFrontend(options);
   let loader: Awaited<ReturnType<typeof createSourceProjectLoader>>;
@@ -267,17 +275,32 @@ export async function createNativeProjectCompiler(
     queue = task.then(() => {}, () => {});
     return task;
   }
-  return {
-    async compile(
-      source: SourceProject | string | URL,
-      options: CompileOptions = {},
-    ) {
-      const { result, stats } = await run("compile", source, options);
-      if (result.operation !== "compile") {
+  /** With `analysis: false` the artifact carries only the Wasm bytes. */
+  function compile(
+    source: SourceProject | string | URL,
+    options?: AnalyzedArtifactOptions,
+  ): Promise<{ artifact: AnalyzedArtifact; stats: NativeProjectStats }>;
+  function compile(
+    source: SourceProject | string | URL,
+    options?: ArtifactOptions,
+  ): Promise<{ artifact: Artifact; stats: NativeProjectStats }>;
+  async function compile(
+    source: SourceProject | string | URL,
+    options: ArtifactOptions = {},
+  ): Promise<{ artifact: Artifact; stats: NativeProjectStats }> {
+    const operation = includesAnalysis(options) ? "compile" : "emit";
+    const { result, stats } = await run(operation, source, options);
+    switch (result.operation) {
+      case "compile":
+        return { artifact: result.artifact, stats };
+      case "emit":
+        return { artifact: { bytes: result.bytes }, stats };
+      default:
         throw new Error("Expected native artifact");
-      }
-      return { artifact: result.artifact, stats };
-    },
+    }
+  }
+  return {
+    compile,
     async analyze(
       source: SourceProject | string | URL,
       options: CompileOptions = {},

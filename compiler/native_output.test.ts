@@ -211,3 +211,59 @@ Deno.test("native chunk writer matches the original complete response byte for b
     frontend.dispose();
   }
 });
+
+Deno.test("native Wasm-only responses match the reference encoder without the analysis", async () => {
+  const frontend = await createSourceFrontend({ prelude: "none" });
+  try {
+    for (const threads of [1, 8]) {
+      const native = await NativeProcess.start({ threads });
+      try {
+        for (
+          const source of [
+            "const answer = fn () => 42\n",
+            arithmeticSource("balanced", false),
+          ]
+        ) {
+          const prepared = frontend.prepare(source);
+          const request = {
+            operation: "emit" as const,
+            root: prepared.root,
+            prelude: prepared.prelude,
+            fuel: prepared.nodeCount,
+            const_steps: 10000000n,
+          };
+          const artifact = backend["main.compile_source"](
+            request.root,
+            request.prelude,
+            request.fuel,
+            request.const_steps,
+          );
+          ok(artifact.$ === "Done");
+          const bytes = artifact.value.bytes as BendList<number>;
+          const expected = backend["native_response.encode_work"](
+            10000000n,
+            bendList([
+              ...[1112297300, nativeProtocolVersion, 5].map((value) => ({
+                $: "Word",
+                value,
+              })),
+              { $: "ByteLength", value: BigInt(bendArray(bytes).length) },
+              { $: "ByteWords", values: bytes },
+            ]),
+            16777216n,
+            bendList([]),
+          );
+          ok(expected.$ === "Done");
+          equal(
+            await native.request(encodeNativeRequest(request)),
+            wordsBytes(bendArray(expected.value)),
+          );
+        }
+      } finally {
+        await native.dispose();
+      }
+    }
+  } finally {
+    frontend.dispose();
+  }
+});

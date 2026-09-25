@@ -17,6 +17,7 @@ import {
 } from "./native_protocol.ts";
 import type { Cst, CstList } from "./syntax.ts";
 import { bendList } from "./bend_list.ts";
+import { createSourceFrontend } from "./source_frontend.ts";
 
 const emptyModule: Cst = {
   $: "Cst",
@@ -126,12 +127,13 @@ Deno.test("native decoder rejects every truncated request prefix and recovers", 
   const payloads = [
     encodeNativeRequest(tinyRequest),
     encodeNativeRequest({ ...tinyRequest, operation: "compile" }),
+    encodeNativeRequest({ ...tinyRequest, operation: "emit" }),
     encodeNativeSessionRequest({
       operation: "open",
       prelude: emptyModule,
       fuel: 1n,
     }),
-    ...(["analyze", "compile"] as const).flatMap((operation) => [
+    ...(["analyze", "compile", "emit"] as const).flatMap((operation) => [
       encodeNativeSessionRequest({ ...tinyRequest, operation }),
       encodeNativeSessionRequest({
         operation,
@@ -161,12 +163,12 @@ Deno.test("native request headers preserve exact validation order and Nat offset
     [
       [nativeProtocolMagic, 0],
       1,
-      "unsupported native protocol version; expected 11",
+      "unsupported native protocol version; expected 12",
     ],
     [
       [nativeProtocolMagic, nativeProtocolVersion, 10],
       2,
-      "unknown operation; expected 0..6",
+      "unknown operation; expected 0..9",
     ],
     [[...header], 3, "truncated request while reading frontend fuel low word"],
     [
@@ -510,8 +512,8 @@ Deno.test("dictionary compression preserves frame limits for unique strings", ()
   );
 });
 
-Deno.test("protocol eleven has only generic analyze/compile session operations", () => {
-  equal(nativeProtocolVersion, 11);
+Deno.test("protocol twelve has only generic analyze/compile/emit session operations", () => {
+  equal(nativeProtocolVersion, 12);
   const opcode = (payload: Uint8Array) =>
     new DataView(payload.buffer, payload.byteOffset, payload.byteLength)
       .getUint32(8, true);
@@ -519,6 +521,19 @@ Deno.test("protocol eleven has only generic analyze/compile session operations",
   equal(
     opcode(encodeNativeRequest({ ...tinyRequest, operation: "compile" })),
     1,
+  );
+  equal(
+    opcode(encodeNativeRequest({ ...tinyRequest, operation: "emit" })),
+    7,
+  );
+  equal(
+    opcode(encodeNativeChunks({
+      operation: "emit",
+      chunks: [encodeCstChunk(emptyModule)],
+      prelude: encodeCstChunk(emptyModule),
+      const_steps: 7n,
+    })),
+    7,
   );
   equal(
     opcode(encodeNativeSessionRequest({
@@ -529,11 +544,11 @@ Deno.test("protocol eleven has only generic analyze/compile session operations",
     2,
   );
   for (
-    const [operation, full, patch] of [["analyze", 3, 5], [
-      "compile",
-      4,
-      6,
-    ]] as const
+    const [operation, full, patch] of [
+      ["analyze", 3, 5],
+      ["compile", 4, 6],
+      ["emit", 8, 9],
+    ] as const
   ) {
     equal(
       opcode(encodeNativeSessionRequest({
@@ -567,11 +582,68 @@ Deno.test("protocol eleven has only generic analyze/compile session operations",
     constants: [],
     remaining_steps: 0n,
   });
+  const emitted = decodeNativeSessionResponse(words([
+    ...prefix(4),
+    ...Array<number>(16).fill(0),
+    5,
+    5,
+    0x04030201,
+    5,
+  ]));
+  ok("result" in emitted && emitted.result.operation === "emit");
+  equal(emitted.result.bytes, Uint8Array.of(1, 2, 3, 4, 5));
+  equal(decodeNativeResponse(words([...prefix(5), 5, 0x04030201, 5])), {
+    operation: "emit",
+    bytes: Uint8Array.of(1, 2, 3, 4, 5),
+  });
+  for (const operation of ["open", "bytes", "wasm"]) {
+    throws(
+      () =>
+        encodeNativeRequest({
+          ...tinyRequest,
+          operation: operation as NativeRequest["operation"],
+        }),
+      NativeProtocolError,
+    );
+  }
   for (const kind of [5, 6, 999]) {
     throws(
       () => decodeNativeSessionResponse(words(prefix(kind))),
       NativeProtocolError,
     );
+  }
+});
+
+Deno.test("native emit replies carry exactly the compile reply's Wasm and nothing else", async () => {
+  const frontend = await createSourceFrontend({ prelude: "none" });
+  try {
+    const prepared = frontend.prepare(
+      "const base = 40\nconst answer = fn () => @u32.add base 2\n",
+    );
+    const request = {
+      root: prepared.root,
+      prelude: prepared.prelude,
+      fuel: prepared.nodeCount,
+      const_steps: 100n,
+    };
+    await withNative(async (process) => {
+      const compiled = await process.request(
+        encodeNativeRequest({ ...request, operation: "compile" }),
+      );
+      const emitted = await process.request(
+        encodeNativeRequest({ ...request, operation: "emit" }),
+      );
+      const full = decodeNativeResponse(compiled);
+      const wasm = decodeNativeResponse(emitted);
+      ok(full.operation === "compile" && wasm.operation === "emit");
+      equal(wasm.bytes, full.artifact.bytes);
+      // Magic, version, kind, byte count and the packed bytes: no analysis.
+      equal(emitted.length, (4 + Math.ceil(wasm.bytes.length / 4)) * 4);
+      ok(full.artifact.analysis.functions.length > 0);
+      ok(compiled.length > emitted.length);
+    });
+  } finally {
+    frontend.dispose();
   }
 });
 
@@ -600,6 +672,11 @@ Deno.test("response decoder rejects malformed framing, tags, Unicode, Nat and co
     [...prefix(1), 1, ...string("f"), 0, 0, 0, 1, 1, 0xD800],
     // A claimed multi-gigabyte byte vector must fail before allocating it.
     [...prefix(2), ...emptyAnalysis, 0xFFFFFFFF, 0],
+    // Wasm-only replies: truncated, nonzero padding, trailing analysis.
+    [...prefix(5)],
+    [...prefix(5), 5, 0x04030201],
+    [...prefix(5), 1, 0x0101],
+    [...prefix(5), 0, ...emptyAnalysis],
   ];
   for (const payload of malformed) {
     throws(() => decodeNativeResponse(words(payload)), NativeProtocolError);

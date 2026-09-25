@@ -7,6 +7,7 @@ try {
     await Deno.readTextFile(
       new URL("../examples/prelude.blot", import.meta.url),
     ),
+    { analysis: false },
   );
 } finally {
   await compiler.dispose();

@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 import { createSourceCompiler } from "./source.ts";
 import { createNativeCompiler } from "./native.ts";
 import { createNativeIncrementalCompiler } from "./native_incremental.ts";
-import type { Artifact } from "./host.ts";
+import type { AnalyzedArtifact } from "./host.ts";
 
 const samples = Number(Deno.args[0] ?? 7);
 const reportPath = Deno.args[1] ?? "build/native-bench.json";
@@ -45,7 +45,10 @@ async function sha256(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   );
 }
 
-async function execute(artifact: Artifact, expected: number): Promise<void> {
+async function execute(
+  artifact: AnalyzedArtifact,
+  expected: number,
+): Promise<void> {
   const compiled = await WebAssembly.compile(artifact.bytes);
   equal(WebAssembly.Module.imports(compiled), []);
   const instance = await WebAssembly.instantiate(compiled);

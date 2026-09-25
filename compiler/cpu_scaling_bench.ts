@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { deserialize, serialize } from "node:v8";
 import { benchmarkWorkloads } from "./benchmark_workloads.ts";
-import type { Artifact } from "./host.ts";
+import type { AnalyzedArtifact } from "./host.ts";
 
 // Linux diagnostic driver. Each sample runs in a separately pinned host and
 // inherits that affinity in its native child. No instrumentation in blotc.
@@ -17,7 +17,7 @@ async function digest(bytes: Uint8Array<ArrayBuffer>) {
     (byte) => byte.toString(16).padStart(2, "0"),
   ).join("");
 }
-async function execute(artifact: Artifact, expected: number) {
+async function execute(artifact: AnalyzedArtifact, expected: number) {
   const { instance } = await WebAssembly.instantiate(artifact.bytes);
   const entry = instance.exports.entry_0;
   ok(typeof entry === "function");
@@ -96,8 +96,8 @@ if (Deno.args[0] === "--reference") {
   const { reference, changed } = deserialize(
     await Deno.readFile(referencePath),
   ) as {
-    reference: Artifact;
-    changed: Artifact;
+    reference: AnalyzedArtifact;
+    changed: AnalyzedArtifact;
   };
   const frontend = (backend === "native" && regime !== "incremental"
     ? await frontendModule.createSourceFrontend({ prelude: "none", threads })

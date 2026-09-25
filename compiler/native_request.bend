@@ -4,10 +4,13 @@ import ./cst.bend as Cst
 import ./native_session.bend as Session
 import ./native_io.bend as NativeIO
 import ./native_response.bend as Response
+import ./native_output.bend as Output
 
+# Emit compiles exactly like Compile but replies with the Wasm module only.
 type Operation is Data:
   Analyze{}
   Compile{}
+  Emit{}
 
 type Request is Data:
   Request{operation: Operation, fuel: Nat, steps: Nat, root: Cst.Cst, prelude: Cst.Cst}
@@ -344,8 +347,34 @@ def body(opcode: U32, bound: Nat, cursor: Cursor) -> Result<&2, &1, ScanFailure,
       patch(Analyze{}, bound, cursor)
     case 6:
       patch(Compile{}, bound, cursor)
+    case 7:
+      stateless(Emit{}, bound, cursor)
+    case 8:
+      cached(Emit{}, bound, cursor)
+    case 9:
+      patch(Emit{}, bound, cursor)
     case other:
-      Fail{Rejected{2n, "unknown operation; expected 0..6"}}
+      Fail{Rejected{2n, "unknown operation; expected 0..9"}}
+
+# Emit shares Compile's pipeline and session caches, so both produce the same
+# Wasm; only the reply differs.
+def mode(operation: Operation) -> Session.Mode:
+  match operation:
+    case Analyze{}:
+      Session.AnalyzeMode{}
+    case Compile{}:
+      Session.CompileMode{}
+    case Emit{}:
+      Session.CompileMode{}
+
+def contents(operation: Operation) -> Output.Contents:
+  match operation:
+    case Analyze{}:
+      Output.FullArtifact{}
+    case Compile{}:
+      Output.FullArtifact{}
+    case Emit{}:
+      Output.WasmOnly{}
 
 def expected_word(valid: Bool, cursor: Cursor, offset: Nat, message: String) -> Result<&2, &1, ScanFailure, Parsed<Unit>>:
   match valid:

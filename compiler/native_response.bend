@@ -4,9 +4,9 @@ import ./const_eval.bend as Const
 import ./main.bend as Main
 
 def version() -> U32:
-  11
+  12
 
-# This is the version-11 word protocol paired with native_protocol.ts. Fields
+# This is the version-12 word protocol paired with native_protocol.ts. Fields
 # follow public Analysis order; compiler-only checked declarations stay native.
 type Work is Data:
   Word{value: U32}

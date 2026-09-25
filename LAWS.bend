@@ -40,6 +40,7 @@ import ./compiler/globals.bend as Globals
 import ./compiler/state_specialize.bend as StateSpecialize
 import ./compiler/parallel_infer.bend as ParallelInfer
 import ./compiler/staging_scheme.bend as StagingScheme
+import ./compiler/main.bend as Main
 
 # An exported function-valued constant is called through its stored value.
 # Selecting exports after inference must never duplicate its initializer.
@@ -342,7 +343,20 @@ law native_trailing_words_fail:
   {Result.is_done(&2, &1, NativeRequest.ScanFailure, Unit, NativeRequest.end(NativeRequest.Cursor{words, offset, 1n+remaining, [SNil{} : String*1n], 0})) == False{} : Bool}
 
 law native_response_failure_keeps_protocol_version:
-  {List.take(&2, U32, NativeResponse.finish(Fail{M.Diagnostic{"native_protocol", "native_response", "response exceeds 16M words"}}), 3n) == [1112297300, 11, 0] : List<&2, U32>}
+  {List.take(&2, U32, NativeResponse.finish(Fail{M.Diagnostic{"native_protocol", "native_response", "response exceeds 16M words"}}), 3n) == [1112297300, 12, 0] : List<&2, U32>}
+
+# A Wasm-only (Emit) request runs the same compile pipeline and session caches
+# as Compile, so its Wasm is identical; only the reply drops the analysis.
+law native_emit_compiles_like_compile:
+  {NativeRequest.mode(NativeRequest.Emit{}) == NativeRequest.mode(NativeRequest.Compile{}) : Session.Mode}
+
+law native_emit_replies_wasm_only:
+  {NativeRequest.contents(NativeRequest.Emit{}) == NativeOutput.WasmOnly{} : NativeOutput.Contents}
+
+# encode_artifact and session replies take their fields from artifact_fields.
+law native_wasm_only_reply_omits_analysis:
+  for analysis: Main.Analysis
+  {NativeOutput.artifact_fields(NativeOutput.WasmOnly{}, analysis) == [NativeResponse.Word{5}] : List<&2, NativeResponse.Work>}
 
 # Metadata reads never invent entries in an empty index.
 law empty_index_is_absent:

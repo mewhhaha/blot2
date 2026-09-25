@@ -1,4 +1,11 @@
-import type { CompileOptions } from "./host.ts";
+import {
+  type AnalyzedArtifact,
+  type AnalyzedArtifactOptions,
+  type Artifact,
+  type ArtifactOptions,
+  type CompileOptions,
+  includesAnalysis,
+} from "./host.ts";
 import { bendArray } from "./bend_list.ts";
 import {
   createIncrementalFrontend,
@@ -218,6 +225,30 @@ export async function createNativeIncrementalCompiler(
     return task;
   }
 
+  /** With `analysis: false` the artifact carries only the Wasm bytes. */
+  function compile(
+    source: string,
+    options?: AnalyzedArtifactOptions,
+  ): Promise<{ artifact: AnalyzedArtifact; stats: NativeIncrementalStats }>;
+  function compile(
+    source: string,
+    options?: ArtifactOptions,
+  ): Promise<{ artifact: Artifact; stats: NativeIncrementalStats }>;
+  async function compile(
+    source: string,
+    options: ArtifactOptions = {},
+  ): Promise<{ artifact: Artifact; stats: NativeIncrementalStats }> {
+    const operation = includesAnalysis(options) ? "compile" : "emit";
+    const { result, stats } = await run(operation, source, options);
+    switch (result.operation) {
+      case "compile":
+        return { artifact: result.artifact, stats };
+      case "emit":
+        return { artifact: { bytes: result.bytes }, stats };
+      default:
+        throw new Error("Expected native artifact");
+    }
+  }
   return {
     async analyze(source: string, options: CompileOptions = {}) {
       const { result, stats } = await run("analyze", source, options);
@@ -226,13 +257,7 @@ export async function createNativeIncrementalCompiler(
       }
       return { analysis: result.analysis, stats };
     },
-    async compile(source: string, options: CompileOptions = {}) {
-      const { result, stats } = await run("compile", source, options);
-      if (result.operation !== "compile") {
-        throw new Error("Expected native artifact");
-      }
-      return { artifact: result.artifact, stats };
-    },
+    compile,
     dispose,
   };
 }

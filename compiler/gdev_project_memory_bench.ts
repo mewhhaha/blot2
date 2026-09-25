@@ -14,7 +14,7 @@ import {
   validateState,
 } from "../../gdev/boundary.ts";
 import { type Guest, instantiateGuest } from "./guest.ts";
-import type { Artifact } from "./host.ts";
+import type { AnalyzedArtifact } from "./host.ts";
 
 const edits = Number(Deno.args[0] ?? "50");
 const threads = Number(Deno.args[1] ?? "1");
@@ -94,7 +94,7 @@ function observeGame(guest: Guest) {
   return { abi: guest.abi, schema, created, cleaned, packet };
 }
 
-async function execute(artifact: Artifact) {
+async function execute(artifact: AnalyzedArtifact) {
   const guest = await instantiateGuest(artifact.bytes);
   try {
     return observeGame(guest);
@@ -147,7 +147,7 @@ const clean = await createNativeCompiler({ executable, threads });
 const oracles = {} as Record<
   Variant,
   {
-    artifact: Artifact;
+    artifact: AnalyzedArtifact;
     wasm_sha256: string;
     result: Awaited<ReturnType<typeof execute>>;
   }

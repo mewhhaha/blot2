@@ -62,11 +62,53 @@ const session = await createNativeIncrementalCompiler({ threads: 1 });
 try {
   const analysis = await compiler.analyze(source);
   const artifact = await compiler.compile(source);
+  const { bytes } = await compiler.compile(source, { analysis: false });
   const edited = await session.compile(changedSource); // artifact + cache stats
 } finally {
   await Promise.all([session.dispose(), compiler.dispose()]);
 }
 ```
+
+`compile` returns the Wasm bytes and the analysis (functions, constants,
+remaining const steps). With `analysis: false` it returns only `{ bytes }`: the
+Wasm module carries its guest ABI in the `blot:abi` section, so
+`instantiateGuest` needs nothing else. Wasm-only compiles run the same pipeline
+and session caches as full compiles and produce identical bytes; the native side
+just skips encoding the analysis and the host skips decoding it. Every compiler
+(`createNativeCompiler`, the native incremental and project sessions, and the
+JavaScript references) accepts the option. Runtimes that only instantiate guests
+should use it.
+
+### Scheduling
+
+Desktop schedulers often demote the Deno process that launches `blotc`. For
+example, ananicy-cpp's default rule
+`/etc/ananicy.d/00-default/Development & Programming/deno.rules` gives every
+`deno` process the `BG_CPUIO` type (SCHED_IDLE, nice 16, idle IO class) and
+reapplies it every 15 s. A child inherits all three, so a ~3 s compile could
+take 10-15 s on a loaded machine. On Linux, `blotc` therefore restores normal
+scheduling at startup, before the Bend runtime creates its worker threads. If a
+thread runs under SCHED_IDLE, or under SCHED_OTHER/SCHED_BATCH with a positive
+nice value, `blotc` switches it to SCHED_OTHER with nice 0 and best-effort IO
+priority 4. A thread in the idle IO class also gets best-effort IO priority 4.
+Policy, nice and IO priority are per thread on Linux. `blotc` resets every
+existing task, and the worker threads it creates later inherit the result.
+ananicy matches process names, so it does not demote `blotc` itself later. This
+is best effort. Leaving SCHED_IDLE or lowering the nice value needs
+`RLIMIT_NICE` of at least 20 (`ulimit -e`); on EPERM `blotc` keeps the inherited
+setting. Real-time policies, SCHED_BATCH at nice 0 and negative nice values are
+left alone. Pass `--inherit-priority` to `blotc`, or `priority: "inherit"` to
+`createNativeCompiler` and the native sessions, to keep the launcher's
+scheduling. `native_priority.test.ts` launches `blotc` under `chrt --idle 0`,
+`nice -n 16` and `ionice -c 3` and checks every thread after the handshake and
+after a compile. Some harnesses keep rewriting the scheduling of every
+descendant thread; for example, a wrapper that forces SCHED_BATCH would hide
+`blotc`'s own choice. Each test `blotc` therefore runs outside the test's
+process tree: `setsid --fork` orphans a shell that keeps the test's stdin and
+stdout and reports the compiler's pid and exit status. A launch that still shows
+a harness's SCHED_BATCH nice 0 is retried twice, then fails. The checks are
+skipped only when `ps`, `setsid`, `chrt`, `nice` or `ionice` is missing, or when
+`RLIMIT_NICE` is below 20.
 
 The stateless API is a clean oracle. Incremental sessions retain declarations,
 dependency groups, inferred interfaces, evaluated constants, and relocatable
@@ -318,7 +360,7 @@ relocation is repeated against the current catalog; cached code contains no live
 table indices or runtime pointers. The JS worker-pool implementation remains a
 separate reference with the same compiler semantics.
 
-The binary native protocol is version **11**. Its bounded little-endian frames
+The binary native protocol is version **12**. Its bounded little-endian frames
 contain at most 16M words (64 MiB), per-request dictionaries of Unicode scalar
 strings, and 48-bit Nats. CST kind/field/text values reference dictionary IDs;
 IDs are assigned in first-seen preorder across all trees in the request. The
@@ -327,7 +369,12 @@ valid frame length, including dictionary IDs and allocation counts. Rebuild the
 executable with the host: older protocol versions are not accepted. Stdout is
 reserved for frames; stderr carries process diagnostics. Framing or process
 failures are fatal; checked language diagnostics leave a session usable. No
-native error triggers a silent JS fallback.
+native error triggers a silent JS fallback. Request opcodes are 0/1 stateless
+analyze/compile, 2 open session, 3/4 session analyze/compile, 5/6 declaration
+patches, and 7/8/9 emit (stateless, session, patch). Emit is the Wasm-only
+compile behind `analysis: false`. Response kinds are 0 diagnostic, 1 analysis, 2
+artifact (analysis and Wasm), 3 opened, 4 cached (eight counters and an inner
+kind 1, 2 or 5), and 5 Wasm only.
 
 ## Source modules
 

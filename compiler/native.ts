@@ -1,4 +1,12 @@
-import type { Analysis, CompileOptions } from "./host.ts";
+import {
+  type Analysis,
+  type AnalyzedArtifact,
+  type AnalyzedArtifactOptions,
+  type Artifact,
+  type ArtifactOptions,
+  type CompileOptions,
+  includesAnalysis,
+} from "./host.ts";
 import type { SourceInput } from "./source_project.ts";
 import { NativeProcess, type NativeProcessOptions } from "./native_process.ts";
 import {
@@ -57,6 +65,35 @@ export async function createNativeCompiler(
       return prepared.translate(error);
     }
   }
+  /**
+   * Compiles `source` to Wasm. With `analysis: false` the native side skips
+   * encoding the analysis and the artifact carries only the Wasm bytes.
+   */
+  function compile(
+    source: SourceInput,
+    options?: AnalyzedArtifactOptions,
+  ): Promise<AnalyzedArtifact>;
+  function compile(
+    source: SourceInput,
+    options?: ArtifactOptions,
+  ): Promise<Artifact>;
+  async function compile(
+    source: SourceInput,
+    options: ArtifactOptions = {},
+  ): Promise<Artifact> {
+    if (!includesAnalysis(options)) {
+      const response = await run("emit", source, options);
+      if (response.operation !== "emit") {
+        throw new Error("Expected native Wasm");
+      }
+      return { bytes: response.bytes };
+    }
+    const response = await run("compile", source, options);
+    if (response.operation !== "compile") {
+      throw new Error("Expected native artifact");
+    }
+    return response.artifact;
+  }
   return {
     async analyze(
       source: SourceInput,
@@ -68,13 +105,7 @@ export async function createNativeCompiler(
       }
       return response.analysis;
     },
-    async compile(source: SourceInput, options: CompileOptions = {}) {
-      const response = await run("compile", source, options);
-      if (response.operation !== "compile") {
-        throw new Error("Expected native artifact");
-      }
-      return response.artifact;
-    },
+    compile,
     async dispose() {
       if (!closed) {
         closed = true;

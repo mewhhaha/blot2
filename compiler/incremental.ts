@@ -1,8 +1,12 @@
 import {
+  type AnalyzedArtifact,
+  type AnalyzedArtifactOptions,
   type Artifact,
+  type ArtifactOptions,
   type CompileOptions,
   constSteps,
   decodePipelineArtifact,
+  includesAnalysis,
 } from "./host.ts";
 import {
   bendArray,
@@ -99,7 +103,7 @@ export async function createIncrementalCompiler(
   let entries = new Map<string, Cached<EntryCode>>();
   let planning: Cached<readonly GroupJob[]> | undefined;
   let previous:
-    | Cached<{ artifact: Artifact; stats: CompilationStats }>
+    | Cached<{ artifact: AnalyzedArtifact; stats: CompilationStats }>
     | undefined;
   let previousInput:
     | { source: string; steps: bigint }
@@ -389,14 +393,30 @@ export async function createIncrementalCompiler(
     return operation;
   }
 
+  /** With `analysis: false` the artifact carries only the Wasm bytes. */
+  function compile(
+    source: string,
+    options?: AnalyzedArtifactOptions,
+  ): Promise<{ artifact: AnalyzedArtifact; stats: CompilationStats }>;
+  function compile(
+    source: string,
+    options?: ArtifactOptions,
+  ): Promise<{ artifact: Artifact; stats: CompilationStats }>;
+  async function compile(
+    source: string,
+    options: ArtifactOptions = {},
+  ): Promise<{ artifact: Artifact; stats: CompilationStats }> {
+    const analysis = includesAnalysis(options);
+    const { artifact, stats } = await enqueue(source, options);
+    return {
+      artifact: analysis
+        ? { analysis: artifact.analysis, bytes: artifact.bytes }
+        : { bytes: artifact.bytes },
+      stats,
+    };
+  }
   return {
-    async compile(source: string, options: CompileOptions = {}) {
-      const { artifact, stats } = await enqueue(source, options);
-      return {
-        artifact: { analysis: artifact.analysis, bytes: artifact.bytes },
-        stats,
-      };
-    },
+    compile,
     dispose() {
       if (disposed) return;
       disposed = true;
