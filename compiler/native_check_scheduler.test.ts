@@ -64,7 +64,9 @@ Deno.test("ready inference preserves generic SCCs and latent effects in JS and o
         equal(update.artifact, reference.compile(edited));
         equal(update.artifact, await native.compile(edited));
         equal(await answer(update.artifact.bytes), 43);
-        equal(update.stats.groups_checked, 1);
+        // The changed group is checked in the source pass; its exact certificate
+        // joins retained groups in the final pass counted by these statistics.
+        equal(update.stats.groups_checked, 0);
         ok(update.stats.groups_reused > 0);
       } finally {
         await native.dispose();
@@ -213,8 +215,8 @@ Deno.test("dependency chains preserve artifacts, cache counts and rollback at on
           changed.artifact.analysis.functions,
           editExpected.analysis.functions,
         );
-        equal(changed.stats.groups_checked, 1);
-        equal(changed.stats.groups_reused, 63);
+        equal(changed.stats.groups_checked, 0);
+        equal(changed.stats.groups_reused, 64);
         equal(
           await diagnostic(() => native.compile(broken)),
           expectedDiagnostic,
@@ -283,8 +285,8 @@ for (
             first.stats.groups_reused;
           const changed = await session.compile(edited);
           equal(changed.artifact.bytes, editExpected.bytes);
-          equal(changed.stats.groups_checked, 1);
-          equal(changed.stats.groups_reused, groupCount - 1);
+          equal(changed.stats.groups_checked, 0);
+          equal(changed.stats.groups_reused, groupCount);
           equal(
             await diagnostic(() => native.compile(broken)),
             expectedDiagnostic,
@@ -341,8 +343,8 @@ Deno.test("native ready batches retain interface hits and roll back all caches a
         equal(changed.artifact, expected);
         equal(await native.compile(edited), expected);
         equal(await answer(changed.artifact.bytes), 57);
-        equal(changed.stats.groups_checked, 1);
-        equal(changed.stats.groups_reused, groupCount - 1);
+        equal(changed.stats.groups_checked, 0);
+        equal(changed.stats.groups_reused, groupCount);
         equal(
           await diagnostic(() => native.compile(broken)),
           expectedDiagnostic,

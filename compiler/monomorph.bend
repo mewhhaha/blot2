@@ -1738,20 +1738,23 @@ def finish_requirements(needs: List<&2, I.Coverage>, specialized: Specialization
     case head <> tail:
       prune_generic_roots(specialized, configuration)
 
-def infer_required(expanded: ExpandedModule, +configuration: Configuration, +shapes: List<&2, I.Binding>, isolated: Bool) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
+def infer_required_at(expanded: ExpandedModule, +configuration: Configuration, +shapes: List<&2, I.Binding>, isolated: Bool, limit: Result<&2, &2, M.Diagnostic, Nat>) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
   ExpandedModule{M.Module{+constants, +functions, +types, +operations}, counter, bindings, certificates} = expanded
   Configuration{+originals, templates, entry, locals, affected, stride, constant_values, family_templates, step, schema} = configuration
   +owned = List.append(&2, G.Declaration, G.function_declarations(functions), G.constant_declarations(constants))
   +ordinary = ordinary_bindings(shapes, Bool.pick(List<&2, String>, isolated, G.names(owned), affected))
   +declarations = List.append(&2, G.Declaration, G.function_declarations(pending_functions(functions, ordinary)), G.constant_declarations(pending_constants(constants, ordinary)))
   do Result<&2, &2, M.Diagnostic, ExpandedModule>:
-    start : Nat <- shape_limit(shapes, 0n)
+    start : Nat <- limit
     +inferred : G.Environment <- infer_pending(declarations, shapes, G.Environment{ordinary, Nil{}, I.State{T.empty(), start, MTip{}}}, operations, types, G.function_names(G.function_declarations(List.append(&2, M.Function, originals, functions))))
     +initial_needs : List<&2, I.Coverage> = pending(inferred)
     +initial_count : Nat = List.length(&2, I.Definition, G.env_definitions(inferred))
     +solved : Specialization <- solve(65536n, Needs{initial_needs}, Specialization{M.Module{constants, functions, types, operations}, inferred, Map.new(&2, Choice), counter, certificates}, configuration, shapes, PendingCache{initial_count, initial_needs})
     specialized : Specialization <- finish_requirements(specialization_pending(solved), solved, configuration)
     finish_expansion(specialized)
+
+def infer_required(expanded: ExpandedModule, configuration: Configuration, +shapes: List<&2, I.Binding>, isolated: Bool) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
+  infer_required_at(expanded, configuration, shapes, isolated, shape_limit(shapes, 0n))
 
 def infer_present(present: Bool, expanded: ExpandedModule, configuration: Configuration, shapes: List<&2, I.Binding>, isolated: Bool) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
   match present:
@@ -1764,20 +1767,23 @@ def infer_expansion(+expanded: ExpandedModule, configuration: Configuration, sha
   ExpandedModule{module, counter, bindings, certificates} = expanded
   infer_present(required(module), expanded, configuration, shapes, isolated)
 
-def infer_required_staged(expanded: ExpandedModule, +configuration: Configuration, +shapes: List<&2, I.Binding>, isolated: Bool, +schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
+def infer_required_staged_at(expanded: ExpandedModule, +configuration: Configuration, +shapes: List<&2, I.Binding>, isolated: Bool, +schemes: List<&2, Staging.Scheme>, limit: Result<&2, &2, M.Diagnostic, Nat>) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
   ExpandedModule{M.Module{+constants, +functions, +types, +operations}, counter, bindings, certificates} = expanded
   Configuration{+originals, templates, entry, locals, affected, stride, constant_values, family_templates, step, schema} = configuration
   +owned = List.append(&2, G.Declaration, G.function_declarations(functions), G.constant_declarations(constants))
   +ordinary = ordinary_bindings(shapes, Bool.pick(List<&2, String>, isolated, G.names(owned), affected))
   +declarations = List.append(&2, G.Declaration, G.function_declarations(pending_functions(functions, ordinary)), G.constant_declarations(pending_constants(constants, ordinary)))
   do Result<&2, &2, M.Diagnostic, ExpandedModule>:
-    start : Nat <- shape_limit(shapes, 0n)
+    start : Nat <- limit
     +inferred : G.Environment <- infer_pending_staged(declarations, shapes, G.Environment{ordinary, Nil{}, I.State{T.empty(), start, MTip{}}}, operations, types, G.function_names(G.function_declarations(List.append(&2, M.Function, originals, functions))), schemes, stride)
     +initial_needs : List<&2, I.Coverage> = pending(inferred)
     +initial_count : Nat = List.length(&2, I.Definition, G.env_definitions(inferred))
     +solved : Specialization <- solve_staged(65536n, Needs{initial_needs}, Specialization{M.Module{constants, functions, types, operations}, inferred, Map.new(&2, Choice), counter, certificates}, configuration, shapes, PendingCache{initial_count, initial_needs}, schemes)
     specialized : Specialization <- finish_requirements(specialization_pending(solved), solved, configuration)
     finish_expansion(specialized)
+
+def infer_required_staged(expanded: ExpandedModule, configuration: Configuration, +shapes: List<&2, I.Binding>, isolated: Bool, +schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
+  infer_required_staged_at(expanded, configuration, shapes, isolated, schemes, shape_limit(shapes, 0n))
 
 def infer_required_optional(+expanded: ExpandedModule, +configuration: Configuration, +shapes: List<&2, I.Binding>, +isolated: Bool, schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
   match schemes:
@@ -1802,13 +1808,37 @@ def infer_expansion_staged(+expanded: ExpandedModule, +configuration: Configurat
       infer_present_staged(required(module), expanded, configuration, shapes, isolated, head <> tail)
 
 
-def generic_templates(bindings: List<&2, I.Binding>, +affected: List<&2, String>) -> List<&2, String>:
+# The bound belongs to the immutable shape context. Keep its failure deferred
+# until a task actually requests inference, just as on the uncached path.
+def infer_present_at(present: Bool, expanded: ExpandedModule, configuration: Configuration, shapes: List<&2, I.Binding>, isolated: Bool, schemes: List<&2, Staging.Scheme>, limit: Result<&2, &2, M.Diagnostic, Nat>) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
+  match present schemes:
+    case False{} _:
+      Done{expanded}
+    case True{} Nil{}:
+      infer_required_at(expanded, configuration, shapes, isolated, limit)
+    case True{} head <> tail:
+      infer_required_staged_at(expanded, configuration, shapes, isolated, head <> tail, limit)
+
+def infer_expansion_at(+expanded: ExpandedModule, configuration: Configuration, shapes: List<&2, I.Binding>, isolated: Bool, schemes: List<&2, Staging.Scheme>, limit: Result<&2, &2, M.Diagnostic, Nat>) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
+  ExpandedModule{module, counter, bindings, certificates} = expanded
+  infer_present_at(required(module), expanded, configuration, shapes, isolated, schemes, limit)
+
+def generic_template_selected(selected: Bool, +name: String, ty: M.Ty, +rest: List<&2, String>) -> List<&2, String>:
+  match selected:
+    case False{}:
+      rest
+    case True{}:
+      Bool.pick(List<&2, String>, polymorphic(65536n, [ty]), name <> rest, rest)
+
+def generic_templates_in(bindings: List<&2, I.Binding>, +affected: Set()) -> List<&2, String>:
   match bindings:
     case Nil{}:
       Nil{}
     case I.Binding{+name, ty, variables} <> tail:
-      +rest = generic_templates(tail, affected)
-      Bool.pick(List<&2, String>, Bool.and(D.contains(affected, name), polymorphic(65536n, [ty])), name <> rest, rest)
+      generic_template_selected(D.member(affected, name), name, ty, generic_templates_in(tail, affected))
+
+def generic_templates(bindings: List<&2, I.Binding>, affected: List<&2, String>) -> List<&2, String>:
+  generic_templates_in(bindings, Set.from_list(affected))
 
 def constant_annotation(annotation: Maybe<&2, M.Ty>, value: M.Expr) -> M.Expr:
   match annotation value:
@@ -1819,13 +1849,22 @@ def constant_annotation(annotation: Maybe<&2, M.Ty>, value: M.Expr) -> M.Expr:
     case Some{ty} value:
       M.SourceExpr{0n, Some{ty}, value}
 
-def constant_templates(constants: List<&2, M.Constant>, +affected: List<&2, String>) -> List<&2, LocalTemplate>:
+def constant_template_selected(selected: Bool, name: String, annotation: Maybe<&2, M.Ty>, +value: M.Expr, +rest: List<&2, LocalTemplate>) -> List<&2, LocalTemplate>:
+  match selected:
+    case False{}:
+      rest
+    case True{}:
+      Bool.pick(List<&2, LocalTemplate>, template_value(65536n, value), LocalTemplate{name, constant_annotation(annotation, value)} <> rest, rest)
+
+def constant_templates_in(constants: List<&2, M.Constant>, +affected: Set()) -> List<&2, LocalTemplate>:
   match constants:
     case Nil{}:
       Nil{}
-    case M.Constant{+name, exported, annotation, +value} <> tail:
-      +rest = constant_templates(tail, affected)
-      Bool.pick(List<&2, LocalTemplate>, Bool.and(D.contains(affected, name), template_value(65536n, value)), LocalTemplate{name, constant_annotation(annotation, value)} <> rest, rest)
+    case M.Constant{+name, exported, annotation, value} <> tail:
+      constant_template_selected(D.member(affected, name), name, annotation, value, constant_templates_in(tail, affected))
+
+def constant_templates(constants: List<&2, M.Constant>, affected: List<&2, String>) -> List<&2, LocalTemplate>:
+  constant_templates_in(constants, Set.from_list(affected))
 
 def retained_constants(constants: List<&2, M.Constant>, +templates: List<&2, LocalTemplate>) -> List<&2, M.Constant>:
   match constants:
@@ -1859,16 +1898,34 @@ def constant_callable(found: Maybe<&2, I.Binding>) -> Bool:
     case None{}:
       False{}
 
-def specialized_constants(constants: List<&2, M.Constant>, +templates: List<&2, String>, +shapes: List<&2, I.Binding>) -> List<&2, M.Constant>:
+def specialized_constant_callable(callable: Bool, +constant: M.Constant, +rest: List<&2, M.Constant>) -> List<&2, M.Constant>:
+  match callable:
+    case False{}:
+      rest
+    case True{}:
+      M.Constant{name, exported, annotation, value} = constant
+      Bool.pick(List<&2, M.Constant>, template_value(65536n, value), rest, constant <> rest)
+
+def specialized_constant_selected(selected: Bool, +constant: M.Constant, shapes: List<&2, I.Binding>, rest: List<&2, M.Constant>) -> List<&2, M.Constant>:
+  match selected:
+    case False{}:
+      rest
+    case True{}:
+      M.Constant{name, exported, annotation, value} = constant
+      specialized_constant_callable(constant_callable(I.lookup_binding(shapes, name)), constant, rest)
+
+def specialized_constants_in(constants: List<&2, M.Constant>, +templates: Set(), +shapes: List<&2, I.Binding>) -> List<&2, M.Constant>:
   match constants:
     case Nil{}:
       Nil{}
     case M.Constant{name, exported, annotation, M.RuntimeInitExpr{value}} <> tail:
-      specialized_constants(tail, templates, shapes)
-    case M.Constant{+name, +exported, +annotation, +value} <> tail:
-      +constant = {M.Constant{name, exported, annotation, value} : M.Constant}
-      +rest = specialized_constants(tail, templates, shapes)
-      Bool.pick(List<&2, M.Constant>, Bool.and(Bool.and(D.contains(templates, name), constant_callable(I.lookup_binding(shapes, name))), Bool.not(template_value(65536n, value))), constant <> rest, rest)
+      specialized_constants_in(tail, templates, shapes)
+    case M.Constant{+name, exported, annotation, value} <> tail:
+      constant : M.Constant = M.Constant{name, exported, annotation, value}
+      specialized_constant_selected(D.member(templates, name), constant, shapes, specialized_constants_in(tail, templates, shapes))
+
+def specialized_constants(constants: List<&2, M.Constant>, templates: List<&2, String>, shapes: List<&2, I.Binding>) -> List<&2, M.Constant>:
+  specialized_constants_in(constants, Set.from_list(templates), shapes)
 
 def retained_specializations(constants: List<&2, M.Constant>, +templates: List<&2, M.Constant>) -> List<&2, M.Constant>:
   match constants:
@@ -1968,7 +2025,7 @@ type SpecializationTask is Data:
   SpecializationTask{declaration: G.Declaration, first: Nat}
 
 type SpecializationContext is Data:
-  SpecializationContext{configuration: Configuration, shapes: List<&2, I.Binding>, types: List<&2, M.DataType>, operations: List<&2, M.Operation>, schemes: List<&2, Staging.Scheme>}
+  SpecializationContext{configuration: Configuration, shapes: List<&2, I.Binding>, types: List<&2, M.DataType>, operations: List<&2, M.Operation>, schemes: List<&2, Staging.Scheme>, limit: Result<&2, &2, M.Diagnostic, Nat>}
 
 # A task result is reusable only with the same inferred shapes and nominal
 # context. Source declarations are encoded once per revision, then each task
@@ -1977,13 +2034,13 @@ type CachedTask is Data:
   CachedTask{position: Nat, name: String, dependencies: List<&2, String>, result: ExpandedModule}
 
 type Cache is Data:
-  Cache{context: List<&2, U32>, tasks: List<&2, CachedTask>, sources: Map<&2, List<&2, U32>>}
+  Cache{context: List<&2, U32>, tasks: List<&2, CachedTask>, sources: Map<&2, List<&2, U32>>, source_certificates: List<&2, Core.Certificate>}
 
 type Reusable is Data:
   Reusable{tasks: List<&2, CachedTask>, sources: Map<&2, List<&2, U32>>}
 
 def empty_cache() -> Cache:
-  Cache{Nil{}, Nil{}, Map.new(&2, List<&2, U32>)}
+  Cache{Nil{}, Nil{}, Map.new(&2, List<&2, U32>), Nil{}}
 
 type Prepared is Data:
   Prepared{module: M.Module, cache: Cache, certificates: List<&2, Core.Certificate>}
@@ -2002,6 +2059,19 @@ def prepared_module(prepared: Prepared) -> M.Module:
 def prepared_cache(prepared: Prepared) -> Cache:
   Prepared{module, cache, certificates} = prepared
   cache
+
+def source_certificates(previous: Maybe<&2, Cache>) -> List<&2, Core.Certificate>:
+  match previous:
+    case None{}:
+      Nil{}
+    case Some{Cache{context, tasks, sources, certificates}}:
+      certificates
+
+# Source evidence is published only with a successful prepared module. The
+# native session leaves its previous cache in place when compilation fails.
+def with_source_certificates(prepared: Prepared, certificates: List<&2, Core.Certificate>) -> Prepared:
+  Prepared{module, Cache{context, tasks, sources, old}, final_certificates} = prepared
+  Prepared{module, Cache{context, tasks, sources, Core.ready_certificates(certificates)}, final_certificates}
 
 def prepared_certificates(prepared: Prepared) -> List<&2, Core.Certificate>:
   Prepared{module, cache, certificates} = prepared
@@ -2039,7 +2109,7 @@ def cache_for_context(previous: Maybe<&2, Cache>, +context: List<&2, U32>) -> Re
   match previous:
     case None{}:
       Reusable{Nil{}, Map.new(&2, List<&2, U32>)}
-    case Some{Cache{prior, tasks, sources}}:
+    case Some{Cache{prior, tasks, sources, certificates}}:
       reusable_match(same_words(prior, context), tasks, sources)
 
 def shape_variables(variables: List<&2, Nat>) -> List<&2, M.Function>:
@@ -2090,7 +2160,7 @@ def schema_source_functions(proofs: List<&2, Schema.Evidence>) -> List<&2, M.Fun
       node_method <> terminal_method <> equality <> type_equality <> schema_source_functions(tail)
 
 def context_module(context: SpecializationContext, +nodes: List<&2, D.Node>) -> M.Module:
-  SpecializationContext{Configuration{originals, +templates, entry, +locals, +affected, stride, constants, family_templates, step, +schema}, +shapes, types, +operations, schemes} = context
+  SpecializationContext{Configuration{originals, +templates, entry, +locals, +affected, stride, constants, family_templates, step, +schema}, +shapes, types, +operations, schemes, limit} = context
   metadata : List<&2, M.Function> = [M.Function{entry, False{}, Nat.show(stride), None{}, None{}, M.UnitExpr{}}, M.Function{Nat.show(step), False{}, Nat.show(List.length(&2, String, templates)), None{}, None{}, M.UnitExpr{}}, M.Function{Nat.show(List.length(&2, LocalTemplate, locals)), False{}, Nat.show(List.length(&2, M.Operation, operations)), None{}, None{}, M.UnitExpr{}}, M.Function{Nat.show(List.length(&2, I.Binding, shapes)), False{}, "", None{}, None{}, M.UnitExpr{}}, M.Function{"@schema.evidence", False{}, Nat.show(List.length(&2, Schema.Evidence, schema)), None{}, None{}, M.UnitExpr{}}]
   marked = List.append(&2, M.Function, metadata, List.append(&2, M.Function, marker_functions(templates), M.Function{"@affected", False{}, Nat.show(List.length(&2, String, affected)), None{}, None{}, M.UnitExpr{}} <> List.append(&2, M.Function, marker_functions(affected), shape_functions(shapes))))
   # Shared-constant specialization can add source-independent helper bodies.
@@ -2142,10 +2212,10 @@ def specialization_tasks(declarations: List<&2, G.Declaration>, +first: Nat) -> 
 
 def specialize_task(task: SpecializationTask, context: SpecializationContext) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
   SpecializationTask{declaration, first} = task
-  SpecializationContext{+configuration, shapes, types, operations, schemes} = context
+  SpecializationContext{+configuration, shapes, types, operations, schemes, limit} = context
   do Result<&2, &2, M.Diagnostic, ExpandedModule>:
     expanded : ExpandedModule <- expand_declaration(declaration, configuration, types, operations, first)
-    infer_expansion_staged(expanded, configuration, shapes, True{}, schemes)
+    infer_expansion_at(expanded, configuration, shapes, True{}, schemes, limit)
 
 def run_task(task: TaskRun, context: SpecializationContext) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
   match task:
@@ -2275,11 +2345,11 @@ def distinct_cached(compiled: CachedExpansion) -> CachedExpansion:
   CachedExpansion{value, tasks} = compiled
   CachedExpansion{distinct_expansion(value), tasks}
 
-def specialize_declarations_cached(+declarations: List<&2, G.Declaration>, configuration: Configuration, shapes: List<&2, I.Binding>, +types: List<&2, M.DataType>, +operations: List<&2, M.Operation>, +counter: Nat, +nodes: List<&2, D.Node>, +previous: List<&2, CachedTask>, +old: Map<&2, List<&2, U32>>, +current: Map<&2, List<&2, U32>>) -> Result<&2, &2, M.Diagnostic, CachedExpansion>:
+def specialize_declarations_cached(+declarations: List<&2, G.Declaration>, configuration: Configuration, +shapes: List<&2, I.Binding>, +types: List<&2, M.DataType>, +operations: List<&2, M.Operation>, +counter: Nat, +nodes: List<&2, D.Node>, +previous: List<&2, CachedTask>, +old: Map<&2, List<&2, U32>>, +current: Map<&2, List<&2, U32>>) -> Result<&2, &2, M.Diagnostic, CachedExpansion>:
   +width = Nat.max(1n, List.length(&2, G.Declaration, declarations))
   +stepped = with_step(configuration, width)
   +runs = cached_tasks(declarations, task_index(previous, Map.new(&2, CachedTask)), old, current, counter)
-  context : SpecializationContext = SpecializationContext{stepped, shapes, types, operations, Nil{}}
+  context : SpecializationContext = SpecializationContext{stepped, shapes, types, operations, Nil{}, shape_limit(shapes, 0n)}
   outcomes = Batch.execute(~TaskRun, ~SpecializationContext, ~Result<&2, &2, M.Diagnostic, ExpandedModule>, ~run_task, Batch.plan(TaskRun, runs, 2048n), context)
   do Result<&2, &2, M.Diagnostic, CachedExpansion>:
     collected : CachedExpansion <- collect_cached(runs, outcomes, nodes, types, operations, counter)
@@ -2297,10 +2367,10 @@ def collect_specializations(outcomes: List<&2, Result<&2, &2, M.Diagnostic, Expa
 
 # Lane n uses n, n+width, n+2*width, ... . No worker shares a counter, and
 # source-ordered collection keeps diagnostics independent of completion order.
-def specialize_declarations(+declarations: List<&2, G.Declaration>, configuration: Configuration, shapes: List<&2, I.Binding>, +types: List<&2, M.DataType>, +operations: List<&2, M.Operation>, +counter: Nat, schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
+def specialize_declarations(+declarations: List<&2, G.Declaration>, configuration: Configuration, +shapes: List<&2, I.Binding>, +types: List<&2, M.DataType>, +operations: List<&2, M.Operation>, +counter: Nat, schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, ExpandedModule>:
   +width = Nat.max(1n, List.length(&2, G.Declaration, declarations))
   tasks = specialization_tasks(declarations, counter)
-  context : SpecializationContext = SpecializationContext{with_step(configuration, width), shapes, types, operations, schemes}
+  context : SpecializationContext = SpecializationContext{with_step(configuration, width), shapes, types, operations, schemes, shape_limit(shapes, 0n)}
   outcomes = Batch.execute(~SpecializationTask, ~SpecializationContext, ~Result<&2, &2, M.Diagnostic, ExpandedModule>, ~specialize_task, Batch.plan(SpecializationTask, tasks, 2048n), context)
   do Result<&2, &2, M.Diagnostic, ExpandedModule>:
     collected : ExpandedModule <- collect_specializations(outcomes, types, operations, counter)
@@ -2598,7 +2668,7 @@ def finish_cached(compiled: CachedExpansion, +context_key: List<&2, U32>, +sourc
   ExpandedModule{expanded, next, bindings, +certificates} = expansion
   do Result<&2, &2, M.Diagnostic, Prepared>:
     module : M.Module <- public_expansion(expansion, shapes, configuration)
-    return Prepared{module, Cache{context_key, tasks, sources}, certificates}
+    return Prepared{module, Cache{context_key, tasks, sources, Nil{}}, certificates}
 
 def cached_sources(probe: Result<&2, &2, M.Diagnostic, Map<&2, List<&2, U32>>>, +context_key: List<&2, U32>, originals: List<&2, M.Function>, retained: List<&2, M.Constant>, types: List<&2, M.DataType>, operations: List<&2, M.Operation>, +configuration: Configuration, +shapes: List<&2, I.Binding>, counter: Nat, +nodes: List<&2, D.Node>, +reusable: Reusable) -> Result<&2, &2, M.Diagnostic, Prepared>:
   match probe:
@@ -2630,7 +2700,7 @@ def cached_specialize(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U3
         return Prepared{module, empty_cache(), Nil{}}
     case True{}:
       +declarations = List.append(&2, G.Declaration, G.function_declarations(originals), G.constant_declarations(retained))
-      +context : SpecializationContext = SpecializationContext{with_step(configuration, Nat.max(1n, List.length(&2, G.Declaration, declarations))), shapes, types, operations, Nil{}}
+      +context : SpecializationContext = SpecializationContext{with_step(configuration, Nat.max(1n, List.length(&2, G.Declaration, declarations))), shapes, types, operations, Nil{}, Done{0n}}
       cached_context(~key, key(context_module(context, nodes)), originals, source_constants, retained, types, operations, configuration, shapes, counter, nodes, previous)
 
 def with_prepared_certificates(prepared: Prepared, prior: List<&2, Core.Certificate>) -> Prepared:
@@ -2672,15 +2742,6 @@ def concrete_prepared(prepared: Prepared) -> Prepared:
   Prepared{expanded, cache, certificates} = prepared
   Prepared{concrete_module(expanded), cache, certificates}
 
-def source_check(module: M.Module, retain: Bool) -> Result<&2, &2, M.Diagnostic, Scheduler.Initial>:
-  match retain:
-    case True{}:
-      Scheduler.check_module_evidenced(module)
-    case False{}:
-      do Result<&2, &2, M.Diagnostic, Scheduler.Initial>:
-        checked : M.CheckedModule <- Scheduler.check_module(module)
-        return Scheduler.Initial{checked, Nil{}, Nil{}}
-
 def prepare_cached_nodes(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, entry: String, +family_templates: List<&2, M.Operation>, +nodes: List<&2, D.Node>, previous: Maybe<&2, Cache>, initial: Scheduler.Initial) -> Result<&2, &2, M.Diagnostic, Prepared>:
   Scheduler.Initial{+checked, certificates, needs} = initial
   +shape = shape_bindings(checked)
@@ -2690,12 +2751,15 @@ def prepare_cached_nodes(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2,
     prepared : Prepared <- prepare_templates_cached(~key, module_templates(module, nodes), selected, shapes, entry, family_templates, nodes, previous, checked)
     return with_prepared_certificates(concrete_prepared(prepared), Core.ready_certificates(certificates))
 
-def prepare_cached_evidenced(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, +entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Cache>, retain: Bool) -> Result<&2, &2, M.Diagnostic, Prepared>:
+def prepare_cached_evidenced(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, +entry: String, family_templates: List<&2, M.Operation>, +previous: Maybe<&2, Cache>) -> Result<&2, &2, M.Diagnostic, Prepared>:
   do Result<&2, &2, M.Diagnostic, Prepared>:
-    initial : Scheduler.Initial <- source_check(module, retain)
+    # Even a revision with no dispatch must publish source-ready certificates:
+    # its next edit may introduce dispatch or fail while other groups remain.
+    +initial : Scheduler.Initial <- Scheduler.check_module_resolving(module, source_certificates(previous))
     +pruned : Entries.Pruned <- Entries.prune_initial(module, initial, entry)
     +nodes : List<&2, D.Node> <- Check.module_graph(Entries.pruned_module(pruned))
-    prepare_cached_nodes(~key, Entries.pruned_module(pruned), entry, family_templates, nodes, previous, Entries.pruned_initial(pruned))
+    prepared : Prepared <- prepare_cached_nodes(~key, Entries.pruned_module(pruned), entry, family_templates, nodes, previous, Entries.pruned_initial(pruned))
+    return with_source_certificates(prepared, Scheduler.initial_certificates(initial))
 
 # Dispatch resolution has already checked this exact module.
 def prepare_cached_initial(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Cache>, initial: Scheduler.Initial) -> Result<&2, &2, M.Diagnostic, Prepared>:

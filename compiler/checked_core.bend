@@ -100,6 +100,24 @@ def operation_identity(operation: M.Operation) -> M.TypeId:
     case M.OperationInstance{template, arguments}:
       template
 
+# Build from the tail so a duplicate identity retains the same first match
+# that the original left-to-right `find_type` and `find_operation` would see.
+# Group certificates carry the full operation catalog; constructing these
+# indexes once avoids rescanning it for every certificate and operation.
+def first_type_index(types: List<&2, M.DataType>, indexed: Map<&2, M.DataType>) -> Map<&2, M.DataType>:
+  match types:
+    case Nil{}:
+      indexed
+    case +head <> tail:
+      Map.set(&2, M.DataType, first_type_index(tail, indexed), Groups.type_key(type_identity(head)), head)
+
+def first_operation_index(operations: List<&2, M.Operation>, indexed: Map<&2, M.Operation>) -> Map<&2, M.Operation>:
+  match operations:
+    case Nil{}:
+      indexed
+    case +head <> tail:
+      Map.set(&2, M.Operation, first_operation_index(tail, indexed), Groups.type_key(operation_identity(head)), head)
+
 def find_operation(+identity: M.TypeId, operations: List<&2, M.Operation>) -> Maybe<&2, M.Operation>:
   match operations:
     case Nil{}:
@@ -128,6 +146,36 @@ def same_operations(required: List<&2, M.Operation>, +available: List<&2, M.Oper
 def valid_catalog(certificate: Certificate, +types: List<&2, M.DataType>, +operations: List<&2, M.Operation>) -> Bool:
   Certificate{M.Module{constants, functions, original_types, original_operations}, checked, imports} = certificate
   Bool.and(same_types(original_types, types), same_operations(original_operations, operations))
+
+def indexed_types(wanted: List<&2, M.DataType>, +available: Map<&2, M.DataType>) -> Bool:
+  match wanted:
+    case Nil{}:
+      True{}
+    case +ty <> tail:
+      Bool.and(matches_type(ty, Index.find(M.DataType, available, Groups.type_key(type_identity(ty)))), indexed_types(tail, available))
+
+def indexed_operations(required: List<&2, M.Operation>, +available: Map<&2, M.Operation>) -> Bool:
+  match required:
+    case Nil{}:
+      True{}
+    case M.OperationTemplate{identity, parameters, parameter, result} <> tail:
+      indexed_operations(tail, available)
+    case M.OperationInstance{template, arguments} <> tail:
+      indexed_operations(tail, available)
+    case +operation <> tail:
+      Bool.and(matches_operation(operation, Index.find(M.Operation, available, Groups.type_key(operation_identity(operation)))), indexed_operations(tail, available))
+
+def valid_indexed_catalog(certificate: Certificate, +types: Map<&2, M.DataType>, +operations: Map<&2, M.Operation>) -> Bool:
+  Certificate{M.Module{constants, functions, original_types, original_operations}, checked, imports} = certificate
+  Bool.and(indexed_types(original_types, types), indexed_operations(original_operations, operations))
+
+def indexed_catalog_certificates(certificates: List<&2, Certificate>, +types: Map<&2, M.DataType>, +operations: Map<&2, M.Operation>) -> List<&2, Certificate>:
+  match certificates:
+    case Nil{}:
+      Nil{}
+    case +certificate <> tail:
+      +rest = indexed_catalog_certificates(tail, types, operations)
+      Bool.pick(List<&2, Certificate>, valid_indexed_catalog(certificate, types, operations), certificate <> rest, rest)
 
 def catalog_certificates(certificates: List<&2, Certificate>, +types: List<&2, M.DataType>, +operations: List<&2, M.Operation>) -> List<&2, Certificate>:
   match certificates:
@@ -162,9 +210,18 @@ def index(certificates: List<&2, Certificate>) -> Map<&2, List<&2, Certificate>>
     case Certificate{+module, checked, imports} <> tail:
       add_names(names(module), Certificate{module, checked, imports}, index(tail))
 
-def index_for(final_module: M.Module, certificates: List<&2, Certificate>) -> Map<&2, List<&2, Certificate>>:
+def index_for_nonempty(final_module: M.Module, certificates: List<&2, Certificate>) -> Map<&2, List<&2, Certificate>>:
   M.Module{constants, functions, types, operations} = final_module
-  index(catalog_certificates(certificates, types, operations))
+  available_types = first_type_index(types, Map.new(&2, M.DataType))
+  available_operations = first_operation_index(operations, Map.new(&2, M.Operation))
+  index(indexed_catalog_certificates(certificates, available_types, available_operations))
+
+def index_for(final_module: M.Module, certificates: List<&2, Certificate>) -> Map<&2, List<&2, Certificate>>:
+  match certificates:
+    case Nil{}:
+      Map.new(&2, List<&2, Certificate>)
+    case head <> tail:
+      index_for_nonempty(final_module, head <> tail)
 
 def same_kind(left: Groups.InterfaceKind, right: Groups.InterfaceKind) -> Bool:
   match left right:

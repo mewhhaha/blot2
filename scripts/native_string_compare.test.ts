@@ -11,6 +11,29 @@ const version = "bend 2.0.24";
 const currentFixture = await Deno.readTextFile(
   new URL("./fixtures/native_string_compare_2_0_27.c", import.meta.url),
 );
+const bend28Fixture = await Deno.readTextFile(
+  new URL("./fixtures/native_string_compare_2_0_28.c", import.meta.url),
+);
+
+Deno.test("native String specialization accepts reviewed Bend 2.0.28 ownership", () => {
+  const { source, wrapper, helper } = optimizeNativeStringComparison(
+    bend28Fixture,
+    model,
+    "bend 2.0.28",
+  );
+  equal(wrapper, "spin_13");
+  equal(helper, "spin_14");
+  ok(source.includes("term_sink(e, r0);\n  term_sink(e, r1);"));
+  const altered = bend28Fixture.replace(
+    "ctr_take(e, _left_1, 2,",
+    "ctr_take(e, _left_1, 1,",
+  );
+  ok(altered !== bend28Fixture);
+  throws(
+    () => optimizeNativeStringComparison(altered, model, "bend 2.0.28"),
+    /Expected one generated model\.name_equal/,
+  );
+});
 
 Deno.test("native String specialization accepts the verified Bend 2.0.27 emission", () => {
   const { source, wrapper, helper } = optimizeNativeStringComparison(
@@ -42,8 +65,8 @@ Deno.test("Bend 2.0.27 specialization still rejects altered ownership and equali
     );
   }
   throws(
-    () => optimizeNativeStringComparison(currentFixture, model, "bend 2.0.28"),
-    /requires bend 2\.0\.24 or bend 2\.0\.27/,
+    () => optimizeNativeStringComparison(currentFixture, model, "bend 2.0.29"),
+    /requires bend 2\.0\.24 or bend 2\.0\.27 or bend 2\.0\.28/,
   );
 });
 

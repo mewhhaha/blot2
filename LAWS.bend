@@ -33,6 +33,7 @@ import ./compiler/array_reuse.bend as Reuse
 import ./compiler/public_exports.bend as Public
 import ./compiler/core_compare.bend as CoreCompare
 import ./compiler/checked_core.bend as CheckedCore
+import ./compiler/resolving_core.bend as ResolvingCore
 import ./compiler/nat_index.bend as NatIndex
 import ./compiler/frontier_alpha_compare.bend as FrontierAlpha
 import ./compiler/global_bindings.bend as GlobalBindings
@@ -79,6 +80,39 @@ law checked_public_wrapper_calls_stored_constant:
 law dependency_membership_hit_finishes:
   for remaining: Unit -> Bool
   {Dependency.contains_step(True{}, remaining) == True{} : Bool}
+
+# A singleton remains one SCC even with self or unresolved outgoing edges.
+# The general DFS still spends one fuel step per pending event.
+law empty_dependency_graph_has_no_components:
+  {Dependency.components(Nil{}) == Done{Nil{}} : Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>}
+
+law singleton_dependency_graph_is_one_component:
+  for +name: String
+  for references: List<&2, String>
+  for lambdas: List<&2, Nat>
+  {Dependency.components([Dependency.Node{name, references, lambdas}]) == Done{[name <> Nil{}]} : Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>}
+
+law seen_dependency_enter_does_not_expand_neighbors:
+  for name: String
+  for edges: Map<&2, List<&2, String>>
+  for +pending: List<&2, Dependency.Visit>
+  {Dependency.visit_events_edges(False{}, name, edges, pending) == pending : List<&2, Dependency.Visit>}
+
+law seen_compact_dependency_enter_does_not_expand_neighbors:
+  for identity: Nat
+  for edges: NatIndex.Index<List<&2, Nat>>
+  for +pending: List<&2, Dependency.CompactVisit>
+  {Dependency.compact_events(False{}, identity, edges, pending) == pending : List<&2, Dependency.CompactVisit>}
+
+law unknown_compact_dependency_reference_is_omitted:
+  for +tail: List<&2, Nat>
+  {Dependency.compact_numbered_reference(None{}, tail) == tail : List<&2, Nat>}
+
+law seen_dependency_reach_does_not_expand_neighbors:
+  for edges: Map<&2, List<&2, String>>
+  for name: String
+  for +pending: List<&2, String>
+  {Dependency.next_work_edges(False{}, edges, name, pending) == pending : List<&2, String>}
 
 # Once a specialization lookup finds its first binding, later bindings cannot
 # change the result, including a duplicate of the same name.
@@ -370,10 +404,10 @@ law native_response_failure_keeps_protocol_version:
 # A Wasm-only (Emit) request runs the same compile pipeline and session caches
 # as Compile, so its Wasm is identical; only the reply drops the analysis.
 law native_emit_compiles_like_compile:
-  {NativeRequest.mode(NativeRequest.Emit{}) == NativeRequest.mode(NativeRequest.Compile{}) : Session.Mode}
+  {NativeRequest.mode(NativeRequest.EmitWasm{}) == NativeRequest.mode(NativeRequest.Compile{}) : Session.Mode}
 
 law native_emit_replies_wasm_only:
-  {NativeRequest.contents(NativeRequest.Emit{}) == NativeOutput.WasmOnly{} : NativeOutput.Contents}
+  {NativeRequest.contents(NativeRequest.EmitWasm{}) == NativeOutput.WasmOnly{} : NativeOutput.Contents}
 
 # encode_artifact and session replies take their fields from artifact_fields.
 law native_wasm_only_reply_omits_analysis:
@@ -776,6 +810,15 @@ law retained_group_cannot_discard_all_functions:
   for rest: List<&2, M.Function>
   {CheckedCore.same_declarations(M.Module{Nil{}, function <> rest, Nil{}, Nil{}}, M.Module{Nil{}, Nil{}, Nil{}, Nil{}}) == False{} : Bool}
 
+# A duplicate catalog identity resolves to the earliest declaration. This also
+# applies when an abstract operation precedes a concrete operation of the same
+# identity: only required abstract operations are skipped during validation.
+law certificate_type_index_keeps_first_identity:
+  {Index.find(M.DataType, CheckedCore.first_type_index([M.DataType{M.TypeId{"catalog", "Item"}, 0n, Nil{}}, M.DataType{M.TypeId{"catalog", "Item"}, 1n, Nil{}}], Map.new(&2, M.DataType)), Groups.type_key(M.TypeId{"catalog", "Item"})) == Some{M.DataType{M.TypeId{"catalog", "Item"}, 0n, Nil{}}} : Maybe<&2, M.DataType>}
+
+law certificate_operation_index_keeps_first_identity:
+  {Index.find(M.Operation, CheckedCore.first_operation_index([M.OperationTemplate{M.TypeId{"catalog", "Read"}, 1n, M.UnitTy{}, M.U32Ty{}}, M.Operation{M.TypeId{"catalog", "Read"}, M.UnitTy{}, M.U32Ty{}}], Map.new(&2, M.Operation)), Groups.type_key(M.TypeId{"catalog", "Read"})) == Some{M.OperationTemplate{M.TypeId{"catalog", "Read"}, 1n, M.UnitTy{}, M.U32Ty{}}} : Maybe<&2, M.Operation>}
+
 # Frontier reuse fails closed and never reinterprets an already retained group.
 law frontier_comparison_stops_on_mismatch:
   for fuel: Nat
@@ -884,6 +927,10 @@ law shared_nominal_catalog_reuses_sorted_list:
   for shared: Groups.TypeSet()
   for +common: List<&2, M.TypeId>
   {Groups.required_for_summary(MTip{}, shared, common) == common : List<&2, M.TypeId>}
+
+law sorted_nominal_merge_keeps_common_without_new_types:
+  for +common: List<&2, M.TypeId>
+  {Groups.merge_required(common, Nil{}) == common : List<&2, M.TypeId>}
 
 # Optional schema reduction must fall back when evidence or bounded work fails.
 law exhausted_schema_reduction_is_a_miss:
@@ -1014,8 +1061,8 @@ law dispatch_duplicate_accessor_keeps_first:
   for +reversed: List<&2, M.Function>
   {Mono.kept_accessor(True{}, function, reversed) == reversed : List<&2, M.Function>}
 
-# Resolution never reports a diagnostic: a failed round, or no resolution at
-# all, specializes the original module exactly as before.
+# A failed rewritten round carries first-pass evidence to the original-source
+# fallback. It never exposes the rewritten diagnostic.
 law dispatch_failed_round_abandons_resolution:
   for fuel: Nat
   for module: M.Module
@@ -1025,7 +1072,11 @@ law dispatch_failed_round_abandons_resolution:
   for cache: Map<&2, Resolution.Accessor>
   for budget: Nat
   for entry: String
-  {Resolution.rounds(1n+fuel, Resolution.CheckedRound{module, Fail{diagnostic}, next, proofs, cache, budget}, entry) == None{} : Maybe<&2, Resolution.Resolved>}
+  for +source: List<&2, CheckedCore.Certificate>
+  for +partial: List<&2, CheckedCore.Certificate>
+  for inferred: Nat
+  for retained: Nat
+  {Resolution.rounds(1n+fuel, Resolution.CheckedRound{module, Scheduler.FailedInitial{diagnostic, partial, inferred, retained}, next, proofs, cache, budget, source}, entry) == Resolution.Fallback{List.append(&2, CheckedCore.Certificate, source, partial)} : Resolution.Resolved}
 
 law dispatch_unchanged_round_keeps_its_check:
   for fuel: Nat
@@ -1038,7 +1089,8 @@ law dispatch_unchanged_round_keeps_its_check:
   for proofs: List<&2, Schema.Evidence>
   for budget: Nat
   for entry: String
-  {Resolution.rounds(1n+fuel, Resolution.RewrittenRound{initial, Resolution.Rewrite{module, certificates, next, cache, False{}, stable}, proofs, budget}, entry) == Some{Resolution.Resolved{module, initial}} : Maybe<&2, Resolution.Resolved>}
+  for source: List<&2, CheckedCore.Certificate>
+  {Resolution.rounds(1n+fuel, Resolution.RewrittenRound{initial, Resolution.Rewrite{module, certificates, next, cache, False{}, stable}, proofs, budget, source}, entry) == Resolution.Resolved{module, initial, source} : Resolution.Resolved}
 
 # A rewrite that leaves every interface unchanged is not checked again.
 law dispatch_stable_rewrite_skips_verification:
@@ -1051,7 +1103,8 @@ law dispatch_stable_rewrite_skips_verification:
   for proofs: List<&2, Schema.Evidence>
   for budget: Nat
   for entry: String
-  {Resolution.rounds(1n+fuel, Resolution.RewrittenRound{initial, Resolution.Rewrite{module, certificates, next, cache, True{}, True{}}, proofs, budget}, entry) == Some{Resolution.Resolved{module, Resolution.extended_initial(initial, certificates)}} : Maybe<&2, Resolution.Resolved>}
+  for source: List<&2, CheckedCore.Certificate>
+  {Resolution.rounds(1n+fuel, Resolution.RewrittenRound{initial, Resolution.Rewrite{module, certificates, next, cache, True{}, True{}}, proofs, budget, source}, entry) == Resolution.Resolved{module, Resolution.extended_initial(initial, certificates), source} : Resolution.Resolved}
 
 law dispatch_group_without_resolutions_is_stable:
   for state: Infer.State
@@ -1118,7 +1171,7 @@ law dispatch_unresolved_module_specializes_original:
   for +module: M.Module
   for +entry: String
   for +family_templates: List<&2, M.Operation>
-  {Resolution.prepare_deferred_resolved(None{}, module, entry, family_templates) == Mono.prepare_deferred_core(module, entry, family_templates) : Result<&2, &2, M.Diagnostic, CheckedCore.Prepared>}
+  {Resolution.prepare_deferred_resolved(Resolution.NoResolution{}, module, entry, family_templates) == Mono.prepare_deferred_core(module, entry, family_templates) : Result<&2, &2, M.Diagnostic, CheckedCore.Prepared>}
 
 # Resolution rounds retain unchanged groups and certify them again, so the last
 # round's certificates cover every group of the module it returns.
@@ -1127,7 +1180,7 @@ law evidence_check_certifies_retained_groups:
   for +subset: M.Module
   for +imports: List<&2, Groups.Interface>
   for +checked: Groups.CheckedGroup
-  {Scheduler.selected_task(Some{checked}, True{}, position, subset, imports) == Scheduler.RetainedEvidenceTask{position, subset, imports, checked} : Scheduler.Task}
+  {Scheduler.selected_task(Some{checked}, True{}, position, subset, imports) == Scheduler.RetainedEvidenceTask{position, subset, imports, checked, Nil{}} : Scheduler.Task}
 
 # Entry declarations. `entry` is a contextual declaration modifier: any other
 # identifier before `const`/`let` is rejected, `entry` outside the entry module
@@ -1202,20 +1255,14 @@ law entry_owner_prefix_matches_specialization:
   for +entry: String
   {Entries.owner_prefix(identity, entry) == Mono.nominal_prefix(identity, entry) : String}
 
-# A failed initial check or reachability walk abandons resolution; the original
-# module is then checked, pruned and specialized unchanged.
-law dispatch_failed_initial_check_abandons_resolution:
-  for diagnostic: M.Diagnostic
-  for +module: M.Module
-  for next: Nat
-  for +entry: String
-  {Resolution.first_round(Fail{diagnostic}, module, next, entry) == None{} : Maybe<&2, Resolution.Resolved>}
-
+# Transformed reachability failure returns a fallback marker; the source-first
+# wrapper reuses the already checked original module and its Initial.
 law dispatch_failed_pruning_abandons_resolution:
   for diagnostic: M.Diagnostic
   for next: Nat
   for +entry: String
-  {Resolution.pruned_round(Fail{diagnostic}, next, entry) == None{} : Maybe<&2, Resolution.Resolved>}
+  for source: List<&2, CheckedCore.Certificate>
+  {Resolution.pruned_round(Fail{diagnostic}, next, entry, source) == Resolution.Fallback{source} : Resolution.Resolved}
 
 # Builds need an entry; a module without exports fails with no_entry.
 law build_without_entries_fails:
@@ -1234,7 +1281,6 @@ law unused_operation_has_no_wasm_job:
   for parameter: M.Ty
   for result: M.Ty
   {Wasm.used_operations([M.Operation{identity, parameter, result}], Set.new()) == Nil{} : List<&2, M.Operation>}
-
 # Recycling a loop arena requires a closed effect boundary: source state
 # operations could otherwise retain pointers not represented by the carry.
 law loop_memory_pure_closed_row_is_isolated:
@@ -1250,3 +1296,74 @@ law loop_memory_open_row_is_not_isolated:
 
 law loop_memory_source_state_is_not_isolated:
   {LoopMemory.isolated(M.EffectRow{[M.TypeId{"game", "State.write"}], M.ClosedRow{}}) == False{} : Bool}
+
+# The full source is checked before inlining and pruning, so its first error is
+# authoritative even when a later transformation could have changed the body.
+law dispatch_original_failure_is_authoritative:
+  for diagnostic: M.Diagnostic
+  for certificates: List<&2, CheckedCore.Certificate>
+  for inferred: Nat
+  for retained: Nat
+  for module: M.Module
+  for entry: String
+  {Resolution.source_checked(Scheduler.FailedInitial{diagnostic, certificates, inferred, retained}, module, entry) == Resolution.OriginalFailure{diagnostic} : Resolution.Resolved}
+
+law dispatch_transformed_failure_preserves_certificates:
+  for diagnostic: M.Diagnostic
+  for +certificates: List<&2, CheckedCore.Certificate>
+  for inferred: Nat
+  for retained: Nat
+  for module: M.Module
+  for next: Nat
+  for entry: String
+  for +source: List<&2, CheckedCore.Certificate>
+  {Resolution.transformed_round(Scheduler.FailedInitial{diagnostic, certificates, inferred, retained}, module, next, entry, source) == Resolution.Fallback{List.append(&2, CheckedCore.Certificate, source, certificates)} : Resolution.Resolved}
+
+law dispatch_fallback_reuses_checked_source:
+  for transformed: List<&2, CheckedCore.Certificate>
+  for module: M.Module
+  for initial: Scheduler.Initial
+  for source: List<&2, CheckedCore.Certificate>
+  {Resolution.source_fallback(Resolution.Fallback{transformed}, module, initial, source) == Resolution.Resolved{module, initial, source} : Resolution.Resolved}
+
+law dispatch_without_sites_reuses_checked_source:
+  for seen: Set()
+  for unique: Bool
+  for module: M.Module
+  for inlined: M.Module
+  for initial: Scheduler.Initial
+  for original: M.Module
+  for entry: String
+  for source: List<&2, CheckedCore.Certificate>
+  {Resolution.resolve_scanned(Resolution.DispatchScan{0n, seen, unique}, module, inlined, initial, original, entry, source) == Resolution.Resolved{module, initial, source} : Resolution.Resolved}
+
+law failed_initial_assembly_preserves_completed_groups:
+  for diagnostic: M.Diagnostic
+  for certificates: List<&2, CheckedCore.Certificate>
+  for needs: List<&2, Groups.GroupNeeds>
+  for inferred: Nat
+  for retained: Nat
+  {Scheduler.assembled_attempt(Fail{diagnostic}, certificates, needs, Scheduler.AuditCounts{inferred, retained}) == Scheduler.FailedInitial{diagnostic, certificates, inferred, retained} : Scheduler.InitialAttempt}
+
+# Reusing a resolving check retains requirements in the same variable namespace.
+law retained_resolving_task_keeps_requirements:
+  for position: Nat
+  for module: M.Module
+  for imports: List<&2, Groups.Interface>
+  for checked: Groups.CheckedGroup
+  for needs: List<&2, Groups.GroupNeeds>
+  {Scheduler.check_task(Scheduler.RetainedEvidenceTask{position, module, imports, checked, needs}, Unit{}) == Scheduler.EvidenceOutcome{position, module, imports, Done{Groups.Resolving{checked, needs}}} : Scheduler.Outcome}
+
+law conflicting_resolving_association_cannot_certify:
+  for certificate: CheckedCore.Certificate
+  {ResolvingCore.paired(ResolvingCore.Invalid{}, certificate) == None{} : Maybe<&2, ResolvingCore.Witness>}
+
+# A cached shape-bound failure belongs only to tasks that require inference.
+law specialization_without_inference_ignores_shape_failure:
+  for expanded: Mono.ExpandedModule
+  for configuration: Mono.Configuration
+  for shapes: List<&2, Infer.Binding>
+  for isolated: Bool
+  for schemes: List<&2, StagingScheme.Scheme>
+  for diagnostic: M.Diagnostic
+  {Mono.infer_present_at(False{}, expanded, configuration, shapes, isolated, schemes, Fail{diagnostic}) == Done{expanded} : Result<&2, &2, M.Diagnostic, Mono.ExpandedModule>}

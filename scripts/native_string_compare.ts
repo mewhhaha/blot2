@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 
-// Bend 2.0.24 and 2.0.27 emit model.name_equal as a consuming String traversal. This
+// Bend 2.0.24, 2.0.27 and reviewed 2.0.28 emit model.name_equal as a consuming String traversal. This
 // guarded native-only specialization keeps both owned roots alive, borrows
 // their immutable nodes, and releases each root exactly once at the end.
 // Unknown compiler versions or code shapes fail closed.
-const SUPPORTED_BEND_VERSIONS = ["bend 2.0.24", "bend 2.0.27"];
+const SUPPORTED_BEND_VERSIONS = ["bend 2.0.24", "bend 2.0.27", "bend 2.0.28"];
 const EXPECTED_MODEL =
   `def name_equal_tail(left: String, right: String, same: Bool) -> Bool:
   match left right same:

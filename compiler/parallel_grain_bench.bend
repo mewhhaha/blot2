@@ -223,16 +223,16 @@ def measure(phase: Phase, grain: Nat, iterations: Nat, prepared: Fixture) -> IO(
   match phase prepared:
     case Codegen{} Fixture{+jobs, tasks, entries}:
       do IO<Nat>:
-        expected : List<&2, W.EntryCode> <- required(List<&2, W.EntryCode>, W.compile_entries_with_grain(Nat.read.max(), jobs))
+        expected : List<&2, W.EntryCode> <- required(List<&2, W.EntryCode>, W.compile_entries_with_grain(M.max_nat(), jobs))
         time_codegen(iterations, grain, jobs, expected, 0n)
     case Inference{} Fixture{jobs, +tasks, entries}:
       do IO<Nat>:
-        expected : List<&2, List<&2, U32>> <- required(List<&2, List<&2, U32>>, outcome_keys(S.check_batch_with_grain(tasks, Nat.read.max()), Nil{}))
+        expected : List<&2, List<&2, U32>> <- required(List<&2, List<&2, U32>>, outcome_keys(S.check_batch_with_grain(tasks, M.max_nat()), Nil{}))
         time_inference(iterations, grain, tasks, expected, 0n)
     case Preparation{} Fixture{jobs, tasks, +entries}:
       +projection = I.metadata(Nil{}, Map.new(&2, Maybe<&2, E.ConstructorSlot>))
       do IO<Nat>:
-        expected : List<&2, List<&2, U32>> <- required(List<&2, List<&2, U32>>, preparation_result_keys(W.prepare_jobs_with_grain(Nat.read.max(), entries, projection)))
+        expected : List<&2, List<&2, U32>> <- required(List<&2, List<&2, U32>>, preparation_result_keys(W.prepare_jobs_with_grain(M.max_nat(), entries, projection)))
         time_preparation(iterations, grain, entries, projection, expected, 0n)
 
 def phase_name(phase: Phase) -> String:
@@ -284,7 +284,7 @@ def shape_option(tiny: Bool, uneven: Bool) -> Maybe<&2, Shape>:
 def grain_option(serial: Bool, text: String) -> Maybe<&2, Nat>:
   match serial:
     case True{}:
-      Some{Nat.read.max()}
+      Some{M.max_nat()}
     case False{}:
       Nat.read(text)
 

@@ -386,10 +386,10 @@ def flatten(fuel: Nat, pending: List<&2, Work>, reversed: List<&2, R.Work>) -> R
 def encode_limited(fuel: Nat, pending: List<&2, Work>, room: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
   do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
     fields : List<&2, R.Work> <- flatten(fuel, pending, Nil{})
-    R.encode_work(Nat.read.max(), fields, room, Nil{})
+    R.encode_work(M.max_nat(), fields, room, Nil{})
 
 def encode(pending: List<&2, Work>) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
-  encode_limited(Nat.read.max(), pending, U32.to_nat(16777216))
+  encode_limited(M.max_nat(), pending, U32.to_nat(16777216))
 
 def same_go(left: List<&2, U32>, right: List<&2, U32>, equal: Bool) -> Bool:
   match left right equal:
@@ -429,7 +429,7 @@ def compare_cst(fuel: Nat, pending: List<&2, CstComparison>, equal: Bool) -> Boo
       False{}
 
 def same_cst(left: C.Cst, right: C.Cst) -> Bool:
-  compare_cst(Nat.read.max(), [NodePair{left, right}], True{})
+  compare_cst(M.max_nat(), [NodePair{left, right}], True{})
 
 def scope(context: L.Context) -> Result<&2, &2, M.Diagnostic, List<&2, U32>>:
   L.Context{globals, headers, fixities, locals, return_label, annotation_variables} = context

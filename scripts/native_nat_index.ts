@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-/** Bend 2.0.27 native-only replacement for NatIndex.find's branch closures. */
+/** Bend 2.0.27/2.0.28 native-only replacement for NatIndex.find's branch closures. */
 export type NativeNatIndexSources = { natIndex: string };
 
 const SOURCE_CONTRACTS = [
@@ -125,9 +125,11 @@ function verify(
   bendVersion: string,
   probe: boolean,
 ): { start: number; end: number } {
-  if (bendVersion.trim() !== "bend 2.0.27") {
+  if (
+    bendVersion.trim() !== "bend 2.0.27" && bendVersion.trim() !== "bend 2.0.28"
+  ) {
     throw new Error(
-      `Native NatIndex requires bend 2.0.27; got ${bendVersion.trim()}`,
+      `Native NatIndex requires bend 2.0.27 or 2.0.28; got ${bendVersion.trim()}`,
     );
   }
   for (const [label, start, end, hash] of SOURCE_CONTRACTS) {

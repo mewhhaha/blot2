@@ -25,10 +25,14 @@ for each installed Bend version downloads four upstream loader files from that
 version's release tag into `generated/compiler/bend-<version>/`; subsequent
 builds reuse them offline. Release tags must be available upstream for JS
 builds. The JS build also emits `generated/compiler/native_session.js` for
-direct regression tests of the native session's pure cache-planning logic.
+direct regression tests of the native session's pure cache-planning logic. The
+JS build preserves the host's short constructor tags across Bend 2.0.27 and
+2.0.28 using [a guarded emission adapter](../scripts/bend_js_abi.ts). It changes
+constructor tags and typed matches at build time; function exports, string
+values, and the installed Bend compiler remain unchanged.
 
-The optimized native build requires Bend 2.0.27. It applies guarded String
-comparison, consuming index lookup, borrowed free-variable collection,
+The optimized native build supports Bend 2.0.27 and 2.0.28. It applies guarded
+String comparison, consuming index lookup, borrowed free-variable collection,
 closed-type resolution, and a bounded resolver for active substitutions to the
 generated C. These kernels preserve the runtime's ownership and reclamation
 operations. Bounded type scans fall back to the Bend implementation when they
@@ -150,15 +154,24 @@ type that mentions one, would change what the `let` means at its uses (for
 example `let helper = fn (x: U32) => x + 1` stops being generic in its result),
 so it is checked again like an interface refinement. Only a fresh variable of a
 selected implementation's instance may name one, which is how the rewritten
-direct call instantiates inside the `let`. Any failed round abandons resolution
-and the original module is specialized unchanged, so resolution never reports a
-diagnostic of its own; a module that fails to check is therefore checked twice,
-once by resolution and once for the original diagnostic. Incremental sessions
-resolve every revision afresh: the resolution check replaces the warm shape
-check, and its ready certificates reach the final check behind the session's
-group cache (paired gdev body edits still used 7-18% less native CPU per warm
-revision than before resolution). A declaration without remaining deferred
-dispatch is no longer a template seed: a helper such as
+direct call instantiates inside the `let`. The original source is checked before
+inlining or pruning, so a source error is reported directly after one check.
+Successful source checking supplies the checked module and certificates for
+resolution; a failed transformed round returns to that checked source without
+checking it again. Within that compilation, unchanged groups retain their
+checked result together with the complete dispatch requirements from the same
+inference. Reuse requires exact declarations, ordered imports, nominal types,
+and the full ordered operation catalog. A rejected witness is inferred again;
+ordinary certificates can only retain source-ready groups. Incremental sessions
+retain source-ready first-pass certificates from successful revisions for exact
+group reuse on later revisions; groups with deferred dispatch are inferred again
+so their resolution needs are collected. Ready certificates also reach the final
+check behind the session's group cache. Native session
+`groups_checked`/`groups_reused` count this final pass, not the earlier source
+inference: a changed, ready source group may be freshly inferred there and then
+counted as reused here. The source-pass audit probe separately verifies exact
+retention and invalidation. A declaration without remaining deferred dispatch is
+no longer a template seed: a helper such as
 `leaf = fn value => @u32.add value 1 + 0` compiles once instead of once per
 caller path, and `Array.get`'s bounds comparison no longer clones `Array.get` at
 every use. Dispatch on operand types a caller supplies is still specialized per

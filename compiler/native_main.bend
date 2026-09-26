@@ -40,7 +40,7 @@ def encoded(previous: Maybe<&2, Session.State>, state: Session.State, result: Re
 
 def encode_analysis(fields: List<&2, Response.Work>) -> Result<&2, &2, M.Diagnostic, Output.Packet>:
   do Result<&2, &2, M.Diagnostic, Output.Packet>:
-    words : List<&2, U32> <- Response.encode_work(Nat.read.max(), fields, U32.to_nat(16777216), Nil{})
+    words : List<&2, U32> <- Response.encode_work(M.max_nat(), fields, U32.to_nat(16777216), Nil{})
     return Output.words(words)
 
 def completed(previous: Maybe<&2, Session.State>, contents: Output.Contents, result: Result<&2, &2, M.Diagnostic, Session.Completion>) -> Reply:
@@ -74,7 +74,7 @@ def respond(state: Maybe<&2, Session.State>, request: Result<&2, &2, M.Diagnosti
       Reply{state, Output.words(Response.encode_analysis(Compiler.analyze_source(root, prelude, fuel, steps)))}
     case Done{Request.Request{Request.Compile{}, fuel, steps, root, prelude}}:
       Reply{state, Output.encode_artifact(Output.FullArtifact{}, Compiler.compile_source_plan(root, prelude, fuel, steps))}
-    case Done{Request.Request{Request.Emit{}, fuel, steps, root, prelude}}:
+    case Done{Request.Request{Request.EmitWasm{}, fuel, steps, root, prelude}}:
       Reply{state, Output.encode_artifact(Output.WasmOnly{}, Compiler.compile_source_plan(root, prelude, fuel, steps))}
     case Done{Request.OpenSession{prelude, fuel}}:
       opened(state, Session.open(prelude, fuel))
@@ -109,4 +109,4 @@ def main() -> IO(Unit):
     # Handshake lets the parent measure process startup separately from work.
     NativeIO.send(2, [1112297300, Response.version()], Nil{})
     first : Maybe<&1, NativeIO.Frame> <- NativeIO.receive()
-    serve(Nat.read.max(), None{}, first)
+    serve(M.max_nat(), None{}, first)

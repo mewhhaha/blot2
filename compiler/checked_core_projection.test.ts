@@ -185,10 +185,10 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
   });
   const certified = catalog([box], [operationDefinition]);
   const catalogCertificate = { ...certificate, module: certified };
-  const catalogHit = (final: Node) => {
+  const catalogHitWith = (candidate: Node, final: Node) => {
     const candidates = api["checked_core.index_for"](
       final,
-      bendList([catalogCertificate]),
+      bendList([candidate]),
     );
     return api["checked_core.lookup"](
       candidates,
@@ -197,6 +197,7 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
       bendList([imported([read, write])]),
     ).$;
   };
+  const catalogHit = (final: Node) => catalogHitWith(catalogCertificate, final);
   equal(catalogHit(certified), "Some");
   equal(catalogHit(catalog([], [operationDefinition])), "None");
   equal(
@@ -226,4 +227,70 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
     )),
     "Some",
   );
+
+  const wrongBox = { ...box, parameters: 1n };
+  const wrongOperation = {
+    ...operationDefinition,
+    result: { $: "F32Ty" },
+  };
+  equal(catalogHit(catalog([wrongBox, box], [operationDefinition])), "None");
+  equal(catalogHit(catalog([box, wrongBox], [operationDefinition])), "Some");
+  equal(
+    catalogHit(catalog([box], [wrongOperation, operationDefinition])),
+    "None",
+  );
+  equal(
+    catalogHit(catalog([box], [operationDefinition, wrongOperation])),
+    "Some",
+  );
+
+  // The old linear search includes abstract operations in its first match.
+  const shadowingTemplate: Node = {
+    $: "OperationTemplate",
+    identity: id("Read"),
+    parameters: 1n,
+    parameter: { $: "UnitTy" },
+    result: { $: "U32Ty" },
+  };
+  equal(
+    catalogHit(catalog([box], [shadowingTemplate, operationDefinition])),
+    "None",
+  );
+  equal(
+    catalogHit(catalog([box], [operationDefinition, shadowingTemplate])),
+    "Some",
+  );
+
+  const collisionA = { $: "TypeId", module_name: "a::b", declaration: "c" };
+  const collisionB = { $: "TypeId", module_name: "a", declaration: "b::c" };
+  const collisionBox = { ...box, identity: collisionA };
+  const colliding = { ...box, identity: collisionB };
+  const collisionCertificate = {
+    ...catalogCertificate,
+    module: catalog([collisionBox], [operationDefinition]),
+  };
+  equal(
+    catalogHitWith(
+      collisionCertificate,
+      catalog([colliding], [operationDefinition]),
+    ),
+    "None",
+  );
+  equal(
+    catalogHitWith(
+      collisionCertificate,
+      catalog([colliding, collisionBox], [operationDefinition]),
+    ),
+    "Some",
+  );
+
+  const abstractCertificate = {
+    ...catalogCertificate,
+    module: catalog([box], [shadowingTemplate, {
+      $: "OperationInstance",
+      template: id("Read"),
+      arguments: bendList([{ $: "U32Ty" }]),
+    }]),
+  };
+  equal(catalogHitWith(abstractCertificate, catalog([box], [])), "Some");
 });

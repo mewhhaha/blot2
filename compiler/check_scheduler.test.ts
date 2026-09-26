@@ -12,6 +12,22 @@ type Result<T> = { readonly $: "Done"; readonly value: T } | {
   readonly $: "Fail";
   readonly error: Diagnostic;
 };
+type InitialAttempt = {
+  readonly $: "CheckedInitial";
+  readonly initial: {
+    readonly certificates: BendList<Record<string, unknown>>;
+    readonly needs: BendList<Record<string, unknown>>;
+    readonly checked: unknown;
+  };
+  readonly inferred: bigint;
+  readonly retained: bigint;
+} | {
+  readonly $: "FailedInitial";
+  readonly diagnostic: Diagnostic;
+  readonly certificates: BendList<unknown>;
+  readonly inferred: bigint;
+  readonly retained: bigint;
+};
 interface Job {
   readonly $: "Job";
   readonly members: BendList<string>;
@@ -95,6 +111,24 @@ const scheduler = compiled as unknown as {
     completed: unknown,
   ): Result<unknown>;
   "check_scheduler.check_module"(module: unknown): Result<unknown>;
+  "check_scheduler.check_module_resolving_probe"(
+    module: unknown,
+    certificates: BendList<unknown>,
+  ): InitialAttempt;
+  "check_scheduler.check_module_resolving_reusing"(
+    module: unknown,
+    certificates: BendList<unknown>,
+    previous: unknown,
+  ): InitialAttempt;
+  "resolving_core.pair"(
+    certificate: unknown,
+    needs: BendList<unknown>,
+  ): { readonly $: "Some"; readonly value: unknown } | { readonly $: "None" };
+  "resolving_core.matches"(
+    witness: unknown,
+    subset: unknown,
+    imports: unknown,
+  ): { readonly $: "Some"; readonly value: unknown } | { readonly $: "None" };
   "check.check_module"(module: unknown): Result<unknown>;
   "groups.checked_group"(module: unknown): Result<unknown>;
 };
@@ -372,6 +406,144 @@ function module(functions: unknown[]) {
   };
 }
 
+Deno.test("failed source checks retain exact completed groups and preserve checker diagnostic order", () => {
+  const immediate = module([fn("only", unit)]);
+  const immediateAttempt = scheduler
+    ["check_scheduler.check_module_resolving_probe"](
+      immediate,
+      bendList([]),
+    );
+  ok(immediateAttempt.$ === "FailedInitial");
+  const immediateBaseline = scheduler["check_scheduler.check_module"](
+    immediate,
+  );
+  ok(immediateBaseline.$ === "Fail");
+  equal(immediateAttempt.diagnostic, immediateBaseline.error);
+  equal(bendArray(immediateAttempt.certificates), []);
+
+  const healthy = module([
+    fn("good", integer(7)),
+    fn("early", integer(1)),
+    fn("late", integer(2)),
+  ]);
+  const healthyAttempt = scheduler
+    ["check_scheduler.check_module_resolving_probe"](
+      healthy,
+      bendList([]),
+    );
+  ok(healthyAttempt.$ === "CheckedInitial");
+
+  const catalogEdit = scheduler["check_scheduler.check_module_resolving_probe"](
+    {
+      ...healthy,
+      operations: bendList([{
+        $: "Operation",
+        identity: { $: "TypeId", module_name: "main", declaration: "Unused" },
+        parameter: { $: "UnitTy" },
+        result: { $: "U32Ty" },
+      }]),
+    },
+    healthyAttempt.initial.certificates,
+  );
+  ok(catalogEdit.$ === "CheckedInitial");
+  // A new unused operation does not change a ready certificate's dependencies.
+  equal(catalogEdit.retained, healthyAttempt.inferred);
+  const changedCatalog = scheduler
+    ["check_scheduler.check_module_resolving_probe"](
+      {
+        ...healthy,
+        operations: bendList([{
+          $: "Operation",
+          identity: { $: "TypeId", module_name: "main", declaration: "Unused" },
+          parameter: { $: "UnitTy" },
+          result: { $: "BoolTy" },
+        }]),
+      },
+      catalogEdit.initial.certificates,
+    );
+  ok(changedCatalog.$ === "CheckedInitial");
+  equal(changedCatalog.retained, 0n);
+  equal(changedCatalog.inferred, healthyAttempt.inferred);
+
+  const source = module([
+    fn("good", integer(7)),
+    fn("early", unit),
+    fn("late", unit),
+  ]);
+  const first = scheduler["check_scheduler.check_module_resolving_probe"](
+    source,
+    bendList([]),
+  );
+  ok(first.$ === "FailedInitial");
+  const baseline = scheduler["check_scheduler.check_module"](source);
+  ok(baseline.$ === "Fail");
+  equal(first.diagnostic, baseline.error);
+  // Independent checking owns the diagnostic order, including its SCC order.
+  ok(bendArray(first.certificates).length > 0);
+  ok(first.inferred > 0n);
+  equal(first.retained, 0n);
+
+  const warmEdit = scheduler["check_scheduler.check_module_resolving_probe"](
+    source,
+    healthyAttempt.initial.certificates,
+  );
+  ok(warmEdit.$ === "FailedInitial");
+  equal(warmEdit.diagnostic, first.diagnostic);
+  ok(
+    warmEdit.retained > 0n,
+    "a failed edit reuses unchanged successful groups",
+  );
+
+  const dispatchEdit = module([
+    fn("good", integer(7)),
+    fn("early", integer(1)),
+    fn("late", {
+      $: "AssociatedExpr",
+      identity: 123n,
+      dispatch: { $: "BinaryDispatch" },
+      member: "missing",
+      templates: bendList([]),
+      left: integer(1),
+      right: integer(2),
+    }),
+  ]);
+  const introduced = scheduler["check_scheduler.check_module_resolving_probe"](
+    dispatchEdit,
+    healthyAttempt.initial.certificates,
+  );
+  ok(
+    introduced.retained > 0n,
+    "a newly introduced dispatch retains unchanged no-dispatch groups",
+  );
+
+  const warm = scheduler["check_scheduler.check_module_resolving_probe"](
+    source,
+    first.certificates,
+  );
+  ok(warm.$ === "FailedInitial");
+  equal(warm.diagnostic, first.diagnostic);
+  ok(warm.retained > 0n, "the warm failed check must actually retain a group");
+  equal(warm.inferred, 0n);
+
+  const changed = module([
+    fn("good", integer(8)),
+    fn("early", unit),
+    fn("late", unit),
+  ]);
+  const edited = scheduler["check_scheduler.check_module_resolving_probe"](
+    changed,
+    first.certificates,
+  );
+  ok(edited.$ === "FailedInitial");
+  equal(edited.diagnostic, first.diagnostic);
+  equal(
+    edited.retained,
+    0n,
+    "an edited source group cannot use stale evidence",
+  );
+  ok(edited.inferred > 0n);
+});
+
 Deno.test("ready inference frontiers preserve SCC members and dependency levels", () => {
   equal(
     unwrap(scheduler["check_scheduler.schedule"](bendList([]))),
@@ -539,4 +711,127 @@ Deno.test("ready grouped checking agrees with serial inference interfaces on a d
     scheduler["groups.checked_group"](ready),
     scheduler["groups.checked_group"](serial),
   );
+});
+
+Deno.test("resolving reuse retains complete deferred requirements across unrelated edits", () => {
+  const deferred = fn("deferred", {
+    $: "AssociatedExpr",
+    identity: 17n,
+    dispatch: { $: "BinaryDispatch" },
+    member: "add",
+    templates: bendList([]),
+    left: { $: "U32Expr", value: 1 },
+    right: { $: "U32Expr", value: 2 },
+  });
+  const original = module([deferred, fn("other", { $: "U32Expr", value: 3 })]);
+  const first = scheduler["check_scheduler.check_module_resolving_probe"](
+    original,
+    bendList([]),
+  );
+  ok(first.$ === "CheckedInitial");
+  ok(
+    bendArray(first.initial.needs).length > 0,
+    "fixture must carry deferred evidence",
+  );
+  const edited = module([deferred, fn("other", { $: "U32Expr", value: 4 })]);
+  const fresh = scheduler["check_scheduler.check_module_resolving_probe"](
+    edited,
+    bendList([]),
+  );
+  const reused = scheduler["check_scheduler.check_module_resolving_reusing"](
+    edited,
+    first.initial.certificates,
+    first.initial,
+  );
+  ok(fresh.$ === "CheckedInitial");
+  ok(reused.$ === "CheckedInitial");
+  equal(reused.initial, fresh.initial);
+
+  const certificates = bendArray(first.initial.certificates);
+  const witnesses = certificates.map((certificate) => ({
+    certificate,
+    pair: scheduler["resolving_core.pair"](certificate, first.initial.needs),
+  }));
+  for (const { certificate, pair } of witnesses) {
+    ok(pair.$ === "Some");
+    ok(
+      scheduler["resolving_core.matches"](
+        pair.value,
+        certificate.module,
+        certificate.imports,
+      ).$ === "Some",
+    );
+  }
+});
+
+Deno.test("resolving witness rejects malformed, duplicated and changed evidence", () => {
+  const original = module([fn("deferred", {
+    $: "AssociatedExpr",
+    identity: 17n,
+    dispatch: { $: "BinaryDispatch" },
+    member: "add",
+    templates: bendList([]),
+    left: { $: "U32Expr", value: 1 },
+    right: { $: "U32Expr", value: 2 },
+  })]);
+  const first = scheduler["check_scheduler.check_module_resolving_probe"](
+    original,
+    bendList([]),
+  );
+  ok(first.$ === "CheckedInitial");
+  const [certificate] = bendArray(first.initial.certificates);
+  const [need] = bendArray(first.initial.needs);
+  ok(certificate && need);
+  equal(scheduler["resolving_core.pair"](certificate, bendList([need, need])), {
+    $: "None",
+  });
+  equal(
+    scheduler["resolving_core.pair"](
+      certificate,
+      bendList([{ ...need, members: bendList([]) }]),
+    ),
+    { $: "None" },
+  );
+  const pair = scheduler["resolving_core.pair"](
+    certificate,
+    first.initial.needs,
+  );
+  ok(pair.$ === "Some");
+  const changed = {
+    ...original,
+    operations: bendList([{
+      $: "OperationTemplate",
+      identity: { $: "TypeId", module_name: "effects", declaration: "Read" },
+      parameters: 1n,
+      parameter: { $: "UnitTy" },
+      result: { $: "ParameterTy", index: 0n },
+    }]),
+  };
+  equal(
+    scheduler["resolving_core.matches"](
+      pair.value,
+      changed,
+      certificate.imports,
+    ),
+    { $: "None" },
+  );
+  equal(
+    scheduler["resolving_core.matches"](
+      pair.value,
+      module([fn("deferred", { $: "U32Expr", value: 3 })]),
+      certificate.imports,
+    ),
+    { $: "None" },
+  );
+  const imported = bendList([{
+    $: "Interface",
+    name: "newDependency",
+    kind: { $: "ConstantInterface" },
+    template: { $: "U32Ty" },
+    parameters: 0n,
+    effects: bendList([]),
+  }]);
+  equal(scheduler["resolving_core.matches"](pair.value, original, imported), {
+    $: "None",
+  });
 });

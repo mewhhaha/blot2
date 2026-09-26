@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 
-/** Native Bend 2.0.27 String traversal. The device keeps Bend's generated cases. */
+/** Native Bend 2.0.27/2.0.28 String traversal. The device keeps Bend's generated cases. */
 export type BorrowedStringBase = { map: string; string: string; char: string };
 
-const VERSION = "bend 2.0.27";
+const VERSIONS = ["bend 2.0.27", "bend 2.0.28"];
 const BASE_CONTRACTS = [
   [
     "Map.bit",
@@ -61,9 +61,11 @@ function baseSection(
 }
 
 function verifyBase(base: BorrowedStringBase, version: string): void {
-  if (version.trim() !== VERSION) {
+  if (!VERSIONS.includes(version.trim())) {
     throw new Error(
-      `Borrowed String requires ${VERSION}; got ${version.trim()}`,
+      `Borrowed String requires ${
+        VERSIONS.join(" or ")
+      }; got ${version.trim()}`,
     );
   }
   for (const [label, key, first, last, expected] of BASE_CONTRACTS) {

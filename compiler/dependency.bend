@@ -1,6 +1,7 @@
 import Base
 import ./model.bend as M
 import ./index.bend as Index
+import ./nat_index.bend as NatIndex
 
 type Node is Data:
   Node{name: String, references: List<&2, String>, lambdas: List<&2, Nat>}
@@ -180,7 +181,7 @@ def references_walk(fuel: Nat, step: Result<&2, &2, M.Diagnostic, ReferenceStep>
       references_walk(rest, reference_step(depth, work, tail, reversed))
 
 def references_go(fuel: Nat, work: Work, reversed: References) -> Result<&2, &2, M.Diagnostic, References>:
-  references_walk(Nat.read.max(), Done{ReferenceStep{[PendingReference{fuel, work}], reversed}})
+  references_walk(M.max_nat(), Done{ReferenceStep{[PendingReference{fuel, work}], reversed}})
 
 def references(fuel: Nat, work: Work) -> Result<&2, &2, M.Diagnostic, References>:
   do Result<&2, &2, M.Diagnostic, References>:
@@ -306,6 +307,25 @@ def visit_events(fresh: Bool, name: String, refs: List<&2, String>, tail: List<&
     case True{}:
       enter_events(refs, Leave{name} <> tail)
 
+# A previously visited name needs neither another known-set lookup nor an
+# adjacency lookup. The event list and fuel spent on each event stay unchanged.
+def unseen_known(already_seen: Bool, known: Set(), name: String) -> Bool:
+  match already_seen:
+    case True{}:
+      False{}
+    case False{}:
+      member(known, name)
+
+def fresh_name(+name: String, +known: Set(), seen: Set()) -> Bool:
+  unseen_known(member(seen, name), known, name)
+
+def visit_events_edges(fresh: Bool, +name: String, edges: Map<&2, List<&2, String>>, tail: List<&2, Visit>) -> List<&2, Visit>:
+  match fresh:
+    case False{}:
+      tail
+    case True{}:
+      enter_events(neighbors(edges, name), Leave{name} <> tail)
+
 def finish_order(fuel: Nat, pending: List<&2, Visit>, +edges: Map<&2, List<&2, String>>, +known: Set(), +seen: Set(), order: List<&2, String>) -> Result<&2, &2, M.Diagnostic, List<&2, String>>:
   match fuel pending:
     case _ Nil{}:
@@ -313,8 +333,8 @@ def finish_order(fuel: Nat, pending: List<&2, Visit>, +edges: Map<&2, List<&2, S
     case 0n _:
       Fail{M.Diagnostic{"internal_error", "inference", "dependency DFS exceeded its node/edge bound"}}
     case 1n+rest Enter{+name} <> tail:
-      +fresh = Bool.and(member(known, name), Bool.not(member(seen, name)))
-      finish_order(rest, visit_events(fresh, name, neighbors(edges, name), tail), edges, known, mark(fresh, seen, name), order)
+      +fresh = fresh_name(name, known, seen)
+      finish_order(rest, visit_events_edges(fresh, name, edges, tail), edges, known, mark(fresh, seen, name), order)
     case 1n+rest Leave{name} <> tail:
       finish_order(rest, tail, edges, known, seen, name <> order)
 
@@ -329,6 +349,13 @@ def reached_members(result: Reachability) -> List<&2, String>:
   Reachability{seen, members} = result
   members
 
+def next_work_edges(fresh: Bool, edges: Map<&2, List<&2, String>>, name: String, pending: List<&2, String>) -> List<&2, String>:
+  match fresh:
+    case False{}:
+      pending
+    case True{}:
+      List.append(&2, String, neighbors(edges, name), pending)
+
 def reachable(fuel: Nat, pending: List<&2, String>, +edges: Map<&2, List<&2, String>>, +known: Set(), +seen: Set(), +members: List<&2, String>) -> Result<&2, &2, M.Diagnostic, Reachability>:
   match fuel pending:
     case _ Nil{}:
@@ -336,8 +363,8 @@ def reachable(fuel: Nat, pending: List<&2, String>, +edges: Map<&2, List<&2, Str
     case 0n _:
       Fail{M.Diagnostic{"internal_error", "inference", "dependency component exceeded its node/edge bound"}}
     case 1n+rest +head <> tail:
-      +fresh = Bool.and(member(known, head), Bool.not(member(seen, head)))
-      reachable(rest, next_work(Bool.not(fresh), neighbors(edges, head), tail), edges, known, mark(fresh, seen, head), Bool.pick(List<&2, String>, fresh, head <> members, members))
+      +fresh = fresh_name(head, known, seen)
+      reachable(rest, next_work_edges(fresh, edges, head, tail), edges, known, mark(fresh, seen, head), Bool.pick(List<&2, String>, fresh, head <> members, members))
 
 def prepend_component(members: List<&2, String>, rest: List<&2, List<&2, String>>) -> List<&2, List<&2, String>>:
   match members:
@@ -356,13 +383,141 @@ def collect_components(order: List<&2, String>, +edges: Map<&2, List<&2, String>
         rest : List<&2, List<&2, String>> <- collect_components(tail, edges, known, reached_seen(reached), fuel)
         return prepend_component(reached_members(reached), rest)
 
-# Kosaraju runs once per module. Visiting the transpose first orders the
-# resulting original-graph components dependency-first, ready for HM schemes.
-# Unknown references are ignored by graph traversal, then diagnosed by inference.
-def components(+nodes: List<&2, Node>) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>:
-  +names = node_names(nodes)
-  +known = Set.from_list(names)
-  +fuel = {1n+Nat.add(Nat.mul(2n, List.length(&2, String, names)), edge_count(nodes)) : Nat}
+# Resolve declaration names once. Both Kosaraju passes then use compact
+# numeric identities, preserving input, edge and SCC member order. Unknown
+# references remain inference's responsibility; dropping their DFS events
+# cannot move a known declaration or exhaust the original node/edge bound.
+type CompactCatalog is Data:
+  CompactCatalog{ids: Map<&2, Nat>, names: NatIndex.Index<String>}
+
+def compact_catalog(nodes: List<&2, Node>, +next: Nat, known: CompactCatalog) -> CompactCatalog:
+  match nodes:
+    case Nil{}:
+      known
+    case Node{+name, references, lambdas} <> tail:
+      CompactCatalog{ids, names} = known
+      compact_catalog(tail, 1n+next, CompactCatalog{Map.set(&2, Nat, ids, name, next), NatIndex.set(String, names, next, name)})
+
+def compact_numbered_reference(found: Maybe<&2, Nat>, rest: List<&2, Nat>) -> List<&2, Nat>:
+  match found:
+    case None{}: rest
+    case Some{identity}: identity <> rest
+
+def compact_numbered_references(names: List<&2, String>, +ids: Map<&2, Nat>) -> List<&2, Nat>:
+  match names:
+    case Nil{}: Nil{}
+    case name <> tail:
+      compact_numbered_reference(Index.find(Nat, ids, name), compact_numbered_references(tail, ids))
+
+def compact_reverse_edges(references: List<&2, Nat>, +identity: Nat, +reversed: NatIndex.Index<List<&2, Nat>>) -> NatIndex.Index<List<&2, Nat>>:
+  match references:
+    case Nil{}: reversed
+    case +head <> tail:
+      compact_reverse_edges(tail, identity, NatIndex.set(List<&2, Nat>, reversed, head, identity <> NatIndex.get(List<&2, Nat>, reversed, head, Nil{})))
+
+type CompactGraph is Data:
+  CompactGraph{order: List<&2, Nat>, forward: NatIndex.Index<List<&2, Nat>>, reverse: NatIndex.Index<List<&2, Nat>>, fuel: Nat}
+
+def compact_graph(nodes: List<&2, Node>, +ids: Map<&2, Nat>, forward: NatIndex.Index<List<&2, Nat>>, reverse: NatIndex.Index<List<&2, Nat>>, fuel: Nat, order: List<&2, Nat>) -> CompactGraph:
+  match nodes:
+    case Nil{}:
+      CompactGraph{List.reverse(&2, Nat, order), forward, reverse, fuel}
+    case Node{name, +references, lambdas} <> tail:
+      +identity = Index.get(Nat, ids, name, 0n)
+      +targets = compact_numbered_references(references, ids)
+      compact_graph(tail, ids, NatIndex.set(List<&2, Nat>, forward, identity, targets), compact_reverse_edges(targets, identity, reverse), Nat.add(2n+fuel, List.length(&2, String, references)), identity <> order)
+
+type CompactVisit is Data:
+  CompactEnter{identity: Nat}
+  CompactLeave{identity: Nat}
+
+def compact_enter(names: List<&2, Nat>, pending: List<&2, CompactVisit>) -> List<&2, CompactVisit>:
+  match names:
+    case Nil{}: pending
+    case head <> tail: CompactEnter{head} <> compact_enter(tail, pending)
+
+def compact_fresh(seen: NatIndex.Index<Unit>, identity: Nat) -> Bool:
+  Bool.not(Maybe.is_some(&2, Unit, NatIndex.find(Unit, seen, identity)))
+
+def compact_mark(fresh: Bool, seen: NatIndex.Index<Unit>, identity: Nat) -> NatIndex.Index<Unit>:
+  match fresh:
+    case False{}: seen
+    case True{}: NatIndex.set(Unit, seen, identity, Unit{})
+
+def compact_events(fresh: Bool, +identity: Nat, edges: NatIndex.Index<List<&2, Nat>>, tail: List<&2, CompactVisit>) -> List<&2, CompactVisit>:
+  match fresh:
+    case False{}: tail
+    case True{}: compact_enter(NatIndex.get(List<&2, Nat>, edges, identity, Nil{}), CompactLeave{identity} <> tail)
+
+def compact_finish(fuel: Nat, pending: List<&2, CompactVisit>, +edges: NatIndex.Index<List<&2, Nat>>, +seen: NatIndex.Index<Unit>, order: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+  match fuel pending:
+    case _ Nil{}: Done{order}
+    case 0n _:
+      Fail{M.Diagnostic{"internal_error", "inference", "dependency DFS exceeded its node/edge bound"}}
+    case 1n+rest CompactEnter{+identity} <> tail:
+      +unseen = compact_fresh(seen, identity)
+      compact_finish(rest, compact_events(unseen, identity, edges, tail), edges, compact_mark(unseen, seen, identity), order)
+    case 1n+rest CompactLeave{identity} <> tail:
+      compact_finish(rest, tail, edges, seen, identity <> order)
+
+type CompactReachability is Data:
+  CompactReachability{seen: NatIndex.Index<Unit>, members: List<&2, Nat>}
+
+def compact_reached_seen(found: CompactReachability) -> NatIndex.Index<Unit>:
+  CompactReachability{seen, members} = found
+  seen
+
+def compact_reached_members(found: CompactReachability) -> List<&2, Nat>:
+  CompactReachability{seen, members} = found
+  members
+
+def compact_pending(fresh: Bool, edges: NatIndex.Index<List<&2, Nat>>, identity: Nat, tail: List<&2, Nat>) -> List<&2, Nat>:
+  match fresh:
+    case False{}: tail
+    case True{}: List.append(&2, Nat, NatIndex.get(List<&2, Nat>, edges, identity, Nil{}), tail)
+
+def compact_reach(fuel: Nat, work: List<&2, Nat>, +edges: NatIndex.Index<List<&2, Nat>>, +seen: NatIndex.Index<Unit>, +members: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, CompactReachability>:
+  match fuel work:
+    case _ Nil{}: Done{CompactReachability{seen, members}}
+    case 0n _:
+      Fail{M.Diagnostic{"internal_error", "inference", "dependency component exceeded its node/edge bound"}}
+    case 1n+rest +identity <> tail:
+      +unseen = compact_fresh(seen, identity)
+      compact_reach(rest, compact_pending(unseen, edges, identity, tail), edges, compact_mark(unseen, seen, identity), Bool.pick(List<&2, Nat>, unseen, identity <> members, members))
+
+def compact_names(members: List<&2, Nat>, +catalog: NatIndex.Index<String>) -> List<&2, String>:
+  match members:
+    case Nil{}: Nil{}
+    case identity <> tail:
+      NatIndex.get(String, catalog, identity, "") <> compact_names(tail, catalog)
+
+def compact_prepend(members: List<&2, Nat>, rest: List<&2, List<&2, String>>, catalog: NatIndex.Index<String>) -> List<&2, List<&2, String>>:
+  match members:
+    case Nil{}: rest
+    case head <> tail: compact_names(head <> tail, catalog) <> rest
+
+def compact_collect(order: List<&2, Nat>, +edges: NatIndex.Index<List<&2, Nat>>, seen: NatIndex.Index<Unit>, +fuel: Nat, +catalog: NatIndex.Index<String>) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>:
+  match order:
+    case Nil{}: Done{Nil{}}
+    case head <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>:
+        +reached : CompactReachability <- compact_reach(fuel, [head], edges, seen, Nil{})
+        rest : List<&2, List<&2, String>> <- compact_collect(tail, edges, compact_reached_seen(reached), fuel, catalog)
+        return compact_prepend(compact_reached_members(reached), rest, catalog)
+
+def compact_components_graph(graph: CompactGraph, catalog: NatIndex.Index<String>) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>:
+  CompactGraph{order, forward, reverse, +fuel} = graph
   do Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>:
-    order : List<&2, String> <- finish_order(fuel, enter_events(names, Nil{}), transpose(nodes, Map.new(&2, List<&2, String>)), known, Set.new(), Nil{})
-    collect_components(order, adjacency(nodes, Map.new(&2, List<&2, String>)), known, Set.new(), fuel)
+    finished : List<&2, Nat> <- compact_finish(fuel, compact_enter(order, Nil{}), reverse, NatIndex.Empty{}, Nil{})
+    compact_collect(finished, forward, NatIndex.Empty{}, fuel, catalog)
+
+def compact_components_catalog(nodes: List<&2, Node>, known: CompactCatalog) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>:
+  CompactCatalog{ids, names} = known
+  compact_components_graph(compact_graph(nodes, ids, NatIndex.Empty{}, NatIndex.Empty{}, 1n, Nil{}), names)
+
+def components(+nodes: List<&2, Node>) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, String>>>:
+  match nodes:
+    case Nil{}: Done{Nil{}}
+    case Node{name, references, lambdas} <> Nil{}: Done{[name <> Nil{}]}
+    case head <> tail:
+      compact_components_catalog(nodes, compact_catalog(head <> tail, 0n, CompactCatalog{MTip{}, NatIndex.Empty{}}))

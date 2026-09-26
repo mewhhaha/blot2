@@ -66,7 +66,7 @@ def group_chunks(chunks: List<&2, List<&2, U32>>, remaining: Nat, +grain: Nat, r
       group_chunks(tail, rest, grain, head <> reversed_chunks, reversed_groups)
 
 def pack_group(chunks: List<&2, List<&2, U32>>, context: Unit) -> Result<&2, &2, M.Diagnostic, Packed>:
-  pack_leaf(Nat.read.max(), chunks, Nil{}, 0, 0, 0n, Nil{}, True{})
+  pack_leaf(M.max_nat(), chunks, Nil{}, 0, 0, 0n, Nil{}, True{})
 
 def collect_groups(results: List<&2, Result<&2, &2, M.Diagnostic, Packed>>) -> Result<&2, &2, M.Diagnostic, Packed>:
   match results:
@@ -114,7 +114,7 @@ def encode_payload(header: List<&2, U32>, length: Nat, chunks: List<&2, List<&2,
     case False{}:
       # Only this exceptional path flattens. Preserve the original competition
       # between an invalid byte and exhaustion of the response word allowance.
-      oversized(R.encode_work(Nat.read.max(), [R.ByteWords{W.join(chunks)}], remaining, Nil{}))
+      oversized(R.encode_work(M.max_nat(), [R.ByteWords{W.join(chunks)}], remaining, Nil{}))
     case True{}:
       do Result<&2, &2, M.Diagnostic, Packet>:
         packed : Packed <- pack_chunks(chunks, grain)
@@ -123,7 +123,7 @@ def encode_payload(header: List<&2, U32>, length: Nat, chunks: List<&2, List<&2,
 def encode_plan(fields: List<&2, R.Work>, plan: W.BytePlan, +maximum: Nat, grain: Nat) -> Result<&2, &2, M.Diagnostic, Packet>:
   W.BytePlan{+length, chunks} = plan
   do Result<&2, &2, M.Diagnostic, Packet>:
-    +header : List<&2, U32> <- R.encode_work(Nat.read.max(), List.append(&2, R.Work, fields, [R.ByteLength{length}]), maximum, Nil{})
+    +header : List<&2, U32> <- R.encode_work(M.max_nat(), List.append(&2, R.Work, fields, [R.ByteLength{length}]), maximum, Nil{})
     +remaining : Nat = Nat.sub(maximum, List.length(&2, U32, header))
     encode_payload(header, length, chunks, maximum, remaining, grain, Nat.is_le(Nat.div(Nat.add(length, 3n), 4n), remaining))
 

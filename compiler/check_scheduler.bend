@@ -6,6 +6,7 @@ import ./inference_batch.bend as B
 import ./check_chain_plan.bend as Chains
 import ./check_regions.bend as Regions
 import ./checked_core.bend as Core
+import ./resolving_core.bend as ResolvingCore
 import ./frontier_alpha_compare.bend as AlphaCompare
 import ./nat_index.bend as NatIndex
 
@@ -27,7 +28,8 @@ type Catalog is Data:
     operations: List<&2, M.Operation>,
     costs: Map<&2, Nat>,
     core: Map<&2, List<&2, Core.Certificate>>,
-    evidence: Bool
+    evidence: Bool,
+    resolving: Map<&2, List<&2, ResolvingCore.Witness>>
   }
 
 def index_functions(values: List<&2, M.Function>, +position: Nat, found: Map<&2, Positioned<M.Function>>) -> Map<&2, Positioned<M.Function>>:
@@ -53,25 +55,33 @@ def index_types(values: List<&2, M.DataType>, +position: Nat, found: Map<&2, Pos
 
 def catalog_costs(module: M.Module, costs: Map<&2, Nat>) -> Catalog:
   M.Module{constants, functions, types, operations} = module
-  Catalog{index_functions(functions, 0n, Map.new(&2, Positioned<M.Function>)), index_constants(constants, 0n, Map.new(&2, Positioned<M.Constant>)), index_types(types, 0n, Map.new(&2, Positioned<M.DataType>)), operations, costs, Map.new(&2, List<&2, Core.Certificate>), False{}}
+  Catalog{index_functions(functions, 0n, Map.new(&2, Positioned<M.Function>)), index_constants(constants, 0n, Map.new(&2, Positioned<M.Constant>)), index_types(types, 0n, Map.new(&2, Positioned<M.DataType>)), operations, costs, Map.new(&2, List<&2, Core.Certificate>), False{}, Map.new(&2, List<&2, ResolvingCore.Witness>)}
 
 def catalog(module: M.Module) -> Catalog:
   catalog_costs(module, Map.new(&2, Nat))
 
 def with_core(known: Catalog, module: M.Module, certificates: List<&2, Core.Certificate>) -> Catalog:
-  Catalog{functions, constants, types, operations, costs, core, evidence} = known
-  Catalog{functions, constants, types, operations, costs, Core.index_for(module, certificates), evidence}
+  Catalog{functions, constants, types, operations, costs, core, evidence, resolving} = known
+  Catalog{functions, constants, types, operations, costs, Core.index_for(module, certificates), evidence, resolving}
 
 def with_evidence(known: Catalog) -> Catalog:
-  Catalog{functions, constants, types, operations, costs, core, evidence} = known
-  Catalog{functions, constants, types, operations, costs, core, True{}}
+  Catalog{functions, constants, types, operations, costs, core, evidence, resolving} = known
+  Catalog{functions, constants, types, operations, costs, core, True{}, resolving}
+
+def with_resolving(known: Catalog, witnesses: Map<&2, List<&2, ResolvingCore.Witness>>) -> Catalog:
+  Catalog{functions, constants, types, operations, costs, core, evidence, resolving} = known
+  Catalog{functions, constants, types, operations, costs, core, evidence, witnesses}
+
+def retained_resolving(known: Catalog, job: G.Job, subset: M.Module, imports: List<&2, G.Interface>) -> Maybe<&2, G.Resolving>:
+  Catalog{functions, constants, types, operations, costs, core, evidence, resolving} = known
+  ResolvingCore.lookup(resolving, job, subset, imports)
 
 def collecting(known: Catalog) -> Bool:
-  Catalog{functions, constants, types, operations, costs, core, evidence} = known
+  Catalog{functions, constants, types, operations, costs, core, evidence, resolving} = known
   evidence
 
 def core_index(known: Catalog) -> Map<&2, List<&2, Core.Certificate>>:
-  Catalog{functions, constants, types, operations, costs, core, evidence} = known
+  Catalog{functions, constants, types, operations, costs, core, evidence, resolving} = known
   core
 
 def retained_group(known: Catalog, job: G.Job, subset: M.Module, imports: List<&2, G.Interface>) -> Maybe<&2, G.CheckedGroup>:
@@ -113,7 +123,7 @@ def type_position_le(left: Positioned<M.DataType>, right: Positioned<M.DataType>
   position_le(M.DataType, left, right)
 
 def group_module(known: Catalog, job: G.Job) -> M.Module:
-  Catalog{functions, constants, types, operations, costs, core, evidence} = known
+  Catalog{functions, constants, types, operations, costs, core, evidence, resolving} = known
   G.Job{+members, dependencies, required_types} = job
   +nominals = G.type_keys(required_types)
   cs = positioned_values(M.Constant, List.sort(~Positioned<M.Constant>, ~constant_position_le, select_positions(M.Constant, members, constants)))
@@ -179,7 +189,7 @@ type Task is Data:
   Task{position: Nat, module: M.Module, dependencies: List<&2, G.Interface>, cost: Nat}
   EvidenceTask{position: Nat, module: M.Module, dependencies: List<&2, G.Interface>, cost: Nat}
   RetainedTask{position: Nat, checked: G.CheckedGroup}
-  RetainedEvidenceTask{position: Nat, module: M.Module, dependencies: List<&2, G.Interface>, checked: G.CheckedGroup}
+  RetainedEvidenceTask{position: Nat, module: M.Module, dependencies: List<&2, G.Interface>, checked: G.CheckedGroup, needs: List<&2, G.GroupNeeds>}
 
 type Outcome is Data:
   Outcome{position: Nat, checked: Result<&2, &2, M.Diagnostic, G.CheckedGroup>}
@@ -255,8 +265,8 @@ def check_task(task: Task, context: Unit) -> Outcome:
       EvidenceOutcome{position, module, dependencies, G.check_group_resolving(module, dependencies)}
     case RetainedTask{position, checked}:
       Outcome{position, Done{checked}}
-    case RetainedEvidenceTask{position, module, dependencies, checked}:
-      EvidenceOutcome{position, module, dependencies, Done{G.Resolving{checked, Nil{}}}}
+    case RetainedEvidenceTask{position, module, dependencies, checked, needs}:
+      EvidenceOutcome{position, module, dependencies, Done{G.Resolving{checked, needs}}}
 
 def check_task_planned(task: Task, context: Unit) -> Outcome:
   match task:
@@ -266,8 +276,8 @@ def check_task_planned(task: Task, context: Unit) -> Outcome:
       EvidenceOutcome{position, module, dependencies, G.check_group_resolving_planned(module, dependencies)}
     case RetainedTask{position, checked}:
       Outcome{position, Done{checked}}
-    case RetainedEvidenceTask{position, module, dependencies, checked}:
-      EvidenceOutcome{position, module, dependencies, Done{G.Resolving{checked, Nil{}}}}
+    case RetainedEvidenceTask{position, module, dependencies, checked, needs}:
+      EvidenceOutcome{position, module, dependencies, Done{G.Resolving{checked, needs}}}
 
 def weighted_tasks(tasks: List<&2, Task>) -> List<&2, B.Weighted<Task>>:
   match tasks:
@@ -279,8 +289,8 @@ def weighted_tasks(tasks: List<&2, Task>) -> List<&2, B.Weighted<Task>>:
       B.Weighted{EvidenceTask{position, module, dependencies, cost}, cost} <> weighted_tasks(tail)
     case RetainedTask{position, checked} <> tail:
       B.Weighted{RetainedTask{position, checked}, 0n} <> weighted_tasks(tail)
-    case RetainedEvidenceTask{position, module, dependencies, checked} <> tail:
-      B.Weighted{RetainedEvidenceTask{position, module, dependencies, checked}, 0n} <> weighted_tasks(tail)
+    case RetainedEvidenceTask{position, module, dependencies, checked, needs} <> tail:
+      B.Weighted{RetainedEvidenceTask{position, module, dependencies, checked, needs}, 0n} <> weighted_tasks(tail)
 
 def task_batch(tasks: List<&2, Task>, grain: Nat) -> B.Batch<Task>:
   B.plan(Task, weighted_tasks(tasks), grain)
@@ -324,7 +334,7 @@ def task_candidate(task: Task) -> Maybe<&2, FrontierCandidate>:
       candidate_parts(position, constants, functions, types, imports)
     case RetainedTask{position, checked}:
       None{}
-    case RetainedEvidenceTask{position, module, imports, checked}:
+    case RetainedEvidenceTask{position, module, imports, checked, needs}:
       None{}
 
 def same_candidate(left: FrontierCandidate, right: FrontierCandidate) -> Bool:
@@ -433,7 +443,7 @@ def replay_for_task(prior: G.CheckedGroup, task: Task) -> Maybe<&2, G.CheckedGro
       replay_parts(old_constants, old_functions, old_interfaces, constants, functions, types, operations)
     case RetainedTask{position, checked}:
       None{}
-    case RetainedEvidenceTask{position, module, imports, checked}:
+    case RetainedEvidenceTask{position, module, imports, checked, needs}:
       None{}
 
 def replay_outcome(task: Task, checked: G.CheckedGroup) -> Outcome:
@@ -444,8 +454,8 @@ def replay_outcome(task: Task, checked: G.CheckedGroup) -> Outcome:
       EvidenceOutcome{position, module, imports, Done{G.Resolving{checked, Nil{}}}}
     case RetainedTask{position, prior}:
       Outcome{position, Done{prior}}
-    case RetainedEvidenceTask{position, module, imports, prior}:
-      EvidenceOutcome{position, module, imports, Done{G.Resolving{prior, Nil{}}}}
+    case RetainedEvidenceTask{position, module, imports, prior, needs}:
+      EvidenceOutcome{position, module, imports, Done{G.Resolving{prior, needs}}}
 
 def replay_found(replayed: Maybe<&2, G.CheckedGroup>, task: Task) -> Outcome:
   match replayed:
@@ -476,7 +486,7 @@ def task_position(task: Task) -> Nat:
       position
     case RetainedTask{position, checked}:
       position
-    case RetainedEvidenceTask{position, module, imports, checked}:
+    case RetainedEvidenceTask{position, module, imports, checked, needs}:
       position
 
 def original_found(prior: Maybe<&2, Outcome>, task: Task) -> Outcome:
@@ -673,7 +683,7 @@ def group_cost_found(found: Maybe<&2, Nat>, known: Catalog, job: G.Job) -> Nat:
 # Cost is scheduling metadata, not a validation budget. Per-declaration
 # saturation may overestimate a large SCC; that SCC still remains indivisible.
 def group_cost(+known: Catalog, +job: G.Job) -> Nat:
-  Catalog{functions, constants, types, operations, costs, core, evidence} = known
+  Catalog{functions, constants, types, operations, costs, core, evidence, resolving} = known
   G.Job{members, dependencies, required_types} = job
   group_cost_found(cached_cost(members, costs, 64n), known, job)
 
@@ -741,7 +751,7 @@ def prepare_result(position: Nat, result: Result<&2, &2, M.Diagnostic, Task>, pr
 def selected_task(found: Maybe<&2, G.CheckedGroup>, evidence: Bool, position: Nat, +subset: M.Module, imports: List<&2, G.Interface>) -> Task:
   match found evidence:
     case Some{checked} True{}:
-      RetainedEvidenceTask{position, subset, imports, checked}
+      RetainedEvidenceTask{position, subset, imports, checked, Nil{}}
     case Some{checked} False{}:
       RetainedTask{position, checked}
     case None{} True{}:
@@ -749,12 +759,19 @@ def selected_task(found: Maybe<&2, G.CheckedGroup>, evidence: Bool, position: Na
     case None{} False{}:
       Task{position, subset, imports, module_cost(subset)}
 
+def resolving_task(found: Maybe<&2, G.Resolving>, +known: Catalog, +job: G.Job, position: Nat, +subset: M.Module, +imports: List<&2, G.Interface>) -> Task:
+  match found:
+    case Some{G.Resolving{checked, needs}}:
+      RetainedEvidenceTask{position, subset, imports, checked, needs}
+    case None{}:
+      selected_task(retained_group(known, job, subset, imports), collecting(known), position, subset, imports)
+
 def prepare_task(position: Nat, +job: G.Job, +known: Catalog, interfaces: Map<&2, G.Interface>) -> Result<&2, &2, M.Diagnostic, Task>:
   G.Job{members, dependencies, types} = job
   +subset = group_module(known, job)
   do Result<&2, &2, M.Diagnostic, Task>:
     +imports : List<&2, G.Interface> <- dependency_interfaces(dependencies, interfaces)
-    return selected_task(retained_group(known, job, subset, imports), collecting(known), position, subset, imports)
+    return resolving_task(retained_resolving(known, job, subset, imports), known, job, position, subset, imports)
 
 def next_allowed(ready: List<&2, Scheduled>, failure: Maybe<&2, Failure>) -> Bool:
   match ready:
@@ -1006,9 +1023,16 @@ def check_module_core(+module: M.Module, certificates: List<&2, Core.Certificate
     assembled(module, completed)
 
 # `certificates` covers every current group; `needs` lists the closed dispatch
-# requirements of the groups this check inferred rather than retained.
+# requirements inferred or atomically retained with their checked group.
 type Initial is Data:
   Initial{checked: M.CheckedModule, certificates: List<&2, Core.Certificate>, needs: List<&2, G.GroupNeeds>}
+
+# A failed source check still certifies every complete SCC that succeeded.
+# These certificates are exact-source evidence; the caller may use them while
+# checking the original module without adopting a rewritten round's error.
+type InitialAttempt is Data:
+  CheckedInitial{initial: Initial, inferred: Nat, retained: Nat}
+  FailedInitial{diagnostic: M.Diagnostic, certificates: List<&2, Core.Certificate>, inferred: Nat, retained: Nat}
 
 def initial_checked(initial: Initial) -> M.CheckedModule:
   Initial{checked, certificates, needs} = initial
@@ -1018,20 +1042,100 @@ def initial_certificates(initial: Initial) -> List<&2, Core.Certificate>:
   Initial{checked, certificates, needs} = initial
   certificates
 
-def assembled_initial(module: M.Module, +completed: Completed) -> Result<&2, &2, M.Diagnostic, Initial>:
-  Completed{interfaces, functions, constants, published, failure, +certificates, +needs} = completed
-  do Result<&2, &2, M.Diagnostic, Initial>:
-    checked : M.CheckedModule <- assembled(module, completed)
-    return Initial{checked, List.reverse(&2, Core.Certificate, certificates), List.reverse(&2, G.GroupNeeds, needs)}
+def retained_members(members: List<&2, String>, module: M.Module, imports: List<&2, G.Interface>, available: Map<&2, List<&2, Core.Certificate>>) -> Bool:
+  match members:
+    case Nil{}:
+      False{}
+    case name <> tail:
+      Maybe.is_some(&2, G.CheckedGroup, Core.available_candidates(Index.find(List<&2, Core.Certificate>, available, name), module, imports))
+
+def retained_certificate(certificate: Core.Certificate, available: Map<&2, List<&2, Core.Certificate>>) -> Bool:
+  Core.Certificate{+module, checked, imports} = certificate
+  retained_members(Core.names(module), module, imports, available)
+
+def retained_count(certificates: List<&2, Core.Certificate>, +available: Map<&2, List<&2, Core.Certificate>>, count: Nat) -> Nat:
+  match certificates:
+    case Nil{}:
+      count
+    case +certificate <> tail:
+      retained_count(tail, available, Nat.add(count, Bool.pick(Nat, retained_certificate(certificate, available), 1n, 0n)))
+
+type AuditCounts is Data:
+  AuditCounts{inferred: Nat, retained: Nat}
+
+def audit_counts(audit: Bool, module: M.Module, +issued: List<&2, Core.Certificate>, supplied: List<&2, Core.Certificate>) -> AuditCounts:
+  match audit:
+    case False{}:
+      AuditCounts{0n, 0n}
+    case True{}:
+      +retained = retained_count(issued, Core.index_for(module, supplied), 0n)
+      AuditCounts{Nat.sub(List.length(&2, Core.Certificate, issued), retained), retained}
+
+def assembled_attempt(result: Result<&2, &2, M.Diagnostic, M.CheckedModule>, issued: List<&2, Core.Certificate>, needs: List<&2, G.GroupNeeds>, counts: AuditCounts) -> InitialAttempt:
+  match result counts:
+    case Done{checked} AuditCounts{inferred, retained}:
+      CheckedInitial{Initial{checked, issued, List.reverse(&2, G.GroupNeeds, needs)}, inferred, retained}
+    case Fail{diagnostic} AuditCounts{inferred, retained}:
+      FailedInitial{diagnostic, issued, inferred, retained}
+
+def initial_attempt(+module: M.Module, +completed: Completed, supplied: List<&2, Core.Certificate>, audit: Bool) -> InitialAttempt:
+  Completed{interfaces, functions, constants, published, failure, certificates, needs} = completed
+  +issued = List.reverse(&2, Core.Certificate, certificates)
+  assembled_attempt(assembled(module, completed), issued, needs, audit_counts(audit, module, issued, supplied))
+
+def failed_attempt(diagnostic: M.Diagnostic) -> InitialAttempt:
+  FailedInitial{diagnostic, Nil{}, 0n, 0n}
+
+def checked_attempt(result: Result<&2, &2, M.Diagnostic, Completed>, module: M.Module, certificates: List<&2, Core.Certificate>, audit: Bool) -> InitialAttempt:
+  match result:
+    case Fail{diagnostic}:
+      failed_attempt(diagnostic)
+    case Done{completed}:
+      initial_attempt(module, completed, certificates, audit)
+
+def planned_attempt(result: Result<&2, &2, M.Diagnostic, List<&2, G.Job>>, +module: M.Module, +certificates: List<&2, Core.Certificate>, audit: Bool) -> InitialAttempt:
+  match result:
+    case Fail{diagnostic}:
+      failed_attempt(diagnostic)
+    case Done{+jobs}:
+      checked_attempt(check_jobs(jobs, with_evidence(with_core(catalog(module), module, certificates)), empty_completed(), has_dependencies(jobs)), module, certificates, audit)
+
+def planned_reusing(result: Result<&2, &2, M.Diagnostic, List<&2, G.Job>>, +module: M.Module, +certificates: List<&2, Core.Certificate>, witnesses: Map<&2, List<&2, ResolvingCore.Witness>>) -> InitialAttempt:
+  match result:
+    case Fail{diagnostic}:
+      failed_attempt(diagnostic)
+    case Done{+jobs}:
+      known = with_resolving(with_evidence(with_core(catalog(module), module, certificates)), witnesses)
+      checked_attempt(check_jobs(jobs, known, empty_completed(), has_dependencies(jobs)), module, certificates, False{})
+
+# Reuse only evidence paired inside the same successful source check. A bare
+# deferred certificate still cannot provide the group's unresolved requirements.
+# Generated/source-ready certificates retain their ordinary final-check lane.
+def check_module_resolving_reusing(+module: M.Module, certificates: List<&2, Core.Certificate>, previous: Initial) -> InitialAttempt:
+  Initial{checked, prior_certificates, needs} = previous
+  witnesses = ResolvingCore.index(prior_certificates, needs, Map.new(&2, List<&2, ResolvingCore.Witness>))
+  planned_reusing(G.plan(module), module, Core.ready_certificates(certificates), witnesses)
+
+def check_module_resolving_attempt(+module: M.Module, certificates: List<&2, Core.Certificate>) -> InitialAttempt:
+  planned_attempt(G.plan(module), module, certificates, False{})
+
+# A pure probe for regression tests. Production checks skip the second lookup
+# needed to count actual retained groups; their result fields stay zero.
+def check_module_resolving_probe(+module: M.Module, certificates: List<&2, Core.Certificate>) -> InitialAttempt:
+  planned_attempt(G.plan(module), module, certificates, True{})
+
+def attempt_result(attempt: InitialAttempt) -> Result<&2, &2, M.Diagnostic, Initial>:
+  match attempt:
+    case CheckedInitial{initial, inferred, retained}:
+      Done{initial}
+    case FailedInitial{diagnostic, certificates, inferred, retained}:
+      Fail{diagnostic}
 
 # Source shape passes ask for principal, exact-SCC evidence. A group whose
 # declarations and imported interfaces match one of `certificates` is retained
 # (and certified again) instead of being inferred.
 def check_module_resolving(+module: M.Module, certificates: List<&2, Core.Certificate>) -> Result<&2, &2, M.Diagnostic, Initial>:
-  do Result<&2, &2, M.Diagnostic, Initial>:
-    +jobs : List<&2, G.Job> <- G.plan(module)
-    completed : Completed <- check_jobs(jobs, with_evidence(with_core(catalog(module), module, certificates)), empty_completed(), has_dependencies(jobs))
-    assembled_initial(module, completed)
+  attempt_result(check_module_resolving_attempt(module, certificates))
 
 def check_module_evidenced(module: M.Module) -> Result<&2, &2, M.Diagnostic, Initial>:
   check_module_resolving(module, Nil{})

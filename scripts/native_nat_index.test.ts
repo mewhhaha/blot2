@@ -7,11 +7,28 @@ import {
 const fixture = await Deno.readTextFile(
   new URL("./fixtures/native_nat_index_2_0_27.c", import.meta.url),
 );
+const bend28Fixture = await Deno.readTextFile(
+  new URL("./fixtures/native_nat_index_2_0_28.c", import.meta.url),
+);
 const natIndex = await Deno.readTextFile(
   new URL("../compiler/nat_index.bend", import.meta.url),
 );
 const transform = (c = fixture, source = natIndex, version = "bend 2.0.27") =>
   optimizeNativeNatIndex(c, { natIndex: source }, version);
+
+Deno.test("native NatIndex accepts reviewed Bend 2.0.28 consuming lookup", async () => {
+  const output = await transform(bend28Fixture, natIndex, "bend 2.0.28");
+  match(output, /Loc span = ctr_take\(e, index, 4, fields\);/);
+  const altered = bend28Fixture.replace(
+    "ctr_take(e, _index_0, 4,",
+    "ctr_take(e, _index_0, 3,",
+  );
+  ok(altered !== bend28Fixture);
+  await rejects(
+    () => transform(altered, natIndex, "bend 2.0.28"),
+    /generated find shape changed/,
+  );
+});
 
 Deno.test("native NatIndex replaces only find and transfers owned paths", async () => {
   const output = await transform();
@@ -31,8 +48,8 @@ Deno.test("native NatIndex replaces only find and transfers owned paths", async 
 
 Deno.test("native NatIndex rejects source, version, predecessor, and ownership drift", async () => {
   await rejects(
-    () => transform(fixture, natIndex, "bend 2.0.28"),
-    /requires bend 2\.0\.27/,
+    () => transform(fixture, natIndex, "bend 2.0.29"),
+    /requires bend 2\.0\.27 or 2\.0\.28/,
   );
   for (
     const [before, after] of [

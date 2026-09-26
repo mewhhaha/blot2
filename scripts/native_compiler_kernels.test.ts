@@ -7,6 +7,9 @@ import {
 const fixture = await Deno.readTextFile(
   new URL("./fixtures/native_compiler_kernels_2_0_27.c", import.meta.url),
 );
+const bend28Fixture = await Deno.readTextFile(
+  new URL("./fixtures/native_compiler_kernels_2_0_28.c", import.meta.url),
+);
 const sources = {
   index: await Deno.readTextFile(
     new URL("../compiler/index.bend", import.meta.url),
@@ -23,6 +26,21 @@ const transform = (
   inputs = sources,
   version = "bend 2.0.27",
 ) => optimizeNativeCompilerKernels(generated, inputs, version);
+
+Deno.test("native compiler kernels accept reviewed Bend 2.0.28 field ownership", async () => {
+  const output = await transform(bend28Fixture, sources, "bend 2.0.28");
+  match(output, /static inline bool compact_free_work/);
+  match(output, /static inline bool compact_closed_work/);
+  const altered = bend28Fixture.replace(
+    "ctr_take(e, _work_1, 5,",
+    "ctr_take(e, _work_1, 4,",
+  );
+  ok(altered !== bend28Fixture);
+  await rejects(
+    () => transform(altered, sources, "bend 2.0.28"),
+    /free_work generated field shape changed: FUNCTIONTY/,
+  );
+});
 
 // Two exact Bend 2.0.27 emissions are supported. The later one adds keeps
 // before a spin helper that consumes its inputs, retaining post-spin keeps.
@@ -91,8 +109,8 @@ Deno.test("native closed kernel accepts the exact pre-spin keep layout and rejec
 
 Deno.test("native compiler kernels fail closed on Bend and semantic changes", async () => {
   await rejects(
-    () => transform(fixture, sources, "bend 2.0.28"),
-    /require bend 2\.0\.27/,
+    () => transform(fixture, sources, "bend 2.0.29"),
+    /require bend 2\.0\.27 or 2\.0\.28/,
   );
   for (
     const [part, before, after] of [

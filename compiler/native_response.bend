@@ -483,7 +483,7 @@ def finish(result: Result<&2, &2, M.Diagnostic, List<&2, U32>>) -> List<&2, U32>
       1112297300 <> version() <> 0 <> text_words(code, text_words(subject, text_words(message, Nil{})))
 
 def encode(kind: U32, fields: List<&2, Work>) -> List<&2, U32>:
-  finish(encode_work(Nat.read.max(), Word{1112297300} <> Word{version()} <> Word{kind} <> fields, U32.to_nat(16777216), Nil{}))
+  finish(encode_work(M.max_nat(), Word{1112297300} <> Word{version()} <> Word{kind} <> fields, U32.to_nat(16777216), Nil{}))
 
 def encode_diagnostic(diagnostic: M.Diagnostic) -> List<&2, U32>:
   encode(0, [Diagnostic{diagnostic}])

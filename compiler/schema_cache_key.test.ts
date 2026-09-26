@@ -93,6 +93,7 @@ const moduleFor = (proofs: Cell<typeof evidence>, types = catalog) =>
     types,
     operations: nil,
     schemes: nil,
+    limit: { $: "Done", value: 0n },
   }, nil) as {
     $: "Module";
     functions: Cell<{ name: string; parameter: string }>;

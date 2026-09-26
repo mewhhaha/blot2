@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-/** A separately guarded Bend 2.0.27 owned, bounded native type resolver. */
+/** A separately guarded Bend 2.0.27/2.0.28 owned, bounded native type resolver. */
 export type OwnedResolverSources = {
   types: string;
   natIndex: string;
@@ -138,9 +138,11 @@ function verifySources(
   sources: OwnedResolverSources,
   bendVersion: string,
 ): void {
-  if (bendVersion.trim() !== "bend 2.0.27") {
+  if (
+    bendVersion.trim() !== "bend 2.0.27" && bendVersion.trim() !== "bend 2.0.28"
+  ) {
     throw new Error(
-      `Owned resolver requires bend 2.0.27; got ${bendVersion.trim()}`,
+      `Owned resolver requires bend 2.0.27 or 2.0.28; got ${bendVersion.trim()}`,
     );
   }
   for (const [label, file, start, end, expected] of SOURCE_CONTRACTS) {

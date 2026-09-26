@@ -1044,13 +1044,6 @@ def groups_if_same_catalog(same: Bool, previous: Map<&2, Cached<G.CheckedGroup>>
     case False{}:
       Map.new(&2, Cached<G.CheckedGroup>)
 
-def retain_initial(previous: Map<&2, Cached<G.CheckedGroup>>) -> Bool:
-  match previous:
-    case MTip{}:
-      True{}
-    case _:
-      False{}
-
 def constants_if_same_catalog(same: Bool, previous: Map<&2, Cached<Const.Constants>>) -> Map<&2, Cached<Const.Constants>>:
   match same:
     case True{}:
@@ -1064,7 +1057,7 @@ def update_lowered_module(state: State, mode: Mode, entry: String, +prelude_modu
   +specialized = Bool.or(Mono.required(raw_module), Families.required(raw_module))
   do Result<&2, &2, M.Diagnostic, Completion>:
     +family_module : M.Module <- Families.prepare(raw_module)
-    +specialization_result : Mono.Prepared <- Resolution.prepare_cached_evidenced(~K.module, family_module, entry, M.module_operations(raw_module), specialization, retain_initial(previous_groups))
+    +specialization_result : Mono.Prepared <- Resolution.prepare_cached_evidenced(~K.module, family_module, entry, M.module_operations(raw_module), specialization)
     +module : M.Module = Mono.prepared_module(specialization_result)
     +expanded : Bool = reshaped(specialized, raw_module, module)
     graph : List<&2, D.Node> <- specialization_graph(expanded, module, Plan.scan(prelude_module) <> scans)

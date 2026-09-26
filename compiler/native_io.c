@@ -91,6 +91,16 @@ static void __attribute__((constructor)) blot_native_priority_use(void) {
 
 #define BLOT_NATIVE_MAX_WORDS 16777216u
 
+// Bend 2.0.28 qualifies foreign effect IDs with their declaring module.
+// Keep the registration names used by the reviewed older runtimes as aliases;
+// otherwise the guards below silently omit both protocol effects.
+#if !defined(CID_RECEIVE) && defined(CID_NATIVE_IO_RECEIVE)
+#define CID_RECEIVE CID_NATIVE_IO_RECEIVE
+#endif
+#if !defined(CID_SEND) && defined(CID_NATIVE_IO_SEND)
+#define CID_SEND CID_NATIVE_IO_SEND
+#endif
+
 static void blot_native_read_exact(uint8_t* bytes, size_t length) {
   size_t offset = 0;
   while (offset < length) {

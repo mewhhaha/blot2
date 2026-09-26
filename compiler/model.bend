@@ -364,3 +364,8 @@ def reference_expr(reference: ValueReference) -> Expr:
       LocalExpr{name}
     case ConstantReference{name}:
       ConstantExpr{name}
+
+# Maximum immediate Nat (2^48 - 1), identical to Base 2.0.27 Nat.read.max.
+# Worklists keep their existing finite budget without a parsing-internal API.
+def max_nat() -> Nat:
+  Nat.mul(U32.to_nat(16777215), U32.to_nat(16777217))

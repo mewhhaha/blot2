@@ -193,6 +193,41 @@ const localPing =
 const localPair =
   "type Pair [a, b] is data = Pair (a, b)\nconst Pair.same = fn (p: Pair [a, a]) => 0\n";
 
+Deno.test("source-first checking preserves a valid local operator forwarder", async () => {
+  const source = localNum +
+    "entry const run = fn () => case Num 40 + Num 2 of\n  Num value => value\n";
+  const reference = await createSourceCompiler({ prelude: "none" });
+  const native = await createNativeCompiler({ prelude: "none" });
+  try {
+    const artifact = reference.compile(source);
+    equal(await native.compile(source), artifact);
+    const { instance } = await WebAssembly.instantiate(artifact.bytes);
+    equal((instance.exports.run as CallableFunction)(), 40);
+  } finally {
+    reference.dispose();
+    await native.dispose();
+  }
+});
+
+Deno.test("unchanged member requirements survive checking an inlined operator caller", async () => {
+  const reference = await createSourceCompiler({ prelude: "none" });
+  const native = await createNativeCompiler({ prelude: "none" });
+  try {
+    for (const value of [40, 41]) {
+      const source = localNum +
+        "const member = fn (value: Num) => value.add (Num 1)\n" +
+        `entry const run = fn () => case member (Num ${value}) + Num 2 of\n  Num result => result\n`;
+      const artifact = reference.compile(source);
+      equal(await native.compile(source), artifact);
+      const { instance } = await WebAssembly.instantiate(artifact.bytes);
+      equal((instance.exports.run as CallableFunction)(), value);
+    }
+  } finally {
+    reference.dispose();
+    await native.dispose();
+  }
+});
+
 // Expected values were recorded from the compiler before concrete dispatch
 // resolution. `at` is the diagnostic position inside the source; the checked
 // subject adds the frontend's source base (the prelude's length plus one).
@@ -272,6 +307,16 @@ const diagnostics: readonly {
     prelude: "default",
     source:
       "const helper = fn (x: U32) => x + 1\nconst bad = fn () => helper 1.0\n",
+    code: "type_mismatch",
+    at: 57,
+    message: "cannot unify U32 with F32",
+  },
+  {
+    name:
+      "original first error survives unrelated inlineable calls and a later error",
+    prelude: "default",
+    source:
+      "const helper = fn (x: U32) => x + 1\nconst bad = fn () => helper 1.0\nconst unrelated = fn () => 1 + 2\nconst later = fn () => helper 2.0\n",
     code: "type_mismatch",
     at: 57,
     message: "cannot unify U32 with F32",

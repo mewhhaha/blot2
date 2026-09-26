@@ -41,7 +41,10 @@ unchanged. Raw final pairs are `final-flat-original-cold.jsonl` and
 ## Reuse boundary
 
 The initial source check computes principal schemes in separate dependency
-components. Each retained result records:
+components. Planning resolves declaration names once to numeric identities for
+both graph traversals. It preserves declaration, edge, component and member
+order; unknown references remain for inference to diagnose. Each retained result
+records:
 
 - the exact component declarations, including annotations and source identities;
 - its checked result, including validated coverage and reflection;
@@ -56,12 +59,19 @@ transactional publication remain ahead of this fallback.
 
 The scheduler captures these results as the initial check finishes each group.
 There is no second source dependency plan or scan to reconstruct checked groups.
-Warm sessions with a finalized group cache skip this source-certificate capture
-when [concrete dispatch resolution](README.md) does not run (no dispatch site)
-or is abandoned. Otherwise its own evidence check replaces the warm shape check,
-and its ready certificates reach the final check behind the session's group
-cache, as on a first revision. Certificates are published only with a successful
-complete initial check.
+Warm sessions retain source-ready certificates from the last successful
+revision, including revisions without dispatch sites. An unchanged group can use
+that evidence in the next source check; a changed group is inferred again. The
+original source check precedes inlining and pruning, so a failed source check
+reports its diagnostic immediately. A later failed resolution round reuses the
+already checked original module. Inlining and later resolution rounds can reuse
+a group with deferred requirements only as an atomic witness of its checked
+result and its original `GroupNeeds`. The complete module and ordered imported
+interfaces must match, including operation templates and nominal declarations.
+Missing, partial, or duplicate requirement associations cannot certify a group.
+Ready certificates also reach the final check behind the session's group cache.
+A successful prepared module publishes the new source certificates; a failed
+revision leaves the previous cache intact.
 
 Comparison uses a bounded structural worklist. It preserves nominal identities,
 float bit patterns, annotations, source offsets, and duplicate, ordered effect

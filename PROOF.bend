@@ -24,6 +24,24 @@ def Laws.checked_public_wrapper_calls_stored_constant(name, input, output, varia
 def Laws.dependency_membership_hit_finishes(remaining):
   {==}
 
+def Laws.empty_dependency_graph_has_no_components():
+  {==}
+
+def Laws.singleton_dependency_graph_is_one_component(name, references, lambdas):
+  {==}
+
+def Laws.seen_dependency_enter_does_not_expand_neighbors(name, edges, pending):
+  {==}
+
+def Laws.seen_compact_dependency_enter_does_not_expand_neighbors(identity, edges, pending):
+  {==}
+
+def Laws.unknown_compact_dependency_reference_is_omitted(tail):
+  {==}
+
+def Laws.seen_dependency_reach_does_not_expand_neighbors(edges, name, pending):
+  {==}
+
 def Laws.mono_rename_keeps_first_found(tail, wanted, specialized):
   match tail:
     case Nil{}:
@@ -619,7 +637,20 @@ def Laws.rejected_staging_scheme_does_not_replay(scheme, clone, parsed, stride, 
   {==}
 
 def Laws.shared_nominal_catalog_reuses_sorted_list(shared, common):
-  {==}
+  match shared:
+    case MTip{}:
+      {==}
+    case MLeaf{key, value}:
+      {==}
+    case MNode{position, left, right}:
+      {==}
+
+def Laws.sorted_nominal_merge_keeps_common_without_new_types(common):
+  match common:
+    case Nil{}:
+      {==}
+    case head <> tail:
+      {==}
 
 
 def Laws.exhausted_schema_reduction_is_a_miss(work):
@@ -676,13 +707,13 @@ def Laws.dispatch_field_update_accessor_is_shared(owner, member):
 def Laws.dispatch_duplicate_accessor_keeps_first(function, reversed):
   {==}
 
-def Laws.dispatch_failed_round_abandons_resolution(fuel, module, diagnostic, next, proofs, cache, budget, entry):
+def Laws.dispatch_failed_round_abandons_resolution(fuel, module, diagnostic, next, proofs, cache, budget, entry, source, partial, inferred, retained):
   {==}
 
-def Laws.dispatch_unchanged_round_keeps_its_check(fuel, initial, module, certificates, next, cache, stable, proofs, budget, entry):
+def Laws.dispatch_unchanged_round_keeps_its_check(fuel, initial, module, certificates, next, cache, stable, proofs, budget, entry, source):
   {==}
 
-def Laws.dispatch_stable_rewrite_skips_verification(fuel, initial, module, certificates, next, cache, proofs, budget, entry):
+def Laws.dispatch_stable_rewrite_skips_verification(fuel, initial, module, certificates, next, cache, proofs, budget, entry, source):
   {==}
 
 def Laws.dispatch_group_without_resolutions_is_stable(state, waiting, progress, members, generalized, next):
@@ -761,10 +792,7 @@ def Laws.entry_owner_prefix_matches_specialization(identity, entry):
     case M.TypeId{module_name, declaration}:
       {==}
 
-def Laws.dispatch_failed_initial_check_abandons_resolution(diagnostic, module, next, entry):
-  {==}
-
-def Laws.dispatch_failed_pruning_abandons_resolution(diagnostic, next, entry):
+def Laws.dispatch_failed_pruning_abandons_resolution(diagnostic, next, entry, source):
   {==}
 
 def Laws.build_without_entries_fails(types, operations):
@@ -777,7 +805,6 @@ def Laws.no_entries_verify(checked):
 
 def Laws.unused_operation_has_no_wasm_job(identity, parameter, result):
   {==}
-
 def Laws.loop_memory_pure_closed_row_is_isolated():
   {==}
 
@@ -788,4 +815,38 @@ def Laws.loop_memory_open_row_is_not_isolated(operations, index):
   {==}
 
 def Laws.loop_memory_source_state_is_not_isolated():
+  {==}
+
+def Laws.dispatch_original_failure_is_authoritative(diagnostic, certificates, inferred, retained, module, entry):
+  {==}
+
+def Laws.dispatch_transformed_failure_preserves_certificates(diagnostic, certificates, inferred, retained, module, next, entry, source):
+  {==}
+
+def Laws.dispatch_fallback_reuses_checked_source(transformed, module, initial, source):
+  {==}
+
+def Laws.dispatch_without_sites_reuses_checked_source(seen, unique, module, inlined, initial, original, entry, source):
+  match unique:
+    case True{}:
+      {==}
+    case False{}:
+      {==}
+
+def Laws.failed_initial_assembly_preserves_completed_groups(diagnostic, certificates, needs, inferred, retained):
+  {==}
+
+def Laws.certificate_type_index_keeps_first_identity():
+  {==}
+
+def Laws.certificate_operation_index_keeps_first_identity():
+  {==}
+
+def Laws.retained_resolving_task_keeps_requirements(position, module, imports, checked, needs):
+  {==}
+
+def Laws.conflicting_resolving_association_cannot_certify(certificate):
+  {==}
+
+def Laws.specialization_without_inference_ignores_shape_failure(expanded, configuration, shapes, isolated, schemes, diagnostic):
   {==}

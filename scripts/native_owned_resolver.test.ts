@@ -4,6 +4,12 @@ import { optimizeNativeOwnedResolver } from "./native_owned_resolver.ts";
 const fixture = await Deno.readTextFile(
   new URL("./fixtures/native_owned_resolver_2_0_27.c", import.meta.url),
 );
+const bend28Fixture = await Deno.readTextFile(
+  new URL(
+    "./fixtures/native_owned_resolver_2_0_28_after_closed.c",
+    import.meta.url,
+  ),
+);
 const sources = {
   types: await Deno.readTextFile(
     new URL("../compiler/types.bend", import.meta.url),
@@ -17,6 +23,20 @@ const sources = {
 };
 const transform = (c = fixture, input = sources, version = "bend 2.0.27") =>
   optimizeNativeOwnedResolver(c, input, version);
+
+Deno.test("owned resolver accepts reviewed Bend 2.0.28 Version construction", async () => {
+  const output = await transform(bend28Fixture, sources, "bend 2.0.28");
+  match(output, /OwnedTypePlan owned_plan_scratch/);
+  const altered = bend28Fixture.replace(
+    "_substitutions_0 = term_keep(e, _substitutions_0);",
+    "_substitutions_0 = _substitutions_0;",
+  );
+  ok(altered !== bend28Fixture);
+  await rejects(
+    () => transform(altered, sources, "bend 2.0.28"),
+    /generated field shape changed: FID_TYPES_RESOLVE_WORK/,
+  );
+});
 
 function prekeepResolveCase(generated: string): string {
   const early = "    Term _v_0 = 0;\n    Term _v_1 = 0;";
@@ -71,8 +91,8 @@ Deno.test("owned resolver accepts exact pre-spin keeps and rejects an altered ow
 
 Deno.test("owned resolver rejects semantic and runtime-domain changes", async () => {
   await rejects(
-    () => transform(fixture, sources, "bend 2.0.28"),
-    /requires bend 2\.0\.27/,
+    () => transform(fixture, sources, "bend 2.0.29"),
+    /requires bend 2\.0\.27 or 2\.0\.28/,
   );
   for (
     const [part, before, after] of [

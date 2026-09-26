@@ -5,6 +5,7 @@ import { optimizeNativeCompilerKernels } from "./native_compiler_kernels.ts";
 import { optimizeNativeOwnedResolver } from "./native_owned_resolver.ts";
 import { optimizeNativeNatIndex } from "./native_nat_index.ts";
 import { optimizeNativeBorrowedStrings } from "./native_borrowed_strings.ts";
+import { normalizeBendJsAbi } from "./bend_js_abi.ts";
 
 const environment = { BEND_NO_TELEMETRY: "1" };
 const decoder = new TextDecoder();
@@ -184,10 +185,13 @@ process.stdout.write(result.source);`,
       loader.href,
       entry.href,
     ]);
+    const normalized = normalizeBendJsAbi(javascript, version);
     await Deno.writeTextFile(
       new URL(`${filename}.js`, output),
-      `// Generated from compiler/${module}.bend with ${version}. Do not edit.\n${javascript}`,
+      `// Generated from compiler/${module}.bend with ${version}. Do not edit.\n${normalized.source}`,
     );
-    console.log(`Built generated/compiler/${filename}.js`);
+    console.log(
+      `Built generated/compiler/${filename}.js (${normalized.constructors} constructors, ${normalized.matches} matches normalized)`,
+    );
   }),
 );

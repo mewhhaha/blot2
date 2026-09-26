@@ -19,7 +19,7 @@ import ./dependency.bend as D
 import ./core_compare.bend as Compare
 import ./entry_points.bend as Entries
 
-# Concrete dispatch resolution runs after the initial shape check and before
+# Concrete dispatch resolution runs after the initial source check and before
 # templating. A dispatch site whose operands (binary dispatch) are closed, or
 # whose receiver's nominal head is known (member and field access), once its
 # declaration group is inferred selects the same implementation or field
@@ -30,8 +30,8 @@ import ./entry_points.bend as Entries
 # the sites that consume it in the same round. A rewrite that refines an
 # interface is checked again, retaining every group whose declarations and
 # imported interfaces are unchanged, and sites the refined interfaces close are
-# resolved in the next round. Resolution never reports a diagnostic: any failure
-# returns None and the caller specializes the original module.
+# resolved in the next round. A failed transformed round returns to the
+# original source's checked Initial.
 
 # ---------------------------------------------------------------------------
 # Operator calls
@@ -843,12 +843,15 @@ def rewrite_round(+module: M.Module, initial: Scheduler.Initial, +entry: String,
 # ---------------------------------------------------------------------------
 
 type Resolved is Data:
-  Resolved{module: M.Module, initial: Scheduler.Initial}
+  Resolved{module: M.Module, initial: Scheduler.Initial, source_certificates: List<&2, Core.Certificate>}
+  Fallback{certificates: List<&2, Core.Certificate>}
+  OriginalFailure{diagnostic: M.Diagnostic}
+  NoResolution{}
 
 type RoundWork is Data:
-  CheckRound{module: M.Module, certificates: List<&2, Core.Certificate>, next: Nat, proofs: Maybe<&2, List<&2, Schema.Evidence>>, cache: Map<&2, Accessor>, budget: Nat}
-  CheckedRound{module: M.Module, checked: Result<&2, &2, M.Diagnostic, Scheduler.Initial>, next: Nat, proofs: Maybe<&2, List<&2, Schema.Evidence>>, cache: Map<&2, Accessor>, budget: Nat}
-  RewrittenRound{initial: Scheduler.Initial, rewrite: Rewrite, proofs: List<&2, Schema.Evidence>, budget: Nat}
+  CheckRound{module: M.Module, certificates: List<&2, Core.Certificate>, previous: Scheduler.Initial, next: Nat, proofs: Maybe<&2, List<&2, Schema.Evidence>>, cache: Map<&2, Accessor>, budget: Nat, source_certificates: List<&2, Core.Certificate>}
+  CheckedRound{module: M.Module, checked: Scheduler.InitialAttempt, next: Nat, proofs: Maybe<&2, List<&2, Schema.Evidence>>, cache: Map<&2, Accessor>, budget: Nat, source_certificates: List<&2, Core.Certificate>}
+  RewrittenRound{initial: Scheduler.Initial, rewrite: Rewrite, proofs: List<&2, Schema.Evidence>, budget: Nat, source_certificates: List<&2, Core.Certificate>}
 
 # Linked-schema evidence comes from the first round's source check; resolution
 # never rewrites the functions it certifies.
@@ -878,97 +881,176 @@ def extended_initial(initial: Scheduler.Initial, +certificates: List<&2, Core.Ce
 def round_budget() -> Nat:
   32n
 
-def rounds(fuel: Nat, work: RoundWork, +entry: String) -> Maybe<&2, Resolved>:
+def rounds(fuel: Nat, work: RoundWork, +entry: String) -> Resolved:
   match fuel work:
-    case 0n _:
-      None{}
-    case 1n+rest CheckRound{+module, certificates, next, proofs, cache, budget}:
-      rounds(rest, CheckedRound{module, Scheduler.check_module_resolving(module, certificates), next, proofs, cache, budget}, entry)
-    case 1n+rest CheckedRound{module, Fail{diagnostic}, next, proofs, cache, budget}:
-      None{}
-    case 1n+rest CheckedRound{module, Done{initial}, next, proofs, cache, 0n}:
-      Some{Resolved{module, initial}}
-    case 1n+rest CheckedRound{+module, Done{+initial}, next, proofs, cache, 1n+budget}:
+    case 0n CheckRound{module, certificates, previous, next, proofs, cache, budget, source_certificates}:
+      Fallback{source_certificates}
+    case 0n CheckedRound{module, checked, next, proofs, cache, budget, source_certificates}:
+      Fallback{source_certificates}
+    case 0n RewrittenRound{initial, rewrite, proofs, budget, source_certificates}:
+      Fallback{source_certificates}
+    case 1n+rest CheckRound{+module, certificates, previous, next, proofs, cache, budget, source_certificates}:
+      rounds(rest, CheckedRound{module, Scheduler.check_module_resolving_reusing(module, certificates, previous), next, proofs, cache, budget, source_certificates}, entry)
+    case 1n+rest CheckedRound{module, Scheduler.FailedInitial{diagnostic, certificates, inferred, retained}, next, proofs, cache, budget, source_certificates}:
+      Fallback{List.append(&2, Core.Certificate, source_certificates, certificates)}
+    case 1n+rest CheckedRound{module, Scheduler.CheckedInitial{initial, inferred, retained}, next, proofs, cache, 0n, source_certificates}:
+      Resolved{module, initial, source_certificates}
+    case 1n+rest CheckedRound{+module, Scheduler.CheckedInitial{+initial, inferred, retained}, next, proofs, cache, 1n+budget, source_certificates}:
       +evidence = captured_proofs(proofs, module, initial, entry)
-      rounds(rest, RewrittenRound{initial, rewrite_round(module, initial, entry, next, evidence, cache), evidence, budget}, entry)
-    case 1n+rest RewrittenRound{initial, Rewrite{module, certificates, next, cache, False{}, stable}, proofs, budget}:
-      Some{Resolved{module, initial}}
-    case 1n+rest RewrittenRound{initial, Rewrite{module, certificates, next, cache, True{}, True{}}, proofs, budget}:
-      Some{Resolved{module, extended_initial(initial, certificates)}}
-    case 1n+rest RewrittenRound{initial, Rewrite{module, certificates, next, cache, True{}, False{}}, proofs, budget}:
-      rounds(rest, CheckRound{module, List.append(&2, Core.Certificate, certificates, Scheduler.initial_certificates(initial)), next, Some{proofs}, cache, budget}, entry)
+      rounds(rest, RewrittenRound{initial, rewrite_round(module, initial, entry, next, evidence, cache), evidence, budget, source_certificates}, entry)
+    case 1n+rest RewrittenRound{initial, Rewrite{module, certificates, next, cache, False{}, stable}, proofs, budget, source_certificates}:
+      Resolved{module, initial, source_certificates}
+    case 1n+rest RewrittenRound{initial, Rewrite{module, certificates, next, cache, True{}, True{}}, proofs, budget, source_certificates}:
+      Resolved{module, extended_initial(initial, certificates), source_certificates}
+    case 1n+rest RewrittenRound{+initial, Rewrite{module, certificates, next, cache, True{}, False{}}, proofs, budget, source_certificates}:
+      rounds(rest, CheckRound{module, List.append(&2, Core.Certificate, certificates, Scheduler.initial_certificates(initial)), initial, next, Some{proofs}, cache, budget, source_certificates}, entry)
 
-# Dead-code elimination follows the first round's check, the initial check of
-# every declaration: later rounds, specialization and the final check see only
-# what the entry declarations reach.
-def pruned_round(pruned: Result<&2, &2, M.Diagnostic, Entries.Pruned>, next: Nat, +entry: String) -> Maybe<&2, Resolved>:
+# The source-first check has already covered every declaration. This second
+# pruning follows the transformed check, so inlining can make a forwarder dead
+# before resolution rounds and specialization.
+def pruned_round(pruned: Result<&2, &2, M.Diagnostic, Entries.Pruned>, next: Nat, +entry: String, source_certificates: List<&2, Core.Certificate>) -> Resolved:
   match pruned:
     case Fail{diagnostic}:
-      None{}
+      Fallback{source_certificates}
     case Done{Entries.Pruned{module, initial}}:
-      rounds(Nat.mul(3n, 2n+round_budget()), CheckedRound{module, Done{initial}, next, None{}, Map.new(&2, Accessor), round_budget()}, entry)
-
-def first_round(checked: Result<&2, &2, M.Diagnostic, Scheduler.Initial>, +module: M.Module, next: Nat, +entry: String) -> Maybe<&2, Resolved>:
-  match checked:
-    case Fail{diagnostic}:
-      None{}
-    case Done{initial}:
-      pruned_round(Entries.prune_initial(module, initial, entry), next, entry)
-
-def resolve_scanned(scan: DispatchScan, limit: Result<&2, &2, M.Diagnostic, Nat>, +module: M.Module, entry: String) -> Maybe<&2, Resolved>:
-  match scan limit:
-    case DispatchScan{0n, seen, unique} _:
-      None{}
-    case DispatchScan{count, seen, False{}} _:
-      None{}
-    case DispatchScan{count, seen, True{}} Done{next}:
-      first_round(Scheduler.check_module_resolving(module, Nil{}), module, next, entry)
-    case _ Fail{diagnostic}:
-      None{}
+      rounds(Nat.mul(3n, 2n+round_budget()), CheckedRound{module, Scheduler.CheckedInitial{initial, 0n, 0n}, next, None{}, Map.new(&2, Accessor), round_budget(), source_certificates}, entry)
 
 def module_identity_limit(module: M.Module) -> Result<&2, &2, M.Diagnostic, Nat>:
   M.Module{constants, functions, types, operations} = module
   Mono.identity_limit(1048576n, Mono.module_expressions(functions, constants), 0n)
 
-def resolve(module: M.Module, entry: String) -> Maybe<&2, Resolved>:
-  +inlined = inline_module(module)
-  resolve_scanned(scan_module(inlined), module_identity_limit(inlined), inlined, entry)
+# The full original module has already passed its source check. An abandoned
+# transformation can use that exact pruned Initial; it never needs a second
+# source check merely to recover the original diagnostic or checked groups.
+def source_fallback(found: Resolved, +module: M.Module, +initial: Scheduler.Initial, source_certificates: List<&2, Core.Certificate>) -> Resolved:
+  match found:
+    case Fallback{certificates}:
+      Resolved{module, initial, source_certificates}
+    case other:
+      other
+
+def transformed_round(checked: Scheduler.InitialAttempt, +module: M.Module, next: Nat, +entry: String, +source_certificates: List<&2, Core.Certificate>) -> Resolved:
+  match checked:
+    case Scheduler.FailedInitial{diagnostic, certificates, inferred, retained}:
+      Fallback{List.append(&2, Core.Certificate, source_certificates, certificates)}
+    case Scheduler.CheckedInitial{initial, inferred, retained}:
+      # Inlining can remove a forwarder reference, making another declaration
+      # dead. Prune again using the transformed check before the first round.
+      pruned_round(Entries.prune_initial(module, initial, entry), next, entry, source_certificates)
+
+def resolved_changed(same: Bool, +module: M.Module, +inlined: M.Module, +initial: Scheduler.Initial, next: Nat, +entry: String, +source_certificates: List<&2, Core.Certificate>) -> Resolved:
+  match same:
+    case True{}:
+      rounds(Nat.mul(3n, 2n+round_budget()), CheckedRound{module, Scheduler.CheckedInitial{initial, 0n, 0n}, next, None{}, Map.new(&2, Accessor), round_budget(), source_certificates}, entry)
+    case False{}:
+      # A deferred source group must carry its GroupNeeds into the first
+      # selection. Deferred reuse requires the exact paired resolving witness.
+      transformed_round(Scheduler.check_module_resolving_reusing(inlined, Scheduler.initial_certificates(initial), initial), inlined, next, entry, source_certificates)
+
+def resolve_limited(limit: Result<&2, &2, M.Diagnostic, Nat>, +module: M.Module, +inlined: M.Module, +initial: Scheduler.Initial, +entry: String, +source_certificates: List<&2, Core.Certificate>) -> Resolved:
+  match limit:
+    case Fail{diagnostic}:
+      Resolved{module, initial, source_certificates}
+    case Done{next}:
+      source_fallback(resolved_changed(Compare.same_module(module, inlined), module, inlined, initial, next, entry, source_certificates), module, initial, source_certificates)
+
+def resolve_scanned(scan: DispatchScan, +module: M.Module, +inlined: M.Module, +initial: Scheduler.Initial, +original: M.Module, +entry: String, +source_certificates: List<&2, Core.Certificate>) -> Resolved:
+  match scan:
+    case DispatchScan{0n, seen, unique}:
+      Resolved{module, initial, source_certificates}
+    case DispatchScan{count, seen, False{}}:
+      Resolved{module, initial, source_certificates}
+    case DispatchScan{count, seen, True{}}:
+      # Original source offsets establish the same generated-name high-water
+      # mark as the old full-module inlining path, including unused bodies.
+      resolve_limited(module_identity_limit(original), module, inlined, initial, entry, source_certificates)
+
+def source_pruned(pruned: Result<&2, &2, M.Diagnostic, Entries.Pruned>, +original: M.Module, +entry: String, source_certificates: List<&2, Core.Certificate>) -> Resolved:
+  match pruned:
+    case Fail{diagnostic}:
+      OriginalFailure{diagnostic}
+    case Done{Entries.Pruned{+module, initial}}:
+      +inlined = inline_module(module)
+      resolve_scanned(scan_module(inlined), module, inlined, initial, original, entry, source_certificates)
+
+def source_checked(checked: Scheduler.InitialAttempt, +module: M.Module, +entry: String) -> Resolved:
+  match checked:
+    case Scheduler.FailedInitial{diagnostic, certificates, inferred, retained}:
+      OriginalFailure{diagnostic}
+    case Scheduler.CheckedInitial{+initial, inferred, retained}:
+      source_pruned(Entries.prune_initial(module, initial, entry), module, entry, Scheduler.initial_certificates(initial))
+
+def resolve(+module: M.Module, entry: String, certificates: List<&2, Core.Certificate>) -> Resolved:
+  source_checked(Scheduler.check_module_resolving_attempt(module, certificates), module, entry)
 
 # ---------------------------------------------------------------------------
 # Entry points
 # ---------------------------------------------------------------------------
 
-def prepare_resolved(found: Maybe<&2, Resolved>, module: M.Module, entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, M.Module>:
+def original_initial(module: M.Module, certificates: List<&2, Core.Certificate>) -> Result<&2, &2, M.Diagnostic, Scheduler.Initial>:
+  Scheduler.check_module_resolving(module, certificates)
+
+def fallback_pruned(+module: M.Module, entry: String, certificates: List<&2, Core.Certificate>) -> Result<&2, &2, M.Diagnostic, Entries.Pruned>:
+  do Result<&2, &2, M.Diagnostic, Entries.Pruned>:
+    initial : Scheduler.Initial <- original_initial(module, certificates)
+    Entries.prune_initial(module, initial, entry)
+
+def prepare_resolved(found: Resolved, module: M.Module, +entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, M.Module>:
   match found:
-    case None{}:
+    case NoResolution{}:
       Mono.prepare(module, entry, family_templates)
-    case Some{Resolved{resolved, initial}}:
+    case OriginalFailure{diagnostic}:
+      Fail{diagnostic}
+    case Fallback{certificates}:
+      do Result<&2, &2, M.Diagnostic, M.Module>:
+        +pruned : Entries.Pruned <- fallback_pruned(module, entry, certificates)
+        Mono.prepare_checked(Entries.pruned_module(pruned), entry, family_templates, Scheduler.initial_checked(Entries.pruned_initial(pruned)))
+    case Resolved{resolved, initial, source_certificates}:
       Mono.prepare_checked(resolved, entry, family_templates, Scheduler.initial_checked(initial))
 
 def prepare(+module: M.Module, +entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, M.Module>:
-  prepare_resolved(resolve(module, entry), module, entry, family_templates)
+  prepare_resolved(resolve(module, entry, Nil{}), module, entry, family_templates)
 
-def prepare_deferred_resolved(found: Maybe<&2, Resolved>, module: M.Module, entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
+def prepare_deferred_resolved(found: Resolved, module: M.Module, +entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
   match found:
-    case None{}:
+    case NoResolution{}:
       Mono.prepare_deferred_core(module, entry, family_templates)
-    case Some{Resolved{resolved, initial}}:
+    case OriginalFailure{diagnostic}:
+      Fail{diagnostic}
+    case Fallback{certificates}:
+      do Result<&2, &2, M.Diagnostic, Core.Prepared>:
+        +pruned : Entries.Pruned <- fallback_pruned(module, entry, certificates)
+        Mono.prepare_deferred_initial(Entries.pruned_module(pruned), entry, family_templates, Entries.pruned_initial(pruned))
+    case Resolved{resolved, initial, source_certificates}:
       Mono.prepare_deferred_initial(resolved, entry, family_templates, initial)
 
 def prepare_deferred_core(+module: M.Module, +entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
-  prepare_deferred_resolved(resolve(module, entry), module, entry, family_templates)
+  prepare_deferred_resolved(resolve(module, entry, Nil{}), module, entry, family_templates)
 
 def prepare_deferred(module: M.Module, entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, M.Module>:
   do Result<&2, &2, M.Diagnostic, M.Module>:
     prepared : Core.Prepared <- prepare_deferred_core(module, entry, family_templates)
     return Core.prepared_module(prepared)
 
-def prepare_cached_resolved(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, found: Maybe<&2, Resolved>, module: M.Module, entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Mono.Cache>, retain: Bool) -> Result<&2, &2, M.Diagnostic, Mono.Prepared>:
-  match found:
-    case None{}:
-      Mono.prepare_cached_evidenced(~key, module, entry, family_templates, previous, retain)
-    case Some{Resolved{resolved, initial}}:
-      Mono.prepare_cached_initial(~key, resolved, entry, family_templates, previous, initial)
+def cached_source(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, +entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Mono.Cache>, certificates: List<&2, Core.Certificate>) -> Result<&2, &2, M.Diagnostic, Mono.Prepared>:
+  do Result<&2, &2, M.Diagnostic, Mono.Prepared>:
+    +initial : Scheduler.Initial <- original_initial(module, certificates)
+    +pruned : Entries.Pruned <- Entries.prune_initial(module, initial, entry)
+    prepared : Mono.Prepared <- Mono.prepare_cached_initial(~key, Entries.pruned_module(pruned), entry, family_templates, previous, Entries.pruned_initial(pruned))
+    return Mono.with_source_certificates(prepared, Scheduler.initial_certificates(initial))
 
-def prepare_cached_evidenced(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, +entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Mono.Cache>, retain: Bool) -> Result<&2, &2, M.Diagnostic, Mono.Prepared>:
-  prepare_cached_resolved(~key, resolve(module, entry), module, entry, family_templates, previous, retain)
+def prepare_cached_resolved(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, found: Resolved, module: M.Module, entry: String, family_templates: List<&2, M.Operation>, previous: Maybe<&2, Mono.Cache>) -> Result<&2, &2, M.Diagnostic, Mono.Prepared>:
+  match found:
+    case NoResolution{}:
+      Mono.prepare_cached_evidenced(~key, module, entry, family_templates, previous)
+    case OriginalFailure{diagnostic}:
+      Fail{diagnostic}
+    case Fallback{certificates}:
+      cached_source(~key, module, entry, family_templates, previous, certificates)
+    case Resolved{resolved, initial, source_certificates}:
+      do Result<&2, &2, M.Diagnostic, Mono.Prepared>:
+        prepared : Mono.Prepared <- Mono.prepare_cached_initial(~key, resolved, entry, family_templates, previous, initial)
+        return Mono.with_source_certificates(prepared, source_certificates)
+
+def prepare_cached_evidenced(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, +module: M.Module, +entry: String, family_templates: List<&2, M.Operation>, +previous: Maybe<&2, Mono.Cache>) -> Result<&2, &2, M.Diagnostic, Mono.Prepared>:
+  prepare_cached_resolved(~key, resolve(module, entry, Mono.source_certificates(previous)), module, entry, family_templates, previous)

@@ -1,8 +1,8 @@
 # Native compiler kernels
 
-`../native_compiler_kernels.ts` applies three Bend 2.0.27 native CPU kernels
-after the guarded String comparison transform. The generated Bend code remains
-the fallback. JS emission is unchanged.
+`../native_compiler_kernels.ts` applies three Bend 2.0.27/2.0.28 native CPU
+kernels after the guarded String comparison transform. The generated Bend code
+remains the fallback. JS emission is unchanged.
 
 - `index.c.inc` consumes each owned Patricia node with `ctr_take`, drops the
   unselected branch, and borrows only a String suffix while its owned root is
@@ -33,6 +33,17 @@ the fallback. JS emission is unchanged.
   five affected generated entries and continuations, their U32 helpers, and the
   native term and atomic read layout. It stops the build if any reviewed
   contract changes.
+
+The transformers accept only reviewed Bend 2.0.27 and 2.0.28 emissions. Their
+separate `scripts/fixtures/*_2_0_28.c` inputs use the reviewed raw 2.0.28 cases
+under `build/perf-overhaul/native-guard-review-bend28-01`. The kernel and
+resolver fixtures are extracted candidates; the String, NatIndex, and borrowed
+String fixtures place raw cases in the existing minimal fixture shells. The
+earlier 2.0.27 fixtures remain unchanged. The borrowed String transform compares
+the 2.0.28 generated cases with the same exact normalized shape contract as the
+2.0.27 reference, and checks the installed 2.0.28 Base Map, String, and Char
+sections against their pinned semantic digests. No version-only acceptance
+bypasses a source, runtime, ownership, or generated-shape check.
 
 The transformer pins the Bend version, relevant source definitions, all 16 Ty
 constructors, runtime ownership helpers and cancellation macros, the complete

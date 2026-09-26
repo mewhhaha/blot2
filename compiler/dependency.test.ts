@@ -64,6 +64,15 @@ Deno.test("empty dependency graph has no inference components", () => {
   equal(components([], false), []);
 });
 
+Deno.test("singleton SCCs retain self and unknown references without changing component order", () => {
+  equal(components([[]], false), [["node_0"]]);
+  equal(components([[0]], false), [["node_0"]]);
+  equal(components([[0]], true), [["node_0"]]);
+  equal(components([[], []], true), [["node_1"], ["node_0"]]);
+  equal(components([[1], []], true), [["node_1"], ["node_0"]]);
+  equal(components([[1], [0]], true), [["node_1", "node_0"]]);
+});
+
 type ReferenceExpr =
   | { $: "FunctionExpr" | "ConstantExpr"; name: string }
   | { $: "ApplyExpr"; callee: ReferenceExpr; argument: ReferenceExpr }
@@ -184,4 +193,47 @@ Deno.test("SCCs agree with transitive closure and order dependencies before user
       }
     }
   }
+});
+
+Deno.test("dependency components preserve source DFS order with long names and duplicate edges", () => {
+  const names = ["leaf", "left", "right", "cycleA", "cycleB", "entry"].map(
+    (name) => `$module[packages/long/shared/prefix].${name}`,
+  );
+  const edges = [[], [0, 0], [0, 1], [4, 2], [3, 0], [1, 3, 2]];
+  const nodes: Node[] = edges.map((references, index) => ({
+    $: "Node",
+    name: names[index],
+    references: list([
+      "unknown_before",
+      ...references.map((target) => names[target]),
+      "unknown_after",
+    ]),
+    lambdas: list([]),
+  }));
+  const result = dependency["dependency.components"](list(nodes));
+  ok(result.$ === "Done");
+  equal(array(result.value).map(array), [
+    [names[0]],
+    [names[1]],
+    [names[2]],
+    [names[3], names[4]],
+    [names[5]],
+  ]);
+});
+
+Deno.test("dependency components preserve last-declaration adjacency for duplicate names", () => {
+  const node = (name: string, references: string[]): Node => ({
+    $: "Node",
+    name,
+    references: list(references),
+    lambdas: list([]),
+  });
+  const result = dependency["dependency.components"](list([
+    node("same", ["leaf"]),
+    node("leaf", []),
+    node("same", ["same", "missing"]),
+    node("entry", ["same", "leaf"]),
+  ]));
+  ok(result.$ === "Done");
+  equal(array(result.value).map(array), [["leaf"], ["same"], ["entry"]]);
 });

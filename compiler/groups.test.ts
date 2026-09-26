@@ -938,6 +938,7 @@ interface NominalSummary {
 function plannedSummaries(
   declarations: readonly DeclarationSummary[],
   nominals: readonly NominalSummary[],
+  shared: readonly TypeId[] = [],
 ) {
   return array(unwrap(groups["groups.finish_plan"]({
     $: "Planning",
@@ -957,7 +958,7 @@ function plannedSummaries(
       identity,
       references: list(references),
     }))),
-    shared_operation_types: list([]),
+    shared_operation_types: list(shared),
   })));
 }
 
@@ -1160,6 +1161,31 @@ Deno.test("shared recursive nominal closures stay exact across independent jobs"
     )),
     new Set(["store"]),
   );
+});
+
+Deno.test("shared nominal catalog merges ordered SCC additions without duplicate identities", () => {
+  const identities: TypeId[] = ["A", "B", "C", "D"].map((declaration) => ({
+    $: "TypeId",
+    module_name: "merge",
+    declaration,
+  }));
+  const jobs = plannedSummaries(
+    [
+      { name: "specific", references: [], nominals: [identities[1]] },
+      { name: "common_only", references: [], nominals: [] },
+    ],
+    [
+      { identity: identities[1], references: [identities[2], identities[3]] },
+      { identity: identities[3], references: [] },
+    ],
+    [identities[2], identities[0]],
+  );
+  const required = (name: string) =>
+    array(
+      jobs.find((job) => array(job.members).includes(name))!.type_dependencies,
+    ).map((identity) => identity.declaration);
+  equal(required("common_only"), ["A", "C"]);
+  equal(required("specific"), ["A", "B", "C", "D"]);
 });
 
 Deno.test("grouped checking includes mutually recursive payload catalogs", () => {

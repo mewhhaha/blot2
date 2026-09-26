@@ -61,7 +61,13 @@ entry const answer = 7
     );
     const changed = await session.compile(changedSource);
     equivalent(changed.artifact, await clean.compile(changedSource));
-    ok(changed.stats.groups_checked > 0);
+    // The changed operation catalog invalidates source certificates. Fresh
+    // source evidence then retains this unchanged body in the final check.
+    equal(changed.stats.groups_checked, 0);
+    equal(
+      changed.stats.groups_reused,
+      first.stats.groups_checked + first.stats.groups_reused,
+    );
     const recovered = await session.compile(source);
     equivalent(recovered.artifact, await clean.compile(source));
   },
@@ -359,7 +365,7 @@ entry const answer = fn () => classify True
 );
 
 sessionTest(
-  "native session leaf edits recheck one group and regenerate one code entry",
+  "native session leaf edits retain source evidence and regenerate one code entry",
   async (session, clean) => {
     const source =
       "entry const increment = fn value => @u32.add value 1\nentry const answer = fn () => increment 40\n";
@@ -369,8 +375,8 @@ sessionTest(
     equivalent(next.artifact, await clean.compile(revision));
     equal(next.stats.declarations_lowered, 1);
     equal(next.stats.declarations_reused, 1);
-    equal(next.stats.groups_checked, 1);
-    equal(next.stats.groups_reused, 1);
+    equal(next.stats.groups_checked, 0);
+    equal(next.stats.groups_reused, 2);
     equal(next.stats.entries_compiled, 1);
     equal(next.stats.entries_reused, first.stats.entries_compiled - 1);
     equal(await answer(first.artifact), 41);
@@ -468,6 +474,97 @@ sessionTest(
     equal(recovered.stats.declarations_lowered, 0);
     equal(recovered.stats.groups_checked, 0);
     equal(recovered.stats.entries_compiled, 0);
+  },
+);
+
+sessionTest(
+  "warm dispatch failures preserve source errors and roll back to the last success",
+  async (session, clean) => {
+    const source = `type Box is data = Box { value: U32 }
+entry const stable = fn () -> U32 => 1
+const get = fn (box: Box) => box.value
+entry const answer = fn () -> U32 => @u32.add (get (Box { value: 41 })) (stable ())
+`;
+    const first = await session.compile(source);
+    equivalent(first.artifact, await clean.compile(source));
+    const invalid = source.replace(
+      "stable = fn () -> U32 => 1",
+      "stable = fn () -> U32 => True",
+    );
+    for (
+      const revision of [
+        invalid,
+        invalid + "const later = fn () -> U32 => True\n",
+        "// offset shift\n" + invalid,
+      ]
+    ) {
+      const warmError = await session.compile(revision).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      const cleanError = await clean.compile(revision).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      ok(warmError instanceof SourceError);
+      ok(cleanError instanceof SourceError);
+      equal(
+        [warmError.code, warmError.message, warmError.start],
+        [cleanError.code, cleanError.message, cleanError.start],
+      );
+      equal(warmError.code, "type_mismatch");
+    }
+    const corrected = source.replace("value: 41", "value: 42");
+    const recovered = await session.compile(corrected);
+    equivalent(recovered.artifact, await clean.compile(corrected));
+    equal(recovered.stats.result_reused, false);
+    const restored = await session.compile(source);
+    equivalent(restored.artifact, first.artifact);
+    equal(restored.stats.result_reused, false);
+  },
+);
+
+sessionTest(
+  "no-dispatch success retains source evidence across failing edits and a new dispatch",
+  async (session, clean) => {
+    const source = `type Box is data = Box { value: U32 }
+entry const stable = fn () -> U32 => 1
+entry const independent = fn () -> U32 => 2
+entry const answer = fn () -> U32 => stable ()
+`;
+    const first = await session.compile(source);
+    equivalent(first.artifact, await clean.compile(source));
+    const noDispatchError = source.replace(
+      "stable = fn () -> U32 => 1",
+      "stable = fn () -> U32 => True",
+    );
+    const dispatchError = source.replace(
+      "entry const answer = fn () -> U32 => stable ()",
+      "entry const answer = fn () -> U32 => (Box { value: 41 }).missing",
+    );
+    for (const revision of [noDispatchError, dispatchError]) {
+      const warmError = await session.compile(revision).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      const cleanError = await clean.compile(revision).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      ok(warmError instanceof SourceError);
+      ok(cleanError instanceof SourceError);
+      equal(
+        [warmError.code, warmError.message, warmError.start],
+        [cleanError.code, cleanError.message, cleanError.start],
+      );
+    }
+    const corrected = source.replace(
+      "independent = fn () -> U32 => 2",
+      "independent = fn () -> U32 => 3",
+    );
+    const recovered = await session.compile(corrected);
+    equivalent(recovered.artifact, await clean.compile(corrected));
+    equal(recovered.stats.result_reused, false);
   },
 );
 

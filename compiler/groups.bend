@@ -825,12 +825,28 @@ def close_nominals(identities: List<&2, M.TypeId>, +summaries: Map<&2, TypeSet()
 
 # SCC interfaces include all nominal types reachable through their dependencies.
 # The dependency-first order shares those closures instead of rescanning bodies.
+# Both inputs are sorted by type_identity_le and contain unique identities.
+# Keep the existing common catalog and sort only this SCC's extra identities.
+def merge_required(+common: List<&2, M.TypeId>, +specific: List<&2, M.TypeId>) -> List<&2, M.TypeId>:
+  match common specific:
+    case Nil{} other:
+      other
+    case other Nil{}:
+      other
+    case +left <> left_rest +right <> right_rest:
+      +xs = {left <> left_rest : List<&2, M.TypeId>}
+      +ys = {right <> right_rest : List<&2, M.TypeId>}
+      List.merge.go(~M.TypeId, ~type_identity_le, Nat.add(List.length(&2, M.TypeId, xs), List.length(&2, M.TypeId, ys)), (Nil{}, xs, ys))
+
 def required_for_summary(summary: TypeSet(), +shared: TypeSet(), common: List<&2, M.TypeId>) -> List<&2, M.TypeId>:
-  match summary:
-    case MTip{}:
+  match summary shared:
+    case MTip{} _:
       common
-    case other:
-      List.sort(~M.TypeId, ~type_identity_le, Map.values(&2, M.TypeId, Map.union(&2, M.TypeId, shared, other)))
+    case other MTip{}:
+      List.sort(~M.TypeId, ~type_identity_le, Map.values(&2, M.TypeId, other))
+    case other available:
+      +specific = type_set_excluding(Map.values(&2, M.TypeId, other), available, Map.new(&2, M.TypeId))
+      merge_required(common, List.sort(~M.TypeId, ~type_identity_le, Map.values(&2, M.TypeId, specific)))
 
 def make_jobs(components: List<&2, List<&2, String>>, +edges: Map<&2, List<&2, String>>, +known: Set(), +seeds: Map<&2, TypeSet()>, +nominals: Map<&2, TypeSet()>, +shared: TypeSet(), +common: List<&2, M.TypeId>, +summaries: Map<&2, TypeSet()>) -> List<&2, Job>:
   match components:

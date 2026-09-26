@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 /**
- * Guarded native-only Bend 2.0.27 kernels. The Bend definitions remain the
+ * Guarded native-only Bend 2.0.27/2.0.28 kernels. The Bend definitions remain the
  * semantic implementation and the fallback on every unsupported input.
  * This transform runs after native_string_compare.ts, whose selected String
  * comparator is called by the path-consuming Index kernel.
@@ -175,9 +175,9 @@ function section(
 }
 
 function verifySources(sources: NativeKernelSources, version: string): void {
-  if (version.trim() !== "bend 2.0.27") {
+  if (version.trim() !== "bend 2.0.27" && version.trim() !== "bend 2.0.28") {
     throw new Error(
-      `Native compiler kernels require bend 2.0.27; got ${version.trim()}`,
+      `Native compiler kernels require bend 2.0.27 or 2.0.28; got ${version.trim()}`,
     );
   }
   for (const [label, file, start, end, expected] of SOURCE_CONTRACTS) {
