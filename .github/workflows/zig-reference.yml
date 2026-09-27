@@ -1,0 +1,63 @@
+name: Zig reference compiler
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/zig-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BEND_NO_TELEMETRY: '1'
+      DENO_DIR: ${{ runner.temp }}/deno-cache
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.5.2
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.22'
+      - name: Install the reference Bend release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bend-release"
+          cd "$RUNNER_TEMP/bend-release"
+          curl --fail --location --retry 3 --output bend.tar.gz https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz
+          echo '5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  bend.tar.gz' | sha256sum --check
+          tar -xzf bend.tar.gz
+          binary=$(find "$PWD" -type f -name bend -perm -u+x | head -n 1)
+          test -n "$binary"
+          dirname "$binary" >> "$GITHUB_PATH"
+      - name: Check the release and source proofs; build unchanged reference outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          bend version
+          bend guide > "$RUNNER_TEMP/bend-guide.txt"
+          deno task build:compiler:all
+          deno cache compiler/native.ts compiler/source.ts compiler/native_incremental.ts compiler/native_project.ts
+      - name: Package reference outputs and offline tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/reference-artifact"
+          tar -czf "$RUNNER_TEMP/reference-artifact/generated.tar.gz" generated/compiler
+          cp "$RUNNER_TEMP/bend-guide.txt" "$RUNNER_TEMP/reference-artifact/"
+          cp "$(command -v deno)" "$RUNNER_TEMP/reference-artifact/deno"
+          tar -czf "$RUNNER_TEMP/reference-artifact/deno-cache.tar.gz" -C "$DENO_DIR" .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zig-reference
+          path: ${{ runner.temp }}/reference-artifact/*
+          retention-days: 1
+          if-no-files-found: error
