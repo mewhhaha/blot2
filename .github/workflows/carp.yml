@@ -112,9 +112,6 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
       - name: Install verified Bend reference release
         run: |
           curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
@@ -130,18 +127,27 @@ jobs:
         run: |
           mkdir -p generated/carp-reference
           cp "$(command -v deno)" generated/carp-reference/deno
-          cp "$(command -v bun)" generated/carp-reference/bun
           cp "$RUNNER_TEMP/bend.tar.gz" generated/carp-reference/
       - uses: actions/upload-artifact@v4
         with:
           name: reference-toolchains
           path: generated/carp-reference/
           retention-days: 7
-      - name: Build proofs and unchanged JS reference
+      - uses: actions/cache@v4
+        id: reference-cache
+        with:
+          path: generated/compiler
+          key: bend232-direct-js-v1-${{ hashFiles('compiler/*.bend', 'compiler/*.c', 'compiler/*.h', 'LAWS.bend', 'PROOF.bend') }}
+      - name: Check original proofs
+        run: bend PROOF.bend
+      - name: Build unchanged JS reference
+        if: steps.reference-cache.outputs.cache-hit != 'true'
         timeout-minutes: 15
         run: |
           bend version
-          deno task build:compiler:js
+          bash compiler/carp/build_reference.sh
+      - name: Package JS reference and parser dependencies
+        run: |
           deno cache compiler/source.ts compiler/native.ts
           tar -czf generated/carp-reference/reference-js.tar.gz generated/compiler .deno-cache
       - uses: actions/upload-artifact@v4
@@ -180,7 +186,15 @@ jobs:
           BEND=$(find "$RUNNER_TEMP/bend-toolchain" -type f -name bend -perm -u+x -print -quit)
           test -n "$BEND"
           echo "$(dirname "$BEND")" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        id: native-reference-cache
+        with:
+          path: |
+            generated/compiler/blotc
+            generated/compiler/native-backend-regression
+          key: bend232-native-O0-v1-${{ hashFiles('compiler/*.bend', 'compiler/*.c', 'compiler/*.h', 'LAWS.bend', 'PROOF.bend') }}
       - name: Build unchanged native reference at development optimization
+        if: steps.native-reference-cache.outputs.cache-hit != 'true'
         timeout-minutes: 20
         run: |
           bend version
