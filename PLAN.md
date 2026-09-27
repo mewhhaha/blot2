@@ -1,23 +1,39 @@
 # Compile speed: numeric identities, reuse, and generic sharing
 
-Updated 2026-09-27 after the user's request to prioritize string inefficiencies
-while retaining fast iteration and the broader compiler work. This is the active
-execution plan. The previous sequence is preserved in
+Updated 2026-09-28 after the user's request to improve memory traversal and
+concurrency while retaining fast iteration and the broader compiler work. This
+is the active execution plan. The previous sequence is preserved in
 `build/perf-overhaul/PLAN.original.md`; the intended language and compiler
 semantics remain in [CONSTRAINTS.md](compiler/CONSTRAINTS.md).
 
 ## Next result
 
-Native regression triage now has two measured Bend-source improvements:
-replacing string-index branch closures with a direct tail loop reduced
-matching-version gdev cold compilation from 126.9 to 85.4 seconds (three
-alternating pairs), with identical Wasm and a similar body-edit improvement.
-Retaining owning string roots during name comparison then reduced a fresh
-lookup-only control from 88.2 to 78.8 seconds (another three pairs), with body
-edits at 86.2 to 75.9 seconds and identical Wasm. Both source changes and their
-verified artifacts are installed. See compiler/COMPILE_SPEED_RESULTS.md.
-Compilation remains expensive; continue measuring the remaining serial work
-before expanding a redesign. Generated output remains unchanged.
+Native regression triage now has three measured Bend-source batches: replacing
+string-index branch closures with a direct tail loop reduced matching-version
+gdev cold compilation from 126.9 to 85.4 seconds (three alternating pairs), with
+identical Wasm and a similar body-edit improvement. Retaining owning string
+roots during name comparison then reduced a fresh lookup-only control from 88.2
+to 78.8 seconds (another three pairs), with body edits at 86.2 to 75.9 seconds
+and identical Wasm. Direct numeric-index traversal and a zero-distance
+string-suffix fast path then reduced a fresh control from 75.8 to 62.3 seconds
+(three pairs), with body edits at 70.9 to 65.0 seconds. Peak native memory
+remains about 279 MiB. All accepted source changes and their verified artifacts
+are installed. See compiler/COMPILE_SPEED_RESULTS.md. Generated output remains
+unchanged.
+
+Two further ideas are parked. Retaining numeric-list roots did not produce
+borrowed traversal in the full native compiler. Preserving workers for nested
+checking improved a small reproducer but made gdev slower: 63.6 to 70.3 seconds
+in the initial screen, with higher CPU time. Do not adopt either without a new
+source change and a favorable measured comparison.
+
+The next bounded investigation is shared-constant preparation. A separate trace
+of the installed candidate spends about 23 seconds in initial checking and
+dispatch, then about 31 seconds between shared-constant preparation and the next
+specialization phase. Profile its repeated traversals and catalog preparation
+before widening parallelism: each accepted constant changes the module, inferred
+shapes, and identity counter needed by later constants. Preserve dependency
+order, exact diagnostics, and deterministic identities.
 
 The first two Blot-side identity catalog experiments are complete and parked.
 Both pass targeted correctness and game behavior checks, but neither improves

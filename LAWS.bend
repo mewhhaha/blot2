@@ -902,6 +902,10 @@ law state_membership_work_stops_after_hit:
   for identity: M.TypeId
   {StateSpecialize.contains_work(rest, identity, True{}) == True{} : Bool}
 
+law zero_distance_index_advance_preserves_suffix:
+  for +suffix: String
+  {Index.advance_suffix(0n, suffix) == suffix : String}
+
 law variable_membership_work_stops_after_hit:
   for rest: List<&2, Nat>
   for variable: Nat

@@ -190,10 +190,15 @@ Read-only string indexes select a child as data and carry the key and its
 remaining suffix through one Bend tail loop. This avoids allocating branch
 closures and keeps native and JavaScript lookup on the same implementation. Name
 equality retains its owning string roots while separate cursors traverse their
-characters, enabling borrowed reads in the full native compiler. The
-[native gdev measurements](COMPILE_SPEED_RESULTS.md) record cold compilation
-falling from 126.9 to 78.8 seconds across these two Bend 2.0.32 experiments,
-with identical Wasm.
+characters, enabling borrowed reads in the full native compiler. Numeric
+Patricia lookup also uses one tail loop while preserving prefix checks, and
+string suffixes are left untouched when the next branch inspects another bit of
+the same character. The [native gdev measurements](COMPILE_SPEED_RESULTS.md)
+record cold compilation falling from 126.9 to 62.3 seconds across three Bend
+2.0.32 experiments, with identical Wasm. The latest batch improves its own
+control from 75.8 to 62.3 seconds; peak native memory remains about 279 MiB. A
+scheduler experiment that exposed more inner parallelism was parked after
+slowing the actual game.
 
 Type and row substitutions use persistent indexes instead of scanning the entire
 substitution history on every lookup. Each index retains replacement order,
@@ -400,21 +405,20 @@ Incremental rows include `base_revision_ms` and `base_cache` for the preceding
 revision; the first warmup row records the first session compile separately from
 warm body-edit latency.
 
-For separate phase diagnostics:
+For separate phase diagnostics, attach GDB to the native process reported by
+`NativeProcess.pid` and sample stacks or set breakpoints on named Bend wrappers:
 
 ```sh
-BEND_NO_TELEMETRY=1 bend compiler/native_main.bend -o build/cpu-phases.c
-deno run --allow-read --allow-write compiler/cpu_scaling_trace.ts build/cpu-phases.c build/cpu-phases-trace.c build/phase-events
-clang -std=c11 -O3 build/cpu-phases-trace.c -lpthread -lm -o build/cpu-phases-trace
-deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-phases.json . 3 1,8 balanced_64,clustered_64 full build/cpu-phases-trace
+gdb --quiet generated/compiler/blotc -p <native-pid>
 ```
 
-The injector requires unique named phase boundaries and fails on changed
-generated structure. The trace executable is the seventh argument to the
-benchmark driver; never use instrumented timings as the production headline
-benchmark. Logs are flushed before the response payload is written, so immediate
-host disposal cannot lose the last trace. The final `send` interval measures
-frame preparation and header writing, not payload writing or log-file IO.
+For example, `thread apply all bt 16` shows active worker stacks, and
+`break WL_FID_MONOMORPH_SHARE_CONSTANTS` stops at shared-constant preparation.
+Disable a breakpoint after its first hit when recording first phase entries. Use
+the original executable and generated output unchanged. Debugger pauses and
+stack samples belong in separate diagnostic runs; keep them out of latency
+comparisons. Saved gdev diagnostics and their limitations are described in
+[COMPILE_SPEED_RESULTS.md](COMPILE_SPEED_RESULTS.md).
 
 Changed source undergoes a conservative declaration-boundary scan. After the
 first edit warms the fragment cache, unchanged raw fragments reuse validated

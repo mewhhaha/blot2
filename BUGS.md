@@ -42,6 +42,41 @@ of incorrect results. See the
 [game measurements](compiler/COMPILE_SPEED_RESULTS.md). No upstream report has
 been filed.
 
+**Numeric-list follow-up, 2.0.32:** Retaining a `List<Nat>` root alongside the
+membership cursor did not produce the same improvement. In the full compiler,
+the unchanged generated loop still calls `ctr_take` per list cell and adds a
+root keep/release around the scan. This source experiment was discarded before
+acceptance; no speedup is claimed. It shows a limit of this borrowing pattern,
+not incorrect membership results. The full
+[experimental source](build/gdev-traversal-20260927/candidate/compiler/types.bend),
+[generated traversal](build/gdev-traversal-20260927/list-borrow-evidence.txt),
+and [full generated C](build/gdev-traversal-20260927/compiler.c) preserve the
+reproducer. Blot keeps its original list-membership routine.
+
+## Performance limitation: nested forks keep their worker partitions (2.0.32)
+
+An outer fork can assign a large task one worker while other workers finish
+small siblings. Inner forks in that large task cannot reclaim the idle workers.
+This limits parallelism in Blot's nested checking regions; no incorrect result
+or deadlock was observed.
+
+The [control reproducer](build/gdev-traversal-20260927/nested-control.bend)
+places one large region beside eight small ones. The
+[source alternative](build/gdev-traversal-20260927/nested-batch.bend) keeps the
+outer sequence serial so the large region's independent inner tasks can use all
+workers. Both produce checksum `401375088`. One diagnostic run during other
+build work took 0.52 seconds with either one or four workers for the control,
+and 0.19 seconds with four workers for the alternative; these are illustrative
+samples, not stable game measurements. See the
+[raw samples](build/gdev-traversal-20260927/nested-micro.json) and
+[game experiment](compiler/COMPILE_SPEED_RESULTS.md). All generated output was
+used unchanged. No upstream issue has been filed.
+
+The full gdev screen regressed from 63.6 to 70.3 seconds against the
+traversal-only candidate, with native CPU time increasing from 65.16 to 76.75
+seconds. The scheduler alternative remains experimental. Its small reproducer
+demonstrates available parallel work, not a general workload speedup.
+
 ## Resolved or tracked upstream
 
 - **List boxing leak:** A singleton `Scalar` list rebuilt and fully consumed

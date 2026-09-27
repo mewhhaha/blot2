@@ -617,6 +617,9 @@ def Laws.state_membership_work_stops_after_hit(rest, identity):
     case M.OperationInstance{template, arguments} <> tail:
       {==}
 
+def Laws.zero_distance_index_advance_preserves_suffix(suffix):
+  {==}
+
 def Laws.variable_membership_work_stops_after_hit(rest, variable):
   match rest:
     case Nil{}:
