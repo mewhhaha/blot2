@@ -30,6 +30,19 @@ let () =
   let replacement = map_set map (text "a") 99 in
   check "Persistent map update" (Ox_index.f_find replacement (text "a") = Some 99 && Ox_index.f_find map (text "a") = Some 1);
   check "Right-biased union" (Ox_index.f_find (map_union map replacement) (text "a") = Some 99);
+  let prefix = String.make 4480 'x' in
+  let long_keys = [prefix; prefix ^ "a"; prefix ^ "b"; prefix ^ "😀"; prefix ^ "λ"] in
+  let long_map = List.mapi (fun i k -> text k,i) long_keys |>
+    List.fold_left (fun m (k,v) -> map_set m k v) MTip in
+  List.iteri (fun i key -> check "Long shared-prefix lookup"
+    (Ox_index.f_find long_map (text key) = Some i)) long_keys;
+  let rec validate_bits = function
+    | MTip | MLeaf _ -> ()
+    | MNode(pos,lo,hi) ->
+      List.iter (fun (k,_) -> check "Patricia low branch" (not (key_bit k pos))) (map_bindings lo);
+      List.iter (fun (k,_) -> check "Patricia high branch" (key_bit k pos)) (map_bindings hi);
+      validate_bits lo; validate_bits hi
+  in validate_bits long_map;
   let random = Random.State.make [|42|] in
   let map = ref MTip in
   let reference = Hashtbl.create 4096 in

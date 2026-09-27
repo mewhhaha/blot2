@@ -28,7 +28,7 @@ def main() -> int:
     if not (ROOT / 'generated/compiler/compiler.js').is_file():
         parser.error('build the unchanged JavaScript reference first: python3 compiler/oxcaml/build_reference.py')
     selected = args.tests or sorted(str(p.relative_to(ROOT)) for p in (ROOT / 'compiler').glob('*.test.ts')
-        if ('native' in p.name or p.name == 'guest_native.test.ts') and p.name != 'native_priority.test.ts')
+        if ('native' in p.name or p.name == 'guest_native.test.ts'))
     for name in selected:
         path = (ROOT / name).resolve(strict=True)
         if ROOT not in path.parents or not path.name.endswith('.test.ts'):
@@ -36,7 +36,7 @@ def main() -> int:
     report = {
         'executable_sha256': hashlib.sha256(executable.read_bytes()).hexdigest(),
         'tests': selected,
-        'excluded': {'compiler/native_priority.test.ts': 'Scheduling restoration is not implemented in the initial serial port.'},
+        'excluded': {},
     }
     print(f'Running {len(selected)} unchanged native regression files against {executable}', flush=True)
     with tempfile.TemporaryDirectory(prefix='blot-oxcaml-tests-') as directory:

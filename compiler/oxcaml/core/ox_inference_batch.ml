@@ -87,22 +87,11 @@ fun v_run v_batch v_context ->
 | (Sequential (v_tasks)) ->
 (f_run_leaf (v_run) (v_tasks) (v_context) ([]))
 | (Parallel ((Parallel ((Parallel (v_a, v_b)), (Parallel (v_c, v_d)))), (Parallel ((Parallel (v_e, v_f)), (Parallel (v_g, v_h)))))) ->
-(let v_ra = (f_execute (v_run) (v_a) (v_context)) in
-(let v_rb = (f_execute (v_run) (v_b) (v_context)) in
-(let v_rc = (f_execute (v_run) (v_c) (v_context)) in
-(let v_rd = (f_execute (v_run) (v_d) (v_context)) in
-(let v_re = (f_execute (v_run) (v_e) (v_context)) in
-(let v_rf = (f_execute (v_run) (v_f) (v_context)) in
-(let v_rg = (f_execute (v_run) (v_g) (v_context)) in
-(let v_rh = (f_execute (v_run) (v_h) (v_context)) in
-(f_join ((f_join ((f_join (v_ra) (v_rb))) ((f_join (v_rc) (v_rd))))) ((f_join ((f_join (v_re) (v_rf))) ((f_join (v_rg) (v_rh))))))))))))))
+(let (v_ra, v_rb, v_rc, v_rd, v_re, v_rf, v_rg, v_rh) = Native_parallel.eight (fun () -> (f_execute (v_run) (v_a) (v_context))) (fun () -> (f_execute (v_run) (v_b) (v_context))) (fun () -> (f_execute (v_run) (v_c) (v_context))) (fun () -> (f_execute (v_run) (v_d) (v_context))) (fun () -> (f_execute (v_run) (v_e) (v_context))) (fun () -> (f_execute (v_run) (v_f) (v_context))) (fun () -> (f_execute (v_run) (v_g) (v_context))) (fun () -> (f_execute (v_run) (v_h) (v_context))) in
+(f_join ((f_join ((f_join (v_ra) (v_rb))) ((f_join (v_rc) (v_rd))))) ((f_join ((f_join (v_re) (v_rf))) ((f_join (v_rg) (v_rh)))))))
 | (Parallel ((Parallel (v_a, v_b)), (Parallel (v_c, v_d)))) ->
-(let v_ra = (f_execute (v_run) (v_a) (v_context)) in
-(let v_rb = (f_execute (v_run) (v_b) (v_context)) in
-(let v_rc = (f_execute (v_run) (v_c) (v_context)) in
-(let v_rd = (f_execute (v_run) (v_d) (v_context)) in
-(f_join ((f_join (v_ra) (v_rb))) ((f_join (v_rc) (v_rd))))))))
+(let (v_ra, v_rb, v_rc, v_rd) = Native_parallel.four (fun () -> (f_execute (v_run) (v_a) (v_context))) (fun () -> (f_execute (v_run) (v_b) (v_context))) (fun () -> (f_execute (v_run) (v_c) (v_context))) (fun () -> (f_execute (v_run) (v_d) (v_context))) in
+(f_join ((f_join (v_ra) (v_rb))) ((f_join (v_rc) (v_rd)))))
 | (Parallel (v_left, v_right)) ->
-(let v_a = (f_execute (v_run) (v_left) (v_context)) in
-(let v_b = (f_execute (v_run) (v_right) (v_context)) in
-(f_join (v_a) (v_b)))))
+(let (v_a, v_b) = Native_parallel.two (fun () -> (f_execute (v_run) (v_left) (v_context))) (fun () -> (f_execute (v_run) (v_right) (v_context))) in
+(f_join (v_a) (v_b))))

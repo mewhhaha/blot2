@@ -11,7 +11,7 @@ let f_receive () () =
     Bytes.set prefix 0 first;
     read_exact prefix 1 3;
     let count = u32_to_nat (Bytes.get_int32_le prefix 0) in
-    if count > max_words then failwith "native frame exceeds 16M words";
+    if count > max_words then failwith "native protocol: frame exceeds 16777216 words";
     let bytes = Bytes.create (count * 4) in
     read_exact bytes 0 (Bytes.length bytes);
     let rec capacity n = if n >= count then n else capacity (n*2) in

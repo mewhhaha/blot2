@@ -1510,9 +1510,8 @@ fun v_nodes v_nominals v_parallel ->
 | false ->
 ((D.f_components (v_nodes)), (D.f_components (v_nominals)))
 | true ->
-(let v_values = (D.f_components (v_nodes)) in
-(let v_types = (D.f_components (v_nominals)) in
-(v_values, v_types))))
+(let (v_values, v_types) = Native_parallel.two (fun () -> (D.f_components (v_nodes))) (fun () -> (D.f_components (v_nominals))) in
+(v_values, v_types)))
 and (* groups.bend:1145 *)
 f_finish_components : ((M.t_Diagnostic, ((Base.text) list) list) Base.result_ * (M.t_Diagnostic, ((Base.text) list) list) Base.result_) -> (D.t_Node) list -> (t_DeclarationUsage) list -> (t_TypeDependencies) list -> (D.t_Node) list -> (M.t_TypeId) list -> (M.t_Diagnostic, (t_Job) list) Base.result_ =
 fun v_pair v_nodes v_usages v_nominal_graph v_nominal_graph_nodes v_shared_operation_types ->

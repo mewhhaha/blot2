@@ -298,7 +298,12 @@ class Emitter:
                 pattern, guards, bindings, bound = self.pattern(p)
                 if guards or bindings: raise ValueError('guarded parallel binding')
                 out.append((pattern, exp(value))); names |= bound
-            return self.lets(out, self.expression(rest, scope | names, variables, monad))
+            arity = {2: 'two', 4: 'four', 8: 'eight'}.get(len(out))
+            if arity is None: raise ValueError('unsupported parallel arity')
+            patterns = ', '.join(pattern for pattern, _ in out)
+            thunks = ' '.join('(fun () -> ' + value + ')' for _, value in out)
+            body = self.expression(rest, scope | names, variables, monad)
+            return f'(let ({patterns}) = Native_parallel.{arity} {thunks} in\n{body})'
         if k == 'match':
             values, arms = n.items
             scrutinee = exp(values[0]) if len(values) == 1 else '(' + ', '.join(exp(v) for v in values) + ')'

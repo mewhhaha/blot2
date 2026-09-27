@@ -4298,25 +4298,14 @@ fun v_batch v_prefix v_module_name v_entry_module v_fuel v_context ->
 | (DeclarationLeaf (v_nodes)) ->
 (f_lower_declarations_sequential (v_nodes) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))
 | (DeclarationFork ((DeclarationFork ((DeclarationFork (v_a, v_b)), (DeclarationFork (v_c, v_d)))), (DeclarationFork ((DeclarationFork (v_e, v_f)), (DeclarationFork (v_g, v_h)))))) ->
-(let v_ra = (f_lower_declaration_batch (v_a) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_rb = (f_lower_declaration_batch (v_b) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_rc = (f_lower_declaration_batch (v_c) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_rd = (f_lower_declaration_batch (v_d) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_re = (f_lower_declaration_batch (v_e) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_rf = (f_lower_declaration_batch (v_f) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_rg = (f_lower_declaration_batch (v_g) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_rh = (f_lower_declaration_batch (v_h) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(f_merge_declarations ((f_merge_declarations ((f_merge_declarations (v_ra) (v_rb))) ((f_merge_declarations (v_rc) (v_rd))))) ((f_merge_declarations ((f_merge_declarations (v_re) (v_rf))) ((f_merge_declarations (v_rg) (v_rh))))))))))))))
+(let (v_ra, v_rb, v_rc, v_rd, v_re, v_rf, v_rg, v_rh) = Native_parallel.eight (fun () -> (f_lower_declaration_batch (v_a) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_b) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_c) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_d) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_e) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_f) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_g) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_h) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) in
+(f_merge_declarations ((f_merge_declarations ((f_merge_declarations (v_ra) (v_rb))) ((f_merge_declarations (v_rc) (v_rd))))) ((f_merge_declarations ((f_merge_declarations (v_re) (v_rf))) ((f_merge_declarations (v_rg) (v_rh)))))))
 | (DeclarationFork ((DeclarationFork (v_a, v_b)), (DeclarationFork (v_c, v_d)))) ->
-(let v_ra = (f_lower_declaration_batch (v_a) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_rb = (f_lower_declaration_batch (v_b) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_rc = (f_lower_declaration_batch (v_c) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_rd = (f_lower_declaration_batch (v_d) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(f_merge_declarations ((f_merge_declarations (v_ra) (v_rb))) ((f_merge_declarations (v_rc) (v_rd))))))))
+(let (v_ra, v_rb, v_rc, v_rd) = Native_parallel.four (fun () -> (f_lower_declaration_batch (v_a) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_b) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_c) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_d) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) in
+(f_merge_declarations ((f_merge_declarations (v_ra) (v_rb))) ((f_merge_declarations (v_rc) (v_rd)))))
 | (DeclarationFork (v_left, v_right)) ->
-(let v_a = (f_lower_declaration_batch (v_left) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(let v_b = (f_lower_declaration_batch (v_right) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context)) in
-(f_merge_declarations (v_a) (v_b)))))
+(let (v_a, v_b) = Native_parallel.two (fun () -> (f_lower_declaration_batch (v_left) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) (fun () -> (f_lower_declaration_batch (v_right) (v_prefix) (v_module_name) (v_entry_module) (v_fuel) (v_context))) in
+(f_merge_declarations (v_a) (v_b))))
 and (* lower.bend:2874 *)
 f_validate_declaration_nodes : (C.t_Cst) list -> (M.t_Diagnostic, unit) Base.result_ =
 fun v_nodes ->

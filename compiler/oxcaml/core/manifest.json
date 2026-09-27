@@ -135,14 +135,14 @@
   {
     "module": "groups",
     "source_sha256": "541cbfd75d4df0b8a9f9bb053da7f83889d13c4f82fcac515cca10355ad824fa",
-    "ocaml_sha256": "3cba83a111412a0fd9fc5aa53c5c3fd45eadb19fcf8ee219d28a890721362ae5",
+    "ocaml_sha256": "937dbc81c39312cb5ab6d2fa5ebfcb4c81a7945f29c52d2c062feebe3e2aed3f",
     "functions": 110,
     "types": 12
   },
   {
     "module": "inference_batch",
     "source_sha256": "b44645829783b3ffcc4b32261eaea5421c324a008f3d0beb762afe0f6b0f2776",
-    "ocaml_sha256": "0755df0b7433ffb661a7af248edff800f3b8c1f60c54c18231ff6bddf76df393",
+    "ocaml_sha256": "6624b017def34977e249bdf9a41969f3dcd37f9974b7252119329f215660c2aa",
     "functions": 9,
     "types": 3
   },
@@ -345,7 +345,7 @@
   {
     "module": "wasm",
     "source_sha256": "5b41be50886f469f6d86eb2a5b413f190b3d0dc97a94cf4756e9c4c8905f9aa2",
-    "ocaml_sha256": "6c2744c304e95012f511c737cc5781a65c680e9c424c65a994308203e11b9fdf",
+    "ocaml_sha256": "a08a88915f20ccfb35a23455dde75d4dc51c05baf87369e66e0b9b9a98f4b2e2",
     "functions": 236,
     "types": 37
   },
@@ -394,7 +394,7 @@
   {
     "module": "lower",
     "source_sha256": "76e6fc0a4e99093e42758ce5a5bd443f20a26f068fa2d0d5bfc1e5ab7ee2e2f9",
-    "ocaml_sha256": "582006270d286d61c43185ecb781771a122d241d568a08b8bc20b9f9b230bb65",
+    "ocaml_sha256": "5184330ff53cc6983a390622703dfe412a98e76f301199cf62a460f7f18c970a",
     "functions": 272,
     "types": 27
   },
@@ -450,7 +450,7 @@
   {
     "module": "native_session",
     "source_sha256": "41000979b851136da8760dd0ea739c02a280bd9ee4f56f387b67268b133224dd",
-    "ocaml_sha256": "a279b26e48b603d35a96551f326d13415e49b3fd8e807dfb4cf4b70d1fc3c28c",
+    "ocaml_sha256": "1d91bf8fa612732f95e0aa0b6f1c09626f765c2fb18ccbdd04abbfda378ee49d",
     "functions": 150,
     "types": 34
   },

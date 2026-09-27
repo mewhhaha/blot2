@@ -1,11 +1,11 @@
-import {
-  type Analysis,
-  type AnalyzedArtifact,
-  type AnalyzedArtifactOptions,
-  type Artifact,
-  type ArtifactOptions,
-  type CompileOptions,
-  includesAnalysis,
+import { includesAnalysis } from "./artifact_options.ts";
+import type {
+  Analysis,
+  AnalyzedArtifact,
+  AnalyzedArtifactOptions,
+  Artifact,
+  ArtifactOptions,
+  CompileOptions,
 } from "./host.ts";
 import type { SourceInput } from "./source_project.ts";
 import { NativeProcess, type NativeProcessOptions } from "./native_process.ts";

@@ -329,25 +329,14 @@ fun v_batch v_scope v_fuel ->
 | (L.DeclarationLeaf (v_nodes)) ->
 (f_lower_missing_leaf (v_nodes) (v_scope) (v_fuel) ([]))
 | (L.DeclarationFork ((L.DeclarationFork ((L.DeclarationFork (v_a, v_b)), (L.DeclarationFork (v_c, v_d)))), (L.DeclarationFork ((L.DeclarationFork (v_e, v_f)), (L.DeclarationFork (v_g, v_h)))))) ->
-(let v_ra = (f_lower_missing_batch (v_a) (v_scope) (v_fuel)) in
-(let v_rb = (f_lower_missing_batch (v_b) (v_scope) (v_fuel)) in
-(let v_rc = (f_lower_missing_batch (v_c) (v_scope) (v_fuel)) in
-(let v_rd = (f_lower_missing_batch (v_d) (v_scope) (v_fuel)) in
-(let v_re = (f_lower_missing_batch (v_e) (v_scope) (v_fuel)) in
-(let v_rf = (f_lower_missing_batch (v_f) (v_scope) (v_fuel)) in
-(let v_rg = (f_lower_missing_batch (v_g) (v_scope) (v_fuel)) in
-(let v_rh = (f_lower_missing_batch (v_h) (v_scope) (v_fuel)) in
-(f_merge_lowered ((f_merge_lowered ((f_merge_lowered (v_ra) (v_rb))) ((f_merge_lowered (v_rc) (v_rd))))) ((f_merge_lowered ((f_merge_lowered (v_re) (v_rf))) ((f_merge_lowered (v_rg) (v_rh))))))))))))))
+(let (v_ra, v_rb, v_rc, v_rd, v_re, v_rf, v_rg, v_rh) = Native_parallel.eight (fun () -> (f_lower_missing_batch (v_a) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_b) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_c) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_d) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_e) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_f) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_g) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_h) (v_scope) (v_fuel))) in
+(f_merge_lowered ((f_merge_lowered ((f_merge_lowered (v_ra) (v_rb))) ((f_merge_lowered (v_rc) (v_rd))))) ((f_merge_lowered ((f_merge_lowered (v_re) (v_rf))) ((f_merge_lowered (v_rg) (v_rh)))))))
 | (L.DeclarationFork ((L.DeclarationFork (v_a, v_b)), (L.DeclarationFork (v_c, v_d)))) ->
-(let v_ra = (f_lower_missing_batch (v_a) (v_scope) (v_fuel)) in
-(let v_rb = (f_lower_missing_batch (v_b) (v_scope) (v_fuel)) in
-(let v_rc = (f_lower_missing_batch (v_c) (v_scope) (v_fuel)) in
-(let v_rd = (f_lower_missing_batch (v_d) (v_scope) (v_fuel)) in
-(f_merge_lowered ((f_merge_lowered (v_ra) (v_rb))) ((f_merge_lowered (v_rc) (v_rd))))))))
+(let (v_ra, v_rb, v_rc, v_rd) = Native_parallel.four (fun () -> (f_lower_missing_batch (v_a) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_b) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_c) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_d) (v_scope) (v_fuel))) in
+(f_merge_lowered ((f_merge_lowered (v_ra) (v_rb))) ((f_merge_lowered (v_rc) (v_rd)))))
 | (L.DeclarationFork (v_left, v_right)) ->
-(let v_a = (f_lower_missing_batch (v_left) (v_scope) (v_fuel)) in
-(let v_b = (f_lower_missing_batch (v_right) (v_scope) (v_fuel)) in
-(f_merge_lowered (v_a) (v_b)))))
+(let (v_a, v_b) = Native_parallel.two (fun () -> (f_lower_missing_batch (v_left) (v_scope) (v_fuel))) (fun () -> (f_lower_missing_batch (v_right) (v_scope) (v_fuel))) in
+(f_merge_lowered (v_a) (v_b))))
 and (* native_session.bend:222 *)
 f_publish_lowered : (t_LoweringSelection) list -> (t_Lowered) list -> (t_Lowered) list -> (Plan.t_Scanned) list -> t_Counts -> (M.t_Diagnostic, t_Lowering) Base.result_ =
 fun v_selections v_missing v_reversed v_scans v_counts ->

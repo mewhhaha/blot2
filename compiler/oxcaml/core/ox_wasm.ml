@@ -1891,25 +1891,14 @@ fun v_batch ->
 | (SequentialEntries (v_entries)) ->
 (f_compile_entry_leaf (v_entries) ([]))
 | (ParallelEntries ((ParallelEntries ((ParallelEntries (v_a, v_b)), (ParallelEntries (v_c, v_d)))), (ParallelEntries ((ParallelEntries (v_e, v_f)), (ParallelEntries (v_g, v_h)))))) ->
-(let v_ra = (f_compile_entry_batch (v_a)) in
-(let v_rb = (f_compile_entry_batch (v_b)) in
-(let v_rc = (f_compile_entry_batch (v_c)) in
-(let v_rd = (f_compile_entry_batch (v_d)) in
-(let v_re = (f_compile_entry_batch (v_e)) in
-(let v_rf = (f_compile_entry_batch (v_f)) in
-(let v_rg = (f_compile_entry_batch (v_g)) in
-(let v_rh = (f_compile_entry_batch (v_h)) in
-(f_merge_entries ((f_merge_entries ((f_merge_entries (v_ra) (v_rb))) ((f_merge_entries (v_rc) (v_rd))))) ((f_merge_entries ((f_merge_entries (v_re) (v_rf))) ((f_merge_entries (v_rg) (v_rh))))))))))))))
+(let (v_ra, v_rb, v_rc, v_rd, v_re, v_rf, v_rg, v_rh) = Native_parallel.eight (fun () -> (f_compile_entry_batch (v_a))) (fun () -> (f_compile_entry_batch (v_b))) (fun () -> (f_compile_entry_batch (v_c))) (fun () -> (f_compile_entry_batch (v_d))) (fun () -> (f_compile_entry_batch (v_e))) (fun () -> (f_compile_entry_batch (v_f))) (fun () -> (f_compile_entry_batch (v_g))) (fun () -> (f_compile_entry_batch (v_h))) in
+(f_merge_entries ((f_merge_entries ((f_merge_entries (v_ra) (v_rb))) ((f_merge_entries (v_rc) (v_rd))))) ((f_merge_entries ((f_merge_entries (v_re) (v_rf))) ((f_merge_entries (v_rg) (v_rh)))))))
 | (ParallelEntries ((ParallelEntries (v_a, v_b)), (ParallelEntries (v_c, v_d)))) ->
-(let v_ra = (f_compile_entry_batch (v_a)) in
-(let v_rb = (f_compile_entry_batch (v_b)) in
-(let v_rc = (f_compile_entry_batch (v_c)) in
-(let v_rd = (f_compile_entry_batch (v_d)) in
-(f_merge_entries ((f_merge_entries (v_ra) (v_rb))) ((f_merge_entries (v_rc) (v_rd))))))))
+(let (v_ra, v_rb, v_rc, v_rd) = Native_parallel.four (fun () -> (f_compile_entry_batch (v_a))) (fun () -> (f_compile_entry_batch (v_b))) (fun () -> (f_compile_entry_batch (v_c))) (fun () -> (f_compile_entry_batch (v_d))) in
+(f_merge_entries ((f_merge_entries (v_ra) (v_rb))) ((f_merge_entries (v_rc) (v_rd)))))
 | (ParallelEntries (v_left, v_right)) ->
-(let v_a = (f_compile_entry_batch (v_left)) in
-(let v_b = (f_compile_entry_batch (v_right)) in
-(f_merge_entries (v_a) (v_b)))))
+(let (v_a, v_b) = Native_parallel.two (fun () -> (f_compile_entry_batch (v_left))) (fun () -> (f_compile_entry_batch (v_right))) in
+(f_merge_entries (v_a) (v_b))))
 and (* wasm.bend:1558 *)
 f_compile_entries_with_grain : int -> (t_CodegenJob) list -> (M.t_Diagnostic, (t_EntryCode) list) Base.result_ =
 fun v_grain v_jobs ->
@@ -2692,25 +2681,14 @@ fun v_batch v_projection ->
 | (SequentialEntries (v_entries)) ->
 (f_prepare_job_leaf (v_entries) (v_projection) ([]))
 | (ParallelEntries ((ParallelEntries ((ParallelEntries (v_a, v_b)), (ParallelEntries (v_c, v_d)))), (ParallelEntries ((ParallelEntries (v_e, v_f)), (ParallelEntries (v_g, v_h)))))) ->
-(let v_ra = (f_prepare_job_batch (v_a) (v_projection)) in
-(let v_rb = (f_prepare_job_batch (v_b) (v_projection)) in
-(let v_rc = (f_prepare_job_batch (v_c) (v_projection)) in
-(let v_rd = (f_prepare_job_batch (v_d) (v_projection)) in
-(let v_re = (f_prepare_job_batch (v_e) (v_projection)) in
-(let v_rf = (f_prepare_job_batch (v_f) (v_projection)) in
-(let v_rg = (f_prepare_job_batch (v_g) (v_projection)) in
-(let v_rh = (f_prepare_job_batch (v_h) (v_projection)) in
-(f_merge_prepared ((f_merge_prepared ((f_merge_prepared (v_ra) (v_rb))) ((f_merge_prepared (v_rc) (v_rd))))) ((f_merge_prepared ((f_merge_prepared (v_re) (v_rf))) ((f_merge_prepared (v_rg) (v_rh))))))))))))))
+(let (v_ra, v_rb, v_rc, v_rd, v_re, v_rf, v_rg, v_rh) = Native_parallel.eight (fun () -> (f_prepare_job_batch (v_a) (v_projection))) (fun () -> (f_prepare_job_batch (v_b) (v_projection))) (fun () -> (f_prepare_job_batch (v_c) (v_projection))) (fun () -> (f_prepare_job_batch (v_d) (v_projection))) (fun () -> (f_prepare_job_batch (v_e) (v_projection))) (fun () -> (f_prepare_job_batch (v_f) (v_projection))) (fun () -> (f_prepare_job_batch (v_g) (v_projection))) (fun () -> (f_prepare_job_batch (v_h) (v_projection))) in
+(f_merge_prepared ((f_merge_prepared ((f_merge_prepared (v_ra) (v_rb))) ((f_merge_prepared (v_rc) (v_rd))))) ((f_merge_prepared ((f_merge_prepared (v_re) (v_rf))) ((f_merge_prepared (v_rg) (v_rh)))))))
 | (ParallelEntries ((ParallelEntries (v_a, v_b)), (ParallelEntries (v_c, v_d)))) ->
-(let v_ra = (f_prepare_job_batch (v_a) (v_projection)) in
-(let v_rb = (f_prepare_job_batch (v_b) (v_projection)) in
-(let v_rc = (f_prepare_job_batch (v_c) (v_projection)) in
-(let v_rd = (f_prepare_job_batch (v_d) (v_projection)) in
-(f_merge_prepared ((f_merge_prepared (v_ra) (v_rb))) ((f_merge_prepared (v_rc) (v_rd))))))))
+(let (v_ra, v_rb, v_rc, v_rd) = Native_parallel.four (fun () -> (f_prepare_job_batch (v_a) (v_projection))) (fun () -> (f_prepare_job_batch (v_b) (v_projection))) (fun () -> (f_prepare_job_batch (v_c) (v_projection))) (fun () -> (f_prepare_job_batch (v_d) (v_projection))) in
+(f_merge_prepared ((f_merge_prepared (v_ra) (v_rb))) ((f_merge_prepared (v_rc) (v_rd)))))
 | (ParallelEntries (v_left, v_right)) ->
-(let v_a = (f_prepare_job_batch (v_left) (v_projection)) in
-(let v_b = (f_prepare_job_batch (v_right) (v_projection)) in
-(f_merge_prepared (v_a) (v_b)))))
+(let (v_a, v_b) = Native_parallel.two (fun () -> (f_prepare_job_batch (v_left) (v_projection))) (fun () -> (f_prepare_job_batch (v_right) (v_projection))) in
+(f_merge_prepared (v_a) (v_b))))
 and (* wasm.bend:2258 *)
 f_preparation_grain : unit -> int =
 fun () ->

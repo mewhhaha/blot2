@@ -217,8 +217,21 @@ let map_set m key value =
   | None -> leaf
   | Some old when string_eq old key -> replace m
   | Some old ->
-    let rec differing pos = if key_bit key pos <> key_bit old pos then pos else differing (pos+1) in
-    let pos = differing 0 in
+    (* Scan the common prefix once. Repeated key_bit probes start from the
+       head of a code-point list and made long identifiers quadratic. *)
+    let rec differing offset left right = match left, right with
+      | SNil, SCon _ | SCon _, SNil -> offset
+      | SCon (Chr a, at), SCon (Chr b, bt) ->
+        if a = b then differing (offset + 33) at bt
+        else
+          let xor = Int32.logxor a b in
+          let rec leading bit =
+            if Int32.logand xor (Int32.shift_left 1l (31-bit)) <> 0l
+            then bit else leading (bit+1)
+          in offset + 1 + leading 0
+      | SNil, SNil -> assert false (* Equal keys were handled above. *)
+    in
+    let pos = differing 0 key old in
     let splice node = if key_bit key pos then MNode(pos,node,leaf) else MNode(pos,leaf,node) in
     let rec insert = function
       | MNode(p,lo,hi) when p < pos ->
