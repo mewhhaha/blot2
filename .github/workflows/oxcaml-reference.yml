@@ -1,0 +1,57 @@
+name: OxCaml reference compiler
+on:
+  push:
+    branches: [rebuild/oxcaml-compiler]
+    paths: ['.github/workflows/oxcaml-reference.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      BEND_NO_TELEMETRY: '1'
+      DENO_DIR: ${{ github.workspace }}/.reference-cache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: oven-sh/setup-bun@v2
+      - name: Install reference release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reference-tools/bend reference-tools/bin
+          curl -fL https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o /tmp/bend.tar.gz
+          echo '5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  /tmp/bend.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/bend.tar.gz -C reference-tools/bend
+          executable="$(find "$PWD/reference-tools/bend" -type f -name bend | head -n1)"
+          test -n "$executable"
+          chmod +x "$executable"
+          echo "$(dirname "$executable")" >> "$GITHUB_PATH"
+          cp "$(command -v deno)" "$(command -v bun)" reference-tools/bin/
+      - name: Read guide and build unmodified reference
+        run: |
+          mkdir -p reference-evidence
+          bend version | tee reference-evidence/version.txt
+          bend guide > reference-evidence/guide.txt
+          deno task build:compiler:all 2>&1 | tee reference-evidence/build.txt
+          deno cache compiler/*.test.ts
+      - name: Run reference native parity tests
+        run: deno test --allow-all compiler/native.test.ts compiler/native_incremental.test.ts 2>&1 | tee reference-evidence/tests.txt
+      - name: Export reproducible reference
+        if: always()
+        run: |
+          mkdir -p reference-snapshot
+          cp -r reference-evidence reference-snapshot/
+          tar -czf reference-snapshot/reference.tar.gz reference-tools .reference-cache generated/compiler
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oxcaml-reference-${{ github.sha }}
+          path: reference-snapshot/
+          retention-days: 3
