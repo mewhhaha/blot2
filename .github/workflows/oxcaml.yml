@@ -21,17 +21,8 @@ jobs:
         with:
           persist-credentials: false
       - run: sudo apt-get update && sudo apt-get install -y ocaml-nox
+      - run: python3 compiler/oxcaml/bootstrap/port.py
       - run: ocamlopt -version && make -C compiler/oxcaml test
-      - name: Export development snapshot
-        run: |
-          mkdir -p snapshot
-          git archive --format=tar.gz HEAD > snapshot/source.tar.gz
-          tar -czf snapshot/ocaml-tools.tar.gz /usr/bin/ocamlopt* /usr/bin/ocamlc* /usr/bin/ocamlrun /usr/lib/ocaml
-      - uses: actions/upload-artifact@v4
-        with:
-          name: oxcaml-development-snapshot-${{ github.sha }}
-          path: snapshot/
-          retention-days: 3
   oxcaml:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -51,5 +42,36 @@ jobs:
             opam switch create 5.2.0+ox --repos ox=git+https://github.com/oxcaml/opam-repository.git,default -y
           fi
           opam exec --switch 5.2.0+ox -- ocamlopt -config
+      - run: python3 compiler/oxcaml/bootstrap/port.py
       - name: Build and test with OxCaml
         run: opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oxcaml-native-${{ github.sha }}
+          path: |
+            compiler/oxcaml/_build/blotc
+            compiler/oxcaml/core/
+          retention-days: 7
+  materialize-port:
+    # One-time migration commit, restricted to this experimental branch. Later
+    # builds use the checked-in OCaml source without invoking the bootstrap.
+    needs: [portable, oxcaml]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/rebuild/oxcaml-compiler'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/oxcaml-compiler
+      - name: Commit initial native sources only once
+        run: |
+          set -euo pipefail
+          if test -f compiler/oxcaml/core/modules.txt; then exit 0; fi
+          test "$(git rev-parse HEAD)" = '${{ github.sha }}'
+          python3 compiler/oxcaml/bootstrap/port.py
+          git add compiler/oxcaml/core
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Materialize the tested typed OCaml compiler modules'
+          git push origin HEAD:rebuild/oxcaml-compiler
