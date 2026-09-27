@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Set isolated cache directory
         run: echo "DENO_DIR=$RUNNER_TEMP/deno-cache" >> "$GITHUB_ENV"
       - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2
@@ -39,14 +40,24 @@ jobs:
           binary=$(find "$PWD" -type f -name bend -perm -u+x | head -n 1)
           test -n "$binary"
           dirname "$binary" >> "$GITHUB_PATH"
+      - name: Cache frontend dependencies and matching reference loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p generated/compiler/bend-2.0.32
+          for name in main.ts bend.ts comp.ts safe.ts base.bend; do
+            curl --fail --location --retry 3 --output "generated/compiler/bend-2.0.32/$name" "https://raw.githubusercontent.com/bendlang/bend/v2.0.32/bend2/$name"
+          done
+          deno cache compiler/syntax.ts
       - name: Check proofs and build unchanged reference outputs
         shell: bash
         run: |
           set -euo pipefail
           bend version
           bend guide > "$RUNNER_TEMP/bend-guide.txt"
-          mkdir -p generated/compiler
-          deno run --allow-read --allow-write="$GITHUB_WORKSPACE" --allow-net=raw.githubusercontent.com --allow-run=bend,bun,clang,generated/compiler/native-backend-regression scripts/build_compiler.ts all
+          # A build must be allowed to create its executables. Whitelisting a
+          # generated executable in --allow-run makes its directory read-only.
+          deno run --allow-read --allow-write="$GITHUB_WORKSPACE" --allow-net=raw.githubusercontent.com --allow-run scripts/build_compiler.ts all
           deno cache compiler/native.ts compiler/source.ts compiler/native_incremental.ts compiler/native_project.ts
       - name: Package reference outputs and offline tools
         if: always()
@@ -55,10 +66,11 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/reference-artifact"
           tar -czf "$RUNNER_TEMP/reference-artifact/generated.tar.gz" generated/compiler
-          cp "$RUNNER_TEMP/bend-guide.txt" "$RUNNER_TEMP/reference-artifact/"
-          cp "$RUNNER_TEMP/bend-release/bend.tar.gz" "$RUNNER_TEMP/reference-artifact/"
+          test ! -f "$RUNNER_TEMP/bend-guide.txt" || cp "$RUNNER_TEMP/bend-guide.txt" "$RUNNER_TEMP/reference-artifact/"
           cp "$(command -v deno)" "$RUNNER_TEMP/reference-artifact/deno"
+          cp "$(command -v bun)" "$RUNNER_TEMP/reference-artifact/bun"
           tar -czf "$RUNNER_TEMP/reference-artifact/deno-cache.tar.gz" -C "$DENO_DIR" .
+          if test -d node_modules; then tar -czf "$RUNNER_TEMP/reference-artifact/node_modules.tar.gz" node_modules; fi
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
