@@ -15,11 +15,12 @@ jobs:
     timeout-minutes: 30
     env:
       BEND_NO_TELEMETRY: '1'
-      DENO_DIR: ${{ runner.temp }}/deno-cache
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+      - name: Set isolated cache directory
+        run: echo "DENO_DIR=$RUNNER_TEMP/deno-cache" >> "$GITHUB_ENV"
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.5.2
