@@ -1,0 +1,83 @@
+name: Carp compiler
+
+on:
+  pull_request:
+    paths:
+      - 'compiler/**'
+      - 'std/**'
+      - 'examples/**'
+      - 'scripts/**'
+      - 'deno.json'
+      - 'deno.lock'
+      - 'baba.json'
+      - '.github/workflows/carp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: carp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      CARP_DIR: ${{ github.workspace }}/.carp-toolchain
+      LC_ALL: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: carp-lang/Carp
+          ref: 56d7115e289896d16bbb753c39383dac12811339
+          path: .carp-toolchain
+          persist-credentials: false
+      - name: Source snapshot for reproducible debugging
+        run: |
+          mkdir -p generated/carp
+          git archive --format=tar.gz -o generated/carp/source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: carp-source
+          path: generated/carp/source.tar.gz
+          retention-days: 7
+      - uses: haskell-actions/setup@v2
+        with:
+          ghc-version: '9.2.5'
+          enable-stack: true
+          stack-version: latest
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.stack
+            .carp-toolchain/.stack-work
+            .carp-toolchain/bin
+          key: carp-linux-ghc925-56d7115e289896d16bbb753c39383dac12811339
+      - name: Build pinned Carp
+        run: |
+          cd "$CARP_DIR"
+          mkdir -p bin
+          stack --system-ghc install --local-bin-path "$CARP_DIR/bin"
+          echo "$CARP_DIR/bin" >> "$GITHUB_PATH"
+      - name: Build and execute native bootstrap
+        run: |
+          carp -b compiler/carp/bootstrap.carp
+          test -x generated/carp/blot-carp-bootstrap
+          generated/carp/blot-carp-bootstrap
+      - name: Package diagnostic toolchain
+        if: always()
+        run: |
+          if test -x "$CARP_DIR/bin/carp"; then
+            tar -czf generated/carp/toolchain.tar.gz -C "$CARP_DIR" bin core docs
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: carp-native-diagnostics
+          path: generated/carp/
+          retention-days: 7
