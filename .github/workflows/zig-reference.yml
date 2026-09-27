@@ -49,30 +49,41 @@ jobs:
             curl --fail --location --retry 3 --output "generated/compiler/bend-2.0.32/$name" "https://raw.githubusercontent.com/bendlang/bend/v2.0.32/bend2/$name"
           done
           deno cache compiler/syntax.ts
-      - name: Check proofs and build the unchanged JavaScript reference
-        shell: bash
+          mkdir -p "$RUNNER_TEMP/reference-tools"
+          tar -czf "$RUNNER_TEMP/reference-tools/loader.tar.gz" generated/compiler/bend-2.0.32
+          cp "$(command -v deno)" "$RUNNER_TEMP/reference-tools/deno"
+          cp "$(command -v bun)" "$RUNNER_TEMP/reference-tools/bun"
+          tar -czf "$RUNNER_TEMP/reference-tools/deno-cache.tar.gz" -C "$DENO_DIR" .
+          if test -d node_modules; then tar -czf "$RUNNER_TEMP/reference-tools/node_modules.tar.gz" node_modules; fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zig-reference-tools
+          path: ${{ runner.temp }}/reference-tools/*
+          retention-days: 1
+          if-no-files-found: error
+      - name: Check original source proofs
         run: |
-          set -euo pipefail
           bend version
           bend guide > "$RUNNER_TEMP/bend-guide.txt"
-          deno run --allow-read --allow-write="$GITHUB_WORKSPACE" --allow-net=raw.githubusercontent.com --allow-run scripts/build_compiler.ts js
-          deno cache compiler/native.ts compiler/source.ts compiler/native_incremental.ts compiler/native_project.ts
-      - name: Package reference outputs and offline tools
-        if: always()
+          bend PROOF.bend
+      - name: Build unchanged JavaScript reference modules sequentially
+        timeout-minutes: 8
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/reference-artifact"
-          tar -czf "$RUNNER_TEMP/reference-artifact/generated.tar.gz" generated/compiler
-          test ! -f "$RUNNER_TEMP/bend-guide.txt" || cp "$RUNNER_TEMP/bend-guide.txt" "$RUNNER_TEMP/reference-artifact/"
-          cp "$(command -v deno)" "$RUNNER_TEMP/reference-artifact/deno"
-          cp "$(command -v bun)" "$RUNNER_TEMP/reference-artifact/bun"
-          tar -czf "$RUNNER_TEMP/reference-artifact/deno-cache.tar.gz" -C "$DENO_DIR" .
-          if test -d node_modules; then tar -czf "$RUNNER_TEMP/reference-artifact/node_modules.tar.gz" node_modules; fi
+          loader="file://$GITHUB_WORKSPACE/generated/compiler/bend-2.0.32/main.ts"
+          for module in main native_session native_output; do
+            output="$module"
+            test "$module" != main || output=compiler
+            bun --eval 'const {load}=await import(process.argv[1]); const result=await load(process.argv[2], {},()=>{throw new Error("unrecognized Bend entry")}); process.stdout.write(result.source);' "$loader" "file://$GITHUB_WORKSPACE/compiler/$module.bend" > "generated/compiler/$output.js"
+            test -s "generated/compiler/$output.js"
+            echo "Built $output.js"
+          done
+          deno cache compiler/native.ts compiler/source.ts compiler/native_incremental.ts compiler/native_project.ts
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: zig-reference
-          path: ${{ runner.temp }}/reference-artifact/*
+          name: zig-reference-modules
+          path: generated/compiler/*.js
           retention-days: 1
           if-no-files-found: error
