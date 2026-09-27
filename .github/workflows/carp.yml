@@ -37,7 +37,10 @@ jobs:
           ref: 56d7115e289896d16bbb753c39383dac12811339
           path: .carp-toolchain
           persist-credentials: false
-      - name: Source snapshot for reproducible debugging
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Source snapshot
         run: |
           mkdir -p generated/carp
           git archive --format=tar.gz -o generated/carp/source.tar.gz HEAD
@@ -64,11 +67,25 @@ jobs:
           mkdir -p bin
           stack --system-ghc install --local-bin-path "$CARP_DIR/bin"
           echo "$CARP_DIR/bin" >> "$GITHUB_PATH"
-      - name: Build and execute native bootstrap
+      - name: Debug compiler and execution tests
         run: |
-          carp -b compiler/carp/bootstrap.carp
-          test -x generated/carp/blot-carp-bootstrap
-          generated/carp/blot-carp-bootstrap
+          /usr/bin/time -v bash compiler/carp/build.sh debug
+          node --experimental-transform-types compiler/carp/test.mjs
+          node --experimental-transform-types compiler/carp/stress.mjs
+      - name: Sanitized compiler and execution tests
+        env:
+          ASAN_OPTIONS: detect_leaks=0
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: |
+          bash compiler/carp/build.sh sanitize
+          node --experimental-transform-types compiler/carp/test.mjs
+          node --experimental-transform-types compiler/carp/stress.mjs
+          ASAN_OPTIONS=detect_leaks=1 generated/carp/blotc-carp build examples/carp_scalar.blot generated/carp/leak-check.wasm
+      - name: Release compiler and execution tests
+        run: |
+          /usr/bin/time -v bash compiler/carp/build.sh release
+          node --experimental-transform-types compiler/carp/test.mjs
+          node --experimental-transform-types compiler/carp/stress.mjs
       - name: Package diagnostic toolchain
         if: always()
         run: |
@@ -84,7 +101,7 @@ jobs:
 
   reference:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 20
     env:
       BEND_NO_TELEMETRY: '1'
       DENO_DIR: ${{ github.workspace }}/.deno-cache
@@ -109,21 +126,107 @@ jobs:
           echo "$(dirname "$BEND")" >> "$GITHUB_PATH"
           "$BEND" version
           "$BEND" guide > "$RUNNER_TEMP/bend-guide.txt"
-      - name: Build proofs and both unchanged reference compilers
-        run: |
-          bend version
-          deno task build:compiler:all
-          deno cache compiler/native.ts
-      - name: Archive reference for reproducible parity debugging
-        if: always()
+      - name: Archive toolchains before expensive builds
         run: |
           mkdir -p generated/carp-reference
           cp "$(command -v deno)" generated/carp-reference/deno
+          cp "$(command -v bun)" generated/carp-reference/bun
           cp "$RUNNER_TEMP/bend.tar.gz" generated/carp-reference/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reference-toolchains
+          path: generated/carp-reference/
+          retention-days: 7
+      - name: Build proofs and unchanged JS reference
+        timeout-minutes: 15
+        run: |
+          bend version
+          deno task build:compiler:js
+          deno cache compiler/source.ts compiler/native.ts
+          tar -czf generated/carp-reference/reference-js.tar.gz generated/compiler .deno-cache
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reference-js
+          path: generated/carp-reference/reference-js.tar.gz
+          retention-days: 7
+
+  baseline:
+    needs: reference
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      BEND_NO_TELEMETRY: '1'
+      DENO_DIR: ${{ github.workspace }}/.deno-cache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: reference-toolchains
+          path: generated/carp-reference
+      - uses: actions/download-artifact@v4
+        with:
+          name: reference-js
+          path: generated/carp-reference
+      - name: Restore reference toolchain
+        run: |
+          tar -xzf generated/carp-reference/reference-js.tar.gz
+          mkdir -p "$RUNNER_TEMP/bend-toolchain"
+          tar -xzf generated/carp-reference/bend.tar.gz -C "$RUNNER_TEMP/bend-toolchain"
+          BEND=$(find "$RUNNER_TEMP/bend-toolchain" -type f -name bend -perm -u+x -print -quit)
+          test -n "$BEND"
+          echo "$(dirname "$BEND")" >> "$GITHUB_PATH"
+      - name: Build unchanged native reference at development optimization
+        timeout-minutes: 20
+        run: |
+          bend version
+          bend compiler/native_backend_regression.bend -o generated/compiler/native-backend-regression.c
+          clang -std=c11 -O0 -w -pthread generated/compiler/native-backend-regression.c -lm -o generated/compiler/native-backend-regression
+          generated/compiler/native-backend-regression --threads 1
+          generated/compiler/native-backend-regression --threads 4
+          bend compiler/native_main.bend -o generated/compiler/blotc.c
+          clang -std=c11 -O0 -w -pthread generated/compiler/blotc.c -lm -o generated/compiler/blotc
+      - name: Existing compiler regression suite
+        timeout-minutes: 15
+        run: deno test --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts
+      - name: Archive native reference
+        if: always()
+        run: |
           tar -czf generated/carp-reference/reference.tar.gz generated/compiler .deno-cache
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: carp-reference
-          path: generated/carp-reference/
+          path: generated/carp-reference/reference.tar.gz
           retention-days: 7
+
+  parity:
+    needs: [native, reference]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      DENO_DIR: ${{ github.workspace }}/.deno-cache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: carp-native-diagnostics
+          path: generated/carp
+      - uses: actions/download-artifact@v4
+        with:
+          name: reference-js
+          path: generated/carp-reference
+      - name: Compare both implementations on the shared corpus
+        run: |
+          chmod +x generated/carp/blotc-carp
+          tar -xzf generated/carp-reference/reference-js.tar.gz
+          deno run --allow-read --allow-write --allow-run=generated/carp/blotc-carp --allow-env compiler/carp/reference_test.mjs

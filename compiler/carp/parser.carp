@@ -1,0 +1,216 @@
+; Keep mutually recursive parser functions at file scope for Carp name resolution.
+(defn parse-token [state]
+  (Array.unsafe-nth (ParseState.tokens state) @(ParseState.position state)))
+(defn parse-at [state] @(Token.offset (parse-token state)))
+(defn parse-is [state text] (= (Token.text (parse-token state)) text))
+(defn parse-next-is [state text]
+  (let [next (+ @(ParseState.position state) 1) tokens (ParseState.tokens state)]
+    (and (< next (Array.length tokens)) (= (Token.text (Array.unsafe-nth tokens next)) text))))
+(defn parse-advance [state]
+  (ParseState.set-position! state (+ @(ParseState.position state) 1)))
+(defn parse-take [state text]
+  (if (parse-is state text) (do (parse-advance state) true) false))
+(defn parse-expect [state text]
+  (when (not (parse-take state text)) (fail &(String.append "syntax: expected " text) (parse-at state))))
+(defn parse-newlines [state] (while (parse-take state "<newline>") ()))
+(defn parse-line-end [state]
+  (let [position @(ParseState.position state)
+        previous (Token.text (Array.unsafe-nth (ParseState.tokens state) (- position 1)))]
+    (when (not (or (parse-is state "<newline>") (parse-is state "<dedent>")
+                   (parse-is state "<eof>") (= previous "<dedent>")))
+      (fail "syntax: expected a line boundary" (parse-at state)))))
+(defn parse-name [state]
+  (do
+    (when (not (= @(Token.kind (parse-token state)) 1)) (fail "syntax: expected a name" (parse-at state)))
+    (let [text @(Token.text (parse-token state))]
+      (do (parse-advance state) text))))
+(defn parse-scalar-type [state]
+  (let [offset (parse-at state) text (parse-name state)]
+    (cond (= &text "U32") u32-type (= &text "F32") f32-type
+          (= &text "Bool") bool-type (= &text "Unit") unit-type
+          (fail "unsupported_type: scalar annotations only in this milestone" offset))))
+(defn parse-simple [state tag a b c text offset]
+  (Arena.fresh (ParseState.program state) tag a b c text offset))
+(defn parse-literal [state tag bits offset]
+  (Arena.add (ParseState.program state) tag -1 -1 -1 @"" bits offset tag))
+(defn parse-comparison [op]
+  (or (= op "==") (= op "!=") (= op "<") (= op "<=") (= op ">") (= op ">=")))
+(defn parse-precedence [op]
+  (cond (parse-comparison op) 30
+        (or (= op "+") (= op "-")) 60
+        (or (= op "*") (= op "/")) 70
+        -1))
+(defn parse-builtin-unary [op]
+  (or (= op "@f32.neg") (= op "@f32.abs") (= op "@f32.sqrt")
+      (= op "@f32.floor") (= op "@f32.ceil") (= op "@f32.trunc")
+      (= op "@u32.to_f32") (= op "@f32.to_u32")))
+(defn parse-builtin-binary [op]
+  (or (= op "@u32.add") (= op "@u32.sub") (= op "@u32.mul")
+      (= op "@u32.eq") (= op "@u32.lt")
+      (= op "@f32.add") (= op "@f32.sub") (= op "@f32.mul") (= op "@f32.div")
+      (= op "@f32.eq") (= op "@f32.ne") (= op "@f32.lt") (= op "@f32.le")
+      (= op "@f32.gt") (= op "@f32.ge")))
+(defn parse-apply [state callee argument offset]
+  (let [world (ParseState.program state) n @(Arena.node world callee)]
+    (cond
+      (and (= @(Node.tag &n) 4) (parse-builtin-unary (Node.text &n)))
+        (parse-simple state 6 argument -1 -1 @(Node.text &n) offset)
+      (= @(Node.tag &n) 7)
+        (let [head @(Arena.node world @(Node.a &n))]
+          (if (and (= @(Node.tag &head) 4) (parse-builtin-binary (Node.text &head)))
+            (parse-simple state 5 @(Node.b &n) argument -1 @(Node.text &head) offset)
+            (parse-simple state 7 callee argument -1 @"" offset)))
+      (parse-simple state 7 callee argument -1 @"" offset))))
+(defn parse-starts-atom [state]
+  (let [text (Token.text (parse-token state)) kind @(Token.kind (parse-token state))]
+    (or (= kind 2) (= kind 3) (= text "(")
+        (and (= kind 1)
+             (not (or (= text "else") (= text "of") (= text "in")
+                      (= text "return") (= text "let") (= text "const")
+                      (= text "if") (= text "for") (= text "type") (= text "entry")))))))
+(defn parse-atom [state]
+  (let [offset (parse-at state) kind @(Token.kind (parse-token state)) text @(Token.text (parse-token state))]
+    (cond
+      (= kind 2) (do (parse-advance state) (parse-literal state 1 (Lexer.integer &text offset) offset))
+      (= kind 3) (do (parse-advance state) (parse-literal state 3 (Host.float-bits (Host.float &text)) offset))
+      (parse-take state "True") (parse-literal state 2 1l offset)
+      (parse-take state "False") (parse-literal state 2 0l offset)
+      (parse-take state "(")
+        (if (parse-take state ")") (parse-literal state 0 0l offset)
+          (let [value (parse-expression state 0)] (do (parse-expect state ")") value)))
+      (parse-take state "-")
+        (parse-simple state 6 (parse-expression state 80) -1 -1 @"@f32.neg" offset)
+      (parse-take state "do")
+        (parse-simple state 8 (parse-suite state) -1 -1 @"" offset)
+      (= &text "fn") (fail "unsupported_closure: nested or returned functions are not ported yet" offset)
+      (= kind 1) (do (parse-advance state) (parse-simple state 4 -1 -1 -1 text offset))
+      (fail "syntax: expected an expression" offset))))
+(defn parse-expression [state minimum]
+  (do
+    (when (>= @(ParseState.depth state) 256) (fail "resource_limit: expression nesting" (parse-at state)))
+    (ParseState.set-depth! state (+ @(ParseState.depth state) 1))
+    (let [left (parse-atom state) running true compared false]
+      (do
+        (while running
+          (let [op @(Token.text (parse-token state)) offset (parse-at state) priority (parse-precedence &op)]
+            (cond
+              (= (Token.text (Array.unsafe-nth (ParseState.tokens state) (- @(ParseState.position state) 1))) "<dedent>")
+                (set! running false)
+              (and (>= priority minimum) (>= priority 0))
+                (do
+                  (when (and compared (= priority 30)) (fail "syntax: comparisons are non-associative" offset))
+                  (parse-advance state)
+                  (let [right (parse-expression state (+ priority 1))]
+                    (set! left (parse-simple state 5 left right -1 @&op offset)))
+                  (set! compared (= priority 30)))
+              (and (<= minimum 90) (parse-starts-atom state))
+                (let [argument (parse-expression state 91)]
+                  (set! left (parse-apply state left argument offset)))
+              (set! running false))))
+        (ParseState.set-depth! state (- @(ParseState.depth state) 1))
+        left))))
+(defn parse-suite [state]
+  (do
+    (when (>= @(ParseState.depth state) 256) (fail "resource_limit: suite nesting" (parse-at state)))
+    (ParseState.set-depth! state (+ @(ParseState.depth state) 1))
+    (parse-expect state ":") (parse-expect state "<newline>") (parse-newlines state) (parse-expect state "<indent>")
+    (let [items (the (Array Int) []) result -1]
+      (do
+        (parse-newlines state)
+        (while (not (or (parse-is state "<dedent>") (parse-is state "<eof>")))
+          (do (Array.push-back! &items (parse-statement state)) (parse-line-end state) (parse-newlines state)))
+        (parse-expect state "<dedent>")
+        (let [index (- (Array.length &items) 1)]
+          (while (>= index 0)
+            (do
+              (set! result (parse-simple state 13 @(Array.unsafe-nth &items index) result -1 @"" (parse-at state)))
+              (set! index (- index 1)))))
+        (ParseState.set-depth! state (- @(ParseState.depth state) 1))
+        result))))
+(defn parse-statement [state]
+  (let [offset (parse-at state)]
+    (cond
+      (parse-take state "return")
+        (parse-simple state 9 (parse-expression state 0) -1 -1 @"" offset)
+      (parse-take state "let")
+        (let [text (parse-name state)
+              annotation (if (parse-take state ":") (parse-scalar-type state) (Types.fresh (ParseState.program state)))]
+          (do
+            (parse-expect state "=")
+            (let [value (parse-expression state 0)]
+              (Arena.add (ParseState.program state) 10 value -1 -1 text 0l offset annotation))))
+      (parse-take state "if")
+        (let [condition (parse-expression state 0) yes (parse-suite state)
+              no (if (parse-take state "else") (parse-suite state) -1)]
+          (parse-simple state 12 condition yes no @"" offset))
+      (parse-take state "for")
+        (if (parse-take state "ever")
+          (parse-simple state 16 (parse-suite state) -1 -1 @"" offset)
+          (let [explicit (parse-take state "let") index @"$discard"]
+            (do
+              (when (or explicit (parse-next-is state "in"))
+                (do (set! index (parse-name state)) (parse-expect state "in")))
+              (let [start (parse-expression state 0)]
+                (do
+                  (when (not (parse-take state ".."))
+                    (fail "unsupported_array_loop: this milestone iterates U32 ranges only" offset))
+                  (let [end (parse-expression state 0) body (parse-suite state)]
+                    (parse-simple state 15 start end body index offset)))))))
+      (parse-next-is state ":=")
+        (let [text (parse-name state)]
+          (do (parse-expect state ":=") (parse-simple state 11 (parse-expression state 0) -1 -1 text offset)))
+      (parse-simple state 14 (parse-expression state 0) -1 -1 @"" offset))))
+(defn parse-declaration [state]
+  (let [world (ParseState.program state) exported (parse-take state "entry")
+        offset (parse-at state) is-let (parse-take state "let")]
+    (do
+      (when (not is-let) (parse-expect state "const"))
+      (let [text (parse-name state) annotation-input -1 annotation-result -1
+            input (Types.fresh world) result (Types.fresh world)
+            parameter @"$unit" function false body -1]
+        (do
+          (when (>= (Arena.find-decl world &text) 0) (fail "duplicate_name: duplicate declaration" offset))
+          (when (parse-take state ":")
+            (let [first (parse-scalar-type state)]
+              (if (parse-take state "->")
+                (do (set! annotation-input first) (set! annotation-result (parse-scalar-type state)))
+                (set! annotation-result first))))
+          (parse-expect state "=")
+          (if (parse-take state "fn")
+            (do
+              (set! function true)
+              (if (parse-take state "(")
+                (if (parse-take state ")") (Types.merge world input unit-type offset)
+                  (do
+                    (set! parameter (parse-name state))
+                    (when (parse-take state ":") (Types.merge world input (parse-scalar-type state) offset))
+                    (parse-expect state ")")))
+                (set! parameter (parse-name state)))
+              (when (parse-take state "->") (Types.merge world result (parse-scalar-type state) offset))
+              (parse-expect state "=>")
+              (set! body (parse-expression state 0)))
+            (do
+              (when is-let (fail "unsupported_runtime_init: top-level let values are not ported yet" offset))
+              (Types.merge world input unit-type offset)
+              (set! body (parse-expression state 0))))
+          (when (>= annotation-input 0)
+            (do
+              (when (not function) (fail "type_mismatch: expected a function" offset))
+              (Types.merge world input annotation-input offset)))
+          (when (and function (>= annotation-result 0) (< annotation-input 0))
+            (fail "type_mismatch: a scalar annotation cannot describe a function" offset))
+          (when (>= annotation-result 0) (Types.merge world result annotation-result offset))
+          (Array.push-back! (Program.declarations world)
+            (Decl.init text exported function parameter input result body offset [])))))))
+(defn parse-parse [source]
+  (let [state (ParseState.init (Lexer.lex source) 0 0 (Program.init [] [] [0 1 2 3]))]
+    (do
+      (parse-newlines &state)
+      (while (not (parse-is &state "<eof>"))
+        (do
+          (parse-declaration &state)
+          (parse-line-end &state)
+          (parse-newlines &state)))
+      @(ParseState.program &state))))
+
+(defmodule Parse (defn parse [source] (parse-parse source)))

@@ -1,0 +1,214 @@
+; Direct binary Wasm generation, not WAT or an external assembler. Declaration
+; indices, local slots and section lengths remain deterministic in source order.
+(deftype Link [live (Array Bool) functions (Array Int) globals (Array Int) function-count Int global-count Int])
+
+(defn link-add [world link work declaration]
+  (when (not @(Array.unsafe-nth (Link.live link) declaration))
+    (do (Array.aset! (Link.live link) declaration true)
+        (Array.push-back! work @(Decl.body (Arena.declaration world declaration))))))
+(defn link-build [world]
+  (let [count (Array.length (Program.declarations world))
+        link (Link.init [] [] [] 0 0) work (the (Array Int) []) i 0]
+    (do
+      (while (< i count)
+        (do (Array.push-back! (Link.live &link) false)
+            (Array.push-back! (Link.functions &link) -1)
+            (Array.push-back! (Link.globals &link) -1) (set! i (+ i 1))))
+      (set! i 0)
+      (while (< i count)
+        (do (when @(Decl.exported (Arena.declaration world i)) (link-add world &link &work i))
+            (set! i (+ i 1))))
+      (while (> (Array.length &work) 0)
+        (let [id (Array.pop-back! &work)]
+          (when (>= id 0)
+            (let [n @(Arena.node world id) tag @(Node.tag &n)]
+              (cond
+                (= tag 4) (when (< @(Node.slot &n) -1) (link-add world &link &work (- -2 @(Node.slot &n))))
+                (= tag 7)
+                  (do (link-add world &link &work @(Node.slot &n)) (Array.push-back! &work @(Node.b &n)))
+                (>= tag 5)
+                  (do (Array.push-back! &work @(Node.a &n))
+                      (when (or (= tag 5) (= tag 12) (= tag 13) (= tag 15)) (Array.push-back! &work @(Node.b &n)))
+                      (when (or (= tag 12) (= tag 15)) (Array.push-back! &work @(Node.c &n))))
+                ())))))
+      (set! i 0)
+      (while (< i count)
+        (do
+          (when @(Array.unsafe-nth (Link.live &link) i)
+            (let [d @(Arena.declaration world i)]
+              (do
+                (when (>= (Types.root world @(Decl.result &d)) 4)
+                  (fail "unsupported_polymorphism: reachable scalar result is not concrete" @(Decl.offset &d)))
+                (if @(Decl.function &d)
+                  (do
+                    (when (>= (Types.root world @(Decl.input &d)) 4)
+                      (fail "unsupported_polymorphism: reachable scalar parameter is not concrete" @(Decl.offset &d)))
+                    (Array.aset! (Link.functions &link) i @(Link.function-count &link))
+                    (Link.set-function-count! &link (+ @(Link.function-count &link) 1)))
+                  (do (Array.aset! (Link.globals &link) i @(Link.global-count &link))
+                      (Link.set-global-count! &link (+ @(Link.global-count &link) 1)))))))
+          (set! i (+ i 1))))
+      link)))
+
+(defn emit-scalar [out ty bits]
+  (if (= ty f32-type)
+    (do (Bytes.byte out 67) (Bytes.f32 out bits))
+    (do (Bytes.byte out 65) (Bytes.signed out bits))))
+(defn emit-index [out opcode index]
+  (do (Bytes.byte out opcode) (Bytes.unsigned out (Long.from-int index))))
+(defn emit-binary [out op ty]
+  (let [code (Operations.binary op)]
+    (Bytes.byte out
+      (if (= ty f32-type)
+        (cond (= code 0) 146 (= code 1) 147 (= code 2) 148 (= code 3) 149
+              (= code 4) 91 (= code 5) 92 (= code 6) 93 (= code 7) 95 (= code 8) 94 96)
+        (cond (= code 0) 106 (= code 1) 107 (= code 2) 108
+              (= code 4) 70 (= code 5) 71 (= code 6) 73 (= code 7) 77 (= code 8) 75 79)))))
+(defn emit-unary [out op]
+  (cond
+    (= op "@f32.to_u32") (do (Bytes.byte out 252) (Bytes.byte out 1))
+    (Bytes.byte out
+      (cond (= op "@f32.neg") 140 (= op "@f32.abs") 139 (= op "@f32.sqrt") 145
+            (= op "@f32.floor") 142 (= op "@f32.ceil") 141 (= op "@f32.trunc") 143
+            (= op "@u32.to_f32") 179
+            (fail "internal_error: unrecognized unary instruction" 0)))))
+(sig emit-expression (Fn [&Program &Link &(Array Int) Int] ()))
+(defn emit-expression [world link out id]
+  (let [n @(Arena.node world id) tag @(Node.tag &n) a @(Node.a &n) b @(Node.b &n)]
+    (cond
+      (< tag 4) (emit-scalar out tag @(Node.bits &n))
+      (= tag 4)
+        (let [slot @(Node.slot &n)]
+          (if (>= slot 0) (emit-index out 32 slot)
+            (emit-index out 35 @(Array.unsafe-nth (Link.globals link) (- -2 slot)))))
+      (= tag 5)
+        (do (emit-expression world link out a) (emit-expression world link out b)
+            (emit-binary out (Node.text &n) (Types.root world @(Node.ty (Arena.node world a)))))
+      (= tag 6) (do (emit-expression world link out a) (emit-unary out (Node.text &n)))
+      (= tag 7)
+        (do (emit-expression world link out b)
+            (emit-index out 16 @(Array.unsafe-nth (Link.functions link) @(Node.slot &n))))
+      (= tag 8)
+        (do
+          (Bytes.byte out 2) (Bytes.byte out (Types.wasm (Types.root world @(Node.ty &n))))
+          (let [falls (emit-sequence world link out a 0)]
+            (if falls (emit-scalar out unit-type 0l) (Bytes.byte out 0)))
+          (Bytes.byte out 11))
+      (fail "internal_error: non-expression in Wasm emission" @(Node.offset &n)))))
+(sig emit-statement (Fn [&Program &Link &(Array Int) Int Int] Bool))
+(defn emit-statement [world link out id depth]
+  (let [n @(Arena.node world id) tag @(Node.tag &n) a @(Node.a &n)]
+    (cond
+      (= tag 9) (do (emit-expression world link out a) (emit-index out 12 depth) false)
+      (or (= tag 10) (= tag 11))
+        (do (emit-expression world link out a) (emit-index out 33 @(Node.slot &n)) true)
+      (= tag 12)
+        (do
+          (emit-expression world link out a) (Bytes.byte out 4) (Bytes.byte out 64)
+          (let [yes (emit-sequence world link out @(Node.b &n) (+ depth 1)) no true]
+            (do
+              (when (>= @(Node.c &n) 0)
+                (do (Bytes.byte out 5) (set! no (emit-sequence world link out @(Node.c &n) (+ depth 1)))))
+              (Bytes.byte out 11)
+              (or yes no))))
+      (= tag 15)
+        (do
+          (emit-expression world link out a) (emit-index out 33 @(Node.slot &n))
+          (emit-expression world link out @(Node.b &n)) (emit-index out 33 @(Node.extra &n))
+          (Bytes.byte out 2) (Bytes.byte out 64) (Bytes.byte out 3) (Bytes.byte out 64)
+          (emit-index out 32 @(Node.slot &n)) (emit-index out 32 @(Node.extra &n))
+          (Bytes.byte out 79) (emit-index out 13 1)
+          (when (>= @(Node.index &n) 0)
+            (do (emit-index out 32 @(Node.slot &n)) (emit-index out 33 @(Node.index &n))))
+          (let [falls (the Bool (emit-sequence world link out @(Node.c &n) (+ depth 2)))] ())
+          (emit-index out 32 @(Node.slot &n)) (emit-scalar out u32-type 1l)
+          (Bytes.byte out 106) (emit-index out 33 @(Node.slot &n))
+          (emit-index out 12 0) (Bytes.byte out 11) (Bytes.byte out 11)
+          true)
+      (= tag 16)
+        (do
+          (Bytes.byte out 3) (Bytes.byte out 64)
+          (let [falls (the Bool (emit-sequence world link out a (+ depth 1)))] ())
+          (emit-index out 12 0) (Bytes.byte out 11) (Bytes.byte out 0)
+          false)
+      (= tag 14) (do (emit-expression world link out a) (Bytes.byte out 26) true)
+      (fail "internal_error: non-statement in Wasm emission" @(Node.offset &n)))))
+(sig emit-sequence (Fn [&Program &Link &(Array Int) Int Int] Bool))
+(defn emit-sequence [world link out first depth]
+  (let [id first falls true]
+    (do
+      (while (and (>= id 0) falls)
+        (let [n @(Arena.node world id)]
+          (do (set! falls (emit-statement world link out @(Node.a &n) depth)) (set! id @(Node.b &n)))))
+      falls)))
+
+(defmodule Wasm
+  (defn compile [world fuel]
+    (let [link (link-build world) count (Array.length (Program.declarations world))
+          evaluation (Evaluation.init [] [] fuel 0) i 0
+          output [0 97 115 109 1 0 0 0]
+          types (the (Array Int) []) functions (the (Array Int) [])
+          globals (the (Array Int) []) exports (the (Array Int) [])
+          bodies (the (Array Int) []) abi (the (Array Int) [])
+          exported-functions 0 exported-globals 0]
+      (do
+        (while (< i count)
+          (do (Array.push-back! (Evaluation.values &evaluation) 0l)
+              (Array.push-back! (Evaluation.status &evaluation) 0) (set! i (+ i 1))))
+        (set! i 0)
+        (while (< i count)
+          (do
+            (when @(Decl.exported (Arena.declaration world i))
+              (if @(Decl.function (Arena.declaration world i)) (set! exported-functions (+ exported-functions 1))
+                (set! exported-globals (+ exported-globals 1))))
+            (set! i (+ i 1))))
+        (Bytes.unsigned &types (Long.from-int @(Link.function-count &link)))
+        (Bytes.unsigned &functions (Long.from-int @(Link.function-count &link)))
+        (Bytes.unsigned &globals (Long.from-int @(Link.global-count &link)))
+        (Bytes.unsigned &bodies (Long.from-int @(Link.function-count &link)))
+        (Bytes.unsigned &exports (Long.from-int (+ exported-functions exported-globals)))
+        (Bytes.name &abi "blot:abi") (Bytes.byte &abi 2)
+        (Bytes.unsigned &abi (Long.from-int exported-functions))
+        (set! i 0)
+        (while (< i count)
+          (do
+            (when @(Array.unsafe-nth (Link.live &link) i)
+              (let [d @(Arena.declaration world i) ty (Types.root world @(Decl.result &d))]
+                (if @(Decl.function &d)
+                  (let [parameter (Types.root world @(Decl.input &d))
+                        code (the (Array Int) []) locals (Decl.locals &d) j 1]
+                    (do
+                      (Bytes.byte &types 96) (Bytes.byte &types 1) (Bytes.byte &types (Types.wasm parameter))
+                      (Bytes.byte &types 1) (Bytes.byte &types (Types.wasm ty))
+                      (Bytes.unsigned &functions (Long.from-int @(Array.unsafe-nth (Link.functions &link) i)))
+                      (when @(Decl.exported &d)
+                        (do
+                          (Bytes.name &exports (Decl.name &d)) (Bytes.byte &exports 0)
+                          (Bytes.unsigned &exports (Long.from-int @(Array.unsafe-nth (Link.functions &link) i)))
+                          (Bytes.name &abi (Decl.name &d)) (Bytes.byte &abi parameter) (Bytes.byte &abi ty)))
+                      (Bytes.unsigned &code (Long.from-int (- (Array.length locals) 1)))
+                      (while (< j (Array.length locals))
+                        (let [local-type (Types.root world @(Array.unsafe-nth locals j))]
+                          (do
+                            (when (>= local-type 4) (fail "unsupported_polymorphism: unresolved local type" @(Decl.offset &d)))
+                            (Bytes.byte &code 1) (Bytes.byte &code (Types.wasm local-type)) (set! j (+ j 1)))))
+                      (emit-expression world &link &code @(Decl.body &d)) (Bytes.byte &code 11)
+                      (Bytes.unsigned &bodies (Long.from-int (Array.length &code))) (Bytes.append &bodies &code)))
+                  (do
+                    (Bytes.byte &globals (Types.wasm ty)) (Bytes.byte &globals 0)
+                    (emit-scalar &globals ty (eval-global world &evaluation i)) (Bytes.byte &globals 11)
+                    (when @(Decl.exported &d)
+                      (do (Bytes.name &exports (Decl.name &d)) (Bytes.byte &exports 3)
+                          (Bytes.unsigned &exports (Long.from-int @(Array.unsafe-nth (Link.globals &link) i)))))))))
+            (set! i (+ i 1))))
+        (Bytes.unsigned &abi (Long.from-int exported-globals)) (set! i 0)
+        (while (< i count)
+          (let [d @(Arena.declaration world i)]
+            (do
+              (when (and @(Decl.exported &d) (not @(Decl.function &d)))
+                (do (Bytes.name &abi (Decl.name &d)) (Bytes.byte &abi (Types.root world @(Decl.result &d)))))
+              (set! i (+ i 1)))))
+        (Bytes.section &output 1 &types) (Bytes.section &output 3 &functions)
+        (Bytes.section &output 6 &globals) (Bytes.section &output 7 &exports)
+        (Bytes.section &output 10 &bodies) (Bytes.section &output 0 &abi)
+        output))))

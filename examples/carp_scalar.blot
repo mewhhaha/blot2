@@ -1,0 +1,12 @@
+// Standalone Carp milestone example; also valid input for the reference.
+const factorial = fn (n: U32) -> U32 => do:
+  if n <= 1:
+    return 1
+  return n * factorial (n - 1)
+
+entry const answer = factorial 5
+entry const sum_to = fn (end: U32) => do:
+  let total = 0
+  for index in 0..end:
+    total := self + index
+  return total

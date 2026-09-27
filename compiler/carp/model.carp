@@ -1,0 +1,51 @@
+; Compact arena: children and references are integer IDs, never owning pointers.
+; Tags: 0 unit, 1 u32, 2 bool, 3 f32, 4 name, 5 binary, 6 unary,
+; 7 call, 8 do, 9 return, 10 let, 11 rebind, 12 if, 13 sequence,
+; 14 discard, 15 range loop, 16 forever loop.
+(deftype Node [tag Int a Int b Int c Int slot Int extra Int index Int text String bits Long offset Int ty Int])
+(deftype Decl [name String exported Bool function Bool parameter String input Int result Int body Int offset Int locals (Array Int)])
+(deftype Program [nodes (Array Node) declarations (Array Decl) parents (Array Int)])
+(deftype ParseState [tokens (Array Token) position Int depth Int program Program])
+(deftype Binding [name String slot Int ty Int])
+
+(defmodule Types
+  (defn fresh [program]
+    (let [parents (Program.parents program) index (Array.length parents)]
+      (do (Array.push-back! parents index) index)))
+  (defn root [program index]
+    (let [parents (Program.parents program) result index current index]
+      (do
+        (while (not (= result @(Array.unsafe-nth parents result)))
+          (set! result @(Array.unsafe-nth parents result)))
+        (while (not (= current result))
+          (let [next @(Array.unsafe-nth parents current)]
+            (do (Array.aset! parents current result) (set! current next))))
+        result)))
+  (defn merge [program a b offset]
+    (let [left (root program a) right (root program b)]
+      (when (not (= left right))
+        (cond
+          (>= left 4) (Array.aset! (Program.parents program) left right)
+          (>= right 4) (Array.aset! (Program.parents program) right left)
+          (fail "type_mismatch: incompatible scalar types" offset)))))
+  (defn wasm [type] (if (= type f32-type) 125 127)))
+
+(defmodule Arena
+  (defn add [program tag a b c text bits offset ty]
+    (let [nodes (Program.nodes program) id (Array.length nodes)]
+      (do
+        (when (>= id 1000000) (fail "resource_limit: too many compiler nodes" offset))
+        (Array.push-back! nodes (Node.init tag a b c -1 -1 -1 text bits offset ty))
+        id)))
+  (defn fresh [program tag a b c text offset]
+    (let [ty (Types.fresh program)] (add program tag a b c text 0l offset ty)))
+  (defn node [program index] (Array.unsafe-nth (Program.nodes program) index))
+  (defn find-decl [program name]
+    (let [decls (Program.declarations program) i 0 found -1]
+      (do
+        (while (< i (Array.length decls))
+          (do
+            (when (= (Decl.name (Array.unsafe-nth decls i)) name) (set! found i))
+            (set! i (+ i 1))))
+        found)))
+  (defn declaration [program index] (Array.unsafe-nth (Program.declarations program) index)))
