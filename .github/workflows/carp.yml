@@ -81,3 +81,49 @@ jobs:
           name: carp-native-diagnostics
           path: generated/carp/
           retention-days: 7
+
+  reference:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      BEND_NO_TELEMETRY: '1'
+      DENO_DIR: ${{ github.workspace }}/.deno-cache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install verified Bend reference release
+        run: |
+          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/bend-toolchain"
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend-toolchain"
+          BEND=$(find "$RUNNER_TEMP/bend-toolchain" -type f -name bend -perm -u+x -print -quit)
+          test -n "$BEND"
+          echo "$(dirname "$BEND")" >> "$GITHUB_PATH"
+          "$BEND" version
+          "$BEND" guide > "$RUNNER_TEMP/bend-guide.txt"
+      - name: Build proofs and both unchanged reference compilers
+        run: |
+          bend version
+          deno task build:compiler:all
+          deno cache compiler/native.ts
+      - name: Archive reference for reproducible parity debugging
+        if: always()
+        run: |
+          mkdir -p generated/carp-reference
+          cp "$(command -v deno)" generated/carp-reference/deno
+          cp "$RUNNER_TEMP/bend.tar.gz" generated/carp-reference/
+          tar -czf generated/carp-reference/reference.tar.gz generated/compiler .deno-cache
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: carp-reference
+          path: generated/carp-reference/
+          retention-days: 7
