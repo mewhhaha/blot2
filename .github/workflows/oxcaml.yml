@@ -1,0 +1,55 @@
+name: OxCaml compiler
+on:
+  push:
+    branches: [rebuild/oxcaml-compiler]
+  pull_request:
+    paths:
+      - 'compiler/oxcaml/**'
+      - '.github/workflows/oxcaml.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: oxcaml-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  portable:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y ocaml-nox
+      - run: ocamlopt -version && make -C compiler/oxcaml test
+      - name: Export development snapshot
+        run: |
+          mkdir -p snapshot
+          git archive --format=tar.gz HEAD > snapshot/source.tar.gz
+          tar -czf snapshot/ocaml-tools.tar.gz /usr/bin/ocamlopt* /usr/bin/ocamlc* /usr/bin/ocamlrun /usr/lib/ocaml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oxcaml-development-snapshot-${{ github.sha }}
+          path: snapshot/
+          retention-days: 3
+  oxcaml:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: sudo apt-get update && sudo apt-get install -y opam autoconf build-essential
+      - uses: actions/cache@v4
+        with:
+          path: ~/.opam
+          key: oxcaml-5.2.0-ox-${{ runner.os }}-${{ runner.arch }}-v1
+      - name: Install OxCaml
+        run: |
+          opam init --bare --disable-sandboxing -y
+          if ! opam switch list --short | grep -Fxq 5.2.0+ox; then
+            opam switch create 5.2.0+ox --repos ox=git+https://github.com/oxcaml/opam-repository.git,default -y
+          fi
+          opam exec --switch 5.2.0+ox -- ocamlopt -config
+      - name: Build and test with OxCaml
+        run: opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml test
