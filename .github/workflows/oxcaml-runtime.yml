@@ -1,0 +1,67 @@
+name: OxCaml runtime migration
+on:
+  push:
+    branches: [rebuild/oxcaml-compiler]
+    paths:
+      - '.github/workflows/oxcaml-runtime.yml'
+      - 'compiler/oxcaml/bootstrap/runtime.patch'
+      - 'compiler/oxcaml/native_parallel_*.ml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  materialize:
+    if: github.ref == 'refs/heads/rebuild/oxcaml-compiler'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: rebuild/oxcaml-compiler
+      - name: Check and apply reviewed runtime changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ github.sha }}'
+          git apply --check compiler/oxcaml/bootstrap/runtime.patch
+          git apply compiler/oxcaml/bootstrap/runtime.patch
+          python3 compiler/oxcaml/bootstrap/port.py
+          test "$(grep -h 'Native_parallel\.' compiler/oxcaml/core/*.ml | wc -l)" -eq 16
+      - run: sudo apt-get update && sudo apt-get install -y opam autoconf build-essential
+      - uses: actions/cache@v4
+        with:
+          path: ~/.opam
+          key: oxcaml-5.2.0-ox-${{ runner.os }}-${{ runner.arch }}-v1
+      - name: Install OxCaml
+        run: |
+          git config --global maintenance.auto false
+          git config --global gc.auto 0
+          opam init --bare --disable-sandboxing -y
+          if ! opam switch list --short | grep -Fxq 5.2.0+ox; then
+            opam switch create 5.2.0+ox --repos ox=git+https://github.com/oxcaml/opam-repository.git,default -y
+          fi
+      - name: Test actual multicore build
+        run: opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml test
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Test standalone source compilation without reference artifacts
+        run: |
+          test ! -f generated/compiler/compiler.js
+          deno run --allow-all compiler/oxcaml/smoke.ts
+          deno run --allow-read --allow-write --allow-run compiler/oxcaml/cli.ts build examples/scalar.blot build/oxcaml-smoke.wasm
+      - name: Commit tested runtime and native fork points
+        run: |
+          git add compiler/artifact_options.ts compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts compiler/oxcaml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Enable tested persistent OxCaml workers and finish native host isolation'
+          git push origin HEAD:rebuild/oxcaml-compiler
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oxcaml-runtime-executable
+          path: compiler/oxcaml/_build/blotc
+          retention-days: 7

@@ -1,0 +1,235 @@
+--- a/compiler/native.ts
++++ b/compiler/native.ts
+@@ -1,11 +1,11 @@
+-import {
+-  type Analysis,
+-  type AnalyzedArtifact,
+-  type AnalyzedArtifactOptions,
+-  type Artifact,
+-  type ArtifactOptions,
+-  type CompileOptions,
+-  includesAnalysis,
++import { includesAnalysis } from "./artifact_options.ts";
++import type {
++  Analysis,
++  AnalyzedArtifact,
++  AnalyzedArtifactOptions,
++  Artifact,
++  ArtifactOptions,
++  CompileOptions,
+ } from "./host.ts";
+ import type { SourceInput } from "./source_project.ts";
+ import { NativeProcess, type NativeProcessOptions } from "./native_process.ts";
+--- a/compiler/native_incremental.ts
++++ b/compiler/native_incremental.ts
+@@ -1,10 +1,10 @@
+-import {
+-  type AnalyzedArtifact,
+-  type AnalyzedArtifactOptions,
+-  type Artifact,
+-  type ArtifactOptions,
+-  type CompileOptions,
+-  includesAnalysis,
++import { includesAnalysis } from "./artifact_options.ts";
++import type {
++  AnalyzedArtifact,
++  AnalyzedArtifactOptions,
++  Artifact,
++  ArtifactOptions,
++  CompileOptions,
+ } from "./host.ts";
+ import { bendArray } from "./bend_list.ts";
+ import {
+--- a/compiler/native_project.ts
++++ b/compiler/native_project.ts
+@@ -1,11 +1,11 @@
++import { includesAnalysis } from "./artifact_options.ts";
+ import { bendArray, bendList } from "./bend_list.ts";
+-import {
+-  type AnalyzedArtifact,
+-  type AnalyzedArtifactOptions,
+-  type Artifact,
+-  type ArtifactOptions,
+-  type CompileOptions,
+-  includesAnalysis,
++import type {
++  AnalyzedArtifact,
++  AnalyzedArtifactOptions,
++  Artifact,
++  ArtifactOptions,
++  CompileOptions,
+ } from "./host.ts";
+ import { sameDeclaration } from "./native_incremental.ts";
+ import type { NativeCompilerOptions } from "./native.ts";
+--- /dev/null
++++ b/compiler/artifact_options.ts
+@@ -0,0 +1,8 @@
++/** Shared option validation without loading the JavaScript reference compiler. */
++export function includesAnalysis(options: { readonly analysis?: boolean }): boolean {
++  if (options.analysis === undefined) return true;
++  if (typeof options.analysis !== "boolean") {
++    throw new TypeError("analysis must be a boolean");
++  }
++  return options.analysis;
++}
+--- a/compiler/oxcaml/base.ml
++++ b/compiler/oxcaml/base.ml
+@@ -217,8 +217,21 @@
+   | None -> leaf
+   | Some old when string_eq old key -> replace m
+   | Some old ->
+-    let rec differing pos = if key_bit key pos <> key_bit old pos then pos else differing (pos+1) in
+-    let pos = differing 0 in
++    (* Scan the common prefix once. Repeated key_bit probes start from the
++       head of a code-point list and made long identifiers quadratic. *)
++    let rec differing offset left right = match left, right with
++      | SNil, SCon _ | SCon _, SNil -> offset
++      | SCon (Chr a, at), SCon (Chr b, bt) ->
++        if a = b then differing (offset + 33) at bt
++        else
++          let xor = Int32.logxor a b in
++          let rec leading bit =
++            if Int32.logand xor (Int32.shift_left 1l (31-bit)) <> 0l
++            then bit else leading (bit+1)
++          in offset + 1 + leading 0
++      | SNil, SNil -> assert false (* Equal keys were handled above. *)
++    in
++    let pos = differing 0 key old in
+     let splice node = if key_bit key pos then MNode(pos,node,leaf) else MNode(pos,leaf,node) in
+     let rec insert = function
+       | MNode(p,lo,hi) when p < pos ->
+--- a/compiler/oxcaml/Makefile
++++ b/compiler/oxcaml/Makefile
+@@ -1,6 +1,8 @@
+ OCAMLOPT ?= ocamlopt
+ OCAMLFLAGS ?= -g -w -8-11-26-27
+ BUILD := _build
++OCAML_MAJOR := $(shell $(OCAMLOPT) -version | cut -d. -f1)
++PARALLEL := $(shell test "$(OCAML_MAJOR)" -ge 5 && echo domains || echo serial)
+ MODULES := $(shell cat core/modules.txt 2>/dev/null)
+ CORE := $(addprefix core/,$(addsuffix .ml,$(filter-out ox_native_transport,$(MODULES))))
+ 
+@@ -13,9 +15,13 @@
+ $(BUILD):
+ 	mkdir -p $@
+ 
+-$(BUILD)/blotc: base.ml ox_native_transport.ml driver.ml core/modules.txt $(CORE) | $(BUILD)
+-	cp base.ml ox_native_transport.ml driver.ml $(CORE) $(BUILD)/
+-	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -o blotc base.ml $(addsuffix .ml,$(MODULES)) driver.ml
++$(BUILD)/native_parallel.ml: native_parallel_$(PARALLEL).ml Makefile | $(BUILD)
++	cp $< $@
++
++$(BUILD)/blotc: base.ml native_runtime.ml runtime_stubs.c ox_native_transport.ml driver.ml core/modules.txt $(CORE) $(BUILD)/native_parallel.ml | $(BUILD)
++	cp base.ml native_runtime.ml runtime_stubs.c ox_native_transport.ml driver.ml $(CORE) $(BUILD)/
++	cd $(BUILD) && $(OCAMLOPT) -c runtime_stubs.c
++	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -I +threads -o blotc unix.cmxa threads.cmxa runtime_stubs.o native_runtime.ml native_parallel.ml base.ml $(addsuffix .ml,$(MODULES)) driver.ml
+ 
+ $(BUILD)/test_bytes: wasm_bytes.ml test_bytes.ml | $(BUILD)
+ 	cp wasm_bytes.ml test_bytes.ml $(BUILD)/
+@@ -25,9 +31,19 @@
+ 	cp test_runtime.ml $(BUILD)/
+ 	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -o test_runtime base.cmx ox_model.cmx ox_numeric_literal.cmx ox_index.cmx test_runtime.ml
+ 
+-test: all $(BUILD)/test_bytes $(BUILD)/test_runtime
++$(BUILD)/test_parallel: $(BUILD)/blotc test_parallel.ml
++	cp test_parallel.ml $(BUILD)/
++	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -I +threads -o test_parallel unix.cmxa threads.cmxa native_parallel.cmx test_parallel.ml
++
++$(BUILD)/test_domains: $(BUILD)/blotc test_domains.ml
++	cp test_domains.ml $(BUILD)/
++	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -I +threads -o test_domains unix.cmxa threads.cmxa native_parallel.cmx test_domains.ml
++
++test: all $(BUILD)/test_bytes $(BUILD)/test_runtime $(BUILD)/test_parallel $(if $(filter domains,$(PARALLEL)),$(BUILD)/test_domains)
+ 	$(BUILD)/test_bytes
+ 	$(BUILD)/test_runtime
++	$(BUILD)/test_parallel $(PARALLEL)
++	$(if $(filter domains,$(PARALLEL)),$(BUILD)/test_domains,true)
+ 	python3 test_transport.py $(BUILD)/blotc
+ 
+ clean:
+--- a/compiler/oxcaml/driver.ml
++++ b/compiler/oxcaml/driver.ml
+@@ -6,7 +6,12 @@
+     "--inherit-priority", Arg.Set inherit_priority, "Inherit process priority"
+   ] (fun arg -> raise (Arg.Bad ("unexpected argument: " ^ arg))) "blotc [--threads N]";
+   if !threads < 1 || !threads > 64 then (prerr_endline "threads must be in [1,64]"; exit 2);
++  Native_runtime.configure !inherit_priority;
+   Printexc.record_backtrace true;
+-  try Ox_native_main.f_main () () with
+-  | End_of_file -> prerr_endline "truncated native frame"; exit 1
++  try
++    Native_parallel.configure !threads;
++    Fun.protect (fun () -> Ox_native_main.f_main () ())
++      ~finally:Native_parallel.shutdown
++  with
++  | End_of_file -> prerr_endline "native protocol: truncated frame"; exit 1
+   | exn -> prerr_endline (Printexc.to_string exn); Printexc.print_backtrace stderr; exit 1
+--- a/compiler/oxcaml/ox_native_transport.ml
++++ b/compiler/oxcaml/ox_native_transport.ml
+@@ -11,7 +11,7 @@
+     Bytes.set prefix 0 first;
+     read_exact prefix 1 3;
+     let count = u32_to_nat (Bytes.get_int32_le prefix 0) in
+-    if count > max_words then failwith "native frame exceeds 16M words";
++    if count > max_words then failwith "native protocol: frame exceeds 16777216 words";
+     let bytes = Bytes.create (count * 4) in
+     read_exact bytes 0 (Bytes.length bytes);
+     let rec capacity n = if n >= count then n else capacity (n*2) in
+--- a/compiler/oxcaml/bootstrap/port.py
++++ b/compiler/oxcaml/bootstrap/port.py
+@@ -298,7 +298,12 @@
+                 pattern, guards, bindings, bound = self.pattern(p)
+                 if guards or bindings: raise ValueError('guarded parallel binding')
+                 out.append((pattern, exp(value))); names |= bound
+-            return self.lets(out, self.expression(rest, scope | names, variables, monad))
++            arity = {2: 'two', 4: 'four', 8: 'eight'}.get(len(out))
++            if arity is None: raise ValueError('unsupported parallel arity')
++            patterns = ', '.join(pattern for pattern, _ in out)
++            thunks = ' '.join('(fun () -> ' + value + ')' for _, value in out)
++            body = self.expression(rest, scope | names, variables, monad)
++            return f'(let ({patterns}) = Native_parallel.{arity} {thunks} in\n{body})'
+         if k == 'match':
+             values, arms = n.items
+             scrutinee = exp(values[0]) if len(values) == 1 else '(' + ', '.join(exp(v) for v in values) + ')'
+--- a/compiler/oxcaml/test_runtime.ml
++++ b/compiler/oxcaml/test_runtime.ml
+@@ -30,6 +30,19 @@
+   let replacement = map_set map (text "a") 99 in
+   check "Persistent map update" (Ox_index.f_find replacement (text "a") = Some 99 && Ox_index.f_find map (text "a") = Some 1);
+   check "Right-biased union" (Ox_index.f_find (map_union map replacement) (text "a") = Some 99);
++  let prefix = String.make 4480 'x' in
++  let long_keys = [prefix; prefix ^ "a"; prefix ^ "b"; prefix ^ "😀"; prefix ^ "λ"] in
++  let long_map = List.mapi (fun i k -> text k,i) long_keys |>
++    List.fold_left (fun m (k,v) -> map_set m k v) MTip in
++  List.iteri (fun i key -> check "Long shared-prefix lookup"
++    (Ox_index.f_find long_map (text key) = Some i)) long_keys;
++  let rec validate_bits = function
++    | MTip | MLeaf _ -> ()
++    | MNode(pos,lo,hi) ->
++      List.iter (fun (k,_) -> check "Patricia low branch" (not (key_bit k pos))) (map_bindings lo);
++      List.iter (fun (k,_) -> check "Patricia high branch" (key_bit k pos)) (map_bindings hi);
++      validate_bits lo; validate_bits hi
++  in validate_bits long_map;
+   let random = Random.State.make [|42|] in
+   let map = ref MTip in
+   let reference = Hashtbl.create 4096 in
+--- a/compiler/oxcaml/test_existing.py
++++ b/compiler/oxcaml/test_existing.py
+@@ -28,7 +28,7 @@
+     if not (ROOT / 'generated/compiler/compiler.js').is_file():
+         parser.error('build the unchanged JavaScript reference first: python3 compiler/oxcaml/build_reference.py')
+     selected = args.tests or sorted(str(p.relative_to(ROOT)) for p in (ROOT / 'compiler').glob('*.test.ts')
+-        if ('native' in p.name or p.name == 'guest_native.test.ts') and p.name != 'native_priority.test.ts')
++        if ('native' in p.name or p.name == 'guest_native.test.ts'))
+     for name in selected:
+         path = (ROOT / name).resolve(strict=True)
+         if ROOT not in path.parents or not path.name.endswith('.test.ts'):
+@@ -36,7 +36,7 @@
+     report = {
+         'executable_sha256': hashlib.sha256(executable.read_bytes()).hexdigest(),
+         'tests': selected,
+-        'excluded': {'compiler/native_priority.test.ts': 'Scheduling restoration is not implemented in the initial serial port.'},
++        'excluded': {},
+     }
+     print(f'Running {len(selected)} unchanged native regression files against {executable}', flush=True)
+     with tempfile.TemporaryDirectory(prefix='blot-oxcaml-tests-') as directory:
