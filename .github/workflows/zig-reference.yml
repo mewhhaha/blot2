@@ -39,25 +39,28 @@ jobs:
           binary=$(find "$PWD" -type f -name bend -perm -u+x | head -n 1)
           test -n "$binary"
           dirname "$binary" >> "$GITHUB_PATH"
-      - name: Check the release and source proofs; build unchanged reference outputs
+      - name: Check proofs and build unchanged reference outputs
         shell: bash
         run: |
           set -euo pipefail
           bend version
           bend guide > "$RUNNER_TEMP/bend-guide.txt"
           mkdir -p generated/compiler
-          deno task build:compiler:all
+          deno run --allow-read --allow-write="$GITHUB_WORKSPACE" --allow-net=raw.githubusercontent.com --allow-run=bend,bun,clang,generated/compiler/native-backend-regression scripts/build_compiler.ts all
           deno cache compiler/native.ts compiler/source.ts compiler/native_incremental.ts compiler/native_project.ts
       - name: Package reference outputs and offline tools
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/reference-artifact"
           tar -czf "$RUNNER_TEMP/reference-artifact/generated.tar.gz" generated/compiler
           cp "$RUNNER_TEMP/bend-guide.txt" "$RUNNER_TEMP/reference-artifact/"
+          cp "$RUNNER_TEMP/bend-release/bend.tar.gz" "$RUNNER_TEMP/reference-artifact/"
           cp "$(command -v deno)" "$RUNNER_TEMP/reference-artifact/deno"
           tar -czf "$RUNNER_TEMP/reference-artifact/deno-cache.tar.gz" -C "$DENO_DIR" .
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
         with:
           name: zig-reference
           path: ${{ runner.temp }}/reference-artifact/*
