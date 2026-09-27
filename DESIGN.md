@@ -38,6 +38,20 @@ const add_ten = curried_add 10
 The parameter is one pattern. A tuple pattern accepts a tuple; currying uses
 another explicit function. Type annotations use `:`.
 
+Rank-one bindings can state their required implementation evidence after a
+complete annotation:
+`const twice: a -> a where { associated "add" a a a } =
+fn value => value + value`.
+The same clause is available on a local `let` and constrains the final value
+after expression tags. The word `where` remains an ordinary identifier
+elsewhere. Inferred constraints and explicit clauses share the same semantic
+predicates; a clause must account for the body's obligations, while extra
+predicates intentionally restrict callers. Open effect rows use
+`! {OperationType | e}` or `! {| e}`. A binding cannot use one free name as both
+a type and row variable. Qualified parameter types remain unsupported. The first
+implementation accepts concrete labels before an open row tail; symbolic generic
+effect labels need a later row-identity representation.
+
 ```blot
 const squared = fn (value: F32) -> F32 => value * value
 ```

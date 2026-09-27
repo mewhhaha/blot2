@@ -6,6 +6,7 @@ import ./native_request.bend as Request
 import ./native_response.bend as Response
 import ./native_output.bend as Output
 import ./native_io.bend as NativeIO
+import ./native_transport.bend as Transport
 import ./native_session.bend as Session
 
 type Reply is Data:
@@ -85,7 +86,7 @@ def respond(state: Maybe<&2, Session.State>, request: Result<&2, &2, M.Diagnosti
 
 def send_packet(packet: Output.Packet) -> IO(Unit):
   Output.Packet{word_count, header, blocks} = packet
-  NativeIO.send(word_count, header, blocks)
+  Transport.send(word_count, header, blocks)
 
 # A malformed complete payload is recoverable; framing failures are fatal in
 # NativeIO because the next request boundary can no longer be trusted.
@@ -101,12 +102,12 @@ def serve(fuel: Nat, state: Maybe<&2, Session.State>, incoming: Maybe<&1, Native
       packet = packet_of(reply)
       do IO<Unit>:
         send_packet(packet)
-        next : Maybe<&1, NativeIO.Frame> <- NativeIO.receive()
+        next : Maybe<&1, NativeIO.Frame> <- Transport.receive()
         serve(remaining, next_state, next)
 
 def main() -> IO(Unit):
   do IO<Unit>:
     # Handshake lets the parent measure process startup separately from work.
-    NativeIO.send(2, [1112297300, Response.version()], Nil{})
-    first : Maybe<&1, NativeIO.Frame> <- NativeIO.receive()
+    Transport.send(2, [1112297300, Response.version()], Nil{})
+    first : Maybe<&1, NativeIO.Frame> <- Transport.receive()
     serve(M.max_nat(), None{}, first)

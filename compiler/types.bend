@@ -82,6 +82,7 @@ type TypeWork is Data:
 type Replacement is Data:
   ReplaceVariable{index: Nat, value: M.Ty}
   ReplaceParameter{index: Nat, value: M.Ty}
+  FreshParameters{mapping: NatIndex.Index<Nat>}
   ReplaceFree{scope: String, name: String, value: M.Ty}
   RelocateFree{suffix: String}
 
@@ -95,12 +96,24 @@ def first_type(types: List<&2, M.Ty>) -> Result<&2, &2, M.Diagnostic, M.Ty>:
     case _:
       Fail{M.Diagnostic{"internal_error", "inference", "type rewrite did not produce exactly one type"}}
 
+def fresh_parameter_leaf_found(found: Maybe<&2, Nat>, index: Nat) -> M.Ty:
+  match found:
+    case Some{variable}:
+      M.VariableTy{variable}
+    case None{}:
+      M.ParameterTy{index}
+
+def fresh_parameter_leaf(+index: Nat, mapping: NatIndex.Index<Nat>) -> M.Ty:
+  fresh_parameter_leaf_found(NatIndex.find(Nat, mapping, index), index)
+
 def replace_leaf(ty: M.Ty, replacement: Replacement) -> M.Ty:
   match ty replacement:
     case M.VariableTy{+found} ReplaceVariable{index, value}:
       Bool.pick(M.Ty, Nat.is_eq(found, index), value, M.VariableTy{found})
     case M.ParameterTy{+found} ReplaceParameter{index, value}:
       Bool.pick(M.Ty, Nat.is_eq(found, index), value, M.ParameterTy{found})
+    case M.ParameterTy{found} FreshParameters{mapping}:
+      fresh_parameter_leaf(found, mapping)
     case M.FreeTy{+scope, +name} ReplaceFree{wanted_scope, wanted_name, value}:
       Bool.pick(M.Ty, Bool.and(M.name_equal(scope, wanted_scope), M.name_equal(name, wanted_name)), value, M.FreeTy{scope, name})
     case M.FreeTy{scope, name} RelocateFree{suffix}:
@@ -124,12 +137,28 @@ def rewrite_tail_match(same: Bool, original: M.RowTail, value: M.Ty) -> Result<&
     case True{}:
       replacement_tail(value)
 
+def fresh_parameter_tail_found(found: Maybe<&2, Nat>, index: Nat) -> Result<&2, &2, M.Diagnostic, M.RowTail>:
+  match found:
+    case Some{variable}:
+      Done{M.RowVariable{variable}}
+    case None{}:
+      Done{M.RowParameter{index}}
+
+def fresh_parameter_tail(+index: Nat, mapping: NatIndex.Index<Nat>) -> Result<&2, &2, M.Diagnostic, M.RowTail>:
+  fresh_parameter_tail_found(NatIndex.find(Nat, mapping, index), index)
+
 def rewrite_tail(tail: M.RowTail, replacement: Replacement) -> Result<&2, &2, M.Diagnostic, M.RowTail>:
   match tail replacement:
     case M.RowVariable{+found} ReplaceVariable{index, value}:
       rewrite_tail_match(Nat.is_eq(found, index), M.RowVariable{found}, value)
     case M.RowParameter{+found} ReplaceParameter{index, value}:
       rewrite_tail_match(Nat.is_eq(found, index), M.RowParameter{found}, value)
+    case M.RowParameter{found} FreshParameters{mapping}:
+      fresh_parameter_tail(found, mapping)
+    case M.FreeRow{+scope, +name} ReplaceFree{wanted_scope, wanted_name, value}:
+      rewrite_tail_match(Bool.and(M.name_equal(scope, wanted_scope), M.name_equal(name, wanted_name)), M.FreeRow{scope, name}, value)
+    case M.FreeRow{scope, name} RelocateFree{suffix}:
+      Done{M.FreeRow{scope ++ suffix, name}}
     case original _:
       Done{original}
 
@@ -540,20 +569,148 @@ def contains(variables: List<&2, Nat>, variable: Nat) -> Bool:
 def put(+variables: List<&2, Nat>, +variable: Nat) -> List<&2, Nat>:
   Bool.pick(List<&2, Nat>, contains(variables, variable), variables, variable <> variables)
 
+# Retain the source list itself: the index is only a membership summary. In
+# particular duplicate IDs already present on the right must not disappear.
+type VariableUnion is Data:
+  SmallUnion{values: List<&2, Nat>, count: Nat}
+  IndexedUnion{values: List<&2, Nat>, seen: NatIndex.Index<Unit>}
+
+def index_variables(variables: List<&2, Nat>, index: NatIndex.Index<Unit>) -> NatIndex.Index<Unit>:
+  match variables:
+    case Nil{}:
+      index
+    case head <> tail:
+      index_variables(tail, NatIndex.set(Unit, index, head, Unit{}))
+
+# Count at most 256 cells. Duplicates count toward the threshold; this can
+# promote early, but never changes the retained list or membership result.
+def union_seed_count_work(variables: List<&2, Nat>, count: Nat) -> Nat:
+  match variables count:
+    case _ 256n:
+      256n
+    case Nil{} current:
+      current
+    case head <> tail current:
+      union_seed_count_work(tail, 1n+current)
+
+def union_small_grown(+values: List<&2, Nat>, count: Nat) -> VariableUnion:
+  match count:
+    case 256n:
+      IndexedUnion{values, index_variables(values, NatIndex.new(Unit))}
+    case small:
+      SmallUnion{values, small}
+
+def union_seed(+values: List<&2, Nat>) -> VariableUnion:
+  union_small_grown(values, union_seed_count_work(values, 0n))
+
+def union_insert_small_found(found: Bool, values: List<&2, Nat>, count: Nat, variable: Nat) -> VariableUnion:
+  match found:
+    case True{}:
+      SmallUnion{values, count}
+    case False{}:
+      union_small_grown(variable <> values, 1n+count)
+
+def union_insert_small(+values: List<&2, Nat>, count: Nat, +variable: Nat) -> VariableUnion:
+  union_insert_small_found(contains(values, variable), values, count, variable)
+
+def union_insert_found(found: Maybe<&2, Unit>, +values: List<&2, Nat>, seen: NatIndex.Index<Unit>, +variable: Nat) -> VariableUnion:
+  match found:
+    case Some{present}:
+      IndexedUnion{values, seen}
+    case None{}:
+      IndexedUnion{variable <> values, NatIndex.set(Unit, seen, variable, Unit{})}
+
+def union_insert(state: VariableUnion, +variable: Nat) -> VariableUnion:
+  match state:
+    case SmallUnion{values, count}:
+      union_insert_small(values, count, variable)
+    case IndexedUnion{values, +seen}:
+      union_insert_found(NatIndex.find(Unit, seen, variable), values, seen, variable)
+
+def union_into(left: List<&2, Nat>, state: VariableUnion) -> VariableUnion:
+  match left:
+    case Nil{}:
+      state
+    case head <> tail:
+      union_into(tail, union_insert(state, head))
+
+def union_values(state: VariableUnion) -> List<&2, Nat>:
+  match state:
+    case SmallUnion{values, count}:
+      values
+    case IndexedUnion{values, seen}:
+      values
+
+# The bounded check avoids building an index for the numerous singleton
+# unions in free type traversal. It never walks an entire wide list.
+def wide_variables_work(variables: List<&2, Nat>, remaining: Nat) -> Bool:
+  match variables remaining:
+    case _ 0n:
+      True{}
+    case Nil{} 1n+rest:
+      False{}
+    case head <> tail 1n+rest:
+      wide_variables_work(tail, rest)
+
+def wide_variables(variables: List<&2, Nat>) -> Bool:
+  wide_variables_work(variables, 16n)
+
+def union_small(left: List<&2, Nat>, right: List<&2, Nat>) -> List<&2, Nat>:
+  match left:
+    case Nil{}:
+      right
+    case head <> tail:
+      union_small(tail, put(right, head))
+
+def union_select(left: List<&2, Nat>, right: List<&2, Nat>, indexed: Bool) -> List<&2, Nat>:
+  match indexed:
+    case False{}:
+      union_small(left, right)
+    case True{}:
+      union_values(union_into(left, union_seed(right)))
+
+def union_nonempty(+left: List<&2, Nat>, right: List<&2, Nat>) -> List<&2, Nat>:
+  union_select(left, right, wide_variables(left))
+
 def union(left: List<&2, Nat>, right: List<&2, Nat>) -> List<&2, Nat>:
   match left:
     case Nil{}:
       right
     case head <> tail:
-      union(tail, put(right, head))
+      union_nonempty(head <> tail, right)
 
-def difference(variables: List<&2, Nat>, +excluded: List<&2, Nat>) -> List<&2, Nat>:
+# Preserve every nonexcluded occurrence in source order without nesting one
+# JS/Bend continuation per variable in very wide imported schemes.
+def difference_work(variables: List<&2, Nat>, +excluded: List<&2, Nat>, +reversed: List<&2, Nat>) -> List<&2, Nat>:
   match variables:
     case Nil{}:
-      Nil{}
+      List.reverse(&2, Nat, reversed)
     case +head <> tail:
-      +rest = difference(tail, excluded)
-      Bool.pick(List<&2, Nat>, contains(excluded, head), rest, head <> rest)
+      difference_work(tail, excluded, Bool.pick(List<&2, Nat>, contains(excluded, head), reversed, head <> reversed))
+
+def difference_indexed_found(found: Maybe<&2, Unit>, +head: Nat, +reversed: List<&2, Nat>) -> List<&2, Nat>:
+  match found:
+    case Some{present}:
+      reversed
+    case None{}:
+      head <> reversed
+
+def difference_indexed_work(variables: List<&2, Nat>, +excluded: NatIndex.Index<Unit>, +reversed: List<&2, Nat>) -> List<&2, Nat>:
+  match variables:
+    case Nil{}:
+      List.reverse(&2, Nat, reversed)
+    case +head <> tail:
+      difference_indexed_work(tail, excluded, difference_indexed_found(NatIndex.find(Unit, excluded, head), head, reversed))
+
+def difference_select(variables: List<&2, Nat>, excluded: List<&2, Nat>, indexed: Bool) -> List<&2, Nat>:
+  match indexed:
+    case False{}:
+      difference_work(variables, excluded, Nil{})
+    case True{}:
+      difference_indexed_work(variables, index_variables(excluded, NatIndex.new(Unit)), Nil{})
+
+def difference(+variables: List<&2, Nat>, +excluded: List<&2, Nat>) -> List<&2, Nat>:
+  difference_select(variables, excluded, Bool.and(wide_variables(variables), wide_variables(excluded)))
 
 def row_free(row: M.EffectRow) -> List<&2, Nat>:
   match row:
@@ -786,12 +943,17 @@ def parameter_kinds(+fuel: Nat, work: TypeWork) -> Result<&2, &2, M.Diagnostic, 
     case 1n+rest _:
       Done{ParameterKinds{Nil{}, Nil{}}}
 
-def disjoint(variables: List<&2, Nat>, +excluded: List<&2, Nat>) -> Bool:
-  match variables:
-    case Nil{}:
+def disjoint_work(variables: List<&2, Nat>, +excluded: List<&2, Nat>, clear: Bool) -> Bool:
+  match variables clear:
+    case _ False{}:
+      False{}
+    case Nil{} True{}:
       True{}
-    case head <> tail:
-      Bool.and(Bool.not(contains(excluded, head)), disjoint(tail, excluded))
+    case head <> tail True{}:
+      disjoint_work(tail, excluded, Bool.not(contains(excluded, head)))
+
+def disjoint(variables: List<&2, Nat>, excluded: List<&2, Nat>) -> Bool:
+  disjoint_work(variables, excluded, True{})
 
 def kind_check(kinds: ParameterKinds, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
   ParameterKinds{types, rows} = kinds
@@ -1021,6 +1183,13 @@ def scalar(ty: M.Ty) -> Bool:
 
 # Free source names are separate from quantified data parameters and compiler
 # inference variables, so malformed core annotations keep their diagnostics.
+def annotation_row_names(row: M.EffectRow) -> List<&2, M.Ty>:
+  match row:
+    case M.EffectRow{operations, M.FreeRow{scope, name}}:
+      [M.FreeTy{scope, name}]
+    case _:
+      Nil{}
+
 def annotation_names(+fuel: Nat, work: TypeWork) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
   match fuel work:
     case 0n _:
@@ -1028,7 +1197,11 @@ def annotation_names(+fuel: Nat, work: TypeWork) -> Result<&2, &2, M.Diagnostic,
     case 1n+rest OneType{M.FreeTy{scope, name}}:
       Done{[M.FreeTy{scope, name}]}
     case 1n+rest OneType{M.FunctionTy{parameter, result, row}}:
-      annotation_names(rest, ManyTypes{[parameter, result]})
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+        nested : List<&2, M.Ty> <- annotation_names(rest, ManyTypes{[parameter, result]})
+        return List.append(&2, M.Ty, nested, annotation_row_names(row))
+    case 1n+rest OneType{M.ProviderTy{identity, row}}:
+      Done{annotation_row_names(row)}
     case 1n+rest OneType{M.AppliedTy{identity, arguments}}:
       annotation_names(rest, ManyTypes{arguments})
     case 1n+rest OneType{M.ProductTy{elements}}:

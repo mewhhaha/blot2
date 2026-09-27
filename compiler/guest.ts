@@ -313,13 +313,22 @@ function arrayRange(
   length: number,
 ): number {
   if (
-    typeof pointer !== "number" || !Number.isInteger(pointer) || pointer < 4 ||
-    pointer % 4 !== 0 || pointer > arena.memory.buffer.byteLength - 4 ||
-    length > (arena.memory.buffer.byteLength - pointer - 4) / 4
+    typeof pointer !== "number" || !Number.isInteger(pointer) ||
+    pointer < -0x8000_0000 || pointer > 0xffff_ffff
   ) {
     throw new GuestError("invalid_abi", "Array lies outside the guest arena");
   }
-  return pointer;
+  // Wasm exposes i32 results as signed JS numbers, including valid addresses
+  // in the upper half of its 4 GiB address space.
+  const address = pointer >>> 0;
+  if (
+    address < 4 || address % 4 !== 0 ||
+    address > arena.memory.buffer.byteLength - 4 ||
+    length > (arena.memory.buffer.byteLength - address - 4) / 4
+  ) {
+    throw new GuestError("invalid_abi", "Array lies outside the guest arena");
+  }
+  return address;
 }
 
 function arrayToWasm(
@@ -342,10 +351,10 @@ function arrayToWasm(
     );
   }
   const values = argument as Uint32Array | Float32Array;
-  if (values.length >= 4_194_304) {
+  if (values.length >= 1_073_741_823) {
     throw new GuestError(
       code,
-      `${name} array exceeds the 16 MiB arena`,
+      `${name} array byte count exceeds the Wasm32 address range`,
     );
   }
   const pointer = arrayRange(
@@ -398,6 +407,8 @@ const capabilityOwners = new WeakMap<object, CapabilityOwner>();
 type InvokeCallback = (value: GuestValue) => unknown;
 
 export interface Guest {
+  /** Committed linear-memory bytes, including temporary allocation capacity. */
+  memoryBytes(): number;
   readonly abi: GuestAbi;
   capability<P extends ValueType, R extends ValueType>(
     callback: HostCallback<P, R>,
@@ -713,6 +724,7 @@ export async function instantiateGuest(
 
   return {
     abi,
+    memoryBytes: () => arena?.memory.buffer.byteLength ?? 0,
     capability: (definition) => createCapability(definition, false),
     capabilityAsync: (definition) => {
       requireAsync();

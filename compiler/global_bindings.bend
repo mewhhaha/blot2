@@ -16,7 +16,7 @@ def build(bindings: List<&2, I.Binding>, +position: Nat, index: Map<&2, List<&2,
     case Nil{}:
       index
     case +binding <> tail:
-      I.Binding{+name, ty, variables} = binding
+      I.Binding{+name, ty, variables, predicates} = binding
       +known = index
       prior = Index.get(List<&2, Entry>, known, name, Nil{})
       build(tail, 1n+position, Map.set(&2, List<&2, Entry>, known, name, Entry{position, binding} <> prior))

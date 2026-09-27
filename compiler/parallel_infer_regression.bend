@@ -17,7 +17,7 @@ def same_substitutions(left: List<&2, T.Substitution>, right: List<&2, T.Substit
 def same_definitions(left: List<&2, I.Definition>, right: List<&2, I.Definition>) -> Bool:
   match left right:
     case Nil{} Nil{}: True{}
-    case I.Definition{a, I.Inference{x, coverage_a, exits_a, reflections_a}} <> xs I.Definition{b, I.Inference{y, coverage_b, exits_b, reflections_b}} <> ys:
+    case I.Definition{a, I.Inference{x, coverage_a, exits_a, reflections_a, Nil{}, Nil{}}} <> xs I.Definition{b, I.Inference{y, coverage_b, exits_b, reflections_b, Nil{}, Nil{}}} <> ys:
       Bool.and(M.name_equal(a, b), Bool.and(String.eq(M.type_show(x), M.type_show(y)), same_definitions(xs, ys)))
     case _ _: False{}
 
@@ -42,16 +42,16 @@ def shared_case(imported: I.Binding, first: Maybe<&2, M.Ty>, second: Maybe<&2, M
   same_result(G.infer_component(G.names(declarations), declarations, environment, operations, Nil{}, Nil{}), ParallelInfer.infer_component(declarations, environment, operations, Nil{}, Nil{}))
 
 def read_only() -> Bool:
-  shared_case(I.Binding{"shared", M.ProductTy{[M.VariableTy{100n}]}, Nil{}}, None{}, None{}, Nil{})
+  shared_case(I.Binding{"shared", M.ProductTy{[M.VariableTy{100n}]}, Nil{}, Nil{}}, None{}, None{}, Nil{})
 
 def writable_type() -> Bool:
-  shared_case(I.Binding{"shared", M.VariableTy{100n}, Nil{}}, Some{M.U32Ty{}}, Some{M.BoolTy{}}, Nil{})
+  shared_case(I.Binding{"shared", M.VariableTy{100n}, Nil{}, Nil{}}, Some{M.U32Ty{}}, Some{M.BoolTy{}}, Nil{})
 
 def writable_row() -> Bool:
   +read = {M.TypeId{"ops", "read"} : M.TypeId}
   +write = {M.TypeId{"ops", "write"} : M.TypeId}
   +operations = {[M.Operation{read, M.UnitTy{}, M.UnitTy{}}, M.Operation{write, M.UnitTy{}, M.UnitTy{}}] : List<&2, M.Operation>}
-  shared_case(I.Binding{"shared", M.ProviderTy{read, M.EffectRow{Nil{}, M.RowVariable{100n}}}, Nil{}}, Some{M.ProviderTy{read, M.EffectRow{Nil{}, M.ClosedRow{}}}}, Some{M.ProviderTy{read, M.EffectRow{[write], M.ClosedRow{}}}}, operations)
+  shared_case(I.Binding{"shared", M.ProviderTy{read, M.EffectRow{Nil{}, M.RowVariable{100n}}}, Nil{}, Nil{}}, Some{M.ProviderTy{read, M.EffectRow{Nil{}, M.ClosedRow{}}}}, Some{M.ProviderTy{read, M.EffectRow{[write], M.ClosedRow{}}}}, operations)
 
 def indexed_version_order(found: Result<&2, &2, M.Diagnostic, List<&2, Nat>>) -> Bool:
   match found:

@@ -60,12 +60,17 @@ def invoke(callee: M.Expr, argument: M.Expr) -> M.Expr:
   match callee:
     case M.FunctionExpr{name}:
       M.CallExpr{name, argument}
+    case M.InstantiationExpr{site, M.FunctionExpr{name}}:
+      M.InstantiationExpr{site, M.CallExpr{name, argument}}
+    case M.SourceExpr{offset, annotation, M.InstantiationExpr{site, M.FunctionExpr{name}}}:
+      M.SourceExpr{offset, annotation, M.InstantiationExpr{site, M.CallExpr{name, argument}}}
     case value:
       M.ApplyExpr{value, argument}
 
 def reduce(operator: Operator, left: M.Expr, right: M.Expr) -> M.Expr:
-  Operator{precedence, associativity, target, offset} = operator
-  M.SourceExpr{offset, None{}, M.ApplyExpr{invoke(target, left), right}}
+  Operator{precedence, associativity, target, +offset} = operator
+  +base = Nat.mul(offset, 16n)
+  M.SourceExpr{offset, None{}, M.InstantiationExpr{Nat.add(base, 5n), M.ApplyExpr{M.InstantiationExpr{Nat.add(base, 4n), invoke(target, left)}, right}}}
 
 def resolve(fuel: Nat, work: Work, values: List<&2, M.Expr>, operators: List<&2, Operator>) -> Result<&2, &2, M.Diagnostic, M.Expr>:
   match fuel:

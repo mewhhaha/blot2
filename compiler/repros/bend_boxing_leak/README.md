@@ -1,5 +1,10 @@
 # Bend 2 native boxing leak: list identity
 
+Status: fixed upstream in Bend 2.0.28. Bend 2.0.31's generated C also reuses the
+list cell correctly. The measurements below describe older releases; the
+allocation probe uses an older runtime interface and needs updating before it
+can run on 2.0.31. See [BUGS.md](../../../BUGS.md) for current tracking.
+
 The smallest reproducer reduced here is the 12-line [repro.bend](repro.bend). It
 defines a two-constructor value and an identity function on lists:
 

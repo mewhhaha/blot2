@@ -1,5 +1,6 @@
 import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import compiled from "../generated/compiler/native_output.js";
+import { toBendCst } from "./bend_abi.ts";
 import { bendArray, type BendList, bendList } from "./bend_list.ts";
 import { NativeProcess } from "./native_process.ts";
 import {
@@ -46,7 +47,7 @@ const backend = compiled as unknown as {
   ): Result<Node>;
 };
 const fields: Node[] = [1112297300, nativeProtocolVersion, 2].map((value) => ({
-  $: "Word",
+  $: "native_response.Word",
   value,
 }));
 function wordsBytes(words: readonly number[]) {
@@ -73,7 +74,7 @@ function packetBytes(packet: Packet) {
 }
 function plan(chunks: number[][], length = chunks.flat().length): Node {
   return {
-    $: "BytePlan",
+    $: "wasm.BytePlan",
     length: BigInt(length),
     chunks: bendList(chunks.map(bendList)),
   };
@@ -81,7 +82,10 @@ function plan(chunks: number[][], length = chunks.flat().length): Node {
 function legacy(chunks: number[][], maximum: bigint, prefix = fields) {
   return backend["native_response.encode_work"](
     10000000n,
-    bendList([...prefix, { $: "Bytes", values: bendList(chunks.flat()) }]),
+    bendList([...prefix, {
+      $: "native_response.Bytes",
+      values: bendList(chunks.flat()),
+    }]),
     maximum,
     bendList([]),
   );
@@ -149,7 +153,7 @@ Deno.test("chunked output preserves size and invalid-byte error precedence", () 
     ok(result.$ === "Fail");
     equal(result.error.code, "internal_error");
   }
-  const malformed: Node[] = [{ $: "Length", value: 16777217n }];
+  const malformed: Node[] = [{ $: "native_response.Length", value: 16777217n }];
   equal(
     backend.encode_plan(bendList(malformed), plan([[256]]), 1000n, 1n),
     legacy([[256]], 1000n, malformed),
@@ -177,8 +181,8 @@ Deno.test("native chunk writer matches the original complete response byte for b
             const_steps: 10000000n,
           };
           const artifact = backend["main.compile_source"](
-            request.root,
-            request.prelude,
+            toBendCst(request.root),
+            toBendCst(request.prelude),
             request.fuel,
             request.const_steps,
           );
@@ -190,9 +194,12 @@ Deno.test("native chunk writer matches the original complete response byte for b
             10000000n,
             bendList([
               ...fields,
-              { $: "Analysis", value: artifact.value.analysis },
-              { $: "ByteLength", value: BigInt(bendArray(bytes).length) },
-              { $: "ByteWords", values: bytes },
+              { $: "native_response.Analysis", value: artifact.value.analysis },
+              {
+                $: "native_response.ByteLength",
+                value: BigInt(bendArray(bytes).length),
+              },
+              { $: "native_response.ByteWords", values: bytes },
             ]),
             16777216n,
             bendList([]),
@@ -233,8 +240,8 @@ Deno.test("native Wasm-only responses match the reference encoder without the an
             const_steps: 10000000n,
           };
           const artifact = backend["main.compile_source"](
-            request.root,
-            request.prelude,
+            toBendCst(request.root),
+            toBendCst(request.prelude),
             request.fuel,
             request.const_steps,
           );
@@ -244,11 +251,14 @@ Deno.test("native Wasm-only responses match the reference encoder without the an
             10000000n,
             bendList([
               ...[1112297300, nativeProtocolVersion, 5].map((value) => ({
-                $: "Word",
+                $: "native_response.Word",
                 value,
               })),
-              { $: "ByteLength", value: BigInt(bendArray(bytes).length) },
-              { $: "ByteWords", values: bytes },
+              {
+                $: "native_response.ByteLength",
+                value: BigInt(bendArray(bytes).length),
+              },
+              { $: "native_response.ByteWords", values: bytes },
             ]),
             16777216n,
             bendList([]),

@@ -2,14 +2,14 @@ import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
 
 interface Global {
-  readonly $: "Global";
+  readonly $: "lower.Global";
   readonly source: string;
   readonly core: string;
-  readonly kind: { readonly $: "FunctionName" };
+  readonly kind: { readonly $: "lower.FunctionName" };
 }
 
 interface Context {
-  readonly $: "Context";
+  readonly $: "lower.Context";
   readonly globals: unknown;
   readonly headers: unknown;
   readonly fixities: unknown;
@@ -36,7 +36,7 @@ const compiler = compiled as unknown as {
 
 function empty(): Context {
   return {
-    $: "Context",
+    $: "lower.Context",
     globals: { $: "MTip" },
     headers: { $: "MTip" },
     fixities: { $: "Nil" },
@@ -47,7 +47,7 @@ function empty(): Context {
 }
 
 function global(source: string, core = source): Global {
-  return { $: "Global", source, core, kind: { $: "FunctionName" } };
+  return { $: "lower.Global", source, core, kind: { $: "lower.FunctionName" } };
 }
 
 function scope(names: readonly string[], prefix = ""): Context {
@@ -56,9 +56,9 @@ function scope(names: readonly string[], prefix = ""): Context {
       context,
       source,
       prefix + source,
-      { $: "FunctionName" },
+      { $: "lower.FunctionName" },
       {
-        $: "Cst",
+        $: "cst.Cst",
         kind: "IDENT",
         field: "",
         text: source,

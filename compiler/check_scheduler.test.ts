@@ -3,7 +3,7 @@ import compiled from "../generated/compiler/compiler.js";
 import { bendArray, type BendList, bendList } from "./bend_list.ts";
 
 interface Diagnostic {
-  readonly $: "Diagnostic";
+  readonly $: "model.Diagnostic";
   readonly code: string;
   readonly subject: string;
   readonly message: string;
@@ -13,7 +13,7 @@ type Result<T> = { readonly $: "Done"; readonly value: T } | {
   readonly error: Diagnostic;
 };
 type InitialAttempt = {
-  readonly $: "CheckedInitial";
+  readonly $: "check_scheduler.CheckedInitial";
   readonly initial: {
     readonly certificates: BendList<Record<string, unknown>>;
     readonly needs: BendList<Record<string, unknown>>;
@@ -22,50 +22,62 @@ type InitialAttempt = {
   readonly inferred: bigint;
   readonly retained: bigint;
 } | {
-  readonly $: "FailedInitial";
+  readonly $: "check_scheduler.FailedInitial";
   readonly diagnostic: Diagnostic;
   readonly certificates: BendList<unknown>;
   readonly inferred: bigint;
   readonly retained: bigint;
 };
 interface Job {
-  readonly $: "Job";
+  readonly $: "groups.Job";
   readonly members: BendList<string>;
   readonly dependencies: BendList<string>;
   readonly type_dependencies: BendList<never>;
 }
 interface Scheduled {
-  readonly $: "Scheduled";
+  readonly $: "check_scheduler.Scheduled";
   readonly position: bigint;
   readonly level: bigint;
   readonly job: Job;
 }
 interface Chain {
-  readonly $: "Chain";
+  readonly $: "check_chain_plan.Chain";
   readonly position: bigint;
   readonly level: bigint;
   readonly jobs: BendList<
-    { readonly $: "Job"; readonly position: bigint; readonly job: Job }
+    {
+      readonly $: "check_chain_plan.Job";
+      readonly position: bigint;
+      readonly job: Job;
+    }
   >;
 }
 interface Task {
-  readonly $: "Task";
+  readonly $: "check_scheduler.Task";
   readonly position: bigint;
   readonly module: unknown;
   readonly dependencies: BendList<unknown>;
   readonly cost: bigint;
 }
 interface Outcome {
-  readonly $: "Outcome";
+  readonly $: "check_scheduler.Outcome";
   readonly position: bigint;
   readonly checked: Result<unknown>;
 }
 type Batch = {
-  readonly $: "Sequential";
+  readonly $: "inference_batch.Sequential";
   readonly tasks: BendList<
-    { readonly $: "Weighted"; readonly value: Task; readonly cost: bigint }
+    {
+      readonly $: "inference_batch.Weighted";
+      readonly value: Task;
+      readonly cost: bigint;
+    }
   >;
-} | { readonly $: "Parallel"; readonly left: Batch; readonly right: Batch };
+} | {
+  readonly $: "inference_batch.Parallel";
+  readonly left: Batch;
+  readonly right: Batch;
+};
 
 const scheduler = compiled as unknown as {
   "check_regions.rooted_plan"(chains: BendList<Chain>): Result<{
@@ -74,7 +86,7 @@ const scheduler = compiled as unknown as {
   }>;
   "check_regions.partition"(chains: BendList<Chain>): Result<
     BendList<{
-      readonly $: "Region";
+      readonly $: "check_regions.Region";
       readonly chains: BendList<Chain>;
     }>
   >;
@@ -110,6 +122,20 @@ const scheduler = compiled as unknown as {
     module: unknown,
     completed: unknown,
   ): Result<unknown>;
+  "check_scheduler.empty_completed"(): unknown;
+  "check_scheduler.with_core"(
+    catalog: unknown,
+    module: unknown,
+    certificates: BendList<unknown>,
+  ): unknown;
+  "check_scheduler.has_dependencies"(jobs: BendList<Job>): boolean;
+  "groups.plan"(module: unknown): Result<BendList<Job>>;
+  "groups.check_group"(
+    module: unknown,
+    dependencies: BendList<unknown>,
+  ): Result<
+    { readonly checked: unknown; readonly interfaces: BendList<unknown> }
+  >;
   "check_scheduler.check_module"(module: unknown): Result<unknown>;
   "check_scheduler.check_module_resolving_probe"(
     module: unknown,
@@ -129,8 +155,6 @@ const scheduler = compiled as unknown as {
     subset: unknown,
     imports: unknown,
   ): { readonly $: "Some"; readonly value: unknown } | { readonly $: "None" };
-  "check.check_module"(module: unknown): Result<unknown>;
-  "groups.checked_group"(module: unknown): Result<unknown>;
 };
 
 function unwrap<T>(result: Result<T>): T {
@@ -138,21 +162,55 @@ function unwrap<T>(result: Result<T>): T {
   return result.value;
 }
 
+function checkedWithInterfaces(module: unknown): {
+  checked: Result<unknown>;
+  interfaces: BendList<unknown>;
+} {
+  const jobs = unwrap(scheduler["groups.plan"](module));
+  const completed = unwrap(scheduler["check_scheduler.check_jobs"](
+    jobs,
+    scheduler["check_scheduler.with_core"](
+      scheduler["check_scheduler.catalog"](module),
+      module,
+      bendList([]),
+    ),
+    scheduler["check_scheduler.empty_completed"](),
+    scheduler["check_scheduler.has_dependencies"](jobs),
+  ));
+  return {
+    checked: scheduler["check_scheduler.assembled"](module, completed),
+    interfaces: (completed as { readonly published: BendList<unknown> })
+      .published,
+  };
+}
+
+function byName(interfaces: BendList<unknown>): unknown[] {
+  return bendArray(interfaces).sort((left, right) =>
+    String((left as { name: string }).name).localeCompare(
+      String((right as { name: string }).name),
+    )
+  );
+}
+
 function job(members: string[], dependencies: string[] = []): Job {
   return {
-    $: "Job",
+    $: "groups.Job",
     members: bendList(members),
     dependencies: bendList(dependencies),
     type_dependencies: bendList([]),
   };
 }
 
-const unit = { $: "UnitExpr" };
-const integer = (value: number) => ({ $: "U32Expr", value });
-const call = (callee: string) => ({ $: "CallExpr", callee, argument: unit });
+const unit = { $: "model.UnitExpr" };
+const integer = (value: number) => ({ $: "model.U32Expr", value });
+const call = (callee: string) => ({
+  $: "model.CallExpr",
+  callee,
+  argument: unit,
+});
 const add = (left: unknown, right: unknown) => ({
-  $: "ScalarExpr",
-  operator: { $: "Add" },
+  $: "model.ScalarExpr",
+  operator: { $: "model.Add" },
   left,
   right,
 });
@@ -188,11 +246,11 @@ Deno.test("completed shared roots release independent branches but preserve unfi
     [1, 2, 3, 4, 5, 6, 7],
   ]);
   const invalid: Chain = {
-    $: "Chain",
+    $: "check_chain_plan.Chain",
     position: 1n,
     level: 1n,
     jobs: bendList([{
-      $: "Job",
+      $: "check_chain_plan.Job",
       position: 1n,
       job: job(["bad"], ["unknown"]),
     }]),
@@ -386,19 +444,19 @@ Deno.test("dependency chains contract only single-consumer edges and preserve SC
 
 function fn(name: string, body: unknown, parameter = "value") {
   return {
-    $: "Function",
+    $: "model.Function",
     name,
     exported: false,
     parameter,
-    parameter_type: { $: "Some", value: { $: "UnitTy" } },
-    result_type: { $: "Some", value: { $: "U32Ty" } },
+    parameter_type: { $: "Some", value: { $: "model.UnitTy" } },
+    result_type: { $: "Some", value: { $: "model.U32Ty" } },
     body,
   };
 }
 
 function module(functions: unknown[]) {
   return {
-    $: "Module",
+    $: "model.Module",
     constants: bendList([]),
     functions: bendList(functions),
     data_types: bendList([]),
@@ -413,7 +471,7 @@ Deno.test("failed source checks retain exact completed groups and preserve check
       immediate,
       bendList([]),
     );
-  ok(immediateAttempt.$ === "FailedInitial");
+  ok(immediateAttempt.$ === "check_scheduler.FailedInitial");
   const immediateBaseline = scheduler["check_scheduler.check_module"](
     immediate,
   );
@@ -431,21 +489,25 @@ Deno.test("failed source checks retain exact completed groups and preserve check
       healthy,
       bendList([]),
     );
-  ok(healthyAttempt.$ === "CheckedInitial");
+  ok(healthyAttempt.$ === "check_scheduler.CheckedInitial");
 
   const catalogEdit = scheduler["check_scheduler.check_module_resolving_probe"](
     {
       ...healthy,
       operations: bendList([{
-        $: "Operation",
-        identity: { $: "TypeId", module_name: "main", declaration: "Unused" },
-        parameter: { $: "UnitTy" },
-        result: { $: "U32Ty" },
+        $: "model.Operation",
+        identity: {
+          $: "model.TypeId",
+          module_name: "main",
+          declaration: "Unused",
+        },
+        parameter: { $: "model.UnitTy" },
+        result: { $: "model.U32Ty" },
       }]),
     },
     healthyAttempt.initial.certificates,
   );
-  ok(catalogEdit.$ === "CheckedInitial");
+  ok(catalogEdit.$ === "check_scheduler.CheckedInitial");
   // A new unused operation does not change a ready certificate's dependencies.
   equal(catalogEdit.retained, healthyAttempt.inferred);
   const changedCatalog = scheduler
@@ -453,15 +515,19 @@ Deno.test("failed source checks retain exact completed groups and preserve check
       {
         ...healthy,
         operations: bendList([{
-          $: "Operation",
-          identity: { $: "TypeId", module_name: "main", declaration: "Unused" },
-          parameter: { $: "UnitTy" },
-          result: { $: "BoolTy" },
+          $: "model.Operation",
+          identity: {
+            $: "model.TypeId",
+            module_name: "main",
+            declaration: "Unused",
+          },
+          parameter: { $: "model.UnitTy" },
+          result: { $: "model.BoolTy" },
         }]),
       },
       catalogEdit.initial.certificates,
     );
-  ok(changedCatalog.$ === "CheckedInitial");
+  ok(changedCatalog.$ === "check_scheduler.CheckedInitial");
   equal(changedCatalog.retained, 0n);
   equal(changedCatalog.inferred, healthyAttempt.inferred);
 
@@ -474,7 +540,7 @@ Deno.test("failed source checks retain exact completed groups and preserve check
     source,
     bendList([]),
   );
-  ok(first.$ === "FailedInitial");
+  ok(first.$ === "check_scheduler.FailedInitial");
   const baseline = scheduler["check_scheduler.check_module"](source);
   ok(baseline.$ === "Fail");
   equal(first.diagnostic, baseline.error);
@@ -487,7 +553,7 @@ Deno.test("failed source checks retain exact completed groups and preserve check
     source,
     healthyAttempt.initial.certificates,
   );
-  ok(warmEdit.$ === "FailedInitial");
+  ok(warmEdit.$ === "check_scheduler.FailedInitial");
   equal(warmEdit.diagnostic, first.diagnostic);
   ok(
     warmEdit.retained > 0n,
@@ -498,9 +564,9 @@ Deno.test("failed source checks retain exact completed groups and preserve check
     fn("good", integer(7)),
     fn("early", integer(1)),
     fn("late", {
-      $: "AssociatedExpr",
+      $: "model.AssociatedExpr",
       identity: 123n,
-      dispatch: { $: "BinaryDispatch" },
+      dispatch: { $: "model.BinaryDispatch" },
       member: "missing",
       templates: bendList([]),
       left: integer(1),
@@ -520,7 +586,7 @@ Deno.test("failed source checks retain exact completed groups and preserve check
     source,
     first.certificates,
   );
-  ok(warm.$ === "FailedInitial");
+  ok(warm.$ === "check_scheduler.FailedInitial");
   equal(warm.diagnostic, first.diagnostic);
   ok(warm.retained > 0n, "the warm failed check must actually retain a group");
   equal(warm.inferred, 0n);
@@ -534,7 +600,7 @@ Deno.test("failed source checks retain exact completed groups and preserve check
     changed,
     first.certificates,
   );
-  ok(edited.$ === "FailedInitial");
+  ok(edited.$ === "check_scheduler.FailedInitial");
   equal(edited.diagnostic, first.diagnostic);
   equal(
     edited.retained,
@@ -560,7 +626,7 @@ Deno.test("ready inference frontiers preserve SCC members and dependency levels"
     {
       $: "Fail",
       error: {
-        $: "Diagnostic",
+        $: "model.Diagnostic",
         code: "internal_error",
         subject: "missing",
         message: "incremental plan omitted a required checked dependency",
@@ -588,7 +654,7 @@ Deno.test("ready inference frontiers preserve SCC members and dependency levels"
       unwrap(scheduler["check_scheduler.schedule"](bendList(jobs))),
     );
     const expected = jobs.map((job, position) => ({
-      $: "Scheduled",
+      $: "check_scheduler.Scheduled",
       position: BigInt(position),
       level: BigInt(levels[position]),
       job,
@@ -599,7 +665,7 @@ Deno.test("ready inference frontiers preserve SCC members and dependency levels"
 
 Deno.test("inference grain preserves ordered results and keeps small or indivisible leaves sequential", () => {
   const tasks: Task[] = Array.from({ length: 16 }, (_, position) => ({
-    $: "Task",
+    $: "check_scheduler.Task",
     position: BigInt(position),
     module: module([
       fn(`value_${position}`, position === 5 ? unit : integer(position)),
@@ -631,16 +697,22 @@ Deno.test("inference grain preserves ordered results and keeps small or indivisi
   const tree = (tasks: Task[], grain: bigint) => {
     return scheduler["check_scheduler.task_batch"](bendList(tasks), grain);
   };
-  equal(tree(tasks.slice(1, 3), 1024n).$, "Sequential");
-  equal(tree([{ ...tasks[0], cost: 1_000_000n }], 0n).$, "Sequential");
-  equal(tree(tasks, 256n).$, "Parallel");
+  equal(tree(tasks.slice(1, 3), 1024n).$, "inference_batch.Sequential");
+  equal(
+    tree([{ ...tasks[0], cost: 1_000_000n }], 0n).$,
+    "inference_batch.Sequential",
+  );
+  equal(tree(tasks, 256n).$, "inference_batch.Parallel");
   const uneven = tree([
     { ...tasks[0], cost: 600n },
     { ...tasks[1], cost: 600n },
     { ...tasks[2], cost: 1500n },
   ], 1024n);
-  ok(uneven.$ === "Parallel");
-  ok(uneven.left.$ === "Sequential" && uneven.right.$ === "Sequential");
+  ok(uneven.$ === "inference_batch.Parallel");
+  ok(
+    uneven.left.$ === "inference_batch.Sequential" &&
+      uneven.right.$ === "inference_batch.Sequential",
+  );
   equal(bendArray(uneven.left.tasks).map(({ value }) => value.position), [
     0n,
     1n,
@@ -652,7 +724,7 @@ Deno.test("a later ready inference error cannot hide an earlier blocked group er
   const source = module([
     fn("seed", integer(1)),
     fn("earlier", add(call("seed"), unit)),
-    fn("later", { $: "LocalExpr", name: "missing" }),
+    fn("later", { $: "model.LocalExpr", name: "missing" }),
   ]);
   const plan = unwrap(scheduler["check_scheduler.schedule"](bendList([
     job(["seed"]),
@@ -664,7 +736,7 @@ Deno.test("a later ready inference error cannot hide an earlier blocked group er
     scheduler["check_scheduler.next_frontier"](plan),
     scheduler["check_scheduler.catalog"](source),
     {
-      $: "Completed",
+      $: "check_scheduler.Completed",
       interfaces: { $: "MTip" },
       functions: { $: "MTip" },
       constants: { $: "MTip" },
@@ -682,7 +754,7 @@ Deno.test("a later ready inference error cannot hide an earlier blocked group er
     bendList([job(["seed"]), job(["earlier"], ["seed"]), job(["later"])]),
     scheduler["check_scheduler.catalog"](source),
     {
-      $: "Completed",
+      $: "check_scheduler.Completed",
       interfaces: { $: "MTip" },
       functions: { $: "MTip" },
       constants: { $: "MTip" },
@@ -705,35 +777,43 @@ Deno.test("ready grouped checking agrees with serial inference interfaces on a d
     fn("recursive_b", call("recursive_a")),
     fn("seed", integer(21)),
   ]);
-  const serial = unwrap(scheduler["check.check_module"](source));
   const ready = unwrap(scheduler["check_scheduler.check_module"](source));
-  equal(
-    scheduler["groups.checked_group"](ready),
-    scheduler["groups.checked_group"](serial),
-  );
+  const readyWithInterfaces = checkedWithInterfaces(source);
+  const serialGroup = unwrap(scheduler["groups.check_group"](
+    source,
+    bendList([]),
+  ));
+  equal(readyWithInterfaces.checked, { $: "Done", value: ready });
+  equal(byName(readyWithInterfaces.interfaces), byName(serialGroup.interfaces));
 });
 
 Deno.test("resolving reuse retains complete deferred requirements across unrelated edits", () => {
   const deferred = fn("deferred", {
-    $: "AssociatedExpr",
+    $: "model.AssociatedExpr",
     identity: 17n,
-    dispatch: { $: "BinaryDispatch" },
+    dispatch: { $: "model.BinaryDispatch" },
     member: "add",
     templates: bendList([]),
-    left: { $: "U32Expr", value: 1 },
-    right: { $: "U32Expr", value: 2 },
+    left: { $: "model.U32Expr", value: 1 },
+    right: { $: "model.U32Expr", value: 2 },
   });
-  const original = module([deferred, fn("other", { $: "U32Expr", value: 3 })]);
+  const original = module([
+    deferred,
+    fn("other", { $: "model.U32Expr", value: 3 }),
+  ]);
   const first = scheduler["check_scheduler.check_module_resolving_probe"](
     original,
     bendList([]),
   );
-  ok(first.$ === "CheckedInitial");
+  ok(first.$ === "check_scheduler.CheckedInitial");
   ok(
     bendArray(first.initial.needs).length > 0,
     "fixture must carry deferred evidence",
   );
-  const edited = module([deferred, fn("other", { $: "U32Expr", value: 4 })]);
+  const edited = module([
+    deferred,
+    fn("other", { $: "model.U32Expr", value: 4 }),
+  ]);
   const fresh = scheduler["check_scheduler.check_module_resolving_probe"](
     edited,
     bendList([]),
@@ -743,8 +823,8 @@ Deno.test("resolving reuse retains complete deferred requirements across unrelat
     first.initial.certificates,
     first.initial,
   );
-  ok(fresh.$ === "CheckedInitial");
-  ok(reused.$ === "CheckedInitial");
+  ok(fresh.$ === "check_scheduler.CheckedInitial");
+  ok(reused.$ === "check_scheduler.CheckedInitial");
   equal(reused.initial, fresh.initial);
 
   const certificates = bendArray(first.initial.certificates);
@@ -766,19 +846,19 @@ Deno.test("resolving reuse retains complete deferred requirements across unrelat
 
 Deno.test("resolving witness rejects malformed, duplicated and changed evidence", () => {
   const original = module([fn("deferred", {
-    $: "AssociatedExpr",
+    $: "model.AssociatedExpr",
     identity: 17n,
-    dispatch: { $: "BinaryDispatch" },
+    dispatch: { $: "model.BinaryDispatch" },
     member: "add",
     templates: bendList([]),
-    left: { $: "U32Expr", value: 1 },
-    right: { $: "U32Expr", value: 2 },
+    left: { $: "model.U32Expr", value: 1 },
+    right: { $: "model.U32Expr", value: 2 },
   })]);
   const first = scheduler["check_scheduler.check_module_resolving_probe"](
     original,
     bendList([]),
   );
-  ok(first.$ === "CheckedInitial");
+  ok(first.$ === "check_scheduler.CheckedInitial");
   const [certificate] = bendArray(first.initial.certificates);
   const [need] = bendArray(first.initial.needs);
   ok(certificate && need);
@@ -800,11 +880,15 @@ Deno.test("resolving witness rejects malformed, duplicated and changed evidence"
   const changed = {
     ...original,
     operations: bendList([{
-      $: "OperationTemplate",
-      identity: { $: "TypeId", module_name: "effects", declaration: "Read" },
+      $: "model.OperationTemplate",
+      identity: {
+        $: "model.TypeId",
+        module_name: "effects",
+        declaration: "Read",
+      },
       parameters: 1n,
-      parameter: { $: "UnitTy" },
-      result: { $: "ParameterTy", index: 0n },
+      parameter: { $: "model.UnitTy" },
+      result: { $: "model.ParameterTy", index: 0n },
     }]),
   };
   equal(
@@ -818,16 +902,18 @@ Deno.test("resolving witness rejects malformed, duplicated and changed evidence"
   equal(
     scheduler["resolving_core.matches"](
       pair.value,
-      module([fn("deferred", { $: "U32Expr", value: 3 })]),
+      module([fn("deferred", { $: "model.U32Expr", value: 3 })]),
       certificate.imports,
     ),
     { $: "None" },
   );
   const imported = bendList([{
-    $: "Interface",
+    $: "groups.Interface",
     name: "newDependency",
-    kind: { $: "ConstantInterface" },
-    template: { $: "U32Ty" },
+    predicates: bendList([]),
+    kind: { $: "groups.ConstantInterface" },
+    template: { $: "model.U32Ty" },
+
     parameters: 0n,
     effects: bendList([]),
   }]);

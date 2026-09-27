@@ -1,6 +1,12 @@
 import compiled from "../generated/compiler/compiler.js";
 import type { Cst } from "./syntax.ts";
 import { CompilerError, type Diagnostic } from "./diagnostics.ts";
+import {
+  fromBendModel,
+  fromBendValue,
+  toBendCst,
+  toBendModel,
+} from "./bend_abi.ts";
 export { CompilerError } from "./diagnostics.ts";
 
 // The FFI vocabulary mirrors model.bend. This module only marshals core values;
@@ -13,7 +19,8 @@ export interface TypeId {
 
 export type RowTail =
   | { readonly $: "ClosedRow" }
-  | { readonly $: "RowVariable" | "RowParameter"; readonly index: bigint };
+  | { readonly $: "RowVariable" | "RowParameter"; readonly index: bigint }
+  | { readonly $: "FreeRow"; readonly scope: string; readonly name: string };
 export interface EffectRow {
   readonly $: "EffectRow";
   readonly operations: readonly TypeId[];
@@ -99,6 +106,47 @@ export interface Operation {
   readonly parameter: Type;
   readonly result: Type;
 }
+export type Predicate =
+  | {
+    readonly $: "AssociatedPredicate";
+    readonly member: string;
+    readonly templates: readonly TypeId[];
+    readonly left: Type;
+    readonly right: Type;
+    readonly result: Type;
+    readonly invocation: EffectRow;
+  }
+  | {
+    readonly $: "ReceiverPredicate";
+    readonly member: string;
+    readonly templates: readonly TypeId[];
+    readonly receiver: Type;
+    readonly argument: Type;
+    readonly result: Type;
+    readonly invocation: EffectRow;
+  }
+  | {
+    readonly $: "FieldPredicate";
+    readonly member: string;
+    readonly receiver: Type;
+    readonly result: Type;
+  }
+  | {
+    readonly $: "UpdatePredicate";
+    readonly member: string;
+    readonly receiver: Type;
+    readonly assigned: Type;
+    readonly result: Type;
+    readonly invocation: EffectRow;
+  }
+  | {
+    readonly $: "OperationPredicate";
+    readonly template: TypeId;
+    readonly arguments: readonly Type[];
+    readonly function_type: Type;
+  }
+  | { readonly $: "TypeRepPredicate"; readonly represented: Type }
+  | { readonly $: "EffectRepPredicate"; readonly row: EffectRow };
 
 export interface DataType {
   readonly identity: TypeId;
@@ -207,6 +255,18 @@ export type Expr =
     readonly $: "SourceExpr";
     readonly offset: bigint;
     readonly annotation: Maybe<Type>;
+    readonly value: Expr;
+  }
+  | {
+    readonly $: "QualifiedExpr";
+    readonly offset: bigint;
+    readonly annotation: Type;
+    readonly predicates: readonly Predicate[];
+    readonly value: Expr;
+  }
+  | {
+    readonly $: "InstantiationExpr";
+    readonly site: bigint;
     readonly value: Expr;
   }
   | { readonly $: "PanicExpr"; readonly message: string }
@@ -423,6 +483,48 @@ type WireType =
     readonly effects: WireRow;
   };
 
+type WirePredicate =
+  | {
+    readonly $: "AssociatedPredicate";
+    readonly member: string;
+    readonly templates: List<TypeId>;
+    readonly left: WireType;
+    readonly right: WireType;
+    readonly result: WireType;
+    readonly invocation: WireRow;
+  }
+  | {
+    readonly $: "ReceiverPredicate";
+    readonly member: string;
+    readonly templates: List<TypeId>;
+    readonly receiver: WireType;
+    readonly argument: WireType;
+    readonly result: WireType;
+    readonly invocation: WireRow;
+  }
+  | {
+    readonly $: "FieldPredicate";
+    readonly member: string;
+    readonly receiver: WireType;
+    readonly result: WireType;
+  }
+  | {
+    readonly $: "UpdatePredicate";
+    readonly member: string;
+    readonly receiver: WireType;
+    readonly assigned: WireType;
+    readonly result: WireType;
+    readonly invocation: WireRow;
+  }
+  | {
+    readonly $: "OperationPredicate";
+    readonly template: TypeId;
+    readonly arguments: List<WireType>;
+    readonly function_type: WireType;
+  }
+  | { readonly $: "TypeRepPredicate"; readonly represented: WireType }
+  | { readonly $: "EffectRepPredicate"; readonly row: WireRow };
+
 type WirePattern =
   | Exclude<Pattern, { readonly $: "ConstructorPattern" | "ProductPattern" }>
   | { readonly $: "ProductPattern"; readonly elements: List<WirePattern> }
@@ -578,6 +680,18 @@ type WireExpr =
     readonly $: "SourceExpr";
     readonly offset: bigint;
     readonly annotation: Maybe<WireType>;
+    readonly value: WireExpr;
+  }
+  | {
+    readonly $: "QualifiedExpr";
+    readonly offset: bigint;
+    readonly annotation: WireType;
+    readonly predicates: List<WirePredicate>;
+    readonly value: WireExpr;
+  }
+  | {
+    readonly $: "InstantiationExpr";
+    readonly site: bigint;
     readonly value: WireExpr;
   }
   | {
@@ -795,10 +909,18 @@ function encodeIdentity(identity: TypeId): TypeId {
 }
 
 function encodeRow(row: EffectRow): WireRow {
-  const tail = row.tail.$ === "ClosedRow"
+  const tail: RowTail = row.tail.$ === "ClosedRow"
     ? row.tail
+    : row.tail.$ === "FreeRow"
+    ? {
+      $: "FreeRow",
+      scope: unicode(row.tail.scope, "Row scope"),
+      name: unicode(row.tail.name, "Row name"),
+    }
     : { $: row.tail.$, index: nat(row.tail.index, "Row index") };
-  if (!["ClosedRow", "RowVariable", "RowParameter"].includes(tail.$)) {
+  if (
+    !["ClosedRow", "RowVariable", "RowParameter", "FreeRow"].includes(tail.$)
+  ) {
     throw new TypeError(`Unknown effect row tail: ${tail.$}`);
   }
   return {
@@ -948,6 +1070,105 @@ function decodePattern(pattern: WirePattern): Pattern {
       ? null
       : decodePattern(pattern.payload.value),
   };
+}
+
+function encodePredicate(predicate: Predicate): WirePredicate {
+  switch (predicate.$) {
+    case "AssociatedPredicate":
+      return {
+        $: predicate.$,
+        member: unicode(predicate.member, "Associated member"),
+        templates: list(predicate.templates.map(encodeIdentity)),
+        left: encodeType(predicate.left),
+        right: encodeType(predicate.right),
+        result: encodeType(predicate.result),
+        invocation: encodeRow(predicate.invocation),
+      };
+    case "ReceiverPredicate":
+      return {
+        $: predicate.$,
+        member: unicode(predicate.member, "Receiver member"),
+        templates: list(predicate.templates.map(encodeIdentity)),
+        receiver: encodeType(predicate.receiver),
+        argument: encodeType(predicate.argument),
+        result: encodeType(predicate.result),
+        invocation: encodeRow(predicate.invocation),
+      };
+    case "FieldPredicate":
+      return {
+        $: predicate.$,
+        member: unicode(predicate.member, "Field member"),
+        receiver: encodeType(predicate.receiver),
+        result: encodeType(predicate.result),
+      };
+    case "UpdatePredicate":
+      return {
+        $: predicate.$,
+        member: unicode(predicate.member, "Update member"),
+        receiver: encodeType(predicate.receiver),
+        assigned: encodeType(predicate.assigned),
+        result: encodeType(predicate.result),
+        invocation: encodeRow(predicate.invocation),
+      };
+    case "OperationPredicate":
+      return {
+        $: predicate.$,
+        template: encodeIdentity(predicate.template),
+        arguments: list(predicate.arguments.map(encodeType)),
+        function_type: encodeType(predicate.function_type),
+      };
+    case "TypeRepPredicate":
+      return { $: predicate.$, represented: encodeType(predicate.represented) };
+    case "EffectRepPredicate":
+      return { $: predicate.$, row: encodeRow(predicate.row) };
+  }
+}
+
+function decodePredicate(predicate: WirePredicate): Predicate {
+  switch (predicate.$) {
+    case "AssociatedPredicate":
+      return {
+        ...predicate,
+        templates: array(predicate.templates),
+        left: decodeType(predicate.left),
+        right: decodeType(predicate.right),
+        result: decodeType(predicate.result),
+        invocation: decodeRow(predicate.invocation),
+      };
+    case "ReceiverPredicate":
+      return {
+        ...predicate,
+        templates: array(predicate.templates),
+        receiver: decodeType(predicate.receiver),
+        argument: decodeType(predicate.argument),
+        result: decodeType(predicate.result),
+        invocation: decodeRow(predicate.invocation),
+      };
+    case "FieldPredicate":
+      return {
+        ...predicate,
+        receiver: decodeType(predicate.receiver),
+        result: decodeType(predicate.result),
+      };
+    case "UpdatePredicate":
+      return {
+        ...predicate,
+        receiver: decodeType(predicate.receiver),
+        assigned: decodeType(predicate.assigned),
+        result: decodeType(predicate.result),
+        invocation: decodeRow(predicate.invocation),
+      };
+    case "OperationPredicate":
+      return {
+        ...predicate,
+        arguments: array(predicate.arguments).map(decodeType),
+        function_type: decodeType(predicate.function_type),
+      };
+    case "TypeRepPredicate":
+      return { ...predicate, represented: decodeType(predicate.represented) };
+    case "EffectRepPredicate":
+      return { ...predicate, row: decodeRow(predicate.row) };
+  }
 }
 
 function encodeExpr(expression: Expr): WireExpr {
@@ -1219,6 +1440,20 @@ function encodeExpr(expression: Expr): WireExpr {
           : { $: "Some", value: encodeType(expression.annotation.value) },
         value: encodeExpr(expression.value),
       };
+    case "QualifiedExpr":
+      return {
+        $: expression.$,
+        offset: nat(expression.offset, "Qualified offset"),
+        annotation: encodeType(expression.annotation),
+        predicates: list(expression.predicates.map(encodePredicate)),
+        value: encodeExpr(expression.value),
+      };
+    case "InstantiationExpr":
+      return {
+        $: expression.$,
+        site: nat(expression.site, "Instantiation site"),
+        value: encodeExpr(expression.value),
+      };
     default: {
       const invalid: never = expression;
       throw new TypeError(`Unknown core expression: ${String(invalid)}`);
@@ -1403,6 +1638,15 @@ function decodeExpr(expression: WireExpr): Expr {
           : { $: "Some", value: decodeType(expression.annotation.value) },
         value: decodeExpr(expression.value),
       };
+    case "QualifiedExpr":
+      return {
+        ...expression,
+        annotation: decodeType(expression.annotation),
+        predicates: array(expression.predicates).map(decodePredicate),
+        value: decodeExpr(expression.value),
+      };
+    case "InstantiationExpr":
+      return { ...expression, value: decodeExpr(expression.value) };
   }
 }
 
@@ -1506,15 +1750,15 @@ function decodeAnalysis(analysis: WireAnalysis): Analysis {
   return structuredClone({
     functions: array(analysis.checked.functions).map((fn) => ({
       name: fn.signature.name,
-      parameter: decodeType(fn.signature.parameter),
-      result: decodeType(fn.signature.result),
+      parameter: decodeType(fromBendModel(fn.signature.parameter)),
+      result: decodeType(fromBendModel(fn.signature.result)),
       variables: array(fn.signature.variables),
-      effects: array(fn.effects),
-      effect_row: decodeRow(fn.signature.effects),
+      effects: array(fromBendModel(fn.effects)),
+      effect_row: decodeRow(fromBendModel(fn.signature.effects)),
     })),
     constants: array(analysis.constants).map(({ name, value }) => ({
       name,
-      value: decodeValue(value),
+      value: decodeValue(fromBendValue(value)),
     })),
     remaining_steps: analysis.remaining_steps,
   });
@@ -1582,7 +1826,10 @@ export function analyze(
   module: CoreModule,
   options: CompileOptions = {},
 ): Analysis {
-  const result = bend.analyze(marshal(module), constSteps(options));
+  const result = bend.analyze(
+    toBendModel(marshal(module)),
+    constSteps(options),
+  );
   return decodeAnalysis(unwrap(result as Result<WireAnalysis>));
 }
 
@@ -1599,7 +1846,10 @@ export function compile(
   options: ArtifactOptions = {},
 ): Artifact {
   const analysis = includesAnalysis(options);
-  const result = bend.compile(marshal(module), constSteps(options));
+  const result = bend.compile(
+    toBendModel(marshal(module)),
+    constSteps(options),
+  );
   return decodeArtifact(unwrap(result as Result<WireArtifact>), analysis);
 }
 
@@ -1610,8 +1860,8 @@ export function analyzeSourceTree(
   options: CompileOptions = {},
 ): Analysis {
   const result = bend.analyze_source(
-    root,
-    preludeRoot,
+    toBendCst(root),
+    toBendCst(preludeRoot),
     nat(nodeCount, "CST node count"),
     constSteps(options),
   );
@@ -1638,8 +1888,8 @@ export function compileSourceTree(
 ): Artifact {
   const analysis = includesAnalysis(options);
   const result = bend.compile_source(
-    root,
-    preludeRoot,
+    toBendCst(root),
+    toBendCst(preludeRoot),
     nat(nodeCount, "CST node count"),
     constSteps(options),
   );

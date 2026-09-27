@@ -13,7 +13,7 @@ export interface NominalDeclaration {
 }
 
 export interface RawModule {
-  readonly $: "Module";
+  readonly $: "model.Module";
   readonly operations: BendList<NominalDeclaration>;
   readonly data_types: BendList<NominalDeclaration>;
   readonly constants: BendList<Declaration>;
@@ -31,7 +31,7 @@ export interface CheckedFunction {
 }
 
 export interface CheckedModule {
-  readonly $: "CheckedModule";
+  readonly $: "model.CheckedModule";
   readonly constants: BendList<CheckedConstant>;
   readonly functions: BendList<CheckedFunction>;
   readonly data_types: BendList<unknown>;

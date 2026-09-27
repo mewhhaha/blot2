@@ -8,22 +8,32 @@ const api = compiled as unknown as Record<
 >;
 const nil = bendList([]);
 const none = { $: "None" };
-const variable = { $: "VariableTy", index: 19n };
-const unit = { $: "UnitTy" };
+const variable = { $: "model.VariableTy", index: 19n };
+const unit = { $: "model.UnitTy" };
 const callable = {
-  $: "FunctionTy",
+  $: "model.FunctionTy",
   parameter: variable,
   result: variable,
-  effects: { $: "EffectRow", operations: nil, tail: { $: "ClosedRow" } },
+  effects: {
+    $: "model.EffectRow",
+    operations: nil,
+    tail: { $: "model.ClosedRow" },
+  },
 };
-const binding = (name: string, inferred_type: unknown) => ({
-  $: "Binding",
+const binding = (
+  name: string,
+  inferred_type: unknown,
+  predicates: unknown = nil,
+) => ({
+  $: "infer.Binding",
+
   name,
   inferred_type,
   variables: nil,
+  predicates,
 });
 const value = (name: string, expression: unknown) => ({
-  $: "Constant",
+  $: "model.Constant",
   name,
   exported: false,
   annotation: none,
@@ -45,22 +55,27 @@ Deno.test("specialization filters preserve declaration order and duplicate bindi
     bendList(["first", "last", "first"]),
   );
   const first = value("first", {
-    $: "CallExpr",
+    $: "model.CallExpr",
     callee: "make",
-    argument: { $: "UnitExpr" },
+    argument: { $: "model.UnitExpr" },
   });
   const last = value("last", {
-    $: "CallExpr",
+    $: "model.CallExpr",
     callee: "make",
-    argument: { $: "UnitExpr" },
+    argument: { $: "model.UnitExpr" },
   });
   const runtime = value("runtime", {
-    $: "RuntimeInitExpr",
-    value: { $: "UnitExpr" },
+    $: "model.RuntimeInitExpr",
+    value: { $: "model.UnitExpr" },
   });
   equal(
     api["monomorph.specialized_constants"](
-      bendList([first, runtime, value("closed", { $: "UnitExpr" }), last]),
+      bendList([
+        first,
+        runtime,
+        value("closed", { $: "model.UnitExpr" }),
+        last,
+      ]),
       bendList(["last", "closed", "runtime", "first"]),
       bendList([
         binding("first", callable),
@@ -79,10 +94,55 @@ Deno.test("shared specialization bound covers free variables in all shape bindin
       bendList([
         binding("closed", unit),
         binding("generic", callable),
-        binding("later", { $: "VariableTy", index: 47n }),
+        binding("later", { $: "model.VariableTy", index: 47n }),
       ]),
       0n,
     ),
     { $: "Done", value: 48n },
+  );
+});
+
+Deno.test("qualified shape bound covers variables that occur only in predicates", () => {
+  equal(
+    api["monomorph.shape_limit"](
+      bendList([binding(
+        "qualified",
+        unit,
+        bendList([
+          {
+            $: "model.TypeRepPredicate",
+            represented: { $: "model.VariableTy", index: 63n },
+          },
+          {
+            $: "model.EffectRepPredicate",
+            row: {
+              $: "model.EffectRow",
+              operations: nil,
+              tail: { $: "model.RowVariable", index: 79n },
+            },
+          },
+        ]),
+      )]),
+      0n,
+    ),
+    { $: "Done", value: 80n },
+  );
+});
+
+Deno.test("selected monomorphic shapes retain explicit predicates as templates", () => {
+  const predicates = bendList([{
+    $: "model.TypeRepPredicate",
+    represented: unit,
+  }]);
+  equal(
+    api["monomorph.generic_templates"](
+      bendList([
+        binding("ignored", unit, predicates),
+        binding("qualified", unit, predicates),
+        binding("closed", unit),
+      ]),
+      bendList(["qualified", "closed"]),
+    ),
+    bendList(["qualified"]),
   );
 });

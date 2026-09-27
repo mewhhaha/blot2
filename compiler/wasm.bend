@@ -10,6 +10,7 @@ import ./runtime_reachable.bend as Reachable
 import ./runtime_initialization.bend as Init
 import ./public_exports.bend as Public
 import ./loop_memory.bend as LoopMemory
+import ./arena_runtime.bend as Arena
 import ./inference_batch.bend as B
 
 type Slot is Data:
@@ -56,6 +57,7 @@ type Fragment is Data:
   Bytes{bytes: List<&2, U32>}
   NamedCall{key: String}
   Allocate{}
+  Collect{}
   EntryIndex{key: String}
   ConstantReference{name: String}
   ConstructorIndex{name: String}
@@ -647,6 +649,15 @@ def array_code(elements: Code, +count: Nat, size: U32, +first: Nat) -> Code:
     element_stores(count, pointer, first, 4n, Nil{})
   ])}]]), Nat.max(locals, 1n+pointer)}
 
+# The length header and payload byte count must fit one Wasm32 word before
+# allocation checks the end pointer. Static bootstrap constants keep their own
+# smaller compilation budget.
+def runtime_array_max_count() -> U32:
+  1073741822
+
+def runtime_memory_max_pages() -> Nat:
+  65536n
+
 # Values occupy full words, so memory.fill cannot implement generic fills.
 # Validate the count before multiplication and skip the store loop for empties.
 def array_fill_code(+first: Nat) -> Code:
@@ -655,7 +666,7 @@ def array_fill_code(+first: Nat) -> Code:
   +index = {3n+first : Nat}
   Code{[
     Bytes{join([
-      local_get(first), i32_constant(4194303), [75, 4, 64, 0, 11],
+      local_get(first), i32_constant(runtime_array_max_count()), [75, 4, 64, 0, 11],
       local_get(first), [65, 1, 106, 65, 4, 108]
     ])},
     Allocate{},
@@ -677,7 +688,7 @@ def array_generate_code(+first: Nat, +provider: Nat) -> Code:
   +index = {3n+first : Nat}
   Code{[
     Bytes{join([
-      local_get(first), i32_constant(4194303), [75, 4, 64, 0, 11],
+      local_get(first), i32_constant(runtime_array_max_count()), [75, 4, 64, 0, 11],
       local_get(first), [65, 1, 106, 65, 4, 108]
     ])},
     Allocate{},
@@ -710,7 +721,7 @@ def array_set_code(+first: Nat) -> Code:
     Bytes{join([
       local_get(first), [40, 2, 0], 33 <> unsigned_leb(length),
       local_get(index), local_get(length), [79, 4, 64, 0, 11],
-      local_get(length), i32_constant(4194303), [75, 4, 64, 0, 11],
+      local_get(length), i32_constant(runtime_array_max_count()), [75, 4, 64, 0, 11],
       local_get(length), [65, 1, 106, 65, 4, 108]
     ])},
     Allocate{},
@@ -855,24 +866,16 @@ def next_scrutinee(values: List<&2, I.Expr>, +first: Nat, compiled: Code, revers
   Code{fragments, used} = compiled
   ScrutineesWork{values, 1n+first, Bytes{33 <> unsigned_leb(first)} <> List.reverse.go(&2, Fragment, fragments, reversed), Nat.max(Nat.max(locals, used), 1n+first)}
 
-# A numeric-array loop carry owns the only references that survive an iteration.
-# The floor is captured after evaluating the initial value, preserving pre-loop
-# aliases and closures. memory.copy handles an overlapping source/destination.
-# Reserving through Allocate retains the allocator's size and growth checks.
-def compact_flat_array(+state_slot: Nat, +floor_slot: Nat, +scratch_slot: Nat) -> Code:
-  Code{[
-    Bytes{join([
-      local_get(state_slot), [40, 2, 0], i32_constant(4194303), [75, 4, 64, 0, 11],
-      local_get(state_slot), [40, 2, 0, 65, 1, 106, 65, 2, 116], 33 <> unsigned_leb(scratch_slot),
-      local_get(floor_slot), [36, 0], local_get(scratch_slot)
-    ])}, Allocate{}, Bytes{join([
-      [26], local_get(floor_slot), local_get(state_slot), local_get(scratch_slot), [252, 10, 0, 0],
-      local_get(floor_slot), 33 <> unsigned_leb(state_slot)
-    ])}
-  ], 1n+scratch_slot}
-
-def forever_compaction(enabled: Bool, state_slot: Nat, floor_slot: Nat, scratch_slot: Nat) -> Code:
-  Bool.pick(Code, enabled, compact_flat_array(state_slot, floor_slot, scratch_slot), byte_code(Nil{}, 0n))
+# Collection preserves addresses and graph sharing. The watermark pins all
+# allocations that preceded the loop; the runtime traces their outgoing edges.
+# A counter belongs to this loop activation. A global cadence can starve
+# outer-loop collection when an inner loop repeatedly consumes its GC turn.
+def forever_compaction(enabled: Bool, +state_slot: Nat, floor_slot: Nat, +scratch_slot: Nat) -> Code:
+  Bool.pick(Code, enabled, Code{[
+    Bytes{join([local_get(scratch_slot), [65, 1, 106], 34 <> unsigned_leb(scratch_slot), [65, 3, 113, 69, 4, 64], local_get(state_slot), local_get(floor_slot), [65, 0]])},
+    Collect{},
+    Bytes{join([33 <> unsigned_leb(state_slot), [11]])}
+  ], 1n+scratch_slot}, byte_code(Nil{}, 0n))
 
 def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M.Diagnostic, Code>:
   match fuel:
@@ -930,7 +933,7 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             prepared : Code <- emit_expr(rest, ScrutineesWork{[initial], first, Nil{}, 0n}, reserve(context, 3n))
             iteration : Code <- emit_expr(rest, ExpressionWork{body}, nested)
-            return require_locals(append_code(append_code(prepared, iteration, join([[35, 0], 33 <> unsigned_leb(1n+first), [2, 64, 3, 64]]), 33 <> unsigned_leb(first)), forever_compaction(compact, first, 1n+first, 2n+first), Nil{}, join([[12, 0, 11, 11], local_get(first)])), 3n+first)
+            return require_locals(append_code(append_code(prepared, iteration, join([[35, 0], 33 <> unsigned_leb(1n+first), [65, 0], 33 <> unsigned_leb(2n+first), [2, 64, 3, 64]]), 33 <> unsigned_leb(first)), forever_compaction(compact, first, 1n+first, 2n+first), Nil{}, join([[12, 0, 11, 11], local_get(first)])), 3n+first)
         case ExpressionWork{I.ArrayGenerateExpr{count, generator}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
@@ -1572,9 +1575,11 @@ def resolve_fragment(fragment: Fragment, +symbols: Catalog, imports: Nat) -> Res
     case NamedCall{key}:
       do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
         index : Nat <- lookup_symbol(symbol_entries(symbols), key)
-        return 16 <> unsigned_leb(1n+Nat.add(imports, index))
+        return 16 <> unsigned_leb(3n+Nat.add(imports, index))
     case Allocate{}:
       Done{16 <> unsigned_leb(imports)}
+    case Collect{}:
+      Done{16 <> unsigned_leb(2n+imports)}
     case EntryIndex{key}:
       do Result<&2, &2, M.Diagnostic, List<&2, U32>>:
         index : Nat <- lookup_symbol(symbol_entries(symbols), key)
@@ -1670,16 +1675,10 @@ def link_bodies_with_grain(grain: Nat, jobs: List<&2, CodegenJob>, entries: List
 def link_bodies(jobs: List<&2, CodegenJob>, entries: List<&2, EntryCode>, symbols: Catalog, imports: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, BytePlan>>:
   link_bodies_with_grain(256n, jobs, entries, symbols, imports)
 
-# The first defined function is (byte_count:i32) -> pointer:i32. Memory is bounded
-# at 256 pages (16 MiB); every addition and memory.grow failure is checked.
+# Three private runtime entries precede generated jobs: allocator, marker,
+# and collector. Their internal calls are relocated by the callback import count.
 def allocator() -> List<&2, U32>:
-  body_bytes(join([
-    [35, 0, 34, 1, 32, 0, 106, 34, 2, 32, 1, 73, 4, 64, 0, 11],
-    [32, 2], i32_constant(16777216), [75, 4, 64, 0, 11],
-    [32, 2], i32_constant(65535), [106], i32_constant(16), [118, 34, 3, 63, 0, 75, 4, 64],
-    [32, 3, 63, 0, 107, 64, 0], i32_constant(4294967295), [70, 4, 64, 0, 11, 11],
-    [32, 2, 36, 0, 32, 1]
-  ]), 4n, 1n)
+  sized(Arena.allocate(0n))
 
 def scalar_tag(scalar: AbiScalar) -> U32:
   match scalar:
@@ -1866,8 +1865,13 @@ def arena_floor(initialized: Bool, heap_start: Nat) -> List<&2, U32>:
       [65, 0, 40, 2, 0]
 
 
+# Reset invalidates free-list links into discarded allocations. Runtime
+# initializers remain before the restored cursor and keep their block headers.
+def clear_free_bins() -> List<&2, U32>:
+  join([i32_constant(32), [65, 0], i32_constant(132), [252, 11, 0]])
+
 def wrapper_reset(parameter: AbiParameter, heap_start: Nat, initialized: Bool) -> List<&2, U32>:
-  Bool.pick(List<&2, U32>, array_parameter(parameter), Nil{}, concat(arena_floor(initialized, heap_start), [36, 0]))
+  Bool.pick(List<&2, U32>, array_parameter(parameter), Nil{}, join([arena_floor(initialized, heap_start), [36, 0], clear_free_bins()]))
 
 def abi_parameter_bytes(parameter: AbiParameter) -> List<&2, U32>:
   match parameter:
@@ -1958,7 +1962,7 @@ def wrapper_bodies(functions: List<&2, AbiFunction>, +slots: Map<&2, Maybe<&2, N
         index : Nat <- lookup_symbol(slots, "fn:" ++ name)
         argument : List<&2, U32> <- wrapper_argument(parameter, callbacks, entries)
         rest : List<&2, BytePlan> <- wrapper_bodies(tail, slots, heap_start, callbacks, entries, initialized)
-        return byte_plan(body_bytes(join([wrapper_reset(parameter, heap_start, initialized), argument, [65, 0, 16], unsigned_leb(1n+Nat.add(imports, index)), wrapper_return(callbacks, result)]), Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n), 1n)) <> rest
+        return byte_plan(body_bytes(join([wrapper_reset(parameter, heap_start, initialized), argument, [65, 0, 16], unsigned_leb(3n+Nat.add(imports, index)), wrapper_return(callbacks, result)]), Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n), 1n)) <> rest
 
 def function_exports(functions: List<&2, AbiFunction>, index: Nat) -> List<&2, List<&2, U32>>:
   match functions:
@@ -2087,7 +2091,7 @@ def arena_reset_body(enabled: Bool, +heap_start: Nat, +initialized: Bool) -> Lis
     case False{}:
       Nil{}
     case True{}:
-      [byte_plan(body_bytes(join([arena_floor(initialized, heap_start), [36, 0], arena_floor(initialized, heap_start)]), 1n, 1n))]
+      [byte_plan(body_bytes(join([arena_floor(initialized, heap_start), [36, 0], clear_free_bins(), arena_floor(initialized, heap_start)]), 1n, 1n))]
 
 def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePlan>, names: List<&2, ExportedConstant>, values: List<&2, List<&2, U32>>, heap: Heap, +startup: List<&2, BytePlan>) -> BytePlan:
   Abi{+functions, constants, +callbacks} = abi
@@ -2100,20 +2104,20 @@ def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePla
   +initialized = Bool.not(List.is_empty(&2, BytePlan, startup))
   +start_count = List.length(&2, BytePlan, startup)
   +start_type = Bool.pick(Nat, Nat.is_eq(imports, 0n), 5n, 7n+imports)
-  +start_index = {1n+Nat.add(imports, Nat.add(count, Nat.add(wrapper_count, reset_count))) : Nat}
+  +start_index = {3n+Nat.add(imports, Nat.add(count, Nat.add(wrapper_count, reset_count))) : Nat}
   +pages = Nat.max(1n, U32.to_nat(U32.shrn(U32.add(U32.from_nat(heap_start), 65535), 16n)))
   plan_sequence([
     byte_plan([0, 97, 115, 109, 1, 0, 0, 0]),
     type_section(callbacks, initialized),
     import_section(callbacks),
-    byte_plan(section(3, join([unsigned_leb(1n+Nat.add(count, Nat.add(wrapper_count, Nat.add(reset_count, start_count)))), [1], List.replicate(U32, count, 0), wrapper_types(functions), List.replicate(U32, reset_count, 1), Bool.pick(List<&2, U32>, initialized, unsigned_leb(start_type), Nil{})]))),
+    byte_plan(section(3, join([unsigned_leb(3n+Nat.add(count, Nat.add(wrapper_count, Nat.add(reset_count, start_count)))), [1, 0, 0], List.replicate(U32, count, 0), wrapper_types(functions), List.replicate(U32, reset_count, 1), Bool.pick(List<&2, U32>, initialized, unsigned_leb(start_type), Nil{})]))),
     byte_plan(section(4, join([[1, 112, 0], unsigned_leb(count)]))),
-    byte_plan(section(5, join([[1, 1], unsigned_leb(pages), unsigned_leb(256n)]))),
+    byte_plan(section(5, join([[1, 1], unsigned_leb(pages), unsigned_leb(runtime_memory_max_pages())]))),
     byte_plan(section(6, vector(join([[127, 1], i32_constant(U32.from_nat(heap_start)), [11]]) <> callback_globals(callbacks, values)))),
-    byte_plan(section(7, vector(List.append(&2, List<&2, U32>, function_exports(functions, 1n+Nat.add(imports, count)), List.append(&2, List<&2, U32>, global_exports(names, Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n)), arena_exports(arrays, imports, 1n+Nat.add(imports, Nat.add(count, wrapper_count)))))))),
+    byte_plan(section(7, vector(List.append(&2, List<&2, U32>, function_exports(functions, 3n+Nat.add(imports, count)), List.append(&2, List<&2, U32>, global_exports(names, Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n)), arena_exports(arrays, imports, 3n+Nat.add(imports, Nat.add(count, wrapper_count)))))))),
     byte_plan(Bool.pick(List<&2, U32>, initialized, section(8, unsigned_leb(start_index)), Nil{})),
-    byte_plan(section(9, join([[1, 0, 65, 0, 11], unsigned_leb(count), table_indices(count, 1n+imports)]))),
-    plan_section(10, plan_vector(byte_plan(allocator()) <> List.append(&2, BytePlan, bodies, List.append(&2, BytePlan, wrappers, List.append(&2, BytePlan, arena_reset_body(arrays, heap_start, initialized), startup))))),
+    byte_plan(section(9, join([[1, 0, 65, 0, 11], unsigned_leb(count), table_indices(count, 3n+imports)]))),
+    plan_section(10, plan_vector(byte_plan(allocator()) <> byte_plan(sized(Arena.mark(imports))) <> byte_plan(sized(Arena.collect(imports))) <> List.append(&2, BytePlan, bodies, List.append(&2, BytePlan, wrappers, List.append(&2, BytePlan, arena_reset_body(arrays, heap_start, initialized), startup))))),
     data_section(Heap{heap_start, chunks}),
     abi_section(abi)
   ])
@@ -2169,6 +2173,10 @@ def preparation_weight(fuel: Nat, pending: List<&2, PreparationWeightWork>, weig
       preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.SourceExpr{offset, annotation, value}} <> tail:
       preparation_weight(rest, PreparationExpression{value} <> tail, 1n+weight)
+    case 1n+rest PreparationExpression{M.QualifiedExpr{offset, annotation, predicates, value}} <> tail:
+      preparation_weight(rest, PreparationExpression{value} <> tail, weight)
+    case 1n+rest PreparationExpression{M.InstantiationExpr{site, value}} <> tail:
+      preparation_weight(rest, PreparationExpression{value} <> tail, weight)
     case 1n+rest PreparationExpression{M.TagExpr{offset, callee, argument}} <> tail:
       preparation_weight(rest, PreparationExpression{callee} <> PreparationExpression{argument} <> tail, 1n+weight)
     case 1n+rest PreparationExpression{M.StateProviderExpr{read, write, initial}} <> tail:
@@ -2343,7 +2351,7 @@ def private_globals(initializers: List<&2, Init.Initializer>, +symbols: Catalog,
 
 def initializer_call(global: RuntimeGlobal, entry: Nat, +imports: Nat) -> List<&2, U32>:
   RuntimeGlobal{index, ty} = global
-  join([[65, 0, 65, 0, 65, 0, 16], unsigned_leb(1n+Nat.add(imports, entry)), runtime_from_word(ty), [36], unsigned_leb(global_index(index, imports))])
+  join([[65, 0, 65, 0, 65, 0, 16], unsigned_leb(3n+Nat.add(imports, entry)), runtime_from_word(ty), [36], unsigned_leb(global_index(index, imports))])
 
 def initializer_calls(initializers: List<&2, Init.Initializer>, +symbols: Catalog, +imports: Nat) -> Result<&2, &2, M.Diagnostic, List<&2, List<&2, U32>>>:
   match initializers:
@@ -2370,7 +2378,7 @@ def prepare_catalog(runtime: Reachable.Runtime, safe_loops: Set()) -> Result<&2,
   +needed_operations = used_operations(operations, used)
   +declarations = E.type_catalog(types)
   entries = List.append(&2, Entry, function_entries(functions), List.append(&2, Entry, lambda_entries(lambdas), constructor_entries(E.catalog_variants(declarations), constructors)))
-  +projection = I.with_safe_loops(I.metadata(lambdas, E.catalog_constructors(declarations)), safe_loops)
+  +projection = I.with_safe_loops(I.with_functions(I.metadata(lambdas, E.catalog_constructors(declarations)), functions), safe_loops)
   do Result<&2, &2, M.Diagnostic, Prepared>:
     supported : Unit <- check_functions(functions)
     +names : List<&2, ExportedConstant> <- exported_constants(checked_constants)
@@ -2379,7 +2387,7 @@ def prepare_catalog(runtime: Reachable.Runtime, safe_loops: Set()) -> Result<&2,
     +jobs : List<&2, CodegenJob> = List.append(&2, CodegenJob, normal, operation_jobs(needed_operations))
     +slots : Map<&2, Maybe<&2, Nat>> = slot_index(job_slots(jobs, 0n))
     +operation_ids : Map<&2, Maybe<&2, Nat>> = slot_index(operation_slots(needed_operations, 0n))
-    +serialized : StaticConstants <- serialize_constants(constants, StaticCatalog{slots, projection, operation_ids}, Heap{4n, [[0, 0, 0, 0]]})
+    +serialized : StaticConstants <- serialize_constants(constants, StaticCatalog{slots, projection, operation_ids}, Heap{256n, [List.replicate(U32, 256n, 0)]})
     return Prepared{jobs, Catalog{slots, E.catalog_constructors(declarations), slot_index(static_slots(serialized)), operation_ids, runtime_globals(initializers, names, 1n+List.length(&2, ExportedConstant, names), MTip{})}, functions, names, static_heap(serialized), initializers}
 
 def prepare(+checked: M.CheckedModule, constants: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, Prepared>:

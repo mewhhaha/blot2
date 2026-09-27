@@ -10,6 +10,7 @@ import ./cst.bend as Cst
 import ./public_exports.bend as Public
 import ./checked_core.bend as Core
 import ./entry_points.bend as Entries
+import ./raw_core_qualification.bend as RawQualification
 
 type Analysis is Data:
   Analysis{checked: M.CheckedModule, constants: List<&2, Const.Binding<Const.Value>>, remaining_steps: Nat}
@@ -39,6 +40,7 @@ def finish_analysis(checked: M.CheckedModule, constants: Const.Constants) -> Ana
 def analyze(+module: M.Module, steps: Nat) -> Result<&2, &2, M.Diagnostic, Analysis>:
   do Result<&2, &2, M.Diagnostic, Analysis>:
     +checked : M.CheckedModule <- CheckScheduler.check_module(module)
+    qualified : Unit <- RawQualification.check(module)
     constants : Const.Constants <- Const.evaluate_constants(checked_constants(checked), steps, const_context(module, checked))
     return finish_analysis(checked, constants)
 

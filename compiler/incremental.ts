@@ -197,7 +197,7 @@ export async function createIncrementalCompiler(
         // Bend decides membership and transitive type dependencies. This is
         // only an indexed, source-order-preserving projection of its job.
         const subset: RawModule = {
-          $: "Module",
+          $: "model.Module",
           functions: select(functionIndex, members),
           constants: select(constantIndex, members),
           data_types: select(typeIndex, nominals),
@@ -272,7 +272,7 @@ export async function createIncrementalCompiler(
         return found;
       };
       const checked: CheckedModule = {
-        $: "CheckedModule",
+        $: "model.CheckedModule",
         functions: bendList(
           bendArray(module.functions).map((fn) =>
             requireChecked(checkedFunctions.get(fn.name), fn.name)

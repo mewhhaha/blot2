@@ -6,7 +6,7 @@ type List<A> =
   | { readonly $: "Con"; readonly head: A; readonly tail: List<A> };
 
 interface Node {
-  readonly $: "Node";
+  readonly $: "dependency.Node";
   readonly name: string;
   readonly references: List<string>;
   readonly lambdas: List<bigint>;
@@ -44,7 +44,7 @@ function array<A>(values: List<A>): A[] {
 
 function components(edges: readonly (readonly number[])[], unknown: boolean) {
   const nodes: Node[] = edges.map((references, index) => ({
-    $: "Node",
+    $: "dependency.Node",
     name: `node_${index}`,
     references: list([
       ...references.map((target) => `node_${target}`),
@@ -74,38 +74,45 @@ Deno.test("singleton SCCs retain self and unknown references without changing co
 });
 
 type ReferenceExpr =
-  | { $: "FunctionExpr" | "ConstantExpr"; name: string }
-  | { $: "ApplyExpr"; callee: ReferenceExpr; argument: ReferenceExpr }
+  | { $: "model.FunctionExpr" | "ConstantExpr"; name: string }
+  | { $: "model.ApplyExpr"; callee: ReferenceExpr; argument: ReferenceExpr }
   | {
-    $: "IfExpr";
+    $: "model.IfExpr";
     condition: ReferenceExpr;
     consequent: ReferenceExpr;
     alternative: ReferenceExpr;
   }
-  | { $: "ArrayExpr"; elements: List<ReferenceExpr> };
+  | { $: "model.ArrayExpr"; elements: List<ReferenceExpr> };
 type ReferencesResult =
   | {
     $: "Done";
-    value: { $: "References"; names: List<string>; lambdas: List<bigint> };
+    value: {
+      $: "dependency.References";
+      names: List<string>;
+      lambdas: List<bigint>;
+    };
   }
   | Extract<ComponentsResult, { $: "Fail" }>;
 const referenceCompiler = compiled as unknown as {
   "dependency.references"(
     fuel: bigint,
-    work: { $: "Expression"; value: ReferenceExpr },
+    work: { $: "dependency.Expression"; value: ReferenceExpr },
   ): ReferencesResult;
 };
 
 Deno.test("flat dependency traversal preserves branch order and structural fuel", () => {
-  const fn = (name: string): ReferenceExpr => ({ $: "FunctionExpr", name });
+  const fn = (name: string): ReferenceExpr => ({
+    $: "model.FunctionExpr",
+    name,
+  });
   const apply: ReferenceExpr = {
-    $: "ApplyExpr",
+    $: "model.ApplyExpr",
     callee: fn("left"),
     argument: fn("right"),
   };
   const call = (fuel: bigint, value: ReferenceExpr) =>
     referenceCompiler["dependency.references"](fuel, {
-      $: "Expression",
+      $: "dependency.Expression",
       value,
     });
   for (const fuel of [0n, 1n]) {
@@ -117,10 +124,13 @@ Deno.test("flat dependency traversal preserves branch order and structural fuel"
   ok(shallow.$ === "Done");
   equal(array(shallow.value.names), ["left", "right"]);
   const branches: ReferenceExpr = {
-    $: "IfExpr",
+    $: "model.IfExpr",
     condition: apply,
     consequent: fn("then"),
-    alternative: { $: "ArrayExpr", elements: list([fn("last"), fn("left")]) },
+    alternative: {
+      $: "model.ArrayExpr",
+      elements: list([fn("last"), fn("left")]),
+    },
   };
   const result = call(5n, branches);
   ok(result.$ === "Done");
@@ -201,7 +211,7 @@ Deno.test("dependency components preserve source DFS order with long names and d
   );
   const edges = [[], [0, 0], [0, 1], [4, 2], [3, 0], [1, 3, 2]];
   const nodes: Node[] = edges.map((references, index) => ({
-    $: "Node",
+    $: "dependency.Node",
     name: names[index],
     references: list([
       "unknown_before",
@@ -223,7 +233,7 @@ Deno.test("dependency components preserve source DFS order with long names and d
 
 Deno.test("dependency components preserve last-declaration adjacency for duplicate names", () => {
   const node = (name: string, references: string[]): Node => ({
-    $: "Node",
+    $: "dependency.Node",
     name,
     references: list(references),
     lambdas: list([]),

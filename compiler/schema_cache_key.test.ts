@@ -22,19 +22,19 @@ const array = <T>(values: Cell<T>): T[] => {
   return out;
 };
 const identity = (name: string) => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name: "cache-test",
   declaration: name,
 });
 const dataType = (name: string, extra = false) => ({
-  $: "DataType",
+  $: "model.DataType",
   identity: identity(name),
   parameters: 0n,
   constructors: list([
-    { $: "Constructor", name, payload: { $: "None" }, fields: nil },
+    { $: "model.Constructor", name, payload: { $: "None" }, fields: nil },
     ...(extra
       ? [{
-        $: "Constructor",
+        $: "model.Constructor",
         name: `${name}Extra`,
         payload: { $: "None" },
         fields: nil,
@@ -43,13 +43,13 @@ const dataType = (name: string, extra = false) => ({
   ]),
 });
 const functionSource = (name: string, value: number) => ({
-  $: "Function",
+  $: "model.Function",
   name,
   exported: false,
   parameter: "argument",
   parameter_type: { $: "None" },
   result_type: { $: "None" },
-  body: { $: "U32Expr", value },
+  body: { $: "model.U32Expr", value },
 });
 const node = functionSource("Entry.contains", 1);
 const terminal = functionSource("End.contains", 2);
@@ -60,7 +60,7 @@ const terminalType = dataType("End");
 const witnessType = dataType("Type");
 const catalog = list([nodeType, terminalType, witnessType]);
 const evidence = {
-  $: "Evidence",
+  $: "schema_stage.Evidence",
   node_method: node,
   terminal_method: terminal,
   equality,
@@ -75,9 +75,9 @@ const evidence = {
 };
 const moduleFor = (proofs: Cell<typeof evidence>, types = catalog) =>
   compiled["monomorph.context_module"]({
-    $: "SpecializationContext",
+    $: "monomorph.SpecializationContext",
     configuration: {
-      $: "Configuration",
+      $: "monomorph.Configuration",
       functions: nil,
       templates: list(["Entry.contains"]),
       entry: "main.blot",
@@ -95,7 +95,7 @@ const moduleFor = (proofs: Cell<typeof evidence>, types = catalog) =>
     schemes: nil,
     limit: { $: "Done", value: 0n },
   }, nil) as {
-    $: "Module";
+    $: "model.Module";
     functions: Cell<{ name: string; parameter: string }>;
   };
 const key = (module: unknown) => {
@@ -131,7 +131,10 @@ Deno.test("schema context key frames proof presence, four source bodies, order, 
     ] as const
   ) {
     const changed = structuredClone(evidence);
-    changed[field] = { ...changed[field], body: { $: "U32Expr", value: 99 } };
+    changed[field] = {
+      ...changed[field],
+      body: { $: "model.U32Expr", value: 99 },
+    };
     different(
       key(one),
       key(moduleFor(list([changed]))),
@@ -139,7 +142,10 @@ Deno.test("schema context key frames proof presence, four source bodies, order, 
     );
   }
   const second = structuredClone(evidence);
-  second.equality = { ...second.equality, body: { $: "U32Expr", value: 99 } };
+  second.equality = {
+    ...second.equality,
+    body: { $: "model.U32Expr", value: 99 },
+  };
   const two = moduleFor(list([evidence, second]));
   equal(marker(two)?.parameter, "2");
   different(key(one), key(two));

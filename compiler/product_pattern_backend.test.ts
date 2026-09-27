@@ -1,5 +1,6 @@
 import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import generated from "../generated/compiler/compiler.js";
+import { toBendModel } from "./bend_abi.ts";
 import {
   compile,
   type CoreModule,
@@ -189,8 +190,8 @@ Deno.test("a failed tuple field skips an invalid later constructor pointer", () 
     readonly [field: string]: unknown;
   };
   type Fragment =
-    | { readonly $: "Bytes"; readonly bytes: List<number> }
-    | { readonly $: "ConstructorIndex"; readonly name: string };
+    | { readonly $: "wasm.Bytes"; readonly bytes: List<number> }
+    | { readonly $: "wasm.ConstructorIndex"; readonly name: string };
   function list<T>(values: readonly T[]): List<T> {
     let result: List<T> = { $: "Nil" };
     for (let index = values.length - 1; index >= 0; index--) {
@@ -214,33 +215,37 @@ Deno.test("a failed tuple field skips an invalid later constructor pointer", () 
       | { readonly $: "Done"; readonly value: List<Fragment> }
       | { readonly $: "Fail"; readonly error: unknown };
   };
-  const result = backend["wasm.pattern_test_work"](16384n, {
-    $: "PatternTest",
-    location: { $: "Location", local: 0n, offsets: list([]) },
-    pattern: {
-      $: "ProductPattern",
-      elements: list<RawPattern>([
-        { $: "U32Pattern", value: 1 },
-        {
-          $: "ConstructorPattern",
-          constructor: "Some",
-          payload: {
-            $: "Some",
-            value: {
-              $: "ProductPattern",
-              elements: list([
-                { $: "U32Pattern", value: 2 },
-                { $: "U32Pattern", value: 3 },
-              ]),
+  const result = backend["wasm.pattern_test_work"](
+    16384n,
+    toBendModel({
+      $: "wasm.PatternTest",
+      location: { $: "wasm.Location", local: 0n, offsets: list([]) },
+      pattern: {
+        $: "ProductPattern",
+        elements: list<RawPattern>([
+          { $: "U32Pattern", value: 1 },
+          {
+            $: "ConstructorPattern",
+            constructor: "Some",
+            payload: {
+              $: "Some",
+              value: {
+                $: "ProductPattern",
+                elements: list([
+                  { $: "U32Pattern", value: 2 },
+                  { $: "U32Pattern", value: 3 },
+                ]),
+              },
             },
           },
-        },
-      ]),
-    },
-  }, list([]));
+        ]),
+      },
+    }),
+    list([]),
+  );
   ok(result.$ === "Done");
   const instructions = array(result.value).flatMap((fragment) => {
-    if (fragment.$ === "Bytes") return array(fragment.bytes);
+    if (fragment.$ === "wasm.Bytes") return array(fragment.bytes);
     equal(fragment.name, "Some");
     return [65, 0];
   });

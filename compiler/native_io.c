@@ -91,14 +91,19 @@ static void __attribute__((constructor)) blot_native_priority_use(void) {
 
 #define BLOT_NATIVE_MAX_WORDS 16777216u
 
-// Bend 2.0.28 qualifies foreign effect IDs with their declaring module.
+// Foreign effect IDs carry their declaring module. Bend 2.0.32 keeps
+// transport effects separate from the pure native_io.Frame datatype.
 // Keep the registration names used by the reviewed older runtimes as aliases;
 // otherwise the guards below silently omit both protocol effects.
 #if !defined(CID_RECEIVE) && defined(CID_NATIVE_IO_RECEIVE)
 #define CID_RECEIVE CID_NATIVE_IO_RECEIVE
+#elif !defined(CID_RECEIVE) && defined(CID_NATIVE_TRANSPORT_RECEIVE)
+#define CID_RECEIVE CID_NATIVE_TRANSPORT_RECEIVE
 #endif
 #if !defined(CID_SEND) && defined(CID_NATIVE_IO_SEND)
 #define CID_SEND CID_NATIVE_IO_SEND
+#elif !defined(CID_SEND) && defined(CID_NATIVE_TRANSPORT_SEND)
+#define CID_SEND CID_NATIVE_TRANSPORT_SEND
 #endif
 
 static void blot_native_read_exact(uint8_t* bytes, size_t length) {
@@ -140,7 +145,7 @@ static void blot_native_store(uint8_t* bytes, uint32_t word) {
 // This effect runs after corpus_eval has joined the CPU pool. Clear both the
 // used slots and their cursors: resetting cursors alone would let a consumer
 // mistake an old slot's publication bit for a newly published task.
-static void blot_native_reset_queues(Corpus heap) {
+static void blot_native_reset_queues(u64* heap) {
   if (io_gpu || pool_size == 1) return;
   uint32_t slots = 0;
   for (uint32_t lane = 0; lane < LANES; lane += 1) {

@@ -2,12 +2,12 @@ import { deepStrictEqual as equal } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
 
 interface Identity {
-  readonly $: "TypeId";
+  readonly $: "model.TypeId";
   readonly module_name: string;
   readonly declaration: string;
 }
 interface Effect {
-  readonly $: "OperationEffect";
+  readonly $: "model.OperationEffect";
   readonly identity: Identity;
 }
 type List<T> = { readonly $: "Nil" } | {
@@ -37,8 +37,8 @@ function array<T>(values: List<T>): T[] {
   return result;
 }
 const effect = (module_name: string, declaration: string): Effect => ({
-  $: "OperationEffect",
-  identity: { $: "TypeId", module_name, declaration },
+  $: "model.OperationEffect",
+  identity: { $: "model.TypeId", module_name, declaration },
 });
 
 Deno.test("generic effect metadata compares exact nominal identities", () => {

@@ -20,17 +20,17 @@ interface Analysis {
   readonly constants: List<Node>;
 }
 interface Job {
-  readonly $: "CodegenJob";
+  readonly $: "wasm.CodegenJob";
   readonly key: string;
   readonly parameter: string;
   readonly body: Node;
   readonly captures: List<string>;
 }
 interface EntryCode {
-  readonly $: "EntryCode";
+  readonly $: "wasm.EntryCode";
   readonly key: string;
   readonly code: {
-    readonly $: "Code";
+    readonly $: "wasm.Code";
     readonly fragments: List<Node>;
     readonly locals: bigint;
   };
@@ -39,7 +39,7 @@ interface Prepared {
   readonly jobs: List<Job>;
 }
 interface BytePlan {
-  readonly $: "BytePlan";
+  readonly $: "wasm.BytePlan";
   readonly length: bigint;
   readonly chunks: List<List<number>>;
 }
@@ -104,22 +104,22 @@ const node = ($: string, fields: Record<string, unknown> = {}): Node => ({
 });
 const none = node("None");
 const some = (value: Node) => node("Some", { value });
-const unit = node("UnitExpr");
-const unitType = node("UnitTy");
-const u32Type = node("U32Ty");
-const integer = (value: number) => node("U32Expr", { value });
-const local = (name: string) => node("LocalExpr", { name });
-const constant = (name: string) => node("ConstantExpr", { name });
+const unit = node("model.UnitExpr");
+const unitType = node("model.UnitTy");
+const u32Type = node("model.U32Ty");
+const integer = (value: number) => node("model.U32Expr", { value });
+const local = (name: string) => node("model.LocalExpr", { name });
+const constant = (name: string) => node("model.ConstantExpr", { name });
 const call = (callee: string, argument = unit) =>
-  node("CallExpr", { callee, argument });
+  node("model.CallExpr", { callee, argument });
 const apply = (callee: Node, argument: Node) =>
-  node("ApplyExpr", { callee, argument });
+  node("model.ApplyExpr", { callee, argument });
 const add = (left: Node, right: Node) =>
-  node("ScalarExpr", { operator: node("Add"), left, right });
+  node("model.ScalarExpr", { operator: node("model.Add"), left, right });
 const binding = (name: string, value: Node, body: Node) =>
-  node("LetExpr", { name, value, body });
+  node("model.LetExpr", { name, value, body });
 const lambda = (identity: bigint, parameter: string, body: Node) =>
-  node("LambdaExpr", {
+  node("model.LambdaExpr", {
     identity,
     parameter,
     parameter_type: none,
@@ -127,13 +127,13 @@ const lambda = (identity: bigint, parameter: string, body: Node) =>
     body,
   });
 const construct = (constructor: string, payload: Node | null = null) =>
-  node("ConstructExpr", {
+  node("model.ConstructExpr", {
     constructor,
     payload: payload === null ? none : some(payload),
   });
 const dataType = (name: string, constructors: readonly Node[]) =>
-  node("DataType", {
-    identity: node("TypeId", {
+  node("model.DataType", {
+    identity: node("model.TypeId", {
       module_name: "codegen/test",
       declaration: name,
     }),
@@ -141,7 +141,7 @@ const dataType = (name: string, constructors: readonly Node[]) =>
     constructors: list(constructors),
   });
 const variant = (name: string, payload: Node | null = null) =>
-  node("Constructor", {
+  node("model.Constructor", {
     fields: list([]),
     name,
     payload: payload === null ? none : some(payload),
@@ -151,7 +151,7 @@ const fn = (
   body: Node,
   options: { exported?: boolean; parameter_type?: Node } = {},
 ) =>
-  node("Function", {
+  node("model.Function", {
     name,
     exported: options.exported ?? true,
     parameter: "value",
@@ -160,7 +160,7 @@ const fn = (
     body,
   });
 const constDefinition = (name: string, value: Node) =>
-  node("Constant", { name, value, exported: false, annotation: none });
+  node("model.Constant", { name, value, exported: false, annotation: none });
 const source = (
   functions: readonly Node[],
   options: {
@@ -169,20 +169,20 @@ const source = (
     operations?: readonly Node[];
   } = {},
 ) =>
-  node("Module", {
+  node("model.Module", {
     functions: list(functions),
     constants: list(options.constants ?? []),
     data_types: list(options.data_types ?? []),
     operations: list(options.operations ?? []),
   });
 const matched = (value: Node, constructor: string, body: Node) =>
-  node("MatchExpr", {
+  node("model.MatchExpr", {
     values: list([value]),
     arms: list([
-      node("MatchArm", {
-        patterns: list([node("ConstructorPattern", {
+      node("model.MatchArm", {
+        patterns: list([node("model.ConstructorPattern", {
           constructor,
-          payload: some(node("BindingPattern", { name: "payload" })),
+          payload: some(node("model.BindingPattern", { name: "payload" })),
         })]),
         body,
       }),
@@ -194,6 +194,13 @@ function fingerprint(value: unknown): string {
     value,
     (_, field) => typeof field === "bigint" ? `${field}n` : field,
   );
+}
+
+function containsNode(value: unknown, tag: string): boolean {
+  if (value === null || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return record.$ === tag ||
+    Object.values(record).some((child) => containsNode(child, tag));
 }
 
 function prepare(program: Node) {
@@ -288,7 +295,7 @@ Deno.test("cached codegen relinks constant addresses, captured values, function 
         "Box",
         matched(
           apply(
-            node("ConstructorRefExpr", { constructor: "Box" }),
+            node("model.ConstructorRefExpr", { constructor: "Box" }),
             apply(constant("adder"), local("payload")),
           ),
           "Box",
@@ -311,7 +318,10 @@ Deno.test("cached codegen relinks constant addresses, captured values, function 
         lambda(71n, "number", add(local("captured"), local("number"))),
       ),
     ),
-    constDefinition("incrementer", node("FunctionExpr", { name: "increment" })),
+    constDefinition(
+      "incrementer",
+      node("model.FunctionExpr", { name: "increment" }),
+    ),
   ];
   const first = cached(
     source(functions, {
@@ -349,6 +359,11 @@ Deno.test("nested lambda bodies are independent jobs but capture layouts invalid
       fn("answer", apply(call("make", integer(40)), integer(2))),
     ]);
   const first = cached(program(add(local("value"), local("number"))), cache);
+  const caller = first.jobs.find((job) => job.key === "fn:answer")!;
+  ok(
+    containsNode(caller.body, "codegen_ir.ApplyExpr"),
+    "an outer binding before the returned lambda keeps the ordinary call path",
+  );
   equal(await answer(first.bytes), 42);
   const bodyOnly = cached(
     program(add(local("value"), add(local("number"), integer(3)))),
@@ -364,15 +379,209 @@ Deno.test("nested lambda bodies are independent jobs but capture layouts invalid
   equal(await answer(capturesChanged.bytes), 12);
 });
 
+Deno.test("saturated literal curried calls eliminate intermediate applications and closures", async () => {
+  const pair = apply(call("pair", integer(40)), integer(2));
+  const triple = apply(
+    apply(call("triple", integer(10)), integer(20)),
+    integer(12),
+  );
+  const captured = binding(
+    "base",
+    integer(40),
+    apply(
+      apply(
+        lambda(
+          213n,
+          "first",
+          lambda(
+            214n,
+            "second",
+            add(local("base"), add(local("first"), local("second"))),
+          ),
+        ),
+        integer(1),
+      ),
+      integer(1),
+    ),
+  );
+  const result = cached(
+    source([
+      fn("pair", lambda(210n, "right", add(local("value"), local("right"))), {
+        exported: false,
+        parameter_type: u32Type,
+      }),
+      fn(
+        "triple",
+        lambda(
+          211n,
+          "middle",
+          lambda(
+            212n,
+            "last",
+            add(add(local("value"), local("middle")), local("last")),
+          ),
+        ),
+        { exported: false, parameter_type: u32Type },
+      ),
+      fn("answer", add(add(pair, triple), captured)),
+    ]),
+    new Map(),
+  );
+  equal(await answer(result.bytes), 126);
+  const caller = result.jobs.find((job) => job.key === "fn:answer")!;
+  ok(!containsNode(caller.body, "codegen_ir.ApplyExpr"));
+  ok(!containsNode(caller.body, "codegen_ir.ClosureExpr"));
+});
+
+Deno.test("saturated call arguments keep caller bindings when parameter names overlap", async () => {
+  const result = cached(
+    source([
+      fn("pair", lambda(215n, "right", add(local("value"), local("right"))), {
+        exported: false,
+        parameter_type: u32Type,
+      }),
+      fn(
+        "answer",
+        binding(
+          "value",
+          integer(10),
+          apply(
+            call("pair", add(local("value"), integer(1))),
+            add(local("value"), integer(2)),
+          ),
+        ),
+      ),
+    ]),
+    new Map(),
+  );
+  equal(await answer(result.bytes), 23);
+});
+
+Deno.test("expanded curried callee body changes invalidate the saturated caller cache", async () => {
+  const cache = new Map<string, EntryCode>();
+  const program = (body: Node) =>
+    source([
+      fn("pair", lambda(216n, "right", body), {
+        exported: false,
+        parameter_type: u32Type,
+      }),
+      fn("answer", apply(call("pair", integer(40)), integer(2))),
+    ]);
+  const first = cached(program(add(local("value"), local("right"))), cache);
+  equal(await answer(first.bytes), 42);
+  const changed = cached(
+    program(add(local("value"), add(local("right"), integer(3)))),
+    cache,
+  );
+  equal(await answer(changed.bytes), 45);
+  equal([...changed.created].sort(), ["fn:answer", "lambda:216"]);
+  const unchanged = cached(
+    program(add(local("value"), add(local("right"), integer(3)))),
+    cache,
+  );
+  equal(unchanged.created, []);
+});
+
+Deno.test("stored partial applications retain captures across repeated calls", async () => {
+  const result = cached(
+    source([
+      fn("pair", lambda(217n, "right", add(local("value"), local("right"))), {
+        exported: false,
+        parameter_type: u32Type,
+      }),
+      fn(
+        "answer",
+        binding(
+          "later",
+          call("pair", integer(40)),
+          add(
+            apply(local("later"), integer(1)),
+            apply(local("later"), integer(2)),
+          ),
+        ),
+      ),
+    ]),
+    new Map(),
+  );
+  equal(await answer(result.bytes), 83);
+  const creator = result.jobs.find((job) => job.key === "fn:pair")!;
+  const caller = result.jobs.find((job) => job.key === "fn:answer")!;
+  ok(containsNode(creator.body, "codegen_ir.ClosureExpr"));
+  ok(containsNode(caller.body, "codegen_ir.ApplyExpr"));
+});
+
+Deno.test("annotated saturated array initializers preserve forever carry compaction", async () => {
+  const f32Type = node("model.F32Ty");
+  const result = cached(
+    source([
+      fn(
+        "seed",
+        lambda(
+          218n,
+          "right",
+          node("model.ArrayExpr", {
+            elements: list([local("value"), local("right")]),
+          }),
+        ),
+        { exported: false, parameter_type: f32Type },
+      ),
+      fn(
+        "answer",
+        binding(
+          "seed",
+          node("model.SourceExpr", {
+            offset: 123n,
+            annotation: some(node("model.ArrayTy", { element: f32Type })),
+            value: apply(
+              call("seed", node("model.F32Expr", { value: 41 })),
+              node("model.F32Expr", { value: 42 }),
+            ),
+          }),
+          node("model.BlockExpr", {
+            label: 219n,
+            body: node("model.ForeverExpr", {
+              state: "state",
+              initial: local("seed"),
+              body: node("model.ReturnExpr", {
+                label: 219n,
+                value: node("model.ArrayGetExpr", {
+                  array: local("state"),
+                  index: integer(1),
+                }),
+              }),
+            }),
+          }),
+        ),
+      ),
+    ]),
+    new Map(),
+  );
+  equal(await answer(result.bytes), 42);
+  const caller = result.jobs.find((job) => job.key === "fn:answer")!;
+  ok(!containsNode(caller.body, "codegen_ir.ApplyExpr"));
+  ok(!containsNode(caller.body, "codegen_ir.ClosureExpr"));
+  equal(caller.body.$, "codegen_ir.LetExpr");
+  const block = caller.body.body as Node;
+  equal(block.$, "codegen_ir.BlockExpr");
+  const loop = block.body as Node;
+  equal(loop.$, "codegen_ir.ForeverExpr");
+
+  equal(loop.compact, true);
+});
+
 Deno.test("constructor references depend on arity, not unrelated declarations or type annotations", () => {
   const cache = new Map<string, EntryCode>();
   const definitions = [
-    fn("reference", node("ConstructorRefExpr", { constructor: "Choice" }), {
-      exported: false,
-    }),
+    fn(
+      "reference",
+      node("model.ConstructorRefExpr", { constructor: "Choice" }),
+      {
+        exported: false,
+      },
+    ),
     fn(
       "answer",
-      node("SequenceExpr", {
+      node("model.SequenceExpr", {
         first: call("reference"),
         next: integer(0),
       }),
@@ -395,7 +604,7 @@ Deno.test("constructor references depend on arity, not unrelated declarations or
   const located = source([
     fn(
       "answer",
-      node("SourceExpr", {
+      node("model.SourceExpr", {
         offset: 987n,
         annotation: some(u32Type),
         value: integer(0),
@@ -440,10 +649,10 @@ Deno.test("indexed relocation lookup rejects cached references to missing symbol
   const first = cached(source([fn("answer", integer(42))]), new Map());
   for (
     const fragment of [
-      node("NamedCall", { key: "fn:missing" }),
-      node("EntryIndex", { key: "fn:missing" }),
-      node("ConstantReference", { name: "missing" }),
-      node("ConstructorIndex", { name: "missing" }),
+      node("wasm.NamedCall", { key: "fn:missing" }),
+      node("wasm.EntryIndex", { key: "fn:missing" }),
+      node("wasm.ConstantReference", { name: "missing" }),
+      node("wasm.ConstructorIndex", { name: "missing" }),
     ]
   ) {
     const entry = first.entries[0];

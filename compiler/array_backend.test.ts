@@ -432,7 +432,7 @@ Deno.test("Wasm array local indices and element offsets cross LEB boundaries", (
   }
 });
 
-Deno.test("Wasm immutable array allocation grows safely, traps at the arena limit, and resets after traps", () => {
+Deno.test("Wasm immutable array allocation grows beyond 16 MiB and resets between calls", () => {
   const numbers = arrayType(u32Type);
   const functions: FunctionDefinition[] = [
     fn("copy_0", set(local("value"), integer(0), integer(42)), {
@@ -468,7 +468,7 @@ Deno.test("Wasm immutable array allocation grows safely, traps at the arena limi
   for (let iteration = 0; iteration < 70; iteration++) {
     equal(compiled.exports.grow(0), 42);
   }
-  throws(() => compiled.exports.exhaust(0), WebAssembly.RuntimeError);
+  equal(compiled.exports.exhaust(0), 42);
   equal(compiled.exports.original(0), 0);
   equal(compiled.exports.grow(0), 42);
 });

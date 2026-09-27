@@ -38,34 +38,34 @@ function unwrap<T>(result: Result<T>): T {
 }
 
 const identity = (module_name: string, declaration: string): Node => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name,
   declaration,
 });
-const scalar = (name: "U32Ty" | "BoolTy"): Node => ({ $: name });
+const scalar = (name: "model.U32Ty" | "model.BoolTy"): Node => ({ $: name });
 const dataType = (
   module_name: string,
   declaration: string,
   payload: Node,
 ): Node => ({
-  $: "DataType",
+  $: "model.DataType",
   identity: identity(module_name, declaration),
   parameters: 0n,
   constructors: bendList([{
-    $: "Constructor",
+    $: "model.Constructor",
     name: `Make${declaration}`,
     payload: { $: "Some", value: payload },
     fields: bendList([]),
   }]),
 });
 const operation = (name: string): Node => ({
-  $: "Operation",
+  $: "model.Operation",
   identity: identity("effects", name),
-  parameter: scalar("U32Ty"),
-  result: scalar("BoolTy"),
+  parameter: scalar("model.U32Ty"),
+  result: scalar("model.BoolTy"),
 });
 const module = (types: Node[], operations: Node[] = []): Node => ({
-  $: "Module",
+  $: "model.Module",
   constants: bendList([]),
   functions: bendList([]),
   data_types: bendList(types),
@@ -81,9 +81,9 @@ const key = (subset: Node, revision: Node) =>
   unwrap(backend["catalog_versions.group_key"](subset, revision));
 
 Deno.test("nominal version tokens retain exact unchanged schemas and distinguish edits", () => {
-  const a = dataType("one", "A", scalar("U32Ty"));
-  const changedA = dataType("one", "A", scalar("BoolTy"));
-  const b = dataType("one", "B", scalar("U32Ty"));
+  const a = dataType("one", "A", scalar("model.U32Ty"));
+  const changedA = dataType("one", "A", scalar("model.BoolTy"));
+  const b = dataType("one", "B", scalar("model.U32Ty"));
   const first = prepare([a, b], []);
   const unchanged = prepare([a, b], [], first.revision);
   equal(unchanged.same_operations, true);
@@ -123,7 +123,7 @@ Deno.test("nominal version tokens retain exact unchanged schemas and distinguish
 });
 
 Deno.test("operation gates and shape seeds compare exact ordered catalogs", () => {
-  const a = dataType("one", "A", scalar("U32Ty"));
+  const a = dataType("one", "A", scalar("model.U32Ty"));
   const op = operation("Ask");
   const first = prepare([a], [op]);
   equal(
@@ -168,7 +168,7 @@ Deno.test("operation gates and shape seeds compare exact ordered catalogs", () =
     false,
   );
 
-  const b = dataType("one", "B", scalar("BoolTy"));
+  const b = dataType("one", "B", scalar("model.BoolTy"));
   const reordered = prepare([b, a], [op], prepare([a, b], [op]).revision);
   equal(
     backend["catalog_versions.original_matches"](
@@ -180,8 +180,8 @@ Deno.test("operation gates and shape seeds compare exact ordered catalogs", () =
 });
 
 Deno.test("nominal identities stay distinct across separator-like names", () => {
-  const left = dataType("a", "b.c", scalar("U32Ty"));
-  const right = dataType("a.b", "c", scalar("U32Ty"));
+  const left = dataType("a", "b.c", scalar("model.U32Ty"));
+  const right = dataType("a.b", "c", scalar("model.U32Ty"));
   const revision = prepare([left, right], []).revision;
   differs(key(module([left]), revision), key(module([right]), revision));
 });

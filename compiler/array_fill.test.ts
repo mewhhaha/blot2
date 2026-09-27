@@ -43,7 +43,8 @@ async function exercise(bytes: Uint8Array<ArrayBuffer>) {
     equal(call(name), 42);
   }
   equal(call("size", 8192), 8192);
-  for (const count of [4194304, 0x80000000, 0xffffffff]) {
+  equal(call("size", 4_194_304), 4_194_304);
+  for (const count of [1_073_741_822, 1_073_741_823, 0x80000000, 0xffffffff]) {
     throws(() => call("size", count), WebAssembly.RuntimeError);
     equal(call("size", 2), 2);
   }

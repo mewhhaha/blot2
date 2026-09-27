@@ -153,6 +153,8 @@ def valid_row_tail(tail: M.RowTail, parameters: Maybe<&2, Nat>, subject: String)
       require(valid_parameter(parameters, index), subject, "effect parameter index is outside its quantified scope")
     case M.RowVariable{index}:
       Fail{M.Diagnostic{"invalid_annotation", subject, "effect inference variables are compiler-owned"}}
+    case M.FreeRow{scope, name}:
+      Done{Unit{}}
 
 def valid_row_operations(identities: List<&2, M.TypeId>, +operations: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, Unit>:
   match identities:

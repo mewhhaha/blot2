@@ -9,6 +9,7 @@ import ./operators.bend as O
 import ./index.bend as Index
 import ./effect_families.bend as Families
 import ./dependency.bend as D
+import ./closures.bend as Closures
 
 type Local is Data:
   Local{source: String, core: String}
@@ -215,16 +216,21 @@ def lookup_local(locals: List<&2, Local>, name: String) -> Maybe<&2, String>:
 def lookup_global(globals: Map<&2, Global>, name: String) -> Maybe<&2, Global>:
   Index.find(Global, globals, name)
 
+# Each source token has sixteen distinct semantic lanes. A reference, its
+# enclosing call, and a bound member can share an offset without sharing a use.
+def instantiate_at(offset: Nat, lane: Nat, value: M.Expr) -> M.Expr:
+  M.InstantiationExpr{Nat.add(Nat.mul(offset, 16n), lane), value}
+
 def global_value(found: Maybe<&2, Global>, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
   match found:
     case Some{Global{source, core, ConstantName{}}}:
-      Done{M.ConstantExpr{core}}
+      Done{instantiate_at(C.offset_of(node), 0n, M.ConstantExpr{core})}
     case Some{Global{source, core, FunctionName{}}}:
-      Done{M.FunctionExpr{core}}
+      Done{instantiate_at(C.offset_of(node), 0n, M.FunctionExpr{core})}
     case Some{Global{source, core, ConstructorName{}}}:
-      Done{M.ConstructorRefExpr{core}}
+      Done{instantiate_at(C.offset_of(node), 0n, M.ConstructorRefExpr{core})}
     case Some{Global{source, core, RecordConstructorName{fields}}}:
-      Done{M.ConstructorRefExpr{core}}
+      Done{instantiate_at(C.offset_of(node), 0n, M.ConstructorRefExpr{core})}
     case Some{Global{source, core, OperationName{identity}}}:
       Done{M.OperationExpr{identity}}
     case Some{Global{source, core, OperationTemplateName{identity, parameters}}}:
@@ -244,7 +250,7 @@ def member_path(nodes: List<&2, C.Cst>, receiver: M.Expr) -> M.Expr:
     case C.Cst{kind, field, ".", offset, children} <> tail:
       member_path(tail, receiver)
     case C.Cst{kind, field, member, +offset, children} <> tail:
-      member_path(tail, located(offset, M.AssociatedExpr{offset, M.MemberDispatch{}, member, Nil{}, receiver, M.UnitExpr{}}))
+      member_path(tail, located(offset, instantiate_at(offset, 2n, M.AssociatedExpr{offset, M.MemberDispatch{}, member, Nil{}, receiver, M.UnitExpr{}})))
 
 type GlobalPrefix is Data:
   GlobalPrefix{global: Global, remaining: List<&2, C.Cst>}
@@ -275,17 +281,17 @@ def global_member(found: Maybe<&2, GlobalPrefix>, node: C.Cst) -> Result<&2, &2,
     case None{}:
       global_value(None{}, node)
 
-def resolve_root(found: Maybe<&2, String>, nodes: List<&2, C.Cst>, globals: Map<&2, Global>, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+def resolve_root(found: Maybe<&2, String>, root: C.Cst, nodes: List<&2, C.Cst>, globals: Map<&2, Global>, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
   match found:
     case Some{core}:
-      Done{member_path(nodes, M.LocalExpr{core})}
+      Done{member_path(nodes, instantiate_at(C.offset_of(root), 0n, M.LocalExpr{core}))}
     case None{}:
       global_member(global_prefix(C.children_of(node), globals, "", None{}), node)
 
 def resolve_parts(nodes: List<&2, C.Cst>, context: Context, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
   match nodes context:
-    case root <> tail Context{globals, headers, fixities, locals, label, variables}:
-      resolve_root(lookup_local(locals, C.text_of(root)), tail, globals, node)
+    case +root <> tail Context{globals, headers, fixities, locals, label, variables}:
+      resolve_root(lookup_local(locals, C.text_of(root)), root, tail, globals, node)
     case _ _:
       Fail{C.diagnostic(node, "internal_cst", "qualified name has no root")}
 
@@ -681,6 +687,206 @@ def source_annotation(nodes: List<&2, C.Cst>, fuel: Nat, context: Context) -> Re
       Context{globals, headers, fixities, locals, label, annotation_variables} = context
       T.annotation(~Map<&2, Global>, ~lookup_effect, head <> tail, fuel, headers, annotation_variables, globals)
 
+def constraint_type(node: C.Cst, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.Ty>:
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
+  do Result<&2, &2, M.Diagnostic, M.Ty>:
+    types : List<&2, M.Ty> <- T.lower(~Map<&2, Global>, ~lookup_effect, fuel, T.visit(node), headers, annotation_variables, globals)
+    T.one(types)
+
+def constraint_types(nodes: List<&2, C.Cst>, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+  match nodes:
+    case Nil{}:
+      Done{Nil{}}
+    case node <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
+        value : M.Ty <- constraint_type(node, fuel, context)
+        rest : List<&2, M.Ty> <- constraint_types(tail, fuel, context)
+        return value <> rest
+
+def constraint_row(node: C.Cst, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, M.EffectRow>:
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
+  T.row(~Map<&2, Global>, ~lookup_effect, node, fuel, headers, annotation_variables, globals)
+
+def constraint_invocation(nodes: List<&2, C.Cst>, fuel: Nat, context: Context, scope: String, origin: C.Cst) -> Result<&2, &2, M.Diagnostic, M.EffectRow>:
+  match nodes:
+    case Nil{}:
+      Done{M.EffectRow{Nil{}, M.FreeRow{scope, "$predicate$" ++ Nat.show(C.offset_of(origin))}}}
+    case row <> Nil{}:
+      constraint_row(row, fuel, context)
+    case _:
+      Fail{C.diagnostic(origin, "invalid_constraint", "a predicate has more than one invocation row")}
+
+def constraint_no_row(nodes: List<&2, C.Cst>, origin: C.Cst) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match nodes:
+    case Nil{}:
+      Done{Unit{}}
+    case _:
+      Fail{C.diagnostic(origin, "invalid_constraint", "this predicate does not accept an invocation row")}
+
+def constraint_member(nodes: List<&2, C.Cst>, origin: C.Cst) -> Result<&2, &2, M.Diagnostic, String>:
+  match nodes:
+    case literal <> Nil{}:
+      C.literal(literal)
+    case _:
+      Fail{C.diagnostic(origin, "invalid_constraint", "this predicate needs one quoted member name")}
+
+def constraint_name_children(children: List<&2, C.Cst>, node: C.Cst) -> Result<&2, &2, M.Diagnostic, String>:
+  match children:
+    case +name <> Nil{}:
+      Bool.pick(Result<&2, &2, M.Diagnostic, String>, M.name_equal(C.kind_of(name), "qualified_name"), Done{C.name_of(name)}, Fail{C.diagnostic(node, "invalid_constraint", "operation predicate needs a qualified operation name")})
+    case _:
+      Fail{C.diagnostic(node, "invalid_constraint", "operation predicate needs a qualified operation name")}
+
+def constraint_name(+node: C.Cst) -> Result<&2, &2, M.Diagnostic, String>:
+  constraint_name_children(C.children_of(node), node)
+
+def constraint_global(context: Context, target: String) -> Maybe<&2, Global>:
+  Context{globals, headers, fixities, locals, label, annotation_variables} = context
+  lookup_global(globals, target)
+
+def constraint_operation(found: Maybe<&2, Global>, arguments: List<&2, C.Cst>, fuel: Nat, context: Context, scope: String, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Predicate>:
+  match found:
+    case Some{Global{source, core, OperationTemplateName{identity, parameters}}}:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        types : List<&2, M.Ty> <- constraint_types(arguments, fuel, context)
+        return M.OperationPredicate{identity, types, M.FreeTy{scope, "$operation$" ++ Nat.show(C.offset_of(node))}}
+    case _:
+      Fail{C.diagnostic(node, "invalid_constraint", "operation predicate needs a declared generic effect operation")}
+
+def constraint_operation_arguments(nodes: List<&2, C.Cst>, fuel: Nat, +context: Context, scope: String, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Predicate>:
+  match nodes:
+    case name <> arguments:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        target : String <- constraint_name(name)
+        constraint_operation(constraint_global(context, target), arguments, fuel, context, scope, node)
+    case Nil{}:
+      Fail{C.diagnostic(node, "invalid_constraint", "operation predicate needs an effect operation name")}
+
+type ConstraintKind is Data:
+  AssociatedConstraint{}
+  ReceiverConstraint{}
+  FieldConstraint{}
+  UpdateConstraint{}
+  OperationConstraint{}
+  TypeRepConstraint{}
+  EffectRepConstraint{}
+  UnknownConstraint{}
+
+def constraint_kind(+name: String) -> ConstraintKind:
+  Bool.pick(ConstraintKind, M.name_equal(name, "associated"), AssociatedConstraint{},
+    Bool.pick(ConstraintKind, M.name_equal(name, "receiver"), ReceiverConstraint{},
+      Bool.pick(ConstraintKind, M.name_equal(name, "field"), FieldConstraint{},
+        Bool.pick(ConstraintKind, M.name_equal(name, "update"), UpdateConstraint{},
+          Bool.pick(ConstraintKind, M.name_equal(name, "operation"), OperationConstraint{},
+            Bool.pick(ConstraintKind, M.name_equal(name, "type_rep"), TypeRepConstraint{},
+              Bool.pick(ConstraintKind, M.name_equal(name, "effect_rep"), EffectRepConstraint{}, UnknownConstraint{})))))))
+
+def constraint_predicate_parts(kind: ConstraintKind, member: String, types: List<&2, M.Ty>, effects: List<&2, C.Cst>, fuel: Nat, context: Context, scope: String, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Predicate>:
+  match kind types:
+    case AssociatedConstraint{} left <> right <> result <> Nil{}:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        invocation : M.EffectRow <- constraint_invocation(effects, fuel, context, scope, node)
+        return M.AssociatedPredicate{member, Nil{}, left, right, result, invocation}
+    case ReceiverConstraint{} receiver <> argument <> result <> Nil{}:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        invocation : M.EffectRow <- constraint_invocation(effects, fuel, context, scope, node)
+        return M.ReceiverPredicate{member, Nil{}, receiver, argument, result, invocation}
+    case FieldConstraint{} receiver <> result <> Nil{}:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        valid : Unit <- constraint_no_row(effects, node)
+        return M.FieldPredicate{member, receiver, result}
+    case UpdateConstraint{} receiver <> assigned <> result <> Nil{}:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        invocation : M.EffectRow <- constraint_invocation(effects, fuel, context, scope, node)
+        return M.UpdatePredicate{member, receiver, assigned, result, invocation}
+    case _ _:
+      Fail{C.diagnostic(node, "invalid_constraint", "predicate has the wrong kind or number of type arguments")}
+
+def constraint_simple_parts(kind: ConstraintKind, types: List<&2, M.Ty>, effects: List<&2, C.Cst>, fuel: Nat, context: Context, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Predicate>:
+  match kind types effects:
+    case TypeRepConstraint{} represented <> Nil{} Nil{}:
+      Done{M.TypeRepPredicate{represented}}
+    case EffectRepConstraint{} Nil{} row <> Nil{}:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        value : M.EffectRow <- constraint_row(row, fuel, context)
+        return M.EffectRepPredicate{value}
+    case _ _ _:
+      Fail{C.diagnostic(node, "invalid_constraint", "predicate has the wrong argument shape")}
+
+def constraint_no_member(nodes: List<&2, C.Cst>, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match nodes:
+    case Nil{}:
+      Done{Unit{}}
+    case _:
+      Fail{C.diagnostic(node, "invalid_constraint", "this predicate does not accept a member name")}
+
+def lower_constraint_parts(+kind: ConstraintKind, +node: C.Cst, +fuel: Nat, +context: Context, scope: String, arguments: List<&2, C.Cst>, effects: List<&2, C.Cst>) -> Result<&2, &2, M.Diagnostic, M.Predicate>:
+  match kind:
+    case OperationConstraint{}:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        valid_member : Unit <- constraint_no_member(C.field_values(node, "member"), node)
+        valid : Unit <- constraint_no_row(effects, node)
+        constraint_operation_arguments(arguments, fuel, context, scope, node)
+    case TypeRepConstraint{}:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        valid : Unit <- constraint_no_member(C.field_values(node, "member"), node)
+        types : List<&2, M.Ty> <- constraint_types(arguments, fuel, context)
+        constraint_simple_parts(kind, types, effects, fuel, context, node)
+    case EffectRepConstraint{}:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        valid : Unit <- constraint_no_member(C.field_values(node, "member"), node)
+        types : List<&2, M.Ty> <- constraint_types(arguments, fuel, context)
+        constraint_simple_parts(kind, types, effects, fuel, context, node)
+    case _:
+      do Result<&2, &2, M.Diagnostic, M.Predicate>:
+        member : String <- constraint_member(C.field_values(node, "member"), node)
+        types : List<&2, M.Ty> <- constraint_types(arguments, fuel, context)
+        constraint_predicate_parts(kind, member, types, effects, fuel, context, scope, node)
+
+def lower_constraint_kind(kind: ConstraintKind, +node: C.Cst, fuel: Nat, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, M.Predicate>:
+  lower_constraint_parts(kind, node, fuel, context, scope, C.field_values(node, "arguments"), C.field_values(node, "effects"))
+
+def constraint_diagnostic(found: Result<&2, &2, M.Diagnostic, M.Predicate>, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Predicate>:
+  match found:
+    case Done{predicate}:
+      Done{predicate}
+    case Fail{M.Diagnostic{+code, subject, message}}:
+      Bool.pick(Result<&2, &2, M.Diagnostic, M.Predicate>, M.name_equal(code, "effect_instance"), Fail{C.diagnostic(node, "unsupported_polymorphic_effect_label", "explicit predicate rows currently require concrete effect operation labels")}, Fail{C.diagnostic(node, code, message)})
+
+def lower_constraint_raw(+node: C.Cst, fuel: Nat, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, M.Predicate>:
+  do Result<&2, &2, M.Diagnostic, M.Predicate>:
+    kind_node : C.Cst <- C.one(C.field_values(node, "kind"))
+    lower_constraint_kind(constraint_kind(C.text_of(kind_node)), node, fuel, context, scope)
+
+def lower_constraint(+node: C.Cst, fuel: Nat, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, M.Predicate>:
+  constraint_diagnostic(lower_constraint_raw(node, fuel, context, scope), node)
+
+
+def lower_constraints(nodes: List<&2, C.Cst>, +fuel: Nat, +context: Context, +scope: String) -> Result<&2, &2, M.Diagnostic, List<&2, M.Predicate>>:
+  match nodes:
+    case Nil{}:
+      Done{Nil{}}
+    case node <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Predicate>>:
+        first : M.Predicate <- lower_constraint(node, fuel, context, scope)
+        rest : List<&2, M.Predicate> <- lower_constraints(tail, fuel, context, scope)
+        return first <> rest
+
+def where_clause(annotation: Maybe<&2, M.Ty>, nodes: List<&2, C.Cst>, value: M.Expr, fuel: Nat, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match annotation nodes:
+    case _ Nil{}:
+      Done{value}
+    case None{} node <> Nil{}:
+      Fail{C.diagnostic(node, "invalid_constraint", "where requires a complete binding type annotation")}
+    case Some{ty} +node <> Nil{}:
+      do Result<&2, &2, M.Diagnostic, M.Expr>:
+        +marker : C.Cst <- C.one(C.field_values(node, "marker"))
+        valid : Unit <- Bool.pick(Result<&2, &2, M.Diagnostic, Unit>, M.name_equal(C.text_of(marker), "where"), Done{Unit{}}, Fail{C.diagnostic(marker, "invalid_constraint", "expected where before predicate block")})
+        predicates : List<&2, M.Predicate> <- lower_constraints(C.field_values(node, "predicates"), fuel, context, scope)
+        return M.QualifiedExpr{C.offset_of(node), ty, predicates, value}
+    case _ _:
+      Fail{M.Diagnostic{"internal_cst", "parser", "invalid where clause field"}}
+
 def parameter_fields(names: List<&2, C.Cst>, annotations: List<&2, C.Cst>, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, Parameter>:
   match names:
     case Nil{}:
@@ -692,8 +898,17 @@ def parameter_fields(names: List<&2, C.Cst>, annotations: List<&2, C.Cst>, fuel:
     case _:
       Fail{M.Diagnostic{"internal_cst", "parser", "invalid parameter"}}
 
+def parameter_rank(nodes: List<&2, C.Cst>) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match nodes:
+    case Nil{}:
+      Done{Unit{}}
+    case clause <> tail:
+      Fail{C.diagnostic(clause, "higher_rank_constraint", "where clauses are supported on bindings, not parameter annotations")}
+
 def lower_parameter(+node: C.Cst, fuel: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, Parameter>:
-  parameter_fields(C.field_values(node, "name"), C.field_values(node, "annotation"), fuel, context)
+  do Result<&2, &2, M.Diagnostic, Parameter>:
+    valid : Unit <- parameter_rank(C.field_values(node, "where"))
+    parameter_fields(C.field_values(node, "name"), C.field_values(node, "annotation"), fuel, context)
 
 def bind_parameter(context: Context, param: Parameter) -> Context:
   Parameter{source, core, annotation} = param
@@ -842,6 +1057,10 @@ def require_unsealed_operation(sealed: Bool, node: C.Cst) -> Result<&2, &2, M.Di
 
 def function_reference(value: M.Expr, node: C.Cst) -> Result<&2, &2, M.Diagnostic, String>:
   match value:
+    case M.InstantiationExpr{site, inner}:
+      function_reference(inner, node)
+    case M.SourceExpr{offset, annotation, inner}:
+      function_reference(inner, node)
     case M.FunctionExpr{callee}:
       Done{callee}
     case _:
@@ -864,6 +1083,10 @@ def prefix(operators: List<&2, C.Cst>, value: M.Expr) -> Result<&2, &2, M.Diagno
 
 def constructor_name(value: M.Expr, node: C.Cst) -> Result<&2, &2, M.Diagnostic, String>:
   match value:
+    case M.InstantiationExpr{site, inner}:
+      constructor_name(inner, node)
+    case M.SourceExpr{offset, annotation, inner}:
+      constructor_name(inner, node)
     case M.ConstructorRefExpr{constructor}:
       Done{constructor}
     case _:
@@ -876,6 +1099,10 @@ def pattern_name(+node: C.Cst) -> PatternResult:
 
 def value_pattern(reference: M.Expr, node: C.Cst) -> Result<&2, &2, M.Diagnostic, PatternResult>:
   match reference:
+    case M.InstantiationExpr{site, inner}:
+      value_pattern(inner, node)
+    case M.SourceExpr{offset, annotation, inner}:
+      value_pattern(inner, node)
     case M.LocalExpr{name}:
       Done{PatternResult{M.ValuePattern{M.LocalReference{name}}, Nil{}}}
     case M.ConstantExpr{name}:
@@ -1340,8 +1567,81 @@ def grouped_operation(fuel: Nat, work: GroupedOperation, arguments: List<&2, C.C
         call : TypedCall <- typed_operation_value(template, arguments, rest, context, node)
         return Some{call}
 
+# Terminal field replacement need not read the old value when `self` is unused.
+# Array getters retain their read because bounds traps must precede the RHS.
+def terminal_update_field(free: Result<&2, &2, M.Diagnostic, List<&2, String>>, +name: String, receiver: M.Expr, +value: M.Expr) -> M.Expr:
+  match free:
+    case Done{names}:
+      Bool.pick(M.Expr, Closures.contains(names, name), M.UseExpr{name, receiver, value}, value)
+    case Fail{diagnostic}:
+      M.UseExpr{name, receiver, value}
+
+def terminal_update_value(receiver: M.Expr, +name: String, +value: M.Expr) -> M.Expr:
+  match receiver:
+    case M.AssociatedExpr{identity, M.MemberDispatch{}, member, templates, left, right}:
+      terminal_update_field(Closures.free(4096n, Closures.ExpressionWork{value, Nil{}}), name, M.AssociatedExpr{identity, M.MemberDispatch{}, member, templates, left, right}, value)
+    case other:
+      M.UseExpr{name, other, value}
+
 # Expression and statement recursion share an explicit work type. Each branch
 # consumes source-tree fuel; block exits stay explicit rather than copying tails.
+type AnnotationScan is Data:
+  ScanNode{node: C.Cst, root: Bool}
+  ScanNodes{nodes: List<&2, C.Cst>, reversed: List<&2, C.Cst>}
+
+# A nested let owns its annotation names. The declaration's broad CST scan
+# must not capture those names before the let gets its own $let$ scope.
+def annotation_scan_work(+fuel: Nat, work: AnnotationScan) -> Result<&2, &2, M.Diagnostic, List<&2, C.Cst>>:
+  match fuel work:
+    case 0n _:
+      Fail{M.Diagnostic{"type_argument", "parser", "annotation scope exceeds the source-tree limit"}}
+    case 1n+rest ScanNode{C.Cst{"binding", field, text, offset, children}, False{}}:
+      Done{[C.Cst{"binding", field, text, offset, Nil{}}]}
+    case 1n+rest ScanNode{C.Cst{kind, field, text, offset, children}, root}:
+      do Result<&2, &2, M.Diagnostic, List<&2, C.Cst>>:
+        scoped : List<&2, C.Cst> <- annotation_scan_work(rest, ScanNodes{children, Nil{}})
+        return [C.Cst{kind, field, text, offset, scoped}]
+    case 1n+rest ScanNodes{Nil{}, reversed}:
+      Done{List.reverse(&2, C.Cst, reversed)}
+    case 1n+rest ScanNodes{head <> tail, reversed}:
+      do Result<&2, &2, M.Diagnostic, List<&2, C.Cst>>:
+        scanned : List<&2, C.Cst> <- annotation_scan_work(rest, ScanNode{head, False{}})
+        node : C.Cst <- C.one(scanned)
+        annotation_scan_work(rest, ScanNodes{tail, node <> reversed})
+
+def inherited_annotation_kind(same: Bool, source: String, value: M.Ty, kind: T.VariableKind, node: C.Cst) -> Result<&2, &2, M.Diagnostic, T.Variable>:
+  match same:
+    case True{}:
+      Done{T.Variable{source, value, kind}}
+    case False{}:
+      Fail{C.diagnostic(node, "annotation_kind_mismatch", "one annotation name cannot be both a type and an effect-row variable")}
+
+def inherited_annotation_variable(found: Maybe<&2, T.Variable>, scanned: T.Variable, node: C.Cst) -> Result<&2, &2, M.Diagnostic, T.Variable>:
+  match found scanned:
+    case None{} variable:
+      Done{variable}
+    case Some{T.Variable{previous_name, previous_value, previous_kind}} T.Variable{source, value, +kind}:
+      inherited_annotation_kind(T.same_kind(previous_kind, kind), source, previous_value, kind, node)
+
+def inherited_annotation_variables(scanned: List<&2, T.Variable>, +previous: List<&2, T.Variable>, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:
+  match scanned:
+    case Nil{}:
+      Done{previous}
+    case T.Variable{+source, value, kind} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:
+        variable : T.Variable <- inherited_annotation_variable(T.found_variable(previous, source), T.Variable{source, value, kind}, node)
+        rest : List<&2, T.Variable> <- inherited_annotation_variables(tail, previous, node)
+        return variable <> rest
+
+def annotation_scope(+node: C.Cst, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, Context>:
+  Context{globals, headers, fixities, locals, label, previous} = context
+  do Result<&2, &2, M.Diagnostic, Context>:
+    scoped : List<&2, C.Cst> <- annotation_scan_work(1048576n, ScanNode{node, True{}})
+    root : C.Cst <- C.one(scoped)
+    scanned : List<&2, T.Variable> <- T.free_variables(root, scope)
+    variables : List<&2, T.Variable> <- inherited_annotation_variables(scanned, previous, node)
+    return Context{globals, headers, fixities, locals, label, variables}
+
 def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Expr>:
   match fuel:
     case 0n:
@@ -1415,7 +1715,8 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             receiver_node : C.Cst <- C.one(C.field_values(node, "receiver"))
             +name : C.Cst <- C.one(C.field_values(node, "name"))
             receiver : M.Expr <- lower(remaining, visit(receiver_node), context)
-            return located(C.offset_of(name), M.AssociatedExpr{C.offset_of(name), M.MemberDispatch{}, C.text_of(name), Nil{}, receiver, M.UnitExpr{}})
+            +offset : Nat = C.offset_of(name)
+            return located(offset, instantiate_at(offset, 2n, M.AssociatedExpr{offset, M.MemberDispatch{}, C.text_of(name), Nil{}, receiver, M.UnitExpr{}}))
         case Expression{IndexNode{}, +node}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             receiver_node : C.Cst <- C.one(C.field_values(node, "receiver"))
@@ -1618,10 +1919,10 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             lower(remaining, Arguments{callee, arguments, offset}, context)
         case Arguments{callee, Nil{}, offset}:
           Done{located(offset, callee)}
-        case Arguments{callee, head <> rest, offset}:
+        case Arguments{callee, +head <> rest, offset}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             argument : M.Expr <- lower(remaining, visit(head), context)
-            lower(remaining, Arguments{O.invoke(callee, argument), rest, offset}, context)
+            lower(remaining, Arguments{instantiate_at(C.offset_of(head), 1n, O.invoke(callee, argument)), rest, offset}, context)
         case Expression{InfixNode{}, +node}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             first : C.Cst <- C.one(C.field_values(node, "head"))
@@ -1686,15 +1987,19 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
             lower(remaining, Statement{classify(C.kind_of(node)), node, tail, carried}, context)
         case Statement{Binding{}, +node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
+            +scope : String = "$let$" ++ Nat.show(C.offset_of(node))
+            +annotated : Context <- annotation_scope(node, context, scope)
             +pattern_node : C.Cst <- C.one(C.field_values(node, "pattern"))
             +pat : PatternResult <- lower_pattern(remaining, classify(C.kind_of(pattern_node)), pattern_node, context)
-            ty : Maybe<&2, M.Ty> <- source_annotation(C.field_values(node, "annotation"), remaining, context)
+            +ty : Maybe<&2, M.Ty> <- source_annotation(C.field_values(node, "annotation"), remaining, annotated)
             value_node : C.Cst <- C.one(C.field_values(node, "value"))
-            value : M.Expr <- lower(remaining, visit(value_node), context)
+            value : M.Expr <- lower(remaining, visit(value_node), annotated)
+            qualified : M.Expr <- where_clause(ty, C.field_values(node, "where"), value, remaining, annotated, scope)
             otherwise : List<&2, C.Cst> <- else_statements(C.field_values(node, "fallback"))
             alternative : M.Expr <- lower(remaining, Statements{otherwise, Nil{}}, context)
             body : M.Expr <- lower(remaining, Statements{tail, carried}, pattern_scope(context, pat))
-            return located(C.offset_of(node), binding(C.present(C.field_values(node, "fallback")), pattern_of(pat), M.SourceExpr{C.offset_of(node), ty, value}, alternative, body, C.offset_of(node)))
+            old_annotation : Maybe<&2, M.Ty> = Bool.pick(Maybe<&2, M.Ty>, C.present(C.field_values(node, "where")), None{}, ty)
+            return located(C.offset_of(node), binding(C.present(C.field_values(node, "fallback")), pattern_of(pat), M.SourceExpr{C.offset_of(node), old_annotation, qualified}, alternative, body, C.offset_of(node)))
         case Statement{ForLoop{}, +node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             +pat : PatternResult <- loop_pattern(remaining, C.field_values(node, "pattern"), context)
@@ -1740,8 +2045,8 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
         case UpdatePath{receiver, Nil{}, value_node, offset}:
           +name = "$update$self$" ++ Nat.show(offset)
           do Result<&2, &2, M.Diagnostic, M.Expr>:
-            value : M.Expr <- lower(remaining, visit(value_node), bind(context, Local{"self", name}))
-            return M.UseExpr{name, receiver, value}
+            +value : M.Expr <- lower(remaining, visit(value_node), bind(context, Local{"self", name}))
+            return terminal_update_value(receiver, name, value)
         case UpdatePath{receiver, +node <> tail, value, offset}:
           lower(remaining, UpdateSelector{C.kind_of(node), receiver, node, tail, value, offset}, context)
         case UpdateSelector{"member_access", receiver, +node, tail, value_node, offset}:
@@ -2055,11 +2360,6 @@ def function_value(name: String, exported: Bool, param: Parameter, result: Maybe
   Parameter{source, core, annotation} = param
   M.Function{name, exported, core, annotation, result, body}
 
-def annotation_scope(node: C.Cst, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, Context>:
-  Context{globals, headers, fixities, locals, label, previous} = context
-  do Result<&2, &2, M.Diagnostic, Context>:
-    variables : List<&2, T.Variable> <- T.free_variables(node, scope)
-    return Context{globals, headers, fixities, locals, label, variables}
 
 def lower_function(+node: C.Cst, name: String, exported: Bool, +fuel: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, M.Function>:
   do Result<&2, &2, M.Diagnostic, M.Function>:
@@ -2125,16 +2425,28 @@ def reject_recursive_tag(tags: List<&2, C.Cst>, name: String, value: M.Expr) -> 
         refs : D.References <- D.references(65536n, D.Expression{value})
         reject_recursive_tag_found(D.contains(D.names_of(refs), name), tag)
 
-def lower_constant(+node: C.Cst, +attributes: List<&2, C.Cst>, +name: String, exported: Bool, +fuel: Nat, base_context: Context) -> Result<&2, &2, M.Diagnostic, M.Constant>:
+# An exported qualified declaration is itself a concrete host use. Lane 3 is
+# reserved for that root; ordinary references and calls use lanes 0-2.
+def qualified_root(exported: Bool, constrained: Bool, offset: Nat, value: M.Expr) -> M.Expr:
+  match exported constrained:
+    case True{} True{}:
+      instantiate_at(offset, 3n, value)
+    case _ _:
+      value
+
+def lower_constant(+node: C.Cst, +attributes: List<&2, C.Cst>, +name: String, +exported: Bool, +fuel: Nat, base_context: Context) -> Result<&2, &2, M.Diagnostic, M.Constant>:
   do Result<&2, &2, M.Diagnostic, M.Constant>:
     +context : Context <- annotation_scope(node, base_context, name)
-    ty : Maybe<&2, M.Ty> <- source_annotation(C.field_values(node, "annotation"), fuel, context)
+    +ty : Maybe<&2, M.Ty> <- source_annotation(C.field_values(node, "annotation"), fuel, context)
     value_node : C.Cst <- C.one(C.field_values(node, "value"))
     +initial : M.Expr <- lower(fuel, visit(value_node), context)
     +value : M.Expr <- apply_tags(attributes, initial, fuel, context)
     valid : Unit <- reject_recursive_tag(attributes, name, value)
+    +qualified : M.Expr <- where_clause(ty, C.field_values(node, "where"), value, fuel, context, name)
     keyword : C.Cst <- C.one(C.field_values(node, "kind"))
-    return M.Constant{name, exported, ty, Bool.pick(M.Expr, M.name_equal(C.text_of(keyword), "let"), M.RuntimeInitExpr{value}, value)}
+    old_annotation : Maybe<&2, M.Ty> = Bool.pick(Maybe<&2, M.Ty>, C.present(C.field_values(node, "where")), None{}, ty)
+    +root : M.Expr = qualified_root(exported, C.present(C.field_values(node, "where")), C.offset_of(node), qualified)
+    return M.Constant{name, exported, old_annotation, Bool.pick(M.Expr, M.name_equal(C.text_of(keyword), "let"), M.RuntimeInitExpr{root}, root)}
 
 def annotated_function(annotation: Maybe<&2, M.Ty>, function: M.Function, +node: C.Cst) -> M.Function:
   match annotation function:
@@ -2143,6 +2455,24 @@ def annotated_function(annotation: Maybe<&2, M.Ty>, function: M.Function, +node:
     case Some{ty} M.Function{name, exported, +parameter, p, r, body}:
       +offset = C.offset_of(node)
       M.Function{name, exported, parameter, None{}, None{}, M.ApplyExpr{M.SourceExpr{offset, Some{ty}, M.LambdaExpr{offset, parameter, p, r, body}}, M.LocalExpr{parameter}}}
+
+def qualified_function(annotation: Maybe<&2, M.Ty>, function: M.Function, +node: C.Cst, fuel: Nat, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, M.Function>:
+  match function:
+    case M.Function{name, +exported, +parameter, p, r, body}:
+      do Result<&2, &2, M.Diagnostic, M.Function>:
+        +offset : Nat = C.offset_of(node)
+        qualified : M.Expr <- where_clause(annotation, C.field_values(node, "where"), M.LambdaExpr{offset, parameter, p, r, body}, fuel, context, scope)
+        return M.Function{name, exported, parameter, None{}, None{}, M.ApplyExpr{qualified_root(exported, True{}, offset, qualified), M.LocalExpr{parameter}}}
+
+def binding_function_found(found: Bool, annotation: Maybe<&2, M.Ty>, function: M.Function, node: C.Cst, fuel: Nat, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, M.Function>:
+  match found:
+    case True{}:
+      qualified_function(annotation, function, node, fuel, context, scope)
+    case False{}:
+      Done{annotated_function(annotation, function, node)}
+
+def binding_function(annotation: Maybe<&2, M.Ty>, function: M.Function, +node: C.Cst, fuel: Nat, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, M.Function>:
+  binding_function_found(C.present(C.field_values(node, "where")), annotation, function, node, fuel, context, scope)
 
 def value_function_phase(runtime: Bool, function: M.Function) -> M.Function:
   match runtime function:
@@ -2157,7 +2487,8 @@ def lower_value_function(+binding: C.Cst, node: C.Cst, +name: String, exported: 
     annotation : Maybe<&2, M.Ty> <- source_annotation(C.field_values(binding, "annotation"), fuel, context)
     function : M.Function <- lower_function(node, name, exported, fuel, context)
     keyword : C.Cst <- C.one(C.field_values(binding, "kind"))
-    return value_function_phase(M.name_equal(C.text_of(keyword), "let"), annotated_function(annotation, function, binding))
+    qualified : M.Function <- binding_function(annotation, function, binding, fuel, context, name)
+    return value_function_phase(M.name_equal(C.text_of(keyword), "let"), qualified)
 
 def require_parameter(found: Maybe<&2, M.Ty>, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Unit>:
   match found:
@@ -2174,7 +2505,7 @@ def named_type_variables(names: List<&2, String>, +index: Nat, +node: C.Cst) -> 
       do Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:
         +rest : List<&2, T.Variable> <- named_type_variables(tail, 1n+index, node)
         valid : Unit <- require_parameter(T.lookup_variable(rest, name), node)
-        return T.Variable{name, M.ParameterTy{index}} <> rest
+        return T.Variable{name, M.ParameterTy{index}, T.TypeKind{}} <> rest
 
 def type_variables(+node: C.Cst) -> Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:
   do Result<&2, &2, M.Diagnostic, List<&2, T.Variable>>:

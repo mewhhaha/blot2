@@ -151,6 +151,7 @@ export type LiteralKind =
   | "`"
   | "."
   | "!"
+  | "wherE"
   | "fn"
   | "True"
   | "False"
@@ -252,6 +253,8 @@ export type RuleName =
   | "type_field"
   | "type_expression"
   | "effect_row"
+  | "where_clause"
+  | "constraint_predicate"
   | "type_application"
   | "type_atom"
   | "type_group"
@@ -386,6 +389,7 @@ export interface ValueDeclarationCursor extends RuleCursorBase<"value_declaratio
   field(name: "modifier"): TokenCursor<"named", "IDENT"> | null;
   field(name: "name"): QualifiedNameCursor;
   field(name: "value"): ExpressionCursor;
+  field(name: "where"): WhereClauseCursor | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -483,6 +487,7 @@ export interface QualifiedNameCursor extends RuleCursorBase<"qualified_name"> {
 export interface ParameterCursor extends RuleCursorBase<"parameter"> {
   field(name: "annotation"): TypeExpressionCursor | null;
   field(name: "name"): TokenCursor<"named", "IDENT"> | null;
+  field(name: "where"): WhereClauseCursor | null | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -518,8 +523,26 @@ export interface TypeExpressionCursor extends RuleCursorBase<"type_expression"> 
 
 export interface EffectRowCursor extends RuleCursorBase<"effect_row"> {
   field(name: "labels"): ReadonlyArray<TypeApplicationCursor>;
+  field(name: "tail"): TokenCursor<"named", "IDENT"> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: "labels"): ReadonlyArray<TypeApplicationCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface WhereClauseCursor extends RuleCursorBase<"where_clause"> {
+  field(name: "marker"): TokenCursor<"literal", "wherE">;
+  field(name: "predicates"): ReadonlyArray<ConstraintPredicateCursor>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "predicates"): ReadonlyArray<ConstraintPredicateCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ConstraintPredicateCursor extends RuleCursorBase<"constraint_predicate"> {
+  field(name: "arguments"): ReadonlyArray<TypeAtomCursor>;
+  field(name: "effects"): EffectRowCursor | null;
+  field(name: "kind"): TokenCursor<"named", "IDENT">;
+  field(name: "member"): TokenCursor<"named", "STRING"> | null;
+  field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
@@ -719,6 +742,7 @@ export interface BindingCursor extends RuleCursorBase<"binding"> {
   field(name: "fallback"): BindingElseCursor | null;
   field(name: "pattern"): PatternCursor;
   field(name: "value"): ExpressionCursor;
+  field(name: "where"): WhereClauseCursor | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -838,6 +862,8 @@ export type AnyRuleCursor =
   | TypeFieldCursor
   | TypeExpressionCursor
   | EffectRowCursor
+  | WhereClauseCursor
+  | ConstraintPredicateCursor
   | TypeApplicationCursor
   | TypeAtomCursor
   | TypeGroupCursor

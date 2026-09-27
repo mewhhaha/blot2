@@ -85,3 +85,18 @@ Deno.test("adjacent same-line tagged declarations split after nested tag bracket
     chunks,
   );
 });
+
+Deno.test("multiline qualified clauses and open rows stay with adjacent declarations", () => {
+  const chunks = [
+    'const first: a -> a ! {Reader.ask | e} where {\n  associated "add" a a a ! {| e},\n  effect_rep ! {Reader.ask | e},\n} = fn value => value + value\n',
+    "#[fn value => value] entry const answer: U32 where { type_rep U32 } = 42\n",
+    "entry const next = 43\n",
+  ];
+  const source = chunks.join("");
+  equal(
+    sourceDeclarationRanges(source)?.map((range) =>
+      source.slice(range.start, range.end)
+    ),
+    chunks,
+  );
+});

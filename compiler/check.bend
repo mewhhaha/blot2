@@ -1,6 +1,7 @@
 import Base
 import ./model.bend as M
 import ./types.bend as T
+import ./constraints.bend as C
 import ./infer.bend as I
 import ./effects.bend as E
 import ./effect_rows.bend as R
@@ -214,17 +215,18 @@ def checked_signature(ty: M.Ty, name: String, variables: List<&2, Nat>) -> Resul
     case other:
       Fail{M.Diagnostic{"internal_error", name, "function does not have an arrow type"}}
 
-def resolve_binding(found: Maybe<&2, I.Binding>, substitutions: T.Substitutions, subject: String) -> Result<&2, &2, M.Diagnostic, I.Binding>:
+def resolve_binding(found: Maybe<&2, I.Binding>, +substitutions: T.Substitutions, subject: String) -> Result<&2, &2, M.Diagnostic, I.Binding>:
   match found:
     case None{}:
       Fail{M.Diagnostic{"internal_error", subject, "missing inferred binding"}}
-    case Some{I.Binding{name, ty, variables}}:
+    case Some{I.Binding{name, ty, variables, predicates}}:
       do Result<&2, &2, M.Diagnostic, I.Binding>:
         resolved : M.Ty <- T.resolve(substitutions, ty)
-        return I.Binding{name, resolved, variables}
+        needs : List<&2, M.Predicate> <- C.resolve_list(substitutions, predicates)
+        return I.Binding{name, resolved, variables, needs}
 
 def binding_signature(binding: I.Binding) -> Result<&2, &2, M.Diagnostic, M.Signature>:
-  I.Binding{name, ty, variables} = binding
+  I.Binding{name, ty, variables, predicates} = binding
   checked_signature(ty, name, variables)
 
 def signature_effects(signature: M.Signature) -> List<&2, M.Effect>:
@@ -243,7 +245,7 @@ def function_results(functions: List<&2, M.Function>, +bindings: List<&2, I.Bind
         return M.CheckedFunction{M.Function{name, exported, parameter, p, r, body}, signature, signature_effects(signature)} <> rest
 
 def checked_constant(constant: M.Constant, binding: I.Binding) -> M.CheckedConstant:
-  I.Binding{name, ty, variables} = binding
+  I.Binding{name, ty, variables, predicates} = binding
   M.CheckedConstant{constant, ty, variables}
 
 def constant_results(constants: List<&2, M.Constant>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, M.CheckedConstant>>:
@@ -260,14 +262,14 @@ def coverage_constraints(definitions: List<&2, I.Definition>) -> List<&2, I.Cove
   match definitions:
     case Nil{}:
       Nil{}
-    case I.Definition{name, I.Inference{ty, coverage, exits, reflections}} <> tail:
+    case I.Definition{name, I.Inference{ty, coverage, exits, reflections, predicates, uses}} <> tail:
       List.append(&2, I.Coverage, coverage, coverage_constraints(tail))
 
 def reflection_constraints(definitions: List<&2, I.Definition>) -> List<&2, I.Reflection>:
   match definitions:
     case Nil{}:
       Nil{}
-    case I.Definition{name, I.Inference{ty, coverage, exits, reflections}} <> tail:
+    case I.Definition{name, I.Inference{ty, coverage, exits, reflections, predicates, uses}} <> tail:
       List.append(&2, I.Reflection, reflections, reflection_constraints(tail))
 
 def reflected_type(ty: M.Ty, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
@@ -280,17 +282,17 @@ def reflected_type(ty: M.Ty, subject: String) -> Result<&2, &2, M.Diagnostic, Un
       Fail{M.Diagnostic{"invalid_effect_descriptor", subject, "effect reflection requires a named function"}}
 
 def reflected_binding(binding: I.Binding, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
-  I.Binding{name, ty, variables} = binding
+  I.Binding{name, ty, variables, predicates} = binding
   reflected_type(ty, subject)
 
 def check_reflections(reflections: List<&2, I.Reflection>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, Unit>:
   match reflections:
     case Nil{}:
       Done{Unit{}}
-    case I.Reflection{callee, +subject} <> tail:
+    case I.Reflection{callee, +subject, instantiated_type, predicates} <> tail:
       do Result<&2, &2, M.Diagnostic, Unit>:
-        binding : I.Binding <- resolve_binding(I.lookup_binding(bindings, callee), substitutions, subject)
-        closed : Unit <- reflected_binding(binding, subject)
+        resolved : M.Ty <- T.resolve(substitutions, instantiated_type)
+        closed : Unit <- reflected_type(resolved, subject)
         check_reflections(tail, bindings, substitutions)
 
 def require_let_pure(effects: List<&2, M.Effect>, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:

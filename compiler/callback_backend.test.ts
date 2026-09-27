@@ -44,28 +44,31 @@ function unwrap<T>(result: Result<T>): T {
   return result.value;
 }
 const none = n("None");
-const unit = n("UnitExpr");
-const unitType = n("UnitTy");
-const u32 = n("U32Ty");
-const bool = n("BoolTy");
-const f32 = n("F32Ty");
-const foreign = n("TypeId", {
+const unit = n("model.UnitExpr");
+const unitType = n("model.UnitTy");
+const u32 = n("model.U32Ty");
+const bool = n("model.BoolTy");
+const f32 = n("model.F32Ty");
+const foreign = n("model.TypeId", {
   module_name: "blot:compiler",
   declaration: "Foreign",
 });
-const reader = n("TypeId", { module_name: "test", declaration: "Reader.ask" });
-const row = (operations: readonly Node[] = [], tail = n("ClosedRow")) =>
-  n("EffectRow", { operations: list(operations), tail });
+const reader = n("model.TypeId", {
+  module_name: "test",
+  declaration: "Reader.ask",
+});
+const row = (operations: readonly Node[] = [], tail = n("model.ClosedRow")) =>
+  n("model.EffectRow", { operations: list(operations), tail });
 const callback = (parameter = u32, result = u32, effects = row([foreign])) =>
-  n("FunctionTy", { parameter, result, effects });
-const local = (name: string) => n("LocalExpr", { name });
-const integer = (value: number) => n("U32Expr", { value });
+  n("model.FunctionTy", { parameter, result, effects });
+const local = (name: string) => n("model.LocalExpr", { name });
+const integer = (value: number) => n("model.U32Expr", { value });
 const apply = (callee: Node, argument: Node) =>
-  n("ApplyExpr", { callee, argument });
+  n("model.ApplyExpr", { callee, argument });
 const call = (callee: string, argument = unit) =>
-  n("CallExpr", { callee, argument });
+  n("model.CallExpr", { callee, argument });
 const lambda = (identity: bigint, body: Node) =>
-  n("LambdaExpr", {
+  n("model.LambdaExpr", {
     identity,
     parameter: "ignored",
     parameter_type: none,
@@ -73,9 +76,9 @@ const lambda = (identity: bigint, body: Node) =>
     body,
   });
 const bind = (name: string, value: Node, body: Node) =>
-  n("LetExpr", { name, value, body });
+  n("model.LetExpr", { name, value, body });
 const add = (left: Node, right: Node) =>
-  n("ScalarExpr", { operator: n("Add"), left, right });
+  n("model.ScalarExpr", { operator: n("model.Add"), left, right });
 
 function fn(name: string, body: Node, options: {
   parameter?: Node;
@@ -86,8 +89,8 @@ function fn(name: string, body: Node, options: {
   const parameter = options.parameter ?? unitType;
   const result = options.result ?? u32;
   const effects = options.effects ?? row();
-  return n("CheckedFunction", {
-    function: n("Function", {
+  return n("model.CheckedFunction", {
+    function: n("model.Function", {
       name,
       exported: options.exported ?? true,
       parameter: "value",
@@ -95,7 +98,7 @@ function fn(name: string, body: Node, options: {
       result_type: n("Some", { value: result }),
       body,
     }),
-    signature: n("Signature", {
+    signature: n("model.Signature", {
       name,
       parameter,
       result,
@@ -104,7 +107,7 @@ function fn(name: string, body: Node, options: {
     }),
     effects: list(
       array(effects.operations as List<Node>).map((identity) =>
-        n("OperationEffect", { identity })
+        n("model.OperationEffect", { identity })
       ),
     ),
   });
@@ -122,12 +125,12 @@ function source(functions: readonly Node[], options: {
 } = {}) {
   const constants = options.constants ?? [];
   return {
-    checked: n("CheckedModule", {
+    checked: n("model.CheckedModule", {
       functions: list(functions),
       constants: list(
         constants.map(({ name, type, exported }) =>
-          n("CheckedConstant", {
-            constant: n("Constant", {
+          n("model.CheckedConstant", {
+            constant: n("model.Constant", {
               name,
               exported: exported ?? false,
               annotation: none,
@@ -142,7 +145,9 @@ function source(functions: readonly Node[], options: {
       data_types: list(options.data_types ?? []),
     }),
     constants: list(
-      constants.map(({ name, value }) => n("Binding", { name, value })),
+      constants.map(({ name, value }) =>
+        n("const_eval.Binding", { name, value })
+      ),
     ),
   };
 }
@@ -246,7 +251,7 @@ Deno.test("scalar modules publish exact UTF-8 ABI metadata without ambient impor
       [fn("雪🙂", integer(42)), fn("private", unit, { exported: false })],
       {
         operations: [
-          n("Operation", {
+          n("model.Operation", {
             identity: reader,
             parameter: unitType,
             result: u32,
@@ -255,7 +260,7 @@ Deno.test("scalar modules publish exact UTF-8 ABI metadata without ambient impor
         constants: [{
           name: "π",
           type: f32,
-          value: n("F32Value", { value: -0 }),
+          value: n("const_eval.F32Value", { value: -0 }),
           exported: true,
         }],
       },
@@ -293,7 +298,7 @@ Deno.test("all sixteen callback scalar signatures execute through explicit opaqu
     {
       type: bool,
       name: "bool",
-      expression: n("BoolExpr", { value: true }),
+      expression: n("model.BoolExpr", { value: true }),
       input: 1,
       output: 19,
       expected: 1,
@@ -301,7 +306,7 @@ Deno.test("all sixteen callback scalar signatures execute through explicit opaqu
     {
       type: f32,
       name: "f32",
-      expression: n("F32Expr", { value: -0 }),
+      expression: n("model.F32Expr", { value: -0 }),
       input: -0,
       output: -0,
       expected: -0,
@@ -381,12 +386,12 @@ Deno.test("callbacks remain ordinary closures through captures and lexical provi
     ),
     fn(
       "provided",
-      n("HandleExpr", {
-        provider: n("ProviderExpr", {
+      n("model.HandleExpr", {
+        provider: n("model.ProviderExpr", {
           identity: reader,
           implementation: local("value"),
         }),
-        body: apply(n("OperationExpr", { identity: reader }), unit),
+        body: apply(n("model.OperationExpr", { identity: reader }), unit),
       }),
       { parameter: callback(unitType), effects: row([foreign]) },
     ),
@@ -396,7 +401,11 @@ Deno.test("callbacks remain ordinary closures through captures and lexical provi
     }),
   ], {
     operations: [
-      n("Operation", { identity: reader, parameter: unitType, result: u32 }),
+      n("model.Operation", {
+        identity: reader,
+        parameter: unitType,
+        result: u32,
+      }),
     ],
   }));
   equal(WebAssembly.Module.imports(built.module).length, 2);
@@ -420,8 +429,8 @@ Deno.test("callbacks remain ordinary closures through captures and lexical provi
 });
 
 Deno.test("callback export boundaries reject open, mixed, ordinary, and non-scalar signatures", () => {
-  const unknown = n("AppliedTy", {
-    identity: n("TypeId", { module_name: "m", declaration: "Box" }),
+  const unknown = n("model.AppliedTy", {
+    identity: n("model.TypeId", { module_name: "m", declaration: "Box" }),
     arguments: list([]),
   });
   const badParameters = [
@@ -429,7 +438,7 @@ Deno.test("callback export boundaries reject open, mixed, ordinary, and non-scal
     callback(u32, u32, row([reader])),
     callback(u32, u32, row([foreign, reader])),
     callback(u32, u32, row([foreign, foreign])),
-    callback(u32, u32, row([foreign], n("RowVariable", { index: 0n }))),
+    callback(u32, u32, row([foreign], n("model.RowVariable", { index: 0n }))),
     callback(unknown),
     callback(u32, callback()),
   ];
@@ -443,7 +452,7 @@ Deno.test("callback export boundaries reject open, mixed, ordinary, and non-scal
     const effects of [
       row([reader]),
       row([foreign, reader]),
-      row([], n("RowVariable", { index: 0n })),
+      row([], n("model.RowVariable", { index: 0n })),
     ]
   ) {
     throws(
@@ -515,7 +524,7 @@ Deno.test("wrappers clear successful callback tokens and replace trapped tokens 
     constants: [{
       name: "answer",
       type: u32,
-      value: n("U32Value", { value: 42 }),
+      value: n("const_eval.U32Value", { value: 42 }),
       exported: true,
     }],
   }));
@@ -561,7 +570,7 @@ Deno.test("cached function and allocator relocations survive callback imports an
     fn("answer", call("helper", integer(41))),
     fn(
       "saved_answer",
-      apply(n("ConstantExpr", { name: "saved" }), integer(41)),
+      apply(n("model.ConstantExpr", { name: "saved" }), integer(41)),
     ),
     ...filler,
     fn("helper", add(local("value"), integer(1)), {
@@ -572,7 +581,7 @@ Deno.test("cached function and allocator relocations survive callback imports an
   const constants = [{
     name: "saved",
     type: callback(u32, u32, row()),
-    value: n("FunctionValue", { name: "helper" }),
+    value: n("const_eval.FunctionValue", { name: "helper" }),
   }];
   const first = build(source(base, { constants }), cache);
   equal(exportsOf(first.module).answer(0), 42);
@@ -593,7 +602,7 @@ Deno.test("cached function and allocator relocations survive callback imports an
     ...base,
     fn(
       "second_signature",
-      apply(local("value"), n("F32Expr", { value: 1.5 })),
+      apply(local("value"), n("model.F32Expr", { value: 1.5 })),
       {
         parameter: callback(f32, f32),
         result: f32,

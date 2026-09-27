@@ -1,6 +1,7 @@
 import { reachedSource } from "./fixtures.ts";
 import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
+import { toBendCst, toBendModel } from "./bend_abi.ts";
 import { bendArray, type BendList, bendList } from "./bend_list.ts";
 import { createNativeCompiler } from "./native.ts";
 import { createSourceCompiler } from "./source.ts";
@@ -35,9 +36,23 @@ const api = compiled as unknown as {
     module: Node,
     certificates: BendList<Node>,
   ): Result<Node>;
+  "check_scheduler.catalog"(module: Node): Node;
+  "check_scheduler.with_core"(
+    catalog: Node,
+    module: Node,
+    certificates: BendList<Node>,
+  ): Node;
+  "check_scheduler.empty_completed"(): Node;
+  "check_scheduler.has_dependencies"(jobs: BendList<Node>): boolean;
+  "check_scheduler.check_jobs"(
+    jobs: BendList<Node>,
+    catalog: Node,
+    completed: Node,
+    dependent: boolean,
+  ): Result<Node>;
+  "check_scheduler.assembled"(module: Node, completed: Node): Result<Node>;
   "groups.plan"(module: Node): Result<BendList<Node>>;
   "groups.job_module"(module: Node, job: Node): Result<Node>;
-  "groups.checked_group"(checked: Node): Result<Node>;
   "groups.check_group_planned"(
     module: Node,
     imports: BendList<Node>,
@@ -56,6 +71,30 @@ const api = compiled as unknown as {
     steps: bigint,
   ): Result<Node>;
 };
+
+function checkedWithInterfaces(
+  module: Node,
+  certificates: BendList<Node>,
+): { checked: Result<Node>; interfaces: BendList<Node> } {
+  const planned = api["groups.plan"](module);
+  ok(planned.$ === "Done");
+  const jobs = planned.value;
+  const completed = api["check_scheduler.check_jobs"](
+    jobs,
+    api["check_scheduler.with_core"](
+      api["check_scheduler.catalog"](module),
+      module,
+      certificates,
+    ),
+    api["check_scheduler.empty_completed"](),
+    api["check_scheduler.has_dependencies"](jobs),
+  );
+  ok(completed.$ === "Done");
+  return {
+    checked: api["check_scheduler.assembled"](module, completed.value),
+    interfaces: completed.value.published as BendList<Node>,
+  };
+}
 
 const cases = [
   {
@@ -107,8 +146,8 @@ Deno.test("field helpers retain principal checked groups across generic, nominal
       const input = frontend.prepare(fixture.source);
       const prepared = api["source_modules.source_module_core"](
         false,
-        input.root,
-        input.prelude,
+        toBendCst(input.root),
+        toBendCst(input.prelude),
         input.nodeCount,
       );
       equal(prepared.$, "Done", fixture.name);
@@ -147,17 +186,15 @@ Deno.test("field helpers retain principal checked groups across generic, nominal
       equal(retained.$, "Done", fixture.name);
       equal(independent.$, "Done", fixture.name);
       if (retained.$ !== "Done" || independent.$ !== "Done") continue;
-      const retainedGroup = api["groups.checked_group"](retained.value);
-      const independentGroup = api["groups.checked_group"](independent.value);
-      equal(retainedGroup.$, "Done", fixture.name);
-      equal(independentGroup.$, "Done", fixture.name);
-      if (retainedGroup.$ === "Done" && independentGroup.$ === "Done") {
-        equal(
-          retainedGroup.value.interfaces,
-          independentGroup.value.interfaces,
-          fixture.name,
-        );
-      }
+      const retainedGroup = checkedWithInterfaces(module, certificates);
+      const independentGroup = checkedWithInterfaces(module, bendList([]));
+      equal(retainedGroup.checked, retained, fixture.name);
+      equal(independentGroup.checked, independent, fixture.name);
+      equal(
+        retainedGroup.interfaces,
+        independentGroup.interfaces,
+        fixture.name,
+      );
 
       const plan = api["groups.plan"](module);
       equal(plan.$, "Done", fixture.name);
@@ -183,8 +220,8 @@ Deno.test("field helpers retain principal checked groups across generic, nominal
       }
 
       const artifact = api.compile_source(
-        input.root,
-        input.prelude,
+        toBendCst(input.root),
+        toBendCst(input.prelude),
         input.nodeCount,
         100_000n,
       );
@@ -217,7 +254,7 @@ Deno.test("minimal field evidence preserves provider types and latent operation 
     declaration,
   });
   const operation = id("Reader.ask");
-  const owner: Node = {
+  const owner: Node = toBendModel({
     $: "DataType",
     identity: id("Holder"),
     parameters: 0n,
@@ -238,23 +275,24 @@ Deno.test("minimal field evidence preserves provider types and latent operation 
       },
       fields: bendList(["provider"]),
     }]),
-  };
+  });
   const functionResult = api["members.function"](
     owner.constructors as BendList<Node>,
-    { $: "MemberDispatch" },
+    { $: "model.MemberDispatch" },
     "provider",
     "$member[1]",
     1n,
   );
   equal(functionResult.$, "Done");
   if (functionResult.$ !== "Done") return;
-  const makeModule = (operations: readonly Node[]): Node => ({
-    $: "Module",
-    constants: bendList([]),
-    functions: bendList([functionResult.value]),
-    data_types: bendList([owner]),
-    operations: bendList(operations),
-  });
+  const makeModule = (operations: readonly Node[]): Node =>
+    toBendModel({
+      $: "Module",
+      constants: bendList([]),
+      functions: bendList([functionResult.value]),
+      data_types: bendList([owner]),
+      operations: bendList(operations),
+    });
   const minimal = makeModule([]);
   const final = makeModule([{
     $: "Operation",
@@ -275,7 +313,7 @@ Deno.test("minimal field evidence preserves provider types and latent operation 
   if (independent.$ !== "Done" || ordinary.$ !== "Done") return;
   equal(independent.value.interfaces, ordinary.value.interfaces);
   const certificate = {
-    $: "Certificate",
+    $: "checked_core.Certificate",
     module: minimal,
     checked: independent.value,
     imports: bendList([]),
@@ -309,7 +347,7 @@ const Box.value = fn box => 0
 const run = fn () => (Box { value: 1 }).value
 `,
           {
-            $: "Diagnostic",
+            $: "model.Diagnostic",
             code: "ambiguous_member",
             subject: "offset:109",
             message: "field and associated function share the name value",
@@ -321,10 +359,10 @@ const run = fn item => item.value
 const test = run (Left { value: 42 })
 `,
           {
-            $: "Diagnostic",
+            $: "model.Diagnostic",
             code: "type_mismatch",
-            // The retaining entry also references `run`, adding one instance.
-            subject: "$member[3]",
+            // The reached entry selects the second generated field helper.
+            subject: "$member[2]",
             message: "cannot unify U32 with Bool",
           },
         ],
@@ -332,8 +370,8 @@ const test = run (Left { value: 42 })
     ) {
       const input = frontend.prepare(reachedSource(source));
       const result = api.compile_source(
-        input.root,
-        input.prelude,
+        toBendCst(input.root),
+        toBendCst(input.prelude),
         input.nodeCount,
         100_000n,
       );

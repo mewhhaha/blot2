@@ -165,15 +165,18 @@ entry const answer = fn () => first (Entry { head: 42, tail: True })
 
 Currying is explicit in the declaration. `Curried U32` remains a constructor;
 `(Curried U32) Bool` supplies its remaining argument. A free lowercase type name
-in an annotation is inferred and shared throughout that declaration, including
-annotations on local bindings and nested functions. Separate declarations have
-separate scopes.
+in an annotation is inferred and shared within its binding. A local `let`
+inherits type and effect-row names already introduced by an enclosing
+annotation: a parameter's `a` and a local `let`'s `a` refer to the same type
+variable. A name introduced only in that `let` gets a fresh scope, so sibling
+`let` bindings may each use `b` independently.
 
 Records use named constructors. Supply each field once; shorthand `{ x, y }`
 uses locals. Fields evaluate in written order. Destructure with named patterns;
-fields can be reordered or omitted. There is no `value.field` access/update yet.
-Tuples use `(a, b)`; project with patterns or `@product.get tuple 0` with a
-literal index and known tuple shape.
+fields can be reordered or omitted. Read a named field with `value.field`;
+`value.field := expression` rebinds the local root, with `self` naming the old
+field value inside the replacement. Tuples use `(a, b)`; project with patterns
+or `@product.get tuple 0` with a literal index and known tuple shape.
 
 Matches must be exhaustive. `case a, b of` evaluates inputs once left-to-right;
 each arm has the same number of patterns. Patterns include constructors,
@@ -450,8 +453,41 @@ currently require a family with one plain type binder. Ordinary operation calls
 and explicit providers support composite and curried families. Specialization
 resolves operations before const evaluation and Wasm emission; there is no
 runtime type lookup. Unhandled effects remain visible in function types; pure
-annotations and const evaluation reject unhandled calls. Explicit polymorphic
-effect-row annotations such as `! {State a}` are not supported.
+annotations and const evaluation reject unhandled calls. An effect annotation
+may include an open tail, as in `U32 -> U32 ! {State.get U32 | e}` or
+`U32 -> U32 ! {| e}`. The tail is a row variable; using `e` as both a type
+variable and a row variable in one binding is an error. Checked rows preserve
+repeated labels; reflected effect sets discard repetitions. This release accepts
+concrete operation labels, including closed instances of generic effects, before
+an open tail. A label applied to a free type variable, such as `State a`,
+reports `unsupported_polymorphic_effect_label`; symbolic generic labels require
+a later effect-identity representation.
+
+## Qualified bindings
+
+An inferred generic function keeps the associated operations, members, fields,
+or effect operations it needs as constraints on its type. A caller selects the
+implementation when it supplies concrete arguments. You may write the same
+constraints explicitly after a complete binding annotation:
+
+```blot
+const twice: a -> a where { associated "add" a a a } = fn value => value + value
+const first: a -> b where { field "first" a b } = fn value => value.first
+entry const answer = fn () => twice 21
+```
+
+The `where` clause is available on top-level `const`/`let` and local `let`;
+`where` remains an ordinary identifier elsewhere. Predicates are separated by
+commas, and a final comma is allowed. The forms are `associated "member" T T
+T`,
+`receiver "member" T T T`, `field "member" T T`, `update "member" T T
+T`,
+`operation Operation.name T...`, `type_rep T`, and `effect_rep !{...}`.
+Parenthesize a non-atomic type argument. `associated`, `receiver`, and `update`
+may end in an effect row such as `! {| e}`; without one, their invocation
+effects are inferred. The clause constrains the binding's callers and must cover
+the requirements of its body. Extra predicates deliberately narrow the public
+type. Parameter annotations cannot contain `where` clauses.
 
 In gdev, const resource/component registrations determine the nested world type;
 `ecs.build` discards registration metadata and retains initial state, scope and

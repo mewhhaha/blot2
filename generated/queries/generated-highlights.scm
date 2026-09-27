@@ -62,6 +62,7 @@
 (symbolic_fixity associativity: "infixr" @keyword)
 (value_declaration kind: "const" @keyword)
 (value_declaration kind: "let" @keyword)
+(where_clause marker: "wherE" @keyword)
 (effect_type) @type
 (data_type) @type
 (type_array) @type

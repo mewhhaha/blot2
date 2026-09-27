@@ -1,5 +1,6 @@
 import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
+import { toBendCst } from "./bend_abi.ts";
 import { bendArray, type BendList, bendList } from "./bend_list.ts";
 import { createSourceFrontend } from "./source_frontend.ts";
 
@@ -32,11 +33,48 @@ const api = compiled as unknown as {
     module: Node,
     certificates: BendList<Node>,
   ): Result<Node>;
+  "check_scheduler.with_core"(
+    catalog: Node,
+    module: Node,
+    certificates: BendList<Node>,
+  ): Node;
+  "check_scheduler.empty_completed"(): Node;
+  "check_scheduler.has_dependencies"(jobs: BendList<Node>): boolean;
+  "check_scheduler.check_jobs"(
+    jobs: BendList<Node>,
+    catalog: Node,
+    completed: Node,
+    dependent: boolean,
+  ): Result<Node>;
+  "check_scheduler.assembled"(module: Node, completed: Node): Result<Node>;
   "check_scheduler.catalog"(module: Node): Node;
   "check_scheduler.group_module"(catalog: Node, job: Node): Node;
   "groups.plan"(module: Node): Result<BendList<Node>>;
-  "groups.checked_group"(checked: Node): Result<Node>;
 };
+
+function checkedWithInterfaces(
+  module: Node,
+  certificates: BendList<Node>,
+): { checked: Result<Node>; interfaces: BendList<Node> } {
+  const planned = api["groups.plan"](module);
+  ok(planned.$ === "Done");
+  const jobs = planned.value;
+  const completed = api["check_scheduler.check_jobs"](
+    jobs,
+    api["check_scheduler.with_core"](
+      api["check_scheduler.catalog"](module),
+      module,
+      certificates,
+    ),
+    api["check_scheduler.empty_completed"](),
+    api["check_scheduler.has_dependencies"](jobs),
+  );
+  ok(completed.$ === "Done");
+  return {
+    checked: api["check_scheduler.assembled"](module, completed.value),
+    interfaces: completed.value.published as BendList<Node>,
+  };
+}
 
 Deno.test("real specialization certificates produce checked groups with the same interfaces", async () => {
   const frontend = await createSourceFrontend();
@@ -66,8 +104,8 @@ entry const run = fn () => do:
       const prepared = frontend.prepare(source);
       const lowered = api["source_modules.source_module_core"](
         false,
-        prepared.root,
-        prepared.prelude,
+        toBendCst(prepared.root),
+        toBendCst(prepared.prelude),
         prepared.nodeCount,
       );
       equal(lowered.$, "Done", source);
@@ -91,14 +129,13 @@ entry const run = fn () => do:
         equal(retained, independent, source);
         continue;
       }
-      const retainedGroup = api["groups.checked_group"](retained.value);
-      const independentGroup = api["groups.checked_group"](independent.value);
-      equal(retainedGroup.$, "Done", source);
-      equal(independentGroup.$, "Done", source);
-      if (retainedGroup.$ !== "Done" || independentGroup.$ !== "Done") continue;
+      const retainedGroup = checkedWithInterfaces(module, certificates);
+      const independentGroup = checkedWithInterfaces(module, bendList([]));
+      equal(retainedGroup.checked, retained, source);
+      equal(independentGroup.checked, independent, source);
       equal(
-        retainedGroup.value.interfaces,
-        independentGroup.value.interfaces,
+        retainedGroup.interfaces,
+        independentGroup.interfaces,
         source,
       );
 
@@ -108,7 +145,7 @@ entry const run = fn () => do:
       const indexed = api["checked_core.index_for"](module, certificates);
       const catalog = api["check_scheduler.catalog"](module);
       const interfaces = new Map(
-        bendArray(independentGroup.value.interfaces as BendList<Node>).map((
+        bendArray(independentGroup.interfaces).map((
           entry,
         ) => [entry.name as string, entry] as const),
       );

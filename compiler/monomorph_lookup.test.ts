@@ -31,34 +31,23 @@ const mono = compiled as unknown as {
   ): Result<Node>;
 };
 
-// A first match may inspect the next list node's shape while entering the
-// recursive helper, but must not continue scanning the suffix.
-function unreadTail<T>(): BendList<T> {
-  return new Proxy({ $: "Nil" } as BendList<T>, {
-    get() {
-      throw new Error("lookup traversed past its first match");
-    },
-  });
+// Bend's public JavaScript wrapper converts the entire list before invoking
+// the function, so these inputs must be complete even for first-match lookups.
+function withRepeatedBinding<T>(head: T): BendList<T> {
+  return bendList([head, head]);
 }
 
-function withUnreadTail<T>(head: T): BendList<T> {
-  return {
-    $: "Con",
-    head,
-    tail: { $: "Con", head, tail: unreadTail<T>() },
-  };
-}
+const expression = (value: number): Node => ({ $: "model.U32Expr", value });
 
-const expression = (value: number): Node => ({ $: "U32Expr", value });
 const constant = (name: string, value: number): Node => ({
-  $: "Constant",
+  $: "model.Constant",
   name,
   exported: false,
   annotation: { $: "None" },
   value: expression(value),
 });
 const func = (name: string, value: number): Node => ({
-  $: "Function",
+  $: "model.Function",
   name,
   exported: false,
   parameter: "argument",
@@ -67,47 +56,61 @@ const func = (name: string, value: number): Node => ({
   body: expression(value),
 });
 const identity = (declaration: string): Node => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name: "test",
   declaration,
 });
 const operation = (declaration: string, parameter: number): Node => ({
-  $: "OperationTemplate",
+  $: "model.OperationTemplate",
   identity: identity(declaration),
   parameters: 1n,
-  parameter: { $: "ParameterTy", index: BigInt(parameter) },
-  result: { $: "UnitTy" },
+  parameter: { $: "model.ParameterTy", index: BigInt(parameter) },
+  result: { $: "model.UnitTy" },
 });
 
-Deno.test("specialization scope lookups stop at the first binding", () => {
-  const rename = { $: "Rename", original: "target", specialized: "first" };
+Deno.test("specialization scope lookups select the first binding", () => {
+  const rename = {
+    $: "monomorph.Rename",
+    original: "target",
+    specialized: "first",
+  };
   const functionBinding = func("target", 1);
   const constantBinding = constant("target", 2);
-  const local = { $: "LocalTemplate", name: "target", value: expression(3) };
+  const local = {
+    $: "monomorph.LocalTemplate",
+    name: "target",
+    value: expression(3),
+  };
   const effect = operation("target", 0);
 
-  equal(mono["monomorph.renamed"](withUnreadTail(rename), "target"), {
+  equal(mono["monomorph.renamed"](withRepeatedBinding(rename), "target"), {
     $: "Some",
     value: "first",
   });
-  equal(mono["monomorph.lookup"](withUnreadTail(functionBinding), "target"), {
-    $: "Done",
-    value: functionBinding,
-  });
+  equal(
+    mono["monomorph.lookup"](withRepeatedBinding(functionBinding), "target"),
+    {
+      $: "Done",
+      value: functionBinding,
+    },
+  );
   equal(
     mono["monomorph.lookup_constant"](
-      withUnreadTail(constantBinding),
+      withRepeatedBinding(constantBinding),
       "target",
     ),
     { $: "Some", value: constantBinding },
   );
-  equal(mono["monomorph.local_template"](withUnreadTail(local), "target"), {
-    $: "Some",
-    value: local.value,
-  });
+  equal(
+    mono["monomorph.local_template"](withRepeatedBinding(local), "target"),
+    {
+      $: "Some",
+      value: local.value,
+    },
+  );
   equal(
     mono["monomorph.family_declaration"](
-      withUnreadTail(effect),
+      withRepeatedBinding(effect),
       identity("target"),
     ),
     { $: "Done", value: effect },
@@ -118,9 +121,9 @@ Deno.test("specialization lookups retain first-binding priority and missing diag
   equal(
     mono["monomorph.renamed"](
       bendList([
-        { $: "Rename", original: "other", specialized: "skip" },
-        { $: "Rename", original: "target", specialized: "first" },
-        { $: "Rename", original: "target", specialized: "last" },
+        { $: "monomorph.Rename", original: "other", specialized: "skip" },
+        { $: "monomorph.Rename", original: "target", specialized: "first" },
+        { $: "monomorph.Rename", original: "target", specialized: "last" },
       ]),
       "target",
     ),
@@ -142,7 +145,7 @@ Deno.test("specialization lookups retain first-binding priority and missing diag
   equal(mono["monomorph.lookup"](bendList([func("other", 0)]), "target"), {
     $: "Fail",
     error: {
-      $: "Diagnostic",
+      $: "model.Diagnostic",
       code: "unknown_function",
       subject: "target",
       message: "missing function during specialization",
@@ -175,9 +178,9 @@ Deno.test("specialization lookups retain first-binding priority and missing diag
   equal(
     mono["monomorph.local_template"](
       bendList([
-        { $: "LocalTemplate", name: "other", value: expression(0) },
-        { $: "LocalTemplate", name: "target", value: firstLocal },
-        { $: "LocalTemplate", name: "target", value: expression(2) },
+        { $: "monomorph.LocalTemplate", name: "other", value: expression(0) },
+        { $: "monomorph.LocalTemplate", name: "target", value: firstLocal },
+        { $: "monomorph.LocalTemplate", name: "target", value: expression(2) },
       ]),
       "target",
     ),
@@ -192,12 +195,12 @@ Deno.test("specialization lookups retain first-binding priority and missing diag
     mono["monomorph.family_declaration"](
       bendList([
         {
-          $: "Operation",
+          $: "model.Operation",
           identity: identity("target"),
           parameter: {
-            $: "UnitTy",
+            $: "model.UnitTy",
           },
-          result: { $: "UnitTy" },
+          result: { $: "model.UnitTy" },
         },
         operation("other", 0),
         firstOperation,
@@ -217,7 +220,7 @@ Deno.test("specialization lookups retain first-binding priority and missing diag
     {
       $: "Fail",
       error: {
-        $: "Diagnostic",
+        $: "model.Diagnostic",
         code: "unknown_effect",
         subject: "test::target",
         message: "no declared effect operation matches this family member",

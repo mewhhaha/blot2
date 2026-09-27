@@ -20,10 +20,10 @@ const lookups = [
     lookup: backend["wasm.lookup_local"],
     binding(name: string, value: number): Node {
       return {
-        $: "Local",
+        $: "wasm.Local",
         name,
         location: {
-          $: "Location",
+          $: "wasm.Location",
           local: BigInt(value),
           offsets: bendList([]),
         },
@@ -38,7 +38,11 @@ const lookups = [
     name: "constant evaluator locals",
     lookup: backend["const_eval.lookup_local"],
     binding(name: string, value: number): Node {
-      return { $: "Binding", name, value: { $: "U32Value", value } };
+      return {
+        $: "const_eval.Binding",
+        name,
+        value: { $: "const_eval.U32Value", value },
+      };
     },
     value(binding: Node): Node {
       return binding.value as Node;
@@ -50,11 +54,11 @@ const lookups = [
     lookup: backend["const_eval.lookup_constant"],
     binding(name: string, value: number): Node {
       return {
-        $: "Constant",
+        $: "model.Constant",
         name,
         exported: { $: "False" },
         annotation: { $: "None" },
-        value: { $: "U32Expr", value },
+        value: { $: "model.U32Expr", value },
       };
     },
     value(binding: Node): Node {
@@ -67,13 +71,13 @@ const lookups = [
     lookup: backend["const_eval.lookup_function"],
     binding(name: string, value: number): Node {
       return {
-        $: "Function",
+        $: "model.Function",
         name,
         exported: { $: "False" },
         parameter: "argument",
         parameter_type: { $: "None" },
         result_type: { $: "None" },
-        body: { $: "U32Expr", value },
+        body: { $: "model.U32Expr", value },
       };
     },
     value(binding: Node): Node {
@@ -103,7 +107,7 @@ for (const scan of lookups) {
     equal(scan.lookup(bindings, "missing"), {
       $: "Fail",
       error: {
-        $: "Diagnostic",
+        $: "model.Diagnostic",
         code: "internal_error",
         subject: "missing",
         message: scan.message,

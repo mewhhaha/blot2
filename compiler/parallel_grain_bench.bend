@@ -70,6 +70,8 @@ def same_fragment(left: W.Fragment, right: W.Fragment) -> Bool:
       M.name_equal(a, b)
     case W.Allocate{} W.Allocate{}:
       True{}
+    case W.Collect{} W.Collect{}:
+      True{}
     case W.EntryIndex{a} W.EntryIndex{b}:
       M.name_equal(a, b)
     case W.ConstantReference{a} W.ConstantReference{b}:
@@ -121,7 +123,7 @@ def outcome_key(outcome: S.Outcome) -> Result<&2, &2, M.Diagnostic, List<&2, U32
   match outcome:
     case S.Outcome{position, Fail{error}}:
       Fail{error}
-    case S.Outcome{position, Done{G.CheckedGroup{M.CheckedModule{Nil{}, +functions, Nil{}, Nil{}}, interfaces}}}:
+    case S.Outcome{position, Done{G.CheckedGroup{M.CheckedModule{Nil{}, +functions, Nil{}, Nil{}}, interfaces, Nil{}}}}:
       K.encode([K.Field{R.Natural{position}}, K.Functions{source_functions(functions, Nil{})}, K.Field{R.Functions{functions}}, K.Interfaces{interfaces}])
     case _:
       Fail{M.Diagnostic{"benchmark_fixture", "inference", "expected independent function-only modules"}}

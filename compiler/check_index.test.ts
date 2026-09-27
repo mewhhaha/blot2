@@ -1,5 +1,6 @@
 import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
+import { toBendModel } from "./bend_abi.ts";
 import {
   analyze,
   CompilerError,
@@ -17,7 +18,7 @@ type List<A> = { readonly $: "Nil" } | {
 };
 
 interface Diagnostic {
-  readonly $: "Diagnostic";
+  readonly $: "model.Diagnostic";
   readonly code: string;
   readonly subject: string;
   readonly message: string;
@@ -40,7 +41,7 @@ function call<A>(name: string, ...args: unknown[]): A {
     string,
     (...args: unknown[]) => A
   >;
-  return exports[name](...args);
+  return exports[name](...args.map(toBendModel));
 }
 
 const done = <A>(value: A): Result<A> => ({ $: "Done", value });
@@ -50,7 +51,7 @@ const fail = (
   message: string,
 ): Result<never> => ({
   $: "Fail",
-  error: { $: "Diagnostic", code, subject, message },
+  error: { $: "model.Diagnostic", code, subject, message },
 });
 const unitResult = done({ $: "Unit" });
 const sameIdentity = (left: TypeId, right: TypeId) =>
@@ -59,10 +60,11 @@ const sameIdentity = (left: TypeId, right: TypeId) =>
 const showIdentity = ({ module_name, declaration }: TypeId) =>
   `${module_name}::${declaration}`;
 
-const wireOperation = (value: Operation) => ({
-  $: "Operation",
-  ...value,
-});
+const wireOperation = (value: Operation) =>
+  toBendModel({
+    $: "Operation",
+    ...value,
+  });
 
 function firstDuplicate<A>(
   values: readonly A[],

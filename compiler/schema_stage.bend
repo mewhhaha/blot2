@@ -52,6 +52,9 @@ def bare(value: M.Expr) -> Maybe<&2, M.Expr>:
       bare(inner)
     case M.SourceExpr{offset, Some{annotation}, inner}:
       None{}
+    # InstantiationExpr records a use site without changing expression value.
+    case M.InstantiationExpr{site, inner}:
+      bare(inner)
     case other:
       Some{other}
 

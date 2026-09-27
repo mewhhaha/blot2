@@ -43,12 +43,12 @@ function array<T>(values: List<T>): T[] {
   return result;
 }
 
-const unit = { $: "UnitTy" };
-const u32 = { $: "U32Ty" };
-const f32 = { $: "F32Ty" };
-const parameter = { $: "ParameterTy", index: 0n };
+const unit = { $: "model.UnitTy" };
+const u32 = { $: "model.U32Ty" };
+const f32 = { $: "model.F32Ty" };
+const parameter = { $: "model.ParameterTy", index: 0n };
 const name = (declaration: string, module_name = "main"): Node => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name,
   declaration,
 });
@@ -58,14 +58,14 @@ const template = (
   output: Node,
   parameters = 1n,
 ): Node => ({
-  $: "OperationTemplate",
+  $: "model.OperationTemplate",
   identity,
   parameters,
   parameter: input,
   result: output,
 });
 const request = (identity: Node, ty: Node): Node => ({
-  $: "OperationInstance",
+  $: "model.OperationInstance",
   template: identity,
   arguments: list([ty]),
 });
@@ -73,7 +73,7 @@ const moduleWith = (
   operations: readonly Node[],
   constants: readonly Node[] = [],
 ): Module => ({
-  $: "Module",
+  $: "model.Module",
   constants: list(constants),
   functions: list([]),
   data_types: list([]),
@@ -98,7 +98,7 @@ Deno.test("effect family identities distinguish type arguments and module owners
 
 Deno.test("ordinary effect modules need no family rewrite", () => {
   const ordinary = moduleWith([{
-    $: "Operation",
+    $: "model.Operation",
     identity: name("Reader.ask"),
     parameter: unit,
     result: u32,
@@ -121,15 +121,15 @@ Deno.test("effect family preparation registers annotation-only instances and era
     request(get, u32),
     request(set, u32),
   ], [{
-    $: "Constant",
+    $: "model.Constant",
     name: "operation",
     exported: false,
-    annotation: null,
+    annotation: { $: "None" },
     value: {
-      $: "SpecializeOperationExpr",
+      $: "model.SpecializeOperationExpr",
       template: get,
       arguments: list([u32]),
-      body: { $: "OperationExpr", identity: concreteGet },
+      body: { $: "model.OperationExpr", identity: concreteGet },
     },
   }]);
   equal(families["effect_families.required"](source), true);
@@ -142,20 +142,20 @@ Deno.test("effect family preparation registers annotation-only instances and era
     template(get, unit, parameter),
     template(set, parameter, unit),
     {
-      $: "Operation",
+      $: "model.Operation",
       identity: concreteGet,
       parameter: unit,
       result: u32,
     },
     {
-      $: "Operation",
+      $: "model.Operation",
       identity: name("State.set<1:i>"),
       parameter: u32,
       result: unit,
     },
   ]);
   equal(array(prepared.value.constants)[0].value, {
-    $: "OperationExpr",
+    $: "model.OperationExpr",
     identity: concreteGet,
   });
 });
@@ -164,54 +164,54 @@ Deno.test("effect family preparation finds an instance inside an expression", ()
   const get = name("State.get");
   const concreteGet = name("State.get<1:i>");
   const source = moduleWith([template(get, unit, parameter)], [{
-    $: "Constant",
+    $: "model.Constant",
     name: "answer",
     exported: false,
-    annotation: null,
+    annotation: { $: "None" },
     value: {
-      $: "ApplyExpr",
+      $: "model.ApplyExpr",
       callee: {
-        $: "SpecializeOperationExpr",
+        $: "model.SpecializeOperationExpr",
         template: get,
         arguments: list([u32]),
-        body: { $: "OperationExpr", identity: concreteGet },
+        body: { $: "model.OperationExpr", identity: concreteGet },
       },
-      argument: { $: "UnitExpr" },
+      argument: { $: "model.UnitExpr" },
     },
   }]);
   const prepared = families["effect_families.prepare"](source);
   equal(prepared.$, "Done");
   if (prepared.$ !== "Done") return;
   equal(array(prepared.value.operations), [template(get, unit, parameter), {
-    $: "Operation",
+    $: "model.Operation",
     identity: concreteGet,
     parameter: unit,
     result: u32,
   }]);
   equal(array(prepared.value.constants)[0].value, {
-    $: "ApplyExpr",
-    callee: { $: "OperationExpr", identity: concreteGet },
-    argument: { $: "UnitExpr" },
+    $: "model.ApplyExpr",
+    callee: { $: "model.OperationExpr", identity: concreteGet },
+    argument: { $: "model.UnitExpr" },
   });
 });
 
 Deno.test("effect family preparation handles wide sibling expressions", () => {
-  const values = Array.from({ length: 8192 }, () => ({ $: "UnitExpr" }));
+  const values = Array.from({ length: 8192 }, () => ({ $: "model.UnitExpr" }));
   const source = moduleWith(
     [template(name("Get"), unit, parameter)],
     [{
-      $: "Constant",
+      $: "model.Constant",
       name: "wide",
       exported: false,
-      annotation: null,
-      value: { $: "ArrayExpr", elements: list(values) },
+      annotation: { $: "None" },
+      value: { $: "model.ArrayExpr", elements: list(values) },
     }],
   );
   const prepared = families["effect_families.prepare"](source);
   equal(prepared.$, "Done");
   if (prepared.$ !== "Done") return;
   const value = array(prepared.value.constants)[0].value as Node;
-  equal(value.$, "ArrayExpr");
+  equal(value.$, "model.ArrayExpr");
   equal(array(value.elements as List<Node>).length, values.length);
 });
 
@@ -219,7 +219,7 @@ Deno.test("effect family preparation checks unused signatures and instance arity
   const get = name("State.get");
   equal(
     families["effect_families.prepare"](moduleWith([
-      template(get, unit, { $: "ParameterTy", index: 1n }),
+      template(get, unit, { $: "model.ParameterTy", index: 1n }),
     ])).$,
     "Fail",
   );
@@ -231,13 +231,13 @@ Deno.test("effect family preparation checks unused signatures and instance arity
   if (duplicate.$ === "Fail") equal(duplicate.error.code, "duplicate_type");
   const wrong = families["effect_families.prepare"](moduleWith([
     template(get, unit, parameter),
-    { $: "OperationInstance", template: get, arguments: list([]) },
+    { $: "model.OperationInstance", template: get, arguments: list([]) },
   ]));
   equal(wrong.$, "Fail");
   if (wrong.$ === "Fail") equal(wrong.error.code, "effect_instance");
   const unresolved = families["effect_families.identity"](
     get,
-    list([{ $: "ParameterTy", index: 0n }]),
+    list([{ $: "model.ParameterTy", index: 0n }]),
   );
   equal(unresolved.$, "Fail");
   if (unresolved.$ === "Fail") equal(unresolved.error.code, "effect_instance");

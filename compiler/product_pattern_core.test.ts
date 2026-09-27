@@ -1,5 +1,6 @@
 import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
+import { toBendModel } from "./bend_abi.ts";
 import { bendList } from "./bend_list.ts";
 import {
   analyze,
@@ -263,17 +264,19 @@ Deno.test("tuple matrix coverage agrees with finite correlated field enumeration
     };
     equal(
       coverage["patterns.coverage"](65536n, {
-        $: "Cover",
-        inferred_types: bendList([tupleType, { $: "BoolTy" }]),
-        rows: bendList(rows.map(([first, second, third]) =>
-          bendList([
-            {
-              $: "ProductPattern",
-              elements: bendList([wire(first), wire(second)]),
-            },
-            wire(third),
-          ])
-        )),
+        $: "patterns.Cover",
+        inferred_types: bendList(toBendModel([tupleType, { $: "BoolTy" }])),
+        rows: bendList(
+          rows.map(([first, second, third]) =>
+            bendList(toBendModel([
+              {
+                $: "ProductPattern",
+                elements: bendList([wire(first), wire(second)]),
+              },
+              wire(third),
+            ]))
+          ),
+        ),
       }, bendList([])),
       { $: "Done", value: complete },
       `tuple matrix ${trial}`,

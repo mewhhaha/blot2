@@ -1,5 +1,6 @@
 import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import generated from "../generated/compiler/compiler.js";
+import { toBendModel } from "./bend_abi.ts";
 import { bendArray, type BendList, bendList } from "./bend_list.ts";
 import { createSourceCompiler } from "./source.ts";
 import { createNativeCompiler } from "./native.ts";
@@ -65,8 +66,8 @@ Deno.test("wide dependency collection preserves call and lambda preorder exactly
     },
   }));
   const result = backend["dependency.references"](65536n, {
-    $: "Expression",
-    value: { $: "ArrayExpr", elements: bendList(expressions) },
+    $: "dependency.Expression",
+    value: toBendModel({ $: "ArrayExpr", elements: bendList(expressions) }),
   });
   ok(result.$ === "Done");
   equal(
@@ -81,14 +82,14 @@ Deno.test("wide dependency collection preserves call and lambda preorder exactly
     expressions.map((_, index) => BigInt(index)),
   );
   const enough = backend["dependency.references"](2n, {
-    $: "Expressions",
-    values: bendList([{ $: "FunctionExpr", name: "first" }]),
+    $: "dependency.Expressions",
+    values: bendList(toBendModel([{ $: "FunctionExpr", name: "first" }])),
   });
   ok(enough.$ === "Done");
   equal(bendArray(enough.value.names), ["first"]);
   const exhausted = backend["dependency.references"](1n, {
-    $: "Expressions",
-    values: bendList([{ $: "FunctionExpr", name: "first" }]),
+    $: "dependency.Expressions",
+    values: bendList(toBendModel([{ $: "FunctionExpr", name: "first" }])),
   });
   ok(exhausted.$ === "Fail");
   equal(exhausted.error.code, "expression_complexity");

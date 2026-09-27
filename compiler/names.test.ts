@@ -58,15 +58,17 @@ Deno.test("long shared name prefixes use stack-safe equality", () => {
 
 Deno.test("metadata scans preserve first-match binding and nominal identity semantics", () => {
   const identities = [
-    { $: "TypeId", module_name: "a::b", declaration: "c" },
-    { $: "TypeId", module_name: "a", declaration: "b::c" },
-    { $: "TypeId", module_name: "🦆", declaration: "é" },
-    { $: "TypeId", module_name: "🦆", declaration: "e\u0301" },
+    { $: "model.TypeId", module_name: "a::b", declaration: "c" },
+    { $: "model.TypeId", module_name: "a", declaration: "b::c" },
+    { $: "model.TypeId", module_name: "🦆", declaration: "é" },
+    { $: "model.TypeId", module_name: "🦆", declaration: "e\u0301" },
   ];
   const bindings = ["value", "other", "value"].map((name, index) => ({
-    $: "Binding",
+    $: "infer.Binding",
+    predicates: { $: "Nil" },
+
     name,
-    inferred_type: { $: "VariableTy", index: BigInt(index) },
+    inferred_type: { $: "model.VariableTy", index: BigInt(index) },
     variables: list([]),
   }));
   for (const name of ["value", "other", "missing"]) {
@@ -77,11 +79,11 @@ Deno.test("metadata scans preserve first-match binding and nominal identity sema
     );
   }
   const types = [...identities, identities[0]].map((identity, index) => ({
-    $: "DataType",
+    $: "model.DataType",
     identity,
     parameters: BigInt(index),
     constructors: list([{
-      $: "Constructor",
+      $: "model.Constructor",
       fields: { $: "Nil" },
       name: `Variant${index % identities.length}`,
       payload: { $: "None" },
@@ -95,17 +97,17 @@ Deno.test("metadata scans preserve first-match binding and nominal identity sema
     equal(names["type_data.constructor"](list(types), `Variant${index}`), {
       $: "Some",
       value: {
-        $: "ConstructorDefinition",
+        $: "type_data.ConstructorDefinition",
         identity,
         parameters: BigInt(index),
         payload: { $: "None" },
       },
     });
     const operation = {
-      $: "Operation",
+      $: "model.Operation",
       identity,
-      parameter: { $: "UnitTy" },
-      result: { $: "U32Ty" },
+      parameter: { $: "model.UnitTy" },
+      result: { $: "model.U32Ty" },
     };
     for (const other of identities) {
       equal(

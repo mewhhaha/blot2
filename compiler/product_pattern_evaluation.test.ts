@@ -1,5 +1,6 @@
 import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
+import { toBendModel } from "./bend_abi.ts";
 import { bendArray, type BendList, bendList } from "./bend_list.ts";
 import {
   analyze,
@@ -145,53 +146,59 @@ Deno.test("tuple patterns reject malformed arity and duplicate nested bindings",
 Deno.test("const tuple matching handles 8192 fields and preserves binding order without host recursion", () => {
   const width = 8192;
   const value = {
-    $: "ProductValue",
+    $: "const_eval.ProductValue",
     elements: bendList(Array.from({ length: width }, (_, value) => ({
-      $: "U32Value",
+      $: "const_eval.U32Value",
       value,
     }))),
   };
   equal(
-    evaluator["const_eval.match_pattern"]({
-      $: "ProductPattern",
-      elements: bendList(Array.from({ length: width }, () => ({
-        $: "WildcardPattern",
-      }))),
-    }, value),
+    evaluator["const_eval.match_pattern"](
+      toBendModel({
+        $: "ProductPattern",
+        elements: bendList(Array.from({ length: width }, () => ({
+          $: "WildcardPattern",
+        }))),
+      }),
+      value,
+    ),
     { $: "Done", value: { $: "Some", value: { $: "Nil" } } },
   );
 
-  const matched = evaluator["const_eval.match_pattern"]({
-    $: "ProductPattern",
-    elements: bendList(Array.from({ length: width }, (_, index) => ({
-      $: "BindingPattern",
-      name: `field_${index}`,
-    }))),
-  }, value);
+  const matched = evaluator["const_eval.match_pattern"](
+    toBendModel({
+      $: "ProductPattern",
+      elements: bendList(Array.from({ length: width }, (_, index) => ({
+        $: "BindingPattern",
+        name: `field_${index}`,
+      }))),
+    }),
+    value,
+  );
   ok(matched.$ === "Done" && matched.value.$ === "Some");
   const bindings = bendArray(matched.value.value);
   equal(bindings.length, width);
   for (const [index, binding] of bindings.entries()) {
     equal(binding.name, `field_${index}`);
-    equal(binding.value, { $: "U32Value", value: index });
+    equal(binding.value, { $: "const_eval.U32Value", value: index });
   }
 });
 
 Deno.test("const tuple matching reports traversal exhaustion and stops at the first failed field", () => {
   const work = {
-    $: "PatternValue",
-    pattern: {
+    $: "const_eval.PatternValue",
+    pattern: toBendModel({
       $: "ProductPattern",
       elements: bendList([
         { $: "U32Pattern", value: 1 },
         { $: "WildcardPattern" },
       ]),
-    },
+    }),
     value: {
-      $: "ProductValue",
+      $: "const_eval.ProductValue",
       elements: bendList([
-        { $: "U32Value", value: 1 },
-        { $: "U32Value", value: 2 },
+        { $: "const_eval.U32Value", value: 1 },
+        { $: "const_eval.U32Value", value: 2 },
       ]),
     },
   };
@@ -208,10 +215,10 @@ Deno.test("const tuple matching reports traversal exhaustion and stops at the fi
     evaluator["const_eval.match_pattern_work"](3n, {
       ...work,
       value: {
-        $: "ProductValue",
+        $: "const_eval.ProductValue",
         elements: bendList([
-          { $: "U32Value", value: 0 },
-          { $: "U32Value", value: 2 },
+          { $: "const_eval.U32Value", value: 0 },
+          { $: "const_eval.U32Value", value: 2 },
         ]),
       },
     }),

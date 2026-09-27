@@ -5,6 +5,7 @@ import {
   throws,
 } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
+import { toBendModel } from "./bend_abi.ts";
 import type { CoreModule, DataType, Expr, TypeId } from "./host.ts";
 import {
   add,
@@ -26,7 +27,7 @@ type List<A> =
   | { readonly $: "Con"; readonly head: A; readonly tail: List<A> };
 
 interface Diagnostic {
-  readonly $: "Diagnostic";
+  readonly $: "model.Diagnostic";
   readonly code: string;
   readonly subject: string;
   readonly message: string;
@@ -37,17 +38,19 @@ type Result<A> =
   | { readonly $: "Fail"; readonly error: Diagnostic };
 
 interface Job {
-  readonly $: "Job";
+  readonly $: "groups.Job";
   readonly members: List<string>;
   readonly dependencies: List<string>;
   readonly type_dependencies: List<TypeId>;
 }
 
 interface Interface {
-  readonly $: "Interface";
+  readonly $: "groups.Interface";
+  readonly predicates: List<unknown>;
+
   readonly name: string;
   readonly kind: {
-    readonly $: "FunctionInterface" | "ConstantInterface";
+    readonly $: "groups.FunctionInterface" | "groups.ConstantInterface";
   };
   readonly template: unknown;
   readonly parameters: bigint;
@@ -55,7 +58,9 @@ interface Interface {
 }
 
 interface CheckedGroup {
-  readonly $: "CheckedGroup";
+  readonly $: "groups.CheckedGroup";
+  readonly uses: List<unknown>;
+
   readonly checked: unknown;
   readonly interfaces: List<Interface>;
 }
@@ -73,7 +78,6 @@ const groups = compiled as unknown as {
     module: unknown,
     dependencies: List<Interface>,
   ): Result<CheckedGroup>;
-  "groups.checked_group"(checked: unknown): Result<CheckedGroup>;
   "check.check_module"(module: unknown): Result<unknown>;
   "check_scheduler.check_module"(module: unknown): Result<unknown>;
 };
@@ -114,21 +118,31 @@ const elementTag = new Map([
 ]);
 
 // A test-only adapter for trusted fixtures, not a second inference path.
-function wire(value: unknown, tag?: string): unknown {
-  if (Array.isArray(value)) return list(value.map((entry) => wire(entry, tag)));
+function wireRaw(value: unknown, tag?: string): unknown {
+  if (Array.isArray(value)) {
+    return list(value.map((entry) => wireRaw(entry, tag)));
+  }
   if (value === null || typeof value !== "object") return value;
   const record: Record<string, unknown> = tag ? { $: tag } : {};
+  const variant = tag ?? (value as { readonly $?: string }).$;
   if (tag === "Constructor") record.fields = list([]);
   for (const [field, child] of Object.entries(value)) {
-    if (optional.has(field)) {
+    if (
+      optional.has(field) &&
+      !(field === "annotation" && variant === "QualifiedExpr")
+    ) {
       record[field] = child === null
         ? { $: "None" }
-        : { $: "Some", value: wire(child) };
+        : { $: "Some", value: wireRaw(child) };
     } else {
-      record[field] = wire(child, elementTag.get(field));
+      record[field] = wireRaw(child, elementTag.get(field));
     }
   }
   return record;
+}
+
+function wire(value: unknown, tag?: string): unknown {
+  return toBendModel(wireRaw(value, tag));
 }
 
 function byName(interfaces: readonly Interface[]) {
@@ -165,9 +179,14 @@ function grouped(source: CoreModule) {
 
 function agrees(source: CoreModule) {
   const result = grouped(source);
-  const baseline = unwrap(groups["groups.checked_group"](
-    unwrap(groups["check.check_module"](wire(source, "Module"))),
+  const baseline = unwrap(groups["groups.check_group"](
+    wire(source, "Module"),
+    list([]),
   ));
+  equal(
+    baseline.checked,
+    unwrap(groups["check.check_module"](wire(source, "Module"))),
+  );
   equal(result.interfaces, byName(array(baseline.interfaces)));
   return result;
 }
@@ -209,7 +228,7 @@ Deno.test("product dependencies and nominal payloads agree across independent gr
   );
   ok(pairJob);
   equal(array(pairJob.dependencies), ["number"]);
-  equal(array(pairJob.type_dependencies), [box.identity]);
+  equal(array(pairJob.type_dependencies), [wire(box.identity)]);
 });
 
 Deno.test("tuple pattern constructors retain nominal dependencies in independent groups", () => {
@@ -234,7 +253,7 @@ Deno.test("tuple pattern constructors retain nominal dependencies in independent
     }],
   }, { parameter_type: null, exported: false })], { data_types: [wrapper] }));
   equal(result.jobs.length, 1);
-  equal(array(result.jobs[0].type_dependencies), [wrapper.identity]);
+  equal(array(result.jobs[0].type_dependencies), [wire(wrapper.identity)]);
 });
 
 Deno.test("array interfaces generalize element types and retain nominal operation signatures", () => {
@@ -265,7 +284,7 @@ Deno.test("array interfaces generalize element types and retain nominal operatio
     ),
   ], { data_types: [box], operations: [send] }));
   for (const job of result.jobs) {
-    equal(array(job.type_dependencies), [box.identity]);
+    equal(array(job.type_dependencies), [wire(box.identity)]);
   }
 });
 
@@ -302,7 +321,7 @@ Deno.test("independent groups agree with whole-module polymorphic inference", ()
   equal(result.jobs.length, 3);
   equal(
     result.interfaces.find((entry) => entry.name === "identity")?.template,
-    {
+    wire({
       $: "FunctionTy",
       parameter: { $: "ParameterTy", index: 0n },
       result: { $: "ParameterTy", index: 0n },
@@ -311,7 +330,7 @@ Deno.test("independent groups agree with whole-module polymorphic inference", ()
         operations: list([]),
         tail: { $: "ClosedRow" },
       },
-    },
+    }),
   );
 });
 
@@ -400,7 +419,7 @@ Deno.test("higher-order dependency interfaces preserve shared effect rows", () =
     effects: { tail: { $: string; index: bigint } };
   };
   equal(template.parameter.effects, template.effects);
-  equal(template.effects.tail.$, "RowParameter");
+  equal(template.effects.tail.$, "model.RowParameter");
   equal(array(signature.effects), []);
   equal(result.jobs.length, 4);
 });
@@ -428,11 +447,11 @@ Deno.test("returned callback interfaces retain invocation effects across groups"
     result: { effects: { tail: { $: string } } };
   };
   equal(template.parameter.effects, template.result.effects);
-  equal(template.result.effects.tail.$, "RowParameter");
+  equal(template.result.effects.tail.$, "model.RowParameter");
   equal(array(deferred.effects), []);
   equal(
     array(result.interfaces.find(({ name }) => name === "read")!.effects),
-    [{ $: "OperationEffect", identity: ask.identity }],
+    [wire({ $: "OperationEffect", identity: ask.identity })],
   );
   equal(result.jobs.length, 2);
 });
@@ -566,7 +585,7 @@ Deno.test("metadata catalogs follow inferred dependency results but exclude unre
     equal(
       array(job.type_dependencies),
       [
-        members.includes("velocity") ? velocity : position,
+        wire(members.includes("velocity") ? velocity : position),
       ],
     );
   }
@@ -827,11 +846,66 @@ Deno.test("effectful functions generalize unused value parameters", () => {
   ], { operations: [ask] }));
   equal(result.interfaces.length, 1);
   equal(result.interfaces[0].parameters, 1n);
-  equal(array(result.interfaces[0].effects), [{
+  equal(array(result.interfaces[0].effects), [wire({
     $: "OperationEffect",
     identity: ask.identity,
-  }]);
+  })]);
   equal(result.checked.length, 1);
+});
+
+Deno.test("bare core recursive calls still propagate a peer's qualified interface", () => {
+  const closed = {
+    $: "EffectRow" as const,
+    operations: [],
+    tail: { $: "ClosedRow" as const },
+  };
+  const result = unwrap(groups["groups.check_group"](
+    wire(
+      module([
+        fn("first", call("second", local("value")), {
+          parameter_type: u32Type,
+          result_type: u32Type,
+          exported: false,
+        }),
+        fn("second", {
+          $: "ApplyExpr",
+          callee: {
+            $: "QualifiedExpr",
+            offset: 1n,
+            annotation: {
+              $: "FunctionTy",
+              parameter: u32Type,
+              result: u32Type,
+              effects: closed,
+            },
+            predicates: [{ $: "TypeRepPredicate", represented: u32Type }],
+            value: {
+              $: "LambdaExpr",
+              identity: 2n,
+              parameter: "input",
+              parameter_type: null,
+              result_type: null,
+              body: call("first", local("input")),
+            },
+          },
+          argument: local("value"),
+        }, {
+          parameter_type: u32Type,
+          result_type: u32Type,
+          exported: false,
+        }),
+      ]),
+      "Module",
+    ),
+    list([]),
+  ));
+  const first = array(result.interfaces).find((entry) =>
+    entry.name === "first"
+  );
+  ok(first);
+  equal(array(first.predicates).map((predicate: any) => predicate.$), [
+    "model.TypeRepPredicate",
+  ]);
 });
 
 Deno.test("dependency boundaries reject open variables, wrong kinds and inconsistent effects", () => {
@@ -839,10 +913,12 @@ Deno.test("dependency boundaries reject open variables, wrong kinds and inconsis
     module([fn("use_dependency", call("dependency"))]),
     "Module",
   );
-  const base: Interface = {
-    $: "Interface",
+  const base: Interface = toBendModel({
+    $: "groups.Interface",
+    predicates: list([]),
+
     name: "dependency",
-    kind: { $: "FunctionInterface" },
+    kind: { $: "groups.FunctionInterface" },
     template: {
       $: "FunctionTy",
       parameter: { $: "UnitTy" },
@@ -855,12 +931,12 @@ Deno.test("dependency boundaries reject open variables, wrong kinds and inconsis
     },
     parameters: 0n,
     effects: list([]),
-  };
+  });
   const malformed = groups["groups.check_group"](
     source,
     list([{
       ...base,
-      template: { $: "VariableTy", index: 0n },
+      template: { $: "model.VariableTy", index: 0n },
     }]),
   );
   ok(malformed.$ === "Fail");
@@ -869,7 +945,7 @@ Deno.test("dependency boundaries reject open variables, wrong kinds and inconsis
     source,
     list([{
       ...base,
-      kind: { $: "ConstantInterface" },
+      kind: { $: "groups.ConstantInterface" },
     }]),
   );
   ok(wrongKind.$ === "Fail");
@@ -889,7 +965,7 @@ Deno.test("dependency boundaries reject open variables, wrong kinds and inconsis
     effectfulSource,
     list([{
       ...base,
-      template: {
+      template: toBendModel({
         $: "FunctionTy",
         parameter: { $: "UnitTy" },
         result: { $: "U32Ty" },
@@ -898,7 +974,7 @@ Deno.test("dependency boundaries reject open variables, wrong kinds and inconsis
           operations: list([ask.identity]),
           tail: { $: "ClosedRow" },
         },
-      },
+      }),
     }]),
   );
   ok(missingMetadata.$ === "Fail");
@@ -907,7 +983,7 @@ Deno.test("dependency boundaries reject open variables, wrong kinds and inconsis
     effectfulSource,
     list([{
       ...base,
-      kind: { $: "ConstantInterface" },
+      kind: { $: "groups.ConstantInterface" },
       effects,
     }]),
   );
@@ -940,26 +1016,26 @@ function plannedSummaries(
   nominals: readonly NominalSummary[],
   shared: readonly TypeId[] = [],
 ) {
-  return array(unwrap(groups["groups.finish_plan"]({
-    $: "Planning",
+  return array(unwrap(groups["groups.finish_plan"](toBendModel({
+    $: "groups.Planning",
     nodes: list(declarations.map(({ name, references }) => ({
-      $: "Node",
+      $: "dependency.Node",
       name,
       references: list(references),
       lambdas: list([]),
     }))),
     usages: list(declarations.map(({ name, nominals }) => ({
-      $: "DeclarationUsage",
+      $: "groups.DeclarationUsage",
       name,
-      usage: { $: "Usage", nominals: list(nominals) },
+      usage: { $: "groups.Usage", nominals: list(nominals) },
     }))),
     type_dependencies: list(nominals.map(({ identity, references }) => ({
-      $: "TypeDependencies",
+      $: "groups.TypeDependencies",
       identity,
       references: list(references),
     }))),
     shared_operation_types: list(shared),
-  })));
+  }))));
 }
 
 function transitiveClosure(edges: readonly (readonly boolean[])[]) {

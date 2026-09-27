@@ -221,7 +221,7 @@ ${keep("outer", "inner", "explicitly_pure")}`);
   }
 });
 
-Deno.test("closed rows resolve declared operations, deduplicate sets, and preserve ordinary handling", async () => {
+Deno.test("closed rows retain duplicates, reflected sets deduplicate, and ordinary handling stays pure", async () => {
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const analysis = compiler.analyze(`
@@ -233,11 +233,29 @@ const supplied = fn (callback: U32 -> U32 ! {Reader.ask}) => do provider:
 data Callback = Callback (U32 -> U32 ! {Foreign})
 const unwrap = fn wrapped => case wrapped of
   Callback io => io
+const mixed_requirements = @effect.of mixed
+entry const mixed_count = @effect.count mixed_requirements
+entry const mixed_has_reader = @effect.has mixed_requirements Reader.ask
+entry const mixed_has_foreign = @effect.has mixed_requirements Foreign
 ${keep("mixed", "supplied", "unwrap")}`);
     equal(signature(analysis, "mixed").effect_row.operations, [
       foreign,
       { $: "TypeId", module_name: "main", declaration: "Reader.ask" },
+      { $: "TypeId", module_name: "main", declaration: "Reader.ask" },
     ]);
+    equal(
+      analysis.constants.find((entry) => entry.name === "mixed_count")?.value,
+      {
+        $: "U32Value",
+        value: 2,
+      },
+    );
+    for (const name of ["mixed_has_reader", "mixed_has_foreign"]) {
+      equal(analysis.constants.find((entry) => entry.name === name)?.value, {
+        $: "BoolValue",
+        value: true,
+      });
+    }
     equal(signature(analysis, "supplied").effect_row, emptyRow());
     equal(signature(analysis, "unwrap").result, {
       $: "FunctionTy",

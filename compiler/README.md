@@ -21,37 +21,37 @@ Builds require Bend, Deno, and clang 14+ on POSIX. Every compiler build runs
 `bend PROOF.bend`. Source-only iterations reuse the compiled executable.
 `build:compiler:js` builds the JavaScript reference; `build:compiler:all` builds
 both backends for parity checks. The JS build also requires Bun. Its first build
-for each installed Bend version downloads four upstream loader files from that
+for each installed Bend version downloads five upstream loader files from that
 version's release tag into `generated/compiler/bend-<version>/`; subsequent
 builds reuse them offline. Release tags must be available upstream for JS
 builds. The JS build also emits `generated/compiler/native_session.js` for
-direct regression tests of the native session's pure cache-planning logic. The
-JS build preserves the host's short constructor tags across Bend 2.0.27 and
-2.0.28 using [a guarded emission adapter](../scripts/bend_js_abi.ts). It changes
-constructor tags and typed matches at build time; function exports, string
-values, and the installed Bend compiler remain unchanged.
+direct regression tests of the native session's pure cache-planning logic.
 
-The optimized native build supports Bend 2.0.27 and 2.0.28. It applies guarded
-String comparison, consuming index lookup, borrowed free-variable collection,
-closed-type resolution, and a bounded resolver for active substitutions to the
-generated C. These kernels preserve the runtime's ownership and reclamation
-operations. Bounded type scans fall back to the Bend implementation when they
-cannot certify a result. The build checks the source definitions, generated
-field layouts, ownership code, and runtime helpers; it refuses an unknown
-version or code shape. See
-[the String transformer](../scripts/native_string_compare.ts),
-[the compiler kernels](../scripts/native_kernels/README.md), and
-[cold-compilation results](COLD_COMPILE_RESULTS.md). The
-[scaling plan](COLD_COMPILE_PLAN.md) records the remaining gap to 500 ms. The
-[type-system redesign study](TYPE_SYSTEM_REDESIGN_STUDY.md) investigates the
-broader changes needed for a 100–200 ms source-to-Wasm target. The
-[retained-checking implementation](TYPED_CORE_IMPLEMENTATION.md) records the
+The build uses the latest released Bend's generated C and JavaScript without
+output patches. Clang compiles the emitted C directly, and the upstream loader's
+JavaScript is saved unchanged. Host code handles the JavaScript data boundary.
+Suspected upstream bugs and performance limitations are recorded in
+[BUGS.md](../BUGS.md) for review before filing an issue.
+
+The active [compile-speed plan](../PLAN.md) prioritizes a small paired
+performance experiment on gdev's actual cold and body-edit paths before further
+M3 expansion. The [experiment results](COMPILE_SPEED_RESULTS.md) include the
+reusable benchmark command, current baseline, and the limits of each
+measurement.
+
+Historical [cold-compilation results](COLD_COMPILE_RESULTS.md) include native
+output patches that have since been removed; those timings do not describe the
+current build. The [scaling plan](COLD_COMPILE_PLAN.md) records the remaining
+gap to 500 ms. The [type-system redesign study](TYPE_SYSTEM_REDESIGN_STUDY.md)
+investigates the broader changes needed for a 100–200 ms source-to-Wasm target.
+The [retained-checking implementation](TYPED_CORE_IMPLEMENTATION.md) records the
+
 implemented reuse boundaries, correctness checks, and measured limits. The
-[allocation and checking follow-up](TYPE_KERNEL_IMPLEMENTATION.md) implements
-the subsequent measured kernels and avoids repeated checking and scans. Bend
-2.0.24 passes the ownership regression that required an isolated emitter patch
-on 2.0.5, so that obsolete patch has been removed. The build still compiles and
-runs [the regression](native_backend_regression.bend) at 1 and 4 threads before
+[allocation and checking follow-up](TYPE_KERNEL_IMPLEMENTATION.md) records the
+former native kernels alongside source-level improvements. Bend 2.0.24 passes
+the ownership regression that required an isolated emitter patch on 2.0.5, so
+that obsolete patch has been removed. The build still compiles and runs
+[the regression](native_backend_regression.bend) at 1 and 4 threads before
 publishing the binary. The native transport uses the new runtime's
 constructor-sealing interface; the installed Bend is never modified.
 
@@ -185,6 +185,15 @@ resolution and every specialization unit reuse the same function; parallel units
 that both create it keep the first copy in source order. An accessor that fails
 its independent check falls back to the per-site `$member[<n>]` helper, which
 reports the diagnostic exactly as before.
+
+Read-only string indexes select a child as data and carry the key and its
+remaining suffix through one Bend tail loop. This avoids allocating branch
+closures and keeps native and JavaScript lookup on the same implementation. Name
+equality retains its owning string roots while separate cursors traverse their
+characters, enabling borrowed reads in the full native compiler. The
+[native gdev measurements](COMPILE_SPEED_RESULTS.md) record cold compilation
+falling from 126.9 to 78.8 seconds across these two Bend 2.0.32 experiments,
+with identical Wasm.
 
 Type and row substitutions use persistent indexes instead of scanning the entire
 substitution history on every lookup. Each index retains replacement order,
@@ -466,6 +475,23 @@ Several tags compose nearest first, and an annotation constrains the decorated
 result. Tags on `const` run at compile time; tags on `let` run at startup. Their
 expression dependencies enter reachability and incremental cache keys.
 
+Binding annotations may carry a contextual `where { ... }` clause after the
+complete type and effect row. It records associated, receiver, field, update,
+operation, type-representation, and effect-representation requirements on a
+rank-one binding. Local `let` supports the same form; parameter annotations do
+not. Open effect rows use `! {Operation, ... | e}` or `! {| e}` with a row
+variable scoped to the binding. Type and row variables share names but cannot
+use the same name at both kinds. The annotation and clause describe the value
+after all expression tags have run. `where` remains an ordinary identifier
+outside the clause boundary. Open rows currently require concrete operation
+labels; symbolic generic labels such as `State a` receive
+`unsupported_polymorphic_effect_label` at the source clause.
+
+The raw core `analyze`/`compile` API performs type checking but does not run
+source evidence selection. It rejects a core `QualifiedExpr` with nonempty
+predicates as `unspecialized_qualified` before constant evaluation; use the
+source compiler for such bindings. An empty qualification wrapper is allowed.
+
 Only the entry module reaches the host, so `entry` in any other module, the
 prelude included, is `entry_outside_entry_module`. `entry` never affects Blot
 visibility: every declaration of every module stays importable exactly as
@@ -631,8 +657,9 @@ complete checked examples. It does not start or build the native compiler.
   folds, and short-circuit predicates in source. Fills evaluate their value once
   and preserve immutable sharing. Generation allocates once and calls a pure
   `U32 -> T` function for each index in ascending order; zero skips the
-  callback. Both reject counts that exceed the 16 MiB runtime arena before
-  computing an allocation size.
+  callback. Both reject counts whose length header and payload overflow a Wasm32
+  byte count before computing an allocation size. Compile-time arrays retain the
+  separate 16 MiB bootstrap limit.
 - Curried named functions/lambdas, immutable lexical capture, rank-1 inference,
   pure/closed-effect annotations, and inferred higher-order effect rows.
 - `case value of` and `case a, b, c of`; every row has the same arity. Inputs
@@ -714,6 +741,16 @@ binding. Closures capture locals, not active providers: invoking an escaped
 closure uses the caller's provider scope. A provider implementation sees the
 outer chain, excluding the selected provider and younger frames.
 
+Before instruction-job caching, a bounded saturation pass expands small known
+functions whose leading bodies are literal curried lambdas when every argument
+is supplied. Arguments evaluate once, left to right, into fresh temporaries
+before parameter bindings are introduced. This removes intermediate closures for
+ordinary arithmetic operators and other small helpers. Dynamic calls, partial
+applications, and functions doing work between lambda stages retain their
+curried behavior. Known unary function references use the existing direct entry.
+Expanded bodies participate in the caller's cache key; recursion, expansion
+size, and loop movement are conservatively restricted.
+
 Export wrappers accept Unit/Bool/U32/F32, Array U32/F32, or one
 scalar/numeric-array callback with exactly `! {Foreign}`, and return scalars or
 numeric arrays. The adapter copies typed-array inputs and outputs so hosts can
@@ -736,7 +773,26 @@ array carried through a loop. Parameters, captures, module values, and projected
 arrays remain conservative copy cases. Shared or unknown storage is copied in
 full, so repeated updates can still have quadratic copying cost. Const updates
 always copy and charge one extra step per copied element. Array size arithmetic
-is checked before allocation; the private arena is bounded to 16 MiB.
+is checked before allocation; the private arena grows on demand through the
+Wasm32 address space. Failed growth traps without changing its cursor.
+
+Eligible `for ever` loops reclaim arbitrary nested carry graphs every fourth
+backedge with a nonmoving conservative collector. Each loop activation owns its
+counter, so nested loops cannot delay an outer loop indefinitely. Collection
+amortizes tracing work but adds latency to collection iterations and retains up
+to four iterations of temporary allocations. Allocation headers and an
+exact-start bitmap identify blocks; marking preserves sharing and scans pinned
+pre-loop objects, then sweeping recycles unreachable blocks into size-class
+bins. No graph is serialized or copied during collection. Scalars that happen to
+equal an object address may retain extra objects, but are never rewritten.
+Dynamic blocks start at or above 64 KiB to avoid collisions with common small
+integer IDs; static data can still occupy the first page. The block-start bitmap
+is cached across free-list reuse. Fresh bump allocation invalidates it,
+including the first such allocation after an arena reset; collection then
+rebuilds it. Effect-provider escape exclusions still apply. The readable runtime
+is `arena_runtime.wat`; `deno run -A scripts/generate_arena_runtime.ts`
+regenerates its relocatable Bend encoding (WABT is only required for
+regeneration).
 
 Value patterns use `^name` or `^module.name` to compare a `U32` or `Bool`
 against an existing constant, parameter, or lexical binding. Pins introduce no

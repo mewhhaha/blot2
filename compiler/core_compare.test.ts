@@ -19,22 +19,22 @@ const core = compiled as unknown as {
 };
 const some = (value: Node): Node => ({ $: "Some", value });
 const id = (declaration: string): Node => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name: "scope",
   declaration,
 });
-const empty: Node = { $: "UnitExpr" };
-const u32: Node = { $: "U32Ty" };
+const empty: Node = { $: "model.UnitExpr" };
+const u32: Node = { $: "model.U32Ty" };
 const row = (
   operations: readonly Node[],
-  tail: Node = { $: "ClosedRow" },
+  tail: Node = { $: "model.ClosedRow" },
 ): Node => ({
-  $: "EffectRow",
+  $: "model.EffectRow",
   operations: bendList(operations),
   tail,
 });
 const arm = (pattern: Node): Node => ({
-  $: "MatchArm",
+  $: "model.MatchArm",
   patterns: bendList([pattern]),
   body: empty,
 });
@@ -55,10 +55,10 @@ function moduleWith({
   operations?: readonly Node[];
 } = {}): Node {
   return {
-    $: "Module",
+    $: "model.Module",
     constants: bendList(
       constants ?? [{
-        $: "Constant",
+        $: "model.Constant",
         name: "answer",
         exported: false,
         annotation,
@@ -94,43 +94,51 @@ function specimen(type: string, changed = false): unknown {
     case "TypeId":
       return id(changed ? "Other" : "Thing");
     case "RowTail":
-      return changed ? { $: "RowVariable", index: 1n } : { $: "ClosedRow" };
+      return changed
+        ? { $: "model.RowVariable", index: 1n }
+        : { $: "model.ClosedRow" };
     case "EffectRow":
       return row(changed ? [id("Thing")] : [id("Thing"), id("Thing")]);
     case "Ty":
-      return changed ? { $: "F32Ty" } : u32;
+      return changed ? { $: "model.F32Ty" } : u32;
+    case "Predicate":
+      return {
+        $: "model.TypeRepPredicate",
+        represented: changed ? { $: "model.F32Ty" } : u32,
+      };
+
     case "Operation":
       return {
-        $: "Operation",
+        $: "model.Operation",
         identity: id(changed ? "Other" : "Thing"),
         parameter: u32,
         result: u32,
       };
     case "Constructor":
       return {
-        $: "Constructor",
+        $: "model.Constructor",
         name: changed ? "Other" : "Thing",
         payload: { $: "None" },
         fields: bendList([]),
       };
     case "ValueReference":
       return changed
-        ? { $: "ConstantReference", name: "first" }
-        : { $: "LocalReference", name: "first" };
+        ? { $: "model.ConstantReference", name: "first" }
+        : { $: "model.LocalReference", name: "first" };
     case "Pattern":
-      return { $: "BindingPattern", name: changed ? "other" : "first" };
+      return { $: "model.BindingPattern", name: changed ? "other" : "first" };
     case "MatchArm<Expr>":
       return changed
-        ? arm({ $: "BindingPattern", name: "other" })
-        : arm({ $: "BindingPattern", name: "first" });
+        ? arm({ $: "model.BindingPattern", name: "other" })
+        : arm({ $: "model.BindingPattern", name: "first" });
     case "Expr":
-      return { $: "U32Expr", value: changed ? 2 : 1 };
+      return { $: "model.U32Expr", value: changed ? 2 : 1 };
     case "ScalarOp":
-      return { $: changed ? "Subtract" : "Add" };
+      return { $: changed ? "model.Subtract" : "model.Add" };
     case "UnaryOp":
-      return { $: changed ? "F32Absolute" : "F32Negate" };
+      return { $: changed ? "model.F32Absolute" : "model.F32Negate" };
     case "Dispatch":
-      return { $: changed ? "MemberDispatch" : "BinaryDispatch" };
+      return { $: changed ? "model.MemberDispatch" : "model.BinaryDispatch" };
     default:
       throw new Error(`Add a comparator fixture for ${type}`);
   }
@@ -168,7 +176,7 @@ function splitFields(fields: string): string[] {
 
 function modelNode(entry: ReturnType<typeof constructors>[number]): Node {
   return Object.fromEntries([
-    ["$", entry.name],
+    ["$", `model.${entry.name}`],
     ...entry.fields.map(([name, type]) => [name, specimen(type)]),
   ]) as Node;
 }
@@ -182,7 +190,7 @@ function embed(type: string, value: Node): Node {
     case "Pattern":
       return moduleWith({
         expr: {
-          $: "MatchExpr",
+          $: "model.MatchExpr",
           values: bendList([empty]),
           arms: bendList([arm(value)]),
         },
@@ -191,25 +199,37 @@ function embed(type: string, value: Node): Node {
       return moduleWith({ operations: [value] });
     case "EffectRow":
       return embed("Ty", {
-        $: "FunctionTy",
+        $: "model.FunctionTy",
         parameter: u32,
         result: u32,
         effects: value,
       });
     case "RowTail":
       return embed("EffectRow", row([id("Thing")], value));
+    case "Predicate":
+      return embed("Expr", {
+        $: "model.QualifiedExpr",
+        offset: 1n,
+        annotation: u32,
+        predicates: bendList([value]),
+        value: empty,
+      });
     case "ScalarOp":
       return embed("Expr", {
-        $: "ScalarExpr",
+        $: "model.ScalarExpr",
         operator: value,
         left: empty,
         right: empty,
       });
     case "UnaryOp":
-      return embed("Expr", { $: "UnaryExpr", operator: value, value: empty });
+      return embed("Expr", {
+        $: "model.UnaryExpr",
+        operator: value,
+        value: empty,
+      });
     case "Dispatch":
       return embed("Expr", {
-        $: "AssociatedExpr",
+        $: "model.AssociatedExpr",
         identity: 1n,
         dispatch: value,
         member: "choose",
@@ -218,7 +238,7 @@ function embed(type: string, value: Node): Node {
         right: empty,
       });
     case "ValueReference":
-      return embed("Pattern", { $: "ValuePattern", reference: value });
+      return embed("Pattern", { $: "model.ValuePattern", reference: value });
     default:
       throw new Error(`Add a module embedding for ${type}`);
   }
@@ -244,11 +264,12 @@ Deno.test("certificate module comparison covers every expression, type and opera
   );
   for (
     const [type, count] of [
-      ["Expr", 48],
+      ["Expr", 50],
       ["Ty", 16],
+      ["Predicate", 7],
       ["Pattern", 8],
       ["Operation", 3],
-      ["RowTail", 3],
+      ["RowTail", 4],
       ["ScalarOp", 15],
       ["UnaryOp", 8],
       ["Dispatch", 3],
@@ -284,13 +305,13 @@ Deno.test("certificate comparison preserves float bits, duplicate effects, and s
     ]
   ) {
     comparison(
-      expression({ $: "F32Expr", value: f32(left) }),
-      expression({ $: "F32Expr", value: f32(right) }),
+      expression({ $: "model.F32Expr", value: f32(left) }),
+      expression({ $: "model.F32Expr", value: f32(right) }),
       false,
     );
   }
   const functionType = (effects: Node): Node => ({
-    $: "FunctionTy",
+    $: "model.FunctionTy",
     parameter: u32,
     result: u32,
     effects,
@@ -309,13 +330,13 @@ Deno.test("certificate comparison preserves float bits, duplicate effects, and s
   );
   comparison(
     expression({
-      $: "SourceExpr",
+      $: "model.SourceExpr",
       offset: 7n,
       annotation: some(u32),
       value: empty,
     }),
     expression({
-      $: "SourceExpr",
+      $: "model.SourceExpr",
       offset: 8n,
       annotation: some(u32),
       value: empty,
@@ -324,15 +345,15 @@ Deno.test("certificate comparison preserves float bits, duplicate effects, and s
   );
   comparison(
     expression({
-      $: "SourceExpr",
+      $: "model.SourceExpr",
       offset: 7n,
       annotation: some(u32),
       value: empty,
     }),
     expression({
-      $: "SourceExpr",
+      $: "model.SourceExpr",
       offset: 7n,
-      annotation: some({ $: "F32Ty" }),
+      annotation: some({ $: "model.F32Ty" }),
       value: empty,
     }),
     false,
@@ -340,14 +361,14 @@ Deno.test("certificate comparison preserves float bits, duplicate effects, and s
   comparison(
     moduleWith({
       annotation: some({
-        $: "AppliedTy",
+        $: "model.AppliedTy",
         identity: id("First"),
         arguments: bendList([u32]),
       }),
     }),
     moduleWith({
       annotation: some({
-        $: "AppliedTy",
+        $: "model.AppliedTy",
         identity: id("Second"),
         arguments: bendList([u32]),
       }),
@@ -356,9 +377,48 @@ Deno.test("certificate comparison preserves float bits, duplicate effects, and s
   );
 });
 
+Deno.test("qualified predicate comparison preserves operation templates and row tails", () => {
+  const qualified = (predicate: Node) => embed("Predicate", predicate);
+  const operation = (template: Node): Node => ({
+    $: "model.OperationPredicate",
+    template,
+    arguments: bendList([u32]),
+    function_type: {
+      $: "model.FunctionTy",
+      parameter: u32,
+      result: u32,
+      effects: row([]),
+    },
+  });
+  comparison(
+    qualified(operation(id("Read"))),
+    qualified(operation(id("Write"))),
+    false,
+  );
+
+  const reflected = (tail: Node): Node => ({
+    $: "model.EffectRepPredicate",
+    row: row([id("Read"), id("Read")], tail),
+  });
+  comparison(
+    qualified(
+      reflected({ $: "model.FreeRow", scope: "binding", name: "first" }),
+    ),
+    qualified(
+      reflected({ $: "model.FreeRow", scope: "binding", name: "second" }),
+    ),
+    false,
+  );
+  comparison(
+    qualified(reflected({ $: "model.RowVariable", index: 1n })),
+    qualified(reflected({ $: "model.RowVariable", index: 2n })),
+    false,
+  );
+});
+
 Deno.test("certificate comparison checks declaration headers, constructors, and match arms", () => {
   const fn: Node = {
-    $: "Function",
+    $: "model.Function",
     name: "run",
     exported: true,
     parameter: "value",
@@ -373,8 +433,8 @@ Deno.test("certificate comparison checks declaration headers, constructors, and 
       { exported: false },
       { parameter: "other" },
       { parameter_type: { $: "None" } },
-      { result_type: some({ $: "F32Ty" }) },
-      { body: { $: "U32Expr", value: 1 } },
+      { result_type: some({ $: "model.F32Ty" }) },
+      { body: { $: "model.U32Expr", value: 1 } },
     ]
   ) {
     comparison(
@@ -385,7 +445,7 @@ Deno.test("certificate comparison checks declaration headers, constructors, and 
   }
 
   const constant: Node = {
-    $: "Constant",
+    $: "model.Constant",
     name: "answer",
     exported: true,
     annotation: some(u32),
@@ -397,7 +457,7 @@ Deno.test("certificate comparison checks declaration headers, constructors, and 
       { name: "other" },
       { exported: false },
       { annotation: { $: "None" } },
-      { value: { $: "U32Expr", value: 1 } },
+      { value: { $: "model.U32Expr", value: 1 } },
     ]
   ) {
     comparison(
@@ -408,13 +468,13 @@ Deno.test("certificate comparison checks declaration headers, constructors, and 
   }
 
   const constructor: Node = {
-    $: "Constructor",
+    $: "model.Constructor",
     name: "Box",
     payload: some(u32),
     fields: bendList(["value"]),
   };
   const dataType = (member: Node): Node => ({
-    $: "DataType",
+    $: "model.DataType",
     identity: id("Box"),
     parameters: 1n,
     constructors: bendList([member]),
@@ -438,14 +498,14 @@ Deno.test("certificate comparison checks declaration headers, constructors, and 
   const match = (arms: readonly Node[]) =>
     moduleWith({
       expr: {
-        $: "MatchExpr",
+        $: "model.MatchExpr",
         values: bendList([empty]),
         arms: bendList(arms),
       },
     });
   const first: Node = {
-    $: "MatchArm",
-    patterns: bendList([{ $: "WildcardPattern" }]),
+    $: "model.MatchArm",
+    patterns: bendList([{ $: "model.WildcardPattern" }]),
     body: empty,
   };
   comparison(match([first]), match([first, first]), false);
@@ -456,7 +516,7 @@ Deno.test("certificate comparison checks declaration headers, constructors, and 
   );
   comparison(
     match([first]),
-    match([{ ...first, body: { $: "U32Expr", value: 1 } }]),
+    match([{ ...first, body: { $: "model.U32Expr", value: 1 } }]),
     false,
   );
 });
@@ -476,7 +536,7 @@ Deno.test("certificate comparison rejects exhausted traversal budgets", () => {
       limited["core_compare.compare"](
         fuel,
         bendList([{
-          $: "ModulePair",
+          $: "core_compare.ModulePair",
           left,
           right: left,
         }]),

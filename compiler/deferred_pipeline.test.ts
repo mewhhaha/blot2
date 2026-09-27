@@ -1,5 +1,6 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
+import { toBendCst } from "./bend_abi.ts";
 import { createSourceFrontend } from "./source_frontend.ts";
 
 type Node = { readonly $: string; readonly [field: string]: unknown };
@@ -22,6 +23,19 @@ const api = compiled as unknown as {
     steps: bigint,
   ): Result<Node>;
 };
+
+// Runtime bytes are a deep linked list; flatten that list before the recursive
+// assertion so adding runtime code does not exhaust JavaScript's call stack.
+function comparable(result: Result<Node>): Result<Node> {
+  if (result.$ === "Fail") return result;
+  const bytes: unknown[] = [];
+  let cursor = result.value.bytes as Node;
+  for (; cursor.$ === "Con"; cursor = cursor.tail as Node) {
+    bytes.push(cursor.head);
+  }
+  equal(cursor.$, "Nil");
+  return { ...result, value: { ...result.value, bytes } };
+}
 
 Deno.test("deferred cold checking matches legacy specialization across effects and closures", async () => {
   const frontend = await createSourceFrontend({ prelude: "none" });
@@ -55,22 +69,24 @@ entry const metadata = fn () => @effect.count (@effect.of transform)
   try {
     for (const source of cases) {
       const prepared = frontend.prepare(source);
+      const root = toBendCst(prepared.root);
+      const prelude = toBendCst(prepared.prelude);
       const module = api["source_modules.source_module"](
         false,
-        prepared.root,
-        prepared.prelude,
+        root,
+        prelude,
         prepared.nodeCount,
       );
       const legacy = module.$ === "Fail"
         ? module
         : api.compile(module.value, 100_000n);
       const deferred = api.compile_source(
-        prepared.root,
-        prepared.prelude,
+        root,
+        prelude,
         prepared.nodeCount,
         100_000n,
       );
-      equal(deferred, legacy, source);
+      equal(comparable(deferred), comparable(legacy), source);
     }
   } finally {
     frontend.dispose();

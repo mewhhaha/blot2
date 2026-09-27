@@ -1,15 +1,20 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
-import { bendArray, bendList } from "./bend_list.ts";
-import type { Cst, CstList } from "./syntax.ts";
+import { bendArray, type BendList, bendList } from "./bend_list.ts";
+import type { Cst } from "./syntax.ts";
+
+type RawCst = Omit<Cst, "$" | "children"> & {
+  readonly $: "cst.Cst";
+  readonly children: BendList<RawCst>;
+};
 
 const cst = compiled as unknown as {
-  "cst.fields"(nodes: CstList, label: string): CstList;
+  "cst.fields"(nodes: BendList<RawCst>, label: string): BendList<RawCst>;
 };
 
 Deno.test("CST field selection preserves order without a recursive wide-list stack", () => {
-  const nodes = Array.from({ length: 32768 }, (_, index): Cst => ({
-    $: "Cst",
+  const nodes = Array.from({ length: 32768 }, (_, index): RawCst => ({
+    $: "cst.Cst",
     kind: "INTEGER",
     field: index % 3 === 0 ? "elements" : "separator",
     text: String(index),

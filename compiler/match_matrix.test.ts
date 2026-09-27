@@ -7,8 +7,8 @@ type List<A> = { readonly $: "Nil" } | {
   readonly tail: List<A>;
 };
 type BoolPattern =
-  | { readonly $: "WildcardPattern" }
-  | { readonly $: "BoolPattern"; readonly value: boolean };
+  | { readonly $: "model.WildcardPattern" }
+  | { readonly $: "model.BoolPattern"; readonly value: boolean };
 
 function list<A>(values: readonly A[]): List<A> {
   return values.reduceRight<List<A>>(
@@ -21,8 +21,8 @@ const patterns = compiled as unknown as {
   "patterns.coverage"(
     fuel: bigint,
     work: {
-      readonly $: "Cover";
-      readonly inferred_types: List<{ readonly $: "BoolTy" }>;
+      readonly $: "patterns.Cover";
+      readonly inferred_types: List<{ readonly $: "model.BoolTy" }>;
       readonly rows: List<List<BoolPattern>>;
     },
     types: List<never>,
@@ -43,8 +43,8 @@ Deno.test("pattern matrix coverage agrees with complete finite row enumeration",
         Array.from({ length: columns }, (): BoolPattern => {
           const value = random(3);
           return value === 2
-            ? { $: "WildcardPattern" }
-            : { $: "BoolPattern", value: value === 1 };
+            ? { $: "model.WildcardPattern" }
+            : { $: "model.BoolPattern", value: value === 1 };
         }),
     );
     const combinations = Array.from(
@@ -58,7 +58,7 @@ Deno.test("pattern matrix coverage agrees with complete finite row enumeration",
     const complete = combinations.every((values) =>
       rows.some((row) =>
         row.every((pattern, column) =>
-          pattern.$ === "WildcardPattern" ||
+          pattern.$ === "model.WildcardPattern" ||
           pattern.value === values[column]
         )
       )
@@ -67,10 +67,10 @@ Deno.test("pattern matrix coverage agrees with complete finite row enumeration",
       patterns["patterns.coverage"](
         65536n,
         {
-          $: "Cover",
+          $: "patterns.Cover",
           inferred_types: list(Array.from(
             { length: columns },
-            () => ({ $: "BoolTy" as const }),
+            () => ({ $: "model.BoolTy" as const }),
           )),
           rows: list(rows.map(list)),
         },

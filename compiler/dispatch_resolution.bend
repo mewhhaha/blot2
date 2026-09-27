@@ -2,6 +2,7 @@ import Base
 import ./model.bend as M
 import ./types.bend as T
 import ./infer.bend as I
+import ./constraints.bend as C
 import ./globals.bend as G
 import ./groups.bend as Groups
 import ./check_scheduler.bend as Scheduler
@@ -73,27 +74,36 @@ def forwarder_call(callee: M.Expr, right: M.Expr, +forwarders: Map<&2, Mono.Bina
     case _:
       None{}
 
+def inline_location(offset: Nat, site: Maybe<&2, Nat>, value: M.Expr) -> M.Expr:
+  match site:
+    case None{}:
+      M.SourceExpr{offset, None{}, value}
+    case Some{identity}:
+      M.SourceExpr{offset, None{}, M.InstantiationExpr{identity, value}}
+
 type InlineWork is Data:
   Inline{value: M.Expr}
   InlineMany{values: List<&2, M.Expr>, reversed: List<&2, M.Expr>}
-  InlineApply{offset: Nat, callee: M.Expr, argument: M.Expr, call: Maybe<&2, Mono.BinaryCall>}
+  InlineApply{offset: Nat, site: Maybe<&2, Nat>, callee: M.Expr, argument: M.Expr, call: Maybe<&2, Mono.BinaryCall>}
 
 def inline_work(+fuel: Nat, work: InlineWork, +forwarders: Map<&2, Mono.BinaryMember>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Expr>>:
   match fuel work:
     case 0n _:
       Fail{M.Diagnostic{"specialization_limit", "dispatch", "operator inlining exceeded its structural limit"}}
     case 1n+rest Inline{M.SourceExpr{offset, None{}, M.ApplyExpr{+callee, +argument}}}:
-      inline_work(rest, InlineApply{offset, callee, argument, forwarder_call(Mono.unlocated(65536n, callee), argument, forwarders)}, forwarders)
-    case 1n+rest InlineApply{+offset, callee, argument, Some{Mono.BinaryCall{member, templates, left, right}}}:
+      inline_work(rest, InlineApply{offset, None{}, callee, argument, forwarder_call(Mono.unlocated(65536n, callee), argument, forwarders)}, forwarders)
+    case 1n+rest Inline{M.SourceExpr{offset, None{}, M.InstantiationExpr{site, M.ApplyExpr{+callee, +argument}}}}:
+      inline_work(rest, InlineApply{offset, Some{site}, callee, argument, forwarder_call(Mono.unlocated(65536n, callee), argument, forwarders)}, forwarders)
+    case 1n+rest InlineApply{+offset, site, callee, argument, Some{Mono.BinaryCall{member, templates, left, right}}}:
       do Result<&2, &2, M.Diagnostic, List<&2, M.Expr>>:
         operands : List<&2, M.Expr> <- inline_work(rest, InlineMany{[left, right], Nil{}}, forwarders)
         call : M.Expr <- Mono.rebuild(M.AssociatedExpr{offset, M.BinaryDispatch{}, member, templates, M.UnitExpr{}, M.UnitExpr{}}, operands, 0n)
-        return [M.SourceExpr{offset, None{}, call}]
-    case 1n+rest InlineApply{offset, callee, argument, None{}}:
+        return [inline_location(offset, site, call)]
+    case 1n+rest InlineApply{offset, site, callee, argument, None{}}:
       do Result<&2, &2, M.Diagnostic, List<&2, M.Expr>>:
         parts : List<&2, M.Expr> <- inline_work(rest, InlineMany{[callee, argument], Nil{}}, forwarders)
         apply : M.Expr <- Mono.rebuild(M.ApplyExpr{M.UnitExpr{}, M.UnitExpr{}}, parts, 0n)
-        return [M.SourceExpr{offset, None{}, apply}]
+        return [inline_location(offset, site, apply)]
     case 1n+rest Inline{+expression}:
       do Result<&2, &2, M.Diagnostic, List<&2, M.Expr>>:
         children : List<&2, M.Expr> <- inline_work(rest, InlineMany{F.children(expression), Nil{}}, forwarders)
@@ -177,8 +187,13 @@ type DispatchScan is Data:
 
 def scan_identity(scan: DispatchScan, identity: Nat, associated: Nat) -> DispatchScan:
   DispatchScan{count, +seen, unique} = scan
-  +key = Nat.show(identity)
+  +key = "d" ++ Nat.show(identity)
   DispatchScan{Nat.add(count, associated), Set.add(seen, key), Bool.and(unique, Bool.not(D.member(seen, key)))}
+
+def scan_use_site(scan: DispatchScan, site: Nat) -> DispatchScan:
+  DispatchScan{count, +seen, unique} = scan
+  +key = "u" ++ Nat.show(site)
+  DispatchScan{count, Set.add(seen, key), Bool.and(unique, Bool.not(D.member(seen, key)))}
 
 def scan_limit(scan: DispatchScan) -> DispatchScan:
   DispatchScan{count, seen, unique} = scan
@@ -194,6 +209,8 @@ def dispatch_scan(fuel: Nat, pending: List<&2, M.Expr>, scan: DispatchScan) -> D
       dispatch_scan(rest, left <> right <> tail, scan_identity(scan, identity, 1n))
     case 1n+rest M.GenericOperationExpr{identity, template, arguments} <> tail:
       dispatch_scan(rest, tail, scan_identity(scan, identity, 0n))
+    case 1n+rest M.InstantiationExpr{site, value} <> tail:
+      dispatch_scan(rest, value <> tail, scan_use_site(scan, site))
     case 1n+rest head <> tail:
       dispatch_scan(rest, List.reverse.go(&2, M.Expr, List.reverse(&2, M.Expr, F.children(head)), tail), scan)
 
@@ -290,9 +307,9 @@ def need_uses(needs: List<&2, Groups.Resolution>, +uses: Uses) -> Uses:
   match needs:
     case Nil{}:
       uses
-    case Groups.Resolution{declaration, identity, M.BinaryDispatch{}, member, templates, left, right, result, ambient} <> tail:
+    case Groups.Resolution{declaration, identity, M.BinaryDispatch{}, member, templates, left, right, result, invocation, ambient} <> tail:
       need_uses(tail, uses)
-    case Groups.Resolution{declaration, identity, +dispatch, +member, templates, left, right, result, ambient} <> tail:
+    case Groups.Resolution{declaration, identity, +dispatch, +member, templates, left, right, result, invocation, ambient} <> tail:
       Uses{seen, reversed} = uses
       +key = dispatch_tag(dispatch) ++ member
       need_uses(tail, use_if(Bool.not(D.member(seen, key)), key, dispatch, member, uses))
@@ -327,7 +344,7 @@ def request_next(requests: Requests) -> Nat:
   next
 
 def accessor_binding(checked: Groups.CheckedGroup, name: String) -> Maybe<&2, I.Binding>:
-  Groups.CheckedGroup{M.CheckedModule{constants, functions, types, operations}, interfaces} = checked
+  Groups.CheckedGroup{M.CheckedModule{constants, functions, types, operations}, interfaces, uses} = checked
   I.lookup_binding(Mono.function_bindings(functions), name)
 
 def accessor_found(binding: Maybe<&2, I.Binding>, name: String, function: M.Function, module: M.Module, checked: Groups.CheckedGroup) -> Maybe<&2, Accessor>:
@@ -421,27 +438,76 @@ def candidate_indexed(name: Maybe<&2, String>, +bindings: Map<&2, I.Binding>, le
     case Some{+name}:
       Mono.candidate_binding(Index.find(I.Binding, bindings, name), name, left, right, state, "dispatch")
 
-# The unification specialization performs once it has selected `name`.
-def unified(found: Maybe<&2, I.Binding>, name: String, signature: M.Ty, state: I.State) -> Result<&2, &2, M.Diagnostic, I.State>:
-  do Result<&2, &2, M.Diagnostic, I.State>:
-    +target : I.Typing <- I.instantiate_binding(found, state, name, "dispatch")
-    I.unify(I.type_of(target), signature, I.state_of(target), "dispatch")
+# The checked implementation is instantiated once. Its opened typing checks
+# the caller's ambient capability; its pre-covariance exact typing identifies
+# the selected invocation row at this same instance.
+type Linked is Data:
+  Linked{state: I.State, signature: M.Ty}
 
-def selected_attempt(result: Result<&2, &2, M.Diagnostic, I.State>, plan: Plan) -> Attempt:
+def selected_invocation(signature: M.Ty, dispatch: M.Dispatch) -> Result<&2, &2, M.Diagnostic, Maybe<&2, M.EffectRow>>:
+  match dispatch:
+    case M.BinaryDispatch{}:
+      Mono.selected_binary_invocation(signature)
+    case M.FieldUpdateDispatch{}:
+      Mono.selected_binary_invocation(signature)
+    case M.MemberDispatch{}:
+      Mono.selected_receiver_invocation(signature)
+
+def linked_found(found: Maybe<&2, M.EffectRow>, row: M.EffectRow, state: I.State) -> Result<&2, &2, M.Diagnostic, I.State>:
+  match found:
+    case Some{selected}:
+      I.unify_rows(row, selected, state, "dispatch")
+    case None{}:
+      Fail{M.Diagnostic{"ambiguous_qualified", "dispatch", "selected implementation effects remain open"}}
+
+def linked_row(invocation: Maybe<&2, M.EffectRow>, exact: M.Ty, dispatch: M.Dispatch, state: I.State) -> Result<&2, &2, M.Diagnostic, I.State>:
+  match invocation:
+    case None{}:
+      Done{state}
+    case Some{row}:
+      do Result<&2, &2, M.Diagnostic, I.State>:
+        found : Maybe<&2, M.EffectRow> <- selected_invocation(exact, dispatch)
+        linked_found(found, row, state)
+
+def planned_signature(invocation: Maybe<&2, M.EffectRow>, exact: M.Ty, requested: M.Ty) -> M.Ty:
+  match invocation:
+    case Some{row}:
+      exact
+    case None{}:
+      requested
+
+def unified(found: Maybe<&2, I.Binding>, name: String, +signature: M.Ty, +invocation: Maybe<&2, M.EffectRow>, dispatch: M.Dispatch, state: I.State) -> Result<&2, &2, M.Diagnostic, Linked>:
+  do Result<&2, &2, M.Diagnostic, Linked>:
+    +instance : I.SelectedInstantiation <- I.instantiate_binding_selected(found, state, name, "dispatch")
+    +target : I.Typing = I.selected_typing(instance)
+    +checked : I.State <- I.unify(I.type_of(target), signature, I.state_of(target), "dispatch")
+    +exact : M.Ty <- T.resolve(I.substitutions_of(checked), I.selected_exact(instance))
+    +linked : I.State <- linked_row(invocation, exact, dispatch, checked)
+    resolved : M.Ty <- T.resolve(I.substitutions_of(linked), exact)
+    return Linked{linked, planned_signature(invocation, resolved, signature)}
+
+def selected_binary(result: Result<&2, &2, M.Diagnostic, Linked>, declaration: String, key: String, name: String) -> Attempt:
   match result:
-    case Done{state}:
-      Selected{plan, state}
+    case Done{Linked{state, signature}}:
+      Selected{Planned{declaration, key, Mono.FunctionChoice{name, signature}}, state}
     case Fail{diagnostic}:
       Dropped{}
 
-def binary_chosen(selected: Result<&2, &2, M.Diagnostic, String>, declaration: String, identity: Nat, left: M.Ty, right: M.Ty, result: M.Ty, +ambient: M.EffectRow, state: I.State, +bindings: Map<&2, I.Binding>) -> Attempt:
+def selected_receiver(result: Result<&2, &2, M.Diagnostic, Linked>, declaration: String, key: String, name: String, dispatch: M.Dispatch) -> Attempt:
+  match result:
+    case Done{Linked{state, signature}}:
+      Selected{Planned{declaration, key, Mono.receiver_choice(dispatch, name, signature)}, state}
+    case Fail{diagnostic}:
+      Dropped{}
+
+def binary_chosen(selected: Result<&2, &2, M.Diagnostic, String>, declaration: String, identity: Nat, +left: M.Ty, +right: M.Ty, +result: M.Ty, invocation: Maybe<&2, M.EffectRow>, +ambient: M.EffectRow, state: I.State, +bindings: Map<&2, I.Binding>) -> Attempt:
   match selected:
     case Fail{diagnostic}:
       Dropped{}
     case Done{+name}:
-      selected_attempt(unified(Index.find(I.Binding, bindings, name), name, M.FunctionTy{left, M.FunctionTy{right, result, ambient}, ambient}, state), Planned{declaration, choice_key(identity, M.BinaryDispatch{}), Mono.FunctionChoice{name}})
+      selected_binary(unified(Index.find(I.Binding, bindings, name), name, M.FunctionTy{left, M.FunctionTy{right, result, ambient}, ambient}, invocation, M.BinaryDispatch{}, state), declaration, choice_key(identity, M.BinaryDispatch{}), name)
 
-def attempt_binary(plain: Bool, closed: Bool, declaration: String, identity: Nat, +member: String, +left: M.Ty, +right: M.Ty, result: M.Ty, ambient: M.EffectRow, +state: I.State, context: SolveContext) -> Attempt:
+def attempt_binary(plain: Bool, closed: Bool, declaration: String, identity: Nat, +member: String, +left: M.Ty, +right: M.Ty, result: M.Ty, invocation: Maybe<&2, M.EffectRow>, ambient: M.EffectRow, +state: I.State, context: SolveContext) -> Attempt:
   match plain closed:
     case False{} _:
       Dropped{}
@@ -451,7 +517,7 @@ def attempt_binary(plain: Bool, closed: Bool, declaration: String, identity: Nat
       SolveContext{+bindings, accessors, types, +entry, proofs} = context
       +left_name = Mono.member_name(Mono.owner(left, entry), member)
       +right_name = Mono.member_name(Mono.owner(right, entry), member)
-      binary_chosen(Mono.chosen(candidate_indexed(left_name, bindings, left, right, state), left_name, candidate_indexed(right_name, bindings, left, right, state), right_name, "dispatch", member), declaration, identity, left, right, result, ambient, state, bindings)
+      binary_chosen(Mono.chosen(candidate_indexed(left_name, bindings, left, right, state), left_name, candidate_indexed(right_name, bindings, left, right, state), right_name, "dispatch", member), declaration, identity, left, right, result, invocation, ambient, state, bindings)
 
 def method_found(name: Maybe<&2, String>, bindings: Map<&2, I.Binding>) -> Maybe<&2, String>:
   match name:
@@ -471,39 +537,39 @@ def cached_binding(found: Maybe<&2, Accessor>, bindings: Map<&2, I.Binding>, nam
 # are ambiguous, a missing writable field and a missing member are errors, and a
 # method with linked-schema evidence keeps the schema reduction. Those sites
 # stay deferred so specialization reports or reduces them as before.
-def receiver_attempt(field: Bool, method: Maybe<&2, String>, schema: Bool, dispatch: M.Dispatch, declaration: String, +identity: Nat, +member: String, +left: M.Ty, right: M.Ty, result: M.Ty, ambient: M.EffectRow, state: I.State, +bindings: Map<&2, I.Binding>, accessors: Map<&2, Accessor>, entry: String) -> Attempt:
+def receiver_attempt(field: Bool, method: Maybe<&2, String>, schema: Bool, +dispatch: M.Dispatch, declaration: String, +identity: Nat, +member: String, +left: M.Ty, +right: M.Ty, +result: M.Ty, invocation: Maybe<&2, M.EffectRow>, +ambient: M.EffectRow, state: I.State, +bindings: Map<&2, I.Binding>, accessors: Map<&2, Accessor>, entry: String) -> Attempt:
   match field method schema dispatch:
     case True{} Some{name} _ M.MemberDispatch{}:
       Dropped{}
     case True{} _ _ +dispatch:
       +name = Mono.accessor_name(Mono.accessor_owner(Mono.owner(left, entry)), member, dispatch)
-      selected_attempt(unified(cached_binding(Index.find(Accessor, accessors, name), bindings, name), name, Mono.receiver_signature(dispatch, left, right, result, ambient), state), Planned{declaration, choice_key(identity, dispatch), Mono.receiver_choice(dispatch, name)})
+      selected_receiver(unified(cached_binding(Index.find(Accessor, accessors, name), bindings, name), name, Mono.receiver_signature(dispatch, left, right, result, ambient), invocation, dispatch, state), declaration, choice_key(identity, dispatch), name, dispatch)
     case False{} Some{+name} False{} M.MemberDispatch{}:
-      selected_attempt(unified(Index.find(I.Binding, bindings, name), name, Mono.receiver_signature(M.MemberDispatch{}, left, right, result, ambient), state), Planned{declaration, choice_key(identity, M.MemberDispatch{}), Mono.ReceiverChoice{name}})
+      selected_receiver(unified(Index.find(I.Binding, bindings, name), name, Mono.receiver_signature(M.MemberDispatch{}, left, right, result, ambient), invocation, M.MemberDispatch{}, state), declaration, choice_key(identity, M.MemberDispatch{}), name, M.MemberDispatch{})
     case _ _ _ _:
       Dropped{}
 
-def attempt_receiver(known: Bool, dispatch: M.Dispatch, declaration: String, identity: Nat, +member: String, +left: M.Ty, right: M.Ty, result: M.Ty, ambient: M.EffectRow, state: I.State, context: SolveContext) -> Attempt:
+def attempt_receiver(known: Bool, dispatch: M.Dispatch, declaration: String, identity: Nat, +member: String, +left: M.Ty, right: M.Ty, result: M.Ty, invocation: Maybe<&2, M.EffectRow>, ambient: M.EffectRow, state: I.State, context: SolveContext) -> Attempt:
   match known:
     case False{}:
       Waiting{}
     case True{}:
       SolveContext{+bindings, accessors, types, +entry, proofs} = context
-      receiver_attempt(Members.has_field(Members.constructors(left, types), member), method_found(Mono.member_name(Mono.owner(left, entry), member), bindings), Schema.eligible(proofs, member, left), dispatch, declaration, identity, member, left, right, result, ambient, state, bindings, accessors, entry)
+      receiver_attempt(Members.has_field(Members.constructors(left, types), member), method_found(Mono.member_name(Mono.owner(left, entry), member), bindings), Schema.eligible(proofs, member, left), dispatch, declaration, identity, member, left, right, result, invocation, ambient, state, bindings, accessors, entry)
 
-def attempt_dispatch(dispatch: M.Dispatch, templates: List<&2, M.TypeId>, declaration: String, identity: Nat, +member: String, +left: M.Ty, +right: M.Ty, result: M.Ty, ambient: M.EffectRow, state: I.State, context: SolveContext) -> Attempt:
+def attempt_dispatch(dispatch: M.Dispatch, templates: List<&2, M.TypeId>, declaration: String, identity: Nat, +member: String, +left: M.Ty, +right: M.Ty, result: M.Ty, invocation: Maybe<&2, M.EffectRow>, ambient: M.EffectRow, state: I.State, context: SolveContext) -> Attempt:
   match dispatch templates:
     case M.BinaryDispatch{} Nil{}:
-      attempt_binary(plain_member(member), Groups.closed_types(65536n, [left, right]), declaration, identity, member, left, right, result, ambient, state, context)
+      attempt_binary(plain_member(member), Groups.closed_types(65536n, [left, right]), declaration, identity, member, left, right, result, invocation, ambient, state, context)
     case M.BinaryDispatch{} _:
       Dropped{}
     case receiver _:
-      attempt_receiver(receiver_known(left), receiver, declaration, identity, member, left, right, result, ambient, state, context)
+      attempt_receiver(receiver_known(left), receiver, declaration, identity, member, left, right, result, invocation, ambient, state, context)
 
-def attempt_resolved(left: Result<&2, &2, M.Diagnostic, M.Ty>, right: Result<&2, &2, M.Diagnostic, M.Ty>, result: Result<&2, &2, M.Diagnostic, M.Ty>, ambient: M.EffectRow, dispatch: M.Dispatch, templates: List<&2, M.TypeId>, declaration: String, identity: Nat, member: String, state: I.State, context: SolveContext) -> Attempt:
+def attempt_resolved(left: Result<&2, &2, M.Diagnostic, M.Ty>, right: Result<&2, &2, M.Diagnostic, M.Ty>, result: Result<&2, &2, M.Diagnostic, M.Ty>, invocation: Maybe<&2, M.EffectRow>, ambient: M.EffectRow, dispatch: M.Dispatch, templates: List<&2, M.TypeId>, declaration: String, identity: Nat, member: String, state: I.State, context: SolveContext) -> Attempt:
   match left right result:
     case Done{l} Done{r} Done{value}:
-      attempt_dispatch(dispatch, templates, declaration, identity, member, l, r, value, ambient, state, context)
+      attempt_dispatch(dispatch, templates, declaration, identity, member, l, r, value, invocation, ambient, state, context)
     case _ _ _:
       Dropped{}
 
@@ -530,10 +596,10 @@ def settle(attempt: Attempt, need: Groups.Resolution, solving: Solving) -> Solvi
 # consume it, exactly as it would in every specialization of the group.
 def solve_need(need: Groups.Resolution, +solving: Solving, context: SolveContext) -> Solving:
   match need:
-    case Groups.Resolution{+declaration, +identity, +dispatch, +member, +templates, +left, +right, +result, +ambient}:
+    case Groups.Resolution{+declaration, +identity, +dispatch, +member, +templates, +left, +right, +result, +invocation, +ambient}:
       +state = solving_state(solving)
       +substitutions = I.substitutions_of(state)
-      settle(attempt_resolved(T.resolve(substitutions, left), T.resolve(substitutions, right), T.resolve(substitutions, result), T.resolve_row(substitutions, ambient), dispatch, templates, declaration, identity, member, state, context), Groups.Resolution{declaration, identity, dispatch, member, templates, left, right, result, ambient}, solving)
+      settle(attempt_resolved(T.resolve(substitutions, left), T.resolve(substitutions, right), T.resolve(substitutions, result), Groups.resolved_invocation(invocation, substitutions), T.resolve_row(substitutions, ambient), dispatch, templates, declaration, identity, member, state, context), Groups.Resolution{declaration, identity, dispatch, member, templates, left, right, result, invocation, ambient}, solving)
 
 def solve_pass(needs: List<&2, Groups.Resolution>, solving: Solving, +context: SolveContext) -> Solving:
   match needs:
@@ -568,12 +634,35 @@ def member_unchanged(resolved: Result<&2, &2, M.Diagnostic, M.Ty>, original: M.T
     case Done{ty}:
       Compare.same_ty(ty, original)
 
+# Keep the accumulated comparison in the worker arguments so wide predicate
+# lists use a tail call, and a mismatching prefix does not traverse the suffix.
+def same_predicates_work(left: List<&2, M.Predicate>, right: List<&2, M.Predicate>, equal: Bool) -> Bool:
+  match left right equal:
+    case _ _ False{}:
+      False{}
+    case Nil{} Nil{} True{}:
+      True{}
+    case a <> as b <> bs True{}:
+      same_predicates_work(as, bs, C.same_predicate(a, b))
+    case _ _ _:
+      False{}
+
+def same_predicates(left: List<&2, M.Predicate>, right: List<&2, M.Predicate>) -> Bool:
+  same_predicates_work(left, right, True{})
+
+def predicates_unchanged(resolved: Result<&2, &2, M.Diagnostic, List<&2, M.Predicate>>, original: List<&2, M.Predicate>) -> Bool:
+  match resolved:
+    case Fail{diagnostic}:
+      False{}
+    case Done{predicates}:
+      same_predicates(predicates, original)
+
 def unchanged_members(members: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Bool:
   match members:
     case Nil{}:
       True{}
-    case I.Binding{name, +ty, variables} <> tail:
-      Bool.and(member_unchanged(T.resolve(substitutions, ty), ty), unchanged_members(tail, substitutions))
+    case I.Binding{name, +ty, variables, +predicates} <> tail:
+      Bool.and(Bool.and(member_unchanged(T.resolve(substitutions, ty), ty), predicates_unchanged(C.resolve_list(substitutions, predicates), predicates)), unchanged_members(tail, substitutions))
 
 def disjoint(variables: List<&2, Nat>, +generalized: List<&2, Nat>) -> Bool:
   match variables:
@@ -671,13 +760,49 @@ def all_stable(groups: List<&2, Solved>) -> Bool:
     case Solved{plans, stable} <> tail:
       Bool.and(stable, all_stable(tail))
 
+# Member bindings catch changes to a declaration's residual predicates. Use
+# plans can also carry obligations that were discharged at an annotated or
+# generic call site; replacing a dispatch in that same checked group changes
+# the executable evidence even when its public binding stays identical.
+def planned_names(plans: List<&2, Plan>, seen: Set()) -> Set():
+  match plans:
+    case Nil{}:
+      seen
+    case Planned{declaration, key, choice} <> tail:
+      planned_names(tail, Set.add(seen, declaration))
+
+def any_planned_name(names: List<&2, String>, +planned: Set()) -> Bool:
+  match names:
+    case Nil{}:
+      False{}
+    case name <> tail:
+      Bool.or(D.member(planned, name), any_planned_name(tail, planned))
+
+def predicated_rewrite(certificates: List<&2, Core.Certificate>, +planned: Set()) -> Bool:
+  match certificates:
+    case Nil{}:
+      False{}
+    case Core.Certificate{+module, Groups.CheckedGroup{checked, interfaces, uses}, imports} <> tail:
+      Bool.or(Bool.and(Core.pending_uses(uses), any_planned_name(Core.names(module), planned)), predicated_rewrite(tail, planned))
+
+def stable_with_uses(stable: Bool, +plans: List<&2, Plan>, certificates: List<&2, Core.Certificate>) -> Bool:
+  match stable plans:
+    case False{} _:
+      False{}
+    case True{} Nil{}:
+      True{}
+    case True{} plans:
+      Bool.not(predicated_rewrite(certificates, planned_names(plans, Set.new())))
+
 def chosen_name(choice: Mono.Choice) -> String:
   match choice:
-    case Mono.FunctionChoice{name}:
+    case Mono.FunctionChoice{name, signature}:
       name
-    case Mono.ReceiverChoice{name}:
+    case Mono.ReceiverChoice{name, signature}:
       name
-    case Mono.OperationChoice{identity}:
+    case Mono.OperationChoice{identity, signature}:
+      ""
+    case Mono.QualifiedChoice{solved, answers}:
       ""
 
 type Generated is Data:
@@ -829,14 +954,15 @@ def rewrite_planned(+plans: List<&2, Plan>, module: M.Module, +known: Set(), +ca
 
 def rewrite_round(+module: M.Module, initial: Scheduler.Initial, +entry: String, next: Nat, proofs: List<&2, Schema.Evidence>, +cache: Map<&2, Accessor>) -> Rewrite:
   M.Module{constants, +functions, +types, operations} = module
-  Scheduler.Initial{checked, certificates, +needs} = initial
+  Scheduler.Initial{checked, +certificates, +needs} = initial
   +known = function_names(functions, Set.new())
   +requests = group_requests(needs, types, known, cache, entry, Requests{Set.new(), Nil{}, next})
   built = Batch.execute(~AccessorRequest, ~Unit, ~Maybe<&2, Accessor>, ~build_accessor, Batch.plan(AccessorRequest, weighted_requests(request_list(requests)), 128n), Unit{})
   +accessors = cache_accessors(built, cache)
   +bindings = Public.binding_index(G.env_bindings(Mono.shape_bindings(checked)), MTip{})
   +solved = Batch.execute(~Groups.GroupNeeds, ~SolveContext, ~Solved, ~solve_group, Batch.plan(Groups.GroupNeeds, weighted_groups(needs), 256n), SolveContext{bindings, accessors, types, entry, proofs})
-  rewrite_planned(flatten_plans(solved), module, known, accessors, request_next(requests), all_stable(solved))
+  +plans = flatten_plans(solved)
+  rewrite_planned(plans, module, known, accessors, request_next(requests), stable_with_uses(all_stable(solved), plans, certificates))
 
 # ---------------------------------------------------------------------------
 # Rounds
@@ -867,7 +993,7 @@ def certificate_functions(certificates: List<&2, Core.Certificate>) -> List<&2, 
   match certificates:
     case Nil{}:
       Nil{}
-    case Core.Certificate{module, Groups.CheckedGroup{M.CheckedModule{constants, functions, types, operations}, interfaces}, imports} <> tail:
+    case Core.Certificate{module, Groups.CheckedGroup{M.CheckedModule{constants, functions, types, operations}, interfaces, uses}, imports} <> tail:
       List.append(&2, M.CheckedFunction, functions, certificate_functions(tail))
 
 # A stable rewrite needs no further check: every interface is unchanged, so the
@@ -1004,9 +1130,9 @@ def prepare_resolved(found: Resolved, module: M.Module, +entry: String, family_t
     case Fallback{certificates}:
       do Result<&2, &2, M.Diagnostic, M.Module>:
         +pruned : Entries.Pruned <- fallback_pruned(module, entry, certificates)
-        Mono.prepare_checked(Entries.pruned_module(pruned), entry, family_templates, Scheduler.initial_checked(Entries.pruned_initial(pruned)))
+        Mono.prepare_checked(Entries.pruned_module(pruned), entry, family_templates, Entries.pruned_initial(pruned))
     case Resolved{resolved, initial, source_certificates}:
-      Mono.prepare_checked(resolved, entry, family_templates, Scheduler.initial_checked(initial))
+      Mono.prepare_checked(resolved, entry, family_templates, initial)
 
 def prepare(+module: M.Module, +entry: String, family_templates: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, M.Module>:
   prepare_resolved(resolve(module, entry, Nil{}), module, entry, family_templates)

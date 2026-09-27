@@ -25,7 +25,7 @@ const backend = compiled as unknown as {
 
 Deno.test("native planning keys include shared operation nominal requirements", () => {
   const planning = (shared: readonly Node[]): Node => ({
-    $: "Planning",
+    $: "groups.Planning",
     nodes: bendList([]),
     usages: bendList([]),
     type_dependencies: bendList([]),
@@ -37,13 +37,13 @@ Deno.test("native planning keys include shared operation nominal requirements", 
   notEqual(key([id("Box")]), key([id("Wrap")]));
 });
 const id = (declaration: string): Node => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name: "main",
   declaration,
 });
-const unit: Node = { $: "UnitTy" };
-const u32: Node = { $: "U32Ty" };
-const empty = { $: "UnitExpr" };
+const unit: Node = { $: "model.UnitTy" };
+const u32: Node = { $: "model.U32Ty" };
+const empty = { $: "model.UnitExpr" };
 
 function words(result: Result<BendList<number>>): number[] {
   equal(result.$, "Done");
@@ -53,9 +53,9 @@ function words(result: Result<BendList<number>>): number[] {
 
 function moduleWith(operations: readonly Node[], body: Node = empty): Node {
   return {
-    $: "Module",
+    $: "model.Module",
     constants: bendList([{
-      $: "Constant",
+      $: "model.Constant",
       name: "answer",
       exported: false,
       annotation: { $: "None" },
@@ -83,20 +83,20 @@ function moduleKey(operations: readonly Node[], body: Node = empty): number[] {
 Deno.test("native module keys encode concrete, template, and instance operations exactly", () => {
   const get = id("Get");
   const concrete = {
-    $: "Operation",
+    $: "model.Operation",
     identity: get,
     parameter: unit,
     result: u32,
   };
   const template = {
-    $: "OperationTemplate",
+    $: "model.OperationTemplate",
     identity: get,
     parameters: 1n,
     parameter: unit,
-    result: { $: "ParameterTy", index: 0n },
+    result: { $: "model.ParameterTy", index: 0n },
   };
   const instance = {
-    $: "OperationInstance",
+    $: "model.OperationInstance",
     template: get,
     arguments: bendList([u32]),
   };
@@ -122,10 +122,10 @@ Deno.test("native module keys encode concrete, template, and instance operations
 Deno.test("native module keys include nested specialization and associated dispatch fields", () => {
   const get = id("Get");
   const specialized = {
-    $: "SpecializeOperationExpr",
+    $: "model.SpecializeOperationExpr",
     template: get,
     arguments: bendList([u32]),
-    body: { $: "OperationExpr", identity: get },
+    body: { $: "model.OperationExpr", identity: get },
   };
   notEqual(
     moduleKey([], specialized),
@@ -138,13 +138,13 @@ Deno.test("native module keys include nested specialization and associated dispa
     moduleKey([], specialized),
     moduleKey([], {
       ...specialized,
-      body: { $: "OperationExpr", identity: id("Set") },
+      body: { $: "model.OperationExpr", identity: id("Set") },
     }),
   );
   const associated = {
-    $: "AssociatedExpr",
+    $: "model.AssociatedExpr",
     identity: 3n,
-    dispatch: { $: "MemberDispatch" },
+    dispatch: { $: "model.MemberDispatch" },
     member: "field",
     templates: bendList([get]),
     left: empty,
@@ -154,7 +154,7 @@ Deno.test("native module keys include nested specialization and associated dispa
     moduleKey([], associated),
     moduleKey([], {
       ...associated,
-      dispatch: { $: "FieldUpdateDispatch" },
+      dispatch: { $: "model.FieldUpdateDispatch" },
     }),
   );
   notEqual(
@@ -167,18 +167,24 @@ Deno.test("native module keys include nested specialization and associated dispa
 });
 
 Deno.test("runtime cache tags distinguish state providers from array reuse", () => {
+  const empty = { $: "codegen_ir.UnitExpr" };
   const state = words(backend["native_cache_keys.encode"](bendList([{
-    $: "Runtime",
+    $: "native_cache_keys.Runtime",
     value: {
-      $: "StateProviderExpr",
+      $: "codegen_ir.StateProviderExpr",
       read: id("Read"),
       write: id("Write"),
       initial: empty,
     },
   }])));
   const reuse = words(backend["native_cache_keys.encode"](bendList([{
-    $: "Runtime",
-    value: { $: "ArrayReuseExpr", array: empty, index: empty, value: empty },
+    $: "native_cache_keys.Runtime",
+    value: {
+      $: "codegen_ir.ArrayReuseExpr",
+      array: empty,
+      index: empty,
+      value: empty,
+    },
   }])));
   equal(state[0], 32);
   equal(reuse[0], 33);

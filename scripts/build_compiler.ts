@@ -1,11 +1,5 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { optimizeNativeStringComparison } from "./native_string_compare.ts";
-import { optimizeNativeCompilerKernels } from "./native_compiler_kernels.ts";
-import { optimizeNativeOwnedResolver } from "./native_owned_resolver.ts";
-import { optimizeNativeNatIndex } from "./native_nat_index.ts";
-import { optimizeNativeBorrowedStrings } from "./native_borrowed_strings.ts";
-import { normalizeBendJsAbi } from "./bend_js_abi.ts";
 
 const environment = { BEND_NO_TELEMETRY: "1" };
 const decoder = new TextDecoder();
@@ -57,56 +51,6 @@ if (target !== "js") {
       "-o",
       generatedC,
     ])).trim());
-    const nativeVersion = (await run("bend", ["version"])).trim();
-    const modelSource = await Deno.readTextFile(
-      new URL("../compiler/model.bend", import.meta.url),
-    );
-    const specialized = optimizeNativeStringComparison(
-      await Deno.readTextFile(generatedC),
-      modelSource,
-      nativeVersion,
-    );
-    const typesSource = await Deno.readTextFile(
-      new URL("../compiler/types.bend", import.meta.url),
-    );
-    const kernelSource = await optimizeNativeCompilerKernels(
-      specialized.source,
-      {
-        index: await Deno.readTextFile(
-          new URL("../compiler/index.bend", import.meta.url),
-        ),
-        types: typesSource,
-        model: modelSource,
-      },
-      nativeVersion,
-    );
-    const ownedSource = await optimizeNativeOwnedResolver(
-      kernelSource,
-      {
-        types: typesSource,
-        natIndex: await Deno.readTextFile(
-          new URL("../compiler/nat_index.bend", import.meta.url),
-        ),
-        model: modelSource,
-      },
-      nativeVersion,
-    );
-    const indexedSource = await optimizeNativeNatIndex(ownedSource, {
-      natIndex: await Deno.readTextFile(
-        new URL("../compiler/nat_index.bend", import.meta.url),
-      ),
-    }, nativeVersion);
-    const [baseMap, baseString, baseChar] = await Promise.all([
-      run("bend", ["base", "Map"]),
-      run("bend", ["base", "String"]),
-      run("bend", ["base", "Char"]),
-    ]);
-    const borrowedSource = await optimizeNativeBorrowedStrings(indexedSource, {
-      map: baseMap,
-      string: baseString,
-      char: baseChar,
-    }, nativeVersion);
-    await Deno.writeTextFile(generatedC, borrowedSource);
     await run("clang", [
       "-std=c11",
       "-O3",
@@ -117,9 +61,6 @@ if (target !== "js") {
       "-o",
       resolve(staging, "blotc"),
     ]);
-    console.log(
-      `Enabled guarded native String comparison, compiler kernels, owned resolver, NatIndex and borrowed String traversals for ${nativeVersion}`,
-    );
     await Deno.rename(resolve(staging, "blotc"), new URL("blotc", output));
     console.log("Built generated/compiler/blotc (native CPU executable)");
   } finally {
@@ -139,26 +80,28 @@ if (!release) {
 const backend = new URL(`bend-${release}/`, output);
 await Deno.mkdir(backend, { recursive: true });
 await Promise.all(
-  ["main.ts", "bend.ts", "comp.ts", "base.bend"].map(async (name) => {
-    const destination = new URL(name, backend);
-    try {
-      await Deno.readFile(destination);
-    } catch (error) {
-      if (!(error instanceof Deno.errors.NotFound)) throw error;
-      const response = await fetch(
-        `https://raw.githubusercontent.com/bendlang/bend/v${release}/bend2/${name}`,
-      );
-      if (!response.ok) {
-        throw new Error(
-          `Bend ${release} loader download failed: ${name} (${response.status})`,
+  ["main.ts", "bend.ts", "comp.ts", "safe.ts", "base.bend"].map(
+    async (name) => {
+      const destination = new URL(name, backend);
+      try {
+        await Deno.readFile(destination);
+      } catch (error) {
+        if (!(error instanceof Deno.errors.NotFound)) throw error;
+        const response = await fetch(
+          `https://raw.githubusercontent.com/bendlang/bend/v${release}/bend2/${name}`,
+        );
+        if (!response.ok) {
+          throw new Error(
+            `Bend ${release} loader download failed: ${name} (${response.status})`,
+          );
+        }
+        await Deno.writeFile(
+          destination,
+          new Uint8Array(await response.arrayBuffer()),
         );
       }
-      await Deno.writeFile(
-        destination,
-        new Uint8Array(await response.arrayBuffer()),
-      );
-    }
-  }),
+    },
+  ),
 );
 const loader = new URL("main.ts", backend);
 
@@ -185,13 +128,10 @@ process.stdout.write(result.source);`,
       loader.href,
       entry.href,
     ]);
-    const normalized = normalizeBendJsAbi(javascript, version);
     await Deno.writeTextFile(
       new URL(`${filename}.js`, output),
-      `// Generated from compiler/${module}.bend with ${version}. Do not edit.\n${normalized.source}`,
+      javascript,
     );
-    console.log(
-      `Built generated/compiler/${filename}.js (${normalized.constructors} constructors, ${normalized.matches} matches normalized)`,
-    );
+    console.log(`Built generated/compiler/${filename}.js (${version})`);
   }),
 );

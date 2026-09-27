@@ -46,30 +46,33 @@ const n = ($: string, fields: Record<string, unknown> = {}): Node => ({
 });
 const none = n("None");
 const some = (value: Node) => n("Some", { value });
-const unit = n("UnitExpr");
-const unitType = n("UnitTy");
-const u32 = n("U32Ty");
-const integer = (value: number) => n("U32Expr", { value });
-const local = (name: string) => n("LocalExpr", { name });
-const constant = (name: string) => n("ConstantExpr", { name });
+const unit = n("model.UnitExpr");
+const unitType = n("model.UnitTy");
+const u32 = n("model.U32Ty");
+const integer = (value: number) => n("model.U32Expr", { value });
+const local = (name: string) => n("model.LocalExpr", { name });
+const constant = (name: string) => n("model.ConstantExpr", { name });
 const identity = (declaration: string, module_name = "effects/backend") =>
-  n("TypeId", { declaration, module_name });
+  n("model.TypeId", { declaration, module_name });
 const reader = identity("Reader.ask");
 const other = identity("Other.ask");
 const row = (operations: readonly Node[] = []) =>
-  n("EffectRow", { operations: list(operations), tail: n("ClosedRow") });
+  n("model.EffectRow", {
+    operations: list(operations),
+    tail: n("model.ClosedRow"),
+  });
 const declaration = (identity: Node) =>
-  n("Operation", { identity, parameter: unitType, result: u32 });
-const operation = (identity = reader) => n("OperationExpr", { identity });
+  n("model.Operation", { identity, parameter: unitType, result: u32 });
+const operation = (identity = reader) => n("model.OperationExpr", { identity });
 const apply = (callee: Node, argument = unit) =>
-  n("ApplyExpr", { callee, argument });
+  n("model.ApplyExpr", { callee, argument });
 const ask = (identity = reader) => apply(operation(identity));
 const call = (callee: string, argument = unit) =>
-  n("CallExpr", { callee, argument });
+  n("model.CallExpr", { callee, argument });
 const add = (left: Node, right: Node) =>
-  n("ScalarExpr", { operator: n("Add"), left, right });
+  n("model.ScalarExpr", { operator: n("model.Add"), left, right });
 const lambda = (identity: bigint, body: Node, parameter = "value") =>
-  n("LambdaExpr", {
+  n("model.LambdaExpr", {
     identity,
     parameter,
     parameter_type: none,
@@ -77,17 +80,18 @@ const lambda = (identity: bigint, body: Node, parameter = "value") =>
     body,
   });
 const provider = (implementation: Node, identity = reader) =>
-  n("ProviderExpr", { identity, implementation });
+  n("model.ProviderExpr", { identity, implementation });
 const handle = (provider: Node, body: Node) =>
-  n("HandleExpr", { provider, body });
+  n("model.HandleExpr", { provider, body });
 const bind = (name: string, value: Node, body: Node) =>
-  n("LetExpr", { name, value, body });
+  n("model.LetExpr", { name, value, body });
 const sequence = (first: Node, next: Node) =>
-  n("SequenceExpr", { first, next });
-const block = (label: bigint, body: Node) => n("BlockExpr", { label, body });
+  n("model.SequenceExpr", { first, next });
+const block = (label: bigint, body: Node) =>
+  n("model.BlockExpr", { label, body });
 const returns = (label: bigint, value: Node) =>
-  n("ReturnExpr", { label, value });
-const panic = n("PanicExpr", { message: "must not execute" });
+  n("model.ReturnExpr", { label, value });
+const panic = n("model.PanicExpr", { message: "must not execute" });
 
 function fn(
   name: string,
@@ -103,8 +107,8 @@ function fn(
   const parameter = options.parameter ?? "value";
   const parameter_type = options.parameter_type ?? unitType;
   const result_type = options.result_type ?? u32;
-  return n("CheckedFunction", {
-    function: n("Function", {
+  return n("model.CheckedFunction", {
+    function: n("model.Function", {
       name,
       exported: options.exported ?? true,
       parameter,
@@ -112,7 +116,7 @@ function fn(
       result_type: some(result_type),
       body,
     }),
-    signature: n("Signature", {
+    signature: n("model.Signature", {
       name,
       parameter: parameter_type,
       result: result_type,
@@ -121,7 +125,7 @@ function fn(
     }),
     effects: list(
       (options.operations ?? []).map((identity) =>
-        n("OperationEffect", { identity })
+        n("model.OperationEffect", { identity })
       ),
     ),
   });
@@ -136,29 +140,33 @@ function program(
 ) {
   const constants = options.constants ?? [];
   return {
-    checked: n("CheckedModule", {
+    checked: n("model.CheckedModule", {
       functions: list(functions),
-      constants: list(constants.map(({ name, type }) =>
-        n("CheckedConstant", {
-          constant: n("Constant", {
-            name,
-            exported: false,
-            annotation: none,
-            value: unit,
-          }),
-          inferred_type: type ?? u32,
-          variables: list([]),
-        })
-      )),
+      constants: list(
+        constants.map(({ name, type }) =>
+          n("model.CheckedConstant", {
+            constant: n("model.Constant", {
+              name,
+              exported: false,
+              annotation: none,
+              value: unit,
+            }),
+            inferred_type: type ?? u32,
+            variables: list([]),
+          })
+        ),
+      ),
       data_types: list([]),
       operations: list(
         (options.operations ?? [reader]).map((operation) =>
-          operation.$ === "Operation" ? operation : declaration(operation)
+          operation.$ === "model.Operation" ? operation : declaration(operation)
         ),
       ),
     }),
     constants: list(
-      constants.map(({ name, value }) => n("Binding", { name, value })),
+      constants.map(({ name, value }) =>
+        n("const_eval.Binding", { name, value })
+      ),
     ),
   };
 }
@@ -292,7 +300,7 @@ Deno.test("Wasm higher-order operation callbacks carry provider scope through di
     fn("twice", add(apply(local("callback")), apply(local("callback"))), {
       exported: false,
       parameter: "callback",
-      parameter_type: n("FunctionTy", {
+      parameter_type: n("model.FunctionTy", {
         parameter: unitType,
         result: u32,
         effects: row([reader]),
@@ -316,12 +324,15 @@ Deno.test("Wasm constant providers and operation aliases delegate without scope 
     ),
   )], {
     constants: [
-      { name: "ask", value: n("OperationValue", { identity: reader }) },
+      {
+        name: "ask",
+        value: n("const_eval.OperationValue", { identity: reader }),
+      },
       {
         name: "delegate",
-        value: n("ProviderValue", {
+        value: n("const_eval.ProviderValue", {
           identity: reader,
-          implementation: n("OperationValue", { identity: reader }),
+          implementation: n("const_eval.OperationValue", { identity: reader }),
         }),
       },
     ],
@@ -330,7 +341,7 @@ Deno.test("Wasm constant providers and operation aliases delegate without scope 
 });
 
 Deno.test("Wasm generic operation calls preserve F32 payload words and typed exports", () => {
-  const float = n("F32Ty");
+  const float = n("model.F32Ty");
   const double = identity("Numbers.double");
   const built = encode(
     program([fn(
@@ -339,10 +350,10 @@ Deno.test("Wasm generic operation calls preserve F32 payload words and typed exp
         provider(
           lambda(
             1n,
-            n("ScalarExpr", {
-              operator: n("F32Multiply"),
+            n("model.ScalarExpr", {
+              operator: n("model.F32Multiply"),
               left: local("value"),
-              right: n("F32Expr", { value: 2 }),
+              right: n("model.F32Expr", { value: 2 }),
             }),
           ),
           double,
@@ -355,7 +366,11 @@ Deno.test("Wasm generic operation calls preserve F32 payload words and typed exp
       },
     )], {
       operations: [
-        n("Operation", { identity: double, parameter: float, result: float }),
+        n("model.Operation", {
+          identity: double,
+          parameter: float,
+          result: float,
+        }),
       ],
     }),
   );
@@ -401,8 +416,8 @@ Deno.test("Wasm omits const-only descriptor helpers and unused captured descript
   const built = encode(program([
     fn(
       "describe",
-      n("EffectCountExpr", {
-        set: n("FunctionEffectsExpr", { callee: "read" }),
+      n("model.EffectCountExpr", {
+        set: n("model.FunctionEffectsExpr", { callee: "read" }),
       }),
       { exported: false },
     ),
@@ -412,22 +427,24 @@ Deno.test("Wasm omits const-only descriptor helpers and unused captured descript
     constants: [
       {
         name: "metadata",
-        value: n("EffectSetValue", { operations: list([reader]) }),
+        value: n("const_eval.EffectSetValue", { operations: list([reader]) }),
       },
       {
         name: "get",
-        value: n("ClosureValue", {
+        value: n("const_eval.ClosureValue", {
           identity: 5n,
           parameter: "value",
           body: local("captured"),
           environment: list([
-            n("Binding", {
+            n("const_eval.Binding", {
               name: "captured",
-              value: n("U32Value", { value: 42 }),
+              value: n("const_eval.U32Value", { value: 42 }),
             }),
-            n("Binding", {
+            n("const_eval.Binding", {
               name: "metadata",
-              value: n("EffectSetValue", { operations: list([reader]) }),
+              value: n("const_eval.EffectSetValue", {
+                operations: list([reader]),
+              }),
             }),
           ]),
         }),
@@ -446,8 +463,8 @@ Deno.test("Wasm rejects runtime-reachable reflection and descriptor values", () 
   throws(() =>
     encode(program([fn(
       "answer",
-      n("EffectCountExpr", {
-        set: n("FunctionEffectsExpr", { callee: "answer" }),
+      n("model.EffectCountExpr", {
+        set: n("model.FunctionEffectsExpr", { callee: "answer" }),
       }),
     )])), /backend_const_only/);
   throws(
@@ -456,7 +473,7 @@ Deno.test("Wasm rejects runtime-reachable reflection and descriptor values", () 
         constants: [
           {
             name: "metadata",
-            value: n("EffectDescriptorValue", { identity: reader }),
+            value: n("const_eval.EffectDescriptorValue", { identity: reader }),
           },
         ],
       })),
@@ -466,13 +483,13 @@ Deno.test("Wasm rejects runtime-reachable reflection and descriptor values", () 
 
 Deno.test("Wasm reachability follows distinct captured functions of one constant lambda", () => {
   const closure = (name: string) =>
-    n("ClosureValue", {
+    n("const_eval.ClosureValue", {
       identity: 8n,
       parameter: "value",
       body: apply(local("callback")),
-      environment: list([n("Binding", {
+      environment: list([n("const_eval.Binding", {
         name: "callback",
-        value: n("FunctionValue", { name }),
+        value: n("const_eval.FunctionValue", { name }),
       })]),
     });
   const built = encode(program([
@@ -496,13 +513,13 @@ Deno.test("Wasm multiple match scrutinees short-circuit nonlocal returns left to
     "answer",
     block(
       0n,
-      n("MatchExpr", {
+      n("model.MatchExpr", {
         values: list([returns(0n, integer(42)), panic]),
         arms: list([
-          n("MatchArm", {
+          n("model.MatchArm", {
             patterns: list([
-              n("WildcardPattern"),
-              n("WildcardPattern"),
+              n("model.WildcardPattern"),
+              n("model.WildcardPattern"),
             ]),
             body: integer(0),
           }),
@@ -516,20 +533,20 @@ Deno.test("Wasm multiple match scrutinees short-circuit nonlocal returns left to
 Deno.test("Wasm multiple match patterns bind distinct pre-evaluated locals", () => {
   const built = encode(program([fn(
     "answer",
-    n("MatchExpr", {
+    n("model.MatchExpr", {
       values: list([integer(20), integer(22)]),
       arms: list([
-        n("MatchArm", {
+        n("model.MatchArm", {
           patterns: list([
-            n("U32Pattern", { value: 1 }),
-            n("WildcardPattern"),
+            n("model.U32Pattern", { value: 1 }),
+            n("model.WildcardPattern"),
           ]),
           body: panic,
         }),
-        n("MatchArm", {
+        n("model.MatchArm", {
           patterns: list([
-            n("BindingPattern", { name: "left" }),
-            n("BindingPattern", { name: "right" }),
+            n("model.BindingPattern", { name: "left" }),
+            n("model.BindingPattern", { name: "right" }),
           ]),
           body: add(local("left"), local("right")),
         }),

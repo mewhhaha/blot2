@@ -4,7 +4,8 @@ export interface SourceRange {
 }
 
 // This only finds conservative work boundaries, not tokens or valid syntax.
-// Every slice still passes through Baba and the ordinary layout rules; any
+// Braces also keep multiline `where` predicates and open effect rows attached
+// to their binding. Every slice still passes through Baba and layout rules; any
 // rejection falls back to a whole-file parse for canonical diagnostics.
 export function sourceDeclarationRanges(
   source: string,

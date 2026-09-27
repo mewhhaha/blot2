@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import candidate from "../generated/compiler/compiler.js";
+import { toBendCst } from "./bend_abi.ts";
 import { bendArray, bendList } from "./bend_list.ts";
 import { createSourceFrontend } from "./source_frontend.ts";
 import { createSourceProjectLoader } from "./source_project.ts";
@@ -17,22 +18,22 @@ const Entry.contains = fn entry => fn witness => do:
 const run = fn () => Entry { head: True, tail: End }.contains(True)
 `;
 const row = {
-  $: "EffectRow",
+  $: "model.EffectRow",
   operations: bendList([]),
-  tail: { $: "ClosedRow" },
+  tail: { $: "model.ClosedRow" },
 };
 const applied = (identity: Node, args: Node[]): Node => ({
-  $: "AppliedTy",
+  $: "model.AppliedTy",
   identity,
   arguments: bendList(args),
 });
 const result = (witness: Node): Node => ({
-  $: "FunctionTy",
+  $: "model.FunctionTy",
   parameter: witness,
-  result: { $: "BoolTy" },
+  result: { $: "model.BoolTy" },
   effects: row,
 });
-const bool: Node = { $: "BoolTy" }, u32: Node = { $: "U32Ty" };
+const bool: Node = { $: "model.BoolTy" }, u32: Node = { $: "model.U32Ty" };
 
 function checkedSource(input: string) {
   return async () => {
@@ -40,8 +41,8 @@ function checkedSource(input: string) {
     try {
       const prepared = frontend.prepare(input);
       const lowered = api["lower.source_module"](
-        prepared.root,
-        prepared.prelude,
+        toBendCst(prepared.root),
+        toBendCst(prepared.prelude),
         prepared.nodeCount,
       );
       assert.equal(lowered.$, "Done", Deno.inspect(lowered.error));
@@ -84,7 +85,10 @@ Deno.test("independently checked linked schema reduces concrete chains only", as
     );
   assert.deepEqual(decide(chain, bool), { $: "Some", value: true });
   assert.deepEqual(decide(chain, u32), { $: "Some", value: true });
-  assert.deepEqual(decide(chain, { $: "F32Ty" }), { $: "Some", value: false });
+  assert.deepEqual(decide(chain, { $: "model.F32Ty" }), {
+    $: "Some",
+    value: false,
+  });
   assert.equal(
     decide(
       entry(
@@ -97,12 +101,15 @@ Deno.test("independently checked linked schema reduces concrete chains only", as
     "early match still validates the tail",
   );
   assert.equal(
-    decide(entry(bool, entry({ $: "VariableTy", index: 987n }, end)), bool).$,
+    decide(
+      entry(bool, entry({ $: "model.VariableTy", index: 987n }, end)),
+      bool,
+    ).$,
     "None",
     "later open head falls back",
   );
   assert.equal(
-    decide(entry(bool, { $: "VariableTy", index: 988n }), bool).$,
+    decide(entry(bool, { $: "model.VariableTy", index: 988n }), bool).$,
     "None",
     "open tail falls back",
   );
@@ -115,7 +122,9 @@ Deno.test("independently checked linked schema reduces concrete chains only", as
     ]
   ) {
     const changed = functions.map((fn) =>
-      fn.name === target ? { ...fn, body: { $: "BoolExpr", value: false } } : fn
+      fn.name === target
+        ? { ...fn, body: { $: "model.BoolExpr", value: false } }
+        : fn
     );
     assert.equal(
       api["schema_stage.decide"](
@@ -223,11 +232,11 @@ Deno.test("optional helper guards Nat48 counters, fresh IDs, and generated names
   assert.equal(api["monomorph.schema_space"](max - 1n, 1n, 1n), true);
   assert.equal(api["monomorph.schema_space"](1n, 0n, 1n), false);
   const environment = (next: bigint) => ({
-    $: "Environment",
+    $: "globals.Environment",
     bindings: bendList([]),
     definitions: bendList([]),
     state: {
-      $: "State",
+      $: "infer.State",
       substitutions: api["types.empty"](),
       next,
       annotations: { $: "MTip" },
@@ -242,13 +251,13 @@ Deno.test("optional helper guards Nat48 counters, fresh IDs, and generated names
     api["monomorph.schema_name_free"]({
       $: "Done",
       value: {
-        $: "Function",
+        $: "model.Function",
         name: "$schema[1].contains",
         exported: false,
         parameter: "x",
         parameter_type: { $: "None" },
         result_type: { $: "None" },
-        body: { $: "UnitExpr" },
+        body: { $: "model.UnitExpr" },
       },
     }),
     false,
@@ -257,7 +266,7 @@ Deno.test("optional helper guards Nat48 counters, fresh IDs, and generated names
     api["monomorph.schema_name_free"]({
       $: "Fail",
       error: {
-        $: "Diagnostic",
+        $: "model.Diagnostic",
         code: "unknown_function",
         subject: "x",
         message: "missing",
@@ -276,8 +285,11 @@ Deno.test("source evidence follows a different project module identity", async (
     const project = await loader.load("/virtual/staged-schema/custom.blot");
     const prepared = frontend.prepare(project);
     const lowered = api["source_modules.prepared_project"](
-      api["lower.prepare_prelude"](prepared.prelude, prepared.nodeCount),
-      prepared.root,
+      api["lower.prepare_prelude"](
+        toBendCst(prepared.prelude),
+        prepared.nodeCount,
+      ),
+      toBendCst(prepared.root),
       prepared.nodeCount,
     );
     assert.equal(lowered.$, "Done", Deno.inspect(lowered.error));

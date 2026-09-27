@@ -3,7 +3,7 @@ import compiled from "../generated/compiler/compiler.js";
 
 type Arguments = { readonly $: "Nil" } | {
   readonly $: "Con";
-  readonly head: { readonly $: "VariableTy"; readonly index: bigint };
+  readonly head: { readonly $: "model.VariableTy"; readonly index: bigint };
   readonly tail: Arguments;
 };
 
@@ -17,7 +17,10 @@ Deno.test("fresh type arguments retain ascending identities after a small warm c
     let cursor = types["type_data.fresh_arguments"](BigInt(count), start);
     let index = 0;
     while (cursor.$ === "Con") {
-      equal(cursor.head, { $: "VariableTy", index: start + BigInt(index) });
+      equal(cursor.head, {
+        $: "model.VariableTy",
+        index: start + BigInt(index),
+      });
       index++;
       cursor = cursor.tail;
     }

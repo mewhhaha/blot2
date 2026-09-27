@@ -32,47 +32,54 @@ function fixture(shape: string) {
   const entries = [];
   for (let index = 0; index < 64; index++) {
     const depth = shape === "tiny" ? 0 : index % 2 === 0 ? 8 : 64;
-    let body: unknown = { $: "U32Expr", value: index };
+    let body: unknown = { $: "model.U32Expr", value: index };
+    let codegenBody: unknown = { $: "codegen_ir.U32Expr", value: index };
     for (let level = 0; level < depth; level++) {
       body = {
-        $: "LetExpr",
+        $: "model.LetExpr",
         name: `local_${level}`,
-        value: { $: "U32Expr", value: index },
+        value: { $: "model.U32Expr", value: index },
         body,
+      };
+      codegenBody = {
+        $: "codegen_ir.LetExpr",
+        name: `local_${level}`,
+        value: { $: "codegen_ir.U32Expr", value: index },
+        body: codegenBody,
       };
     }
     const name = `bench_${index}`;
     const module = {
-      $: "Module",
+      $: "model.Module",
       constants: bendList([]),
       data_types: bendList([]),
       operations: bendList([]),
       functions: bendList([{
-        $: "Function",
+        $: "model.Function",
         name,
         exported: false,
         parameter: "value",
-        parameter_type: { $: "Some", value: { $: "UnitTy" } },
-        result_type: { $: "Some", value: { $: "U32Ty" } },
+        parameter_type: { $: "Some", value: { $: "model.UnitTy" } },
+        result_type: { $: "Some", value: { $: "model.U32Ty" } },
         body,
       }]),
     };
     jobs.push({
-      $: "CodegenJob",
+      $: "wasm.CodegenJob",
       key: `fn:${name}`,
       parameter: "value",
-      body,
+      body: codegenBody,
       captures: bendList([]),
     });
     entries.push({
-      $: "Entry",
+      $: "wasm.Entry",
       key: `fn:${name}`,
       parameter: "value",
       body,
       captures: bendList([]),
     });
     tasks.push({
-      $: "Task",
+      $: "check_scheduler.Task",
       position: BigInt(index),
       module,
       dependencies: bendList([]),
@@ -126,9 +133,11 @@ for (const phase of phases) {
           grain,
           prepared.entries,
           {
-            $: "Metadata",
+            $: "codegen_ir.Metadata",
             lambdas: { $: "MTip" },
             constructors: { $: "MTip" },
+            safe_loops: { $: "MTip" },
+            functions: { $: "MTip" },
           },
         );
       }

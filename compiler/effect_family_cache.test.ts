@@ -43,12 +43,12 @@ function array<T>(values: List<T>): T[] {
 }
 
 function identity(declaration: string): Node {
-  return { $: "TypeId", module_name: "main", declaration };
+  return { $: "model.TypeId", module_name: "main", declaration };
 }
 
 function scope(kind: Node): Node {
   const empty = {
-    $: "Context",
+    $: "lower.Context",
     globals: { $: "MTip" },
     headers: { $: "MTip" },
     fixities: list([]),
@@ -57,7 +57,7 @@ function scope(kind: Node): Node {
     annotation_variables: list([]),
   };
   const added = backend["lower.add_global"](empty, "State", "State", kind, {
-    $: "Cst",
+    $: "cst.Cst",
     kind: "IDENT",
     field: "",
     text: "State",
@@ -79,39 +79,39 @@ function key(kind: Node): number[] {
 Deno.test("native scope keys distinguish effect templates, arity, and family members", () => {
   const get = identity("State.get");
   const set = identity("State.set");
-  const ordinary = key({ $: "OperationName", identity: get });
+  const ordinary = key({ $: "lower.OperationName", identity: get });
   const template = key({
-    $: "OperationTemplateName",
+    $: "lower.OperationTemplateName",
     identity: get,
-    parameters: list([{ $: "Binding", source: "a" }]),
+    parameters: list([{ $: "source_arguments.Binding", source: "a" }]),
   });
   notEqual(template, ordinary);
   notEqual(
     template,
     key({
-      $: "OperationTemplateName",
+      $: "lower.OperationTemplateName",
       identity: get,
       parameters: list([{
-        $: "ArrayPattern",
-        elements: list([{ $: "Binding", source: "a" }, {
-          $: "Binding",
+        $: "source_arguments.ArrayPattern",
+        elements: list([{ $: "source_arguments.Binding", source: "a" }, {
+          $: "source_arguments.Binding",
           source: "b",
         }]),
       }]),
     }),
   );
   const family = key({
-    $: "EffectFamilyName",
+    $: "lower.EffectFamilyName",
     members: list([get, set]),
-    parameters: list([{ $: "Binding", source: "a" }]),
+    parameters: list([{ $: "source_arguments.Binding", source: "a" }]),
   });
   notEqual(family, template);
   notEqual(
     family,
     key({
-      $: "EffectFamilyName",
+      $: "lower.EffectFamilyName",
       members: list([set, get]),
-      parameters: list([{ $: "Binding", source: "a" }]),
+      parameters: list([{ $: "source_arguments.Binding", source: "a" }]),
     }),
   );
 });

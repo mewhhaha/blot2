@@ -12,24 +12,24 @@ function list<T>(items: readonly T[]): List<T> {
 }
 function constant(name: string, value: unknown, annotation: unknown = none) {
   return {
-    $: "ConstantDeclaration",
-    value: { $: "Constant", name, exported: false, annotation, value },
+    $: "globals.ConstantDeclaration",
+    value: { $: "model.Constant", name, exported: false, annotation, value },
   };
 }
-const u32 = { $: "U32Ty" };
-const bool = { $: "BoolTy" };
-const unit = { $: "UnitTy" };
-const u32Expr = (value: number) => ({ $: "U32Expr", value });
-const boolExpr = (value: boolean) => ({ $: "BoolExpr", value });
-const ref = (name: string) => ({ $: "ConstantExpr", name });
+const u32 = { $: "model.U32Ty" };
+const bool = { $: "model.BoolTy" };
+const unit = { $: "model.UnitTy" };
+const u32Expr = (value: number) => ({ $: "model.U32Expr", value });
+const boolExpr = (value: boolean) => ({ $: "model.BoolExpr", value });
+const ref = (name: string) => ({ $: "model.ConstantExpr", name });
 const some = (value: unknown) => ({ $: "Some", value });
 const id = (name: string) => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name: "ops",
   declaration: name,
 });
-const row = (labels: unknown[], tail: unknown = { $: "ClosedRow" }) => ({
-  $: "EffectRow",
+const row = (labels: unknown[], tail: unknown = { $: "model.ClosedRow" }) => ({
+  $: "model.EffectRow",
   operations: list(labels),
   tail,
 });
@@ -94,11 +94,11 @@ function environment(
     bindings.push(cursor.head);
   }
   return {
-    $: "Environment",
+    $: "globals.Environment",
     bindings: list([...bindings, ...imports]),
     definitions: nil,
     state: {
-      $: "State",
+      $: "infer.State",
       substitutions,
       next: api.initialNext(declarations, start),
       annotations: { $: "MTip" },
@@ -163,7 +163,7 @@ Deno.test("independent jobs pass guard and commit exact serial state", () => {
   }
   equal(jobs.length, 2);
   const context = {
-    $: "Context",
+    $: "parallel_infer.Context",
     environment: env,
     operations: nil,
     types: nil,
@@ -207,7 +207,7 @@ function speculativeOutcomes(
   };
   equal(prepared.$, "Done");
   const context = {
-    $: "Context",
+    $: "parallel_infer.Context",
     environment: env,
     operations: list(operations),
     types: nil,
@@ -229,11 +229,13 @@ function assertSpeculativeSuccess(outcomes: List<unknown>) {
 
 Deno.test("shared read-only inference aliases can commit", () => {
   const shared = {
-    $: "Binding",
+    $: "infer.Binding",
+    predicates: { $: "Nil" },
+
     name: "shared",
     inferred_type: {
-      $: "ProductTy",
-      elements: list([{ $: "VariableTy", index: 100n }]),
+      $: "model.ProductTy",
+      elements: list([{ $: "model.VariableTy", index: 100n }]),
     },
     variables: nil,
   };
@@ -257,9 +259,11 @@ Deno.test("shared read-only inference aliases can commit", () => {
 
 Deno.test("actual writes to shared monomorphic type and row variables force replay", () => {
   const tyShared = {
-    $: "Binding",
+    $: "infer.Binding",
+    predicates: { $: "Nil" },
+
     name: "shared",
-    inferred_type: { $: "VariableTy", index: 100n },
+    inferred_type: { $: "model.VariableTy", index: 100n },
     variables: nil,
   };
   const typeDeclarations = [
@@ -283,12 +287,14 @@ Deno.test("actual writes to shared monomorphic type and row variables force repl
   equal(compare(typeDeclarations, [tyShared], [], 101n).$, "Fail");
 
   const rowShared = {
-    $: "Binding",
+    $: "infer.Binding",
+    predicates: { $: "Nil" },
+
     name: "shared",
     inferred_type: {
-      $: "ProviderTy",
+      $: "model.ProviderTy",
       identity: id("read"),
-      effects: row([], { $: "RowVariable", index: 100n }),
+      effects: row([], { $: "model.RowVariable", index: 100n }),
     },
     variables: nil,
   };
@@ -296,20 +302,20 @@ Deno.test("actual writes to shared monomorphic type and row variables force repl
     constant(
       "first",
       ref("shared"),
-      some({ $: "ProviderTy", identity: id("read"), effects: row([]) }),
+      some({ $: "model.ProviderTy", identity: id("read"), effects: row([]) }),
     ),
     constant(
       "second",
       ref("shared"),
       some({
-        $: "ProviderTy",
+        $: "model.ProviderTy",
         identity: id("read"),
         effects: row([id("write")]),
       }),
     ),
   ];
   const rowOps = ["read", "write"].map((name) => ({
-    $: "Operation",
+    $: "model.Operation",
     identity: id(name),
     parameter: unit,
     result: unit,
@@ -350,19 +356,19 @@ function ids(values: List<bigint>): bigint[] {
 }
 
 Deno.test("indexed neighbors include every historical type and row version in order", () => {
-  const variable = (index: bigint) => ({ $: "VariableTy", index });
+  const variable = (index: bigint) => ({ $: "model.VariableTy", index });
   const substitutions = appendAll([
-    { $: "Substitution", variable: 0n, replacement: variable(1n) },
+    { $: "types.Substitution", variable: 0n, replacement: variable(1n) },
     {
-      $: "RowSubstitution",
+      $: "types.RowSubstitution",
       variable: 0n,
-      replacement: row([], { $: "RowVariable", index: 2n }),
+      replacement: row([], { $: "model.RowVariable", index: 2n }),
     },
-    { $: "Substitution", variable: 0n, replacement: variable(3n) },
+    { $: "types.Substitution", variable: 0n, replacement: variable(3n) },
     {
-      $: "RowSubstitution",
+      $: "types.RowSubstitution",
       variable: 0n,
-      replacement: row([], { $: "RowVariable", index: 4n }),
+      replacement: row([], { $: "model.RowVariable", index: 4n }),
     },
   ]);
   const current = api.indexedNeighbors(substitutions, 0n) as {
@@ -380,21 +386,25 @@ Deno.test("indexed neighbors include every historical type and row version in or
 });
 
 Deno.test("indexed read closure visits diamond and cyclic aliases once", () => {
-  const variable = (index: bigint) => ({ $: "VariableTy", index });
+  const variable = (index: bigint) => ({ $: "model.VariableTy", index });
   const substitutions = appendAll([
     {
-      $: "Substitution",
+      $: "types.Substitution",
       variable: 0n,
       replacement: {
-        $: "ProductTy",
+        $: "model.ProductTy",
         elements: list([variable(1n), variable(2n)]),
       },
     },
-    { $: "Substitution", variable: 1n, replacement: variable(3n) },
-    { $: "Substitution", variable: 2n, replacement: variable(3n) },
-    { $: "Substitution", variable: 3n, replacement: variable(0n) },
+    { $: "types.Substitution", variable: 1n, replacement: variable(3n) },
+    { $: "types.Substitution", variable: 2n, replacement: variable(3n) },
+    { $: "types.Substitution", variable: 3n, replacement: variable(0n) },
   ]);
-  const work = { $: "ClosureStep", queue: list([0n]), seen: nil };
+  const work = {
+    $: "parallel_infer.ClosureStep",
+    queue: list([0n]),
+    seen: nil,
+  };
   const closure = api.readClosure(12n, work, substitutions) as {
     $: string;
     value: List<bigint>;
@@ -430,24 +440,26 @@ Deno.test("parallel inference replays first diagnostic in source order", () => {
 
 Deno.test("shared monomorphic State provider variables remain serial", () => {
   const shared = {
-    $: "Binding",
+    $: "infer.Binding",
+    predicates: { $: "Nil" },
+
     name: "shared",
     inferred_type: {
-      $: "StateProviderTy",
+      $: "model.StateProviderTy",
       read: id("read"),
       write: id("write"),
-      state: { $: "VariableTy", index: 100n },
+      state: { $: "model.VariableTy", index: 100n },
     },
     variables: nil,
   };
   const op = (name: string) => ({
-    $: "Operation",
+    $: "model.Operation",
     identity: id(name),
     parameter: unit,
     result: unit,
   });
   const provider = (state: unknown) => ({
-    $: "StateProviderTy",
+    $: "model.StateProviderTy",
     read: id("read"),
     write: id("write"),
     state,
@@ -466,23 +478,25 @@ Deno.test("shared monomorphic State provider variables remain serial", () => {
 
 Deno.test("shared monomorphic effect row constraints preserve serial state", () => {
   const shared = {
-    $: "Binding",
+    $: "infer.Binding",
+    predicates: { $: "Nil" },
+
     name: "shared",
     inferred_type: {
-      $: "ProviderTy",
+      $: "model.ProviderTy",
       identity: id("read"),
-      effects: row([], { $: "RowVariable", index: 100n }),
+      effects: row([], { $: "model.RowVariable", index: 100n }),
     },
     variables: nil,
   };
   const op = (name: string) => ({
-    $: "Operation",
+    $: "model.Operation",
     identity: id(name),
     parameter: unit,
     result: unit,
   });
   const provider = (labels: unknown[]) => ({
-    $: "ProviderTy",
+    $: "model.ProviderTy",
     identity: id("read"),
     effects: row(labels),
   });
@@ -499,14 +513,16 @@ Deno.test("shared monomorphic effect row constraints preserve serial state", () 
 
 Deno.test("seeded aliases and bound imported quantifiers preserve serial state", () => {
   const alias = api.appendSubstitution(api.empty(), {
-    $: "Substitution",
+    $: "types.Substitution",
     variable: 100n,
-    replacement: { $: "VariableTy", index: 101n },
+    replacement: { $: "model.VariableTy", index: 101n },
   });
   const shared = (variables: bigint[]) => ({
-    $: "Binding",
+    $: "infer.Binding",
+    predicates: { $: "Nil" },
+
     name: "shared",
-    inferred_type: { $: "VariableTy", index: 100n },
+    inferred_type: { $: "model.VariableTy", index: 100n },
     variables: list(variables),
   });
   const declarations = [
@@ -531,9 +547,11 @@ Deno.test("staged segment uses full pending names across barriers", () => {
   ];
   const source = list(declarations);
   const imported = {
-    $: "Binding",
+    $: "infer.Binding",
+    predicates: { $: "Nil" },
+
     name: "later",
-    inferred_type: { $: "VariableTy", index: 100n },
+    inferred_type: { $: "model.VariableTy", index: 100n },
     variables: nil,
   };
   const env = environment(source, [imported], 101n);

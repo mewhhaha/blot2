@@ -21,6 +21,7 @@ export default grammar({
         $.infix_function,
         $.forward_return,
         $.declaration_tag,
+        $.where_clause,
         $.parenthesized,
         $.bracketed,
         $.braced,
@@ -118,6 +119,10 @@ export default grammar({
           alias("!", $.operator),
         )),
       ),
+
+    // Highlight the contextual clause without treating `where` as a global
+    // keyword: `const where` and `fn where =>` remain ordinary identifiers.
+    where_clause: ($) => prec(4, seq("where", $.braced)),
 
     type_header: ($) =>
       prec.right(

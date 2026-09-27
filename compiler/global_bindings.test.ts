@@ -3,10 +3,11 @@ import compiled from "../generated/compiler/compiler.js";
 
 type List<T> = { $: "Nil" } | { $: "Con"; head: T; tail: List<T> };
 type Binding = {
-  $: "Binding";
+  $: "infer.Binding";
   name: string;
-  inferred_type: { $: "VariableTy"; index: bigint };
+  inferred_type: { $: "model.VariableTy"; index: bigint };
   variables: List<bigint>;
+  predicates: List<unknown>;
 };
 const api = compiled as unknown as {
   "global_bindings.build"(
@@ -32,9 +33,11 @@ function list<T>(items: readonly T[]): List<T> {
 }
 function binding(name: string, index: number): Binding {
   return {
-    $: "Binding",
+    $: "infer.Binding",
+    predicates: { $: "Nil" },
+
     name,
-    inferred_type: { $: "VariableTy", index: BigInt(index) },
+    inferred_type: { $: "model.VariableTy", index: BigInt(index) },
     variables: list([BigInt(index)]),
   };
 }
@@ -86,13 +89,13 @@ Deno.test("global binding index matches ordered filtering for prefixes, Unicode 
 
 Deno.test("global declaration lookup retains its first match and missing-name diagnostic", () => {
   const declaration = (name: string, value: bigint) => ({
-    $: "ConstantDeclaration",
+    $: "globals.ConstantDeclaration",
     value: {
-      $: "Constant",
+      $: "model.Constant",
       name,
       exported: false,
       annotation: { $: "None" },
-      value: { $: "U32Expr", value },
+      value: { $: "model.U32Expr", value },
     },
   });
   const first = declaration("same", 1n);
@@ -108,7 +111,7 @@ Deno.test("global declaration lookup retains its first match and missing-name di
   equal(api["globals.lookup"](declarations, "missing"), {
     $: "Fail",
     error: {
-      $: "Diagnostic",
+      $: "model.Diagnostic",
       code: "internal_error",
       subject: "missing",
       message: "missing top-level declaration",

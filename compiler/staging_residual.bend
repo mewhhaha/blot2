@@ -3,6 +3,8 @@ import ./model.bend as M
 import ./types.bend as T
 import ./infer.bend as I
 import ./nat_index.bend as NatIndex
+import ./constraints.bend as C
+import ./use_plans.bend as Uses
 
 # A retained inference result is useful only when all its type-bearing evidence
 # moves with the scheme. Identity renaming is supplied by the caller that also
@@ -45,6 +47,22 @@ def rewrite_row(row: M.EffectRow, +rewrite: Rewrite) -> Result<&2, &2, M.Diagnos
     case Resolution{substitutions}:
       Done{T.resolve_row(substitutions, row)}
 
+def rewrite_invocation(invocation: Maybe<&2, M.EffectRow>, rewrite: Rewrite) -> Result<&2, &2, M.Diagnostic, Maybe<&2, M.EffectRow>>:
+  match invocation:
+    case None{}:
+      Done{None{}}
+    case Some{row}:
+      do Result<&2, &2, M.Diagnostic, Maybe<&2, M.EffectRow>>:
+        next : M.EffectRow <- rewrite_row(row, rewrite)
+        return Some{next}
+
+def invocation_free(invocation: Maybe<&2, M.EffectRow>) -> List<&2, Nat>:
+  match invocation:
+    case None{}:
+      Nil{}
+    case Some{row}:
+      T.row_free(row)
+
 def rewrite_identity(identity: Nat, +rewrite: Rewrite) -> Nat:
   match rewrite:
     case Alpha{mapping, identities}:
@@ -58,6 +76,51 @@ def rewrite_identity(identity: Nat, +rewrite: Rewrite) -> Nat:
     case Resolution{substitutions}:
       identity
 
+def rewrite_predicate(predicate: M.Predicate, rewrite: Rewrite) -> Result<&2, &2, M.Diagnostic, M.Predicate>:
+  match rewrite:
+    case Alpha{mapping, identities}:
+      C.rename(mapping, predicate)
+    case Sequential{old, fresh}:
+      C.transform(predicate, C.ReplaceVariable{old, fresh})
+    case Identities{mapping}:
+      Done{predicate}
+    case IdentityOffset{base}:
+      Done{predicate}
+    case Resolution{substitutions}:
+      C.resolve(substitutions, predicate)
+
+def rewrite_predicates(predicates: List<&2, M.Predicate>, +rewrite: Rewrite) -> Result<&2, &2, M.Diagnostic, List<&2, M.Predicate>>:
+  match predicates:
+    case Nil{}:
+      Done{Nil{}}
+    case head <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Predicate>>:
+        first : M.Predicate <- rewrite_predicate(head, rewrite)
+        rest : List<&2, M.Predicate> <- rewrite_predicates(tail, rewrite)
+        return first <> rest
+
+def rewrite_uses(uses: List<&2, C.UsePlan>, +rewrite: Rewrite) -> Result<&2, &2, M.Diagnostic, List<&2, C.UsePlan>>:
+  match uses:
+    case Nil{}:
+      Done{Nil{}}
+    case C.UsePlan{site, subject, ty, predicates} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, C.UsePlan>>:
+        next_type : M.Ty <- rewrite_type(ty, rewrite)
+        next_predicates : List<&2, M.Predicate> <- rewrite_predicates(predicates, rewrite)
+        rest : List<&2, C.UsePlan> <- rewrite_uses(tail, rewrite)
+        return C.UsePlan{rewrite_identity(site, rewrite), subject, next_type, next_predicates} <> rest
+
+def rewrite_reflections(reflections: List<&2, I.Reflection>, +rewrite: Rewrite) -> Result<&2, &2, M.Diagnostic, List<&2, I.Reflection>>:
+  match reflections:
+    case Nil{}:
+      Done{Nil{}}
+    case I.Reflection{callee, subject, ty, predicates} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, I.Reflection>>:
+        next_type : M.Ty <- rewrite_type(ty, rewrite)
+        next_predicates : List<&2, M.Predicate> <- rewrite_predicates(predicates, rewrite)
+        rest : List<&2, I.Reflection> <- rewrite_reflections(tail, rewrite)
+        return I.Reflection{callee, subject, next_type, next_predicates} <> rest
+
 def rewrite_types(values: List<&2, M.Ty>, +rewrite: Rewrite) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
   match values:
     case Nil{}:
@@ -70,18 +133,27 @@ def rewrite_types(values: List<&2, M.Ty>, +rewrite: Rewrite) -> Result<&2, &2, M
 
 def rewrite_coverage(value: I.Coverage, +rewrite: Rewrite) -> Result<&2, &2, M.Diagnostic, I.Coverage>:
   match value:
+    case I.QualifiedBoundary{offset, declared, subject}:
+      do Result<&2, &2, M.Diagnostic, I.Coverage>:
+        needs : List<&2, M.Predicate> <- rewrite_predicates(declared, rewrite)
+        return I.QualifiedBoundary{offset, needs, subject}
+    case I.QualifiedNeed{site, predicate, subject}:
+      do Result<&2, &2, M.Diagnostic, I.Coverage>:
+        next : M.Predicate <- rewrite_predicate(predicate, rewrite)
+        return I.QualifiedNeed{rewrite_identity(site, rewrite), next, subject}
     case I.OperationNeed{identity, template, arguments, function_type, subject}:
       do Result<&2, &2, M.Diagnostic, I.Coverage>:
         args : List<&2, M.Ty> <- rewrite_types(arguments, rewrite)
         function : M.Ty <- rewrite_type(function_type, rewrite)
         return I.OperationNeed{rewrite_identity(identity, rewrite), template, args, function, subject}
-    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject}:
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, invocation, ambient, subject}:
       do Result<&2, &2, M.Diagnostic, I.Coverage>:
         l : M.Ty <- rewrite_type(left, rewrite)
         r : M.Ty <- rewrite_type(right, rewrite)
         value : M.Ty <- rewrite_type(result, rewrite)
+        selected : Maybe<&2, M.EffectRow> <- rewrite_invocation(invocation, rewrite)
         row : M.EffectRow <- rewrite_row(ambient, rewrite)
-        return I.AssociatedNeed{rewrite_identity(identity, rewrite), dispatch, member, templates, l, r, value, row, subject}
+        return I.AssociatedNeed{rewrite_identity(identity, rewrite), dispatch, member, templates, l, r, value, selected, row, subject}
     case I.ValuePatternType{inferred_type, subject}:
       do Result<&2, &2, M.Diagnostic, I.Coverage>:
         ty : M.Ty <- rewrite_type(inferred_type, rewrite)
@@ -113,11 +185,14 @@ def rewrite_exits(exits: List<&2, Nat>, +rewrite: Rewrite) -> List<&2, Nat>:
       rewrite_identity(head, rewrite) <> rewrite_exits(tail, rewrite)
 
 def rewrite_inference(inference: I.Inference, +rewrite: Rewrite) -> Result<&2, &2, M.Diagnostic, I.Inference>:
-  I.Inference{ty, coverage, exits, reflections} = inference
+  I.Inference{ty, coverage, exits, reflections, predicates, uses} = inference
   do Result<&2, &2, M.Diagnostic, I.Inference>:
     result : M.Ty <- rewrite_type(ty, rewrite)
     needs : List<&2, I.Coverage> <- rewrite_coverages(coverage, rewrite)
-    return I.Inference{result, needs, rewrite_exits(exits, rewrite), reflections}
+    next_predicates : List<&2, M.Predicate> <- rewrite_predicates(predicates, rewrite)
+    next_uses : List<&2, C.UsePlan> <- rewrite_uses(uses, rewrite)
+    next_reflections : List<&2, I.Reflection> <- rewrite_reflections(reflections, rewrite)
+    return I.Inference{result, needs, rewrite_exits(exits, rewrite), next_reflections, next_predicates, next_uses}
 
 # The fallback exactly retains the old left-to-right substitution behavior for
 # duplicate quantified IDs and allocation collisions. It remaps source IDs once
@@ -163,17 +238,21 @@ def types_free(values: List<&2, M.Ty>) -> Result<&2, &2, M.Diagnostic, List<&2, 
 
 def coverage_free(value: I.Coverage) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
   match value:
+    case I.QualifiedBoundary{offset, declared, subject}:
+      C.free_list(declared)
+    case I.QualifiedNeed{site, predicate, subject}:
+      C.free(predicate)
     case I.OperationNeed{identity, template, arguments, function_type, subject}:
       do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
         a : List<&2, Nat> <- types_free(arguments)
         f : List<&2, Nat> <- T.free(function_type)
         return T.union(a, f)
-    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject}:
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, invocation, ambient, subject}:
       do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
         a : List<&2, Nat> <- T.free(left)
         b : List<&2, Nat> <- T.free(right)
         c : List<&2, Nat> <- T.free(result)
-        return T.union(T.row_free(ambient), T.union(a, T.union(b, c)))
+        return T.union(invocation_free(invocation), T.union(T.row_free(ambient), T.union(a, T.union(b, c))))
     case I.ValuePatternType{inferred_type, subject}:
       T.free(inferred_type)
     case I.Coverage{inferred_types, patterns, subject}:
@@ -191,9 +270,23 @@ def coverages_free(values: List<&2, I.Coverage>) -> Result<&2, &2, M.Diagnostic,
         b : List<&2, Nat> <- coverages_free(tail)
         return T.union(a, b)
 
+def reflections_free(reflections: List<&2, I.Reflection>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+  match reflections:
+    case Nil{}:
+      Done{Nil{}}
+    case I.Reflection{callee, subject, ty, predicates} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+        own_type : List<&2, Nat> <- T.free(ty)
+        own_predicates : List<&2, Nat> <- C.free_list(predicates)
+        rest : List<&2, Nat> <- reflections_free(tail)
+        return T.union(own_type, T.union(own_predicates, rest))
+
 def free(inference: I.Inference) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
-  I.Inference{ty, coverage, exits, reflections} = inference
+  I.Inference{ty, coverage, exits, reflections, predicates, uses} = inference
   do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
     a : List<&2, Nat> <- T.free(ty)
     b : List<&2, Nat> <- coverages_free(coverage)
-    return T.union(a, b)
+    c : List<&2, Nat> <- C.free_list(predicates)
+    d : List<&2, Nat> <- Uses.free(uses)
+    e : List<&2, Nat> <- reflections_free(reflections)
+    return T.union(a, T.union(b, T.union(c, T.union(d, e))))

@@ -1,5 +1,10 @@
 # Compiler allocation and checking improvements
 
+This is a historical report. The native output transformers and their probes
+have been removed. Current builds use Bend's output unchanged; the measurements
+below include the former patches and are not current build timings. Suspected
+upstream problems are tracked in [BUGS.md](../BUGS.md).
+
 This implements the measured candidates from
 [the larger compilation study](LARGE_LEVER_STUDY.md), plus its incremental
 pending-constraint scan. It preserves the existing type system and uses Bend
@@ -125,8 +130,6 @@ emits its three independent JS reference modules concurrently as well.
 
 ```sh
 deno task build:compiler:all
-deno test --allow-read scripts/native_string_compare.test.ts scripts/native_compiler_kernels.test.ts scripts/native_owned_resolver.test.ts
-deno task test:native-kernels
 deno run --allow-read --allow-run scripts/native_compiler_kernels_oracle.ts BEFORE AFTER
 deno run --allow-all compiler/gdev_cold_bench.ts BEFORE AFTER 5 1 1
 ```

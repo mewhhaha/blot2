@@ -178,10 +178,16 @@ def check(constraints: List<&2, I.Coverage>, +substitutions: T.Substitutions, +t
       Done{Unit{}}
     case I.OperationNeed{identity, template, arguments, function_type, subject} <> tail:
       check(tail, substitutions, types)
-    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject} <> tail:
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, invocation, ambient, subject} <> tail:
       # Monomorphization discharges these; this pass checks pattern coverage.
       check(tail, substitutions, types)
     case I.LetGeneralized{witness} <> tail:
+      check(tail, substitutions, types)
+    case I.QualifiedBoundary{offset, declared, subject} <> tail:
+      check(tail, substitutions, types)
+    # QualifiedNeed is produced only for release execution sites, after this
+    # source pattern pass. Keep this visitor total if a caller supplies one.
+    case I.QualifiedNeed{site, predicate, subject} <> tail:
       check(tail, substitutions, types)
     case I.ValuePatternType{inferred, subject} <> tail:
       do Result<&2, &2, M.Diagnostic, Unit>:

@@ -5,6 +5,7 @@ import ./checked_core.bend as Core
 import ./core_compare.bend as Compare
 import ./frontier_alpha_compare.bend as Alpha
 import ./check_scheduler.bend as Scheduler
+import ./constraints.bend as C
 
 def all(values: List<&2, Bool>) -> Bool:
   match values:
@@ -26,7 +27,7 @@ def nominal(name: String) -> M.DataType:
   M.DataType{M.TypeId{"frontier", name}, 0n, [M.Constructor{"Make", None{}, Nil{}}]}
 
 def imported(parameters: Nat, +effect: M.TypeId) -> Groups.Interface:
-  Groups.Interface{"dependency", Groups.FunctionInterface{}, M.FunctionTy{M.UnitTy{}, M.UnitTy{}, M.EffectRow{[effect, effect], M.ClosedRow{}}}, parameters, [M.OperationEffect{effect}]}
+  Groups.Interface{"dependency", Groups.FunctionInterface{}, M.FunctionTy{M.UnitTy{}, M.UnitTy{}, M.EffectRow{[effect, effect], M.ClosedRow{}}}, parameters, [M.OperationEffect{effect}], Nil{}}
 
 def candidate(value: M.Function, imports: List<&2, Groups.Interface>, types: List<&2, M.DataType>) -> Scheduler.FrontierCandidate:
   Scheduler.FrontierCandidate{0n, "origin", value, types, imports}
@@ -75,7 +76,7 @@ def mixed_task(position: Nat, name: String, result: M.Ty) -> Scheduler.Task:
 
 def outcome_type(outcome: Scheduler.Outcome) -> Maybe<&2, M.Ty>:
   match outcome:
-    case Scheduler.Outcome{position, Done{Groups.CheckedGroup{M.CheckedModule{constants, M.CheckedFunction{function, M.Signature{name, parameter, result, variables, effects}, inferred} <> Nil{}, types, operations}, interfaces}}}:
+    case Scheduler.Outcome{position, Done{Groups.CheckedGroup{M.CheckedModule{constants, M.CheckedFunction{function, M.Signature{name, parameter, result, variables, effects}, inferred} <> Nil{}, types, operations}, interfaces, uses}}}:
       Some{result}
     case _:
       None{}
@@ -161,11 +162,39 @@ def retained_result(found: Maybe<&2, Scheduler.FrontierCandidate>) -> Bool:
       False{}
 
 def retained_not_candidate() -> Bool:
-  +retained : Groups.CheckedGroup = Groups.CheckedGroup{M.CheckedModule{Nil{}, Nil{}, Nil{}, Nil{}}, Nil{}}
+  +retained : Groups.CheckedGroup = Groups.CheckedGroup{M.CheckedModule{Nil{}, Nil{}, Nil{}, Nil{}}, Nil{}, Nil{}}
   retained_result(Scheduler.task_candidate(Scheduler.RetainedTask{0n, retained}))
+
+def prior_group(predicates: List<&2, M.Predicate>, uses: List<&2, C.UsePlan>) -> Groups.CheckedGroup:
+  Groups.CheckedGroup{M.CheckedModule{Nil{}, [M.CheckedFunction{evidence_function("$mono[1].evidence"), M.Signature{"$mono[1].evidence", M.UnitTy{}, M.UnitTy{}, Nil{}, M.EffectRow{Nil{}, M.ClosedRow{}}}, Nil{}}], Nil{}, Nil{}},
+    [Groups.Interface{"$mono[1].evidence", Groups.FunctionInterface{}, M.FunctionTy{M.UnitTy{}, M.UnitTy{}, M.EffectRow{Nil{}, M.ClosedRow{}}}, 0n, Nil{}, predicates}], uses}
+
+def no_group(found: Maybe<&2, Groups.CheckedGroup>) -> Bool:
+  match found:
+    case None{}:
+      True{}
+    case _:
+      False{}
+
+def qualified_retained(found: Maybe<&2, Groups.CheckedGroup>) -> Bool:
+  match found:
+    case Some{Groups.CheckedGroup{checked, Groups.Interface{name, kind, ty, parameters, effects, M.TypeRepPredicate{M.UnitTy{}} <> Nil{}} <> Nil{}, C.UsePlan{9n, "qualified source", M.VariableTy{7n}, M.TypeRepPredicate{M.VariableTy{7n}} <> Nil{}} <> Nil{}}}:
+      True{}
+    case _:
+      False{}
+
+def qualified_reuse_check() -> Bool:
+  +plan = {C.UsePlan{9n, "qualified source", M.VariableTy{7n}, [M.TypeRepPredicate{M.VariableTy{7n}}]} : C.UsePlan}
+  +source = module(evidence_function("$mono[1].evidence"), Nil{})
+  all([
+    no_group(Scheduler.replay_for_task(prior_group([M.TypeRepPredicate{M.UnitTy{}}], Nil{}), evidence_task(1n, "$mono[2].evidence"))),
+    no_group(Scheduler.replay_for_task(prior_group(Nil{}, [plan]), evidence_task(1n, "$mono[2].evidence"))),
+    qualified_retained(Core.matching_certificate(Core.Certificate{source, prior_group([M.TypeRepPredicate{M.UnitTy{}}], [plan]), Nil{}}, source, Nil{}))
+  ])
 
 def check() -> Bool:
   all([
+    qualified_reuse_check(),
     alpha_and_input_check(),
     large_label_check(),
     mixed_catalog_check(Scheduler.check_batch_planned([mixed_task(0n, "$mono[1].mixed", M.UnitTy{}), mixed_task(1n, "$mono[2].mixed", M.BoolTy{})])),

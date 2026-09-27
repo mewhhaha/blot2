@@ -145,8 +145,8 @@ def publish_interfaces(values: List<&2, G.Interface>, known: Map<&2, G.Interface
   match values:
     case Nil{}:
       known
-    case G.Interface{+name, kind, template, parameters, effects} <> tail:
-      publish_interfaces(tail, Map.set(&2, G.Interface, known, name, G.Interface{name, kind, template, parameters, effects}))
+    case G.Interface{+name, kind, template, parameters, effects, predicates} <> tail:
+      publish_interfaces(tail, Map.set(&2, G.Interface, known, name, G.Interface{name, kind, template, parameters, effects, predicates}))
 
 def publish_functions(values: List<&2, M.CheckedFunction>, known: Map<&2, M.CheckedFunction>) -> Map<&2, M.CheckedFunction>:
   match values:
@@ -429,21 +429,21 @@ def outcome_checked(outcome: Outcome) -> Result<&2, &2, M.Diagnostic, G.CheckedG
 
 def replay_parts(old_constants: List<&2, M.CheckedConstant>, old_functions: List<&2, M.CheckedFunction>, old_interfaces: List<&2, G.Interface>, constants: List<&2, M.Constant>, functions: List<&2, M.Function>, types: List<&2, M.DataType>, operations: List<&2, M.Operation>) -> Maybe<&2, G.CheckedGroup>:
   match old_constants old_functions old_interfaces constants functions:
-    case Nil{} M.CheckedFunction{old_function, M.Signature{old_name, parameter, result, variables, row}, effects} <> Nil{} G.Interface{interface_name, G.FunctionInterface{}, template, parameters, interface_effects} <> Nil{} Nil{} M.Function{+current_name, exported, argument, p, r, body} <> Nil{}:
-      Bool.pick(Maybe<&2, G.CheckedGroup>, M.name_equal(old_name, interface_name), Some{G.CheckedGroup{M.CheckedModule{Nil{}, [M.CheckedFunction{M.Function{current_name, exported, argument, p, r, body}, M.Signature{current_name, parameter, result, variables, row}, effects}], types, operations}, [G.Interface{current_name, G.FunctionInterface{}, template, parameters, interface_effects}]}}, None{})
+    case Nil{} M.CheckedFunction{old_function, M.Signature{old_name, parameter, result, variables, row}, effects} <> Nil{} G.Interface{interface_name, G.FunctionInterface{}, template, parameters, interface_effects, Nil{}} <> Nil{} Nil{} M.Function{+current_name, exported, argument, p, r, body} <> Nil{}:
+      Bool.pick(Maybe<&2, G.CheckedGroup>, M.name_equal(old_name, interface_name), Some{G.CheckedGroup{M.CheckedModule{Nil{}, [M.CheckedFunction{M.Function{current_name, exported, argument, p, r, body}, M.Signature{current_name, parameter, result, variables, row}, effects}], types, operations}, [G.Interface{current_name, G.FunctionInterface{}, template, parameters, interface_effects, Nil{}}], Nil{}}}, None{})
     case _ _ _ _ _:
       None{}
 
+# Alpha clone replay does not yet remap source use plans. Exact-source core
+# certificates still retain qualified groups; only this clone optimization falls
+# back to inference when plans or qualified interfaces are present.
 def replay_for_task(prior: G.CheckedGroup, task: Task) -> Maybe<&2, G.CheckedGroup>:
-  G.CheckedGroup{M.CheckedModule{old_constants, old_functions, old_types, old_operations}, old_interfaces} = prior
-  match task:
-    case Task{position, M.Module{constants, functions, types, operations}, imports, cost}:
+  match prior task:
+    case G.CheckedGroup{M.CheckedModule{old_constants, old_functions, old_types, old_operations}, old_interfaces, Nil{}} Task{position, M.Module{constants, functions, types, operations}, imports, cost}:
       replay_parts(old_constants, old_functions, old_interfaces, constants, functions, types, operations)
-    case EvidenceTask{position, M.Module{constants, functions, types, operations}, imports, cost}:
+    case G.CheckedGroup{M.CheckedModule{old_constants, old_functions, old_types, old_operations}, old_interfaces, Nil{}} EvidenceTask{position, M.Module{constants, functions, types, operations}, imports, cost}:
       replay_parts(old_constants, old_functions, old_interfaces, constants, functions, types, operations)
-    case RetainedTask{position, checked}:
-      None{}
-    case RetainedEvidenceTask{position, module, imports, checked, needs}:
+    case _ _:
       None{}
 
 def replay_outcome(task: Task, checked: G.CheckedGroup) -> Outcome:
@@ -607,6 +607,10 @@ def expression_cost(fuel: Nat, pending: List<&2, CostWork>, total: Nat) -> Nat:
       expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.SourceExpr{offset, annotation, value}} <> tail:
       expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
+    case 1n+rest ExpressionCost{M.QualifiedExpr{offset, annotation, predicates, value}} <> tail:
+      expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
+    case 1n+rest ExpressionCost{M.InstantiationExpr{site, value}} <> tail:
+      expression_cost(rest, ExpressionCost{value} <> tail, Nat.add(total, 8n))
     case 1n+rest ExpressionCost{M.TagExpr{offset, callee, argument}} <> tail:
       expression_cost(rest, ExpressionCost{callee} <> ExpressionCost{argument} <> tail, Nat.add(total, 16n))
     case 1n+rest ExpressionCost{M.UnaryExpr{operator, value}} <> tail:
@@ -702,7 +706,7 @@ def empty_completed() -> Completed:
   Completed{Map.new(&2, G.Interface), Map.new(&2, M.CheckedFunction), Map.new(&2, M.CheckedConstant), Nil{}, None{}, Nil{}, Nil{}}
 
 def publish_checked(checked: G.CheckedGroup, completed: Completed) -> Completed:
-  G.CheckedGroup{M.CheckedModule{cs, fs, types, operations}, +exported} = checked
+  G.CheckedGroup{M.CheckedModule{cs, fs, types, operations}, +exported, uses} = checked
   Completed{interfaces, functions, constants, published, failure, certificates, needs} = completed
   Completed{publish_interfaces(exported, interfaces), publish_functions(fs, functions), publish_constants(cs, constants), List.reverse.go(&2, G.Interface, exported, published), failure, certificates, needs}
 

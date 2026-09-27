@@ -25,6 +25,9 @@ type Work is Data:
   TypePattern{value: A.Pattern}
   TypePatterns{values: List<&2, A.Pattern>}
   TypeVariables{values: List<&2, T.Variable>}
+  VariableKind{value: T.VariableKind}
+  Predicate{value: M.Predicate}
+  Predicates{values: List<&2, M.Predicate>}
   Fixities{values: List<&2, O.Fixity>}
   Locals{values: List<&2, L.Local>}
   OptionalNatural{value: Maybe<&2, Nat>}
@@ -123,8 +126,12 @@ def flatten(fuel: Nat, pending: List<&2, Work>, reversed: List<&2, R.Work>) -> R
       flatten(rest, Field{R.Word{3}} <> Field{R.Strings{names}} <> TypePatterns{fields} <> tail, reversed)
     case 1n+rest TypeVariables{Nil{}} <> tail:
       flatten(rest, Field{R.Word{0}} <> tail, reversed)
-    case 1n+rest TypeVariables{T.Variable{name, ty} <> following} <> tail:
-      flatten(rest, Field{R.Word{1}} <> Field{R.Text{name}} <> Field{R.TypeValue{ty}} <> TypeVariables{following} <> tail, reversed)
+    case 1n+rest TypeVariables{T.Variable{name, ty, kind} <> following} <> tail:
+      flatten(rest, Field{R.Word{1}} <> Field{R.Text{name}} <> Field{R.TypeValue{ty}} <> VariableKind{kind} <> TypeVariables{following} <> tail, reversed)
+    case 1n+rest VariableKind{T.TypeKind{}} <> tail:
+      flatten(rest, Field{R.Word{0}} <> tail, reversed)
+    case 1n+rest VariableKind{T.RowKind{}} <> tail:
+      flatten(rest, Field{R.Word{1}} <> tail, reversed)
     case 1n+rest Fixities{Nil{}} <> tail:
       flatten(rest, Field{R.Word{0}} <> tail, reversed)
     case 1n+rest Fixities{O.Fixity{name, named, precedence, associativity, target} <> following} <> tail:
@@ -166,6 +173,24 @@ def flatten(fuel: Nat, pending: List<&2, Work>, reversed: List<&2, R.Work>) -> R
       flatten(rest, Field{R.Word{1}} <> Field{R.Identity{identity}} <> Field{R.Natural{parameters}} <> Field{R.TypeValue{parameter}} <> Field{R.TypeValue{result}} <> tail, reversed)
     case 1n+rest Operation{M.OperationInstance{template, arguments}} <> tail:
       flatten(rest, Field{R.Word{2}} <> Field{R.Identity{template}} <> Field{R.Types{arguments}} <> tail, reversed)
+    case 1n+rest Predicates{Nil{}} <> tail:
+      flatten(rest, Field{R.Word{0}} <> tail, reversed)
+    case 1n+rest Predicates{head <> following} <> tail:
+      flatten(rest, Field{R.Word{1}} <> Predicate{head} <> Predicates{following} <> tail, reversed)
+    case 1n+rest Predicate{M.AssociatedPredicate{member, templates, left, right, result, invocation}} <> tail:
+      flatten(rest, Field{R.Word{0}} <> Field{R.Text{member}} <> Identities{templates} <> Field{R.TypeValue{left}} <> Field{R.TypeValue{right}} <> Field{R.TypeValue{result}} <> Field{R.Row{invocation}} <> tail, reversed)
+    case 1n+rest Predicate{M.ReceiverPredicate{member, templates, receiver, argument, result, invocation}} <> tail:
+      flatten(rest, Field{R.Word{1}} <> Field{R.Text{member}} <> Identities{templates} <> Field{R.TypeValue{receiver}} <> Field{R.TypeValue{argument}} <> Field{R.TypeValue{result}} <> Field{R.Row{invocation}} <> tail, reversed)
+    case 1n+rest Predicate{M.FieldPredicate{member, receiver, result}} <> tail:
+      flatten(rest, Field{R.Word{2}} <> Field{R.Text{member}} <> Field{R.TypeValue{receiver}} <> Field{R.TypeValue{result}} <> tail, reversed)
+    case 1n+rest Predicate{M.UpdatePredicate{member, receiver, assigned, result, invocation}} <> tail:
+      flatten(rest, Field{R.Word{3}} <> Field{R.Text{member}} <> Field{R.TypeValue{receiver}} <> Field{R.TypeValue{assigned}} <> Field{R.TypeValue{result}} <> Field{R.Row{invocation}} <> tail, reversed)
+    case 1n+rest Predicate{M.OperationPredicate{template, arguments, function_type}} <> tail:
+      flatten(rest, Field{R.Word{4}} <> Field{R.Identity{template}} <> Field{R.Types{arguments}} <> Field{R.TypeValue{function_type}} <> tail, reversed)
+    case 1n+rest Predicate{M.TypeRepPredicate{represented}} <> tail:
+      flatten(rest, Field{R.Word{5}} <> Field{R.TypeValue{represented}} <> tail, reversed)
+    case 1n+rest Predicate{M.EffectRepPredicate{row}} <> tail:
+      flatten(rest, Field{R.Word{6}} <> Field{R.Row{row}} <> tail, reversed)
     case 1n+rest Expression{M.UnitExpr{}} <> tail:
       flatten(rest, Field{R.Word{0}} <> tail, reversed)
     case 1n+rest Expression{M.U32Expr{value}} <> tail:
@@ -210,6 +235,10 @@ def flatten(fuel: Nat, pending: List<&2, Work>, reversed: List<&2, R.Work>) -> R
       flatten(rest, Field{R.Word{19}} <> Field{R.Natural{label}} <> Expression{value} <> tail, reversed)
     case 1n+rest Expression{M.SourceExpr{offset, annotation, value}} <> tail:
       flatten(rest, Field{R.Word{20}} <> Field{R.Natural{offset}} <> Field{R.OptionalType{annotation}} <> Expression{value} <> tail, reversed)
+    case 1n+rest Expression{M.QualifiedExpr{offset, annotation, predicates, value}} <> tail:
+      flatten(rest, Field{R.Word{48}} <> Field{R.Natural{offset}} <> Field{R.TypeValue{annotation}} <> Predicates{predicates} <> Expression{value} <> tail, reversed)
+    case 1n+rest Expression{M.InstantiationExpr{site, value}} <> tail:
+      flatten(rest, Field{R.Word{49}} <> Field{R.Natural{site}} <> Expression{value} <> tail, reversed)
     case 1n+rest Expression{M.F32Expr{value}} <> tail:
       flatten(rest, Field{R.Word{21}} <> Field{R.Word{F32.bits(value)}} <> tail, reversed)
     case 1n+rest Expression{M.UnaryExpr{operator, value}} <> tail:
@@ -298,8 +327,8 @@ def flatten(fuel: Nat, pending: List<&2, Work>, reversed: List<&2, R.Work>) -> R
       flatten(rest, Field{R.Word{1}} <> Field{R.Identity{identity}} <> Identities{references} <> TypeDependencies{following} <> tail, reversed)
     case 1n+rest Interfaces{Nil{}} <> tail:
       flatten(rest, Field{R.Word{0}} <> tail, reversed)
-    case 1n+rest Interfaces{G.Interface{name, kind, template, parameters, effects} <> following} <> tail:
-      flatten(rest, Field{R.Word{1}} <> Field{R.Text{name}} <> interface_kind(kind) <> Field{R.TypeValue{template}} <> Field{R.Natural{parameters}} <> Field{R.Effects{effects}} <> Interfaces{following} <> tail, reversed)
+    case 1n+rest Interfaces{G.Interface{name, kind, template, parameters, effects, predicates} <> following} <> tail:
+      flatten(rest, Field{R.Word{1}} <> Field{R.Text{name}} <> interface_kind(kind) <> Field{R.TypeValue{template}} <> Field{R.Natural{parameters}} <> Field{R.Effects{effects}} <> Predicates{predicates} <> Interfaces{following} <> tail, reversed)
     case 1n+rest Runtime{I.UnitExpr{}} <> tail:
       flatten(rest, Field{R.Word{0}} <> tail, reversed)
     case 1n+rest Runtime{I.U32Expr{value}} <> tail:

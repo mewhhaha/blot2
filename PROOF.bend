@@ -33,12 +33,6 @@ def Laws.singleton_dependency_graph_is_one_component(name, references, lambdas):
 def Laws.seen_dependency_enter_does_not_expand_neighbors(name, edges, pending):
   {==}
 
-def Laws.seen_compact_dependency_enter_does_not_expand_neighbors(identity, edges, pending):
-  {==}
-
-def Laws.unknown_compact_dependency_reference_is_omitted(tail):
-  {==}
-
 def Laws.seen_dependency_reach_does_not_expand_neighbors(edges, name, pending):
   {==}
 
@@ -502,7 +496,7 @@ def Laws.empty_array_generation_skips_callback(steps, generator, context):
 def Laws.associated_left_precedence(left, right, name, other, subject, description):
   {==}
 
-def Laws.associated_call_preserves_operands(name, member, left, right):
+def Laws.associated_call_preserves_operands(name, member, left, right, signature):
   {==}
 
 def Laws.rebinding_self_uses_previous_local(core, context, node):
@@ -689,10 +683,10 @@ def Laws.dispatch_unplanned_site_stays_deferred(identity, dispatch, member, temp
 def Laws.dispatch_conflicting_requirements_rewrite_neither(choice):
   {==}
 
-def Laws.dispatch_binary_site_calls_selected_implementation(identity, member, templates, left, right, name):
+def Laws.dispatch_binary_site_calls_selected_implementation(identity, member, templates, left, right, name, signature):
   {==}
 
-def Laws.dispatch_receiver_site_applies_selected_member(identity, member, templates, receiver, unit, name):
+def Laws.dispatch_receiver_site_applies_selected_member(identity, member, templates, receiver, unit, name, signature):
   {==}
 
 def Laws.dispatch_resolved_site_is_not_a_seed(left, right, name):
@@ -805,6 +799,67 @@ def Laws.no_entries_verify(checked):
 
 def Laws.unused_operation_has_no_wasm_job(identity, parameter, result):
   {==}
+
+def Laws.dispatch_original_failure_is_authoritative(diagnostic, certificates, inferred, retained, module, entry):
+  {==}
+
+def Laws.inlined_operator_retains_source_and_creation_site(offset, site, value):
+  {==}
+
+def Laws.dispatch_transformed_failure_preserves_certificates(diagnostic, certificates, inferred, retained, module, next, entry, source):
+  {==}
+
+def Laws.failed_initial_assembly_preserves_completed_groups(diagnostic, certificates, needs, inferred, retained):
+  {==}
+
+def Laws.qualified_rename_shares_type_and_row_mapping(mapping, type_index, row_index, labels):
+  {==}
+
+def Laws.qualified_parameterize_preserves_row_multiplicity(mapping, index, labels):
+  {==}
+
+def Laws.qualified_relocate_free_row_scope_only(scope, name, suffix, labels):
+  {==}
+
+def Laws.qualified_occurrence_site_is_not_a_predicate(site, subject, ty, predicate):
+  {==}
+
+def Laws.qualified_root_uses_reserved_creation_lane(offset, value):
+  {==}
+
+def Laws.unexported_qualified_declaration_has_no_root_demand(offset, value):
+  {==}
+
+def Laws.scc_creation_site_keeps_peer_obligation(site, subject, ty, predicate):
+  {==}
+
+def Laws.scc_effect_reflection_creates_no_callable_site(name):
+  {==}
+
+def Laws.scc_raw_core_reference_keeps_dependency_without_inventing_site(name):
+  {==}
+
+def Laws.scc_qualified_reference_keeps_nearest_boundary(offset, site, name):
+  {==}
+
+def Laws.scc_other_boundary_cannot_satisfy_local_clause(site, name, predicate):
+  {==}
+
+def Laws.raw_core_rejects_nonempty_qualification(offset):
+  {==}
+
+def Laws.raw_core_accepts_empty_qualification(value):
+  {==}
+
+def Laws.imported_scheme_rejects_mixed_parameter_kinds(subject):
+  {==}
+
+def Laws.const_instantiation_metadata_is_free(site, value, depth, steps, context):
+  {==}
+
+def Laws.const_qualified_metadata_is_free(offset, annotation, predicates, value, depth, steps, context):
+  {==}
+
 def Laws.loop_memory_pure_closed_row_is_isolated():
   {==}
 
@@ -817,12 +872,6 @@ def Laws.loop_memory_open_row_is_not_isolated(operations, index):
 def Laws.loop_memory_source_state_is_not_isolated():
   {==}
 
-def Laws.dispatch_original_failure_is_authoritative(diagnostic, certificates, inferred, retained, module, entry):
-  {==}
-
-def Laws.dispatch_transformed_failure_preserves_certificates(diagnostic, certificates, inferred, retained, module, next, entry, source):
-  {==}
-
 def Laws.dispatch_fallback_reuses_checked_source(transformed, module, initial, source):
   {==}
 
@@ -832,9 +881,6 @@ def Laws.dispatch_without_sites_reuses_checked_source(seen, unique, module, inli
       {==}
     case False{}:
       {==}
-
-def Laws.failed_initial_assembly_preserves_completed_groups(diagnostic, certificates, needs, inferred, retained):
-  {==}
 
 def Laws.certificate_type_index_keeps_first_identity():
   {==}
@@ -848,5 +894,41 @@ def Laws.retained_resolving_task_keeps_requirements(position, module, imports, c
 def Laws.conflicting_resolving_association_cannot_certify(certificate):
   {==}
 
+
+def Laws.seen_compact_dependency_enter_does_not_expand_neighbors(identity, edges, pending):
+  {==}
+
+
+def Laws.unknown_compact_dependency_reference_is_omitted(tail):
+  {==}
+
 def Laws.specialization_without_inference_ignores_shape_failure(expanded, configuration, shapes, isolated, schemes, diagnostic):
+  {==}
+
+def Laws.protected_selected_row_preserves_state(index, state):
+  {==}
+
+def Laws.selected_signature_collects_only_flexible_effect_tail(value, row, parameter, labels, scope, name):
+  {==}
+
+def Laws.closing_selected_tail_preserves_duplicate_operations(operation):
+  {==}
+
+
+def Laws.runtime_array_byte_count_does_not_wrap():
+  {==}
+
+def Laws.runtime_memory_uses_wasm32_page_range():
+  {==}
+
+def Laws.saturated_partial_application_is_not_expanded(key, left, right, body, argument):
+  {==}
+
+def Laws.saturated_known_head_uses_direct_call(name, argument):
+  {==}
+
+def Laws.saturated_compaction_loop_is_not_inlineable(state, initial, body):
+  {==}
+
+def Laws.saturated_counted_loop_is_not_inlineable(index, start, end, state, initial, body):
   {==}

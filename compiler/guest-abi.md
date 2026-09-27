@@ -114,11 +114,12 @@ Only modules with array arguments/results (including callback signatures) export
 takes an i32 byte count and returns an aligned i32 pointer. Reset takes an
 ignored i32 and returns the first dynamic arena byte. Arrays use a little-endian
 U32 length followed by contiguous 32-bit words, with F32 values stored as
-IEEE-754 bits. Memory remains bounded to 16 MiB. The adapter checks typed-array
-kinds, lengths, aligned pointers and ranges; it acquires fresh memory views
-after allocation and guest execution because either can grow memory. It resets
-before preparing inputs and in `finally` after output copying, including traps.
-Raw Wasm callers must implement the same lifetime.
+IEEE-754 bits. Memory grows on demand through the Wasm32 address space, subject
+to the engine's available memory. Allocation overflow and failed growth trap.
+The adapter checks typed-array kinds, lengths, aligned pointers and ranges; it
+acquires fresh memory views after allocation and guest execution because either
+can grow memory. It resets before preparing inputs and in `finally` after output
+copying, including traps. Raw Wasm callers must implement the same lifetime.
 
 ## Versioned manifest
 
@@ -218,16 +219,31 @@ pending host callback so the invocation can unwind, then dispose. A rejected
 host callback produces `host_exception` with the original rejection as its
 cause. A new invocation remains possible after cleanup.
 
-Suspension alone does not reclaim allocations. A `for ever:` loop can recycle
-its temporary arena when it carries exactly one local explicitly annotated
-`Array F32` or `Array U32`. The compiler copies that buffer within guest memory
-at the loop backedge and reclaims the iteration's other allocations. It keeps
-all pre-loop allocations, including aliases of the initial buffer.
+Suspension alone does not reclaim allocations. Every fourth backedge of an
+eligible `for ever:` loop, the runtime traces the carry's object graph and
+reuses unreachable allocation blocks. Each loop activation has its own counter,
+so nested loops cannot consume an outer loop's collection turns. Collection
+amortizes tracing work while adding latency to the iterations that collect.
+Carries may contain tuples, records, variants, closures, and nested arrays; no
+numeric-buffer packing or annotation is required. Objects do not move, so
+sharing, immutable aliases, and rollback versions retain their addresses.
+Pre-loop objects remain pinned and their outgoing references are traced as well.
 
-This optimization requires a checked, closed function effect row containing only
-`Foreign` or no effects; it also applies to curried functions with that checked
-type. Loops inside lexical effect handlers are excluded because a provider can
-retain additional live pointers. Other loop state shapes and unannotated carries
-keep the ordinary arena allocation behavior and do not recycle memory. The 16
-MiB arena must still fit one iteration's peak allocations. The host cannot reset
-memory while Wasm still holds pointers into it.
+Collection requires a checked, closed function effect row containing only
+`Foreign` or no effects, including curried functions with that checked type.
+Loops inside lexical effect handlers remain excluded. The collector recognizes
+exact allocated object starts conservatively: a scalar with the same bits as a
+pointer can retain an extra object, but its bits are never changed. Foreign
+packets remain copied values, not roots or borrowed heap views.
+
+Allocation blocks carry private headers and use size classes for reuse. Dynamic
+blocks start at or above 64 KiB so common small integer IDs cannot be mistaken
+for dynamic pointers; static data can still occupy the first page. The
+exact-start bitmap is reused while block boundaries remain unchanged, and
+invalidated by fresh bump allocation, including the first such allocation after
+an arena reset. The arena's high-water mark can therefore exceed the live
+payload size. Memory must fit the live graph, up to four iterations of temporary
+allocations, and temporary collection metadata. `blot:allocate(0)` observes that
+high-water cursor; cursor differences are not cumulative allocation counts once
+blocks are reused. The host must not reset memory while a suspended invocation
+still holds pointers.

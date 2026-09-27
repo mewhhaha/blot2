@@ -1,5 +1,6 @@
 import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
+import { toBendModel } from "./bend_abi.ts";
 import {
   analyze,
   CompilerError,
@@ -341,8 +342,11 @@ Deno.test("product covariance preserves rows shared with a sibling callback inpu
     },
   };
   const original = { $: "ProductTy", elements: bendList([action, accepts]) };
-  equal(types["types.close_generalized"](original, bendList([3n])), {
-    $: "Done",
-    value: original,
-  });
+  equal(
+    types["types.close_generalized"](toBendModel(original), bendList([3n])),
+    {
+      $: "Done",
+      value: toBendModel(original),
+    },
+  );
 });

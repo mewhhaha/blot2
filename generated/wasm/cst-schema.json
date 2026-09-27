@@ -26,6 +26,8 @@
     "index",
     "kind",
     "labels",
+    "marker",
+    "member",
     "modifier",
     "name",
     "operations",
@@ -37,6 +39,7 @@
     "patterns",
     "payload",
     "precedence",
+    "predicates",
     "resolver",
     "rest",
     "result",
@@ -46,10 +49,12 @@
     "start",
     "statements",
     "symbol",
+    "tail",
     "tails",
     "target",
     "value",
-    "values"
+    "values",
+    "where"
   ],
   "tokens": [
     "IDENT",

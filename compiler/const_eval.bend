@@ -739,6 +739,10 @@ def budget_diagnostic(expression: M.Expr) -> M.Diagnostic:
   match expression:
     case M.TagExpr{offset, callee, argument}:
       M.Diagnostic{"const_budget", "offset:" ++ Nat.show(offset), "compile-time evaluation exhausted its step budget"}
+    case M.QualifiedExpr{offset, annotation, predicates, value}:
+      budget_diagnostic(value)
+    case M.InstantiationExpr{site, value}:
+      budget_diagnostic(value)
     case _:
       M.Diagnostic{"const_budget", "const", "compile-time evaluation exhausted its step budget"}
 
@@ -840,6 +844,13 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
       Fail{budget_diagnostic(expression)}
     case _ _ _ Budget{0n, cells} Expression{expression}:
       Fail{budget_diagnostic(expression)}
+    # These wrappers carry checking metadata, not an evaluated step. Budget
+    # failure above is independent of their shape, so it also reduces for a
+    # symbolic expression in the zero-budget law.
+    case _ _ _ _ Expression{M.QualifiedExpr{offset, annotation, predicates, value}}:
+      evaluate_work(depth, matching_fuel, pending, steps, Expression{value}, context)
+    case _ _ _ _ Expression{M.InstantiationExpr{site, value}}:
+      evaluate_work(depth, matching_fuel, pending, steps, Expression{value}, context)
     case 1n+limit _ _ Budget{1n+remaining, cells} Expression{expression}:
       match expression:
         # Budget guards must reduce without inspecting symbolic expressions in proofs.
@@ -1089,7 +1100,14 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
           evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), Expression{value}, context)
 
 def evaluate(depth: Nat, steps: Nat, expression: M.Expr, context: Context) -> Result<&2, &2, M.Diagnostic, Evaluation>:
-  evaluate_work(depth, U32.to_nat(65536), Nil{}, Budget{steps, Nil{}}, Expression{expression}, context)
+  # Keep exhausted entry budgets independent of the recursive work matcher.
+  match depth steps:
+    case 0n _:
+      Fail{budget_diagnostic(expression)}
+    case _ 0n:
+      Fail{budget_diagnostic(expression)}
+    case 1n+remaining_depth 1n+remaining_steps:
+      evaluate_work(1n+remaining_depth, U32.to_nat(65536), Nil{}, Budget{1n+remaining_steps, Nil{}}, Expression{expression}, context)
 
 def prepend_constant(name: String, value: Value, constants: Constants) -> Constants:
   Constants{bindings, remaining} = constants

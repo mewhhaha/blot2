@@ -8,13 +8,13 @@ type Result<T> = { readonly $: "Done"; readonly value: T } | {
   readonly error: Node;
 };
 interface Scanned {
-  readonly $: "Scanned";
+  readonly $: "native_plan.Scanned";
   readonly functions: Result<BendList<Node>>;
   readonly constants: Result<BendList<Node>>;
   readonly costs: Node;
 }
 interface Nominals {
-  readonly $: "Nominals";
+  readonly $: "native_plan.Nominals";
   readonly functions: Result<BendList<Node>>;
   readonly constants: Result<BendList<Node>>;
 }
@@ -52,14 +52,14 @@ const backend = compiled as unknown as {
   "check_scheduler.module_cost"(module: Node): bigint;
 };
 const module = (functions: Node[], constants: Node[] = []): Node => ({
-  $: "Module",
+  $: "model.Module",
   functions: bendList(functions),
   constants: bendList(constants),
   data_types: bendList([]),
   operations: bendList([]),
 });
 const fn = (name: string, body: Node): Node => ({
-  $: "Function",
+  $: "model.Function",
   name,
   exported: false,
   parameter: "value",
@@ -68,7 +68,7 @@ const fn = (name: string, body: Node): Node => ({
   body,
 });
 const constant = (name: string, value: Node): Node => ({
-  $: "Constant",
+  $: "model.Constant",
   name,
   exported: false,
   annotation: { $: "None" },
@@ -76,7 +76,7 @@ const constant = (name: string, value: Node): Node => ({
 });
 const failure = (code: string): Result<BendList<Node>> => ({
   $: "Fail",
-  error: { $: "Diagnostic", code, subject: "probe", message: code },
+  error: { $: "model.Diagnostic", code, subject: "probe", message: code },
 });
 const empty = (): Result<BendList<Node>> => ({
   $: "Done",
@@ -85,10 +85,12 @@ const empty = (): Result<BendList<Node>> => ({
 
 Deno.test("cached declaration scans preserve whole-module dependency and planning order", () => {
   const functions = [
-    fn("first", { $: "FunctionExpr", name: "second" }),
-    fn("second", { $: "U32Expr", value: 1 }),
+    fn("first", { $: "model.FunctionExpr", name: "second" }),
+    fn("second", { $: "model.U32Expr", value: 1 }),
   ];
-  const constants = [constant("saved", { $: "FunctionExpr", name: "first" })];
+  const constants = [
+    constant("saved", { $: "model.FunctionExpr", name: "first" }),
+  ];
   const complete = module(functions, constants);
   const fragments = [
     module([], constants),
@@ -117,13 +119,13 @@ Deno.test("cached declaration scans preserve whole-module dependency and plannin
 Deno.test("cached scan failures retain global validation and function-before-constant precedence", () => {
   const scans: Scanned[] = [
     {
-      $: "Scanned",
+      $: "native_plan.Scanned",
       functions: empty(),
       constants: failure("constant_scan"),
       costs: { $: "MTip" },
     },
     {
-      $: "Scanned",
+      $: "native_plan.Scanned",
       functions: failure("function_scan"),
       constants: empty(),
       costs: { $: "MTip" },
@@ -133,7 +135,7 @@ Deno.test("cached scan failures retain global validation and function-before-con
     backend["native_plan.graph"](module([]), bendList(scans)),
     failure("function_scan"),
   );
-  const repeated = fn("same", { $: "U32Expr", value: 0 });
+  const repeated = fn("same", { $: "model.U32Expr", value: 0 });
   const duplicate = module([repeated, repeated]);
   equal(
     backend["native_plan.graph"](duplicate, bendList(scans)),
@@ -144,12 +146,12 @@ Deno.test("cached scan failures retain global validation and function-before-con
 Deno.test("cached scans still reject lambda identities duplicated across fragments", () => {
   const functions = ["first", "second"].map((name) =>
     fn(name, {
-      $: "LambdaExpr",
+      $: "model.LambdaExpr",
       identity: 42n,
       parameter: "x",
       parameter_type: { $: "None" },
       result_type: { $: "None" },
-      body: { $: "LocalExpr", name: "x" },
+      body: { $: "model.LocalExpr", name: "x" },
     })
   );
   const complete = module(functions);
@@ -164,11 +166,11 @@ Deno.test("cached scans still reject lambda identities duplicated across fragmen
 
 Deno.test("nominal summaries preserve function-before-constant order and validation precedence", () => {
   const fragments = [
-    module([], [constant("saved", { $: "U32Expr", value: 1 })]),
-    module([fn("read", { $: "U32Expr", value: 2 })]),
+    module([], [constant("saved", { $: "model.U32Expr", value: 1 })]),
+    module([fn("read", { $: "model.U32Expr", value: 2 })]),
   ];
-  const complete = module([fn("read", { $: "U32Expr", value: 2 })], [
-    constant("saved", { $: "U32Expr", value: 1 }),
+  const complete = module([fn("read", { $: "model.U32Expr", value: 2 })], [
+    constant("saved", { $: "model.U32Expr", value: 1 }),
   ]);
   const scans = fragments.map((fragment) =>
     backend["native_plan.nominal_scan"](fragment, { $: "MTip" })
@@ -189,12 +191,12 @@ Deno.test("nominal summaries preserve function-before-constant order and validat
   const failures = backend["native_plan.nominal_usages"](
     backend["native_plan.merge_nominals"](
       {
-        $: "Nominals",
+        $: "native_plan.Nominals",
         functions: empty(),
         constants: failure("constant_usage"),
       },
       {
-        $: "Nominals",
+        $: "native_plan.Nominals",
         functions: failure("function_usage"),
         constants: empty(),
       },
@@ -209,12 +211,12 @@ Deno.test("nominal summaries preserve function-before-constant order and validat
 
 Deno.test("retained nominal summaries invalidate when constructor ownership changes", () => {
   const fragment = module([
-    fn("construct", { $: "ConstructorRefExpr", constructor: "Carry" }),
+    fn("construct", { $: "model.ConstructorRefExpr", constructor: "Carry" }),
   ]);
   const lowered: Node = {
     $: "Lowered",
     node: {
-      $: "Cst",
+      $: "cst.Cst",
       kind: "function",
       field: "declarations",
       text: "",
@@ -227,7 +229,7 @@ Deno.test("retained nominal summaries invalidate when constructor ownership chan
     nominals: { $: "None" },
   };
   const identity = (declaration: string): Node => ({
-    $: "TypeId",
+    $: "model.TypeId",
     module_name: "main",
     declaration,
   });
@@ -236,14 +238,14 @@ Deno.test("retained nominal summaries invalidate when constructor ownership chan
     key: bendList([key]),
     constructors: backend["groups.constructor_index"](
       bendList([{
-        $: "DataType",
+        $: "model.DataType",
         identity: identity(declaration),
         parameters: 0n,
         constructors: bendList([{
-          $: "Constructor",
+          $: "model.Constructor",
           fields: { $: "Nil" },
           name: "Carry",
-          payload: { $: "Some", value: { $: "U32Ty" } },
+          payload: { $: "Some", value: { $: "model.U32Ty" } },
         }]),
       }]),
       { $: "MTip" },
@@ -296,14 +298,17 @@ Deno.test("nominal caching uses an average work threshold and rejects empty scan
   equal(select(512n, 2n), true);
   equal(select(513n, 2n), true);
   const tiny = backend["native_plan.scan"](
-    module([fn("tiny", { $: "U32Expr", value: 0 })]),
+    module([fn("tiny", { $: "model.U32Expr", value: 0 })]),
   );
   const large = backend["native_plan.scan"](
     module([
       fn("large", {
-        $: "ArrayExpr",
+        $: "model.ArrayExpr",
         elements: bendList(
-          Array.from({ length: 1024 }, (_, value) => ({ $: "U32Expr", value })),
+          Array.from(
+            { length: 1024 },
+            (_, value) => ({ $: "model.U32Expr", value }),
+          ),
         ),
       }),
     ]),
@@ -317,17 +322,17 @@ Deno.test("cached declaration costs preserve group weights and fall back for unc
     { length: 8 },
     (_, index) =>
       fn(`work_${index}`, {
-        $: "ArrayExpr",
+        $: "model.ArrayExpr",
         elements: bendList(
           Array.from(
             { length: index * 31 + 1 },
-            (_, value) => ({ $: "U32Expr", value }),
+            (_, value) => ({ $: "model.U32Expr", value }),
           ),
         ),
       }),
   );
   const complete = module(functions, [
-    constant("saved", { $: "U32Expr", value: 42 }),
+    constant("saved", { $: "model.U32Expr", value: 42 }),
   ]);
   const scans = functions.map((value) =>
     backend["native_plan.scan"](module([value]))
@@ -343,7 +348,7 @@ Deno.test("cached declaration costs preserve group weights and fall back for unc
     ]]
   ) {
     const job = {
-      $: "Job",
+      $: "groups.Job",
       members: bendList(members),
       dependencies: bendList([]),
       type_dependencies: bendList([]),

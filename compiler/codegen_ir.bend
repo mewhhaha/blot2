@@ -3,9 +3,10 @@ import ./model.bend as M
 import ./closures.bend as F
 import ./wasm_catalog.bend as E
 import ./index.bend as Index
+import ./codegen_saturation.bend as Saturation
 
 type Metadata is Data:
-  Metadata{lambdas: Map<&2, Maybe<&2, F.Lambda>>, constructors: Map<&2, Maybe<&2, E.ConstructorSlot>>, safe_loops: Set()}
+  Metadata{lambdas: Map<&2, Maybe<&2, F.Lambda>>, constructors: Map<&2, Maybe<&2, E.ConstructorSlot>>, safe_loops: Set(), functions: Map<&2, Maybe<&2, Saturation.Definition>>}
 
 def lambda_index_go(lambdas: List<&2, F.Lambda>, indexed: Map<&2, Maybe<&2, F.Lambda>>) -> Map<&2, Maybe<&2, F.Lambda>>:
   match lambdas:
@@ -15,22 +16,30 @@ def lambda_index_go(lambdas: List<&2, F.Lambda>, indexed: Map<&2, Maybe<&2, F.La
       lambda_index_go(tail, Map.set(&2, Maybe<&2, F.Lambda>, indexed, Nat.show(identity), Some{F.Lambda{identity, parameter, body, captures}}))
 
 def metadata(lambdas: List<&2, F.Lambda>, constructors: Map<&2, Maybe<&2, E.ConstructorSlot>>) -> Metadata:
-  Metadata{lambda_index_go(List.reverse(&2, F.Lambda, lambdas), Map.new(&2, Maybe<&2, F.Lambda>)), constructors, Set.new()}
+  Metadata{lambda_index_go(List.reverse(&2, F.Lambda, lambdas), Map.new(&2, Maybe<&2, F.Lambda>)), constructors, Set.new(), Saturation.empty()}
 
 def metadata_lambdas(projection: Metadata) -> Map<&2, Maybe<&2, F.Lambda>>:
-  Metadata{lambdas, constructors, safe_loops} = projection
+  Metadata{lambdas, constructors, safe_loops, functions} = projection
   lambdas
 
 def metadata_constructors(projection: Metadata) -> Map<&2, Maybe<&2, E.ConstructorSlot>>:
-  Metadata{lambdas, constructors, safe_loops} = projection
+  Metadata{lambdas, constructors, safe_loops, functions} = projection
   constructors
 
 def with_safe_loops(projection: Metadata, entries: Set()) -> Metadata:
-  Metadata{lambdas, constructors, previous} = projection
-  Metadata{lambdas, constructors, entries}
+  Metadata{lambdas, constructors, previous, functions} = projection
+  Metadata{lambdas, constructors, entries, functions}
+
+def with_functions(projection: Metadata, checked: List<&2, M.CheckedFunction>) -> Metadata:
+  Metadata{lambdas, constructors, safe_loops, previous} = projection
+  Metadata{lambdas, constructors, safe_loops, Saturation.definitions(checked, Saturation.empty())}
+
+def metadata_functions(projection: Metadata) -> Map<&2, Maybe<&2, Saturation.Definition>>:
+  Metadata{lambdas, constructors, safe_loops, functions} = projection
+  functions
 
 def safe_loop_entry(projection: Metadata, key: String) -> Bool:
-  Metadata{lambdas, constructors, safe_loops} = projection
+  Metadata{lambdas, constructors, safe_loops, functions} = projection
   Maybe.is_some(&2, Unit, Index.find(Unit, safe_loops, key))
 
 def lambda_get(indexed: Map<&2, Maybe<&2, F.Lambda>>, identity: Nat) -> Maybe<&2, F.Lambda>:
@@ -226,6 +235,10 @@ def flat_annotation(fuel: Nat, expression: M.Expr) -> Bool:
       True{}
     case 1n+rest M.SourceExpr{offset, annotation, value}:
       flat_annotation(rest, value)
+    case 1n+rest M.QualifiedExpr{offset, annotation, predicates, value}:
+      flat_annotation(rest, value)
+    case 1n+rest M.InstantiationExpr{site, value}:
+      flat_annotation(rest, value)
     case _ _:
       False{}
 
@@ -236,6 +249,10 @@ def flat_carry(fuel: Nat, expression: M.Expr, +arrays: Set()) -> Bool:
     case 1n+rest M.LocalExpr{name}:
       Maybe.is_some(&2, Unit, Index.find(Unit, arrays, name))
     case 1n+rest M.SourceExpr{offset, annotation, value}:
+      flat_carry(rest, value, arrays)
+    case 1n+rest M.QualifiedExpr{offset, annotation, predicates, value}:
+      flat_carry(rest, value, arrays)
+    case 1n+rest M.InstantiationExpr{site, value}:
       flat_carry(rest, value, arrays)
     case _ _:
       False{}
@@ -254,6 +271,10 @@ def lower(+fuel: Nat, work: Work, +projection: Metadata, +arrays: Set(), +isolat
     case 1n+rest ExpressionWork{M.RuntimeInitExpr{value}}:
       lower(rest, ExpressionWork{value}, projection, arrays, isolated)
     case 1n+rest ExpressionWork{M.SourceExpr{offset, annotation, value}}:
+      lower(rest, ExpressionWork{value}, projection, arrays, isolated)
+    case 1n+rest ExpressionWork{M.QualifiedExpr{offset, annotation, predicates, value}}:
+      lower(rest, ExpressionWork{value}, projection, arrays, isolated)
+    case 1n+rest ExpressionWork{M.InstantiationExpr{site, value}}:
       lower(rest, ExpressionWork{value}, projection, arrays, isolated)
     case 1n+rest ExpressionWork{M.TagExpr{offset, callee, argument}}:
       lower(rest, ExpressionWork{M.ApplyExpr{callee, argument}}, projection, arrays, isolated)
@@ -274,7 +295,7 @@ def lower(+fuel: Nat, work: Work, +projection: Metadata, +arrays: Set(), +isolat
         b : Expr <- one(bodies)
         return [LetExpr{name, v, b}]
     case 1n+rest ExpressionWork{M.ForeverExpr{state, +initial, body}}:
-      +compact = Bool.and(isolated, flat_carry(16384n, initial, arrays))
+      +compact = isolated
       do Result<&2, &2, M.Diagnostic, List<&2, Expr>>:
         values : List<&2, Expr> <- lower(rest, ExpressionWork{initial}, projection, arrays, isolated)
         v : Expr <- one(values)
@@ -296,9 +317,10 @@ def lower(+fuel: Nat, work: Work, +projection: Metadata, +arrays: Set(), +isolat
         prepared : Expr <- one(first)
         lower(rest, ExpressionsWork{tail, prepared <> reversed}, projection, arrays, isolated)
 
-def prepare_scoped(expression: M.Expr, projection: Metadata, isolated: Bool) -> Result<&2, &2, M.Diagnostic, Expr>:
+def prepare_scoped(expression: M.Expr, +projection: Metadata, isolated: Bool) -> Result<&2, &2, M.Diagnostic, Expr>:
   do Result<&2, &2, M.Diagnostic, Expr>:
-    result : List<&2, Expr> <- lower(U32.to_nat(16384), ExpressionWork{expression}, projection, Set.new(), isolated)
+    expanded : M.Expr <- Saturation.prepare(expression, metadata_functions(projection))
+    result : List<&2, Expr> <- lower(U32.to_nat(16384), ExpressionWork{expanded}, projection, Set.new(), isolated)
     one(result)
 
 def prepare(expression: M.Expr, projection: Metadata) -> Result<&2, &2, M.Diagnostic, Expr>:

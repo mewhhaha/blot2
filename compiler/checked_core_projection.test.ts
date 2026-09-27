@@ -17,49 +17,49 @@ const api = compiled as unknown as {
 };
 const nil = bendList<Node>([]);
 const id = (declaration: string): Node => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name: "scope",
   declaration,
 });
 const operation = (identity: Node): Node => ({
-  $: "OperationEffect",
+  $: "model.OperationEffect",
   identity,
 });
 const row = (identities: readonly Node[]): Node => ({
-  $: "EffectRow",
+  $: "model.EffectRow",
   operations: bendList(identities),
-  tail: { $: "ClosedRow" },
+  tail: { $: "model.ClosedRow" },
 });
 const functionType = (effects: Node): Node => ({
-  $: "FunctionTy",
-  parameter: { $: "U32Ty" },
-  result: { $: "U32Ty" },
+  $: "model.FunctionTy",
+  parameter: { $: "model.U32Ty" },
+  result: { $: "model.U32Ty" },
   effects,
 });
 const sourceFunction = (name: string): Node => ({
-  $: "Function",
+  $: "model.Function",
   name,
   exported: false,
   parameter: "value",
   parameter_type: { $: "None" },
   result_type: { $: "None" },
-  body: { $: "LocalExpr", name: "value" },
+  body: { $: "model.LocalExpr", name: "value" },
 });
 const checkedFunction = (fn: Node): Node => ({
-  $: "CheckedFunction",
+  $: "model.CheckedFunction",
   function: fn,
   signature: {
-    $: "Signature",
+    $: "model.Signature",
     name: fn.name,
-    parameter: { $: "U32Ty" },
-    result: { $: "U32Ty" },
+    parameter: { $: "model.U32Ty" },
+    result: { $: "model.U32Ty" },
     variables: bendList([]),
     effects: row([]),
   },
   effects: bendList([]),
 });
 const moduleWith = (functions: readonly Node[]): Node => ({
-  $: "Module",
+  $: "model.Module",
   constants: nil,
   functions: bendList(functions),
   data_types: nil,
@@ -69,9 +69,11 @@ const imported = (
   identities: readonly Node[],
   metadata = identities,
 ): Node => ({
-  $: "Interface",
+  $: "groups.Interface",
+  predicates: nil,
+
   name: "dependency",
-  kind: { $: "FunctionInterface" },
+  kind: { $: "groups.FunctionInterface" },
   template: functionType(row(identities)),
   parameters: 0n,
   effects: bendList(metadata.map(operation)),
@@ -84,9 +86,11 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
   const sibling = sourceFunction("sibling");
   const original = moduleWith([run, sibling]);
   const checked: Node = {
-    $: "CheckedGroup",
+    $: "groups.CheckedGroup",
+    uses: nil,
+
     checked: {
-      $: "CheckedModule",
+      $: "model.CheckedModule",
       constants: nil,
       functions: bendList([checkedFunction(run), checkedFunction(sibling)]),
       data_types: nil,
@@ -95,7 +99,7 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
     interfaces: nil,
   };
   const certificate: Node = {
-    $: "Certificate",
+    $: "checked_core.Certificate",
     module: original,
     checked,
     imports: bendList([imported([read, write])]),
@@ -105,7 +109,7 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
     bendList([certificate]),
   );
   const job: Node = {
-    $: "Job",
+    $: "groups.Job",
     members: bendList(["run", "sibling"]),
     dependencies: bendList(["dependency"]),
     type_dependencies: nil,
@@ -139,7 +143,7 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
     "None",
   );
 
-  const changedBody = { ...run, body: { $: "U32Expr", value: 42 } };
+  const changedBody = { ...run, body: { $: "model.U32Expr", value: 42 } };
   equal(
     lookup(moduleWith([changedBody, sibling]), imported([read, write])).$,
     "None",
@@ -151,7 +155,7 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
   equal(
     lookup(original, {
       ...imported([read, write]),
-      kind: { $: "ConstantInterface" },
+      kind: { $: "groups.ConstantInterface" },
       effects: nil,
     }).$,
     "None",
@@ -159,21 +163,21 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
   ok(hit.$ === "Some");
 
   const box: Node = {
-    $: "DataType",
+    $: "model.DataType",
     identity: id("Box"),
     parameters: 0n,
     constructors: bendList([{
-      $: "Constructor",
+      $: "model.Constructor",
       name: "Box",
-      payload: { $: "Some", value: { $: "U32Ty" } },
+      payload: { $: "Some", value: { $: "model.U32Ty" } },
       fields: bendList([]),
     }]),
   };
   const operationDefinition: Node = {
-    $: "Operation",
+    $: "model.Operation",
     identity: id("Read"),
-    parameter: { $: "UnitTy" },
-    result: { $: "U32Ty" },
+    parameter: { $: "model.UnitTy" },
+    result: { $: "model.U32Ty" },
   };
   const catalog = (
     types: readonly Node[],
@@ -207,7 +211,10 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
   equal(catalogHit(catalog([box], [])), "None");
   equal(
     catalogHit(
-      catalog([box], [{ ...operationDefinition, result: { $: "F32Ty" } }]),
+      catalog([box], [{
+        ...operationDefinition,
+        result: { $: "model.F32Ty" },
+      }]),
     ),
     "None",
   );
@@ -217,7 +224,7 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
         ...box,
         identity: id("Unused"),
         constructors: bendList([{
-          $: "Constructor",
+          $: "model.Constructor",
           name: "Unused",
           payload: { $: "None" },
           fields: nil,
@@ -231,7 +238,7 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
   const wrongBox = { ...box, parameters: 1n };
   const wrongOperation = {
     ...operationDefinition,
-    result: { $: "F32Ty" },
+    result: { $: "model.F32Ty" },
   };
   equal(catalogHit(catalog([wrongBox, box], [operationDefinition])), "None");
   equal(catalogHit(catalog([box, wrongBox], [operationDefinition])), "Some");
@@ -246,11 +253,11 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
 
   // The old linear search includes abstract operations in its first match.
   const shadowingTemplate: Node = {
-    $: "OperationTemplate",
+    $: "model.OperationTemplate",
     identity: id("Read"),
     parameters: 1n,
-    parameter: { $: "UnitTy" },
-    result: { $: "U32Ty" },
+    parameter: { $: "model.UnitTy" },
+    result: { $: "model.U32Ty" },
   };
   equal(
     catalogHit(catalog([box], [shadowingTemplate, operationDefinition])),
@@ -261,8 +268,16 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
     "Some",
   );
 
-  const collisionA = { $: "TypeId", module_name: "a::b", declaration: "c" };
-  const collisionB = { $: "TypeId", module_name: "a", declaration: "b::c" };
+  const collisionA = {
+    $: "model.TypeId",
+    module_name: "a::b",
+    declaration: "c",
+  };
+  const collisionB = {
+    $: "model.TypeId",
+    module_name: "a",
+    declaration: "b::c",
+  };
   const collisionBox = { ...box, identity: collisionA };
   const colliding = { ...box, identity: collisionB };
   const collisionCertificate = {
@@ -287,9 +302,9 @@ Deno.test("retained SCC certificate requires its whole group and exact imported 
   const abstractCertificate = {
     ...catalogCertificate,
     module: catalog([box], [shadowingTemplate, {
-      $: "OperationInstance",
+      $: "model.OperationInstance",
       template: id("Read"),
-      arguments: bendList([{ $: "U32Ty" }]),
+      arguments: bendList([{ $: "model.U32Ty" }]),
     }]),
   };
   equal(catalogHitWith(abstractCertificate, catalog([box], [])), "Some");

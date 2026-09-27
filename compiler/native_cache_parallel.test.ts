@@ -4,14 +4,14 @@ import { bendArray, type BendList, bendList } from "./bend_list.ts";
 
 type Node = { readonly $: string; readonly [field: string]: unknown };
 interface Job {
-  readonly $: "CodegenJob";
+  readonly $: "wasm.CodegenJob";
   readonly key: string;
   readonly parameter: string;
   readonly body: Node;
   readonly captures: BendList<string>;
 }
 interface Diagnostic {
-  readonly $: "Diagnostic";
+  readonly $: "model.Diagnostic";
   readonly code: string;
   readonly subject: string;
   readonly message: string;
@@ -35,7 +35,7 @@ interface EntryPlan {
   };
 }
 interface Scheduled {
-  readonly $: "Scheduled";
+  readonly $: "check_scheduler.Scheduled";
   readonly position: bigint;
   readonly level: bigint;
   readonly job: Node;
@@ -132,7 +132,7 @@ const backend = compiled as unknown as {
   ): Result<Node>;
 };
 const job = (key: string, body: Node): Job => ({
-  $: "CodegenJob",
+  $: "wasm.CodegenJob",
   key,
   parameter: "value",
   body,
@@ -158,10 +158,10 @@ Deno.test("pipelined codegen preserves cold, mixed-hit, reordered and evicted ca
     { length: 16 },
     (_, index) =>
       job(`fn:pipeline_${index}`, {
-        $: "ArrayExpr",
+        $: "codegen_ir.ArrayExpr",
         elements: bendList(Array.from(
           { length: index < 4 ? 1024 : 3 },
-          (_, value) => ({ $: "U32Expr", value: value + index }),
+          (_, value) => ({ $: "codegen_ir.U32Expr", value: value + index }),
         )),
       }),
   );
@@ -173,7 +173,7 @@ Deno.test("pipelined codegen preserves cold, mixed-hit, reordered and evicted ca
       jobs,
       jobs,
       [
-        job(jobs[0].key, { $: "U32Expr", value: 42 }),
+        job(jobs[0].key, { $: "codegen_ir.U32Expr", value: 42 }),
         ...jobs.slice(1),
       ],
       jobs.toReversed(),
@@ -221,10 +221,13 @@ Deno.test("pipelined codegen preserves cold, mixed-hit, reordered and evicted ca
 
 Deno.test("pipelined codegen retains source-order errors across keying and compilation", () => {
   const empty = backend["empty_checked"]().groups;
-  const earlier = job("fn:earlier", { $: "LocalExpr", name: "missing" });
-  const later = job("fn:later", { $: "U32Expr", value: 42 });
+  const earlier = job("fn:earlier", {
+    $: "codegen_ir.LocalExpr",
+    name: "missing",
+  });
+  const later = job("fn:later", { $: "codegen_ir.U32Expr", value: 42 });
   const failure: Diagnostic = {
-    $: "Diagnostic",
+    $: "model.Diagnostic",
     code: "cache_key_complexity",
     subject: later.key,
     message: "synthetic key failure",
@@ -257,7 +260,7 @@ Deno.test("pipelined codegen retains source-order errors across keying and compi
 Deno.test("frontier routing keeps tiny jobs staged and pipelines substantial groups", () => {
   for (const heavy of [false, true]) {
     const functions = Array.from({ length: 8 }, (_, index) => ({
-      $: "Function",
+      $: "model.Function",
       name: `work_${index}`,
       exported: false,
       parameter: "value",
@@ -265,29 +268,29 @@ Deno.test("frontier routing keeps tiny jobs staged and pipelines substantial gro
       result_type: { $: "None" },
       body: heavy
         ? {
-          $: "ArrayExpr",
+          $: "model.ArrayExpr",
           elements: bendList(
             Array.from(
               { length: 256 },
-              (_, value) => ({ $: "U32Expr", value }),
+              (_, value) => ({ $: "model.U32Expr", value }),
             ),
           ),
         }
-        : { $: "U32Expr", value: 1 },
+        : { $: "model.U32Expr", value: 1 },
     }));
     const known = checkCatalog({
-      $: "Module",
+      $: "model.Module",
       functions: bendList(functions),
       constants: bendList([]),
       data_types: bendList([]),
       operations: bendList([]),
     });
     const ready: Scheduled[] = functions.map((fn, index) => ({
-      $: "Scheduled",
+      $: "check_scheduler.Scheduled",
       position: BigInt(index),
       level: 0n,
       job: {
-        $: "Job",
+        $: "groups.Job",
         members: bendList([fn.name]),
         dependencies: bendList([]),
         type_dependencies: bendList([]),
@@ -304,32 +307,32 @@ Deno.test("frontier routing keeps tiny jobs staged and pipelines substantial gro
 Deno.test("pipelined frontiers and singleton fast paths equal ordered two-stage checking", () => {
   const names = Array.from({ length: 48 }, (_, index) => `work_${index}`);
   const catalog = checkCatalog({
-    $: "Module",
+    $: "model.Module",
     constants: bendList([]),
     data_types: bendList([]),
     operations: bendList([]),
     functions: bendList(names.map((name, index) => ({
-      $: "Function",
+      $: "model.Function",
       name,
       exported: false,
       parameter: "value",
       parameter_type: { $: "None" },
       result_type: { $: "None" },
       body: {
-        $: "ArrayExpr",
+        $: "model.ArrayExpr",
         elements: bendList(Array.from(
           { length: index < 8 ? 256 : 8 },
-          (_, value) => ({ $: "U32Expr", value }),
+          (_, value) => ({ $: "model.U32Expr", value }),
         )),
       },
     }))),
   });
   const ready: Scheduled[] = names.map((name, index) => ({
-    $: "Scheduled",
+    $: "check_scheduler.Scheduled",
     position: BigInt(index),
     level: 0n,
     job: {
-      $: "Job",
+      $: "groups.Job",
       members: bendList([name]),
       dependencies: bendList(index === 2 ? ["missing_dependency"] : []),
       type_dependencies: bendList([]),
@@ -347,10 +350,10 @@ Deno.test("pipelined frontiers and singleton fast paths equal ordered two-stage 
       const failure: Node = cutoff === 48 ? { $: "None" } : {
         $: "Some",
         value: {
-          $: "Failure",
+          $: "check_scheduler.Failure",
           position: BigInt(cutoff),
           diagnostic: {
-            $: "Diagnostic",
+            $: "model.Diagnostic",
             code: "earlier_failure",
             subject: "earlier",
             message: "prior frontier failed",
@@ -421,10 +424,10 @@ Deno.test("pipelined frontiers and singleton fast paths equal ordered two-stage 
 Deno.test("parallel entry keys equal serial keys and preserve uneven source order", () => {
   const jobs = Array.from({ length: 48 }, (_, index) =>
     job(`fn:λ_${index}`, {
-      $: "ArrayExpr",
+      $: "codegen_ir.ArrayExpr",
       elements: bendList(Array.from(
         { length: index < 8 ? 1024 : 3 },
-        (_, value) => ({ $: "U32Expr", value: value + index }),
+        (_, value) => ({ $: "codegen_ir.U32Expr", value: value + index }),
       )),
     }));
   for (const input of [[], jobs.slice(0, 1), jobs, jobs.toReversed()]) {
@@ -441,11 +444,14 @@ Deno.test("parallel entry keys equal serial keys and preserve uneven source orde
 });
 
 Deno.test("parallel key failures preserve earlier compile errors and discard later results", () => {
-  const earlier = job("fn:earlier", { $: "LocalExpr", name: "missing" });
-  const failing = job("fn:key_failure", { $: "U32Expr", value: 1 });
-  const later = job("fn:later", { $: "U32Expr", value: 2 });
+  const earlier = job("fn:earlier", {
+    $: "codegen_ir.LocalExpr",
+    name: "missing",
+  });
+  const failing = job("fn:key_failure", { $: "codegen_ir.U32Expr", value: 1 });
+  const later = job("fn:later", { $: "codegen_ir.U32Expr", value: 2 });
   const failure: Diagnostic = {
-    $: "Diagnostic",
+    $: "model.Diagnostic",
     code: "cache_key_complexity",
     subject: failing.key,
     message: "synthetic key failure",

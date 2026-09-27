@@ -121,6 +121,10 @@ def children(expression: M.Expr) -> List<&2, M.Expr>:
       [value]
     case M.SourceExpr{offset, annotation, value}:
       [value]
+    case M.QualifiedExpr{offset, annotation, predicates, value}:
+      [value]
+    case M.InstantiationExpr{site, value}:
+      [value]
     case M.SpecializeOperationExpr{template, arguments, body}:
       [body]
     case M.StateProviderExpr{read, write, initial}:

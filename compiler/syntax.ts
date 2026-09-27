@@ -28,6 +28,7 @@ export interface PreparedSource {
   readonly source: string;
   readonly originalOffsets: readonly number[];
   readonly tokens: readonly Token[];
+  readonly clauseMarkers: readonly number[];
 }
 
 export interface ParseRange {
@@ -42,6 +43,15 @@ export interface ParseRange {
 function parserSource(prepared: PreparedSource, range: ParseRange = {}) {
   const start = range.start ?? 0;
   const neutral = prepared.source.slice(start, range.end).split("");
+  // Keep source width and offsets unchanged. The parser sees a distinct marker
+  // only at an annotation's `where {`; CST text still comes from real source.
+  for (const position of prepared.clauseMarkers) {
+    if (
+      position >= start && position + 5 <= (range.end ?? prepared.source.length)
+    ) {
+      neutral[position - start + 4] = "E";
+    }
+  }
   for (
     let index = range.tokenStart ?? 0;
     index < (range.tokenEnd ?? prepared.tokens.length);
@@ -53,6 +63,68 @@ function parserSource(prepared: PreparedSource, range: ParseRange = {}) {
     }
   }
   return neutral.join("");
+}
+
+function annotationWhere(
+  tokens: readonly Token[],
+  originalOffsets: readonly number[],
+): number[] {
+  const markers: number[] = [];
+  let braces = 0;
+  let annotationDepth: number | undefined;
+  // A record field also has a colon. Only declaration headers and lambda
+  // parameters introduce annotations that can own a where clause.
+  const annotationColon = (index: number) => {
+    let nested = 0;
+    for (let cursor = index - 1; cursor >= 0; cursor--) {
+      const text = tokens[cursor].text;
+      if ([")", "]", "}"].includes(text)) {
+        nested++;
+        continue;
+      }
+      if (["(", "[", "{"].includes(text)) {
+        if (nested > 0) {
+          nested--;
+          continue;
+        }
+        if (text !== "(") return false;
+      }
+      if (nested > 0) continue;
+      if (text === "let" || text === "const" || text === "fn") return true;
+      if (["\uE000", "=", "=>", "<-", ","].includes(text)) {
+        return false;
+      }
+    }
+    return false;
+  };
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index];
+    const text = token.text;
+    if (text === "{") braces++;
+    else if (text === "}") braces--;
+    if (annotationDepth !== undefined && braces < annotationDepth) {
+      annotationDepth = undefined;
+    }
+    if (text === ":" && annotationColon(index)) annotationDepth = braces;
+    else if (
+      annotationDepth === braces &&
+      ["\uE000", "=", "=>", "<-", ":="].includes(text)
+    ) annotationDepth = undefined;
+    else if (
+      annotationDepth === braces && tokens[index + 1]?.text === "{"
+    ) {
+      if (text === "where") markers.push(token.span.start);
+      else if (text === "wherE") {
+        throw new SourceError(
+          "reserved_clause_marker",
+          "The spelling 'wherE' is reserved before a clause body",
+          originalOffsets[token.span.start],
+          originalOffsets[token.span.end],
+        );
+      }
+    }
+  }
+  return markers;
 }
 
 // Layout/delimiter boundaries are only candidates. Each slice still goes
@@ -356,7 +428,11 @@ export async function createFrontend() {
       const token = lexed.tokenTape.token(index)!;
       if (token.channel === "main" && token.type !== "eof") tokens.push(token);
     }
-    return { ...prepared, tokens };
+    return {
+      ...prepared,
+      tokens,
+      clauseMarkers: annotationWhere(tokens, prepared.originalOffsets),
+    };
   }
   function compactPrepared(
     prepared: PreparedSource,

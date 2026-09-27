@@ -7,6 +7,8 @@ import ./dependency.bend as D
 import ./inference_batch.bend as Batch
 import ./nat_index.bend as NatIndex
 import ./global_bindings.bend as Bindings
+import ./constraints.bend as C
+import ./use_plans.bend as Uses
 
 # These tasks are speculative. A failed guard replays the entire run through
 # Globals in declaration order, including the first diagnostic.
@@ -59,14 +61,17 @@ def binding_free(bindings: List<&2, I.Binding>, +substitutions: T.Substitutions)
   match bindings:
     case Nil{}:
       Done{Nil{}}
-    case I.Binding{name, +ty, +variables} <> tail:
+    case I.Binding{name, +ty, +variables, +predicates} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
         checked : Unit <- Bool.pick(Result<&2, &2, M.Diagnostic, Unit>, quantified_unbound(variables, substitutions), Done{Unit{}}, Fail{M.Diagnostic{"internal_error", name, "bound imported quantifier"}})
-        raw : List<&2, Nat> <- T.free(ty)
+        raw_type : List<&2, Nat> <- T.free(ty)
+        raw_predicates : List<&2, Nat> <- C.free_list(predicates)
         resolved : M.Ty <- T.resolve(substitutions, ty)
-        refined : List<&2, Nat> <- T.free(resolved)
+        refined_type : List<&2, Nat> <- T.free(resolved)
+        resolved_predicates : List<&2, M.Predicate> <- C.resolve_list(substitutions, predicates)
+        refined_predicates : List<&2, Nat> <- C.free_list(resolved_predicates)
         rest : List<&2, Nat> <- binding_free(tail, substitutions)
-        return T.union(T.union(T.difference(raw, variables), T.difference(refined, variables)), rest)
+        return T.union(T.union(T.difference(T.union(raw_type, raw_predicates), variables), T.difference(T.union(refined_type, refined_predicates), variables)), rest)
 
 def substitution_free(one: T.Substitution) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
   match one:
@@ -296,17 +301,35 @@ def types_free(types: List<&2, M.Ty>) -> Result<&2, &2, M.Diagnostic, List<&2, N
         b : List<&2, Nat> <- types_free(tail)
         return T.union(a, b)
 
+def invocation_free(invocation: Maybe<&2, M.EffectRow>) -> List<&2, Nat>:
+  match invocation:
+    case None{}:
+      Nil{}
+    case Some{row}:
+      T.row_free(row)
+
+def rename_invocation(invocation: Maybe<&2, M.EffectRow>, +mapping: NatIndex.Index<Nat>) -> Maybe<&2, M.EffectRow>:
+  match invocation:
+    case None{}:
+      None{}
+    case Some{row}:
+      Some{T.rename_row(row, mapping)}
+
 def coverage_free(coverage: I.Coverage) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
   match coverage:
+    case I.QualifiedBoundary{offset, declared, subject}:
+      C.free_list(declared)
+    case I.QualifiedNeed{site, predicate, subject}:
+      C.free(predicate)
     case I.OperationNeed{identity, template, arguments, function_type, subject}:
       do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
         a : List<&2, Nat> <- types_free(arguments)
         b : List<&2, Nat> <- T.free(function_type)
         return T.union(a, b)
-    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject}:
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, invocation, ambient, subject}:
       do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
         free : List<&2, Nat> <- types_free([left, right, result])
-        return T.union(free, T.row_free(ambient))
+        return T.union(free, T.union(invocation_free(invocation), T.row_free(ambient)))
     case I.ValuePatternType{inferred_type, subject}:
       T.free(inferred_type)
     case I.Coverage{inferred_types, patterns, subject}:
@@ -323,12 +346,26 @@ def coverages_free(coverages: List<&2, I.Coverage>) -> Result<&2, &2, M.Diagnost
         b : List<&2, Nat> <- coverages_free(tail)
         return T.union(a, b)
 
+def reflections_free(reflections: List<&2, I.Reflection>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+  match reflections:
+    case Nil{}:
+      Done{Nil{}}
+    case I.Reflection{callee, subject, ty, predicates} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+        own_type : List<&2, Nat> <- T.free(ty)
+        own_predicates : List<&2, Nat> <- C.free_list(predicates)
+        rest : List<&2, Nat> <- reflections_free(tail)
+        return T.union(own_type, T.union(own_predicates, rest))
+
 def definition_free(definition: I.Definition) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
-  I.Definition{name, I.Inference{ty, coverage, exits, reflections}} = definition
+  I.Definition{name, I.Inference{ty, coverage, exits, reflections, predicates, uses}} = definition
   do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
     a : List<&2, Nat> <- T.free(ty)
     b : List<&2, Nat> <- coverages_free(coverage)
-    return T.union(a, b)
+    c : List<&2, Nat> <- C.free_list(predicates)
+    d : List<&2, Nat> <- Uses.free(uses)
+    e : List<&2, Nat> <- reflections_free(reflections)
+    return T.union(a, T.union(b, T.union(c, T.union(d, e))))
 
 def mapping(count: Nat, +first: Nat, +target: Nat, +result: NatIndex.Index<Nat>) -> NatIndex.Index<Nat>:
   match count:
@@ -346,17 +383,25 @@ def rename_types(types: List<&2, M.Ty>, +mapping: NatIndex.Index<Nat>) -> Result
 
 def rename_coverage(coverage: I.Coverage, +mapping: NatIndex.Index<Nat>) -> Result<&2, &2, M.Diagnostic, I.Coverage>:
   match coverage:
+    case I.QualifiedBoundary{offset, declared, subject}:
+      do Result<&2, &2, M.Diagnostic, I.Coverage>:
+        needs : List<&2, M.Predicate> <- C.rename_list(mapping, declared)
+        return I.QualifiedBoundary{offset, needs, subject}
+    case I.QualifiedNeed{site, predicate, subject}:
+      do Result<&2, &2, M.Diagnostic, I.Coverage>:
+        next : M.Predicate <- C.rename(mapping, predicate)
+        return I.QualifiedNeed{site, next, subject}
     case I.OperationNeed{identity, template, arguments, function_type, subject}:
       do Result<&2, &2, M.Diagnostic, I.Coverage>:
         args : List<&2, M.Ty> <- rename_types(arguments, mapping)
         fn : M.Ty <- T.rename_type(function_type, mapping)
         return I.OperationNeed{identity, template, args, fn, subject}
-    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject}:
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, invocation, ambient, subject}:
       do Result<&2, &2, M.Diagnostic, I.Coverage>:
         a : M.Ty <- T.rename_type(left, mapping)
         b : M.Ty <- T.rename_type(right, mapping)
         c : M.Ty <- T.rename_type(result, mapping)
-        return I.AssociatedNeed{identity, dispatch, member, templates, a, b, c, T.rename_row(ambient, mapping), subject}
+        return I.AssociatedNeed{identity, dispatch, member, templates, a, b, c, rename_invocation(invocation, mapping), T.rename_row(ambient, mapping), subject}
     case I.ValuePatternType{inferred_type, subject}:
       do Result<&2, &2, M.Diagnostic, I.Coverage>:
         ty : M.Ty <- T.rename_type(inferred_type, mapping)
@@ -379,12 +424,26 @@ def rename_coverages(coverages: List<&2, I.Coverage>, +mapping: NatIndex.Index<N
         b : List<&2, I.Coverage> <- rename_coverages(tail, mapping)
         return a <> b
 
+def rename_reflections(reflections: List<&2, I.Reflection>, +mapping: NatIndex.Index<Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, I.Reflection>>:
+  match reflections:
+    case Nil{}:
+      Done{Nil{}}
+    case I.Reflection{callee, subject, ty, predicates} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, I.Reflection>>:
+        next_type : M.Ty <- T.rename_type(ty, mapping)
+        next_predicates : List<&2, M.Predicate> <- C.rename_list(mapping, predicates)
+        rest : List<&2, I.Reflection> <- rename_reflections(tail, mapping)
+        return I.Reflection{callee, subject, next_type, next_predicates} <> rest
+
 def rename_definition(definition: I.Definition, +mapping: NatIndex.Index<Nat>) -> Result<&2, &2, M.Diagnostic, I.Definition>:
-  I.Definition{name, I.Inference{ty, coverage, exits, reflections}} = definition
+  I.Definition{name, I.Inference{ty, coverage, exits, reflections, predicates, uses}} = definition
   do Result<&2, &2, M.Diagnostic, I.Definition>:
     next_ty : M.Ty <- T.rename_type(ty, mapping)
     next_coverage : List<&2, I.Coverage> <- rename_coverages(coverage, mapping)
-    return I.Definition{name, I.Inference{next_ty, next_coverage, exits, reflections}}
+    next_predicates : List<&2, M.Predicate> <- C.rename_list(mapping, predicates)
+    next_uses : List<&2, C.UsePlan> <- Uses.transform_types(uses, C.Rename{mapping, T.FreshVariables{}})
+    next_reflections : List<&2, I.Reflection> <- rename_reflections(reflections, mapping)
+    return I.Definition{name, I.Inference{next_ty, next_coverage, exits, next_reflections, next_predicates, next_uses}}
 
 def rename_substitution(substitution: T.Substitution, +mapping: NatIndex.Index<Nat>) -> Result<&2, &2, M.Diagnostic, T.Substitution>:
   match substitution:

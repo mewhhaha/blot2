@@ -4,9 +4,9 @@ import ./const_eval.bend as Const
 import ./main.bend as Main
 
 def version() -> U32:
-  12
+  13
 
-# This is the version-12 word protocol paired with native_protocol.ts. Fields
+# This is the version-13 word protocol paired with native_protocol.ts. Fields
 # follow public Analysis order; compiler-only checked declarations stay native.
 type Work is Data:
   Word{value: U32}
@@ -23,6 +23,9 @@ type Work is Data:
   Operation{value: M.Operation}
   Operations{values: List<&2, M.Operation>}
   OperationEntries{values: List<&2, M.Operation>}
+  Predicate{value: M.Predicate}
+  Predicates{values: List<&2, M.Predicate>}
+  PredicateEntries{values: List<&2, M.Predicate>}
   Effect{value: M.Effect}
   Effects{values: List<&2, M.Effect>}
   EffectEntries{values: List<&2, M.Effect>}
@@ -120,6 +123,8 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{1} <> Natural{index} <> tail, room, reversed)
     case 1n+rest RowTail{M.RowParameter{index}} <> tail room:
       encode_work(rest, Word{2} <> Natural{index} <> tail, room, reversed)
+    case 1n+rest RowTail{M.FreeRow{scope, name}} <> tail room:
+      encode_work(rest, Word{3} <> Text{scope} <> Text{name} <> tail, room, reversed)
     case 1n+rest Operation{M.Operation{identity, parameter, result}} <> tail room:
       encode_work(rest, Identity{identity} <> TypeValue{parameter} <> TypeValue{result} <> tail, room, reversed)
     case 1n+rest Operation{other} <> tail room:
@@ -180,6 +185,26 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{0} <> tail, room, reversed)
     case 1n+rest OptionalType{Some{value}} <> tail room:
       encode_work(rest, Word{1} <> TypeValue{value} <> tail, room, reversed)
+    case 1n+rest Predicates{+values} <> tail room:
+      encode_work(rest, Length{List.length(&2, M.Predicate, values)} <> PredicateEntries{values} <> tail, room, reversed)
+    case 1n+rest PredicateEntries{Nil{}} <> tail room:
+      encode_work(rest, tail, room, reversed)
+    case 1n+rest PredicateEntries{head <> following} <> tail room:
+      encode_work(rest, Predicate{head} <> PredicateEntries{following} <> tail, room, reversed)
+    case 1n+rest Predicate{M.AssociatedPredicate{member, templates, left, right, result, invocation}} <> tail room:
+      encode_work(rest, Word{0} <> Text{member} <> Identities{templates} <> TypeValue{left} <> TypeValue{right} <> TypeValue{result} <> Row{invocation} <> tail, room, reversed)
+    case 1n+rest Predicate{M.ReceiverPredicate{member, templates, receiver, argument, result, invocation}} <> tail room:
+      encode_work(rest, Word{1} <> Text{member} <> Identities{templates} <> TypeValue{receiver} <> TypeValue{argument} <> TypeValue{result} <> Row{invocation} <> tail, room, reversed)
+    case 1n+rest Predicate{M.FieldPredicate{member, receiver, result}} <> tail room:
+      encode_work(rest, Word{2} <> Text{member} <> TypeValue{receiver} <> TypeValue{result} <> tail, room, reversed)
+    case 1n+rest Predicate{M.UpdatePredicate{member, receiver, assigned, result, invocation}} <> tail room:
+      encode_work(rest, Word{3} <> Text{member} <> TypeValue{receiver} <> TypeValue{assigned} <> TypeValue{result} <> Row{invocation} <> tail, room, reversed)
+    case 1n+rest Predicate{M.OperationPredicate{template, arguments, function_type}} <> tail room:
+      encode_work(rest, Word{4} <> Identity{template} <> Types{arguments} <> TypeValue{function_type} <> tail, room, reversed)
+    case 1n+rest Predicate{M.TypeRepPredicate{represented}} <> tail room:
+      encode_work(rest, Word{5} <> TypeValue{represented} <> tail, room, reversed)
+    case 1n+rest Predicate{M.EffectRepPredicate{row}} <> tail room:
+      encode_work(rest, Word{6} <> Row{row} <> tail, room, reversed)
     case 1n+rest Patterns{+values} <> tail room:
       encode_work(rest, Length{List.length(&2, M.Pattern, values)} <> PatternEntries{values} <> tail, room, reversed)
     case 1n+rest PatternEntries{head <> following} <> tail room:
@@ -300,6 +325,10 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{44} <> Expression{value} <> tail, room, reversed)
     case 1n+rest Expression{M.SourceExpr{offset, annotation, value}} <> tail room:
       encode_work(rest, Word{20} <> Natural{offset} <> OptionalType{annotation} <> Expression{value} <> tail, room, reversed)
+    case 1n+rest Expression{M.QualifiedExpr{offset, annotation, predicates, value}} <> tail room:
+      encode_work(rest, Word{47} <> Natural{offset} <> TypeValue{annotation} <> Predicates{predicates} <> Expression{value} <> tail, room, reversed)
+    case 1n+rest Expression{M.InstantiationExpr{site, value}} <> tail room:
+      encode_work(rest, Word{48} <> Natural{site} <> Expression{value} <> tail, room, reversed)
     case 1n+rest Expression{M.F32Expr{value}} <> tail room:
       encode_work(rest, Word{21} <> Word{F32.bits(value)} <> tail, room, reversed)
     case 1n+rest Expression{M.UnaryExpr{operator, value}} <> tail room:

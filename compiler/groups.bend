@@ -9,6 +9,7 @@ import ./dependency.bend as D
 import ./effects.bend as E
 import ./effect_rows.bend as R
 import ./index.bend as Index
+import ./constraints.bend as C
 
 type Job is Data:
   Job{members: List<&2, String>, dependencies: List<&2, String>, type_dependencies: List<&2, M.TypeId>}
@@ -20,33 +21,44 @@ type InterfaceKind is Data:
 # ParameterTy indices bind within this interface, never within another job's
 # inference state. An interface contains no unresolved monomorphic variables.
 type Interface is Data:
-  Interface{name: String, kind: InterfaceKind, template: M.Ty, parameters: Nat, effects: List<&2, M.Effect>}
+  Interface{name: String, kind: InterfaceKind, template: M.Ty, parameters: Nat, effects: List<&2, M.Effect>, predicates: List<&2, M.Predicate>}
 
 type CheckedGroup is Data:
-  CheckedGroup{checked: M.CheckedModule, interfaces: List<&2, Interface>}
+  CheckedGroup{checked: M.CheckedModule, interfaces: List<&2, Interface>, uses: List<&2, C.UsePlan>}
+
+def checked_interfaces(group: CheckedGroup) -> List<&2, Interface>:
+  CheckedGroup{checked, interfaces, uses} = group
+  interfaces
+
+def checked_uses(group: CheckedGroup) -> List<&2, C.UsePlan>:
+  CheckedGroup{checked, interfaces, uses} = group
+  uses
 
 def interface_names(interfaces: List<&2, Interface>) -> List<&2, String>:
   match interfaces:
     case Nil{}:
       Nil{}
-    case Interface{name, kind, template, parameters, effects} <> tail:
+    case Interface{name, kind, template, parameters, effects, predicates} <> tail:
       name <> interface_names(tail)
 
 def interface_functions(interfaces: List<&2, Interface>) -> List<&2, String>:
   match interfaces:
     case Nil{}:
       Nil{}
-    case Interface{name, FunctionInterface{}, template, parameters, effects} <> tail:
+    case Interface{name, FunctionInterface{}, template, parameters, effects, predicates} <> tail:
       name <> interface_functions(tail)
     case head <> tail:
       interface_functions(tail)
 
-def indices(count: Nat, +start: Nat) -> List<&2, Nat>:
+def indices_accumulated(count: Nat, +start: Nat, reversed: List<&2, Nat>) -> List<&2, Nat>:
   match count:
     case 0n:
-      Nil{}
+      List.reverse(&2, Nat, reversed)
     case 1n+rest:
-      start <> indices(rest, 1n+start)
+      indices_accumulated(rest, 1n+start, start <> reversed)
+
+def indices(count: Nat, start: Nat) -> List<&2, Nat>:
+  indices_accumulated(count, start, Nil{})
 
 def same_effects(left: List<&2, M.Effect>, right: List<&2, M.Effect>) -> Bool:
   match left right:
@@ -73,17 +85,104 @@ def valid_interface_kind(kind: InterfaceKind, template: M.Ty, parameters: Nat, e
     case _ _ _:
       Fail{M.Diagnostic{"invalid_interface", subject, "dependencies require pure constant initializers or function interfaces"}}
 
+def validate_predicate_templates(templates: List<&2, M.TypeId>, +operations: List<&2, M.Operation>) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match templates:
+    case Nil{}:
+      Done{Unit{}}
+    case head <> tail:
+      do Result<&2, &2, M.Diagnostic, Unit>:
+        declared : M.Operation <- I.operation_template(operations, head)
+        validate_predicate_templates(tail, operations)
+
+def validate_operation_arity(declared: M.Operation, count: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match declared:
+    case M.OperationTemplate{identity, parameters, parameter, result}:
+      Bool.pick(Result<&2, &2, M.Diagnostic, Unit>, Nat.is_eq(parameters, count), Done{Unit{}}, Fail{M.Diagnostic{"invalid_interface", subject, "qualified operation predicate has the wrong number of type arguments"}})
+    case _:
+      Fail{M.Diagnostic{"invalid_interface", subject, "qualified operation predicate does not name a generic operation template"}}
+
+def validate_predicate_arity(predicate: M.Predicate, operations: List<&2, M.Operation>, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match predicate:
+    case M.OperationPredicate{template, +arguments, function_type}:
+      do Result<&2, &2, M.Diagnostic, Unit>:
+        declared : M.Operation <- I.operation_template(operations, template)
+        validate_operation_arity(declared, List.length(&2, M.Ty, arguments), subject)
+    case _:
+      Done{Unit{}}
+
+def validate_predicates(predicates: List<&2, M.Predicate>, +parameters: Nat, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, +subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match predicates:
+    case Nil{}:
+      Done{Unit{}}
+    case +head <> tail:
+      do Result<&2, &2, M.Diagnostic, Unit>:
+        valid : Unit <- TD.validate_template(C.shape_type(head), Some{parameters}, operations, types, subject)
+        source_names : List<&2, Nat> <- C.free(head)
+        known : Unit <- validate_predicate_templates(C.predicate_templates([head]), operations)
+        arity : Unit <- validate_predicate_arity(head, operations, subject)
+        validate_predicates(tail, parameters, operations, types, subject)
+
+def predicate_shapes_accumulated(predicates: List<&2, M.Predicate>, reversed: List<&2, M.Ty>) -> List<&2, M.Ty>:
+  match predicates:
+    case Nil{}:
+      List.reverse(&2, M.Ty, reversed)
+    case head <> tail:
+      predicate_shapes_accumulated(tail, C.shape_type(head) <> reversed)
+
+def predicate_shapes(predicates: List<&2, M.Predicate>) -> List<&2, M.Ty>:
+  predicate_shapes_accumulated(predicates, Nil{})
+
+# T.parameter_kinds(ManyTypes) checks each head with the same remaining fuel
+# used by the list tail, then right-folds merge_kinds. Keep its per-branch
+# complexity limit and first-error order while avoiding nested Result binds
+# for a dependency interface with thousands of predicates.
+def scheme_kind_groups(+fuel: Nat, pending: List<&2, M.Ty>, reversed: List<&2, T.ParameterKinds>) -> Result<&2, &2, M.Diagnostic, List<&2, T.ParameterKinds>>:
+  match fuel pending:
+    case 0n _:
+      Fail{T.complexity()}
+    case 1n+rest Nil{}:
+      Done{reversed}
+    case 1n+ +rest head <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, T.ParameterKinds>>:
+        first : T.ParameterKinds <- T.parameter_kinds(rest, T.OneType{head})
+        scheme_kind_groups(rest, tail, first <> reversed)
+
+def scheme_kind_merge(reversed: List<&2, T.ParameterKinds>, merged: T.ParameterKinds) -> T.ParameterKinds:
+  match reversed:
+    case Nil{}:
+      merged
+    case head <> tail:
+      scheme_kind_merge(tail, T.merge_kinds(head, merged))
+
+def scheme_kinds(fuel: Nat, pending: List<&2, M.Ty>) -> Result<&2, &2, M.Diagnostic, T.ParameterKinds>:
+  do Result<&2, &2, M.Diagnostic, T.ParameterKinds>:
+    reversed : List<&2, T.ParameterKinds> <- scheme_kind_groups(fuel, pending, Nil{})
+    return scheme_kind_merge(reversed, T.ParameterKinds{Nil{}, Nil{}})
+
+# A quantified index has one kind across the entire imported scheme. Checking
+# the template and predicates separately misses a type/row collision between
+# them, even though each individual tree is well formed.
+def validate_scheme_kinds(template: M.Ty, predicates: List<&2, M.Predicate>, subject: String) -> Result<&2, &2, M.Diagnostic, Unit>:
+  do Result<&2, &2, M.Diagnostic, Unit>:
+    kinds : T.ParameterKinds <- scheme_kinds(U32.to_nat(65536), template <> predicate_shapes(predicates))
+    T.kind_check(kinds, subject)
+
 def import_interfaces(interfaces: List<&2, Interface>, +operations: List<&2, M.Operation>, +types: List<&2, M.DataType>, +start: Nat) -> Result<&2, &2, M.Diagnostic, G.Environment>:
   match interfaces:
     case Nil{}:
       Done{G.Environment{Nil{}, Nil{}, I.State{T.empty(), start, MTip{}}}}
-    case Interface{+name, +kind, +template, +parameters, +effects} <> tail:
+    case Interface{+name, +kind, +template, +parameters, +effects, +predicates} <> tail:
       do Result<&2, &2, M.Diagnostic, G.Environment>:
         valid : Unit <- TD.validate_template(template, Some{parameters}, operations, types, name)
+        source_names : List<&2, Nat> <- C.free(M.TypeRepPredicate{template})
         compatible : Unit <- valid_interface_kind(kind, template, parameters, effects, name)
-        +ty : M.Ty <- T.parameters(TD.fresh_arguments(parameters, start), 0n, template)
+        valid_needs : Unit <- validate_predicates(predicates, parameters, operations, types, name)
+        kinds : Unit <- validate_scheme_kinds(template, predicates, name)
+        +arguments : List<&2, M.Ty> = TD.fresh_arguments(parameters, start)
+        +ty : M.Ty <- T.parameters(arguments, 0n, template)
+        needs : List<&2, M.Predicate> <- C.instantiate_parameters(arguments, predicates, 0n)
         +rest : G.Environment <- import_interfaces(tail, operations, types, Nat.add(start, parameters))
-        return G.Environment{I.Binding{name, ty, indices(parameters, start)} <> G.env_bindings(rest), I.Definition{name, I.pure(ty)} <> G.env_definitions(rest), G.env_state(rest)}
+        return G.Environment{I.Binding{name, ty, indices(parameters, start), needs} <> G.env_bindings(rest), I.Definition{name, I.pure(ty)} <> G.env_definitions(rest), G.env_state(rest)}
 
 def template_type_sequential(variables: List<&2, Nat>, +index: Nat, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
   match variables:
@@ -145,58 +244,118 @@ def canonical_work(+fuel: Nat, work: T.TypeWork) -> Result<&2, &2, M.Diagnostic,
         ts : List<&2, M.Ty> <- canonical_work(rest, T.ManyTypes{tail})
         return h <> ts
 
-def closed_interface(open: List<&2, Nat>, +variables: List<&2, Nat>, name: String, kind: InterfaceKind, ty: M.Ty, effects: List<&2, M.Effect>) -> Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
+# Interface variable lists can be much wider than the host stack. Keep the
+# count local to this export path; Bend Base's generic List.length is unchanged.
+def interface_variable_count(variables: List<&2, Nat>, count: Nat) -> Nat:
+  match variables:
+    case Nil{}:
+      count
+    case head <> tail:
+      interface_variable_count(tail, Nat.add(count, 1n))
+
+def closed_interface(open: List<&2, Nat>, +variables: List<&2, Nat>, name: String, kind: InterfaceKind, ty: M.Ty, effects: List<&2, M.Effect>, predicates: List<&2, M.Predicate>) -> Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
   match open:
     case Nil{}:
       do Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
         template : M.Ty <- template_type(variables, 0n, ty)
-        return [Interface{name, kind, template, List.length(&2, Nat, variables), E.canonical(effects)}]
+        needs : List<&2, M.Predicate> <- C.parameterize_list(T.parameter_mapping(variables, 0n), predicates)
+        return [Interface{name, kind, template, interface_variable_count(variables, 0n), E.canonical(effects), needs}]
     case head <> tail:
       Fail{M.Diagnostic{"invalid_interface", name, "a dependency interface cannot expose an unquantified inference variable"}}
 
-def export_interface(name: String, kind: InterfaceKind, ty: M.Ty, variables: List<&2, Nat>, effects: List<&2, M.Effect>) -> Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
+def export_interface(name: String, kind: InterfaceKind, ty: M.Ty, +variables: List<&2, Nat>, effects: List<&2, M.Effect>, predicates: List<&2, M.Predicate>) -> Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
   do Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
     normalized : List<&2, M.Ty> <- canonical_work(Nat.mul(256n, 256n), T.OneType{ty})
     +canonical : M.Ty <- T.first_type(normalized)
-    +free : List<&2, Nat> <- T.free(canonical)
-    closed_interface(T.difference(free, variables), free, name, kind, canonical, effects)
+    type_free : List<&2, Nat> <- T.free(canonical)
+    +needs : List<&2, M.Predicate> = C.canonical_predicates(predicates, Nil{})
+    predicate_free : List<&2, Nat> <- C.free_list(needs)
+    +free : List<&2, Nat> = T.union(type_free, predicate_free)
+    closed_interface(T.difference(free, variables), free, name, kind, canonical, effects, needs)
 
-def function_interfaces(functions: List<&2, M.CheckedFunction>) -> Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
+def binding_predicates_found(found: Maybe<&2, I.Binding>, substitutions: T.Substitutions, name: String) -> Result<&2, &2, M.Diagnostic, List<&2, M.Predicate>>:
+  match found:
+    case None{}:
+      Fail{M.Diagnostic{"internal_error", name, "checked interface is missing its qualified binding"}}
+    case Some{I.Binding{found, ty, variables, predicates}}:
+      C.resolve_list(substitutions, predicates)
+
+def binding_predicates(bindings: List<&2, I.Binding>, +name: String, substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, M.Predicate>>:
+  binding_predicates_found(I.lookup_binding(bindings, name), substitutions, name)
+
+def function_interfaces(functions: List<&2, M.CheckedFunction>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
   match functions:
     case Nil{}:
       Done{Nil{}}
-    case M.CheckedFunction{function, M.Signature{name, parameter, result, variables, row}, effects} <> tail:
+    case M.CheckedFunction{function, M.Signature{+name, parameter, result, variables, row}, effects} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
-        head : List<&2, Interface> <- export_interface(name, FunctionInterface{}, M.FunctionTy{parameter, result, row}, variables, effects)
-        rest : List<&2, Interface> <- function_interfaces(tail)
+        predicates : List<&2, M.Predicate> <- binding_predicates(bindings, name, substitutions)
+        head : List<&2, Interface> <- export_interface(name, FunctionInterface{}, M.FunctionTy{parameter, result, row}, variables, effects, predicates)
+        rest : List<&2, Interface> <- function_interfaces(tail, bindings, substitutions)
         return List.append(&2, Interface, head, rest)
 
-def constant_interfaces(constants: List<&2, M.CheckedConstant>) -> Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
+def constant_interfaces(constants: List<&2, M.CheckedConstant>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
   match constants:
     case Nil{}:
       Done{Nil{}}
-    case M.CheckedConstant{M.Constant{name, exported, annotation, value}, ty, variables} <> tail:
+    case M.CheckedConstant{M.Constant{+name, exported, annotation, value}, ty, variables} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, Interface>>:
-        head : List<&2, Interface> <- export_interface(name, ConstantInterface{}, ty, variables, Nil{})
-        rest : List<&2, Interface> <- constant_interfaces(tail)
+        predicates : List<&2, M.Predicate> <- binding_predicates(bindings, name, substitutions)
+        head : List<&2, Interface> <- export_interface(name, ConstantInterface{}, ty, variables, Nil{}, predicates)
+        rest : List<&2, Interface> <- constant_interfaces(tail, bindings, substitutions)
         return List.append(&2, Interface, head, rest)
 
-def checked_group(+checked: M.CheckedModule) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
-  M.CheckedModule{constants, functions, types, operations} = checked
+def checked_function_names(functions: List<&2, M.CheckedFunction>) -> List<&2, String>:
+  match functions:
+    case Nil{}:
+      Nil{}
+    case M.CheckedFunction{M.Function{name, exported, parameter, p, r, body}, signature, effects} <> tail:
+      name <> checked_function_names(tail)
+
+def checked_constant_names(constants: List<&2, M.CheckedConstant>) -> List<&2, String>:
+  match constants:
+    case Nil{}:
+      Nil{}
+    case M.CheckedConstant{M.Constant{name, exported, annotation, value}, ty, variables} <> tail:
+      name <> checked_constant_names(tail)
+
+def append_own_uses(owned: Bool, inference: I.Inference, rest: List<&2, C.UsePlan>, substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, C.UsePlan>>:
+  match owned:
+    case False{}:
+      Done{rest}
+    case True{}:
+      do Result<&2, &2, M.Diagnostic, List<&2, C.UsePlan>>:
+        current : List<&2, C.UsePlan> <- C.resolve_uses(I.inference_uses(inference), substitutions)
+        return List.append(&2, C.UsePlan, current, rest)
+
+def own_uses(definitions: List<&2, I.Definition>, +names: List<&2, String>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, C.UsePlan>>:
+  match definitions:
+    case Nil{}:
+      Done{Nil{}}
+    case I.Definition{+name, inference} <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, C.UsePlan>>:
+        rest : List<&2, C.UsePlan> <- own_uses(tail, names, substitutions)
+        append_own_uses(D.contains(names, name), inference, rest, substitutions)
+
+def checked_group(+checked: M.CheckedModule, +environment: G.Environment) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
+  M.CheckedModule{+constants, +functions, types, operations} = checked
+  +bindings = G.env_bindings(environment)
+  +substitutions = I.substitutions_of(G.env_state(environment))
   do Result<&2, &2, M.Diagnostic, CheckedGroup>:
-    fns : List<&2, Interface> <- function_interfaces(functions)
-    consts : List<&2, Interface> <- constant_interfaces(constants)
-    return CheckedGroup{checked, List.append(&2, Interface, fns, consts)}
+    fns : List<&2, Interface> <- function_interfaces(functions, bindings, substitutions)
+    consts : List<&2, Interface> <- constant_interfaces(constants, bindings, substitutions)
+    uses : List<&2, C.UsePlan> <- own_uses(G.env_definitions(environment), List.append(&2, String, checked_function_names(functions), checked_constant_names(constants)), substitutions)
+    return CheckedGroup{checked, List.append(&2, Interface, fns, consts), uses}
 
 # The deferred dispatch requirements of one checked group. Their types are
 # resolved against the group's final substitution; every variable they still
 # mention is numbered below `next`, and variables are shared only within the
 # group (an SCC is inferred with one state).
 type Resolution is Data:
-  Resolution{declaration: String, identity: Nat, dispatch: M.Dispatch, member: String, templates: List<&2, M.TypeId>, left: M.Ty, right: M.Ty, result: M.Ty, ambient: M.EffectRow}
+  Resolution{declaration: String, identity: Nat, dispatch: M.Dispatch, member: String, templates: List<&2, M.TypeId>, left: M.Ty, right: M.Ty, result: M.Ty, invocation: Maybe<&2, M.EffectRow>, ambient: M.EffectRow}
 
-# `members` holds the group's own declaration types under the same numbering,
-# so a resolution can tell whether its unifications refine an interface.
+# `members` holds the group's own declaration types and residual predicates
+# under the same numbering, so resolution can detect changes to either.
 # `generalized` holds the variables local lets generalized that a requirement
 # mentions: binding one would change a local scheme, which no interface shows.
 type GroupNeeds is Data:
@@ -242,10 +401,17 @@ def closed_types(fuel: Nat, pending: List<&2, M.Ty>) -> Bool:
     case 1n+rest head <> tail:
       closed_types(rest, tail)
 
-def resolved_need(left: Result<&2, &2, M.Diagnostic, M.Ty>, right: Result<&2, &2, M.Diagnostic, M.Ty>, result: Result<&2, &2, M.Diagnostic, M.Ty>, declaration: String, identity: Nat, dispatch: M.Dispatch, member: String, templates: List<&2, M.TypeId>, ambient: M.EffectRow, rest: List<&2, Resolution>) -> List<&2, Resolution>:
+def resolved_invocation(invocation: Maybe<&2, M.EffectRow>, substitutions: T.Substitutions) -> Maybe<&2, M.EffectRow>:
+  match invocation:
+    case None{}:
+      None{}
+    case Some{row}:
+      Some{T.resolve_row(substitutions, row)}
+
+def resolved_need(left: Result<&2, &2, M.Diagnostic, M.Ty>, right: Result<&2, &2, M.Diagnostic, M.Ty>, result: Result<&2, &2, M.Diagnostic, M.Ty>, declaration: String, identity: Nat, dispatch: M.Dispatch, member: String, templates: List<&2, M.TypeId>, invocation: Maybe<&2, M.EffectRow>, ambient: M.EffectRow, rest: List<&2, Resolution>) -> List<&2, Resolution>:
   match left right result:
     case Done{l} Done{r} Done{value}:
-      Resolution{declaration, identity, dispatch, member, templates, l, r, value, ambient} <> rest
+      Resolution{declaration, identity, dispatch, member, templates, l, r, value, invocation, ambient} <> rest
     case _ _ _:
       rest
 
@@ -253,8 +419,8 @@ def coverage_needs(coverage: List<&2, I.Coverage>, +declaration: String, +substi
   match coverage:
     case Nil{}:
       List.reverse(&2, Resolution, reversed)
-    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, ambient, subject} <> tail:
-      coverage_needs(tail, declaration, substitutions, resolved_need(T.resolve(substitutions, left), T.resolve(substitutions, right), T.resolve(substitutions, result), declaration, identity, dispatch, member, templates, T.resolve_row(substitutions, ambient), reversed))
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, invocation, ambient, subject} <> tail:
+      coverage_needs(tail, declaration, substitutions, resolved_need(T.resolve(substitutions, left), T.resolve(substitutions, right), T.resolve(substitutions, result), declaration, identity, dispatch, member, templates, resolved_invocation(invocation, substitutions), T.resolve_row(substitutions, ambient), reversed))
     case head <> tail:
       coverage_needs(tail, declaration, substitutions, reversed)
 
@@ -262,25 +428,32 @@ def definition_needs(definitions: List<&2, I.Definition>, +substitutions: T.Subs
   match definitions:
     case Nil{}:
       Nil{}
-    case I.Definition{name, I.Inference{ty, coverage, exits, reflections}} <> tail:
+    case I.Definition{name, I.Inference{ty, coverage, exits, reflections, predicates, uses}} <> tail:
       List.append(&2, Resolution, coverage_needs(coverage, name, substitutions, Nil{}), definition_needs(tail, substitutions))
 
-def member_binding(member: Bool, name: String, resolved: Result<&2, &2, M.Diagnostic, M.Ty>, rest: List<&2, I.Binding>) -> List<&2, I.Binding>:
-  match member resolved:
-    case True{} Done{ty}:
-      I.Binding{name, ty, Nil{}} <> rest
+def member_resolved(name: String, resolved: Result<&2, &2, M.Diagnostic, M.Ty>, predicates: Result<&2, &2, M.Diagnostic, List<&2, M.Predicate>>, rest: List<&2, I.Binding>) -> List<&2, I.Binding>:
+  match resolved predicates:
+    case Done{ty} Done{resolved_predicates}:
+      I.Binding{name, ty, Nil{}, resolved_predicates} <> rest
     case _ _:
       rest
 
-# Member types before generalization: generalization closes unconstrained
-# rows, which would hide an effect a resolved call adds to the interface.
+def member_binding(member: Bool, name: String, ty: M.Ty, predicates: List<&2, M.Predicate>, +substitutions: T.Substitutions, rest: List<&2, I.Binding>) -> List<&2, I.Binding>:
+  match member:
+    case False{}:
+      rest
+    case True{}:
+      member_resolved(name, T.resolve(substitutions, ty), C.resolve_list(substitutions, predicates), rest)
+
+# Member types and predicates before generalization: generalization closes
+# unconstrained rows, which could hide an effect a resolved call adds.
 def member_bindings(definitions: List<&2, I.Definition>, +members: Set(), +substitutions: T.Substitutions) -> List<&2, I.Binding>:
   match definitions:
     case Nil{}:
       Nil{}
-    case I.Definition{+name, I.Inference{ty, coverage, exits, reflections}} <> tail:
+    case I.Definition{+name, I.Inference{ty, coverage, exits, reflections, predicates, uses}} <> tail:
       +rest = member_bindings(tail, members, substitutions)
-      member_binding(D.member(members, name), name, T.resolve(substitutions, ty), rest)
+      member_binding(D.member(members, name), name, ty, predicates, substitutions, rest)
 
 # The let-generalized variables under the group's final substitution. A
 # witness that cannot be resolved leaves the group without requirements, so
@@ -306,7 +479,7 @@ def definition_generalized(definitions: List<&2, I.Definition>, +substitutions: 
   match definitions:
     case Nil{}:
       Done{found}
-    case I.Definition{name, I.Inference{ty, coverage, exits, reflections}} <> tail:
+    case I.Definition{name, I.Inference{ty, coverage, exits, reflections, predicates, uses}} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
         variables : List<&2, Nat> <- coverage_generalized(coverage, substitutions, found)
         definition_generalized(tail, substitutions, variables)
@@ -338,7 +511,7 @@ def check_group_resolving_graph(+module: M.Module, +dependencies: List<&2, Inter
     imported : G.Environment <- import_interfaces(dependencies, operations, types, 0n)
     +environment : G.Environment <- G.infer_with(declarations, graph, operations, types, imported, interface_functions(dependencies))
     checked : M.CheckedModule <- Check.finish(module, environment)
-    group : CheckedGroup <- checked_group(checked)
+    group : CheckedGroup <- checked_group(checked, environment)
     return Resolving{group, environment_needs(collect, environment, G.names(declarations))}
 
 def check_group_graph(+module: M.Module, +dependencies: List<&2, Interface>, graph_result: Result<&2, &2, M.Diagnostic, List<&2, D.Node>>) -> Result<&2, &2, M.Diagnostic, CheckedGroup>:
@@ -371,10 +544,13 @@ type UsageWork is Data:
   PatternsUsage{values: List<&2, M.Pattern>}
   TypeUsage{value: M.Ty}
   TypesUsage{values: List<&2, M.Ty>}
+  PredicateUsage{value: M.Predicate}
+  PredicatesUsage{values: List<&2, M.Predicate>}
   ExpressionsUsage{values: List<&2, M.Expr>}
   CollectedExpressionsUsage{values: List<&2, M.Expr>, reversed: List<&2, Usage>}
   CollectedPatternsUsage{values: List<&2, M.Pattern>, reversed: List<&2, Usage>}
   CollectedTypesUsage{values: List<&2, M.Ty>, reversed: List<&2, Usage>}
+  CollectedPredicatesUsage{values: List<&2, M.Predicate>, reversed: List<&2, Usage>}
   CollectedArmsUsage{values: List<&2, M.MatchArm<M.Expr>>, reversed: List<&2, Usage>}
 
 def contains_type(identities: List<&2, M.TypeId>, +identity: M.TypeId) -> Bool:
@@ -445,8 +621,19 @@ def collected_usage(reversed: List<&2, Usage>, result: Usage) -> Usage:
     case head <> tail:
       collected_usage(tail, combine_usage(head, result))
 
+def row_identities(rows: List<&2, M.EffectRow>) -> List<&2, M.TypeId>:
+  match rows:
+    case Nil{}:
+      Nil{}
+    case M.EffectRow{operations, tail} <> rest:
+      List.append(&2, M.TypeId, operations, row_identities(rest))
+
 # Wide arrays, tuple patterns and annotations must not grow the JS stack.
 # Preserve the recursive walk's sibling fuel and right-associated merge order.
+def effect_row_usage(row: M.EffectRow) -> Usage:
+  M.EffectRow{operations, tail} = row
+  Usage{operations}
+
 def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, &2, M.Diagnostic, Usage>:
   match fuel work:
     case 0n _:
@@ -463,6 +650,10 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
       do Result<&2, &2, M.Diagnostic, Usage>:
         found : Usage <- usage(rest, TypeUsage{head}, types)
         usage(rest, CollectedTypesUsage{tail, found <> reversed}, types)
+    case 1n+rest CollectedPredicatesUsage{head <> tail, reversed}:
+      do Result<&2, &2, M.Diagnostic, Usage>:
+        found : Usage <- usage(rest, PredicateUsage{head}, types)
+        usage(rest, CollectedPredicatesUsage{tail, found <> reversed}, types)
     case 1n+rest CollectedArmsUsage{M.MatchArm{patterns, body} <> tail, reversed}:
       do Result<&2, &2, M.Diagnostic, Usage>:
         found_patterns : Usage <- usage(rest, PatternsUsage{patterns}, types)
@@ -473,6 +664,8 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
     case 1n+rest CollectedPatternsUsage{Nil{}, reversed}:
       Done{collected_usage(reversed, Usage{Nil{}})}
     case 1n+rest CollectedTypesUsage{Nil{}, reversed}:
+      Done{collected_usage(reversed, Usage{Nil{}})}
+    case 1n+rest CollectedPredicatesUsage{Nil{}, reversed}:
       Done{collected_usage(reversed, Usage{Nil{}})}
     case 1n+rest CollectedArmsUsage{Nil{}, reversed}:
       Done{collected_usage(reversed, Usage{Nil{}})}
@@ -581,6 +774,14 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
         a : Usage <- usage(rest, TypeUsage{optional_type(annotation)}, types)
         b : Usage <- usage(rest, ExpressionUsage{value}, types)
         return combine_usage(a, b)
+    case 1n+rest ExpressionUsage{M.QualifiedExpr{offset, annotation, +predicates, value}}:
+      do Result<&2, &2, M.Diagnostic, Usage>:
+        a : Usage <- usage(rest, TypeUsage{annotation}, types)
+        b : Usage <- usage(rest, PredicatesUsage{predicates}, types)
+        c : Usage <- usage(rest, ExpressionUsage{value}, types)
+        return combine_usage(a, combine_usage(b, c))
+    case 1n+rest ExpressionUsage{M.InstantiationExpr{site, value}}:
+      usage(rest, ExpressionUsage{value}, types)
     case 1n+rest ExpressionUsage{M.TagExpr{offset, callee, argument}}:
       do Result<&2, &2, M.Diagnostic, Usage>:
         a : Usage <- usage(rest, ExpressionUsage{callee}, types)
@@ -615,7 +816,17 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
       do Result<&2, &2, M.Diagnostic, Usage>:
         a : Usage <- usage(rest, TypeUsage{parameter}, types)
         b : Usage <- usage(rest, TypeUsage{result}, types)
-        return combine_usage(a, b)
+        return combine_usage(effect_row_usage(effects), combine_usage(a, b))
+    case 1n+rest TypeUsage{M.ProviderTy{identity, M.EffectRow{operations, tail}}}:
+      Done{Usage{identity <> operations}}
+    case 1n+rest PredicateUsage{+predicate}:
+      do Result<&2, &2, M.Diagnostic, Usage>:
+        from_types : Usage <- usage(rest, TypesUsage{C.predicate_types(predicate)}, types)
+        return combine_usage(Usage{List.append(&2, M.TypeId, C.predicate_templates([predicate]), row_identities(C.predicate_rows(predicate)))}, from_types)
+    case 1n+rest PredicatesUsage{head <> tail}:
+      do Result<&2, &2, M.Diagnostic, Usage>:
+        found : Usage <- usage(rest, PredicateUsage{head}, types)
+        usage(rest, CollectedPredicatesUsage{tail, [found]}, types)
     case 1n+rest TypesUsage{head <> tail}:
       do Result<&2, &2, M.Diagnostic, Usage>:
         found : Usage <- usage(rest, TypeUsage{head}, types)

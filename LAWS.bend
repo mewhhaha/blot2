@@ -1,6 +1,7 @@
 import Base
 import ./compiler/schema_stage.bend as Schema
 import ./compiler/model.bend as M
+import ./compiler/constraints.bend as Constraints
 import ./compiler/effects.bend as Effects
 import ./compiler/const_eval.bend as Const
 import ./compiler/check.bend as Check
@@ -8,6 +9,7 @@ import ./compiler/lower.bend as Lower
 import ./compiler/types.bend as Substitutions
 import ./compiler/wasm.bend as Wasm
 import ./compiler/codegen_ir.bend as Codegen
+import ./compiler/codegen_saturation.bend as Saturation
 import ./compiler/index.bend as Index
 import ./compiler/native_request.bend as NativeRequest
 import ./compiler/native_io.bend as NativeIO
@@ -45,6 +47,18 @@ import ./compiler/main.bend as Main
 import ./compiler/dispatch_resolution.bend as Resolution
 import ./compiler/entry_points.bend as Entries
 import ./compiler/loop_memory.bend as LoopMemory
+import ./compiler/raw_core_qualification.bend as RawQualification
+import ./compiler/effect_rows.bend as Rows
+
+# Raw core has no evidence selector, so a nonempty qualification cannot be
+# erased by constant evaluation. Empty metadata remains transparent.
+law raw_core_rejects_nonempty_qualification:
+  for offset: Nat
+  {RawQualification.check(M.Module{[M.Constant{"answer", False{}, None{}, M.QualifiedExpr{offset, M.U32Ty{}, [M.TypeRepPredicate{M.U32Ty{}}], M.U32Expr{42}}}], Nil{}, Nil{}, Nil{}}) == Fail{M.Diagnostic{"unspecialized_qualified", "offset:" ++ Nat.show(offset), "raw core with a nonempty where clause requires evidence elaboration through the source compiler"}} : Result<&2, &2, M.Diagnostic, Unit>}
+
+law raw_core_accepts_empty_qualification:
+  for value: U32
+  {RawQualification.check(M.Module{[M.Constant{"answer", False{}, None{}, M.QualifiedExpr{0n, M.U32Ty{}, Nil{}, M.U32Expr{value}}}], Nil{}, Nil{}, Nil{}}) == Done{Unit{}} : Result<&2, &2, M.Diagnostic, Unit>}
 
 # A declaration tag records the exact source origin and both dependencies.
 law declaration_tag_preserves_origin_and_operands:
@@ -97,16 +111,6 @@ law seen_dependency_enter_does_not_expand_neighbors:
   for edges: Map<&2, List<&2, String>>
   for +pending: List<&2, Dependency.Visit>
   {Dependency.visit_events_edges(False{}, name, edges, pending) == pending : List<&2, Dependency.Visit>}
-
-law seen_compact_dependency_enter_does_not_expand_neighbors:
-  for identity: Nat
-  for edges: NatIndex.Index<List<&2, Nat>>
-  for +pending: List<&2, Dependency.CompactVisit>
-  {Dependency.compact_events(False{}, identity, edges, pending) == pending : List<&2, Dependency.CompactVisit>}
-
-law unknown_compact_dependency_reference_is_omitted:
-  for +tail: List<&2, Nat>
-  {Dependency.compact_numbered_reference(None{}, tail) == tail : List<&2, Nat>}
 
 law seen_dependency_reach_does_not_expand_neighbors:
   for edges: Map<&2, List<&2, String>>
@@ -399,7 +403,7 @@ law native_trailing_words_fail:
   {Result.is_done(&2, &1, NativeRequest.ScanFailure, Unit, NativeRequest.end(NativeRequest.Cursor{words, offset, 1n+remaining, [SNil{} : String*1n], 0})) == False{} : Bool}
 
 law native_response_failure_keeps_protocol_version:
-  {List.take(&2, U32, NativeResponse.finish(Fail{M.Diagnostic{"native_protocol", "native_response", "response exceeds 16M words"}}), 3n) == [1112297300, 12, 0] : List<&2, U32>}
+  {List.take(&2, U32, NativeResponse.finish(Fail{M.Diagnostic{"native_protocol", "native_response", "response exceeds 16M words"}}), 3n) == [1112297300, 13, 0] : List<&2, U32>}
 
 # A Wasm-only (Emit) request runs the same compile pipeline and session caches
 # as Compile, so its Wasm is identical; only the reply drops the analysis.
@@ -714,7 +718,8 @@ law associated_call_preserves_operands:
   for member: String
   for +left: M.Expr
   for +right: M.Expr
-  {Mono.selected_call(Some{Mono.FunctionChoice{name}}, member, left, right) == Done{M.UseExpr{"$associated.left", left, M.UseExpr{"$associated.right", right, M.ApplyExpr{M.ApplyExpr{M.FunctionExpr{name}, M.LocalExpr{"$associated.left"}}, M.LocalExpr{"$associated.right"}}}}} : Result<&2, &2, M.Diagnostic, M.Expr>}
+  for signature: M.Ty
+  {Mono.selected_call(Some{Mono.FunctionChoice{name, signature}}, member, left, right) == Done{M.UseExpr{"$associated.left", left, M.UseExpr{"$associated.right", right, M.ApplyExpr{M.ApplyExpr{M.FunctionExpr{name}, M.LocalExpr{"$associated.left"}}, M.LocalExpr{"$associated.right"}}}}} : Result<&2, &2, M.Diagnostic, M.Expr>}
 
 law rebinding_self_uses_previous_local:
   for +core: String
@@ -801,7 +806,7 @@ law parameter_mapping_keeps_first_binder:
 law empty_generic_scheme_needs_no_traversal:
   for +ty: M.Ty
   for +next: Nat
-  {Infer.instance(Nil{}, ty, next) == Done{Infer.SchemeInstance{ty, next}} : Result<&2, &2, M.Diagnostic, Infer.SchemeInstance>}
+  {Infer.instance(Nil{}, ty, next) == Done{Infer.SchemeInstance{ty, Nil{}, next}} : Result<&2, &2, M.Diagnostic, Infer.SchemeInstance>}
 
 # A successful group check is reused as a whole dependency component. Dropping
 # declarations cannot turn a larger certificate into a proof for a smaller one.
@@ -1025,7 +1030,8 @@ law dispatch_binary_site_calls_selected_implementation:
   for left: M.Expr
   for right: M.Expr
   for name: String
-  {Resolution.resolved_call(Some{Some{Mono.FunctionChoice{name}}}, identity, M.BinaryDispatch{}, member, templates, left, right) == Done{M.UseExpr{"$associated.left", left, M.UseExpr{"$associated.right", right, M.ApplyExpr{M.ApplyExpr{M.FunctionExpr{name}, M.LocalExpr{"$associated.left"}}, M.LocalExpr{"$associated.right"}}}}} : Result<&2, &2, M.Diagnostic, M.Expr>}
+  for signature: M.Ty
+  {Resolution.resolved_call(Some{Some{Mono.FunctionChoice{name, signature}}}, identity, M.BinaryDispatch{}, member, templates, left, right) == Done{M.UseExpr{"$associated.left", left, M.UseExpr{"$associated.right", right, M.ApplyExpr{M.ApplyExpr{M.FunctionExpr{name}, M.LocalExpr{"$associated.left"}}, M.LocalExpr{"$associated.right"}}}}} : Result<&2, &2, M.Diagnostic, M.Expr>}
 
 law dispatch_receiver_site_applies_selected_member:
   for identity: Nat
@@ -1034,7 +1040,8 @@ law dispatch_receiver_site_applies_selected_member:
   for receiver: M.Expr
   for unit: M.Expr
   for name: String
-  {Resolution.resolved_call(Some{Some{Mono.ReceiverChoice{name}}}, identity, M.MemberDispatch{}, member, templates, receiver, unit) == Done{M.ApplyExpr{M.FunctionExpr{name}, receiver}} : Result<&2, &2, M.Diagnostic, M.Expr>}
+  for signature: M.Ty
+  {Resolution.resolved_call(Some{Some{Mono.ReceiverChoice{name, signature}}}, identity, M.MemberDispatch{}, member, templates, receiver, unit) == Done{M.ApplyExpr{M.FunctionExpr{name}, receiver}} : Result<&2, &2, M.Diagnostic, M.Expr>}
 
 # The resolved call contains no deferred dispatch, so its declaration is no
 # longer a template seed.
@@ -1281,21 +1288,6 @@ law unused_operation_has_no_wasm_job:
   for parameter: M.Ty
   for result: M.Ty
   {Wasm.used_operations([M.Operation{identity, parameter, result}], Set.new()) == Nil{} : List<&2, M.Operation>}
-# Recycling a loop arena requires a closed effect boundary: source state
-# operations could otherwise retain pointers not represented by the carry.
-law loop_memory_pure_closed_row_is_isolated:
-  {LoopMemory.isolated(M.EffectRow{Nil{}, M.ClosedRow{}}) == True{} : Bool}
-
-law loop_memory_foreign_closed_row_is_isolated:
-  {LoopMemory.isolated(M.EffectRow{[M.foreign_identity()], M.ClosedRow{}}) == True{} : Bool}
-
-law loop_memory_open_row_is_not_isolated:
-  for operations: List<&2, M.TypeId>
-  for index: Nat
-  {LoopMemory.isolated(M.EffectRow{operations, M.RowVariable{index}}) == False{} : Bool}
-
-law loop_memory_source_state_is_not_isolated:
-  {LoopMemory.isolated(M.EffectRow{[M.TypeId{"game", "State.write"}], M.ClosedRow{}}) == False{} : Bool}
 
 # The full source is checked before inlining and pruning, so its first error is
 # authoritative even when a later transformation could have changed the body.
@@ -1307,6 +1299,12 @@ law dispatch_original_failure_is_authoritative:
   for module: M.Module
   for entry: String
   {Resolution.source_checked(Scheduler.FailedInitial{diagnostic, certificates, inferred, retained}, module, entry) == Resolution.OriginalFailure{diagnostic} : Resolution.Resolved}
+
+law inlined_operator_retains_source_and_creation_site:
+  for offset: Nat
+  for site: Nat
+  for value: M.Expr
+  {Resolution.inline_location(offset, Some{site}, value) == M.SourceExpr{offset, None{}, M.InstantiationExpr{site, value}} : M.Expr}
 
 law dispatch_transformed_failure_preserves_certificates:
   for diagnostic: M.Diagnostic
@@ -1345,7 +1343,115 @@ law failed_initial_assembly_preserves_completed_groups:
   for retained: Nat
   {Scheduler.assembled_attempt(Fail{diagnostic}, certificates, needs, Scheduler.AuditCounts{inferred, retained}) == Scheduler.FailedInitial{diagnostic, certificates, inferred, retained} : Scheduler.InitialAttempt}
 
-# Reusing a resolving check retains requirements in the same variable namespace.
+# Qualified schemes share all semantic mappings with their occurrence plans.
+law qualified_rename_shares_type_and_row_mapping:
+  for +mapping: NatIndex.Index<Nat>
+  for +type_index: Nat
+  for +row_index: Nat
+  for +labels: List<&2, M.TypeId>
+  {Constraints.rename(mapping, M.AssociatedPredicate{"combine", Nil{}, M.VariableTy{type_index}, M.VariableTy{type_index}, M.VariableTy{type_index}, M.EffectRow{labels, M.RowVariable{row_index}}}) == Done{M.AssociatedPredicate{"combine", Nil{}, Substitutions.renamed_type(type_index, mapping, Substitutions.FreshVariables{}), Substitutions.renamed_type(type_index, mapping, Substitutions.FreshVariables{}), Substitutions.renamed_type(type_index, mapping, Substitutions.FreshVariables{}), M.EffectRow{labels, Substitutions.rename_tail(M.RowVariable{row_index}, mapping)}}} : Result<&2, &2, M.Diagnostic, M.Predicate>}
+
+law qualified_parameterize_preserves_row_multiplicity:
+  for +mapping: NatIndex.Index<Nat>
+  for +index: Nat
+  for +labels: List<&2, M.TypeId>
+  {Constraints.parameterize(mapping, M.EffectRepPredicate{M.EffectRow{labels, M.RowVariable{index}}}) == Done{M.EffectRepPredicate{M.EffectRow{labels, Substitutions.rename_tail_kind(M.RowVariable{index}, mapping, Substitutions.SchemeParameters{})}}} : Result<&2, &2, M.Diagnostic, M.Predicate>}
+
+law qualified_relocate_free_row_scope_only:
+  for +scope: String
+  for +name: String
+  for +suffix: String
+  for +labels: List<&2, M.TypeId>
+  {Constraints.relocate_free([M.EffectRepPredicate{M.EffectRow{labels, M.FreeRow{scope, name}}}], suffix) == Done{[M.EffectRepPredicate{M.EffectRow{labels, M.FreeRow{scope ++ suffix, name}}}]} : Result<&2, &2, M.Diagnostic, List<&2, M.Predicate>>}
+
+law qualified_occurrence_site_is_not_a_predicate:
+  for +site: Nat
+  for +subject: String
+  for ty: M.Ty
+  for +predicate: M.Predicate
+  {Infer.execution_needs([Constraints.UsePlan{site, subject, ty, [predicate]}]) == [Infer.QualifiedNeed{site, predicate, subject}] : List<&2, Infer.Coverage>}
+
+law qualified_root_uses_reserved_creation_lane:
+  for +offset: Nat
+  for value: M.Expr
+  {Lower.qualified_root(True{}, True{}, offset, value) == M.InstantiationExpr{Nat.add(Nat.mul(offset, 16n), 3n), value} : M.Expr}
+
+law unexported_qualified_declaration_has_no_root_demand:
+  for offset: Nat
+  for value: M.Expr
+  {Lower.qualified_root(False{}, True{}, offset, value) == value : M.Expr}
+
+# A recursive peer can acquire requirements after the caller was first
+# inferred. Its original, even empty, creation-site plan is filled in place.
+law scc_creation_site_keeps_peer_obligation:
+  for +site: Nat
+  for +subject: String
+  for ty: M.Ty
+  for +predicate: M.Predicate
+  {Globals.scc_plan_for(Some{"peer"}, Constraints.UsePlan{site, subject, ty, Nil{}}, [Globals.SccClosure{"peer", [predicate]}]) == Constraints.UsePlan{site, subject, ty, [predicate]} : Constraints.UsePlan}
+
+law scc_effect_reflection_creates_no_callable_site:
+  for +name: String
+  {Globals.scc_sites(M.FunctionEffectsExpr{name}) == Done{Nil{}} : Result<&2, &2, M.Diagnostic, List<&2, Globals.SccSite>>}
+
+law scc_raw_core_reference_keeps_dependency_without_inventing_site:
+  for +name: String
+  {Globals.scc_sites(M.FunctionExpr{name}) == Done{[Globals.SccSite{None{}, name, None{}}]} : Result<&2, &2, M.Diagnostic, List<&2, Globals.SccSite>>}
+
+# A local where clause owns only the peer references inside its own boundary.
+# Its initially empty requirement list must still be checked after SCC closure.
+law scc_qualified_reference_keeps_nearest_boundary:
+  for +offset: Nat
+  for +site: Nat
+  for +name: String
+  {Globals.scc_sites(M.QualifiedExpr{offset, M.UnitTy{}, Nil{}, M.InstantiationExpr{site, M.FunctionExpr{name}}}) == Done{[Globals.SccSite{Some{site}, name, Some{offset}}]} : Result<&2, &2, M.Diagnostic, List<&2, Globals.SccSite>>}
+
+law scc_other_boundary_cannot_satisfy_local_clause:
+  for +site: Nat
+  for +name: String
+  for +predicate: M.Predicate
+  {Globals.scc_boundary_predicates([Globals.SccSite{Some{site}, name, Some{1n}}], 0n, Globals.reference_set([name], Set.new()), [Globals.SccClosure{name, [predicate]}]) == Nil{} : List<&2, M.Predicate>}
+
+# Imported templates and their requirements quantify one shared index space.
+law imported_scheme_rejects_mixed_parameter_kinds:
+  for +subject: String
+  {Groups.validate_scheme_kinds(M.ParameterTy{0n}, [M.EffectRepPredicate{M.EffectRow{Nil{}, M.RowParameter{0n}}}], subject) == Fail{M.Diagnostic{"kind_mismatch", subject, "a quantified index is used as both a value type and an effect row"}} : Result<&2, &2, M.Diagnostic, Unit>}
+
+# Evidence metadata cannot consume the program's constant-evaluation budget.
+law const_instantiation_metadata_is_free:
+  for site: Nat
+  for +value: U32
+  for +depth: Nat
+  for +steps: Nat
+  for +context: Const.Context
+  {Const.evaluate(1n+depth, 1n+steps, M.InstantiationExpr{site, M.U32Expr{value}}, context) == Const.evaluate(1n+depth, 1n+steps, M.U32Expr{value}, context) : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+law const_qualified_metadata_is_free:
+  for offset: Nat
+  for annotation: M.Ty
+  for predicates: List<&2, M.Predicate>
+  for +value: U32
+  for +depth: Nat
+  for +steps: Nat
+  for +context: Const.Context
+  {Const.evaluate(1n+depth, 1n+steps, M.QualifiedExpr{offset, annotation, predicates, M.U32Expr{value}}, context) == Const.evaluate(1n+depth, 1n+steps, M.U32Expr{value}, context) : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+# Recycling a loop arena requires a closed effect boundary: source state
+# operations could otherwise retain pointers not represented by the carry.
+law loop_memory_pure_closed_row_is_isolated:
+  {LoopMemory.isolated(M.EffectRow{Nil{}, M.ClosedRow{}}) == True{} : Bool}
+
+law loop_memory_foreign_closed_row_is_isolated:
+  {LoopMemory.isolated(M.EffectRow{[M.foreign_identity()], M.ClosedRow{}}) == True{} : Bool}
+
+law loop_memory_open_row_is_not_isolated:
+  for operations: List<&2, M.TypeId>
+  for index: Nat
+  {LoopMemory.isolated(M.EffectRow{operations, M.RowVariable{index}}) == False{} : Bool}
+
+law loop_memory_source_state_is_not_isolated:
+  {LoopMemory.isolated(M.EffectRow{[M.TypeId{"game", "State.write"}], M.ClosedRow{}}) == False{} : Bool}
+
 law retained_resolving_task_keeps_requirements:
   for position: Nat
   for module: M.Module
@@ -1359,6 +1465,18 @@ law conflicting_resolving_association_cannot_certify:
   {ResolvingCore.paired(ResolvingCore.Invalid{}, certificate) == None{} : Maybe<&2, ResolvingCore.Witness>}
 
 # A cached shape-bound failure belongs only to tasks that require inference.
+
+law seen_compact_dependency_enter_does_not_expand_neighbors:
+  for identity: Nat
+  for edges: NatIndex.Index<List<&2, Nat>>
+  for +pending: List<&2, Dependency.CompactVisit>
+  {Dependency.compact_events(False{}, identity, edges, pending) == pending : List<&2, Dependency.CompactVisit>}
+
+
+law unknown_compact_dependency_reference_is_omitted:
+  for +tail: List<&2, Nat>
+  {Dependency.compact_numbered_reference(None{}, tail) == tail : List<&2, Nat>}
+
 law specialization_without_inference_ignores_shape_failure:
   for expanded: Mono.ExpandedModule
   for configuration: Mono.Configuration
@@ -1367,3 +1485,81 @@ law specialization_without_inference_ignores_shape_failure:
   for schemes: List<&2, StagingScheme.Scheme>
   for diagnostic: M.Diagnostic
   {Mono.infer_present_at(False{}, expanded, configuration, shapes, isolated, schemes, Fail{diagnostic}) == Done{expanded} : Result<&2, &2, M.Diagnostic, Mono.ExpandedModule>}
+
+# Canonical reader/writer evidence may retain owner-quantified rows only after
+# verifying its exact generated body and operation catalog. The handler uses
+# residual row E; the action uses one handled operation plus E, retaining all
+# duplicate labels. The concrete operation key comes from State.witness while
+# the predicate keeps the original witness. This proof does not change the
+# owning substitution or close its protected rows.
+# Final row closure can touch only a selected flexible tail. A protected row
+# must preserve the entire inference state, including its other substitutions.
+law protected_selected_row_preserves_state:
+  for index: Nat
+  for +state: Infer.State
+  {Mono.close_selected_one(True{}, index, state) == Done{state} : Result<&2, &2, M.Diagnostic, Infer.State>}
+
+# Value variables and rigid or source-named effect tails are not closure
+# candidates, even when they share a signature with a flexible effect tail.
+law selected_signature_collects_only_flexible_effect_tail:
+  for value: Nat
+  for +row: Nat
+  for parameter: Nat
+  for +labels: List<&2, M.TypeId>
+  for scope: String
+  for name: String
+  {Mono.signature_rows(M.ProductTy{[
+    M.FunctionTy{M.VariableTy{value}, M.UnitTy{}, M.EffectRow{labels, M.RowVariable{row}}},
+    M.FunctionTy{M.UnitTy{}, M.UnitTy{}, M.EffectRow{labels, M.RowParameter{parameter}}},
+    M.FunctionTy{M.UnitTy{}, M.UnitTy{}, M.EffectRow{labels, M.FreeRow{scope, name}}}
+  ]}) == Done{[row]} : Result<&2, &2, M.Diagnostic, List<&2, Nat>>}
+
+# Replacing a selected tail with the empty row leaves every concrete label in
+# place, including repeated occurrences of the same operation.
+law closing_selected_tail_preserves_duplicate_operations:
+  for +operation: M.TypeId
+  {Rows.resolve([Rows.Binding{0n, M.empty_row()}], M.EffectRow{[operation, operation], M.RowVariable{0n}}) == M.EffectRow{[operation, operation], M.ClosedRow{}} : M.EffectRow}
+
+
+# Dynamic arrays check multiplication before allocating into Wasm32 memory.
+# Header plus the largest accepted payload stays below unsigned wraparound.
+law runtime_array_byte_count_does_not_wrap:
+  {U32.mul(U32.add(Wasm.runtime_array_max_count(), 1), 4) == 4294967292 : U32}
+
+law runtime_memory_uses_wasm32_page_range:
+  {Wasm.runtime_memory_max_pages() == 65536n : Nat}
+
+# Saturation applies only after every parameter in a literal lambda chain is
+# supplied. Partial applications preserve their closure-producing behavior.
+law saturated_partial_application_is_not_expanded:
+  for key: String
+  for left: String
+  for right: String
+  for body: M.Expr
+  for argument: M.Expr
+  {Saturation.arity_match(Some{Saturation.Definition{key, [left, right], body}}, [argument]) == None{} : Maybe<&2, Saturation.Candidate>}
+
+# Statically named functions can use the existing direct unary entry without
+# changing the calling convention for escaping function values.
+law saturated_known_head_uses_direct_call:
+  for name: String
+  for argument: M.Expr
+  {Saturation.direct_head(256n, M.FunctionExpr{name}, argument) == M.CallExpr{name, argument} : M.Expr}
+
+# Moving a compaction loop into another function can change arena ownership.
+law saturated_compaction_loop_is_not_inlineable:
+  for state: String
+  for initial: M.Expr
+  for body: M.Expr
+  {Saturation.body_cost(256n, [M.ForeverExpr{state, initial, body}], 0n) == 97n : Nat}
+
+# Ownership analysis is scoped to instruction jobs; duplicated counted loops
+# must not merge their binder usage counts and lose in-place array updates.
+law saturated_counted_loop_is_not_inlineable:
+  for index: String
+  for start: M.Expr
+  for end: M.Expr
+  for state: String
+  for initial: M.Expr
+  for body: M.Expr
+  {Saturation.body_cost(256n, [M.ForExpr{index, start, end, state, initial, body}], 0n) == 97n : Nat}

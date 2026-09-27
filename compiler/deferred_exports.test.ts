@@ -18,45 +18,49 @@ const api = compiled as unknown as {
 };
 const none: Node = { $: "None" };
 const pure: Node = {
-  $: "EffectRow",
+  $: "model.EffectRow",
   operations: bendList([]),
-  tail: { $: "ClosedRow" },
+  tail: { $: "model.ClosedRow" },
 };
-const u32: Node = { $: "U32Ty" };
-const unit: Node = { $: "UnitTy" };
-const variable: Node = { $: "VariableTy", index: 0n };
+const u32: Node = { $: "model.U32Ty" };
+const unit: Node = { $: "model.UnitTy" };
+const variable: Node = { $: "model.VariableTy", index: 0n };
 const arrow = (parameter: Node, result: Node, effects: Node = pure): Node => ({
-  $: "FunctionTy",
+  $: "model.FunctionTy",
   parameter,
   result,
   effects,
 });
 const fn = (name: string): Node => ({
-  $: "Function",
+  $: "model.Function",
   name,
   exported: true,
   parameter: "argument",
   parameter_type: none,
   result_type: none,
-  body: { $: "U32Expr", value: 7 },
+  body: { $: "model.U32Expr", value: 7 },
 });
 const constant = (name: string): Node => ({
-  $: "Constant",
+  $: "model.Constant",
   name,
   exported: true,
   annotation: none,
-  value: { $: "UnitExpr" },
+  value: { $: "model.UnitExpr" },
 });
 const binding = (name: string, ty: Node, variables: bigint[] = []): Node => ({
-  $: "Binding",
+  $: "infer.Binding",
+  predicates: { $: "Nil" },
+
   name,
   inferred_type: ty,
   variables: bendList(variables),
 });
 const signature = (name: string, ty: Node, variables: bigint[] = []): Node => {
-  if (ty.$ !== "FunctionTy") throw new Error("function signature needs arrow");
+  if (ty.$ !== "model.FunctionTy") {
+    throw new Error("function signature needs arrow");
+  }
   return {
-    $: "Signature",
+    $: "model.Signature",
     name,
     parameter: ty.parameter,
     result: ty.result,
@@ -66,7 +70,7 @@ const signature = (name: string, ty: Node, variables: bigint[] = []): Node => {
 };
 function checkedFunction(name: string, ty: Node, variables: bigint[] = []) {
   return {
-    $: "CheckedFunction",
+    $: "model.CheckedFunction",
     function: fn(name),
     signature: signature(name, ty, variables),
     effects: bendList([]),
@@ -74,7 +78,7 @@ function checkedFunction(name: string, ty: Node, variables: bigint[] = []) {
 }
 function checkedConstant(name: string, ty: Node, variables: bigint[] = []) {
   return {
-    $: "CheckedConstant",
+    $: "model.CheckedConstant",
     constant: constant(name),
     inferred_type: ty,
     variables: bendList(variables),
@@ -82,7 +86,7 @@ function checkedConstant(name: string, ty: Node, variables: bigint[] = []) {
 }
 function moduleOf(functions: Node[], constants: Node[]) {
   return {
-    $: "CheckedModule",
+    $: "model.CheckedModule",
     constants: bendList(constants),
     functions: bendList(functions),
     data_types: bendList([]),
@@ -94,33 +98,18 @@ function legacySelected(checked: Node, bindings: Node[]): Node {
   const result = api["public_exports.select"](
     input,
     bendList(bindings),
-    { $: "Resolved" },
+    { $: "public_exports.Resolved" },
   );
   if (result.$ === "Fail") throw new Error(String(result.error));
   return result.value;
 }
 
-Deno.test("checked-driven export selection matches resolved selection", () => {
-  const open: Node = {
-    $: "EffectRow",
-    operations: bendList([]),
-    tail: { $: "RowVariable", index: 1n },
-  };
+Deno.test("checked-driven export selection matches resolved selection for ABI-ready signatures", () => {
   const cases: Array<[Node[], Node[], Node[]]> = [
     [
       [checkedFunction("plain", arrow(u32, u32))],
       [checkedConstant("number", u32)],
       [binding("plain", arrow(u32, u32)), binding("number", u32)],
-    ],
-    [
-      [checkedFunction("open_effect", arrow(unit, u32, open))],
-      [],
-      [binding("open_effect", arrow(unit, u32, open))],
-    ],
-    [
-      [checkedFunction("generic", arrow(variable, variable), [0n])],
-      [],
-      [binding("generic", arrow(variable, variable), [0n])],
     ],
     [
       [],
@@ -138,6 +127,34 @@ Deno.test("checked-driven export selection matches resolved selection", () => {
   }
 });
 
+Deno.test("resolved pre-check intent is distinct from final ABI rejection", () => {
+  const open: Node = {
+    $: "model.EffectRow",
+    operations: bendList([]),
+    tail: { $: "model.RowVariable", index: 1n },
+  };
+  const cases: Array<[string, Node, bigint[]]> = [
+    ["open_effect", arrow(unit, u32, open), []],
+    ["generic", arrow(variable, variable), [0n]],
+  ];
+  for (const [name, ty, variables] of cases) {
+    const checked = moduleOf([checkedFunction(name, ty, variables)], []);
+    const preliminary = legacySelected(checked, [binding(name, ty, variables)]);
+    const preliminaryFunction = bendArray(
+      preliminary.functions as BendList<Node>,
+    )[0];
+    equal(preliminaryFunction.exported, true);
+
+    // The inferred signature can still change after this pre-check. Its
+    // unresolved form cannot pass the final guest ABI check unchanged.
+    const final = api["public_exports.select_checked"](checked);
+    const finalFunction = bendArray(
+      final.functions as BendList<Node>,
+    )[0] as Node;
+    equal((finalFunction.function as Node).exported, false);
+  }
+});
+
 Deno.test("checked callable-constant wrapper has the inferred signature", () => {
   const checked = moduleOf([], [checkedConstant("factory", arrow(u32, u32))]);
   const selected = api["public_exports.select_checked"](checked);
@@ -146,7 +163,7 @@ Deno.test("checked callable-constant wrapper has the inferred signature", () => 
   );
   equal(functions.length, 1);
   equal((functions[0] as unknown as { signature: Node }).signature, {
-    $: "Signature",
+    $: "model.Signature",
     name: "$public:factory",
     parameter: u32,
     result: u32,

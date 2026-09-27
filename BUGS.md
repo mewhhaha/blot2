@@ -1,0 +1,86 @@
+# Bend issues observed while building Blot
+
+Keep suspected Bend defects and missed optimizations here until they have a
+small reproducer and current-version evidence. **Do not file or comment on an
+upstream issue without the user's explicit approval.** Record the Bend version,
+the observed behavior, the expected behavior, and a way to reproduce it before
+proposing a report.
+
+## Candidate: unnecessary work when traversing strings
+
+**Status:** Local investigation; no upstream issue filed for this specific
+behavior. This is a performance concern, not a known correctness bug.
+
+In Bend 2.0.31's generated C, `String.cmp` and `Map.bit` consume string nodes
+while traversing them and rebuild prefixes to return the original strings.
+Blot's `name_equal` also performs consuming matches and ownership cleanup while
+walking the strings. Borrowing immutable characters while retaining the owning
+roots avoided some of this work in an older native experiment. See
+[the source function](compiler/model.bend),
+[the regression inputs](compiler/native_string_compare_regression.bend), and
+[the experiment record](compiler/HIGH_COST_EXPERIMENTS.md).
+
+The recorded performance measurements used older Bend output and several Blot
+changes. They do not measure the cost on 2.0.31 in isolation. Before seeking
+approval to file this upstream, reduce the case to a standalone Bend program,
+inspect its current generated C, and measure the ownership and allocation costs
+on 2.0.31. Compare source-level alternatives if available, keeping Bend's
+emitted output unchanged.
+
+**2.0.32 evidence:** In the full native compiler, `M.name_equal_tail` still
+emits a consuming traversal with `ctr_take` and per-character ownership cleanup.
+The same comparator in a standalone program already emits borrowed reads, so the
+full-program difference is not yet reduced to a small reproducer. A Bend source
+alternative retains the owning roots while separate cursors traverse the
+strings, then releases the roots after obtaining the Boolean result. Its
+unchanged generated C uses `term_peek` without per-character allocation or
+release in that loop. This is an observed optimization limitation, not evidence
+of incorrect results. See the
+[full control C](build/gdev-regression-20260927/candidate.c),
+[alternative C](build/gdev-regression-20260927/borrow/compiler.c),
+[standalone comparison](build/gdev-regression-20260927/borrow/compare.bend), and
+[game measurements](compiler/COMPILE_SPEED_RESULTS.md). No upstream report has
+been filed.
+
+## Resolved or tracked upstream
+
+- **List boxing leak:** A singleton `Scalar` list rebuilt and fully consumed
+  leaked 16 bytes per call on Bend 2.0.21 and 2.0.24. The local
+  [reproducer](compiler/repros/bend_boxing_leak/README.md) explains the
+  allocation accounting. Bend
+  [issue #970](https://github.com/bendlang/bend/issues/970) was closed by merged
+  [PR #987](https://github.com/bendlang/bend/pull/987); the fix was released in
+  2.0.28. Generated C from 2.0.31 reuses the consumed list cell in both
+  branches. The old runtime allocation probe needs updating for the 2.0.31
+  allocator interface before it can measure bytes again.
+- **Old constructor ownership regression:** The
+  [regression](compiler/native_backend_regression.bend) records a Bend 2.0.5
+  failure. It passes on current Bend and is not a pending report.
+
+Generated C interface changes that break Blot's former native patch scripts are
+an integration concern in this repository, not evidence of a Bend bug.
+
+## Candidate: checker stack exhaustion on a long diagnostic pattern (2.0.32)
+
+**Status:** Local investigation; no upstream report. The reproducer currently
+needs the full regression import graph, so this is not yet a minimal Bend bug.
+
+The frozen `build/perf-overhaul/m3-r23-collector-dev-bend32/PROOF.bend` fails
+after 28.15 seconds with a checker stack overflow. Its individual changed
+modules and new law pass when checked separately. A diagnostic using the
+unchanged upstream `book_load` and `book_valid` APIs traced the failure to
+`specialization_local_tree_computed_regression.conflicting_answer`, at
+`bend.ts:3627`, while checking a nested match against two long diagnostic
+strings. See
+[the checker trace](build/perf-overhaul/logs/M3-r24-bend-check-diagnostic.log).
+The diagnostic records declaration reads through an array proxy; it does not
+patch the checker or its generated output.
+
+The source workaround replaces those literal string patterns with explicit
+`M.name_equal` checks. The expected error code and full subject remain required.
+The r25 full proof passes in 48.85 seconds, unchanged regression JS emission in
+107.60 seconds, and all 475 collector/source/development tests pass. Exact
+inputs and logs are in `build/perf-overhaul/logs/M3-r25-collector-dev32-proof/`,
+`M3-r25-regression-js/`, and `M3-r25-collector-and-source-tests.log`. The
+attempted proof/test-entry split was abandoned; the combined proof entry is
+restored.

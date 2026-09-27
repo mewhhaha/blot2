@@ -75,7 +75,16 @@ async function exercise(bytes: Uint8Array<ArrayBuffer>) {
       () => guest.call("first", new Float32Array()),
       WebAssembly.RuntimeError,
     );
-    throws(() => guest.call("filled", 4_194_304), WebAssembly.RuntimeError);
+    // Each input/copy crosses the old 16 MiB boundary; host and guest limits
+    // must agree, and a later call must still reset and reuse the arena.
+    const beyondBootstrap = new Float32Array(4_194_304).fill(2.25);
+    const copied = guest.call("change", beyondBootstrap);
+    ok(copied instanceof Float32Array);
+    equal(copied.length, beyondBootstrap.length);
+    equal(copied[0], 42.5);
+    equal(copied[copied.length - 1], 2.25);
+    equal(beyondBootstrap[0], 2.25);
+    throws(() => guest.call("filled", 1_073_741_823), WebAssembly.RuntimeError);
     equal(guest.call("first", new Float32Array([7])), 7);
     equal(
       guest.call(

@@ -438,11 +438,11 @@ def group_owner(members: List<&2, String>) -> Result<&2, &2, M.Diagnostic, Strin
       Fail{M.Diagnostic{"internal_error", "native_session", "incremental planner returned an empty declaration group"}}
 
 def checked_group_checked(group: G.CheckedGroup) -> M.CheckedModule:
-  G.CheckedGroup{checked, interfaces} = group
+  G.CheckedGroup{checked, interfaces, uses} = group
   checked
 
 def checked_group_interfaces(group: G.CheckedGroup) -> List<&2, G.Interface>:
-  G.CheckedGroup{checked, interfaces} = group
+  G.CheckedGroup{checked, interfaces, uses} = group
   interfaces
 
 def publish_group(state: CheckedGroups, owner: String, members: List<&2, String>, closure: Set(), base_key: List<&2, U32>, keys: List<&2, List<&2, U32>>, +selected: Selected<G.CheckedGroup>) -> CheckedGroups:

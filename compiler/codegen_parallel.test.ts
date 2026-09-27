@@ -4,25 +4,25 @@ import { bendArray, type BendList, bendList } from "./bend_list.ts";
 
 type Node = { readonly $: string; readonly [field: string]: unknown };
 interface Job {
-  readonly $: "CodegenJob";
+  readonly $: "wasm.CodegenJob";
   readonly key: string;
   readonly parameter: string;
   readonly body: Node;
   readonly captures: BendList<string>;
 }
-type Entry = Omit<Job, "$"> & { readonly $: "Entry" };
+type Entry = Omit<Job, "$"> & { readonly $: "wasm.Entry" };
 interface WeightedEntry<JobType = Job> {
-  readonly $: "WeightedEntry";
+  readonly $: "wasm.WeightedEntry";
   readonly job: JobType;
   readonly weight: bigint;
 }
 type Batch<JobType = Job> =
   | {
-    readonly $: "SequentialEntries";
+    readonly $: "wasm.SequentialEntries";
     readonly entries: BendList<WeightedEntry<JobType>>;
   }
   | {
-    readonly $: "ParallelEntries";
+    readonly $: "wasm.ParallelEntries";
     readonly left: Batch<JobType>;
     readonly right: Batch<JobType>;
   };
@@ -37,19 +37,19 @@ type Result<T> =
     };
   };
 type Fragment =
-  | { readonly $: "Bytes"; readonly bytes: BendList<number> }
-  | { readonly $: "NamedCall" | "EntryIndex"; readonly key: string }
-  | { readonly $: "Allocate" }
+  | { readonly $: "wasm.Bytes"; readonly bytes: BendList<number> }
+  | { readonly $: "wasm.NamedCall" | "wasm.EntryIndex"; readonly key: string }
+  | { readonly $: "wasm.Allocate" | "wasm.Collect" }
   | {
-    readonly $: "ConstantReference" | "ConstructorIndex";
+    readonly $: "wasm.ConstantReference" | "wasm.ConstructorIndex";
     readonly name: string;
   }
-  | { readonly $: "OperationIndex"; readonly identity: Node };
+  | { readonly $: "wasm.OperationIndex"; readonly identity: Node };
 interface EntryCode {
-  readonly $: "EntryCode";
+  readonly $: "wasm.EntryCode";
   readonly key: string;
   readonly code: {
-    readonly $: "Code";
+    readonly $: "wasm.Code";
     readonly fragments: BendList<Fragment>;
     readonly locals: bigint;
   };
@@ -76,13 +76,18 @@ const backend = generated as unknown as {
   "codegen_ir.prepare"(body: Node, projection: Node): Result<Node>;
   "codegen_ir.metadata"(lambdas: BendList<Node>, constructors: Node): Node;
 };
-const integer = (value: number): Node => ({ $: "U32Expr", value });
+const integer = (value: number): Node => ({ $: "codegen_ir.U32Expr", value });
 const array = (length: number): Node => ({
-  $: "ArrayExpr",
+  $: "codegen_ir.ArrayExpr",
   elements: bendList(Array.from({ length }, (_, index) => integer(index))),
 });
+const modelInteger = (value: number): Node => ({ $: "model.U32Expr", value });
+const modelArray = (length: number): Node => ({
+  $: "model.ArrayExpr",
+  elements: bendList(Array.from({ length }, (_, index) => modelInteger(index))),
+});
 const job = (key: string, body: Node = integer(42)): Job => ({
-  $: "CodegenJob",
+  $: "wasm.CodegenJob",
   key,
   parameter: "value",
   body,
@@ -93,7 +98,7 @@ function leaves<JobType>(batch: Batch<JobType>): WeightedEntry<JobType>[][] {
   const result: WeightedEntry<JobType>[][] = [];
   const pending = [batch];
   for (let current = pending.pop(); current; current = pending.pop()) {
-    if (current.$ === "SequentialEntries") {
+    if (current.$ === "wasm.SequentialEntries") {
       result.push(bendArray(current.entries));
     } else {
       pending.push(current.right, current.left);
@@ -108,7 +113,7 @@ function comparableEntries(entries: BendList<EntryCode>) {
     code: {
       ...entry.code,
       fragments: bendArray(entry.code.fragments).map((fragment) =>
-        fragment.$ === "Bytes"
+        fragment.$ === "wasm.Bytes"
           ? { ...fragment, bytes: bendArray(fragment.bytes) }
           : fragment
       ),
@@ -121,7 +126,7 @@ Deno.test("codegen work estimates include IR, pattern, and capture work", () => 
   equal(backend["wasm.codegen_weight"](job("array", array(3))), 12n);
   equal(
     backend["wasm.codegen_weight"](job("closure", {
-      $: "ClosureExpr",
+      $: "codegen_ir.ClosureExpr",
       key: "fn:target",
       captures: bendList(["first", "second", "third"]),
     })),
@@ -129,15 +134,15 @@ Deno.test("codegen work estimates include IR, pattern, and capture work", () => 
   );
   equal(
     backend["wasm.codegen_weight"](job("pattern", {
-      $: "MatchExpr",
+      $: "codegen_ir.MatchExpr",
       values: bendList([integer(1)]),
       arms: bendList([{
-        $: "MatchArm",
+        $: "model.MatchArm",
         patterns: bendList([{
-          $: "ProductPattern",
+          $: "model.ProductPattern",
           elements: bendList([
-            { $: "WildcardPattern" },
-            { $: "WildcardPattern" },
+            { $: "model.WildcardPattern" },
+            { $: "model.WildcardPattern" },
           ]),
         }]),
         body: integer(42),
@@ -159,9 +164,9 @@ Deno.test("codegen grain boundaries form sequential leaves without tiny fork tas
     bendList(tiny.slice(1)),
     grain,
   );
-  equal(below.$, "SequentialEntries");
+  equal(below.$, "wasm.SequentialEntries");
   const at = backend["wasm.plan_entries"](bendList(tiny), grain);
-  equal(at.$, "ParallelEntries");
+  equal(at.$, "wasm.ParallelEntries");
   const batches = leaves(at);
   equal(batches.length, 2);
   ok(
@@ -173,7 +178,7 @@ Deno.test("codegen grain boundaries form sequential leaves without tiny fork tas
   for (const jobs of [[], [job("only")]]) {
     equal(
       backend["wasm.plan_entries"](bendList(jobs), 0n).$,
-      "SequentialEntries",
+      "wasm.SequentialEntries",
     );
   }
 });
@@ -185,24 +190,24 @@ Deno.test("codegen partitions by estimated work at the nearer ordered boundary",
     job("last", array(503)),
   ];
   const plan = backend["wasm.plan_entries"](bendList(jobs), 512n);
-  ok(plan.$ === "ParallelEntries");
+  ok(plan.$ === "wasm.ParallelEntries");
   equal(leaves(plan.left).flat().map(({ job }) => job.key), ["first"]);
   equal(leaves(plan.right).flat().map(({ job }) => job.key), ["heavy", "last"]);
   equal(
     backend["wasm.plan_entries"](bendList([jobs[1], job("tiny")]), 512n).$,
-    "SequentialEntries",
+    "wasm.SequentialEntries",
   );
 });
 
 Deno.test("serial and coarse codegen preserve complete entry output and ordering", () => {
   const jobs = Array.from({ length: 12 }, (_, index) =>
     job("entry_" + index, {
-      $: "ArrayGetExpr",
+      $: "codegen_ir.ArrayGetExpr",
       array: array(160),
       index: integer(index),
     }));
   jobs.splice(4, 0, {
-    ...job("captured", { $: "LocalExpr", name: "capture" }),
+    ...job("captured", { $: "codegen_ir.LocalExpr", name: "capture" }),
     captures: bendList(["capture"]),
   });
   const serial = backend["wasm.compile_entries_with_grain"](
@@ -228,9 +233,9 @@ Deno.test("serial and coarse codegen preserve complete entry output and ordering
 Deno.test("parallel codegen keeps the first source-order diagnostic across batches", () => {
   const invalid = (name: string) =>
     job(name, {
-      $: "SequenceExpr",
+      $: "codegen_ir.SequenceExpr",
       first: array(600),
-      next: { $: "LocalExpr", name },
+      next: { $: "codegen_ir.LocalExpr", name },
     });
   const first = invalid("missing_first");
   const expected = backend["wasm.compile_entry"](first);
@@ -243,19 +248,19 @@ Deno.test("parallel codegen keeps the first source-order diagnostic across batch
     );
   }
   const scalar = job("scalar", {
-    $: "ScalarExpr",
-    operator: { $: "Add" },
-    left: { $: "LocalExpr", name: "left_missing" },
-    right: { $: "LocalExpr", name: "right_missing" },
+    $: "codegen_ir.ScalarExpr",
+    operator: { $: "model.Add" },
+    left: { $: "codegen_ir.LocalExpr", name: "left_missing" },
+    right: { $: "codegen_ir.LocalExpr", name: "right_missing" },
   });
   const error = backend["wasm.compile_entry"](scalar);
   ok(error.$ === "Fail");
   equal(error.error.subject, "left_missing");
 });
 
-const entry = (key: string, body: Node = integer(42)): Entry => ({
+const entry = (key: string, body: Node = modelInteger(42)): Entry => ({
   ...job(key, body),
-  $: "Entry",
+  $: "wasm.Entry",
 });
 
 Deno.test("projection batches keep tiny work serial and balance clustered expensive entries", () => {
@@ -263,18 +268,18 @@ Deno.test("projection batches keep tiny work serial and balance clustered expens
   const tiny = Array.from({ length: 64 }, (_, index) => entry(`tiny_${index}`));
   equal(
     backend["wasm.plan_preparations"](bendList(tiny), grain).$,
-    "SequentialEntries",
+    "wasm.SequentialEntries",
   );
-  for (const entries of [[], [entry("single", array(10_000))]]) {
+  for (const entries of [[], [entry("single", modelArray(10_000))]]) {
     equal(
       backend["wasm.plan_preparations"](bendList(entries), 0n).$,
-      "SequentialEntries",
+      "wasm.SequentialEntries",
     );
   }
   const clustered = [
     ...Array.from(
       { length: 8 },
-      (_, index) => entry(`large_${index}`, array(2048)),
+      (_, index) => entry(`large_${index}`, modelArray(2048)),
     ),
     ...tiny,
   ];
@@ -296,12 +301,12 @@ Deno.test("projection batches keep tiny work serial and balance clustered expens
     ),
   );
   const lambda = entry("reference", {
-    $: "LambdaExpr",
+    $: "model.LambdaExpr",
     identity: 7n,
     parameter: "argument",
     parameter_type: { $: "None" },
     result_type: { $: "None" },
-    body: array(10_000),
+    body: modelArray(10_000),
   });
   equal(
     leaves(backend["wasm.plan_preparations"](bendList([lambda]), grain))[0][0]
@@ -312,10 +317,10 @@ Deno.test("projection batches keep tiny work serial and balance clustered expens
 
 Deno.test("parallel projection matches ordered independent preparation across grains", () => {
   const lambda: Node = {
-    $: "Lambda",
+    $: "closures.Lambda",
     identity: 7n,
     parameter: "argument",
-    body: integer(42),
+    body: modelInteger(42),
     captures: bendList(["capture"]),
   };
   const metadata = backend["codegen_ir.metadata"](bendList([lambda]), {
@@ -328,20 +333,26 @@ Deno.test("parallel projection matches ordered independent preparation across gr
         `entry_${index}`,
         index === 32
           ? {
-            $: "LambdaExpr",
+            $: "model.LambdaExpr",
             identity: 7n,
             parameter: "argument",
             parameter_type: { $: "None" },
             result_type: { $: "None" },
-            body: integer(99),
+            body: modelInteger(99),
           }
-          : array(index < 8 ? 1024 : 8),
+          : modelArray(index < 8 ? 1024 : 8),
       ),
   );
   const expected = entries.map(({ key, parameter, body, captures }): Job => {
     const prepared = backend["codegen_ir.prepare"](body, metadata);
     ok(prepared.$ === "Done");
-    return { $: "CodegenJob", key, parameter, body: prepared.value, captures };
+    return {
+      $: "wasm.CodegenJob",
+      key,
+      parameter,
+      body: prepared.value,
+      captures,
+    };
   });
   for (const grain of [0n, 128n, 512n, 2048n, 0xffff_ffff_ffffn]) {
     const actual = backend["wasm.prepare_jobs_with_grain"](
@@ -358,16 +369,16 @@ Deno.test("parallel projection preserves the first error across batch boundaries
   const metadata = backend["codegen_ir.metadata"](bendList([]), { $: "MTip" });
   const invalid = (constructor: string) =>
     entry(constructor, {
-      $: "SequenceExpr",
-      first: array(1024),
-      next: { $: "ConstructorRefExpr", constructor },
+      $: "model.SequenceExpr",
+      first: modelArray(1024),
+      next: { $: "model.ConstructorRefExpr", constructor },
     });
   const first = invalid("missing_first");
   const expected = backend["codegen_ir.prepare"](first.body, metadata);
   ok(expected.$ === "Fail");
   equal(expected.error.subject, "missing_first");
   const entries = [
-    entry("valid", array(1024)),
+    entry("valid", modelArray(1024)),
     first,
     ...Array.from({ length: 30 }, (_, index) => invalid(`later_${index}`)),
   ];

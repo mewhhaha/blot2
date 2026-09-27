@@ -7,21 +7,21 @@ type List<T> = { readonly $: "Nil" } | {
   readonly tail: List<T>;
 };
 interface Identity {
-  readonly $: "TypeId";
+  readonly $: "model.TypeId";
   readonly module_name: string;
   readonly declaration: string;
 }
-type Tail = { readonly $: "ClosedRow" } | {
-  readonly $: "RowVariable" | "RowParameter";
+type Tail = { readonly $: "model.ClosedRow" } | {
+  readonly $: "model.RowVariable" | "model.RowParameter";
   readonly index: bigint;
 };
 interface Row {
-  readonly $: "EffectRow";
+  readonly $: "model.EffectRow";
   readonly operations: List<Identity>;
   readonly tail: Tail;
 }
 interface Binding {
-  readonly $: "Binding";
+  readonly $: "effect_rows.Binding";
   readonly variable: bigint;
   readonly replacement: Row;
 }
@@ -60,15 +60,15 @@ function array<T>(values: List<T>): T[] {
   return result;
 }
 const identity = (declaration: string): Identity => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name: "effects",
   declaration,
 });
-const closed: Tail = { $: "ClosedRow" };
-const variable = (index: bigint): Tail => ({ $: "RowVariable", index });
-const parameter = (index: bigint): Tail => ({ $: "RowParameter", index });
+const closed: Tail = { $: "model.ClosedRow" };
+const variable = (index: bigint): Tail => ({ $: "model.RowVariable", index });
+const parameter = (index: bigint): Tail => ({ $: "model.RowParameter", index });
 const row = (operations: readonly string[], tail: Tail = closed): Row => ({
-  $: "EffectRow",
+  $: "model.EffectRow",
   operations: list(operations.map(identity)),
   tail,
 });
@@ -90,21 +90,23 @@ function solvable(left: Row, right: Row): boolean {
   const b = labelCounts(right);
   const names = new Set([...a.keys(), ...b.keys()]);
   const sameTail = left.tail.$ === right.tail.$ &&
-    (left.tail.$ === "ClosedRow" ||
-      (right.tail.$ !== "ClosedRow" &&
+    (left.tail.$ === "model.ClosedRow" ||
+      (right.tail.$ !== "model.ClosedRow" &&
         left.tail.index === right.tail.index));
   if (sameTail) {
     return [...names].every((name) =>
       (a.get(name) ?? 0) === (b.get(name) ?? 0)
     );
   }
-  if (left.tail.$ === "RowVariable" && right.tail.$ === "RowVariable") {
+  if (
+    left.tail.$ === "model.RowVariable" && right.tail.$ === "model.RowVariable"
+  ) {
     return true;
   }
-  if (left.tail.$ === "RowVariable") {
+  if (left.tail.$ === "model.RowVariable") {
     return [...names].every((name) => (a.get(name) ?? 0) <= (b.get(name) ?? 0));
   }
-  if (right.tail.$ === "RowVariable") {
+  if (right.tail.$ === "model.RowVariable") {
     return [...names].every((name) => (b.get(name) ?? 0) <= (a.get(name) ?? 0));
   }
   return false;
@@ -149,11 +151,11 @@ Deno.test("scoped effect rows agree with a multiset unification oracle", () => {
 
 Deno.test("row substitutions preserve chronological dependencies and scoped multiplicity", () => {
   const bindings: Binding[] = [{
-    $: "Binding",
+    $: "effect_rows.Binding",
     variable: 0n,
     replacement: row(["A"], variable(1n)),
   }, {
-    $: "Binding",
+    $: "effect_rows.Binding",
     variable: 1n,
     replacement: row(["A", "B"]),
   }];
@@ -185,7 +187,7 @@ Deno.test("row occurs checks reject introducing a label through the same tail", 
   );
   ok(result.$ === "Fail");
   equal(result.error, {
-    $: "Diagnostic",
+    $: "model.Diagnostic",
     code: "infinite_effect",
     subject: "recursive",
     message: "effect row occurs check failed",

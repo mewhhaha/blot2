@@ -5,6 +5,7 @@ import ./index.bend as Index
 import ./core_compare.bend as Compare
 import ./globals.bend as Globals
 import ./closures.bend as Closures
+import ./constraints.bend as C
 
 # A certificate comes from a successful independent check of one complete SCC.
 # Its imported principal schemes are frozen at that boundary.
@@ -35,6 +36,8 @@ def deferred(fuel: Nat, pending: List<&2, M.Expr>) -> Bool:
       True{}
     case 1n+rest M.SpecializeOperationExpr{template, arguments, body} <> tail:
       True{}
+    case 1n+rest M.QualifiedExpr{offset, annotation, predicates, body} <> tail:
+      True{}
     case 1n+rest head <> tail:
       deferred(rest, List.reverse.go(&2, M.Expr, List.reverse(&2, M.Expr, Closures.children(head)), tail))
 
@@ -56,6 +59,24 @@ def source_ready(module: M.Module) -> Bool:
   M.Module{constants, functions, types, operations} = module
   Bool.not(Bool.or(deferred_functions(functions), deferred_constants(constants)))
 
+def pending_uses(plans: List<&2, C.UsePlan>) -> Bool:
+  match plans:
+    case Nil{}:
+      False{}
+    case C.UsePlan{site, subject, ty, predicates} <> tail:
+      Bool.or(Bool.not(List.is_empty(&2, M.Predicate, predicates)), pending_uses(tail))
+
+def pending_interfaces(interfaces: List<&2, Groups.Interface>) -> Bool:
+  match interfaces:
+    case Nil{}:
+      False{}
+    case Groups.Interface{name, kind, template, parameters, effects, predicates} <> tail:
+      Bool.or(Bool.not(List.is_empty(&2, M.Predicate, predicates)), pending_interfaces(tail))
+
+def ready_group(group: Groups.CheckedGroup) -> Bool:
+  Groups.CheckedGroup{checked, interfaces, uses} = group
+  Bool.not(Bool.or(pending_uses(uses), pending_interfaces(interfaces)))
+
 # Final-check reuse accepts only groups whose source needs no specialization.
 def ready_certificates(certificates: List<&2, Certificate>) -> List<&2, Certificate>:
   match certificates:
@@ -64,7 +85,7 @@ def ready_certificates(certificates: List<&2, Certificate>) -> List<&2, Certific
     case +certificate <> tail:
       Certificate{module, checked, imports} = certificate
       +rest = ready_certificates(tail)
-      Bool.pick(List<&2, Certificate>, source_ready(module), certificate <> rest, rest)
+      Bool.pick(List<&2, Certificate>, Bool.and(source_ready(module), ready_group(checked)), certificate <> rest, rest)
 
 def type_identity(ty: M.DataType) -> M.TypeId:
   M.DataType{identity, parameters, constructors} = ty
@@ -232,10 +253,24 @@ def same_kind(left: Groups.InterfaceKind, right: Groups.InterfaceKind) -> Bool:
     case _ _:
       False{}
 
+def same_predicates_work(left: List<&2, M.Predicate>, right: List<&2, M.Predicate>, equal: Bool) -> Bool:
+  match left right equal:
+    case _ _ False{}:
+      False{}
+    case Nil{} Nil{} True{}:
+      True{}
+    case a <> rest b <> following True{}:
+      same_predicates_work(rest, following, C.same_predicate(a, b))
+    case _ _ _:
+      False{}
+
+def same_predicates(left: List<&2, M.Predicate>, right: List<&2, M.Predicate>) -> Bool:
+  same_predicates_work(left, right, True{})
+
 def same_interface(left: Groups.Interface, right: Groups.Interface) -> Bool:
-  Groups.Interface{a_name, a_kind, a_type, a_parameters, a_effects} = left
-  Groups.Interface{b_name, b_kind, b_type, b_parameters, b_effects} = right
-  Bool.and(M.name_equal(a_name, b_name), Bool.and(same_kind(a_kind, b_kind), Bool.and(Nat.is_eq(a_parameters, b_parameters), Bool.and(Groups.same_effects(a_effects, b_effects), Compare.same_ty(a_type, b_type)))))
+  Groups.Interface{a_name, a_kind, a_type, a_parameters, a_effects, a_predicates} = left
+  Groups.Interface{b_name, b_kind, b_type, b_parameters, b_effects, b_predicates} = right
+  Bool.and(M.name_equal(a_name, b_name), Bool.and(same_kind(a_kind, b_kind), Bool.and(Nat.is_eq(a_parameters, b_parameters), Bool.and(Groups.same_effects(a_effects, b_effects), Bool.and(Compare.same_ty(a_type, b_type), same_predicates(a_predicates, b_predicates))))))
 
 def same_imports(left: List<&2, Groups.Interface>, right: List<&2, Groups.Interface>) -> Bool:
   match left right:
@@ -252,10 +287,10 @@ def same_declarations(left: M.Module, right: M.Module) -> Bool:
   Compare.same_module(M.Module{a_constants, a_functions, Nil{}, Nil{}}, M.Module{b_constants, b_functions, Nil{}, Nil{}})
 
 def matching_certificate(certificate: Certificate, +subset: M.Module, imports: List<&2, Groups.Interface>) -> Maybe<&2, Groups.CheckedGroup>:
-  Certificate{old_module, Groups.CheckedGroup{M.CheckedModule{old_constants, old_functions, old_types, old_operations}, interfaces}, old_imports} = certificate
+  Certificate{old_module, Groups.CheckedGroup{M.CheckedModule{old_constants, old_functions, old_types, old_operations}, interfaces, uses}, old_imports} = certificate
   M.Module{constants, functions, types, operations} = subset
   +valid = Bool.and(same_declarations(old_module, subset), same_imports(old_imports, imports))
-  Bool.pick(Maybe<&2, Groups.CheckedGroup>, valid, Some{Groups.CheckedGroup{M.CheckedModule{old_constants, old_functions, types, operations}, interfaces}}, None{})
+  Bool.pick(Maybe<&2, Groups.CheckedGroup>, valid, Some{Groups.CheckedGroup{M.CheckedModule{old_constants, old_functions, types, operations}, interfaces, uses}}, None{})
 
 def candidates_work(available: List<&2, Certificate>, +subset: M.Module, +imports: List<&2, Groups.Interface>, found: Maybe<&2, Groups.CheckedGroup>) -> Maybe<&2, Groups.CheckedGroup>:
   match available found:

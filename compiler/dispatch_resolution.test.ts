@@ -1,6 +1,7 @@
 import { reachedSource } from "./fixtures.ts";
 import { deepStrictEqual as equal, ok, rejects } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
+import { toBendCst } from "./bend_abi.ts";
 import { createNativeCompiler } from "./native.ts";
 import { createSourceCompiler } from "./source.ts";
 import { createSourceFrontend } from "./source_frontend.ts";
@@ -439,15 +440,15 @@ Deno.test("dispatch diagnostics keep their code, position and message", async ()
         expected.at;
       equal(
         api.compile_source(
-          input.root,
-          input.prelude,
+          toBendCst(input.root),
+          toBendCst(input.prelude),
           input.nodeCount,
           100_000n,
         ),
         {
           $: "Fail",
           error: {
-            $: "Diagnostic",
+            $: "model.Diagnostic",
             code: expected.code,
             subject: `offset:${offset}`,
             message: expected.message,

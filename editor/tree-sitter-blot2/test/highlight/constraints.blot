@@ -1,0 +1,9 @@
+const where = fn where => where
+
+const twice: a -> a where { associated "add" a a a } = fn value => value + value
+//                    ^ keyword.control
+
+const read: a -> b ! {Reader.ask | e} where {
+  field "first" a b,
+  effect_rep ! {| e},
+} = fn value => value.first

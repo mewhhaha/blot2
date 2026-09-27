@@ -7,12 +7,16 @@ import ./staging_residual.bend as R
 import ./closures.bend as F
 import ./nat_index.bend as NatIndex
 import ./core_compare.bend as Compare
+import ./constraints.bend as C
 
 # A principal source inference for the built-in type-witness equality function.
 # Its body contains no global or captured references; the source is checked
 # independently, and the caller must also prove an exact expanded clone match.
 type Scheme is Data:
   Scheme{source: M.Function, inference: I.Inference, variables: List<&2, Nat>, allocated: Nat, types: List<&2, M.DataType>}
+
+type LocalSite is Data:
+  LocalSite{site: Nat, subject: String}
 
 # Reject every global, closure capture, operation or arbitrary call. The only
 # unresolved choice permitted by this slice is the exact @type.same request.
@@ -22,6 +26,8 @@ def safe_work(+fuel: Nat, pending: List<&2, M.Expr>) -> Bool:
       True{}
     case 0n _:
       False{}
+    case 1n+rest M.SourceExpr{offset, None{}, M.InstantiationExpr{site, M.LocalExpr{name}}} <> tail:
+      Bool.and(Nat.is_eq(site, Nat.mul(offset, 16n)), safe_work(rest, tail))
     case 1n+rest M.SourceExpr{offset, None{}, value} <> tail:
       safe_work(rest, value <> tail)
     case 1n+rest M.LambdaExpr{identity, parameter, None{}, None{}, body} <> tail:
@@ -30,8 +36,6 @@ def safe_work(+fuel: Nat, pending: List<&2, M.Expr>) -> Bool:
       safe_work(rest, List.append(&2, M.Expr, F.children(M.MatchExpr{values, arms}), tail))
     case 1n+rest M.AssociatedExpr{identity, M.BinaryDispatch{}, member, Nil{}, left, right} <> tail:
       Bool.and(M.name_equal(member, "@type.same"), safe_work(rest, left <> right <> tail))
-    case 1n+rest M.LocalExpr{name} <> tail:
-      safe_work(rest, tail)
     case _ _:
       False{}
 
@@ -42,21 +46,77 @@ def eligible(function: M.Function) -> Bool:
     case _:
       False{}
 
-def type_equality_inference(value: I.Inference) -> Bool:
-  # Match children omit pattern expressions. The exact coverage shape below
-  # also rejects ValuePatternType, so no hidden pattern reference is replayed.
-  match value:
-    case I.Inference{M.FunctionTy{parameter, result, effects}, I.Coverage{inferred, patterns, coverage_subject} <> I.AssociatedNeed{identity, M.BinaryDispatch{}, member, Nil{}, left, right, selected, ambient, subject} <> Nil{}, Nil{}, Nil{}}:
-      Bool.and(M.name_equal(member, "@type.same"), M.name_equal(subject, "offset:" ++ Nat.show(identity)))
+# Lowering gives every local reference a lane-0 InstantiationExpr, and Infer
+# records a UsePlan at that site. Admit exactly those source sites with one
+# runtime-only plan apiece; absent, duplicate, or predicate-bearing plans stay
+# on ordinary inference. The @type.same predicate is checked separately.
+def local_sites_work(fuel: Nat, pending: List<&2, M.Expr>, reversed: List<&2, LocalSite>) -> Maybe<&2, List<&2, LocalSite>>:
+  match fuel pending:
+    case 0n _:
+      None{}
+    case 1n+rest Nil{}:
+      Some{List.reverse(&2, LocalSite, reversed)}
+    case 1n+rest M.SourceExpr{offset, None{}, M.InstantiationExpr{site, M.LocalExpr{name}}} <> tail:
+      local_sites_work(rest, tail, LocalSite{site, "offset:" ++ Nat.show(offset)} <> reversed)
+    case 1n+rest head <> tail:
+      local_sites_work(rest, List.append(&2, M.Expr, F.children(head), tail), reversed)
+
+def local_sites(source: M.Function) -> Maybe<&2, List<&2, LocalSite>>:
+  M.Function{name, exported, parameter, p, r, body} = source
+  local_sites_work(65536n, [body], Nil{})
+
+def use_count(uses: List<&2, C.UsePlan>, +site: Nat, +subject: String) -> Nat:
+  match uses:
+    case Nil{}:
+      0n
+    case C.UsePlan{actual, found, ty, predicates} <> tail:
+      Nat.add(Bool.pick(Nat, Bool.and(Nat.is_eq(site, actual), M.name_equal(subject, found)), 1n, 0n), use_count(tail, site, subject))
+
+def each_site(sites: List<&2, LocalSite>, +uses: List<&2, C.UsePlan>) -> Bool:
+  match sites:
+    case Nil{}:
+      True{}
+    case LocalSite{site, subject} <> tail:
+      Bool.and(Nat.is_eq(use_count(uses, site, subject), 1n), each_site(tail, uses))
+
+def site_count(sites: List<&2, LocalSite>, +wanted: Nat, +subject: String) -> Nat:
+  match sites:
+    case Nil{}:
+      0n
+    case LocalSite{site, found} <> tail:
+      Nat.add(Bool.pick(Nat, Bool.and(Nat.is_eq(site, wanted), M.name_equal(subject, found)), 1n, 0n), site_count(tail, wanted, subject))
+
+def each_use(uses: List<&2, C.UsePlan>, +sites: List<&2, LocalSite>) -> Bool:
+  match uses:
+    case Nil{}:
+      True{}
+    case C.UsePlan{site, subject, ty, Nil{}} <> tail:
+      Bool.and(Nat.is_eq(site_count(sites, site, subject), 1n), each_use(tail, sites))
     case _:
       False{}
 
-def captured_free(free: Result<&2, &2, M.Diagnostic, List<&2, Nat>>, source: M.Function, +inference: I.Inference, +allocated: Nat, types: List<&2, M.DataType>) -> Maybe<&2, Scheme>:
+def matched_uses(found: Maybe<&2, List<&2, LocalSite>>, +uses: List<&2, C.UsePlan>) -> Bool:
+  match found:
+    case None{}:
+      False{}
+    case Some{+sites}:
+      Bool.and(Nat.is_gt(List.length(&2, LocalSite, sites), 0n), Bool.and(Nat.is_eq(List.length(&2, LocalSite, sites), List.length(&2, C.UsePlan, uses)), Bool.and(each_site(sites, uses), each_use(uses, sites))))
+
+def type_equality_inference(+source: M.Function, value: I.Inference) -> Bool:
+  # Match children omit pattern expressions. The exact coverage shape below
+  # also rejects ValuePatternType, so no hidden pattern reference is replayed.
+  match value:
+    case I.Inference{M.FunctionTy{parameter, result, effects}, I.Coverage{inferred, patterns, coverage_subject} <> I.AssociatedNeed{identity, M.BinaryDispatch{}, +member, Nil{}, left, right, selected, Some{invocation}, ambient, subject} <> Nil{}, Nil{}, Nil{}, predicate <> Nil{}, uses}:
+      Bool.and(eligible(source), Bool.and(M.name_equal(member, "@type.same"), Bool.and(M.name_equal(subject, "offset:" ++ Nat.show(identity)), Bool.and(Compare.same_predicate(predicate, M.AssociatedPredicate{member, Nil{}, left, right, selected, invocation}), matched_uses(local_sites(source), uses)))))
+    case _:
+      False{}
+
+def captured_free(free: Result<&2, &2, M.Diagnostic, List<&2, Nat>>, +source: M.Function, +inference: I.Inference, +allocated: Nat, types: List<&2, M.DataType>) -> Maybe<&2, Scheme>:
   match free:
     case Fail{diagnostic}:
       None{}
     case Done{+variables}:
-      Bool.pick(Maybe<&2, Scheme>, Bool.and(Nat.is_ge(allocated, 3n), Bool.and(Nat.is_le(T.above(variables, 0n), allocated), type_equality_inference(inference))), Some{Scheme{source, inference, variables, allocated, types}}, None{})
+      Bool.pick(Maybe<&2, Scheme>, Bool.and(Nat.is_ge(allocated, 3n), Bool.and(Nat.is_le(T.above(variables, 0n), allocated), type_equality_inference(source, inference))), Some{Scheme{source, inference, variables, allocated, types}}, None{})
 
 def captured_resolved(resolved: Result<&2, &2, M.Diagnostic, I.Inference>, +source: M.Function, allocated: Nat, types: List<&2, M.DataType>) -> Maybe<&2, Scheme>:
   match resolved:
@@ -159,7 +219,7 @@ type Placeholder is Data:
 
 def placeholder(found: Maybe<&2, I.Binding>, +wanted: String) -> Maybe<&2, Placeholder>:
   match found:
-    case Some{I.Binding{name, M.FunctionTy{M.VariableTy{+p}, M.VariableTy{+r}, M.EffectRow{Nil{}, M.RowVariable{+e}}}, Nil{}}}:
+    case Some{I.Binding{name, M.FunctionTy{M.VariableTy{+p}, M.VariableTy{+r}, M.EffectRow{Nil{}, M.RowVariable{+e}}}, Nil{}, Nil{}}}:
       Bool.pick(Maybe<&2, Placeholder>, M.name_equal(name, wanted), Some{Placeholder{p, r, e, M.FunctionTy{M.VariableTy{p}, M.VariableTy{r}, M.EffectRow{Nil{}, M.RowVariable{e}}}}}, None{})
     case _:
       None{}

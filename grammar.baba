@@ -22,7 +22,7 @@ import_binding = (name:(IDENT | TYPE_IDENT) alias:("as" (IDENT | TYPE_IDENT))?) 
 declaration = (attributes:declaration_attribute* value:(value_declaration | data_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
 declaration_attribute = ("#" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" value:expression "]") ;
-value_declaration = (modifier:IDENT? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? "=" value:expression) ;
+value_declaration = (modifier:IDENT? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
 effect_declaration = ("effect" name:qualified_name ":" signature:type_expression) ;
 effect_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" "effect" "=" (operations:effect_operations | signature:effect_signature)) ;
 // A bare record declares operations; signatures start with a type name or group.
@@ -36,12 +36,16 @@ constructor = (name:TYPE_IDENT payload:type_expression?) ;
 symbolic_fixity = (associativity:("infixl" | "infixr" | "infix") precedence:INTEGER "(" symbol:(SYMBOL | "$" | "*" | "^") ")" "=" target:qualified_name) ;
 named_fixity = (associativity:("infixl" | "infixr" | "infix") precedence:INTEGER "`" target:qualified_name "`") ;
 qualified_name = (root:(IDENT | TYPE_IDENT) rest:("." (IDENT | TYPE_IDENT))*) ;
-parameter = (name:IDENT | "(" (name:IDENT ":" annotation:type_expression)? ")") ;
+parameter = (name:IDENT | "(" (name:IDENT ":" annotation:type_expression where:where_clause?)? ")") ;
 type_array = ("[" (elements:type_expression ("," elements:type_expression)* ","?)? "]") ;
 type_record = ("{" (fields:type_field ("," fields:type_field)* ","?)? "}") ;
 type_field = (name:IDENT (":" value:type_expression)?) ;
 type_expression = (head:type_application results:("->" type_application)* effects:effect_row?) ;
-effect_row = ("!" "{" (labels:type_application ("," labels:type_application)*)? "}") ;
+effect_row = ("!" "{" (labels:type_application ("," labels:type_application)*)? ("|" tail:IDENT)? "}") ;
+// The frontend promotes `where` to this same-width private marker only after
+// an annotation. Other uses remain ordinary IDENT, including type variables.
+where_clause = (marker:"wherE" "{" (predicates:constraint_predicate ("," predicates:constraint_predicate)* ","?)? "}") ;
+constraint_predicate = (kind:IDENT member:STRING? arguments:type_atom* effects:effect_row?) ;
 type_application = (head:type_atom arguments:type_atom*) ;
 type_atom = (qualified_name | type_group | type_array | type_record) ;
 type_group = ("(" (value:type_expression ("," value:type_expression)* ","?)? ")") ;
@@ -74,7 +78,7 @@ record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_fi
 record_pattern_field = (name:IDENT (":" value:pattern)?) ;
 suite = (LAYOUT_NEWLINE LAYOUT_INDENT statements:statement* LAYOUT_DEDENT) ;
 statement = (value:(binding | rebinding | effect_binding | effect_step | result | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
-binding = ("let" pattern:pattern annotation:(":" type_expression)? "=" value:expression fallback:binding_else?) ;
+binding = ("let" pattern:pattern annotation:(":" type_expression)? where:where_clause? "=" value:expression fallback:binding_else?) ;
 rebinding = (name:IDENT path:(member_access | index_access)* ":=" value:expression) ;
 index_access = ("[" index:expression "]") ;
 for_statement = ("for" "let"? pattern:pattern "in" start:expression (".." end:expression)? ":" body:suite) ;

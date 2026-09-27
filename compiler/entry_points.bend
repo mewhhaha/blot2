@@ -8,6 +8,7 @@ import ./groups.bend as G
 import ./checked_core.bend as Core
 import ./check_scheduler.bend as Scheduler
 import ./inference_batch.bend as Batch
+import ./constraints.bend as Constraints
 
 # Entry declarations (`entry const` / `entry let` in the entry module) are the
 # host's entrypoints. Lowering marks them with the `exported` flag; nothing
@@ -86,6 +87,10 @@ def scan_work(fuel: Nat, pending: List<&2, ScanWork>, names: List<&2, String>, m
       scan_work(rest, ScanExpressions{argument <> values} <> tail, callee <> names, members)
     case 1n+rest ScanExpressions{M.AssociatedExpr{identity, dispatch, member, templates, left, right} <> values} <> tail:
       scan_work(rest, ScanExpressions{left <> right <> values} <> tail, names, member <> members)
+    case 1n+rest ScanExpressions{M.QualifiedExpr{offset, annotation, predicates, value} <> values} <> tail:
+      # Deliberately extra declared predicates remain caller obligations even
+      # when no body expression performs that selection.
+      scan_work(rest, ScanExpressions{value <> values} <> tail, names, List.reverse.go(&2, String, List.reverse(&2, String, Constraints.predicate_members(predicates)), members))
     case 1n+rest ScanExpressions{M.MatchExpr{scrutinees, arms} <> values} <> tail:
       scan_work(rest, ScanExpressions{scrutinees} <> ScanArms{arms} <> ScanExpressions{values} <> tail, names, members)
     case 1n+rest ScanExpressions{M.GuardExpr{pattern, value, alternative, body} <> values} <> tail:
@@ -301,7 +306,7 @@ def group_reached(members: List<&2, I.Binding>, +seen: Set()) -> Bool:
   match members:
     case Nil{}:
       True{}
-    case I.Binding{name, ty, variables} <> tail:
+    case I.Binding{name, ty, variables, predicates} <> tail:
       D.member(seen, name)
 
 # A group is a strongly connected component: its members are reached together.

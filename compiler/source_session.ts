@@ -9,6 +9,7 @@ import {
 import type { SourceCompilerOptions } from "./source_frontend.ts";
 import type { Cst } from "./syntax.ts";
 import { createIncrementalFrontend } from "./incremental_frontend.ts";
+import { toBendCst } from "./bend_abi.ts";
 
 interface Prelude {
   readonly module: RawModule;
@@ -27,7 +28,7 @@ export async function createSourceSession(options: SourceCompilerOptions) {
   try {
     prepared = result<Prelude>(
       "lower.prepare_prelude",
-      frontend.prelude,
+      toBendCst(frontend.prelude),
       frontend.preludeCount,
     );
   } catch (error) {
@@ -43,7 +44,7 @@ export async function createSourceSession(options: SourceCompilerOptions) {
         const lowerStart = performance.now();
         const plan = result<SourcePlan>(
           "lower.prepare_source",
-          parsed.root,
+          toBendCst(parsed.root),
           prepared,
         );
         const scopeKey = structuralKey(plan.scope);
@@ -72,7 +73,7 @@ export async function createSourceSession(options: SourceCompilerOptions) {
           fragments.push(fragment);
         }
         const module: RawModule = {
-          $: "Module",
+          $: "model.Module",
           constants: bendList(fragments.flatMap((m) => bendArray(m.constants))),
           functions: bendList(fragments.flatMap((m) => bendArray(m.functions))),
           operations: bendList(

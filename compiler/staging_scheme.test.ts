@@ -1,6 +1,8 @@
+import { toBendCst } from "./bend_abi.ts";
 import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
 import { bendArray, type BendList, bendList } from "./bend_list.ts";
+import { createSourceFrontend } from "./source_frontend.ts";
 
 type Node = { readonly $: string; readonly [field: string]: unknown };
 type Result<T> = { readonly $: "Done"; readonly value: T } | {
@@ -17,26 +19,32 @@ const api = compiled as unknown as Record<
 const nil = bendList<Node>([]);
 const none: Node = { $: "None" };
 const some = (value: Node): Node => ({ $: "Some", value });
-const local = (name: string): Node => ({ $: "LocalExpr", name });
+const local = (name: string): Node => ({ $: "model.LocalExpr", name });
 const at = (offset: bigint, value: Node): Node => ({
-  $: "SourceExpr",
+  $: "model.SourceExpr",
   offset,
   annotation: none,
   value,
 });
+const localAt = (offset: bigint, name: string): Node =>
+  at(offset, {
+    $: "model.InstantiationExpr",
+    site: offset * 16n,
+    value: local(name),
+  });
 const id = (declaration: string): Node => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name: "std/prelude",
   declaration,
 });
 const typeCatalog = bendList<Node>([{
-  $: "DataType",
+  $: "model.DataType",
   identity: id("Type"),
   parameters: 1n,
   constructors: bendList<Node>([{
-    $: "Constructor",
+    $: "model.Constructor",
     name: "$prelude.Type",
-    payload: some({ $: "ParameterTy", index: 0n }),
+    payload: some({ $: "model.ParameterTy", index: 0n }),
     fields: nil,
   }]),
 }]);
@@ -45,40 +53,40 @@ const typeCatalog = bendList<Node>([{
 // pattern names are real syntax evidence used by the exact clone guard.
 function sourceFunction(): Node {
   const pattern = (name: string): Node => ({
-    $: "ConstructorPattern",
+    $: "model.ConstructorPattern",
     constructor: "$prelude.Type",
-    payload: some({ $: "BindingPattern", name }),
+    payload: some({ $: "model.BindingPattern", name }),
   });
   return {
-    $: "Function",
+    $: "model.Function",
     name: "$prelude.Type.eq",
     exported: false,
     parameter: "left$379",
     parameter_type: none,
     result_type: none,
     body: at(381n, {
-      $: "LambdaExpr",
+      $: "model.LambdaExpr",
       identity: 381n,
       parameter: "right$382",
       parameter_type: none,
       result_type: none,
       body: at(384n, {
-        $: "MatchExpr",
+        $: "model.MatchExpr",
         values: bendList([
-          at(385n, local("left$379")),
-          at(387n, local("right$382")),
+          localAt(385n, "left$379"),
+          localAt(387n, "right$382"),
         ]),
         arms: bendList<Node>([{
-          $: "MatchArm",
+          $: "model.MatchArm",
           patterns: bendList([pattern("a$390"), pattern("b$393")]),
           body: at(395n, {
-            $: "AssociatedExpr",
+            $: "model.AssociatedExpr",
             identity: 395n,
-            dispatch: { $: "BinaryDispatch" },
+            dispatch: { $: "model.BinaryDispatch" },
             member: "@type.same",
             templates: nil,
-            left: at(396n, local("a$390")),
-            right: at(397n, local("b$393")),
+            left: localAt(396n, "a$390"),
+            right: localAt(397n, "b$393"),
           }),
         }]),
       }),
@@ -168,14 +176,14 @@ const inferDeclaration = api["globals.infer_declaration_prepared"] as (
 function environment(clone: Node, start = 0n, constrained?: Node): Node {
   const declaration = declarations(bendList([clone]));
   return {
-    $: "Environment",
+    $: "globals.Environment",
     bindings: initialBindings(declaration, start),
     definitions: nil,
     state: {
-      $: "State",
+      $: "infer.State",
       substitutions: constrained
         ? appendSubstitution(emptySubstitutions(), {
-          $: "Substitution",
+          $: "types.Substitution",
           variable: start,
           replacement: constrained,
         })
@@ -208,24 +216,176 @@ function resolvedDefinition(result: Maybe<Node> | Result<Node>): {
 }
 
 function ordinaryInference(clone: Node, env: Node): Result<Node> {
+  return ordinaryInferenceWith(clone, env, typeCatalog);
+}
+
+function ordinaryInferenceWith(
+  clone: Node,
+  env: Node,
+  types: BendList<Node>,
+): Result<Node> {
   const declaration = bendArray(declarations(bendList([clone])))[0];
   return inferDeclaration(
     declaration,
     env,
     nil,
-    typeCatalog,
+    types,
     bendList([clone.name as string]),
     { $: "None" },
   );
 }
 
+Deno.test("staging captures actual lowered std/prelude Type.eq use sites", async () => {
+  const frontend = await createSourceFrontend();
+  try {
+    const prepared = frontend.prepare("entry const sentinel = fn () => 0");
+    const lowered = api["lower.source_module"](
+      toBendCst(prepared.root),
+      toBendCst(prepared.prelude),
+      prepared.nodeCount,
+    ) as Result<Node>;
+    equal(lowered.$, "Done");
+    if (lowered.$ !== "Done") throw new Error("prelude lowering failed");
+    const module = lowered.value;
+    const source = bendArray(module.functions as BendList<Node>).find(
+      (functionValue) => functionValue.name === "$prelude.Type.eq",
+    );
+    ok(source, "lowered prelude Type.eq is present");
+    const types = module.data_types as BendList<Node>;
+    const schemes = captureClosed(true, bendList([source]), nil, types);
+    equal(bendArray(schemes).length, 1);
+    const inference = bendArray(schemes)[0].inference as Node;
+    const uses = bendArray(inference.uses as BendList<Node>);
+    equal(uses.length, 4);
+    for (const use of uses) {
+      equal((use.site as bigint) % 16n, 0n);
+      equal(bendArray(use.predicates as BendList<Node>).length, 0);
+    }
+    const sourceExpressions = api["monomorph.module_expressions"](
+      module.functions,
+      module.constants,
+    );
+    const measured = api["monomorph.identity_limit"](
+      1048576n,
+      sourceExpressions,
+      0n,
+    ) as Result<bigint>;
+    equal(measured.$, "Done");
+    if (measured.$ !== "Done") throw new Error("identity scan failed");
+    const stride = measured.value;
+    const configuration: Node = {
+      $: "monomorph.Configuration",
+      functions: bendList([source]),
+      templates: bendList([source.name as string]),
+      entry: "",
+      locals: nil,
+      affected: nil,
+      stride,
+      constants: nil,
+      family_templates: nil,
+      step: 1n,
+      schema: nil,
+    };
+    const expanded = expand(
+      65536n,
+      { $: "monomorph.Clone", function: source },
+      configuration,
+      nil,
+      0n,
+      1n,
+    );
+    equal(expanded.$, "Done");
+    if (expanded.$ !== "Done") throw new Error("Type.eq expansion failed");
+    const clones = bendArray(expanded.value.functions as BendList<Node>);
+    equal(clones.length, 1);
+    const clone = clones[0];
+    const found = candidate(clone, schemes);
+    equal(found.$, "Some");
+    if (found.$ !== "Some") throw new Error("Type.eq clone was not recognized");
+    ok(exactClone(found.value, clone, stride));
+    const staged = stagedCandidate(
+      found,
+      clone,
+      stride,
+      environment(clone),
+      types,
+    );
+    equal(staged.$, "Some");
+    equal(
+      resolvedDefinition(staged),
+      resolvedDefinition(
+        ordinaryInferenceWith(clone, environment(clone), types),
+      ),
+    );
+  } finally {
+    frontend.dispose();
+  }
+});
+
 function fixture() {
   const source = sourceFunction();
   const schemes = captureClosed(true, bendList([source]), nil, typeCatalog);
   equal(bendArray(schemes).length, 1, "independent Type.eq body must capture");
+  const inference = bendArray(schemes)[0].inference as Node;
+  const predicates = bendArray(inference.predicates as BendList<Node>);
+  equal(predicates.length, 1);
+  equal(predicates[0].member, "@type.same");
+  const guarded = api["staging_scheme.type_equality_inference"];
+  const uses = bendArray(inference.uses as BendList<Node>);
+  equal(uses.length, 4);
+  equal(guarded(source, { ...inference, uses: nil }), false);
+  equal(
+    guarded(source, {
+      ...inference,
+      uses: bendList([
+        { ...uses[0], site: (uses[0].site as bigint) + 1n },
+        ...uses.slice(1),
+      ]),
+    }),
+    false,
+  );
+  equal(
+    guarded(source, {
+      ...inference,
+      uses: bendList([...uses, uses[0]]),
+    }),
+    false,
+  );
+  equal(
+    guarded(source, {
+      ...inference,
+      uses: bendList([
+        { ...uses[0], predicates: bendList([predicates[0]]) },
+        ...uses.slice(1),
+      ]),
+    }),
+    false,
+  );
+  equal(guarded(source, { ...inference, predicates: nil }), false);
+  equal(
+    guarded(source, {
+      ...inference,
+      predicates: bendList([{ ...predicates[0], member: "add" }]),
+    }),
+    false,
+  );
+  equal(
+    guarded(source, {
+      ...inference,
+      predicates: bendList([{ ...predicates[0], left: { $: "model.U32Ty" } }]),
+    }),
+    false,
+  );
+  equal(
+    guarded(source, {
+      ...inference,
+      predicates: bendList([predicates[0], predicates[0]]),
+    }),
+    false,
+  );
   const stride = 500n;
   const configuration: Node = {
-    $: "Configuration",
+    $: "monomorph.Configuration",
     functions: bendList([source]),
     templates: bendList([source.name as string]),
     entry: "",
@@ -239,7 +399,7 @@ function fixture() {
   };
   const expanded = expand(
     65536n,
-    { $: "Clone", function: source },
+    { $: "monomorph.Clone", function: source },
     configuration,
     nil,
     0n,
@@ -274,7 +434,10 @@ Deno.test("staging captures and replays the independently inferred Type.eq clone
   );
   equal(staged, ordinary);
   const needs = bendArray(staged.inference.coverage as BendList<Node>);
-  equal(needs.map((need) => need.$), ["Coverage", "AssociatedNeed"]);
+  equal(needs.map((need) => need.$), [
+    "infer.Coverage",
+    "infer.AssociatedNeed",
+  ]);
   equal(needs[0].subject, "offset:384");
   equal(needs[1].identity, 895n);
   equal(needs[1].subject, "offset:395");
@@ -284,15 +447,15 @@ Deno.test("staging captures and replays the independently inferred Type.eq clone
 Deno.test("one captured scheme replays independently under distinct constrained seeds", () => {
   const { stride, clone, candidate: found } = fixture();
   const witness = (type: Node): Node => ({
-    $: "AppliedTy",
+    $: "model.AppliedTy",
     identity: id("Type"),
     arguments: bendList([type]),
   });
   for (
     const [start, type] of [
-      [1000n, { $: "U32Ty" }],
-      [2000n, { $: "F32Ty" }],
-      [1000n, { $: "U32Ty" }],
+      [1000n, { $: "model.U32Ty" }],
+      [2000n, { $: "model.F32Ty" }],
+      [1000n, { $: "model.U32Ty" }],
     ] as const
   ) {
     const env = environment(clone, start, witness(type));
@@ -315,7 +478,7 @@ Deno.test("staging rejects altered clones and preserves the original first diagn
   const { stride, clone, candidate: found } = fixture();
   const invalid: Node = {
     ...clone,
-    body: at(381n, { $: "FunctionExpr", name: "missing" }),
+    body: at(381n, { $: "model.FunctionExpr", name: "missing" }),
   };
   ok(!exactClone(found, invalid, stride));
   const env = environment(invalid);
@@ -350,9 +513,9 @@ Deno.test("staging rejects changed and open nominal catalogs", () => {
   const changed: BendList<Node> = bendList([{
     ...bendArray(typeCatalog)[0],
     constructors: bendList<Node>([{
-      $: "Constructor",
+      $: "model.Constructor",
       name: "$prelude.Type",
-      payload: some({ $: "F32Ty" }),
+      payload: some({ $: "model.F32Ty" }),
       fields: nil,
     }]),
   }]);
@@ -363,9 +526,9 @@ Deno.test("staging rejects changed and open nominal catalogs", () => {
   const open: BendList<Node> = bendList([{
     ...bendArray(typeCatalog)[0],
     constructors: bendList<Node>([{
-      $: "Constructor",
+      $: "model.Constructor",
       name: "$prelude.Type",
-      payload: some({ $: "VariableTy", index: 12n }),
+      payload: some({ $: "model.VariableTy", index: 12n }),
       fields: nil,
     }]),
   }]);

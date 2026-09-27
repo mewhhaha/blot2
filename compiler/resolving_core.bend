@@ -22,14 +22,14 @@ def member_names(members: List<&2, I.Binding>) -> List<&2, String>:
   match members:
     case Nil{}:
       Nil{}
-    case I.Binding{name, ty, variables} <> tail:
+    case I.Binding{name, ty, variables, predicates} <> tail:
       name <> member_names(tail)
 
 def need_names(needs: List<&2, G.Resolution>) -> List<&2, String>:
   match needs:
     case Nil{}:
       Nil{}
-    case G.Resolution{declaration, identity, dispatch, member, templates, left, right, result, ambient} <> tail:
+    case G.Resolution{declaration, identity, dispatch, member, templates, left, right, result, invocation, ambient} <> tail:
       declaration <> need_names(tail)
 
 def contains_all(names: List<&2, String>, +available: List<&2, String>) -> Bool:

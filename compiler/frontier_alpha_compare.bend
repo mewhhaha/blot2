@@ -10,6 +10,7 @@ type Work is Data:
   RowTailPair{left: M.RowTail, right: M.RowTail}
   EffectRowPair{left: M.EffectRow, right: M.EffectRow}
   TyPair{left: M.Ty, right: M.Ty}
+  PredicatePair{left: M.Predicate, right: M.Predicate}
   OperationPair{left: M.Operation, right: M.Operation}
   ConstructorPair{left: M.Constructor, right: M.Constructor}
   DataTypePair{left: M.DataType, right: M.DataType}
@@ -28,6 +29,7 @@ type Work is Data:
   AlphaNatPair{left: Nat, right: Nat}
   TypeIdListPair{left: List<&2, M.TypeId>, right: List<&2, M.TypeId>}
   TyListPair{left: List<&2, M.Ty>, right: List<&2, M.Ty>}
+  PredicateListPair{left: List<&2, M.Predicate>, right: List<&2, M.Predicate>}
   TyMaybePair{left: Maybe<&2, M.Ty>, right: Maybe<&2, M.Ty>}
   StringListPair{left: List<&2, String>, right: List<&2, String>}
   ConstructorListPair{left: List<&2, M.Constructor>, right: List<&2, M.Constructor>}
@@ -64,6 +66,8 @@ def compare_work(fuel: Nat, matching: Bool, pending: List<&2, Work>, delta: Mayb
       compare_work(rest, True{}, NatPair{a0, b0} <> tail, delta)
     case 1n+rest True{} RowTailPair{M.RowParameter{a0}, M.RowParameter{b0}} <> tail:
       compare_work(rest, True{}, NatPair{a0, b0} <> tail, delta)
+    case 1n+rest True{} RowTailPair{M.FreeRow{a0, a1}, M.FreeRow{b0, b1}} <> tail:
+      compare_work(rest, True{}, StringPair{a0, b0} <> StringPair{a1, b1} <> tail, delta)
     case 1n+rest True{} EffectRowPair{M.EffectRow{a0, a1}, M.EffectRow{b0, b1}} <> tail:
       compare_work(rest, True{}, TypeIdListPair{a0, b0} <> RowTailPair{a1, b1} <> tail, delta)
     case 1n+rest True{} TyPair{M.UnitTy{}, M.UnitTy{}} <> tail:
@@ -98,6 +102,20 @@ def compare_work(fuel: Nat, matching: Bool, pending: List<&2, Work>, delta: Mayb
       compare_work(rest, True{}, TyPair{a0, b0} <> tail, delta)
     case 1n+rest True{} TyPair{M.FreeTy{a0, a1}, M.FreeTy{b0, b1}} <> tail:
       compare_work(rest, True{}, StringPair{a0, b0} <> StringPair{a1, b1} <> tail, delta)
+    case 1n+rest True{} PredicatePair{M.AssociatedPredicate{a0, a1, a2, a3, a4, a5}, M.AssociatedPredicate{b0, b1, b2, b3, b4, b5}} <> tail:
+      compare_work(rest, True{}, StringPair{a0, b0} <> TypeIdListPair{a1, b1} <> TyPair{a2, b2} <> TyPair{a3, b3} <> TyPair{a4, b4} <> EffectRowPair{a5, b5} <> tail, delta)
+    case 1n+rest True{} PredicatePair{M.ReceiverPredicate{a0, a1, a2, a3, a4, a5}, M.ReceiverPredicate{b0, b1, b2, b3, b4, b5}} <> tail:
+      compare_work(rest, True{}, StringPair{a0, b0} <> TypeIdListPair{a1, b1} <> TyPair{a2, b2} <> TyPair{a3, b3} <> TyPair{a4, b4} <> EffectRowPair{a5, b5} <> tail, delta)
+    case 1n+rest True{} PredicatePair{M.FieldPredicate{a0, a1, a2}, M.FieldPredicate{b0, b1, b2}} <> tail:
+      compare_work(rest, True{}, StringPair{a0, b0} <> TyPair{a1, b1} <> TyPair{a2, b2} <> tail, delta)
+    case 1n+rest True{} PredicatePair{M.UpdatePredicate{a0, a1, a2, a3, a4}, M.UpdatePredicate{b0, b1, b2, b3, b4}} <> tail:
+      compare_work(rest, True{}, StringPair{a0, b0} <> TyPair{a1, b1} <> TyPair{a2, b2} <> TyPair{a3, b3} <> EffectRowPair{a4, b4} <> tail, delta)
+    case 1n+rest True{} PredicatePair{M.OperationPredicate{a0, a1, a2}, M.OperationPredicate{b0, b1, b2}} <> tail:
+      compare_work(rest, True{}, TypeIdPair{a0, b0} <> TyListPair{a1, b1} <> TyPair{a2, b2} <> tail, delta)
+    case 1n+rest True{} PredicatePair{M.TypeRepPredicate{a0}, M.TypeRepPredicate{b0}} <> tail:
+      compare_work(rest, True{}, TyPair{a0, b0} <> tail, delta)
+    case 1n+rest True{} PredicatePair{M.EffectRepPredicate{a0}, M.EffectRepPredicate{b0}} <> tail:
+      compare_work(rest, True{}, EffectRowPair{a0, b0} <> tail, delta)
     case 1n+rest True{} OperationPair{M.Operation{a0, a1, a2}, M.Operation{b0, b1, b2}} <> tail:
       compare_work(rest, True{}, TypeIdPair{a0, b0} <> TyPair{a1, b1} <> TyPair{a2, b2} <> tail, delta)
     case 1n+rest True{} OperationPair{M.OperationTemplate{a0, a1, a2, a3}, M.OperationTemplate{b0, b1, b2, b3}} <> tail:
@@ -224,6 +242,10 @@ def compare_work(fuel: Nat, matching: Bool, pending: List<&2, Work>, delta: Mayb
       compare_work(rest, True{}, AlphaNatPair{a0, b0} <> ExprPair{a1, b1} <> tail, delta)
     case 1n+rest True{} ExprPair{M.SourceExpr{a0, a1, a2}, M.SourceExpr{b0, b1, b2}} <> tail:
       compare_work(rest, True{}, NatPair{a0, b0} <> TyMaybePair{a1, b1} <> ExprPair{a2, b2} <> tail, delta)
+    case 1n+rest True{} ExprPair{M.QualifiedExpr{a0, a1, a2, a3}, M.QualifiedExpr{b0, b1, b2, b3}} <> tail:
+      compare_work(rest, True{}, NatPair{a0, b0} <> TyPair{a1, b1} <> PredicateListPair{a2, b2} <> ExprPair{a3, b3} <> tail, delta)
+    case 1n+rest True{} ExprPair{M.InstantiationExpr{a0, a1}, M.InstantiationExpr{b0, b1}} <> tail:
+      compare_work(rest, True{}, AlphaNatPair{a0, b0} <> ExprPair{a1, b1} <> tail, delta)
     case 1n+rest True{} ExprPair{M.TagExpr{a0, a1, a2}, M.TagExpr{b0, b1, b2}} <> tail:
       compare_work(rest, True{}, NatPair{a0, b0} <> ExprPair{a1, b1} <> ExprPair{a2, b2} <> tail, delta)
     case 1n+rest True{} ExprPair{M.RuntimeInitExpr{a0}, M.RuntimeInitExpr{b0}} <> tail:
@@ -302,6 +324,10 @@ def compare_work(fuel: Nat, matching: Bool, pending: List<&2, Work>, delta: Mayb
       compare_work(rest, True{}, tail, delta)
     case 1n+rest True{} TyListPair{a <> at, b <> bt} <> tail:
       compare_work(rest, True{}, TyPair{a, b} <> TyListPair{at, bt} <> tail, delta)
+    case 1n+rest True{} PredicateListPair{Nil{}, Nil{}} <> tail:
+      compare_work(rest, True{}, tail, delta)
+    case 1n+rest True{} PredicateListPair{a <> at, b <> bt} <> tail:
+      compare_work(rest, True{}, PredicatePair{a, b} <> PredicateListPair{at, bt} <> tail, delta)
     case 1n+rest True{} TyMaybePair{None{}, None{}} <> tail:
       compare_work(rest, True{}, tail, delta)
     case 1n+rest True{} TyMaybePair{Some{a}, Some{b}} <> tail:

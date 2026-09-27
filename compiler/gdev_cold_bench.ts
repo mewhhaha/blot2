@@ -31,7 +31,10 @@ const executables = Deno.args.slice(0, 2).map((path) =>
 const entry = fileURLToPath(
   new URL("../../gdev/src/main.blot", import.meta.url),
 );
-const imports = { "std/": new URL("../std/", import.meta.url) };
+const imports = {
+  "std/": new URL("../std/", import.meta.url),
+  "gdev/": new URL("../../gdev/packages/", import.meta.url),
+};
 let expectedHash: string | undefined;
 
 for (let round = 0; round < rounds; round++) {
@@ -53,6 +56,7 @@ for (let round = 0; round < rounds; round++) {
       const compileStarted = performance.now();
       const artifact = await compiler.compile(project, {
         const_steps: 100_000n,
+        analysis: false,
       });
       const compiled = performance.now();
       const cpuAfter = await nativeCpuSample(pid);

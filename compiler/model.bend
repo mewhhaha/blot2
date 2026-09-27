@@ -7,6 +7,7 @@ type RowTail is Data:
   ClosedRow{}
   RowVariable{index: Nat}
   RowParameter{index: Nat}
+  FreeRow{scope: String, name: String}
 
 # Scoped rows preserve duplicate labels during inference; reflection exposes sets.
 type EffectRow is Data:
@@ -90,6 +91,17 @@ type Dispatch is Data:
   MemberDispatch{}
   FieldUpdateDispatch{}
 
+# Semantic requirements have no source identity. Occurrence sites and diagnostic
+# subjects live in inference use plans instead.
+type Predicate is Data:
+  AssociatedPredicate{member: String, templates: List<&2, TypeId>, left: Ty, right: Ty, result: Ty, invocation: EffectRow}
+  ReceiverPredicate{member: String, templates: List<&2, TypeId>, receiver: Ty, argument: Ty, result: Ty, invocation: EffectRow}
+  FieldPredicate{member: String, receiver: Ty, result: Ty}
+  UpdatePredicate{member: String, receiver: Ty, assigned: Ty, result: Ty, invocation: EffectRow}
+  OperationPredicate{template: TypeId, arguments: List<&2, Ty>, function_type: Ty}
+  TypeRepPredicate{represented: Ty}
+  EffectRepPredicate{row: EffectRow}
+
 # This is resolved core, not a second spelling of the surface grammar.
 type Expr is Data:
   UnitExpr{}
@@ -140,6 +152,8 @@ type Expr is Data:
   AssociatedExpr{identity: Nat, dispatch: Dispatch, member: String, templates: List<&2, TypeId>, left: Expr, right: Expr}
   GenericOperationExpr{identity: Nat, template: TypeId, arguments: List<&2, Ty>}
   TagExpr{offset: Nat, callee: Expr, argument: Expr}
+  QualifiedExpr{offset: Nat, annotation: Ty, predicates: List<&2, Predicate>, value: Expr}
+  InstantiationExpr{site: Nat, value: Expr}
 
 type Function is Data:
   Function{
@@ -205,8 +219,28 @@ def name_equal_tail(left: String, right: String, same: Bool) -> Bool:
     case _ _ True{}:
       False{}
 
-def name_equal(left: String, right: String) -> Bool:
-  name_equal_tail(left, right, True{})
+# Retain the owning roots while read-only cursors traverse their characters.
+# Returning the roots keeps their lifetime explicit across the entire loop.
+type NameComparison is Data:
+  NameComparison{equal: Bool, left: String, right: String}
+
+def name_equal_walk(left_root: String, right_root: String, left: String, right: String, same: Bool) -> NameComparison:
+  match left right same:
+    case _ _ False{}:
+      NameComparison{False{}, left_root, right_root}
+    case SNil{} SNil{} True{}:
+      NameComparison{True{}, left_root, right_root}
+    case SCon{a, left_tail} SCon{b, right_tail} True{}:
+      name_equal_walk(left_root, right_root, left_tail, right_tail, Char.is_eq(a, b))
+    case _ _ True{}:
+      NameComparison{False{}, left_root, right_root}
+
+def name_equal_result(result: NameComparison) -> Bool:
+  NameComparison{equal, left, right} = result
+  equal
+
+def name_equal(+left: String, +right: String) -> Bool:
+  name_equal_result(name_equal_walk(left, right, left, right, True{}))
 
 def type_id_equal(a: TypeId, b: TypeId) -> Bool:
   TypeId{am, an} = a
@@ -239,6 +273,8 @@ def row_tail_show(tail: RowTail) -> String:
       "| ?e" ++ Nat.show(index)
     case RowParameter{index}:
       "| 'e" ++ Nat.show(index)
+    case FreeRow{scope, name}:
+      "| " ++ name
 
 def row_operations_show(operations: List<&2, TypeId>) -> String:
   match operations:

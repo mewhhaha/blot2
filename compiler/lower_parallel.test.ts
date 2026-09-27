@@ -1,5 +1,6 @@
 import { deepStrictEqual as equal, ok, rejects } from "node:assert/strict";
 import generated from "../generated/compiler/compiler.js";
+import { toBendCst } from "./bend_abi.ts";
 import { createSourceFrontend } from "./source_frontend.ts";
 import { createNativeCompiler } from "./native.ts";
 import { createSourceCompiler } from "./source.ts";
@@ -66,7 +67,7 @@ Deno.test("lowering classification retains exact labels and rejects prefix colli
     effect_declaration: "EffectNode",
   };
   for (const [kind, expected] of Object.entries(kinds)) {
-    equal(lower["lower.classify"](kind), { $: expected });
+    equal(lower["lower.classify"](kind), { $: `lower.${expected}` });
     for (
       const unknown of [
         kind[0],
@@ -76,7 +77,7 @@ Deno.test("lowering classification retains exact labels and rejects prefix colli
       ]
     ) {
       equal(lower["lower.classify"](unknown), {
-        $: kinds[unknown] ?? "Unsupported",
+        $: `lower.${kinds[unknown] ?? "Unsupported"}`,
       });
     }
   }
@@ -90,7 +91,7 @@ Deno.test("lowering classification retains exact labels and rejects prefix colli
       "EffectBinding",
     ]
   ) {
-    equal(lower["lower.classify"](unknown), { $: "Unsupported" });
+    equal(lower["lower.classify"](unknown), { $: "lower.Unsupported" });
   }
 });
 
@@ -110,12 +111,12 @@ Deno.test("parallel lowering agrees with serial lowering across batch boundaries
             : source,
         );
         const prelude = lower["lower.prepare_prelude"](
-          prepared.prelude,
+          toBendCst(prepared.prelude),
           prepared.nodeCount,
         );
         ok(prelude.$ === "Done");
         const plan = lower["lower.prepare_source"](
-          prepared.root,
+          toBendCst(prepared.root),
           prelude.value,
         );
         ok(plan.$ === "Done");
@@ -201,8 +202,8 @@ Deno.test("native lowering preserves ordered artifacts and diagnostics at 1/2/4/
   }
 });
 
-type Batch = { $: "DeclarationLeaf"; nodes: BendList<Cst> } | {
-  $: "DeclarationFork";
+type Batch = { $: "lower.DeclarationLeaf"; nodes: BendList<Cst> } | {
+  $: "lower.DeclarationFork";
   left: Batch;
   right: Batch;
 };
@@ -220,21 +221,21 @@ const planner = generated as unknown as {
   ): bigint;
 };
 function node(identity: number, cost: number): Cst {
-  const leaf: Cst = {
-    $: "Cst",
+  const leaf = {
+    $: "cst.Cst",
     kind: "leaf",
     field: "",
     text: "",
     offset: BigInt(identity),
     children: bendList([]),
-  };
+  } as unknown as Cst;
   return {
     ...leaf,
     children: bendList(Array.from({ length: cost - 1 }, () => leaf)),
   };
 }
 function leaves(batch: Batch): Cst[][] {
-  return batch.$ === "DeclarationLeaf"
+  return batch.$ === "lower.DeclarationLeaf"
     ? [bendArray(batch.nodes)]
     : [...leaves(batch.left), ...leaves(batch.right)];
 }
@@ -278,7 +279,7 @@ Deno.test("lowering partitions clustered work without empty leaves or source reo
         groups: groups.map((group) => group.map((node) => Number(node.offset))),
       }),
     );
-    ok(batch.$ === "DeclarationFork");
+    ok(batch.$ === "lower.DeclarationFork");
     const left = leaves(batch.left).flat().reduce(
       (cost, node) => cost + costs[Number(node.offset)],
       0,
@@ -289,6 +290,6 @@ Deno.test("lowering partitions clustered work without empty leaves or source reo
   const tiny = [node(0, 500), node(1, 1)];
   equal(
     planner["lower.declaration_batches"](48n, bendList(tiny), 2n, true),
-    { $: "DeclarationLeaf", nodes: bendList(tiny) },
+    { $: "lower.DeclarationLeaf", nodes: bendList(tiny) },
   );
 });

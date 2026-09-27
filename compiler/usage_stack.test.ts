@@ -4,7 +4,7 @@ import { bendArray, type BendList, bendList } from "./bend_list.ts";
 
 type Term = { readonly $: string; readonly [field: string]: unknown };
 type Identity = {
-  readonly $: "TypeId";
+  readonly $: "model.TypeId";
   readonly module_name: string;
   readonly declaration: string;
 };
@@ -19,21 +19,25 @@ const backend = generated as unknown as {
   "groups.usage"(fuel: bigint, work: Term, types: Term): UsageResult;
 };
 const identity = (declaration: string): Identity => ({
-  $: "TypeId",
+  $: "model.TypeId",
   module_name: "test",
   declaration,
 });
 const empty = { $: "MTip" };
-const unit = { $: "UnitExpr" };
-const wildcard = { $: "WildcardPattern" };
+const unit = { $: "model.UnitExpr" };
+const wildcard = { $: "model.WildcardPattern" };
 
 Deno.test("wide nominal dependency lists retain their exact sibling fuel boundary", () => {
   for (
     const [kind, element] of [
-      ["ExpressionsUsage", unit],
-      ["PatternsUsage", wildcard],
-      ["TypesUsage", { $: "U32Ty" }],
-      ["ArmsUsage", { $: "MatchArm", patterns: bendList([]), body: unit }],
+      ["groups.ExpressionsUsage", unit],
+      ["groups.PatternsUsage", wildcard],
+      ["groups.TypesUsage", { $: "model.U32Ty" }],
+      ["groups.ArmsUsage", {
+        $: "model.MatchArm",
+        patterns: bendList([]),
+        body: unit,
+      }],
     ] as const
   ) {
     const count = 8192;
@@ -50,11 +54,11 @@ Deno.test("wide nominal dependency lists retain their exact sibling fuel boundar
 Deno.test("nominal collection preserves recursive merge order and duplicate elimination", () => {
   const catalog = backend["groups.constructor_index"](
     bendList(["A", "B", "C"].map((name) => ({
-      $: "DataType",
+      $: "model.DataType",
       identity: identity(name),
       parameters: 0n,
       constructors: bendList([{
-        $: "Constructor",
+        $: "model.Constructor",
         fields: { $: "Nil" },
         name,
         payload: { $: "None" },
@@ -63,19 +67,19 @@ Deno.test("nominal collection preserves recursive merge order and duplicate elim
     empty,
   );
   const result = backend["groups.usage"](32n, {
-    $: "ArmsUsage",
+    $: "groups.ArmsUsage",
     values: bendList([{
-      $: "MatchArm",
+      $: "model.MatchArm",
       patterns: bendList([{
-        $: "ConstructorPattern",
+        $: "model.ConstructorPattern",
         constructor: "A",
         payload: { $: "None" },
       }]),
       body: {
-        $: "ArrayExpr",
+        $: "model.ArrayExpr",
         elements: bendList(
           ["B", "A", "C"].map((constructor) => ({
-            $: "ConstructorRefExpr",
+            $: "model.ConstructorRefExpr",
             constructor,
           })),
         ),

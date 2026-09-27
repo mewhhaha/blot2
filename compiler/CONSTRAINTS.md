@@ -1,10 +1,13 @@
 # Inferred constraints, keyed specialization, and development compilation
 
 Design synthesis for M3. This document describes the target implementation; the
-current compiler does not yet implement it. Release remains the default until
-the corresponding slices pass their gates. The three source reviews are
-`design-qualified-types.md`, `design-incremental.md`, and
-`design-runtime-first.md` in the compile-speed harness directory.
+current compiler does not yet implement it. The active
+[iteration plan](../PLAN.md) prioritizes small measured experiments before
+completing these architecture slices. Their semantic and landing requirements
+remain unchanged. Release remains the default until the corresponding slices
+pass their gates. The three source reviews are `design-qualified-types.md`,
+`design-incremental.md`, and `design-runtime-first.md` in the compile-speed
+harness directory.
 
 ## Decisions
 
@@ -168,9 +171,9 @@ pass the evidence before the pattern comparison. Include old-source concrete
 value-pattern parity and open qualified pattern success in that slice's gates.
 
 Implement predicate traversal in a focused constraints module where possible.
-Changes to guarded type traversals in `types.bend` or `model.bend` require
-updating the corresponding native generated-C transformations and their negative
-shape tests; do not bypass those guards.
+Changes to type traversals in `types.bend` or `model.bend` require the relevant
+semantic and traversal regressions. Use upstream generated C and JavaScript
+unchanged; the former generated-C transformations have been removed.
 
 ## Release collector
 

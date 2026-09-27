@@ -1,5 +1,6 @@
 import { equal, ok, rejects } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
+import { toBendCst } from "./bend_abi.ts";
 import { bendArray, type BendList } from "./bend_list.ts";
 import { createNativeCompiler } from "./native.ts";
 import { createSourceFrontend } from "./source_frontend.ts";
@@ -63,8 +64,8 @@ Deno.test("schema selection evaluates typed receiver and witness operands and ch
       const prepared = frontend.prepare(await project(main));
       const lowered = api["source_modules.source_module_core"](
         true,
-        prepared.root,
-        prepared.prelude,
+        toBendCst(prepared.root),
+        toBendCst(prepared.prelude),
         prepared.nodeCount,
       );
       equal(lowered.$, "Done", Deno.inspect(lowered));

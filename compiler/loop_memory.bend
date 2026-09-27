@@ -29,6 +29,10 @@ def lambda_entries(fuel: Nat, expression: M.Expr, ty: M.Ty, entries: Set()) -> S
       entries
     case 1n+rest M.SourceExpr{offset, annotation, value} ty:
       lambda_entries(rest, value, ty, entries)
+    case 1n+rest M.QualifiedExpr{offset, annotation, predicates, value} ty:
+      lambda_entries(rest, value, ty, entries)
+    case 1n+rest M.InstantiationExpr{site, value} ty:
+      lambda_entries(rest, value, ty, entries)
     case 1n+rest M.RuntimeInitExpr{value} ty:
       lambda_entries(rest, value, ty, entries)
     case 1n+rest M.LetExpr{name, value, body} ty:

@@ -59,7 +59,7 @@ function normalized(analysis: Analysis): Analysis {
             ? 1
             : 0
         ),
-        tail: value.tail.$ === "ClosedRow"
+        tail: value.tail.$ === "ClosedRow" || value.tail.$ === "FreeRow"
           ? value.tail
           : { ...value.tail, index: index(value.tail.index) },
       });
@@ -385,7 +385,7 @@ Deno.test("incremental disposal rejects startup jobs, queued revisions and later
   const job = workers.run({
     kind: "check",
     module: {
-      $: "Module",
+      $: "model.Module",
       functions: bendList([]),
       constants: bendList([]),
       data_types: bendList([]),

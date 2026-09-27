@@ -5,6 +5,7 @@ import {
   CompilerError,
   type CoreModule,
   type Expr,
+  type Predicate,
   type ScalarOp,
 } from "./host.ts";
 import {
@@ -58,6 +59,54 @@ Deno.test("core module marshalling accepts a for ever expression", () => {
     body: add(local("state"), integer(1)),
   }, { exported: false })]);
   equal(analyze(source).functions[0].name, "loop");
+});
+
+const qualifiedCore = (
+  predicates: readonly Predicate[],
+  value: Expr,
+): Expr => ({
+  $: "QualifiedExpr",
+  offset: 73n,
+  annotation: u32Type,
+  predicates,
+  value,
+});
+
+Deno.test("raw core rejects qualified constant evidence before evaluation", () => {
+  const source = module([], {
+    constants: [{
+      name: "answer",
+      exported: false,
+      annotation: null,
+      value: qualifiedCore(
+        [{ $: "TypeRepPredicate", represented: u32Type }],
+        integer(42),
+      ),
+    }],
+  });
+  for (const run of [analyze, compile]) {
+    throws(() => run(source), (error) => {
+      ok(error instanceof CompilerError, String(error));
+      equal(error.code, "unspecialized_qualified");
+      equal(error.subject, "offset:73");
+      return true;
+    });
+  }
+});
+
+Deno.test("raw core rejects qualified function evidence before code generation", () => {
+  const source = module([fn(
+    "answer",
+    qualifiedCore([
+      { $: "TypeRepPredicate", represented: u32Type },
+    ], integer(42)),
+  )]);
+  rejects(source, "unspecialized_qualified");
+});
+
+Deno.test("raw core retains an empty qualification wrapper", async () => {
+  const source = module([fn("answer", qualifiedCore([], integer(42)))]);
+  equal((await instantiate(source)).exports.answer(0), 42);
 });
 
 Deno.test("forward calls instantiate generic parameters and results", async () => {

@@ -8,6 +8,7 @@ import type {
   FunctionAnalysis,
   MatchArm,
   Pattern,
+  Predicate,
   RowTail,
   ScalarOp,
   Type,
@@ -17,7 +18,7 @@ import type {
 import type { Cst, CstList } from "./syntax.ts";
 
 export const nativeProtocolMagic = 0x424C4F54;
-export const nativeProtocolVersion = 12;
+export const nativeProtocolVersion = 13;
 export const nativeProtocolMaxWords = 16 * 1024 * 1024;
 const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
@@ -590,8 +591,14 @@ class WordReader {
     });
 
   readonly rowTail: Read<RowTail> = (receive) => {
-    const $ = this.tag(["ClosedRow", "RowVariable", "RowParameter"]);
-    receive($ === "ClosedRow" ? { $ } : { $, index: this.nat() });
+    const $ = this.tag(["ClosedRow", "RowVariable", "RowParameter", "FreeRow"]);
+    receive(
+      $ === "ClosedRow"
+        ? { $ }
+        : $ === "FreeRow"
+        ? { $, scope: this.string(), name: this.string() }
+        : { $, index: this.nat() },
+    );
   };
   readonly row: Read<EffectRow> = (receive) =>
     this.fields(
@@ -774,6 +781,107 @@ class WordReader {
       receive,
     );
 
+  readonly predicate: Read<Predicate> = (receive) => {
+    const $ = this.tag([
+      "AssociatedPredicate",
+      "ReceiverPredicate",
+      "FieldPredicate",
+      "UpdatePredicate",
+      "OperationPredicate",
+      "TypeRepPredicate",
+      "EffectRepPredicate",
+    ]);
+    switch ($) {
+      case "AssociatedPredicate":
+        this.fields(
+          [
+            this.readString,
+            this.array(this.identity),
+            this.type,
+            this.type,
+            this.type,
+            this.row,
+          ],
+          (member, templates, left, right, result, invocation) => ({
+            $,
+            member,
+            templates,
+            left,
+            right,
+            result,
+            invocation,
+          }),
+          receive,
+        );
+        return;
+      case "ReceiverPredicate":
+        this.fields(
+          [
+            this.readString,
+            this.array(this.identity),
+            this.type,
+            this.type,
+            this.type,
+            this.row,
+          ],
+          (member, templates, receiver, argument, result, invocation) => ({
+            $,
+            member,
+            templates,
+            receiver,
+            argument,
+            result,
+            invocation,
+          }),
+          receive,
+        );
+        return;
+      case "FieldPredicate":
+        this.fields(
+          [this.readString, this.type, this.type],
+          (member, receiver, result) => ({ $, member, receiver, result }),
+          receive,
+        );
+        return;
+      case "UpdatePredicate":
+        this.fields(
+          [this.readString, this.type, this.type, this.type, this.row],
+          (member, receiver, assigned, result, invocation) => ({
+            $,
+            member,
+            receiver,
+            assigned,
+            result,
+            invocation,
+          }),
+          receive,
+        );
+        return;
+      case "OperationPredicate":
+        this.fields(
+          [this.identity, this.array(this.type), this.type],
+          (template, arguments_, function_type) => ({
+            $,
+            template,
+            arguments: arguments_,
+            function_type,
+          }),
+          receive,
+        );
+        return;
+      case "TypeRepPredicate":
+        this.fields(
+          [this.type],
+          (represented) => ({ $, represented }),
+          receive,
+        );
+        return;
+      case "EffectRepPredicate":
+        this.fields([this.row], (row) => ({ $, row }), receive);
+        return;
+    }
+  };
+
   readonly expression: Read<Expr> = (receive) => {
     const $ = this.tag([
       "UnitExpr",
@@ -823,6 +931,8 @@ class WordReader {
       "RuntimeInitExpr",
       "TagExpr",
       "ForeverExpr",
+      "QualifiedExpr",
+      "InstantiationExpr",
     ]);
     switch ($) {
       case "StateProviderExpr":
@@ -1072,6 +1182,31 @@ class WordReader {
               ? { $: "None" as const }
               : { $: "Some" as const, value: annotation },
           }),
+          receive,
+        );
+        return;
+      case "QualifiedExpr":
+        this.fields(
+          [
+            this.readNat,
+            this.type,
+            this.array(this.predicate),
+            this.expression,
+          ],
+          (offset, annotation, predicates, value) => ({
+            $,
+            offset,
+            annotation,
+            predicates,
+            value,
+          }),
+          receive,
+        );
+        return;
+      case "InstantiationExpr":
+        this.fields(
+          [this.readNat, this.expression],
+          (site, value) => ({ $, site, value }),
           receive,
         );
         return;

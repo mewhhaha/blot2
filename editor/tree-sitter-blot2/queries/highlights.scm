@@ -2,6 +2,7 @@
 ["import" "from" "as"] @keyword.control.import
 ["data" "type" "is" "effect" "const" "let" "use"] @keyword.storage.type
 (entry_binding) @keyword.storage.modifier
+(where_clause "where" @keyword.control)
 ["infixl" "infixr" "infix" "prefix"] @keyword.directive
 "rec" @keyword.storage.modifier
 ["if" "else" "case" "of"] @keyword.control.conditional
@@ -16,6 +17,8 @@
 (type_identifier) @type
 (type_parameter) @type.parameter
 (identifier) @variable
+(binding_annotation (identifier) @keyword.control
+  (#eq? @keyword.control "where"))
 (integer) @constant.numeric.integer
 (float) @constant.numeric.float
 (operator) @operator

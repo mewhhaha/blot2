@@ -96,15 +96,24 @@ def binding_index(bindings: List<&2, I.Binding>, index: Map<&2, I.Binding>) -> M
   match bindings:
     case Nil{}:
       index
-    case I.Binding{+name, ty, variables} <> tail:
-      binding_index(tail, Map.set(&2, I.Binding, index, name, I.Binding{name, ty, variables}))
+    case I.Binding{+name, ty, variables, predicates} <> tail:
+      binding_index(tail, Map.set(&2, I.Binding, index, name, I.Binding{name, ty, variables, predicates}))
 
 def inferred(found: Maybe<&2, I.Binding>, name: String) -> Result<&2, &2, M.Diagnostic, M.Ty>:
   match found:
-    case Some{I.Binding{name, ty, variables}}:
+    case Some{I.Binding{name, ty, variables, predicates}}:
       Done{ty}
     case None{}:
       Fail{M.Diagnostic{"internal_error", name, "missing inferred type while selecting public entry points"}}
+
+# Resolved selection still precedes the final checked signature. Keep an
+# entry function eligible until checked_functions can decide its final ABI.
+def preliminary_function_export(ty: M.Ty, selection: Selection) -> Bool:
+  match selection:
+    case Candidates{}:
+      callable(ty, Candidates{})
+    case Resolved{}:
+      True{}
 
 def functions(pending: List<&2, M.Function>, +types: Map<&2, I.Binding>, +selection: Selection) -> Result<&2, &2, M.Diagnostic, List<&2, M.Function>>:
   match pending:
@@ -114,7 +123,7 @@ def functions(pending: List<&2, M.Function>, +types: Map<&2, I.Binding>, +select
       do Result<&2, &2, M.Diagnostic, List<&2, M.Function>>:
         ty : M.Ty <- inferred(Index.find(I.Binding, types, name), name)
         rest : List<&2, M.Function> <- functions(tail, types, selection)
-        return M.Function{name, callable(ty, selection), argument, input, output, body} <> rest
+        return M.Function{name, preliminary_function_export(ty, selection), argument, input, output, body} <> rest
     case head <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, M.Function>>:
         rest : List<&2, M.Function> <- functions(tail, types, selection)
@@ -180,8 +189,8 @@ def wrapper_binding(existing: Maybe<&2, I.Binding>, original: Maybe<&2, I.Bindin
   match existing original:
     case Some{binding} _:
       Done{Nil{}}
-    case None{} Some{I.Binding{source, ty, variables}}:
-      Done{[I.Binding{name, ty, variables}]}
+    case None{} Some{I.Binding{source, ty, variables, predicates}}:
+      Done{[I.Binding{name, ty, variables, predicates}]}
     case None{} None{}:
       Fail{M.Diagnostic{"internal_error", name, "missing inferred binding for public callable value"}}
 

@@ -17,23 +17,24 @@ const backend = compiled as unknown as {
   ): Result;
 };
 const symbols: Node = {
-  $: "Catalog",
+  $: "wasm.Catalog",
   entries: { $: "MTip" },
   constructors: { $: "MTip" },
   constants: { $: "MTip" },
   operations: { $: "MTip" },
+  runtime: { $: "MTip" },
 };
 const job = (key: string): Node => ({
-  $: "CodegenJob",
+  $: "wasm.CodegenJob",
   key,
   parameter: "value",
-  body: { $: "U32Expr", value: 42 },
+  body: { $: "codegen_ir.U32Expr", value: 42 },
   captures: bendList([]),
 });
 const entry = (key: string, fragments: Node[]): Node => ({
-  $: "EntryCode",
+  $: "wasm.EntryCode",
   key,
-  code: { $: "Code", fragments: bendList(fragments), locals: 0n },
+  code: { $: "wasm.Code", fragments: bendList(fragments), locals: 0n },
 });
 const link = (grain: bigint, jobs: Node[], entries: Node[]) =>
   backend["wasm.link_bodies_with_grain"](
@@ -51,7 +52,7 @@ Deno.test("parallel relocation preserves uneven function order and exact body ch
       String(job.key),
       Array.from(
         { length: 1 + index * 3 },
-        () => ({ $: "Bytes", bytes: bendList([65, index]) }),
+        () => ({ $: "wasm.Bytes", bytes: bendList([65, index]) }),
       ),
     )
   );
@@ -66,8 +67,8 @@ Deno.test("parallel relocation preserves uneven function order and exact body ch
 
 Deno.test("parallel relocation preserves name, relocation and count failure precedence", () => {
   const jobs = [job("first"), job("second")];
-  const good = entry("first", [{ $: "Bytes", bytes: bendList([65, 42]) }]);
-  const bad = entry("first", [{ $: "NamedCall", key: "missing" }]);
+  const good = entry("first", [{ $: "wasm.Bytes", bytes: bendList([65, 42]) }]);
+  const bad = entry("first", [{ $: "wasm.NamedCall", key: "missing" }]);
   for (
     const entries of [
       [bad, entry("wrong", [])],

@@ -73,6 +73,101 @@ entry const answer = 7
   },
 );
 
+sessionTest(
+  "qualified use plans preserve native parity across concrete calls and edits",
+  async (session, clean) => {
+    const source =
+      `const twice: a -> a where { associated "add" a a a } = fn value => value + value
+const alias = twice
+entry const integer = fn () => alias 21
+entry const fraction = fn () => alias 1.0
+`;
+    const first = await session.compile(source);
+    equivalent(first.artifact, await clean.compile(source));
+    const exports = new WebAssembly.Instance(
+      new WebAssembly.Module(first.artifact.bytes),
+    ).exports;
+    equal((exports.integer as CallableFunction)(), 42);
+    equal((exports.fraction as CallableFunction)(), 2);
+
+    const revised = source.replace(
+      'associated "add" a a a',
+      'associated "add" a a a, type_rep U32',
+    );
+    const edited = await session.compile(revised);
+    equivalent(edited.artifact, await clean.compile(revised));
+    ok(edited.stats.groups_checked > 0);
+
+    const invalid = source.replace(
+      'associated "add" a a a',
+      'associated "missing" a a a',
+    );
+    await rejects(() => session.compile(invalid));
+    await rejects(() => clean.compile(invalid));
+    const restored = await session.compile(source);
+    equivalent(restored.artifact, await clean.compile(source));
+  },
+  { prelude: "default", threads: 1 },
+);
+
+sessionTest(
+  "mutual SCC carries qualified plans through aliases and predicate-only variables",
+  async (session, clean) => {
+    for (
+      const source of [
+        `const first: a -> a = fn value => do:
+  let alias = second
+  return alias value
+const second: a -> a where { associated "add" a a a } = fn value => case True of
+  True => value + value
+  False => first value
+entry const answer = fn () => first 21
+`,
+        `const first: U32 -> U32 = fn value => second value
+const second: U32 -> U32 where { associated "add" U32 U32 a } = fn value => case True of
+  True => value
+  False => first value
+entry const answer = fn () => first 42
+`,
+      ]
+    ) {
+      const cached = await session.compile(source);
+      equivalent(cached.artifact, await clean.compile(source));
+      const exports = new WebAssembly.Instance(
+        new WebAssembly.Module(cached.artifact.bytes),
+      ).exports;
+      equal((exports.answer as CallableFunction)(), 42);
+    }
+  },
+  { prelude: "default", threads: 1 },
+);
+
+sessionTest(
+  "predicate-only field and type-changing update results resolve at concrete uses",
+  async (session, clean) => {
+    const source = `type Box a is data = Box { value: a }
+const read: a -> b where { field "value" a b } = fn box => box.value
+const replace: a -> b -> c where { update "value" a b c } = fn box => fn value => do:
+  let current = box
+  current.value := value
+  return current
+entry const field_result = fn () => read (Box { value: 42 })
+entry const changed_result = fn () => do:
+  let changed = replace (Box { value: 0 }) True
+  return case changed.value of
+    True => 42
+    False => 0
+`;
+    const artifact = await session.compile(source);
+    equivalent(artifact.artifact, await clean.compile(source));
+    const exports = new WebAssembly.Instance(
+      new WebAssembly.Module(artifact.artifact.bytes),
+    ).exports;
+    equal((exports.field_result as CallableFunction)(), 42);
+    equal((exports.changed_result as CallableFunction)(), 42);
+  },
+);
+
 function normalized(analysis: Analysis): Analysis {
   return {
     ...analysis,
@@ -96,9 +191,9 @@ function normalized(analysis: Analysis): Analysis {
             ? 1
             : 0
         ),
-        tail: value.tail.$ === "ClosedRow"
-          ? value.tail
-          : { ...value.tail, index: index(value.tail.index) },
+        tail: value.tail.$ === "RowVariable" || value.tail.$ === "RowParameter"
+          ? { ...value.tail, index: index(value.tail.index) }
+          : value.tail,
       });
       const type = (value: Type): Type => {
         switch (value.$) {
@@ -224,7 +319,10 @@ entry const edited = fn () => @array.get changed 0
     });
     const withoutSource = (value: Expr): Expr => {
       let expression = value;
-      while (expression.$ === "SourceExpr") expression = expression.value;
+      while (
+        expression.$ === "SourceExpr" ||
+        expression.$ === "InstantiationExpr"
+      ) expression = expression.value;
       return expression;
     };
     const js = await createSourceCompiler({ prelude: "none" });

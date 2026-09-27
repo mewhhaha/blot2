@@ -4,11 +4,11 @@ import ./infer.bend as I
 import ./global_bindings.bend as B
 
 def source() -> List<&2, I.Binding>:
-  [I.Binding{"last", M.U32Ty{}, Nil{}}, I.Binding{"duplicate", M.VariableTy{7n}, [7n]}, I.Binding{"unused", M.UnitTy{}, Nil{}}, I.Binding{"duplicate", M.BoolTy{}, Nil{}}, I.Binding{"first", M.F32Ty{}, Nil{}}]
+  [I.Binding{"last", M.U32Ty{}, Nil{}, Nil{}}, I.Binding{"duplicate", M.VariableTy{7n}, [7n], Nil{}}, I.Binding{"unused", M.UnitTy{}, Nil{}, Nil{}}, I.Binding{"duplicate", M.BoolTy{}, Nil{}, Nil{}}, I.Binding{"first", M.F32Ty{}, Nil{}, Nil{}}]
 
 def ordered(bindings: List<&2, I.Binding>) -> Bool:
   match bindings:
-    case I.Binding{a, M.U32Ty{}, Nil{}} <> I.Binding{b, M.VariableTy{7n}, 7n <> Nil{}} <> I.Binding{c, M.BoolTy{}, Nil{}} <> I.Binding{d, M.F32Ty{}, Nil{}} <> Nil{}:
+    case I.Binding{a, M.U32Ty{}, Nil{}, Nil{}} <> I.Binding{b, M.VariableTy{7n}, 7n <> Nil{}, Nil{}} <> I.Binding{c, M.BoolTy{}, Nil{}, Nil{}} <> I.Binding{d, M.F32Ty{}, Nil{}, Nil{}} <> Nil{}:
       Bool.and(M.name_equal(a, "last"), Bool.and(M.name_equal(b, "duplicate"), Bool.and(M.name_equal(c, "duplicate"), M.name_equal(d, "first"))))
     case _:
       False{}

@@ -193,6 +193,18 @@
         }
       },
       {
+        "rule": "where_clause",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "constraint_predicate",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
         "rule": "type_application",
         "boundary": {
           "kind": "root"
