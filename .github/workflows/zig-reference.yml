@@ -21,10 +21,10 @@ jobs:
           persist-credentials: false
       - name: Set isolated cache directory
         run: echo "DENO_DIR=$RUNNER_TEMP/deno-cache" >> "$GITHUB_ENV"
-      - uses: denoland/setup-deno@v2
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2
         with:
           deno-version: v2.5.2
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: '1.2.22'
       - name: Install the reference Bend release
@@ -45,6 +45,7 @@ jobs:
           set -euo pipefail
           bend version
           bend guide > "$RUNNER_TEMP/bend-guide.txt"
+          mkdir -p generated/compiler
           deno task build:compiler:all
           deno cache compiler/native.ts compiler/source.ts compiler/native_incremental.ts compiler/native_project.ts
       - name: Package reference outputs and offline tools
