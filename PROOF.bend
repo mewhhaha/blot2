@@ -979,3 +979,21 @@ def Laws.closure_result_keeps_conservative_tracing(key, captures):
 
 def Laws.projected_array_element_keeps_conservative_tracing(array, index):
   {==}
+
+def Laws.layout_unknown_join_is_conservative():
+  {==}
+
+def Laws.layout_array_pointer_is_not_scalar():
+  {==}
+
+def Laws.layout_product_pointer_is_not_scalar(fields):
+  {==}
+
+def Laws.layout_block_result_is_unknown(label, body, locals):
+  {==}
+
+def Laws.layout_budget_exhaustion_is_unknown(value, locals):
+  {==}
+
+def Laws.layout_unknown_fields_are_not_empty_scalars():
+  {==}

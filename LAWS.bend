@@ -9,6 +9,7 @@ import ./compiler/lower.bend as Lower
 import ./compiler/types.bend as Substitutions
 import ./compiler/wasm.bend as Wasm
 import ./compiler/codegen_ir.bend as Codegen
+import ./compiler/codegen_layout.bend as Layout
 import ./compiler/codegen_saturation.bend as Saturation
 import ./compiler/index.bend as Index
 import ./compiler/native_request.bend as NativeRequest
@@ -1617,3 +1618,29 @@ law projected_array_element_keeps_conservative_tracing:
   for array: Codegen.Expr
   for index: Codegen.Expr
   {Wasm.scalar_word(Codegen.ArrayGetExpr{array, index}) == False{} : Bool}
+
+# Layout propagation can forget evidence, never manufacture scalar words from
+# pointers, nonlocal returns, or an exhausted analysis budget.
+law layout_unknown_join_is_conservative:
+  {Layout.meet(1n, Layout.Scalar{}, Layout.Unknown{}) == Layout.Unknown{} : Layout.Shape}
+
+law layout_array_pointer_is_not_scalar:
+  {Layout.scalar(Layout.ScalarArray{}) == False{} : Bool}
+
+law layout_product_pointer_is_not_scalar:
+  for fields: List<&2, Layout.Shape>
+  {Layout.scalar(Layout.Product{fields}) == False{} : Bool}
+
+law layout_block_result_is_unknown:
+  for label: Nat
+  for body: Codegen.Expr
+  for locals: Map<&2, Layout.Shape>
+  {Layout.expression(1n, Codegen.BlockExpr{label, body}, locals) == Layout.Unknown{} : Layout.Shape}
+
+law layout_budget_exhaustion_is_unknown:
+  for value: Codegen.Expr
+  for locals: Map<&2, Layout.Shape>
+  {Layout.expression(0n, value, locals) == Layout.Unknown{} : Layout.Shape}
+
+law layout_unknown_fields_are_not_empty_scalars:
+  {Layout.scalar_fields(Layout.Unknown{}) == False{} : Bool}
