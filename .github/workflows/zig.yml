@@ -1,0 +1,212 @@
+name: Zig compiler
+
+on:
+  pull_request:
+    paths:
+      - 'zig/**'
+      - 'compiler/**'
+      - 'std/**'
+      - 'examples/**'
+      - 'generated/wasm/**'
+      - 'deno.json'
+      - 'deno.lock'
+      - '.npmrc'
+      - '.github/workflows/zig.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Explicit bash enables -e -o pipefail. A failing test must not be hidden by tee.
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: zig-compiler-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [Debug, ReleaseSafe]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install verified Zig 0.16.0
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl --fail --location --retry 3 --output zig.tar.xz https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz
+          echo '70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  zig.tar.xz' | sha256sum --check
+          tar -xf zig.tar.xz
+          echo "$RUNNER_TEMP/zig-x86_64-linux-0.16.0" >> "$GITHUB_PATH"
+      - name: Build native semantic implementation
+        working-directory: zig
+        run: zig build -Doptimize=${{ matrix.mode }} -j2 --summary all
+      - name: Test native values, worker pool, and binary transport
+        working-directory: zig
+        run: |
+          zig build test -Doptimize=${{ matrix.mode }} -j2 --summary all
+          python3 tests_protocol.py -v
+          python3 tests_generate.py -v
+          zig fmt --check build.zig src/main.zig src/runtime.zig src/pool.zig
+      - name: Run protocol regressions on a baseline x86-64 CPU
+        if: matrix.mode == 'ReleaseSafe'
+        working-directory: zig
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends qemu-user
+          BLOT_ZIG_RUNNER='qemu-x86_64 -cpu qemu64' python3 tests_protocol.py -v
+      - name: Verify deterministic source generation
+        working-directory: zig
+        run: |
+          sha256sum src/generated/* > "$RUNNER_TEMP/generated.sha256"
+          PYTHONHASHSEED=8675309 python3 tools/generate.py
+          sha256sum --check "$RUNNER_TEMP/generated.sha256"
+      - name: Check handwritten Zig with zig-analyzer
+        if: matrix.mode == 'Debug'
+        working-directory: zig
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/zig-analyzer.tar.xz" https://github.com/mewhhaha/zig-analyzer/releases/download/v0.16.0-5/zig-analyzer-0.16.0-5-x86_64-linux.tar.xz
+          echo '108aead67169bc12fc3036f6295ef3eb5b8f5e0b35929f0b3cd18383e4c5b668  zig-analyzer.tar.xz' | (cd "$RUNNER_TEMP" && sha256sum --check)
+          tar -xf "$RUNNER_TEMP/zig-analyzer.tar.xz" -C "$RUNNER_TEMP"
+          analyzer="$RUNNER_TEMP/zig-analyzer-0.16.0-5-x86_64-linux/bin/zig-analyzer"
+          "$analyzer" doctor
+          "$analyzer" check --no-cache .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: blotc-zig-${{ matrix.mode }}
+          path: |
+            zig/zig-out/bin/blotc-zig
+            zig/src/generated/
+          retention-days: 7
+          if-no-files-found: error
+
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      BEND_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: '1.2.22'
+      - name: Install checksum-verified reference Bend 2.0.32
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bend-release"
+          cd "$RUNNER_TEMP/bend-release"
+          curl --fail --location --retry 3 --output bend.tar.gz https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz
+          echo '5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  bend.tar.gz' | sha256sum --check
+          tar -xzf bend.tar.gz
+          binary=$(find "$PWD" -type f -name bend -perm -u+x | head -n 1)
+          test -n "$binary"
+          dirname "$binary" >> "$GITHUB_PATH"
+      - name: Check original source proofs
+        run: |
+          bend version
+          bend guide > "$RUNNER_TEMP/bend-guide.txt"
+          bend PROOF.bend
+      - name: Build unchanged JavaScript reference modules
+        run: |
+          set -euo pipefail
+          mkdir -p generated/compiler/bend-2.0.32
+          for name in main.ts bend.ts comp.ts safe.ts base.bend; do
+            curl --fail --location --retry 3 --output "generated/compiler/bend-2.0.32/$name" "https://raw.githubusercontent.com/bendlang/bend/v2.0.32/bend2/$name"
+          done
+          loader="file://$GITHUB_WORKSPACE/generated/compiler/bend-2.0.32/main.ts"
+          for module in main native_session native_output; do
+            output="$module"
+            test "$module" != main || output=compiler
+            bun --eval 'const {load}=await import(process.argv[1]); const result=await load(process.argv[2], {},()=>{throw new Error("unrecognized Bend entry")}); process.stdout.write(result.source);' "$loader" "file://$GITHUB_WORKSPACE/compiler/$module.bend" > "generated/compiler/$output.js"
+            test -s "generated/compiler/$output.js"
+          done
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zig-reference-modules
+          path: generated/compiler/*.js
+          retention-days: 7
+          if-no-files-found: error
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2
+        with:
+          deno-version: v2.5.2
+      - name: Type-check the native APIs and differential adapter
+        run: |
+          deno check compiler/cli.ts compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts zig/check_test_partition.ts
+          deno fmt --check zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts zig/check_test_partition.ts zig/differential.json zig/README.md zig/zig-analyzer.json
+
+  compatibility:
+    needs: [native, reference]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [Debug, ReleaseSafe]
+        shard: [0, 1, 2, 3, codegen-1, codegen-2, codegen-4, codegen-8]
+        # Keep both complete passes, but do not serialize them in one job.
+        suite: [native, differential]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2
+        with:
+          deno-version: v2.5.2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: blotc-zig-${{ matrix.mode }}
+          path: zig
+      - name: Prepare native frontend without a Bend build
+        run: |
+          chmod +x zig/zig-out/bin/blotc-zig
+          mkdir -p generated/compiler build/zig-validation
+          ln -s ../../zig/zig-out/bin/blotc-zig generated/compiler/blotc
+          deno cache compiler/syntax.ts
+      - name: Verify native APIs before reference modules exist
+        if: matrix.shard == 0 && matrix.suite == 'native'
+        run: |
+          test ! -e generated/compiler/compiler.js
+          deno test --cached-only --no-check --allow-read --allow-run=zig/zig-out/bin/blotc-zig zig/standalone.test.ts 2>&1 | tee build/zig-validation/standalone.log
+          deno task blot:zig check examples/syntax.blot
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: zig-reference-modules
+          path: generated/compiler
+      - name: Verify and select a complete, non-overlapping test partition
+        run: |
+          deno run --cached-only --no-check --allow-read=compiler,generated,std zig/check_test_partition.ts
+          python3 zig/tools/partition.py '${{ matrix.shard }}'
+      - name: Run the retained suite shard with the Zig native process
+        if: matrix.suite == 'native'
+        run: |
+          mapfile -t tests < build/zig-validation/test-files.txt
+          filters=()
+          filter=$(cat build/zig-validation/test-filter.txt)
+          if [[ -n "$filter" ]]; then filters=(--filter "$filter"); fi
+          deno test --cached-only --no-check --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid "${filters[@]}" "${tests[@]}" 2>&1 | tee build/zig-validation/native.log
+      - name: Re-run source tests against both backends and execute Zig Wasm
+        if: matrix.suite == 'differential'
+        run: |
+          mapfile -t tests < build/zig-validation/test-files.txt
+          filters=()
+          filter=$(cat build/zig-validation/test-filter.txt)
+          if [[ -n "$filter" ]]; then filters=(--filter "$filter"); fi
+          deno test --cached-only --no-check --config=zig/differential.json --allow-env=NODE_V8_COVERAGE --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid "${filters[@]}" "${tests[@]}" 2>&1 | tee build/zig-validation/differential.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: zig-compatibility-results-${{ matrix.mode }}-${{ matrix.shard }}-${{ matrix.suite }}
+          path: build/zig-validation/
+          retention-days: 7
+          if-no-files-found: error
