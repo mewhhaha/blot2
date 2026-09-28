@@ -1,0 +1,51 @@
+(Project.config "title" "blotc-carp")
+(Project.config "output-directory" "generated/carp")
+(add-cflag "-Icompiler/carp")
+(add-cflag "-D_POSIX_C_SOURCE=200809L")
+(add-cflag "-ffp-contract=off")
+(load "support.carp")
+(load "lexer.carp")
+(load "model.carp")
+(load "parser.carp")
+(load "dependencies.carp")
+(load "check.carp")
+(load "specialize.carp")
+(load "eval.carp")
+(load "wasm.carp")
+
+(defn usage []
+  (do (IO.println "blotc-carp build INPUT.blot OUTPUT.wasm [--const-steps N]\nblotc-carp check INPUT.blot [--const-steps N]\nExperimental scalar compiler; not yet a feature-complete Blot compiler.")
+      (System.exit 2)))
+(defn require-entries [world]
+  (let [i 0 found false]
+    (do
+      (while (< i (Array.length (Program.declarations world)))
+        (do (set! found (or found @(Decl.exported (Arena.declaration world i)))) (set! i (+ i 1))))
+      (when (not found) (fail "no_entry: a build needs an entry const or entry let declaration" 0)))))
+(defn main []
+  (let [count (StaticArray.length &System.args)]
+    (do
+      (when (< count 2) (usage))
+      (let [command (StaticArray.unsafe-nth &System.args 1)]
+        (cond
+          (= command "--version") (IO.println "blotc-carp scalar polymorphism milestone 0.2 (Carp 0.6.0)")
+          (or (= command "build") (= command "check"))
+            (let [building (= command "build") required (if building 4 3) fuel 100000]
+              (do
+                (when (not (or (= count required) (= count (+ required 2)))) (usage))
+                (when (= count (+ required 2))
+                  (do
+                    (when (not (= (StaticArray.unsafe-nth &System.args required) "--const-steps")) (usage))
+                    (let [limit (Lexer.integer (StaticArray.unsafe-nth &System.args (+ required 1)) 0)]
+                      (do
+                        (when (> limit 10000000l) (fail "resource_limit: const steps must be at most 10000000" 0))
+                        (set! fuel (Long.to-int limit))))))
+                (let [source (Host.read (StaticArray.unsafe-nth &System.args 2))
+                      program (Parse.parse &source)]
+                  (do
+                    (Check.run &program)
+                    (when building (require-entries &program))
+                    (Specialize.run &program)
+                    (let [bytes (Wasm.compile &program fuel)]
+                      (when building (Host.write (StaticArray.unsafe-nth &System.args 3) &bytes)))))))
+          (usage))))))

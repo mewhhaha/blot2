@@ -1,0 +1,5 @@
+(Project.config "title" "blot-carp-bootstrap")
+(Project.config "output-directory" "generated/carp")
+
+; Toolchain smoke test; the replacement compiler is developed separately.
+(defn main [] ())

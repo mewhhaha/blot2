@@ -1,0 +1,330 @@
+; First-order scalar rank-1 inference. Recursive components are monomorphic
+; while their bodies are checked, then generalized. Every call outside a
+; component receives fresh scheme variables. All source bodies are checked,
+; including unreachable ones; no fallback compiler is used.
+(deftype CheckState [bindings (Array Binding) locals (Array Int) numeric (Array Numeric) depth Int carried (Array Binding)])
+
+(defn check-find [bindings name]
+  (let [i (- (Array.length bindings) 1) found -1]
+    (do
+      (while (and (>= i 0) (< found 0))
+        (do (when (= (Binding.name (Array.unsafe-nth bindings i)) name) (set! found i))
+            (set! i (- i 1))))
+      found)))
+(defn check-truncate [bindings size]
+  (while (> (Array.length bindings) size)
+    (let [removed (Array.pop-back! bindings)] ())))
+(defn check-bind [state name ty]
+  (let [slot (Array.length (CheckState.locals state))]
+    (do
+      (Array.push-back! (CheckState.locals state) ty)
+      (Array.push-back! (CheckState.bindings state) (Binding.init @name slot ty))
+      slot)))
+(defn check-intrinsic-type [op]
+  (cond (String.starts-with? op "@u32.") u32-type
+        (String.starts-with? op "@f32.") f32-type -1))
+(defn check-is-comparison [op]
+  (or (parse-comparison op) (= op "@u32.eq") (= op "@u32.lt")
+      (= op "@f32.eq") (= op "@f32.ne") (= op "@f32.lt")
+      (= op "@f32.le") (= op "@f32.gt") (= op "@f32.ge")))
+
+(defn check-contains [types ty]
+  (let [i 0 found false]
+    (do
+      (while (< i (Array.length types))
+        (do (set! found (or found (= @(Array.unsafe-nth types i) ty))) (set! i (+ i 1))))
+      found)))
+(defn check-add-numeric [world requests ty offset division]
+  (let [root (Types.root world ty) i 0 found -1]
+    (do
+      (while (< i (Array.length requests))
+        (do
+          (when (= root (Types.root world @(Numeric.ty (Array.unsafe-nth requests i))))
+            (set! found i))
+          (set! i (+ i 1))))
+      (if (< found 0)
+        (Array.push-back! requests (Numeric.init root offset division))
+        (when division
+          (do
+            (Numeric.set-division! (Array.unsafe-nth requests found) true)
+            (Numeric.set-offset! (Array.unsafe-nth requests found) offset)))))))
+(defn check-instance-type [world generics instances ty]
+  (let [root (Types.root world ty) result root i 0]
+    (do
+      (while (< i (Array.length generics))
+        (do
+          (when (= root @(Array.unsafe-nth generics i))
+            (set! result @(Array.unsafe-nth instances i)))
+          (set! i (+ i 1))))
+      result)))
+(defn check-instances [world generics]
+  (let [result (the (Array Int) []) i 0]
+    (do
+      (while (< i (Array.length generics))
+        (do (Array.push-back! &result (Types.fresh world)) (set! i (+ i 1))))
+      result)))
+(defn check-numeric [world request]
+  (let [ty (Types.root world @(Numeric.ty request))]
+    (do
+      (when (not (or (= ty u32-type) (= ty f32-type)))
+        (fail "unsupported_numeric_type: scalar operation needs a concrete numeric type" @(Numeric.offset request)))
+      (when (and @(Numeric.division request) (= ty u32-type))
+        (fail "missing_implementation: U32 has no division in the source prelude" @(Numeric.offset request))))))
+
+; Returns a type ID. The node table does not grow during checking, but scalar
+; snapshots avoid retaining member references across updates to the same node.
+(sig check-expression (Fn [&Program &CheckState Int] Int))
+(defn check-expression [world state id]
+  (let [n @(Arena.node world id) tag @(Node.tag &n) a @(Node.a &n) b @(Node.b &n)
+        ty @(Node.ty &n) offset @(Node.offset &n)]
+    (do
+      (when (>= @(CheckState.depth state) 512) (fail "resource_limit: checker nesting" offset))
+      (CheckState.set-depth! state (+ @(CheckState.depth state) 1))
+      (cond
+        (< tag 4) ()
+        (= tag 4)
+          (let [found (check-find (CheckState.bindings state) (Node.text &n))]
+            (if (>= found 0)
+              (let [binding @(Array.unsafe-nth (CheckState.bindings state) found)]
+                (do (Types.merge world ty @(Binding.ty &binding) offset)
+                    (Node.set-slot! (Arena.node world id) @(Binding.slot &binding))))
+              (let [global (Arena.find-decl world (Node.text &n))]
+                (do
+                  (when (< global 0) (fail "unknown_name: no scalar value with this name" offset))
+                  (when @(Decl.function (Arena.declaration world global))
+                    (fail "unsupported_function_value: functions must be called directly" offset))
+                  (Types.merge world ty @(Decl.result (Arena.declaration world global)) offset)
+                  (Node.set-slot! (Arena.node world id) (- -2 global))))))
+        (= tag 5)
+          (let [left (check-expression world state a) right (check-expression world state b)
+                intrinsic (check-intrinsic-type (Node.text &n))
+                division (or (= (Node.text &n) "/") (= (Node.text &n) "@f32.div"))]
+            (do
+              (Types.merge world left right offset)
+              (when (>= intrinsic 0) (Types.merge world left intrinsic offset))
+              (Types.merge world ty (if (check-is-comparison (Node.text &n)) bool-type left) offset)
+              (check-add-numeric world (CheckState.numeric state) left offset division)))
+        (= tag 6)
+          (let [input (check-expression world state a) op (Node.text &n)]
+            (cond
+              (= op "@u32.to_f32")
+                (do (Types.merge world input u32-type offset) (Types.merge world ty f32-type offset))
+              (= op "@f32.to_u32")
+                (do (Types.merge world input f32-type offset) (Types.merge world ty u32-type offset))
+              (do (Types.merge world input f32-type offset) (Types.merge world ty f32-type offset))))
+        (= tag 7)
+          (let [callee @(Arena.node world a)]
+            (do
+              (when (not (= @(Node.tag &callee) 4))
+                (fail "unsupported_call: only direct single-argument calls are ported" offset))
+              (when (>= (check-find (CheckState.bindings state) (Node.text &callee)) 0)
+                (fail "unsupported_function_value: local function calls are not ported" offset))
+              (let [global (Arena.find-decl world (Node.text &callee))]
+                (do
+                  (when (< global 0) (fail "unknown_function: function or intrinsic is not ported" offset))
+                  (when (not @(Decl.function (Arena.declaration world global)))
+                    (fail "not_callable: scalar value used as a function" offset))
+                  (let [argument (check-expression world state b)
+                        declaration @(Arena.declaration world global)
+                        generics (Decl.generics &declaration)
+                        instances (check-instances world generics)
+                        input (check-instance-type world generics &instances @(Decl.input &declaration))
+                        output (check-instance-type world generics &instances @(Decl.result &declaration))
+                        requests (Decl.numeric &declaration) i 0]
+                    (do
+                      (Types.merge world input argument offset)
+                      (Types.merge world ty output offset)
+                      (while (< i (Array.length requests))
+                        (let [request @(Array.unsafe-nth requests i)]
+                          (do
+                            (when (and @(Decl.checked &declaration)
+                                       (check-contains generics (Types.root world @(Numeric.ty &request))))
+                              (check-add-numeric world (CheckState.numeric state)
+                                (check-instance-type world generics &instances @(Numeric.ty &request))
+                                offset @(Numeric.division &request)))
+                            (set! i (+ i 1)))))
+                      (Node.set-slot! (Arena.node world id) global)))))))
+        (= tag 8)
+          (let [scope (Array.length (CheckState.bindings state)) saved @(CheckState.carried state)]
+            (do
+              (CheckState.set-carried! state [])
+              (let [falls (check-sequence world state a ty)]
+                (do
+                  (when falls (Types.merge world ty unit-type offset))
+                  (check-truncate (CheckState.bindings state) scope)
+                  (CheckState.set-carried! state saved)))))
+        (fail "internal_error: statement in expression position" offset))
+      (CheckState.set-depth! state (- @(CheckState.depth state) 1))
+      ty)))
+
+; Returns whether execution can fall through. Unreachable statements still
+; receive name/type checking and constrain their lexical block return type.
+(sig check-statement (Fn [&Program &CheckState Int Int] Bool))
+(defn check-statement [world state id return-type]
+  (let [n @(Arena.node world id) tag @(Node.tag &n) a @(Node.a &n)
+        offset @(Node.offset &n)]
+    (cond
+      (= tag 9)
+        (do (Types.merge world (check-expression world state a)
+              return-type offset) false)
+      (= tag 10)
+        (let [value (check-expression world state a)]
+          (do
+            (Types.merge world value @(Node.ty &n) offset)
+            (Node.set-slot! (Arena.node world id) (check-bind state (Node.text &n) value))
+            true))
+      (= tag 11)
+        (let [previous (check-find (CheckState.bindings state) (Node.text &n))
+              scope (Array.length (CheckState.bindings state))]
+          (do
+            (when (< previous 0) (fail "unknown_rebinding: name is not a local or parameter" offset))
+            (let [old @(Array.unsafe-nth (CheckState.bindings state) previous)]
+              (Array.push-back! (CheckState.bindings state)
+                (Binding.init @"self" @(Binding.slot &old) @(Binding.ty &old))))
+            (let [value (check-expression world state a)]
+              (do
+                (check-truncate (CheckState.bindings state) scope)
+                (Types.merge world @(Node.ty &n) value offset)
+                (let [carry (check-find (CheckState.carried state) (Node.text &n))]
+                  (if (and (>= carry 0)
+                           (= @(Binding.slot (Array.unsafe-nth (CheckState.bindings state) previous))
+                              @(Binding.slot (Array.unsafe-nth (CheckState.carried state) carry))))
+                    (let [binding @(Array.unsafe-nth (CheckState.carried state) carry)]
+                      (do (Types.merge world value @(Binding.ty &binding) offset)
+                          (Node.set-slot! (Arena.node world id) @(Binding.slot &binding))))
+                    (Node.set-slot! (Arena.node world id) (check-bind state (Node.text &n) value))))))
+            true))
+      (= tag 12)
+        (let [condition (check-expression world state a)
+              scope (Array.length (CheckState.bindings state)) saved @(CheckState.carried state)]
+          (do
+            (CheckState.set-carried! state [])
+            (Types.merge world condition bool-type offset)
+            (let [yes (check-sequence world state @(Node.b &n) return-type)]
+              (do
+                (check-truncate (CheckState.bindings state) scope)
+                (let [no (check-sequence world state @(Node.c &n) return-type)]
+                  (do (check-truncate (CheckState.bindings state) scope)
+                      (CheckState.set-carried! state saved) (or yes no)))))))
+      (or (= tag 15) (= tag 16))
+        (let [scope (Array.length (CheckState.bindings state)) saved @(CheckState.carried state)]
+          (do
+            (CheckState.set-carried! state @(CheckState.bindings state))
+            (when (= tag 15)
+              (do
+                (Types.merge world (check-expression world state a) u32-type offset)
+                (Types.merge world (check-expression world state @(Node.b &n)) u32-type offset)
+                (let [counter (Array.length (CheckState.locals state))]
+                  (do
+                    (Array.push-back! (CheckState.locals state) u32-type)
+                    (Array.push-back! (CheckState.locals state) u32-type)
+                    (Node.set-slot! (Arena.node world id) counter)
+                    (Node.set-extra! (Arena.node world id) (+ counter 1))))
+                (when (not (= (Node.text &n) "$discard"))
+                  (Node.set-index! (Arena.node world id) (check-bind state (Node.text &n) u32-type)))))
+            (let [body-falls (the Bool (check-sequence world state (if (= tag 15) @(Node.c &n) a) return-type))] ())
+            (check-truncate (CheckState.bindings state) scope)
+            (CheckState.set-carried! state saved)
+            (= tag 15)))
+      (= tag 14) (do (let [discarded (the Int (check-expression world state a))] ()) true)
+      (fail "internal_error: expression in statement position" offset))))
+(sig check-sequence (Fn [&Program &CheckState Int Int] Bool))
+(defn check-sequence [world state first return-type]
+  (let [id first falls true]
+    (do
+      (while (>= id 0)
+        (let [n @(Arena.node world id)
+              next-falls (check-statement world state @(Node.a &n) return-type)]
+          (do (set! falls (and falls next-falls)) (set! id @(Node.b &n)))))
+      falls)))
+
+; Global constants currently have one scalar storage slot and no schemes.
+; Their unresolved roots must remain shared in this representation. Generalized
+; constants need separate lowering and are not implemented by this milestone.
+; Function signatures contain only scalar roots, not nested function types.
+(defn check-global-types [world]
+  (let [result (the (Array Int) []) i 0]
+    (do
+      (while (< i (Array.length (Program.declarations world)))
+        (do
+          (when (not @(Decl.function (Arena.declaration world i)))
+            (Array.push-back! &result @(Decl.result (Arena.declaration world i))))
+          (set! i (+ i 1))))
+      result)))
+(defn check-global-root [world global-types root]
+  (let [i 0 found false]
+    (do
+      (while (and (< i (Array.length global-types)) (not found))
+        (do
+          (set! found (= root (Types.root world @(Array.unsafe-nth global-types i))))
+          (set! i (+ i 1))))
+      found)))
+(defn check-quantify [world generics global-types ty]
+  (let [root (Types.root world ty)]
+    (when (and (>= root 4) (not (check-contains generics root))
+               (not (check-global-root world global-types root)))
+      (Array.push-back! generics root))))
+(defn check-component [world members global-types]
+  (let [i 0 numeric (the (Array Numeric) [])]
+    (do
+      ; No member is generalized until every recursive body has constrained it.
+      (while (< i (Array.length members))
+        (let [id @(Array.unsafe-nth members i) decl @(Arena.declaration world id)
+              state (CheckState.init [] [] [] 0 [])]
+          (do
+            (let [slot (check-bind &state (Decl.parameter &decl) @(Decl.input &decl))] ())
+            (Types.merge world @(Decl.result &decl)
+              (check-expression world &state @(Decl.body &decl)) @(Decl.offset &decl))
+            (Decl.set-locals! (Arena.declaration world id) @(CheckState.locals &state))
+            (Decl.set-numeric! (Arena.declaration world id) @(CheckState.numeric &state))
+            (let [requests (CheckState.numeric &state) j 0]
+              (while (< j (Array.length requests))
+                (let [request @(Array.unsafe-nth requests j)]
+                  (do
+                    (check-add-numeric world &numeric @(Numeric.ty &request)
+                      @(Numeric.offset &request) @(Numeric.division &request))
+                    (set! j (+ j 1))))))
+            (set! i (+ i 1)))))
+      (set! i 0)
+      (while (< i (Array.length members))
+        (let [id @(Array.unsafe-nth members i) decl @(Arena.declaration world id)
+              generics (the (Array Int) [])]
+          (do
+            (when @(Decl.function &decl)
+              (do (check-quantify world &generics global-types @(Decl.input &decl))
+                  (check-quantify world &generics global-types @(Decl.result &decl))))
+            (Decl.set-generics! (Arena.declaration world id) generics)
+            (set! i (+ i 1)))))
+      ; Prelude numeric dispatch is demanded by reachability in the reference.
+      ; Keep concrete/ambiguous obligations on their body; propagate generic
+      ; obligations across the recursive group, then instantiate them at calls.
+      (set! i 0)
+      (while (< i (Array.length members))
+        (let [id @(Array.unsafe-nth members i) decl @(Arena.declaration world id)
+              requests (the (Array Numeric) []) own (Decl.numeric &decl) j 0]
+          (do
+            (while (< j (Array.length own))
+              (let [request @(Array.unsafe-nth own j)]
+                (do
+                  (check-add-numeric world &requests @(Numeric.ty &request)
+                    @(Numeric.offset &request) @(Numeric.division &request))
+                  (set! j (+ j 1)))))
+            (set! j 0)
+            (while (< j (Array.length &numeric))
+              (let [request @(Array.unsafe-nth &numeric j) ty (Types.root world @(Numeric.ty &request))]
+                (do
+                  (when (check-contains (Decl.generics &decl) ty)
+                    (check-add-numeric world &requests ty @(Numeric.offset &request) @(Numeric.division &request)))
+                  (set! j (+ j 1)))))
+            (Decl.set-numeric! (Arena.declaration world id) requests)
+            (Decl.set-checked! (Arena.declaration world id) true)
+            (set! i (+ i 1))))))))
+
+(defmodule Check
+  (defn run [world]
+    (let [graph (dependency-graph world) components (dependency-components &graph)
+          global-types (check-global-types world) i 0]
+      (while (< i (Array.length &components))
+        (do
+          (check-component world (Component.members (Array.unsafe-nth &components i)) &global-types)
+          (set! i (+ i 1)))))))

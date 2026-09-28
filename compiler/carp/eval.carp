@@ -1,0 +1,141 @@
+; Bounded scalar constant evaluation. Values are U32/Bool/Unit bits or the
+; IEEE-754 bits of an F32, never a host Double masquerading as a guest F32.
+(deftype Evaluation [values (Array Long) status (Array Int) fuel Int depth Int])
+(deftype Flow [value Long returned Bool])
+
+(defmodule Operations
+  (defn binary [op]
+    (cond
+      (or (= op "+") (= op "@u32.add") (= op "@f32.add")) 0
+      (or (= op "-") (= op "@u32.sub") (= op "@f32.sub")) 1
+      (or (= op "*") (= op "@u32.mul") (= op "@f32.mul")) 2
+      (or (= op "/") (= op "@f32.div")) 3
+      (or (= op "==") (= op "@u32.eq") (= op "@f32.eq")) 4
+      (or (= op "!=") (= op "@f32.ne")) 5
+      (or (= op "<") (= op "@u32.lt") (= op "@f32.lt")) 6
+      (or (= op "<=") (= op "@f32.le")) 7
+      (or (= op ">") (= op "@f32.gt")) 8
+      (or (= op ">=") (= op "@f32.ge")) 9
+      (fail "internal_error: unknown binary operation" 0)))
+  (defn truth [b] (if b 1l 0l))
+  (defn binary-value [op ty left right]
+    (let [code (binary op)]
+      (if (= ty f32-type)
+        (let [a (Host.bits-float left) b (Host.bits-float right)]
+          (cond (= code 0) (Host.float-bits (+ a b))
+                (= code 1) (Host.float-bits (- a b))
+                (= code 2) (Host.float-bits (* a b))
+                (= code 3) (Host.float-bits (/ a b))
+                (= code 4) (truth (= a b)) (= code 5) (truth (not (= a b)))
+                (= code 6) (truth (< a b)) (= code 7) (truth (<= a b))
+                (= code 8) (truth (> a b)) (truth (>= a b))))
+        (cond (= code 0) (Host.u32 (+ left right))
+              (= code 1) (Host.u32 (- left right))
+              ; Avoid signed 64-bit overflow for a full-width U32 multiply.
+              (= code 2) (Host.u32 (+ (* (mod left 65536l) right)
+                              (* 65536l (mod (* (/ left 65536l) right) 65536l))))
+              (= code 4) (truth (= left right)) (= code 5) (truth (not (= left right)))
+              (= code 6) (truth (< left right)) (= code 7) (truth (<= left right))
+              (= code 8) (truth (> left right)) (= code 9) (truth (>= left right))
+              (fail "internal_error: unsupported U32 operation" 0)))))
+  (defn unary-value [op bits]
+    (let [value (Host.bits-float bits)]
+      (cond (= op "@f32.neg") (Host.float-bits (Float.neg value))
+            (= op "@f32.abs") (Host.float-bits (Float.abs value))
+            (= op "@f32.sqrt") (Host.float-bits (Float.sqrt value))
+            (= op "@f32.floor") (Host.float-bits (Float.floor value))
+            (= op "@f32.ceil") (Host.float-bits (Float.ceil value))
+            (= op "@f32.trunc") (Host.float-bits (if (< value 0.0f) (Float.ceil value) (Float.floor value)))
+            (= op "@u32.to_f32") (Host.float-bits (Host.long-float bits))
+            (= op "@f32.to_u32")
+              (cond (not (> value 0.0f)) 0l (>= value 4294967296.0f) 4294967295l
+                    (Host.float-long value))
+            (fail "internal_error: unknown unary operation" 0)))))
+
+(defn eval-tick [state offset]
+  (do
+    (when (<= @(Evaluation.fuel state) 0) (fail "const_steps: constant evaluation exhausted its fuel" offset))
+    (Evaluation.set-fuel! state (- @(Evaluation.fuel state) 1))))
+(defn eval-locals [world declaration argument]
+  (let [result (the (Array Long) []) count (Array.length (Decl.locals (Arena.declaration world declaration))) i 0]
+    (do
+      (while (< i count)
+        (do (Array.push-back! &result (if (= i 0) argument 0l)) (set! i (+ i 1))))
+      result)))
+(sig eval-global (Fn [&Program &Evaluation Int] Long))
+(defn eval-global [world state declaration]
+  (let [status @(Array.unsafe-nth (Evaluation.status state) declaration)
+        d @(Arena.declaration world declaration)]
+    (cond
+      (= status 2) @(Array.unsafe-nth (Evaluation.values state) declaration)
+      (= status 1) (fail "const_cycle: cyclic constant dependency" @(Decl.offset &d))
+      (let [locals (eval-locals world declaration 0l)]
+        (do
+          (Array.aset! (Evaluation.status state) declaration 1)
+          (let [value (eval-expression world state &locals @(Decl.body &d))]
+            (do (Array.aset! (Evaluation.values state) declaration value)
+                (Array.aset! (Evaluation.status state) declaration 2) value)))))))
+(sig eval-expression (Fn [&Program &Evaluation &(Array Long) Int] Long))
+(defn eval-expression [world state locals id]
+  (let [n @(Arena.node world id) tag @(Node.tag &n) a @(Node.a &n) b @(Node.b &n)
+        offset @(Node.offset &n)]
+    (do
+      (eval-tick state offset)
+      (when (>= @(Evaluation.depth state) 256) (fail "const_depth: constant evaluation nesting limit" offset))
+      (Evaluation.set-depth! state (+ @(Evaluation.depth state) 1))
+      (let [value
+        (cond
+          (< tag 4) @(Node.bits &n)
+          (= tag 4)
+            (let [slot @(Node.slot &n)]
+              (if (>= slot 0) @(Array.unsafe-nth locals slot) (eval-global world state (- -2 slot))))
+          (= tag 5)
+            (let [left (eval-expression world state locals a)
+                  right (eval-expression world state locals b)]
+              (Operations.binary-value (Node.text &n) (Types.root world @(Node.ty (Arena.node world a))) left right))
+          (= tag 6) (Operations.unary-value (Node.text &n) (eval-expression world state locals a))
+          (= tag 7)
+            (let [argument (eval-expression world state locals b)
+                  declaration @(Node.slot &n) nested (eval-locals world declaration argument)]
+              (eval-expression world state &nested @(Decl.body (Arena.declaration world declaration))))
+          (= tag 8)
+            (let [flow (eval-sequence world state locals a)] @(Flow.value &flow))
+          (fail "internal_error: non-expression in evaluator" offset))]
+        (do
+          (Evaluation.set-depth! state (- @(Evaluation.depth state) 1))
+          value)))))
+(sig eval-statement (Fn [&Program &Evaluation &(Array Long) Int] Flow))
+(defn eval-statement [world state locals id]
+  (let [n @(Arena.node world id) tag @(Node.tag &n) a @(Node.a &n)]
+    (do
+      (eval-tick state @(Node.offset &n))
+      (cond
+        (= tag 9) (Flow.init (eval-expression world state locals a) true)
+        (or (= tag 10) (= tag 11))
+          (do (Array.aset! locals @(Node.slot &n) (eval-expression world state locals a)) (Flow.init 0l false))
+        (= tag 12)
+          (eval-sequence world state locals
+            (if (= (eval-expression world state locals a) 0l) @(Node.c &n) @(Node.b &n)))
+        (or (= tag 15) (= tag 16))
+          (let [start (if (= tag 15) (eval-expression world state locals a) 0l)
+                end (if (= tag 15) (eval-expression world state locals @(Node.b &n)) 0l)
+                current start result (Flow.init 0l false)]
+            (do
+              (while (and (or (= tag 16) (< current end)) (not @(Flow.returned &result)))
+                (do
+                  (eval-tick state @(Node.offset &n))
+                  (when (and (= tag 15) (>= @(Node.index &n) 0))
+                    (Array.aset! locals @(Node.index &n) current))
+                  (set! result (eval-sequence world state locals (if (= tag 15) @(Node.c &n) a)))
+                  (when (= tag 15) (set! current (+ current 1l)))))
+              result))
+        (= tag 14) (do (let [discarded (the Long (eval-expression world state locals a))] ()) (Flow.init 0l false))
+        (fail "internal_error: non-statement in evaluator" @(Node.offset &n))))))
+(sig eval-sequence (Fn [&Program &Evaluation &(Array Long) Int] Flow))
+(defn eval-sequence [world state locals first]
+  (let [id first result (Flow.init 0l false)]
+    (do
+      (while (and (>= id 0) (not @(Flow.returned &result)))
+        (let [n @(Arena.node world id)]
+          (do (set! result (eval-statement world state locals @(Node.a &n))) (set! id @(Node.b &n)))))
+      result)))

@@ -1,0 +1,87 @@
+; Generated and modified from the pinned Blot/Bend semantic input.
+; See ../NOTICE and ../licenses for origin and license notices.
+(load "bindings.carp")
+; $$$$047const_eval$evaluate_work$/lambda@1438496/lambda@1438569/lambda@1438600/lambda@1438798/lambda@1438871/lambda@1438902/lambda@1439067/lambda@1439284/lambda@1439414/lambda@1439445/lambda@1439476
+(meta-set! port6514 "sig" (Fn [(Ptr Long)] Long))
+(defn port6514 [frame]
+  (v-callthen6 1126 3261 (v-run-clo (v-closure0 6523)) (v-get frame 0) 4679240012837945344l (v-record0 0) (v-get frame 3) (v-record1 380 (v-get frame 1)) (v-get frame 2)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1480733/lambda@1480806/lambda@1480837/lambda@1481035/lambda@1481108/lambda@1481139/lambda@1481254/lambda@1481421/lambda@1481508/lambda@1481539/lambda@1481570
+(meta-set! port6515 "sig" (Fn [(Ptr Long)] Long))
+(defn port6515 [frame]
+  (v-callthen6 1126 3261 (v-run-clo (v-closure0 6524)) (v-get frame 0) 4679240012837945344l (v-record0 0) (v-get frame 3) (v-record1 380 (v-get frame 1)) (v-get frame 2)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1495305/lambda@1495378/lambda@1495409/lambda@1495607/lambda@1495680/lambda@1495711/lambda@1495876/lambda@1496093/lambda@1496223/lambda@1496254/lambda@1496285
+(meta-set! port6516 "sig" (Fn [(Ptr Long)] Long))
+(defn port6516 [frame]
+  (v-callthen6 1126 3261 (v-run-clo (v-closure0 6525)) (v-get frame 0) 4679240012837945344l (v-record0 0) (v-get frame 3) (v-record1 380 (v-get frame 1)) (v-get frame 2)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1550963/lambda@1551036/lambda@1551067/lambda@1551265/lambda@1551338/lambda@1551369/lambda@1551484/lambda@1551651/lambda@1551738/lambda@1551769/lambda@1551800
+(meta-set! port6517 "sig" (Fn [(Ptr Long)] Long))
+(defn port6517 [frame]
+  (v-callthen6 1126 3261 (v-run-clo (v-closure0 6526)) (v-get frame 0) 4679240012837945344l (v-record0 0) (v-get frame 3) (v-record1 380 (v-get frame 1)) (v-get frame 2)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1565562/lambda@1565635/lambda@1565666/lambda@1565864/lambda@1565937/lambda@1565968/lambda@1566133/lambda@1566350/lambda@1566480/lambda@1566511/lambda@1566542
+(meta-set! port6518 "sig" (Fn [(Ptr Long)] Long))
+(defn port6518 [frame]
+  (v-callthen6 1126 3261 (v-run-clo (v-closure0 6527)) (v-get frame 0) 4679240012837945344l (v-record0 0) (v-get frame 3) (v-record1 380 (v-get frame 1)) (v-get frame 2)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1622502/lambda@1622575/lambda@1622606/lambda@1622804/lambda@1622877/lambda@1622908/lambda@1623023/lambda@1623190/lambda@1623277/lambda@1623308/lambda@1623339
+(meta-set! port6519 "sig" (Fn [(Ptr Long)] Long))
+(defn port6519 [frame]
+  (v-callthen6 1126 3261 (v-run-clo (v-closure0 6528)) (v-get frame 0) 4679240012837945344l (v-record0 0) (v-get frame 3) (v-record1 380 (v-get frame 1)) (v-get frame 2)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1637122/lambda@1637195/lambda@1637226/lambda@1637425/lambda@1637498/lambda@1637529/lambda@1637694/lambda@1637911/lambda@1638041/lambda@1638072/lambda@1638103
+(meta-set! port6520 "sig" (Fn [(Ptr Long)] Long))
+(defn port6520 [frame]
+  (v-callthen6 1126 3261 (v-run-clo (v-closure0 6529)) (v-get frame 0) 4679240012837945344l (v-record0 0) (v-get frame 3) (v-record1 380 (v-get frame 1)) (v-get frame 2)))
+
+; $$$$047lower$lower$/lambda@3671097/lambda@3671207/lambda@3671495/lambda@3671611/lambda@3671797/lambda@3671911/lambda@3672024/lambda@3672150/lambda@3672384/lambda@3672635/lambda@3672745
+(meta-set! port6521 "sig" (Fn [(Ptr Long)] Long))
+(defn port6521 [frame]
+  (v-callthen3 2825 3261 (v-run-clo (v-closure5 6530 (v-get frame 1) (v-get frame 5) (v-get frame 7) (v-get frame 9) (v-get frame 10))) (v-get frame 2) (v-record6 1137 (v-call2 2 (v-call1 36 (v-get frame 1)) (v-literal 1495)) (v-get frame 1) (v-call1 2796 (v-get frame 3)) (v-call1 2810 (v-call1 2811 (v-get frame 4))) (v-call5 2813 (v-get frame 6) (v-binary 0 (v-get frame 5) (v-literal 399)) 0l (v-get frame 10) (v-get frame 8)) (v-get frame 5)) (v-get frame 0)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1423943/lambda@1424016/lambda@1424047/lambda@1424245/lambda@1424318/lambda@1424349/lambda@1424464/lambda@1424631/lambda@1424718/lambda@1424749/lambda@1424780/lambda@1424969
+(meta-set! port6522 "sig" (Fn [(Ptr Long)] Long))
+(defn port6522 [frame]
+  (v-tailcall1 1119 (v-get frame 0)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1438496/lambda@1438569/lambda@1438600/lambda@1438798/lambda@1438871/lambda@1438902/lambda@1439067/lambda@1439284/lambda@1439414/lambda@1439445/lambda@1439476/lambda@1439665
+(meta-set! port6523 "sig" (Fn [(Ptr Long)] Long))
+(defn port6523 [frame]
+  (v-tailcall1 1119 (v-get frame 0)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1480733/lambda@1480806/lambda@1480837/lambda@1481035/lambda@1481108/lambda@1481139/lambda@1481254/lambda@1481421/lambda@1481508/lambda@1481539/lambda@1481570/lambda@1481759
+(meta-set! port6524 "sig" (Fn [(Ptr Long)] Long))
+(defn port6524 [frame]
+  (v-tailcall1 1119 (v-get frame 0)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1495305/lambda@1495378/lambda@1495409/lambda@1495607/lambda@1495680/lambda@1495711/lambda@1495876/lambda@1496093/lambda@1496223/lambda@1496254/lambda@1496285/lambda@1496474
+(meta-set! port6525 "sig" (Fn [(Ptr Long)] Long))
+(defn port6525 [frame]
+  (v-tailcall1 1119 (v-get frame 0)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1550963/lambda@1551036/lambda@1551067/lambda@1551265/lambda@1551338/lambda@1551369/lambda@1551484/lambda@1551651/lambda@1551738/lambda@1551769/lambda@1551800/lambda@1551989
+(meta-set! port6526 "sig" (Fn [(Ptr Long)] Long))
+(defn port6526 [frame]
+  (v-tailcall1 1119 (v-get frame 0)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1565562/lambda@1565635/lambda@1565666/lambda@1565864/lambda@1565937/lambda@1565968/lambda@1566133/lambda@1566350/lambda@1566480/lambda@1566511/lambda@1566542/lambda@1566731
+(meta-set! port6527 "sig" (Fn [(Ptr Long)] Long))
+(defn port6527 [frame]
+  (v-tailcall1 1119 (v-get frame 0)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1622502/lambda@1622575/lambda@1622606/lambda@1622804/lambda@1622877/lambda@1622908/lambda@1623023/lambda@1623190/lambda@1623277/lambda@1623308/lambda@1623339/lambda@1623528
+(meta-set! port6528 "sig" (Fn [(Ptr Long)] Long))
+(defn port6528 [frame]
+  (v-tailcall1 1119 (v-get frame 0)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1637122/lambda@1637195/lambda@1637226/lambda@1637425/lambda@1637498/lambda@1637529/lambda@1637694/lambda@1637911/lambda@1638041/lambda@1638072/lambda@1638103/lambda@1638292
+(meta-set! port6529 "sig" (Fn [(Ptr Long)] Long))
+(defn port6529 [frame]
+  (v-tailcall1 1119 (v-get frame 0)))
+
+; $$$$047lower$lower$/lambda@3671097/lambda@3671207/lambda@3671495/lambda@3671611/lambda@3671797/lambda@3671911/lambda@3672024/lambda@3672150/lambda@3672384/lambda@3672635/lambda@3672745/lambda@3673206
+(meta-set! port6530 "sig" (Fn [(Ptr Long)] Long))
+(defn port6530 [frame]
+  (v-tailcall1 3262 (v-call2 2665 (v-call1 38 (v-get frame 0)) (v-record3 459 (v-binary 0 (v-get frame 1) (v-literal 1531)) (v-get frame 5) (v-call5 2813 (v-get frame 2) (v-binary 0 (v-get frame 1) (v-literal 1531)) 0l (v-get frame 4) (v-get frame 3))))))

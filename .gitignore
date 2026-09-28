@@ -7,3 +7,9 @@ __pycache__/
 /editor/tree-sitter-blot2/*.so
 /editor/tree-sitter-blot2/*.dylib
 /editor/tree-sitter-blot2/*.dll
+/generated/carp/
+/generated/carp-reference/
+/.carp-toolchain/
+/.deno-cache/
+
+/generated/carp-port/

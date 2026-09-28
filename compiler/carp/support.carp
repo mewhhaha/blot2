@@ -1,0 +1,62 @@
+(system-include "host.h")
+(defmodule Host
+  (register error (Fn [&String Int] ()) "blot_error")
+  (register at (Fn [&String Int] Int) "blot_byte_at")
+  (register length (Fn [&String] Int) "blot_byte_length")
+  (register slice (Fn [&String Int Int] String) "blot_slice")
+  (register read (Fn [&String] String) "blot_read")
+  (register write (Fn [&String &(Array Int)] ()) "blot_write")
+  (register float (Fn [&String] Float) "blot_float")
+  (register float-bits (Fn [Float] Long) "blot_float_bits")
+  (register bits-float (Fn [Long] Float) "blot_bits_float")
+  (register long-float (Fn [Long] Float) "blot_long_float")
+  (register float-long (Fn [Float] Long) "blot_float_long")
+  (register u32 (Fn [Long] Long) "blot_u32"))
+
+(defn fail [message offset]
+  (do (Host.error message offset) (System.exit 1)))
+
+; Fixed tags double as the version-2 scalar ABI tags.
+(def unit-type 0)
+(def u32-type 1)
+(def bool-type 2)
+(def f32-type 3)
+
+(defmodule Bytes
+  (defn byte [out n] (Array.push-back! out n))
+  (defn unsigned [out number]
+    (let [n number]
+      (do
+        (while (> n 127l)
+          (do (byte out (+ (Long.to-int (mod n 128l)) 128))
+              (set! n (/ n 128l))))
+        (byte out (Long.to-int n)))))
+  (defn signed [out number]
+    (let [n (if (> number 2147483647l) (- number 4294967296l) number)
+          more true]
+      (while more
+        (let [b (Long.to-int (mod (+ (mod n 128l) 128l) 128l))
+              next (if (< n 0l) (/ (- n 127l) 128l) (/ n 128l))]
+          (do
+            (set! more (not (or (and (= next 0l) (< b 64))
+                               (and (= next -1l) (>= b 64)))))
+            (byte out (+ b (if more 128 0)))
+            (set! n next))))))
+  (defn append [out input]
+    (let [i 0]
+      (while (< i (Array.length input))
+        (do (byte out @(Array.unsafe-nth input i)) (set! i (+ i 1))))))
+  (defn name [out text]
+    (let [i 0 n (Host.length text)]
+      (do (unsigned out (Long.from-int n))
+          (while (< i n)
+            (do (byte out (Host.at text i)) (set! i (+ i 1)))))))
+  (defn section [out tag payload]
+    (do (byte out tag)
+        (unsigned out (Long.from-int (Array.length payload)))
+        (append out payload)))
+  (defn f32 [out bits]
+    (let [n bits i 0]
+      (while (< i 4)
+        (do (byte out (Long.to-int (mod n 256l)))
+            (set! n (/ n 256l)) (set! i (+ i 1)))))))

@@ -1,0 +1,140 @@
+(deftype Token [text String kind Int offset Int])
+
+(defmodule Lexer
+  ; Token kinds: name=1, integer=2, float=3, punctuation=4, layout=5.
+  (defn digit [c] (and (>= c 48) (<= c 57)))
+  (defn alpha [c]
+    (or (and (>= c 65) (<= c 90)) (and (>= c 97) (<= c 122)) (= c 95)))
+  (defn hex [c]
+    (cond (digit c) (- c 48)
+          (and (>= c 65) (<= c 70)) (+ 10 (- c 65))
+          (and (>= c 97) (<= c 102)) (+ 10 (- c 97))
+          -1))
+  (defn add [tokens text kind offset]
+    (Array.push-back! tokens (Token.init text kind offset)))
+  (defn lex [source]
+    (let [tokens (the (Array Token) [])
+          indents [0] position 0 nesting 0 beginning true
+          size (Host.length source)]
+      (do
+        (while (< position size)
+          (do
+            (when (and beginning (= nesting 0))
+              (let [start position]
+                (do
+                  (while (and (< position size) (= (Host.at source position) 32))
+                    (set! position (+ position 1)))
+                  (when (and (< position size) (= (Host.at source position) 9))
+                    (fail "layout: tabs are not supported; use spaces" position))
+                  (when (and (< position size)
+                             (not (or (= (Host.at source position) 10) (= (Host.at source position) 13)))
+                             (not (and (< (+ position 1) size)
+                                       (= (Host.at source position) 47)
+                                       (= (Host.at source (+ position 1)) 47))))
+                    (let [width (- position start)
+                          previous @(Array.unsafe-nth &indents (- (Array.length &indents) 1))]
+                      (do
+                        (when (> width previous)
+                          (do (Array.push-back! &indents width)
+                              (add &tokens @"<indent>" 5 position)))
+                        (while (< width @(Array.unsafe-nth &indents (- (Array.length &indents) 1)))
+                          (do (let [ignored (Array.pop-back! &indents)] ())
+                              (add &tokens @"<dedent>" 5 position)))
+                        (when (not (= width @(Array.unsafe-nth &indents (- (Array.length &indents) 1))))
+                          (fail "layout: inconsistent indentation" position))))))))
+            (set! beginning false)
+            (when (< position size)
+              (let [c (Host.at source position) start position]
+                (cond
+                  (or (= c 32) (= c 9)) (set! position (+ position 1))
+                  (or (= c 10) (= c 13))
+                    (do
+                      (set! position (+ position 1))
+                      (when (and (= c 13) (< position size) (= (Host.at source position) 10))
+                        (set! position (+ position 1)))
+                      (when (= nesting 0) (add &tokens @"<newline>" 5 start))
+                      (set! beginning true))
+                  (and (= c 47) (< (+ position 1) size) (= (Host.at source (+ position 1)) 47))
+                    (while (and (< position size)
+                                (not (or (= (Host.at source position) 10) (= (Host.at source position) 13))))
+                      (set! position (+ position 1)))
+                  (or (alpha c) (= c 64))
+                    (do
+                      (set! position (+ position 1))
+                      (while (and (< position size)
+                                  (or (alpha (Host.at source position)) (digit (Host.at source position))
+                                      (and (= (Host.at source position) 46)
+                                           (< (+ position 1) size) (alpha (Host.at source (+ position 1))))))
+                        (set! position (+ position 1)))
+                      (add &tokens (Host.slice source start position) 1 start))
+                  (digit c)
+                    (let [floating false]
+                      (do
+                        (set! position (+ position 1))
+                        (if (and (= c 48) (< position size) (= (Host.at source position) 120))
+                          (do
+                            (set! position (+ position 1))
+                            (while (and (< position size)
+                                        (or (>= (hex (Host.at source position)) 0) (= (Host.at source position) 95)))
+                              (set! position (+ position 1))))
+                          (do
+                            (while (and (< position size) (or (digit (Host.at source position)) (= (Host.at source position) 95)))
+                              (set! position (+ position 1)))
+                            (when (and (< position size) (= (Host.at source position) 46)
+                                       (not (and (< (+ position 1) size) (= (Host.at source (+ position 1)) 46))))
+                              (do
+                                (set! floating true) (set! position (+ position 1))
+                                (while (and (< position size) (digit (Host.at source position)))
+                                  (set! position (+ position 1)))))
+                            (when (and (< position size) (or (= (Host.at source position) 101) (= (Host.at source position) 69)))
+                              (do
+                                (set! floating true) (set! position (+ position 1))
+                                (when (and (< position size) (or (= (Host.at source position) 43) (= (Host.at source position) 45)))
+                                  (set! position (+ position 1)))
+                                (let [digits-start position]
+                                  (do
+                                    (while (and (< position size) (digit (Host.at source position)))
+                                      (set! position (+ position 1)))
+                                    (when (= position digits-start) (fail "number: missing exponent digits" start))))))))
+                        (when (and (< position size) (or (alpha (Host.at source position)) (= (Host.at source position) 95)))
+                          (fail "number: invalid suffix" position))
+                        (add &tokens (Host.slice source start position) (if floating 3 2) start)))
+                  (or (= c 40) (= c 41) (= c 43) (= c 45) (= c 42) (= c 47)
+                      (= c 61) (= c 58) (= c 60) (= c 62) (= c 33) (= c 46) (= c 36))
+                    (do
+                      (set! position (+ position 1))
+                      (when (= c 40) (set! nesting (+ nesting 1)))
+                      (when (= c 41) (do (set! nesting (- nesting 1))
+                                         (when (< nesting 0) (fail "syntax: unmatched closing parenthesis" start))))
+                      (when (< position size)
+                        (let [next (Host.at source position)]
+                          (when (or (and (= next 61) (or (= c 61) (= c 33) (= c 60) (= c 62) (= c 58)))
+                                    (and (= next 62) (or (= c 61) (= c 45)))
+                                    (and (= next 46) (= c 46)))
+                            (set! position (+ position 1)))))
+                      (add &tokens (Host.slice source start position) 4 start))
+                  (fail "unsupported_syntax: this token is outside the Carp scalar milestone" start))))))
+        (when (not (= nesting 0)) (fail "syntax: unclosed parenthesis" size))
+        (add &tokens @"<newline>" 5 size)
+        (while (> (Array.length &indents) 1)
+          (do (let [ignored (Array.pop-back! &indents)] ()) (add &tokens @"<dedent>" 5 size)))
+        (add &tokens @"<eof>" 5 size)
+        tokens)))
+  (defn integer [text offset]
+    (let [size (Host.length text) index 0 base 10l value 0l digits 0]
+      (do
+        (when (and (> size 1) (= (Host.at text 0) 48) (= (Host.at text 1) 120))
+          (do (set! base 16l) (set! index 2)))
+        (while (< index size)
+          (let [c (Host.at text index)]
+            (do
+              (when (not (= c 95))
+                (let [d (hex c)]
+                  (do
+                    (when (or (< d 0) (>= (Long.from-int d) base)) (fail "number: invalid U32 digit" offset))
+                    (set! value (+ (* value base) (Long.from-int d)))
+                    (set! digits (+ digits 1))
+                    (when (> value 4294967295l) (fail "number: U32 overflow" offset)))))
+              (set! index (+ index 1)))))
+        (when (= digits 0) (fail "number: missing U32 digits" offset))
+        value))))
