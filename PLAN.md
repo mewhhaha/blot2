@@ -8,7 +8,7 @@ semantics remain in [CONSTRAINTS.md](compiler/CONSTRAINTS.md).
 
 ## Next result
 
-Native regression triage now has three measured Bend-source batches: replacing
+Native regression triage now has four measured Bend-source batches: replacing
 string-index branch closures with a direct tail loop reduced matching-version
 gdev cold compilation from 126.9 to 85.4 seconds (three alternating pairs), with
 identical Wasm and a similar body-edit improvement. Retaining owning string
@@ -27,11 +27,20 @@ checking improved a small reproducer but made gdev slower: 63.6 to 70.3 seconds
 in the initial screen, with higher CPU time. Do not adopt either without a new
 source change and a favorable measured comparison.
 
-The next bounded investigation is shared-constant preparation. A separate trace
-of the installed candidate spends about 23 seconds in initial checking and
-dispatch, then about 31 seconds between shared-constant preparation and the next
-specialization phase. Profile its repeated traversals and catalog preparation
-before widening parallelism: each accepted constant changes the module, inferred
+The fourth batch stops dependency and predicate searches at their first match
+and skips an aligned retained operation prefix during merging. Three fresh cold
+pairs improve the median from 41.37 to 39.98 seconds (3.3%); three body-edit
+pairs are mixed, with medians of 42.51 and 41.90 seconds and almost unchanged
+CPU time. Peak native memory rises slightly from about 279 to 281 MiB. All 927
+compiler tests, Bend proofs, native ownership checks, and game behavior checks
+pass, with identical Wasm. The overnight change from the previous batch is not
+attributed to this source change.
+
+The next bounded investigation remains within shared-constant preparation. A
+separate matched trace shortens its interval from 22.27 to 21.05 seconds; almost
+all of it falls after the fifth shared constant begins. Distinguish that
+constant's inference and solver work from preparation following it before
+widening parallelism: each accepted constant changes the module, inferred
 shapes, and identity counter needed by later constants. Preserve dependency
 order, exact diagnostics, and deterministic identities.
 

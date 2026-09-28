@@ -242,12 +242,19 @@ def external_names(members: List<&2, String>, +nodes: List<&2, D.Node>) -> List<
     case head <> tail:
       List.append(&2, String, D.lookup(nodes, head), external_names(tail, nodes))
 
-def definition_predicates(definitions: List<&2, I.Definition>, +wanted: String) -> List<&2, M.Predicate>:
-  match definitions:
-    case Nil{}:
+# A matching definition with no predicates still wins over every later
+# definition. Carry a separate matched flag rather than using an empty result.
+def definition_predicates_work(definitions: List<&2, I.Definition>, +wanted: String, matched: Bool, found: List<&2, M.Predicate>) -> List<&2, M.Predicate>:
+  match definitions matched:
+    case _ True{}:
+      found
+    case Nil{} False{}:
       Nil{}
-    case I.Definition{+name, inference} <> tail:
-      Bool.pick(List<&2, M.Predicate>, M.name_equal(name, wanted), I.inference_predicates(inference), definition_predicates(tail, wanted))
+    case I.Definition{name, inference} <> tail False{}:
+      definition_predicates_work(tail, wanted, M.name_equal(name, wanted), I.inference_predicates(inference))
+
+def definition_predicates(definitions: List<&2, I.Definition>, wanted: String) -> List<&2, M.Predicate>:
+  definition_predicates_work(definitions, wanted, False{}, Nil{})
 
 def generalize_member(member: Bool, binding: I.Binding, +definitions: List<&2, I.Definition>, context: I.Context, state: I.State) -> Result<&2, &2, M.Diagnostic, I.Binding>:
   match member:

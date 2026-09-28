@@ -902,6 +902,22 @@ law state_membership_work_stops_after_hit:
   for identity: M.TypeId
   {StateSpecialize.contains_work(rest, identity, True{}) == True{} : Bool}
 
+law dependency_lookup_stops_after_match:
+  for rest: List<&2, Dependency.Node>
+  for name: String
+  for +found: List<&2, String>
+  {Dependency.lookup_work(rest, name, True{}, found) == found : List<&2, String>}
+
+law definition_predicates_stop_after_match:
+  for rest: List<&2, Infer.Definition>
+  for name: String
+  for +found: List<&2, M.Predicate>
+  {Globals.definition_predicates_work(rest, name, True{}, found) == found : List<&2, M.Predicate>}
+
+law empty_operation_merge_preserves_catalog:
+  for +operations: List<&2, M.Operation>
+  {StateSpecialize.merge(Nil{}, operations) == operations : List<&2, M.Operation>}
+
 law zero_distance_index_advance_preserves_suffix:
   for +suffix: String
   {Index.advance_suffix(0n, suffix) == suffix : String}

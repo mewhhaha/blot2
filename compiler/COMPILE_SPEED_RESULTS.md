@@ -3,10 +3,13 @@
 The [active plan](../PLAN.md) measures small changes before expanding the
 compiler redesign. Installed Bend-source improvements brought the observed
 native gdev cold median from 126.9 to 62.3 seconds, about 51%, across the three
-matched-version experiments below. The latest batch reduced its own control from
-75.8 to 62.3 seconds. Generated C and JavaScript remain unchanged. These changes
-are separate from the M3 redesign, whose game speedup remains unproven. The
-earlier experiments in this report use the JavaScript compiler.
+matched-version experiments below. A fourth batch shortens dependency and
+predicate lookups and skips retained operation prefixes: its fresh cold control
+improves from 41.37 to 39.98 seconds. Host conditions changed between batches;
+the overnight difference from 62.3 seconds is not attributed to this change.
+Generated C and JavaScript remain unchanged. These changes are separate from the
+M3 redesign, whose game speedup remains unproven. The earlier experiments in
+this report use the JavaScript compiler.
 
 ## Native regression: traverse string indexes without branch closures
 
@@ -251,6 +254,78 @@ deno run -A compiler/gdev_cold_bench.ts \
   build/gdev-traversal-20260927/blotc-control \
   generated/compiler/blotc 3 4
 ```
+
+## Shared constants: stop completed searches and skip retained operations
+
+2026-09-28: the current-source profile includes repeated name comparisons in
+dependency lookup, definition-predicate lookup, and operation merging. Two
+lookups passed their recursive tail scan to `Bool.pick`, whose arguments are
+eager. They now carry the match result through a tail loop and return at the
+first match, including a match whose references or predicates are empty.
+
+An expanded constant retains the operation catalog used to infer it. Merging
+that catalog previously searched the retained list again for each incoming
+operation. The new merge skips an aligned concrete-operation prefix with one
+identity comparison per entry, then uses the original ordered merge at the first
+mismatch or new suffix. Existing definitions, duplicate precedence, generic
+entries, and insertion order are preserved. These three changes were measured
+together; their individual contributions are not isolated.
+
+Both sides use Bend 2.0.32, matching Base and the official JavaScript loader,
+and unchanged generated output. The control is commit `45b8eac`. The frozen
+25-module game still matches current source. There are three alternating cold
+pairs and three alternating body-edit pairs, each with a fresh four-worker
+process, 100,000 const steps, and `analysis: false`. The edit changes the same
+ambient coefficient as earlier batches. Loading and startup are separate. Only
+the benchmark's process tree has scheduling normalized; other desktop work
+continues.
+
+| Request / measure              |  Control | Candidate | Reduction |
+| ------------------------------ | -------: | --------: | --------: |
+| Cold compile wall, median      | 41.368 s |  39.983 s |      3.3% |
+| Cold native CPU, median        | 42.840 s |  41.490 s |      3.2% |
+| Body-edit compile wall, median | 42.507 s |  41.897 s |      1.4% |
+| Body-edit native CPU, median   | 44.040 s |  43.960 s |      0.2% |
+
+All three cold pairs improve, but the smallest gain is only 0.7%. Cold wall
+samples span 41.11–41.51 seconds for the control and 39.57–40.82 seconds for the
+candidate. Body-edit samples vary more: 42.48–45.97 versus 38.99–43.46 seconds;
+two pairs improve and the last regresses by 2.2%. This supports a small cold
+improvement, not a reliable body-edit speedup. Median peak native RSS rises
+slightly: 278.8 to 280.6 MiB cold, and 278.9 to 280.3 MiB edited. No memory
+reduction is claimed.
+
+Every sample preserves the expected cold or edited Wasm hash and 1,161,014-byte
+size. Game create/frame checks pass for both variants and both sides: schema 8,
+2,778 draws, 10 solids, and the expected ambient coefficient. Full Bend proof,
+all 927 compiler tests, host type checks, and native ownership regressions with
+one and four workers pass. The new tests cover first-match precedence and
+compare operation merges with an independent identity-set oracle over mixed
+kinds, duplicates, altered signatures, prefixes, and divergent order. Source and
+matching artifacts are installed with verified hashes; an integrated proof check
+also passes.
+
+A separate first-entry debugger trace reduces the shared-constant interval from
+22.27 to 21.05 seconds. Both sides enter five shared constants; the interval
+after the fifth entry accounts for 21.97 and 20.76 seconds respectively,
+including work before the following specialization phase. The complete native
+responses are identical. These diagnostic runs are excluded from the medians.
+The next investigation should distinguish that last constant's inference and
+solver work from the preparation that follows it, before changing concurrency.
+
+Evidence:
+[measurement plan](../build/gdev-shared-20260928/measurement-plan.json),
+[samples](../build/gdev-shared-20260928/pairs.json),
+[summary](../build/gdev-shared-20260928/pairs-summary.json),
+[source identities](../build/gdev-shared-20260928/source-identities.json),
+[toolchain](../build/gdev-shared-20260928/toolchain.json),
+[phase comparison](../build/gdev-shared-20260928/diagnostics-summary.json),
+[full suite](../build/gdev-shared-20260928/full-tests.log),
+[native regressions](../build/gdev-shared-20260928/native-regressions.json),
+[integrated proof](../build/gdev-shared-20260928/integrated-proof.log),
+[game behavior](../build/gdev-shared-20260928/guest-checks.log), and
+[installation identities](../build/gdev-shared-20260928/integration.json). The
+`build/` evidence remains local and excluded from Git.
 
 ## Current gdev baseline: first working sample
 

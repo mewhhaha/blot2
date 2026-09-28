@@ -200,6 +200,15 @@ control from 75.8 to 62.3 seconds; peak native memory remains about 279 MiB. A
 scheduler experiment that exposed more inner parallelism was parked after
 slowing the actual game.
 
+Dependency and definition-predicate lookups stop at the first match. Bend's
+`Bool.pick` evaluates its result arguments eagerly, so recursive searches use an
+explicit match state instead of passing a recursive call as an alternative.
+Operation merging skips a retained catalog prefix before falling back to the
+ordinary ordered merge. Together these changes improve a fresh matched cold
+control from 41.37 to 39.98 seconds. Body-edit timing is mixed and peak memory
+remains about 280 MiB; the overnight change from the earlier batch is not
+counted as an improvement from these changes.
+
 Type and row substitutions use persistent indexes instead of scanning the entire
 substitution history on every lookup. Each index retains replacement order,
 including repeated bindings; occurs checks and traversal limits still apply.

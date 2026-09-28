@@ -231,12 +231,19 @@ def contains_work(names: List<&2, String>, +name: String, found: Bool) -> Bool:
 def contains(names: List<&2, String>, name: String) -> Bool:
   contains_work(names, name, False{})
 
-def lookup(nodes: List<&2, Node>, +name: String) -> List<&2, String>:
-  match nodes:
-    case Nil{}:
+# Keep the decision outside Bool.pick: its result arguments are evaluated
+# eagerly, including the otherwise-unused scan after the first matching node.
+def lookup_work(nodes: List<&2, Node>, +name: String, matched: Bool, found: List<&2, String>) -> List<&2, String>:
+  match nodes matched:
+    case _ True{}:
+      found
+    case Nil{} False{}:
       Nil{}
-    case Node{found, +refs, lambdas} <> tail:
-      Bool.pick(List<&2, String>, M.name_equal(found, name), refs, lookup(tail, name))
+    case Node{candidate, refs, lambdas} <> tail False{}:
+      lookup_work(tail, name, M.name_equal(candidate, name), refs)
+
+def lookup(nodes: List<&2, Node>, name: String) -> List<&2, String>:
+  lookup_work(nodes, name, False{}, Nil{})
 
 def edge_count(nodes: List<&2, Node>) -> Nat:
   match nodes:
