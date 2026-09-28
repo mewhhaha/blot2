@@ -1,0 +1,54 @@
+name: Runtime performance
+
+on:
+  push:
+    branches: [perf/runtime-data-paths]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BEND_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive exact source under test
+        run: git archive --format=tar.gz HEAD > "$RUNNER_TEMP/runtime-source.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-source
+          path: ${{ runner.temp }}/runtime-source.tar.gz
+          retention-days: 3
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: oven-sh/setup-bun@v2
+      - name: Install pinned Bend release
+        run: |
+          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/bend"
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
+          echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
+      - name: Record versions and check proofs
+        run: |
+          bend version
+          deno --version
+          bun --version
+          bend guide > "$RUNNER_TEMP/bend-guide.txt"
+          bend PROOF.bend
+      - name: Build parser and run compiler regressions
+        run: |
+          deno task generate:parser
+          deno task test:compiler
