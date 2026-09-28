@@ -1,9 +1,8 @@
 name: Runtime performance
 
 on:
-  push:
-    branches: [perf/runtime-data-paths]
   pull_request:
+    paths: ["compiler/**", "scripts/**", "std/**", "deno.json", "deno.lock", "baba.json", ".github/workflows/runtime-performance.yml"]
   workflow_dispatch:
 
 permissions:
@@ -13,42 +12,142 @@ concurrency:
   group: runtime-performance-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  regression:
+  reference:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [baseline, candidate]
     env:
       BEND_NO_TELEMETRY: "1"
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Archive exact source under test
-        run: git archive --format=tar.gz HEAD > "$RUNNER_TEMP/runtime-source.tar.gz"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: runtime-source
-          path: ${{ runner.temp }}/runtime-source.tar.gz
-          retention-days: 3
+          fetch-depth: 0
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
       - uses: oven-sh/setup-bun@v2
-      - name: Install pinned Bend release
+      - name: Install verified Bend release
         run: |
           curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
           echo "5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
           mkdir -p "$RUNNER_TEMP/bend"
           tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
           echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
-      - name: Record versions and check proofs
+      - name: Record toolchain
         run: |
           bend version
           deno --version
           bun --version
           bend guide > "$RUNNER_TEMP/bend-guide.txt"
-          bend PROOF.bend
-      - name: Build parser and run compiler regressions
+      - name: Build exact comparison source
+        env:
+          REVISION: ${{ matrix.revision }}
+        run: |
+          source="$GITHUB_WORKSPACE"
+          if [ "$REVISION" = baseline ]; then
+            source="$RUNNER_TEMP/baseline"
+            git worktree add --detach "$source" ac59fb68f98780e168ce01fa39410b1a6ef54efd
+          fi
+          python3 "$GITHUB_WORKSPACE/scripts/build_runtime_reference.py" "$source"
+          (cd "$source" && deno task generate:parser)
+          git -C "$source" rev-parse HEAD > "$source/generated/compiler/source-revision.txt"
+          tar -czf "$RUNNER_TEMP/$REVISION.tar.gz" -C "$source" compiler generated std scripts deno.json deno.lock baba.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ matrix.revision }}
+          path: ${{ runner.temp }}/${{ matrix.revision }}.tar.gz
+          retention-days: 3
+  native-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      BEND_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: oven-sh/setup-bun@v2
+      - name: Install verified Bend release
+        run: |
+          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/bend"
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
+          echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
+      - name: Record toolchain
+        run: |
+          bend version
+          deno --version
+          bun --version
+          bend guide > "$RUNNER_TEMP/bend-guide.txt"
+      - name: Build native and matching reference
         run: |
           deno task generate:parser
-          deno task test:compiler
+          deno task build:compiler
+          python3 scripts/build_runtime_reference.py
+      - name: Typecheck and run compiler regressions
+        run: |
+          mkdir -p build
+          deno check compiler/*.ts
+          deno test --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts 2>&1 | tee build/runtime-tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-native-results
+          path: |
+            build/runtime-tests.log
+            generated/compiler/blotc
+          retention-days: 3
+  benchmarks:
+    needs: reference
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: runtime-baseline
+          path: ${{ runner.temp }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: runtime-candidate
+          path: ${{ runner.temp }}
+      - name: Restore exact generated compilers
+        run: |
+          mkdir -p "$RUNNER_TEMP/baseline"
+          tar -xzf "$RUNNER_TEMP/baseline.tar.gz" -C "$RUNNER_TEMP/baseline"
+          tar -xzf "$RUNNER_TEMP/candidate.tar.gz"
+      - name: Test changed data paths against rebuilt compiler
+        run: |
+          deno fmt --check compiler/fifo*.ts compiler/parser_source*.ts compiler/worker_pool*.ts compiler/guest.ts compiler/guest_arrays.test.ts compiler/array_fill.test.ts compiler/source_project.ts compiler/syntax.ts compiler/runtime_bench.ts compiler/RUNTIME_PERFORMANCE.md
+          deno test --allow-read=compiler,generated,examples,std --filter '/^(parser span|FIFO|compiler worker FIFO|JS numeric array ABI|array fill executes|layout line|kinded declarations)/' compiler/parser_source.test.ts compiler/fifo.test.ts compiler/worker_pool.test.ts compiler/guest_arrays.test.ts compiler/array_fill.test.ts compiler/syntax.test.ts
+      - name: Run alternating paired benchmarks
+        run: |
+          mkdir -p build
+          deno run --allow-read --allow-write=build compiler/runtime_bench.ts "$RUNNER_TEMP/baseline" 2>&1 | tee build/runtime-bench.log
+          cp generated/compiler/source-revision.txt build/candidate-revision.txt
+          cp "$RUNNER_TEMP/baseline/generated/compiler/source-revision.txt" build/baseline-revision.txt
+          cp generated/compiler/runtime-reference-version.txt build/bend-version.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-performance-results
+          path: build/
+          retention-days: 7
