@@ -442,12 +442,19 @@ def expression_shape(expression: I.Expr, context: Context) -> Layout.Shape:
 def scalar_word_in(expression: I.Expr, context: Context) -> Bool:
   Layout.scalar(expression_shape(expression, context))
 
-def scalar_words_in(elements: List<&2, I.Expr>, +context: Context) -> Bool:
-  match elements:
-    case Nil{}:
+# Sibling width must not consume the host stack. Short-circuiting this pure
+# classification does not skip evaluation of any emitted array operand.
+def scalar_words_in_go(elements: List<&2, I.Expr>, +context: Context, scalars: Bool) -> Bool:
+  match elements scalars:
+    case _ False{}:
+      False{}
+    case Nil{} True{}:
       True{}
-    case head <> tail:
-      Bool.and(scalar_word_in(head, context), scalar_words_in(tail, context))
+    case head <> tail True{}:
+      scalar_words_in_go(tail, context, scalar_word_in(head, context))
+
+def scalar_words_in(elements: List<&2, I.Expr>, context: Context) -> Bool:
+  scalar_words_in_go(elements, context, True{})
 
 def control(context: Context, label: Maybe<&2, Nat>) -> Context:
   Context{locals, next_local, labels, provider, layouts} = context

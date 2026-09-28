@@ -5,7 +5,7 @@
 ;; Dynamic blocks begin at or above 64 KiB to avoid common low-ID false roots.
 ;; Word 12 caches the allocation-start bitmap; bump allocation invalidates it.
 ;; All user pointers address the payload. Scalar words are never rewritten.
-;; Only compiler-proven scalar arrays carry the pointer-free bit. Generic/host
+;; Only compiler-proven scalar payloads carry the pointer-free bit. Generic/host
 ;; allocations default to conservative tracing. Reuse resets both flag bits.
 (module
   (type $unary (func (param i32) (result i32)))

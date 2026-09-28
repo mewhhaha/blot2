@@ -93,6 +93,11 @@ costs. These microbenchmarks do not establish an application-wide speedup.
 
 ## Pointer-free array tracing
 
+This section describes the initial direct-expression optimization. The
+subsequent [layout-propagation pass](LAYOUT_PROPAGATION.md) extends it through
+local bindings and product fields, and also recognizes scalar-only tuple and
+record payloads.
+
 The arena now distinguishes its transient mark bit from a persistent
 pointer-free layout bit. Runtime numeric/boolean/unit literals, scalar primitive
 results and array lengths provide sufficient layout evidence for fresh array
