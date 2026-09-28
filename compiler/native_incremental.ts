@@ -5,7 +5,7 @@ import {
   type ArtifactOptions,
   type CompileOptions,
   includesAnalysis,
-} from "./host.ts";
+} from "./host_model.ts";
 import { bendArray } from "./bend_list.ts";
 import {
   createIncrementalFrontend,

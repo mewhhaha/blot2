@@ -162,7 +162,8 @@
       (parse-simple state 14 (parse-expression state 0) -1 -1 @"" offset))))
 (defn parse-declaration [state]
   (let [world (ParseState.program state) exported (parse-take state "entry")
-        offset (parse-at state) is-let (parse-take state "let")]
+        offset (parse-at state) is-let (parse-take state "let")
+        first (Array.length (Program.nodes world))]
     (do
       (when (not is-let) (parse-expect state "const"))
       (let [text (parse-name state) annotation-input -1 annotation-result -1
@@ -201,7 +202,8 @@
             (fail "type_mismatch: a scalar annotation cannot describe a function" offset))
           (when (>= annotation-result 0) (Types.merge world result annotation-result offset))
           (Array.push-back! (Program.declarations world)
-            (Decl.init text exported function parameter input result body offset [])))))))
+            (Decl.init text exported function parameter input result body offset []
+              first (Array.length (Program.nodes world)) [] [] false)))))))
 (defn parse-parse [source]
   (let [state (ParseState.init (Lexer.lex source) 0 0 (Program.init [] [] [0 1 2 3]))]
     (do

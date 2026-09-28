@@ -1,7 +1,7 @@
-; The scalar checkpoint is monomorphic. All source declarations are checked;
-; unsupported first-class/polymorphic function use is rejected, never lowered
-; through the reference compiler. Type IDs use a path-compressed union-find.
-(deftype Numeric [ty Int offset Int division Bool])
+; First-order scalar rank-1 inference. Recursive components are monomorphic
+; while their bodies are checked, then generalized. Every call outside a
+; component receives fresh scheme variables. All source bodies are checked,
+; including unreachable ones; no fallback compiler is used.
 (deftype CheckState [bindings (Array Binding) locals (Array Int) numeric (Array Numeric) depth Int carried (Array Binding)])
 
 (defn check-find [bindings name]
@@ -27,6 +27,49 @@
   (or (parse-comparison op) (= op "@u32.eq") (= op "@u32.lt")
       (= op "@f32.eq") (= op "@f32.ne") (= op "@f32.lt")
       (= op "@f32.le") (= op "@f32.gt") (= op "@f32.ge")))
+
+(defn check-contains [types ty]
+  (let [i 0 found false]
+    (do
+      (while (< i (Array.length types))
+        (do (set! found (or found (= @(Array.unsafe-nth types i) ty))) (set! i (+ i 1))))
+      found)))
+(defn check-add-numeric [world requests ty offset division]
+  (let [root (Types.root world ty) i 0 found -1]
+    (do
+      (while (< i (Array.length requests))
+        (do
+          (when (= root (Types.root world @(Numeric.ty (Array.unsafe-nth requests i))))
+            (set! found i))
+          (set! i (+ i 1))))
+      (if (< found 0)
+        (Array.push-back! requests (Numeric.init root offset division))
+        (when division
+          (do
+            (Numeric.set-division! (Array.unsafe-nth requests found) true)
+            (Numeric.set-offset! (Array.unsafe-nth requests found) offset)))))))
+(defn check-instance-type [world generics instances ty]
+  (let [root (Types.root world ty) result root i 0]
+    (do
+      (while (< i (Array.length generics))
+        (do
+          (when (= root @(Array.unsafe-nth generics i))
+            (set! result @(Array.unsafe-nth instances i)))
+          (set! i (+ i 1))))
+      result)))
+(defn check-instances [world generics]
+  (let [result (the (Array Int) []) i 0]
+    (do
+      (while (< i (Array.length generics))
+        (do (Array.push-back! &result (Types.fresh world)) (set! i (+ i 1))))
+      result)))
+(defn check-numeric [world request]
+  (let [ty (Types.root world @(Numeric.ty request))]
+    (do
+      (when (not (or (= ty u32-type) (= ty f32-type)))
+        (fail "unsupported_numeric_type: scalar operation needs a concrete numeric type" @(Numeric.offset request)))
+      (when (and @(Numeric.division request) (= ty u32-type))
+        (fail "missing_implementation: U32 has no division in the source prelude" @(Numeric.offset request))))))
 
 ; Returns a type ID. The node table does not grow during checking, but scalar
 ; snapshots avoid retaining member references across updates to the same node.
@@ -60,7 +103,7 @@
               (Types.merge world left right offset)
               (when (>= intrinsic 0) (Types.merge world left intrinsic offset))
               (Types.merge world ty (if (check-is-comparison (Node.text &n)) bool-type left) offset)
-              (Array.push-back! (CheckState.numeric state) (Numeric.init left offset division))))
+              (check-add-numeric world (CheckState.numeric state) left offset division)))
         (= tag 6)
           (let [input (check-expression world state a) op (Node.text &n)]
             (cond
@@ -82,11 +125,25 @@
                   (when (not @(Decl.function (Arena.declaration world global)))
                     (fail "not_callable: scalar value used as a function" offset))
                   (let [argument (check-expression world state b)
-                        input @(Decl.input (Arena.declaration world global))
-                        output @(Decl.result (Arena.declaration world global))]
-                    (do (Types.merge world input argument offset)
-                        (Types.merge world ty output offset)
-                        (Node.set-slot! (Arena.node world id) global)))))))
+                        declaration @(Arena.declaration world global)
+                        generics (Decl.generics &declaration)
+                        instances (check-instances world generics)
+                        input (check-instance-type world generics &instances @(Decl.input &declaration))
+                        output (check-instance-type world generics &instances @(Decl.result &declaration))
+                        requests (Decl.numeric &declaration) i 0]
+                    (do
+                      (Types.merge world input argument offset)
+                      (Types.merge world ty output offset)
+                      (while (< i (Array.length requests))
+                        (let [request @(Array.unsafe-nth requests i)]
+                          (do
+                            (when (and @(Decl.checked &declaration)
+                                       (check-contains generics (Types.root world @(Numeric.ty &request))))
+                              (check-add-numeric world (CheckState.numeric state)
+                                (check-instance-type world generics &instances @(Numeric.ty &request))
+                                offset @(Numeric.division &request)))
+                            (set! i (+ i 1)))))
+                      (Node.set-slot! (Arena.node world id) global)))))))
         (= tag 8)
           (let [scope (Array.length (CheckState.bindings state)) saved @(CheckState.carried state)]
             (do
@@ -181,29 +238,93 @@
           (do (set! falls (and falls next-falls)) (set! id @(Node.b &n)))))
       falls)))
 
+; Global constants currently have one scalar storage slot and no schemes.
+; Their unresolved roots must remain shared in this representation. Generalized
+; constants need separate lowering and are not implemented by this milestone.
+; Function signatures contain only scalar roots, not nested function types.
+(defn check-global-types [world]
+  (let [result (the (Array Int) []) i 0]
+    (do
+      (while (< i (Array.length (Program.declarations world)))
+        (do
+          (when (not @(Decl.function (Arena.declaration world i)))
+            (Array.push-back! &result @(Decl.result (Arena.declaration world i))))
+          (set! i (+ i 1))))
+      result)))
+(defn check-global-root [world global-types root]
+  (let [i 0 found false]
+    (do
+      (while (and (< i (Array.length global-types)) (not found))
+        (do
+          (set! found (= root (Types.root world @(Array.unsafe-nth global-types i))))
+          (set! i (+ i 1))))
+      found)))
+(defn check-quantify [world generics global-types ty]
+  (let [root (Types.root world ty)]
+    (when (and (>= root 4) (not (check-contains generics root))
+               (not (check-global-root world global-types root)))
+      (Array.push-back! generics root))))
+(defn check-component [world members global-types]
+  (let [i 0 numeric (the (Array Numeric) [])]
+    (do
+      ; No member is generalized until every recursive body has constrained it.
+      (while (< i (Array.length members))
+        (let [id @(Array.unsafe-nth members i) decl @(Arena.declaration world id)
+              state (CheckState.init [] [] [] 0 [])]
+          (do
+            (let [slot (check-bind &state (Decl.parameter &decl) @(Decl.input &decl))] ())
+            (Types.merge world @(Decl.result &decl)
+              (check-expression world &state @(Decl.body &decl)) @(Decl.offset &decl))
+            (Decl.set-locals! (Arena.declaration world id) @(CheckState.locals &state))
+            (Decl.set-numeric! (Arena.declaration world id) @(CheckState.numeric &state))
+            (let [requests (CheckState.numeric &state) j 0]
+              (while (< j (Array.length requests))
+                (let [request @(Array.unsafe-nth requests j)]
+                  (do
+                    (check-add-numeric world &numeric @(Numeric.ty &request)
+                      @(Numeric.offset &request) @(Numeric.division &request))
+                    (set! j (+ j 1))))))
+            (set! i (+ i 1)))))
+      (set! i 0)
+      (while (< i (Array.length members))
+        (let [id @(Array.unsafe-nth members i) decl @(Arena.declaration world id)
+              generics (the (Array Int) [])]
+          (do
+            (when @(Decl.function &decl)
+              (do (check-quantify world &generics global-types @(Decl.input &decl))
+                  (check-quantify world &generics global-types @(Decl.result &decl))))
+            (Decl.set-generics! (Arena.declaration world id) generics)
+            (set! i (+ i 1)))))
+      ; Prelude numeric dispatch is demanded by reachability in the reference.
+      ; Keep concrete/ambiguous obligations on their body; propagate generic
+      ; obligations across the recursive group, then instantiate them at calls.
+      (set! i 0)
+      (while (< i (Array.length members))
+        (let [id @(Array.unsafe-nth members i) decl @(Arena.declaration world id)
+              requests (the (Array Numeric) []) own (Decl.numeric &decl) j 0]
+          (do
+            (while (< j (Array.length own))
+              (let [request @(Array.unsafe-nth own j)]
+                (do
+                  (check-add-numeric world &requests @(Numeric.ty &request)
+                    @(Numeric.offset &request) @(Numeric.division &request))
+                  (set! j (+ j 1)))))
+            (set! j 0)
+            (while (< j (Array.length &numeric))
+              (let [request @(Array.unsafe-nth &numeric j) ty (Types.root world @(Numeric.ty &request))]
+                (do
+                  (when (check-contains (Decl.generics &decl) ty)
+                    (check-add-numeric world &requests ty @(Numeric.offset &request) @(Numeric.division &request)))
+                  (set! j (+ j 1)))))
+            (Decl.set-numeric! (Arena.declaration world id) requests)
+            (Decl.set-checked! (Arena.declaration world id) true)
+            (set! i (+ i 1))))))))
+
 (defmodule Check
   (defn run [world]
-    (let [i 0 numeric (the (Array Numeric) [])]
-      (do
-        (while (< i (Array.length (Program.declarations world)))
-          (let [decl @(Arena.declaration world i)
-                state (CheckState.init [] [] [] 0 [])]
-            (do
-              (let [slot (check-bind &state (Decl.parameter &decl) @(Decl.input &decl))] ())
-              (Types.merge world @(Decl.result &decl)
-                (check-expression world &state @(Decl.body &decl)) @(Decl.offset &decl))
-              (Decl.set-locals! (Arena.declaration world i) @(CheckState.locals &state))
-              (let [requests (CheckState.numeric &state) j 0]
-                (while (< j (Array.length requests))
-                  (do (Array.push-back! &numeric @(Array.unsafe-nth requests j)) (set! j (+ j 1)))))
-              (set! i (+ i 1)))))
-        (set! i 0)
-        (while (< i (Array.length &numeric))
-          (let [request @(Array.unsafe-nth &numeric i)
-                ty (Types.root world @(Numeric.ty &request))]
-            (do
-              (when (not (or (= ty u32-type) (= ty f32-type)))
-                (fail "unsupported_numeric_type: scalar operation needs a concrete numeric type" @(Numeric.offset &request)))
-              (when (and @(Numeric.division &request) (= ty u32-type))
-                (fail "missing_implementation: U32 has no division in the source prelude" @(Numeric.offset &request)))
-              (set! i (+ i 1)))))))))
+    (let [graph (dependency-graph world) components (dependency-components &graph)
+          global-types (check-global-types world) i 0]
+      (while (< i (Array.length &components))
+        (do
+          (check-component world (Component.members (Array.unsafe-nth &components i)) &global-types)
+          (set! i (+ i 1)))))))

@@ -1,0 +1,1387 @@
+; Generated and modified from the pinned Blot/Bend semantic input.
+; See ../NOTICE and ../licenses for origin and license notices.
+(load "bindings.carp")
+; $$$$047infer$expr_work$/lambda@668003/lambda@668183
+(meta-set! port4925 "sig" (Fn [(Ptr Long)] Long))
+(defn port4925 [frame]
+  (v-callthen4 442 3261 (v-run-clo (v-closure2 5596 (v-get frame 1) (v-get frame 2))) (v-call1 425 (v-get frame 1)) (v-record0 16) (v-call1 424 (v-get frame 2)) (v-call1 444 (v-get frame 0))))
+
+; $$$$047infer$expr_work$/lambda@669104/lambda@669284
+(meta-set! port4926 "sig" (Fn [(Ptr Long)] Long))
+(defn port4926 [frame]
+  (do (v-put frame 3 (v-record1 52 (v-call1 426 (v-call1 424 (v-get frame 2))))) (v-callthen4 442 3261 (v-run-clo (v-closure4 5597 (v-get frame 0) (v-get frame 3) (v-get frame 1) (v-get frame 2))) (v-call1 425 (v-get frame 1)) (v-record1 72 (v-get frame 3)) (v-call2 428 (v-call1 424 (v-get frame 2)) (v-nat-chk (v-binary 0 (v-call1 426 (v-call1 424 (v-get frame 2))) 4607182418800017408l))) (v-call1 444 (v-get frame 0)))))
+
+; $$$$047infer$expr_work$/lambda@670588/lambda@670768
+(meta-set! port4927 "sig" (Fn [(Ptr Long)] Long))
+(defn port4927 [frame]
+  (v-callthen4 565 3261 (v-run-clo (v-closure3 5598 (v-get frame 0) (v-get frame 3) (v-get frame 4))) (v-get frame 1) (v-record1 204 (v-get frame 2)) (v-get frame 0) (v-call1 424 (v-get frame 4))))
+
+; $$$$047infer$expr_work$/lambda@672543/lambda@672990
+(meta-set! port4928 "sig" (Fn [(Ptr Long)] Long))
+(defn port4928 [frame]
+  (v-tailcall1 3262 (v-record2 188 (v-call3 431 (v-call1 423 (v-get frame 0)) (v-call1 429 (v-record0 29)) (v-call2 439 (v-call1 425 (v-get frame 0)) (v-record0 16))) (v-get frame 1))))
+
+; $$$$047infer$expr_work$/lambda@673825/lambda@674030
+(meta-set! port4929 "sig" (Fn [(Ptr Long)] Long))
+(defn port4929 [frame]
+  (v-tailcall1 3262 (v-get frame 0)))
+
+; $$$$047infer$expr_work$/lambda@675209/lambda@675370
+(meta-set! port4930 "sig" (Fn [(Ptr Long)] Long))
+(defn port4930 [frame]
+  (v-tailcall1 3262 (v-record2 188 (v-call1 429 (v-call1 525 (v-get frame 1))) (v-call2 527 (v-get frame 1) (v-get frame 0)))))
+
+; $$$$047infer$expr_work$/lambda@675769/lambda@675932
+(meta-set! port4931 "sig" (Fn [(Ptr Long)] Long))
+(defn port4931 [frame]
+  (v-callthen4 565 3261 (v-run-clo (v-closure3 5599 (v-get frame 0) (v-get frame 4) (v-get frame 5))) (v-get frame 2) (v-record1 204 (v-get frame 1)) (v-get frame 0) (v-call2 527 (v-get frame 4) (v-get frame 3))))
+
+; $$$$047infer$expr_work$/lambda@677431/lambda@677550
+(meta-set! port4932 "sig" (Fn [(Ptr Long)] Long))
+(defn port4932 [frame]
+  (v-callthen4 565 3261 (v-run-clo (v-closure4 5600 (v-get frame 1) (v-get frame 3) (v-get frame 5) (v-get frame 6))) (v-get frame 4) (v-record1 204 (v-get frame 0)) (v-call4 451 (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 6)) (v-get frame 7)))
+
+; $$$$047infer$expr_work$/lambda@678491/lambda@678674
+(meta-set! port4933 "sig" (Fn [(Ptr Long)] Long))
+(defn port4933 [frame]
+  (do (v-put frame 3 (v-record1 52 (v-call1 426 (v-call1 424 (v-get frame 2))))) (v-callthen4 442 3261 (v-run-clo (v-closure3 5601 (v-get frame 3) (v-get frame 1) (v-get frame 2))) (v-call1 425 (v-get frame 1)) (v-record3 70 (v-call1 425 (v-get frame 2)) (v-get frame 3) (v-call1 447 (v-get frame 0))) (v-call2 428 (v-call1 424 (v-get frame 2)) (v-nat-chk (v-binary 0 (v-call1 426 (v-call1 424 (v-get frame 2))) 4607182418800017408l))) (v-call1 444 (v-get frame 0)))))
+
+; $$$$047infer$expr_work$/lambda@680065/lambda@680248
+(meta-set! port4934 "sig" (Fn [(Ptr Long)] Long))
+(defn port4934 [frame]
+  (do (v-put frame 4 (v-record1 52 (v-call1 426 (v-call1 424 (v-get frame 3))))) (v-callthen4 442 3261 (v-run-clo (v-closure3 5602 (v-get frame 4) (v-get frame 2) (v-get frame 3))) (v-call1 425 (v-get frame 2)) (v-record3 70 (v-call1 425 (v-get frame 3)) (v-get frame 4) (v-call1 447 (v-get frame 1))) (v-call2 428 (v-call1 424 (v-get frame 3)) (v-nat-chk (v-binary 0 (v-call1 426 (v-call1 424 (v-get frame 3))) 4607182418800017408l))) (v-call1 444 (v-get frame 0)))))
+
+; $$$$047infer$expr_work$/lambda@681367/lambda@681576
+(meta-set! port4935 "sig" (Fn [(Ptr Long)] Long))
+(defn port4935 [frame]
+  (v-callthen4 565 3261 (v-run-clo (v-closure2 5603 (v-get frame 1) (v-get frame 3))) (v-get frame 2) (v-record1 204 (v-get frame 0)) (v-get frame 1) (v-call1 424 (v-get frame 3))))
+
+; $$$$047infer$expr_work$/lambda@683072/lambda@683252
+(meta-set! port4936 "sig" (Fn [(Ptr Long)] Long))
+(defn port4936 [frame]
+  (do (v-put frame 7 (v-record1 52 (v-call1 426 (v-call1 424 (v-get frame 6))))) (do (v-put frame 8 (v-call3 433 (v-call1 423 (v-get frame 5)) (v-call1 423 (v-get frame 6)) (v-call2 439 (v-call1 425 (v-get frame 5)) (v-call2 439 (v-call1 425 (v-get frame 6)) (v-get frame 7))))) (v-callthen7 470 3261 (v-run-clo (v-closure9 5604 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 8) (v-get frame 3) (v-get frame 7) (v-get frame 4) (v-get frame 5) (v-get frame 6))) (v-call2 2 (v-get frame 3) (v-literal 823)) (v-call1 392 (v-get frame 3)) (v-call1 425 (v-get frame 5)) (v-call1 425 (v-get frame 6)) (v-get frame 7) (v-call2 428 (v-call1 424 (v-get frame 6)) (v-nat-chk (v-binary 0 (v-call1 426 (v-call1 424 (v-get frame 6))) 4607182418800017408l))) (v-call1 444 (v-get frame 0))))))
+
+; $$$$047infer$expr_work$/lambda@685367/lambda@685547
+(meta-set! port4937 "sig" (Fn [(Ptr Long)] Long))
+(defn port4937 [frame]
+  (v-callthen4 442 3261 (v-run-clo (v-closure4 5605 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))) (v-call1 425 (v-get frame 2)) (v-call1 13 (v-get frame 1)) (v-call1 424 (v-get frame 3)) (v-call1 444 (v-get frame 0))))
+
+; $$$$047infer$expr_work$/lambda@686651/lambda@686882
+(meta-set! port4938 "sig" (Fn [(Ptr Long)] Long))
+(defn port4938 [frame]
+  (v-tailcall1 3262 (v-record2 188 (v-call3 431 (v-call1 423 (v-get frame 1)) (v-call1 429 (v-record0 29)) (v-call2 439 (v-call1 425 (v-get frame 1)) (v-call1 15 (v-get frame 0)))) (v-get frame 2))))
+
+; $$$$047infer$expr_work$/lambda@687727/lambda@687909
+(meta-set! port4939 "sig" (Fn [(Ptr Long)] Long))
+(defn port4939 [frame]
+  (do (v-put frame 8 (v-call3 478 (v-get frame 5) (v-get frame 7) (v-get frame 4))) (v-callthen3 560 3261 (v-run-clo (v-closure6 5606 (v-get frame 0) (v-get frame 1) (v-get frame 8) (v-get frame 2) (v-get frame 3) (v-get frame 6))) (v-call2 559 4679240012837945344l (v-get frame 5)) (v-call1 415 (v-call1 423 (v-get frame 6))) (v-get frame 8))))
+
+; $$$$047infer$expr_work$/lambda@689841/lambda@690226
+(meta-set! port4940 "sig" (Fn [(Ptr Long)] Long))
+(defn port4940 [frame]
+  (v-tailcall1 3262 (v-record2 188 (v-call3 433 (v-call1 423 (v-get frame 0)) (v-call1 423 (v-get frame 1)) (v-call2 439 (v-call1 425 (v-get frame 0)) (v-call1 425 (v-get frame 1)))) (v-call1 424 (v-get frame 1)))))
+
+; $$$$047infer$expr_work$/lambda@691453/lambda@691662
+(meta-set! port4941 "sig" (Fn [(Ptr Long)] Long))
+(defn port4941 [frame]
+  (v-callthen4 565 3261 (v-run-clo (v-closure4 5607 (v-get frame 0) (v-get frame 2) (v-get frame 3) (v-get frame 4))) (v-get frame 3) (v-record1 204 (v-get frame 1)) (v-get frame 2) (v-get frame 5)))
+
+; $$$$047infer$expr_work$/lambda@692986/lambda@693165
+(meta-set! port4942 "sig" (Fn [(Ptr Long)] Long))
+(defn port4942 [frame]
+  (v-tailcall1 3262 (v-record2 188 (v-call3 433 (v-call1 423 (v-get frame 0)) (v-call1 423 (v-get frame 1)) (v-call2 439 (v-call1 425 (v-get frame 0)) (v-call1 425 (v-get frame 1)))) (v-call1 424 (v-get frame 1)))))
+
+; $$$$047infer$expr_work$/lambda@694770/lambda@694952
+(meta-set! port4943 "sig" (Fn [(Ptr Long)] Long))
+(defn port4943 [frame]
+  (v-callthen4 540 3261 (v-run-clo (v-closure5 5608 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 4) (v-get frame 6))) (v-get frame 3) (v-call1 425 (v-get frame 6)) (v-get frame 2) (v-call2 477 (v-get frame 7) (v-get frame 5))))
+
+; $$$$047infer$expr_work$/lambda@696769/lambda@696966
+(meta-set! port4944 "sig" (Fn [(Ptr Long)] Long))
+(defn port4944 [frame]
+  (v-tailcall1 3262 (v-record2 188 (v-call3 437 (v-call1 423 (v-get frame 2)) (v-get frame 0) (v-get frame 1)) (v-get frame 3))))
+
+; $$$$047infer$expr_work$/lambda@697392/lambda@697550
+(meta-set! port4945 "sig" (Fn [(Ptr Long)] Long))
+(defn port4945 [frame]
+  (v-callthen4 442 3261 (v-run-clo (v-closure2 5609 (v-get frame 1) (v-get frame 3))) (v-call1 425 (v-get frame 3)) (v-get frame 2) (v-call1 424 (v-get frame 3)) (v-call1 444 (v-get frame 0))))
+
+; $$$$047infer$expr_work$/lambda@698683/lambda@698843
+(meta-set! port4946 "sig" (Fn [(Ptr Long)] Long))
+(defn port4946 [frame]
+  (v-tailcall1 3262 (v-record2 188 (v-call1 423 (v-get frame 0)) (v-get frame 1))))
+
+; $$$$047infer$expr_work$/lambda@699521/lambda@699853
+(meta-set! port4947 "sig" (Fn [(Ptr Long)] Long))
+(defn port4947 [frame]
+  (v-callthen4 565 3261 (v-run-clo (v-closure4 5610 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))) (v-get frame 4) (v-record1 204 (v-get frame 5)) (v-get frame 0) (v-get frame 6)))
+
+; $$$$047infer$expr_work$/lambda@702728/lambda@702909
+(meta-set! port4948 "sig" (Fn [(Ptr Long)] Long))
+(defn port4948 [frame]
+  (v-tailcall2 3261 (v-call2 316 (v-call2 314 (v-call1 446 (v-get frame 0)) (v-get frame 5)) (v-get frame 5)) (v-run-clo (v-closure7 5611 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6)))))
+
+; $$$$047infer$expr_work$/lambda@704860/lambda@705027
+(meta-set! port4949 "sig" (Fn [(Ptr Long)] Long))
+(defn port4949 [frame]
+  (do (v-put frame 4 (v-call1 65 (v-call1 426 (v-call1 424 (v-get frame 3))))) (v-callthen4 442 3261 (v-run-clo (v-closure3 5612 (v-get frame 1) (v-get frame 4) (v-get frame 3))) (v-call1 425 (v-get frame 3)) (v-record3 70 (v-call1 548 (v-get frame 2)) (v-call1 549 (v-get frame 2)) (v-get frame 4)) (v-call2 428 (v-call1 424 (v-get frame 3)) (v-nat-chk (v-binary 0 (v-call1 426 (v-call1 424 (v-get frame 3))) 4607182418800017408l))) (v-call1 444 (v-get frame 0)))))
+
+; $$$$047infer$expr_work$/lambda@706229/lambda@706408
+(meta-set! port4950 "sig" (Fn [(Ptr Long)] Long))
+(defn port4950 [frame]
+  (v-tailcall2 3261 (v-call2 550 (v-get frame 4) (v-call1 444 (v-get frame 1))) (v-run-clo (v-closure4 5613 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3)))))
+
+; $$$$047infer$expr_work$/lambda@707894/lambda@708113
+(meta-set! port4951 "sig" (Fn [(Ptr Long)] Long))
+(defn port4951 [frame]
+  (do (v-put frame 3 (v-call1 464 (v-get frame 2))) (v-tailcall1 3262 (v-record2 188 (v-record6 177 (v-record0 31) (v-record0 0) (v-record0 0) (v-record2 1 (v-record4 203 (v-get frame 0) (v-call1 444 (v-get frame 1)) (v-call1 465 (v-get frame 2)) (v-call1 415 (v-call1 423 (v-get frame 3)))) (v-record0 0)) (v-record0 0) (v-record0 0)) (v-call1 424 (v-get frame 3))))))
+
+; $$$$047infer$expr_work$/lambda@709087/lambda@709273
+(meta-set! port4952 "sig" (Fn [(Ptr Long)] Long))
+(defn port4952 [frame]
+  (v-callthen4 442 3261 (v-run-clo (v-closure3 5614 (v-get frame 0) (v-get frame 1) (v-get frame 2))) (v-call1 425 (v-get frame 1)) (v-record0 31) (v-call1 424 (v-get frame 2)) (v-call1 444 (v-get frame 0))))
+
+; $$$$047infer$expr_work$/lambda@710290/lambda@710507
+(meta-set! port4953 "sig" (Fn [(Ptr Long)] Long))
+(defn port4953 [frame]
+  (v-tailcall1 3262 (v-record2 188 (v-call3 431 (v-call1 423 (v-get frame 0)) (v-call1 429 (v-record0 29)) (v-call2 439 (v-call1 425 (v-get frame 0)) (v-record0 16))) (v-get frame 1))))
+
+; $$$$047infer$expr_work$/lambda@711051/lambda@711233
+(meta-set! port4954 "sig" (Fn [(Ptr Long)] Long))
+(defn port4954 [frame]
+  (v-callthen4 442 3261 (v-run-clo (v-closure3 5615 (v-get frame 0) (v-get frame 1) (v-get frame 2))) (v-call1 425 (v-get frame 1)) (v-record0 30) (v-call1 424 (v-get frame 2)) (v-call1 444 (v-get frame 0))))
+
+; $$$$047infer$expr_work$/lambda@715699/lambda@715899
+(meta-set! port4955 "sig" (Fn [(Ptr Long)] Long))
+(defn port4955 [frame]
+  (v-tailcall4 565 (v-get frame 3) (v-record3 205 (v-get frame 4) (v-get frame 2) (v-call3 433 (v-get frame 0) (v-call1 423 (v-get frame 5)) (v-call2 439 (v-call1 413 (v-get frame 0)) (v-call1 425 (v-get frame 5))))) (v-get frame 1) (v-get frame 6)))
+
+; $$$$047infer$expr_work$/lambda@717334/lambda@717586
+(meta-set! port4956 "sig" (Fn [(Ptr Long)] Long))
+(defn port4956 [frame]
+  (v-callthen4 565 3261 (v-run-clo (v-closure3 5616 (v-get frame 0) (v-get frame 4) (v-get frame 5))) (v-get frame 1) (v-record2 207 (v-get frame 3) (v-get frame 2)) (v-get frame 0) (v-call1 424 (v-get frame 5))))
+
+; $$$$047closures$free$/lambda@736857/lambda@737056
+(meta-set! port4957 "sig" (Fn [(Ptr Long)] Long))
+(defn port4957 [frame]
+  (v-tailcall1 3262 (v-call2 578 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047closures$free$/lambda@737782/lambda@738020
+(meta-set! port4958 "sig" (Fn [(Ptr Long)] Long))
+(defn port4958 [frame]
+  (v-tailcall1 3262 (v-call2 578 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047closures$free$/lambda@738506/lambda@738706
+(meta-set! port4959 "sig" (Fn [(Ptr Long)] Long))
+(defn port4959 [frame]
+  (v-tailcall1 3262 (v-call2 578 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047closures$free$/lambda@739180/lambda@739379
+(meta-set! port4960 "sig" (Fn [(Ptr Long)] Long))
+(defn port4960 [frame]
+  (v-tailcall1 3262 (v-call2 578 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047closures$free$/lambda@739818/lambda@739968
+(meta-set! port4961 "sig" (Fn [(Ptr Long)] Long))
+(defn port4961 [frame]
+  (v-tailcall1 3262 (v-call2 578 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047closures$free$/lambda@740549/lambda@740799
+(meta-set! port4962 "sig" (Fn [(Ptr Long)] Long))
+(defn port4962 [frame]
+  (v-callthen1 581 3261 (v-run-clo (v-closure5 5617 (v-get frame 0) (v-get frame 1) (v-get frame 3) (v-get frame 4) (v-get frame 5))) (v-get frame 2)))
+
+; $$$$047closures$free$/lambda@741974/lambda@742140
+(meta-set! port4963 "sig" (Fn [(Ptr Long)] Long))
+(defn port4963 [frame]
+  (v-tailcall1 3262 (v-call2 578 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047closures$free$/lambda@742898/lambda@743063
+(meta-set! port4964 "sig" (Fn [(Ptr Long)] Long))
+(defn port4964 [frame]
+  (v-tailcall1 3262 (v-call2 578 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047closures$free$/lambda@745167/lambda@745262
+(meta-set! port4965 "sig" (Fn [(Ptr Long)] Long))
+(defn port4965 [frame]
+  (v-callthen2 584 3261 (v-run-clo (v-closure4 5618 (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))) (v-get frame 2) (v-record2 212 (v-get frame 0) (v-call2 3265 (v-get frame 5) (v-get frame 1)))))
+
+; $$$$047globals$infer_declaration_prepared$/lambda@758925/lambda@759021
+(meta-set! port4966 "sig" (Fn [(Ptr Long)] Long))
+(defn port4966 [frame]
+  (v-tailcall2 3261 (v-call2 599 (v-get frame 11) (v-get frame 5)) (v-run-clo (v-closure13 5619 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7) (v-get frame 8) (v-get frame 9) (v-get frame 10) (v-get frame 11) (v-get frame 12)))))
+
+; $$$$047globals$infer_declaration_prepared$/lambda@761251/lambda@761624
+(meta-set! port4967 "sig" (Fn [(Ptr Long)] Long))
+(defn port4967 [frame]
+  (v-callthen4 501 3261 (v-run-clo (v-closure7 5620 (v-get frame 0) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7))) (v-get frame 1) (v-get frame 7) (v-call2 428 (v-call1 596 (v-get frame 4)) (v-nat-chk (v-binary 0 (v-call1 426 (v-call1 596 (v-get frame 4))) 4607182418800017408l))) (v-get frame 3)))
+
+; $$$$047globals$infer_component_prepared$/lambda@764005/lambda@764173
+(meta-set! port4968 "sig" (Fn [(Ptr Long)] Long))
+(defn port4968 [frame]
+  (v-tailcall7 610 (v-get frame 4) (v-get frame 0) (v-get frame 6) (v-get frame 3) (v-get frame 5) (v-get frame 1) (v-get frame 2)))
+
+; $$$$047globals$generalize_bindings_indexed$/lambda@768300/lambda@768457
+(meta-set! port4969 "sig" (Fn [(Ptr Long)] Long))
+(defn port4969 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047globals$scc_nodes$/lambda@778001/lambda@778091
+(meta-set! port4970 "sig" (Fn [(Ptr Long)] Long))
+(defn port4970 [frame]
+  (v-callthen2 622 3261 (v-run-clo (v-closure2 5621 (v-get frame 1) (v-get frame 3))) (v-get frame 2) (v-get frame 0)))
+
+; $$$$047globals$scc_closures$/lambda@782157/lambda@782308
+(meta-set! port4971 "sig" (Fn [(Ptr Long)] Long))
+(defn port4971 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-record2 1086 (v-get frame 0) (v-get frame 1)) (v-get frame 2))))
+
+; $$$$047globals$scc_validate$/lambda@789830/lambda@790202
+(meta-set! port4972 "sig" (Fn [(Ptr Long)] Long))
+(defn port4972 [frame]
+  (v-tailcall6 638 (v-get frame 4) (v-get frame 1) (v-get frame 3) (v-get frame 0) (v-get frame 2) (v-get frame 5)))
+
+; $$$$047globals$close_component$/lambda@792690/lambda@792950
+(meta-set! port4973 "sig" (Fn [(Ptr Long)] Long))
+(defn port4973 [frame]
+  (v-callthen6 638 3261 (v-run-clo (v-closure5 5622 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 5) (v-get frame 6))) (v-get frame 3) (v-get frame 1) (v-get frame 5) (v-get frame 6) (v-get frame 2) (v-get frame 4)))
+
+; $$$$047globals$infer_groups$/lambda@793792/lambda@793965
+(meta-set! port4974 "sig" (Fn [(Ptr Long)] Long))
+(defn port4974 [frame]
+  (v-callthen5 618 3261 (v-run-clo (v-closure6 5623 (v-get frame 0) (v-get frame 1) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6))) (v-get frame 7) (v-get frame 2) (v-get frame 4) (v-get frame 6) (v-get frame 3)))
+
+; $$$$047patterns$coverage$/lambda@804529/lambda@804776
+(meta-set! port4975 "sig" (Fn [(Ptr Long)] Long))
+(defn port4975 [frame]
+  (v-tailcall1 3262 (v-call2 3253 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047patterns$coverage$/lambda@809222/lambda@809450
+(meta-set! port4976 "sig" (Fn [(Ptr Long)] Long))
+(defn port4976 [frame]
+  (v-tailcall1 3262 (v-call2 3253 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047patterns$coverage$/lambda@809907/lambda@810217
+(meta-set! port4977 "sig" (Fn [(Ptr Long)] Long))
+(defn port4977 [frame]
+  (v-callthen3 653 3261 (v-run-clo (v-closure1 5624 (v-get frame 6))) (v-get frame 2) (v-record4 229 (v-get frame 4) (v-get frame 0) (v-get frame 1) (v-get frame 3)) (v-get frame 5)))
+
+; $$$$047patterns$check$/lambda@813713/lambda@813813
+(meta-set! port4978 "sig" (Fn [(Ptr Long)] Long))
+(defn port4978 [frame]
+  (v-tailcall3 657 (v-get frame 1) (v-get frame 0) (v-get frame 2)))
+
+; $$$$047patterns$check$/lambda@814272/lambda@814440
+(meta-set! port4979 "sig" (Fn [(Ptr Long)] Long))
+(defn port4979 [frame]
+  (v-tailcall2 3261 (v-call3 655 (v-get frame 5) (v-get frame 4) (v-get frame 0)) (v-run-clo (v-closure3 5625 (v-get frame 1) (v-get frame 2) (v-get frame 3)))))
+
+; $$$$047check$validate_types_indexed$/lambda@821200/lambda@821416
+(meta-set! port4980 "sig" (Fn [(Ptr Long)] Long))
+(defn port4980 [frame]
+  (v-callthen4 335 3261 (v-run-clo (v-closure4 5626 (v-get frame 1) (v-get frame 3) (v-get frame 4) (v-get frame 5))) (v-get frame 0) (v-get frame 2) (v-get frame 1) (v-get frame 5)))
+
+; $$$$047check$validate_operations_indexed$/lambda@822544/lambda@822701
+(meta-set! port4981 "sig" (Fn [(Ptr Long)] Long))
+(defn port4981 [frame]
+  (v-callthen5 330 3261 (v-run-clo (v-closure6 5627 (v-get frame 0) (v-get frame 1) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6))) (v-get frame 2) (v-record0 7) (v-get frame 1) (v-get frame 6) (v-call1 6 (v-get frame 0))))
+
+; $$$$047check$validate_operations_indexed$/lambda@823571/lambda@823780
+(meta-set! port4982 "sig" (Fn [(Ptr Long)] Long))
+(defn port4982 [frame]
+  (v-callthen5 330 3261 (v-run-clo (v-closure4 5628 (v-get frame 1) (v-get frame 3) (v-get frame 5) (v-get frame 6))) (v-get frame 4) (v-record1 6 (v-get frame 2)) (v-get frame 1) (v-get frame 6) (v-call1 6 (v-get frame 0))))
+
+; $$$$047check$validate_module$/lambda@826081/lambda@826194
+(meta-set! port4983 "sig" (Fn [(Ptr Long)] Long))
+(defn port4983 [frame]
+  (v-tailcall1 667 (v-call2 3265 (v-call1 588 (v-get frame 0)) (v-call1 669 (v-get frame 1)))))
+
+; $$$$047check$module_graph_validated$/lambda@826607/lambda@826709
+(meta-set! port4984 "sig" (Fn [(Ptr Long)] Long))
+(defn port4984 [frame]
+  (do (v-put frame 2 (v-call2 3265 (v-get frame 0) (v-get frame 1))) (v-callthen1 678 3261 (v-run-clo (v-closure1 5629 (v-get frame 2))) (v-call1 676 (v-get frame 2)))))
+
+; $$$$047check$resolve_binding$/lambda@828341/lambda@828461
+(meta-set! port4985 "sig" (Fn [(Ptr Long)] Long))
+(defn port4985 [frame]
+  (v-tailcall1 3262 (v-record4 184 (v-get frame 0) (v-get frame 2) (v-get frame 1) (v-get frame 3))))
+
+; $$$$047check$function_results$/lambda@829727/lambda@829811
+(meta-set! port4986 "sig" (Fn [(Ptr Long)] Long))
+(defn port4986 [frame]
+  (v-callthen3 686 3261 (v-run-clo (v-closure7 5630 (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 9))) (v-get frame 8) (v-get frame 0) (v-get frame 7)))
+
+; $$$$047check$constant_results$/lambda@831153/lambda@831278
+(meta-set! port4987 "sig" (Fn [(Ptr Long)] Long))
+(defn port4987 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-call2 687 (v-record4 316 (v-get frame 2) (v-get frame 1) (v-get frame 0) (v-get frame 3)) (v-get frame 4)) (v-get frame 5))))
+
+; $$$$047check$check_reflections$/lambda@833622/lambda@833715
+(meta-set! port4988 "sig" (Fn [(Ptr Long)] Long))
+(defn port4988 [frame]
+  (v-tailcall3 692 (v-get frame 2) (v-get frame 0) (v-get frame 1)))
+
+; $$$$047check$finish$/lambda@834871/lambda@835044
+(meta-set! port4989 "sig" (Fn [(Ptr Long)] Long))
+(defn port4989 [frame]
+  (v-callthen3 686 3261 (v-run-clo (v-closure5 5631 (v-get frame 0) (v-get frame 1) (v-get frame 3) (v-get frame 4) (v-get frame 5))) (v-get frame 2) (v-get frame 0) (v-get frame 4)))
+
+; $$$$047groups$validate_predicates$/lambda@842256/lambda@842344
+(meta-set! port4990 "sig" (Fn [(Ptr Long)] Long))
+(defn port4990 [frame]
+  (v-callthen2 703 3261 (v-run-clo (v-closure6 5632 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5))) (v-call1 279 (v-record2 1 (v-get frame 0) (v-record0 0))) (v-get frame 1)))
+
+; $$$$047groups$import_interfaces$/lambda@846058/lambda@846199
+(meta-set! port4991 "sig" (Fn [(Ptr Long)] Long))
+(defn port4991 [frame]
+  (v-tailcall2 3261 (v-call5 702 (v-get frame 1) (v-get frame 8) (v-get frame 4) (v-get frame 0) (v-get frame 2)) (v-run-clo (v-closure8 5633 (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7) (v-get frame 8) (v-get frame 9)))))
+
+; $$$$047groups$canonical_work$/lambda@849266/lambda@849404
+(meta-set! port4992 "sig" (Fn [(Ptr Long)] Long))
+(defn port4992 [frame]
+  (v-tailcall2 3261 (v-call1 117 (v-get frame 1)) (v-run-clo (v-closure2 5634 (v-get frame 0) (v-get frame 2)))))
+
+; $$$$047groups$canonical_work$/lambda@850080/lambda@850157
+(meta-set! port4993 "sig" (Fn [(Ptr Long)] Long))
+(defn port4993 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-record3 71 (v-get frame 0) (v-get frame 1) (v-get frame 2)) (v-record0 0))))
+
+; $$$$047groups$canonical_work$/lambda@851680/lambda@851757
+(meta-set! port4994 "sig" (Fn [(Ptr Long)] Long))
+(defn port4994 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-record1 72 (v-get frame 0)) (v-record0 0))))
+
+; $$$$047groups$canonical_work$/lambda@852342/lambda@852421
+(meta-set! port4995 "sig" (Fn [(Ptr Long)] Long))
+(defn port4995 [frame]
+  (v-callthen2 715 3261 (v-run-clo (v-closure1 5635 (v-get frame 2))) (v-get frame 0) (v-record1 57 (v-get frame 1))))
+
+; $$$$047groups$closed_interface$/lambda@853277/lambda@853436
+(meta-set! port4996 "sig" (Fn [(Ptr Long)] Long))
+(defn port4996 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-record6 318 (v-get frame 2) (v-get frame 1) (v-get frame 4) (v-call2 716 (v-get frame 3) 0l) (v-call1 391 (v-get frame 0)) (v-get frame 5)) (v-record0 0))))
+
+; $$$$047groups$export_interface$/lambda@854204/lambda@854281
+(meta-set! port4997 "sig" (Fn [(Ptr Long)] Long))
+(defn port4997 [frame]
+  (v-callthen1 186 3261 (v-run-clo (v-closure6 5636 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5))) (v-get frame 5)))
+
+; $$$$047groups$function_interfaces$/lambda@856120/lambda@856378
+(meta-set! port4998 "sig" (Fn [(Ptr Long)] Long))
+(defn port4998 [frame]
+  (v-callthen3 721 3261 (v-run-clo (v-closure1 5637 (v-get frame 3))) (v-get frame 2) (v-get frame 0) (v-get frame 1)))
+
+; $$$$047groups$constant_interfaces$/lambda@857128/lambda@857298
+(meta-set! port4999 "sig" (Fn [(Ptr Long)] Long))
+(defn port4999 [frame]
+  (v-callthen3 722 3261 (v-run-clo (v-closure1 5638 (v-get frame 3))) (v-get frame 2) (v-get frame 0) (v-get frame 1)))
+
+; $$$$047groups$checked_group$/lambda@859821/lambda@859955
+(meta-set! port5000 "sig" (Fn [(Ptr Long)] Long))
+(defn port5000 [frame]
+  (v-callthen3 726 3261 (v-run-clo (v-closure6 5639 (v-get frame 0) (v-get frame 2) (v-get frame 3) (v-get frame 5) (v-get frame 6) (v-get frame 7))) (v-call1 595 (v-get frame 1)) (v-call2 3265 (v-call1 723 (v-get frame 2)) (v-call1 724 (v-get frame 0))) (v-get frame 4)))
+
+; $$$$047groups$coverage_generalized$/lambda@869052/lambda@869185
+(meta-set! port5001 "sig" (Fn [(Ptr Long)] Long))
+(defn port5001 [frame]
+  (v-tailcall3 738 (v-get frame 1) (v-get frame 0) (v-get frame 2)))
+
+; $$$$047groups$check_group_resolving_graph$/lambda@871868/lambda@872125
+(meta-set! port5002 "sig" (Fn [(Ptr Long)] Long))
+(defn port5002 [frame]
+  (v-callthen4 713 3261 (v-run-clo (v-closure8 5640 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7))) (v-get frame 3) (v-get frame 5) (v-get frame 6) 0l))
+
+; $$$$047groups$usage$/lambda@882328/lambda@882474
+(meta-set! port5003 "sig" (Fn [(Ptr Long)] Long))
+(defn port5003 [frame]
+  (v-tailcall3 758 (v-get frame 0) (v-record2 1087 (v-get frame 2) (v-record2 1 (v-get frame 5) (v-record2 1 (v-get frame 4) (v-get frame 1)))) (v-get frame 3)))
+
+; $$$$047groups$usage$/lambda@888380/lambda@888526
+(meta-set! port5004 "sig" (Fn [(Ptr Long)] Long))
+(defn port5004 [frame]
+  (v-tailcall1 3262 (v-call2 749 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047groups$usage$/lambda@888914/lambda@889064
+(meta-set! port5005 "sig" (Fn [(Ptr Long)] Long))
+(defn port5005 [frame]
+  (v-tailcall1 3262 (v-call2 749 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047groups$usage$/lambda@891601/lambda@891749
+(meta-set! port5006 "sig" (Fn [(Ptr Long)] Long))
+(defn port5006 [frame]
+  (v-tailcall1 3262 (v-call2 749 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047groups$usage$/lambda@892372/lambda@892519
+(meta-set! port5007 "sig" (Fn [(Ptr Long)] Long))
+(defn port5007 [frame]
+  (v-tailcall1 3262 (v-call2 749 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047groups$usage$/lambda@892897/lambda@893044
+(meta-set! port5008 "sig" (Fn [(Ptr Long)] Long))
+(defn port5008 [frame]
+  (v-tailcall1 3262 (v-call2 749 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047groups$usage$/lambda@893427/lambda@893574
+(meta-set! port5009 "sig" (Fn [(Ptr Long)] Long))
+(defn port5009 [frame]
+  (v-tailcall1 3262 (v-call2 749 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047groups$usage$/lambda@894031/lambda@894184
+(meta-set! port5010 "sig" (Fn [(Ptr Long)] Long))
+(defn port5010 [frame]
+  (v-callthen3 758 3261 (v-run-clo (v-closure2 5641 (v-get frame 3) (v-get frame 4))) (v-get frame 1) (v-record1 237 (v-get frame 0)) (v-get frame 2)))
+
+; $$$$047groups$usage$/lambda@894767/lambda@894909
+(meta-set! port5011 "sig" (Fn [(Ptr Long)] Long))
+(defn port5011 [frame]
+  (v-tailcall1 3262 (v-call2 749 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047groups$usage$/lambda@895392/lambda@895540
+(meta-set! port5012 "sig" (Fn [(Ptr Long)] Long))
+(defn port5012 [frame]
+  (v-callthen3 758 3261 (v-run-clo (v-closure5 5642 (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5))) (v-get frame 2) (v-record1 237 (v-get frame 0)) (v-get frame 3)))
+
+; $$$$047groups$usage$/lambda@897092/lambda@897240
+(meta-set! port5013 "sig" (Fn [(Ptr Long)] Long))
+(defn port5013 [frame]
+  (v-tailcall1 3262 (v-call2 749 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047groups$usage$/lambda@897690/lambda@897844
+(meta-set! port5014 "sig" (Fn [(Ptr Long)] Long))
+(defn port5014 [frame]
+  (v-callthen3 758 3261 (v-run-clo (v-closure2 5643 (v-get frame 3) (v-get frame 4))) (v-get frame 0) (v-record1 237 (v-get frame 2)) (v-get frame 1)))
+
+; $$$$047groups$usage$/lambda@898681/lambda@898832
+(meta-set! port5015 "sig" (Fn [(Ptr Long)] Long))
+(defn port5015 [frame]
+  (v-tailcall1 3262 (v-call2 749 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047groups$usage$/lambda@899499/lambda@899646
+(meta-set! port5016 "sig" (Fn [(Ptr Long)] Long))
+(defn port5016 [frame]
+  (v-tailcall3 758 (v-get frame 0) (v-record2 1087 (v-get frame 1) (v-record2 1 (v-get frame 4) (v-record2 1 (v-get frame 3) (v-record0 0)))) (v-get frame 2)))
+
+; $$$$047groups$usage$/lambda@903314/lambda@903457
+(meta-set! port5017 "sig" (Fn [(Ptr Long)] Long))
+(defn port5017 [frame]
+  (v-tailcall1 3262 (v-call2 749 (v-call1 757 (v-get frame 0)) (v-call2 749 (v-get frame 1) (v-get frame 2)))))
+
+; $$$$047groups$declaration_usage$/lambda@907313/lambda@907470
+(meta-set! port5018 "sig" (Fn [(Ptr Long)] Long))
+(defn port5018 [frame]
+  (v-tailcall1 3262 (v-record2 245 (v-get frame 0) (v-call2 749 (v-get frame 1) (v-get frame 2)))))
+
+; $$$$047groups$declaration_usage$/lambda@907969/lambda@908127
+(meta-set! port5019 "sig" (Fn [(Ptr Long)] Long))
+(defn port5019 [frame]
+  (v-tailcall1 3262 (v-record2 245 (v-get frame 0) (v-call2 749 (v-get frame 1) (v-get frame 2)))))
+
+; $$$$047groups$declaration_usages$/lambda@908636/lambda@908743
+(meta-set! port5020 "sig" (Fn [(Ptr Long)] Long))
+(defn port5020 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047groups$operation_types$/lambda@909554/lambda@909658
+(meta-set! port5021 "sig" (Fn [(Ptr Long)] Long))
+(defn port5021 [frame]
+  (v-tailcall1 3262 (v-call2 748 (v-call1 761 (v-get frame 0)) (v-get frame 1))))
+
+; $$$$047groups$operation_types$/lambda@910194/lambda@910298
+(meta-set! port5022 "sig" (Fn [(Ptr Long)] Long))
+(defn port5022 [frame]
+  (v-tailcall1 3262 (v-call2 748 (v-call1 761 (v-get frame 0)) (v-get frame 1))))
+
+; $$$$047groups$constructor_types$/lambda@911686/lambda@911792
+(meta-set! port5023 "sig" (Fn [(Ptr Long)] Long))
+(defn port5023 [frame]
+  (v-tailcall1 3262 (v-call2 748 (v-call1 761 (v-get frame 0)) (v-get frame 1))))
+
+; $$$$047groups$type_dependencies$/lambda@912344/lambda@912450
+(meta-set! port5024 "sig" (Fn [(Ptr Long)] Long))
+(defn port5024 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-record2 246 (v-get frame 0) (v-get frame 1)) (v-get frame 2))))
+
+; $$$$047groups$prepare_plan_usages$/lambda@925010/lambda@925152
+(meta-set! port5025 "sig" (Fn [(Ptr Long)] Long))
+(defn port5025 [frame]
+  (v-callthen2 762 3261 (v-run-clo (v-closure4 5644 (v-get frame 0) (v-get frame 2) (v-get frame 3) (v-get frame 4))) (v-get frame 1) (v-get frame 0)))
+
+; $$$$047groups$prepare_plan_graph$/lambda@926126/lambda@926335
+(meta-set! port5026 "sig" (Fn [(Ptr Long)] Long))
+(defn port5026 [frame]
+  (v-callthen2 762 3261 (v-run-clo (v-closure4 5645 (v-get frame 0) (v-get frame 2) (v-get frame 3) (v-get frame 4))) (v-get frame 1) (v-get frame 0)))
+
+; $$$$047groups$finish_components$/lambda@928317/lambda@928380
+(meta-set! port5027 "sig" (Fn [(Ptr Long)] Long))
+(defn port5027 [frame]
+  (do (v-put frame 7 (v-call5 779 (v-get frame 6) (v-call2 354 (v-get frame 2) (v-call0 3279)) (v-call2 778 (v-get frame 1) (v-call0 3279)) (v-call1 3287 (v-call1 353 (v-get frame 2))) (v-call0 3279))) (do (v-put frame 8 (v-call3 780 (v-get frame 3) (v-get frame 7) (v-call2 768 (v-get frame 3) (v-call0 3279)))) (do (v-put frame 9 (v-call1 3291 (v-call1 3286 (v-get frame 8)))) (v-tailcall1 3262 (v-call8 783 (v-get frame 5) (v-call2 354 (v-get frame 0) (v-call0 3279)) (v-call1 3287 (v-call1 353 (v-get frame 0))) (v-call3 776 (v-get frame 4) (v-get frame 8) (v-call0 3279)) (v-get frame 7) (v-get frame 8) (v-get frame 9) (v-call0 3279)))))))
+
+; $$$$047check_chain_plan$next_chain$/lambda@944148/lambda@944301
+(meta-set! port5028 "sig" (Fn [(Ptr Long)] Long))
+(defn port5028 [frame]
+  (v-tailcall1 3262 (v-call3 813 (v-get frame 2) (v-get frame 1) (v-get frame 0))))
+
+; $$$$047check_regions$unite_distinct$/lambda@953283/lambda@953497
+(meta-set! port5029 "sig" (Fn [(Ptr Long)] Long))
+(defn port5029 [frame]
+  (do (v-put frame 2 (v-call1 826 (v-get frame 0))) (do (v-put frame 3 (v-call1 826 (v-get frame 1))) (v-tailcall1 3262 (v-call7 831 (v-call1 825 (v-get frame 0)) (v-call1 826 (v-get frame 0)) (v-call1 825 (v-get frame 1)) (v-call1 826 (v-get frame 1)) (v-call1 827 (v-get frame 1)) (v-call2 2 (v-call1 825 (v-get frame 0)) (v-call1 825 (v-get frame 1))) (v-cmp-new (v-get frame 2) (v-get frame 3)))))))
+
+; $$$$047check_scheduler$dependency_interfaces$/lambda@1125967/lambda@1126086
+(meta-set! port5030 "sig" (Fn [(Ptr Long)] Long))
+(defn port5030 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047check_scheduler$ordered_functions$/lambda@1129358/lambda@1129473
+(meta-set! port5031 "sig" (Fn [(Ptr Long)] Long))
+(defn port5031 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047check_scheduler$ordered_constants$/lambda@1129955/lambda@1130070
+(meta-set! port5032 "sig" (Fn [(Ptr Long)] Long))
+(defn port5032 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047check_scheduler$assembled$/lambda@1198637/lambda@1198769
+(meta-set! port5033 "sig" (Fn [(Ptr Long)] Long))
+(defn port5033 [frame]
+  (v-tailcall1 3262 (v-record4 269 (v-get frame 3) (v-get frame 2) (v-get frame 1) (v-get frame 0))))
+
+; $$$$047check_scheduler$check_dependent_jobs$/lambda@1219532/lambda@1219626
+(meta-set! port5034 "sig" (Fn [(Ptr Long)] Long))
+(defn port5034 [frame]
+  (v-tailcall3 1023 (v-call1 847 (v-get frame 2)) (v-get frame 1) (v-call3 1015 (v-call1 846 (v-get frame 2)) (v-get frame 1) (v-get frame 0))))
+
+; $$$$047check_scheduler$check_module_core$/lambda@1220564/lambda@1220865
+(meta-set! port5035 "sig" (Fn [(Ptr Long)] Long))
+(defn port5035 [frame]
+  (v-tailcall2 999 (v-get frame 0) (v-get frame 1)))
+
+; $$$$047const_eval$capture_environment$/lambda@1230203/lambda@1230316
+(meta-set! port5036 "sig" (Fn [(Ptr Long)] Long))
+(defn port5036 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-record2 347 (v-get frame 0) (v-get frame 1)) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1320208/lambda@1320277
+(meta-set! port5037 "sig" (Fn [(Ptr Long)] Long))
+(defn port5037 [frame]
+  (v-run-clo (v-closure3 5646 (v-get frame 0) (v-get frame 1) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1327401/lambda@1327470
+(meta-set! port5038 "sig" (Fn [(Ptr Long)] Long))
+(defn port5038 [frame]
+  (v-run-clo (v-closure3 5647 (v-get frame 0) (v-get frame 1) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1335137/lambda@1335257
+(meta-set! port5039 "sig" (Fn [(Ptr Long)] Long))
+(defn port5039 [frame]
+  (v-tailcall6 1126 0l (v-get frame 5) (v-record0 0) (v-call1 1054 (v-get frame 6)) (v-record2 381 (v-get frame 2) (v-call3 1098 (v-record2 373 (v-get frame 7) (v-get frame 0)) (v-get frame 3) (v-get frame 4))) (v-get frame 1)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1344019/lambda@1344090
+(meta-set! port5040 "sig" (Fn [(Ptr Long)] Long))
+(defn port5040 [frame]
+  (v-run-clo (v-closure7 5648 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1345192/lambda@1345357
+(meta-set! port5041 "sig" (Fn [(Ptr Long)] Long))
+(defn port5041 [frame]
+  (v-callthen3 1096 3261 (v-run-clo (v-closure5 5649 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 4) (v-get frame 5))) (v-get frame 6) (v-get frame 3) (v-run-clo (v-closure1 5650 (v-get frame 5)))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1349844/lambda@1349964
+(meta-set! port5042 "sig" (Fn [(Ptr Long)] Long))
+(defn port5042 [frame]
+  (v-tailcall6 1126 0l (v-get frame 5) (v-record0 0) (v-call1 1054 (v-get frame 6)) (v-record2 381 (v-get frame 2) (v-call3 1098 (v-record2 373 (v-get frame 7) (v-get frame 0)) (v-get frame 3) (v-get frame 4))) (v-get frame 1)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1362508/lambda@1362628
+(meta-set! port5043 "sig" (Fn [(Ptr Long)] Long))
+(defn port5043 [frame]
+  (v-tailcall6 1126 0l (v-get frame 5) (v-record0 0) (v-call1 1054 (v-get frame 6)) (v-record2 381 (v-get frame 2) (v-call3 1098 (v-record2 373 (v-get frame 7) (v-get frame 0)) (v-get frame 3) (v-get frame 4))) (v-get frame 1)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1367803/lambda@1367874
+(meta-set! port5044 "sig" (Fn [(Ptr Long)] Long))
+(defn port5044 [frame]
+  (v-run-clo (v-closure4 5651 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1371930/lambda@1372001
+(meta-set! port5045 "sig" (Fn [(Ptr Long)] Long))
+(defn port5045 [frame]
+  (v-run-clo (v-closure7 5652 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1373103/lambda@1373268
+(meta-set! port5046 "sig" (Fn [(Ptr Long)] Long))
+(defn port5046 [frame]
+  (v-callthen3 1096 3261 (v-run-clo (v-closure5 5653 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 4) (v-get frame 5))) (v-get frame 6) (v-get frame 3) (v-run-clo (v-closure1 5654 (v-get frame 5)))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1377755/lambda@1377875
+(meta-set! port5047 "sig" (Fn [(Ptr Long)] Long))
+(defn port5047 [frame]
+  (v-tailcall6 1126 0l (v-get frame 5) (v-record0 0) (v-call1 1054 (v-get frame 6)) (v-record2 381 (v-get frame 2) (v-call3 1098 (v-record2 373 (v-get frame 7) (v-get frame 0)) (v-get frame 3) (v-get frame 4))) (v-get frame 1)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1383198/lambda@1383269
+(meta-set! port5048 "sig" (Fn [(Ptr Long)] Long))
+(defn port5048 [frame]
+  (v-run-clo (v-closure4 5655 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1395811/lambda@1395882
+(meta-set! port5049 "sig" (Fn [(Ptr Long)] Long))
+(defn port5049 [frame]
+  (v-run-clo (v-closure5 5656 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1408549/lambda@1408620
+(meta-set! port5050 "sig" (Fn [(Ptr Long)] Long))
+(defn port5050 [frame]
+  (v-run-clo (v-closure2 5657 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1409685/lambda@1409756
+(meta-set! port5051 "sig" (Fn [(Ptr Long)] Long))
+(defn port5051 [frame]
+  (v-run-clo (v-closure1 5658 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1410857/lambda@1410928
+(meta-set! port5052 "sig" (Fn [(Ptr Long)] Long))
+(defn port5052 [frame]
+  (v-run-clo (v-closure2 5659 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1411461/lambda@1411532
+(meta-set! port5053 "sig" (Fn [(Ptr Long)] Long))
+(defn port5053 [frame]
+  (v-run-clo (v-closure1 5660 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1412335/lambda@1412406
+(meta-set! port5054 "sig" (Fn [(Ptr Long)] Long))
+(defn port5054 [frame]
+  (v-run-clo (v-closure8 5661 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1413852/lambda@1413923
+(meta-set! port5055 "sig" (Fn [(Ptr Long)] Long))
+(defn port5055 [frame]
+  (v-run-clo (v-closure5 5662 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1414662/lambda@1414735
+(meta-set! port5056 "sig" (Fn [(Ptr Long)] Long))
+(defn port5056 [frame]
+  (v-run-clo (v-closure4 5663 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1415887/lambda@1415960
+(meta-set! port5057 "sig" (Fn [(Ptr Long)] Long))
+(defn port5057 [frame]
+  (v-run-clo (v-closure4 5664 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1416881/lambda@1416954
+(meta-set! port5058 "sig" (Fn [(Ptr Long)] Long))
+(defn port5058 [frame]
+  (v-run-clo (v-closure4 5665 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1417927/lambda@1418000
+(meta-set! port5059 "sig" (Fn [(Ptr Long)] Long))
+(defn port5059 [frame]
+  (v-run-clo (v-closure5 5666 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1419834/lambda@1419907
+(meta-set! port5060 "sig" (Fn [(Ptr Long)] Long))
+(defn port5060 [frame]
+  (v-run-clo (v-closure1 5667 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1420466/lambda@1420618
+(meta-set! port5061 "sig" (Fn [(Ptr Long)] Long))
+(defn port5061 [frame]
+  (v-tailcall1 3262 (v-record2 349 (v-record4 1088 (v-get frame 2) (v-get frame 3) (v-get frame 0) (v-get frame 5)) (v-call1 1053 (v-record2 345 (v-nat-chk (v-binary 0 (v-get frame 4) 4607182418800017408l)) (v-get frame 1))))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1421518/lambda@1421591
+(meta-set! port5062 "sig" (Fn [(Ptr Long)] Long))
+(defn port5062 [frame]
+  (v-run-clo (v-closure3 5668 (v-get frame 0) (v-get frame 1) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1422356/lambda@1422429
+(meta-set! port5063 "sig" (Fn [(Ptr Long)] Long))
+(defn port5063 [frame]
+  (v-run-clo (v-closure2 5669 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1423158/lambda@1423231
+(meta-set! port5064 "sig" (Fn [(Ptr Long)] Long))
+(defn port5064 [frame]
+  (v-run-clo (v-closure4 5670 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1423943/lambda@1424016
+(meta-set! port5065 "sig" (Fn [(Ptr Long)] Long))
+(defn port5065 [frame]
+  (v-run-clo (v-closure4 5671 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1425586/lambda@1425659
+(meta-set! port5066 "sig" (Fn [(Ptr Long)] Long))
+(defn port5066 [frame]
+  (v-run-clo (v-closure4 5672 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1426751/lambda@1426824
+(meta-set! port5067 "sig" (Fn [(Ptr Long)] Long))
+(defn port5067 [frame]
+  (v-run-clo (v-closure5 5673 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1427757/lambda@1427830
+(meta-set! port5068 "sig" (Fn [(Ptr Long)] Long))
+(defn port5068 [frame]
+  (v-run-clo (v-closure2 5674 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1428439/lambda@1428512
+(meta-set! port5069 "sig" (Fn [(Ptr Long)] Long))
+(defn port5069 [frame]
+  (v-run-clo (v-closure4 5675 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1429380/lambda@1429453
+(meta-set! port5070 "sig" (Fn [(Ptr Long)] Long))
+(defn port5070 [frame]
+  (v-run-clo (v-closure1 5676 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1430052/lambda@1430125
+(meta-set! port5071 "sig" (Fn [(Ptr Long)] Long))
+(defn port5071 [frame]
+  (v-run-clo (v-closure4 5677 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1431091/lambda@1431164
+(meta-set! port5072 "sig" (Fn [(Ptr Long)] Long))
+(defn port5072 [frame]
+  (v-run-clo (v-closure5 5678 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1431951/lambda@1432024
+(meta-set! port5073 "sig" (Fn [(Ptr Long)] Long))
+(defn port5073 [frame]
+  (v-run-clo (v-closure5 5679 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1432845/lambda@1432918
+(meta-set! port5074 "sig" (Fn [(Ptr Long)] Long))
+(defn port5074 [frame]
+  (v-run-clo (v-closure5 5680 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1433723/lambda@1433796
+(meta-set! port5075 "sig" (Fn [(Ptr Long)] Long))
+(defn port5075 [frame]
+  (v-run-clo (v-closure3 5681 (v-get frame 0) (v-get frame 1) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1434464/lambda@1434537
+(meta-set! port5076 "sig" (Fn [(Ptr Long)] Long))
+(defn port5076 [frame]
+  (v-run-clo (v-closure4 5682 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1435460/lambda@1435533
+(meta-set! port5077 "sig" (Fn [(Ptr Long)] Long))
+(defn port5077 [frame]
+  (v-run-clo (v-closure6 5683 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1437609/lambda@1437682
+(meta-set! port5078 "sig" (Fn [(Ptr Long)] Long))
+(defn port5078 [frame]
+  (v-run-clo (v-closure2 5684 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1438496/lambda@1438569
+(meta-set! port5079 "sig" (Fn [(Ptr Long)] Long))
+(defn port5079 [frame]
+  (v-run-clo (v-closure5 5685 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1447445/lambda@1447518
+(meta-set! port5080 "sig" (Fn [(Ptr Long)] Long))
+(defn port5080 [frame]
+  (v-run-clo (v-closure4 5686 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1451891/lambda@1451964
+(meta-set! port5081 "sig" (Fn [(Ptr Long)] Long))
+(defn port5081 [frame]
+  (v-run-clo (v-closure5 5687 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1456853/lambda@1456926
+(meta-set! port5082 "sig" (Fn [(Ptr Long)] Long))
+(defn port5082 [frame]
+  (v-run-clo (v-closure4 5688 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1465272/lambda@1465345
+(meta-set! port5083 "sig" (Fn [(Ptr Long)] Long))
+(defn port5083 [frame]
+  (v-run-clo (v-closure2 5689 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1466415/lambda@1466488
+(meta-set! port5084 "sig" (Fn [(Ptr Long)] Long))
+(defn port5084 [frame]
+  (v-run-clo (v-closure1 5690 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1467594/lambda@1467667
+(meta-set! port5085 "sig" (Fn [(Ptr Long)] Long))
+(defn port5085 [frame]
+  (v-run-clo (v-closure2 5691 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1468205/lambda@1468278
+(meta-set! port5086 "sig" (Fn [(Ptr Long)] Long))
+(defn port5086 [frame]
+  (v-run-clo (v-closure1 5692 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1469086/lambda@1469159
+(meta-set! port5087 "sig" (Fn [(Ptr Long)] Long))
+(defn port5087 [frame]
+  (v-run-clo (v-closure8 5693 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1470622/lambda@1470695
+(meta-set! port5088 "sig" (Fn [(Ptr Long)] Long))
+(defn port5088 [frame]
+  (v-run-clo (v-closure5 5694 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1471439/lambda@1471512
+(meta-set! port5089 "sig" (Fn [(Ptr Long)] Long))
+(defn port5089 [frame]
+  (v-run-clo (v-closure4 5695 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1472665/lambda@1472738
+(meta-set! port5090 "sig" (Fn [(Ptr Long)] Long))
+(defn port5090 [frame]
+  (v-run-clo (v-closure4 5696 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1473660/lambda@1473733
+(meta-set! port5091 "sig" (Fn [(Ptr Long)] Long))
+(defn port5091 [frame]
+  (v-run-clo (v-closure4 5697 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1474707/lambda@1474780
+(meta-set! port5092 "sig" (Fn [(Ptr Long)] Long))
+(defn port5092 [frame]
+  (v-run-clo (v-closure5 5698 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1476615/lambda@1476688
+(meta-set! port5093 "sig" (Fn [(Ptr Long)] Long))
+(defn port5093 [frame]
+  (v-run-clo (v-closure1 5699 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1477248/lambda@1477400
+(meta-set! port5094 "sig" (Fn [(Ptr Long)] Long))
+(defn port5094 [frame]
+  (v-tailcall1 3262 (v-record2 349 (v-record4 1088 (v-get frame 2) (v-get frame 3) (v-get frame 0) (v-get frame 5)) (v-call1 1053 (v-record2 345 (v-nat-chk (v-binary 0 (v-get frame 4) 4607182418800017408l)) (v-get frame 1))))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1478303/lambda@1478376
+(meta-set! port5095 "sig" (Fn [(Ptr Long)] Long))
+(defn port5095 [frame]
+  (v-run-clo (v-closure3 5700 (v-get frame 0) (v-get frame 1) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1479143/lambda@1479216
+(meta-set! port5096 "sig" (Fn [(Ptr Long)] Long))
+(defn port5096 [frame]
+  (v-run-clo (v-closure2 5701 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1479947/lambda@1480020
+(meta-set! port5097 "sig" (Fn [(Ptr Long)] Long))
+(defn port5097 [frame]
+  (v-run-clo (v-closure4 5702 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1480733/lambda@1480806
+(meta-set! port5098 "sig" (Fn [(Ptr Long)] Long))
+(defn port5098 [frame]
+  (v-run-clo (v-closure4 5703 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1482377/lambda@1482450
+(meta-set! port5099 "sig" (Fn [(Ptr Long)] Long))
+(defn port5099 [frame]
+  (v-run-clo (v-closure4 5704 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1483543/lambda@1483616
+(meta-set! port5100 "sig" (Fn [(Ptr Long)] Long))
+(defn port5100 [frame]
+  (v-run-clo (v-closure5 5705 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1484550/lambda@1484623
+(meta-set! port5101 "sig" (Fn [(Ptr Long)] Long))
+(defn port5101 [frame]
+  (v-run-clo (v-closure2 5706 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1485233/lambda@1485306
+(meta-set! port5102 "sig" (Fn [(Ptr Long)] Long))
+(defn port5102 [frame]
+  (v-run-clo (v-closure4 5707 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1486175/lambda@1486248
+(meta-set! port5103 "sig" (Fn [(Ptr Long)] Long))
+(defn port5103 [frame]
+  (v-run-clo (v-closure1 5708 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1486848/lambda@1486921
+(meta-set! port5104 "sig" (Fn [(Ptr Long)] Long))
+(defn port5104 [frame]
+  (v-run-clo (v-closure4 5709 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1487888/lambda@1487961
+(meta-set! port5105 "sig" (Fn [(Ptr Long)] Long))
+(defn port5105 [frame]
+  (v-run-clo (v-closure5 5710 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1488749/lambda@1488822
+(meta-set! port5106 "sig" (Fn [(Ptr Long)] Long))
+(defn port5106 [frame]
+  (v-run-clo (v-closure5 5711 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1489644/lambda@1489717
+(meta-set! port5107 "sig" (Fn [(Ptr Long)] Long))
+(defn port5107 [frame]
+  (v-run-clo (v-closure5 5712 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1490523/lambda@1490596
+(meta-set! port5108 "sig" (Fn [(Ptr Long)] Long))
+(defn port5108 [frame]
+  (v-run-clo (v-closure3 5713 (v-get frame 0) (v-get frame 1) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1491265/lambda@1491338
+(meta-set! port5109 "sig" (Fn [(Ptr Long)] Long))
+(defn port5109 [frame]
+  (v-run-clo (v-closure4 5714 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1492263/lambda@1492336
+(meta-set! port5110 "sig" (Fn [(Ptr Long)] Long))
+(defn port5110 [frame]
+  (v-run-clo (v-closure6 5715 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1494417/lambda@1494490
+(meta-set! port5111 "sig" (Fn [(Ptr Long)] Long))
+(defn port5111 [frame]
+  (v-run-clo (v-closure2 5716 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1495305/lambda@1495378
+(meta-set! port5112 "sig" (Fn [(Ptr Long)] Long))
+(defn port5112 [frame]
+  (v-run-clo (v-closure5 5717 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1504766/lambda@1504888
+(meta-set! port5113 "sig" (Fn [(Ptr Long)] Long))
+(defn port5113 [frame]
+  (v-tailcall6 1126 (v-nat-chk (v-binary 0 (v-get frame 3) 4607182418800017408l)) (v-get frame 6) (v-record0 0) (v-call1 1054 (v-get frame 7)) (v-record2 381 (v-get frame 2) (v-call3 1098 (v-record2 373 (v-get frame 8) (v-get frame 0)) (v-get frame 4) (v-get frame 5))) (v-get frame 1)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1515290/lambda@1515363
+(meta-set! port5114 "sig" (Fn [(Ptr Long)] Long))
+(defn port5114 [frame]
+  (v-run-clo (v-closure8 5718 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1516310/lambda@1516383
+(meta-set! port5115 "sig" (Fn [(Ptr Long)] Long))
+(defn port5115 [frame]
+  (v-run-clo (v-closure6 5719 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1517176/lambda@1517343
+(meta-set! port5116 "sig" (Fn [(Ptr Long)] Long))
+(defn port5116 [frame]
+  (v-callthen3 1096 3261 (v-run-clo (v-closure6 5720 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 5) (v-get frame 6))) (v-get frame 7) (v-get frame 4) (v-run-clo (v-closure2 5721 (v-get frame 3) (v-get frame 6)))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1521954/lambda@1522076
+(meta-set! port5117 "sig" (Fn [(Ptr Long)] Long))
+(defn port5117 [frame]
+  (v-tailcall6 1126 (v-nat-chk (v-binary 0 (v-get frame 3) 4607182418800017408l)) (v-get frame 6) (v-record0 0) (v-call1 1054 (v-get frame 7)) (v-record2 381 (v-get frame 2) (v-call3 1098 (v-record2 373 (v-get frame 8) (v-get frame 0)) (v-get frame 4) (v-get frame 5))) (v-get frame 1)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1535474/lambda@1535547
+(meta-set! port5118 "sig" (Fn [(Ptr Long)] Long))
+(defn port5118 [frame]
+  (v-run-clo (v-closure2 5722 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1536620/lambda@1536693
+(meta-set! port5119 "sig" (Fn [(Ptr Long)] Long))
+(defn port5119 [frame]
+  (v-run-clo (v-closure1 5723 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1537800/lambda@1537873
+(meta-set! port5120 "sig" (Fn [(Ptr Long)] Long))
+(defn port5120 [frame]
+  (v-run-clo (v-closure2 5724 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1538412/lambda@1538485
+(meta-set! port5121 "sig" (Fn [(Ptr Long)] Long))
+(defn port5121 [frame]
+  (v-run-clo (v-closure1 5725 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1539295/lambda@1539368
+(meta-set! port5122 "sig" (Fn [(Ptr Long)] Long))
+(defn port5122 [frame]
+  (v-run-clo (v-closure8 5726 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1540834/lambda@1540907
+(meta-set! port5123 "sig" (Fn [(Ptr Long)] Long))
+(defn port5123 [frame]
+  (v-run-clo (v-closure5 5727 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1541653/lambda@1541726
+(meta-set! port5124 "sig" (Fn [(Ptr Long)] Long))
+(defn port5124 [frame]
+  (v-run-clo (v-closure4 5728 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1542880/lambda@1542953
+(meta-set! port5125 "sig" (Fn [(Ptr Long)] Long))
+(defn port5125 [frame]
+  (v-run-clo (v-closure4 5729 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1543876/lambda@1543949
+(meta-set! port5126 "sig" (Fn [(Ptr Long)] Long))
+(defn port5126 [frame]
+  (v-run-clo (v-closure4 5730 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1544924/lambda@1544997
+(meta-set! port5127 "sig" (Fn [(Ptr Long)] Long))
+(defn port5127 [frame]
+  (v-run-clo (v-closure5 5731 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1546833/lambda@1546906
+(meta-set! port5128 "sig" (Fn [(Ptr Long)] Long))
+(defn port5128 [frame]
+  (v-run-clo (v-closure1 5732 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1547468/lambda@1547620
+(meta-set! port5129 "sig" (Fn [(Ptr Long)] Long))
+(defn port5129 [frame]
+  (v-tailcall1 3262 (v-record2 349 (v-record4 1088 (v-get frame 2) (v-get frame 3) (v-get frame 0) (v-get frame 5)) (v-call1 1053 (v-record2 345 (v-nat-chk (v-binary 0 (v-get frame 4) 4607182418800017408l)) (v-get frame 1))))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1548526/lambda@1548599
+(meta-set! port5130 "sig" (Fn [(Ptr Long)] Long))
+(defn port5130 [frame]
+  (v-run-clo (v-closure3 5733 (v-get frame 0) (v-get frame 1) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1549367/lambda@1549440
+(meta-set! port5131 "sig" (Fn [(Ptr Long)] Long))
+(defn port5131 [frame]
+  (v-run-clo (v-closure2 5734 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1550175/lambda@1550248
+(meta-set! port5132 "sig" (Fn [(Ptr Long)] Long))
+(defn port5132 [frame]
+  (v-run-clo (v-closure4 5735 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1550963/lambda@1551036
+(meta-set! port5133 "sig" (Fn [(Ptr Long)] Long))
+(defn port5133 [frame]
+  (v-run-clo (v-closure4 5736 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1552609/lambda@1552682
+(meta-set! port5134 "sig" (Fn [(Ptr Long)] Long))
+(defn port5134 [frame]
+  (v-run-clo (v-closure4 5737 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1553777/lambda@1553850
+(meta-set! port5135 "sig" (Fn [(Ptr Long)] Long))
+(defn port5135 [frame]
+  (v-run-clo (v-closure5 5738 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1554785/lambda@1554858
+(meta-set! port5136 "sig" (Fn [(Ptr Long)] Long))
+(defn port5136 [frame]
+  (v-run-clo (v-closure2 5739 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1555469/lambda@1555542
+(meta-set! port5137 "sig" (Fn [(Ptr Long)] Long))
+(defn port5137 [frame]
+  (v-run-clo (v-closure4 5740 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1556412/lambda@1556485
+(meta-set! port5138 "sig" (Fn [(Ptr Long)] Long))
+(defn port5138 [frame]
+  (v-run-clo (v-closure1 5741 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1557086/lambda@1557159
+(meta-set! port5139 "sig" (Fn [(Ptr Long)] Long))
+(defn port5139 [frame]
+  (v-run-clo (v-closure4 5742 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1558129/lambda@1558202
+(meta-set! port5140 "sig" (Fn [(Ptr Long)] Long))
+(defn port5140 [frame]
+  (v-run-clo (v-closure5 5743 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1558995/lambda@1559068
+(meta-set! port5141 "sig" (Fn [(Ptr Long)] Long))
+(defn port5141 [frame]
+  (v-run-clo (v-closure5 5744 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1559893/lambda@1559966
+(meta-set! port5142 "sig" (Fn [(Ptr Long)] Long))
+(defn port5142 [frame]
+  (v-run-clo (v-closure5 5745 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1560773/lambda@1560846
+(meta-set! port5143 "sig" (Fn [(Ptr Long)] Long))
+(defn port5143 [frame]
+  (v-run-clo (v-closure3 5746 (v-get frame 0) (v-get frame 1) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1561516/lambda@1561589
+(meta-set! port5144 "sig" (Fn [(Ptr Long)] Long))
+(defn port5144 [frame]
+  (v-run-clo (v-closure4 5747 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1562515/lambda@1562588
+(meta-set! port5145 "sig" (Fn [(Ptr Long)] Long))
+(defn port5145 [frame]
+  (v-run-clo (v-closure6 5748 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1564671/lambda@1564744
+(meta-set! port5146 "sig" (Fn [(Ptr Long)] Long))
+(defn port5146 [frame]
+  (v-run-clo (v-closure2 5749 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1565562/lambda@1565635
+(meta-set! port5147 "sig" (Fn [(Ptr Long)] Long))
+(defn port5147 [frame]
+  (v-run-clo (v-closure5 5750 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1575016/lambda@1575138
+(meta-set! port5148 "sig" (Fn [(Ptr Long)] Long))
+(defn port5148 [frame]
+  (v-tailcall6 1126 (v-nat-chk (v-binary 0 (v-get frame 3) 4607182418800017408l)) (v-get frame 6) (v-record0 0) (v-call1 1054 (v-get frame 7)) (v-record2 381 (v-get frame 2) (v-call3 1098 (v-record2 373 (v-get frame 8) (v-get frame 0)) (v-get frame 4) (v-get frame 5))) (v-get frame 1)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1580523/lambda@1580596
+(meta-set! port5149 "sig" (Fn [(Ptr Long)] Long))
+(defn port5149 [frame]
+  (v-run-clo (v-closure5 5751 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1586139/lambda@1586212
+(meta-set! port5150 "sig" (Fn [(Ptr Long)] Long))
+(defn port5150 [frame]
+  (v-run-clo (v-closure8 5752 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1587161/lambda@1587234
+(meta-set! port5151 "sig" (Fn [(Ptr Long)] Long))
+(defn port5151 [frame]
+  (v-run-clo (v-closure6 5753 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1588027/lambda@1588194
+(meta-set! port5152 "sig" (Fn [(Ptr Long)] Long))
+(defn port5152 [frame]
+  (v-callthen3 1096 3261 (v-run-clo (v-closure6 5754 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 5) (v-get frame 6))) (v-get frame 7) (v-get frame 4) (v-run-clo (v-closure2 5755 (v-get frame 3) (v-get frame 6)))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1592805/lambda@1592927
+(meta-set! port5153 "sig" (Fn [(Ptr Long)] Long))
+(defn port5153 [frame]
+  (v-tailcall6 1126 (v-nat-chk (v-binary 0 (v-get frame 3) 4607182418800017408l)) (v-get frame 6) (v-record0 0) (v-call1 1054 (v-get frame 7)) (v-record2 381 (v-get frame 2) (v-call3 1098 (v-record2 373 (v-get frame 8) (v-get frame 0)) (v-get frame 4) (v-get frame 5))) (v-get frame 1)))
+
+; $$$$047const_eval$evaluate_work$/lambda@1598462/lambda@1598535
+(meta-set! port5154 "sig" (Fn [(Ptr Long)] Long))
+(defn port5154 [frame]
+  (v-run-clo (v-closure5 5756 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1606997/lambda@1607070
+(meta-set! port5155 "sig" (Fn [(Ptr Long)] Long))
+(defn port5155 [frame]
+  (v-run-clo (v-closure2 5757 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1608143/lambda@1608216
+(meta-set! port5156 "sig" (Fn [(Ptr Long)] Long))
+(defn port5156 [frame]
+  (v-run-clo (v-closure1 5758 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1609325/lambda@1609398
+(meta-set! port5157 "sig" (Fn [(Ptr Long)] Long))
+(defn port5157 [frame]
+  (v-run-clo (v-closure2 5759 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1609937/lambda@1610010
+(meta-set! port5158 "sig" (Fn [(Ptr Long)] Long))
+(defn port5158 [frame]
+  (v-run-clo (v-closure1 5760 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1610820/lambda@1610893
+(meta-set! port5159 "sig" (Fn [(Ptr Long)] Long))
+(defn port5159 [frame]
+  (v-run-clo (v-closure8 5761 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1612359/lambda@1612432
+(meta-set! port5160 "sig" (Fn [(Ptr Long)] Long))
+(defn port5160 [frame]
+  (v-run-clo (v-closure5 5762 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1613178/lambda@1613251
+(meta-set! port5161 "sig" (Fn [(Ptr Long)] Long))
+(defn port5161 [frame]
+  (v-run-clo (v-closure4 5763 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1614406/lambda@1614479
+(meta-set! port5162 "sig" (Fn [(Ptr Long)] Long))
+(defn port5162 [frame]
+  (v-run-clo (v-closure4 5764 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1615403/lambda@1615476
+(meta-set! port5163 "sig" (Fn [(Ptr Long)] Long))
+(defn port5163 [frame]
+  (v-run-clo (v-closure4 5765 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1616454/lambda@1616527
+(meta-set! port5164 "sig" (Fn [(Ptr Long)] Long))
+(defn port5164 [frame]
+  (v-run-clo (v-closure5 5766 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1618366/lambda@1618439
+(meta-set! port5165 "sig" (Fn [(Ptr Long)] Long))
+(defn port5165 [frame]
+  (v-run-clo (v-closure1 5767 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1619001/lambda@1619153
+(meta-set! port5166 "sig" (Fn [(Ptr Long)] Long))
+(defn port5166 [frame]
+  (v-tailcall1 3262 (v-record2 349 (v-record4 1088 (v-get frame 2) (v-get frame 3) (v-get frame 0) (v-get frame 5)) (v-call1 1053 (v-record2 345 (v-nat-chk (v-binary 0 (v-get frame 4) 4607182418800017408l)) (v-get frame 1))))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1620061/lambda@1620134
+(meta-set! port5167 "sig" (Fn [(Ptr Long)] Long))
+(defn port5167 [frame]
+  (v-run-clo (v-closure3 5768 (v-get frame 0) (v-get frame 1) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1620904/lambda@1620977
+(meta-set! port5168 "sig" (Fn [(Ptr Long)] Long))
+(defn port5168 [frame]
+  (v-run-clo (v-closure2 5769 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1621712/lambda@1621785
+(meta-set! port5169 "sig" (Fn [(Ptr Long)] Long))
+(defn port5169 [frame]
+  (v-run-clo (v-closure4 5770 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1622502/lambda@1622575
+(meta-set! port5170 "sig" (Fn [(Ptr Long)] Long))
+(defn port5170 [frame]
+  (v-run-clo (v-closure4 5771 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1624150/lambda@1624223
+(meta-set! port5171 "sig" (Fn [(Ptr Long)] Long))
+(defn port5171 [frame]
+  (v-run-clo (v-closure4 5772 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1625321/lambda@1625394
+(meta-set! port5172 "sig" (Fn [(Ptr Long)] Long))
+(defn port5172 [frame]
+  (v-run-clo (v-closure5 5773 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1626332/lambda@1626405
+(meta-set! port5173 "sig" (Fn [(Ptr Long)] Long))
+(defn port5173 [frame]
+  (v-run-clo (v-closure2 5774 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1627016/lambda@1627089
+(meta-set! port5174 "sig" (Fn [(Ptr Long)] Long))
+(defn port5174 [frame]
+  (v-run-clo (v-closure4 5775 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1627959/lambda@1628032
+(meta-set! port5175 "sig" (Fn [(Ptr Long)] Long))
+(defn port5175 [frame]
+  (v-run-clo (v-closure1 5776 (v-get frame 0))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1628636/lambda@1628709
+(meta-set! port5176 "sig" (Fn [(Ptr Long)] Long))
+(defn port5176 [frame]
+  (v-run-clo (v-closure4 5777 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1629682/lambda@1629755
+(meta-set! port5177 "sig" (Fn [(Ptr Long)] Long))
+(defn port5177 [frame]
+  (v-run-clo (v-closure5 5778 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1630550/lambda@1630623
+(meta-set! port5178 "sig" (Fn [(Ptr Long)] Long))
+(defn port5178 [frame]
+  (v-run-clo (v-closure5 5779 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1631448/lambda@1631521
+(meta-set! port5179 "sig" (Fn [(Ptr Long)] Long))
+(defn port5179 [frame]
+  (v-run-clo (v-closure5 5780 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1632328/lambda@1632401
+(meta-set! port5180 "sig" (Fn [(Ptr Long)] Long))
+(defn port5180 [frame]
+  (v-run-clo (v-closure3 5781 (v-get frame 0) (v-get frame 1) (v-get frame 2))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1633071/lambda@1633144
+(meta-set! port5181 "sig" (Fn [(Ptr Long)] Long))
+(defn port5181 [frame]
+  (v-run-clo (v-closure4 5782 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1634072/lambda@1634145
+(meta-set! port5182 "sig" (Fn [(Ptr Long)] Long))
+(defn port5182 [frame]
+  (v-run-clo (v-closure6 5783 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1636230/lambda@1636303
+(meta-set! port5183 "sig" (Fn [(Ptr Long)] Long))
+(defn port5183 [frame]
+  (v-run-clo (v-closure2 5784 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047const_eval$evaluate_work$/lambda@1637122/lambda@1637195
+(meta-set! port5184 "sig" (Fn [(Ptr Long)] Long))
+(defn port5184 [frame]
+  (v-run-clo (v-closure5 5785 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047const_eval$evaluate_constants$/lambda@1641125/lambda@1641216
+(meta-set! port5185 "sig" (Fn [(Ptr Long)] Long))
+(defn port5185 [frame]
+  (v-callthen3 1129 3261 (v-run-clo (v-closure2 5786 (v-get frame 1) (v-get frame 3))) (v-get frame 2) (v-call1 1052 (v-get frame 3)) (v-get frame 0)))
+
+; $$$$047public_exports$functions$/lambda@1652321/lambda@1652441
+(meta-set! port5186 "sig" (Fn [(Ptr Long)] Long))
+(defn port5186 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-record6 175 (v-get frame 3) (v-call2 1148 (v-get frame 6) (v-get frame 5)) (v-get frame 0) (v-get frame 2) (v-get frame 4) (v-get frame 1)) (v-get frame 7))))
+
+; $$$$047public_exports$constants$/lambda@1658196/lambda@1658316
+(meta-set! port5187 "sig" (Fn [(Ptr Long)] Long))
+(defn port5187 [frame]
+  (v-tailcall1 3262 (v-call4 1151 (v-get frame 4) (v-get frame 3) (v-record4 316 (v-get frame 2) 9221964661971222529l (v-get frame 0) (v-get frame 1)) (v-get frame 5))))
+
+; $$$$047public_exports$wrapper_bindings$/lambda@1661069/lambda@1661195
+(meta-set! port5188 "sig" (Fn [(Ptr Long)] Long))
+(defn port5188 [frame]
+  (v-tailcall1 3262 (v-call2 3265 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047public_exports$select$/lambda@1662399/lambda@1662520
+(meta-set! port5189 "sig" (Fn [(Ptr Long)] Long))
+(defn port5189 [frame]
+  (v-tailcall1 3262 (v-call4 1154 (v-get frame 3) (v-get frame 2) (v-get frame 1) (v-get frame 0))))
+
+; $$$$047members$arms$/lambda@1674862/lambda@1674970
+(meta-set! port5190 "sig" (Fn [(Ptr Long)] Long))
+(defn port5190 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-record2 171 (v-record2 1 (v-record2 841 (v-get frame 0) (v-record1 6 (v-record1 173 (v-literal 814)))) (v-record0 0)) (v-get frame 1)) (v-get frame 2))))
+
+; $$$$047use_plans$transform$/lambda@1677426/lambda@1677541
+(meta-set! port5191 "sig" (Fn [(Ptr Long)] Long))
+(defn port5191 [frame]
+  (v-tailcall1 3262 (v-record4 178 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047use_plans$transform_types$/lambda@1678318/lambda@1678426
+(meta-set! port5192 "sig" (Fn [(Ptr Long)] Long))
+(defn port5192 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047use_plans$free$/lambda@1678883/lambda@1678982
+(meta-set! port5193 "sig" (Fn [(Ptr Long)] Long))
+(defn port5193 [frame]
+  (v-callthen1 1186 3261 (v-run-clo (v-closure2 5787 (v-get frame 1) (v-get frame 2))) (v-get frame 0)))
+
+; $$$$047staging_residual$rewrite_predicates$/lambda@1683554/lambda@1683673
+(meta-set! port5194 "sig" (Fn [(Ptr Long)] Long))
+(defn port5194 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047staging_residual$rewrite_uses$/lambda@1684258/lambda@1684383
+(meta-set! port5195 "sig" (Fn [(Ptr Long)] Long))
+(defn port5195 [frame]
+  (v-callthen2 1194 3261 (v-run-clo (v-closure5 5788 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 4) (v-get frame 5))) (v-get frame 3) (v-get frame 0)))
+
+; $$$$047staging_residual$rewrite_reflections$/lambda@1685294/lambda@1685419
+(meta-set! port5196 "sig" (Fn [(Ptr Long)] Long))
+(defn port5196 [frame]
+  (v-callthen2 1195 3261 (v-run-clo (v-closure4 5789 (v-get frame 0) (v-get frame 2) (v-get frame 4) (v-get frame 5))) (v-get frame 3) (v-get frame 1)))
+
+; $$$$047staging_residual$rewrite_types$/lambda@1686091/lambda@1686205
+(meta-set! port5197 "sig" (Fn [(Ptr Long)] Long))
+(defn port5197 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047staging_residual$rewrite_coverage$/lambda@1687701/lambda@1687823
+(meta-set! port5198 "sig" (Fn [(Ptr Long)] Long))
+(defn port5198 [frame]
+  (v-tailcall1 3262 (v-record5 200 (v-call2 1191 (v-get frame 0) (v-get frame 1)) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 2))))
+
+; $$$$047staging_residual$rewrite_coverage$/lambda@1688672/lambda@1688786
+(meta-set! port5199 "sig" (Fn [(Ptr Long)] Long))
+(defn port5199 [frame]
+  (v-callthen2 1187 3261 (v-run-clo (v-closure10 5790 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 6) (v-get frame 7) (v-get frame 8) (v-get frame 9) (v-get frame 10))) (v-get frame 5) (v-get frame 6)))
+
+; $$$$047staging_residual$rewrite_coverages$/lambda@1690949/lambda@1691067
+(meta-set! port5200 "sig" (Fn [(Ptr Long)] Long))
+(defn port5200 [frame]
+  (v-tailcall1 3262 (v-record2 1 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047staging_residual$rewrite_inference$/lambda@1692009/lambda@1692131
+(meta-set! port5201 "sig" (Fn [(Ptr Long)] Long))
+(defn port5201 [frame]
+  (v-callthen2 1193 3261 (v-run-clo (v-closure6 5791 (v-get frame 0) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6))) (v-get frame 1) (v-get frame 3)))

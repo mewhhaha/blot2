@@ -6,7 +6,7 @@ import {
   type ArtifactOptions,
   type CompileOptions,
   includesAnalysis,
-} from "./host.ts";
+} from "./host_model.ts";
 import type { SourceInput } from "./source_project.ts";
 import { NativeProcess, type NativeProcessOptions } from "./native_process.ts";
 import {

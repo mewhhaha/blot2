@@ -11,3 +11,5 @@ __pycache__/
 /generated/carp-reference/
 /.carp-toolchain/
 /.deno-cache/
+
+/generated/carp-port/

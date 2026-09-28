@@ -49,8 +49,14 @@ try {
   assert.equal(fuel.status,1); assert(fuel.stderr.includes('const_steps')); checks++;
   const preserve = compile('entry const answer = 42\n');
   const old = fs.readFileSync(preserve.output);
-  fs.writeFileSync(preserve.input,'entry const answer = missing\n');
-  const failure = spawnSync(binary,['build',preserve.input,preserve.output],{encoding:'utf8'});
-  assert.equal(failure.status,1); assert.deepEqual(fs.readFileSync(preserve.output),old); checks++;
+  for (const invalid of [
+    'entry const answer = missing\n',
+    'const identity = fn x => x\nentry const answer: U32 = identity True\n',
+  ]) {
+    fs.writeFileSync(preserve.input, invalid);
+    const failure = spawnSync(binary,['build',preserve.input,preserve.output],{encoding:'utf8',timeout:15000});
+    if (failure.error) throw failure.error;
+    assert.equal(failure.status,1); assert.deepEqual(fs.readFileSync(preserve.output),old); checks++;
+  }
   console.log(`PASS: ${accepted.length} execution programs, ${rejected.length} rejection programs, ${checks} value/error checks; deterministic Wasm and artifact preservation`);
 } finally {fs.rmSync(temp,{recursive:true,force:true});}

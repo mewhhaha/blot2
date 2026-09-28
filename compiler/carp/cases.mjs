@@ -100,9 +100,143 @@ entry const stop = do:
     if x == 5:
       return x
 `,read:{sum:10,stop:5}},
+  {name:'polymorphic scalar identity',source:`const identity = fn value => value
+entry const integer = identity 42
+entry const floating = identity 1.25
+entry const boolean = identity True
+entry const unit = identity ()
+entry const uint = fn (value: U32) => identity value
+entry const float = fn (value: F32) => identity value
+entry const bool = fn (value: Bool) => identity value
+entry const nothing = fn () => identity ()
+`,read:{integer:42,floating:1.25,boolean:true,unit:null},calls:[['uint',4294967295,4294967295],['float',-0,-0],['bool',false,false],['nothing',null,null]]},
+  {name:'polymorphic forward composition',source:`entry const integer = outer 42
+entry const floating = outer 1.5
+entry const boolean = outer False
+const outer = fn value => inner value
+const inner = fn value => identity value
+const identity = fn value => value
+`,read:{integer:42,floating:1.5,boolean:false}},
+  {name:'polymorphic numeric helpers',source:`const twice = fn value => value + value
+const square = fn value => value * value
+const compose = fn value => square (twice value)
+entry const integer = compose 3
+entry const floating = compose 1.5
+entry const uint = fn (value: U32) => twice value
+entry const float = fn (value: F32) => twice value
+`,read:{integer:36,floating:9},calls:[['uint',4294967295,4294967294],['float',1.25,2.5]]},
+  {name:'polymorphic comparison',source:`const equal_self = fn value => value == value
+entry const integer = equal_self 42
+entry const floating = equal_self 1.25
+entry const nan = equal_self (0.0 / 0.0)
+`,read:{integer:true,floating:true,nan:false}},
+  {name:'polymorphic scalar recursion',source:`const recurse = fn value => do:
+  if True:
+    return value
+  return recurse value
+entry const integer = recurse 42
+entry const floating = recurse 1.25
+entry const boolean = recurse True
+entry const unit = recurse ()
+`,read:{integer:42,floating:1.25,boolean:true,unit:null}},
+  {name:'polymorphic mutual recursion',source:`const first = fn value => second value
+const second = fn value => do:
+  if True:
+    return value
+  return first value
+entry const integer = first 42
+entry const floating = first 1.25
+entry const boolean = first True
+entry const unit = first ()
+`,read:{integer:42,floating:1.25,boolean:true,unit:null}},
+  {name:'polymorphic recursive numeric constraint',source:`const first = fn value => second value
+const second = fn value => do:
+  if True:
+    return value + value
+  return first value
+entry const integer = first 21
+entry const floating = first 1.25
+`,read:{integer:42,floating:2.5}},
+  {name:'polymorphic block locals',source:`const identity = fn value => do:
+  let copy = value
+  copy := self
+  let nested = do:
+    return copy
+  return nested
+entry const integer = identity 42
+entry const floating = identity 1.25
+entry const boolean = identity True
+`,read:{integer:42,floating:1.25,boolean:true}},
+  {name:'polymorphic loop carried values',source:`const repeat = fn value => do:
+  let result = value
+  for 0..3:
+    result := self
+  return result
+entry const integer = repeat 42
+entry const floating = repeat 1.25
+entry const boolean = repeat False
+`,read:{integer:42,floating:1.25,boolean:false}},
+  {name:'polymorphic unused parameter',source:`const ignore = fn value => 42
+entry const integer = ignore 1
+entry const floating = ignore 1.25
+entry const boolean = ignore False
+entry const unit = ignore ()
+`,read:{integer:42,floating:42,boolean:42,unit:42}},
+  {name:'polymorphic global constant capture',source:`const answer = 42
+const read = fn ignored => answer
+entry const integer = read 1
+entry const floating = read 1.25
+entry const boolean = read False
+`,read:{integer:42,floating:42,boolean:42}},
+  {name:'dependency respects lexical shadowing',source:`const identity = fn value => do:
+  let caller = value
+  return caller
+const caller = fn () => identity True
+entry const integer = identity 42
+entry const floating = identity 1.25
+entry const boolean = caller ()
+`,read:{integer:42,floating:1.25,boolean:true}},
+  {name:'dependency respects let initializer',source:`const identity = fn value => value
+const wrapper = fn value => do:
+  let identity = identity value
+  return identity
+entry const integer = wrapper 42
+entry const floating = wrapper 1.25
+`,read:{integer:42,floating:1.25}},
+  {name:'dead deferred numeric obligation',source:`const unused = fn x => True + False
+entry const answer = 42
+`,read:{answer:42},exports:['answer']},
+  {name:'dead generic numeric helper',source:`const unused = fn value => value + value
+entry const answer = 42
+`,read:{answer:42},exports:['answer']},
+  {name:'multiple result specializations',source:`const bottom = fn value => bottom value
+entry const uint = fn () => do:
+  if False:
+    return bottom ()
+  return 42
+entry const float = fn () => do:
+  if False:
+    return bottom ()
+  return 1.25
+`,calls:[['uint',null,42],['float',null,1.25]]},
 ];
 
 export const rejected = [
+  ['concrete global constant capture','const shared = 42\nconst read = fn ignored => shared\nentry const integer: U32 = read True\nentry const floating: F32 = read 42\n','type_mismatch','type_mismatch'],
+  // Constants with unresolved types are not generalized by this milestone.
+  // The reference instead reaches const_budget on this divergent initializer;
+  // this case is deliberately NOT a diagnostic-parity assertion.
+  ['unresolved shared global type (unsupported)','const bottom = fn x => bottom x\nconst shared = bottom ()\nconst read = fn ignored => shared\nentry const integer: U32 = read True\nentry const floating: F32 = read 42\n','type_mismatch'],
+  ['reachable concrete numeric obligation','const broken = fn x => True + False\nentry const answer = broken ()\n','unsupported_numeric_type','missing_associated'],
+  ['generic Bool numeric obligation','const twice = fn x => x + x\nentry const answer = twice True\n','unsupported_numeric_type','missing_associated'],
+  ['generic U32 division obligation','const divide = fn x => x / x\nentry const answer = divide 2\n','missing_implementation','missing_associated'],
+  ['forward generic constraint','const outer = fn x => twice x\nconst twice = fn x => x + x\nentry const answer = outer True\n','unsupported_numeric_type','missing_associated'],
+  ['recursive generic constraint','const f = fn x => g x\nconst g = fn x => do:\n  if True:\n    return x + x\n  return f x\nentry const answer = f True\n','unsupported_numeric_type','missing_associated'],
+  ['monomorphic recursive input','const f = fn x => do:\n  f True\n  return f 1\nentry const answer = 42\n','type_mismatch','type_mismatch'],
+  ['monomorphic recursive result','const f = fn x => do:\n  let a: U32 = f x\n  let b: F32 = f x\n  return x\nentry const answer = 42\n','type_mismatch','type_mismatch'],
+  ['dead generic bad call','const identity = fn (x: U32) => x\nconst unused = fn x => identity True\nentry const answer = 42\n','type_mismatch','type_mismatch'],
+  ['generic same variable conflict','const identity = fn x => x\nentry const answer: U32 = identity True\n','type_mismatch','type_mismatch'],
+
   ['U32 overflow','entry const answer = 4294967296\n','number: U32 overflow'],
   ['missing hex digits','entry const answer = 0x\n','number: missing'],
   ['numeric suffix','entry const answer = 1f\n','number: invalid'],
@@ -145,3 +279,6 @@ export const rejected = [
   ['unreachable return mismatch','entry const answer = fn () => do:\n  return 1\n  return True\n','type_mismatch'],
   ['loop carried type mismatch','entry const answer = fn () => do:\n  let x = 0\n  for 0..2:\n    x := True\n  return x\n','type_mismatch'],
 ];
+
+// The fourth field is a verified reference diagnostic, not an unsupported-feature claim.
+export const referenceRejected = rejected.filter((item) => item[3]);

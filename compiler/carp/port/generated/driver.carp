@@ -1,0 +1,13 @@
+; Generated and modified from the pinned Blot/Bend semantic input.
+; See ../NOTICE and ../licenses for origin and license notices.
+(load "bindings.carp")
+; The transport owns bytes; all request decoding and language semantics are Carp.
+(defn port-serve []
+ (let [state (v-call0 3250) incoming (v-receive)]
+  (do
+   (while (v-has-frame incoming)
+    (let [reply (v-run-loop (v-call3 3249 state incoming (v-request-length)))]
+     (do (set! state (v-field (v-keep reply) 2))
+         (v-send (v-field reply 3))
+         (set! incoming (v-receive)))))
+   (v-drop state))))

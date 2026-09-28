@@ -14,7 +14,7 @@ import type {
   Type,
   TypeId,
   UnaryOp,
-} from "./host.ts";
+} from "./host_model.ts";
 import type { Cst, CstList } from "./syntax.ts";
 
 export const nativeProtocolMagic = 0x424C4F54;

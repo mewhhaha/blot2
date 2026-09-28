@@ -3,14 +3,14 @@ name: Carp compiler
 on:
   pull_request:
     paths:
-      - 'compiler/**'
-      - 'std/**'
-      - 'examples/**'
-      - 'scripts/**'
-      - 'deno.json'
-      - 'deno.lock'
-      - 'baba.json'
-      - '.github/workflows/carp.yml'
+      - "compiler/**"
+      - "std/**"
+      - "examples/**"
+      - "scripts/**"
+      - "deno.json"
+      - "deno.lock"
+      - "baba.json"
+      - ".github/workflows/carp.yml"
   workflow_dispatch:
 
 permissions:
@@ -39,7 +39,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22.16.0'
+          node-version: "22.16.0"
       - name: Source snapshot
         run: |
           mkdir -p generated/carp
@@ -51,7 +51,7 @@ jobs:
           retention-days: 7
       - uses: haskell-actions/setup@v2
         with:
-          ghc-version: '9.2.5'
+          ghc-version: "9.2.5"
           enable-stack: true
           stack-version: latest
       - uses: actions/cache@v4
@@ -81,6 +81,7 @@ jobs:
           node --experimental-transform-types compiler/carp/test.mjs
           node --experimental-transform-types compiler/carp/stress.mjs
           ASAN_OPTIONS=detect_leaks=1 generated/carp/blotc-carp build examples/carp_scalar.blot generated/carp/leak-check.wasm
+          ASAN_OPTIONS=detect_leaks=1 generated/carp/blotc-carp build examples/carp_polymorphic.blot generated/carp/polymorphic-leak-check.wasm
       - name: Release compiler and execution tests
         run: |
           /usr/bin/time -v bash compiler/carp/build.sh release
@@ -103,7 +104,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     env:
-      BEND_NO_TELEMETRY: '1'
+      BEND_NO_TELEMETRY: "1"
       DENO_DIR: ${{ github.workspace }}/.deno-cache
     steps:
       - uses: actions/checkout@v4
@@ -146,10 +147,13 @@ jobs:
         run: |
           bend version
           bash compiler/carp/build_reference.sh
+      - name: Regenerate the pinned semantic-port boundary
+        run: |
+          bend compiler/carp/port_reference.bend -o generated/carp-reference/port-reference.mjs
       - name: Package JS reference and parser dependencies
         run: |
           deno cache compiler/source.ts compiler/native.ts
-          tar -czf generated/carp-reference/reference-js.tar.gz generated/compiler .deno-cache
+          tar -czf generated/carp-reference/reference-js.tar.gz generated/compiler .deno-cache generated/carp-reference/port-reference.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: reference-js
@@ -161,7 +165,7 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     env:
-      BEND_NO_TELEMETRY: '1'
+      BEND_NO_TELEMETRY: "1"
       DENO_DIR: ${{ github.workspace }}/.deno-cache
     steps:
       - uses: actions/checkout@v4
@@ -244,3 +248,70 @@ jobs:
           chmod +x generated/carp/blotc-carp
           tar -xzf generated/carp-reference/reference-js.tar.gz
           deno run --allow-read --allow-write --allow-run=generated/carp/blotc-carp --allow-env compiler/carp/reference_test.mjs
+
+  full-port:
+    needs: [native, reference]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [debug, release, sanitize]
+    env:
+      CARP_DIR: ${{ github.workspace }}/.carp-toolchain
+      CARP: ${{ github.workspace }}/.carp-toolchain/bin/carp
+      DENO_DIR: ${{ github.workspace }}/.deno-cache
+      LC_ALL: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.16.0"
+      - uses: actions/download-artifact@v4
+        with:
+          name: carp-native-diagnostics
+          path: generated/carp
+      - uses: actions/download-artifact@v4
+        with:
+          name: reference-js
+          path: generated/carp-reference
+      - name: Restore pinned toolchain and independent test oracle
+        run: |
+          mkdir -p "$CARP_DIR"
+          tar -xzf generated/carp/toolchain.tar.gz -C "$CARP_DIR"
+          chmod +x "$CARP"
+          tar -xzf generated/carp-reference/reference-js.tar.gz
+      - name: Verify deterministic AOT regeneration
+        run: |
+          python3 compiler/carp/port/check_generation.py generated/carp-reference/port-reference.mjs
+          python3 compiler/carp/port/generator_test.py generated/carp-reference/port-reference.mjs
+          node compiler/carp/port/optimization_test.cjs generated/carp-reference/port-reference.mjs
+          python3 compiler/carp/port/build_test.py
+          python3 compiler/carp/port/layout_test.py --sanitize
+      - name: Build native Carp and test ownership runtime
+        run: python3 compiler/carp/port/build.py ${{ matrix.mode }} --retest
+      - name: Check public APIs
+        run: deno check compiler/carp.ts compiler/carp/cli.ts compiler/carp/backend.test.ts compiler/carp/eof.test.ts compiler/carp/bench.ts compiler/carp/worker_probe.ts
+      - name: Run without any Bend binary or generated Bend JavaScript
+        run: python3 compiler/carp/port/standalone.py
+      - name: Native parity against unchanged JavaScript compiler
+        run: python3 compiler/carp/port/run_suite.py --native-only --log generated/carp-port/native-oracle.log
+      - name: Existing source regressions through native Carp
+        run: python3 compiler/carp/port/run_suite.py --source-only --log generated/carp-port/source-suite.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: carp-full-${{ matrix.mode }}
+          path: |
+            generated/carp-port/*.log
+            generated/carp-port/*.json
+            generated/carp-port/${{ matrix.mode }}/build.json
+            generated/carp-port/${{ matrix.mode }}/runtime-test*.log
+            generated/carp-port/${{ matrix.mode }}/blotc-carp-native
+            compiler/carp/port/generated/manifest.json
+          retention-days: 7

@@ -1,0 +1,627 @@
+; Generated and modified from the pinned Blot/Bend semantic input.
+; See ../NOTICE and ../licenses for origin and license notices.
+(load "bindings.carp")
+; $$$$047staging_scheme$clean_state$
+(meta-set! port1245 "sig" (Fn [(Ptr Long)] Long))
+(defn port1245 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 151)) (if (v-truthy (v-local-tag frame 1 182)) 9221964661971222529l 9221964661971222528l)))
+
+; $$$$047staging_scheme$replay_if_clean$
+(meta-set! port1246 "sig" (Fn [(Ptr Long)] Long))
+(defn port1246 [frame]
+  (if (v-truthy (v-not (v-get frame 0))) (v-record0 7) (v-tailcall6 1244 (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6))))
+
+; $$$$047staging_scheme$replay_scheme$
+(meta-set! port1247 "sig" (Fn [(Ptr Long)] Long))
+(defn port1247 [frame]
+  (if (v-truthy (v-not (v-get frame 0))) (v-record0 7) (do (v-put frame 6 (v-call1 1230 (v-get frame 2))) (v-tailcall7 1246 (v-call1 1245 (v-call1 596 (v-get frame 5))) (v-call2 1233 (v-call2 454 (v-call1 594 (v-get frame 5)) (v-get frame 6)) (v-get frame 6)) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5)))))
+
+; $$$$047staging_scheme$lookup$
+(meta-set! port1248 "sig" (Fn [(Ptr Long)] Long))
+(defn port1248 [frame]
+  (if (v-truthy (v-local-tag frame 0 0)) (v-record0 7) (do (v-put frame 2 (v-local-field frame 0 7)) (do (v-put frame 3 (v-local-field frame 2 241)) (do (v-put frame 4 (v-local-field frame 2 150)) (do (v-put frame 5 (v-local-field frame 2 158)) (do (v-put frame 6 (v-local-field frame 2 242)) (do (v-put frame 7 (v-local-field frame 2 77)) (do (v-put frame 8 (v-local-field frame 0 8)) (v-tailcall3 3256 (v-call2 2 (v-call1 1230 (v-get frame 3)) (v-get frame 1)) (v-record1 6 (v-record5 402 (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7))) (v-call2 1248 (v-get frame 8) (v-get frame 1))))))))))))
+
+; $$$$047staging_scheme$candidate_found$
+(meta-set! port1249 "sig" (Fn [(Ptr Long)] Long))
+(defn port1249 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) (v-record0 7) (do (v-put frame 2 (v-local-field frame 0 12)) (v-tailcall3 3256 (v-call2 1232 (v-get frame 2) (v-get frame 1)) (v-record1 6 (v-record2 406 (v-get frame 2) (v-get frame 1))) (v-record0 7)))))
+
+; $$$$047staging_scheme$candidate_parsed$
+(meta-set! port1250 "sig" (Fn [(Ptr Long)] Long))
+(defn port1250 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) (v-record0 7) (do (v-put frame 2 (v-local-field frame 0 12)) (do (v-put frame 3 (v-local-field frame 2 243)) (do (v-put frame 4 (v-local-field frame 2 241)) (v-tailcall2 1249 (v-call2 1248 (v-get frame 1) (v-get frame 4)) (v-record2 403 (v-get frame 3) (v-get frame 4))))))))
+
+; $$$$047staging_scheme$candidate$
+(meta-set! port1251 "sig" (Fn [(Ptr Long)] Long))
+(defn port1251 [frame]
+  (v-tailcall2 1250 (v-call1 1229 (v-call1 1230 (v-get frame 0))) (v-get frame 1)))
+
+; $$$$047staging_scheme$candidate_source$
+(meta-set! port1252 "sig" (Fn [(Ptr Long)] Long))
+(defn port1252 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 244)) (v-tailcall1 1231 (v-get frame 1))))
+
+; $$$$047staging_scheme$candidate_counter$
+(meta-set! port1253 "sig" (Fn [(Ptr Long)] Long))
+(defn port1253 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 245)) (v-tailcall1 1241 (v-get frame 1))))
+
+; $$$$047staging_scheme$replay$
+(meta-set! port1254 "sig" (Fn [(Ptr Long)] Long))
+(defn port1254 [frame]
+  (do (v-put frame 6 (v-local-field frame 0 244)) (do (v-put frame 7 (v-local-field frame 6 241)) (do (v-put frame 8 (v-local-field frame 6 150)) (do (v-put frame 9 (v-local-field frame 6 158)) (do (v-put frame 10 (v-local-field frame 6 242)) (do (v-put frame 11 (v-local-field frame 6 77)) (do (v-put frame 12 (v-local-field frame 0 245)) (v-tailcall6 1247 (v-call2 3253 (v-get frame 5) (v-call3 240 4697254411347427328l (v-record2 1 (v-record2 117 (v-get frame 11) (v-get frame 4)) (v-record0 0)) 9221964661971222529l)) (v-record5 402 (v-get frame 7) (v-get frame 8) (v-get frame 9) (v-get frame 10) (v-get frame 11)) (v-get frame 1) (v-get frame 12) (v-get frame 2) (v-get frame 3))))))))))
+
+; $$$$047schema_stage$node_constructor$
+(meta-set! port1255 "sig" (Fn [(Ptr Long)] Long))
+(defn port1255 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 99)) (v-get frame 1)))
+
+; $$$$047schema_stage$node_member$
+(meta-set! port1256 "sig" (Fn [(Ptr Long)] Long))
+(defn port1256 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 84)) (v-get frame 1)))
+
+; $$$$047schema_stage$node_equality$
+(meta-set! port1257 "sig" (Fn [(Ptr Long)] Long))
+(defn port1257 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 246)) (v-get frame 1)))
+
+; $$$$047schema_stage$witness_constructor$
+(meta-set! port1258 "sig" (Fn [(Ptr Long)] Long))
+(defn port1258 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 99)) (do (v-put frame 2 (v-local-field frame 0 247)) (v-get frame 2))))
+
+; $$$$047schema_stage$distinct2$
+(meta-set! port1259 "sig" (Fn [(Ptr Long)] Long))
+(defn port1259 [frame]
+  (v-tailcall1 3275 (v-call2 2 (v-get frame 0) (v-get frame 1))))
+
+; $$$$047schema_stage$distinct4$
+(meta-set! port1260 "sig" (Fn [(Ptr Long)] Long))
+(defn port1260 [frame]
+  (v-tailcall2 3253 (v-call2 1259 (v-get frame 0) (v-get frame 1)) (v-call2 3253 (v-call2 1259 (v-get frame 0) (v-get frame 2)) (v-call2 3253 (v-call2 1259 (v-get frame 0) (v-get frame 3)) (v-call2 3253 (v-call2 1259 (v-get frame 1) (v-get frame 2)) (v-call2 3253 (v-call2 1259 (v-get frame 1) (v-get frame 3)) (v-call2 1259 (v-get frame 2) (v-get frame 3))))))))
+
+; $$$$047schema_stage$distinct5$
+(meta-set! port1261 "sig" (Fn [(Ptr Long)] Long))
+(defn port1261 [frame]
+  (v-tailcall2 3253 (v-call4 1260 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3)) (v-call2 3253 (v-call2 1259 (v-get frame 0) (v-get frame 4)) (v-call2 3253 (v-call2 1259 (v-get frame 1) (v-get frame 4)) (v-call2 3253 (v-call2 1259 (v-get frame 2) (v-get frame 4)) (v-call2 1259 (v-get frame 3) (v-get frame 4)))))))
+
+; $$$$047schema_stage$bare$
+(meta-set! port1262 "sig" (Fn [(Ptr Long)] Long))
+(defn port1262 [frame]
+  (let [result 9221683186994511872l running true] (do (while running (do (v-put frame 1 (v-get frame 0)) (if (v-truthy (v-local-tag frame 1 265)) (do (v-put frame 2 (v-local-field frame 1 113)) (if (v-truthy (v-local-tag frame 2 7)) (do (v-put frame 3 (v-local-field frame 1 12)) (do (v-drop (v-assign frame 0 (v-get frame 3))) ())) (do (set! result (v-record0 7)) (set! running false)))) (if (v-truthy (v-local-tag frame 1 268)) (do (v-put frame 2 (v-local-field frame 1 12)) (do (v-drop (v-assign frame 0 (v-get frame 2))) ())) (do (set! result (v-record1 6 (v-get frame 1))) (set! running false)))))) result)))
+
+; $$$$047schema_stage$local_bare$
+(meta-set! port1263 "sig" (Fn [(Ptr Long)] Long))
+(defn port1263 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 2 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 2 73)) (do (v-put frame 3 (v-local-field frame 2 17)) (v-tailcall2 2 (v-get frame 3) (v-get frame 1))) 9221964661971222528l)) 9221964661971222528l))
+
+; $$$$047schema_stage$local$
+(meta-set! port1264 "sig" (Fn [(Ptr Long)] Long))
+(defn port1264 [frame]
+  (v-tailcall2 1263 (v-call1 1262 (v-get frame 0)) (v-get frame 1)))
+
+; $$$$047schema_stage$unit_bare$
+(meta-set! port1265 "sig" (Fn [(Ptr Long)] Long))
+(defn port1265 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 1 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 1 244)) 9221964661971222529l 9221964661971222528l)) 9221964661971222528l))
+
+; $$$$047schema_stage$unit$
+(meta-set! port1266 "sig" (Fn [(Ptr Long)] Long))
+(defn port1266 [frame]
+  (v-tailcall1 1265 (v-call1 1262 (v-get frame 0))))
+
+; $$$$047schema_stage$boolean_bare$
+(meta-set! port1267 "sig" (Fn [(Ptr Long)] Long))
+(defn port1267 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 2 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 2 246)) (do (v-put frame 3 (v-local-field frame 2 12)) (if (v-truthy (v-get frame 3)) (if (v-truthy (v-get frame 1)) 9221964661971222529l 9221964661971222528l) (if (v-truthy (v-not (v-get frame 1))) 9221964661971222529l 9221964661971222528l))) 9221964661971222528l)) 9221964661971222528l))
+
+; $$$$047schema_stage$boolean$
+(meta-set! port1268 "sig" (Fn [(Ptr Long)] Long))
+(defn port1268 [frame]
+  (v-tailcall2 1267 (v-call1 1262 (v-get frame 0)) (v-get frame 1)))
+
+; $$$$047schema_stage$type_argument_callee$
+(meta-set! port1269 "sig" (Fn [(Ptr Long)] Long))
+(defn port1269 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 3 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 3 248)) (do (v-put frame 4 (v-local-field frame 3 99)) (v-tailcall3 3256 (v-call2 1264 (v-get frame 1) (v-get frame 2)) (v-record1 6 (v-get frame 4)) (v-record0 7))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$type_argument_bare$
+(meta-set! port1270 "sig" (Fn [(Ptr Long)] Long))
+(defn port1270 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 2 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 2 252)) (do (v-put frame 3 (v-local-field frame 2 104)) (do (v-put frame 4 (v-local-field frame 2 88)) (v-tailcall3 1269 (v-call1 1262 (v-get frame 3)) (v-get frame 4) (v-get frame 1)))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$type_argument$
+(meta-set! port1271 "sig" (Fn [(Ptr Long)] Long))
+(defn port1271 [frame]
+  (v-tailcall2 1270 (v-call1 1262 (v-get frame 0)) (v-get frame 1)))
+
+; $$$$047schema_stage$equal_arguments$
+(meta-set! port1272 "sig" (Fn [(Ptr Long)] Long))
+(defn port1272 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 3 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 1 6)) (do (v-put frame 4 (v-local-field frame 1 12)) (v-tailcall3 3256 (v-call2 2 (v-get frame 3) (v-get frame 4)) (v-record1 6 (v-record2 407 (v-get frame 2) (v-get frame 3))) (v-record0 7))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$equality_callee$
+(meta-set! port1273 "sig" (Fn [(Ptr Long)] Long))
+(defn port1273 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 4 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 4 253)) (do (v-put frame 5 (v-local-field frame 4 104)) (do (v-put frame 6 (v-local-field frame 4 88)) (v-tailcall3 1272 (v-call2 1271 (v-get frame 6) (v-get frame 3)) (v-call2 1271 (v-get frame 1) (v-get frame 2)) (v-get frame 5)))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$equality_bare$
+(meta-set! port1274 "sig" (Fn [(Ptr Long)] Long))
+(defn port1274 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 3 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 3 252)) (do (v-put frame 4 (v-local-field frame 3 104)) (do (v-put frame 5 (v-local-field frame 3 88)) (v-tailcall4 1273 (v-call1 1262 (v-get frame 4)) (v-get frame 5) (v-get frame 1) (v-get frame 2)))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$equality$
+(meta-set! port1275 "sig" (Fn [(Ptr Long)] Long))
+(defn port1275 [frame]
+  (v-tailcall3 1274 (v-call1 1262 (v-get frame 0)) (v-get frame 1) (v-get frame 2)))
+
+; $$$$047schema_stage$returned_bool_bare$
+(meta-set! port1276 "sig" (Fn [(Ptr Long)] Long))
+(defn port1276 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 3 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 3 264)) (do (v-put frame 4 (v-local-field frame 3 112)) (do (v-put frame 5 (v-local-field frame 3 12)) (v-tailcall2 3253 (v-call2 3266 (v-get frame 4) (v-get frame 1)) (v-call2 1268 (v-get frame 5) (v-get frame 2))))) 9221964661971222528l)) 9221964661971222528l))
+
+; $$$$047schema_stage$returned_bool$
+(meta-set! port1277 "sig" (Fn [(Ptr Long)] Long))
+(defn port1277 [frame]
+  (v-tailcall3 1276 (v-call1 1262 (v-get frame 0)) (v-get frame 1) (v-get frame 2)))
+
+; $$$$047schema_stage$tail_call_callee$
+(meta-set! port1278 "sig" (Fn [(Ptr Long)] Long))
+(defn port1278 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 4 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 4 295)) (do (v-put frame 5 (v-local-field frame 4 125)) (if (v-truthy (v-local-tag frame 5 242)) (do (v-put frame 6 (v-local-field frame 4 84)) (do (v-put frame 7 (v-local-field frame 4 85)) (if (v-truthy (v-local-tag frame 7 0)) (do (v-put frame 8 (v-local-field frame 4 48)) (do (v-put frame 9 (v-local-field frame 4 49)) (v-tailcall3 3256 (v-call2 3253 (v-call2 1264 (v-get frame 8) (v-get frame 3)) (v-call2 3253 (v-call1 1266 (v-get frame 9)) (v-call2 1264 (v-get frame 1) (v-get frame 2)))) (v-record1 6 (v-get frame 6)) (v-record0 7)))) (v-record0 7)))) (v-record0 7))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$tail_call_bare$
+(meta-set! port1279 "sig" (Fn [(Ptr Long)] Long))
+(defn port1279 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 3 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 3 252)) (do (v-put frame 4 (v-local-field frame 3 104)) (do (v-put frame 5 (v-local-field frame 3 88)) (v-tailcall4 1278 (v-call1 1262 (v-get frame 4)) (v-get frame 5) (v-get frame 1) (v-get frame 2)))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$returned_tail_bare$
+(meta-set! port1280 "sig" (Fn [(Ptr Long)] Long))
+(defn port1280 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 4 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 4 264)) (do (v-put frame 5 (v-local-field frame 4 112)) (do (v-put frame 6 (v-local-field frame 4 12)) (v-tailcall3 3256 (v-call2 3266 (v-get frame 5) (v-get frame 1)) (v-call3 1279 (v-call1 1262 (v-get frame 6)) (v-get frame 2) (v-get frame 3)) (v-record0 7)))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$returned_tail$
+(meta-set! port1281 "sig" (Fn [(Ptr Long)] Long))
+(defn port1281 [frame]
+  (v-tailcall4 1280 (v-call1 1262 (v-get frame 0)) (v-get frame 1) (v-get frame 2) (v-get frame 3)))
+
+; $$$$047schema_stage$branch_bare$
+(meta-set! port1282 "sig" (Fn [(Ptr Long)] Long))
+(defn port1282 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 4 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 4 257)) (do (v-put frame 5 (v-local-field frame 4 106)) (do (v-put frame 6 (v-local-field frame 4 107)) (do (v-put frame 7 (v-local-field frame 4 108)) (v-tailcall3 3256 (v-call2 3253 (v-call3 1277 (v-get frame 6) (v-get frame 1) 9221964661971222529l) (v-call1 1266 (v-get frame 7))) (v-call3 1275 (v-get frame 5) (v-get frame 2) (v-get frame 3)) (v-record0 7))))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$joined_parts$
+(meta-set! port1283 "sig" (Fn [(Ptr Long)] Long))
+(defn port1283 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 3 (v-local-field frame 0 12)) (do (v-put frame 4 (v-local-field frame 3 181)) (do (v-put frame 5 (v-local-field frame 3 99)) (if (v-truthy (v-local-tag frame 1 6)) (do (v-put frame 6 (v-local-field frame 1 12)) (v-record1 6 (v-record4 408 (v-get frame 2) (v-get frame 6) (v-get frame 4) (v-get frame 5)))) (v-record0 7))))) (v-record0 7)))
+
+; $$$$047schema_stage$node_sequence_bare$
+(meta-set! port1284 "sig" (Fn [(Ptr Long)] Long))
+(defn port1284 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 6 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 6 258)) (do (v-put frame 7 (v-local-field frame 6 109)) (do (v-put frame 8 (v-local-field frame 6 46)) (v-tailcall3 1283 (v-call4 1282 (v-call1 1262 (v-get frame 7)) (v-get frame 2) (v-get frame 3) (v-get frame 4)) (v-call4 1281 (v-get frame 8) (v-get frame 2) (v-get frame 3) (v-get frame 5)) (v-get frame 1)))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$node_arm$
+(meta-set! port1285 "sig" (Fn [(Ptr Long)] Long))
+(defn port1285 [frame]
+  (do (v-put frame 5 (v-local-field frame 0 100)) (if (v-truthy (v-local-tag frame 5 1)) (do (v-put frame 6 (v-local-field frame 5 7)) (if (v-truthy (v-local-tag frame 6 220)) (do (v-put frame 7 (v-local-field frame 6 99)) (do (v-put frame 8 (v-local-field frame 6 95)) (if (v-truthy (v-local-tag frame 8 6)) (do (v-put frame 9 (v-local-field frame 8 12)) (if (v-truthy (v-local-tag frame 9 222)) (do (v-put frame 10 (v-local-field frame 9 26)) (if (v-truthy (v-local-tag frame 10 1)) (do (v-put frame 11 (v-local-field frame 10 7)) (if (v-truthy (v-local-tag frame 11 213)) (do (v-put frame 12 (v-local-field frame 11 17)) (do (v-put frame 13 (v-local-field frame 10 8)) (if (v-truthy (v-local-tag frame 13 1)) (do (v-put frame 14 (v-local-field frame 13 7)) (if (v-truthy (v-local-tag frame 14 213)) (do (v-put frame 15 (v-local-field frame 14 17)) (do (v-put frame 16 (v-local-field frame 13 8)) (if (v-truthy (v-local-tag frame 16 0)) (do (v-put frame 17 (v-local-field frame 5 8)) (if (v-truthy (v-local-tag frame 17 0)) (do (v-put frame 18 (v-local-field frame 0 101)) (v-tailcall3 3256 (v-call5 1261 (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 12) (v-get frame 15)) (v-call6 1284 (v-call1 1262 (v-get frame 18)) (v-get frame 7) (v-get frame 1) (v-get frame 4) (v-get frame 12) (v-get frame 15)) (v-record0 7))) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7))) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7))))
+
+; $$$$047schema_stage$node_match_bare$
+(meta-set! port1286 "sig" (Fn [(Ptr Long)] Long))
+(defn port1286 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 5 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 5 259)) (do (v-put frame 6 (v-local-field frame 5 20)) (if (v-truthy (v-local-tag frame 6 1)) (do (v-put frame 7 (v-local-field frame 6 7)) (if (v-truthy (v-local-tag frame 7 73)) (do (v-put frame 8 (v-local-field frame 7 17)) (do (v-put frame 9 (v-local-field frame 6 8)) (if (v-truthy (v-local-tag frame 9 0)) (do (v-put frame 10 (v-local-field frame 5 110)) (if (v-truthy (v-local-tag frame 10 1)) (do (v-put frame 11 (v-local-field frame 10 7)) (do (v-put frame 12 (v-local-field frame 10 8)) (if (v-truthy (v-local-tag frame 12 0)) (v-tailcall3 3256 (v-call2 2 (v-get frame 8) (v-get frame 1)) (v-call5 1285 (v-get frame 11) (v-get frame 2) (v-get frame 3) (v-get frame 1) (v-get frame 4)) (v-record0 7)) (v-record0 7)))) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$node_let_bare$
+(meta-set! port1287 "sig" (Fn [(Ptr Long)] Long))
+(defn port1287 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 4 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 4 255)) (do (v-put frame 5 (v-local-field frame 4 17)) (do (v-put frame 6 (v-local-field frame 4 12)) (do (v-put frame 7 (v-local-field frame 4 101)) (v-tailcall3 3256 (v-call2 1264 (v-get frame 6) (v-get frame 1)) (v-call5 1286 (v-call1 1262 (v-get frame 7)) (v-get frame 5) (v-get frame 2) (v-get frame 1) (v-get frame 3)) (v-record0 7))))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$node_block_bare$
+(meta-set! port1288 "sig" (Fn [(Ptr Long)] Long))
+(defn port1288 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 3 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 3 263)) (do (v-put frame 4 (v-local-field frame 3 112)) (do (v-put frame 5 (v-local-field frame 3 101)) (v-tailcall4 1287 (v-call1 1262 (v-get frame 5)) (v-get frame 1) (v-get frame 4) (v-get frame 2)))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$node_lambda_bare$
+(meta-set! port1289 "sig" (Fn [(Ptr Long)] Long))
+(defn port1289 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 2 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 2 251)) (do (v-put frame 3 (v-local-field frame 2 21)) (do (v-put frame 4 (v-local-field frame 2 102)) (if (v-truthy (v-local-tag frame 4 7)) (do (v-put frame 5 (v-local-field frame 2 103)) (if (v-truthy (v-local-tag frame 5 7)) (do (v-put frame 6 (v-local-field frame 2 101)) (v-tailcall3 1288 (v-call1 1262 (v-get frame 6)) (v-get frame 1) (v-get frame 3))) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$node$
+(meta-set! port1290 "sig" (Fn [(Ptr Long)] Long))
+(defn port1290 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 21)) (do (v-put frame 2 (v-local-field frame 0 102)) (if (v-truthy (v-local-tag frame 2 7)) (do (v-put frame 3 (v-local-field frame 0 103)) (if (v-truthy (v-local-tag frame 3 7)) (do (v-put frame 4 (v-local-field frame 0 101)) (v-tailcall2 1289 (v-call1 1262 (v-get frame 4)) (v-get frame 1))) (v-record0 7))) (v-record0 7)))))
+
+; $$$$047schema_stage$terminal_lambda_bare$
+(meta-set! port1291 "sig" (Fn [(Ptr Long)] Long))
+(defn port1291 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 1 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 1 251)) (do (v-put frame 2 (v-local-field frame 1 102)) (if (v-truthy (v-local-tag frame 2 7)) (do (v-put frame 3 (v-local-field frame 1 103)) (if (v-truthy (v-local-tag frame 3 7)) (do (v-put frame 4 (v-local-field frame 1 101)) (v-tailcall2 1268 (v-get frame 4) 9221964661971222528l)) 9221964661971222528l)) 9221964661971222528l)) 9221964661971222528l)) 9221964661971222528l))
+
+; $$$$047schema_stage$terminal$
+(meta-set! port1292 "sig" (Fn [(Ptr Long)] Long))
+(defn port1292 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 103)) (if (v-truthy (v-local-tag frame 1 7)) (do (v-put frame 2 (v-local-field frame 0 101)) (v-tailcall1 1291 (v-call1 1262 (v-get frame 2)))) 9221964661971222528l)))
+
+; $$$$047schema_stage$forwarded_call_bare$
+(meta-set! port1293 "sig" (Fn [(Ptr Long)] Long))
+(defn port1293 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 3 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 3 295)) (do (v-put frame 4 (v-local-field frame 3 125)) (if (v-truthy (v-local-tag frame 4 241)) (do (v-put frame 5 (v-local-field frame 3 84)) (do (v-put frame 6 (v-local-field frame 3 85)) (if (v-truthy (v-local-tag frame 6 0)) (do (v-put frame 7 (v-local-field frame 3 48)) (do (v-put frame 8 (v-local-field frame 3 49)) (v-tailcall2 3253 (v-call2 2 (v-get frame 5) (v-literal 833)) (v-call2 3253 (v-call2 1264 (v-get frame 7) (v-get frame 1)) (v-call2 1264 (v-get frame 8) (v-get frame 2)))))) 9221964661971222528l))) 9221964661971222528l)) 9221964661971222528l)) 9221964661971222528l))
+
+; $$$$047schema_stage$forwarding_lambda_bare$
+(meta-set! port1294 "sig" (Fn [(Ptr Long)] Long))
+(defn port1294 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 2 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 2 251)) (do (v-put frame 3 (v-local-field frame 2 21)) (do (v-put frame 4 (v-local-field frame 2 102)) (if (v-truthy (v-local-tag frame 4 7)) (do (v-put frame 5 (v-local-field frame 2 103)) (if (v-truthy (v-local-tag frame 5 7)) (do (v-put frame 6 (v-local-field frame 2 101)) (v-tailcall2 3253 (v-call2 1259 (v-get frame 1) (v-get frame 3)) (v-call3 1293 (v-call1 1262 (v-get frame 6)) (v-get frame 1) (v-get frame 3)))) 9221964661971222528l)) 9221964661971222528l))) 9221964661971222528l)) 9221964661971222528l))
+
+; $$$$047schema_stage$equality_forwarder$
+(meta-set! port1295 "sig" (Fn [(Ptr Long)] Long))
+(defn port1295 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 21)) (do (v-put frame 2 (v-local-field frame 0 102)) (if (v-truthy (v-local-tag frame 2 7)) (do (v-put frame 3 (v-local-field frame 0 103)) (if (v-truthy (v-local-tag frame 3 7)) (do (v-put frame 4 (v-local-field frame 0 101)) (v-tailcall2 1294 (v-call1 1262 (v-get frame 4)) (v-get frame 1))) 9221964661971222528l)) 9221964661971222528l))))
+
+; $$$$047schema_stage$type_same_bare$
+(meta-set! port1296 "sig" (Fn [(Ptr Long)] Long))
+(defn port1296 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 3 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 3 295)) (do (v-put frame 4 (v-local-field frame 3 125)) (if (v-truthy (v-local-tag frame 4 241)) (do (v-put frame 5 (v-local-field frame 3 84)) (do (v-put frame 6 (v-local-field frame 3 85)) (if (v-truthy (v-local-tag frame 6 0)) (do (v-put frame 7 (v-local-field frame 3 48)) (do (v-put frame 8 (v-local-field frame 3 49)) (v-tailcall2 3253 (v-call2 2 (v-get frame 5) (v-literal 823)) (v-call2 3253 (v-call2 1264 (v-get frame 7) (v-get frame 1)) (v-call2 1264 (v-get frame 8) (v-get frame 2)))))) 9221964661971222528l))) 9221964661971222528l)) 9221964661971222528l)) 9221964661971222528l))
+
+; $$$$047schema_stage$type_eq_arm$
+(meta-set! port1297 "sig" (Fn [(Ptr Long)] Long))
+(defn port1297 [frame]
+  (do (v-put frame 3 (v-local-field frame 0 100)) (if (v-truthy (v-local-tag frame 3 1)) (do (v-put frame 4 (v-local-field frame 3 7)) (if (v-truthy (v-local-tag frame 4 220)) (do (v-put frame 5 (v-local-field frame 4 99)) (do (v-put frame 6 (v-local-field frame 4 95)) (if (v-truthy (v-local-tag frame 6 6)) (do (v-put frame 7 (v-local-field frame 6 12)) (if (v-truthy (v-local-tag frame 7 213)) (do (v-put frame 8 (v-local-field frame 7 17)) (do (v-put frame 9 (v-local-field frame 3 8)) (if (v-truthy (v-local-tag frame 9 1)) (do (v-put frame 10 (v-local-field frame 9 7)) (if (v-truthy (v-local-tag frame 10 220)) (do (v-put frame 11 (v-local-field frame 10 99)) (do (v-put frame 12 (v-local-field frame 10 95)) (if (v-truthy (v-local-tag frame 12 6)) (do (v-put frame 13 (v-local-field frame 12 12)) (if (v-truthy (v-local-tag frame 13 213)) (do (v-put frame 14 (v-local-field frame 13 17)) (do (v-put frame 15 (v-local-field frame 9 8)) (if (v-truthy (v-local-tag frame 15 0)) (do (v-put frame 16 (v-local-field frame 0 101)) (v-tailcall3 3256 (v-call2 3253 (v-call4 1260 (v-get frame 1) (v-get frame 2) (v-get frame 8) (v-get frame 14)) (v-call2 3253 (v-call2 2 (v-get frame 5) (v-get frame 11)) (v-call3 1296 (v-call1 1262 (v-get frame 16)) (v-get frame 8) (v-get frame 14)))) (v-record1 6 (v-get frame 5)) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7))))
+
+; $$$$047schema_stage$type_eq_match_bare$
+(meta-set! port1298 "sig" (Fn [(Ptr Long)] Long))
+(defn port1298 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 3 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 3 259)) (do (v-put frame 4 (v-local-field frame 3 20)) (if (v-truthy (v-local-tag frame 4 1)) (do (v-put frame 5 (v-local-field frame 4 7)) (do (v-put frame 6 (v-local-field frame 4 8)) (if (v-truthy (v-local-tag frame 6 1)) (do (v-put frame 7 (v-local-field frame 6 7)) (do (v-put frame 8 (v-local-field frame 6 8)) (if (v-truthy (v-local-tag frame 8 0)) (do (v-put frame 9 (v-local-field frame 3 110)) (if (v-truthy (v-local-tag frame 9 1)) (do (v-put frame 10 (v-local-field frame 9 7)) (do (v-put frame 11 (v-local-field frame 9 8)) (if (v-truthy (v-local-tag frame 11 0)) (v-tailcall3 3256 (v-call2 3253 (v-call2 1264 (v-get frame 5) (v-get frame 1)) (v-call2 1264 (v-get frame 7) (v-get frame 2))) (v-call3 1297 (v-get frame 10) (v-get frame 1) (v-get frame 2)) (v-record0 7)) (v-record0 7)))) (v-record0 7))) (v-record0 7)))) (v-record0 7)))) (v-record0 7))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$type_eq_lambda_bare$
+(meta-set! port1299 "sig" (Fn [(Ptr Long)] Long))
+(defn port1299 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 2 (v-local-field frame 0 12)) (if (v-truthy (v-local-tag frame 2 251)) (do (v-put frame 3 (v-local-field frame 2 21)) (do (v-put frame 4 (v-local-field frame 2 102)) (if (v-truthy (v-local-tag frame 4 7)) (do (v-put frame 5 (v-local-field frame 2 103)) (if (v-truthy (v-local-tag frame 5 7)) (do (v-put frame 6 (v-local-field frame 2 101)) (v-tailcall3 1298 (v-call1 1262 (v-get frame 6)) (v-get frame 1) (v-get frame 3))) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$type_equality$
+(meta-set! port1300 "sig" (Fn [(Ptr Long)] Long))
+(defn port1300 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 21)) (do (v-put frame 2 (v-local-field frame 0 102)) (if (v-truthy (v-local-tag frame 2 7)) (do (v-put frame 3 (v-local-field frame 0 103)) (if (v-truthy (v-local-tag frame 3 7)) (do (v-put frame 4 (v-local-field frame 0 101)) (v-tailcall2 1299 (v-call1 1262 (v-get frame 4)) (v-get frame 1))) (v-record0 7))) (v-record0 7)))))
+
+; $$$$047schema_stage$name$
+(meta-set! port1301 "sig" (Fn [(Ptr Long)] Long))
+(defn port1301 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 17)) (v-get frame 1)))
+
+; $$$$047schema_stage$find_function_work$
+(meta-set! port1302 "sig" (Fn [(Ptr Long)] Long))
+(defn port1302 [frame]
+  (let [result 9221683186994511872l running true] (do (while running (do (v-put frame 3 (v-get frame 0)) (do (v-put frame 4 (v-get frame 1)) (do (v-put frame 5 (v-get frame 2)) (if (v-truthy (v-local-tag frame 3 0)) (if (v-truthy (v-local-tag frame 5 6)) (do (v-put frame 6 (v-local-field frame 5 12)) (do (set! result (v-record1 6 (v-get frame 6))) (set! running false))) (do (set! result (v-record0 7)) (set! running false))) (do (v-put frame 6 (v-local-field frame 3 7)) (do (v-put frame 7 (v-local-field frame 3 8)) (if (v-truthy (v-local-tag frame 5 6)) (do (v-put frame 8 (v-local-field frame 5 12)) (do (set! result (v-record1 6 (v-get frame 8))) (set! running false))) (do (v-drop (v-assign frame 0 (v-get frame 7))) (do (v-drop (v-assign frame 1 (v-get frame 4))) (do (v-drop (v-assign frame 2 (v-call3 3256 (v-call2 2 (v-call1 1301 (v-get frame 6)) (v-get frame 4)) (v-record1 6 (v-get frame 6)) (v-record0 7)))) ()))))))))))) result)))
+
+; $$$$047schema_stage$find_function$
+(meta-set! port1303 "sig" (Fn [(Ptr Long)] Long))
+(defn port1303 [frame]
+  (v-tailcall3 1302 (v-get frame 0) (v-get frame 1) (v-record0 7)))
+
+; $$$$047schema_stage$certified_if_named$
+(meta-set! port1304 "sig" (Fn [(Ptr Long)] Long))
+(defn port1304 [frame]
+  (if (v-truthy (v-not (v-get frame 0))) 9221964661971222528l (v-tailcall3 240 4697254411347427328l (v-record2 1 (v-record2 123 (v-get frame 1) (v-get frame 2)) (v-record0 0)) 9221964661971222529l)))
+
+; $$$$047schema_stage$certified_function_work$
+(meta-set! port1305 "sig" (Fn [(Ptr Long)] Long))
+(defn port1305 [frame]
+  (let [result 9221683186994511872l running true] (do (while running (do (v-put frame 3 (v-get frame 0)) (do (v-put frame 4 (v-get frame 1)) (do (v-put frame 5 (v-get frame 2)) (if (v-truthy (v-local-tag frame 3 0)) (if (v-truthy (v-get frame 5)) (do (set! result 9221964661971222529l) (set! running false)) (do (set! result 9221964661971222528l) (set! running false))) (do (v-put frame 6 (v-local-field frame 3 7)) (do (v-put frame 7 (v-local-field frame 6 181)) (do (v-put frame 8 (v-local-field frame 3 8)) (if (v-truthy (v-get frame 5)) (do (set! result 9221964661971222529l) (set! running false)) (do (v-drop (v-assign frame 0 (v-get frame 8))) (do (v-drop (v-assign frame 1 (v-get frame 4))) (do (v-drop (v-assign frame 2 (v-call3 1304 (v-call2 2 (v-call1 1301 (v-get frame 7)) (v-call1 1301 (v-get frame 4))) (v-get frame 7) (v-get frame 4)))) ())))))))))))) result)))
+
+; $$$$047schema_stage$certified_function$
+(meta-set! port1306 "sig" (Fn [(Ptr Long)] Long))
+(defn port1306 [frame]
+  (v-tailcall3 1305 (v-get frame 0) (v-get frame 1) 9221964661971222528l))
+
+; $$$$047schema_stage$node_catalog$
+(meta-set! port1307 "sig" (Fn [(Ptr Long)] Long))
+(defn port1307 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 2 (v-local-field frame 0 12)) (do (v-put frame 3 (v-local-field frame 2 18)) (do (v-put frame 4 (v-local-field frame 2 94)) (if (v-truthy (v-binary 5 (v-get frame 4) 0l)) (v-record0 7) (if (v-truthy (v-binary 5 (v-get frame 4) 4607182418800017408l)) (v-record0 7) (if (v-truthy (v-binary 5 (v-get frame 4) 4611686018427387904l)) (do (v-put frame 5 (v-local-field frame 2 97)) (if (v-truthy (v-local-tag frame 5 1)) (do (v-put frame 6 (v-local-field frame 5 7)) (do (v-put frame 7 (v-local-field frame 6 17)) (do (v-put frame 8 (v-local-field frame 6 95)) (if (v-truthy (v-local-tag frame 8 6)) (do (v-put frame 9 (v-local-field frame 8 12)) (if (v-truthy (v-local-tag frame 9 51)) (do (v-put frame 10 (v-local-field frame 9 26)) (if (v-truthy (v-local-tag frame 10 1)) (do (v-put frame 11 (v-local-field frame 10 7)) (if (v-truthy (v-local-tag frame 11 56)) (do (v-put frame 12 (v-local-field frame 11 16)) (if (v-truthy (v-binary 5 (v-get frame 12) 0l)) (do (v-put frame 13 (v-local-field frame 10 8)) (if (v-truthy (v-local-tag frame 13 1)) (do (v-put frame 14 (v-local-field frame 13 7)) (if (v-truthy (v-local-tag frame 14 56)) (do (v-put frame 15 (v-local-field frame 14 16)) (if (v-truthy (v-binary 5 (v-get frame 15) 0l)) (v-record0 7) (if (v-truthy (v-binary 5 (v-get frame 15) 4607182418800017408l)) (do (v-put frame 16 (v-local-field frame 13 8)) (if (v-truthy (v-local-tag frame 16 0)) (do (v-put frame 17 (v-local-field frame 6 96)) (do (v-put frame 18 (v-local-field frame 5 8)) (if (v-truthy (v-local-tag frame 18 0)) (v-tailcall3 3256 (v-call2 2 (v-get frame 7) (v-get frame 1)) (v-record1 6 (v-record3 140 (v-get frame 3) 4611686018427387904l (v-record2 1 (v-record3 354 (v-get frame 7) (v-record1 6 (v-record1 74 (v-record2 1 (v-record1 53 0l) (v-record2 1 (v-record1 53 4607182418800017408l) (v-record0 0))))) (v-get frame 17)) (v-record0 0)))) (v-record0 7)) (v-record0 7)))) (v-record0 7))) (v-record0 7)))) (v-record0 7))) (v-record0 7))) (v-record0 7))) (v-record0 7))) (v-record0 7))) (v-record0 7))) (v-record0 7))))) (v-record0 7))) (v-record0 7))))))) (v-record0 7)))
+
+; $$$$047schema_stage$terminal_catalog$
+(meta-set! port1308 "sig" (Fn [(Ptr Long)] Long))
+(defn port1308 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 1 (v-local-field frame 0 12)) (do (v-put frame 2 (v-local-field frame 1 18)) (do (v-put frame 3 (v-local-field frame 1 94)) (if (v-truthy (v-binary 5 (v-get frame 3) 0l)) (do (v-put frame 4 (v-local-field frame 1 97)) (if (v-truthy (v-local-tag frame 4 1)) (do (v-put frame 5 (v-local-field frame 4 7)) (do (v-put frame 6 (v-local-field frame 5 17)) (do (v-put frame 7 (v-local-field frame 5 95)) (if (v-truthy (v-local-tag frame 7 7)) (do (v-put frame 8 (v-local-field frame 5 96)) (do (v-put frame 9 (v-local-field frame 4 8)) (if (v-truthy (v-local-tag frame 9 0)) (v-record1 6 (v-record3 140 (v-get frame 2) 0l (v-record2 1 (v-record3 354 (v-get frame 6) (v-record0 7) (v-get frame 8)) (v-record0 0)))) (v-record0 7)))) (v-record0 7))))) (v-record0 7))) (v-record0 7))))) (v-record0 7)))
+
+; $$$$047schema_stage$witness_catalog$
+(meta-set! port1309 "sig" (Fn [(Ptr Long)] Long))
+(defn port1309 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 2 (v-local-field frame 0 12)) (do (v-put frame 3 (v-local-field frame 2 18)) (do (v-put frame 4 (v-local-field frame 2 94)) (if (v-truthy (v-binary 5 (v-get frame 4) 0l)) (v-record0 7) (if (v-truthy (v-binary 5 (v-get frame 4) 4607182418800017408l)) (do (v-put frame 5 (v-local-field frame 2 97)) (if (v-truthy (v-local-tag frame 5 1)) (do (v-put frame 6 (v-local-field frame 5 7)) (do (v-put frame 7 (v-local-field frame 6 17)) (do (v-put frame 8 (v-local-field frame 6 95)) (if (v-truthy (v-local-tag frame 8 6)) (do (v-put frame 9 (v-local-field frame 8 12)) (if (v-truthy (v-local-tag frame 9 56)) (do (v-put frame 10 (v-local-field frame 9 16)) (if (v-truthy (v-binary 5 (v-get frame 10) 0l)) (do (v-put frame 11 (v-local-field frame 6 96)) (if (v-truthy (v-local-tag frame 11 0)) (do (v-put frame 12 (v-local-field frame 5 8)) (if (v-truthy (v-local-tag frame 12 0)) (v-tailcall3 3256 (v-call2 2 (v-get frame 7) (v-get frame 1)) (v-record1 6 (v-record3 140 (v-get frame 3) 4607182418800017408l (v-record2 1 (v-record3 354 (v-get frame 7) (v-record1 6 (v-record1 53 0l)) (v-record0 0)) (v-record0 0)))) (v-record0 7)) (v-record0 7))) (v-record0 7))) (v-record0 7))) (v-record0 7))) (v-record0 7))))) (v-record0 7))) (v-record0 7)))))) (v-record0 7)))
+
+; $$$$047schema_stage$type_identity$
+(meta-set! port1310 "sig" (Fn [(Ptr Long)] Long))
+(defn port1310 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 18)) (v-get frame 1)))
+
+; $$$$047schema_stage$constructor_identity$
+(meta-set! port1311 "sig" (Fn [(Ptr Long)] Long))
+(defn port1311 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 18)) (v-get frame 1)))
+
+; $$$$047schema_stage$nominal_prefix$
+(meta-set! port1312 "sig" (Fn [(Ptr Long)] Long))
+(defn port1312 [frame]
+  (do (v-put frame 2 (v-local-field frame 0 14)) (do (v-put frame 3 (v-local-field frame 0 15)) (do (v-put frame 4 (v-binary 0 (v-get frame 2) (v-literal 834))) (do (v-put frame 5 (v-call3 3256 (v-call2 2 (v-get frame 2) (v-literal 835)) (v-literal 836) (v-call3 3256 (v-call2 2 (v-get frame 2) (v-get frame 1)) (v-literal 10) (v-binary 0 (v-literal 837) (v-get frame 4))))) (v-binary 0 (v-get frame 5) (v-get frame 3)))))))
+
+; $$$$047schema_stage$method_name$
+(meta-set! port1313 "sig" (Fn [(Ptr Long)] Long))
+(defn port1313 [frame]
+  (do (v-put frame 3 (v-call2 1312 (v-get frame 0) (v-get frame 1))) (do (v-put frame 4 (v-binary 0 (v-literal 838) (v-get frame 2))) (v-binary 0 (v-get frame 3) (v-get frame 4)))))
+
+; $$$$047schema_stage$terminal_from_catalog$
+(meta-set! port1314 "sig" (Fn [(Ptr Long)] Long))
+(defn port1314 [frame]
+  (if (v-truthy (v-local-tag frame 0 6)) (do (v-put frame 6 (v-local-field frame 0 12)) (v-tailcall3 3256 (v-call2 3253 (v-call1 1292 (v-get frame 1)) (v-call2 3253 (v-call2 2 (v-call1 1301 (v-get frame 1)) (v-call3 1313 (v-get frame 2) (v-get frame 4) (v-get frame 3))) (v-call2 1306 (v-get frame 5) (v-get frame 1)))) (v-record1 6 (v-record2 409 (v-get frame 1) (v-get frame 6))) (v-record0 7))) (v-record0 7)))
+
+; $$$$047schema_stage$terminal_source$
+(meta-set! port1315 "sig" (Fn [(Ptr Long)] Long))
+(defn port1315 [frame]
+  (do (v-put frame 5 (v-local-field frame 0 17)) (do (v-put frame 6 (v-local-field frame 0 126)) (do (v-put frame 7 (v-local-field frame 0 21)) (do (v-put frame 8 (v-local-field frame 0 102)) (if (v-truthy (v-local-tag frame 8 6)) (do (v-put frame 9 (v-local-field frame 8 12)) (if (v-truthy (v-local-tag frame 9 35)) (do (v-put frame 10 (v-local-field frame 9 18)) (do (v-put frame 11 (v-local-field frame 9 19)) (if (v-truthy (v-local-tag frame 11 0)) (do (v-put frame 12 (v-local-field frame 0 103)) (do (v-put frame 13 (v-local-field frame 0 101)) (v-tailcall6 1314 (v-call1 1308 (v-call2 304 (v-get frame 3) (v-get frame 10))) (v-record6 175 (v-get frame 5) (v-get frame 6) (v-get frame 7) (v-record1 6 (v-record2 73 (v-get frame 10) (v-record0 0))) (v-get frame 12) (v-get frame 13)) (v-get frame 10) (v-get frame 1) (v-get frame 2) (v-get frame 4)))) (v-record0 7)))) (v-record0 7))) (v-record0 7)))))))
+
+; $$$$047schema_stage$find_terminal_work$
+(meta-set! port1316 "sig" (Fn [(Ptr Long)] Long))
+(defn port1316 [frame]
+  (let [result 9221683186994511872l running true] (do (while running (do (v-put frame 6 (v-get frame 0)) (do (v-put frame 7 (v-get frame 1)) (do (v-put frame 8 (v-get frame 2)) (do (v-put frame 9 (v-get frame 3)) (do (v-put frame 10 (v-get frame 4)) (do (v-put frame 11 (v-get frame 5)) (if (v-truthy (v-local-tag frame 6 0)) (if (v-truthy (v-local-tag frame 7 6)) (do (v-put frame 12 (v-local-field frame 7 12)) (do (set! result (v-record1 6 (v-get frame 12))) (set! running false))) (do (set! result (v-record0 7)) (set! running false))) (do (v-put frame 12 (v-local-field frame 6 7)) (do (v-put frame 13 (v-local-field frame 6 8)) (if (v-truthy (v-local-tag frame 7 6)) (do (v-put frame 14 (v-local-field frame 7 12)) (do (set! result (v-record1 6 (v-get frame 14))) (set! running false))) (do (v-drop (v-assign frame 0 (v-get frame 13))) (do (v-drop (v-assign frame 1 (v-call5 1315 (v-get frame 12) (v-get frame 8) (v-get frame 9) (v-get frame 10) (v-get frame 11)))) (do (v-drop (v-assign frame 2 (v-get frame 8))) (do (v-drop (v-assign frame 3 (v-get frame 9))) (do (v-drop (v-assign frame 4 (v-get frame 10))) (do (v-drop (v-assign frame 5 (v-get frame 11))) ()))))))))))))))))) result)))
+
+; $$$$047schema_stage$find_terminal$
+(meta-set! port1317 "sig" (Fn [(Ptr Long)] Long))
+(defn port1317 [frame]
+  (v-tailcall6 1316 (v-get frame 0) (v-record0 7) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4)))
+
+; $$$$047schema_stage$matched_type_equality_found$
+(meta-set! port1318 "sig" (Fn [(Ptr Long)] Long))
+(defn port1318 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) (v-record0 7) (do (v-put frame 4 (v-local-field frame 0 12)) (v-tailcall3 3256 (v-call2 3253 (v-call2 2 (v-get frame 4) (v-get frame 2)) (v-call2 1306 (v-get frame 3) (v-get frame 1))) (v-record1 6 (v-get frame 1)) (v-record0 7)))))
+
+; $$$$047schema_stage$matched_type_equality$
+(meta-set! port1319 "sig" (Fn [(Ptr Long)] Long))
+(defn port1319 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) (v-record0 7) (do (v-put frame 3 (v-local-field frame 0 12)) (v-tailcall4 1318 (v-call1 1300 (v-get frame 3)) (v-get frame 3) (v-get frame 1) (v-get frame 2)))))
+
+; $$$$047schema_stage$matched_forwarder$
+(meta-set! port1320 "sig" (Fn [(Ptr Long)] Long))
+(defn port1320 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) (v-record0 7) (do (v-put frame 2 (v-local-field frame 0 12)) (v-tailcall3 3256 (v-call2 3253 (v-call1 1295 (v-get frame 2)) (v-call2 1306 (v-get frame 1) (v-get frame 2))) (v-record1 6 (v-get frame 2)) (v-record0 7)))))
+
+; $$$$047schema_stage$data_has_field$
+(meta-set! port1321 "sig" (Fn [(Ptr Long)] Long))
+(defn port1321 [frame]
+  (do (v-put frame 2 (v-local-field frame 0 97)) (v-tailcall2 1183 (v-get frame 2) (v-get frame 1))))
+
+; $$$$047schema_stage$capture_valid$
+(meta-set! port1322 "sig" (Fn [(Ptr Long)] Long))
+(defn port1322 [frame]
+  (do (v-put frame 10 (v-local-field frame 1 99)) (do (v-put frame 11 (v-local-field frame 1 84)) (do (v-put frame 12 (v-call1 1310 (v-get frame 2))) (do (v-put frame 13 (v-call1 1310 (v-get frame 5))) (do (v-put frame 14 (v-call2 3253 (v-call1 3275 (v-call2 1321 (v-get frame 2) (v-get frame 11))) (v-call2 3253 (v-call1 3275 (v-call2 1321 (v-get frame 5) (v-get frame 11))) (v-call2 3253 (v-call2 2 (v-call1 1301 (v-get frame 0)) (v-call3 1313 (v-get frame 12) (v-get frame 8) (v-get frame 11))) (v-call2 3253 (v-call2 2 (v-call1 1301 (v-get frame 4)) (v-call3 1313 (v-get frame 13) (v-get frame 8) (v-get frame 11))) (v-call2 3253 (v-call2 1306 (v-get frame 9) (v-get frame 0)) (v-call2 3253 (v-call2 1306 (v-get frame 9) (v-get frame 6)) (v-call2 1306 (v-get frame 9) (v-get frame 7))))))))) (v-tailcall3 3256 (v-get frame 14) (v-record1 6 (v-record11 410 (v-get frame 0) (v-get frame 4) (v-get frame 6) (v-get frame 7) (v-get frame 2) (v-get frame 5) (v-get frame 3) (v-get frame 10) (v-get frame 13) (v-get frame 12) (v-get frame 11))) (v-record0 7))))))))
+
+; $$$$047schema_stage$capture_dependencies$
+(meta-set! port1323 "sig" (Fn [(Ptr Long)] Long))
+(defn port1323 [frame]
+  (if (v-truthy (v-local-tag frame 4 6)) (do (v-put frame 9 (v-local-field frame 4 12)) (do (v-put frame 10 (v-local-field frame 9 181)) (do (v-put frame 11 (v-local-field frame 9 248)) (if (v-truthy (v-local-tag frame 5 6)) (do (v-put frame 12 (v-local-field frame 5 12)) (if (v-truthy (v-local-tag frame 6 6)) (do (v-put frame 13 (v-local-field frame 6 12)) (v-tailcall10 1322 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 10) (v-get frame 11) (v-get frame 12) (v-get frame 13) (v-get frame 7) (v-get frame 8))) (v-record0 7))) (v-record0 7))))) (v-record0 7)))
+
+; $$$$047schema_stage$capture_witness_data$
+(meta-set! port1324 "sig" (Fn [(Ptr Long)] Long))
+(defn port1324 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) (v-record0 7) (do (v-put frame 8 (v-local-field frame 0 12)) (do (v-put frame 9 (v-call3 1313 (v-call1 1310 (v-get frame 8)) (v-get frame 7) (v-literal 833))) (v-tailcall9 1323 (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 8) (v-call5 1317 (v-get frame 4) (v-call1 1256 (v-get frame 2)) (v-get frame 7) (v-get frame 5) (v-get frame 6)) (v-call2 1320 (v-call2 1303 (v-get frame 4) (v-call1 1257 (v-get frame 2))) (v-get frame 6)) (v-call3 1319 (v-call2 1303 (v-get frame 4) (v-get frame 9)) (v-call1 1258 (v-get frame 2)) (v-get frame 6)) (v-get frame 7) (v-get frame 6))))))
+
+; $$$$047schema_stage$capture_witness$
+(meta-set! port1325 "sig" (Fn [(Ptr Long)] Long))
+(defn port1325 [frame]
+  (if (v-truthy (v-local-tag frame 3 7)) (v-record0 7) (do (v-put frame 8 (v-local-field frame 3 12)) (v-tailcall8 1324 (v-call2 1309 (v-call2 304 (v-get frame 5) (v-call1 1311 (v-get frame 8))) (v-call1 1258 (v-get frame 1))) (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7)))))
+
+; $$$$047schema_stage$capture_node_data$
+(meta-set! port1326 "sig" (Fn [(Ptr Long)] Long))
+(defn port1326 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) (v-record0 7) (do (v-put frame 7 (v-local-field frame 0 12)) (v-tailcall8 1325 (v-get frame 1) (v-get frame 2) (v-get frame 7) (v-call2 308 (v-get frame 4) (v-call1 1258 (v-get frame 2))) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6)))))
+
+; $$$$047schema_stage$capture_node$
+(meta-set! port1327 "sig" (Fn [(Ptr Long)] Long))
+(defn port1327 [frame]
+  (if (v-truthy (v-local-tag frame 2 7)) (v-record0 7) (do (v-put frame 7 (v-local-field frame 2 12)) (v-tailcall7 1326 (v-call2 1307 (v-call2 304 (v-get frame 4) (v-call1 1311 (v-get frame 7))) (v-call1 1255 (v-get frame 1))) (v-get frame 0) (v-get frame 1) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6)))))
+
+; $$$$047schema_stage$capture_shape$
+(meta-set! port1328 "sig" (Fn [(Ptr Long)] Long))
+(defn port1328 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) (v-record0 7) (do (v-put frame 6 (v-local-field frame 0 12)) (v-tailcall7 1327 (v-get frame 1) (v-get frame 6) (v-call2 308 (v-get frame 3) (v-call1 1255 (v-get frame 6))) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5)))))
+
+; $$$$047schema_stage$capture_one$
+(meta-set! port1329 "sig" (Fn [(Ptr Long)] Long))
+(defn port1329 [frame]
+  (v-tailcall6 1328 (v-call1 1290 (v-get frame 0)) (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4)))
+
+; $$$$047schema_stage$captured$
+(meta-set! port1330 "sig" (Fn [(Ptr Long)] Long))
+(defn port1330 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) (v-get frame 1) (do (v-put frame 2 (v-local-field frame 0 12)) (v-record2 1 (v-get frame 2) (v-get frame 1)))))
+
+; $$$$047schema_stage$capture_functions$
+(meta-set! port1331 "sig" (Fn [(Ptr Long)] Long))
+(defn port1331 [frame]
+  (if (v-truthy (v-local-tag frame 0 0)) (v-record0 0) (do (v-put frame 5 (v-local-field frame 0 7)) (do (v-put frame 6 (v-local-field frame 0 8)) (v-tailcall2 1330 (v-call5 1329 (v-get frame 5) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4)) (v-call5 1331 (v-get frame 6) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4)))))))
+
+; $$$$047schema_stage$capture_checked_catalog$
+(meta-set! port1332 "sig" (Fn [(Ptr Long)] Long))
+(defn port1332 [frame]
+  (if (v-truthy (v-not (v-get frame 0))) (v-record0 0) (v-tailcall5 1331 (v-get frame 1) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4))))
+
+; $$$$047schema_stage$capture$
+(meta-set! port1333 "sig" (Fn [(Ptr Long)] Long))
+(defn port1333 [frame]
+  (do (v-put frame 4 (v-local-field frame 2 128)) (do (v-put frame 5 (v-local-field frame 2 129)) (v-tailcall5 1332 (v-call3 240 4697254411347427328l (v-record2 1 (v-record2 117 (v-get frame 1) (v-get frame 5)) (v-record0 0)) 9221964661971222529l) (v-get frame 0) (v-get frame 1) (v-get frame 4) (v-get frame 3)))))
+
+; $$$$047schema_stage$node_id$
+(meta-set! port1334 "sig" (Fn [(Ptr Long)] Long))
+(defn port1334 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 257)) (v-get frame 1)))
+
+; $$$$047schema_stage$terminal_id$
+(meta-set! port1335 "sig" (Fn [(Ptr Long)] Long))
+(defn port1335 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 256)) (v-get frame 1)))
+
+; $$$$047schema_stage$proof_member$
+(meta-set! port1336 "sig" (Fn [(Ptr Long)] Long))
+(defn port1336 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 84)) (v-get frame 1)))
+
+; $$$$047schema_stage$node_method$
+(meta-set! port1337 "sig" (Fn [(Ptr Long)] Long))
+(defn port1337 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 249)) (v-tailcall1 1301 (v-get frame 1))))
+
+; $$$$047schema_stage$terminal_method$
+(meta-set! port1338 "sig" (Fn [(Ptr Long)] Long))
+(defn port1338 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 250)) (v-tailcall1 1301 (v-get frame 1))))
+
+; $$$$047schema_stage$method_matches$
+(meta-set! port1339 "sig" (Fn [(Ptr Long)] Long))
+(defn port1339 [frame]
+  (if (v-truthy (v-local-tag frame 0 35)) (do (v-put frame 3 (v-local-field frame 0 18)) (do (v-put frame 4 (v-call2 3253 (v-call2 3 (v-get frame 3) (v-call1 1334 (v-get frame 2))) (v-call2 2 (v-get frame 1) (v-call1 1337 (v-get frame 2))))) (do (v-put frame 5 (v-call2 3253 (v-call2 3 (v-get frame 3) (v-call1 1335 (v-get frame 2))) (v-call2 2 (v-get frame 1) (v-call1 1338 (v-get frame 2))))) (let [logical0 (v-get frame 4)] (if (v-truthy (v-keep logical0)) logical0 (do (v-drop logical0) (v-get frame 5))))))) 9221964661971222528l))
+
+; $$$$047schema_stage$exact_function$
+(meta-set! port1340 "sig" (Fn [(Ptr Long)] Long))
+(defn port1340 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) 9221964661971222528l (do (v-put frame 2 (v-local-field frame 0 12)) (v-tailcall3 240 4697254411347427328l (v-record2 1 (v-record2 123 (v-get frame 2) (v-get frame 1)) (v-record0 0)) 9221964661971222529l))))
+
+; $$$$047schema_stage$exact_type$
+(meta-set! port1341 "sig" (Fn [(Ptr Long)] Long))
+(defn port1341 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) 9221964661971222528l (do (v-put frame 2 (v-local-field frame 0 12)) (v-tailcall2 242 (v-get frame 2) (v-get frame 1)))))
+
+; $$$$047schema_stage$exact_sources$
+(meta-set! port1342 "sig" (Fn [(Ptr Long)] Long))
+(defn port1342 [frame]
+  (do (v-put frame 3 (v-local-field frame 0 249)) (do (v-put frame 4 (v-local-field frame 0 250)) (do (v-put frame 5 (v-local-field frame 0 246)) (do (v-put frame 6 (v-local-field frame 0 251)) (do (v-put frame 7 (v-local-field frame 0 252)) (do (v-put frame 8 (v-local-field frame 0 253)) (do (v-put frame 9 (v-local-field frame 0 254)) (v-tailcall2 3253 (v-call2 1340 (v-call2 1303 (v-get frame 1) (v-call1 1301 (v-get frame 3))) (v-get frame 3)) (v-call2 3253 (v-call2 1340 (v-call2 1303 (v-get frame 1) (v-call1 1301 (v-get frame 4))) (v-get frame 4)) (v-call2 3253 (v-call2 1340 (v-call2 1303 (v-get frame 1) (v-call1 1301 (v-get frame 5))) (v-get frame 5)) (v-call2 3253 (v-call2 1340 (v-call2 1303 (v-get frame 1) (v-call1 1301 (v-get frame 6))) (v-get frame 6)) (v-call2 3253 (v-call2 1341 (v-call2 304 (v-get frame 2) (v-call1 1310 (v-get frame 7))) (v-get frame 7)) (v-call2 3253 (v-call2 1341 (v-call2 304 (v-get frame 2) (v-call1 1310 (v-get frame 8))) (v-get frame 8)) (v-call2 1341 (v-call2 304 (v-get frame 2) (v-call1 1310 (v-get frame 9))) (v-get frame 9))))))))))))))))
+
+; $$$$047schema_stage$type_key$
+(meta-set! port1343 "sig" (Fn [(Ptr Long)] Long))
+(defn port1343 [frame]
+  (if (v-truthy (v-local-tag frame 0 81)) (do (v-put frame 1 (v-local-field frame 0 12)) (v-record1 6 (v-get frame 1))) (v-record0 7)))
+
+; $$$$047schema_stage$key$
+(meta-set! port1344 "sig" (Fn [(Ptr Long)] Long))
+(defn port1344 [frame]
+  (v-tailcall1 1343 (v-run-loop (v-call2 400 4679240012837945344l (v-record1 165 (v-call2 393 4679240012837945344l (v-get frame 0)))))))
+
+; $$$$047schema_stage$decide_chain$
+(meta-set! port1345 "sig" (Fn [(Ptr Long)] Long))
+(defn port1345 [frame]
+  (let [result 9221683186994511872l running true] (do (while running (do (v-put frame 2 (v-get frame 0)) (do (v-put frame 3 (v-get frame 1)) (if (v-truthy (v-binary 5 (v-get frame 2) 0l)) (do (set! result (v-record0 7)) (set! running false)) (do (v-put frame 4 (v-binary 1 (v-get frame 2) 4607182418800017408l)) (if (v-truthy (v-local-tag frame 3 841)) (do (v-put frame 5 (v-local-field frame 3 144)) (if (v-truthy (v-local-tag frame 5 35)) (do (v-put frame 6 (v-local-field frame 5 18)) (do (v-put frame 7 (v-local-field frame 5 19)) (if (v-truthy (v-local-tag frame 7 0)) (do (v-put frame 8 (v-local-field frame 3 258)) (do (v-put frame 9 (v-local-field frame 3 259)) (do (set! result (v-tailcall3 3256 (v-call2 3 (v-get frame 6) (v-call1 1335 (v-get frame 8))) (v-record1 6 (v-get frame 9)) (v-record0 7))) (set! running false)))) (do (v-put frame 8 (v-local-field frame 7 7)) (do (v-put frame 9 (v-local-field frame 7 8)) (if (v-truthy (v-local-tag frame 9 1)) (do (v-put frame 10 (v-local-field frame 9 7)) (do (v-put frame 11 (v-local-field frame 9 8)) (if (v-truthy (v-local-tag frame 11 0)) (do (v-put frame 12 (v-local-field frame 3 260)) (do (v-put frame 13 (v-local-field frame 3 258)) (do (v-put frame 14 (v-local-field frame 3 259)) (do (v-drop (v-assign frame 0 (v-get frame 4))) (do (v-drop (v-assign frame 1 (v-record6 411 (v-get frame 8) (v-get frame 10) (v-get frame 12) (v-get frame 13) (v-call2 3 (v-get frame 6) (v-call1 1334 (v-get frame 13))) (v-get frame 14)))) ()))))) (do (set! result (v-record0 7)) (set! running false))))) (do (set! result (v-record0 7)) (set! running false)))))))) (do (set! result (v-record0 7)) (set! running false)))) (if (v-truthy (v-local-tag frame 3 842)) (do (v-put frame 5 (v-local-field frame 3 7)) (do (v-put frame 6 (v-local-field frame 3 8)) (do (v-put frame 7 (v-local-field frame 3 260)) (do (v-put frame 8 (v-local-field frame 3 258)) (do (v-put frame 9 (v-local-field frame 3 261)) (if (v-truthy (v-not (v-get frame 9))) (do (set! result (v-record0 7)) (set! running false)) (do (v-put frame 10 (v-local-field frame 3 259)) (do (v-drop (v-assign frame 0 (v-get frame 4))) (do (v-drop (v-assign frame 1 (v-record5 412 (v-call1 1344 (v-get frame 5)) (v-get frame 7) (v-get frame 6) (v-get frame 8) (v-get frame 10)))) ()))))))))) (if (v-truthy (v-local-tag frame 3 843)) (do (v-put frame 5 (v-local-field frame 3 47)) (if (v-truthy (v-local-tag frame 5 7)) (do (set! result (v-record0 7)) (set! running false)) (do (v-put frame 6 (v-local-field frame 5 12)) (do (v-put frame 7 (v-local-field frame 3 260)) (do (v-put frame 8 (v-local-field frame 3 8)) (do (v-put frame 9 (v-local-field frame 3 258)) (do (v-put frame 10 (v-local-field frame 3 259)) (do (v-drop (v-assign frame 0 (v-get frame 4))) (do (v-drop (v-assign frame 1 (v-record5 413 (v-call2 2 (v-get frame 6) (v-get frame 7)) (v-get frame 8) (v-get frame 7) (v-get frame 9) (v-get frame 10)))) ()))))))))) (do (v-put frame 5 (v-local-field frame 3 51)) (do (v-put frame 6 (v-local-field frame 3 8)) (do (v-put frame 7 (v-local-field frame 3 260)) (do (v-put frame 8 (v-local-field frame 3 258)) (do (v-put frame 9 (v-local-field frame 3 259)) (do (v-drop (v-assign frame 0 (v-get frame 4))) (do (v-drop (v-assign frame 1 (v-record4 414 (v-get frame 6) (v-get frame 7) (v-get frame 8) (let [logical0 (v-get frame 5)] (if (v-truthy (v-keep logical0)) logical0 (do (v-drop logical0) (v-get frame 9))))))) ()))))))))))))))) result)))
+
+; $$$$047schema_stage$decide_witness$
+(meta-set! port1346 "sig" (Fn [(Ptr Long)] Long))
+(defn port1346 [frame]
+  (if (v-truthy (v-local-tag frame 0 7)) (v-record0 7) (do (v-put frame 3 (v-local-field frame 0 12)) (v-tailcall2 1345 4679240012837945344l (v-record4 414 (v-get frame 1) (v-get frame 3) (v-get frame 2) 9221964661971222528l)))))
+
+; $$$$047schema_stage$decide_checked$
+(meta-set! port1347 "sig" (Fn [(Ptr Long)] Long))
+(defn port1347 [frame]
+  (if (v-truthy (v-not (v-get frame 0))) (v-record0 7) (v-tailcall3 1346 (v-call1 1344 (v-get frame 2)) (v-get frame 1) (v-get frame 3))))
+
+; $$$$047schema_stage$decide_ready$
+(meta-set! port1348 "sig" (Fn [(Ptr Long)] Long))
+(defn port1348 [frame]
+  (if (v-truthy (v-not (v-get frame 0))) (v-record0 7) (v-tailcall4 1347 (v-call3 1342 (v-get frame 3) (v-get frame 4) (v-get frame 5)) (v-get frame 1) (v-get frame 2) (v-get frame 3))))
+
+; $$$$047schema_stage$decide_one$
+(meta-set! port1349 "sig" (Fn [(Ptr Long)] Long))
+(defn port1349 [frame]
+  (if (v-truthy (v-local-tag frame 4 37)) (do (v-put frame 7 (v-local-field frame 4 21)) (do (v-put frame 8 (v-local-field frame 4 22)) (if (v-truthy (v-local-tag frame 8 33)) (do (v-put frame 9 (v-local-field frame 4 23)) (do (v-put frame 10 (v-local-field frame 9 13)) (if (v-truthy (v-local-tag frame 10 0)) (do (v-put frame 11 (v-local-field frame 9 8)) (if (v-truthy (v-local-tag frame 11 12)) (v-tailcall6 1348 (v-call2 3253 (v-call2 2 (v-get frame 2) (v-call1 1336 (v-get frame 0))) (v-call3 1339 (v-get frame 3) (v-get frame 1) (v-get frame 0))) (v-get frame 3) (v-get frame 7) (v-get frame 0) (v-get frame 5) (v-get frame 6)) (v-record0 7))) (v-record0 7)))) (v-record0 7)))) (v-record0 7)))
+
+; $$$$047schema_stage$eligible_one$
+(meta-set! port1350 "sig" (Fn [(Ptr Long)] Long))
+(defn port1350 [frame]
+  (do (v-put frame 3 (v-local-field frame 0 256)) (do (v-put frame 4 (v-local-field frame 0 257)) (do (v-put frame 5 (v-local-field frame 0 84)) (if (v-truthy (v-local-tag frame 2 35)) (do (v-put frame 6 (v-local-field frame 2 18)) (do (v-put frame 7 (v-local-field frame 2 19)) (if (v-truthy (v-local-tag frame 7 1)) (do (v-put frame 8 (v-local-field frame 7 8)) (if (v-truthy (v-local-tag frame 8 1)) (do (v-put frame 9 (v-local-field frame 8 8)) (if (v-truthy (v-local-tag frame 9 0)) (v-tailcall2 3253 (v-call2 2 (v-get frame 1) (v-get frame 5)) (v-call2 3 (v-get frame 6) (v-get frame 4))) 9221964661971222528l)) 9221964661971222528l)) (v-tailcall2 3253 (v-call2 2 (v-get frame 1) (v-get frame 5)) (v-call2 3 (v-get frame 6) (v-get frame 3)))))) 9221964661971222528l)))))
+
+; $$$$047schema_stage$eligible_work$
+(meta-set! port1351 "sig" (Fn [(Ptr Long)] Long))
+(defn port1351 [frame]
+  (let [result 9221683186994511872l running true] (do (while running (do (v-put frame 4 (v-get frame 0)) (do (v-put frame 5 (v-get frame 1)) (do (v-put frame 6 (v-get frame 2)) (do (v-put frame 7 (v-get frame 3)) (if (v-truthy (v-local-tag frame 4 0)) (if (v-truthy (v-get frame 7)) (do (set! result 9221964661971222529l) (set! running false)) (do (set! result 9221964661971222528l) (set! running false))) (do (v-put frame 8 (v-local-field frame 4 7)) (do (v-put frame 9 (v-local-field frame 4 8)) (if (v-truthy (v-get frame 7)) (do (set! result 9221964661971222529l) (set! running false)) (do (v-drop (v-assign frame 0 (v-get frame 9))) (do (v-drop (v-assign frame 1 (v-get frame 5))) (do (v-drop (v-assign frame 2 (v-get frame 6))) (do (v-drop (v-assign frame 3 (v-call3 1350 (v-get frame 8) (v-get frame 5) (v-get frame 6)))) ()))))))))))))) result)))
+
+; $$$$047schema_stage$eligible$
+(meta-set! port1352 "sig" (Fn [(Ptr Long)] Long))
+(defn port1352 [frame]
+  (v-tailcall4 1351 (v-get frame 0) (v-get frame 1) (v-get frame 2) 9221964661971222528l))
+
+; $$$$047schema_stage$decide_search$
+(meta-set! port1353 "sig" (Fn [(Ptr Long)] Long))
+(defn port1353 [frame]
+  (let [result 9221683186994511872l running true] (do (while running (do (v-put frame 2 (v-get frame 0)) (do (v-put frame 3 (v-get frame 1)) (if (v-truthy (v-binary 5 (v-get frame 2) 0l)) (do (set! result (v-record0 7)) (set! running false)) (do (v-put frame 4 (v-binary 1 (v-get frame 2) 4607182418800017408l)) (if (v-truthy (v-local-tag frame 3 845)) (do (v-put frame 5 (v-local-field frame 3 262)) (if (v-truthy (v-local-tag frame 5 0)) (do (set! result (v-record0 7)) (set! running false)) (do (v-put frame 6 (v-local-field frame 5 7)) (do (v-put frame 7 (v-local-field frame 5 8)) (do (v-put frame 8 (v-local-field frame 3 263)) (do (v-put frame 9 (v-local-field frame 3 84)) (do (v-put frame 10 (v-local-field frame 3 48)) (do (v-put frame 11 (v-local-field frame 3 22)) (do (v-put frame 12 (v-local-field frame 3 128)) (do (v-put frame 13 (v-local-field frame 3 77)) (do (v-drop (v-assign frame 0 (v-get frame 4))) (do (v-drop (v-assign frame 1 (v-record8 415 (v-call7 1349 (v-get frame 6) (v-get frame 8) (v-get frame 9) (v-get frame 10) (v-get frame 11) (v-get frame 12) (v-get frame 13)) (v-get frame 7) (v-get frame 8) (v-get frame 9) (v-get frame 10) (v-get frame 11) (v-get frame 12) (v-get frame 13)))) ())))))))))))) (do (v-put frame 5 (v-local-field frame 3 47)) (if (v-truthy (v-local-tag frame 5 6)) (do (v-put frame 6 (v-local-field frame 5 12)) (do (set! result (v-record1 6 (v-get frame 6))) (set! running false))) (do (v-put frame 6 (v-local-field frame 3 40)) (do (v-put frame 7 (v-local-field frame 3 263)) (do (v-put frame 8 (v-local-field frame 3 84)) (do (v-put frame 9 (v-local-field frame 3 48)) (do (v-put frame 10 (v-local-field frame 3 22)) (do (v-put frame 11 (v-local-field frame 3 128)) (do (v-put frame 12 (v-local-field frame 3 77)) (do (v-drop (v-assign frame 0 (v-get frame 4))) (do (v-drop (v-assign frame 1 (v-record7 416 (v-get frame 6) (v-get frame 7) (v-get frame 8) (v-get frame 9) (v-get frame 10) (v-get frame 11) (v-get frame 12)))) ()))))))))))))))))) result)))
+
+; $$$$047schema_stage$decide$
+(meta-set! port1354 "sig" (Fn [(Ptr Long)] Long))
+(defn port1354 [frame]
+  (v-tailcall2 1353 4679240012837945344l (v-record7 416 (v-get frame 0) (v-get frame 1) (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-get frame 5) (v-get frame 6))))
+
+; $$$$047state_run_evidence$free_within$
+(meta-set! port1355 "sig" (Fn [(Ptr Long)] Long))
+(defn port1355 [frame]
+  (if (v-truthy (v-local-tag frame 0 81)) (do (v-put frame 2 (v-local-field frame 0 12)) (v-tailcall1 3280 (v-call2 183 (v-get frame 2) (v-get frame 1)))) 9221964661971222528l))
+
+; $$$$047state_run_evidence$admissible_tail$
+(meta-set! port1356 "sig" (Fn [(Ptr Long)] Long))
+(defn port1356 [frame]
+  (if (v-truthy (v-local-tag frame 0 12)) 9221964661971222529l (if (v-truthy (v-local-tag frame 0 17)) (do (v-put frame 2 (v-local-field frame 0 16)) (v-tailcall2 161 (v-get frame 1) (v-get frame 2))) 9221964661971222528l)))
+
+; $$$$047state_run_evidence$admissible_result_type$
+(meta-set! port1357 "sig" (Fn [(Ptr Long)] Long))
+(defn port1357 [frame]
+  (let [result 9221683186994511872l running true] (do (while running (do (v-put frame 3 (v-get frame 0)) (do (v-put frame 4 (v-get frame 1)) (do (v-put frame 5 (v-get frame 2)) (if (v-truthy (v-binary 5 (v-get frame 3) 0l)) (do (set! result 9221964661971222528l) (set! running false)) (do (v-put frame 6 (v-binary 1 (v-get frame 3) 4607182418800017408l)) (if (v-truthy (v-local-tag frame 4 0)) (do (set! result 9221964661971222529l) (set! running false)) (do (v-put frame 7 (v-local-field frame 4 7)) (if (v-truthy (v-local-tag frame 7 58)) (do (v-put frame 8 (v-local-field frame 7 16)) (do (v-put frame 9 (v-local-field frame 4 8)) (do (set! result (v-tailcall2 3253 (v-call2 161 (v-get frame 5) (v-get frame 8)) (v-call3 1357 (v-get frame 6) (v-get frame 9) (v-get frame 5)))) (set! running false)))) (if (v-truthy (v-local-tag frame 7 56)) (do (set! result 9221964661971222528l) (set! running false)) (if (v-truthy (v-local-tag frame 7 55)) (do (set! result 9221964661971222528l) (set! running false)) (if (v-truthy (v-local-tag frame 7 37)) (do (v-put frame 8 (v-local-field frame 7 21)) (do (v-put frame 9 (v-local-field frame 7 22)) (do (v-put frame 10 (v-local-field frame 7 23)) (do (v-put frame 11 (v-local-field frame 4 8)) (do (set! result (v-tailcall2 3253 (v-call2 1356 (v-call1 67 (v-get frame 10)) (v-get frame 5)) (v-call3 1357 (v-get frame 6) (v-record2 1 (v-get frame 8) (v-record2 1 (v-get frame 9) (v-get frame 11))) (v-get frame 5)))) (set! running false)))))) (if (v-truthy (v-local-tag frame 7 45)) (do (v-put frame 8 (v-local-field frame 7 23)) (do (v-put frame 9 (v-local-field frame 4 8)) (do (set! result (v-tailcall2 3253 (v-call2 1356 (v-call1 67 (v-get frame 8)) (v-get frame 5)) (v-call3 1357 (v-get frame 6) (v-get frame 9) (v-get frame 5)))) (set! running false)))) (if (v-truthy (v-local-tag frame 7 41)) (do (v-put frame 8 (v-local-field frame 7 2)) (do (v-put frame 9 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-record2 1 (v-get frame 8) (v-get frame 9)))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ()))))) (if (v-truthy (v-local-tag frame 7 35)) (do (v-put frame 8 (v-local-field frame 7 19)) (do (v-put frame 9 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-call2 3265 (v-get frame 8) (v-get frame 9)))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ()))))) (if (v-truthy (v-local-tag frame 7 51)) (do (v-put frame 8 (v-local-field frame 7 26)) (do (v-put frame 9 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-call2 3265 (v-get frame 8) (v-get frame 9)))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ()))))) (if (v-truthy (v-local-tag frame 7 53)) (do (v-put frame 8 (v-local-field frame 7 27)) (do (v-put frame 9 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-record2 1 (v-get frame 8) (v-get frame 9)))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ()))))) (if (v-truthy (v-local-tag frame 7 27)) (do (v-put frame 8 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-get frame 8))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ())))) (if (v-truthy (v-local-tag frame 7 29)) (do (v-put frame 8 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-get frame 8))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ())))) (if (v-truthy (v-local-tag frame 7 33)) (do (v-put frame 8 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-get frame 8))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ())))) (if (v-truthy (v-local-tag frame 7 180)) (do (v-put frame 8 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-get frame 8))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ())))) (if (v-truthy (v-local-tag frame 7 31)) (do (v-put frame 8 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-get frame 8))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ())))) (if (v-truthy (v-local-tag frame 7 47)) (do (v-put frame 8 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-get frame 8))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ())))) (do (v-put frame 8 (v-local-field frame 4 8)) (do (v-drop (v-assign frame 0 (v-get frame 6))) (do (v-drop (v-assign frame 1 (v-get frame 8))) (do (v-drop (v-assign frame 2 (v-get frame 5))) ()))))))))))))))))))))))))))) result)))
+
+; $$$$047state_run_evidence$same_ty$
+(meta-set! port1358 "sig" (Fn [(Ptr Long)] Long))
+(defn port1358 [frame]
+  (v-tailcall3 240 4679240012837945344l (v-record2 1 (v-record2 95 (v-get frame 0) (v-get frame 1)) (v-record0 0)) 9221964661971222529l))
+
+; $$$$047state_run_evidence$same_tail$
+(meta-set! port1359 "sig" (Fn [(Ptr Long)] Long))
+(defn port1359 [frame]
+  (v-tailcall3 240 4679240012837945344l (v-record2 1 (v-record2 92 (v-get frame 0) (v-get frame 1)) (v-record0 0)) 9221964661971222529l))
+
+; $$$$047state_run_evidence$same_row$
+(meta-set! port1360 "sig" (Fn [(Ptr Long)] Long))
+(defn port1360 [frame]
+  (v-tailcall3 240 4679240012837945344l (v-record2 1 (v-record2 96 (v-call1 88 (v-get frame 0)) (v-call1 88 (v-get frame 1))) (v-record0 0)) 9221964661971222529l))
+
+; $$$$047state_run_evidence$same_predicate$
+(meta-set! port1361 "sig" (Fn [(Ptr Long)] Long))
+(defn port1361 [frame]
+  (if (v-truthy (v-local-tag frame 0 193)) (do (v-put frame 2 (v-local-field frame 0 84)) (do (v-put frame 3 (v-local-field frame 0 85)) (do (v-put frame 4 (v-local-field frame 0 48)) (do (v-put frame 5 (v-local-field frame 0 49)) (if (v-truthy (v-local-tag frame 5 37)) (do (v-put frame 6 (v-local-field frame 5 21)) (do (v-put frame 7 (v-local-field frame 5 22)) (do (v-put frame 8 (v-local-field frame 5 23)) (do (v-put frame 9 (v-local-field frame 0 22)) (do (v-put frame 10 (v-local-field frame 0 86)) (if (v-truthy (v-local-tag frame 1 193)) (do (v-put frame 11 (v-local-field frame 1 84)) (do (v-put frame 12 (v-local-field frame 1 85)) (do (v-put frame 13 (v-local-field frame 1 48)) (do (v-put frame 14 (v-local-field frame 1 49)) (if (v-truthy (v-local-tag frame 14 37)) (do (v-put frame 15 (v-local-field frame 14 21)) (do (v-put frame 16 (v-local-field frame 14 22)) (do (v-put frame 17 (v-local-field frame 14 23)) (do (v-put frame 18 (v-local-field frame 1 22)) (do (v-put frame 19 (v-local-field frame 1 86)) (v-tailcall3 240 4679240012837945344l (v-record2 1 (v-record2 119 (v-record6 193 (v-get frame 2) (v-get frame 3) (v-get frame 4) (v-record3 70 (v-get frame 6) (v-get frame 7) (v-call1 88 (v-get frame 8))) (v-get frame 9) (v-call1 88 (v-get frame 10))) (v-record6 193 (v-get frame 11) (v-get frame 12) (v-get frame 13) (v-record3 70 (v-get frame 15) (v-get frame 16) (v-call1 88 (v-get frame 17))) (v-get frame 18) (v-call1 88 (v-get frame 19)))) (v-record0 0)) 9221964661971222529l)))))) 9221964661971222528l))))) 9221964661971222528l)))))) 9221964661971222528l))))) 9221964661971222528l))
+
+; $$$$047state_run_evidence$same_operation$
+(meta-set! port1362 "sig" (Fn [(Ptr Long)] Long))
+(defn port1362 [frame]
+  (v-tailcall3 240 4679240012837945344l (v-record2 1 (v-record2 125 (v-get frame 0) (v-get frame 1)) (v-record0 0)) 9221964661971222529l))
+
+; $$$$047state_run_evidence$exact_operation$
+(meta-set! port1363 "sig" (Fn [(Ptr Long)] Long))
+(defn port1363 [frame]
+  (if (v-truthy (v-local-tag frame 0 0)) (v-get frame 3) (do (v-put frame 4 (v-local-field frame 0 7)) (if (v-truthy (v-local-tag frame 4 201)) (do (v-put frame 5 (v-local-field frame 4 18)) (do (v-put frame 6 (v-local-field frame 4 21)) (do (v-put frame 7 (v-local-field frame 4 22)) (do (v-put frame 8 (v-local-field frame 0 8)) (do (v-put frame 9 (v-call2 3 (v-get frame 5) (v-get frame 1))) (do (v-put frame 10 (v-call1 3275 (v-get frame 9))) (do (v-put frame 11 (v-call2 3253 (v-call1 3275 (v-get frame 3)) (v-call2 1362 (v-record3 142 (v-get frame 5) (v-get frame 6) (v-get frame 7)) (v-get frame 2)))) (do (v-put frame 12 (let [logical0 (v-get frame 10)] (if (v-truthy (v-keep logical0)) logical0 (do (v-drop logical0) (v-get frame 11))))) (v-tailcall2 3253 (v-get frame 12) (v-call4 1363 (v-get frame 8) (v-get frame 1) (v-get frame 2) (let [logical1 (v-get frame 3)] (if (v-truthy (v-keep logical1)) logical1 (do (v-drop logical1) (v-get frame 9)))))))))))))) (if (v-truthy (v-local-tag frame 4 202)) (do (v-put frame 5 (v-local-field frame 4 18)) (do (v-put frame 6 (v-local-field frame 0 8)) (v-tailcall2 3253 (v-call1 3275 (v-call2 3 (v-get frame 5) (v-get frame 1))) (v-call4 1363 (v-get frame 6) (v-get frame 1) (v-get frame 2) (v-get frame 3))))) (do (v-put frame 5 (v-local-field frame 4 90)) (do (v-put frame 6 (v-local-field frame 0 8)) (v-tailcall2 3253 (v-call1 3275 (v-call2 3 (v-get frame 5) (v-get frame 1))) (v-call4 1363 (v-get frame 6) (v-get frame 1) (v-get frame 2) (v-get frame 3))))))))))
+
+; $$$$047state_run_evidence$exact_catalog$
+(meta-set! port1364 "sig" (Fn [(Ptr Long)] Long))
+(defn port1364 [frame]
+  (if (v-truthy (v-local-tag frame 0 1)) (do (v-put frame 2 (v-local-field frame 0 7)) (if (v-truthy (v-local-tag frame 2 201)) (do (v-put frame 3 (v-local-field frame 2 18)) (do (v-put frame 4 (v-local-field frame 2 21)) (do (v-put frame 5 (v-local-field frame 2 22)) (do (v-put frame 6 (v-local-field frame 0 8)) (if (v-truthy (v-local-tag frame 6 1)) (do (v-put frame 7 (v-local-field frame 6 7)) (if (v-truthy (v-local-tag frame 7 201)) (do (v-put frame 8 (v-local-field frame 7 18)) (do (v-put frame 9 (v-local-field frame 7 21)) (do (v-put frame 10 (v-local-field frame 7 22)) (do (v-put frame 11 (v-local-field frame 6 8)) (if (v-truthy (v-local-tag frame 11 0)) (v-tailcall2 3253 (v-call4 1363 (v-get frame 1) (v-get frame 3) (v-record3 142 (v-get frame 3) (v-get frame 4) (v-get frame 5)) 9221964661971222528l) (v-call4 1363 (v-get frame 1) (v-get frame 8) (v-record3 142 (v-get frame 8) (v-get frame 9) (v-get frame 10)) 9221964661971222528l)) 9221964661971222528l))))) 9221964661971222528l)) 9221964661971222528l))))) 9221964661971222528l)) 9221964661971222528l))
+
+; $$$$047state_run_evidence$exact_template$
+(meta-set! port1365 "sig" (Fn [(Ptr Long)] Long))
+(defn port1365 [frame]
+  (if (v-truthy (v-local-tag frame 0 0)) (v-get frame 3) (do (v-put frame 4 (v-local-field frame 0 7)) (if (v-truthy (v-local-tag frame 4 202)) (do (v-put frame 5 (v-local-field frame 4 18)) (do (v-put frame 6 (v-local-field frame 4 94)) (do (v-put frame 7 (v-local-field frame 4 21)) (do (v-put frame 8 (v-local-field frame 4 22)) (do (v-put frame 9 (v-local-field frame 0 8)) (do (v-put frame 10 (v-call2 3 (v-get frame 5) (v-get frame 1))) (do (v-put frame 11 (v-call1 3275 (v-get frame 10))) (do (v-put frame 12 (v-call2 3253 (v-call1 3275 (v-get frame 3)) (v-call2 1362 (v-record4 191 (v-get frame 5) (v-get frame 6) (v-get frame 7) (v-get frame 8)) (v-get frame 2)))) (do (v-put frame 13 (let [logical0 (v-get frame 11)] (if (v-truthy (v-keep logical0)) logical0 (do (v-drop logical0) (v-get frame 12))))) (v-tailcall2 3253 (v-get frame 13) (v-call4 1365 (v-get frame 9) (v-get frame 1) (v-get frame 2) (let [logical1 (v-get frame 3)] (if (v-truthy (v-keep logical1)) logical1 (do (v-drop logical1) (v-get frame 10))))))))))))))) (if (v-truthy (v-local-tag frame 4 201)) (do (v-put frame 5 (v-local-field frame 4 18)) (do (v-put frame 6 (v-local-field frame 0 8)) (v-tailcall2 3253 (v-call1 3275 (v-call2 3 (v-get frame 5) (v-get frame 1))) (v-call4 1365 (v-get frame 6) (v-get frame 1) (v-get frame 2) (v-get frame 3))))) (do (v-put frame 5 (v-local-field frame 4 90)) (do (v-put frame 6 (v-local-field frame 0 8)) (v-tailcall2 3253 (v-call1 3275 (v-call2 3 (v-get frame 5) (v-get frame 1))) (v-call4 1365 (v-get frame 6) (v-get frame 1) (v-get frame 2) (v-get frame 3))))))))))
+
+; $$$$047state_run_evidence$family_identity$
+(meta-set! port1366 "sig" (Fn [(Ptr Long)] Long))
+(defn port1366 [frame]
+  (do (v-put frame 2 (v-local-field frame 0 14)) (do (v-put frame 3 (v-local-field frame 0 15)) (do (v-put frame 4 (v-binary 0 (v-get frame 1) (v-literal 847))) (do (v-put frame 5 (v-binary 0 (v-literal 848) (v-get frame 4))) (v-record2 12 (v-get frame 2) (v-binary 0 (v-get frame 3) (v-get frame 5))))))))
+
+; $$$$047state_run_evidence$family_catalog$
+(meta-set! port1367 "sig" (Fn [(Ptr Long)] Long))
+(defn port1367 [frame]
+  (v-tailcall2 3253 (v-call1 3275 (v-call2 3 (v-get frame 1) (v-get frame 2))) (v-call2 3253 (v-call4 1365 (v-get frame 0) (v-get frame 1) (v-record4 191 (v-get frame 1) 4607182418800017408l (v-record0 29) (v-record1 53 0l)) 9221964661971222528l) (v-call2 3253 (v-call4 1365 (v-get frame 0) (v-get frame 2) (v-record4 191 (v-get frame 2) 4607182418800017408l (v-record1 53 0l) (v-record0 29)) 9221964661971222528l) (v-call2 1364 (v-record2 1 (v-record3 142 (v-get frame 3) (v-record0 29) (v-get frame 5)) (v-record2 1 (v-record3 142 (v-get frame 4) (v-get frame 5) (v-record0 29)) (v-record0 0))) (v-get frame 0))))))
+
+; $$$$047state_run_evidence$function_name$
+(meta-set! port1368 "sig" (Fn [(Ptr Long)] Long))
+(defn port1368 [frame]
+  (do (v-put frame 1 (v-local-field frame 0 17)) (v-get frame 1)))
+
+; $$$$047state_run_evidence$exact_run_body$
+(meta-set! port1369 "sig" (Fn [(Ptr Long)] Long))
+(defn port1369 [frame]
+  (do (v-put frame 4 (v-local-field frame 0 17)) (do (v-put frame 5 (v-local-field frame 0 126)) (do (v-put frame 6 (v-local-field frame 0 21)) (do (v-put frame 7 (v-local-field frame 0 102)) (do (v-put frame 8 (v-local-field frame 0 103)) (do (v-put frame 9 (v-local-field frame 0 101)) (if (v-truthy (v-local-tag frame 9 251)) (do (v-put frame 10 (v-local-field frame 9 18)) (do (v-put frame 11 (v-local-field frame 9 21)) (do (v-put frame 12 (v-local-field frame 9 102)) (do (v-put frame 13 (v-local-field frame 9 103)) (do (v-put frame 14 (v-local-field frame 9 101)) (v-tailcall3 240 4679240012837945344l (v-record2 1 (v-record2 123 (v-record6 175 (v-get frame 4) (v-get frame 5) (v-get frame 6) (v-get frame 7) (v-get frame 8) (v-record5 176 (v-get frame 10) (v-get frame 11) (v-get frame 12) (v-get frame 13) (v-get frame 14))) (v-call5 412 (v-record0 161) (v-get frame 2) (v-get frame 3) (v-get frame 1) (v-get frame 10))) (v-record0 0)) 9221964661971222529l)))))) 9221964661971222528l))))))))

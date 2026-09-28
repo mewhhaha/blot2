@@ -7,7 +7,9 @@
 (load "lexer.carp")
 (load "model.carp")
 (load "parser.carp")
+(load "dependencies.carp")
 (load "check.carp")
+(load "specialize.carp")
 (load "eval.carp")
 (load "wasm.carp")
 
@@ -26,7 +28,7 @@
       (when (< count 2) (usage))
       (let [command (StaticArray.unsafe-nth &System.args 1)]
         (cond
-          (= command "--version") (IO.println "blotc-carp scalar milestone 0.1 (Carp 0.6.0)")
+          (= command "--version") (IO.println "blotc-carp scalar polymorphism milestone 0.2 (Carp 0.6.0)")
           (or (= command "build") (= command "check"))
             (let [building (= command "build") required (if building 4 3) fuel 100000]
               (do
@@ -43,6 +45,7 @@
                   (do
                     (Check.run &program)
                     (when building (require-entries &program))
+                    (Specialize.run &program)
                     (let [bytes (Wasm.compile &program fuel)]
                       (when building (Host.write (StaticArray.unsafe-nth &System.args 3) &bytes)))))))
           (usage))))))

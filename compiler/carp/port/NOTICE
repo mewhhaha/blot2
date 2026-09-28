@@ -1,0 +1,19 @@
+Blot native Carp semantic port
+
+The generated files contain mechanical translations of Blot compiler sources
+from mewhhaha/blot2, commit 0c04639358ac64cc9c76924493748b7bca785cf3.
+Blot source is copyright 2026 Jacob Torrång, under the repository's MIT license.
+
+Standard-library functions and representation conventions derive from Bend
+2.0.32, copyright 2026 HigherOrderCO, licensed under Apache License 2.0.
+The translation changes the implementation language, calling convention and
+memory management. Tail calls and terminal bind chains use stack-safe native
+calling conventions. The request decoder validates Unicode before character
+construction to preserve native error recovery. Selected list operations have been rewritten as loops;
+weighted batch boundaries use the new native cooperative worker pool.
+The Apache license is included in licenses/BEND-APACHE-2.0.txt.
+
+The regeneration-only parser in vendor/acorn.cjs is Acorn 8.15.0 (MIT).
+Its original notices are retained in licenses/ACORN-MIT.txt.
+Neither Acorn, Node nor Bend is required to build the checked-in Carp sources
+or to execute the native compiler.

@@ -6,7 +6,7 @@ import {
   type ArtifactOptions,
   type CompileOptions,
   includesAnalysis,
-} from "./host.ts";
+} from "./host_model.ts";
 import { sameDeclaration } from "./native_incremental.ts";
 import type { NativeCompilerOptions } from "./native.ts";
 import { NativeProcess } from "./native_process.ts";

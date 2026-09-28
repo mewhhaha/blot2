@@ -3,7 +3,10 @@
 ; 7 call, 8 do, 9 return, 10 let, 11 rebind, 12 if, 13 sequence,
 ; 14 discard, 15 range loop, 16 forever loop.
 (deftype Node [tag Int a Int b Int c Int slot Int extra Int index Int text String bits Long offset Int ty Int])
-(deftype Decl [name String exported Bool function Bool parameter String input Int result Int body Int offset Int locals (Array Int)])
+(deftype Numeric [ty Int offset Int division Bool])
+(deftype Decl [name String exported Bool function Bool parameter String
+               input Int result Int body Int offset Int locals (Array Int)
+               first Int limit Int generics (Array Int) numeric (Array Numeric) checked Bool])
 (deftype Program [nodes (Array Node) declarations (Array Decl) parents (Array Int)])
 (deftype ParseState [tokens (Array Token) position Int depth Int program Program])
 (deftype Binding [name String slot Int ty Int])

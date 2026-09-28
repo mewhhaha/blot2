@@ -24,6 +24,28 @@ function rejects(source, diagnostic) {
   assert(result.stderr.includes(diagnostic), result.stderr);
   assert(!fs.existsSync(output));
 }
+function functionCount(bytes) {
+  let position = 8;
+  function u32() {
+    let result = 0;
+    for (let shift = 0; shift <= 28; shift += 7) {
+      assert(position < bytes.length, 'truncated Wasm count');
+      const byte = bytes[position++];
+      result += (byte & 127) * 2 ** shift;
+      if (!(byte & 128)) return result;
+    }
+    throw new Error('oversized Wasm count');
+  }
+  while (position < bytes.length) {
+    const section = bytes[position++];
+    const length = u32();
+    const end = position + length;
+    assert(end <= bytes.length, 'truncated Wasm section');
+    if (section === 3) return u32();
+    position = end;
+  }
+  return 0;
+}
 let checks = 0;
 try {
   let seed = 0x6a09e667;
@@ -51,6 +73,58 @@ try {
       checks += 2;
     } finally { guest.dispose(); }
   }
+  // Dependency depth must not become host stack depth. No entries avoids
+  // confounding this graph test with the independent const-evaluation limit.
+  const depth = 2048;
+  const chain = Array.from({ length: depth }, (_, i) =>
+    `const chain_${i} = fn x => ${i + 1 < depth ? `chain_${i + 1} x` : 'x'}`,
+  ).join('\n') + '\n';
+  const checked = run(chain, 'check');
+  assert.equal(checked.status, 0, checked.stderr); checks++;
+
+  // Repeated edges must neither duplicate constraints exponentially nor make
+  // one instance per call site. Runtime follows one path, so this also tests
+  // generated calls without exponential execution or const-evaluation costs.
+  const levels = 96;
+  let diamond = 'const diamond_0 = fn x => x + x\n';
+  for (let i = 1; i <= levels; i++) {
+    diamond += `const diamond_${i} = fn x => do:
+  if True:
+    return diamond_${i - 1} x
+  return diamond_${i - 1} x
+`;
+  }
+  diamond += `entry const uint = fn (x: U32) => diamond_${levels} x
+entry const float = fn (x: F32) => diamond_${levels} x
+`;
+  const generated = run(diamond);
+  assert.equal(generated.status, 0, generated.stderr);
+  const diamondBytes = fs.readFileSync(output);
+  assert(WebAssembly.validate(diamondBytes));
+  assert.equal(functionCount(diamondBytes), 2 * (levels + 1) + 2,
+    'each reachable helper needs exactly one U32 and one F32 instance');
+  const diamondGuest = await instantiateGuest(diamondBytes);
+  try {
+    assert.equal(diamondGuest.call('uint', 21), 42);
+    assert.equal(diamondGuest.call('float', 1.25), 2.5); checks += 3;
+  } finally { diamondGuest.dispose(); }
+  const repeatedDiamond = run(diamond);
+  assert.equal(repeatedDiamond.status, 0, repeatedDiamond.stderr);
+  assert.deepEqual(fs.readFileSync(output), diamondBytes); checks++;
+
+  let repeated = 'const identity = fn x => x\nentry const answer = do:\n';
+  for (let i = 0; i < 128; i++) {
+    repeated += '  identity 42\n  identity 1.25\n  identity True\n  identity ()\n';
+  }
+  repeated += '  return identity 42\n';
+  const repeatedResult = run(repeated);
+  assert.equal(repeatedResult.status, 0, repeatedResult.stderr);
+  const repeatedBytes = fs.readFileSync(output);
+  assert.equal(functionCount(repeatedBytes), 4, '513 call sites must share four scalar instances');
+  const repeatedGuest = await instantiateGuest(repeatedBytes);
+  try { assert.equal(repeatedGuest.read('answer'), 42); checks += 2; }
+  finally { repeatedGuest.dispose(); }
+
   rejects('entry const x = 1\0entry const y = 2\n', 'NUL');
   rejects('entry const x: U32 = fn () => 42\n', 'type_mismatch');
   rejects('entry const x = ' + '('.repeat(300) + '1' + ')'.repeat(300) + '\n', 'resource_limit');
@@ -72,5 +146,5 @@ try {
   assert.equal(failure.status, 1, failure.stderr);
   assert(fs.statSync(destination).isDirectory());
   assert(!fs.readdirSync(directory).some(name => name.includes('.tmp.'))); checks++;
-  console.log(`PASS: ${checks} generated arithmetic, encoding, limit and IO checks`);
+  console.log(`PASS: ${checks} generated arithmetic, polymorphism, encoding, limit and IO checks`);
 } finally { fs.rmSync(directory, { recursive: true, force: true }); }

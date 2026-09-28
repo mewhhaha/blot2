@@ -1,0 +1,156 @@
+; Demand-driven scalar monomorphization after inference. A function instance is
+; keyed by (declaration, parameter, result); recursive calls reuse the installed
+; instance instead of recursively cloning it. Only entry-reachable code is
+; instantiated. Inference has already checked all source bodies.
+(deftype Specializer [cache (Array Int) mapped (Array Int) stamps (Array Int)
+                     epoch Int jobs (Array Int) globals (Array Bool)])
+
+; Reuse an epoch-stamped dense map rather than clearing a whole type arena per
+; instance. Original scheme roots never unify with their instantiated copies.
+(defn specialize-type [world state ty]
+  (let [root (Types.root world ty)]
+    (if (< root 4) root
+      (do
+        (when (>= root (Array.length (Specializer.stamps state)))
+          (fail "internal_error: specialization received a non-template type" 0))
+        (when (not (= @(Array.unsafe-nth (Specializer.stamps state) root) @(Specializer.epoch state)))
+          (do
+            (Array.aset! (Specializer.stamps state) root @(Specializer.epoch state))
+            (Array.aset! (Specializer.mapped state) root (Types.fresh world))))
+        @(Array.unsafe-nth (Specializer.mapped state) root)))))
+(defn specialize-child [child first limit delta]
+  (if (< child 0) child
+    (do
+      (when (or (< child first) (>= child limit))
+        (fail "internal_error: AST child escapes its declaration" 0))
+      (+ child delta))))
+(defn specialize-copy [world state original input output offset key]
+  (let [d @(Arena.declaration world original) first @(Decl.first &d) limit @(Decl.limit &d)
+        new-first (Array.length (Program.nodes world)) delta (- new-first first)
+        id (Array.length (Program.declarations world)) i first
+        locals (the (Array Int) [])]
+    (do
+      (when (not @(Decl.function &d)) (fail "internal_error: specializing a value" offset))
+      (when (> (+ new-first (- limit first)) 1000000)
+        (fail "resource_limit: too many specialized compiler nodes" offset))
+      (Specializer.set-epoch! state (+ @(Specializer.epoch state) 1))
+      (Types.merge world (specialize-type world state @(Decl.input &d)) input offset)
+      (Types.merge world (specialize-type world state @(Decl.result &d)) output offset)
+      (let [requests (Decl.numeric &d) j 0]
+        (while (< j (Array.length requests))
+          (let [request @(Array.unsafe-nth requests j)
+                instance (Numeric.init (specialize-type world state @(Numeric.ty &request))
+                                      offset @(Numeric.division &request))]
+            (do (check-numeric world &instance) (set! j (+ j 1))))))
+      (while (< i limit)
+        (let [n @(Arena.node world i)]
+          (do
+            (Node.set-a! &n (specialize-child @(Node.a &n) first limit delta))
+            (Node.set-b! &n (specialize-child @(Node.b &n) first limit delta))
+            (Node.set-c! &n (specialize-child @(Node.c &n) first limit delta))
+            (Node.set-ty! &n (specialize-type world state @(Node.ty &n)))
+            (Array.push-back! (Program.nodes world) n)
+            (set! i (+ i 1)))))
+      (set! i 0)
+      (while (< i (Array.length (Decl.locals &d)))
+        (do
+          (Array.push-back! &locals
+            (specialize-type world state @(Array.unsafe-nth (Decl.locals &d) i)))
+          (set! i (+ i 1))))
+      (Decl.set-exported! &d false)
+      (Decl.set-input! &d input) (Decl.set-result! &d output)
+      (Decl.set-body! &d (+ @(Decl.body &d) delta))
+      (Decl.set-first! &d new-first) (Decl.set-limit! &d (Array.length (Program.nodes world)))
+      (Decl.set-locals! &d locals) (Decl.set-generics! &d []) (Decl.set-numeric! &d [])
+      (Array.push-back! (Program.declarations world) d)
+      ; Publish the cache entry before processing the instance's body.
+      (Array.aset! (Specializer.cache state) key id)
+      (Array.push-back! (Specializer.jobs state) id)
+      id)))
+(defn specialize-request [world state original input output offset]
+  (do
+    (when (or (< input 0) (>= input 4) (< output 0) (>= output 4))
+      (fail "unsupported_polymorphism: reachable scalar signature is not concrete" offset))
+    (let [key (+ (* original 16) (+ (* input 4) output))
+          cached @(Array.unsafe-nth (Specializer.cache state) key)]
+      (if (>= cached 0) cached
+        (let [decl @(Arena.declaration world original)]
+          (if (= (Array.length (Decl.generics &decl)) 0)
+            ; Concrete functions need no arena copy and have only one instance.
+            (do
+              (when (or (not (= (Types.root world @(Decl.input &decl)) input))
+                        (not (= (Types.root world @(Decl.result &decl)) output)))
+                (fail "internal_error: incompatible monomorphic instance" offset))
+              (Array.aset! (Specializer.cache state) key original)
+              (Array.push-back! (Specializer.jobs state) original)
+              original)
+            (specialize-copy world state original input output offset key)))))))
+(defn specialize-global [state id]
+  (when (not @(Array.unsafe-nth (Specializer.globals state) id))
+    (do
+      (Array.aset! (Specializer.globals state) id true)
+      (Array.push-back! (Specializer.jobs state) id))))
+(defn specialize-body [world state declaration]
+  (let [decl @(Arena.declaration world declaration)
+        requests (Decl.numeric &decl) i 0 work [@(Decl.body &decl)]]
+    (do
+      (while (< i (Array.length requests))
+        (do (check-numeric world (Array.unsafe-nth requests i)) (set! i (+ i 1))))
+      (while (> (Array.length &work) 0)
+        (let [id (Array.pop-back! &work)]
+          (when (>= id 0)
+            (let [n @(Arena.node world id) tag @(Node.tag &n)]
+              (cond
+                (= tag 4)
+                  (when (< @(Node.slot &n) -1) (specialize-global state (- -2 @(Node.slot &n))))
+                (= tag 7)
+                  (let [input (Types.root world @(Node.ty (Arena.node world @(Node.b &n))))
+                        output (Types.root world @(Node.ty &n))
+                        target (specialize-request world state @(Node.slot &n) input output @(Node.offset &n))]
+                    (do (Node.set-slot! (Arena.node world id) target)
+                        (Array.push-back! &work @(Node.b &n))))
+                (>= tag 5)
+                  (do
+                    (Array.push-back! &work @(Node.a &n))
+                    (when (or (= tag 5) (= tag 12) (= tag 13) (= tag 15))
+                      (Array.push-back! &work @(Node.b &n)))
+                    (when (or (= tag 12) (= tag 15)) (Array.push-back! &work @(Node.c &n))))
+                ()))))))))
+
+(defmodule Specialize
+  (defn run [world]
+    (let [count (Array.length (Program.declarations world))
+          types (Array.length (Program.parents world))
+          state (Specializer.init [] [] [] 0 [] []) i 0]
+      (do
+        (while (< i types)
+          (do (Array.push-back! (Specializer.mapped &state) -1)
+              (Array.push-back! (Specializer.stamps &state) 0) (set! i (+ i 1))))
+        (set! i 0)
+        (while (< i count)
+          (do
+            (Array.push-back! (Specializer.globals &state) false)
+            (let [j 0]
+              (while (< j 16)
+                (do (Array.push-back! (Specializer.cache &state) -1) (set! j (+ j 1)))))
+            (set! i (+ i 1))))
+        (set! i 0)
+        (while (< i count)
+          (let [d @(Arena.declaration world i)]
+            (do
+              (when @(Decl.exported &d)
+                (if @(Decl.function &d)
+                  (let [instance (specialize-request world &state i
+                                   (Types.root world @(Decl.input &d))
+                                   (Types.root world @(Decl.result &d)) @(Decl.offset &d))]
+                    (do
+                      (Decl.set-exported! (Arena.declaration world i) false)
+                      (Decl.set-exported! (Arena.declaration world instance) true)))
+                  (specialize-global &state i)))
+              (set! i (+ i 1)))))
+        ; The worklist grows as new instances and globals become reachable.
+        (set! i 0)
+        (while (< i (Array.length (Specializer.jobs &state)))
+          (do
+            (specialize-body world &state @(Array.unsafe-nth (Specializer.jobs &state) i))
+            (set! i (+ i 1))))))))

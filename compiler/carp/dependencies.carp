@@ -1,0 +1,144 @@
+; Resolve declaration dependencies before inference. Local names are tracked in
+; lexical scope, so a shadowed global does not create a false recursive group.
+; Traversal follows the AST, not the arena's unused intermediate call nodes.
+(deftype Dependency [edges (Array Int)])
+(deftype Component [members (Array Int)])
+(deftype DependencyFrame [declaration Int next Int])
+
+(defn dependency-local [locals name]
+  (let [i (- (Array.length locals) 1) found false]
+    (do
+      (while (and (>= i 0) (not found))
+        (do (set! found (= (Array.unsafe-nth locals i) name)) (set! i (- i 1))))
+      found)))
+(defn dependency-truncate [locals size]
+  (while (> (Array.length locals) size)
+    (let [removed (the String (Array.pop-back! locals))] ())))
+(defn dependency-add [edges target]
+  (when (>= target 0)
+    (let [i 0 found false]
+      (do
+        (while (< i (Array.length edges))
+          (do (set! found (or found (= @(Array.unsafe-nth edges i) target))) (set! i (+ i 1))))
+        (when (not found) (Array.push-back! edges target))))))
+(sig dependency-expression (Fn [&Program &(Array String) &(Array Int) Int Int] ()))
+(defn dependency-expression [world locals edges id depth]
+  (let [n @(Arena.node world id) tag @(Node.tag &n) a @(Node.a &n) b @(Node.b &n)]
+    (do
+      (when (>= depth 512) (fail "resource_limit: dependency nesting" @(Node.offset &n)))
+      (cond
+        (= tag 4)
+          (when (not (dependency-local locals (Node.text &n)))
+            (dependency-add edges (Arena.find-decl world (Node.text &n))))
+        (= tag 5)
+          (do (dependency-expression world locals edges a (+ depth 1))
+              (dependency-expression world locals edges b (+ depth 1)))
+        (= tag 6) (dependency-expression world locals edges a (+ depth 1))
+        (= tag 7)
+          (do (dependency-expression world locals edges a (+ depth 1))
+              (dependency-expression world locals edges b (+ depth 1)))
+        (= tag 8)
+          (let [scope (Array.length locals)]
+            (do (dependency-sequence world locals edges a (+ depth 1))
+                (dependency-truncate locals scope)))
+        ()))))
+(sig dependency-sequence (Fn [&Program &(Array String) &(Array Int) Int Int] ()))
+(defn dependency-sequence [world locals edges first depth]
+  (let [id first]
+    (while (>= id 0)
+      (let [sequence @(Arena.node world id) n @(Arena.node world @(Node.a &sequence))
+            tag @(Node.tag &n) a @(Node.a &n) scope (Array.length locals)]
+        (do
+          (when (>= depth 512) (fail "resource_limit: dependency nesting" @(Node.offset &n)))
+          (cond
+            (= tag 10)
+              (do (dependency-expression world locals edges a (+ depth 1))
+                  (Array.push-back! locals @(Node.text &n)))
+            (= tag 11)
+              (do (Array.push-back! locals @"self")
+                  (dependency-expression world locals edges a (+ depth 1))
+                  (dependency-truncate locals scope))
+            (= tag 12)
+              (do
+                (dependency-expression world locals edges a (+ depth 1))
+                (dependency-sequence world locals edges @(Node.b &n) (+ depth 1))
+                (dependency-truncate locals scope)
+                (dependency-sequence world locals edges @(Node.c &n) (+ depth 1))
+                (dependency-truncate locals scope))
+            (= tag 15)
+              (do
+                (dependency-expression world locals edges a (+ depth 1))
+                (dependency-expression world locals edges @(Node.b &n) (+ depth 1))
+                (when (not (= (Node.text &n) "$discard")) (Array.push-back! locals @(Node.text &n)))
+                (dependency-sequence world locals edges @(Node.c &n) (+ depth 1))
+                (dependency-truncate locals scope))
+            (= tag 16)
+              (do (dependency-sequence world locals edges a (+ depth 1))
+                  (dependency-truncate locals scope))
+            (dependency-expression world locals edges a (+ depth 1)))
+          (set! id @(Node.b &sequence)))))))
+
+(defn dependency-graph [world]
+  (let [graph (the (Array Dependency) []) i 0]
+    (do
+      (while (< i (Array.length (Program.declarations world)))
+        (let [d @(Arena.declaration world i) edges (the (Array Int) [])
+              locals [@(Decl.parameter &d)]]
+          (do
+            (dependency-expression world &locals &edges @(Decl.body &d) 0)
+            (Array.push-back! &graph (Dependency.init edges)) (set! i (+ i 1)))))
+      graph)))
+
+; Iterative Tarjan traversal. A long chain of declarations consumes heap space,
+; not the C stack. Components are emitted dependency-first for generalization.
+(defn dependency-components [graph]
+  (let [count (Array.length graph) index (the (Array Int) []) low (the (Array Int) [])
+        active (the (Array Bool) []) stack (the (Array Int) [])
+        frames (the (Array DependencyFrame) []) result (the (Array Component) [])
+        i 0 serial 0]
+    (do
+      (while (< i count)
+        (do (Array.push-back! &index -1) (Array.push-back! &low -1)
+            (Array.push-back! &active false) (set! i (+ i 1))))
+      (set! i 0)
+      (while (< i count)
+        (do
+          (when (< @(Array.unsafe-nth &index i) 0)
+            (do
+              (Array.push-back! &frames (DependencyFrame.init i 0))
+              (Array.push-back! &stack i) (Array.aset! &active i true)
+              (Array.aset! &index i serial) (Array.aset! &low i serial) (set! serial (+ serial 1))
+              (while (> (Array.length &frames) 0)
+                (let [position (- (Array.length &frames) 1)
+                      frame @(Array.unsafe-nth &frames position)
+                      v @(DependencyFrame.declaration &frame) next @(DependencyFrame.next &frame)
+                      edges (Dependency.edges (Array.unsafe-nth graph v))]
+                  (if (< next (Array.length edges))
+                    (let [w @(Array.unsafe-nth edges next)]
+                      (do
+                        (DependencyFrame.set-next! (Array.unsafe-nth &frames position) (+ next 1))
+                        (if (< @(Array.unsafe-nth &index w) 0)
+                          (do
+                            (Array.push-back! &frames (DependencyFrame.init w 0))
+                            (Array.push-back! &stack w) (Array.aset! &active w true)
+                            (Array.aset! &index w serial) (Array.aset! &low w serial)
+                            (set! serial (+ serial 1)))
+                          (when @(Array.unsafe-nth &active w)
+                            (when (< @(Array.unsafe-nth &index w) @(Array.unsafe-nth &low v))
+                              (Array.aset! &low v @(Array.unsafe-nth &index w)))))))
+                    (do
+                      (let [removed (Array.pop-back! &frames)] ())
+                      (when (= @(Array.unsafe-nth &low v) @(Array.unsafe-nth &index v))
+                        (let [members (the (Array Int) []) finished false]
+                          (do
+                            (while (not finished)
+                              (let [w (Array.pop-back! &stack)]
+                                (do (Array.aset! &active w false) (Array.push-back! &members w)
+                                    (set! finished (= v w)))))
+                            (Array.push-back! &result (Component.init members)))))
+                      (when (> (Array.length &frames) 0)
+                        (let [parent @(DependencyFrame.declaration (Array.unsafe-nth &frames (- (Array.length &frames) 1)))]
+                          (when (< @(Array.unsafe-nth &low v) @(Array.unsafe-nth &low parent))
+                            (Array.aset! &low parent @(Array.unsafe-nth &low v)))))))))))
+          (set! i (+ i 1))))
+      result)))

@@ -1,0 +1,9 @@
+const identity = fn value => value
+const square = fn value => value * value
+
+entry const answer = identity 42
+entry const fraction = identity 0.25
+entry const flag = identity True
+entry const nothing = identity ()
+entry const uint_square = fn (value: U32) => square value
+entry const float_square = fn (value: F32) => square value

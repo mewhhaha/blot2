@@ -6,7 +6,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { instantiateGuest } from '../guest.ts';
 import { createSourceCompiler } from '../source.ts';
-import { accepted } from './cases.mjs';
+import { SourceError } from '../syntax.ts';
+import { accepted, referenceRejected } from './cases.mjs';
 
 const compiler = await createSourceCompiler();
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'blot-carp-parity-'));
@@ -56,9 +57,31 @@ try {
       replacement?.dispose();
     }
   }
+  for (const [name, source, diagnostic, referenceCode] of referenceRejected) {
+    try {
+      await assert.rejects(
+        async () => compiler.compile(source, { analysis: false }),
+        (error) => error instanceof SourceError && error.code === referenceCode,
+        `${name}: reference must reject with ${referenceCode}`,
+      );
+      const input = path.join(directory, 'invalid.blot');
+      const output = path.join(directory, 'invalid.wasm');
+      fs.writeFileSync(input, source);
+      fs.rmSync(output, { force: true });
+      const result = spawnSync(binary, ['build', input, output], { encoding: 'utf8', timeout: 15000 });
+      if (result.error) throw result.error;
+      assert.equal(result.status, 1, `${name}: replacement must reject: ${result.stderr}`);
+      assert(result.stderr.includes(diagnostic), `${name}: replacement diagnostic: ${result.stderr}`);
+      assert(!fs.existsSync(output), `${name}: invalid source published an artifact`);
+      console.log(`rejection parity: ${name}`);
+    } catch (error) {
+      console.error(`FAIL: ${name}: ${error.stack ?? error}`);
+      failures.push(name);
+    }
+  }
 } finally {
   compiler.dispose();
   fs.rmSync(directory, { recursive: true, force: true });
 }
 assert.deepEqual(failures, [], 'Differential corpus failed; do not declare parity');
-console.log(`PASS: ${accepted.length} shared source programs, ${values} differential values; scalar milestone only`);
+console.log(`PASS: ${accepted.length} shared source programs, ${values} differential values, ${referenceRejected.length} semantic rejection comparisons; scalar milestone only`);

@@ -1,0 +1,13 @@
+{
+  "sourceRepository": "mewhhaha/blot2",
+  "sourceCommit": "700c698bdb65db048e38dc87f059559be18023e2",
+  "sourceEntry": "compiler/carp/port_reference.bend",
+  "bendVersion": "2.0.32",
+  "semanticSha256": "11191df195b83297ec0865c16b5d2e1014ec3bb96411527f070ca439bc4a3002",
+  "carpVersion": "0.6.0",
+  "carpCommit": "56d7115e289896d16bbb753c39383dac12811339",
+  "acornVersion": "8.15.0",
+  "sourceTree": "e43b01f6c75740326c002063b3a7eea7ceda352b",
+  "mainCommit": "ac59fb68f98780e168ce01fa39410b1a6ef54efd",
+  "semanticArtifactCommit": "0be4d2e35679e6c4c00f4a20940f2c2c9c72d294"
+}

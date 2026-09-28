@@ -20,7 +20,16 @@
     "test:study-source": "deno test --allow-read=case-study/ecs/game.blot,case-study/ecs/engine scripts/case_study_source.test.ts",
     "test:compiler": "deno task build:compiler:all && deno check compiler/demo.ts compiler/host_demo.ts compiler/ecs_demo.ts compiler/cli.ts compiler/bench.ts compiler/native_bench.ts compiler/parallel_grain_bench.ts compiler/cpu_scaling_bench.ts compiler/cpu_scaling_trace.ts compiler/worker.ts compiler/syntax_worker.ts && deno test --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts",
     "test": "deno task test:editor && deno task test:study-source && deno task test:compiler",
-    "check": "deno fmt --check && deno check generated/wasm/mod.ts scripts/setup_helix.ts scripts/build_compiler.ts scripts/generate_parser.ts && deno task test"
+    "check": "deno fmt --check && deno check generated/wasm/mod.ts scripts/setup_helix.ts scripts/build_compiler.ts scripts/generate_parser.ts && deno task test",
+    "build:compiler:carp": "python3 compiler/carp/port/build.py release",
+    "blot:carp": "deno run --allow-read --allow-write=build --allow-run=generated/carp-port/blotc-carp-native compiler/carp/cli.ts",
+    "test:compiler:carp": "deno test --allow-read=compiler,generated,examples,std --allow-run=generated/carp-port/blotc-carp-native compiler/carp/*.test.ts",
+    "test:compiler:carp:parity": "python3 compiler/carp/port/run_suite.py --native-only",
+    "test:compiler:carp:source": "python3 compiler/carp/port/run_suite.py --source-only",
+    "test:compiler:carp:standalone": "python3 compiler/carp/port/standalone.py",
+    "check:compiler:carp": "python3 compiler/carp/port/verify.py && deno check compiler/carp.ts compiler/carp/cli.ts compiler/carp/backend.test.ts compiler/carp/eof.test.ts compiler/carp/bench.ts compiler/carp/worker_probe.ts",
+    "bench:carp": "deno run --allow-read=generated --allow-run=generated/carp-port/blotc-carp-native compiler/carp/bench.ts",
+    "test:compiler:carp:workers": "deno run --allow-read=generated --allow-run=generated/carp-port/blotc-carp-native compiler/carp/worker_probe.ts"
   },
   "imports": {
     "@mewhhaha/baba": "npm:@jsr/mewhhaha__baba@9.0.1"
@@ -28,7 +37,9 @@
   "fmt": {
     "exclude": [
       "generated",
-      "editor/tree-sitter-blot2/src"
+      "editor/tree-sitter-blot2/src",
+      "compiler/carp/port/generated",
+      "compiler/carp/port/vendor"
     ]
   }
 }
