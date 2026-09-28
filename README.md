@@ -14,6 +14,24 @@ host entrypoints are its `entry const` and `entry let` declarations: they are
 its only Wasm exports and the roots from which compilation keeps code. See
 [effects and controlled IO](compiler/effects-and-io.md).
 
+## OxCaml backend
+
+The native compiler can also be built in OxCaml, without Bend or generated
+JavaScript compiler artifacts:
+
+```sh
+# With OxCaml selected in your opam environment:
+deno task build:compiler:oxcaml
+deno task blot check examples/generic_effects.blot
+deno task blot build examples/arrays.blot build/arrays.wasm
+```
+
+This installs OxCaml at the existing native executable path. Source syntax,
+Wasm/host contracts, and incremental APIs stay the same. `just build-oxcaml` and
+`just test-oxcaml` provide the build and native validation shortcuts. The
+original Bend build remains available through `just build`. See
+[OxCaml development and parity checks](compiler/oxcaml/README.md).
+
 ## Work with the compiler
 
 Requires Deno 2, Bend, and clang 14+ on a POSIX system. Builds use the installed

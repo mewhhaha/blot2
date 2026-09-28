@@ -48,3 +48,15 @@ bench-grains iterations="32" samples="3" phases="codegen,check,prepare":
 # Compile the implemented source-language core to Wasm.
 compile source="examples/prelude.blot" output="build/example.wasm":
   deno task blot build {{quote(source)}} {{quote(output)}}
+
+# Build OxCaml and select it at the conventional native executable path.
+build-oxcaml:
+  deno task build:compiler:oxcaml
+
+# Native runtime, incremental-build and standalone source checks.
+test-oxcaml:
+  deno task test:compiler:oxcaml
+
+# Compile with the isolated OxCaml executable without changing the default.
+compile-oxcaml source="examples/prelude.blot" output="build/example.wasm":
+  deno task blot:oxcaml build {{quote(source)}} {{quote(output)}}

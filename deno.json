@@ -20,7 +20,11 @@
     "test:study-source": "deno test --allow-read=case-study/ecs/game.blot,case-study/ecs/engine scripts/case_study_source.test.ts",
     "test:compiler": "deno task build:compiler:all && deno check compiler/demo.ts compiler/host_demo.ts compiler/ecs_demo.ts compiler/cli.ts compiler/bench.ts compiler/native_bench.ts compiler/parallel_grain_bench.ts compiler/cpu_scaling_bench.ts compiler/cpu_scaling_trace.ts compiler/worker.ts compiler/syntax_worker.ts && deno test --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts",
     "test": "deno task test:editor && deno task test:study-source && deno task test:compiler",
-    "check": "deno fmt --check && deno check generated/wasm/mod.ts scripts/setup_helix.ts scripts/build_compiler.ts scripts/generate_parser.ts && deno task test"
+    "check": "deno fmt --check && deno check generated/wasm/mod.ts scripts/setup_helix.ts scripts/build_compiler.ts scripts/generate_parser.ts && deno task test",
+    "build:compiler:oxcaml": "make -C compiler/oxcaml install",
+    "test:compiler:oxcaml": "make -C compiler/oxcaml test test-build && deno run --allow-all compiler/oxcaml/smoke.ts",
+    "test:compiler:oxcaml:parity": "python3 compiler/oxcaml/test_existing.py --report build/oxcaml-parity.json",
+    "blot:oxcaml": "deno run --allow-read --allow-write --allow-run=compiler/oxcaml/_build/blotc compiler/oxcaml/cli.ts"
   },
   "imports": {
     "@mewhhaha/baba": "npm:@jsr/mewhhaha__baba@9.0.1"

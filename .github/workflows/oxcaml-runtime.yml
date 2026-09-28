@@ -2,9 +2,9 @@ name: OxCaml standalone
 on:
   push:
     branches: [rebuild/oxcaml-compiler]
-    paths: ['compiler/**', 'std/**', 'generated/wasm/**', '.github/workflows/oxcaml-runtime.yml']
+    paths: ['compiler/**', 'std/**', 'generated/wasm/**', 'deno.json', 'deno.lock', 'Justfile', '.github/workflows/oxcaml-runtime.yml']
   pull_request:
-    paths: ['compiler/**', 'std/**', 'generated/wasm/**', '.github/workflows/oxcaml-runtime.yml']
+    paths: ['compiler/**', 'std/**', 'generated/wasm/**', 'deno.json', 'deno.lock', 'Justfile', '.github/workflows/oxcaml-runtime.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
           fi
           opam exec --switch 5.2.0+ox -- ocamlopt -config
       - name: Build and test checked-in native source
-        run: opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml test
+        run: opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml test test-build
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
@@ -46,7 +46,11 @@ jobs:
           test ! -f generated/compiler/compiler.js
           test ! -f generated/compiler/blotc
           deno run --allow-all compiler/oxcaml/smoke.ts
-          deno run --allow-read --allow-write --allow-run compiler/oxcaml/cli.ts build examples/scalar.blot build/oxcaml-smoke.wasm
+          deno task blot:oxcaml build examples/scalar.blot build/oxcaml-smoke.wasm
+          opam exec --switch 5.2.0+ox -- deno task build:compiler:oxcaml
+          deno task blot check examples/generic_effects.blot
+          deno task blot build examples/arrays.blot build/oxcaml-arrays.wasm
+          test ! -f generated/compiler/compiler.js
       - name: Export minimal development snapshot
         if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[dev-snapshot]'))
         run: |

@@ -3,7 +3,7 @@ on:
   push:
     branches: [rebuild/oxcaml-compiler]
   pull_request:
-    paths: ['compiler/**', 'std/**', 'generated/wasm/**', '.github/workflows/oxcaml.yml']
+    paths: ['compiler/**', 'std/**', 'generated/wasm/**', 'deno.json', 'deno.lock', 'Justfile', '.github/workflows/oxcaml.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,7 +22,7 @@ jobs:
         with:
           persist-credentials: false
       - run: sudo apt-get update && sudo apt-get install -y ocaml-nox
-      - run: ocamlopt -version && make -C compiler/oxcaml test
+      - run: ocamlopt -version && make -C compiler/oxcaml test test-build
   oxcaml:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -45,7 +45,7 @@ jobs:
           fi
           opam exec --switch 5.2.0+ox -- ocamlopt -config
       - name: Build checked-in native source with OxCaml
-        run: opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml test
+        run: opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml test test-build
       - uses: actions/upload-artifact@v4
         with:
           name: oxcaml-executable
@@ -115,7 +115,7 @@ jobs:
           tar -xzf reference.tar.gz
           chmod +x compiler/oxcaml/_build/blotc
           echo "$PWD/reference-tools/bin" >> "$GITHUB_PATH"
-      - name: Run unchanged native suites against OxCaml
+      - name: Run unchanged compiler suites with source-level differential checks
         run: |
           mkdir -p parity-results
           python3 compiler/oxcaml/test_existing.py --report parity-results/manifest.json 2>&1 | tee parity-results/tests.txt

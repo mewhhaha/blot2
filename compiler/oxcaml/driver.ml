@@ -2,7 +2,7 @@ let () =
   let threads = ref 1 in
   let inherit_priority = ref false in
   Arg.parse [
-    "--threads", Arg.Set_int threads, "N Accepted host scheduling hint (currently serial)";
+    "--threads", Arg.Set_int threads, "N Worker count (1..64; bounded by available CPUs)";
     "--inherit-priority", Arg.Set inherit_priority, "Inherit process priority"
   ] (fun arg -> raise (Arg.Bad ("unexpected argument: " ^ arg))) "blotc [--threads N]";
   if !threads < 1 || !threads > 64 then (prerr_endline "threads must be in [1,64]"; exit 2);
