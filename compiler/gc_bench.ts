@@ -22,6 +22,8 @@ const newCompiler = await createSourceCompiler({ prelude: "none" });
 const rows: {
   name: string;
   loop_iterations: number;
+  iterations_per_sample: number;
+  warmup_calls: number[];
   baseline_ms: number[];
   candidate_ms: number[];
   baseline_median_ms: number;
@@ -50,17 +52,44 @@ async function measure(
   const after = await instantiateGuest(newArtifact.bytes);
   try {
     equal(after.abi, before.abi);
+    const warmupCalls: number[] = [];
     for (const guest of [before, after]) {
-      equal(guest.call("run", turns), expected);
-      // Warmup also establishes reusable heap and GC metadata capacity.
-      for (let i = 0; i < 3; i++) equal(guest.call("run", turns), expected);
-    }
-    const sample = (guest: typeof before) => {
       const start = performance.now();
-      const result = guest.call("run", turns);
-      const elapsed = performance.now() - start;
-      equal(result, expected); // Correctness and observation outside the timer.
-      sink = (sink ^ (result as number)) >>> 0;
+      let calls = 0;
+      // Give the Wasm optimizer time to publish tiered code. A fixed handful
+      // of calls produced misleading ratios on the sub-millisecond controls.
+      do {
+        for (let i = 0; i < 8; i++) {
+          equal(guest.call("run", turns), expected);
+          calls++;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      } while (calls < 32 || performance.now() - start < 200);
+      warmupCalls.push(calls);
+    }
+    const pilot = (guest: typeof before) => {
+      const start = performance.now();
+      for (let i = 0; i < 4; i++) guest.call("run", turns);
+      return (performance.now() - start) / 4;
+    };
+    // Use identical batch lengths, sized by the slower implementation so a
+    // large speedup does not turn its baseline into an unbounded benchmark.
+    const iterations = Math.max(
+      1,
+      Math.min(1024, Math.ceil(5 / Math.max(pilot(before), pilot(after)))),
+    );
+    const sample = (guest: typeof before) => {
+      const results: unknown[] = new Array(iterations);
+      const start = performance.now();
+      for (let i = 0; i < iterations; i++) {
+        results[i] = guest.call("run", turns);
+      }
+      const elapsed = (performance.now() - start) / iterations;
+      // Validate every invocation, not only the last one, outside the timer.
+      for (const result of results) {
+        equal(result, expected);
+        sink = (sink ^ (result as number)) >>> 0;
+      }
       return elapsed;
     };
     const b: number[] = [], a: number[] = [];
@@ -81,6 +110,8 @@ async function measure(
     rows.push({
       name,
       loop_iterations: turns,
+      iterations_per_sample: iterations,
+      warmup_calls: warmupCalls,
       baseline_ms: b,
       candidate_ms: a,
       baseline_median_ms: bm,
@@ -91,10 +122,9 @@ async function measure(
       baseline_wasm_bytes: oldArtifact.bytes.length,
       candidate_wasm_bytes: newArtifact.bytes.length,
     });
+    const ratio = (bm / am).toFixed(2);
     console.log(
-      `${name}: ${bm.toFixed(4)} -> ${am.toFixed(4)} ms (${
-        (bm / am).toFixed(2)
-      }x)`,
+      `${name}: ${bm.toFixed(4)} -> ${am.toFixed(4)} ms (${ratio}x)`,
     );
   } finally {
     before.dispose();
@@ -187,6 +217,9 @@ entry const run = fn (limit: U32) => do:
         architecture: Deno.build,
         baseline_directory: baselineUrl.href,
         samples: 11,
+        minimum_warmup_ms_per_implementation: 200,
+        minimum_warmup_calls: 32,
+        target_sample_ms_for_slower_implementation: 5,
         units: "milliseconds per complete run (compilation excluded)",
         sink,
         rows,

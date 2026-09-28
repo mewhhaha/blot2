@@ -110,15 +110,25 @@ and the guest ABI are unchanged. Scratch bitmap clearing uses a bounded
 
 The readable WAT and its generated Bend encoding are checked together. Tests
 cover scalar/pointer collisions, layout-bit reset on reuse, mixed-graph exact
-reachability, negative-zero words and long-lived scalar/reference-array loops.
-Four constructor-level laws protect the conservative classification boundary;
-they are not a formal proof of the complete garbage collector.
+reachability, negative-zero words and long-lived scalar/reference-array loops,
+including arrays of closures whose captures must survive collection. Four
+constructor-level laws protect the conservative classification boundary; they
+are not a formal proof of the complete garbage collector.
 
 `compiler/gc_bench.ts` compares complete loop invocations against a separately
 built previous PR head (`4bfca4a`), isolating collection from the earlier fill
 and host-copy changes. It records eleven alternating samples, Wasm sizes,
 checksums and memory high-water marks. Unknown-layout and allocation-free
-controls remain in the report. Compilation and startup are outside the timer.
+controls remain in the report. Each implementation warms for at least 200 ms and
+32 calls, yielding so tiered code can be installed before timing. Fast cases use
+equal-sized batches targeting 5 ms for the slower implementation, and times are
+normalized per complete invocation. Warmup counts and batch sizes are recorded.
+Every measured result is validated outside the timer.
+
+The initial single-call harness showed warmup transients inside its tiny control
+samples. Do not compare those earlier medians to the revised harness as an
+additional runtime gain; the runtime code is unchanged. Compilation and startup
+remain outside the timer.
 
 ## Remaining boundaries
 
