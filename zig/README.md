@@ -29,8 +29,8 @@ deno task blot:zig build examples/syntax.blot build/syntax.wasm
 
 Builds target baseline CPU instructions by default, so an artifact is not tied
 to the CPU of the build machine. `-Dcpu=native` explicitly opts into host-only
-instructions for a local build. Release builds strip debug information by default;
-`-Dstrip=false` retains it.
+instructions for a local build. Release builds strip debug information by
+default; `-Dstrip=false` retains it.
 
 The executable itself (`zig/zig-out/bin/blotc-zig`) is the framed compiler
 service, not a source-file CLI. Use the Deno command above, or explicitly select
@@ -91,12 +91,15 @@ identifies arena allocators; three local directives explain temporary
 arena-owned buffers.
 
 Both Debug and ReleaseSafe run the complete compatibility gates below, split
-into four disjoint test-file shards per mode. The native APIs and test adapter
-are also type-checked. The optimized binary also runs protocol regressions under
-a baseline QEMU x86-64 CPU. This
-covers valid analysis, deterministic Wasm emission, retained sessions, diagnostic
-recovery, malformed frames and thread limits without relying on the build host's
-CPU extensions.
+into four disjoint test-file shards per mode. The native and differential suites
+run in independent jobs, so neither pass consumes the other's timeout. No test
+files are excluded from either pass. The native APIs and test adapter are also
+type-checked. The optimized binary also runs protocol regressions under a
+baseline QEMU x86-64 CPU. This covers valid analysis, deterministic Wasm
+emission, retained sessions, diagnostic recovery, malformed frames and thread
+limits without relying on the build host's CPU extensions. A decoder regression
+also constrains both the soft and hard native stack limits to 1 MiB, so curried
+tail calls cannot pass merely because the process reserves a larger stack.
 
 Compatibility is checked separately from those runtime tests:
 

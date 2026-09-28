@@ -141,7 +141,9 @@ jobs:
         with:
           deno-version: v2.5.2
       - name: Type-check the native APIs and differential adapter
-        run: deno check compiler/cli.ts compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts
+        run: |
+          deno check compiler/cli.ts compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts
+          deno fmt --check zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts zig/differential.json zig/README.md zig/zig-analyzer.json
 
   compatibility:
     needs: [native, reference]
@@ -152,6 +154,8 @@ jobs:
       matrix:
         mode: [Debug, ReleaseSafe]
         shard: [0, 1, 2, 3]
+        # Keep both complete passes, but do not serialize them in one job.
+        suite: [native, differential]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -170,7 +174,7 @@ jobs:
           ln -s ../../zig/zig-out/bin/blotc-zig generated/compiler/blotc
           deno cache compiler/syntax.ts
       - name: Verify native APIs before reference modules exist
-        if: matrix.shard == 0
+        if: matrix.shard == 0 && matrix.suite == 'native'
         run: |
           test ! -e generated/compiler/compiler.js
           deno test --cached-only --no-check --allow-read --allow-run=zig/zig-out/bin/blotc-zig zig/standalone.test.ts 2>&1 | tee build/zig-validation/standalone.log
@@ -189,17 +193,19 @@ jobs:
           test "${#selected[@]}" -gt 0
           printf '%s\n' "${selected[@]}" | tee build/zig-validation/test-files.txt
       - name: Run the retained suite shard with the Zig native process
+        if: matrix.suite == 'native'
         run: |
           mapfile -t tests < build/zig-validation/test-files.txt
           deno test --cached-only --no-check --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid "${tests[@]}" 2>&1 | tee build/zig-validation/native.log
       - name: Re-run source tests against both backends and execute Zig Wasm
+        if: matrix.suite == 'differential'
         run: |
           mapfile -t tests < build/zig-validation/test-files.txt
           deno test --cached-only --no-check --config=zig/differential.json --allow-env=NODE_V8_COVERAGE --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid "${tests[@]}" 2>&1 | tee build/zig-validation/differential.log
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: zig-compatibility-results-${{ matrix.mode }}-${{ matrix.shard }}
+          name: zig-compatibility-results-${{ matrix.mode }}-${{ matrix.shard }}-${{ matrix.suite }}
           path: build/zig-validation/
           retention-days: 7
           if-no-files-found: error
