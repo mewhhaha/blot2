@@ -353,7 +353,9 @@ function arrayToWasm(
     );
   }
   const values = argument as Uint32Array | Float32Array;
-  if (values.length >= 1_073_741_823) {
+  const length = values.length;
+  const byteLength = length * 4;
+  if (length >= 1_073_741_823) {
     throw new GuestError(
       code,
       `${name} array byte count exceeds the Wasm32 address range`,
@@ -361,27 +363,30 @@ function arrayToWasm(
   }
   const pointer = arrayRange(
     arena,
-    arena.allocate((values.length + 1) * 4),
-    values.length,
+    arena.allocate((length + 1) * 4),
+    length,
   );
   // Allocation may grow memory, so acquire a fresh view only afterwards.
   const view = new DataView(arena.memory.buffer);
-  view.setUint32(pointer, values.length, true);
-  if (littleEndian) {
+  view.setUint32(pointer, length, true);
+  if (
+    littleEndian && length > 32 && values.buffer instanceof ArrayBuffer
+  ) {
     // Byte copies avoid boxing every element and preserve F32 payload bits.
     // Use the view's range, not its entire possibly shared backing buffer.
-    new Uint8Array(arena.memory.buffer, pointer + 4, values.byteLength).set(
-      new Uint8Array(values.buffer, values.byteOffset, values.byteLength),
+    new Uint8Array(arena.memory.buffer, pointer + 4, byteLength).set(
+      new Uint8Array(values.buffer, values.byteOffset, byteLength),
     );
   } else {
-    // Wasm memory is little-endian; typed-array storage is host-endian.
-    const input = new DataView(
-      values.buffer,
-      values.byteOffset,
-      values.byteLength,
-    );
-    for (let index = 0; index < values.length; index++) {
-      view.setUint32(pointer + 4 + index * 4, input.getUint32(index * 4), true);
+    // Small packets avoid extra byte views. Shared inputs retain no-tear U32
+    // reads instead of observing a word as four independently changing bytes.
+    // This is not a coherent snapshot of a concurrently modified whole array.
+    // Raw words also preserve F32 payloads and handle big-endian hosts.
+    const input = type === "Array U32"
+      ? values as Uint32Array
+      : new Uint32Array(values.buffer, values.byteOffset, length);
+    for (let index = 0; index < length; index++) {
+      view.setUint32(pointer + 4 + index * 4, input[index], true);
     }
   }
   return pointer;
@@ -400,19 +405,18 @@ function arrayFromWasm(
   const values = type === "Array U32"
     ? new Uint32Array(length)
     : new Float32Array(length);
-  if (littleEndian) {
+  if (littleEndian && length > 32) {
     // Still copy out: the arena is reset/reused after the invocation, and a
     // host callback must never receive a mutable alias into guest storage.
     new Uint8Array(values.buffer).set(
       new Uint8Array(arena.memory.buffer, pointer + 4, values.byteLength),
     );
   } else {
-    const output = new DataView(values.buffer);
+    const output = type === "Array U32"
+      ? values as Uint32Array
+      : new Uint32Array(values.buffer);
     for (let index = 0; index < length; index++) {
-      output.setUint32(
-        index * 4,
-        view.getUint32(pointer + 4 + index * 4, true),
-      );
+      output[index] = view.getUint32(pointer + 4 + index * 4, true);
     }
   }
   return values;

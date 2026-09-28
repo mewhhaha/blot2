@@ -13,8 +13,12 @@ problem or introduce parallel guest execution.
 `guest.ts` previously loaded/stored each numeric array element through a
 DataView and a JavaScript number in both directions. Large callbacks and numeric
 packets paid this cost on every crossing. The little-endian fast path now
-transfers the exact view range with a bulk byte copy. The big-endian path swaps
-words explicitly. Neither path performs floating-point conversions.
+transfers the exact view range with a bulk byte copy for packets larger than 32
+words. Smaller packets avoid the extra byte views. Big-endian hosts and shared
+input buffers use explicit word reads/writes. Capturing the input length once
+bounds the copy even when a shared buffer can grow. Shared input reads preserve
+the U32 no-tear behavior, not a whole-array snapshot under concurrent mutation.
+No path performs floating-point conversions.
 
 Results remain independent copies. Range checks, argument validation, header
 encoding, arena reset, host capability checks, and fresh views after memory

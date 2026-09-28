@@ -100,7 +100,9 @@ jobs:
       - name: Typecheck and run compiler regressions
         run: |
           mkdir -p build
-          deno check compiler/*.ts
+          # Match the repository's test:compiler entry points and add this benchmark.
+          # Historical, standalone gdev profiling scripts are not in that gate.
+          deno check compiler/demo.ts compiler/host_demo.ts compiler/ecs_demo.ts compiler/cli.ts compiler/bench.ts compiler/native_bench.ts compiler/parallel_grain_bench.ts compiler/cpu_scaling_bench.ts compiler/cpu_scaling_trace.ts compiler/worker.ts compiler/syntax_worker.ts compiler/runtime_bench.ts
           deno test --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts 2>&1 | tee build/runtime-tests.log
       - uses: actions/upload-artifact@v4
         if: always()
