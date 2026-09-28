@@ -11,9 +11,10 @@ facts, not a second type checker. A scalar-array pointer is never a scalar word.
 
 The emitter carries this evidence through lexical bindings, product fields,
 pattern bindings, array reads and branches that agree on representation. Fresh
-products containing only scalar words now receive the same pointer-free header
-bit as scalar arrays. This includes record payload products; constructor
-wrappers still contain a pointer and remain traced.
+products of at least eight scalar words receive the same pointer-free header bit
+as scalar arrays. Smaller products still carry analysis evidence, but avoid the
+extra header store. This includes record payload products; constructor wrappers
+still contain a pointer and remain traced.
 
 Only normalized instruction-job contents contribute facts. Erased annotations,
 other function bodies, constant contents and global metadata do not influence
@@ -61,3 +62,13 @@ Retained-buffer cases deliberately isolate repeated conservative scanning and
 can produce large ratios. They are not application-wide speedup claims. Unknown
 parameter and allocation-free controls are reported alongside optimized cases.
 Timing ratios are diagnostic and do not decide whether CI passes.
+
+## Small-product crossover
+
+Tagging every tiny product regressed the existing ECS workload by roughly 3-6%
+in local repeated measurements. The eight-word guard removes that extra store:
+the final benchmark asserts that the complete `examples/ecs.blot` Wasm is byte
+identical to the previous PR compiler, alongside execution checks. Larger
+products and scalar arrays retain the tracing optimization. This threshold is a
+measured heuristic, not a universal hardware crossover. Tests cover 7, 8, 9 and
+16 fields, and small-product field evidence remains available to later arrays.

@@ -110,7 +110,7 @@ for (const backend of ["javascript", "native"] as const) {
             new Uint32Array(memory.buffer, pointer + 4, 8),
             new Uint32Array(8).fill((input + 1) >>> 0),
           );
-          if (name === "tupled") equal(flags(instance), [2, 2]);
+          if (name === "tupled") equal(flags(instance), [0, 2]);
         }
         for (const name of ["unknown", "blocked", "shadowed"]) {
           const pointer = (instance.exports[name] as CallableFunction)(input);
@@ -142,9 +142,29 @@ for (const backend of ["javascript", "native"] as const) {
         );
         equal(
           flags(instance),
-          [2, 0],
-          "record payload is scalar, constructor wrapper contains its pointer",
+          [0, 0],
+          "small scalar record payload avoids the extra store; wrapper is traced",
         );
+      }
+      for (const count of [7, 8, 9, 16]) {
+        const fields = Array(count).fill("value").join(", ");
+        const names = Array.from({ length: count }, (_, i) => `v${i}`).join(
+          ", ",
+        );
+        const probe = `
+entry const inspect = fn (input: U32) => do:
+  let value = @u32.add input 1
+  let product = (${fields})
+  let (${names}) = product
+  return v${count - 1}
+entry const memory_probe = fn (input: U32) => @array.fill input 0
+`;
+        const compiled = await compiler.compile(probe);
+        const { instance: product } = await WebAssembly.instantiate(
+          compiled.bytes,
+        );
+        equal((product.exports.inspect as CallableFunction)(65552), 65553);
+        equal(flags(product), [count < 8 ? 0 : 2]);
       }
       const guest = await instantiateGuest(
         (await compiler.compile(loops)).bytes,

@@ -274,6 +274,39 @@ entry const f${i} = fn (input: U32) => do:
       }x)`,
     );
   }
+  // A real workload caught the cost of tagging tiny products. Require the
+  // guarded emitter to preserve its exact prior Wasm, not just a noisy time.
+  const ecsOld = await baseline.createSourceCompiler();
+  const ecsNew = await createSourceCompiler();
+  let ecsBytes = 0;
+  try {
+    const ecsSource = await Deno.readTextFile(
+      new URL("../examples/ecs.blot", import.meta.url),
+    );
+    const old = ecsOld.compile(ecsSource), current = ecsNew.compile(ecsSource);
+    equal(
+      current.bytes,
+      old.bytes,
+      "ECS emitted code must not regress for small products",
+    );
+    ecsBytes = current.bytes.length;
+    const guest = await instantiateGuest(current.bytes);
+    try {
+      equal(guest.call("snapshot", null), 6);
+      equal(guest.call("ghost_count", 1), 4);
+      for (const turns of [0, 100, 1000]) {
+        equal(guest.call("run", turns), 33 + 6 * turns);
+      }
+    } finally {
+      guest.dispose();
+    }
+    console.log(
+      `ECS control: byte-identical Wasm (${ecsBytes} bytes), execution checks passed`,
+    );
+  } finally {
+    ecsOld.dispose();
+    ecsNew.dispose();
+  }
   await Deno.mkdir("build", { recursive: true });
   await Deno.writeTextFile(
     "build/layout-performance.json",
@@ -291,6 +324,11 @@ entry const f${i} = fn (input: U32) => do:
         sink,
         rows,
         compilation_rows: compilationRows,
+        application_control: {
+          source: "examples/ecs.blot",
+          wasm_byte_identical: true,
+          wasm_bytes: ecsBytes,
+        },
       },
       null,
       2,

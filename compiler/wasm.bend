@@ -648,10 +648,12 @@ def element_stores(count: Nat, +pointer: Nat, first: Nat, offset: Nat, reversed:
 def scalar_array_header(leaf: Bool, pointer: Nat) -> List<&2, U32>:
   Bool.pick(List<&2, U32>, leaf, join([local_get(pointer), [65, 8, 107, 65, 2, 54, 2, 0]]), Nil{})
 
+# Tiny products often die before tracing; avoid an extra header store for
+# less than eight words. Representation evidence still flows through them.
 def product_code(elements: Code, +count: Nat, +first: Nat, leaf: Bool) -> Code:
   Code{fragments, locals} = elements
   +pointer = Nat.add(first, count)
-  Code{fragments_join([fragments, [Bytes{i32_constant(U32.from_nat(Nat.mul(4n, count)))}, Allocate{}, Bytes{join([33 <> unsigned_leb(pointer), scalar_array_header(leaf, pointer), element_stores(count, pointer, first, 0n, Nil{})])}]]), Nat.max(locals, 1n+pointer)}
+  Code{fragments_join([fragments, [Bytes{i32_constant(U32.from_nat(Nat.mul(4n, count)))}, Allocate{}, Bytes{join([33 <> unsigned_leb(pointer), scalar_array_header(Bool.and(leaf, Nat.is_ge(count, 8n)), pointer), element_stores(count, pointer, first, 0n, Nil{})])}]]), Nat.max(locals, 1n+pointer)}
 
 def product_arity(count: Nat) -> Result<&2, &2, M.Diagnostic, Unit>:
   match count:
