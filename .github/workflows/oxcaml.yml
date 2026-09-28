@@ -127,6 +127,8 @@ jobs:
         run: |
           deno fmt --check deno.json README.md compiler/oxcaml/*.ts compiler/oxcaml/README.md
           deno check compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts compiler/oxcaml/*.ts
+      - name: Validate paired benchmark with identical executables
+        run: deno run --allow-all compiler/oxcaml/bench_compare.ts compiler/oxcaml/_build/blotc compiler/oxcaml/_build/blotc parity-results/benchmark-smoke.json 1 1 reader_8
       - name: Run unchanged compiler suites with source-level differential checks
         run: |
           mkdir -p parity-results

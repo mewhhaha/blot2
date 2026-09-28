@@ -2,7 +2,9 @@
    Strings contain Unicode scalar values, not UTF-8 bytes. F32 values retain
    their IEEE-754 bits, including signed zero. Maps retain Bend's Patricia
    layout because compiler/index.bend deliberately reads it directly. *)
-type char32 = Chr of int32
+(* Keep the exact 32-bit scalar representation, but not a second heap box
+   around it. The constructor remains type-safe at every existing call site. *)
+type char32 = Chr of int32 [@@unboxed]
 type text = SNil | SCon of char32 * text
 type cmp = LT | EQ | GT
 type ('e, 'a) result_ = Fail of 'e | Done of 'a
@@ -118,7 +120,14 @@ let rec string_compare a b =
   | SCon(Chr a,at),SCon(Chr b,bt) ->
     let order = Int64.compare (unsigned a) (unsigned b) in
     if order = 0 then string_compare at bt else order
-let string_eq a b = string_compare a b = 0
+(* Equality needs neither unsigned ordering nor an ownership-carrying result.
+   Shared immutable tails can stop immediately. The strict OxCaml check keeps
+   this hot operation non-allocating; stock OCaml ignores the check attribute. *)
+let[@zero_alloc strict] rec string_eq left right =
+  left == right || match left, right with
+  | SCon (Chr a, at), SCon (Chr b, bt) ->
+    Int32.equal a b && string_eq at bt
+  | _ -> false
 let string_is_lt a b = string_compare a b < 0
 let string_is_le a b = string_compare a b <= 0
 let rec string_starts_with text prefix = match text,prefix with

@@ -8,15 +8,15 @@ PARALLEL := $(shell test "$(OCAML_MAJOR)" -ge 5 && echo domains || echo serial)
 OCAMLDEP ?= $(if $(filter 4,$(OCAML_MAJOR)),ocamldep,$(OCAMLOPT) -depend)
 MODULES := $(shell cat core/modules.txt 2>/dev/null)
 NATIVE := native_runtime native_parallel base $(MODULES) driver
-TESTS := test_bytes test_runtime test_parallel $(if $(filter domains,$(PARALLEL)),test_domains)
-SOURCES := $(addprefix $(BUILD)/,$(addsuffix .ml,$(NATIVE) wasm_bytes $(TESTS)))
+TESTS := test_bytes test_runtime test_names test_parallel $(if $(filter domains,$(PARALLEL)),test_domains)
+SOURCES := $(addprefix $(BUILD)/,$(addsuffix .ml,$(NATIVE) wasm_bytes $(TESTS) bench_names))
 OBJECTS := $(addprefix $(BUILD)/,$(addsuffix .cmx,$(NATIVE)))
 CONFIG := $(BUILD)/.configuration
 COMPILE_FLAGS := $(OCAMLFLAGS) -I +threads $(if $(filter 4,$(OCAML_MAJOR)),,-I +unix)
 
 .DEFAULT_GOAL := all
 .DELETE_ON_ERROR:
-.PHONY: all install bootstrap test test-build clean FORCE
+.PHONY: all install bootstrap test test-build bench-names clean FORCE
 all: $(BUILD)/blotc
 
 # Explicit opt-in replacement at the existing native host path. The ordinary
@@ -82,6 +82,15 @@ $(BUILD)/test_bytes: $(BUILD)/wasm_bytes.cmx $(BUILD)/test_bytes.cmx
 $(BUILD)/test_runtime: $(addprefix $(BUILD)/,base.cmx ox_model.cmx ox_numeric_literal.cmx ox_index.cmx test_runtime.cmx)
 	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -o test_runtime $(notdir $^)
 
+$(BUILD)/test_names: $(addprefix $(BUILD)/,base.cmx ox_model.cmx test_names.cmx)
+	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -o test_names $(notdir $^)
+
+$(BUILD)/bench_names: $(addprefix $(BUILD)/,base.cmx ox_model.cmx bench_names.cmx)
+	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o bench_names unix.cmxa $(notdir $^)
+
+bench-names: $(BUILD)/bench_names
+	$(BUILD)/bench_names
+
 $(BUILD)/test_parallel: $(BUILD)/native_parallel.cmx $(BUILD)/test_parallel.cmx
 	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o test_parallel unix.cmxa threads.cmxa $(notdir $^)
 
@@ -91,6 +100,7 @@ $(BUILD)/test_domains: $(BUILD)/native_parallel.cmx $(BUILD)/test_domains.cmx
 test: all $(addprefix $(BUILD)/,$(TESTS))
 	$(BUILD)/test_bytes
 	$(BUILD)/test_runtime
+	$(BUILD)/test_names
 	$(BUILD)/test_parallel $(PARALLEL)
 	$(if $(filter domains,$(PARALLEL)),$(BUILD)/test_domains,true)
 	python3 test_transport.py $(BUILD)/blotc

@@ -94,18 +94,19 @@ deno task test:compiler:oxcaml:parity
 ```
 
 The native unit gate includes 10 byte-encoding checks, 3,726 Base/runtime
-checks, 177 fork/join checks, a concurrent-domain rendezvous and exception-join
-check, 6 subprocess framing checks, and 8 incremental-build checks. Python 3 is
-needed for the test drivers, not for ordinary builds.
+checks, 6,614 native name/allocation checks, 177 fork/join checks, a
+concurrent-domain rendezvous and exception-join check, 6 subprocess framing
+checks, and 8 incremental-build checks. Python 3 is needed for the test drivers,
+not for ordinary builds.
 
-`test_existing.py` runs the existing 156 compiler test files and two script
-suites in an isolated checkout. Native tests select the OxCaml executable. An
-exact-URL import map routes synchronous source tests through the test-only
-`source_mirror.ts`: each operation must match the unchanged Bend JavaScript
-reference, including full Wasm bytes, analyses, and diagnostic fields. The
-unchanged tests receive the native result. A mismatch remains a gate failure
-even when a negative test catches its exception. Low-level IR-only tests still
-exercise the reference; mirrored operation counts are recorded separately.
+`test_existing.py` discovers the existing compiler test files and script suites
+and runs them in an isolated checkout. Native tests select the OxCaml
+executable. An exact-URL import map routes synchronous source tests through the
+test-only `source_mirror.ts`: each operation must match the unchanged Bend
+JavaScript reference, including full Wasm bytes, analyses, and diagnostic
+fields. The unchanged tests receive the native result. A mismatch remains a gate
+failure even when a negative test catches its exception. Low-level IR-only tests
+still exercise the reference; mirrored operation counts are recorded separately.
 
 Coverage includes imports/prelude, rank-1 types and effects, closures, data and
 patterns, arrays/records, tags/operators, bounded constant evaluation, float
@@ -126,6 +127,25 @@ language features do not become supported merely through migration. This is a
 feature-preserving native backend, not a new language design.
 
 ## Measurements
+
+[Performance work](PERFORMANCE.md) records the first native allocation pass,
+paired samples, and its limitations. Name equality is checked allocation-free by
+OxCaml; the redundant character wrapper is unboxed. The executable still builds
+with stock OCaml, where the OxCaml-specific check attribute is ignored.
+
+For native-to-native comparisons without a JavaScript reference:
+
+```sh
+make -C compiler/oxcaml bench-names
+deno run -A compiler/oxcaml/bench_compare.ts \
+  /path/to/baseline/blotc compiler/oxcaml/_build/blotc \
+  build/oxcaml-paired.json 7 1,4
+```
+
+This alternates baseline and candidate runs, validates outputs and cache
+behavior, and separates startup, source-to-Wasm, pre-encoded native requests,
+analysis, body edits, and unchanged reuse. It records raw samples and hashes;
+synthetic workloads are not a substitute for application measurements.
 
 Measure compiler build time separately from the compiler's own throughput. For
 source-to-Wasm timings, after selecting the OxCaml executable and building the

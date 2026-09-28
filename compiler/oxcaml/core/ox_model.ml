@@ -1,5 +1,8 @@
 (* Native semantic port of compiler/model.bend.
 
+   Native optimization: name/type identity equality returns a boolean directly.
+   The recorded source hash below describes migration provenance, not this edit.
+
    Source SHA-256: 91037a8c8be43b930351e880d1d7a3161cc421f8b58267c50bfff21894c31150
 
    Ownership/type arguments are erased; value types are checked by OCaml.
@@ -263,16 +266,12 @@ f_name_equal_result : t_NameComparison -> bool =
 fun v_result ->
 (let (NameComparison (v_equal, v_left, v_right)) = v_result in
 v_equal)
-and (* model.bend:242 *)
-f_name_equal : Base.text -> Base.text -> bool =
-fun v_left v_right ->
-(f_name_equal_result ((f_name_equal_walk (v_left) (v_right) (v_left) (v_right) (true))))
-and (* model.bend:245 *)
-f_type_id_equal : t_TypeId -> t_TypeId -> bool =
-fun v_a v_b ->
-(let (TypeId (v_am, v_an)) = v_a in
-(let (TypeId (v_bm, v_bn)) = v_b in
-(Base.bool_and ((f_name_equal (v_am) (v_bm))) ((f_name_equal (v_an) (v_bn))))))
+and[@zero_alloc strict] (* Native: do not carry Bend ownership through equality. *)
+f_name_equal (left : Base.text) (right : Base.text) : bool =
+  Base.string_eq left right
+and[@zero_alloc strict]
+f_type_id_equal (TypeId (am, an)) (TypeId (bm, bn)) =
+  f_name_equal am bm && f_name_equal an bn
 and (* model.bend:250 *)
 f_foreign_identity : unit -> t_TypeId =
 fun () ->
