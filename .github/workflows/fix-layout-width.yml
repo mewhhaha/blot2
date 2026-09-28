@@ -3,6 +3,7 @@ on:
   push:
     branches: [perf/runtime-data-paths]
     paths: [.github/workflows/fix-layout-width.yml]
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -36,12 +37,12 @@ jobs:
           new = '''# Sibling width must not consume the host stack. Short-circuiting this pure
           # classification does not skip evaluation of any emitted array operand.
           def scalar_words_in_go(elements: List<&2, I.Expr>, +context: Context, scalars: Bool) -> Bool:
-            match scalars elements:
-              case False{} _:
+            match elements scalars:
+              case _ False{}:
                 False{}
-              case True{} Nil{}:
+              case Nil{} True{}:
                 True{}
-              case True{} head <> tail:
+              case head <> tail True{}:
                 scalar_words_in_go(tail, context, scalar_word_in(head, context))
 
           def scalar_words_in(elements: List<&2, I.Expr>, context: Context) -> Bool:
