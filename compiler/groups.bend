@@ -591,7 +591,7 @@ def constructor_index_entries(constructors: List<&2, M.Constructor>, +identity: 
     case Nil{}:
       index
     case M.Constructor{name, payload, fields} <> tail:
-      constructor_index_entries(tail, identity, Map.set(&2, M.TypeId, index, name, identity))
+      constructor_index_entries(tail, identity, Index.set(M.TypeId, index, name, identity))
 
 def constructor_index(types: List<&2, M.DataType>, index: Map<&2, M.TypeId>) -> Map<&2, M.TypeId>:
   match types:
@@ -946,14 +946,14 @@ def type_set(identities: List<&2, M.TypeId>, found: TypeSet()) -> TypeSet():
     case Nil{}:
       found
     case +head <> tail:
-      type_set(tail, Map.set(&2, M.TypeId, found, type_key(head), head))
+      type_set(tail, Index.set(M.TypeId, found, type_key(head), head))
 
 def type_set_excluding_found(present: Maybe<&2, M.TypeId>, head: M.TypeId, key: String, found: TypeSet()) -> TypeSet():
   match present:
     case Some{value}:
       found
     case None{}:
-      Map.set(&2, M.TypeId, found, key, head)
+      Index.set(M.TypeId, found, key, head)
 
 def type_set_excluding(identities: List<&2, M.TypeId>, +excluded: TypeSet(), found: TypeSet()) -> TypeSet():
   match identities:
@@ -988,14 +988,14 @@ def publish_summary(names: List<&2, String>, +summary: TypeSet(), summaries: Map
     case Nil{}:
       summaries
     case head <> tail:
-      publish_summary(tail, summary, Map.set(&2, TypeSet(), summaries, head, summary))
+      publish_summary(tail, summary, Index.set(TypeSet(), summaries, head, summary))
 
 def usage_seeds(usages: List<&2, DeclarationUsage>, +shared: TypeSet(), seeds: Map<&2, TypeSet()>) -> Map<&2, TypeSet()>:
   match usages:
     case Nil{}:
       seeds
     case DeclarationUsage{name, Usage{nominals}} <> tail:
-      usage_seeds(tail, shared, Map.set(&2, TypeSet(), seeds, name, type_set_excluding(nominals, shared, Map.new(&2, M.TypeId))))
+      usage_seeds(tail, shared, Index.set(TypeSet(), seeds, name, type_set_excluding(nominals, shared, Map.new(&2, M.TypeId))))
 
 def nominal_nodes(types: List<&2, TypeDependencies>) -> List<&2, D.Node>:
   match types:
@@ -1015,7 +1015,7 @@ def nominal_seeds(types: List<&2, TypeDependencies>, seeds: Map<&2, TypeSet()>) 
       nominal_seeds(tail, seeds)
     case TypeDependencies{+identity, references} <> tail:
       # Leaf declarations have no graph node but remain in closures.
-      nominal_seeds(tail, Map.set(&2, TypeSet(), seeds, type_key(identity), type_set(identity <> references, Map.new(&2, M.TypeId))))
+      nominal_seeds(tail, Index.set(TypeSet(), seeds, type_key(identity), type_set(identity <> references, Map.new(&2, M.TypeId))))
 
 def nominal_summaries(components: List<&2, List<&2, String>>, +edges: Map<&2, List<&2, String>>, +seeds: Map<&2, TypeSet()>, +known: Set(), +summaries: Map<&2, TypeSet()>) -> Map<&2, TypeSet()>:
   match components:

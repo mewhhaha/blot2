@@ -967,3 +967,15 @@ def Laws.saturated_compaction_loop_is_not_inlineable(state, initial, body):
 
 def Laws.saturated_counted_loop_is_not_inlineable(index, start, end, state, initial, body):
   {==}
+
+def Laws.ground_resolution_does_not_visit_history(substitutions):
+  {==}
+
+def Laws.ground_unification_preserves_state(substitutions, next, subject):
+  {==}
+
+def Laws.empty_rows_preserve_state(substitutions, next, subject):
+  {==}
+
+def Laws.symbol_insertion_into_empty_map(key, value):
+  {==}

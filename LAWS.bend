@@ -1597,3 +1597,26 @@ law saturated_counted_loop_is_not_inlineable:
   for initial: M.Expr
   for body: M.Expr
   {Saturation.body_cost(256n, [M.ForExpr{index, start, end, state, initial, body}], 0n) == 97n : Nat}
+
+# Scalar fast paths do not allocate new inference identities or rewrite the
+# chronological substitution history. Variables and open rows still solve.
+law ground_resolution_does_not_visit_history:
+  for substitutions: Substitutions.Substitutions
+  {Substitutions.resolve(substitutions, M.U32Ty{}) == Done{M.U32Ty{}} : Result<&2, &2, M.Diagnostic, M.Ty>}
+
+law ground_unification_preserves_state:
+  for +substitutions: Substitutions.Substitutions
+  for +next: Nat
+  for subject: String
+  {Substitutions.unify_at(M.U32Ty{}, M.U32Ty{}, substitutions, next, subject) == Done{Substitutions.Solution{substitutions, next}} : Result<&2, &2, M.Diagnostic, Substitutions.Solution>}
+
+law empty_rows_preserve_state:
+  for +substitutions: Substitutions.Substitutions
+  for +next: Nat
+  for subject: String
+  {Substitutions.unify_rows_at(M.EffectRow{Nil{}, M.ClosedRow{}}, M.EffectRow{Nil{}, M.ClosedRow{}}, substitutions, next, subject) == Done{Substitutions.Solution{substitutions, next}} : Result<&2, &2, M.Diagnostic, Substitutions.Solution>}
+
+law symbol_insertion_into_empty_map:
+  for +key: String
+  for +value: Nat
+  {Index.set(Nat, MTip{}, key, value) == MLeaf{key, value} : Map<&2, Nat>}

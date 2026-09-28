@@ -48,7 +48,7 @@ def forwarder_entry(found: Maybe<&2, Mono.BinaryMember>, name: String, index: Ma
     case None{}:
       index
     case Some{member}:
-      Map.set(&2, Mono.BinaryMember, index, name, member)
+      Index.set(Mono.BinaryMember, index, name, member)
 
 def forwarder_index(functions: List<&2, M.Function>, index: Map<&2, Mono.BinaryMember>) -> Map<&2, Mono.BinaryMember>:
   match functions:
@@ -392,7 +392,7 @@ def cache_accessors(accessors: List<&2, Maybe<&2, Accessor>>, cache: Map<&2, Acc
     case None{} <> tail:
       cache_accessors(tail, cache)
     case Some{Accessor{+name, function, certificate, binding}} <> tail:
-      cache_accessors(tail, Map.set(&2, Accessor, cache, name, Accessor{name, function, certificate, binding}))
+      cache_accessors(tail, Index.set(Accessor, cache, name, Accessor{name, function, certificate, binding}))
 
 # ---------------------------------------------------------------------------
 # Selection
@@ -843,7 +843,7 @@ def choice_entry(present: Bool, choice: Mono.Choice) -> Maybe<&2, Mono.Choice>:
 # A key that two requirements claim is a conflict: neither site is rewritten.
 def add_choice(+choices: Map<&2, Map<&2, Maybe<&2, Mono.Choice>>>, +declaration: String, +key: String, choice: Mono.Choice) -> Map<&2, Map<&2, Maybe<&2, Mono.Choice>>>:
   +current = Index.get(Map<&2, Maybe<&2, Mono.Choice>>, choices, declaration, Map.new(&2, Maybe<&2, Mono.Choice>))
-  Map.set(&2, Map<&2, Maybe<&2, Mono.Choice>>, choices, declaration, Map.set(&2, Maybe<&2, Mono.Choice>, current, key, choice_entry(Maybe.is_some(&2, Maybe<&2, Mono.Choice>, Index.find(Maybe<&2, Mono.Choice>, current, key)), choice)))
+  Index.set(Map<&2, Maybe<&2, Mono.Choice>>, choices, declaration, Index.set(Maybe<&2, Mono.Choice>, current, key, choice_entry(Maybe.is_some(&2, Maybe<&2, Mono.Choice>, Index.find(Maybe<&2, Mono.Choice>, current, key)), choice)))
 
 def declaration_choices(plans: List<&2, Plan>, choices: Map<&2, Map<&2, Maybe<&2, Mono.Choice>>>) -> Map<&2, Map<&2, Maybe<&2, Mono.Choice>>>:
   match plans:

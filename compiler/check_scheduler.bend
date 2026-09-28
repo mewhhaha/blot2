@@ -37,21 +37,21 @@ def index_functions(values: List<&2, M.Function>, +position: Nat, found: Map<&2,
     case Nil{}:
       found
     case M.Function{+name, exported, parameter, p, r, body} <> tail:
-      index_functions(tail, 1n+position, Map.set(&2, Positioned<M.Function>, found, name, Positioned{position, M.Function{name, exported, parameter, p, r, body}}))
+      index_functions(tail, 1n+position, Index.set(Positioned<M.Function>, found, name, Positioned{position, M.Function{name, exported, parameter, p, r, body}}))
 
 def index_constants(values: List<&2, M.Constant>, +position: Nat, found: Map<&2, Positioned<M.Constant>>) -> Map<&2, Positioned<M.Constant>>:
   match values:
     case Nil{}:
       found
     case M.Constant{+name, exported, annotation, value} <> tail:
-      index_constants(tail, 1n+position, Map.set(&2, Positioned<M.Constant>, found, name, Positioned{position, M.Constant{name, exported, annotation, value}}))
+      index_constants(tail, 1n+position, Index.set(Positioned<M.Constant>, found, name, Positioned{position, M.Constant{name, exported, annotation, value}}))
 
 def index_types(values: List<&2, M.DataType>, +position: Nat, found: Map<&2, Positioned<M.DataType>>) -> Map<&2, Positioned<M.DataType>>:
   match values:
     case Nil{}:
       found
     case M.DataType{+identity, parameters, constructors} <> tail:
-      index_types(tail, 1n+position, Map.set(&2, Positioned<M.DataType>, found, G.type_key(identity), Positioned{position, M.DataType{identity, parameters, constructors}}))
+      index_types(tail, 1n+position, Index.set(Positioned<M.DataType>, found, G.type_key(identity), Positioned{position, M.DataType{identity, parameters, constructors}}))
 
 def catalog_costs(module: M.Module, costs: Map<&2, Nat>) -> Catalog:
   M.Module{constants, functions, types, operations} = module
@@ -146,21 +146,21 @@ def publish_interfaces(values: List<&2, G.Interface>, known: Map<&2, G.Interface
     case Nil{}:
       known
     case G.Interface{+name, kind, template, parameters, effects, predicates} <> tail:
-      publish_interfaces(tail, Map.set(&2, G.Interface, known, name, G.Interface{name, kind, template, parameters, effects, predicates}))
+      publish_interfaces(tail, Index.set(G.Interface, known, name, G.Interface{name, kind, template, parameters, effects, predicates}))
 
 def publish_functions(values: List<&2, M.CheckedFunction>, known: Map<&2, M.CheckedFunction>) -> Map<&2, M.CheckedFunction>:
   match values:
     case Nil{}:
       known
     case M.CheckedFunction{M.Function{+name, exported, parameter, p, r, body}, signature, effects} <> tail:
-      publish_functions(tail, Map.set(&2, M.CheckedFunction, known, name, M.CheckedFunction{M.Function{name, exported, parameter, p, r, body}, signature, effects}))
+      publish_functions(tail, Index.set(M.CheckedFunction, known, name, M.CheckedFunction{M.Function{name, exported, parameter, p, r, body}, signature, effects}))
 
 def publish_constants(values: List<&2, M.CheckedConstant>, known: Map<&2, M.CheckedConstant>) -> Map<&2, M.CheckedConstant>:
   match values:
     case Nil{}:
       known
     case M.CheckedConstant{M.Constant{+name, exported, annotation, value}, ty, variables} <> tail:
-      publish_constants(tail, Map.set(&2, M.CheckedConstant, known, name, M.CheckedConstant{M.Constant{name, exported, annotation, value}, ty, variables}))
+      publish_constants(tail, Index.set(M.CheckedConstant, known, name, M.CheckedConstant{M.Constant{name, exported, annotation, value}, ty, variables}))
 
 def ordered_functions(values: List<&2, M.Function>, +known: Map<&2, M.CheckedFunction>) -> Result<&2, &2, M.Diagnostic, List<&2, M.CheckedFunction>>:
   match values:
@@ -219,7 +219,7 @@ def publish_level(names: List<&2, String>, +level: Nat, levels: Map<&2, Nat>) ->
     case Nil{}:
       levels
     case name <> tail:
-      publish_level(tail, level, Map.set(&2, Nat, levels, name, level))
+      publish_level(tail, level, Index.set(Nat, levels, name, level))
 
 def scheduled_le(left: Scheduled, right: Scheduled) -> Bool:
   Scheduled{a, +x, first} = left
@@ -366,7 +366,7 @@ def plan_found(found: Maybe<&2, Nat>, prior: List<&2, FrontierCandidate>, candid
     case None{}:
       FrontierCandidate{position, +origin, function, types, imports} = candidate
       BatchState{known, originals, representatives, followers} = state
-      BatchState{Map.set(&2, List<&2, FrontierCandidate>, known, origin, FrontierCandidate{position, origin, function, types, imports} <> prior), task <> originals, task <> representatives, followers}
+      BatchState{Index.set(List<&2, FrontierCandidate>, known, origin, FrontierCandidate{position, origin, function, types, imports} <> prior), task <> originals, task <> representatives, followers}
     case Some{representative}:
       BatchState{known, originals, representatives, followers} = state
       BatchState{known, task <> originals, representatives, NatIndex.set(Nat, followers, candidate_position(candidate), representative)}

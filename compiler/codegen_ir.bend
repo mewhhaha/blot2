@@ -13,7 +13,7 @@ def lambda_index_go(lambdas: List<&2, F.Lambda>, indexed: Map<&2, Maybe<&2, F.La
     case Nil{}:
       indexed
     case F.Lambda{+identity, parameter, body, captures} <> tail:
-      lambda_index_go(tail, Map.set(&2, Maybe<&2, F.Lambda>, indexed, Nat.show(identity), Some{F.Lambda{identity, parameter, body, captures}}))
+      lambda_index_go(tail, Index.set(Maybe<&2, F.Lambda>, indexed, Nat.show(identity), Some{F.Lambda{identity, parameter, body, captures}}))
 
 def metadata(lambdas: List<&2, F.Lambda>, constructors: Map<&2, Maybe<&2, E.ConstructorSlot>>) -> Metadata:
   Metadata{lambda_index_go(List.reverse(&2, F.Lambda, lambdas), Map.new(&2, Maybe<&2, F.Lambda>)), constructors, Set.new(), Saturation.empty()}

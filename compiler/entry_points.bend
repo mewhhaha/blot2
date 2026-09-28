@@ -206,7 +206,7 @@ def add_implementation(split: Maybe<&2, Split>, +name: String, +owners: Set(), +
     case None{}:
       index
     case Some{Split{owner, +member}}:
-      Bool.pick(Map<&2, List<&2, String>>, D.member(owners, owner), Map.set(&2, List<&2, String>, index, member, name <> Index.get(List<&2, String>, index, member, Nil{})), index)
+      Bool.pick(Map<&2, List<&2, String>>, D.member(owners, owner), Index.set(List<&2, String>, index, member, name <> Index.get(List<&2, String>, index, member, Nil{})), index)
 
 def implementations(names: List<&2, String>, +owners: Set(), index: Map<&2, List<&2, String>>) -> Map<&2, List<&2, String>>:
   match names:
@@ -227,7 +227,7 @@ def adjacency(nodes: List<&2, Declared>, +index: Map<&2, List<&2, String>>, edge
     case Nil{}:
       edges
     case Declared{name, root, Found{names, members}} <> tail:
-      adjacency(tail, index, Map.set(&2, List<&2, String>, edges, name, member_edges(Set.to_list(Set.from_list(members)), index, names)))
+      adjacency(tail, index, Index.set(List<&2, String>, edges, name, member_edges(Set.to_list(Set.from_list(members)), index, names)))
 
 def edge_count(nodes: List<&2, Declared>, total: Nat) -> Nat:
   match nodes:
@@ -392,14 +392,14 @@ def function_types(functions: List<&2, M.CheckedFunction>, types: Map<&2, M.Ty>)
     case Nil{}:
       types
     case M.CheckedFunction{function, M.Signature{name, parameter, result, variables, row}, effects} <> tail:
-      function_types(tail, Map.set(&2, M.Ty, types, name, M.FunctionTy{parameter, result, row}))
+      function_types(tail, Index.set(M.Ty, types, name, M.FunctionTy{parameter, result, row}))
 
 def constant_types(constants: List<&2, M.CheckedConstant>, types: Map<&2, M.Ty>) -> Map<&2, M.Ty>:
   match constants:
     case Nil{}:
       types
     case M.CheckedConstant{M.Constant{name, exported, annotation, value}, ty, variables} <> tail:
-      constant_types(tail, Map.set(&2, M.Ty, types, name, ty))
+      constant_types(tail, Index.set(M.Ty, types, name, ty))
 
 def abi_rule() -> String:
   "entry functions take Unit, U32, F32, Bool, Array U32 or Array F32 (or one scalar/numeric-array callback with exactly ! {Foreign}), return one of those types and handle every other effect; entry values are Unit, U32, F32 or Bool"

@@ -336,7 +336,7 @@ def slot_index_go(slots: List<&2, Slot>, indexed: Map<&2, Maybe<&2, Nat>>) -> Ma
     case Nil{}:
       indexed
     case Slot{name, position} <> tail:
-      slot_index_go(tail, Map.set(&2, Maybe<&2, Nat>, indexed, name, Some{position}))
+      slot_index_go(tail, Index.set(Maybe<&2, Nat>, indexed, name, Some{position}))
 
 def slot_index(slots: List<&2, Slot>) -> Map<&2, Maybe<&2, Nat>>:
   slot_index_go(List.reverse(&2, Slot, slots), Map.new(&2, Maybe<&2, Nat>))
@@ -2326,7 +2326,7 @@ def runtime_globals(initializers: List<&2, Init.Initializer>, +names: List<&2, E
       indexed
     case Init.Initializer{+name, value} <> tail:
       +global = runtime_position(exported_global(names, name, 1n), next)
-      runtime_globals(tail, names, Nat.add(next, Bool.pick(Nat, Nat.is_eq(runtime_global_index(global), next), 1n, 0n)), Map.set(&2, RuntimeGlobal, indexed, name, global))
+      runtime_globals(tail, names, Nat.add(next, Bool.pick(Nat, Nat.is_eq(runtime_global_index(global), next), 1n, 0n)), Index.set(RuntimeGlobal, indexed, name, global))
 
 def required_runtime(found: Maybe<&2, RuntimeGlobal>, name: String) -> Result<&2, &2, M.Diagnostic, RuntimeGlobal>:
   match found:

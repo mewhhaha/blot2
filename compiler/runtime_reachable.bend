@@ -33,14 +33,14 @@ def function_index(functions: List<&2, M.CheckedFunction>, indexed: Map<&2, Mayb
     case Nil{}:
       indexed
     case M.CheckedFunction{M.Function{+name, exported, parameter, parameter_type, result_type, body}, signature, effects} <> tail:
-      function_index(tail, Map.set(&2, Maybe<&2, M.CheckedFunction>, indexed, name, Some{M.CheckedFunction{M.Function{name, exported, parameter, parameter_type, result_type, body}, signature, effects}}))
+      function_index(tail, Index.set(Maybe<&2, M.CheckedFunction>, indexed, name, Some{M.CheckedFunction{M.Function{name, exported, parameter, parameter_type, result_type, body}, signature, effects}}))
 
 def constant_index(constants: List<&2, C.Binding<C.Value>>, indexed: Map<&2, Maybe<&2, C.Value>>) -> Map<&2, Maybe<&2, C.Value>>:
   match constants:
     case Nil{}:
       indexed
     case C.Binding{name, value} <> tail:
-      constant_index(tail, Map.set(&2, Maybe<&2, C.Value>, indexed, name, Some{value}))
+      constant_index(tail, Index.set(Maybe<&2, C.Value>, indexed, name, Some{value}))
 
 def seen(state: State, name: String) -> Bool:
   State{visited, lambda_ids, lambdas, constructors, operations} = state
@@ -48,7 +48,7 @@ def seen(state: State, name: String) -> Bool:
 
 def mark(state: State, name: String) -> State:
   State{visited, lambda_ids, lambdas, constructors, operations} = state
-  State{Map.set(&2, Bool, visited, name, True{}), lambda_ids, lambdas, constructors, operations}
+  State{Index.set(Bool, visited, name, True{}), lambda_ids, lambdas, constructors, operations}
 
 def lambda_seen(state: State, identity: Nat) -> Bool:
   State{visited, lambda_ids, lambdas, constructors, operations} = state
@@ -57,7 +57,7 @@ def lambda_seen(state: State, identity: Nat) -> Bool:
 def add_lambda(state: State, lambda: F.Lambda) -> State:
   State{visited, lambda_ids, lambdas, constructors, operations} = state
   F.Lambda{+identity, parameter, body, captures} = lambda
-  State{visited, Map.set(&2, Bool, lambda_ids, Nat.show(identity), True{}), F.Lambda{identity, parameter, body, captures} <> lambdas, constructors, operations}
+  State{visited, Index.set(Bool, lambda_ids, Nat.show(identity), True{}), F.Lambda{identity, parameter, body, captures} <> lambdas, constructors, operations}
 
 def use_constructor(state: State, name: String) -> State:
   State{visited, lambda_ids, lambdas, constructors, operations} = state
