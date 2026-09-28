@@ -85,7 +85,7 @@ launcher's policy on the main thread and its workers.
 
 The `Zig compiler` workflow builds Debug and ReleaseSafe, runs native tests and
 protocol/generator regressions, checks deterministic generation, and runs pinned
-**zig-analyzer 0.16.0-4** on handwritten Zig. The analyzer configuration
+**zig-analyzer 0.16.0-5** on handwritten Zig. The analyzer configuration
 excludes only generated code and build outputs. Its ownership contract
 identifies arena allocators; three local directives explain temporary
 arena-owned buffers.

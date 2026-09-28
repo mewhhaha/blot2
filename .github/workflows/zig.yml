@@ -74,10 +74,10 @@ jobs:
         working-directory: zig
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 --output "$RUNNER_TEMP/zig-analyzer.tar.xz" https://github.com/mewhhaha/zig-analyzer/releases/download/v0.16.0-4/zig-analyzer-0.16.0-4-x86_64-linux.tar.xz
-          echo 'f40a5e290906c9047d01a1256d99e006bd56d84f56c030a9f60a7bcfb5912634  zig-analyzer.tar.xz' | (cd "$RUNNER_TEMP" && sha256sum --check)
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/zig-analyzer.tar.xz" https://github.com/mewhhaha/zig-analyzer/releases/download/v0.16.0-5/zig-analyzer-0.16.0-5-x86_64-linux.tar.xz
+          echo '108aead67169bc12fc3036f6295ef3eb5b8f5e0b35929f0b3cd18383e4c5b668  zig-analyzer.tar.xz' | (cd "$RUNNER_TEMP" && sha256sum --check)
           tar -xf "$RUNNER_TEMP/zig-analyzer.tar.xz" -C "$RUNNER_TEMP"
-          analyzer="$RUNNER_TEMP/zig-analyzer-0.16.0-4-x86_64-linux/bin/zig-analyzer"
+          analyzer="$RUNNER_TEMP/zig-analyzer-0.16.0-5-x86_64-linux/bin/zig-analyzer"
           "$analyzer" doctor
           "$analyzer" check --no-cache .
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
