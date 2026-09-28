@@ -1,0 +1,274 @@
+diff --git a/LAWS.bend b/LAWS.bend
+index ab51111..92db56b 100644
+--- a/LAWS.bend
++++ b/LAWS.bend
+@@ -1598,2 +1598,25 @@ law saturated_counted_loop_is_not_inlineable:
+   for body: M.Expr
+   {Saturation.body_cost(256n, [M.ForExpr{index, start, end, state, initial, body}], 0n) == 97n : Nat}
++
++# Scalar fast paths do not allocate new inference identities or rewrite the
++# chronological substitution history. Variables and open rows still solve.
++law ground_resolution_does_not_visit_history:
++  for substitutions: Substitutions.Substitutions
++  {Substitutions.resolve(substitutions, M.U32Ty{}) == Done{M.U32Ty{}} : Result<&2, &2, M.Diagnostic, M.Ty>}
++
++law ground_unification_preserves_state:
++  for +substitutions: Substitutions.Substitutions
++  for +next: Nat
++  for subject: String
++  {Substitutions.unify_at(M.U32Ty{}, M.U32Ty{}, substitutions, next, subject) == Done{Substitutions.Solution{substitutions, next}} : Result<&2, &2, M.Diagnostic, Substitutions.Solution>}
++
++law empty_rows_preserve_state:
++  for +substitutions: Substitutions.Substitutions
++  for +next: Nat
++  for subject: String
++  {Substitutions.unify_rows_at(M.EffectRow{Nil{}, M.ClosedRow{}}, M.EffectRow{Nil{}, M.ClosedRow{}}, substitutions, next, subject) == Done{Substitutions.Solution{substitutions, next}} : Result<&2, &2, M.Diagnostic, Substitutions.Solution>}
++
++law symbol_insertion_into_empty_map:
++  for +key: String
++  for +value: Nat
++  {Index.set(Nat, MTip{}, key, value) == MLeaf{key, value} : Map<&2, Nat>}
+diff --git a/PROOF.bend b/PROOF.bend
+index 1148359..8c61c0c 100644
+--- a/PROOF.bend
++++ b/PROOF.bend
+@@ -968,2 +968,14 @@ def Laws.saturated_compaction_loop_is_not_inlineable(state, initial, body):
+ def Laws.saturated_counted_loop_is_not_inlineable(index, start, end, state, initial, body):
+   {==}
++
++def Laws.ground_resolution_does_not_visit_history(substitutions):
++  {==}
++
++def Laws.ground_unification_preserves_state(substitutions, next, subject):
++  {==}
++
++def Laws.empty_rows_preserve_state(substitutions, next, subject):
++  {==}
++
++def Laws.symbol_insertion_into_empty_map(key, value):
++  {==}
+diff --git a/compiler/index.bend b/compiler/index.bend
+index e9acea6..a3e3784 100644
+--- a/compiler/index.bend
++++ b/compiler/index.bend
+@@ -79,2 +79,110 @@ def fallback(-V: Data, found: Maybe<&2, V>, otherwise: V) -> V:
+ def get(-V: Data, index: Map<&2, V>, name: String, otherwise: V) -> V:
+   fallback(V, find(V, index, name), otherwise)
++
++# Return the first differing Base.Map bit, or None for equal strings. Preserve
++# both roots while cursors move so native character reads remain borrowed.
++type KeyDifference is Data:
++  KeyDifference{position: Maybe<&2, Nat>, left: String, right: String}
++
++def differing_bit(delta: U32, position: Nat) -> Maybe<&2, Nat>:
++  match delta:
++    case 0: None{}
++    case value: Some{Nat.add(position, Map.diff.chr(value))}
++
++def difference_walk(left_root: String, right_root: String, left: String, right: String, +position: Nat, different: Maybe<&2, Nat>) -> KeyDifference:
++  match left right different:
++    case _ _ Some{at}:
++      KeyDifference{Some{at}, left_root, right_root}
++    case SNil{} SNil{} None{}:
++      KeyDifference{None{}, left_root, right_root}
++    case SCon{Chr{x}, left_tail} SCon{Chr{y}, right_tail} None{}:
++      difference_walk(left_root, right_root, left_tail, right_tail, Nat.add(position, 33n), differing_bit(U32.xor(x, y), position))
++    case _ _ None{}:
++      KeyDifference{Some{position}, left_root, right_root}
++
++def difference_result(value: KeyDifference) -> Maybe<&2, Nat>:
++  KeyDifference{position, left, right} = value
++  position
++
++def difference(+left: String, +right: String) -> Maybe<&2, Nat>:
++  difference_result(difference_walk(left, right, left, right, 0n, None{}))
++
++# A zipper records only the sibling and position at each visited branch. Seek
++# once, then rebuild once; Base.Map.set reconstructs a search result and starts
++# over to insert/update it. Branch positions increase toward the leaves.
++type InsertFrame<-V: Data> is Data:
++  LeftFrame{position: Nat, right: Map<&2, V>}
++  RightFrame{position: Nat, left: Map<&2, V>}
++
++def rebuild(-V: Data, frames: List<&2, InsertFrame<V>>, node: Map<&2, V>) -> Map<&2, V>:
++  match frames:
++    case Nil{}: node
++    case LeftFrame{position, right} <> tail:
++      rebuild(V, tail, MNode{position, node, right})
++    case RightFrame{position, left} <> tail:
++      rebuild(V, tail, MNode{position, left, node})
++
++def splice_bit(-V: Data, high: Bool, position: Nat, key: String, value: V, previous: Map<&2, V>) -> Map<&2, V>:
++  match high:
++    case False{}: MNode{position, MLeaf{key, value}, previous}
++    case True{}: MNode{position, previous, MLeaf{key, value}}
++
++def splice(-V: Data, +position: Nat, +key: String, value: V, previous: Map<&2, V>) -> Map<&2, V>:
++  splice_bit(V, string_bit(key, Nat.div(position, 33n), Nat.mod(position, 33n)), position, key, value, previous)
++
++def above_split(-V: Data, frames: List<&2, InsertFrame<V>>, split: Nat) -> Bool:
++  match frames:
++    case Nil{}: True{}
++    case LeftFrame{position, right} <> tail: Nat.is_lt(position, split)
++    case RightFrame{position, left} <> tail: Nat.is_lt(position, split)
++
++# Rebuild deeper branches before splicing the new leaf. Stop as soon as the
++# remaining parent precedes the new split; its direction is already recorded.
++def insert_above(-V: Data, fuel: Nat, ready: Bool, frames: List<&2, InsertFrame<V>>, node: Map<&2, V>, key: String, value: V, +split: Nat) -> Map<&2, V>:
++  match fuel ready frames:
++    case _ True{} rest:
++      rebuild(V, rest, splice(V, split, key, value, node))
++    case 0n False{} rest:
++      Map.set(&2, V, rebuild(V, rest, node), key, value)
++    case 1n+fuel False{} Nil{}:
++      splice(V, split, key, value, node)
++    case 1n+fuel False{} LeftFrame{position, right} <> +tail:
++      insert_above(V, fuel, above_split(V, tail, split), tail, MNode{position, node, right}, key, value, split)
++    case 1n+fuel False{} RightFrame{position, left} <> +tail:
++      insert_above(V, fuel, above_split(V, tail, split), tail, MNode{position, left, node}, key, value, split)
++
++def set_leaf(-V: Data, split: Maybe<&2, Nat>, previous_key: String, previous_value: V, key: String, value: V, +frames: List<&2, InsertFrame<V>>) -> Map<&2, V>:
++  match split:
++    case None{}:
++      rebuild(V, frames, MLeaf{previous_key, value})
++    case Some{+position}:
++      insert_above(V, M.max_nat(), above_split(V, frames, position), frames, MLeaf{previous_key, previous_value}, key, value, position)
++
++type InsertPath<-V: Data> is Data:
++  InsertPath{node: Map<&2, V>, frames: List<&2, InsertFrame<V>>}
++
++def descend(-V: Data, high: Bool, position: Nat, left: Map<&2, V>, right: Map<&2, V>, frames: List<&2, InsertFrame<V>>) -> InsertPath<V>:
++  match high:
++    case False{}: InsertPath{left, LeftFrame{position, right} <> frames}
++    case True{}: InsertPath{right, RightFrame{position, left} <> frames}
++
++def set_loop(-V: Data, fuel: Nat, path: InsertPath<V>, +key: String, value: V, remaining: String, cursor: Nat) -> Map<&2, V>:
++  match fuel path:
++    case 0n InsertPath{original, frames}:
++      Map.set(&2, V, rebuild(V, frames, original), key, value)
++    case 1n+rest InsertPath{MTip{}, frames}:
++      MLeaf{key, value}
++    case 1n+rest InsertPath{MLeaf{+previous_key, previous_value}, frames}:
++      set_leaf(V, difference(key, previous_key), previous_key, previous_value, key, value, frames)
++    case 1n+rest InsertPath{MNode{+position, left, right}, frames}:
++      +character = Nat.div(position, 33n)
++      +suffix = advance_suffix(Nat.sub(character, cursor), remaining)
++      set_loop(V, rest, descend(V, string_bit(suffix, 0n, Nat.mod(position, 33n)), position, left, right, frames), key, value, suffix, character)
++
++# Compiler indexes are Data-valued maps. Preserve Base.Map's Patricia shape,
++# iteration order and replacement semantics, including persistent snapshots.
++def set(-V: Data, index: Map<&2, V>, +key: String, value: V) -> Map<&2, V>:
++  set_loop(V, M.max_nat(), InsertPath{index, Nil{}}, key, value, key, 0n)
++
++def set_reference(-V: Data, index: Map<&2, V>, key: String, value: V) -> Map<&2, V>:
++  Map.set(&2, V, index, key, value)
+diff --git a/compiler/infer.bend b/compiler/infer.bend
+index 7d74460..7ca8b77 100644
+--- a/compiler/infer.bend
++++ b/compiler/infer.bend
+@@ -476,5 +476,32 @@ def generalization_variables(generalized: Generalization) -> List<&2, Nat>:
+   variables
+ 
+-def generalization_qualified_excluding(ty: M.Ty, predicates: List<&2, M.Predicate>, +context: Context, +state: State, name: String, +blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, Generalization>:
++# If the solved type and every residual predicate are closed, no variable can
++# be generalized. Computing free variables of the whole environment in this
++# case used to revisit every earlier let binding for no change in the result.
++# The open case still excludes globals, locals, labels, annotations, ambient
++# rows and blocked predicate variables before applying the covariance rules.
++def generalization_candidates(candidates: List<&2, Nat>, +resolved: M.Ty, +needs: List<&2, M.Predicate>, +predicate_free: List<&2, Nat>, +context: Context, +state: State, name: String, blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, Generalization>:
++  match candidates:
++    case Nil{}:
++      Done{Generalization{Binding{name, resolved, Nil{}, needs}, Nil{}}}
++    case head <> tail:
++      do Result<&2, &2, M.Diagnostic, Generalization>:
++        excluded : List<&2, Nat> <- binding_free(List.append(&2, Binding, environment_bindings(context), annotation_bindings(annotation_types(state))), substitutions_of(state))
++        +variables : List<&2, Nat> = T.difference(head <> tail, T.union(blocked, T.union(excluded, T.row_free(T.resolve_row(substitutions_of(state), context_row(context))))))
++        +closed : M.Ty <- T.close_covariant(resolved, variables, predicate_free)
++        remaining : List<&2, Nat> <- T.free(closed)
++        return Generalization{Binding{name, closed, T.difference(variables, T.difference(variables, T.union(remaining, predicate_free))), needs}, variables}
++
++def generalization_qualified_excluding(ty: M.Ty, predicates: List<&2, M.Predicate>, context: Context, +state: State, name: String, blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, Generalization>:
++  do Result<&2, &2, M.Diagnostic, Generalization>:
++    +resolved : M.Ty <- T.resolve(substitutions_of(state), ty)
++    resolved_needs : List<&2, M.Predicate> <- C.resolve_list(substitutions_of(state), predicates)
++    +needs : List<&2, M.Predicate> = C.canonical_predicates(resolved_needs, Nil{})
++    type_free : List<&2, Nat> <- T.free(resolved)
++    +predicate_free : List<&2, Nat> <- C.free_list(needs)
++    generalization_candidates(T.union(type_free, predicate_free), resolved, needs, predicate_free, context, state, name, blocked)
++
++# Retained slow oracle for differential tests of the closed-type fast path.
++def generalization_qualified_excluding_reference(ty: M.Ty, predicates: List<&2, M.Predicate>, +context: Context, +state: State, name: String, +blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, Generalization>:
+   do Result<&2, &2, M.Diagnostic, Generalization>:
+     +resolved : M.Ty <- T.resolve(substitutions_of(state), ty)
+@@ -568,5 +595,5 @@ def annotation_variable(found: Maybe<&2, M.Ty>, key: String, state: State) -> Ty
+     case None{}:
+       State{substitutions, +next, annotations} = state
+-      Typing{pure(M.VariableTy{next}), State{substitutions, 1n+next, Map.set(&2, M.Ty, annotations, key, M.VariableTy{next})}}
++      Typing{pure(M.VariableTy{next}), State{substitutions, 1n+next, Index.set(M.Ty, annotations, key, M.VariableTy{next})}}
+ 
+ def annotation_instance(parameters: List<&2, M.Ty>, ty: M.Ty, +state: State) -> Result<&2, &2, M.Diagnostic, Typing>:
+diff --git a/compiler/types.bend b/compiler/types.bend
+index b41018a..c96d87b 100644
+--- a/compiler/types.bend
++++ b/compiler/types.bend
+@@ -559,9 +559,25 @@ def resolve_work(substitutions: Substitutions, fuel: Nat, work: TypeWork) -> Res
+   resolve_work_flat(substitutions, fuel, work)
+ 
+-def resolve(substitutions: Substitutions, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
++def resolve_reference(substitutions: Substitutions, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
+   do Result<&2, &2, M.Diagnostic, M.Ty>:
+     xs : List<&2, M.Ty> <- resolve_work(substitutions, Nat.mul(256n, 256n), OneType{ty})
+     first_type(xs)
+ 
++# Ground leaves cannot contain a substitution target or exceed the traversal
++# budget. Return them without constructing a worklist and continuation frames.
++# Compound types, variables and row-bearing providers retain the exact resolver.
++def resolve(substitutions: Substitutions, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
++  match ty:
++    case M.UnitTy{}: Done{M.UnitTy{}}
++    case M.U32Ty{}: Done{M.U32Ty{}}
++    case M.F32Ty{}: Done{M.F32Ty{}}
++    case M.BoolTy{}: Done{M.BoolTy{}}
++    case M.NeverTy{}: Done{M.NeverTy{}}
++    case M.EffectDescriptorTy{}: Done{M.EffectDescriptorTy{}}
++    case M.EffectSetTy{}: Done{M.EffectSetTy{}}
++    case M.ParameterTy{index}: Done{M.ParameterTy{index}}
++    case M.FreeTy{scope, name}: Done{M.FreeTy{scope, name}}
++    case other: resolve_reference(substitutions, other)
++
+ def contains(variables: List<&2, Nat>, variable: Nat) -> Bool:
+   variable_contains_work(variables, variable, False{})
+@@ -1160,10 +1176,31 @@ def solve(equations: List<&2, Equation>, substitutions: Substitutions) -> Result
+     return solution_substitutions(solved)
+ 
+-def unify_at(left: M.Ty, right: M.Ty, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
++def unify_at_reference(left: M.Ty, right: M.Ty, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
+   solve_work(U32.to_nat(65536), [Equation{left, right, subject}], substitutions, next)
+ 
+-def unify_rows_at(left: M.EffectRow, right: M.EffectRow, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
++def unify_rows_at_reference(left: M.EffectRow, right: M.EffectRow, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
+   solve_work(U32.to_nat(65536), [RowEquation{left, right, subject}], substitutions, next)
+ 
++# Equality of identical ground scalar constructors needs no constraint queue.
++# Do not extend this to variables or row-bearing types: their substitutions and
++# fresh-row accounting must still run through solve_work.
++def unify_at(left: M.Ty, right: M.Ty, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
++  match left right:
++    case M.UnitTy{} M.UnitTy{}: Done{Solution{substitutions, next}}
++    case M.U32Ty{} M.U32Ty{}: Done{Solution{substitutions, next}}
++    case M.F32Ty{} M.F32Ty{}: Done{Solution{substitutions, next}}
++    case M.BoolTy{} M.BoolTy{}: Done{Solution{substitutions, next}}
++    case M.NeverTy{} M.NeverTy{}: Done{Solution{substitutions, next}}
++    case M.EffectDescriptorTy{} M.EffectDescriptorTy{}: Done{Solution{substitutions, next}}
++    case M.EffectSetTy{} M.EffectSetTy{}: Done{Solution{substitutions, next}}
++    case a b: unify_at_reference(a, b, substitutions, next, subject)
++
++def unify_rows_at(left: M.EffectRow, right: M.EffectRow, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
++  match left right:
++    case M.EffectRow{Nil{}, M.ClosedRow{}} M.EffectRow{Nil{}, M.ClosedRow{}}:
++      Done{Solution{substitutions, next}}
++    case a b:
++      unify_rows_at_reference(a, b, substitutions, next, subject)
++
+ def unify(left: M.Ty, right: M.Ty, substitutions: Substitutions, subject: String) -> Result<&2, &2, M.Diagnostic, Substitutions>:
+   solve([Equation{left, right, subject}], substitutions)
