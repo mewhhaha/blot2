@@ -1,0 +1,97 @@
+name: Validate native compiler efficiency pass
+on:
+  push:
+    branches: [rebuild/oxcaml-compiler]
+    paths:
+      - 'compiler/oxcaml/bootstrap/efficiency-pass.*'
+      - 'compiler/oxcaml/bootstrap/apply_efficiency.py'
+      - '.github/workflows/oxcaml-efficiency-apply.yml'
+permissions:
+  contents: read
+concurrency:
+  group: oxcaml-efficiency-apply
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  portable:
+    if: github.repository == 'mewhhaha/blot2' && github.ref == 'refs/heads/rebuild/oxcaml-compiler' && contains(github.event.head_commit.message, '[apply-efficiency]')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 compiler/oxcaml/bootstrap/apply_efficiency.py
+      - run: sudo apt-get update && sudo apt-get install -y ocaml-nox
+      - name: Check portable release and development builds
+        run: |
+          ocamlopt -version
+          make -C compiler/oxcaml -j2 test test-build 2>&1 | tee efficiency-validation/portable.txt
+          make -C compiler/oxcaml -j2 PROFILE=dev test 2>&1 | tee efficiency-validation/portable-dev.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oxcaml-efficiency-portable
+          path: efficiency-validation/
+          retention-days: 7
+  apply:
+    needs: portable
+    if: github.repository == 'mewhhaha/blot2' && github.ref == 'refs/heads/rebuild/oxcaml-compiler' && contains(github.event.head_commit.message, '[apply-efficiency]')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify and apply exact reviewed native source
+        run: python3 compiler/oxcaml/bootstrap/apply_efficiency.py
+      - run: sudo apt-get update && sudo apt-get install -y opam autoconf build-essential
+      - uses: actions/cache@v4
+        with:
+          path: ~/.opam
+          key: oxcaml-5.2.0-ox-${{ runner.os }}-${{ runner.arch }}-v1
+      - name: Install OxCaml
+        run: |
+          git config --global maintenance.auto false
+          git config --global gc.auto 0
+          opam init --bare --disable-sandboxing -y
+          if ! opam switch list --short | grep -Fxq 5.2.0+ox; then
+            opam switch create 5.2.0+ox --repos ox=git+https://github.com/oxcaml/opam-repository.git,default -y
+          fi
+          opam exec --switch 5.2.0+ox -- ocamlopt -config > efficiency-validation/ocaml-config.txt
+      - name: Check both native profiles with allocation contracts enabled
+        run: |
+          opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml -j2 test test-build 2>&1 | tee efficiency-validation/release.txt
+          opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml -j2 PROFILE=dev test 2>&1 | tee efficiency-validation/dev.txt
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check standalone source compilation and host types
+        run: |
+          test ! -f generated/compiler/compiler.js
+          deno fmt --check deno.json compiler/oxcaml/*.ts
+          deno check compiler/oxcaml/*.ts
+          deno run -A compiler/oxcaml/smoke.ts 2>&1 | tee efficiency-validation/smoke-release.txt
+          deno run -A compiler/oxcaml/smoke.ts compiler/oxcaml/_build-dev/blotc 2>&1 | tee efficiency-validation/smoke-dev.txt
+      - name: Publish tested native source only
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          test "$(git ls-remote origin refs/heads/rebuild/oxcaml-compiler | cut -f1)" = "$EXPECTED_HEAD"
+          git diff --exit-code
+          git rm compiler/oxcaml/bootstrap/efficiency-pass.0.b64 compiler/oxcaml/bootstrap/efficiency-pass.1.b64 compiler/oxcaml/bootstrap/apply_efficiency.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Use direct persistent indexes and isolated incremental compiler builds'
+          git rev-parse HEAD > efficiency-validation/source-commit.txt
+          git push origin HEAD:rebuild/oxcaml-compiler
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oxcaml-efficiency-source-validation
+          path: efficiency-validation/
+          retention-days: 7
