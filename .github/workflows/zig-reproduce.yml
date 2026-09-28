@@ -1,0 +1,40 @@
+name: Zig offline reproduction
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/zig-reproduce.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.5.2
+      - name: Bundle the exact checkout and verified tools for offline debugging
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/zig-reproduction"
+          mkdir -p "$bundle"
+          git archive --format=tar HEAD > "$bundle/source.tar"
+          curl --fail --location --retry 3 --output "$bundle/zig.tar.xz" https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz
+          echo '70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  zig.tar.xz' | (cd "$bundle" && sha256sum --check)
+          cp "$(command -v deno)" "$bundle/deno"
+          export DENO_DIR="$RUNNER_TEMP/frontend-cache"
+          deno cache compiler/syntax.ts
+          tar -czf "$bundle/frontend-cache.tar.gz" -C "$DENO_DIR" .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: zig-offline-reproduction
+          path: ${{ runner.temp }}/zig-reproduction/
+          retention-days: 1
+          if-no-files-found: error
