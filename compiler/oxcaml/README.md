@@ -13,18 +13,21 @@ environment:
 ```sh
 opam switch create 5.2.0+ox --repos ox=git+https://github.com/oxcaml/opam-repository.git,default
 eval $(opam env --switch 5.2.0+ox)
-deno task build:compiler:oxcaml
-deno task blot check examples/generic_effects.blot
-deno task blot build examples/arrays.blot build/arrays.wasm
+just build
+blot check examples/generic_effects.blot
+blot build examples/arrays.blot build/arrays.wasm
 ```
 
-`build:compiler:oxcaml` builds the checked-in `.ml` files and atomically
-installs `generated/compiler/blotc`. Existing native APIs, CLI commands, and
-applications then use OxCaml without an executable override. It requires OxCaml,
-GNU Make 4.3+, and a C toolchain; source tooling needs Deno 2. Neither Bend,
-Bun, the Python migration script, nor generated JavaScript compiler artifacts
-are needed. The original `build:compiler` task remains available to select the
-Bend backend.
+`just build` builds the checked-in `.ml` files, installs
+`generated/compiler/blotc` for repository APIs, keeps a release copy at
+`generated/compiler/blotc-oxcaml`, and installs a standalone `blot` executable
+in `~/.local/bin`. Set `BLOT_INSTALL_DIR` to choose another directory. The
+executable bundles the native compiler, parser, standard library, and guide, so
+it works without this checkout, Deno, or opam. The build requires OxCaml, GNU
+Make 4.3+, a C toolchain, and Deno 2. Neither Bend, Bun, the Python migration
+script, nor generated JavaScript compiler artifacts are needed.
+`deno task build:compiler:oxcaml` builds only the repository backend;
+`deno task build:compiler` remains available to select the Bend backend.
 
 To keep both executables, use the isolated build instead:
 

@@ -1,6 +1,6 @@
 # Blot 2
 
-A native compiler written in Bend, with Deno tooling and Baba 9.0.1
+A native compiler written in OxCaml, with Deno tooling and Baba 9.0.1
 lexing/parsing. The executable core targets Wasm and includes a source prelude,
 rank-1 type/effect inference, closures, algebraic data, multi-value matching,
 tuples, named record constructors, immutable arrays, file imports, bounded const
@@ -14,33 +14,52 @@ host entrypoints are its `entry const` and `entry let` declarations: they are
 its only Wasm exports and the roots from which compilation keeps code. See
 [effects and controlled IO](compiler/effects-and-io.md).
 
-## OxCaml backend
+## Build and install
 
-The native compiler can also be built in OxCaml, without Bend or generated
-JavaScript compiler artifacts:
+With OxCaml selected in your opam environment, build the compiler and install
+the standalone `blot` command in `~/.local/bin`:
 
 ```sh
-# With OxCaml selected in your opam environment:
-deno task build:compiler:oxcaml
-deno task blot check examples/generic_effects.blot
-deno task blot build examples/arrays.blot build/arrays.wasm
+just build
+blot check examples/generic_effects.blot
+blot build examples/arrays.blot build/arrays.wasm
 ```
 
-This installs OxCaml at the existing native executable path. Source syntax,
-Wasm/host contracts, and incremental APIs stay the same. `just build-oxcaml` and
-`just test-oxcaml` provide the build and native validation shortcuts. The
-original Bend build remains available through `just build`. See
+`BLOT_INSTALL_DIR` overrides the install directory. The installed executable
+bundles the OxCaml compiler, frontend, standard library, and language guide; it
+can run outside this checkout without Deno or opam. `just build-oxcaml` only
+builds the native compiler for the repository's Deno tools, while
+`deno task build:compiler` still builds the Bend backend. Source syntax,
+Wasm/host contracts, and incremental APIs stay the same. See
 [OxCaml development and parity checks](compiler/oxcaml/README.md).
+
+## Deno package
+
+`@mewhhaha/blot@0.2.0` exposes the OxCaml compiler and guest API. Its `cli`
+subpath provides the same commands as the installed executable:
+
+```sh
+deno run -A jsr:@mewhhaha/blot@0.2.0/cli check examples/arrays.blot
+```
+
+For local development, `deno link ../blot2` from a sibling Deno project makes
+its `@mewhhaha/blot` imports use this checkout. The package currently bundles a
+Linux x86-64 glibc native compiler. `deno task release:check` builds the OxCaml
+binary and Bend JavaScript reference, then checks the package with a publish dry
+run. The two native backends have separate output files, so a Bend build does
+not replace the OxCaml binary shipped in the package. Publishing is a separate
+`deno publish` step after committing the release changes.
 
 ## Work with the compiler
 
-Requires Deno 2, Bend, and clang 14+ on a POSIX system. Builds use the installed
-Bend without a version restriction. Building the JavaScript reference
-additionally needs Bun and network access on the first build for each Bend
-version to fetch loader sources from its matching upstream release tag.
+`just build` requires Deno 2, OxCaml, GNU Make 4.3+, and a C toolchain on a
+POSIX system. The Bend backend and `just check` additionally require Bend and
+clang 14+. Building the JavaScript reference additionally needs Bun and network
+access on the first build for each Bend version to fetch loader sources from its
+matching upstream release tag.
 
 ```sh
-just build       # native generated/compiler/blotc
+just build       # install ~/.local/bin/blot
 just guide       # compact language reference for people and LLMs
 just demo        # execute the generic-prelude Wasm example
 just demo-host   # execute an explicit host callback and source effect adapter
@@ -52,17 +71,18 @@ just install     # install Blot highlighting in Helix
 deno task blot check examples/generic_effects.blot
 ```
 
-Deno supplies parsing and a persistent subprocess transport; Bend owns lowering,
-inference, const evaluation, and Wasm generation. Native failures never silently
-fall back to JavaScript. The reference JavaScript compiler exists for parity
-checks. Builds run `bend PROOF.bend`; important rules live in `LAWS.bend`. The
-build uses Bend's generated C and JavaScript without rewriting either output.
-See [compiler details](compiler/README.md). Suspected upstream problems are
-tracked in [BUGS.md](BUGS.md); posting them requires the owner's approval.
+Deno supplies parsing and a persistent subprocess transport; OxCaml owns
+lowering, inference, const evaluation, and Wasm generation. Native failures
+never silently fall back to JavaScript. The reference JavaScript compiler exists
+for parity checks. The Bend backend build runs `bend PROOF.bend` and uses Bend's
+generated C and JavaScript without rewriting either output; its rules live in
+`LAWS.bend`. See [compiler details](compiler/README.md). Suspected upstream
+problems are tracked in [BUGS.md](BUGS.md); posting them requires the owner's
+approval.
 
 Read [the CLI guide](compiler/guide.md) for the executable syntax and language
-rules in one pass, or print it with `deno task blot guide` without rebuilding.
-Start with [the executable prelude example](examples/prelude.blot),
+rules in one pass, or print it with `blot guide`. Start with
+[the executable prelude example](examples/prelude.blot),
 [generic effects and descriptors](examples/generic_effects.blot), and
 [explicit host callbacks](examples/host_io.blot). The
 [array example](examples/arrays.blot) imports an ordinary source library and

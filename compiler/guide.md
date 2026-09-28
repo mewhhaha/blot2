@@ -9,11 +9,10 @@ code block below is an independent, compilable module.
 From the Blot repository:
 
 ```sh
-just guide                                  # this reference; no compiler build
-deno task blot guide                        # same CLI command
-just build                                 # build the native compiler
-deno task blot check examples/syntax.blot    # check a source project
-deno task blot build examples/syntax.blot build/example.wasm
+just build                                  # build and install ~/.local/bin/blot
+blot guide                                  # this reference
+blot check examples/syntax.blot             # check a source project
+blot build examples/syntax.blot build/example.wasm
 ```
 
 Blot compiles to Wasm; a host loads the module and calls its entrypoints, the

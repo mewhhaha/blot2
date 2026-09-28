@@ -165,7 +165,7 @@ export class SourceError extends Error {
     readonly code: string,
     message: string,
     readonly start: number,
-    readonly end = start,
+    readonly end: number = start,
     readonly origin?: { readonly filename: string; readonly source: string },
   ) {
     super(message);

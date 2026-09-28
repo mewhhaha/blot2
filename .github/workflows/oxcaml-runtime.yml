@@ -2,9 +2,25 @@ name: OxCaml standalone
 on:
   push:
     branches: [rebuild/oxcaml-compiler]
-    paths: ['compiler/**', 'std/**', 'generated/wasm/**', 'deno.json', 'deno.lock', 'Justfile', '.github/workflows/oxcaml-runtime.yml']
+    paths: [
+      "compiler/**",
+      "std/**",
+      "generated/wasm/**",
+      "deno.json",
+      "deno.lock",
+      "Justfile",
+      ".github/workflows/oxcaml-runtime.yml",
+    ]
   pull_request:
-    paths: ['compiler/**', 'std/**', 'generated/wasm/**', 'deno.json', 'deno.lock', 'Justfile', '.github/workflows/oxcaml-runtime.yml']
+    paths: [
+      "compiler/**",
+      "std/**",
+      "generated/wasm/**",
+      "deno.json",
+      "deno.lock",
+      "Justfile",
+      ".github/workflows/oxcaml-runtime.yml",
+    ]
   workflow_dispatch:
 permissions:
   contents: read

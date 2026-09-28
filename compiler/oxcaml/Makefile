@@ -23,10 +23,12 @@ all: $(BUILD)/blotc
 # Bend build remains available; this target requires no Bend or JS compiler.
 install: all
 	@mkdir -p ../../generated/compiler
-	@set -e; temporary=$$(mktemp ../../generated/compiler/.blotc-oxcaml-XXXXXX); \
+	@set -e; for destination in blotc-oxcaml blotc; do \
+	  temporary=$$(mktemp ../../generated/compiler/.blotc-oxcaml-XXXXXX); \
 	  trap 'rm -f "$$temporary"' EXIT; \
 	  cp $(BUILD)/blotc "$$temporary"; chmod 755 "$$temporary"; \
-	  mv "$$temporary" ../../generated/compiler/blotc
+	  mv "$$temporary" "../../generated/compiler/$$destination"; \
+	done
 
 bootstrap:
 	python3 bootstrap/port.py
