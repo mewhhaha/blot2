@@ -10,6 +10,7 @@ on:
       - 'generated/wasm/**'
       - 'deno.json'
       - 'deno.lock'
+      - '.npmrc'
       - '.github/workflows/zig.yml'
   workflow_dispatch:
 
