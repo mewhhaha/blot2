@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'tools'))
 from generate import Generator, Node, PRIMITIVES, free, bound, walk
+from partition import CODEGEN, GROUPS, select
 
 
 def name(value):
@@ -59,6 +60,31 @@ class GenerationTests(unittest.TestCase):
     def test_differential_config_uses_the_same_package_registry(self):
         root = Path(__file__).resolve().parent.parent
         self.assertEqual((root / '.npmrc').read_text(), (root / 'zig/.npmrc').read_text())
+
+    def test_compatibility_partition_preserves_every_file_and_worker_case(self):
+        root = Path(__file__).resolve().parent.parent
+        files = [p.relative_to(root).as_posix() for p in (root / 'compiler').glob('*.test.ts')]
+        regular, patterns = [], []
+        for group in GROUPS:
+            selected, pattern = select(files, group)
+            self.assertTrue(selected)
+            if pattern:
+                self.assertEqual(selected, [CODEGEN])
+                patterns.append(pattern)
+            else:
+                regular.extend(selected)
+        self.assertEqual(len(regular), len(set(regular)))
+        self.assertEqual(set(regular), set(files) - {CODEGEN})
+        import re
+        for workers in (1, 2, 4, 8):
+            name = f'native {workers}-thread codegen compiles only independent cache misses'
+            self.assertEqual(sum(bool(re.fullmatch(pattern[1:-1], name)) for pattern in patterns), 1)
+        self.assertEqual(len(patterns), 4)
+
+    def test_compatibility_partition_rejects_invalid_or_incomplete_inventories(self):
+        for files, group in [([], '0'), ([CODEGEN, CODEGEN], '0'), ([CODEGEN], 'codegen-16')]:
+            with self.subTest(files=files, group=group), self.assertRaises(ValueError):
+                select(files, group)
 
     def test_generated_semantics_are_native_and_have_bounded_arity(self):
         import json

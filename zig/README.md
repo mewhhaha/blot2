@@ -90,10 +90,14 @@ excludes only generated code and build outputs. Its ownership contract
 identifies arena allocators; three local directives explain temporary
 arena-owned buffers.
 
-Both Debug and ReleaseSafe run the complete compatibility gates below, split
-into four disjoint test-file shards per mode. The native and differential suites
-run in independent jobs, so neither pass consumes the other's timeout. No test
-files are excluded from either pass. The native APIs and test adapter are also
+Both Debug and ReleaseSafe run the complete compatibility gates below. Four
+disjoint file shards cover the regular tests; the four large native-codegen
+worker-count cases run in independent jobs rather than consuming one shard's
+timeout. The original test source and workloads are unchanged. An inventory
+check reads the actual registered names, so new or renamed cases cannot silently
+fall outside the filters. Partition regressions also verify complete file and
+worker-count coverage. The native and differential suites run independently. No
+test is removed from either pass. The native APIs and test adapter are also
 type-checked. The optimized binary also runs protocol regressions under a
 baseline QEMU x86-64 CPU. This covers valid analysis, deterministic Wasm
 emission, retained sessions, diagnostic recovery, malformed frames and thread

@@ -142,8 +142,8 @@ jobs:
           deno-version: v2.5.2
       - name: Type-check the native APIs and differential adapter
         run: |
-          deno check compiler/cli.ts compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts
-          deno fmt --check zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts zig/differential.json zig/README.md zig/zig-analyzer.json
+          deno check compiler/cli.ts compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts zig/check_test_partition.ts
+          deno fmt --check zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts zig/check_test_partition.ts zig/differential.json zig/README.md zig/zig-analyzer.json
 
   compatibility:
     needs: [native, reference]
@@ -153,7 +153,7 @@ jobs:
       fail-fast: false
       matrix:
         mode: [Debug, ReleaseSafe]
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, codegen-1, codegen-2, codegen-4, codegen-8]
         # Keep both complete passes, but do not serialize them in one job.
         suite: [native, differential]
     steps:
@@ -183,25 +183,26 @@ jobs:
         with:
           name: zig-reference-modules
           path: generated/compiler
-      - name: Select a disjoint shard of the complete retained suite
+      - name: Verify and select a complete, non-overlapping test partition
         run: |
-          tests=(compiler/*.test.ts)
-          selected=()
-          for ((i = ${{ matrix.shard }}; i < ${#tests[@]}; i += 4)); do
-            selected+=("${tests[i]}")
-          done
-          test "${#selected[@]}" -gt 0
-          printf '%s\n' "${selected[@]}" | tee build/zig-validation/test-files.txt
+          deno run --cached-only --no-check --allow-read=compiler,generated,std zig/check_test_partition.ts
+          python3 zig/tools/partition.py '${{ matrix.shard }}'
       - name: Run the retained suite shard with the Zig native process
         if: matrix.suite == 'native'
         run: |
           mapfile -t tests < build/zig-validation/test-files.txt
-          deno test --cached-only --no-check --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid "${tests[@]}" 2>&1 | tee build/zig-validation/native.log
+          filters=()
+          filter=$(cat build/zig-validation/test-filter.txt)
+          if [[ -n "$filter" ]]; then filters=(--filter "$filter"); fi
+          deno test --cached-only --no-check --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid "${filters[@]}" "${tests[@]}" 2>&1 | tee build/zig-validation/native.log
       - name: Re-run source tests against both backends and execute Zig Wasm
         if: matrix.suite == 'differential'
         run: |
           mapfile -t tests < build/zig-validation/test-files.txt
-          deno test --cached-only --no-check --config=zig/differential.json --allow-env=NODE_V8_COVERAGE --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid "${tests[@]}" 2>&1 | tee build/zig-validation/differential.log
+          filters=()
+          filter=$(cat build/zig-validation/test-filter.txt)
+          if [[ -n "$filter" ]]; then filters=(--filter "$filter"); fi
+          deno test --cached-only --no-check --config=zig/differential.json --allow-env=NODE_V8_COVERAGE --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid "${filters[@]}" "${tests[@]}" 2>&1 | tee build/zig-validation/differential.log
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
