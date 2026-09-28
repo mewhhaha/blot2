@@ -967,3 +967,15 @@ def Laws.saturated_compaction_loop_is_not_inlineable(state, initial, body):
 
 def Laws.saturated_counted_loop_is_not_inlineable(index, start, end, state, initial, body):
   {==}
+
+def Laws.scalar_u32_result_is_pointer_free(value):
+  {==}
+
+def Laws.unknown_local_result_keeps_conservative_tracing(name):
+  {==}
+
+def Laws.closure_result_keeps_conservative_tracing(key, captures):
+  {==}
+
+def Laws.projected_array_element_keeps_conservative_tracing(array, index):
+  {==}

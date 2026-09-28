@@ -1597,3 +1597,23 @@ law saturated_counted_loop_is_not_inlineable:
   for initial: M.Expr
   for body: M.Expr
   {Saturation.body_cost(256n, [M.ForExpr{index, start, end, state, initial, body}], 0n) == 97n : Nat}
+
+# Collector layout hints are justified by expression constructors, never by
+# pointer-looking bits or the names of erased local bindings.
+law scalar_u32_result_is_pointer_free:
+  for value: U32
+  {Wasm.scalar_word(Codegen.U32Expr{value}) == True{} : Bool}
+
+law unknown_local_result_keeps_conservative_tracing:
+  for name: String
+  {Wasm.scalar_word(Codegen.LocalExpr{name}) == False{} : Bool}
+
+law closure_result_keeps_conservative_tracing:
+  for key: String
+  for captures: List<&2, String>
+  {Wasm.scalar_word(Codegen.ClosureExpr{key, captures}) == False{} : Bool}
+
+law projected_array_element_keeps_conservative_tracing:
+  for array: Codegen.Expr
+  for index: Codegen.Expr
+  {Wasm.scalar_word(Codegen.ArrayGetExpr{array, index}) == False{} : Bool}

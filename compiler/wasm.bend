@@ -641,11 +641,49 @@ def checked_array_size(allowed: Bool, count: Nat) -> Result<&2, &2, M.Diagnostic
 def array_size(+count: Nat) -> Result<&2, &2, M.Diagnostic, U32>:
   checked_array_size(Nat.is_lt(count, U32.to_nat(4194304)), count)
 
-def array_code(elements: Code, +count: Nat, size: U32, +first: Nat) -> Code:
+# This is a sufficient, not exhaustive, proof of a non-pointer result. Never
+# guess from the bits of a Local, Constant, projection, call or array element.
+# The checked array element type is homogeneous, so later valid updates cannot
+# put a reference into an array created from one of these scalar expressions.
+def scalar_word(expression: I.Expr) -> Bool:
+  match expression:
+    case I.UnitExpr{}:
+      True{}
+    case I.U32Expr{value}:
+      True{}
+    case I.F32Expr{value}:
+      True{}
+    case I.BoolExpr{value}:
+      True{}
+    case I.ScalarExpr{operator, left, right}:
+      True{}
+    case I.UnaryExpr{operator, value}:
+      True{}
+    case I.ArrayLengthExpr{array}:
+      True{}
+    case _:
+      False{}
+
+# Checking every element also keeps the low-level instruction API conservative:
+# it does not need to assume that a hand-built ArrayExpr was type checked.
+def scalar_words(elements: List<&2, I.Expr>) -> Bool:
+  match elements:
+    case Nil{}:
+      True{}
+    case head <> tail:
+      Bool.and(scalar_word(head), scalar_words(tail))
+
+# Only use this immediately after allocating a fresh dynamic object. Constants
+# and host-provided pointers need not have this private arena header.
+def scalar_array_header(leaf: Bool, pointer: Nat) -> List<&2, U32>:
+  Bool.pick(List<&2, U32>, leaf, join([local_get(pointer), [65, 8, 107, 65, 2, 54, 2, 0]]), Nil{})
+
+def array_code(elements: Code, +count: Nat, size: U32, +first: Nat, leaf: Bool) -> Code:
   Code{fragments, locals} = elements
   +pointer = Nat.add(first, count)
   Code{fragments_join([fragments, [Bytes{i32_constant(size)}, Allocate{}, Bytes{join([
     34 <> unsigned_leb(pointer), i32_constant(U32.from_nat(count)), [54, 2, 0],
+    scalar_array_header(leaf, pointer),
     element_stores(count, pointer, first, 4n, Nil{})
   ])}]]), Nat.max(locals, 1n+pointer)}
 
@@ -662,7 +700,7 @@ def runtime_memory_max_pages() -> Nat:
 # memory.fill repeats bytes, not words; copying the seed preserves every U32,
 # F32 and reference bit pattern. Each copy is bounded by the remaining count.
 # Tiny fills retain a short store loop without the bulk-copy setup cost.
-def array_fill_code(+first: Nat) -> Code:
+def array_fill_code(+first: Nat, leaf: Bool) -> Code:
   +value = {1n+first : Nat}
   +pointer = {2n+first : Nat}
   +index = {3n+first : Nat}
@@ -675,6 +713,7 @@ def array_fill_code(+first: Nat) -> Code:
     Allocate{},
     Bytes{join([
       34 <> unsigned_leb(pointer), local_get(first), [54, 2, 0],
+      scalar_array_header(leaf, pointer),
       [65, 0], 33 <> unsigned_leb(index), [2, 64, 3, 64],
       local_get(index), local_get(first), [79, 13, 1],
       local_get(index), [65, 32, 79, 13, 1],
@@ -724,7 +763,7 @@ def array_get_code(+first: Nat) -> Code:
 
 # Bounds precede address arithmetic. The copied length is checked before the
 # byte count is formed, independently of the allocator's end-address checks.
-def array_set_code(+first: Nat) -> Code:
+def array_set_code(+first: Nat, leaf: Bool) -> Code:
   +index = {1n+first : Nat}
   +value = {2n+first : Nat}
   +length = {3n+first : Nat}
@@ -739,6 +778,7 @@ def array_set_code(+first: Nat) -> Code:
     Allocate{},
     Bytes{join([
       33 <> unsigned_leb(pointer),
+      scalar_array_header(leaf, pointer),
       local_get(pointer), local_get(first), local_get(length), [65, 1, 106, 65, 4, 108, 252, 10, 0, 0],
       local_get(pointer), local_get(index), [65, 4, 108, 106], local_get(value), [54, 2, 4],
       local_get(pointer)
@@ -931,7 +971,7 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             size : U32 <- array_size(count)
             values : Code <- emit_expr(rest, ScrutineesWork{elements, first, Nil{}, 0n}, reserve(context, 1n+count))
-            return array_code(values, count, size, first)
+            return array_code(values, count, size, first, scalar_words(elements))
         case ExpressionWork{I.ForExpr{index, start, end, state, initial, body}}:
           +first = context_next(context)
           +nested = control(control(bind(bind(reserve(context, 3n), index, Location{first, Nil{}}), state, Location{2n+first, Nil{}}), None{}), None{})
@@ -951,21 +991,21 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             operands : Code <- emit_expr(rest, ScrutineesWork{[count, generator], first, Nil{}, 0n}, reserve(context, 4n))
             return append_code(operands, array_generate_code(first, context_provider(context)), Nil{}, Nil{})
-        case ExpressionWork{I.ArrayFillExpr{count, value}}:
+        case ExpressionWork{I.ArrayFillExpr{count, +value}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
             operands : Code <- emit_expr(rest, ScrutineesWork{[count, value], first, Nil{}, 0n}, reserve(context, 5n))
-            return append_code(operands, array_fill_code(first), Nil{}, Nil{})
+            return append_code(operands, array_fill_code(first, scalar_word(value)), Nil{}, Nil{})
         case ExpressionWork{I.ArrayGetExpr{array, index}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
             operands : Code <- emit_expr(rest, ScrutineesWork{[array, index], first, Nil{}, 0n}, reserve(context, 2n))
             return append_code(operands, array_get_code(first), Nil{}, Nil{})
-        case ExpressionWork{I.ArraySetExpr{array, index, value}}:
+        case ExpressionWork{I.ArraySetExpr{array, index, +value}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
             operands : Code <- emit_expr(rest, ScrutineesWork{[array, index, value], first, Nil{}, 0n}, reserve(context, 5n))
-            return append_code(operands, array_set_code(first), Nil{}, Nil{})
+            return append_code(operands, array_set_code(first, scalar_word(value)), Nil{}, Nil{})
         case ExpressionWork{I.ArrayReuseExpr{array, index, value}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:

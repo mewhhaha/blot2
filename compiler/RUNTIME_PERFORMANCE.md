@@ -91,6 +91,35 @@ normalization and queue draining. Compile/build/startup time and rendering are
 not included. Small and large inputs are both measured to reveal crossover
 costs. These microbenchmarks do not establish an application-wide speedup.
 
+## Pointer-free array tracing
+
+The arena now distinguishes its transient mark bit from a persistent
+pointer-free layout bit. Runtime numeric/boolean/unit literals, scalar primitive
+results and array lengths provide sufficient layout evidence for fresh array
+fills, literal arrays and checked homogeneous array updates. Unknown locals,
+projections, calls, nested arrays and closure values do not provide that
+evidence. They retain conservative tracing; no pointer classification is guessed
+from numeric bits. Static constants and host allocation headers are not changed.
+
+A marked leaf remains live but is not added to the trace work list. Sweeping
+preserves its layout bit, and allocating a reused block clears it before the new
+payload is installed. Pointerful objects still trace their children, including
+shared cycles and pinned pre-loop edges. Collection cadence, pinning watermarks
+and the guest ABI are unchanged. Scratch bitmap clearing uses a bounded
+`memory.fill` instead of a word-at-a-time loop.
+
+The readable WAT and its generated Bend encoding are checked together. Tests
+cover scalar/pointer collisions, layout-bit reset on reuse, mixed-graph exact
+reachability, negative-zero words and long-lived scalar/reference-array loops.
+Four constructor-level laws protect the conservative classification boundary;
+they are not a formal proof of the complete garbage collector.
+
+`compiler/gc_bench.ts` compares complete loop invocations against a separately
+built previous PR head (`4bfca4a`), isolating collection from the earlier fill
+and host-copy changes. It records eleven alternating samples, Wasm sizes,
+checksums and memory high-water marks. Unknown-layout and allocation-free
+controls remain in the report. Compilation and startup are outside the timer.
+
 ## Remaining boundaries
 
 The emitted arena's allocation and conservative collection costs, persistent
