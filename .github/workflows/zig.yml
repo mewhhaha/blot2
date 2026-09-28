@@ -16,6 +16,11 @@ on:
 permissions:
   contents: read
 
+# Explicit bash enables -e -o pipefail. A failing test must not be hidden by tee.
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: zig-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -33,7 +38,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Install verified Zig 0.16.0
-        shell: bash
         run: |
           set -euo pipefail
           cd "$RUNNER_TEMP"
@@ -59,7 +63,6 @@ jobs:
       - name: Check handwritten Zig with zig-analyzer
         if: matrix.mode == 'Debug'
         working-directory: zig
-        shell: bash
         run: |
           set -euo pipefail
           curl --fail --location --retry 3 --output "$RUNNER_TEMP/zig-analyzer.tar.xz" https://github.com/mewhhaha/zig-analyzer/releases/download/v0.16.0-4/zig-analyzer-0.16.0-4-x86_64-linux.tar.xz
@@ -76,6 +79,19 @@ jobs:
             zig/src/generated/
           retention-days: 7
           if-no-files-found: error
+      - name: Package exact inputs for offline reproduction
+        if: matrix.mode == 'Debug'
+        run: git archive --format=tar.gz --output="$RUNNER_TEMP/source.tar.gz" HEAD
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: matrix.mode == 'Debug'
+        with:
+          name: zig-reproduction-inputs
+          path: |
+            ${{ runner.temp }}/source.tar.gz
+            ${{ runner.temp }}/zig.tar.xz
+            ${{ runner.temp }}/zig-analyzer.tar.xz
+          retention-days: 1
+          if-no-files-found: error
 
   reference:
     runs-on: ubuntu-24.04
@@ -90,7 +106,6 @@ jobs:
         with:
           bun-version: '1.2.22'
       - name: Install checksum-verified reference Bend 2.0.32
-        shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/bend-release"
@@ -107,7 +122,6 @@ jobs:
           bend guide > "$RUNNER_TEMP/bend-guide.txt"
           bend PROOF.bend
       - name: Build unchanged JavaScript reference modules
-        shell: bash
         run: |
           set -euo pipefail
           mkdir -p generated/compiler/bend-2.0.32
@@ -132,6 +146,12 @@ jobs:
     needs: [native, reference]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [Debug, ReleaseSafe]
+    env:
+      DENO_DIR: ${{ runner.temp }}/deno-cache
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -141,7 +161,7 @@ jobs:
           deno-version: v2.5.2
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: blotc-zig-ReleaseSafe
+          name: blotc-zig-${{ matrix.mode }}
           path: zig
       - name: Prepare native frontend without a Bend build
         run: |
@@ -152,7 +172,7 @@ jobs:
       - name: Verify native APIs before reference modules exist
         run: |
           test ! -e generated/compiler/compiler.js
-          deno test --cached-only --no-check --allow-read --allow-run=zig/zig-out/bin/blotc-zig zig/standalone.test.ts | tee build/zig-validation/standalone.log
+          deno test --cached-only --no-check --allow-read --allow-run=zig/zig-out/bin/blotc-zig zig/standalone.test.ts 2>&1 | tee build/zig-validation/standalone.log
           deno task blot:zig check examples/syntax.blot
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -160,14 +180,28 @@ jobs:
           path: generated/compiler
       - name: Run the complete retained suite with the Zig native process
         run: |
-          deno test --cached-only --no-check --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts | tee build/zig-validation/native.log
+          deno test --cached-only --no-check --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts 2>&1 | tee build/zig-validation/native.log
       - name: Re-run source tests against both backends and execute Zig Wasm
         run: |
-          deno test --cached-only --no-check --config=zig/differential.json --allow-env=NODE_V8_COVERAGE --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts | tee build/zig-validation/differential.log
+          deno test --cached-only --no-check --config=zig/differential.json --allow-env=NODE_V8_COVERAGE --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts 2>&1 | tee build/zig-validation/differential.log
+      - name: Package frontend inputs for offline reproduction
+        if: always() && matrix.mode == 'Debug'
+        run: |
+          cp "$(command -v deno)" "$RUNNER_TEMP/deno"
+          tar -czf "$RUNNER_TEMP/deno-cache.tar.gz" -C "$DENO_DIR" .
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && matrix.mode == 'Debug'
+        with:
+          name: zig-frontend-reproduction-inputs
+          path: |
+            ${{ runner.temp }}/deno
+            ${{ runner.temp }}/deno-cache.tar.gz
+          retention-days: 1
+          if-no-files-found: error
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: zig-compatibility-results
+          name: zig-compatibility-results-${{ matrix.mode }}
           path: build/zig-validation/
           retention-days: 7
           if-no-files-found: error

@@ -1,7 +1,9 @@
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
+    // Artifacts run on machines other than the build host. Do not silently
+    // require that host's optional CPU instructions; -Dcpu=native opts in.
+    const target = b.standardTargetOptions(.{ .default_target = .{ .cpu_model = .baseline } });
     const optimize = b.standardOptimizeOption(.{});
     // Transitional source migration; generated output is ordinary native Zig.
     // Python reads the retained algorithms but never invokes the Bend compiler.
