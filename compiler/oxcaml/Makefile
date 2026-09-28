@@ -8,7 +8,7 @@ PARALLEL := $(shell test "$(OCAML_MAJOR)" -ge 5 && echo domains || echo serial)
 OCAMLDEP ?= $(if $(filter 4,$(OCAML_MAJOR)),ocamldep,$(OCAMLOPT) -depend)
 MODULES := $(shell cat core/modules.txt 2>/dev/null)
 NATIVE := native_runtime native_parallel base $(MODULES) driver
-TESTS := test_bytes test_runtime test_names test_parallel $(if $(filter domains,$(PARALLEL)),test_domains)
+TESTS := test_bytes test_runtime test_names test_memory test_stream test_parallel $(if $(filter domains,$(PARALLEL)),test_domains test_scheduler)
 SOURCES := $(addprefix $(BUILD)/,$(addsuffix .ml,$(NATIVE) wasm_bytes $(TESTS) bench_names))
 OBJECTS := $(addprefix $(BUILD)/,$(addsuffix .cmx,$(NATIVE)))
 CONFIG := $(BUILD)/.configuration
@@ -85,6 +85,12 @@ $(BUILD)/test_runtime: $(addprefix $(BUILD)/,base.cmx ox_model.cmx ox_numeric_li
 $(BUILD)/test_names: $(addprefix $(BUILD)/,base.cmx ox_model.cmx test_names.cmx)
 	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -o test_names $(notdir $^)
 
+$(BUILD)/test_memory: $(filter-out $(BUILD)/driver.cmx,$(OBJECTS)) $(BUILD)/runtime_stubs.o $(BUILD)/test_memory.cmx
+	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o test_memory unix.cmxa threads.cmxa $(notdir $^)
+
+$(BUILD)/test_stream: $(filter-out $(BUILD)/driver.cmx,$(OBJECTS)) $(BUILD)/runtime_stubs.o $(BUILD)/test_stream.cmx
+	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o test_stream unix.cmxa threads.cmxa $(notdir $^)
+
 $(BUILD)/bench_names: $(addprefix $(BUILD)/,base.cmx ox_model.cmx bench_names.cmx)
 	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o bench_names unix.cmxa $(notdir $^)
 
@@ -94,6 +100,9 @@ bench-names: $(BUILD)/bench_names
 $(BUILD)/test_parallel: $(BUILD)/native_parallel.cmx $(BUILD)/test_parallel.cmx
 	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o test_parallel unix.cmxa threads.cmxa $(notdir $^)
 
+$(BUILD)/test_scheduler: $(BUILD)/native_parallel.cmx $(BUILD)/test_scheduler.cmx
+	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o test_scheduler unix.cmxa threads.cmxa $(notdir $^)
+
 $(BUILD)/test_domains: $(BUILD)/native_parallel.cmx $(BUILD)/test_domains.cmx
 	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o test_domains unix.cmxa threads.cmxa $(notdir $^)
 
@@ -101,8 +110,13 @@ test: all $(addprefix $(BUILD)/,$(TESTS))
 	$(BUILD)/test_bytes
 	$(BUILD)/test_runtime
 	$(BUILD)/test_names
+	$(BUILD)/test_memory
+	$(BUILD)/test_stream
 	$(BUILD)/test_parallel $(PARALLEL)
 	$(if $(filter domains,$(PARALLEL)),$(BUILD)/test_domains,true)
+	$(if $(filter domains,$(PARALLEL)),python3 test_scheduler.py $(BUILD)/test_scheduler,true)
+	python3 test_bootstrap.py
+	python3 test_bench_frames.py
 	python3 test_transport.py $(BUILD)/blotc
 
 test-build:

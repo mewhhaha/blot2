@@ -67,8 +67,10 @@ independent modules concurrently; keep memory available for the larger modules.
 `core/` contains 70 native modules, initially migrated from 3,386 functions and
 436 algebraic types. `bootstrap/` records the fail-closed migration and SHA-256
 provenance from `832e92be7ef227be202771d582d4cdd16967561f`. Normal builds never
-regenerate this code. Review differences before running `make bootstrap` over
-hand-edited native changes. No Bend-generated C or JavaScript is patched.
+regenerate this code. The migration refuses to overwrite differing native files,
+before writing any output. Reproduce into a new directory with
+`python3 compiler/oxcaml/bootstrap/port.py --output /tmp/blot-port` and review
+the differences. No Bend-generated C or JavaScript is patched.
 
 `base.ml` supplies Unicode code-point strings, 32-bit scalars, Patricia maps,
 and the Base operations used by the compiler. Native transport implements
@@ -84,6 +86,30 @@ claim of mode-checked race freedom. OCaml 4.13 builds use a serial portability
 backend. Linux priority restoration is best-effort; `--inherit-priority` keeps
 the launcher's scheduling policy.
 
+## Memory representation
+
+The 64-bit native runtime stores character words as immediate integers. Exact
+U32 bits, code-point order, Unicode validation, and the version-13 wire format
+are unchanged; F32 values still retain their Int32 bits. U32 comparisons use
+non-allocating machine-integer arithmetic, checked with `[@zero_alloc strict]`.
+
+Requests stay in their packed byte buffer instead of expanding to boxed word
+arrays. String decoding validates forward before constructing the result
+backward, preserving diagnostic precedence without per-character cursors. No
+request buffer is retained by the published syntax or incremental session.
+Responses validate their complete output plan before emitting any frame prefix,
+then write through a private buffer capped at 64 KiB.
+
+OxCaml uses tail-modulo-constructor recursion for string append and the native
+list append, allocating one result spine. OCaml 4 retains a stack-safe fallback.
+String joins are right-associated; map and set traversals avoid temporary
+key/value-pair lists. These are internal changes, not changes to source values,
+Wasm, host APIs, or the installer.
+
+See [the experiment report](MEMORY_CONCURRENCY.md) for measurements and rejected
+scheduler experiments. The original FIFO worker pool is retained; adding more
+concurrency machinery did not establish a repeatable speedup.
+
 ## Validation
 
 ```sh
@@ -95,9 +121,10 @@ deno task test:compiler:oxcaml:parity
 
 The native unit gate includes 10 byte-encoding checks, 3,726 Base/runtime
 checks, 6,614 native name/allocation checks, 177 fork/join checks, a
-concurrent-domain rendezvous and exception-join check, 6 subprocess framing
-checks, and 8 incremental-build checks. Python 3 is needed for the test drivers,
-not for ordinary builds.
+concurrent-domain rendezvous and exception-join check, 39,283 memory/scalar
+checks, 1,174 response-stream checks, 564 scheduler stress checks, 3 migration
+overwrite checks, 6 subprocess framing checks, and 8 incremental-build checks.
+Python 3 is needed for the test drivers, not for ordinary builds.
 
 `test_existing.py` discovers the existing compiler test files and script suites
 and runs them in an isolated checkout. Native tests select the OxCaml

@@ -30,7 +30,7 @@ and t_Request =
   | SessionRequest of t_Operation * int * int * Cst.t_Cst
   | SessionPatch of t_Operation * int * int * (Session.t_Declaration) list
 and t_Cursor =
-  | Cursor of (int32) array * int * int * (Base.text) array * int32
+  | Cursor of bytes * int * int * (Base.text) array * int32
 and 'a t_Parsed =
   | Parsed of 'a * t_Cursor
 and t_ScanFailure =
@@ -129,19 +129,18 @@ fun v_failure ->
 | (Rejected (v_offset, v_message)) ->
 (f_diagnostic (v_offset) (v_message)))
 and (* native_request.bend:45 *)
-f_word_read : ((int32) array * int32) -> int -> int -> (Base.text) array -> int32 -> (t_ScanFailure, (int32) t_Parsed) Base.result_ =
+f_word_read : (bytes * int32) -> int -> int -> (Base.text) array -> int32 -> (t_ScanFailure, (int32) t_Parsed) Base.result_ =
 fun v_read v_offset v_remaining v_strings v_string_count ->
 (let (v_words, v_value) = v_read in
 (Done ((Parsed (v_value, (Cursor (v_words, v_offset, v_remaining, v_strings, v_string_count)))))))
 and (* native_request.bend:49 *)
-f_word : t_Cursor -> Base.text -> (t_ScanFailure, (int32) t_Parsed) Base.result_ =
-fun v_cursor v_label ->
-(match v_cursor with
-| (Cursor (v_words, v_offset, 0, v_strings, v_string_count)) ->
-(Fail ((MissingWord (v_offset, v_label))))
-| (Cursor (v_words, v_offset, __nat_1, v_strings, v_string_count)) when __nat_1 >= 1 ->
-(let v_remaining = (__nat_1 - 1) in
-(f_word_read ((Base.array_get (v_words) ((Base.u32_from_nat (v_offset))))) ((Base.nat_add 1 v_offset)) (v_remaining) (v_strings) (v_string_count))))
+f_word : t_Cursor -> Base.text -> (t_ScanFailure, int32 t_Parsed) Base.result_ =
+fun cursor label ->
+  match cursor with
+  | Cursor (_, offset, 0, _, _) -> Fail (MissingWord (offset, label))
+  | Cursor (words, offset, remaining, strings, string_count) ->
+    let value = Bytes.get_int32_le words (offset * 4) in
+    Done (Parsed (value, Cursor (words, offset + 1, remaining - 1, strings, string_count)))
 and (* native_request.bend:56 *)
 f_natural_checked : bool -> int32 -> int32 -> t_Cursor -> int -> (t_ScanFailure, (int) t_Parsed) Base.result_ =
 fun v_valid v_low v_high v_cursor v_offset ->
@@ -176,10 +175,10 @@ f_natural : t_Cursor -> Base.text -> (t_ScanFailure, (int) t_Parsed) Base.result
 fun v_cursor v_label ->
 (f_natural_words (v_cursor) ((Base.string_append v_label s_4)) ((Base.string_append v_label s_5)))
 and (* native_request.bend:94 *)
-f_character_read : ((int32) array * int32) -> int -> int -> Base.text -> (Base.text) array -> int32 -> t_CharacterScan =
+f_character_read : (bytes * int32) -> int -> int -> Base.text -> (Base.text) array -> int32 -> t_CharacterScan =
 fun v_read v_offset v_remaining v_reversed v_strings v_string_count ->
 (let (v_words, v_code) = v_read in
-(CharacterScan ((Cursor (v_words, v_offset, v_remaining, v_strings, v_string_count)), (SCon ((Chr (v_code)), v_reversed)), (Base.bool_and ((Base.u32_is_le (v_code) (0x0010ffffl))) ((Base.bool_or ((Base.u32_is_lt (v_code) (0x0000d800l))) ((Base.u32_is_gt (v_code) (0x0000dfffl)))))))))
+(CharacterScan ((Cursor (v_words, v_offset, v_remaining, v_strings, v_string_count)), (SCon ((Base.char_of_u32 (v_code)), v_reversed)), (Base.bool_and ((Base.u32_is_le (v_code) (0x0010ffffl))) ((Base.bool_or ((Base.u32_is_lt (v_code) (0x0000d800l))) ((Base.u32_is_gt (v_code) (0x0000dfffl)))))))))
 and (* native_request.bend:98 *)
 f_scan_characters : int -> t_CharacterScan -> t_ScannedString =
 fun v_count v_scan ->
@@ -194,11 +193,41 @@ fun v_count v_scan ->
 | (__nat_3, (CharacterScan ((Cursor (v_words, v_offset, __nat_4, v_strings, v_string_count)), v_reversed, true))) when __nat_3 >= 1 && __nat_4 >= 1 ->
 (let v_rest = (__nat_3 - 1) in
 (let v_remaining = (__nat_4 - 1) in
-(f_scan_characters (v_rest) ((f_character_read ((Base.array_get (v_words) ((Base.u32_from_nat (v_offset))))) ((Base.nat_add 1 v_offset)) (v_remaining) (v_reversed) (v_strings) (v_string_count)))))))
+(f_scan_characters (v_rest) ((f_character_read ((v_words, Bytes.get_int32_le v_words (4 * v_offset))) ((Base.nat_add 1 v_offset)) (v_remaining) (v_reversed) (v_strings) (v_string_count)))))))
 and (* native_request.bend:109 *)
+(* Packed frame bytes are immutable after receive. Validate in source order
+   before constructing text backwards, preserving first-invalid/truncated
+   diagnostics without allocating a cursor and reversed string per character.
+   No frame storage escapes into the published syntax or incremental session. *)
 f_scan_string : int -> t_Cursor -> Base.text -> bool -> t_ScannedString =
-fun v_count v_cursor v_reversed v_valid ->
-(f_scan_characters (v_count) ((CharacterScan (v_cursor, v_reversed, v_valid))))
+fun count cursor reversed valid ->
+  let Cursor (words, offset, remaining, strings, string_count) = cursor in
+  if not valid then InvalidCharacter (max 0 (offset - 1))
+  else begin
+    let available = min count remaining in
+    let rec validate index =
+      if index = available then
+        if count > remaining then TruncatedString (offset + available)
+        else begin
+          let value = ref SNil in
+          for i = count - 1 downto 0 do
+            value := SCon (Base.char_of_u32 (Bytes.get_int32_le words ((offset + i) * 4)), !value)
+          done;
+          let value = match reversed with
+            | SNil -> !value
+            | _ -> Base.string_append (Base.string_reverse reversed) !value
+          in
+          CompleteString (value,
+            Cursor (words, offset + count, remaining - count, strings, string_count))
+        end
+      else
+        let code = Base.u32_to_nat (Bytes.get_int32_le words ((offset + index) * 4)) in
+        if code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)
+        then InvalidCharacter (offset + index)
+        else validate (index + 1)
+    in
+    validate 0
+  end
 and (* native_request.bend:112 *)
 f_scanned_string : t_ScannedString -> Base.text -> (t_ScanFailure, (Base.text) t_Parsed) Base.result_ =
 fun v_scanned v_label ->
@@ -222,7 +251,7 @@ f_scan_field : t_Cursor -> Base.text -> Base.text -> (t_ScanFailure, (Base.text)
 fun v_cursor v_length_label v_character_label ->
 (f_field_length ((f_word (v_cursor) (v_length_label))) (v_character_label))
 and (* native_request.bend:131 *)
-f_string_read : ((Base.text) array * Base.text) -> (int32) array -> int -> int -> int32 -> (t_ScanFailure, (Base.text) t_Parsed) Base.result_ =
+f_string_read : ((Base.text) array * Base.text) -> bytes -> int -> int -> int32 -> (t_ScanFailure, (Base.text) t_Parsed) Base.result_ =
 fun v_read v_words v_offset v_remaining v_string_count ->
 (let (v_strings, v_value) = v_read in
 (Done ((Parsed (v_value, (Cursor (v_words, v_offset, v_remaining, v_strings, v_string_count)))))))

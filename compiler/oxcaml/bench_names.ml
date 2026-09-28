@@ -31,13 +31,13 @@ let () =
     ["shared", left, left;
      "distinct-equal", left, right;
      "early-miss", left, text_of_utf8 "different";
-     "shared-tail", SCon (Chr 97l, left), SCon (Chr 97l, left)];
+     "shared-tail", SCon (Chr 97, left), SCon (Chr 97, left)];
   let n = min iterations 100000 in
   Gc.full_major ();
   let before = Gc.allocated_bytes () in
   let text = ref SNil in
   for i = 0 to n - 1 do
-    text := SCon (Chr (Int32.of_int (Sys.opaque_identity i land 0xffff)), !text)
+    text := SCon (Chr (Sys.opaque_identity i land 0xffff), !text)
   done;
   let allocated = Gc.allocated_bytes () -. before in
   Printf.printf "text construction: %.3f allocated bytes/character, length=%d\n%!"

@@ -14,9 +14,11 @@ let rec (* index.bend:5 *)
 f_character_bit : Base.char32 -> int -> bool =
 fun v_character v_offset ->
 (match (v_character, v_offset) with
-| ((Chr (v_value)), 0) ->
+| ((Chr (__char_v_value)), 0) ->
+let v_value = Int32.of_int __char_v_value in
 true
-| ((Chr (v_value)), __nat_1) when __nat_1 >= 1 ->
+| ((Chr (__char_v_value)), __nat_1) when __nat_1 >= 1 ->
+let v_value = Int32.of_int __char_v_value in
 (let v_bit = (__nat_1 - 1) in
 (Base.u32_is_ne ((Base.u32_and ((Base.u32_shrn (v_value) ((Base.nat_sub (31) (v_bit))))) (0x00000001l))) (0x00000000l))))
 and (* index.bend:12 *)

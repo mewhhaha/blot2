@@ -314,7 +314,8 @@ and (* source_arguments.bend:186 *)
 f_lowercase_name : Base.text -> bool =
 fun v_name ->
 (match v_name with
-| (SCon ((Chr (v_initial)), v_tail)) ->
+| (SCon ((Chr (__char_v_initial)), v_tail)) ->
+let v_initial = Int32.of_int __char_v_initial in
 (Base.bool_or ((Base.u32_is_eq (v_initial) (0x0000005fl))) ((Base.bool_and ((Base.u32_is_ge (v_initial) (0x00000061l))) ((Base.u32_is_le (v_initial) (0x0000007al))))))
 | SNil ->
 false)

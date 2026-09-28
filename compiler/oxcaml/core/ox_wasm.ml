@@ -373,7 +373,8 @@ fun v_text ->
 (match v_text with
 | SNil ->
 []
-| (SCon ((Chr (v_code)), v_tail)) ->
+| (SCon ((Chr (__char_v_code)), v_tail)) ->
+let v_code = Int32.of_int __char_v_code in
 (f_concat ((f_utf8_char (v_code))) ((f_utf8 (v_tail)))))
 and (* wasm.bend:253 *)
 f_sized : (int32) list -> (int32) list =

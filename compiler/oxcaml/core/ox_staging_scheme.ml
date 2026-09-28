@@ -229,7 +229,7 @@ and (* staging_scheme.bend:185 *)
 f_parse_digits : Base.text -> Base.text -> (t_CloneName) option =
 fun v_value v_reversed ->
 (match v_value with
-| (SCon ((Chr (0x0000005dl)), (SCon ((Chr (0x0000002el)), v_source)))) ->
+| (SCon ((Chr (0x0000005d)), (SCon ((Chr (0x0000002e)), v_source)))) ->
 (f_parsed_number ((Base.nat_read ((Base.string_reverse (v_reversed))))) (v_source))
 | (SCon (v_character, v_tail)) ->
 (f_parse_digits (v_tail) ((SCon (v_character, v_reversed))))

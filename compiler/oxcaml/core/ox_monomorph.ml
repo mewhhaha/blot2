@@ -1125,7 +1125,7 @@ and (* monomorph.bend:631 *)
 f_clone_origin : Base.text -> Base.text =
 fun v_name ->
 (match v_name with
-| (SCon ((Chr (0x0000005dl)), (SCon ((Chr (0x0000002el)), v_tail)))) ->
+| (SCon ((Chr (0x0000005d)), (SCon ((Chr (0x0000002e)), v_tail)))) ->
 v_tail
 | (SCon (v_character, v_tail)) ->
 (f_clone_origin (v_tail))

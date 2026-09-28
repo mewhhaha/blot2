@@ -20,12 +20,12 @@ let () =
   List.iter (fun a -> List.iter (fun b -> verify (text a) (text b) (a = b)) names) names;
   let suffix = text (String.make 8192 'x' ^ "😀") in
   verify suffix suffix true;
-  verify (SCon (Chr 97l, suffix)) (SCon (Chr 97l, suffix)) true;
-  verify (SCon (Chr 97l, suffix)) (SCon (Chr 98l, suffix)) false;
-  verify suffix (SCon (Chr 97l, suffix)) false;
+  verify (SCon (Chr 97, suffix)) (SCon (Chr 97, suffix)) true;
+  verify (SCon (Chr 97, suffix)) (SCon (Chr 98, suffix)) false;
+  verify suffix (SCon (Chr 97, suffix)) false;
   (* Even values constructed below the validating protocol retain exact bits. *)
   List.iter (fun x -> List.iter (fun y ->
-    verify (SCon (Chr x, SNil)) (SCon (Chr y, SNil)) (Int32.equal x y))
+    verify (SCon (char_of_u32 x, SNil)) (SCon (char_of_u32 y, SNil)) (Int32.equal x y))
     [0l; 0x10ffffl; Int32.max_int; Int32.min_int; Int32.minus_one])
     [0l; 0x10ffffl; Int32.max_int; Int32.min_int; Int32.minus_one];
   let prefix = String.make 200000 'p' in
@@ -60,7 +60,7 @@ let () =
   let before = Gc.allocated_bytes () in
   let constructed = ref SNil in
   for i = 0 to n - 1 do
-    constructed := SCon (Chr (Int32.of_int (Sys.opaque_identity i land 0xffff)), !constructed)
+    constructed := SCon (Chr (Sys.opaque_identity i land 0xffff), !constructed)
   done;
   let allocated = Gc.allocated_bytes () -. before in
   check "constructed text length" (string_length !constructed = n);

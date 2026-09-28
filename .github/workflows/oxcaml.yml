@@ -129,6 +129,10 @@ jobs:
           deno check compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts compiler/oxcaml/*.ts
       - name: Validate paired benchmark with identical executables
         run: deno run --allow-all compiler/oxcaml/bench_compare.ts compiler/oxcaml/_build/blotc compiler/oxcaml/_build/blotc parity-results/benchmark-smoke.json 1 1 reader_8
+      - name: Validate frozen-frame RSS harness without timing thresholds
+        run: |
+          deno run --allow-all compiler/oxcaml/memory_fixtures.ts parity-results/frames
+          python3 compiler/oxcaml/bench_frames.py compiler/oxcaml/_build/blotc compiler/oxcaml/_build/blotc parity-results/frames parity-results/rss-smoke.json --samples 1 --requests 1 --threads 1
       - name: Run unchanged compiler suites with source-level differential checks
         run: |
           mkdir -p parity-results

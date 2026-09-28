@@ -280,7 +280,7 @@ None)
 and (* entry_points.bend:201 *)
 f_split_member : Base.text -> (t_Split) option =
 fun v_name ->
-(f_split_reversed ((Base.list_reverse ((Base.string_split (v_name) ((Chr 0x0000002el)))))))
+(f_split_reversed ((Base.list_reverse ((Base.string_split (v_name) ((Chr 0x0000002e)))))))
 and (* entry_points.bend:204 *)
 f_add_implementation : (t_Split) option -> Base.text -> Base.set -> ((Base.text) list) Base.map -> ((Base.text) list) Base.map =
 fun v_split v_name v_owners v_index ->

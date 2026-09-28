@@ -18,7 +18,7 @@ let rec (* numeric_literal.bend:14 *)
 f_leading_zeroes : Base.text -> Base.text =
 fun v_digits ->
 (match v_digits with
-| (SCon ((Chr (0x00000030l)), v_tail)) ->
+| (SCon ((Chr (0x00000030)), v_tail)) ->
 (f_leading_zeroes (v_tail))
 | v_other ->
 v_other)
@@ -36,7 +36,8 @@ fun v_chars v_value v_limit ->
 (match v_chars with
 | SNil ->
 (Some (v_value))
-| (SCon ((Chr (v_code)), v_tail)) ->
+| (SCon ((Chr (__char_v_code)), v_tail)) ->
+let v_code = Int32.of_int __char_v_code in
 (match (Base.bool_pick ((Base.bool_and ((Base.u32_is_ge (v_code) (0x00000030l))) ((Base.u32_is_le (v_code) (0x00000039l))))) ((Some (()))) (None)) with
 | None -> None
 | Some v_valid ->
@@ -47,12 +48,12 @@ fun v_chars v_limit ->
 (match v_chars with
 | SNil ->
 None
-| (SCon ((Chr (0x0000002dl)), v_tail)) ->
+| (SCon ((Chr (0x0000002d)), v_tail)) ->
 (match (f_exponent_digits (v_tail) (0) (v_limit)) with
 | None -> None
 | Some v_value ->
 (Some ((Exponent (0, v_value)))))
-| (SCon ((Chr (0x0000002bl)), v_tail)) ->
+| (SCon ((Chr (0x0000002b)), v_tail)) ->
 (match (f_exponent_digits (v_tail) (0) (v_limit)) with
 | None -> None
 | Some v_value ->
@@ -68,24 +69,25 @@ fun v_chars v_reversed v_fractional v_point v_limit ->
 (match v_chars with
 | SNil ->
 (Some ((f_decimal ((f_leading_zeroes ((Base.string_reverse (v_reversed))))) (v_fractional) ((Exponent (0, 0))))))
-| (SCon ((Chr (0x0000002el)), v_tail)) ->
+| (SCon ((Chr (0x0000002e)), v_tail)) ->
 (f_significand (v_tail) (v_reversed) (v_fractional) (true) (v_limit))
-| (SCon ((Chr (0x00000065l)), v_tail)) ->
+| (SCon ((Chr (0x00000065)), v_tail)) ->
 (match (f_exponent (v_tail) (v_limit)) with
 | None -> None
 | Some v_scale ->
 (Some ((f_decimal ((f_leading_zeroes ((Base.string_reverse (v_reversed))))) (v_fractional) (v_scale)))))
-| (SCon ((Chr (0x00000045l)), v_tail)) ->
+| (SCon ((Chr (0x00000045)), v_tail)) ->
 (match (f_exponent (v_tail) (v_limit)) with
 | None -> None
 | Some v_scale ->
 (Some ((f_decimal ((f_leading_zeroes ((Base.string_reverse (v_reversed))))) (v_fractional) (v_scale)))))
-| (SCon ((Chr (v_code)), v_tail)) ->
+| (SCon ((Chr (__char_v_code)), v_tail)) ->
+let v_code = Int32.of_int __char_v_code in
 (let v_number = v_code in
 (match (Base.bool_pick ((Base.bool_and ((Base.u32_is_ge (v_number) (0x00000030l))) ((Base.u32_is_le (v_number) (0x00000039l))))) ((Some (()))) (None)) with
 | None -> None
 | Some v_valid ->
-(f_significand (v_tail) ((SCon ((Chr (v_number)), v_reversed))) ((Base.nat_add (v_fractional) ((Base.bool_pick (v_point) (1) (0))))) (v_point) (v_limit)))))
+(f_significand (v_tail) ((SCon ((Base.char_of_u32 (v_number)), v_reversed))) ((Base.nat_add (v_fractional) ((Base.bool_pick (v_point) (1) (0))))) (v_point) (v_limit)))))
 and (* numeric_literal.bend:74 *)
 f_multiply_digits : Base.text -> int32 -> int32 -> Base.text -> Base.text =
 fun v_reversed v_factor v_carry v_result ->
@@ -94,9 +96,10 @@ fun v_reversed v_factor v_carry v_result ->
 v_result
 | (SNil, v_other) ->
 (Base.string_append (Base.u32_show (v_other)) v_result)
-| ((SCon ((Chr (v_code)), v_tail)), v_carry) ->
+| ((SCon ((Chr (__char_v_code)), v_tail)), v_carry) ->
+let v_code = Int32.of_int __char_v_code in
 (let v_value = (Base.u32_add ((Base.u32_mul ((Base.u32_sub (v_code) (0x00000030l))) (v_factor))) (v_carry)) in
-(f_multiply_digits (v_tail) (v_factor) ((Base.u32_div (v_value) (0x0000000al))) ((SCon ((Chr ((Base.u32_add (0x00000030l) ((Base.u32_mod (v_value) (0x0000000al)))))), v_result))))))
+(f_multiply_digits (v_tail) (v_factor) ((Base.u32_div (v_value) (0x0000000al))) ((SCon ((Base.char_of_u32 ((Base.u32_add (0x00000030l) ((Base.u32_mod (v_value) (0x0000000al)))))), v_result))))))
 and (* numeric_literal.bend:84 *)
 f_multiply_power : int -> int32 -> Base.text -> Base.text =
 fun v_power v_factor v_digits ->
@@ -126,11 +129,15 @@ LT
 GT
 | (SNil, SNil, EQ) ->
 EQ
-| (SNil, (SCon ((Chr (v_head)), v_tail)), EQ) ->
+| (SNil, (SCon ((Chr (__char_v_head)), v_tail)), EQ) ->
+let v_head = Int32.of_int __char_v_head in
 (f_compare_digits (SNil) (v_tail) ((Base.u32_cmp (0x00000030l) (v_head))))
-| ((SCon ((Chr (v_head)), v_tail)), SNil, EQ) ->
+| ((SCon ((Chr (__char_v_head)), v_tail)), SNil, EQ) ->
+let v_head = Int32.of_int __char_v_head in
 (f_compare_digits (v_tail) (SNil) ((Base.u32_cmp (v_head) (0x00000030l))))
-| ((SCon ((Chr (v_a)), v_at)), (SCon ((Chr (v_b)), v_bt)), EQ) ->
+| ((SCon ((Chr (__char_v_a)), v_at)), (SCon ((Chr (__char_v_b)), v_bt)), EQ) ->
+let v_a = Int32.of_int __char_v_a in
+let v_b = Int32.of_int __char_v_b in
 (f_compare_digits (v_at) (v_bt) ((Base.u32_cmp (v_a) (v_b)))))
 and (* numeric_literal.bend:115 *)
 f_compare : t_Decimal -> t_Decimal -> Base.cmp =

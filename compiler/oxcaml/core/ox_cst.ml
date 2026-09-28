@@ -150,24 +150,25 @@ f_literal_character : int32 -> t_Cst -> (M.t_Diagnostic, Base.char32) Base.resul
 fun v_code v_node ->
 (match v_code with
 | 0x00000022l ->
-(Done ((Chr (0x00000022l))))
+(Done ((Base.char_of_u32 (0x00000022l))))
 | 0x0000005cl ->
-(Done ((Chr (0x0000005cl))))
+(Done ((Base.char_of_u32 (0x0000005cl))))
 | 0x0000006el ->
-(Done ((Chr (0x0000000al))))
+(Done ((Base.char_of_u32 (0x0000000al))))
 | 0x00000072l ->
-(Done ((Chr (0x0000000dl))))
+(Done ((Base.char_of_u32 (0x0000000dl))))
 | 0x00000074l ->
-(Done ((Chr (0x00000009l))))
+(Done ((Base.char_of_u32 (0x00000009l))))
 | _ ->
 (Fail ((f_diagnostic (v_node) (s_14) (s_15)))))
 and (* cst.bend:94 *)
 f_literal_body : Base.text -> t_Cst -> (M.t_Diagnostic, Base.text) Base.result_ =
 fun v_chars v_node ->
 (match v_chars with
-| (SCon ((Chr (0x00000022l)), SNil)) ->
+| (SCon ((Chr (0x00000022)), SNil)) ->
 (Done (SNil))
-| (SCon ((Chr (0x0000005cl)), (SCon ((Chr (v_code)), v_tail)))) ->
+| (SCon ((Chr (0x0000005c)), (SCon ((Chr (__char_v_code)), v_tail)))) ->
+let v_code = Int32.of_int __char_v_code in
 (match (f_literal_character (v_code) (v_node)) with
 | Fail __error -> Fail __error
 | Done v_character ->
@@ -186,7 +187,7 @@ and (* cst.bend:110 *)
 f_literal_text : Base.text -> t_Cst -> (M.t_Diagnostic, Base.text) Base.result_ =
 fun v_chars v_node ->
 (match v_chars with
-| (SCon ((Chr (0x00000022l)), v_tail)) ->
+| (SCon ((Chr (0x00000022)), v_tail)) ->
 (f_literal_body (v_tail) (v_node))
 | _ ->
 (Fail ((f_diagnostic (v_node) (s_14) (s_17)))))
@@ -200,7 +201,7 @@ fun v_text ->
 (match v_text with
 | SNil ->
 SNil
-| (SCon ((Chr (0x0000005fl)), v_tail)) ->
+| (SCon ((Chr (0x0000005f)), v_tail)) ->
 (f_float_characters (v_tail))
 | (SCon (v_character, v_tail)) ->
 (SCon (v_character, (f_float_characters (v_tail)))))
@@ -242,9 +243,10 @@ fun v_chars v_number v_radix v_node ->
 (match v_chars with
 | SNil ->
 (Done (v_number))
-| (SCon ((Chr (0x0000005fl)), v_tail)) ->
+| (SCon ((Chr (0x0000005f)), v_tail)) ->
 (f_integer_digits (v_tail) (v_number) (v_radix) (v_node))
-| (SCon ((Chr (v_code)), v_tail)) ->
+| (SCon ((Chr (__char_v_code)), v_tail)) ->
+let v_code = Int32.of_int __char_v_code in
 (let v_d = (f_digit (v_code)) in
 (let v_n = v_number in
 (match (f_accumulate ((Base.u32_is_le (v_n) ((Base.u32_div ((Base.u32_sub (0xffffffffl) (v_d))) (v_radix))))) (v_n) (v_d) (v_radix) (v_node)) with

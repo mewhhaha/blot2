@@ -363,8 +363,25 @@ class Emitter:
         return '\n\n'.join(header) + '\n'
 
 
-def emit_modules(modules: list[Module], output: Path):
+def write_checked_outputs(output: Path, outputs: dict[str, str]) -> None:
+    """Never partially regenerate over hand-tuned native modules.
+
+    Reproduction belongs in a new --output directory; compare it to the native
+    implementation rather than silently replacing representation or pool work.
+    """
+    conflicts = [name for name, text in outputs.items()
+                 if (output / name).exists() and (output / name).read_text() != text]
+    if conflicts:
+        raise FileExistsError(
+            'Refusing to overwrite native changes: ' + ', '.join(conflicts)
+            + '. Reproduce into a new directory with --output and review the diff.')
     output.mkdir(parents=True, exist_ok=True)
+    for name, text in outputs.items():
+        (output / name).write_text(text)
+
+
+def emit_modules(modules: list[Module], output: Path):
+    outputs: dict[str, str] = {}
     lookup = {m.name: m for m in modules}
     manifest = []
     for module in modules:
@@ -373,10 +390,11 @@ def emit_modules(modules: list[Module], output: Path):
             # This module's two FFI declarations are replaced by reviewed OCaml IO.
             continue
         text = Emitter(module, lookup).emit()
-        (output / name).write_text(text)
+        outputs[name] = text
         manifest.append({'module': module.name, 'source_sha256': module.digest, 'ocaml_sha256': hashlib.sha256(text.encode()).hexdigest(), 'functions': len(module.functions), 'types': len(module.types)})
-    (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-    (output / 'modules.txt').write_text('\n'.join('ox_' + m.name for m in modules) + '\n')
+    outputs['manifest.json'] = json.dumps(manifest, indent=2) + '\n'
+    outputs['modules.txt'] = '\n'.join('ox_' + m.name for m in modules) + '\n'
+    write_checked_outputs(output, outputs)
 
 
 def main():
