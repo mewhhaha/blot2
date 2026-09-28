@@ -1133,7 +1133,7 @@ fun v_fuel v_work v_generalized v_protected ->
 and (* types.bend:826 *)
 f_close_covariant : M.t_Ty -> (int) list -> (int) list -> (M.t_Diagnostic, M.t_Ty) Base.result_ =
 fun v_ty v_generalized v_protected ->
-(match (f_close_covariant_work ((Base.u32_to_nat (0x00010000l))) ((OneType (v_ty))) (v_generalized) (v_protected)) with
+(match (f_close_covariant_work ((Base.u32_to_nat ((Base.W32 0x10000)))) ((OneType (v_ty))) (v_generalized) (v_protected)) with
 | Fail __error -> Fail __error
 | Done v_closed ->
 (f_first_type (v_closed)))
@@ -1226,7 +1226,7 @@ fun v_fuel v_work v_next ->
 and (* types.bend:897 *)
 f_open_covariant : M.t_Ty -> int -> (M.t_Diagnostic, t_Opened) Base.result_ =
 fun v_ty v_next ->
-(match (f_open_covariant_work ((Base.u32_to_nat (0x00010000l))) ((OneType (v_ty))) (v_next)) with
+(match (f_open_covariant_work ((Base.u32_to_nat ((Base.W32 0x10000)))) ((OneType (v_ty))) (v_next)) with
 | Fail __error -> Fail __error
 | Done v_opened ->
 (match (f_first_type ((f_opened_types (v_opened)))) with
@@ -1495,7 +1495,7 @@ fun v_equations ->
 | [] ->
 (Done ([]))
 | ((Equation (v_left, v_right, v_subject)) :: v_tail) ->
-(match (f_free_work ((Base.u32_to_nat (0x00010000l))) ((ManyTypes ([v_left; v_right])))) with
+(match (f_free_work ((Base.u32_to_nat ((Base.W32 0x10000)))) ((ManyTypes ([v_left; v_right])))) with
 | Fail __error -> Fail __error
 | Done v_first ->
 (match (f_equations_free (v_tail)) with
@@ -1546,18 +1546,18 @@ fun v_equations v_substitutions ->
 (match (f_substitutions_free ((f_substitution_history (v_previous)))) with
 | Fail __error -> Fail __error
 | Done v_second ->
-(match (f_solve_work ((Base.u32_to_nat (0x00010000l))) (v_pending) (v_previous) ((f_above (v_first) ((f_above (v_second) (0)))))) with
+(match (f_solve_work ((Base.u32_to_nat ((Base.W32 0x10000)))) (v_pending) (v_previous) ((f_above (v_first) ((f_above (v_second) (0)))))) with
 | Fail __error -> Fail __error
 | Done v_solved ->
 (Done ((f_solution_substitutions (v_solved)))))))))
 and (* types.bend:1162 *)
 f_unify_at : M.t_Ty -> M.t_Ty -> t_Substitutions -> int -> Base.text -> (M.t_Diagnostic, t_Solution) Base.result_ =
 fun v_left v_right v_substitutions v_next v_subject ->
-(f_solve_work ((Base.u32_to_nat (0x00010000l))) ([(Equation (v_left, v_right, v_subject))]) (v_substitutions) (v_next))
+(f_solve_work ((Base.u32_to_nat ((Base.W32 0x10000)))) ([(Equation (v_left, v_right, v_subject))]) (v_substitutions) (v_next))
 and (* types.bend:1165 *)
 f_unify_rows_at : M.t_EffectRow -> M.t_EffectRow -> t_Substitutions -> int -> Base.text -> (M.t_Diagnostic, t_Solution) Base.result_ =
 fun v_left v_right v_substitutions v_next v_subject ->
-(f_solve_work ((Base.u32_to_nat (0x00010000l))) ([(RowEquation (v_left, v_right, v_subject))]) (v_substitutions) (v_next))
+(f_solve_work ((Base.u32_to_nat ((Base.W32 0x10000)))) ([(RowEquation (v_left, v_right, v_subject))]) (v_substitutions) (v_next))
 and (* types.bend:1168 *)
 f_unify : M.t_Ty -> M.t_Ty -> t_Substitutions -> Base.text -> (M.t_Diagnostic, t_Substitutions) Base.result_ =
 fun v_left v_right v_substitutions v_subject ->

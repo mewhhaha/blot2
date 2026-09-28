@@ -35,7 +35,7 @@ module RawQualification = Ox_raw_core_qualification
 type t_Analysis =
   | Analysis of M.t_CheckedModule * ((Const.t_Value) Const.t_Binding) list * int
 and t_Artifact =
-  | Artifact of t_Analysis * (int32) list
+  | Artifact of t_Analysis * (Base.word32) list
 and t_PlannedArtifact =
   | PlannedArtifact of t_Analysis * Wasm.t_BytePlan
 

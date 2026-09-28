@@ -146,28 +146,28 @@ fun v_node ->
 (let v_name = (f_type_name (v_node)) in
 (Base.bool_pick ((M.f_name_equal (v_name) (s_6))) ((Done (M.U32Ty))) ((Base.bool_pick ((M.f_name_equal (v_name) (s_7))) ((Done (M.F32Ty))) ((Base.bool_pick ((M.f_name_equal (v_name) (s_8))) ((Done (M.BoolTy))) ((Base.bool_pick ((M.f_name_equal (v_name) (s_9))) ((Done (M.UnitTy))) ((Base.bool_pick ((M.f_name_equal (v_name) (s_10))) ((Done (M.EffectDescriptorTy))) ((Base.bool_pick ((M.f_name_equal (v_name) (s_11))) ((Done (M.EffectSetTy))) ((Fail ((f_diagnostic (v_node) (s_12) ((Base.string_append s_13 v_name))))))))))))))))))
 and (* cst.bend:79 *)
-f_literal_character : int32 -> t_Cst -> (M.t_Diagnostic, Base.char32) Base.result_ =
+f_literal_character : Base.word32 -> t_Cst -> (M.t_Diagnostic, Base.char32) Base.result_ =
 fun v_code v_node ->
 (match v_code with
-| 0x00000022l ->
-(Done ((Chr (0x00000022l))))
-| 0x0000005cl ->
-(Done ((Chr (0x0000005cl))))
-| 0x0000006el ->
-(Done ((Chr (0x0000000al))))
-| 0x00000072l ->
-(Done ((Chr (0x0000000dl))))
-| 0x00000074l ->
-(Done ((Chr (0x00000009l))))
+| (Base.W32 0x22) ->
+(Done ((Chr ((Base.W32 0x22)))))
+| (Base.W32 0x5c) ->
+(Done ((Chr ((Base.W32 0x5c)))))
+| (Base.W32 0x6e) ->
+(Done ((Chr ((Base.W32 0xa)))))
+| (Base.W32 0x72) ->
+(Done ((Chr ((Base.W32 0xd)))))
+| (Base.W32 0x74) ->
+(Done ((Chr ((Base.W32 0x9)))))
 | _ ->
 (Fail ((f_diagnostic (v_node) (s_14) (s_15)))))
 and (* cst.bend:94 *)
 f_literal_body : Base.text -> t_Cst -> (M.t_Diagnostic, Base.text) Base.result_ =
 fun v_chars v_node ->
 (match v_chars with
-| (SCon ((Chr (0x00000022l)), SNil)) ->
+| (SCon ((Chr ((Base.W32 0x22))), SNil)) ->
 (Done (SNil))
-| (SCon ((Chr (0x0000005cl)), (SCon ((Chr (v_code)), v_tail)))) ->
+| (SCon ((Chr ((Base.W32 0x5c))), (SCon ((Chr (v_code)), v_tail)))) ->
 (match (f_literal_character (v_code) (v_node)) with
 | Fail __error -> Fail __error
 | Done v_character ->
@@ -186,7 +186,7 @@ and (* cst.bend:110 *)
 f_literal_text : Base.text -> t_Cst -> (M.t_Diagnostic, Base.text) Base.result_ =
 fun v_chars v_node ->
 (match v_chars with
-| (SCon ((Chr (0x00000022l)), v_tail)) ->
+| (SCon ((Chr ((Base.W32 0x22))), v_tail)) ->
 (f_literal_body (v_tail) (v_node))
 | _ ->
 (Fail ((f_diagnostic (v_node) (s_14) (s_17)))))
@@ -200,12 +200,12 @@ fun v_text ->
 (match v_text with
 | SNil ->
 SNil
-| (SCon ((Chr (0x0000005fl)), v_tail)) ->
+| (SCon ((Chr ((Base.W32 0x5f))), v_tail)) ->
 (f_float_characters (v_tail))
 | (SCon (v_character, v_tail)) ->
 (SCon (v_character, (f_float_characters (v_tail)))))
 and (* cst.bend:129 *)
-f_float_finite : bool -> int32 -> t_Cst -> (M.t_Diagnostic, int32) Base.result_ =
+f_float_finite : bool -> Base.word32 -> t_Cst -> (M.t_Diagnostic, Base.word32) Base.result_ =
 fun v_valid v_value v_node ->
 (match v_valid with
 | true ->
@@ -213,23 +213,23 @@ fun v_valid v_value v_node ->
 | false ->
 (Fail ((f_diagnostic (v_node) (s_18) (s_19)))))
 and (* cst.bend:136 *)
-f_float_value : (int32) option -> t_Cst -> (M.t_Diagnostic, int32) Base.result_ =
+f_float_value : (Base.word32) option -> t_Cst -> (M.t_Diagnostic, Base.word32) Base.result_ =
 fun v_parsed v_node ->
 (match v_parsed with
 | (Some (v_value)) ->
-(f_float_finite ((Base.u32_is_ne ((Base.u32_and ((Base.f32_bits (v_value))) (0x7f800000l))) (0x7f800000l))) (v_value) (v_node))
+(f_float_finite ((Base.u32_is_ne ((Base.u32_and ((Base.f32_bits (v_value))) ((Base.W32 0x7f800000)))) ((Base.W32 0x7f800000)))) (v_value) (v_node))
 | None ->
 (Fail ((f_diagnostic (v_node) (s_20) (s_21)))))
 and (* cst.bend:143 *)
-f_float : t_Cst -> (M.t_Diagnostic, int32) Base.result_ =
+f_float : t_Cst -> (M.t_Diagnostic, Base.word32) Base.result_ =
 fun v_node ->
 (f_float_value ((Numeric.f_read ((f_float_characters ((f_text_of (v_node))))))) (v_node))
 and (* cst.bend:146 *)
-f_digit : int32 -> int32 =
+f_digit : Base.word32 -> Base.word32 =
 fun v_code ->
-(Base.bool_pick ((Base.u32_is_le (v_code) (0x00000039l))) ((Base.u32_sub (v_code) (0x00000030l))) ((Base.bool_pick ((Base.u32_is_le (v_code) (0x00000046l))) ((Base.u32_sub (v_code) (0x00000037l))) ((Base.u32_sub (v_code) (0x00000057l))))))
+(Base.bool_pick ((Base.u32_is_le (v_code) ((Base.W32 0x39)))) ((Base.u32_sub (v_code) ((Base.W32 0x30)))) ((Base.bool_pick ((Base.u32_is_le (v_code) ((Base.W32 0x46)))) ((Base.u32_sub (v_code) ((Base.W32 0x37)))) ((Base.u32_sub (v_code) ((Base.W32 0x57)))))))
 and (* cst.bend:150 *)
-f_accumulate : bool -> int32 -> int32 -> int32 -> t_Cst -> (M.t_Diagnostic, int32) Base.result_ =
+f_accumulate : bool -> Base.word32 -> Base.word32 -> Base.word32 -> t_Cst -> (M.t_Diagnostic, Base.word32) Base.result_ =
 fun v_valid v_number v_number_digit v_radix v_node ->
 (match v_valid with
 | true ->
@@ -237,23 +237,23 @@ fun v_valid v_number v_number_digit v_radix v_node ->
 | false ->
 (Fail ((f_diagnostic (v_node) (s_22) (s_23)))))
 and (* cst.bend:157 *)
-f_integer_digits : Base.text -> int32 -> int32 -> t_Cst -> (M.t_Diagnostic, int32) Base.result_ =
+f_integer_digits : Base.text -> Base.word32 -> Base.word32 -> t_Cst -> (M.t_Diagnostic, Base.word32) Base.result_ =
 fun v_chars v_number v_radix v_node ->
 (match v_chars with
 | SNil ->
 (Done (v_number))
-| (SCon ((Chr (0x0000005fl)), v_tail)) ->
+| (SCon ((Chr ((Base.W32 0x5f))), v_tail)) ->
 (f_integer_digits (v_tail) (v_number) (v_radix) (v_node))
 | (SCon ((Chr (v_code)), v_tail)) ->
 (let v_d = (f_digit (v_code)) in
 (let v_n = v_number in
-(match (f_accumulate ((Base.u32_is_le (v_n) ((Base.u32_div ((Base.u32_sub (0xffffffffl) (v_d))) (v_radix))))) (v_n) (v_d) (v_radix) (v_node)) with
+(match (f_accumulate ((Base.u32_is_le (v_n) ((Base.u32_div ((Base.u32_sub ((Base.W32 0xffffffff)) (v_d))) (v_radix))))) (v_n) (v_d) (v_radix) (v_node)) with
 | Fail __error -> Fail __error
 | Done v_next ->
 (f_integer_digits (v_tail) (v_next) (v_radix) (v_node))))))
 and (* cst.bend:170 *)
-f_integer : t_Cst -> (M.t_Diagnostic, int32) Base.result_ =
+f_integer : t_Cst -> (M.t_Diagnostic, Base.word32) Base.result_ =
 fun v_node ->
 (let v_value = (f_text_of (v_node)) in
 (let v_hex = (Base.bool_or ((Base.string_starts_with (v_value) (s_24))) ((Base.string_starts_with (v_value) (s_25)))) in
-(f_integer_digits ((Base.bool_pick (v_hex) ((Base.string_drop (v_value) (2))) (v_value))) (0x00000000l) ((Base.bool_pick (v_hex) (0x00000010l) (0x0000000al))) (v_node))))
+(f_integer_digits ((Base.bool_pick (v_hex) ((Base.string_drop (v_value) (2))) (v_value))) ((Base.W32 0x0)) ((Base.bool_pick (v_hex) ((Base.W32 0x10)) ((Base.W32 0xa)))) (v_node))))

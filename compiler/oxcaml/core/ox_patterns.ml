@@ -268,10 +268,10 @@ fun v_constraints v_substitutions v_types ->
 | Done v_valid ->
 (f_check (v_tail) (v_substitutions) (v_types))))
 | ((I.Coverage (v_inferred, v_patterns, v_subject)) :: v_tail) ->
-(match (T.f_resolve_work (v_substitutions) ((Base.u32_to_nat (0x00010000l))) ((T.ManyTypes (v_inferred)))) with
+(match (T.f_resolve_work (v_substitutions) ((Base.u32_to_nat ((Base.W32 0x10000)))) ((T.ManyTypes (v_inferred)))) with
 | Fail __error -> Fail __error
 | Done v_resolved ->
-(match (f_coverage ((Base.u32_to_nat (0x00010000l))) ((Cover (v_resolved, v_patterns))) (v_types)) with
+(match (f_coverage ((Base.u32_to_nat ((Base.W32 0x10000)))) ((Cover (v_resolved, v_patterns))) (v_types)) with
 | Fail __error -> Fail __error
 | Done v_complete ->
 (match (f_require (v_complete) (v_resolved) (v_subject)) with

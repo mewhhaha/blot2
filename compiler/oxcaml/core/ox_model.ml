@@ -52,7 +52,7 @@ and t_Pattern =
   | WildcardPattern
   | BindingPattern of Base.text
   | UnitPattern
-  | U32Pattern of int32
+  | U32Pattern of Base.word32
   | BoolPattern of bool
   | ValuePattern of t_ValueReference
   | ConstructorPattern of Base.text * (t_Pattern) option
@@ -98,7 +98,7 @@ and t_Predicate =
   | EffectRepPredicate of t_EffectRow
 and t_Expr =
   | UnitExpr
-  | U32Expr of int32
+  | U32Expr of Base.word32
   | BoolExpr of bool
   | LocalExpr of Base.text
   | ConstantExpr of Base.text
@@ -119,7 +119,7 @@ and t_Expr =
   | ReturnExpr of int * t_Expr
   | SourceExpr of int * (t_Ty) option * t_Expr
   | RuntimeInitExpr of t_Expr
-  | F32Expr of int32
+  | F32Expr of Base.word32
   | UnaryExpr of t_UnaryOp * t_Expr
   | OperationExpr of t_TypeId
   | SpecializeOperationExpr of t_TypeId * (t_Ty) list * t_Expr
@@ -459,4 +459,4 @@ fun v_reference ->
 and (* model.bend:406 *)
 f_max_nat : unit -> int =
 fun () ->
-(Base.nat_mul ((Base.u32_to_nat (0x00ffffffl))) ((Base.u32_to_nat (0x01000001l))))
+(Base.nat_mul ((Base.u32_to_nat ((Base.W32 0xffffff)))) ((Base.u32_to_nat ((Base.W32 0x1000001)))))

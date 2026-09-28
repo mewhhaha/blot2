@@ -8,21 +8,21 @@ let () =
   List.iter (fun s -> check "UTF-8 rejection" (try ignore (text s); false with Invalid_argument _ -> true))
     ["\128"; "\192\128"; "\237\160\128"; "\244\144\128\128"; "\240\159"];
   check "Unicode length" (string_length (text "a😀λ") = 3);
-  check "Unsigned compare" (u32_is_gt (-1l) Int32.max_int);
-  check "Unsigned division" (u32_div (-1l) 3l = 1431655765l);
-  check "Unsigned wrapping" (u32_add (-1l) 1l = 0l);
+  check "Unsigned compare" (u32_is_gt ((Base.W32 0xffffffff)) (Base.W32 0x7fff_ffff));
+  check "Unsigned division" (u32_div ((Base.W32 0xffffffff)) (Base.W32 0x3) = (Base.W32 0x55555555));
+  check "Unsigned wrapping" (u32_add ((Base.W32 0xffffffff)) (Base.W32 0x1) = (Base.W32 0x0));
   check "Natural subtraction" (nat_sub 1 2 = 0);
   check "Natural division by zero" (nat_div 17 0 = 0 && nat_mod 17 0 = 17);
   check "Natural range" (nat_read (text "281474976710655") = Some nat_mask);
   check "Natural overflow" (nat_read (text "281474976710656") = None);
-  check "F32 signed zero" (f32_neg 0l = Int32.min_int);
-  check "F32 rounding" (f32_add 0x4b800000l 0x3f800000l = 0x4b800000l);
+  check "F32 signed zero" (f32_neg (Base.W32 0x0) = (Base.W32 0x8000_0000));
+  check "F32 rounding" (f32_add (Base.W32 0x4b800000) (Base.W32 0x3f800000) = (Base.W32 0x4b800000));
   List.iter (fun (s,expected) ->
     check ("Exact decimal " ^ s) (Ox_numeric_literal.f_read (text s) = Some expected))
-    ["1.000000059604644775390625", 0x3f800000l;
-     "1.000000059604644775390626", 0x3f800001l;
-     "1.000000178813934326171875", 0x3f800002l;
-     "0.0",0l; "1.40129846432481707092372958328991613128026194187651577175706828388979108268586060148663818836212158203125e-45",1l];
+    ["1.000000059604644775390625", (Base.W32 0x3f800000);
+     "1.000000059604644775390626", (Base.W32 0x3f800001);
+     "1.000000178813934326171875", (Base.W32 0x3f800002);
+     "0.0",(Base.W32 0x0); "1.40129846432481707092372958328991613128026194187651577175706828388979108268586060148663818836212158203125e-45",(Base.W32 0x1)];
   let keys = [""; "a"; "aa"; "ab"; "b"; "😀"; "λ"; "\000"; "a\000b"] in
   let map = List.mapi (fun i k -> text k,i) keys |> List.fold_left (fun m (k,v) -> map_set m k v) MTip in
   List.iteri (fun i k -> check "Patricia/index compatibility" (Ox_index.f_find map (text k) = Some i)) keys;

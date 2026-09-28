@@ -9,4 +9,4 @@
 open Base
 
 type t_Frame =
-  | Frame of bytes * int32
+  | Frame of bytes * Base.word32

@@ -135,9 +135,9 @@ and t_SpecializationContext =
 and t_CachedTask =
   | CachedTask of int * Base.text * (Base.text) list * t_ExpandedModule
 and t_Cache =
-  | Cache of (int32) list * (t_CachedTask) list * ((int32) list) Base.map * (Core.t_Certificate) list
+  | Cache of (Base.word32) list * (t_CachedTask) list * ((Base.word32) list) Base.map * (Core.t_Certificate) list
 and t_Reusable =
-  | Reusable of (t_CachedTask) list * ((int32) list) Base.map
+  | Reusable of (t_CachedTask) list * ((Base.word32) list) Base.map
 and t_Prepared =
   | Prepared of M.t_Module * t_Cache * (Core.t_Certificate) list
 and t_CachedExpansion =
@@ -1125,7 +1125,7 @@ and (* monomorph.bend:631 *)
 f_clone_origin : Base.text -> Base.text =
 fun v_name ->
 (match v_name with
-| (SCon ((Chr (0x0000005dl)), (SCon ((Chr (0x0000002el)), v_tail)))) ->
+| (SCon ((Chr ((Base.W32 0x5d))), (SCon ((Chr ((Base.W32 0x2e))), v_tail)))) ->
 v_tail
 | (SCon (v_character, v_tail)) ->
 (f_clone_origin (v_tail))
@@ -5037,7 +5037,7 @@ fun v_prepared ->
 (let (Prepared (v_module, v_cache, v_certificates)) = v_prepared in
 v_certificates)
 and (* monomorph.bend:3907 *)
-f_same_words_go : (int32) list -> (int32) list -> bool -> bool =
+f_same_words_go : (Base.word32) list -> (Base.word32) list -> bool -> bool =
 fun v_left v_right v_equal ->
 (match (v_left, v_right, v_equal) with
 | (_, _, false) ->
@@ -5049,7 +5049,7 @@ true
 | (_, _, _) ->
 false)
 and (* monomorph.bend:3918 *)
-f_same_words : (int32) list -> (int32) list -> bool =
+f_same_words : (Base.word32) list -> (Base.word32) list -> bool =
 fun v_left v_right ->
 (f_same_words_go (v_left) (v_right) (true))
 and (* monomorph.bend:3921 *)
@@ -5061,7 +5061,7 @@ v_index
 | ((CachedTask (v_at, v_name, v_dependencies, v_result)) :: v_tail) ->
 (f_task_index (v_tail) ((Base.map_set (v_index) ((Base.nat_show (v_at))) ((CachedTask (v_at, v_name, v_dependencies, v_result)))))))
 and (* monomorph.bend:3928 *)
-f_reusable_match : bool -> (t_CachedTask) list -> ((int32) list) Base.map -> t_Reusable =
+f_reusable_match : bool -> (t_CachedTask) list -> ((Base.word32) list) Base.map -> t_Reusable =
 fun v_equal v_tasks v_sources ->
 (match v_equal with
 | true ->
@@ -5069,7 +5069,7 @@ fun v_equal v_tasks v_sources ->
 | false ->
 (Reusable ([], (Base.map_new ()))))
 and (* monomorph.bend:3935 *)
-f_cache_for_context : (t_Cache) option -> (int32) list -> t_Reusable =
+f_cache_for_context : (t_Cache) option -> (Base.word32) list -> t_Reusable =
 fun v_previous v_context ->
 (match v_previous with
 | None ->
@@ -5142,7 +5142,7 @@ fun v_context v_nodes ->
 (let v_marked = (Base.list_append (v_metadata) ((Base.list_append ((f_marker_functions (v_templates))) (((M.Function (s_133, false, (Base.nat_show ((Base.list_length (v_affected)))), None, None, M.UnitExpr)) :: (Base.list_append ((f_marker_functions (v_affected))) ((f_shape_functions (v_shapes))))))))) in
 (M.Module ((Base.list_append ((f_local_constants (v_locals))) (v_constants)), (Base.list_append (v_marked) ((Base.list_append ((f_unplanned_functions (v_originals) ((D.f_node_names (v_nodes))))) ((f_schema_source_functions (v_schema)))))), v_types, (Base.list_append (v_operations) (v_family_templates)))))))
 and (* monomorph.bend:4004 *)
-f_function_source_keys : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> (M.t_Function) list -> ((int32) list) Base.map -> (M.t_Diagnostic, ((int32) list) Base.map) Base.result_ =
+f_function_source_keys : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> (M.t_Function) list -> ((Base.word32) list) Base.map -> (M.t_Diagnostic, ((Base.word32) list) Base.map) Base.result_ =
 fun v_key v_functions v_acc ->
 (match v_functions with
 | [] ->
@@ -5154,7 +5154,7 @@ fun v_key v_functions v_acc ->
 | Done v_words ->
 (f_function_source_keys (v_key) (v_rest) ((Base.map_set (v_acc) (v_name) (v_words)))))))
 and (* monomorph.bend:4014 *)
-f_constant_source_keys : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> (M.t_Constant) list -> ((int32) list) Base.map -> (M.t_Diagnostic, ((int32) list) Base.map) Base.result_ =
+f_constant_source_keys : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> (M.t_Constant) list -> ((Base.word32) list) Base.map -> (M.t_Diagnostic, ((Base.word32) list) Base.map) Base.result_ =
 fun v_key v_constants v_acc ->
 (match v_constants with
 | [] ->
@@ -5166,7 +5166,7 @@ fun v_key v_constants v_acc ->
 | Done v_words ->
 (f_constant_source_keys (v_key) (v_rest) ((Base.map_set (v_acc) (v_name) (v_words)))))))
 and (* monomorph.bend:4024 *)
-f_source_keys : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> (M.t_Function) list -> (M.t_Constant) list -> (M.t_Diagnostic, ((int32) list) Base.map) Base.result_ =
+f_source_keys : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> (M.t_Function) list -> (M.t_Constant) list -> (M.t_Diagnostic, ((Base.word32) list) Base.map) Base.result_ =
 fun v_key v_functions v_constants ->
 (match (f_function_source_keys (v_key) (v_functions) ((Base.map_new ()))) with
 | Fail __error -> Fail __error
@@ -5219,7 +5219,7 @@ fun v_equal v_entry v_task ->
 | false ->
 (NewTask (v_task, [])))
 and (* monomorph.bend:4068 *)
-f_same_source : ((int32) list) option -> ((int32) list) option -> bool =
+f_same_source : ((Base.word32) list) option -> ((Base.word32) list) option -> bool =
 fun v_old v_current ->
 (match (v_old, v_current) with
 | ((Some (v_prior)), (Some (v_now))) ->
@@ -5227,7 +5227,7 @@ fun v_old v_current ->
 | (_, _) ->
 false)
 and (* monomorph.bend:4075 *)
-f_same_dependencies : (Base.text) list -> ((int32) list) Base.map -> ((int32) list) Base.map -> bool -> bool =
+f_same_dependencies : (Base.text) list -> ((Base.word32) list) Base.map -> ((Base.word32) list) Base.map -> bool -> bool =
 fun v_names v_old v_current v_equal ->
 (match (v_names, v_equal) with
 | (_, false) ->
@@ -5237,7 +5237,7 @@ true
 | ((v_name :: v_rest), true) ->
 (f_same_dependencies (v_rest) (v_old) (v_current) ((f_same_source ((Index.f_find (v_old) (v_name))) ((Index.f_find (v_current) (v_name)))))))
 and (* monomorph.bend:4084 *)
-f_reuse_task : (t_CachedTask) option -> G.t_Declaration -> int -> ((int32) list) Base.map -> ((int32) list) Base.map -> t_TaskRun =
+f_reuse_task : (t_CachedTask) option -> G.t_Declaration -> int -> ((Base.word32) list) Base.map -> ((Base.word32) list) Base.map -> t_TaskRun =
 fun v_candidate v_declaration v_position v_old v_current ->
 (match v_candidate with
 | None ->
@@ -5247,7 +5247,7 @@ fun v_candidate v_declaration v_position v_old v_current ->
 (let v_root = (G.f_declaration_name (v_declaration)) in
 (f_reuse_match ((Base.bool_and ((M.f_name_equal (v_name) (v_root))) ((f_same_dependencies ((v_root :: v_dependencies)) (v_old) (v_current) (true))))) (v_entry) ((SpecializationTask (v_declaration, v_position)))))))
 and (* monomorph.bend:4093 *)
-f_cached_tasks : (G.t_Declaration) list -> (t_CachedTask) Base.map -> ((int32) list) Base.map -> ((int32) list) Base.map -> int -> ((t_TaskRun) Batch.t_Weighted) list =
+f_cached_tasks : (G.t_Declaration) list -> (t_CachedTask) Base.map -> ((Base.word32) list) Base.map -> ((Base.word32) list) Base.map -> int -> ((t_TaskRun) Batch.t_Weighted) list =
 fun v_declarations v_previous v_old v_current v_position ->
 (match v_declarations with
 | [] ->
@@ -5350,7 +5350,7 @@ fun v_compiled ->
 (let (CachedExpansion (v_value, v_tasks)) = v_compiled in
 (CachedExpansion ((f_distinct_expansion (v_value)), v_tasks)))
 and (* monomorph.bend:4182 *)
-f_specialize_declarations_cached : (G.t_Declaration) list -> t_Configuration -> (I.t_Binding) list -> (M.t_DataType) list -> (M.t_Operation) list -> int -> (D.t_Node) list -> (t_CachedTask) list -> ((int32) list) Base.map -> ((int32) list) Base.map -> (M.t_Diagnostic, t_CachedExpansion) Base.result_ =
+f_specialize_declarations_cached : (G.t_Declaration) list -> t_Configuration -> (I.t_Binding) list -> (M.t_DataType) list -> (M.t_Operation) list -> int -> (D.t_Node) list -> (t_CachedTask) list -> ((Base.word32) list) Base.map -> ((Base.word32) list) Base.map -> (M.t_Diagnostic, t_CachedExpansion) Base.result_ =
 fun v_declarations v_configuration v_shapes v_types v_operations v_counter v_nodes v_previous v_old v_current ->
 (let v_width = (Base.nat_max (1) ((Base.list_length (v_declarations)))) in
 (let v_stepped = (f_with_step (v_configuration) (v_width)) in
@@ -5570,7 +5570,7 @@ fun v_templates v_module v_shapes v_entry v_family_templates ->
 (Public.f_select (v_module) (v_shapes) (Public.Resolved))
 | (v_head :: v_tail) ->
 (let (M.Module (v_constants, v_original_functions, v_types, v_operations)) = v_module in
-(match (f_identity_limit ((Base.u32_to_nat (0x00100000l))) ((f_module_expressions (v_original_functions) (v_constants))) (0)) with
+(match (f_identity_limit ((Base.u32_to_nat ((Base.W32 0x100000)))) ((f_module_expressions (v_original_functions) (v_constants))) (0)) with
 | Fail __error -> Fail __error
 | Done v_stride ->
 (let v_generic = (f_generic_templates (v_shapes) ((v_head :: v_tail))) in
@@ -5680,7 +5680,7 @@ fun v_templates v_module v_shapes v_entry v_family_templates v_checked ->
 (let (M.Module (v_constants, v_original_functions, v_types, v_operations)) = v_module in
 (let v_schemes = (Staging.f_capture_closed ((ParallelInfer.f_data_types_closed (v_types))) (v_original_functions) (v_operations) (v_types)) in
 (let v_schema = (Schema.f_capture (v_original_functions) (v_types) (v_checked) (v_entry)) in
-(match (f_identity_limit ((Base.u32_to_nat (0x00100000l))) ((f_module_expressions (v_original_functions) (v_constants))) (0)) with
+(match (f_identity_limit ((Base.u32_to_nat ((Base.W32 0x100000)))) ((f_module_expressions (v_original_functions) (v_constants))) (0)) with
 | Fail __error -> Fail __error
 | Done v_stride ->
 (let v_generic = (f_generic_templates (v_shapes) ((v_head :: v_tail))) in
@@ -5734,7 +5734,7 @@ fun v_module v_entry v_family_templates ->
 | Done v_pruned ->
 (f_prepare_deferred_initial ((Entries.f_pruned_module (v_pruned))) (v_entry) (v_family_templates) ((Entries.f_pruned_initial (v_pruned))))))
 and (* monomorph.bend:4499 *)
-f_finish_cached : t_CachedExpansion -> (int32) list -> ((int32) list) Base.map -> (I.t_Binding) list -> t_Configuration -> (M.t_Diagnostic, t_Prepared) Base.result_ =
+f_finish_cached : t_CachedExpansion -> (Base.word32) list -> ((Base.word32) list) Base.map -> (I.t_Binding) list -> t_Configuration -> (M.t_Diagnostic, t_Prepared) Base.result_ =
 fun v_compiled v_context_key v_sources v_shapes v_configuration ->
 (let (CachedExpansion (v_expansion, v_tasks)) = v_compiled in
 (let (ExpandedModule (v_expanded, v_next, v_bindings, v_certificates)) = v_expansion in
@@ -5743,7 +5743,7 @@ fun v_compiled v_context_key v_sources v_shapes v_configuration ->
 | Done v_module ->
 (Done ((Prepared (v_module, (Cache (v_context_key, v_tasks, v_sources, [])), v_certificates)))))))
 and (* monomorph.bend:4506 *)
-f_cached_sources : (M.t_Diagnostic, ((int32) list) Base.map) Base.result_ -> (int32) list -> (M.t_Function) list -> (M.t_Constant) list -> (M.t_DataType) list -> (M.t_Operation) list -> t_Configuration -> (I.t_Binding) list -> int -> (D.t_Node) list -> t_Reusable -> (M.t_Diagnostic, t_Prepared) Base.result_ =
+f_cached_sources : (M.t_Diagnostic, ((Base.word32) list) Base.map) Base.result_ -> (Base.word32) list -> (M.t_Function) list -> (M.t_Constant) list -> (M.t_DataType) list -> (M.t_Operation) list -> t_Configuration -> (I.t_Binding) list -> int -> (D.t_Node) list -> t_Reusable -> (M.t_Diagnostic, t_Prepared) Base.result_ =
 fun v_probe v_context_key v_originals v_retained v_types v_operations v_configuration v_shapes v_counter v_nodes v_reusable ->
 (match v_probe with
 | (Fail (v_diagnostic)) ->
@@ -5759,7 +5759,7 @@ fun v_probe v_context_key v_originals v_retained v_types v_operations v_configur
 | Done v_compiled ->
 (f_finish_cached (v_compiled) (v_context_key) (v_current) (v_shapes) (v_configuration))))))
 and (* monomorph.bend:4519 *)
-f_cached_context : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> (M.t_Diagnostic, (int32) list) Base.result_ -> (M.t_Function) list -> (M.t_Constant) list -> (M.t_Constant) list -> (M.t_DataType) list -> (M.t_Operation) list -> t_Configuration -> (I.t_Binding) list -> int -> (D.t_Node) list -> (t_Cache) option -> (M.t_Diagnostic, t_Prepared) Base.result_ =
+f_cached_context : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> (M.t_Diagnostic, (Base.word32) list) Base.result_ -> (M.t_Function) list -> (M.t_Constant) list -> (M.t_Constant) list -> (M.t_DataType) list -> (M.t_Operation) list -> t_Configuration -> (I.t_Binding) list -> int -> (D.t_Node) list -> (t_Cache) option -> (M.t_Diagnostic, t_Prepared) Base.result_ =
 fun v_key v_probe v_originals v_source_constants v_retained v_types v_operations v_configuration v_shapes v_counter v_nodes v_previous ->
 (match v_probe with
 | (Fail (v_diagnostic)) ->
@@ -5770,7 +5770,7 @@ fun v_key v_probe v_originals v_source_constants v_retained v_types v_operations
 | (Done (v_context_key)) ->
 (f_cached_sources ((f_source_keys (v_key) (v_originals) (v_source_constants))) (v_context_key) (v_originals) (v_retained) (v_types) (v_operations) (v_configuration) (v_shapes) (v_counter) (v_nodes) ((f_cache_for_context (v_previous) (v_context_key)))))
 and (* monomorph.bend:4528 *)
-f_cached_specialize : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> bool -> (M.t_Function) list -> (M.t_Constant) list -> (M.t_Constant) list -> (M.t_DataType) list -> (M.t_Operation) list -> t_Configuration -> (I.t_Binding) list -> int -> (D.t_Node) list -> (t_Cache) option -> (M.t_Diagnostic, t_Prepared) Base.result_ =
+f_cached_specialize : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> bool -> (M.t_Function) list -> (M.t_Constant) list -> (M.t_Constant) list -> (M.t_DataType) list -> (M.t_Operation) list -> t_Configuration -> (I.t_Binding) list -> int -> (D.t_Node) list -> (t_Cache) option -> (M.t_Diagnostic, t_Prepared) Base.result_ =
 fun v_key v_independent v_originals v_source_constants v_retained v_types v_operations v_configuration v_shapes v_counter v_nodes v_previous ->
 (match v_independent with
 | false ->
@@ -5788,7 +5788,7 @@ fun v_prepared v_prior ->
 (let (Prepared (v_module, v_cache, v_certificates)) = v_prepared in
 (Prepared (v_module, v_cache, (Base.list_append (v_prior) (v_certificates)))))
 and (* monomorph.bend:4543 *)
-f_prepare_shared_cached : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> (Base.text) list -> t_SharedConstants -> Base.text -> int -> (M.t_Operation) list -> (Schema.t_Evidence) list -> (D.t_Node) list -> (t_Cache) option -> (M.t_Diagnostic, t_Prepared) Base.result_ =
+f_prepare_shared_cached : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> (Base.text) list -> t_SharedConstants -> Base.text -> int -> (M.t_Operation) list -> (Schema.t_Evidence) list -> (D.t_Node) list -> (t_Cache) option -> (M.t_Diagnostic, t_Prepared) Base.result_ =
 fun v_key v_templates v_prepared v_entry v_stride v_family_templates v_schema v_nodes v_previous ->
 (let (SharedConstants ((M.Module (v_constants, v_functions, v_types, v_operations)), v_shapes, v_shared, v_counter, v_certificates)) = v_prepared in
 (let v_affected = (f_unshared_names (v_templates) (v_shared)) in
@@ -5802,7 +5802,7 @@ fun v_key v_templates v_prepared v_entry v_stride v_family_templates v_schema v_
 | Done v_result ->
 (Done ((f_with_prepared_certificates (v_result) (v_certificates))))))))))))
 and (* monomorph.bend:4555 *)
-f_prepare_templates_cached : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> (Base.text) list -> M.t_Module -> (I.t_Binding) list -> Base.text -> (M.t_Operation) list -> (D.t_Node) list -> (t_Cache) option -> M.t_CheckedModule -> (M.t_Diagnostic, t_Prepared) Base.result_ =
+f_prepare_templates_cached : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> (Base.text) list -> M.t_Module -> (I.t_Binding) list -> Base.text -> (M.t_Operation) list -> (D.t_Node) list -> (t_Cache) option -> M.t_CheckedModule -> (M.t_Diagnostic, t_Prepared) Base.result_ =
 fun v_key v_templates v_module v_shapes v_entry v_family_templates v_nodes v_previous v_checked ->
 (match v_templates with
 | [] ->
@@ -5813,7 +5813,7 @@ fun v_key v_templates v_module v_shapes v_entry v_family_templates v_nodes v_pre
 | (v_head :: v_tail) ->
 (let (M.Module (v_constants, v_original_functions, v_types, v_operations)) = v_module in
 (let v_schema = (Schema.f_capture (v_original_functions) (v_types) (v_checked) (v_entry)) in
-(match (f_identity_limit ((Base.u32_to_nat (0x00100000l))) ((f_module_expressions (v_original_functions) (v_constants))) (0)) with
+(match (f_identity_limit ((Base.u32_to_nat ((Base.W32 0x100000)))) ((f_module_expressions (v_original_functions) (v_constants))) (0)) with
 | Fail __error -> Fail __error
 | Done v_stride ->
 (let v_generic = (f_generic_templates (v_shapes) ((v_head :: v_tail))) in
@@ -5831,7 +5831,7 @@ fun v_prepared ->
 (let (Prepared (v_expanded, v_cache, v_certificates)) = v_prepared in
 (Prepared ((f_concrete_module (v_expanded)), v_cache, v_certificates)))
 and (* monomorph.bend:4578 *)
-f_prepare_cached_nodes : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> M.t_Module -> Base.text -> (M.t_Operation) list -> (D.t_Node) list -> (t_Cache) option -> Scheduler.t_Initial -> (M.t_Diagnostic, t_Prepared) Base.result_ =
+f_prepare_cached_nodes : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> M.t_Module -> Base.text -> (M.t_Operation) list -> (D.t_Node) list -> (t_Cache) option -> Scheduler.t_Initial -> (M.t_Diagnostic, t_Prepared) Base.result_ =
 fun v_key v_module v_entry v_family_templates v_nodes v_previous v_initial ->
 (let (Scheduler.Initial (v_checked, v_certificates, v_needs)) = v_initial in
 (match (f_shape_initial (v_initial) (v_module)) with
@@ -5848,7 +5848,7 @@ fun v_key v_module v_entry v_family_templates v_nodes v_previous v_initial ->
 | Done v_prepared ->
 (Done ((f_with_prepared_certificates ((f_concrete_prepared (v_prepared))) ((Core.f_ready_certificates (v_certificates)))))))))))
 and (* monomorph.bend:4587 *)
-f_prepare_cached_evidenced : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> M.t_Module -> Base.text -> (M.t_Operation) list -> (t_Cache) option -> (M.t_Diagnostic, t_Prepared) Base.result_ =
+f_prepare_cached_evidenced : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> M.t_Module -> Base.text -> (M.t_Operation) list -> (t_Cache) option -> (M.t_Diagnostic, t_Prepared) Base.result_ =
 fun v_key v_module v_entry v_family_templates v_previous ->
 (match (Scheduler.f_check_module_resolving (v_module) ((f_source_certificates (v_previous)))) with
 | Fail __error -> Fail __error
@@ -5864,7 +5864,7 @@ fun v_key v_module v_entry v_family_templates v_previous ->
 | Done v_prepared ->
 (Done ((f_with_source_certificates (v_prepared) ((Scheduler.f_initial_certificates (v_initial))))))))))
 and (* monomorph.bend:4598 *)
-f_prepare_cached_initial : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> M.t_Module -> Base.text -> (M.t_Operation) list -> (t_Cache) option -> Scheduler.t_Initial -> (M.t_Diagnostic, t_Prepared) Base.result_ =
+f_prepare_cached_initial : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> M.t_Module -> Base.text -> (M.t_Operation) list -> (t_Cache) option -> Scheduler.t_Initial -> (M.t_Diagnostic, t_Prepared) Base.result_ =
 fun v_key v_module v_entry v_family_templates v_previous v_initial ->
 (match (Check.f_module_graph (v_module)) with
 | Fail __error -> Fail __error

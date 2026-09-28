@@ -80,7 +80,7 @@ fun v_fuel v_work v_reversed ->
 and (* closures.bend:51 *)
 f_row_names : (M.t_Pattern) list -> (M.t_Diagnostic, (Base.text) list) Base.result_ =
 fun v_patterns ->
-(match (f_pattern_names_work ((Base.u32_to_nat (0x00004000l))) ((PatternsWork (v_patterns))) ([])) with
+(match (f_pattern_names_work ((Base.u32_to_nat ((Base.W32 0x4000)))) ((PatternsWork (v_patterns))) ([])) with
 | Fail __error -> Fail __error
 | Done v_reversed ->
 (Done ((Base.list_reverse (v_reversed)))))
@@ -292,7 +292,7 @@ f_lambda : M.t_Expr -> (M.t_Diagnostic, (t_Lambda) list) Base.result_ =
 fun v_expression ->
 (match v_expression with
 | (M.LambdaExpr (v_identity, v_parameter, v_parameter_type, v_result_type, v_body)) ->
-(match (f_free ((Base.u32_to_nat (0x00001000l))) ((ExpressionWork (v_body, [v_parameter])))) with
+(match (f_free ((Base.u32_to_nat ((Base.W32 0x1000)))) ((ExpressionWork (v_body, [v_parameter])))) with
 | Fail __error -> Fail __error
 | Done v_captures ->
 (Done ([(Lambda (v_identity, v_parameter, v_body, v_captures))])))

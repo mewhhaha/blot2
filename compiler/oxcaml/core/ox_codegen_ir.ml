@@ -22,7 +22,7 @@ type t_Metadata =
   | Metadata of ((F.t_Lambda) option) Base.map * ((E.t_ConstructorSlot) option) Base.map * Base.set * ((Saturation.t_Definition) option) Base.map
 and t_Expr =
   | UnitExpr
-  | U32Expr of int32
+  | U32Expr of Base.word32
   | BoolExpr of bool
   | LocalExpr of Base.text
   | ConstantExpr of Base.text
@@ -38,7 +38,7 @@ and t_Expr =
   | GuardExpr of M.t_Pattern * t_Expr * t_Expr * t_Expr
   | BlockExpr of int * t_Expr
   | ReturnExpr of int * t_Expr
-  | F32Expr of int32
+  | F32Expr of Base.word32
   | UnaryExpr of M.t_UnaryOp * t_Expr
   | ProviderExpr of M.t_TypeId * t_Expr
   | StateProviderExpr of M.t_TypeId * M.t_TypeId * t_Expr
@@ -424,7 +424,7 @@ fun v_expression v_projection v_isolated ->
 (match (Saturation.f_prepare (v_expression) ((f_metadata_functions (v_projection)))) with
 | Fail __error -> Fail __error
 | Done v_expanded ->
-(match (f_lower ((Base.u32_to_nat (0x00004000l))) ((ExpressionWork (v_expanded))) (v_projection) ((Base.set_new ())) (v_isolated)) with
+(match (f_lower ((Base.u32_to_nat ((Base.W32 0x4000)))) ((ExpressionWork (v_expanded))) (v_projection) ((Base.set_new ())) (v_isolated)) with
 | Fail __error -> Fail __error
 | Done v_result ->
 (f_one (v_result))))

@@ -264,7 +264,7 @@ fun v_fuel v_pending ->
 and (* groups.bend:165 *)
 f_validate_scheme_kinds : M.t_Ty -> (M.t_Predicate) list -> Base.text -> (M.t_Diagnostic, unit) Base.result_ =
 fun v_template v_predicates v_subject ->
-(match (f_scheme_kinds ((Base.u32_to_nat (0x00010000l))) ((v_template :: (f_predicate_shapes (v_predicates))))) with
+(match (f_scheme_kinds ((Base.u32_to_nat ((Base.W32 0x10000)))) ((v_template :: (f_predicate_shapes (v_predicates))))) with
 | Fail __error -> Fail __error
 | Done v_kinds ->
 (T.f_kind_check (v_kinds) (v_subject)))

@@ -17,7 +17,7 @@ module M = Ox_model
    means offsets above 32 retain the low-bit behavior of the reference. *)
 let[@zero_alloc strict] rec f_character_bit : Base.char32 -> int -> bool =
 fun (Chr value) offset ->
-  offset = 0 || ((Int32.to_int value lsr max 0 (32 - offset)) land 1 <> 0)
+  offset = 0 || ((Base.u32_to_nat value lsr max 0 (32 - offset)) land 1 <> 0)
 and[@zero_alloc strict] (* index.bend:12 *)
 f_string_bit : Base.text -> int -> int -> bool =
 fun v_name v_character v_offset ->

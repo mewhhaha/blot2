@@ -40,7 +40,7 @@ def main() -> None:
             'driver.ml': 'let () = Printf.printf "%d %s\\n" Ox_user.value Native_parallel.backend\n',
             'runtime_stubs.c': 'void blot_build_fixture(void) {}\n',
         }
-        for test in ['wasm_bytes', 'test_bytes', 'test_runtime', 'test_names', 'test_parallel', 'test_domains', 'bench_names']:
+        for test in ['wasm_bytes', 'test_bytes', 'test_runtime', 'test_names', 'test_builders', 'test_scalars', 'test_packet', 'test_parallel_stress', 'bench_parallel', 'test_parallel', 'test_domains', 'bench_names']:
             sources[f'{test}.ml'] = 'let () = ()\n'
         for name, contents in sources.items():
             (root / name).write_text(contents)

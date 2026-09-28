@@ -173,7 +173,7 @@ f_visit_lambda : bool -> int -> Base.text -> M.t_Expr -> (((C.t_Value) C.t_Bindi
 fun v_visited v_identity v_parameter v_body v_environment v_state ->
 (match v_visited with
 | true ->
-(match (F.f_free ((Base.u32_to_nat (0x00001000l))) ((F.ExpressionWork (v_body, [v_parameter])))) with
+(match (F.f_free ((Base.u32_to_nat ((Base.W32 0x1000)))) ((F.ExpressionWork (v_body, [v_parameter])))) with
 | Fail __error -> Fail __error
 | Done v_captures ->
 (match (f_closure_captures (v_environment) (v_captures)) with
@@ -181,7 +181,7 @@ fun v_visited v_identity v_parameter v_body v_environment v_state ->
 | Done v_values ->
 (Done ((Step ([(ValuesWork (v_values))], v_state))))))
 | false ->
-(match (F.f_free ((Base.u32_to_nat (0x00001000l))) ((F.ExpressionWork (v_body, [v_parameter])))) with
+(match (F.f_free ((Base.u32_to_nat ((Base.W32 0x1000)))) ((F.ExpressionWork (v_body, [v_parameter])))) with
 | Fail __error -> Fail __error
 | Done v_captures ->
 (match (f_closure_captures (v_environment) (v_captures)) with
@@ -411,7 +411,7 @@ f_prepare : M.t_CheckedModule -> ((C.t_Value) C.t_Binding) list -> (M.t_Diagnost
 fun v_checked v_bindings ->
 (let (M.CheckedModule (v_constants, v_functions, v_types, v_operations)) = v_checked in
 (let v_catalog = (Catalog ((f_function_index (v_functions) ((Base.map_new ()))), (f_constant_index (v_bindings) ((Base.map_new ()))), (Init.f_index ((Init.f_bindings (v_constants))) (MTip)))) in
-(match (f_walk ((Base.u32_to_nat (0x00100000l))) ((Base.list_append ((f_function_roots (v_functions))) ((f_constant_roots (v_constants))))) (v_catalog) ((State ((Base.map_new ()), (Base.map_new ()), [], (Base.set_new ()), (Base.set_new ()))))) with
+(match (f_walk ((Base.u32_to_nat ((Base.W32 0x100000)))) ((Base.list_append ((f_function_roots (v_functions))) ((f_constant_roots (v_constants))))) (v_catalog) ((State ((Base.map_new ()), (Base.map_new ()), [], (Base.set_new ()), (Base.set_new ()))))) with
 | Fail __error -> Fail __error
 | Done v_state ->
 (Done ((Runtime ((M.CheckedModule ((f_keep_constants (v_constants) (v_state)), (f_keep_functions (v_functions) (v_state)), v_types, v_operations)), (f_keep_bindings (v_bindings) (v_state)), (f_reached_lambdas (v_state)), (f_used_constructors (v_state)), (f_used_operations (v_state)))))))))

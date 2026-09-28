@@ -741,7 +741,7 @@ fun v_next v_length v_short ->
 | false ->
 false
 | true ->
-(Base.nat_is_le ((Base.nat_add 1 v_length)) ((Base.nat_div ((Base.nat_sub ((Base.u32_to_nat (0xffffffffl))) (v_next))) (65536)))))
+(Base.nat_is_le ((Base.nat_add 1 v_length)) ((Base.nat_div ((Base.nat_sub ((Base.u32_to_nat ((Base.W32 0xffffffff)))) (v_next))) (65536)))))
 and (* parallel_infer.bend:517 *)
 f_windows_fit : int -> int -> bool -> bool =
 fun v_next v_length v_under_limit ->
@@ -797,7 +797,7 @@ and (* parallel_infer.bend:553 *)
 f_run_parallel : (G.t_Declaration) list -> G.t_Environment -> (M.t_Operation) list -> (M.t_DataType) list -> (Base.text) list -> (((Bindings.t_Entry) list) Base.map) option -> (M.t_Diagnostic, G.t_Environment) Base.result_ =
 fun v_declarations v_environment v_operations v_types v_functions v_catalog ->
 (let v_next = (I.f_next_of ((G.f_env_state (v_environment)))) in
-(f_run_parallel_if (v_declarations) (v_environment) (v_operations) (v_types) (v_functions) (v_catalog) ((f_windows_fit (v_next) ((Base.list_length (v_declarations))) ((Base.nat_is_lt (v_next) ((Base.u32_to_nat (0xffffffffl)))))))))
+(f_run_parallel_if (v_declarations) (v_environment) (v_operations) (v_types) (v_functions) (v_catalog) ((f_windows_fit (v_next) ((Base.list_length (v_declarations))) ((Base.nat_is_lt (v_next) ((Base.u32_to_nat ((Base.W32 0xffffffff))))))))))
 and (* parallel_infer.bend:561 *)
 f_infer_work : int -> t_Work -> (M.t_Operation) list -> (M.t_DataType) list -> (Base.text) list -> (((Bindings.t_Entry) list) Base.map) option -> (M.t_Diagnostic, G.t_Environment) Base.result_ =
 fun v_fuel v_work v_operations v_types v_functions v_catalog ->

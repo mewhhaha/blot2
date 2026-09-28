@@ -57,7 +57,7 @@ and t_PatternWork =
   | ProductFields of (M.t_Pattern) list * t_Location * int
   | RowPatterns of (M.t_Pattern) list * int
 and t_Fragment =
-  | Bytes of (int32) list
+  | Bytes of (Base.word32) list
   | NamedCall of Base.text
   | Allocate
   | Collect
@@ -91,11 +91,11 @@ and 'a t_EntryBatch =
   | SequentialEntries of (('a) t_WeightedEntry) list
   | ParallelEntries of ('a) t_EntryBatch * ('a) t_EntryBatch
 and t_BytePlan =
-  | BytePlan of int * ((int32) list) list
+  | BytePlan of int * ((Base.word32) list) list
 and t_Heap =
-  | Heap of int * ((int32) list) list
+  | Heap of int * ((Base.word32) list) list
 and t_Serialized =
-  | Serialized of (int32) list * t_Heap
+  | Serialized of (Base.word32) list * t_Heap
 and t_Serialization =
   | ValueWork of C.t_Value
   | ValuesWork of (C.t_Value) list
@@ -268,7 +268,7 @@ let s_62 = Base.text_of_utf8 "$unit"
 let s_63 = Base.text_of_utf8 "runtime initializer has no prepared global"
 
 let rec (* wasm.bend:155 *)
-f_byte_length : (int32) list -> int -> int =
+f_byte_length : (Base.word32) list -> int -> int =
 fun v_bytes v_total ->
 (match v_bytes with
 | [] ->
@@ -276,11 +276,11 @@ v_total
 | (v_head :: v_tail) ->
 (f_byte_length (v_tail) ((Base.nat_add 1 v_total))))
 and (* wasm.bend:162 *)
-f_concat : (int32) list -> (int32) list -> (int32) list =
+f_concat : (Base.word32) list -> (Base.word32) list -> (Base.word32) list =
 fun v_left v_right ->
 (Base.list_reverse_go ((Base.list_reverse (v_left))) (v_right))
 and (* wasm.bend:165 *)
-f_join_reversed : ((int32) list) list -> (int32) list -> (int32) list =
+f_join_reversed : ((Base.word32) list) list -> (Base.word32) list -> (Base.word32) list =
 fun v_chunks v_reversed ->
 (match v_chunks with
 | [] ->
@@ -288,15 +288,15 @@ fun v_chunks v_reversed ->
 | (v_head :: v_tail) ->
 (f_join_reversed (v_tail) ((Base.list_reverse_go (v_head) (v_reversed)))))
 and (* wasm.bend:172 *)
-f_join : ((int32) list) list -> (int32) list =
+f_join : ((Base.word32) list) list -> (Base.word32) list =
 fun v_chunks ->
 (f_join_reversed (v_chunks) ([]))
 and (* wasm.bend:175 *)
-f_byte_plan : (int32) list -> t_BytePlan =
+f_byte_plan : (Base.word32) list -> t_BytePlan =
 fun v_bytes ->
 (BytePlan ((f_byte_length (v_bytes) (0)), [v_bytes]))
 and (* wasm.bend:178 *)
-f_plan_sequence_go : (t_BytePlan) list -> int -> ((int32) list) list -> t_BytePlan =
+f_plan_sequence_go : (t_BytePlan) list -> int -> ((Base.word32) list) list -> t_BytePlan =
 fun v_plans v_total v_reversed ->
 (match v_plans with
 | [] ->
@@ -308,12 +308,12 @@ f_plan_sequence : (t_BytePlan) list -> t_BytePlan =
 fun v_plans ->
 (f_plan_sequence_go (v_plans) (0) ([]))
 and (* wasm.bend:188 *)
-f_plan_prefix : (int32) list -> t_BytePlan -> t_BytePlan =
+f_plan_prefix : (Base.word32) list -> t_BytePlan -> t_BytePlan =
 fun v_bytes v_plan ->
 (let (BytePlan (v_length, v_chunks)) = v_plan in
 (BytePlan ((Base.nat_add ((f_byte_length (v_bytes) (0))) (v_length)), (v_bytes :: v_chunks))))
 and (* wasm.bend:192 *)
-f_plan_finish : t_BytePlan -> (int32) list =
+f_plan_finish : t_BytePlan -> (Base.word32) list =
 fun v_plan ->
 (let (BytePlan (v_length, v_chunks)) = v_plan in
 (f_join (v_chunks)))
@@ -330,20 +330,20 @@ f_fragments_join : ((t_Fragment) list) list -> (t_Fragment) list =
 fun v_chunks ->
 (f_fragments_reversed (v_chunks) ([]))
 and (* wasm.bend:206 *)
-f_byte_code : (int32) list -> int -> t_Code =
+f_byte_code : (Base.word32) list -> int -> t_Code =
 fun v_bytes v_locals ->
 (Code ([(Bytes (v_bytes))], v_locals))
 and (* wasm.bend:209 *)
-f_unsigned_leb_go : int -> int32 -> (int32) list =
+f_unsigned_leb_go : int -> Base.word32 -> (Base.word32) list =
 fun v_fuel v_value ->
 (match v_fuel with
 | 0 ->
 []
 | __nat_1 when __nat_1 >= 1 ->
 (let v_rest = (__nat_1 - 1) in
-(Base.bool_pick ((Base.u32_is_lt (v_value) (0x00000080l))) ([v_value]) (((Base.u32_or ((Base.u32_and (v_value) (0x0000007fl))) (0x00000080l)) :: (f_unsigned_leb_go (v_rest) ((Base.u32_shrn (v_value) (7)))))))))
+(Base.bool_pick ((Base.u32_is_lt (v_value) ((Base.W32 0x80)))) ([v_value]) (((Base.u32_or ((Base.u32_and (v_value) ((Base.W32 0x7f)))) ((Base.W32 0x80))) :: (f_unsigned_leb_go (v_rest) ((Base.u32_shrn (v_value) (7)))))))))
 and (* wasm.bend:216 *)
-f_unsigned_leb : int -> (int32) list =
+f_unsigned_leb : int -> (Base.word32) list =
 fun v_value ->
 (f_unsigned_leb_go (5) ((Base.u32_from_nat (v_value))))
 and (* wasm.bend:219 *)
@@ -352,7 +352,7 @@ fun v_plan ->
 (let (BytePlan (v_length, v_chunks)) = v_plan in
 (f_plan_prefix ((f_unsigned_leb (v_length))) ((BytePlan (v_length, v_chunks)))))
 and (* wasm.bend:223 *)
-f_plan_section : int32 -> t_BytePlan -> t_BytePlan =
+f_plan_section : Base.word32 -> t_BytePlan -> t_BytePlan =
 fun v_id v_plan ->
 (f_plan_prefix ([v_id]) ((f_plan_sized (v_plan))))
 and (* wasm.bend:226 *)
@@ -360,15 +360,15 @@ f_plan_vector : (t_BytePlan) list -> t_BytePlan =
 fun v_plans ->
 (f_plan_prefix ((f_unsigned_leb ((Base.list_length (v_plans))))) ((f_plan_sequence (v_plans))))
 and (* wasm.bend:231 *)
-f_i32_constant : int32 -> (int32) list =
+f_i32_constant : Base.word32 -> (Base.word32) list =
 fun v_value ->
-[0x00000041l; (Base.u32_or ((Base.u32_and (v_value) (0x0000007fl))) (0x00000080l)); (Base.u32_or ((Base.u32_and ((Base.u32_shrn (v_value) (7))) (0x0000007fl))) (0x00000080l)); (Base.u32_or ((Base.u32_and ((Base.u32_shrn (v_value) (14))) (0x0000007fl))) (0x00000080l)); (Base.u32_or ((Base.u32_and ((Base.u32_shrn (v_value) (21))) (0x0000007fl))) (0x00000080l)); (Base.u32_or ((Base.u32_shrn (v_value) (28))) ((Base.bool_pick ((Base.u32_is_lt (v_value) (0x80000000l))) (0x00000000l) (0x00000070l))))]
+[(Base.W32 0x41); (Base.u32_or ((Base.u32_and (v_value) ((Base.W32 0x7f)))) ((Base.W32 0x80))); (Base.u32_or ((Base.u32_and ((Base.u32_shrn (v_value) (7))) ((Base.W32 0x7f)))) ((Base.W32 0x80))); (Base.u32_or ((Base.u32_and ((Base.u32_shrn (v_value) (14))) ((Base.W32 0x7f)))) ((Base.W32 0x80))); (Base.u32_or ((Base.u32_and ((Base.u32_shrn (v_value) (21))) ((Base.W32 0x7f)))) ((Base.W32 0x80))); (Base.u32_or ((Base.u32_shrn (v_value) (28))) ((Base.bool_pick ((Base.u32_is_lt (v_value) ((Base.W32 0x80000000)))) ((Base.W32 0x0)) ((Base.W32 0x70)))))]
 and (* wasm.bend:238 *)
-f_utf8_char : int32 -> (int32) list =
+f_utf8_char : Base.word32 -> (Base.word32) list =
 fun v_code ->
-(Base.bool_pick ((Base.u32_is_lt (v_code) (0x00000080l))) ([v_code]) ((Base.bool_pick ((Base.u32_is_lt (v_code) (0x00000800l))) ([(Base.u32_or (0x000000c0l) ((Base.u32_shrn (v_code) (6)))); (Base.u32_or (0x00000080l) ((Base.u32_and (v_code) (0x0000003fl))))]) ((Base.bool_pick ((Base.u32_is_lt (v_code) (0x00010000l))) ([(Base.u32_or (0x000000e0l) ((Base.u32_shrn (v_code) (12)))); (Base.u32_or (0x00000080l) ((Base.u32_and ((Base.u32_shrn (v_code) (6))) (0x0000003fl)))); (Base.u32_or (0x00000080l) ((Base.u32_and (v_code) (0x0000003fl))))]) ([(Base.u32_or (0x000000f0l) ((Base.u32_shrn (v_code) (18)))); (Base.u32_or (0x00000080l) ((Base.u32_and ((Base.u32_shrn (v_code) (12))) (0x0000003fl)))); (Base.u32_or (0x00000080l) ((Base.u32_and ((Base.u32_shrn (v_code) (6))) (0x0000003fl)))); (Base.u32_or (0x00000080l) ((Base.u32_and (v_code) (0x0000003fl))))]))))))
+(Base.bool_pick ((Base.u32_is_lt (v_code) ((Base.W32 0x80)))) ([v_code]) ((Base.bool_pick ((Base.u32_is_lt (v_code) ((Base.W32 0x800)))) ([(Base.u32_or ((Base.W32 0xc0)) ((Base.u32_shrn (v_code) (6)))); (Base.u32_or ((Base.W32 0x80)) ((Base.u32_and (v_code) ((Base.W32 0x3f)))))]) ((Base.bool_pick ((Base.u32_is_lt (v_code) ((Base.W32 0x10000)))) ([(Base.u32_or ((Base.W32 0xe0)) ((Base.u32_shrn (v_code) (12)))); (Base.u32_or ((Base.W32 0x80)) ((Base.u32_and ((Base.u32_shrn (v_code) (6))) ((Base.W32 0x3f))))); (Base.u32_or ((Base.W32 0x80)) ((Base.u32_and (v_code) ((Base.W32 0x3f)))))]) ([(Base.u32_or ((Base.W32 0xf0)) ((Base.u32_shrn (v_code) (18)))); (Base.u32_or ((Base.W32 0x80)) ((Base.u32_and ((Base.u32_shrn (v_code) (12))) ((Base.W32 0x3f))))); (Base.u32_or ((Base.W32 0x80)) ((Base.u32_and ((Base.u32_shrn (v_code) (6))) ((Base.W32 0x3f))))); (Base.u32_or ((Base.W32 0x80)) ((Base.u32_and (v_code) ((Base.W32 0x3f)))))]))))))
 and (* wasm.bend:246 *)
-f_utf8 : Base.text -> (int32) list =
+f_utf8 : Base.text -> (Base.word32) list =
 fun v_text ->
 (match v_text with
 | SNil ->
@@ -376,15 +376,15 @@ fun v_text ->
 | (SCon ((Chr (v_code)), v_tail)) ->
 (f_concat ((f_utf8_char (v_code))) ((f_utf8 (v_tail)))))
 and (* wasm.bend:253 *)
-f_sized : (int32) list -> (int32) list =
+f_sized : (Base.word32) list -> (Base.word32) list =
 fun v_bytes ->
 (f_concat ((f_unsigned_leb ((f_byte_length (v_bytes) (0))))) (v_bytes))
 and (* wasm.bend:256 *)
-f_section : int32 -> (int32) list -> (int32) list =
+f_section : Base.word32 -> (Base.word32) list -> (Base.word32) list =
 fun v_id v_bytes ->
 (v_id :: (f_sized (v_bytes)))
 and (* wasm.bend:259 *)
-f_vector : ((int32) list) list -> (int32) list =
+f_vector : ((Base.word32) list) list -> (Base.word32) list =
 fun v_entries ->
 (f_concat ((f_unsigned_leb ((Base.list_length (v_entries))))) ((f_join (v_entries))))
 and (* wasm.bend:262 *)
@@ -534,27 +534,27 @@ f_global_index : int -> int -> int =
 fun v_index v_imports ->
 (Base.nat_add (v_index) ((Base.bool_pick ((Base.nat_is_eq (v_imports) (0))) (0) (1))))
 and (* wasm.bend:387 *)
-f_runtime_from_word : M.t_Ty -> (int32) list =
+f_runtime_from_word : M.t_Ty -> (Base.word32) list =
 fun v_ty ->
 (match v_ty with
 | M.F32Ty ->
-[0x000000bel]
+[(Base.W32 0xbe)]
 | _ ->
 [])
 and (* wasm.bend:394 *)
-f_runtime_to_word : M.t_Ty -> (int32) list =
+f_runtime_to_word : M.t_Ty -> (Base.word32) list =
 fun v_ty ->
 (match v_ty with
 | M.F32Ty ->
-[0x000000bcl]
+[(Base.W32 0xbc)]
 | _ ->
 [])
 and (* wasm.bend:401 *)
-f_constant_reference : (t_RuntimeGlobal) option -> Base.text -> t_Catalog -> int -> (M.t_Diagnostic, (int32) list) Base.result_ =
+f_constant_reference : (t_RuntimeGlobal) option -> Base.text -> t_Catalog -> int -> (M.t_Diagnostic, (Base.word32) list) Base.result_ =
 fun v_found v_name v_symbols v_imports ->
 (match v_found with
 | (Some ((RuntimeGlobal (v_index, v_ty)))) ->
-(Done ((f_concat ((0x00000023l :: (f_unsigned_leb ((f_global_index (v_index) (v_imports)))))) ((f_runtime_to_word (v_ty))))))
+(Done ((f_concat (((Base.W32 0x23) :: (f_unsigned_leb ((f_global_index (v_index) (v_imports)))))) ((f_runtime_to_word (v_ty))))))
 | None ->
 (match (f_lookup_symbol ((f_symbol_constants (v_symbols))) (v_name)) with
 | Fail __error -> Fail __error
@@ -612,18 +612,18 @@ fun v_context v_label ->
 (let (Context (v_locals, v_next_local, v_labels, v_provider)) = v_context in
 (f_label_depth (v_labels) (v_label) (0)))
 and (* wasm.bend:452 *)
-f_loads : (int) list -> (int32) list =
+f_loads : (int) list -> (Base.word32) list =
 fun v_offsets ->
 (match v_offsets with
 | [] ->
 []
 | (v_offset :: v_tail) ->
-(f_concat ([0x00000028l; 0x00000002l]) ((f_concat ((f_unsigned_leb (v_offset))) ((f_loads (v_tail)))))))
+(f_concat ([(Base.W32 0x28); (Base.W32 0x2)]) ((f_concat ((f_unsigned_leb (v_offset))) ((f_loads (v_tail)))))))
 and (* wasm.bend:459 *)
-f_read_location : t_Location -> (int32) list =
+f_read_location : t_Location -> (Base.word32) list =
 fun v_location ->
 (let (Location (v_local, v_offsets)) = v_location in
-(f_concat ((0x00000020l :: (f_unsigned_leb (v_local)))) ((f_loads (v_offsets)))))
+(f_concat (((Base.W32 0x20) :: (f_unsigned_leb (v_local)))) ((f_loads (v_offsets)))))
 and (* wasm.bend:463 *)
 f_field_location : t_Location -> int -> t_Location =
 fun v_location v_offset ->
@@ -666,77 +666,77 @@ fun v_fuel v_work v_context ->
 | Done v_bound ->
 (f_pattern_bindings_work (v_rest) ((RowPatterns (v_tail, (Base.nat_add 1 v_first)))) (v_bound)))))
 and (* wasm.bend:492 *)
-f_opcode : M.t_ScalarOp -> int32 =
+f_opcode : M.t_ScalarOp -> Base.word32 =
 fun v_operator ->
 (match v_operator with
 | M.Add ->
-0x0000006al
+(Base.W32 0x6a)
 | M.Subtract ->
-0x0000006bl
+(Base.W32 0x6b)
 | M.Multiply ->
-0x0000006cl
+(Base.W32 0x6c)
 | M.Equal ->
-0x00000046l
+(Base.W32 0x46)
 | M.LessThan ->
-0x00000049l
+(Base.W32 0x49)
 | M.F32Add ->
-0x00000092l
+(Base.W32 0x92)
 | M.F32Subtract ->
-0x00000093l
+(Base.W32 0x93)
 | M.F32Multiply ->
-0x00000094l
+(Base.W32 0x94)
 | M.F32Divide ->
-0x00000095l
+(Base.W32 0x95)
 | M.F32Equal ->
-0x0000005bl
+(Base.W32 0x5b)
 | M.F32NotEqual ->
-0x0000005cl
+(Base.W32 0x5c)
 | M.F32LessThan ->
-0x0000005dl
+(Base.W32 0x5d)
 | M.F32LessEqual ->
-0x0000005fl
+(Base.W32 0x5f)
 | M.F32GreaterThan ->
-0x0000005el
+(Base.W32 0x5e)
 | M.F32GreaterEqual ->
-0x00000060l)
+(Base.W32 0x60))
 and (* wasm.bend:525 *)
-f_unary_opcode : M.t_UnaryOp -> (int32) list =
+f_unary_opcode : M.t_UnaryOp -> (Base.word32) list =
 fun v_operator ->
 (match v_operator with
 | M.F32Negate ->
-[0x0000008cl]
+[(Base.W32 0x8c)]
 | M.F32Absolute ->
-[0x0000008bl]
+[(Base.W32 0x8b)]
 | M.F32SquareRoot ->
-[0x00000091l]
+[(Base.W32 0x91)]
 | M.F32Floor ->
-[0x0000008el]
+[(Base.W32 0x8e)]
 | M.F32Ceiling ->
-[0x0000008dl]
+[(Base.W32 0x8d)]
 | M.F32Truncate ->
-[0x0000008fl]
+[(Base.W32 0x8f)]
 | M.U32ToF32 ->
-[0x000000b3l]
+[(Base.W32 0xb3)]
 | M.F32ToU32 ->
-[0x000000fcl; 0x00000001l])
+[(Base.W32 0xfc); (Base.W32 0x1)])
 and (* wasm.bend:546 *)
-f_scalar_from_word : M.t_Ty -> (int32) list =
+f_scalar_from_word : M.t_Ty -> (Base.word32) list =
 fun v_ty ->
 (match v_ty with
 | M.F32Ty ->
-[0x000000bel]
+[(Base.W32 0xbe)]
 | _ ->
 [])
 and (* wasm.bend:553 *)
-f_scalar_to_word : M.t_Ty -> (int32) list =
+f_scalar_to_word : M.t_Ty -> (Base.word32) list =
 fun v_ty ->
 (match v_ty with
 | M.F32Ty ->
-[0x000000bcl]
+[(Base.W32 0xbc)]
 | _ ->
 [])
 and (* wasm.bend:560 *)
-f_append_code : t_Code -> t_Code -> (int32) list -> (int32) list -> t_Code =
+f_append_code : t_Code -> t_Code -> (Base.word32) list -> (Base.word32) list -> t_Code =
 fun v_left v_right v_middle v_end ->
 (let (Code (v_lb, v_ll)) = v_left in
 (let (Code (v_rb, v_rl)) = v_right in
@@ -758,7 +758,7 @@ fun v_left v_right v_operator ->
 (let v_convert = (f_scalar_from_word ((M.f_scalar_parameter (v_operator)))) in
 (Done ((f_append_code (v_a) (v_b) (v_convert) ((f_join ([v_convert; [(f_opcode (v_operator))]; (f_scalar_to_word ((M.f_scalar_result (v_operator))))]))))))))
 and (* wasm.bend:579 *)
-f_capture_stores : (Base.text) list -> (t_Local) list -> int -> int -> (M.t_Diagnostic, (int32) list) Base.result_ =
+f_capture_stores : (Base.text) list -> (t_Local) list -> int -> int -> (M.t_Diagnostic, (Base.word32) list) Base.result_ =
 fun v_names v_locals v_pointer v_offset ->
 (match v_names with
 | [] ->
@@ -771,7 +771,7 @@ fun v_names v_locals v_pointer v_offset ->
 (match (f_capture_stores (v_tail) (v_locals) (v_pointer) ((Base.nat_add 4 v_at))) with
 | Fail __error -> Fail __error
 | Done v_rest ->
-(Done ((f_join ([(0x00000020l :: (f_unsigned_leb (v_pointer))); (f_read_location (v_location)); [0x00000036l; 0x00000002l]; (f_unsigned_leb (v_at)); v_rest]))))))))
+(Done ((f_join ([((Base.W32 0x20) :: (f_unsigned_leb (v_pointer))); (f_read_location (v_location)); [(Base.W32 0x36); (Base.W32 0x2)]; (f_unsigned_leb (v_at)); v_rest]))))))))
 and (* wasm.bend:590 *)
 f_closure_code : Base.text -> (Base.text) list -> t_Context -> (M.t_Diagnostic, t_Code) Base.result_ =
 fun v_key v_captures v_context ->
@@ -779,18 +779,18 @@ fun v_key v_captures v_context ->
 (match (f_capture_stores (v_captures) ((f_context_locals (v_context))) (v_pointer) (4)) with
 | Fail __error -> Fail __error
 | Done v_stores ->
-(Done ((Code ([(Bytes ((f_i32_constant ((Base.u32_from_nat ((Base.nat_mul (4) ((Base.nat_add 1 (Base.list_length (v_captures))))))))))); Allocate; (Bytes ((0x00000022l :: (f_unsigned_leb (v_pointer))))); (EntryIndex (v_key)); (Bytes ((f_join ([[0x00000036l; 0x00000002l; 0x00000000l]; v_stores; (0x00000020l :: (f_unsigned_leb (v_pointer)))]))))], (Base.nat_add 1 v_pointer)))))))
+(Done ((Code ([(Bytes ((f_i32_constant ((Base.u32_from_nat ((Base.nat_mul (4) ((Base.nat_add 1 (Base.list_length (v_captures))))))))))); Allocate; (Bytes (((Base.W32 0x22) :: (f_unsigned_leb (v_pointer))))); (EntryIndex (v_key)); (Bytes ((f_join ([[(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]; v_stores; ((Base.W32 0x20) :: (f_unsigned_leb (v_pointer)))]))))], (Base.nat_add 1 v_pointer)))))))
 and (* wasm.bend:596 *)
 f_construct_code : t_Fragment -> t_Code -> int -> t_Code =
 fun v_tag v_payload v_slot ->
 (let (Code (v_fragments, v_locals)) = v_payload in
-(Code ((f_fragments_join ([v_fragments; [(Bytes ((f_concat ((0x00000021l :: (f_unsigned_leb (v_slot)))) ((f_i32_constant (0x00000008l)))))); Allocate; (Bytes ((0x00000022l :: (f_unsigned_leb ((Base.nat_add 1 v_slot)))))); v_tag; (Bytes ((f_join ([[0x00000036l; 0x00000002l; 0x00000000l]; (0x00000020l :: (f_unsigned_leb ((Base.nat_add 1 v_slot)))); (0x00000020l :: (f_unsigned_leb (v_slot))); [0x00000036l; 0x00000002l; 0x00000004l]; (0x00000020l :: (f_unsigned_leb ((Base.nat_add 1 v_slot))))]))))]])), (Base.nat_max (v_locals) ((Base.nat_add 2 v_slot))))))
+(Code ((f_fragments_join ([v_fragments; [(Bytes ((f_concat (((Base.W32 0x21) :: (f_unsigned_leb (v_slot)))) ((f_i32_constant ((Base.W32 0x8))))))); Allocate; (Bytes (((Base.W32 0x22) :: (f_unsigned_leb ((Base.nat_add 1 v_slot)))))); v_tag; (Bytes ((f_join ([[(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]; ((Base.W32 0x20) :: (f_unsigned_leb ((Base.nat_add 1 v_slot)))); ((Base.W32 0x20) :: (f_unsigned_leb (v_slot))); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x4)]; ((Base.W32 0x20) :: (f_unsigned_leb ((Base.nat_add 1 v_slot))))]))))]])), (Base.nat_max (v_locals) ((Base.nat_add 2 v_slot))))))
 and (* wasm.bend:600 *)
-f_local_get : int -> (int32) list =
+f_local_get : int -> (Base.word32) list =
 fun v_slot ->
-(0x00000020l :: (f_unsigned_leb (v_slot)))
+((Base.W32 0x20) :: (f_unsigned_leb (v_slot)))
 and (* wasm.bend:603 *)
-f_element_stores : int -> int -> int -> int -> ((int32) list) list -> (int32) list =
+f_element_stores : int -> int -> int -> int -> ((Base.word32) list) list -> (Base.word32) list =
 fun v_count v_pointer v_first v_offset v_reversed ->
 (match v_count with
 | 0 ->
@@ -799,14 +799,14 @@ fun v_count v_pointer v_first v_offset v_reversed ->
 (let v_rest = (__nat_10 - 1) in
 (let v_slot = v_first in
 (let v_at = v_offset in
-(let v_bytes = (f_join ([(f_local_get (v_pointer)); (f_local_get (v_slot)); [0x00000036l; 0x00000002l]; (f_unsigned_leb (v_at))])) in
+(let v_bytes = (f_join ([(f_local_get (v_pointer)); (f_local_get (v_slot)); [(Base.W32 0x36); (Base.W32 0x2)]; (f_unsigned_leb (v_at))])) in
 (f_element_stores (v_rest) (v_pointer) ((Base.nat_add 1 v_slot)) ((Base.nat_add 4 v_at)) ((v_bytes :: v_reversed))))))))
 and (* wasm.bend:613 *)
 f_product_code : t_Code -> int -> int -> t_Code =
 fun v_elements v_count v_first ->
 (let (Code (v_fragments, v_locals)) = v_elements in
 (let v_pointer = (Base.nat_add (v_first) (v_count)) in
-(Code ((f_fragments_join ([v_fragments; [(Bytes ((f_i32_constant ((Base.u32_from_nat ((Base.nat_mul (4) (v_count)))))))); Allocate; (Bytes ((f_concat ((0x00000021l :: (f_unsigned_leb (v_pointer)))) ((f_element_stores (v_count) (v_pointer) (v_first) (0) ([]))))))]])), (Base.nat_max (v_locals) ((Base.nat_add 1 v_pointer)))))))
+(Code ((f_fragments_join ([v_fragments; [(Bytes ((f_i32_constant ((Base.u32_from_nat ((Base.nat_mul (4) (v_count)))))))); Allocate; (Bytes ((f_concat (((Base.W32 0x21) :: (f_unsigned_leb (v_pointer)))) ((f_element_stores (v_count) (v_pointer) (v_first) (0) ([]))))))]])), (Base.nat_max (v_locals) ((Base.nat_add 1 v_pointer)))))))
 and (* wasm.bend:618 *)
 f_product_arity : int -> (M.t_Diagnostic, unit) Base.result_ =
 fun v_count ->
@@ -823,11 +823,11 @@ f_projection_code : bool -> int -> (M.t_Diagnostic, t_Code) Base.result_ =
 fun v_allowed v_index ->
 (match v_allowed with
 | true ->
-(Done ((f_byte_code ((f_concat ([0x00000028l; 0x00000002l]) ((f_unsigned_leb ((Base.nat_mul (4) (v_index))))))) (0))))
+(Done ((f_byte_code ((f_concat ([(Base.W32 0x28); (Base.W32 0x2)]) ((f_unsigned_leb ((Base.nat_mul (4) (v_index))))))) (0))))
 | false ->
 (Fail ((M.Diagnostic (s_12, s_17, s_18)))))
 and (* wasm.bend:634 *)
-f_checked_array_size : bool -> int -> (M.t_Diagnostic, int32) Base.result_ =
+f_checked_array_size : bool -> int -> (M.t_Diagnostic, Base.word32) Base.result_ =
 fun v_allowed v_count ->
 (match v_allowed with
 | true ->
@@ -835,19 +835,19 @@ fun v_allowed v_count ->
 | false ->
 (Fail ((M.Diagnostic (s_12, s_19, s_20)))))
 and (* wasm.bend:641 *)
-f_array_size : int -> (M.t_Diagnostic, int32) Base.result_ =
+f_array_size : int -> (M.t_Diagnostic, Base.word32) Base.result_ =
 fun v_count ->
-(f_checked_array_size ((Base.nat_is_lt (v_count) ((Base.u32_to_nat (0x00400000l))))) (v_count))
+(f_checked_array_size ((Base.nat_is_lt (v_count) ((Base.u32_to_nat ((Base.W32 0x400000)))))) (v_count))
 and (* wasm.bend:644 *)
-f_array_code : t_Code -> int -> int32 -> int -> t_Code =
+f_array_code : t_Code -> int -> Base.word32 -> int -> t_Code =
 fun v_elements v_count v_size v_first ->
 (let (Code (v_fragments, v_locals)) = v_elements in
 (let v_pointer = (Base.nat_add (v_first) (v_count)) in
-(Code ((f_fragments_join ([v_fragments; [(Bytes ((f_i32_constant (v_size)))); Allocate; (Bytes ((f_join ([(0x00000022l :: (f_unsigned_leb (v_pointer))); (f_i32_constant ((Base.u32_from_nat (v_count)))); [0x00000036l; 0x00000002l; 0x00000000l]; (f_element_stores (v_count) (v_pointer) (v_first) (4) ([]))]))))]])), (Base.nat_max (v_locals) ((Base.nat_add 1 v_pointer)))))))
+(Code ((f_fragments_join ([v_fragments; [(Bytes ((f_i32_constant (v_size)))); Allocate; (Bytes ((f_join ([((Base.W32 0x22) :: (f_unsigned_leb (v_pointer))); (f_i32_constant ((Base.u32_from_nat (v_count)))); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]; (f_element_stores (v_count) (v_pointer) (v_first) (4) ([]))]))))]])), (Base.nat_max (v_locals) ((Base.nat_add 1 v_pointer)))))))
 and (* wasm.bend:655 *)
-f_runtime_array_max_count : unit -> int32 =
+f_runtime_array_max_count : unit -> Base.word32 =
 fun () ->
-0x3ffffffel
+(Base.W32 0x3ffffffe)
 and (* wasm.bend:658 *)
 f_runtime_memory_max_pages : unit -> int =
 fun () ->
@@ -858,19 +858,19 @@ fun v_first ->
 (let v_value = (Base.nat_add 1 v_first) in
 (let v_pointer = (Base.nat_add 2 v_first) in
 (let v_index = (Base.nat_add 3 v_first) in
-(Code ([(Bytes ((f_join ([(f_local_get (v_first)); (f_i32_constant ((f_runtime_array_max_count ()))); [0x0000004bl; 0x00000004l; 0x00000040l; 0x00000000l; 0x0000000bl]; (f_local_get (v_first)); [0x00000041l; 0x00000001l; 0x0000006al; 0x00000041l; 0x00000004l; 0x0000006cl]])))); Allocate; (Bytes ((f_join ([(0x00000022l :: (f_unsigned_leb (v_pointer))); (f_local_get (v_first)); [0x00000036l; 0x00000002l; 0x00000000l]; [0x00000041l; 0x00000000l]; (0x00000021l :: (f_unsigned_leb (v_index))); [0x00000002l; 0x00000040l; 0x00000003l; 0x00000040l]; (f_local_get (v_index)); (f_local_get (v_first)); [0x0000004fl; 0x0000000dl; 0x00000001l]; (f_local_get (v_pointer)); (f_local_get (v_index)); [0x00000041l; 0x00000004l; 0x0000006cl; 0x0000006al]; (f_local_get (v_value)); [0x00000036l; 0x00000002l; 0x00000004l]; (f_local_get (v_index)); [0x00000041l; 0x00000001l; 0x0000006al]; (0x00000021l :: (f_unsigned_leb (v_index))); [0x0000000cl; 0x00000000l; 0x0000000bl; 0x0000000bl]; (f_local_get (v_pointer))]))))], (Base.nat_add 4 v_first))))))
+(Code ([(Bytes ((f_join ([(f_local_get (v_first)); (f_i32_constant ((f_runtime_array_max_count ()))); [(Base.W32 0x4b); (Base.W32 0x4); (Base.W32 0x40); (Base.W32 0x0); (Base.W32 0xb)]; (f_local_get (v_first)); [(Base.W32 0x41); (Base.W32 0x1); (Base.W32 0x6a); (Base.W32 0x41); (Base.W32 0x4); (Base.W32 0x6c)]])))); Allocate; (Bytes ((f_join ([((Base.W32 0x22) :: (f_unsigned_leb (v_pointer))); (f_local_get (v_first)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]; [(Base.W32 0x41); (Base.W32 0x0)]; ((Base.W32 0x21) :: (f_unsigned_leb (v_index))); [(Base.W32 0x2); (Base.W32 0x40); (Base.W32 0x3); (Base.W32 0x40)]; (f_local_get (v_index)); (f_local_get (v_first)); [(Base.W32 0x4f); (Base.W32 0xd); (Base.W32 0x1)]; (f_local_get (v_pointer)); (f_local_get (v_index)); [(Base.W32 0x41); (Base.W32 0x4); (Base.W32 0x6c); (Base.W32 0x6a)]; (f_local_get (v_value)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x4)]; (f_local_get (v_index)); [(Base.W32 0x41); (Base.W32 0x1); (Base.W32 0x6a)]; ((Base.W32 0x21) :: (f_unsigned_leb (v_index))); [(Base.W32 0xc); (Base.W32 0x0); (Base.W32 0xb); (Base.W32 0xb)]; (f_local_get (v_pointer))]))))], (Base.nat_add 4 v_first))))))
 and (* wasm.bend:685 *)
 f_array_generate_code : int -> int -> t_Code =
 fun v_first v_provider ->
 (let v_generator = (Base.nat_add 1 v_first) in
 (let v_pointer = (Base.nat_add 2 v_first) in
 (let v_index = (Base.nat_add 3 v_first) in
-(Code ([(Bytes ((f_join ([(f_local_get (v_first)); (f_i32_constant ((f_runtime_array_max_count ()))); [0x0000004bl; 0x00000004l; 0x00000040l; 0x00000000l; 0x0000000bl]; (f_local_get (v_first)); [0x00000041l; 0x00000001l; 0x0000006al; 0x00000041l; 0x00000004l; 0x0000006cl]])))); Allocate; (Bytes ((f_join ([(0x00000022l :: (f_unsigned_leb (v_pointer))); (f_local_get (v_first)); [0x00000036l; 0x00000002l; 0x00000000l]; [0x00000041l; 0x00000000l]; (0x00000021l :: (f_unsigned_leb (v_index))); [0x00000002l; 0x00000040l; 0x00000003l; 0x00000040l]; (f_local_get (v_index)); (f_local_get (v_first)); [0x0000004fl; 0x0000000dl; 0x00000001l]; (f_local_get (v_pointer)); (f_local_get (v_index)); [0x00000041l; 0x00000004l; 0x0000006cl; 0x0000006al]; (f_local_get (v_generator)); (f_local_get (v_index)); (f_local_get (v_provider)); (f_local_get (v_generator)); [0x00000028l; 0x00000002l; 0x00000000l; 0x00000011l; 0x00000000l; 0x00000000l; 0x00000036l; 0x00000002l; 0x00000004l]; (f_local_get (v_index)); [0x00000041l; 0x00000001l; 0x0000006al]; (0x00000021l :: (f_unsigned_leb (v_index))); [0x0000000cl; 0x00000000l; 0x0000000bl; 0x0000000bl]; (f_local_get (v_pointer))]))))], (Base.nat_add 4 v_first))))))
+(Code ([(Bytes ((f_join ([(f_local_get (v_first)); (f_i32_constant ((f_runtime_array_max_count ()))); [(Base.W32 0x4b); (Base.W32 0x4); (Base.W32 0x40); (Base.W32 0x0); (Base.W32 0xb)]; (f_local_get (v_first)); [(Base.W32 0x41); (Base.W32 0x1); (Base.W32 0x6a); (Base.W32 0x41); (Base.W32 0x4); (Base.W32 0x6c)]])))); Allocate; (Bytes ((f_join ([((Base.W32 0x22) :: (f_unsigned_leb (v_pointer))); (f_local_get (v_first)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]; [(Base.W32 0x41); (Base.W32 0x0)]; ((Base.W32 0x21) :: (f_unsigned_leb (v_index))); [(Base.W32 0x2); (Base.W32 0x40); (Base.W32 0x3); (Base.W32 0x40)]; (f_local_get (v_index)); (f_local_get (v_first)); [(Base.W32 0x4f); (Base.W32 0xd); (Base.W32 0x1)]; (f_local_get (v_pointer)); (f_local_get (v_index)); [(Base.W32 0x41); (Base.W32 0x4); (Base.W32 0x6c); (Base.W32 0x6a)]; (f_local_get (v_generator)); (f_local_get (v_index)); (f_local_get (v_provider)); (f_local_get (v_generator)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0); (Base.W32 0x11); (Base.W32 0x0); (Base.W32 0x0); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x4)]; (f_local_get (v_index)); [(Base.W32 0x41); (Base.W32 0x1); (Base.W32 0x6a)]; ((Base.W32 0x21) :: (f_unsigned_leb (v_index))); [(Base.W32 0xc); (Base.W32 0x0); (Base.W32 0xb); (Base.W32 0xb)]; (f_local_get (v_pointer))]))))], (Base.nat_add 4 v_first))))))
 and (* wasm.bend:706 *)
 f_array_get_code : int -> t_Code =
 fun v_first ->
 (let v_index = (Base.nat_add 1 v_first) in
-(f_byte_code ((f_join ([(f_local_get (v_index)); (f_local_get (v_first)); [0x00000028l; 0x00000002l; 0x00000000l; 0x0000004fl; 0x00000004l; 0x00000040l; 0x00000000l; 0x0000000bl]; (f_local_get (v_first)); (f_local_get (v_index)); [0x00000041l; 0x00000004l; 0x0000006cl; 0x0000006al; 0x00000028l; 0x00000002l; 0x00000004l]]))) ((Base.nat_add 2 v_first))))
+(f_byte_code ((f_join ([(f_local_get (v_index)); (f_local_get (v_first)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0); (Base.W32 0x4f); (Base.W32 0x4); (Base.W32 0x40); (Base.W32 0x0); (Base.W32 0xb)]; (f_local_get (v_first)); (f_local_get (v_index)); [(Base.W32 0x41); (Base.W32 0x4); (Base.W32 0x6c); (Base.W32 0x6a); (Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x4)]]))) ((Base.nat_add 2 v_first))))
 and (* wasm.bend:715 *)
 f_array_set_code : int -> t_Code =
 fun v_first ->
@@ -878,39 +878,39 @@ fun v_first ->
 (let v_value = (Base.nat_add 2 v_first) in
 (let v_length = (Base.nat_add 3 v_first) in
 (let v_pointer = (Base.nat_add 4 v_first) in
-(Code ([(Bytes ((f_join ([(f_local_get (v_first)); [0x00000028l; 0x00000002l; 0x00000000l]; (0x00000021l :: (f_unsigned_leb (v_length))); (f_local_get (v_index)); (f_local_get (v_length)); [0x0000004fl; 0x00000004l; 0x00000040l; 0x00000000l; 0x0000000bl]; (f_local_get (v_length)); (f_i32_constant ((f_runtime_array_max_count ()))); [0x0000004bl; 0x00000004l; 0x00000040l; 0x00000000l; 0x0000000bl]; (f_local_get (v_length)); [0x00000041l; 0x00000001l; 0x0000006al; 0x00000041l; 0x00000004l; 0x0000006cl]])))); Allocate; (Bytes ((f_join ([(0x00000021l :: (f_unsigned_leb (v_pointer))); (f_local_get (v_pointer)); (f_local_get (v_first)); (f_local_get (v_length)); [0x00000041l; 0x00000001l; 0x0000006al; 0x00000041l; 0x00000004l; 0x0000006cl; 0x000000fcl; 0x0000000al; 0x00000000l; 0x00000000l]; (f_local_get (v_pointer)); (f_local_get (v_index)); [0x00000041l; 0x00000004l; 0x0000006cl; 0x0000006al]; (f_local_get (v_value)); [0x00000036l; 0x00000002l; 0x00000004l]; (f_local_get (v_pointer))]))))], (Base.nat_add 5 v_first)))))))
+(Code ([(Bytes ((f_join ([(f_local_get (v_first)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0)]; ((Base.W32 0x21) :: (f_unsigned_leb (v_length))); (f_local_get (v_index)); (f_local_get (v_length)); [(Base.W32 0x4f); (Base.W32 0x4); (Base.W32 0x40); (Base.W32 0x0); (Base.W32 0xb)]; (f_local_get (v_length)); (f_i32_constant ((f_runtime_array_max_count ()))); [(Base.W32 0x4b); (Base.W32 0x4); (Base.W32 0x40); (Base.W32 0x0); (Base.W32 0xb)]; (f_local_get (v_length)); [(Base.W32 0x41); (Base.W32 0x1); (Base.W32 0x6a); (Base.W32 0x41); (Base.W32 0x4); (Base.W32 0x6c)]])))); Allocate; (Bytes ((f_join ([((Base.W32 0x21) :: (f_unsigned_leb (v_pointer))); (f_local_get (v_pointer)); (f_local_get (v_first)); (f_local_get (v_length)); [(Base.W32 0x41); (Base.W32 0x1); (Base.W32 0x6a); (Base.W32 0x41); (Base.W32 0x4); (Base.W32 0x6c); (Base.W32 0xfc); (Base.W32 0xa); (Base.W32 0x0); (Base.W32 0x0)]; (f_local_get (v_pointer)); (f_local_get (v_index)); [(Base.W32 0x41); (Base.W32 0x4); (Base.W32 0x6c); (Base.W32 0x6a)]; (f_local_get (v_value)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x4)]; (f_local_get (v_pointer))]))))], (Base.nat_add 5 v_first)))))))
 and (* wasm.bend:736 *)
 f_array_reuse_code : int -> t_Code =
 fun v_first ->
 (let v_index = (Base.nat_add 1 v_first) in
 (let v_value = (Base.nat_add 2 v_first) in
-(f_byte_code ((f_join ([(f_local_get (v_index)); (f_local_get (v_first)); [0x00000028l; 0x00000002l; 0x00000000l; 0x0000004fl; 0x00000004l; 0x00000040l; 0x00000000l; 0x0000000bl]; (f_local_get (v_first)); (f_local_get (v_index)); [0x00000041l; 0x00000004l; 0x0000006cl; 0x0000006al]; (f_local_get (v_value)); [0x00000036l; 0x00000002l; 0x00000004l]; (f_local_get (v_first))]))) ((Base.nat_add 3 v_first)))))
+(f_byte_code ((f_join ([(f_local_get (v_index)); (f_local_get (v_first)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0); (Base.W32 0x4f); (Base.W32 0x4); (Base.W32 0x40); (Base.W32 0x0); (Base.W32 0xb)]; (f_local_get (v_first)); (f_local_get (v_index)); [(Base.W32 0x41); (Base.W32 0x4); (Base.W32 0x6c); (Base.W32 0x6a)]; (f_local_get (v_value)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x4)]; (f_local_get (v_first))]))) ((Base.nat_add 3 v_first)))))
 and (* wasm.bend:747 *)
 f_state_provider_code : M.t_TypeId -> M.t_TypeId -> t_Code -> int -> t_Code =
 fun v_read v_write v_value v_slot ->
 (let (Code (v_fragments, v_locals)) = v_value in
 (let v_pointer = (Base.nat_add 1 v_slot) in
-(Code ((f_fragments_join ([v_fragments; [(Bytes ((f_join ([(0x00000021l :: (f_unsigned_leb (v_slot))); (f_i32_constant (0x00000010l))])))); Allocate; (Bytes ((f_join ([(0x00000022l :: (f_unsigned_leb (v_pointer))); (f_i32_constant (0xffffffffl)); [0x00000036l; 0x00000002l; 0x00000000l]; (f_local_get (v_pointer))])))); (OperationIndex (v_read)); (Bytes ((f_join ([[0x00000036l; 0x00000002l; 0x00000004l]; (f_local_get (v_pointer))])))); (OperationIndex (v_write)); (Bytes ((f_join ([[0x00000036l; 0x00000002l; 0x00000008l]; (f_local_get (v_pointer)); (f_local_get (v_slot)); [0x00000036l; 0x00000002l; 0x0000000cl]; (f_local_get (v_pointer))]))))]])), (Base.nat_max (v_locals) ((Base.nat_add 2 v_slot)))))))
+(Code ((f_fragments_join ([v_fragments; [(Bytes ((f_join ([((Base.W32 0x21) :: (f_unsigned_leb (v_slot))); (f_i32_constant ((Base.W32 0x10)))])))); Allocate; (Bytes ((f_join ([((Base.W32 0x22) :: (f_unsigned_leb (v_pointer))); (f_i32_constant ((Base.W32 0xffffffff))); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]; (f_local_get (v_pointer))])))); (OperationIndex (v_read)); (Bytes ((f_join ([[(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x4)]; (f_local_get (v_pointer))])))); (OperationIndex (v_write)); (Bytes ((f_join ([[(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x8)]; (f_local_get (v_pointer)); (f_local_get (v_slot)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0xc)]; (f_local_get (v_pointer))]))))]])), (Base.nat_max (v_locals) ((Base.nat_add 2 v_slot)))))))
 and (* wasm.bend:756 *)
 f_install_provider : int -> int -> t_Code =
 fun v_slot v_outer ->
 (let v_frame = (Base.nat_add 1 v_slot) in
 (let v_cell = (Base.nat_add 2 v_slot) in
-(Code ([(Bytes ((f_join ([(0x00000021l :: (f_unsigned_leb (v_slot))); (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000000l]; (f_i32_constant (0xffffffffl)); [0x00000046l; 0x00000004l; 0x00000040l]; (f_i32_constant (0x00000024l))])))); Allocate; (Bytes ((f_join ([(0x00000022l :: (f_unsigned_leb (v_frame))); [0x00000041l; 0x00000020l; 0x0000006al]; (0x00000021l :: (f_unsigned_leb (v_cell))); (f_local_get (v_cell)); (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x0000000cl; 0x00000036l; 0x00000002l; 0x00000000l]; (f_local_get (v_frame)); (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000004l; 0x00000036l; 0x00000002l; 0x00000000l]; (f_local_get (v_frame)); (f_local_get (v_cell)); [0x00000036l; 0x00000002l; 0x00000004l]; (f_local_get (v_frame)); (f_local_get (v_frame)); [0x00000041l; 0x00000010l; 0x0000006al; 0x00000036l; 0x00000002l; 0x00000008l]; (f_local_get (v_frame)); [0x00000041l; 0x00000001l; 0x00000036l; 0x00000002l; 0x0000000cl]; (f_local_get (v_frame)); (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000008l; 0x00000036l; 0x00000002l; 0x00000010l]; (f_local_get (v_frame)); (f_local_get (v_cell)); [0x00000036l; 0x00000002l; 0x00000014l]; (f_local_get (v_frame)); (f_local_get (v_outer)); [0x00000036l; 0x00000002l; 0x00000018l]; (f_local_get (v_frame)); [0x00000041l; 0x00000002l; 0x00000036l; 0x00000002l; 0x0000001cl; 0x00000005l]; (f_i32_constant (0x00000010l))])))); Allocate; (Bytes ((f_join ([(0x00000022l :: (f_unsigned_leb (v_frame))); (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000000l; 0x00000036l; 0x00000002l; 0x00000000l]; (f_local_get (v_frame)); (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000004l; 0x00000036l; 0x00000002l; 0x00000004l]; (f_local_get (v_frame)); (f_local_get (v_outer)); [0x00000036l; 0x00000002l; 0x00000008l]; (f_local_get (v_frame)); [0x00000041l; 0x00000000l; 0x00000036l; 0x00000002l; 0x0000000cl; 0x0000000bl]]))))], (Base.nat_add 3 v_slot)))))
+(Code ([(Bytes ((f_join ([((Base.W32 0x21) :: (f_unsigned_leb (v_slot))); (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0)]; (f_i32_constant ((Base.W32 0xffffffff))); [(Base.W32 0x46); (Base.W32 0x4); (Base.W32 0x40)]; (f_i32_constant ((Base.W32 0x24)))])))); Allocate; (Bytes ((f_join ([((Base.W32 0x22) :: (f_unsigned_leb (v_frame))); [(Base.W32 0x41); (Base.W32 0x20); (Base.W32 0x6a)]; ((Base.W32 0x21) :: (f_unsigned_leb (v_cell))); (f_local_get (v_cell)); (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0xc); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]; (f_local_get (v_frame)); (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x4); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]; (f_local_get (v_frame)); (f_local_get (v_cell)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x4)]; (f_local_get (v_frame)); (f_local_get (v_frame)); [(Base.W32 0x41); (Base.W32 0x10); (Base.W32 0x6a); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x8)]; (f_local_get (v_frame)); [(Base.W32 0x41); (Base.W32 0x1); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0xc)]; (f_local_get (v_frame)); (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x8); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x10)]; (f_local_get (v_frame)); (f_local_get (v_cell)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x14)]; (f_local_get (v_frame)); (f_local_get (v_outer)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x18)]; (f_local_get (v_frame)); [(Base.W32 0x41); (Base.W32 0x2); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x1c); (Base.W32 0x5)]; (f_i32_constant ((Base.W32 0x10)))])))); Allocate; (Bytes ((f_join ([((Base.W32 0x22) :: (f_unsigned_leb (v_frame))); (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]; (f_local_get (v_frame)); (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x4); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x4)]; (f_local_get (v_frame)); (f_local_get (v_outer)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x8)]; (f_local_get (v_frame)); [(Base.W32 0x41); (Base.W32 0x0); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0xc); (Base.W32 0xb)]]))))], (Base.nat_add 3 v_slot)))))
 and (* wasm.bend:780 *)
 f_complete_provider : int -> t_Code =
 fun v_slot ->
 (let v_frame = (Base.nat_add 1 v_slot) in
 (let v_result = (Base.nat_add 2 v_slot) in
 (let v_tuple = (Base.nat_add 3 v_slot) in
-(Code ([(Bytes ((f_join ([(0x00000021l :: (f_unsigned_leb (v_result))); (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000000l]; (f_i32_constant (0xffffffffl)); [0x00000046l; 0x00000004l; 0x0000007fl]; (f_i32_constant (0x00000008l))])))); Allocate; (Bytes ((f_join ([(0x00000022l :: (f_unsigned_leb (v_tuple))); (f_local_get (v_frame)); [0x00000028l; 0x00000002l; 0x00000004l; 0x00000028l; 0x00000002l; 0x00000000l; 0x00000036l; 0x00000002l; 0x00000000l]; (f_local_get (v_tuple)); (f_local_get (v_result)); [0x00000036l; 0x00000002l; 0x00000004l]; (f_local_get (v_tuple)); [0x00000005l]; (f_local_get (v_result)); [0x0000000bl]]))))], (Base.nat_add 4 v_slot))))))
+(Code ([(Bytes ((f_join ([((Base.W32 0x21) :: (f_unsigned_leb (v_result))); (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0)]; (f_i32_constant ((Base.W32 0xffffffff))); [(Base.W32 0x46); (Base.W32 0x4); (Base.W32 0x7f)]; (f_i32_constant ((Base.W32 0x8)))])))); Allocate; (Bytes ((f_join ([((Base.W32 0x22) :: (f_unsigned_leb (v_tuple))); (f_local_get (v_frame)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x4); (Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]; (f_local_get (v_tuple)); (f_local_get (v_result)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x4)]; (f_local_get (v_tuple)); [(Base.W32 0x5)]; (f_local_get (v_result)); [(Base.W32 0xb)]]))))], (Base.nat_add 4 v_slot))))))
 and (* wasm.bend:793 *)
 f_invoke_operation : M.t_TypeId -> t_Code -> int -> int -> t_Code =
 fun v_identity v_argument v_slot v_provider ->
 (let (Code (v_fragments, v_locals)) = v_argument in
 (let v_handler = (Base.nat_add 1 v_slot) in
 (let v_value = (Base.nat_add 2 v_slot) in
-(Code ((f_fragments_join ([v_fragments; [(Bytes ((f_join ([(0x00000021l :: (f_unsigned_leb (v_value))); (f_local_get (v_provider)); (0x00000021l :: (f_unsigned_leb (v_slot))); [0x00000002l; 0x00000040l; 0x00000003l; 0x00000040l]; (f_local_get (v_slot)); [0x00000045l; 0x00000004l; 0x00000040l; 0x00000000l; 0x0000000bl]; (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000000l]])))); (OperationIndex (v_identity)); (Bytes ((f_join ([[0x00000046l; 0x0000000dl; 0x00000001l]; (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000008l]; (0x00000021l :: (f_unsigned_leb (v_slot))); [0x0000000cl; 0x00000000l; 0x0000000bl; 0x0000000bl]; (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x0000000cl; 0x00000045l; 0x00000004l; 0x0000007fl]; (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000004l]; (0x00000022l :: (f_unsigned_leb (v_handler))); (f_local_get (v_value)); (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000008l]; (f_local_get (v_handler)); [0x00000028l; 0x00000002l; 0x00000000l; 0x00000011l; 0x00000000l; 0x00000000l; 0x00000005l]; (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x0000000cl; 0x00000041l; 0x00000001l; 0x00000046l; 0x00000004l; 0x0000007fl]; (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000004l; 0x00000028l; 0x00000002l; 0x00000000l; 0x00000005l]; (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000004l]; (f_local_get (v_value)); [0x00000036l; 0x00000002l; 0x00000000l; 0x00000041l; 0x00000000l; 0x0000000bl; 0x0000000bl]]))))]])), (Base.nat_max (v_locals) ((Base.nat_add 3 v_slot))))))))
+(Code ((f_fragments_join ([v_fragments; [(Bytes ((f_join ([((Base.W32 0x21) :: (f_unsigned_leb (v_value))); (f_local_get (v_provider)); ((Base.W32 0x21) :: (f_unsigned_leb (v_slot))); [(Base.W32 0x2); (Base.W32 0x40); (Base.W32 0x3); (Base.W32 0x40)]; (f_local_get (v_slot)); [(Base.W32 0x45); (Base.W32 0x4); (Base.W32 0x40); (Base.W32 0x0); (Base.W32 0xb)]; (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0)]])))); (OperationIndex (v_identity)); (Bytes ((f_join ([[(Base.W32 0x46); (Base.W32 0xd); (Base.W32 0x1)]; (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x8)]; ((Base.W32 0x21) :: (f_unsigned_leb (v_slot))); [(Base.W32 0xc); (Base.W32 0x0); (Base.W32 0xb); (Base.W32 0xb)]; (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0xc); (Base.W32 0x45); (Base.W32 0x4); (Base.W32 0x7f)]; (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x4)]; ((Base.W32 0x22) :: (f_unsigned_leb (v_handler))); (f_local_get (v_value)); (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x8)]; (f_local_get (v_handler)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0); (Base.W32 0x11); (Base.W32 0x0); (Base.W32 0x0); (Base.W32 0x5)]; (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0xc); (Base.W32 0x41); (Base.W32 0x1); (Base.W32 0x46); (Base.W32 0x4); (Base.W32 0x7f)]; (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x4); (Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0); (Base.W32 0x5)]; (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x4)]; (f_local_get (v_value)); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0); (Base.W32 0x41); (Base.W32 0x0); (Base.W32 0xb); (Base.W32 0xb)]]))))]])), (Base.nat_max (v_locals) ((Base.nat_add 3 v_slot))))))))
 and (* wasm.bend:811 *)
 f_constructor_tag : E.t_ConstructorSlot -> int =
 fun v_variant ->
@@ -929,55 +929,55 @@ fun v_fuel v_work v_locals ->
 (Fail ((M.Diagnostic (s_12, s_13, s_21))))
 | (__nat_12, (PatternTest (M.WildcardPattern, v_location))) when __nat_12 >= 1 ->
 (let v_rest = (__nat_12 - 1) in
-(Done ([(Bytes ([0x00000041l; 0x00000001l]))])))
+(Done ([(Bytes ([(Base.W32 0x41); (Base.W32 0x1)]))])))
 | (__nat_13, (PatternTest ((M.BindingPattern (v_name)), v_location))) when __nat_13 >= 1 ->
 (let v_rest = (__nat_13 - 1) in
-(Done ([(Bytes ([0x00000041l; 0x00000001l]))])))
+(Done ([(Bytes ([(Base.W32 0x41); (Base.W32 0x1)]))])))
 | (__nat_14, (PatternTest ((M.ValuePattern ((M.LocalReference (v_name)))), v_location))) when __nat_14 >= 1 ->
 (let v_rest = (__nat_14 - 1) in
 (match (f_lookup_local (v_locals) (v_name)) with
 | Fail __error -> Fail __error
 | Done v_expected ->
-(Done ([(Bytes ((f_join ([(f_read_location (v_location)); (f_read_location (v_expected)); [0x00000046l]]))))]))))
+(Done ([(Bytes ((f_join ([(f_read_location (v_location)); (f_read_location (v_expected)); [(Base.W32 0x46)]]))))]))))
 | (__nat_15, (PatternTest ((M.ValuePattern ((M.ConstantReference (v_name)))), v_location))) when __nat_15 >= 1 ->
 (let v_rest = (__nat_15 - 1) in
-(Done ([(Bytes ((f_read_location (v_location)))); (ConstantReference (v_name)); (Bytes ([0x00000046l]))])))
+(Done ([(Bytes ((f_read_location (v_location)))); (ConstantReference (v_name)); (Bytes ([(Base.W32 0x46)]))])))
 | (__nat_16, (PatternTest (M.UnitPattern, v_location))) when __nat_16 >= 1 ->
 (let v_rest = (__nat_16 - 1) in
-(Done ([(Bytes ([0x00000041l; 0x00000001l]))])))
+(Done ([(Bytes ([(Base.W32 0x41); (Base.W32 0x1)]))])))
 | (__nat_17, (PatternTest ((M.U32Pattern (v_value)), v_location))) when __nat_17 >= 1 ->
 (let v_rest = (__nat_17 - 1) in
-(Done ([(Bytes ((f_join ([(f_read_location (v_location)); (f_i32_constant (v_value)); [0x00000046l]]))))])))
+(Done ([(Bytes ((f_join ([(f_read_location (v_location)); (f_i32_constant (v_value)); [(Base.W32 0x46)]]))))])))
 | (__nat_18, (PatternTest ((M.BoolPattern (v_value)), v_location))) when __nat_18 >= 1 ->
 (let v_rest = (__nat_18 - 1) in
-(Done ([(Bytes ((f_join ([(f_read_location (v_location)); [0x00000041l; (Base.bool_pick (v_value) (0x00000001l) (0x00000000l)); 0x00000046l]]))))])))
+(Done ([(Bytes ((f_join ([(f_read_location (v_location)); [(Base.W32 0x41); (Base.bool_pick (v_value) ((Base.W32 0x1)) ((Base.W32 0x0))); (Base.W32 0x46)]]))))])))
 | (__nat_19, (PatternTest ((M.ConstructorPattern (v_constructor, None)), v_location))) when __nat_19 >= 1 ->
 (let v_rest = (__nat_19 - 1) in
-(Done ([(Bytes ((f_concat ((f_read_location (v_location))) ([0x00000028l; 0x00000002l; 0x00000000l])))); (ConstructorIndex (v_constructor)); (Bytes ([0x00000046l]))])))
+(Done ([(Bytes ((f_concat ((f_read_location (v_location))) ([(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0)])))); (ConstructorIndex (v_constructor)); (Bytes ([(Base.W32 0x46)]))])))
 | (__nat_20, (PatternTest ((M.ConstructorPattern (v_constructor, (Some (v_payload)))), v_location))) when __nat_20 >= 1 ->
 (let v_rest = (__nat_20 - 1) in
 (match (f_pattern_test_work (v_rest) ((PatternTest (v_payload, (f_field_location (v_location) (4))))) (v_locals)) with
 | Fail __error -> Fail __error
 | Done v_nested ->
-(Done ((f_fragments_join ([[(Bytes ((f_concat ((f_read_location (v_location))) ([0x00000028l; 0x00000002l; 0x00000000l])))); (ConstructorIndex (v_constructor)); (Bytes ([0x00000046l; 0x00000004l; 0x0000007fl]))]; v_nested; [(Bytes ([0x00000005l; 0x00000041l; 0x00000000l; 0x0000000bl]))]]))))))
+(Done ((f_fragments_join ([[(Bytes ((f_concat ((f_read_location (v_location))) ([(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0)])))); (ConstructorIndex (v_constructor)); (Bytes ([(Base.W32 0x46); (Base.W32 0x4); (Base.W32 0x7f)]))]; v_nested; [(Bytes ([(Base.W32 0x5); (Base.W32 0x41); (Base.W32 0x0); (Base.W32 0xb)]))]]))))))
 | (__nat_21, (PatternTest ((M.ProductPattern (v_elements)), v_location))) when __nat_21 >= 1 ->
 (let v_rest = (__nat_21 - 1) in
 (match (f_product_arity ((Base.list_length (v_elements)))) with
 | Fail __error -> Fail __error
 | Done v_valid ->
-(f_pattern_test_work (v_rest) ((ProductTests (v_elements, v_location, 0, [(Bytes ([0x00000002l; 0x0000007fl]))]))) (v_locals))))
+(f_pattern_test_work (v_rest) ((ProductTests (v_elements, v_location, 0, [(Bytes ([(Base.W32 0x2); (Base.W32 0x7f)]))]))) (v_locals))))
 | (__nat_22, (ProductTests ([], v_location, v_offset, v_reversed))) when __nat_22 >= 1 ->
 (let v_rest = (__nat_22 - 1) in
-(Done ((Base.list_reverse_go (v_reversed) ([(Bytes ([0x00000041l; 0x00000001l; 0x0000000bl]))])))))
+(Done ((Base.list_reverse_go (v_reversed) ([(Bytes ([(Base.W32 0x41); (Base.W32 0x1); (Base.W32 0xb)]))])))))
 | (__nat_23, (ProductTests ((v_head :: v_tail), v_location, v_offset, v_reversed))) when __nat_23 >= 1 ->
 (let v_rest = (__nat_23 - 1) in
 (match (f_pattern_test_work (v_rest) ((PatternTest (v_head, (f_field_location (v_location) (v_offset))))) (v_locals)) with
 | Fail __error -> Fail __error
 | Done v_test ->
-(f_pattern_test_work (v_rest) ((ProductTests (v_tail, v_location, (Base.nat_add 4 v_offset), ((Bytes ([0x00000045l; 0x0000000dl; 0x00000000l; 0x0000001al])) :: (Base.list_reverse_go (v_test) (((Bytes ([0x00000041l; 0x00000000l])) :: v_reversed))))))) (v_locals))))
+(f_pattern_test_work (v_rest) ((ProductTests (v_tail, v_location, (Base.nat_add 4 v_offset), ((Bytes ([(Base.W32 0x45); (Base.W32 0xd); (Base.W32 0x0); (Base.W32 0x1a)])) :: (Base.list_reverse_go (v_test) (((Bytes ([(Base.W32 0x41); (Base.W32 0x0)])) :: v_reversed))))))) (v_locals))))
 | (__nat_24, (RowTests ([], v_first))) when __nat_24 >= 1 ->
 (let v_rest = (__nat_24 - 1) in
-(Done ([(Bytes ([0x00000041l; 0x00000001l]))])))
+(Done ([(Bytes ([(Base.W32 0x41); (Base.W32 0x1)]))])))
 | (__nat_25, (RowTests ((v_head :: v_tail), v_first))) when __nat_25 >= 1 ->
 (let v_rest = (__nat_25 - 1) in
 (match (f_pattern_test_work (v_rest) ((PatternTest (v_head, (Location (v_first, []))))) (v_locals)) with
@@ -986,16 +986,16 @@ fun v_fuel v_work v_locals ->
 (match (f_pattern_test_work (v_rest) ((RowTests (v_tail, (Base.nat_add 1 v_first)))) (v_locals)) with
 | Fail __error -> Fail __error
 | Done v_remaining ->
-(Done ((f_fragments_join ([v_test; [(Bytes ([0x00000004l; 0x0000007fl]))]; v_remaining; [(Bytes ([0x00000005l; 0x00000041l; 0x00000000l; 0x0000000bl]))]]))))))))
+(Done ((f_fragments_join ([v_test; [(Bytes ([(Base.W32 0x4); (Base.W32 0x7f)]))]; v_remaining; [(Bytes ([(Base.W32 0x5); (Base.W32 0x41); (Base.W32 0x0); (Base.W32 0xb)]))]]))))))))
 and (* wasm.bend:865 *)
 f_next_scrutinee : (I.t_Expr) list -> int -> t_Code -> (t_Fragment) list -> int -> t_Emission =
 fun v_values v_first v_compiled v_reversed v_locals ->
 (let (Code (v_fragments, v_used)) = v_compiled in
-(ScrutineesWork (v_values, (Base.nat_add 1 v_first), ((Bytes ((0x00000021l :: (f_unsigned_leb (v_first))))) :: (Base.list_reverse_go (v_fragments) (v_reversed))), (Base.nat_max ((Base.nat_max (v_locals) (v_used))) ((Base.nat_add 1 v_first))))))
+(ScrutineesWork (v_values, (Base.nat_add 1 v_first), ((Bytes (((Base.W32 0x21) :: (f_unsigned_leb (v_first))))) :: (Base.list_reverse_go (v_fragments) (v_reversed))), (Base.nat_max ((Base.nat_max (v_locals) (v_used))) ((Base.nat_add 1 v_first))))))
 and (* wasm.bend:873 *)
 f_forever_compaction : bool -> int -> int -> int -> t_Code =
 fun v_enabled v_state_slot v_floor_slot v_scratch_slot ->
-(Base.bool_pick (v_enabled) ((Code ([(Bytes ((f_join ([(f_local_get (v_scratch_slot)); [0x00000041l; 0x00000001l; 0x0000006al]; (0x00000022l :: (f_unsigned_leb (v_scratch_slot))); [0x00000041l; 0x00000003l; 0x00000071l; 0x00000045l; 0x00000004l; 0x00000040l]; (f_local_get (v_state_slot)); (f_local_get (v_floor_slot)); [0x00000041l; 0x00000000l]])))); Collect; (Bytes ((f_join ([(0x00000021l :: (f_unsigned_leb (v_state_slot))); [0x0000000bl]]))))], (Base.nat_add 1 v_scratch_slot)))) ((f_byte_code ([]) (0))))
+(Base.bool_pick (v_enabled) ((Code ([(Bytes ((f_join ([(f_local_get (v_scratch_slot)); [(Base.W32 0x41); (Base.W32 0x1); (Base.W32 0x6a)]; ((Base.W32 0x22) :: (f_unsigned_leb (v_scratch_slot))); [(Base.W32 0x41); (Base.W32 0x3); (Base.W32 0x71); (Base.W32 0x45); (Base.W32 0x4); (Base.W32 0x40)]; (f_local_get (v_state_slot)); (f_local_get (v_floor_slot)); [(Base.W32 0x41); (Base.W32 0x0)]])))); Collect; (Bytes ((f_join ([((Base.W32 0x21) :: (f_unsigned_leb (v_state_slot))); [(Base.W32 0xb)]]))))], (Base.nat_add 1 v_scratch_slot)))) ((f_byte_code ([]) (0))))
 and (* wasm.bend:880 *)
 f_emit_expr : int -> t_Emission -> t_Context -> (M.t_Diagnostic, t_Code) Base.result_ =
 fun v_fuel v_work v_context ->
@@ -1006,13 +1006,13 @@ fun v_fuel v_work v_context ->
 (let v_rest = (__nat_26 - 1) in
 (match v_work with
 | (ExpressionWork (I.UnitExpr)) ->
-(Done ((f_byte_code ([0x00000041l; 0x00000000l]) (0))))
+(Done ((f_byte_code ([(Base.W32 0x41); (Base.W32 0x0)]) (0))))
 | (ExpressionWork ((I.U32Expr (v_value)))) ->
 (Done ((f_byte_code ((f_i32_constant (v_value))) (0))))
 | (ExpressionWork ((I.F32Expr (v_value)))) ->
 (Done ((f_byte_code ((f_i32_constant ((Base.f32_bits (v_value))))) (0))))
 | (ExpressionWork ((I.BoolExpr (v_value)))) ->
-(Done ((f_byte_code ([0x00000041l; (Base.bool_pick (v_value) (0x00000001l) (0x00000000l))]) (0))))
+(Done ((f_byte_code ([(Base.W32 0x41); (Base.bool_pick (v_value) ((Base.W32 0x1)) ((Base.W32 0x0)))]) (0))))
 | (ExpressionWork ((I.LocalExpr (v_name)))) ->
 (match (f_lookup_local ((f_context_locals (v_context))) (v_name)) with
 | Fail __error -> Fail __error
@@ -1023,7 +1023,7 @@ fun v_fuel v_work v_context ->
 | (ExpressionWork ((I.ClosureExpr (v_key, v_captures)))) ->
 (f_closure_code (v_key) (v_captures) (v_context))
 | (ExpressionWork ((I.PanicExpr (v_message)))) ->
-(Done ((f_byte_code ([0x00000000l]) (0))))
+(Done ((f_byte_code ([(Base.W32 0x0)]) (0))))
 | (ExpressionWork ((I.ProductExpr (v_elements)))) ->
 (let v_first = (f_context_next (v_context)) in
 (let v_count = (Base.list_length (v_elements)) in
@@ -1038,7 +1038,7 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_value))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_compiled ->
-(match (f_projection_code ((Base.nat_is_lt (v_index) ((Base.u32_to_nat (0x00400000l))))) (v_index)) with
+(match (f_projection_code ((Base.nat_is_lt (v_index) ((Base.u32_to_nat ((Base.W32 0x400000)))))) (v_index)) with
 | Fail __error -> Fail __error
 | Done v_access ->
 (Done ((f_append_code (v_compiled) (v_access) ([]) ([]))))))
@@ -1061,7 +1061,7 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_body))) (v_nested)) with
 | Fail __error -> Fail __error
 | Done v_iteration ->
-(Done ((f_require_locals ((f_append_code (v_operands) (v_iteration) ((f_join ([[0x00000002l; 0x00000040l; 0x00000003l; 0x00000040l]; (f_local_get (v_first)); (f_local_get ((Base.nat_add 1 v_first))); [0x0000004fl; 0x0000000dl; 0x00000001l]]))) ((f_join ([(0x00000021l :: (f_unsigned_leb ((Base.nat_add 2 v_first)))); (f_local_get (v_first)); [0x00000041l; 0x00000001l; 0x0000006al]; (0x00000021l :: (f_unsigned_leb (v_first))); [0x0000000cl; 0x00000000l; 0x0000000bl; 0x0000000bl]; (f_local_get ((Base.nat_add 2 v_first)))]))))) ((Base.nat_add 3 v_first)))))))))
+(Done ((f_require_locals ((f_append_code (v_operands) (v_iteration) ((f_join ([[(Base.W32 0x2); (Base.W32 0x40); (Base.W32 0x3); (Base.W32 0x40)]; (f_local_get (v_first)); (f_local_get ((Base.nat_add 1 v_first))); [(Base.W32 0x4f); (Base.W32 0xd); (Base.W32 0x1)]]))) ((f_join ([((Base.W32 0x21) :: (f_unsigned_leb ((Base.nat_add 2 v_first)))); (f_local_get (v_first)); [(Base.W32 0x41); (Base.W32 0x1); (Base.W32 0x6a)]; ((Base.W32 0x21) :: (f_unsigned_leb (v_first))); [(Base.W32 0xc); (Base.W32 0x0); (Base.W32 0xb); (Base.W32 0xb)]; (f_local_get ((Base.nat_add 2 v_first)))]))))) ((Base.nat_add 3 v_first)))))))))
 | (ExpressionWork ((I.ForeverExpr (v_state, v_initial, v_body, v_compact)))) ->
 (let v_first = (f_context_next (v_context)) in
 (let v_nested = (f_control ((f_control ((f_bind ((f_reserve (v_context) (3))) (v_state) ((Location (v_first, []))))) (None))) (None)) in
@@ -1071,7 +1071,7 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_body))) (v_nested)) with
 | Fail __error -> Fail __error
 | Done v_iteration ->
-(Done ((f_require_locals ((f_append_code ((f_append_code (v_prepared) (v_iteration) ((f_join ([[0x00000023l; 0x00000000l]; (0x00000021l :: (f_unsigned_leb ((Base.nat_add 1 v_first)))); [0x00000041l; 0x00000000l]; (0x00000021l :: (f_unsigned_leb ((Base.nat_add 2 v_first)))); [0x00000002l; 0x00000040l; 0x00000003l; 0x00000040l]]))) ((0x00000021l :: (f_unsigned_leb (v_first)))))) ((f_forever_compaction (v_compact) (v_first) ((Base.nat_add 1 v_first)) ((Base.nat_add 2 v_first)))) ([]) ((f_join ([[0x0000000cl; 0x00000000l; 0x0000000bl; 0x0000000bl]; (f_local_get (v_first))]))))) ((Base.nat_add 3 v_first)))))))))
+(Done ((f_require_locals ((f_append_code ((f_append_code (v_prepared) (v_iteration) ((f_join ([[(Base.W32 0x23); (Base.W32 0x0)]; ((Base.W32 0x21) :: (f_unsigned_leb ((Base.nat_add 1 v_first)))); [(Base.W32 0x41); (Base.W32 0x0)]; ((Base.W32 0x21) :: (f_unsigned_leb ((Base.nat_add 2 v_first)))); [(Base.W32 0x2); (Base.W32 0x40); (Base.W32 0x3); (Base.W32 0x40)]]))) (((Base.W32 0x21) :: (f_unsigned_leb (v_first)))))) ((f_forever_compaction (v_compact) (v_first) ((Base.nat_add 1 v_first)) ((Base.nat_add 2 v_first)))) ([]) ((f_join ([[(Base.W32 0xc); (Base.W32 0x0); (Base.W32 0xb); (Base.W32 0xb)]; (f_local_get (v_first))]))))) ((Base.nat_add 3 v_first)))))))))
 | (ExpressionWork ((I.ArrayGenerateExpr (v_count, v_generator)))) ->
 (let v_first = (f_context_next (v_context)) in
 (match (f_emit_expr (v_rest) ((ScrutineesWork ([v_count; v_generator], v_first, [], 0))) ((f_reserve (v_context) (4)))) with
@@ -1106,7 +1106,7 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_array))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_value ->
-(Done ((f_append_code (v_value) ((f_byte_code ([0x00000028l; 0x00000002l; 0x00000000l]) (0))) ([]) ([])))))
+(Done ((f_append_code (v_value) ((f_byte_code ([(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0)]) (0))) ([]) ([])))))
 | (ExpressionWork ((I.StateProviderExpr (v_read, v_write, v_initial)))) ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_initial))) ((f_reserve (v_context) (2)))) with
 | Fail __error -> Fail __error
@@ -1132,7 +1132,7 @@ fun v_fuel v_work v_context ->
 | Done v_value ->
 (Done ((f_invoke_operation (v_identity) (v_value) ((f_context_next (v_context))) ((f_context_provider (v_context)))))))
 | (ExpressionWork ((I.ConstructExpr (v_constructor, None)))) ->
-(Done ((f_construct_code ((ConstructorIndex (v_constructor))) ((f_byte_code ([0x00000041l; 0x00000000l]) (0))) ((f_context_next (v_context))))))
+(Done ((f_construct_code ((ConstructorIndex (v_constructor))) ((f_byte_code ([(Base.W32 0x41); (Base.W32 0x0)]) (0))) ((f_context_next (v_context))))))
 | (ExpressionWork ((I.ConstructExpr (v_constructor, (Some (v_payload)))))) ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_payload))) ((f_reserve (v_context) (2)))) with
 | Fail __error -> Fail __error
@@ -1146,12 +1146,12 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_argument))) ((f_reserve (v_context) (1)))) with
 | Fail __error -> Fail __error
 | Done v_value ->
-(Done ((f_require_locals ((f_append_code (v_function) (v_value) ((f_join ([(0x00000021l :: (f_unsigned_leb (v_slot))); (f_local_get (v_slot))]))) ((f_join ([(f_local_get ((f_context_provider (v_context)))); (f_local_get (v_slot)); [0x00000028l; 0x00000002l; 0x00000000l; 0x00000011l; 0x00000000l; 0x00000000l]]))))) ((Base.nat_add 1 v_slot))))))))
+(Done ((f_require_locals ((f_append_code (v_function) (v_value) ((f_join ([((Base.W32 0x21) :: (f_unsigned_leb (v_slot))); (f_local_get (v_slot))]))) ((f_join ([(f_local_get ((f_context_provider (v_context)))); (f_local_get (v_slot)); [(Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0); (Base.W32 0x11); (Base.W32 0x0); (Base.W32 0x0)]]))))) ((Base.nat_add 1 v_slot))))))))
 | (ExpressionWork ((I.CallExpr (v_key, v_argument)))) ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_argument))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_value ->
-(Done ((f_append_code ((f_append_code ((f_byte_code ([0x00000041l; 0x00000000l]) (0))) (v_value) ([]) ([]))) ((Code ([(NamedCall (v_key))], 0))) ((f_local_get ((f_context_provider (v_context))))) ([])))))
+(Done ((f_append_code ((f_append_code ((f_byte_code ([(Base.W32 0x41); (Base.W32 0x0)]) (0))) (v_value) ([]) ([]))) ((Code ([(NamedCall (v_key))], 0))) ((f_local_get ((f_context_provider (v_context))))) ([])))))
 | (ExpressionWork ((I.ScalarExpr (v_operator, v_left, v_right)))) ->
 (let v_a = (f_emit_expr (v_rest) ((ExpressionWork (v_left))) (v_context)) in
 (let v_b = (f_emit_expr (v_rest) ((ExpressionWork (v_right))) (v_context)) in
@@ -1169,7 +1169,7 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_body))) ((f_bind ((f_reserve (v_context) (1))) (v_name) ((Location (v_slot, [])))))) with
 | Fail __error -> Fail __error
 | Done v_b ->
-(Done ((f_require_locals ((f_append_code (v_v) (v_b) ((0x00000021l :: (f_unsigned_leb (v_slot)))) ([]))) ((Base.nat_add 1 v_slot))))))))
+(Done ((f_require_locals ((f_append_code (v_v) (v_b) (((Base.W32 0x21) :: (f_unsigned_leb (v_slot)))) ([]))) ((Base.nat_add 1 v_slot))))))))
 | (ExpressionWork ((I.IfExpr (v_condition, v_consequent, v_alternative)))) ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_condition))) (v_context)) with
 | Fail __error -> Fail __error
@@ -1180,7 +1180,7 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_alternative))) ((f_control (v_context) (None)))) with
 | Fail __error -> Fail __error
 | Done v_n ->
-(Done ((f_append_code (v_c) ((f_append_code (v_y) (v_n) ([0x00000005l]) ([0x0000000bl]))) ([0x00000004l; 0x0000007fl]) ([])))))))
+(Done ((f_append_code (v_c) ((f_append_code (v_y) (v_n) ([(Base.W32 0x5)]) ([(Base.W32 0xb)]))) ([(Base.W32 0x4); (Base.W32 0x7f)]) ([])))))))
 | (ExpressionWork ((I.SequenceExpr (v_first, v_next)))) ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_first))) (v_context)) with
 | Fail __error -> Fail __error
@@ -1188,7 +1188,7 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_next))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_b ->
-(Done ((f_append_code (v_a) (v_b) ([0x0000001al]) ([]))))))
+(Done ((f_append_code (v_a) (v_b) ([(Base.W32 0x1a)]) ([]))))))
 | (ExpressionWork ((I.MatchExpr (v_values, v_arms)))) ->
 (let v_slot = (f_context_next (v_context)) in
 (let v_count = (Base.list_length (v_values)) in
@@ -1217,12 +1217,12 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_alternative))) (v_nested)) with
 | Fail __error -> Fail __error
 | Done v_no ->
-(Done ((f_require_locals ((f_append_code ((f_append_code (v_v) ((Code (v_test, 0))) ((0x00000021l :: (f_unsigned_leb (v_slot)))) ([]))) ((f_append_code (v_yes) (v_no) ([0x00000005l]) ([0x0000000bl]))) ([0x00000004l; 0x0000007fl]) ([]))) ((Base.nat_add 1 v_slot))))))))))))
+(Done ((f_require_locals ((f_append_code ((f_append_code (v_v) ((Code (v_test, 0))) (((Base.W32 0x21) :: (f_unsigned_leb (v_slot)))) ([]))) ((f_append_code (v_yes) (v_no) ([(Base.W32 0x5)]) ([(Base.W32 0xb)]))) ([(Base.W32 0x4); (Base.W32 0x7f)]) ([]))) ((Base.nat_add 1 v_slot))))))))))))
 | (ExpressionWork ((I.BlockExpr (v_label, v_body)))) ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_body))) ((f_control (v_context) ((Some (v_label)))))) with
 | Fail __error -> Fail __error
 | Done v_value ->
-(Done ((f_append_code ((f_byte_code ([0x00000002l; 0x0000007fl]) (0))) (v_value) ([]) ([0x0000000bl])))))
+(Done ((f_append_code ((f_byte_code ([(Base.W32 0x2); (Base.W32 0x7f)]) (0))) (v_value) ([]) ([(Base.W32 0xb)])))))
 | (ExpressionWork ((I.ReturnExpr (v_label, v_value)))) ->
 (match (f_return_depth (v_context) (v_label)) with
 | Fail __error -> Fail __error
@@ -1230,7 +1230,7 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ExpressionWork (v_value))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_v ->
-(Done ((f_append_code (v_v) ((f_byte_code ((0x0000000cl :: (f_unsigned_leb (v_depth)))) (0))) ([]) ([]))))))
+(Done ((f_append_code (v_v) ((f_byte_code (((Base.W32 0xc) :: (f_unsigned_leb (v_depth)))) (0))) ([]) ([]))))))
 | (ScrutineesWork ([], v_first, v_reversed, v_locals)) ->
 (Done ((Code ((Base.list_reverse (v_reversed)), v_locals))))
 | (ScrutineesWork ((v_head :: v_tail), v_first, v_reversed, v_locals)) ->
@@ -1239,7 +1239,7 @@ fun v_fuel v_work v_context ->
 | Done v_value ->
 (f_emit_expr (v_rest) ((f_next_scrutinee (v_tail) (v_first) (v_value) (v_reversed) (v_locals))) (v_context)))
 | (ArmsWork ([], v_first)) ->
-(Done ((f_byte_code ([0x00000000l]) (0))))
+(Done ((f_byte_code ([(Base.W32 0x0)]) (0))))
 | (ArmsWork (((M.MatchArm (v_patterns, v_body)) :: v_tail), v_first)) ->
 (let v_nested = (f_control (v_context) (None)) in
 (match (f_pattern_test_work (v_rest) ((RowTests (v_patterns, v_first))) ((f_context_locals (v_context)))) with
@@ -1254,13 +1254,13 @@ fun v_fuel v_work v_context ->
 (match (f_emit_expr (v_rest) ((ArmsWork (v_tail, v_first))) (v_nested)) with
 | Fail __error -> Fail __error
 | Done v_no ->
-(Done ((f_append_code ((Code (v_test, 0))) ((f_append_code (v_yes) (v_no) ([0x00000005l]) ([0x0000000bl]))) ([0x00000004l; 0x0000007fl]) ([]))))))))))))
+(Done ((f_append_code ((Code (v_test, 0))) ((f_append_code (v_yes) (v_no) ([(Base.W32 0x5)]) ([(Base.W32 0xb)]))) ([(Base.W32 0x4); (Base.W32 0x7f)]) ([]))))))))))))
 and (* wasm.bend:1068 *)
-f_word_bytes : int32 -> (int32) list =
+f_word_bytes : Base.word32 -> (Base.word32) list =
 fun v_word ->
-[(Base.u32_and (v_word) (0x000000ffl)); (Base.u32_and ((Base.u32_shrn (v_word) (8))) (0x000000ffl)); (Base.u32_and ((Base.u32_shrn (v_word) (16))) (0x000000ffl)); (Base.u32_shrn (v_word) (24))]
+[(Base.u32_and (v_word) ((Base.W32 0xff))); (Base.u32_and ((Base.u32_shrn (v_word) (8))) ((Base.W32 0xff))); (Base.u32_and ((Base.u32_shrn (v_word) (16))) ((Base.W32 0xff))); (Base.u32_shrn (v_word) (24))]
 and (* wasm.bend:1071 *)
-f_words_bytes : (int32) list -> (int32) list =
+f_words_bytes : (Base.word32) list -> (Base.word32) list =
 fun v_words ->
 (match v_words with
 | [] ->
@@ -1268,11 +1268,11 @@ fun v_words ->
 | (v_head :: v_tail) ->
 (f_concat ((f_word_bytes (v_head))) ((f_words_bytes (v_tail)))))
 and (* wasm.bend:1078 *)
-f_heap_allocate : (int32) list -> t_Heap -> (M.t_Diagnostic, t_Serialized) Base.result_ =
+f_heap_allocate : (Base.word32) list -> t_Heap -> (M.t_Diagnostic, t_Serialized) Base.result_ =
 fun v_words v_heap ->
 (let (Heap (v_next, v_chunks)) = v_heap in
 (let v_end = (Base.nat_add (v_next) ((Base.nat_mul (4) ((Base.list_length (v_words)))))) in
-(Base.bool_pick ((Base.nat_is_le (v_end) ((Base.u32_to_nat (0x01000000l))))) ((Done ((Serialized ([(Base.u32_from_nat (v_next))], (Heap (v_end, ((f_words_bytes (v_words)) :: v_chunks)))))))) ((Fail ((M.Diagnostic (s_12, s_24, s_25))))))))
+(Base.bool_pick ((Base.nat_is_le (v_end) ((Base.u32_to_nat ((Base.W32 0x1000000)))))) ((Done ((Serialized ([(Base.u32_from_nat (v_next))], (Heap (v_end, ((f_words_bytes (v_words)) :: v_chunks)))))))) ((Fail ((M.Diagnostic (s_12, s_24, s_25))))))))
 and (* wasm.bend:1083 *)
 f_capture_values : (Base.text) list -> ((C.t_Value) C.t_Binding) list -> (M.t_Diagnostic, (C.t_Value) list) Base.result_ =
 fun v_names v_environment ->
@@ -1288,7 +1288,7 @@ fun v_names v_environment ->
 | Done v_rest ->
 (Done ((v_value :: v_rest))))))
 and (* wasm.bend:1093 *)
-f_only_word : (int32) list -> (M.t_Diagnostic, int32) Base.result_ =
+f_only_word : (Base.word32) list -> (M.t_Diagnostic, Base.word32) Base.result_ =
 fun v_words ->
 (match v_words with
 | (v_word :: []) ->
@@ -1296,7 +1296,7 @@ fun v_words ->
 | _ ->
 (Fail ((M.Diagnostic (s_0, s_24, s_26)))))
 and (* wasm.bend:1100 *)
-f_serialized_words : t_Serialized -> (int32) list =
+f_serialized_words : t_Serialized -> (Base.word32) list =
 fun v_encoded ->
 (let (Serialized (v_words, v_heap)) = v_encoded in
 v_words)
@@ -1330,7 +1330,7 @@ fun v_fuel v_work v_catalog v_heap ->
 (let v_rest = (__nat_27 - 1) in
 (match v_work with
 | (ValueWork (C.UnitValue)) ->
-(Done ((Serialized ([0x00000000l], v_heap))))
+(Done ((Serialized ([(Base.W32 0x0)], v_heap))))
 | (ValueWork ((C.U32Value (v_value)))) ->
 (Done ((Serialized ([v_value], v_heap))))
 | (ValueWork ((C.F32Value (v_value)))) ->
@@ -1370,7 +1370,7 @@ fun v_fuel v_work v_catalog v_heap ->
 (match (f_only_word ((f_serialized_words (v_value)))) with
 | Fail __error -> Fail __error
 | Done v_word ->
-(f_heap_allocate ([0xffffffffl; (Base.u32_from_nat (v_reader)); (Base.u32_from_nat (v_writer)); v_word]) ((f_serialized_heap (v_value))))))))
+(f_heap_allocate ([(Base.W32 0xffffffff); (Base.u32_from_nat (v_reader)); (Base.u32_from_nat (v_writer)); v_word]) ((f_serialized_heap (v_value))))))))
 | (ValueWork ((C.StateReadValue (v_slot)))) ->
 (Fail ((M.Diagnostic (s_0, s_28, s_29))))
 | (ValueWork ((C.StateWriteValue (v_slot)))) ->
@@ -1391,7 +1391,7 @@ fun v_fuel v_work v_catalog v_heap ->
 | (ValueWork ((C.EffectSetValue (v_operations)))) ->
 (Fail ((I.f_const_only ())))
 | (ValueWork ((C.BoolValue (v_value)))) ->
-(Done ((Serialized ([(Base.bool_pick (v_value) (0x00000001l) (0x00000000l))], v_heap))))
+(Done ((Serialized ([(Base.bool_pick (v_value) ((Base.W32 0x1)) ((Base.W32 0x0)))], v_heap))))
 | (ValueWork ((C.FunctionValue (v_name)))) ->
 (match (f_lookup_slot ((f_static_entries (v_catalog))) ((Base.string_append s_5 v_name))) with
 | Fail __error -> Fail __error
@@ -1412,7 +1412,7 @@ fun v_fuel v_work v_catalog v_heap ->
 (match (f_lookup_constructor ((E.f_constructor_get ((I.f_metadata_constructors ((f_static_projection (v_catalog))))) (v_constructor))) (v_constructor)) with
 | Fail __error -> Fail __error
 | Done v_variant ->
-(match (f_heap_allocate ([(Base.u32_from_nat ((f_constructor_tag (v_variant)))); 0x00000000l]) (v_heap)) with
+(match (f_heap_allocate ([(Base.u32_from_nat ((f_constructor_tag (v_variant)))); (Base.W32 0x0)]) (v_heap)) with
 | Fail __error -> Fail __error
 | Done v_result ->
 (Done (v_result))))
@@ -1470,7 +1470,7 @@ fun v_constants v_catalog v_heap ->
 | [] ->
 (Done ((StaticConstants ([], v_heap))))
 | ((C.Binding (v_name, v_value)) :: v_tail) ->
-(match (f_serialize ((Base.u32_to_nat (0x00001000l))) ((ValueWork (v_value))) (v_catalog) (v_heap)) with
+(match (f_serialize ((Base.u32_to_nat ((Base.W32 0x1000)))) ((ValueWork (v_value))) (v_catalog) (v_heap)) with
 | Fail __error -> Fail __error
 | Done v_encoded ->
 (match (f_only_word ((f_serialized_words (v_encoded)))) with
@@ -1638,21 +1638,21 @@ fun v_names v_offset ->
 (let v_at = v_offset in
 ((Local (v_name, (Location (0, [v_at])))) :: (f_capture_locals (v_tail) ((Base.nat_add 4 v_at))))))
 and (* wasm.bend:1352 *)
-f_body_bytes : (int32) list -> int -> int -> (int32) list =
+f_body_bytes : (Base.word32) list -> int -> int -> (Base.word32) list =
 fun v_bytes v_locals v_parameters ->
 (let v_count = (Base.nat_sub (v_locals) (v_parameters)) in
-(f_sized ((f_join ([(Base.bool_pick ((Base.nat_is_eq (v_count) (0))) ([0x00000000l]) ((0x00000001l :: (f_concat ((f_unsigned_leb (v_count))) ([0x0000007fl]))))); v_bytes; [0x0000000bl]])))))
+(f_sized ((f_join ([(Base.bool_pick ((Base.nat_is_eq (v_count) (0))) ([(Base.W32 0x0)]) (((Base.W32 0x1) :: (f_concat ((f_unsigned_leb (v_count))) ([(Base.W32 0x7f)]))))); v_bytes; [(Base.W32 0xb)]])))))
 and (* wasm.bend:1356 *)
 f_body_plan : t_BytePlan -> int -> int -> t_BytePlan =
 fun v_instructions v_locals v_parameters ->
 (let v_count = (Base.nat_sub (v_locals) (v_parameters)) in
-(let v_declarations = (Base.bool_pick ((Base.nat_is_eq (v_count) (0))) ([0x00000000l]) ((0x00000001l :: (f_concat ((f_unsigned_leb (v_count))) ([0x0000007fl]))))) in
-(f_plan_sized ((f_plan_sequence ([(f_byte_plan (v_declarations)); v_instructions; (f_byte_plan ([0x0000000bl]))]))))))
+(let v_declarations = (Base.bool_pick ((Base.nat_is_eq (v_count) (0))) ([(Base.W32 0x0)]) (((Base.W32 0x1) :: (f_concat ((f_unsigned_leb (v_count))) ([(Base.W32 0x7f)]))))) in
+(f_plan_sized ((f_plan_sequence ([(f_byte_plan (v_declarations)); v_instructions; (f_byte_plan ([(Base.W32 0xb)]))]))))))
 and (* wasm.bend:1361 *)
 f_compile_entry : t_CodegenJob -> (M.t_Diagnostic, t_EntryCode) Base.result_ =
 fun v_job ->
 (let (CodegenJob (v_key, v_parameter, v_body, v_captures)) = v_job in
-(match (f_emit_expr ((Base.u32_to_nat (0x00004000l))) ((ExpressionWork (v_body))) ((Context (((Local (v_parameter, (Location (1, [])))) :: (f_capture_locals (v_captures) (4))), 3, [], 2)))) with
+(match (f_emit_expr ((Base.u32_to_nat ((Base.W32 0x4000)))) ((ExpressionWork (v_body))) ((Context (((Local (v_parameter, (Location (1, [])))) :: (f_capture_locals (v_captures) (4))), 3, [], 2)))) with
 | Fail __error -> Fail __error
 | Done v_compiled ->
 (Done ((EntryCode (v_key, v_compiled))))))
@@ -1916,7 +1916,7 @@ None
 | (Some ((E.ConstructorSlot (v_name, v_tag, v_payload)))) ->
 (Some (v_tag)))
 and (* wasm.bend:1571 *)
-f_resolve_fragment : t_Fragment -> t_Catalog -> int -> (M.t_Diagnostic, (int32) list) Base.result_ =
+f_resolve_fragment : t_Fragment -> t_Catalog -> int -> (M.t_Diagnostic, (Base.word32) list) Base.result_ =
 fun v_fragment v_symbols v_imports ->
 (match v_fragment with
 | (Bytes (v_bytes)) ->
@@ -1925,11 +1925,11 @@ fun v_fragment v_symbols v_imports ->
 (match (f_lookup_symbol ((f_symbol_entries (v_symbols))) (v_key)) with
 | Fail __error -> Fail __error
 | Done v_index ->
-(Done ((0x00000010l :: (f_unsigned_leb ((Base.nat_add 3 (Base.nat_add (v_imports) (v_index)))))))))
+(Done (((Base.W32 0x10) :: (f_unsigned_leb ((Base.nat_add 3 (Base.nat_add (v_imports) (v_index)))))))))
 | Allocate ->
-(Done ((0x00000010l :: (f_unsigned_leb (v_imports)))))
+(Done (((Base.W32 0x10) :: (f_unsigned_leb (v_imports)))))
 | Collect ->
-(Done ((0x00000010l :: (f_unsigned_leb ((Base.nat_add 2 v_imports))))))
+(Done (((Base.W32 0x10) :: (f_unsigned_leb ((Base.nat_add 2 v_imports))))))
 | (EntryIndex (v_key)) ->
 (match (f_lookup_symbol ((f_symbol_entries (v_symbols))) (v_key)) with
 | Fail __error -> Fail __error
@@ -1948,7 +1948,7 @@ fun v_fragment v_symbols v_imports ->
 | Done v_index ->
 (Done ((f_i32_constant ((Base.u32_from_nat (v_index))))))))
 and (* wasm.bend:1598 *)
-f_relocation_chunk : (M.t_Diagnostic, (int32) list) Base.result_ -> t_BytePlan -> (M.t_Diagnostic, t_BytePlan) Base.result_ =
+f_relocation_chunk : (M.t_Diagnostic, (Base.word32) list) Base.result_ -> t_BytePlan -> (M.t_Diagnostic, t_BytePlan) Base.result_ =
 fun v_result v_accumulated ->
 (match v_result with
 | (Fail (v_error)) ->
@@ -2032,21 +2032,21 @@ f_link_bodies : (t_CodegenJob) list -> (t_EntryCode) list -> t_Catalog -> int ->
 fun v_jobs v_entries v_symbols v_imports ->
 (f_link_bodies_with_grain (256) (v_jobs) (v_entries) (v_symbols) (v_imports))
 and (* wasm.bend:1680 *)
-f_allocator : unit -> (int32) list =
+f_allocator : unit -> (Base.word32) list =
 fun () ->
 (f_sized ((Arena.f_allocate (0))))
 and (* wasm.bend:1683 *)
-f_scalar_tag : t_AbiScalar -> int32 =
+f_scalar_tag : t_AbiScalar -> Base.word32 =
 fun v_scalar ->
 (match v_scalar with
 | UnitScalar ->
-0x00000000l
+(Base.W32 0x0)
 | U32Scalar ->
-0x00000001l
+(Base.W32 0x1)
 | BoolScalar ->
-0x00000002l
+(Base.W32 0x2)
 | F32Scalar ->
-0x00000003l)
+(Base.W32 0x3))
 and (* wasm.bend:1694 *)
 f_scalar_name : t_AbiScalar -> Base.text =
 fun v_scalar ->
@@ -2060,49 +2060,49 @@ s_47
 | F32Scalar ->
 s_48)
 and (* wasm.bend:1705 *)
-f_scalar_wasm : t_AbiScalar -> int32 =
+f_scalar_wasm : t_AbiScalar -> Base.word32 =
 fun v_scalar ->
 (match v_scalar with
 | F32Scalar ->
-0x0000007dl
+(Base.W32 0x7d)
 | _ ->
-0x0000007fl)
+(Base.W32 0x7f))
 and (* wasm.bend:1712 *)
-f_abi_from_word : t_AbiScalar -> (int32) list =
+f_abi_from_word : t_AbiScalar -> (Base.word32) list =
 fun v_scalar ->
 (match v_scalar with
 | UnitScalar ->
-[0x0000001al; 0x00000041l; 0x00000000l]
+[(Base.W32 0x1a); (Base.W32 0x41); (Base.W32 0x0)]
 | BoolScalar ->
-[0x00000045l; 0x00000045l]
+[(Base.W32 0x45); (Base.W32 0x45)]
 | F32Scalar ->
-[0x000000bel]
+[(Base.W32 0xbe)]
 | U32Scalar ->
 [])
 and (* wasm.bend:1723 *)
-f_abi_to_word : t_AbiScalar -> (int32) list =
+f_abi_to_word : t_AbiScalar -> (Base.word32) list =
 fun v_scalar ->
 (match v_scalar with
 | UnitScalar ->
-[0x0000001al; 0x00000041l; 0x00000000l]
+[(Base.W32 0x1a); (Base.W32 0x41); (Base.W32 0x0)]
 | BoolScalar ->
-[0x00000045l; 0x00000045l]
+[(Base.W32 0x45); (Base.W32 0x45)]
 | F32Scalar ->
-[0x000000bcl]
+[(Base.W32 0xbc)]
 | U32Scalar ->
 [])
 and (* wasm.bend:1734 *)
-f_value_tag : t_AbiValue -> int32 =
+f_value_tag : t_AbiValue -> Base.word32 =
 fun v_value ->
 (match v_value with
 | (ScalarValue (v_scalar)) ->
 (f_scalar_tag (v_scalar))
 | U32ArrayValue ->
-0x00000005l
+(Base.W32 0x5)
 | F32ArrayValue ->
-0x00000006l)
+(Base.W32 0x6))
 and (* wasm.bend:1743 *)
-f_value_from_word : t_AbiValue -> (int32) list =
+f_value_from_word : t_AbiValue -> (Base.word32) list =
 fun v_value ->
 (match v_value with
 | (ScalarValue (v_scalar)) ->
@@ -2110,7 +2110,7 @@ fun v_value ->
 | _ ->
 [])
 and (* wasm.bend:1750 *)
-f_value_to_word : t_AbiValue -> (int32) list =
+f_value_to_word : t_AbiValue -> (Base.word32) list =
 fun v_value ->
 (match v_value with
 | (ScalarValue (v_scalar)) ->
@@ -2128,13 +2128,13 @@ s_49
 | F32ArrayValue ->
 s_50)
 and (* wasm.bend:1766 *)
-f_value_wasm : t_AbiValue -> int32 =
+f_value_wasm : t_AbiValue -> Base.word32 =
 fun v_value ->
 (match v_value with
 | (ScalarValue (v_scalar)) ->
 (f_scalar_wasm (v_scalar))
 | _ ->
-0x0000007fl)
+(Base.W32 0x7f))
 and (* wasm.bend:1773 *)
 f_callback_equal : t_Callback -> t_Callback -> bool =
 fun v_left v_right ->
@@ -2243,31 +2243,31 @@ false
 | ((AbiFunction (v_name, v_parameter, v_result)) :: v_tail) ->
 (Base.bool_or ((Base.bool_or ((Base.bool_or ((f_array_parameter (v_parameter))) ((f_callback_arrays (v_parameter))))) ((f_value_is_array (v_result))))) ((f_array_exports (v_tail)))))
 and (* wasm.bend:1860 *)
-f_arena_floor : bool -> int -> (int32) list =
+f_arena_floor : bool -> int -> (Base.word32) list =
 fun v_initialized v_heap_start ->
 (match v_initialized with
 | false ->
 (f_i32_constant ((Base.u32_from_nat (v_heap_start))))
 | true ->
-[0x00000041l; 0x00000000l; 0x00000028l; 0x00000002l; 0x00000000l])
+[(Base.W32 0x41); (Base.W32 0x0); (Base.W32 0x28); (Base.W32 0x2); (Base.W32 0x0)])
 and (* wasm.bend:1870 *)
-f_clear_free_bins : unit -> (int32) list =
+f_clear_free_bins : unit -> (Base.word32) list =
 fun () ->
-(f_join ([(f_i32_constant (0x00000020l)); [0x00000041l; 0x00000000l]; (f_i32_constant (0x00000084l)); [0x000000fcl; 0x0000000bl; 0x00000000l]]))
+(f_join ([(f_i32_constant ((Base.W32 0x20))); [(Base.W32 0x41); (Base.W32 0x0)]; (f_i32_constant ((Base.W32 0x84))); [(Base.W32 0xfc); (Base.W32 0xb); (Base.W32 0x0)]]))
 and (* wasm.bend:1873 *)
-f_wrapper_reset : t_AbiParameter -> int -> bool -> (int32) list =
+f_wrapper_reset : t_AbiParameter -> int -> bool -> (Base.word32) list =
 fun v_parameter v_heap_start v_initialized ->
-(Base.bool_pick ((f_array_parameter (v_parameter))) ([]) ((f_join ([(f_arena_floor (v_initialized) (v_heap_start)); [0x00000024l; 0x00000000l]; (f_clear_free_bins ())]))))
+(Base.bool_pick ((f_array_parameter (v_parameter))) ([]) ((f_join ([(f_arena_floor (v_initialized) (v_heap_start)); [(Base.W32 0x24); (Base.W32 0x0)]; (f_clear_free_bins ())]))))
 and (* wasm.bend:1876 *)
-f_abi_parameter_bytes : t_AbiParameter -> (int32) list =
+f_abi_parameter_bytes : t_AbiParameter -> (Base.word32) list =
 fun v_parameter ->
 (match v_parameter with
 | (ValueParameter (v_value)) ->
 [(f_value_tag (v_value))]
 | (CallbackParameter ((Callback (v_input, v_output)))) ->
-[0x00000004l; (f_value_tag (v_input)); (f_value_tag (v_output))])
+[(Base.W32 0x4); (f_value_tag (v_input)); (f_value_tag (v_output))])
 and (* wasm.bend:1883 *)
-f_abi_function_bytes : (t_AbiFunction) list -> ((int32) list) list =
+f_abi_function_bytes : (t_AbiFunction) list -> ((Base.word32) list) list =
 fun v_functions ->
 (match v_functions with
 | [] ->
@@ -2275,7 +2275,7 @@ fun v_functions ->
 | ((AbiFunction (v_name, v_parameter, v_result)) :: v_tail) ->
 ((f_join ([(f_sized ((f_utf8 ((Public.f_export_name (v_name)))))); (f_abi_parameter_bytes (v_parameter)); [(f_value_tag (v_result))]])) :: (f_abi_function_bytes (v_tail))))
 and (* wasm.bend:1890 *)
-f_abi_constant_bytes : (t_AbiConstant) list -> ((int32) list) list =
+f_abi_constant_bytes : (t_AbiConstant) list -> ((Base.word32) list) list =
 fun v_constants ->
 (match v_constants with
 | [] ->
@@ -2286,7 +2286,7 @@ and (* wasm.bend:1897 *)
 f_abi_section : t_Abi -> t_BytePlan =
 fun v_abi ->
 (let (Abi (v_functions, v_constants, v_callbacks)) = v_abi in
-(f_byte_plan ((f_section (0x00000000l) ((f_join ([(f_sized ((f_utf8 (s_51)))); [0x00000002l]; (f_vector ((f_abi_function_bytes (v_functions)))); (f_vector ((f_abi_constant_bytes (v_constants))))])))))))
+(f_byte_plan ((f_section ((Base.W32 0x0)) ((f_join ([(f_sized ((f_utf8 (s_51)))); [(Base.W32 0x2)]; (f_vector ((f_abi_function_bytes (v_functions)))); (f_vector ((f_abi_constant_bytes (v_constants))))])))))))
 and (* wasm.bend:1901 *)
 f_callback_slot : bool -> int -> (unit -> (M.t_Diagnostic, int) Base.result_) -> (M.t_Diagnostic, int) Base.result_ =
 fun v_found v_index v_fallback ->
@@ -2305,23 +2305,23 @@ fun v_callbacks v_wanted v_index ->
 (f_callback_slot ((f_callback_equal (v_first) (v_wanted))) (v_index) ((fun v_ignored ->
 (f_callback_index (v_tail) (v_wanted) ((Base.nat_add 1 v_index)))))))
 and (* wasm.bend:1915 *)
-f_wrapper_type : t_AbiFunction -> int32 =
+f_wrapper_type : t_AbiFunction -> Base.word32 =
 fun v_function ->
 (match v_function with
 | (AbiFunction (v_name, (CallbackParameter (v_signature)), (ScalarValue (F32Scalar)))) ->
-0x00000006l
+(Base.W32 0x6)
 | (AbiFunction (v_name, (CallbackParameter (v_signature)), v_result)) ->
-0x00000005l
+(Base.W32 0x5)
 | (AbiFunction (v_name, (ValueParameter ((ScalarValue (F32Scalar)))), (ScalarValue (F32Scalar)))) ->
-0x00000004l
+(Base.W32 0x4)
 | (AbiFunction (v_name, (ValueParameter ((ScalarValue (F32Scalar)))), v_result)) ->
-0x00000002l
+(Base.W32 0x2)
 | (AbiFunction (v_name, v_parameter, (ScalarValue (F32Scalar)))) ->
-0x00000003l
+(Base.W32 0x3)
 | _ ->
-0x00000001l)
+(Base.W32 0x1))
 and (* wasm.bend:1930 *)
-f_wrapper_types : (t_AbiFunction) list -> (int32) list =
+f_wrapper_types : (t_AbiFunction) list -> (Base.word32) list =
 fun v_functions ->
 (match v_functions with
 | [] ->
@@ -2329,26 +2329,26 @@ fun v_functions ->
 | (v_head :: v_tail) ->
 ((f_wrapper_type (v_head)) :: (f_wrapper_types (v_tail))))
 and (* wasm.bend:1937 *)
-f_wrapper_argument : t_AbiParameter -> (t_Callback) list -> int -> (M.t_Diagnostic, (int32) list) Base.result_ =
+f_wrapper_argument : t_AbiParameter -> (t_Callback) list -> int -> (M.t_Diagnostic, (Base.word32) list) Base.result_ =
 fun v_parameter v_callbacks v_entries ->
 (match v_parameter with
 | (ValueParameter (v_value)) ->
-(let v_return_bytes = (f_join ([[0x00000041l; 0x00000000l; 0x00000020l; 0x00000000l]; (f_value_to_word (v_value))])) in
-(Done ((f_concat ((Base.bool_pick ((Base.list_is_empty (v_callbacks))) ([]) ([0x000000d0l; 0x0000006fl; 0x00000024l; 0x00000001l]))) (v_return_bytes)))))
+(let v_return_bytes = (f_join ([[(Base.W32 0x41); (Base.W32 0x0); (Base.W32 0x20); (Base.W32 0x0)]; (f_value_to_word (v_value))])) in
+(Done ((f_concat ((Base.bool_pick ((Base.list_is_empty (v_callbacks))) ([]) ([(Base.W32 0xd0); (Base.W32 0x6f); (Base.W32 0x24); (Base.W32 0x1)]))) (v_return_bytes)))))
 | (CallbackParameter (v_signature)) ->
 (let v_imports = (Base.list_length (v_callbacks)) in
 (match (f_callback_index (v_callbacks) (v_signature) (v_entries)) with
 | Fail __error -> Fail __error
 | Done v_slot ->
-(Done ((f_join ([[0x00000020l; 0x00000000l; 0x00000024l; 0x00000001l; 0x00000041l; 0x00000000l; 0x00000041l; 0x00000004l; 0x00000010l]; (f_unsigned_leb (v_imports)); [0x00000022l; 0x00000001l]; (f_i32_constant ((Base.u32_from_nat (v_slot)))); [0x00000036l; 0x00000002l; 0x00000000l; 0x00000020l; 0x00000001l]])))))))
+(Done ((f_join ([[(Base.W32 0x20); (Base.W32 0x0); (Base.W32 0x24); (Base.W32 0x1); (Base.W32 0x41); (Base.W32 0x0); (Base.W32 0x41); (Base.W32 0x4); (Base.W32 0x10)]; (f_unsigned_leb (v_imports)); [(Base.W32 0x22); (Base.W32 0x1)]; (f_i32_constant ((Base.u32_from_nat (v_slot)))); [(Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0); (Base.W32 0x20); (Base.W32 0x1)]])))))))
 and (* wasm.bend:1948 *)
-f_wrapper_return : (t_Callback) list -> t_AbiValue -> (int32) list =
+f_wrapper_return : (t_Callback) list -> t_AbiValue -> (Base.word32) list =
 fun v_callbacks v_result ->
 (match v_callbacks with
 | [] ->
 (f_value_from_word (v_result))
 | (v_head :: v_tail) ->
-(f_concat ([0x00000021l; 0x00000001l; 0x000000d0l; 0x0000006fl; 0x00000024l; 0x00000001l; 0x00000020l; 0x00000001l]) ((f_value_from_word (v_result)))))
+(f_concat ([(Base.W32 0x21); (Base.W32 0x1); (Base.W32 0xd0); (Base.W32 0x6f); (Base.W32 0x24); (Base.W32 0x1); (Base.W32 0x20); (Base.W32 0x1)]) ((f_value_from_word (v_result)))))
 and (* wasm.bend:1955 *)
 f_wrapper_bodies : (t_AbiFunction) list -> ((int) option) Base.map -> int -> (t_Callback) list -> int -> bool -> (M.t_Diagnostic, (t_BytePlan) list) Base.result_ =
 fun v_functions v_slots v_heap_start v_callbacks v_entries v_initialized ->
@@ -2366,46 +2366,46 @@ fun v_functions v_slots v_heap_start v_callbacks v_entries v_initialized ->
 (match (f_wrapper_bodies (v_tail) (v_slots) (v_heap_start) (v_callbacks) (v_entries) (v_initialized)) with
 | Fail __error -> Fail __error
 | Done v_rest ->
-(Done (((f_byte_plan ((f_body_bytes ((f_join ([(f_wrapper_reset (v_parameter) (v_heap_start) (v_initialized)); v_argument; [0x00000041l; 0x00000000l; 0x00000010l]; (f_unsigned_leb ((Base.nat_add 3 (Base.nat_add (v_imports) (v_index))))); (f_wrapper_return (v_callbacks) (v_result))]))) ((Base.bool_pick ((Base.nat_is_eq (v_imports) (0))) (1) (2))) (1)))) :: v_rest))))))))
+(Done (((f_byte_plan ((f_body_bytes ((f_join ([(f_wrapper_reset (v_parameter) (v_heap_start) (v_initialized)); v_argument; [(Base.W32 0x41); (Base.W32 0x0); (Base.W32 0x10)]; (f_unsigned_leb ((Base.nat_add 3 (Base.nat_add (v_imports) (v_index))))); (f_wrapper_return (v_callbacks) (v_result))]))) ((Base.bool_pick ((Base.nat_is_eq (v_imports) (0))) (1) (2))) (1)))) :: v_rest))))))))
 and (* wasm.bend:1967 *)
-f_function_exports : (t_AbiFunction) list -> int -> ((int32) list) list =
+f_function_exports : (t_AbiFunction) list -> int -> ((Base.word32) list) list =
 fun v_functions v_index ->
 (match v_functions with
 | [] ->
 []
 | ((AbiFunction (v_name, v_parameter, v_result)) :: v_tail) ->
 (let v_slot = v_index in
-((f_concat ((f_sized ((f_utf8 ((Public.f_export_name (v_name))))))) ((0x00000000l :: (f_unsigned_leb (v_slot))))) :: (f_function_exports (v_tail) ((Base.nat_add 1 v_slot))))))
+((f_concat ((f_sized ((f_utf8 ((Public.f_export_name (v_name))))))) (((Base.W32 0x0) :: (f_unsigned_leb (v_slot))))) :: (f_function_exports (v_tail) ((Base.nat_add 1 v_slot))))))
 and (* wasm.bend:1975 *)
-f_global_exports : (t_ExportedConstant) list -> int -> ((int32) list) list =
+f_global_exports : (t_ExportedConstant) list -> int -> ((Base.word32) list) list =
 fun v_names v_index ->
 (match v_names with
 | [] ->
 []
 | ((ExportedConstant (v_name, v_value_type)) :: v_tail) ->
 (let v_slot = v_index in
-((f_concat ((f_sized ((f_utf8 (v_name))))) ((0x00000003l :: (f_unsigned_leb (v_slot))))) :: (f_global_exports (v_tail) ((Base.nat_add 1 v_slot))))))
+((f_concat ((f_sized ((f_utf8 (v_name))))) (((Base.W32 0x3) :: (f_unsigned_leb (v_slot))))) :: (f_global_exports (v_tail) ((Base.nat_add 1 v_slot))))))
 and (* wasm.bend:1983 *)
-f_global_initializer : M.t_Ty -> int32 -> bool -> (int32) list =
+f_global_initializer : M.t_Ty -> Base.word32 -> bool -> (Base.word32) list =
 fun v_ty v_word v_mutable ->
 (match v_ty with
 | M.F32Ty ->
-(f_join ([[0x0000007dl; (Base.bool_pick (v_mutable) (0x00000001l) (0x00000000l)); 0x00000043l]; (f_word_bytes (v_word)); [0x0000000bl]]))
+(f_join ([[(Base.W32 0x7d); (Base.bool_pick (v_mutable) ((Base.W32 0x1)) ((Base.W32 0x0))); (Base.W32 0x43)]; (f_word_bytes (v_word)); [(Base.W32 0xb)]]))
 | _ ->
-(f_join ([[0x0000007fl; (Base.bool_pick (v_mutable) (0x00000001l) (0x00000000l))]; (f_i32_constant (v_word)); [0x0000000bl]])))
+(f_join ([[(Base.W32 0x7f); (Base.bool_pick (v_mutable) ((Base.W32 0x1)) ((Base.W32 0x0)))]; (f_i32_constant (v_word)); [(Base.W32 0xb)]])))
 and (* wasm.bend:1990 *)
-f_exported_initializer : (t_RuntimeGlobal) option -> Base.text -> M.t_Ty -> t_Catalog -> (M.t_Diagnostic, (int32) list) Base.result_ =
+f_exported_initializer : (t_RuntimeGlobal) option -> Base.text -> M.t_Ty -> t_Catalog -> (M.t_Diagnostic, (Base.word32) list) Base.result_ =
 fun v_runtime v_name v_ty v_symbols ->
 (match v_runtime with
 | (Some (v_slot)) ->
-(Done ((f_global_initializer (v_ty) (0x00000000l) (true))))
+(Done ((f_global_initializer (v_ty) ((Base.W32 0x0)) (true))))
 | None ->
 (match (f_lookup_symbol ((f_symbol_constants (v_symbols))) (v_name)) with
 | Fail __error -> Fail __error
 | Done v_value ->
 (Done ((f_global_initializer (v_ty) ((Base.u32_from_nat (v_value))) (false))))))
 and (* wasm.bend:1999 *)
-f_globals : (t_ExportedConstant) list -> t_Catalog -> (M.t_Diagnostic, ((int32) list) list) Base.result_ =
+f_globals : (t_ExportedConstant) list -> t_Catalog -> (M.t_Diagnostic, ((Base.word32) list) list) Base.result_ =
 fun v_names v_symbols ->
 (match v_names with
 | [] ->
@@ -2419,7 +2419,7 @@ fun v_names v_symbols ->
 | Done v_rest ->
 (Done ((v_value :: v_rest))))))
 and (* wasm.bend:2010 *)
-f_table_indices : int -> int -> (int32) list =
+f_table_indices : int -> int -> (Base.word32) list =
 fun v_count v_start ->
 (match v_count with
 | 0 ->
@@ -2432,36 +2432,36 @@ and (* wasm.bend:2018 *)
 f_data_section : t_Heap -> t_BytePlan =
 fun v_heap ->
 (let (Heap (v_heap_start, v_chunks)) = v_heap in
-(f_plan_section (0x0000000bl) ((f_plan_prefix ([0x00000001l; 0x00000000l; 0x00000041l; 0x00000000l; 0x0000000bl]) ((f_plan_sized ((BytePlan (v_heap_start, (Base.list_reverse (v_chunks)))))))))))
+(f_plan_section ((Base.W32 0xb)) ((f_plan_prefix ([(Base.W32 0x1); (Base.W32 0x0); (Base.W32 0x41); (Base.W32 0x0); (Base.W32 0xb)]) ((f_plan_sized ((BytePlan (v_heap_start, (Base.list_reverse (v_chunks)))))))))))
 and (* wasm.bend:2022 *)
-f_callback_types : (t_Callback) list -> ((int32) list) list =
+f_callback_types : (t_Callback) list -> ((Base.word32) list) list =
 fun v_callbacks ->
 (match v_callbacks with
 | [] ->
 []
 | ((Callback (v_parameter, v_result)) :: v_tail) ->
-([0x00000060l; 0x00000002l; 0x0000006fl; (f_value_wasm (v_parameter)); 0x00000001l; (f_value_wasm (v_result))] :: (f_callback_types (v_tail))))
+([(Base.W32 0x60); (Base.W32 0x2); (Base.W32 0x6f); (f_value_wasm (v_parameter)); (Base.W32 0x1); (f_value_wasm (v_result))] :: (f_callback_types (v_tail))))
 and (* wasm.bend:2029 *)
-f_extra_types : (t_Callback) list -> ((int32) list) list =
+f_extra_types : (t_Callback) list -> ((Base.word32) list) list =
 fun v_callbacks ->
 (match v_callbacks with
 | [] ->
 []
 | (v_head :: v_tail) ->
-([0x00000060l; 0x00000001l; 0x0000006fl; 0x00000001l; 0x0000007fl] :: ([0x00000060l; 0x00000001l; 0x0000006fl; 0x00000001l; 0x0000007dl] :: (f_callback_types ((v_head :: v_tail))))))
+([(Base.W32 0x60); (Base.W32 0x1); (Base.W32 0x6f); (Base.W32 0x1); (Base.W32 0x7f)] :: ([(Base.W32 0x60); (Base.W32 0x1); (Base.W32 0x6f); (Base.W32 0x1); (Base.W32 0x7d)] :: (f_callback_types ((v_head :: v_tail))))))
 and (* wasm.bend:2036 *)
 f_type_section : (t_Callback) list -> bool -> t_BytePlan =
 fun v_callbacks v_initialized ->
-(f_byte_plan ((f_section (0x00000001l) ((f_vector ((Base.list_append ([[0x00000060l; 0x00000003l; 0x0000007fl; 0x0000007fl; 0x0000007fl; 0x00000001l; 0x0000007fl]; [0x00000060l; 0x00000001l; 0x0000007fl; 0x00000001l; 0x0000007fl]; [0x00000060l; 0x00000001l; 0x0000007dl; 0x00000001l; 0x0000007fl]; [0x00000060l; 0x00000001l; 0x0000007fl; 0x00000001l; 0x0000007dl]; [0x00000060l; 0x00000001l; 0x0000007dl; 0x00000001l; 0x0000007dl]]) ((Base.list_append ((f_extra_types (v_callbacks))) ((Base.bool_pick (v_initialized) ([[0x00000060l; 0x00000000l; 0x00000000l]]) ([]))))))))))))
+(f_byte_plan ((f_section ((Base.W32 0x1)) ((f_vector ((Base.list_append ([[(Base.W32 0x60); (Base.W32 0x3); (Base.W32 0x7f); (Base.W32 0x7f); (Base.W32 0x7f); (Base.W32 0x1); (Base.W32 0x7f)]; [(Base.W32 0x60); (Base.W32 0x1); (Base.W32 0x7f); (Base.W32 0x1); (Base.W32 0x7f)]; [(Base.W32 0x60); (Base.W32 0x1); (Base.W32 0x7d); (Base.W32 0x1); (Base.W32 0x7f)]; [(Base.W32 0x60); (Base.W32 0x1); (Base.W32 0x7f); (Base.W32 0x1); (Base.W32 0x7d)]; [(Base.W32 0x60); (Base.W32 0x1); (Base.W32 0x7d); (Base.W32 0x1); (Base.W32 0x7d)]]) ((Base.list_append ((f_extra_types (v_callbacks))) ((Base.bool_pick (v_initialized) ([[(Base.W32 0x60); (Base.W32 0x0); (Base.W32 0x0)]]) ([]))))))))))))
 and (* wasm.bend:2045 *)
-f_callback_imports : (t_Callback) list -> int -> ((int32) list) list =
+f_callback_imports : (t_Callback) list -> int -> ((Base.word32) list) list =
 fun v_callbacks v_index ->
 (match v_callbacks with
 | [] ->
 []
 | ((Callback (v_parameter, v_result)) :: v_tail) ->
 (let v_slot = v_index in
-((f_join ([(f_sized ((f_utf8 (s_54)))); (f_sized ((f_utf8 ((Base.string_append s_55 (Base.string_append (f_value_name (v_parameter)) (Base.string_append s_56 (f_value_name (v_result))))))))); [0x00000000l]; (f_unsigned_leb ((Base.nat_add 7 v_slot)))])) :: (f_callback_imports (v_tail) ((Base.nat_add 1 v_slot))))))
+((f_join ([(f_sized ((f_utf8 (s_54)))); (f_sized ((f_utf8 ((Base.string_append s_55 (Base.string_append (f_value_name (v_parameter)) (Base.string_append s_56 (f_value_name (v_result))))))))); [(Base.W32 0x0)]; (f_unsigned_leb ((Base.nat_add 7 v_slot)))])) :: (f_callback_imports (v_tail) ((Base.nat_add 1 v_slot))))))
 and (* wasm.bend:2053 *)
 f_import_section : (t_Callback) list -> t_BytePlan =
 fun v_callbacks ->
@@ -2469,7 +2469,7 @@ fun v_callbacks ->
 | [] ->
 (f_byte_plan ([]))
 | (v_head :: v_tail) ->
-(f_byte_plan ((f_section (0x00000002l) ((f_vector ((f_callback_imports ((v_head :: v_tail)) (0)))))))))
+(f_byte_plan ((f_section ((Base.W32 0x2)) ((f_vector ((f_callback_imports ((v_head :: v_tail)) (0)))))))))
 and (* wasm.bend:2062 *)
 f_callback_bodies : (t_Callback) list -> int -> (t_BytePlan) list =
 fun v_callbacks v_index ->
@@ -2478,23 +2478,23 @@ fun v_callbacks v_index ->
 []
 | ((Callback (v_parameter, v_result)) :: v_tail) ->
 (let v_slot = v_index in
-((f_byte_plan ((f_body_bytes ((f_join ([[0x00000023l; 0x00000001l; 0x00000020l; 0x00000001l]; (f_value_from_word (v_parameter)); [0x00000010l]; (f_unsigned_leb (v_slot)); (f_value_to_word (v_result))]))) (3) (3)))) :: (f_callback_bodies (v_tail) ((Base.nat_add 1 v_slot))))))
+((f_byte_plan ((f_body_bytes ((f_join ([[(Base.W32 0x23); (Base.W32 0x1); (Base.W32 0x20); (Base.W32 0x1)]; (f_value_from_word (v_parameter)); [(Base.W32 0x10)]; (f_unsigned_leb (v_slot)); (f_value_to_word (v_result))]))) (3) (3)))) :: (f_callback_bodies (v_tail) ((Base.nat_add 1 v_slot))))))
 and (* wasm.bend:2070 *)
-f_callback_globals : (t_Callback) list -> ((int32) list) list -> ((int32) list) list =
+f_callback_globals : (t_Callback) list -> ((Base.word32) list) list -> ((Base.word32) list) list =
 fun v_callbacks v_values ->
 (match v_callbacks with
 | [] ->
 v_values
 | (v_head :: v_tail) ->
-([0x0000006fl; 0x00000001l; 0x000000d0l; 0x0000006fl; 0x0000000bl] :: v_values))
+([(Base.W32 0x6f); (Base.W32 0x1); (Base.W32 0xd0); (Base.W32 0x6f); (Base.W32 0xb)] :: v_values))
 and (* wasm.bend:2077 *)
-f_arena_exports : bool -> int -> int -> ((int32) list) list =
+f_arena_exports : bool -> int -> int -> ((Base.word32) list) list =
 fun v_enabled v_allocator_index v_reset_index ->
 (match v_enabled with
 | false ->
 []
 | true ->
-[(f_concat ((f_sized ((f_utf8 (s_57))))) ([0x00000002l; 0x00000000l])); (f_concat ((f_sized ((f_utf8 (s_58))))) ((0x00000000l :: (f_unsigned_leb (v_allocator_index))))); (f_concat ((f_sized ((f_utf8 (s_59))))) ((0x00000000l :: (f_unsigned_leb (v_reset_index)))))])
+[(f_concat ((f_sized ((f_utf8 (s_57))))) ([(Base.W32 0x2); (Base.W32 0x0)])); (f_concat ((f_sized ((f_utf8 (s_58))))) (((Base.W32 0x0) :: (f_unsigned_leb (v_allocator_index))))); (f_concat ((f_sized ((f_utf8 (s_59))))) (((Base.W32 0x0) :: (f_unsigned_leb (v_reset_index)))))])
 and (* wasm.bend:2089 *)
 f_arena_reset_body : bool -> int -> bool -> (t_BytePlan) list =
 fun v_enabled v_heap_start v_initialized ->
@@ -2502,9 +2502,9 @@ fun v_enabled v_heap_start v_initialized ->
 | false ->
 []
 | true ->
-[(f_byte_plan ((f_body_bytes ((f_join ([(f_arena_floor (v_initialized) (v_heap_start)); [0x00000024l; 0x00000000l]; (f_clear_free_bins ()); (f_arena_floor (v_initialized) (v_heap_start))]))) (1) (1))))])
+[(f_byte_plan ((f_body_bytes ((f_join ([(f_arena_floor (v_initialized) (v_heap_start)); [(Base.W32 0x24); (Base.W32 0x0)]; (f_clear_free_bins ()); (f_arena_floor (v_initialized) (v_heap_start))]))) (1) (1))))])
 and (* wasm.bend:2096 *)
-f_assemble : t_Abi -> (t_BytePlan) list -> (t_BytePlan) list -> (t_ExportedConstant) list -> ((int32) list) list -> t_Heap -> (t_BytePlan) list -> t_BytePlan =
+f_assemble : t_Abi -> (t_BytePlan) list -> (t_BytePlan) list -> (t_ExportedConstant) list -> ((Base.word32) list) list -> t_Heap -> (t_BytePlan) list -> t_BytePlan =
 fun v_abi v_bodies v_wrappers v_names v_values v_heap v_startup ->
 (let (Abi (v_functions, v_constants, v_callbacks)) = v_abi in
 (let (Heap (v_heap_start, v_chunks)) = v_heap in
@@ -2517,8 +2517,8 @@ fun v_abi v_bodies v_wrappers v_names v_values v_heap v_startup ->
 (let v_start_count = (Base.list_length (v_startup)) in
 (let v_start_type = (Base.bool_pick ((Base.nat_is_eq (v_imports) (0))) (5) ((Base.nat_add 7 v_imports))) in
 (let v_start_index = (Base.nat_add 3 (Base.nat_add (v_imports) ((Base.nat_add (v_count) ((Base.nat_add (v_wrapper_count) (v_reset_count))))))) in
-(let v_pages = (Base.nat_max (1) ((Base.u32_to_nat ((Base.u32_shrn ((Base.u32_add ((Base.u32_from_nat (v_heap_start))) (0x0000ffffl))) (16)))))) in
-(f_plan_sequence ([(f_byte_plan ([0x00000000l; 0x00000061l; 0x00000073l; 0x0000006dl; 0x00000001l; 0x00000000l; 0x00000000l; 0x00000000l])); (f_type_section (v_callbacks) (v_initialized)); (f_import_section (v_callbacks)); (f_byte_plan ((f_section (0x00000003l) ((f_join ([(f_unsigned_leb ((Base.nat_add 3 (Base.nat_add (v_count) ((Base.nat_add (v_wrapper_count) ((Base.nat_add (v_reset_count) (v_start_count))))))))); [0x00000001l; 0x00000000l; 0x00000000l]; (Base.list_replicate (v_count) (0x00000000l)); (f_wrapper_types (v_functions)); (Base.list_replicate (v_reset_count) (0x00000001l)); (Base.bool_pick (v_initialized) ((f_unsigned_leb (v_start_type))) ([]))])))))); (f_byte_plan ((f_section (0x00000004l) ((f_join ([[0x00000001l; 0x00000070l; 0x00000000l]; (f_unsigned_leb (v_count))])))))); (f_byte_plan ((f_section (0x00000005l) ((f_join ([[0x00000001l; 0x00000001l]; (f_unsigned_leb (v_pages)); (f_unsigned_leb ((f_runtime_memory_max_pages ())))])))))); (f_byte_plan ((f_section (0x00000006l) ((f_vector (((f_join ([[0x0000007fl; 0x00000001l]; (f_i32_constant ((Base.u32_from_nat (v_heap_start)))); [0x0000000bl]])) :: (f_callback_globals (v_callbacks) (v_values))))))))); (f_byte_plan ((f_section (0x00000007l) ((f_vector ((Base.list_append ((f_function_exports (v_functions) ((Base.nat_add 3 (Base.nat_add (v_imports) (v_count)))))) ((Base.list_append ((f_global_exports (v_names) ((Base.bool_pick ((Base.nat_is_eq (v_imports) (0))) (1) (2))))) ((f_arena_exports (v_arrays) (v_imports) ((Base.nat_add 3 (Base.nat_add (v_imports) ((Base.nat_add (v_count) (v_wrapper_count))))))))))))))))); (f_byte_plan ((Base.bool_pick (v_initialized) ((f_section (0x00000008l) ((f_unsigned_leb (v_start_index))))) ([])))); (f_byte_plan ((f_section (0x00000009l) ((f_join ([[0x00000001l; 0x00000000l; 0x00000041l; 0x00000000l; 0x0000000bl]; (f_unsigned_leb (v_count)); (f_table_indices (v_count) ((Base.nat_add 3 v_imports)))])))))); (f_plan_section (0x0000000al) ((f_plan_vector (((f_byte_plan ((f_allocator ()))) :: ((f_byte_plan ((f_sized ((Arena.f_mark (v_imports)))))) :: ((f_byte_plan ((f_sized ((Arena.f_collect (v_imports)))))) :: (Base.list_append (v_bodies) ((Base.list_append (v_wrappers) ((Base.list_append ((f_arena_reset_body (v_arrays) (v_heap_start) (v_initialized))) (v_startup))))))))))))); (f_data_section ((Heap (v_heap_start, v_chunks)))); (f_abi_section (v_abi))]))))))))))))))
+(let v_pages = (Base.nat_max (1) ((Base.u32_to_nat ((Base.u32_shrn ((Base.u32_add ((Base.u32_from_nat (v_heap_start))) ((Base.W32 0xffff)))) (16)))))) in
+(f_plan_sequence ([(f_byte_plan ([(Base.W32 0x0); (Base.W32 0x61); (Base.W32 0x73); (Base.W32 0x6d); (Base.W32 0x1); (Base.W32 0x0); (Base.W32 0x0); (Base.W32 0x0)])); (f_type_section (v_callbacks) (v_initialized)); (f_import_section (v_callbacks)); (f_byte_plan ((f_section ((Base.W32 0x3)) ((f_join ([(f_unsigned_leb ((Base.nat_add 3 (Base.nat_add (v_count) ((Base.nat_add (v_wrapper_count) ((Base.nat_add (v_reset_count) (v_start_count))))))))); [(Base.W32 0x1); (Base.W32 0x0); (Base.W32 0x0)]; (Base.list_replicate (v_count) ((Base.W32 0x0))); (f_wrapper_types (v_functions)); (Base.list_replicate (v_reset_count) ((Base.W32 0x1))); (Base.bool_pick (v_initialized) ((f_unsigned_leb (v_start_type))) ([]))])))))); (f_byte_plan ((f_section ((Base.W32 0x4)) ((f_join ([[(Base.W32 0x1); (Base.W32 0x70); (Base.W32 0x0)]; (f_unsigned_leb (v_count))])))))); (f_byte_plan ((f_section ((Base.W32 0x5)) ((f_join ([[(Base.W32 0x1); (Base.W32 0x1)]; (f_unsigned_leb (v_pages)); (f_unsigned_leb ((f_runtime_memory_max_pages ())))])))))); (f_byte_plan ((f_section ((Base.W32 0x6)) ((f_vector (((f_join ([[(Base.W32 0x7f); (Base.W32 0x1)]; (f_i32_constant ((Base.u32_from_nat (v_heap_start)))); [(Base.W32 0xb)]])) :: (f_callback_globals (v_callbacks) (v_values))))))))); (f_byte_plan ((f_section ((Base.W32 0x7)) ((f_vector ((Base.list_append ((f_function_exports (v_functions) ((Base.nat_add 3 (Base.nat_add (v_imports) (v_count)))))) ((Base.list_append ((f_global_exports (v_names) ((Base.bool_pick ((Base.nat_is_eq (v_imports) (0))) (1) (2))))) ((f_arena_exports (v_arrays) (v_imports) ((Base.nat_add 3 (Base.nat_add (v_imports) ((Base.nat_add (v_count) (v_wrapper_count))))))))))))))))); (f_byte_plan ((Base.bool_pick (v_initialized) ((f_section ((Base.W32 0x8)) ((f_unsigned_leb (v_start_index))))) ([])))); (f_byte_plan ((f_section ((Base.W32 0x9)) ((f_join ([[(Base.W32 0x1); (Base.W32 0x0); (Base.W32 0x41); (Base.W32 0x0); (Base.W32 0xb)]; (f_unsigned_leb (v_count)); (f_table_indices (v_count) ((Base.nat_add 3 v_imports)))])))))); (f_plan_section ((Base.W32 0xa)) ((f_plan_vector (((f_byte_plan ((f_allocator ()))) :: ((f_byte_plan ((f_sized ((Arena.f_mark (v_imports)))))) :: ((f_byte_plan ((f_sized ((Arena.f_collect (v_imports)))))) :: (Base.list_append (v_bodies) ((Base.list_append (v_wrappers) ((Base.list_append ((f_arena_reset_body (v_arrays) (v_heap_start) (v_initialized))) (v_startup))))))))))))); (f_data_section ((Heap (v_heap_start, v_chunks)))); (f_abi_section (v_abi))]))))))))))))))
 and (* wasm.bend:2134 *)
 f_preparation_weight : int -> (t_PreparationWeightWork) list -> int -> int =
 fun v_fuel v_pending v_weight ->
@@ -2783,12 +2783,12 @@ fun v_found v_name ->
 | (Some (v_global)) ->
 (Done (v_global)))
 and (* wasm.bend:2338 *)
-f_private_global : t_RuntimeGlobal -> int -> ((int32) list) list -> ((int32) list) list =
+f_private_global : t_RuntimeGlobal -> int -> ((Base.word32) list) list -> ((Base.word32) list) list =
 fun v_global v_first v_rest ->
 (let (RuntimeGlobal (v_index, v_ty)) = v_global in
-(Base.bool_pick ((Base.nat_is_ge (v_index) (v_first))) (((f_global_initializer (v_ty) (0x00000000l) (true)) :: v_rest)) (v_rest)))
+(Base.bool_pick ((Base.nat_is_ge (v_index) (v_first))) (((f_global_initializer (v_ty) ((Base.W32 0x0)) (true)) :: v_rest)) (v_rest)))
 and (* wasm.bend:2342 *)
-f_private_globals : (Init.t_Initializer) list -> t_Catalog -> int -> (M.t_Diagnostic, ((int32) list) list) Base.result_ =
+f_private_globals : (Init.t_Initializer) list -> t_Catalog -> int -> (M.t_Diagnostic, ((Base.word32) list) list) Base.result_ =
 fun v_initializers v_symbols v_first ->
 (match v_initializers with
 | [] ->
@@ -2802,16 +2802,16 @@ fun v_initializers v_symbols v_first ->
 | Done v_rest ->
 (Done ((f_private_global (v_global) (v_first) (v_rest)))))))
 and (* wasm.bend:2352 *)
-f_initializer_call : t_RuntimeGlobal -> int -> int -> (int32) list =
+f_initializer_call : t_RuntimeGlobal -> int -> int -> (Base.word32) list =
 fun v_global v_entry v_imports ->
 (let (RuntimeGlobal (v_index, v_ty)) = v_global in
-(f_join ([[0x00000041l; 0x00000000l; 0x00000041l; 0x00000000l; 0x00000041l; 0x00000000l; 0x00000010l]; (f_unsigned_leb ((Base.nat_add 3 (Base.nat_add (v_imports) (v_entry))))); (f_runtime_from_word (v_ty)); [0x00000024l]; (f_unsigned_leb ((f_global_index (v_index) (v_imports))))])))
+(f_join ([[(Base.W32 0x41); (Base.W32 0x0); (Base.W32 0x41); (Base.W32 0x0); (Base.W32 0x41); (Base.W32 0x0); (Base.W32 0x10)]; (f_unsigned_leb ((Base.nat_add 3 (Base.nat_add (v_imports) (v_entry))))); (f_runtime_from_word (v_ty)); [(Base.W32 0x24)]; (f_unsigned_leb ((f_global_index (v_index) (v_imports))))])))
 and (* wasm.bend:2356 *)
-f_initializer_calls : (Init.t_Initializer) list -> t_Catalog -> int -> (M.t_Diagnostic, ((int32) list) list) Base.result_ =
+f_initializer_calls : (Init.t_Initializer) list -> t_Catalog -> int -> (M.t_Diagnostic, ((Base.word32) list) list) Base.result_ =
 fun v_initializers v_symbols v_imports ->
 (match v_initializers with
 | [] ->
-(Done ([[0x00000041l; 0x00000000l; 0x00000023l; 0x00000000l; 0x00000036l; 0x00000002l; 0x00000000l]]))
+(Done ([[(Base.W32 0x41); (Base.W32 0x0); (Base.W32 0x23); (Base.W32 0x0); (Base.W32 0x36); (Base.W32 0x2); (Base.W32 0x0)]]))
 | ((Init.Initializer (v_name, v_value)) :: v_tail) ->
 (match (f_required_runtime ((f_runtime_global (v_symbols) (v_name))) (v_name)) with
 | Fail __error -> Fail __error
@@ -2857,7 +2857,7 @@ fun v_runtime v_safe_loops ->
 (let v_jobs = (Base.list_append (v_normal) ((f_operation_jobs (v_needed_operations)))) in
 (let v_slots = (f_slot_index ((f_job_slots (v_jobs) (0)))) in
 (let v_operation_ids = (f_slot_index ((f_operation_slots (v_needed_operations) (0)))) in
-(match (f_serialize_constants (v_constants) ((StaticCatalog (v_slots, v_projection, v_operation_ids))) ((Heap (256, [(Base.list_replicate (256) (0x00000000l))])))) with
+(match (f_serialize_constants (v_constants) ((StaticCatalog (v_slots, v_projection, v_operation_ids))) ((Heap (256, [(Base.list_replicate (256) ((Base.W32 0x0)))])))) with
 | Fail __error -> Fail __error
 | Done v_serialized ->
 (Done ((Prepared (v_jobs, (Catalog (v_slots, (E.f_catalog_constructors (v_declarations)), (f_slot_index ((f_static_slots (v_serialized)))), v_operation_ids, (f_runtime_globals (v_initializers) (v_names) ((Base.nat_add 1 (Base.list_length (v_names)))) (MTip)))), v_functions, v_names, (f_static_heap (v_serialized)), v_initializers)))))))))))))))))
@@ -2900,7 +2900,7 @@ fun v_prepared v_entries ->
 | Done v_startup ->
 (Done ((f_assemble (v_abi) ((Base.list_append (v_bodies) ((f_callback_bodies (v_callbacks) (0))))) (v_wrappers) (v_names) ((Base.list_append (v_values) (v_hidden))) (v_heap) (v_startup))))))))))))
 and (* wasm.bend:2416 *)
-f_link : t_Prepared -> (t_EntryCode) list -> (M.t_Diagnostic, (int32) list) Base.result_ =
+f_link : t_Prepared -> (t_EntryCode) list -> (M.t_Diagnostic, (Base.word32) list) Base.result_ =
 fun v_prepared v_entries ->
 (match (f_link_plan (v_prepared) (v_entries)) with
 | Fail __error -> Fail __error
@@ -2917,7 +2917,7 @@ fun v_checked v_constants ->
 | Done v_entries ->
 (f_link_plan (v_prepared) (v_entries))))
 and (* wasm.bend:2427 *)
-f_emit : M.t_CheckedModule -> ((C.t_Value) C.t_Binding) list -> (M.t_Diagnostic, (int32) list) Base.result_ =
+f_emit : M.t_CheckedModule -> ((C.t_Value) C.t_Binding) list -> (M.t_Diagnostic, (Base.word32) list) Base.result_ =
 fun v_checked v_constants ->
 (match (f_emit_plan (v_checked) (v_constants)) with
 | Fail __error -> Fail __error

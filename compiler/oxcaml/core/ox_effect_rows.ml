@@ -222,7 +222,7 @@ fun v_fuel v_left v_right v_solution v_subject ->
 and (* effect_rows.bend:169 *)
 f_unify : M.t_EffectRow -> M.t_EffectRow -> (t_Binding) list -> int -> Base.text -> (M.t_Diagnostic, t_Solution) Base.result_ =
 fun v_left v_right v_bindings v_next v_subject ->
-(f_unify_work ((Base.u32_to_nat (0x00010000l))) ((f_resolve (v_bindings) (v_left))) ((f_resolve (v_bindings) (v_right))) ((Solution (v_bindings, v_next))) (v_subject))
+(f_unify_work ((Base.u32_to_nat ((Base.W32 0x10000)))) ((f_resolve (v_bindings) (v_left))) ((f_resolve (v_bindings) (v_right))) ((Solution (v_bindings, v_next))) (v_subject))
 and (* effect_rows.bend:172 *)
 f_operation_le : M.t_TypeId -> M.t_TypeId -> bool =
 fun v_left v_right ->

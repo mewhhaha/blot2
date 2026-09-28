@@ -18,7 +18,7 @@ let rec (* numeric_literal.bend:14 *)
 f_leading_zeroes : Base.text -> Base.text =
 fun v_digits ->
 (match v_digits with
-| (SCon ((Chr (0x00000030l)), v_tail)) ->
+| (SCon ((Chr ((Base.W32 0x30))), v_tail)) ->
 (f_leading_zeroes (v_tail))
 | v_other ->
 v_other)
@@ -37,22 +37,22 @@ fun v_chars v_value v_limit ->
 | SNil ->
 (Some (v_value))
 | (SCon ((Chr (v_code)), v_tail)) ->
-(match (Base.bool_pick ((Base.bool_and ((Base.u32_is_ge (v_code) (0x00000030l))) ((Base.u32_is_le (v_code) (0x00000039l))))) ((Some (()))) (None)) with
+(match (Base.bool_pick ((Base.bool_and ((Base.u32_is_ge (v_code) ((Base.W32 0x30)))) ((Base.u32_is_le (v_code) ((Base.W32 0x39)))))) ((Some (()))) (None)) with
 | None -> None
 | Some v_valid ->
-(f_exponent_digits (v_tail) ((Base.nat_min (v_limit) ((Base.nat_add ((Base.nat_mul (v_value) (10))) ((Base.u32_to_nat ((Base.u32_sub (v_code) (0x00000030l))))))))) (v_limit))))
+(f_exponent_digits (v_tail) ((Base.nat_min (v_limit) ((Base.nat_add ((Base.nat_mul (v_value) (10))) ((Base.u32_to_nat ((Base.u32_sub (v_code) ((Base.W32 0x30)))))))))) (v_limit))))
 and (* numeric_literal.bend:37 *)
 f_exponent : Base.text -> int -> (t_Exponent) option =
 fun v_chars v_limit ->
 (match v_chars with
 | SNil ->
 None
-| (SCon ((Chr (0x0000002dl)), v_tail)) ->
+| (SCon ((Chr ((Base.W32 0x2d))), v_tail)) ->
 (match (f_exponent_digits (v_tail) (0) (v_limit)) with
 | None -> None
 | Some v_value ->
 (Some ((Exponent (0, v_value)))))
-| (SCon ((Chr (0x0000002bl)), v_tail)) ->
+| (SCon ((Chr ((Base.W32 0x2b))), v_tail)) ->
 (match (f_exponent_digits (v_tail) (0) (v_limit)) with
 | None -> None
 | Some v_value ->
@@ -68,53 +68,53 @@ fun v_chars v_reversed v_fractional v_point v_limit ->
 (match v_chars with
 | SNil ->
 (Some ((f_decimal ((f_leading_zeroes ((Base.string_reverse (v_reversed))))) (v_fractional) ((Exponent (0, 0))))))
-| (SCon ((Chr (0x0000002el)), v_tail)) ->
+| (SCon ((Chr ((Base.W32 0x2e))), v_tail)) ->
 (f_significand (v_tail) (v_reversed) (v_fractional) (true) (v_limit))
-| (SCon ((Chr (0x00000065l)), v_tail)) ->
+| (SCon ((Chr ((Base.W32 0x65))), v_tail)) ->
 (match (f_exponent (v_tail) (v_limit)) with
 | None -> None
 | Some v_scale ->
 (Some ((f_decimal ((f_leading_zeroes ((Base.string_reverse (v_reversed))))) (v_fractional) (v_scale)))))
-| (SCon ((Chr (0x00000045l)), v_tail)) ->
+| (SCon ((Chr ((Base.W32 0x45))), v_tail)) ->
 (match (f_exponent (v_tail) (v_limit)) with
 | None -> None
 | Some v_scale ->
 (Some ((f_decimal ((f_leading_zeroes ((Base.string_reverse (v_reversed))))) (v_fractional) (v_scale)))))
 | (SCon ((Chr (v_code)), v_tail)) ->
 (let v_number = v_code in
-(match (Base.bool_pick ((Base.bool_and ((Base.u32_is_ge (v_number) (0x00000030l))) ((Base.u32_is_le (v_number) (0x00000039l))))) ((Some (()))) (None)) with
+(match (Base.bool_pick ((Base.bool_and ((Base.u32_is_ge (v_number) ((Base.W32 0x30)))) ((Base.u32_is_le (v_number) ((Base.W32 0x39)))))) ((Some (()))) (None)) with
 | None -> None
 | Some v_valid ->
 (f_significand (v_tail) ((SCon ((Chr (v_number)), v_reversed))) ((Base.nat_add (v_fractional) ((Base.bool_pick (v_point) (1) (0))))) (v_point) (v_limit)))))
 and (* numeric_literal.bend:74 *)
-f_multiply_digits : Base.text -> int32 -> int32 -> Base.text -> Base.text =
+f_multiply_digits : Base.text -> Base.word32 -> Base.word32 -> Base.text -> Base.text =
 fun v_reversed v_factor v_carry v_result ->
 (match (v_reversed, v_carry) with
-| (SNil, 0x00000000l) ->
+| (SNil, (Base.W32 0x0)) ->
 v_result
 | (SNil, v_other) ->
 (Base.string_append (Base.u32_show (v_other)) v_result)
 | ((SCon ((Chr (v_code)), v_tail)), v_carry) ->
-(let v_value = (Base.u32_add ((Base.u32_mul ((Base.u32_sub (v_code) (0x00000030l))) (v_factor))) (v_carry)) in
-(f_multiply_digits (v_tail) (v_factor) ((Base.u32_div (v_value) (0x0000000al))) ((SCon ((Chr ((Base.u32_add (0x00000030l) ((Base.u32_mod (v_value) (0x0000000al)))))), v_result))))))
+(let v_value = (Base.u32_add ((Base.u32_mul ((Base.u32_sub (v_code) ((Base.W32 0x30)))) (v_factor))) (v_carry)) in
+(f_multiply_digits (v_tail) (v_factor) ((Base.u32_div (v_value) ((Base.W32 0xa)))) ((SCon ((Chr ((Base.u32_add ((Base.W32 0x30)) ((Base.u32_mod (v_value) ((Base.W32 0xa))))))), v_result))))))
 and (* numeric_literal.bend:84 *)
-f_multiply_power : int -> int32 -> Base.text -> Base.text =
+f_multiply_power : int -> Base.word32 -> Base.text -> Base.text =
 fun v_power v_factor v_digits ->
 (match v_power with
 | 0 ->
 v_digits
 | __nat_1 when __nat_1 >= 1 ->
 (let v_rest = (__nat_1 - 1) in
-(f_multiply_power (v_rest) (v_factor) ((f_multiply_digits ((Base.string_reverse (v_digits))) (v_factor) (0x00000000l) (SNil))))))
+(f_multiply_power (v_rest) (v_factor) ((f_multiply_digits ((Base.string_reverse (v_digits))) (v_factor) ((Base.W32 0x0)) (SNil))))))
 and (* numeric_literal.bend:91 *)
-f_midpoint : int32 -> t_Decimal =
+f_midpoint : Base.word32 -> t_Decimal =
 fun v_lower ->
 (let v_biased = (Base.u32_shrn (v_lower) (23)) in
-(let v_mantissa = (Base.u32_and (v_lower) (0x007fffffl)) in
-(let v_coefficient = (Base.u32_add ((Base.u32_mul ((Base.bool_pick ((Base.u32_is_eq (v_biased) (0x00000000l))) (v_mantissa) ((Base.u32_add (v_mantissa) (0x00800000l))))) (0x00000002l))) (0x00000001l)) in
-(let v_power = (Base.u32_to_nat ((Base.bool_pick ((Base.u32_is_eq (v_biased) (0x00000000l))) (0x00000001l) (v_biased)))) in
+(let v_mantissa = (Base.u32_and (v_lower) ((Base.W32 0x7fffff))) in
+(let v_coefficient = (Base.u32_add ((Base.u32_mul ((Base.bool_pick ((Base.u32_is_eq (v_biased) ((Base.W32 0x0)))) (v_mantissa) ((Base.u32_add (v_mantissa) ((Base.W32 0x800000)))))) ((Base.W32 0x2)))) ((Base.W32 0x1))) in
+(let v_power = (Base.u32_to_nat ((Base.bool_pick ((Base.u32_is_eq (v_biased) ((Base.W32 0x0)))) ((Base.W32 0x1)) (v_biased)))) in
 (let v_negative = (Base.nat_sub (151) (v_power)) in
-(let v_digits = (f_multiply_power (v_negative) (0x00000005l) ((f_multiply_power ((Base.nat_sub (v_power) (151))) (0x00000002l) ((Base.u32_show (v_coefficient)))))) in
+(let v_digits = (f_multiply_power (v_negative) ((Base.W32 0x5)) ((f_multiply_power ((Base.nat_sub (v_power) (151))) ((Base.W32 0x2)) ((Base.u32_show (v_coefficient)))))) in
 (Decimal (v_digits, (Base.nat_sub ((Base.string_length (v_digits))) (1)), v_negative))))))))
 and (* numeric_literal.bend:100 *)
 f_compare_digits : Base.text -> Base.text -> Base.cmp -> Base.cmp =
@@ -127,9 +127,9 @@ GT
 | (SNil, SNil, EQ) ->
 EQ
 | (SNil, (SCon ((Chr (v_head)), v_tail)), EQ) ->
-(f_compare_digits (SNil) (v_tail) ((Base.u32_cmp (0x00000030l) (v_head))))
+(f_compare_digits (SNil) (v_tail) ((Base.u32_cmp ((Base.W32 0x30)) (v_head))))
 | ((SCon ((Chr (v_head)), v_tail)), SNil, EQ) ->
-(f_compare_digits (v_tail) (SNil) ((Base.u32_cmp (v_head) (0x00000030l))))
+(f_compare_digits (v_tail) (SNil) ((Base.u32_cmp (v_head) ((Base.W32 0x30)))))
 | ((SCon ((Chr (v_a)), v_at)), (SCon ((Chr (v_b)), v_bt)), EQ) ->
 (f_compare_digits (v_at) (v_bt) ((Base.u32_cmp (v_a) (v_b)))))
 and (* numeric_literal.bend:115 *)
@@ -145,57 +145,57 @@ GT
 | ((Decimal (v_a, v_ap, v_an)), (Decimal (v_b, v_bp, v_bn))) ->
 (f_compare_digits (v_a) (v_b) ((Base.nat_cmp ((Base.nat_add (v_ap) (v_bn))) ((Base.nat_add (v_bp) (v_an)))))))
 and (* numeric_literal.bend:126 *)
-f_upper_choice : Base.cmp -> int32 -> int32 =
+f_upper_choice : Base.cmp -> Base.word32 -> Base.word32 =
 fun v_order v_bits ->
 (match v_order with
 | LT ->
 v_bits
 | EQ ->
-(Base.bool_pick ((Base.u32_is_eq ((Base.u32_and (v_bits) (0x00000001l))) (0x00000000l))) (v_bits) ((Base.u32_add (v_bits) (0x00000001l))))
+(Base.bool_pick ((Base.u32_is_eq ((Base.u32_and (v_bits) ((Base.W32 0x1)))) ((Base.W32 0x0)))) (v_bits) ((Base.u32_add (v_bits) ((Base.W32 0x1)))))
 | GT ->
-(Base.u32_add (v_bits) (0x00000001l)))
+(Base.u32_add (v_bits) ((Base.W32 0x1))))
 and (* numeric_literal.bend:135 *)
-f_upper : int32 -> t_Decimal -> int32 =
+f_upper : Base.word32 -> t_Decimal -> Base.word32 =
 fun v_bits v_exact ->
 (match v_bits with
-| 0x7f800000l ->
-0x7f800000l
+| (Base.W32 0x7f800000) ->
+(Base.W32 0x7f800000)
 | v_bits ->
 (f_upper_choice ((f_compare (v_exact) ((f_midpoint (v_bits))))) (v_bits)))
 and (* numeric_literal.bend:142 *)
-f_lower_choice : Base.cmp -> int32 -> t_Decimal -> int32 =
+f_lower_choice : Base.cmp -> Base.word32 -> t_Decimal -> Base.word32 =
 fun v_order v_bits v_exact ->
 (match v_order with
 | LT ->
-(Base.u32_sub (v_bits) (0x00000001l))
+(Base.u32_sub (v_bits) ((Base.W32 0x1)))
 | EQ ->
-(Base.bool_pick ((Base.u32_is_eq ((Base.u32_and (v_bits) (0x00000001l))) (0x00000000l))) (v_bits) ((Base.u32_sub (v_bits) (0x00000001l))))
+(Base.bool_pick ((Base.u32_is_eq ((Base.u32_and (v_bits) ((Base.W32 0x1)))) ((Base.W32 0x0)))) (v_bits) ((Base.u32_sub (v_bits) ((Base.W32 0x1)))))
 | GT ->
 (f_upper (v_bits) (v_exact)))
 and (* numeric_literal.bend:151 *)
-f_rounded : int32 -> t_Decimal -> int32 =
+f_rounded : Base.word32 -> t_Decimal -> Base.word32 =
 fun v_bits v_exact ->
 (match (v_bits, v_exact) with
 | (_, DecimalZero) ->
-0x00000000l
-| (0x00000000l, v_exact) ->
-(f_upper (0x00000000l) (v_exact))
+(Base.W32 0x0)
+| ((Base.W32 0x0), v_exact) ->
+(f_upper ((Base.W32 0x0)) (v_exact))
 | (v_bits, v_exact) ->
-(f_lower_choice ((f_compare (v_exact) ((f_midpoint ((Base.u32_sub (v_bits) (0x00000001l))))))) (v_bits) (v_exact)))
+(f_lower_choice ((f_compare (v_exact) ((f_midpoint ((Base.u32_sub (v_bits) ((Base.W32 0x1)))))))) (v_bits) (v_exact)))
 and (* numeric_literal.bend:160 *)
-f_from_bits : int32 -> int32 =
+f_from_bits : Base.word32 -> Base.word32 =
 fun v_value ->
 (let v_bits = v_value in
 v_bits)
 and (* numeric_literal.bend:164 *)
-f_candidate : (int32) option -> Base.text -> (int32) option =
+f_candidate : (Base.word32) option -> Base.text -> (Base.word32) option =
 fun v_parsed v_text ->
 (match v_parsed with
 | None ->
 None
 | (Some (v_value)) ->
 (let v_bits = (Base.f32_bits (v_value)) in
-(match (Base.bool_pick ((Base.u32_is_le (v_bits) (0x7f800000l))) ((Some (()))) (None)) with
+(match (Base.bool_pick ((Base.u32_is_le (v_bits) ((Base.W32 0x7f800000)))) ((Some (()))) (None)) with
 | None -> None
 | Some v_valid ->
 (match (f_significand (v_text) (SNil) (0) (false) ((Base.nat_add ((Base.string_length (v_text))) (400)))) with
@@ -203,6 +203,6 @@ None
 | Some v_exact ->
 (Some ((f_from_bits ((f_rounded (v_bits) (v_exact))))))))))
 and (* numeric_literal.bend:175 *)
-f_read : Base.text -> (int32) option =
+f_read : Base.text -> (Base.word32) option =
 fun v_text ->
 (f_candidate ((Base.f32_read (v_text))) (v_text))

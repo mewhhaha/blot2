@@ -18,14 +18,14 @@ and 'v t_Provider =
   | Provider of M.t_TypeId * 'v
 and t_Value =
   | UnitValue
-  | U32Value of int32
+  | U32Value of Base.word32
   | BoolValue of bool
   | FunctionValue of Base.text
   | ConstructorFunctionValue of Base.text
   | DataValue of Base.text * (t_Value) option
   | ClosureValue of int * Base.text * M.t_Expr * ((t_Value) t_Binding) list
   | ReturnValue of int * t_Value
-  | F32Value of int32
+  | F32Value of Base.word32
   | OperationValue of M.t_TypeId
   | ProviderValue of M.t_TypeId * t_Value
   | StateProviderValue of M.t_TypeId * M.t_TypeId * t_Value
@@ -66,9 +66,9 @@ and t_EvaluationWork =
   | HandleValue of t_Value * M.t_Expr
   | Expression of M.t_Expr
   | ForBounds of Base.text * t_Value * t_Value * Base.text * t_Value * M.t_Expr
-  | ForIterations of Base.text * int32 * Base.text * t_Value * M.t_Expr
+  | ForIterations of Base.text * Base.word32 * Base.text * t_Value * M.t_Expr
   | ForeverIterations of Base.text * t_Value * M.t_Expr
-  | GenerateElements of t_Value * int32 * (t_Value) list
+  | GenerateElements of t_Value * Base.word32 * (t_Value) list
   | CollectValues
   | MatchArms of ((M.t_Expr) M.t_MatchArm) list * (t_Value) list
   | MatchSelected of t_Value * M.t_Expr * ((M.t_Expr) M.t_MatchArm) list * (t_Value) list
@@ -427,9 +427,9 @@ fun v_operator v_left v_right v_remaining ->
 | (_, _, _) ->
 (Fail ((M.Diagnostic (s_0, s_4, s_8)))))
 and (* const_eval.bend:247 *)
-f_f32_to_u32_saturating : int32 -> int32 =
+f_f32_to_u32_saturating : Base.word32 -> Base.word32 =
 fun v_value ->
-(Base.bool_pick ((Base.f32_is_ge (v_value) (0x4f800000l))) (0xffffffffl) ((Base.f32_to_u32 (v_value))))
+(Base.bool_pick ((Base.f32_is_ge (v_value) ((Base.W32 0x4f800000)))) ((Base.W32 0xffffffff)) ((Base.f32_to_u32 (v_value))))
 and (* const_eval.bend:250 *)
 f_unary : M.t_UnaryOp -> t_Value -> t_Budget -> (M.t_Diagnostic, t_Evaluation) Base.result_ =
 fun v_operator v_value v_remaining ->
@@ -742,7 +742,7 @@ fun v_fuel v_work ->
 and (* const_eval.bend:532 *)
 f_match_pattern : M.t_Pattern -> t_Value -> (M.t_Diagnostic, (((t_Value) t_Binding) list) option) Base.result_ =
 fun v_pattern v_value ->
-(f_match_pattern_work ((Base.u32_to_nat (0x00010000l))) ((PatternValue (v_pattern, v_value))))
+(f_match_pattern_work ((Base.u32_to_nat ((Base.W32 0x10000)))) ((PatternValue (v_pattern, v_value))))
 and (* const_eval.bend:535 *)
 f_prepend_collected_value : t_Value -> t_Value -> t_Budget -> (M.t_Diagnostic, t_Evaluation) Base.result_ =
 fun v_value v_collected v_remaining ->
@@ -801,7 +801,7 @@ fun v_count v_value v_elements v_steps ->
 (let v_remaining = (Budget (v_remaining, v_cells)) in
 (f_array_fill_elements (v_rest) (v_value) ((v_value :: v_elements)) (v_remaining))))))
 and (* const_eval.bend:584 *)
-f_array_fill_checked : bool -> int32 -> t_Value -> t_Budget -> (M.t_Diagnostic, t_Evaluation) Base.result_ =
+f_array_fill_checked : bool -> Base.word32 -> t_Value -> t_Budget -> (M.t_Diagnostic, t_Evaluation) Base.result_ =
 fun v_allowed v_count v_value v_remaining ->
 (match v_allowed with
 | false ->
@@ -813,11 +813,11 @@ f_array_fill : t_Value -> t_Value -> t_Budget -> (M.t_Diagnostic, t_Evaluation) 
 fun v_count v_value v_remaining ->
 (match v_count with
 | (U32Value (v_length)) ->
-(f_array_fill_checked ((Base.u32_is_lt (v_length) (0x00400000l))) (v_length) (v_value) (v_remaining))
+(f_array_fill_checked ((Base.u32_is_lt (v_length) ((Base.W32 0x400000)))) (v_length) (v_value) (v_remaining))
 | _ ->
 (Fail ((M.Diagnostic (s_34, s_4, s_42)))))
 and (* const_eval.bend:598 *)
-f_array_generate_count_checked : bool -> int32 -> (M.t_Diagnostic, int) Base.result_ =
+f_array_generate_count_checked : bool -> Base.word32 -> (M.t_Diagnostic, int) Base.result_ =
 fun v_allowed v_count ->
 (match v_allowed with
 | false ->
@@ -829,7 +829,7 @@ f_array_generate_count : t_Value -> (M.t_Diagnostic, int) Base.result_ =
 fun v_count ->
 (match v_count with
 | (U32Value (v_length)) ->
-(f_array_generate_count_checked ((Base.u32_is_lt (v_length) (0x00400000l))) (v_length))
+(f_array_generate_count_checked ((Base.u32_is_lt (v_length) ((Base.W32 0x400000)))) (v_length))
 | _ ->
 (Fail ((M.Diagnostic (s_34, s_4, s_43)))))
 and (* const_eval.bend:612 *)
@@ -898,7 +898,7 @@ fun v_array v_remaining ->
 (match v_array with
 | (ArrayValue (v_elements)) ->
 (let v_count = (Base.list_length (v_elements)) in
-(f_array_length_checked ((Base.nat_is_le (v_count) ((Base.u32_to_nat (0xffffffffl))))) (v_count) (v_remaining)))
+(f_array_length_checked ((Base.nat_is_le (v_count) ((Base.u32_to_nat ((Base.W32 0xffffffff)))))) (v_count) (v_remaining)))
 | _ ->
 (Fail ((M.Diagnostic (s_34, s_4, s_51)))))
 and (* const_eval.bend:673 *)
@@ -1021,7 +1021,7 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_successor ->
 (fun v_next_steps ->
-(f_evaluate_work (v_depth) (v_rest) ([]) (v_next_steps) ((ForIterations (v_index, (Base.u32_add v_current 0x00000001l), v_state, v_successor, v_body))) (v_context))))))))))
+(f_evaluate_work (v_depth) (v_rest) ([]) (v_next_steps) ((ForIterations (v_index, (Base.u32_add v_current (Base.W32 0x1)), v_state, v_successor, v_body))) (v_context))))))))))
 | (_, _, _, (Budget (0, v_cells)), (ForeverIterations (v_state, v_value, v_body))) ->
 (Fail ((M.Diagnostic (s_37, s_65, s_66))))
 | (__nat_14, _, _, (Budget (__nat_15, v_cells)), (ForeverIterations (v_state, v_value, v_body))) when __nat_14 >= 1 && __nat_15 >= 1 ->
@@ -1062,7 +1062,7 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 | Done v_generated ->
 (f_continue_value (v_generated) ((fun v_element ->
 (fun v_next_steps ->
-(f_evaluate_work (v_depth) (v_rest) ([]) (v_next_steps) ((GenerateElements (v_generator, (Base.u32_add v_index 0x00000001l), (v_element :: v_reversed)))) (v_context))))))))))))
+(f_evaluate_work (v_depth) (v_rest) ([]) (v_next_steps) ((GenerateElements (v_generator, (Base.u32_add v_index (Base.W32 0x1)), (v_element :: v_reversed)))) (v_context))))))))))))
 | (_, _, _, _, (MatchPatterns (v_fuel, (Fail (v_error))))) ->
 (Fail (v_error))
 | (_, _, _, _, (MatchPatterns (v_fuel, (Done (PatternRejected))))) ->
@@ -1089,7 +1089,7 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 (Fail ((M.Diagnostic (s_0, s_4, s_69))))
 | (_, __nat_23, _, _, (MatchArms (((M.MatchArm (v_patterns, v_body)) :: v_tail), v_values))) when __nat_23 >= 1 ->
 (let v_matching_rest = (__nat_23 - 1) in
-(match (f_evaluate_work (v_depth) (v_matching_rest) ([]) (v_steps) ((MatchPatterns ((Base.u32_to_nat (0x00010000l)), (Done ((PatternPending ([(ProductPatterns (v_patterns, v_values))], []))))))) (v_context)) with
+(match (f_evaluate_work (v_depth) (v_matching_rest) ([]) (v_steps) ((MatchPatterns ((Base.u32_to_nat ((Base.W32 0x10000))), (Done ((PatternPending ([(ProductPatterns (v_patterns, v_values))], []))))))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_matched ->
 (f_evaluate_work (v_depth) (v_matching_rest) ([]) ((f_eval_budget (v_matched))) ((MatchSelected ((f_eval_value (v_matched)), v_body, v_tail, v_values))) (v_context))))
@@ -1154,7 +1154,7 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 (match (f_lookup_constant ((f_context_constants (v_context))) (v_name)) with
 | Fail __error -> Fail __error
 | Done v_value ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) ((f_without_locals (v_context)))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) ((f_without_locals (v_context)))))
 | (M.FunctionExpr (v_name)) ->
 (match (f_lookup_function ((f_context_functions (v_context))) (v_name)) with
 | Fail __error -> Fail __error
@@ -1179,14 +1179,14 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 | (M.ConstructExpr (v_constructor, None)) ->
 (Done ((Evaluation ((DataValue (v_constructor, None)), (f_spend_budget (v_steps))))))
 | (M.ConstructExpr (v_constructor, (Some (v_payload)))) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_payload))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_payload))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_value ->
 (fun v_next_steps ->
 (Done ((Evaluation ((DataValue (v_constructor, (Some (v_value)))), v_next_steps)))))))))
 | (M.ProductExpr ((v_first :: (v_second :: v_tail)))) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ((v_first :: (v_second :: v_tail))) ((f_spend_budget (v_steps))) (CollectValues) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ((v_first :: (v_second :: v_tail))) ((f_spend_budget (v_steps))) (CollectValues) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_collected ->
@@ -1195,50 +1195,50 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 | (M.ProductExpr (v_elements)) ->
 (Fail ((M.Diagnostic (s_26, s_4, s_75))))
 | (M.ProjectExpr (v_value, v_index)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_product ->
 (fun v_next_steps ->
 (f_project (v_product) (v_index) (v_next_steps)))))))
 | (M.ArrayExpr (v_elements)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) (v_elements) ((f_spend_budget (v_steps))) (CollectValues) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) (v_elements) ((f_spend_budget (v_steps))) (CollectValues) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_collected ->
 (fun v_next_steps ->
 (f_array_value (v_collected) (v_next_steps)))))))
 | (M.ForExpr (v_index, v_start, v_end, v_state, v_initial, v_body)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_start))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_start))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_first ->
 (fun v_end_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_end_steps) ((Expression (v_end))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_end_steps) ((Expression (v_end))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_bounded ->
 (f_continue_value (v_bounded) ((fun v_last ->
 (fun v_initial_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_initial_steps) ((Expression (v_initial))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_initial_steps) ((Expression (v_initial))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_prepared ->
 (f_continue_value (v_prepared) ((fun v_value ->
 (fun v_next_steps ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_next_steps) ((ForBounds (v_index, v_first, v_last, v_state, v_value, v_body))) (v_context)))))))))))))))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_next_steps) ((ForBounds (v_index, v_first, v_last, v_state, v_value, v_body))) (v_context)))))))))))))))))
 | (M.ForeverExpr (v_state, v_initial, v_body)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_initial))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_initial))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_prepared ->
 (f_continue_value (v_prepared) ((fun v_value ->
 (fun v_next_steps ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_next_steps) ((ForeverIterations (v_state, v_value, v_body))) (v_context)))))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_next_steps) ((ForeverIterations (v_state, v_value, v_body))) (v_context)))))))
 | (M.ArrayGenerateExpr (v_count, v_generator)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_count))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_count))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_length ->
 (fun v_generator_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_generator_steps) ((Expression (v_generator))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_generator_steps) ((Expression (v_generator))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_prepared ->
 (f_continue_value (v_prepared) ((fun v_function ->
@@ -1246,43 +1246,43 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 (match (f_array_generate_count (v_length)) with
 | Fail __error -> Fail __error
 | Done v_count ->
-(f_evaluate_work (v_limit) (v_count) ([]) (v_next_steps) ((GenerateElements (v_function, 0x00000000l, []))) (v_context)))))))))))))
+(f_evaluate_work (v_limit) (v_count) ([]) (v_next_steps) ((GenerateElements (v_function, (Base.W32 0x0), []))) (v_context)))))))))))))
 | (M.ArrayFillExpr (v_count, v_value)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_count))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_count))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_length ->
 (fun v_value_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_value_steps) ((Expression (v_value))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_value_steps) ((Expression (v_value))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_filled ->
 (f_continue_value (v_filled) ((fun v_element ->
 (fun v_next_steps ->
 (f_array_fill (v_length) (v_element) (v_next_steps))))))))))))
 | (M.ArrayGetExpr (v_array, v_index)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_array))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_array))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_value ->
 (fun v_index_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_index_steps) ((Expression (v_index))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_index_steps) ((Expression (v_index))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_indexed ->
 (f_continue_value (v_indexed) ((fun v_offset ->
 (fun v_next_steps ->
 (f_array_get (v_value) (v_offset) (v_next_steps))))))))))))
 | (M.ArraySetExpr (v_array, v_index, v_value)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_array))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_array))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_original ->
 (fun v_index_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_index_steps) ((Expression (v_index))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_index_steps) ((Expression (v_index))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_indexed ->
 (f_continue_value (v_indexed) ((fun v_offset ->
 (fun v_value_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_value_steps) ((Expression (v_value))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_value_steps) ((Expression (v_value))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_changed ->
 (f_continue_value (v_changed) ((fun v_replacement ->
@@ -1293,7 +1293,7 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 | (M.GenericOperationExpr (v_identity, v_template, v_arguments)) ->
 (Fail ((M.Diagnostic (s_73, (M.f_type_id_show (v_template)), s_78))))
 | (M.ArrayLengthExpr (v_array)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_array))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_array))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_value ->
@@ -1308,33 +1308,33 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 | Done v_environment ->
 (Done ((Evaluation ((ClosureValue (v_identity, v_parameter, v_body, v_environment)), (f_spend_budget (v_steps))))))))
 | (M.StateProviderExpr (v_read, v_write, v_initial)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_initial))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_initial))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_value ->
 (fun v_next_steps ->
 (Done ((Evaluation ((StateProviderValue (v_read, v_write, v_value)), v_next_steps)))))))))
 | (M.ProviderExpr (v_identity, v_implementation)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_implementation))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_implementation))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_value ->
 (fun v_next_steps ->
 (Done ((Evaluation ((ProviderValue (v_identity, v_value)), v_next_steps)))))))))
 | (M.HandleExpr (v_provider, v_body)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_provider))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_provider))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_value ->
 (fun v_next_steps ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_next_steps) ((HandleValue (v_value, v_body))) (v_context)))))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_next_steps) ((HandleValue (v_value, v_body))) (v_context)))))))
 | (M.ApplyExpr (v_callee, v_argument)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_callee))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_callee))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_function ->
 (fun v_argument_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_argument_steps) ((Expression (v_argument))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_argument_steps) ((Expression (v_argument))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_applied ->
 (f_continue_value (v_applied) ((fun v_value ->
@@ -1348,12 +1348,12 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 (f_complete_application (v_resolved) (v_call_steps) ((fun v_body ->
 (fun v_scope ->
 (fun v_body_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_body_steps) ((Expression (v_body))) (v_scope)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_body_steps) ((Expression (v_body))) (v_scope)) with
 | Fail __error -> Fail __error
 | Done v_result ->
 (f_complete_definition (v_result))))))))))))))))))))
 | (M.CallExpr (v_callee, v_argument)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_argument))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_argument))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_value ->
@@ -1361,76 +1361,76 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 (match (f_lookup_function ((f_context_functions (v_context))) (v_callee)) with
 | Fail __error -> Fail __error
 | Done v_function ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_next_steps) ((Expression ((f_function_body (v_function))))) ((f_function_context (v_function) (v_value) (v_context)))) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_next_steps) ((Expression ((f_function_body (v_function))))) ((f_function_context (v_function) (v_value) (v_context)))) with
 | Fail __error -> Fail __error
 | Done v_result ->
 (f_complete_definition (v_result)))))))))
 | (M.ScalarExpr (v_operator, v_left, v_right)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_left))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_left))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_left_value ->
 (fun v_right_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_right_steps) ((Expression (v_right))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_right_steps) ((Expression (v_right))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_right_result ->
 (f_continue_value (v_right_result) ((fun v_right_value ->
 (fun v_next_steps ->
 (f_scalar (v_operator) (v_left_value) (v_right_value) (v_next_steps))))))))))))
 | (M.UnaryExpr (v_operator, v_value)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_result ->
 (fun v_next_steps ->
 (f_unary (v_operator) (v_result) (v_next_steps)))))))
 | (M.EffectHasExpr (v_set, v_operation)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_set))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_set))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_selected ->
 (fun v_operation_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_operation_steps) ((Expression (v_operation))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_operation_steps) ((Expression (v_operation))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_inspected ->
 (f_continue_value (v_inspected) ((fun v_descriptor ->
 (fun v_next_steps ->
 (f_effect_has (v_selected) (v_descriptor) (v_next_steps))))))))))))
 | (M.EffectCountExpr (v_set)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_set))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_set))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_selected ->
 (fun v_next_steps ->
 (f_effect_count (v_selected) (v_next_steps)))))))
 | (M.EffectSameExpr (v_left, v_right)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_left))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_left))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_a ->
 (fun v_right_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_right_steps) ((Expression (v_right))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_right_steps) ((Expression (v_right))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_inspected ->
 (f_continue_value (v_inspected) ((fun v_b ->
 (fun v_next_steps ->
 (f_effect_same (v_a) (v_b) (v_next_steps))))))))))))
 | (M.LetExpr (v_name, v_value, v_body)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_bound ->
 (f_continue_value (v_bound) ((fun v_value ->
 (fun v_next_steps ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_next_steps) ((Expression (v_body))) ((f_with_local (v_context) (v_name) (v_value)))))))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_next_steps) ((Expression (v_body))) ((f_with_local (v_context) (v_name) (v_value)))))))))
 | (M.UseExpr (v_name, v_value, v_body)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_bound ->
 (f_continue_value (v_bound) ((fun v_value ->
 (fun v_next_steps ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_next_steps) ((Expression (v_body))) ((f_with_local (v_context) (v_name) (v_value)))))))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_next_steps) ((Expression (v_body))) ((f_with_local (v_context) (v_name) (v_value)))))))))
 | (M.IfExpr (v_condition, v_consequent, v_alternative)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_condition))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_condition))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_test ->
 (f_continue_value (v_test) ((fun v_value ->
@@ -1438,16 +1438,16 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 (match (f_branch (v_value) (v_consequent) (v_alternative)) with
 | Fail __error -> Fail __error
 | Done v_chosen ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_next_steps) ((Expression (v_chosen))) (v_context))))))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_next_steps) ((Expression (v_chosen))) (v_context))))))))
 | (M.SequenceExpr (v_first, v_next)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_first))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_first))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_ignored ->
 (fun v_next_steps ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_next_steps) ((Expression (v_next))) (v_context)))))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_next_steps) ((Expression (v_next))) (v_context)))))))
 | (M.MatchExpr (v_values, v_arms)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) (v_values) ((f_spend_budget (v_steps))) (CollectValues) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) (v_values) ((f_spend_budget (v_steps))) (CollectValues) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_collected ->
@@ -1455,14 +1455,14 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 (match (f_collected_match_values (v_collected)) with
 | Fail __error -> Fail __error
 | Done v_scrutinees ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_next_steps) ((MatchArms (v_arms, v_scrutinees))) (v_context))))))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_next_steps) ((MatchArms (v_arms, v_scrutinees))) (v_context))))))))
 | (M.GuardExpr (v_pattern, v_value, v_alternative, v_body)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_value ->
 (fun v_next_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_next_steps) ((MatchPatterns ((Base.u32_to_nat (0x00010000l)), (Done ((PatternPending ([(PatternValue (v_pattern, v_value))], []))))))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_next_steps) ((MatchPatterns ((Base.u32_to_nat ((Base.W32 0x10000))), (Done ((PatternPending ([(PatternValue (v_pattern, v_value))], []))))))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_matched ->
 (match (f_collected_pattern_bindings ((f_eval_value (v_matched)))) with
@@ -1471,26 +1471,26 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 (f_complete_scope ((f_guard_scope (v_bindings) (v_body) (v_alternative) (v_context))) ((f_eval_budget (v_matched))) ((fun v_selected_body ->
 (fun v_scope_context ->
 (fun v_body_steps ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_body_steps) ((Expression (v_selected_body))) (v_scope_context))))))))))))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_body_steps) ((Expression (v_selected_body))) (v_scope_context))))))))))))))
 | (M.BlockExpr (v_label, v_body)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_body))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_body))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (Done ((f_complete_block (v_checked) (v_label)))))
 | (M.ReturnExpr (v_label, v_value)) ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_value ->
 (fun v_next_steps ->
 (Done ((Evaluation ((ReturnValue (v_label, v_value)), v_next_steps)))))))))
 | (M.TagExpr (v_offset, v_callee, v_argument)) ->
-(match (f_tag_evaluation ((f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_callee))) (v_context))) (v_offset)) with
+(match (f_tag_evaluation ((f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_callee))) (v_context))) (v_offset)) with
 | Fail __error -> Fail __error
 | Done v_checked ->
 (f_continue_value (v_checked) ((fun v_function ->
 (fun v_argument_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_argument_steps) ((Expression (v_argument))) (v_context)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_argument_steps) ((Expression (v_argument))) (v_context)) with
 | Fail __error -> Fail __error
 | Done v_applied ->
 (f_continue_value (v_applied) ((fun v_value ->
@@ -1504,12 +1504,12 @@ fun v_depth v_matching_fuel v_pending v_steps v_work v_context ->
 (f_tag_evaluation ((f_complete_application (v_resolved) (v_call_steps) ((fun v_body ->
 (fun v_scope ->
 (fun v_body_steps ->
-(match (f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) (v_body_steps) ((Expression (v_body))) (v_scope)) with
+(match (f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) (v_body_steps) ((Expression (v_body))) (v_scope)) with
 | Fail __error -> Fail __error
 | Done v_result ->
 (f_complete_definition (v_result))))))))) (v_offset))))))))))))))
 | (M.SourceExpr (v_offset, v_annotation, v_value)) ->
-(f_evaluate_work (v_limit) ((Base.u32_to_nat (0x00010000l))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context))))))
+(f_evaluate_work (v_limit) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((f_spend_budget (v_steps))) ((Expression (v_value))) (v_context))))))
 and (* const_eval.bend:1102 *)
 f_evaluate : int -> int -> M.t_Expr -> t_Context -> (M.t_Diagnostic, t_Evaluation) Base.result_ =
 fun v_depth v_steps v_expression v_context ->
@@ -1521,7 +1521,7 @@ fun v_depth v_steps v_expression v_context ->
 | (__nat_28, __nat_29) when __nat_28 >= 1 && __nat_29 >= 1 ->
 (let v_remaining_depth = (__nat_28 - 1) in
 (let v_remaining_steps = (__nat_29 - 1) in
-(f_evaluate_work ((Base.nat_add 1 v_remaining_depth)) ((Base.u32_to_nat (0x00010000l))) ([]) ((Budget ((Base.nat_add 1 v_remaining_steps), []))) ((Expression (v_expression))) (v_context)))))
+(f_evaluate_work ((Base.nat_add 1 v_remaining_depth)) ((Base.u32_to_nat ((Base.W32 0x10000)))) ([]) ((Budget ((Base.nat_add 1 v_remaining_steps), []))) ((Expression (v_expression))) (v_context)))))
 and (* const_eval.bend:1112 *)
 f_prepend_constant : Base.text -> t_Value -> t_Constants -> t_Constants =
 fun v_name v_value v_constants ->

@@ -38,14 +38,14 @@ type t_Work =
   | TyMaybePair of (M.t_Ty) option * (M.t_Ty) option
   | StringListPair of (Base.text) list * (Base.text) list
   | ConstructorListPair of (M.t_Constructor) list * (M.t_Constructor) list
-  | U32Pair of int32 * int32
+  | U32Pair of Base.word32 * Base.word32
   | BoolPair of bool * bool
   | PatternMaybePair of (M.t_Pattern) option * (M.t_Pattern) option
   | PatternListPair of (M.t_Pattern) list * (M.t_Pattern) list
   | ExprMaybePair of (M.t_Expr) option * (M.t_Expr) option
   | ExprListPair of (M.t_Expr) list * (M.t_Expr) list
   | MatchArmListPair of ((M.t_Expr) M.t_MatchArm) list * ((M.t_Expr) M.t_MatchArm) list
-  | F32Pair of int32 * int32
+  | F32Pair of Base.word32 * Base.word32
   | ConstantListPair of (M.t_Constant) list * (M.t_Constant) list
   | FunctionListPair of (M.t_Function) list * (M.t_Function) list
   | DataTypeListPair of (M.t_DataType) list * (M.t_DataType) list

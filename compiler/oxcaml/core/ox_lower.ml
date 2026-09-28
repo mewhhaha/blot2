@@ -827,43 +827,43 @@ let rec (* lower.bend:151 *)
 f_classify_initial : Base.char32 -> Base.text -> t_NodeKind =
 fun v_initial v_kind ->
 (match v_initial with
-| (Chr 0x00000049l) ->
+| (Chr (Base.W32 0x49)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_0))) (Integer) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_1))) (Intrinsic) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_2))) (PatternName) (Unsupported))))))
-| (Chr 0x00000046l) ->
+| (Chr (Base.W32 0x46)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_3))) (Float) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_4))) (Falsehood) (Unsupported))))
-| (Chr 0x00000054l) ->
+| (Chr (Base.W32 0x54)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_5))) (Truth) (Unsupported))
-| (Chr 0x00000061l) ->
+| (Chr (Base.W32 0x61)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_6))) (Wrapper) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_7))) (ArrayNode) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_8))) (ApplicationNode) (Unsupported))))))
-| (Chr 0x00000062l) ->
+| (Chr (Base.W32 0x62)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_9))) (Binding) (Unsupported))
-| (Chr 0x00000063l) ->
+| (Chr (Base.W32 0x63)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_10))) (ApplicationNode) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_11))) (CaseNode) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_12))) (Conditional) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_13))) (PatternConstructor) (Unsupported))))))))
-| (Chr 0x00000064l) ->
+| (Chr (Base.W32 0x64)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_14))) (DataNode) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_15))) (Block) (Unsupported))))
-| (Chr 0x00000065l) ->
+| (Chr (Base.W32 0x65)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_16))) (ForLoop) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_17))) (Wrapper) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_18))) (EffectBinding) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_19))) (EffectBinding) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_20))) (EffectNode) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_21))) (EffectTypeNode) (Unsupported))))))))))))
-| (Chr 0x00000066l) ->
+| (Chr (Base.W32 0x66)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_22))) (ForLoop) (Unsupported))
-| (Chr 0x00000067l) ->
+| (Chr (Base.W32 0x67)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_23))) (GroupNode) (Unsupported))
-| (Chr 0x00000069l) ->
+| (Chr (Base.W32 0x69)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_24))) (InfixNode) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_25))) (IndexNode) (Unsupported))))
-| (Chr 0x0000006cl) ->
+| (Chr (Base.W32 0x6c)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_26))) (LambdaNode) (Unsupported))
-| (Chr 0x0000006dl) ->
+| (Chr (Base.W32 0x6d)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_27))) (MemberNode) (Unsupported))
-| (Chr 0x0000006el) ->
+| (Chr (Base.W32 0x6e)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_28))) (NamedFixity) (Unsupported))
-| (Chr 0x00000070l) ->
+| (Chr (Base.W32 0x70)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_29))) (PrefixNode) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_30))) (PatternConditional) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_31))) (PatternWrapper) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_32))) (PatternGroup) (Unsupported))))))))
-| (Chr 0x00000076l) ->
+| (Chr (Base.W32 0x76)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_33))) (PatternValue) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_34))) (ValueDeclaration) (Unsupported))))
-| (Chr 0x00000071l) ->
+| (Chr (Base.W32 0x71)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_35))) (Name) (Unsupported))
-| (Chr 0x00000072l) ->
+| (Chr (Base.W32 0x72)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_36))) (ForLoop) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_37))) (RecordNode) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_38))) (Return) ((Base.bool_pick ((M.f_name_equal (v_kind) (s_39))) (Rebinding) (Unsupported))))))))
-| (Chr 0x00000073l) ->
+| (Chr (Base.W32 0x73)) ->
 (Base.bool_pick ((M.f_name_equal (v_kind) (s_40))) (SymbolicFixity) (Unsupported))
 | _ ->
 Unsupported)
@@ -931,7 +931,7 @@ fun v_nodes v_receiver ->
 (match v_nodes with
 | [] ->
 v_receiver
-| ((C.Cst (v_kind, v_field, (SCon (Chr 0x0000002el, SNil)), v_offset, v_children)) :: v_tail) ->
+| ((C.Cst (v_kind, v_field, (SCon (Chr (Base.W32 0x2e), SNil)), v_offset, v_children)) :: v_tail) ->
 (f_member_path (v_tail) (v_receiver))
 | ((C.Cst (v_kind, v_field, v_member, v_offset, v_children)) :: v_tail) ->
 (f_member_path (v_tail) ((f_located (v_offset) ((f_instantiate_at (v_offset) (2) ((M.AssociatedExpr (v_offset, M.MemberDispatch, v_member, [], v_receiver, M.UnitExpr)))))))))
@@ -949,7 +949,7 @@ fun v_nodes v_globals v_prefix v_best ->
 (match v_nodes with
 | [] ->
 v_best
-| ((C.Cst (v_kind, v_field, (SCon (Chr 0x0000002el, SNil)), v_offset, v_children)) :: v_tail) ->
+| ((C.Cst (v_kind, v_field, (SCon (Chr (Base.W32 0x2e), SNil)), v_offset, v_children)) :: v_tail) ->
 (f_global_prefix (v_tail) (v_globals) ((Base.string_append v_prefix s_45)) (v_best))
 | ((C.Cst (v_kind, v_field, v_text, v_offset, v_children)) :: v_tail) ->
 (let v_name = (Base.string_append v_prefix v_text) in
@@ -1875,7 +1875,7 @@ fun v_operators v_value ->
 (match v_operators with
 | [] ->
 (Done (v_value))
-| ((C.Cst (v_kind, v_field, (SCon (Chr 0x0000002dl, SNil)), v_offset, v_children)) :: []) ->
+| ((C.Cst (v_kind, v_field, (SCon (Chr (Base.W32 0x2d), SNil)), v_offset, v_children)) :: []) ->
 (Done ((f_located (v_offset) ((M.UnaryExpr (M.F32Negate, v_value))))))
 | (v_node :: v_rest) ->
 (Fail ((C.f_diagnostic (v_node) (s_189) (s_190)))))
@@ -2261,7 +2261,7 @@ fun v_found v_target v_offset ->
 | (Some ((O.Fixity (v_name, v_named, v_precedence, v_association, v_ignored)))) ->
 (O.Operator (v_precedence, v_association, v_target, v_offset))
 | None ->
-(O.Operator (0x00000050l, O.Left, v_target, v_offset)))
+(O.Operator ((Base.W32 0x50), O.Left, v_target, v_offset)))
 and (* lower.bend:1395 *)
 f_context_fixities : t_Context -> (O.t_Fixity) list =
 fun v_context ->
@@ -2493,7 +2493,7 @@ fun v_fuel v_work ->
 (match (v_fuel, v_work) with
 | (0, _) ->
 (Fail ((M.Diagnostic (s_225, s_82, s_227))))
-| (__nat_30, (ScanNode ((C.Cst ((SCon (Chr 0x00000062l, (SCon (Chr 0x00000069l, (SCon (Chr 0x0000006el, (SCon (Chr 0x00000064l, (SCon (Chr 0x00000069l, (SCon (Chr 0x0000006el, (SCon (Chr 0x00000067l, SNil)))))))))))))), v_field, v_text, v_offset, v_children)), false))) when __nat_30 >= 1 ->
+| (__nat_30, (ScanNode ((C.Cst ((SCon (Chr (Base.W32 0x62), (SCon (Chr (Base.W32 0x69), (SCon (Chr (Base.W32 0x6e), (SCon (Chr (Base.W32 0x64), (SCon (Chr (Base.W32 0x69), (SCon (Chr (Base.W32 0x6e), (SCon (Chr (Base.W32 0x67), SNil)))))))))))))), v_field, v_text, v_offset, v_children)), false))) when __nat_30 >= 1 ->
 (let v_rest = (__nat_30 - 1) in
 (Done ([(C.Cst (s_9, v_field, v_text, v_offset, []))])))
 | (__nat_31, (ScanNode ((C.Cst (v_kind, v_field, v_text, v_offset, v_children)), v_root))) when __nat_31 >= 1 ->
@@ -3160,7 +3160,7 @@ fun v_fuel v_work v_context ->
 | Done v_start ->
 (f_lower (v_remaining) ((ForRange ((C.f_field_values (v_node) (s_255)), v_pattern, v_start, v_initial, v_body, v_prefix, (C.f_offset_of (v_node))))) (v_context))))
 | (ForRange ([], v_pattern, v_array, v_initial, v_body, v_prefix, v_offset)) ->
-(Done ((M.UseExpr ((Base.string_append v_prefix s_7), v_array, (M.ForExpr ((Base.string_append v_prefix s_232), (M.U32Expr (0x00000000l)), (M.ArrayLengthExpr ((M.LocalExpr ((Base.string_append v_prefix s_7))))), (Base.string_append v_prefix s_252), v_initial, (f_plain_binding (v_pattern) ((M.ArrayGetExpr ((M.LocalExpr ((Base.string_append v_prefix s_7))), (M.LocalExpr ((Base.string_append v_prefix s_232)))))) (v_body) (v_offset))))))))
+(Done ((M.UseExpr ((Base.string_append v_prefix s_7), v_array, (M.ForExpr ((Base.string_append v_prefix s_232), (M.U32Expr ((Base.W32 0x0))), (M.ArrayLengthExpr ((M.LocalExpr ((Base.string_append v_prefix s_7))))), (Base.string_append v_prefix s_252), v_initial, (f_plain_binding (v_pattern) ((M.ArrayGetExpr ((M.LocalExpr ((Base.string_append v_prefix s_7))), (M.LocalExpr ((Base.string_append v_prefix s_232)))))) (v_body) (v_offset))))))))
 | (ForRange ((v_end_node :: []), v_pattern, v_start, v_initial, v_body, v_prefix, v_offset)) ->
 (match (f_lower (v_remaining) ((f_visit (v_end_node))) (v_context)) with
 | Fail __error -> Fail __error
@@ -3199,7 +3199,7 @@ fun v_fuel v_work v_context ->
 (Done ((f_terminal_update_value (v_receiver) (v_name) (v_value))))))
 | (UpdatePath (v_receiver, (v_node :: v_tail), v_value, v_offset)) ->
 (f_lower (v_remaining) ((UpdateSelector ((C.f_kind_of (v_node)), v_receiver, v_node, v_tail, v_value, v_offset))) (v_context))
-| (UpdateSelector ((SCon (Chr 0x0000006dl, (SCon (Chr 0x00000065l, (SCon (Chr 0x0000006dl, (SCon (Chr 0x00000062l, (SCon (Chr 0x00000065l, (SCon (Chr 0x00000072l, (SCon (Chr 0x0000005fl, (SCon (Chr 0x00000061l, (SCon (Chr 0x00000063l, (SCon (Chr 0x00000063l, (SCon (Chr 0x00000065l, (SCon (Chr 0x00000073l, (SCon (Chr 0x00000073l, SNil)))))))))))))))))))))))))), v_receiver, v_node, v_tail, v_value_node, v_offset)) ->
+| (UpdateSelector ((SCon (Chr (Base.W32 0x6d), (SCon (Chr (Base.W32 0x65), (SCon (Chr (Base.W32 0x6d), (SCon (Chr (Base.W32 0x62), (SCon (Chr (Base.W32 0x65), (SCon (Chr (Base.W32 0x72), (SCon (Chr (Base.W32 0x5f), (SCon (Chr (Base.W32 0x61), (SCon (Chr (Base.W32 0x63), (SCon (Chr (Base.W32 0x63), (SCon (Chr (Base.W32 0x65), (SCon (Chr (Base.W32 0x73), (SCon (Chr (Base.W32 0x73), SNil)))))))))))))))))))))))))), v_receiver, v_node, v_tail, v_value_node, v_offset)) ->
 (let v_parent = (Base.string_append s_260 (Base.nat_show ((C.f_offset_of (v_node))))) in
 (match (C.f_one ((C.f_field_values (v_node) (s_70)))) with
 | Fail __error -> Fail __error
@@ -3208,7 +3208,7 @@ fun v_fuel v_work v_context ->
 | Fail __error -> Fail __error
 | Done v_value ->
 (Done ((M.UseExpr (v_parent, v_receiver, (f_located ((C.f_offset_of (v_node))) ((M.AssociatedExpr ((C.f_offset_of (v_node)), M.FieldUpdateDispatch, (C.f_text_of (v_name)), [], (M.LocalExpr (v_parent)), v_value)))))))))))
-| (UpdateSelector ((SCon (Chr 0x00000069l, (SCon (Chr 0x0000006el, (SCon (Chr 0x00000064l, (SCon (Chr 0x00000065l, (SCon (Chr 0x00000078l, (SCon (Chr 0x0000005fl, (SCon (Chr 0x00000061l, (SCon (Chr 0x00000063l, (SCon (Chr 0x00000063l, (SCon (Chr 0x00000065l, (SCon (Chr 0x00000073l, (SCon (Chr 0x00000073l, SNil)))))))))))))))))))))))), v_receiver, v_node, v_tail, v_value_node, v_offset)) ->
+| (UpdateSelector ((SCon (Chr (Base.W32 0x69), (SCon (Chr (Base.W32 0x6e), (SCon (Chr (Base.W32 0x64), (SCon (Chr (Base.W32 0x65), (SCon (Chr (Base.W32 0x78), (SCon (Chr (Base.W32 0x5f), (SCon (Chr (Base.W32 0x61), (SCon (Chr (Base.W32 0x63), (SCon (Chr (Base.W32 0x63), (SCon (Chr (Base.W32 0x65), (SCon (Chr (Base.W32 0x73), (SCon (Chr (Base.W32 0x73), SNil)))))))))))))))))))))))), v_receiver, v_node, v_tail, v_value_node, v_offset)) ->
 (let v_parent = (Base.string_append s_260 (Base.nat_show ((C.f_offset_of (v_node))))) in
 (let v_index_name = (Base.string_append s_261 (Base.nat_show ((C.f_offset_of (v_node))))) in
 (match (C.f_one ((C.f_field_values (v_node) (s_232)))) with
@@ -3603,7 +3603,7 @@ fun v_kind v_node v_context v_rest ->
 (match (C.f_integer (v_precedence_node)) with
 | Fail __error -> Fail __error
 | Done v_precedence ->
-(match (f_require_fixity ((O.f_lookup (v_rest) (v_name) (v_named))) ((Base.u32_is_le (v_precedence) (0x000000ffl))) (v_node)) with
+(match (f_require_fixity ((O.f_lookup (v_rest) (v_name) (v_named))) ((Base.u32_is_le (v_precedence) ((Base.W32 0xff)))) (v_node)) with
 | Fail __error -> Fail __error
 | Done v_valid ->
 (match (C.f_one ((C.f_field_values (v_node) (s_285)))) with
@@ -4218,7 +4218,7 @@ fun v_nodes v_reversed ->
 | [] ->
 (Base.list_reverse (v_reversed))
 | (v_node :: v_tail) ->
-(f_weigh_declarations (v_tail) (((WeightedDeclaration (v_node, (f_declaration_cost ((Base.u32_to_nat (0x00010000l))) ([v_node]) (0)))) :: v_reversed))))
+(f_weigh_declarations (v_tail) (((WeightedDeclaration (v_node, (f_declaration_cost ((Base.u32_to_nat ((Base.W32 0x10000)))) ([v_node]) (0)))) :: v_reversed))))
 and (* lower.bend:2789 *)
 f_declaration_nodes : (t_WeightedDeclaration) list -> (C.t_Cst) list -> (C.t_Cst) list =
 fun v_nodes v_reversed ->
@@ -4268,7 +4268,7 @@ fun v_depth v_nodes v_count v_weight v_small ->
 (let v_right = (Base.list_drop (v_nodes) (v_half)) in
 (let v_left_weight = (f_declaration_weight (v_left) (0)) in
 (let v_right_weight = (Base.nat_sub (v_weight) (v_left_weight)) in
-(DeclarationFork ((f_weighted_declaration_batches (v_rest) (v_left) (v_half) (v_left_weight) ((Base.bool_or ((Base.nat_is_le (v_half) (1))) ((Base.bool_and ((Base.nat_is_le (v_half) (4))) ((Base.nat_is_le (v_left_weight) ((Base.u32_to_nat (0x00000200l)))))))))), (f_weighted_declaration_batches (v_rest) (v_right) (v_remaining) (v_right_weight) ((Base.bool_or ((Base.nat_is_le (v_remaining) (1))) ((Base.bool_and ((Base.nat_is_le (v_remaining) (4))) ((Base.nat_is_le (v_right_weight) ((Base.u32_to_nat (0x00000200l)))))))))))))))))))
+(DeclarationFork ((f_weighted_declaration_batches (v_rest) (v_left) (v_half) (v_left_weight) ((Base.bool_or ((Base.nat_is_le (v_half) (1))) ((Base.bool_and ((Base.nat_is_le (v_half) (4))) ((Base.nat_is_le (v_left_weight) ((Base.u32_to_nat ((Base.W32 0x200))))))))))), (f_weighted_declaration_batches (v_rest) (v_right) (v_remaining) (v_right_weight) ((Base.bool_or ((Base.nat_is_le (v_remaining) (1))) ((Base.bool_and ((Base.nat_is_le (v_remaining) (4))) ((Base.nat_is_le (v_right_weight) ((Base.u32_to_nat ((Base.W32 0x200))))))))))))))))))))
 | (_, _) ->
 (DeclarationLeaf ((f_declaration_nodes (v_nodes) ([])))))
 and (* lower.bend:2839 *)

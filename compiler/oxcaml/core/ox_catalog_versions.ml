@@ -17,11 +17,11 @@ module R = Ox_native_response
 module Index = Ox_index
 
 type t_TypeVersion =
-  | TypeVersion of (int32) list * int
+  | TypeVersion of (Base.word32) list * int
 and t_TypeVersions =
   | TypeVersions of ((t_TypeVersion) Base.map) Base.map * int
 and t_Revision =
-  | Revision of (int32) list * (int) list * ((t_TypeVersion) Base.map) Base.map * int
+  | Revision of (Base.word32) list * (int) list * ((t_TypeVersion) Base.map) Base.map * int
 and t_Prepared =
   | Prepared of t_Revision * bool
 
@@ -42,7 +42,7 @@ fun v_index v_identity v_value ->
 (let v_nested = (Index.f_get (v_index) (v_module_name) ((Base.map_new ()))) in
 (Base.map_set (v_index) (v_module_name) ((Base.map_set (v_nested) (v_declaration) (v_value))))))
 and (* catalog_versions.bend:38 *)
-f_select_same : bool -> (int32) list -> int -> int -> (t_TypeVersion * int) =
+f_select_same : bool -> (Base.word32) list -> int -> int -> (t_TypeVersion * int) =
 fun v_same v_words v_token v_next ->
 (match v_same with
 | true ->
@@ -50,7 +50,7 @@ fun v_same v_words v_token v_next ->
 | false ->
 ((TypeVersion (v_words, v_next)), (Base.nat_add 1 v_next)))
 and (* catalog_versions.bend:45 *)
-f_select : (t_TypeVersion) option -> (int32) list -> int -> (t_TypeVersion * int) =
+f_select : (t_TypeVersion) option -> (Base.word32) list -> int -> (t_TypeVersion * int) =
 fun v_found v_words v_next ->
 (match v_found with
 | (Some ((TypeVersion (v_prior, v_token)))) ->
@@ -92,7 +92,7 @@ fun v_pending v_previous v_result ->
 | Done v_words ->
 (f_types_go (v_tail) (v_previous) ((f_insert_selected ((f_select ((f_entry (v_previous) (v_identity))) (v_words) (v_next))) (v_entries) (v_identity))))))))
 and (* catalog_versions.bend:81 *)
-f_operations_match : (t_Revision) option -> (int32) list -> bool =
+f_operations_match : (t_Revision) option -> (Base.word32) list -> bool =
 fun v_previous v_current ->
 (match v_previous with
 | None ->
@@ -100,7 +100,7 @@ false
 | (Some ((Revision (v_operations, v_ordered_types, v_types, v_next)))) ->
 (K.f_same (v_operations) (v_current)))
 and (* catalog_versions.bend:88 *)
-f_make_prepared : t_TypeVersions -> (t_Revision) option -> (int32) list -> (int) list -> t_Prepared =
+f_make_prepared : t_TypeVersions -> (t_Revision) option -> (Base.word32) list -> (int) list -> t_Prepared =
 fun v_versions v_previous v_operation_words v_ordered_types ->
 (let (TypeVersions (v_entries, v_next)) = v_versions in
 (Prepared ((Revision (v_operation_words, v_ordered_types, v_entries, v_next)), (f_operations_match (v_previous) (v_operation_words)))))
@@ -155,7 +155,7 @@ fun v_prepared ->
 (let (Prepared (v_revision, v_same_operations)) = v_prepared in
 v_same_operations)
 and (* catalog_versions.bend:128 *)
-f_group_key : M.t_Module -> t_Revision -> (M.t_Diagnostic, (int32) list) Base.result_ =
+f_group_key : M.t_Module -> t_Revision -> (M.t_Diagnostic, (Base.word32) list) Base.result_ =
 fun v_module v_revision ->
 (let (M.Module (v_constants, v_functions, v_types, v_operations)) = v_module in
 (let (Revision (v_operation_words, v_ordered_types, v_versions, v_next)) = v_revision in
@@ -164,7 +164,7 @@ fun v_module v_revision ->
 | Done v_selected ->
 (K.f_encode ([(K.Constants (v_constants)); (K.Functions (v_functions)); (K.Field ((R.Naturals (v_selected))))])))))
 and (* catalog_versions.bend:137 *)
-f_encoded_same : (M.t_Diagnostic, (int32) list) Base.result_ -> (int32) list -> bool =
+f_encoded_same : (M.t_Diagnostic, (Base.word32) list) Base.result_ -> (Base.word32) list -> bool =
 fun v_result v_expected ->
 (match v_result with
 | (Fail (v_diagnostic)) ->
@@ -172,7 +172,7 @@ false
 | (Done (v_words)) ->
 (K.f_same (v_words) (v_expected)))
 and (* catalog_versions.bend:144 *)
-f_original_type_words_if : bool -> M.t_DataType -> (int32) list -> bool =
+f_original_type_words_if : bool -> M.t_DataType -> (Base.word32) list -> bool =
 fun v_same v_declaration v_words ->
 (match v_same with
 | false ->
@@ -201,7 +201,7 @@ true
 | (_, _, _) ->
 false)
 and (* catalog_versions.bend:170 *)
-f_original_operations_match : (M.t_Diagnostic, (int32) list) Base.result_ -> (int32) list -> (M.t_DataType) list -> (int) list -> ((t_TypeVersion) Base.map) Base.map -> bool =
+f_original_operations_match : (M.t_Diagnostic, (Base.word32) list) Base.result_ -> (Base.word32) list -> (M.t_DataType) list -> (int) list -> ((t_TypeVersion) Base.map) Base.map -> bool =
 fun v_result v_current v_types v_ordered v_versions ->
 (f_original_types_match (v_types) (v_ordered) (v_versions) ((f_encoded_same (v_result) (v_current))))
 and (* catalog_versions.bend:173 *)

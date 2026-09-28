@@ -54,12 +54,12 @@ fun v_previous v_result ->
 | (Fail (v_diagnostic)) ->
 (Reply (v_previous, (Output.f_words ((Response.f_encode_diagnostic (v_diagnostic))))))
 | (Done (v_state)) ->
-(Reply ((Some (v_state)), (Output.f_words ((Response.f_encode (0x00000003l) ([])))))))
+(Reply ((Some (v_state)), (Output.f_words ((Response.f_encode ((Base.W32 0x3)) ([])))))))
 and (* native_main.bend:30 *)
 f_stat_fields : Session.t_Stats -> (Response.t_Work) list -> (Response.t_Work) list =
 fun v_stats v_fields ->
 (let (Session.Stats (v_lowered, v_declarations_reused, v_checked, v_groups_reused, v_evaluated, v_constants_reused, v_compiled, v_entries_reused)) = v_stats in
-((Response.Word (0x424c4f54l)) :: ((Response.Word ((Response.f_version ()))) :: ((Response.Word (0x00000004l)) :: ((Response.Natural (v_lowered)) :: ((Response.Natural (v_declarations_reused)) :: ((Response.Natural (v_checked)) :: ((Response.Natural (v_groups_reused)) :: ((Response.Natural (v_evaluated)) :: ((Response.Natural (v_constants_reused)) :: ((Response.Natural (v_compiled)) :: ((Response.Natural (v_entries_reused)) :: v_fields))))))))))))
+((Response.Word ((Base.W32 0x424c4f54))) :: ((Response.Word ((Response.f_version ()))) :: ((Response.Word ((Base.W32 0x4))) :: ((Response.Natural (v_lowered)) :: ((Response.Natural (v_declarations_reused)) :: ((Response.Natural (v_checked)) :: ((Response.Natural (v_groups_reused)) :: ((Response.Natural (v_evaluated)) :: ((Response.Natural (v_constants_reused)) :: ((Response.Natural (v_compiled)) :: ((Response.Natural (v_entries_reused)) :: v_fields))))))))))))
 and (* native_main.bend:35 *)
 f_encoded : (Session.t_State) option -> Session.t_State -> (M.t_Diagnostic, Output.t_Packet) Base.result_ -> t_Reply =
 fun v_previous v_state v_result ->
@@ -71,7 +71,7 @@ fun v_previous v_state v_result ->
 and (* native_main.bend:42 *)
 f_encode_analysis : (Response.t_Work) list -> (M.t_Diagnostic, Output.t_Packet) Base.result_ =
 fun v_fields ->
-(match (Response.f_encode_work ((M.f_max_nat ())) (v_fields) ((Base.u32_to_nat (0x01000000l))) ([])) with
+(match (Response.f_encode_work ((M.f_max_nat ())) (v_fields) ((Base.u32_to_nat ((Base.W32 0x1000000)))) ([])) with
 | Fail __error -> Fail __error
 | Done v_words ->
 (Done ((Output.f_words (v_words)))))
@@ -82,9 +82,9 @@ fun v_previous v_contents v_result ->
 | (Fail (v_diagnostic)) ->
 (Reply (v_previous, (Output.f_words ((Response.f_encode_diagnostic (v_diagnostic))))))
 | (Done ((Session.Completion (v_state, (Session.Analyzed (v_analysis)), v_stats)))) ->
-(f_encoded (v_previous) (v_state) ((f_encode_analysis ((f_stat_fields (v_stats) ([(Response.Word (0x00000001l)); (Response.Analysis (v_analysis))]))))))
+(f_encoded (v_previous) (v_state) ((f_encode_analysis ((f_stat_fields (v_stats) ([(Response.Word ((Base.W32 0x1))); (Response.Analysis (v_analysis))]))))))
 | (Done ((Session.Completion (v_state, (Session.Compiled ((Compiler.PlannedArtifact (v_analysis, v_plan)))), v_stats)))) ->
-(f_encoded (v_previous) (v_state) ((Output.f_encode_plan ((f_stat_fields (v_stats) ((Output.f_artifact_fields (v_contents) (v_analysis))))) (v_plan) ((Base.u32_to_nat (0x01000000l))) (2048)))))
+(f_encoded (v_previous) (v_state) ((Output.f_encode_plan ((f_stat_fields (v_stats) ((Output.f_artifact_fields (v_contents) (v_analysis))))) (v_plan) ((Base.u32_to_nat ((Base.W32 0x1000000)))) (2048)))))
 and (* native_main.bend:56 *)
 f_cached : (Session.t_State) option -> Request.t_Operation -> Cst.t_Cst -> int -> int -> t_Reply =
 fun v_previous v_operation v_root v_fuel v_steps ->
@@ -131,7 +131,7 @@ fun v_fuel v_state v_incoming ->
 | (_, None) ->
 (Base.io_pure (()))
 | (0, (Some (v_frame))) ->
-(Base.io_die (0x00000001l) (s_3))
+(Base.io_die ((Base.W32 0x1)) (s_3))
 | (__nat_1, (Some (v_frame))) when __nat_1 >= 1 ->
 (let v_remaining = (__nat_1 - 1) in
 (let v_reply = (f_respond (v_state) ((Request.f_decode (v_frame)))) in
@@ -143,6 +143,6 @@ fun v_fuel v_state v_incoming ->
 and (* native_main.bend:108 *)
 f_main : unit -> (unit) Base.io =
 fun () ->
-(Base.io_bind (Transport.f_send (0x00000002l) ([0x424c4f54l; (Response.f_version ())]) ([])) (fun _ ->
+(Base.io_bind (Transport.f_send ((Base.W32 0x2)) ([(Base.W32 0x424c4f54); (Response.f_version ())]) ([])) (fun _ ->
 (Base.io_bind (Transport.f_receive ()) (fun v_first ->
 (f_serve ((M.f_max_nat ())) (None) (v_first))))))

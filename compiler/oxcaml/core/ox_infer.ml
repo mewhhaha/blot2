@@ -771,7 +771,7 @@ fun v_coverage v_substitutions ->
 | [] ->
 (Done ([]))
 | ((AssociatedNeed (v_identity, v_dispatch, v_member, v_templates, v_left, v_right, v_result, v_invocation, v_ambient, v_subject)) :: v_tail) ->
-(match (T.f_resolve_work (v_substitutions) ((Base.u32_to_nat (0x00010000l))) ((T.ManyTypes ([v_left; v_right; v_result])))) with
+(match (T.f_resolve_work (v_substitutions) ((Base.u32_to_nat ((Base.W32 0x10000)))) ((T.ManyTypes ([v_left; v_right; v_result])))) with
 | Fail __error -> Fail __error
 | Done v_resolved ->
 (match (T.f_free ((M.ProductTy (v_resolved)))) with
@@ -1361,7 +1361,7 @@ fun v_fuel v_pending v_context v_state v_bindings v_constraints ->
 and (* infer.bend:982 *)
 f_infer_pattern : M.t_Pattern -> M.t_Ty -> t_Context -> t_State -> (M.t_Diagnostic, t_PatternTyping) Base.result_ =
 fun v_value v_expected v_context v_state ->
-(f_infer_pattern_work ((Base.u32_to_nat (0x00010000l))) ([(PatternValue (v_value, v_expected))]) (v_context) (v_state) ([]) ([]))
+(f_infer_pattern_work ((Base.u32_to_nat ((Base.W32 0x10000)))) ([(PatternValue (v_value, v_expected))]) (v_context) (v_state) ([]) ([]))
 and (* infer.bend:992 *)
 f_arm_patterns : ((M.t_Expr) M.t_MatchArm) list -> ((M.t_Pattern) list) list =
 fun v_arms ->

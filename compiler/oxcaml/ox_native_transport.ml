@@ -10,11 +10,11 @@ let f_receive () () =
     let prefix = Bytes.create 4 in
     Bytes.set prefix 0 first;
     read_exact prefix 1 3;
-    let count = u32_to_nat (Bytes.get_int32_le prefix 0) in
+    let count = Int32.to_int (Bytes.get_int32_le prefix 0) land 0xffff_ffff in
     if count > max_words then failwith "native protocol: frame exceeds 16777216 words";
     let bytes = Bytes.create (count * 4) in
     read_exact bytes 0 (Bytes.length bytes);
-    Some (Ox_native_io.Frame(bytes, Int32.of_int count))
+    Some (Ox_native_io.Frame(bytes, Base.W32 count))
 (* Validate the complete packet before publishing its prefix. Output is then
    streamed through a bounded scratch buffer instead of a response-sized copy.
    Packet lists are immutable; the buffer belongs solely to this call. *)
@@ -50,11 +50,11 @@ let write_packet write word_count header blocks =
   let word value size =
     if size = 4 then begin
       if !used + 4 > Bytes.length buffer then flush ();
-      Bytes.set_int32_le buffer !used value;
+      Bytes.set_int32_le buffer !used (Base.word_to_int32 value);
       used := !used + 4
     end else
       for offset = 0 to size - 1 do
-        byte (Char.chr ((Int32.to_int value lsr (offset * 8)) land 255))
+        byte (Char.chr ((Base.u32_to_nat value lsr (offset * 8)) land 255))
       done
   in
   word word_count 4;

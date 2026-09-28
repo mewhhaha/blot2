@@ -315,7 +315,7 @@ f_lowercase_name : Base.text -> bool =
 fun v_name ->
 (match v_name with
 | (SCon ((Chr (v_initial)), v_tail)) ->
-(Base.bool_or ((Base.u32_is_eq (v_initial) (0x0000005fl))) ((Base.bool_and ((Base.u32_is_ge (v_initial) (0x00000061l))) ((Base.u32_is_le (v_initial) (0x0000007al))))))
+(Base.bool_or ((Base.u32_is_eq (v_initial) ((Base.W32 0x5f)))) ((Base.bool_and ((Base.u32_is_ge (v_initial) ((Base.W32 0x61)))) ((Base.u32_is_le (v_initial) ((Base.W32 0x7a)))))))
 | SNil ->
 false)
 and (* source_arguments.bend:193 *)

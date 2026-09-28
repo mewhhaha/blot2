@@ -229,7 +229,7 @@ and (* staging_scheme.bend:185 *)
 f_parse_digits : Base.text -> Base.text -> (t_CloneName) option =
 fun v_value v_reversed ->
 (match v_value with
-| (SCon ((Chr (0x0000005dl)), (SCon ((Chr (0x0000002el)), v_source)))) ->
+| (SCon ((Chr ((Base.W32 0x5d))), (SCon ((Chr ((Base.W32 0x2e))), v_source)))) ->
 (f_parsed_number ((Base.nat_read ((Base.string_reverse (v_reversed))))) (v_source))
 | (SCon (v_character, v_tail)) ->
 (f_parse_digits (v_tail) ((SCon (v_character, v_reversed))))
@@ -341,7 +341,7 @@ None
 and (* staging_scheme.bend:284 *)
 f_max_nat48 : unit -> int =
 fun () ->
-(Base.nat_add ((Base.nat_mul ((Base.u32_to_nat (0xffffffffl))) (65536))) (65535))
+(Base.nat_add ((Base.nat_mul ((Base.u32_to_nat ((Base.W32 0xffffffff)))) (65536))) (65535))
 and (* staging_scheme.bend:287 *)
 f_replay_placeholder : (t_Placeholder) option -> t_Scheme -> M.t_Function -> t_CloneName -> int -> G.t_Environment -> (G.t_Environment) option =
 fun v_found v_scheme v_clone v_parsed v_stride v_environment ->

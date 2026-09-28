@@ -66,7 +66,7 @@ let dictionary cursor =
     if available <> length then missing cursor.bound "dictionary string character";
     let value = ref SNil in
     for offset = start + length - 1 downto start do
-      value := SCon (Chr (Bytes.get_int32_le cursor.bytes (offset * 4)), !value)
+      value := SCon (Chr (Base.W32 (unsigned_word cursor.bytes offset)), !value)
     done;
     strings.(index) <- !value;
     cursor.position <- start + length

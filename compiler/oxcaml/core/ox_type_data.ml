@@ -352,10 +352,10 @@ fun v_fuel v_work v_parameters v_operations v_types v_subject ->
 and (* type_data.bend:235 *)
 f_validate_template : M.t_Ty -> (int) option -> (M.t_Operation) list -> (M.t_DataType) list -> Base.text -> (M.t_Diagnostic, unit) Base.result_ =
 fun v_ty v_parameters v_operations v_types v_subject ->
-(match (f_validate_work ((Base.u32_to_nat (0x00010000l))) ((T.OneType (v_ty))) (v_parameters) (v_operations) (v_types) (v_subject)) with
+(match (f_validate_work ((Base.u32_to_nat ((Base.W32 0x10000)))) ((T.OneType (v_ty))) (v_parameters) (v_operations) (v_types) (v_subject)) with
 | Fail __error -> Fail __error
 | Done v_valid ->
-(match (T.f_parameter_kinds ((Base.u32_to_nat (0x00010000l))) ((T.OneType (v_ty)))) with
+(match (T.f_parameter_kinds ((Base.u32_to_nat ((Base.W32 0x10000)))) ((T.OneType (v_ty)))) with
 | Fail __error -> Fail __error
 | Done v_kinds ->
 (T.f_kind_check (v_kinds) (v_subject))))
@@ -416,10 +416,10 @@ fun v_constructors v_parameters v_operations v_types ->
 (match (f_unique_fields (v_fields) (v_name) ((Base.set_new ()))) with
 | Fail __error -> Fail __error
 | Done v_unique ->
-(match (f_validate_work ((Base.u32_to_nat (0x00010000l))) ((T.OneType (v_payload))) ((Some (v_parameters))) (v_operations) (v_types) (v_name)) with
+(match (f_validate_work ((Base.u32_to_nat ((Base.W32 0x10000)))) ((T.OneType (v_payload))) ((Some (v_parameters))) (v_operations) (v_types) (v_name)) with
 | Fail __error -> Fail __error
 | Done v_valid ->
-(match (T.f_parameter_kinds ((Base.u32_to_nat (0x00010000l))) ((T.OneType (v_payload)))) with
+(match (T.f_parameter_kinds ((Base.u32_to_nat ((Base.W32 0x10000)))) ((T.OneType (v_payload)))) with
 | Fail __error -> Fail __error
 | Done v_kinds ->
 (match (f_datatype_parameter_kinds (v_kinds) (v_name)) with

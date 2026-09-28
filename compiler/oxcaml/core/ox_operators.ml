@@ -17,9 +17,9 @@ type t_Associativity =
   | Right
   | NonAssociative
 and t_Fixity =
-  | Fixity of Base.text * bool * int32 * t_Associativity * M.t_Expr
+  | Fixity of Base.text * bool * Base.word32 * t_Associativity * M.t_Expr
 and t_Operator =
-  | Operator of int32 * t_Associativity * M.t_Expr * int
+  | Operator of Base.word32 * t_Associativity * M.t_Expr * int
 and t_Tail =
   | Tail of t_Operator * M.t_Expr
 and t_Decision =

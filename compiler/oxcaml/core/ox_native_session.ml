@@ -58,7 +58,7 @@ type t_Mode =
   | AnalyzeMode
   | CompileMode
 and 'v t_Cached =
-  | Cached of ((int32) list) list * 'v
+  | Cached of ((Base.word32) list) list * 'v
 and t_Lowered =
   | Lowered of C.t_Cst * int * M.t_Module * Plan.t_Scanned * ((Plan.t_Nominals) t_Cached) option
 and t_Declaration =
@@ -68,7 +68,7 @@ and t_InferencePlan =
   | IndependentPlan of int * (Scheduler.t_Scheduled) list
   | RegionPlan of (Chains.t_Chain) list * (Regions.t_Region) list
 and t_State =
-  | State of L.t_Prelude * ((int32) list) option * (t_Lowered) Base.map * ((t_InferencePlan) t_Cached) option * ((G.t_CheckedGroup) t_Cached) Base.map * ((Const.t_Constants) t_Cached) Base.map * ((W.t_EntryCode) t_Cached) Base.map * (Mono.t_Cache) option * (CV.t_Revision) option
+  | State of L.t_Prelude * ((Base.word32) list) option * (t_Lowered) Base.map * ((t_InferencePlan) t_Cached) option * ((G.t_CheckedGroup) t_Cached) Base.map * ((Const.t_Constants) t_Cached) Base.map * ((W.t_EntryCode) t_Cached) Base.map * (Mono.t_Cache) option * (CV.t_Revision) option
 and t_Output =
   | Analyzed of Main.t_Analysis
   | Compiled of Main.t_PlannedArtifact
@@ -88,13 +88,13 @@ and t_LoweringSelection =
 and t_LoweringPlan =
   | LoweringPlan of (t_LoweringSelection) list * (C.t_Cst) list
 and t_NominalContext =
-  | NominalContext of (int32) list * (M.t_TypeId) Base.map
+  | NominalContext of (Base.word32) list * (M.t_TypeId) Base.map
 and t_NominalRevision =
   | NominalRevision of (t_Lowered) Base.map * Plan.t_Nominals
 and t_PreparedPlanning =
   | PreparedPlanning of (t_Lowered) Base.map * G.t_Planning
 and t_CheckedGroups =
-  | CheckedGroups of ((G.t_CheckedGroup) t_Cached) Base.map * (G.t_Interface) Base.map * (M.t_CheckedFunction) Base.map * (M.t_CheckedConstant) Base.map * (Base.set) Base.map * ((int32) list) Base.map * t_Counts
+  | CheckedGroups of ((G.t_CheckedGroup) t_Cached) Base.map * (G.t_Interface) Base.map * (M.t_CheckedFunction) Base.map * (M.t_CheckedConstant) Base.map * (Base.set) Base.map * ((Base.word32) list) Base.map * t_Counts
 and t_CheckCatalog =
   | CheckCatalog of Scheduler.t_Catalog * CV.t_Revision
 and t_GroupSelection =
@@ -102,7 +102,7 @@ and t_GroupSelection =
   | GroupMiss of Scheduler.t_Task
   | GroupChecked of G.t_CheckedGroup
 and t_PreparedGroup =
-  | PreparedGroup of int * Base.text * (Base.text) list * Base.set * (int32) list * ((int32) list) list * t_GroupSelection
+  | PreparedGroup of int * Base.text * (Base.text) list * Base.set * (Base.word32) list * ((Base.word32) list) list * t_GroupSelection
 and t_GroupPreparation =
   | GroupPreparation of int * (M.t_Diagnostic, t_PreparedGroup) Base.result_
 and t_GroupProgress =
@@ -116,14 +116,14 @@ and t_Evaluated =
 and t_CompiledEntries =
   | CompiledEntries of ((W.t_EntryCode) t_Cached) Base.map * (W.t_EntryCode) list * t_Counts
 and t_EntrySelection =
-  | ReusedEntry of Base.text * (int32) list * W.t_EntryCode
-  | FreshEntry of Base.text * (int32) list
+  | ReusedEntry of Base.text * (Base.word32) list * W.t_EntryCode
+  | FreshEntry of Base.text * (Base.word32) list
 and t_EntryPlan =
   | EntryPlan of (t_EntrySelection) list * (W.t_CodegenJob) list * (M.t_Diagnostic) option
 and t_KeyedEntry =
-  | KeyedEntry of W.t_CodegenJob * (M.t_Diagnostic, (int32) list) Base.result_
+  | KeyedEntry of W.t_CodegenJob * (M.t_Diagnostic, (Base.word32) list) Base.result_
 and t_PreparedEntry =
-  | PreparedEntry of Base.text * (int32) list * (W.t_EntryCode) t_Selected
+  | PreparedEntry of Base.text * (Base.word32) list * (W.t_EntryCode) t_Selected
 and t_ResolvedDeclarations =
   | ResolvedDeclarations of (C.t_Cst) list * Base.set
 and t_ProjectContext =
@@ -206,7 +206,7 @@ fun v_counts v_reused ->
 | ((Counts (v_fresh, v_old)), false) ->
 (Counts ((Base.nat_add 1 v_fresh), v_old)))
 and (* native_session.bend:98 *)
-f_key_parts_same : ((int32) list) list -> ((int32) list) list -> bool -> bool =
+f_key_parts_same : ((Base.word32) list) list -> ((Base.word32) list) list -> bool -> bool =
 fun v_left v_right v_same ->
 (match (v_left, v_right, v_same) with
 | (_, _, false) ->
@@ -226,7 +226,7 @@ fun v_same v_value ->
 | false ->
 None)
 and (* native_session.bend:116 *)
-f_cached : 'v. (('v) t_Cached) option -> ((int32) list) list -> ('v) option =
+f_cached : 'v. (('v) t_Cached) option -> ((Base.word32) list) list -> ('v) option =
 fun v_previous v_keys ->
 (match v_previous with
 | None ->
@@ -359,7 +359,7 @@ fun v_plan v_scope v_fuel ->
 | Done v_lowered ->
 (f_publish_lowered (v_selections) (v_lowered) ([]) ([]) ((Counts (0, 0)))))))
 and (* native_session.bend:240 *)
-f_reusable_scope : ((int32) list) option -> (int32) list -> (t_Lowered) Base.map -> (t_Lowered) Base.map =
+f_reusable_scope : ((Base.word32) list) option -> (Base.word32) list -> (t_Lowered) Base.map -> (t_Lowered) Base.map =
 fun v_previous v_key v_declarations ->
 (match v_previous with
 | None ->
@@ -407,7 +407,7 @@ fun v_found v_scanned ->
 (let (Plan.Scanned (v_functions, v_constants, v_costs)) = v_scanned in
 (f_sum_costs ((Base.map_values (v_costs))) (16))))
 and (* native_session.bend:285 *)
-f_nominal_tasks : (t_Lowered) list -> (int32) list -> ((t_Lowered) B.t_Weighted) list =
+f_nominal_tasks : (t_Lowered) list -> (Base.word32) list -> ((t_Lowered) B.t_Weighted) list =
 fun v_values v_key ->
 (match v_values with
 | [] ->
@@ -578,7 +578,7 @@ fun v_group ->
 (let (G.CheckedGroup (v_checked, v_interfaces, v_uses)) = v_group in
 v_interfaces)
 and (* native_session.bend:448 *)
-f_publish_group : t_CheckedGroups -> Base.text -> (Base.text) list -> Base.set -> (int32) list -> ((int32) list) list -> (G.t_CheckedGroup) t_Selected -> t_CheckedGroups =
+f_publish_group : t_CheckedGroups -> Base.text -> (Base.text) list -> Base.set -> (Base.word32) list -> ((Base.word32) list) list -> (G.t_CheckedGroup) t_Selected -> t_CheckedGroups =
 fun v_state v_owner v_members v_closure v_base_key v_keys v_selected ->
 (let (CheckedGroups (v_groups, v_interfaces, v_functions, v_constants, v_closures, v_base_keys, v_counts)) = v_state in
 (let v_value = (f_selected_value (v_selected)) in
@@ -701,12 +701,12 @@ fun v_progress v_position v_diagnostic ->
 (let (GroupProgress (v_checked, v_failure)) = v_progress in
 (GroupProgress (v_checked, (Scheduler.f_first_failure (v_failure) ((Scheduler.Failure (v_position, v_diagnostic)))))))
 and (* native_session.bend:581 *)
-f_group_success : t_GroupProgress -> Base.text -> (Base.text) list -> Base.set -> (int32) list -> ((int32) list) list -> (G.t_CheckedGroup) t_Selected -> t_GroupProgress =
+f_group_success : t_GroupProgress -> Base.text -> (Base.text) list -> Base.set -> (Base.word32) list -> ((Base.word32) list) list -> (G.t_CheckedGroup) t_Selected -> t_GroupProgress =
 fun v_progress v_owner v_members v_closure v_base_key v_keys v_selected ->
 (let (GroupProgress (v_checked, v_failure)) = v_progress in
 (GroupProgress ((f_publish_group (v_checked) (v_owner) (v_members) (v_closure) (v_base_key) (v_keys) (v_selected)), v_failure)))
 and (* native_session.bend:585 *)
-f_publish_group_result : (M.t_Diagnostic, G.t_CheckedGroup) Base.result_ -> t_GroupProgress -> int -> Base.text -> (Base.text) list -> Base.set -> (int32) list -> ((int32) list) list -> t_GroupProgress =
+f_publish_group_result : (M.t_Diagnostic, G.t_CheckedGroup) Base.result_ -> t_GroupProgress -> int -> Base.text -> (Base.text) list -> Base.set -> (Base.word32) list -> ((Base.word32) list) list -> t_GroupProgress =
 fun v_result v_progress v_position v_owner v_members v_closure v_base_key v_keys ->
 (match v_result with
 | (Fail (v_diagnostic)) ->
@@ -933,7 +933,7 @@ fun v_value ->
 (let (Const.Constants (v_bindings, v_remaining)) = v_value in
 v_remaining)
 and (* native_session.bend:799 *)
-f_body_keys : (Base.text) list -> ((int32) list) Base.map -> (M.t_Diagnostic, ((int32) list) list) Base.result_ =
+f_body_keys : (Base.text) list -> ((Base.word32) list) Base.map -> (M.t_Diagnostic, ((Base.word32) list) list) Base.result_ =
 fun v_owners v_known ->
 (match v_owners with
 | [] ->
@@ -958,7 +958,7 @@ fun v_found v_constant v_steps v_context ->
 | Done v_value ->
 (Done ((Selected (v_value, false))))))
 and (* native_session.bend:818 *)
-f_evaluate_constants : (M.t_CheckedConstant) list -> int -> Const.t_Context -> (Base.set) Base.map -> ((int32) list) Base.map -> ((Const.t_Constants) t_Cached) Base.map -> ((Const.t_Constants) t_Cached) Base.map -> ((Const.t_Value) Const.t_Binding) list -> t_Counts -> (M.t_Diagnostic, t_Evaluated) Base.result_ =
+f_evaluate_constants : (M.t_CheckedConstant) list -> int -> Const.t_Context -> (Base.set) Base.map -> ((Base.word32) list) Base.map -> ((Const.t_Constants) t_Cached) Base.map -> ((Const.t_Constants) t_Cached) Base.map -> ((Const.t_Value) Const.t_Binding) list -> t_Counts -> (M.t_Diagnostic, t_Evaluated) Base.result_ =
 fun v_constants v_steps v_context v_closures v_base_keys v_previous v_next v_reversed v_counts ->
 (match v_constants with
 | [] ->
@@ -980,7 +980,7 @@ fun v_constants v_steps v_context v_closures v_base_keys v_previous v_next v_rev
 (let v_value = (f_selected_value (v_chosen)) in
 (f_evaluate_constants (v_tail) ((f_constant_remaining (v_value))) (v_context) (v_closures) (v_base_keys) (v_previous) ((Base.map_set (v_next) (v_name) ((Cached (v_keys, v_value))))) ((Base.list_append ((Base.list_reverse ((f_constant_bindings (v_value))))) (v_reversed))) ((f_count (v_counts) ((f_selected_reused (v_chosen)))))))))))))
 and (* native_session.bend:842 *)
-f_select_entry : (W.t_EntryCode) option -> W.t_CodegenJob -> (int32) list -> t_EntryPlan -> t_EntryPlan =
+f_select_entry : (W.t_EntryCode) option -> W.t_CodegenJob -> (Base.word32) list -> t_EntryPlan -> t_EntryPlan =
 fun v_found v_job v_key v_plan ->
 (match v_found with
 | (Some (v_value)) ->
@@ -992,7 +992,7 @@ fun v_found v_job v_key v_plan ->
 (let (EntryPlan (v_selections, v_missing, v_failure)) = v_plan in
 (EntryPlan (((FreshEntry (v_name, v_key)) :: v_selections), ((W.CodegenJob (v_name, v_parameter, v_body, v_captures)) :: v_missing), v_failure)))))
 and (* native_session.bend:853 *)
-f_plan_entry_key : (M.t_Diagnostic, (int32) list) Base.result_ -> W.t_CodegenJob -> ((W.t_EntryCode) t_Cached) Base.map -> t_EntryPlan -> t_EntryPlan =
+f_plan_entry_key : (M.t_Diagnostic, (Base.word32) list) Base.result_ -> W.t_CodegenJob -> ((W.t_EntryCode) t_Cached) Base.map -> t_EntryPlan -> t_EntryPlan =
 fun v_encoded v_job v_previous v_plan ->
 (match v_encoded with
 | (Fail (v_error)) ->
@@ -1226,7 +1226,7 @@ v_previous
 | false ->
 (Base.map_new ()))
 and (* native_session.bend:1054 *)
-f_update_lowered_module : t_State -> t_Mode -> Base.text -> M.t_Module -> M.t_Module -> (int32) list -> t_Lowering -> int -> (M.t_Diagnostic, t_Completion) Base.result_ =
+f_update_lowered_module : t_State -> t_Mode -> Base.text -> M.t_Module -> M.t_Module -> (Base.word32) list -> t_Lowering -> int -> (M.t_Diagnostic, t_Completion) Base.result_ =
 fun v_state v_mode v_entry v_prelude_module v_raw_module v_scope_words v_lowered v_steps ->
 (let (State (v_prelude, v_scope_key, v_declarations, v_planning, v_previous_groups, v_constants, v_entries, v_specialization, v_catalog_version)) = v_state in
 (let (Lowering (v_values, v_scans, v_declaration_counts)) = v_lowered in
@@ -1263,7 +1263,7 @@ fun v_state v_mode v_entry v_prelude_module v_raw_module v_scope_words v_lowered
 | Done v_completed ->
 (f_update_checked ((State (v_prelude, (Some (v_scope_words)), (f_planning_declarations (v_prepared)), (Some ((Cached ([v_plan_key], v_scheduled)))), (Base.map_new ()), (f_constants_if_same_catalog (v_same_catalog) (v_constants)), v_entries, (Some ((Mono.f_prepared_cache (v_specialization_result)))), (Some (v_revision))))) (v_mode) (v_module) (v_completed) (v_declaration_counts) (v_steps) ((Entries.f_entries (v_raw_module)))))))))))))))))))))
 and (* native_session.bend:1075 *)
-f_update_lowered : t_State -> t_Mode -> Base.text -> M.t_Module -> (int32) list -> t_Lowering -> int -> (M.t_Diagnostic, t_Completion) Base.result_ =
+f_update_lowered : t_State -> t_Mode -> Base.text -> M.t_Module -> (Base.word32) list -> t_Lowering -> int -> (M.t_Diagnostic, t_Completion) Base.result_ =
 fun v_state v_mode v_entry v_prelude_module v_scope_words v_lowered v_steps ->
 (let (Lowering (v_values, v_scans, v_counts)) = v_lowered in
 (let v_raw_module = (f_combine_fragments ((v_prelude_module :: (f_lowered_fragments (v_values))))) in
@@ -1424,11 +1424,11 @@ fun v_nodes v_previous ->
 | Done v_rest ->
 (Done (((C.Cst (v_kind, v_field, v_text, v_offset, [v_resolved])) :: v_rest)))))))
 and (* native_session.bend:1208 *)
-f_project_task_key : (M.t_Diagnostic, Modules.t_ModuleTask) Base.result_ -> (M.t_Diagnostic, (int32) list) Base.result_ =
+f_project_task_key : (M.t_Diagnostic, Modules.t_ModuleTask) Base.result_ -> (M.t_Diagnostic, (Base.word32) list) Base.result_ =
 fun v_prepared ->
 (match v_prepared with
 | (Fail (v_error)) ->
-(Done ([0x00000000l]))
+(Done ([(Base.W32 0x0)]))
 | (Done ((Modules.ModuleTask (v_declarations, v_prefix, v_name, v_entry, v_scope)))) ->
 (match (K.f_encode ([(K.Field ((R.Text (v_prefix)))); (K.Field ((R.Text (v_name)))); (K.f_flag (v_entry))])) with
 | Fail __error -> Fail __error
@@ -1438,7 +1438,7 @@ fun v_prepared ->
 | Done v_words ->
 (Done ((Base.list_append (v_header) (((Base.u32_from_nat ((Base.list_length (v_words)))) :: v_words))))))))
 and (* native_session.bend:1219 *)
-f_project_scope_key : (((M.t_Diagnostic, Modules.t_ModuleTask) Base.result_) B.t_Weighted) list -> (M.t_Diagnostic, (int32) list) Base.result_ =
+f_project_scope_key : (((M.t_Diagnostic, Modules.t_ModuleTask) Base.result_) B.t_Weighted) list -> (M.t_Diagnostic, (Base.word32) list) Base.result_ =
 fun v_tasks ->
 (match v_tasks with
 | [] ->
@@ -1542,7 +1542,7 @@ fun v_values ->
 | ((Lowered (v_node, v_fuel, v_fragment, v_scanned, v_nominals)) :: v_tail) ->
 (v_node :: (f_project_nodes (v_tail))))
 and (* native_session.bend:1303 *)
-f_update_project_lowered : t_State -> t_Mode -> Base.text -> M.t_Module -> (int32) list -> t_ProjectLowering -> int -> (M.t_Diagnostic, t_Completion) Base.result_ =
+f_update_project_lowered : t_State -> t_Mode -> Base.text -> M.t_Module -> (Base.word32) list -> t_ProjectLowering -> int -> (M.t_Diagnostic, t_Completion) Base.result_ =
 fun v_state v_mode v_entry v_prelude_module v_key v_project v_steps ->
 (let (ProjectLowering ((Lowering (v_values, v_scans, v_counts)), v_module)) = v_project in
 (match (f_unique_declaration_ids ((f_project_nodes (v_values))) ((Base.set_new ()))) with

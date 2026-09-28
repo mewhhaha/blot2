@@ -200,7 +200,7 @@ fun v_fuel v_pending v_names v_members ->
 and (* entry_points.bend:115 *)
 f_scan_limit : unit -> int =
 fun () ->
-(Base.u32_to_nat (0x01000000l))
+(Base.u32_to_nat ((Base.W32 0x1000000)))
 and (* entry_points.bend:118 *)
 f_scan : M.t_Expr -> (M.t_Diagnostic, t_Found) Base.result_ =
 fun v_body ->
@@ -280,7 +280,7 @@ None)
 and (* entry_points.bend:201 *)
 f_split_member : Base.text -> (t_Split) option =
 fun v_name ->
-(f_split_reversed ((Base.list_reverse ((Base.string_split (v_name) ((Chr 0x0000002el)))))))
+(f_split_reversed ((Base.list_reverse ((Base.string_split (v_name) ((Chr (Base.W32 0x2e))))))))
 and (* entry_points.bend:204 *)
 f_add_implementation : (t_Split) option -> Base.text -> Base.set -> ((Base.text) list) Base.map -> ((Base.text) list) Base.map =
 fun v_split v_name v_owners v_index ->

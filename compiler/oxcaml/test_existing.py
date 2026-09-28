@@ -76,7 +76,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix='blot-oxcaml-tests-') as directory:
         stage = Path(directory)
         shutil.copytree(ROOT, stage, dirs_exist_ok=True, ignore=shutil.ignore_patterns(
-            '.git', '_build', '__pycache__', '_opam', 'node_modules', '.native-backend-*',
+            '.git', '_build*', '__pycache__', '_opam', 'node_modules', '.native-backend-*',
             'reference-tools', '.reference-cache', '.cache', 'build', 'parity-results',
         ))
         target = stage / 'generated/compiler/blotc'

@@ -1267,7 +1267,7 @@ fun v_module v_entry v_family_templates ->
 | Done v_prepared ->
 (Done ((Core.f_prepared_module (v_prepared)))))
 and (* dispatch_resolution.bend:1161 *)
-f_cached_source : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> M.t_Module -> Base.text -> (M.t_Operation) list -> (Mono.t_Cache) option -> (Core.t_Certificate) list -> (M.t_Diagnostic, Mono.t_Prepared) Base.result_ =
+f_cached_source : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> M.t_Module -> Base.text -> (M.t_Operation) list -> (Mono.t_Cache) option -> (Core.t_Certificate) list -> (M.t_Diagnostic, Mono.t_Prepared) Base.result_ =
 fun v_key v_module v_entry v_family_templates v_previous v_certificates ->
 (match (f_original_initial (v_module) (v_certificates)) with
 | Fail __error -> Fail __error
@@ -1280,7 +1280,7 @@ fun v_key v_module v_entry v_family_templates v_previous v_certificates ->
 | Done v_prepared ->
 (Done ((Mono.f_with_source_certificates (v_prepared) ((Scheduler.f_initial_certificates (v_initial)))))))))
 and (* dispatch_resolution.bend:1168 *)
-f_prepare_cached_resolved : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> t_Resolved -> M.t_Module -> Base.text -> (M.t_Operation) list -> (Mono.t_Cache) option -> (M.t_Diagnostic, Mono.t_Prepared) Base.result_ =
+f_prepare_cached_resolved : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> t_Resolved -> M.t_Module -> Base.text -> (M.t_Operation) list -> (Mono.t_Cache) option -> (M.t_Diagnostic, Mono.t_Prepared) Base.result_ =
 fun v_key v_found v_module v_entry v_family_templates v_previous ->
 (match v_found with
 | NoResolution ->
@@ -1295,6 +1295,6 @@ fun v_key v_found v_module v_entry v_family_templates v_previous ->
 | Done v_prepared ->
 (Done ((Mono.f_with_source_certificates (v_prepared) (v_source_certificates))))))
 and (* dispatch_resolution.bend:1181 *)
-f_prepare_cached_evidenced : (M.t_Module -> (M.t_Diagnostic, (int32) list) Base.result_) -> M.t_Module -> Base.text -> (M.t_Operation) list -> (Mono.t_Cache) option -> (M.t_Diagnostic, Mono.t_Prepared) Base.result_ =
+f_prepare_cached_evidenced : (M.t_Module -> (M.t_Diagnostic, (Base.word32) list) Base.result_) -> M.t_Module -> Base.text -> (M.t_Operation) list -> (Mono.t_Cache) option -> (M.t_Diagnostic, Mono.t_Prepared) Base.result_ =
 fun v_key v_module v_entry v_family_templates v_previous ->
 (f_prepare_cached_resolved (v_key) ((f_resolve (v_module) (v_entry) ((Mono.f_source_certificates (v_previous))))) (v_module) (v_entry) (v_family_templates) (v_previous))

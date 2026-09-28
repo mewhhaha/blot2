@@ -20,14 +20,14 @@ let () =
   List.iter (fun a -> List.iter (fun b -> verify (text a) (text b) (a = b)) names) names;
   let suffix = text (String.make 8192 'x' ^ "😀") in
   verify suffix suffix true;
-  verify (SCon (Chr 97l, suffix)) (SCon (Chr 97l, suffix)) true;
-  verify (SCon (Chr 97l, suffix)) (SCon (Chr 98l, suffix)) false;
-  verify suffix (SCon (Chr 97l, suffix)) false;
+  verify (SCon (Chr (Base.W32 0x61), suffix)) (SCon (Chr (Base.W32 0x61), suffix)) true;
+  verify (SCon (Chr (Base.W32 0x61), suffix)) (SCon (Chr (Base.W32 0x62), suffix)) false;
+  verify suffix (SCon (Chr (Base.W32 0x61), suffix)) false;
   (* Even values constructed below the validating protocol retain exact bits. *)
   List.iter (fun x -> List.iter (fun y ->
-    verify (SCon (Chr x, SNil)) (SCon (Chr y, SNil)) (Int32.equal x y))
-    [0l; 0x10ffffl; Int32.max_int; Int32.min_int; Int32.minus_one])
-    [0l; 0x10ffffl; Int32.max_int; Int32.min_int; Int32.minus_one];
+    verify (SCon (Chr x, SNil)) (SCon (Chr y, SNil)) (Base.u32_is_eq x y))
+    [(Base.W32 0x0); (Base.W32 0x10ffff); (Base.W32 0x7fff_ffff); (Base.W32 0x8000_0000); (Base.W32 0xffff_ffff)])
+    [(Base.W32 0x0); (Base.W32 0x10ffff); (Base.W32 0x7fff_ffff); (Base.W32 0x8000_0000); (Base.W32 0xffff_ffff)];
   let prefix = String.make 200000 'p' in
   verify (text prefix) (text prefix) true;
   verify (text (prefix ^ "a")) (text (prefix ^ "b")) false;
@@ -60,9 +60,9 @@ let () =
   let before = Gc.allocated_bytes () in
   let constructed = ref SNil in
   for i = 0 to n - 1 do
-    constructed := SCon (Chr (Int32.of_int (Sys.opaque_identity i land 0xffff)), !constructed)
+    constructed := SCon (Chr (Base.word_of_int (Sys.opaque_identity i land 0xffff)), !constructed)
   done;
   let allocated = Gc.allocated_bytes () -. before in
   check "constructed text length" (string_length !constructed = n);
-  check "no redundant character wrapper" (allocated < 49. *. float_of_int n);
+  check "no redundant character wrapper" (allocated < 25. *. float_of_int n);
   Printf.printf "%d native name equality checks passed\n" !checks
