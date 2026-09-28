@@ -47,17 +47,29 @@ jobs:
           test ! -f generated/compiler/blotc
           deno run --allow-all compiler/oxcaml/smoke.ts
           deno run --allow-read --allow-write --allow-run compiler/oxcaml/cli.ts build examples/scalar.blot build/oxcaml-smoke.wasm
-      - name: Export reproducible development snapshot
-        if: github.event_name != 'pull_request'
+      - name: Export minimal development snapshot
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[dev-snapshot]'))
         run: |
-          mkdir -p development-snapshot
+          mkdir -p development-snapshot toolchain/bin toolchain/lib/ocaml
           git archive --format=tar.gz HEAD > development-snapshot/source.tar.gz
           git rev-parse HEAD > development-snapshot/source.sha
           opam exec --switch 5.2.0+ox -- ocamlopt -config > development-snapshot/ocaml-config.txt
-          tar -C "$HOME/.opam/5.2.0+ox" -czf development-snapshot/toolchain.tar.gz bin lib/ocaml
+          prefix="$HOME/.opam/5.2.0+ox"
+          cp -L "$prefix/bin/ocamlopt" toolchain/bin/ocamlopt
+          strip --strip-debug toolchain/bin/ocamlopt
+          find -L "$prefix/lib/ocaml" -maxdepth 1 -type f \( -name '*.cmi' -o -name '*.cmx' -o -name '*.cmxa' -o -name '*.a' -o -name '*.o' -o -name 'Makefile.config' \) -exec cp -L {} toolchain/lib/ocaml/ \;
+          for directory in caml threads unix; do
+            if test -d "$prefix/lib/ocaml/$directory"; then
+              cp -Lr "$prefix/lib/ocaml/$directory" toolchain/lib/ocaml/
+            fi
+          done
+          find toolchain/lib -type f \( -name '*.cmt' -o -name '*.cmti' -o -name '*.cmxs' \) -delete
+          find toolchain/lib -type f \( -name '*.a' -o -name '*.o' \) -exec strip --strip-debug {} +
+          tar -C toolchain -czf development-snapshot/toolchain.tar.gz bin lib
           cp compiler/oxcaml/_build/blotc development-snapshot/blotc
+          du -h development-snapshot/*
       - uses: actions/upload-artifact@v4
-        if: github.event_name != 'pull_request'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[dev-snapshot]'))
         with:
           name: oxcaml-development-snapshot
           path: development-snapshot/
