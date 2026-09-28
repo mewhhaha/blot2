@@ -1803,12 +1803,26 @@ def qualified_ready(predicate: M.Predicate, entry: String) -> Result<&2, &2, M.D
         free : List<&2, Nat> <- C.free(M.EffectRepPredicate{row})
         return List.is_empty(&2, Nat, free)
 
+type ChoiceChange is Data:
+  OrdinaryChoiceChanged{site: Nat}
+  QualifiedChoiceChanged{site: Nat, predicate: M.Predicate}
+  UnknownChoiceChange{}
+
+def ordinary_choice_change(need: I.Coverage) -> ChoiceChange:
+  match need:
+    case I.OperationNeed{identity, template, arguments, function_type, subject}:
+      OrdinaryChoiceChanged{identity}
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, invocation, ambient, subject}:
+      OrdinaryChoiceChanged{identity}
+    case _:
+      UnknownChoiceChange{}
+
 type SolveWork is Data:
   Needs{values: List<&2, I.Coverage>}
   Operation{value: I.Coverage, arguments: List<&2, M.Ty>, ready: Bool, done: Bool, remaining: List<&2, I.Coverage>}
   Need{value: I.Coverage, left: M.Ty, right: M.Ty, ready: Bool, done: Bool, remaining: List<&2, I.Coverage>}
   Qualified{original: M.Predicate, resolved: M.Predicate, site: Nat, subject: String, ready: Bool, done: Bool, remaining: List<&2, I.Coverage>}
-  Selected{value: Maybe<&2, Specialization>, remaining: List<&2, I.Coverage>}
+  Selected{value: Maybe<&2, Specialization>, change: ChoiceChange, remaining: List<&2, I.Coverage>}
 
 def available_selection(attempt: Result<&2, &2, M.Diagnostic, Specialization>, unresolved: Bool) -> Result<&2, &2, M.Diagnostic, Maybe<&2, Specialization>>:
   match attempt:
@@ -1917,6 +1931,62 @@ def refresh_pending(+selected: Specialization, cache: PendingCache) -> PendingCa
   +current_count = List.length(&2, I.Definition, definitions)
   refresh_with_count(Nat.is_ge(current_count, prior_count), selected, current_count, prior_count, definitions, prior_needs, choices)
 
+# A selector changes one ordinary choice or adds one qualified predicate. The
+# cached needs were already unresolved against the previous choices, so only
+# that site can have become solved. New definitions still use the full map.
+def qualified_pending_after_change(same_site: Bool, predicate: M.Predicate, selected: M.Predicate) -> Bool:
+  match same_site:
+    case False{}:
+      True{}
+    case True{}:
+      Bool.not(C.same_predicate(predicate, selected))
+
+def pending_after_change(need: I.Coverage, change: ChoiceChange) -> Bool:
+  match need change:
+    case I.OperationNeed{identity, template, arguments, function_type, subject} OrdinaryChoiceChanged{site}:
+      Bool.not(Nat.is_eq(identity, site))
+    case I.OperationNeed{identity, template, arguments, function_type, subject} _:
+      True{}
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, invocation, ambient, subject} OrdinaryChoiceChanged{site}:
+      Bool.not(Nat.is_eq(identity, site))
+    case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, invocation, ambient, subject} _:
+      True{}
+    case I.QualifiedNeed{site, predicate, subject} QualifiedChoiceChanged{selected_site, selected}:
+      qualified_pending_after_change(Nat.is_eq(site, selected_site), predicate, selected)
+    case I.QualifiedNeed{site, predicate, subject} _:
+      True{}
+    case _ _:
+      False{}
+
+def remaining_after_change(needs: List<&2, I.Coverage>, +change: ChoiceChange) -> List<&2, I.Coverage>:
+  match needs:
+    case Nil{}:
+      Nil{}
+    case +head <> tail:
+      +rest = remaining_after_change(tail, change)
+      Bool.pick(List<&2, I.Coverage>, pending_after_change(head, change), head <> rest, rest)
+
+def refresh_changed_with_count(valid: Bool, +selected: Specialization, +count: Nat, prior_count: Nat, definitions: List<&2, I.Definition>, prior_needs: List<&2, I.Coverage>, +choices: Map<&2, Choice>, change: ChoiceChange) -> PendingCache:
+  match valid:
+    case False{}:
+      PendingCache{count, specialization_pending(selected)}
+    case True{}:
+      refresh_from_fresh(fresh_unresolved(FreshWork{Nat.sub(count, prior_count), definitions}, choices, remaining_after_change(prior_needs, change)), selected, count)
+
+def refresh_known_change(+selected: Specialization, cache: PendingCache, change: ChoiceChange) -> PendingCache:
+  Specialization{module, environment, +choices, next, certificates} = selected
+  PendingCache{+prior_count, prior_needs} = cache
+  +definitions = G.env_definitions(environment)
+  +count = List.length(&2, I.Definition, definitions)
+  refresh_changed_with_count(Nat.is_ge(count, prior_count), selected, count, prior_count, definitions, prior_needs, choices, change)
+
+def refresh_after_change(selected: Specialization, cache: PendingCache, change: ChoiceChange) -> PendingCache:
+  match change:
+    case UnknownChoiceChange{}:
+      refresh_pending(selected, cache)
+    case changed:
+      refresh_known_change(selected, cache, changed)
+
 def solve_staged(fuel: Nat, work: SolveWork, +specialization: Specialization, +configuration: Configuration, +shapes: List<&2, I.Binding>, +cache: PendingCache, +schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, Specialization>:
   match fuel work:
     case 0n _:
@@ -1932,10 +2002,10 @@ def solve_staged(fuel: Nat, work: SolveWork, +specialization: Specialization, +c
       solve_staged(rest, Needs{tail}, specialization, configuration, shapes, cache, schemes)
     case 1n+rest Operation{need, arguments, False{}, False{}, tail}:
       solve_staged(rest, Needs{tail}, specialization, configuration, shapes, cache, schemes)
-    case 1n+rest Operation{need, arguments, True{}, False{}, tail}:
+    case 1n+rest Operation{+need, arguments, True{}, False{}, tail}:
       do Result<&2, &2, M.Diagnostic, Specialization>:
         +selected : Specialization <- select_operation(need, arguments, specialization, configuration)
-        +updated : PendingCache = refresh_pending(selected, cache)
+        +updated : PendingCache = refresh_after_change(selected, cache, ordinary_choice_change(need))
         solve_staged(rest, Needs{cached_needs(updated)}, selected, configuration, shapes, updated, schemes)
     case 1n+rest Needs{I.AssociatedNeed{+identity, +dispatch, +member, +effect_templates, +left, +right, result, invocation, ambient, subject} <> tail}:
       Specialization{module, environment, choices, counter, certificates} = specialization
@@ -1957,10 +2027,10 @@ def solve_staged(fuel: Nat, work: SolveWork, +specialization: Specialization, +c
       solve_staged(rest, Needs{tail}, specialization, configuration, shapes, cache, schemes)
     case 1n+rest Qualified{original, resolved, site, subject, False{}, False{}, tail}:
       solve_staged(rest, Needs{tail}, specialization, configuration, shapes, cache, schemes)
-    case 1n+rest Qualified{original, resolved, site, subject, True{}, False{}, tail}:
+    case 1n+rest Qualified{+original, resolved, +site, subject, True{}, False{}, tail}:
       do Result<&2, &2, M.Diagnostic, Specialization>:
         +selected : Specialization <- select_qualified(original, resolved, site, subject, specialization, configuration, shapes, schemes)
-        +updated : PendingCache = refresh_pending(selected, cache)
+        +updated : PendingCache = refresh_after_change(selected, cache, QualifiedChoiceChanged{site, original})
         solve_staged(rest, Needs{cached_needs(updated)}, selected, configuration, shapes, updated, schemes)
     case 1n+rest Need{need, left, right, ready, True{}, tail}:
       solve_staged(rest, Needs{tail}, specialization, configuration, shapes, cache, schemes)
@@ -1970,11 +2040,11 @@ def solve_staged(fuel: Nat, work: SolveWork, +specialization: Specialization, +c
       do Result<&2, &2, M.Diagnostic, Specialization>:
         selected : Maybe<&2, Specialization> <- available_selection(select(need, left, right, specialization, configuration, shapes, schemes), polymorphic(65536n, [left, right]))
         constrained : Maybe<&2, Specialization> <- constrain_ordinary_invocation(selected, need)
-        solve_staged(rest, Selected{constrained, tail}, specialization, configuration, shapes, cache, schemes)
-    case 1n+rest Selected{None{}, tail}:
+        solve_staged(rest, Selected{constrained, ordinary_choice_change(need), tail}, specialization, configuration, shapes, cache, schemes)
+    case 1n+rest Selected{None{}, change, tail}:
       solve_staged(rest, Needs{tail}, specialization, configuration, shapes, cache, schemes)
-    case 1n+rest Selected{Some{+selected}, tail}:
-      +updated = refresh_pending(selected, cache)
+    case 1n+rest Selected{Some{+selected}, change, tail}:
+      +updated = refresh_after_change(selected, cache, change)
       solve_staged(rest, Needs{cached_needs(updated)}, selected, configuration, shapes, updated, schemes)
 def solve(fuel: Nat, work: SolveWork, specialization: Specialization, configuration: Configuration, shapes: List<&2, I.Binding>, cache: PendingCache) -> Result<&2, &2, M.Diagnostic, Specialization>:
   solve_staged(fuel, work, specialization, configuration, shapes, cache, Nil{})

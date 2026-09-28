@@ -195,7 +195,7 @@ Patricia lookup also uses one tail loop while preserving prefix checks, and
 string suffixes are left untouched when the next branch inspects another bit of
 the same character. The [native gdev measurements](COMPILE_SPEED_RESULTS.md)
 record cold compilation falling from 126.9 to 62.3 seconds across three Bend
-2.0.32 experiments, with identical Wasm. The latest batch improves its own
+2.0.32 experiments, with identical Wasm. The third batch improves its own
 control from 75.8 to 62.3 seconds; peak native memory remains about 279 MiB. A
 scheduler experiment that exposed more inner parallelism was parked after
 slowing the actual game.
@@ -223,13 +223,17 @@ scope. Checker branches inherit dependency interfaces for lookup and publish
 only interfaces they produce, avoiding repeated merges of the shared
 environment.
 
-The specialization solver keeps an ordered list of unresolved operation and
-associated requirements. After it selects an implementation, it filters the
-previous list against the new choices and prepends requirements from newly
-inferred definitions. Definitions remain in the same order as the full scan;
-type arguments are resolved against the current substitution state when each
-requirement is consumed. If the number of definitions shrinks unexpectedly, the
-solver repeats the full scan.
+The specialization solver keeps an ordered list of unresolved operation,
+associated, and qualified requirements. A successful selection changes one
+ordinary choice or adds one predicate at a qualified site. The solver removes
+matching old requirements using that numeric site, keeping the two namespaces
+separate and comparing predicates only at the affected qualified site. Newly
+inferred definitions still consult all choices and precede older requirements in
+the original order. Type arguments are resolved against the current
+substitutions when consumed. Unknown changes or shrinking definition counts use
+the full-refresh fallback. This improves a fresh matched gdev control from 37.65
+to 33.11 seconds cold and 37.75 to 33.23 seconds after a body edit, both 12%,
+with unchanged Wasm and roughly 280 MiB peak native memory.
 
 Both clean builds and native sessions infer dependency-ready groups in balanced
 Bend batches. Ordinarily, single-consumer dependency chains advance on their own

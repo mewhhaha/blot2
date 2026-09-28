@@ -579,6 +579,15 @@ def Laws.frontier_reuse_excludes_retained_tasks(position, checked):
 def Laws.pending_cache_preserves_requirements(count, needs):
   {==}
 
+def Laws.empty_pending_change_has_no_requirements(change):
+  {==}
+
+def Laws.different_qualified_site_stays_pending(predicate, selected):
+  {==}
+
+def Laws.unknown_choice_change_uses_full_refresh(selected, cache):
+  {==}
+
 def Laws.empty_coverage_preserves_pending_tail(choices, rest):
   {==}
 

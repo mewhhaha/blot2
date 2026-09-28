@@ -73,7 +73,8 @@ def changed_substitutions(old: Infer.Definition) -> Bool:
   +updated_substitutions : Types.Substitutions = Types.from_list([Types.Substitution{0n, M.U32Ty{}}])
   +selected : Mono.Specialization = specialization(old_definitions, updated_substitutions, chosen())
   +next : List<&2, Infer.Coverage> = Mono.cached_needs(Mono.refresh_pending(selected, cache))
-  Bool.and(only_second(identities(next)), resolve_second(next, updated_substitutions))
+  +changed : List<&2, Infer.Coverage> = Mono.cached_needs(Mono.refresh_after_change(selected, cache, Mono.OrdinaryChoiceChanged{1n}))
+  Bool.and(Bool.and(only_second(identities(next)), resolve_second(next, updated_substitutions)), Bool.and(only_second(identities(changed)), resolve_second(changed, updated_substitutions)))
 
 def qualified_slots_result(needs: List<&2, Infer.Coverage>) -> Bool:
   match needs:
@@ -88,7 +89,9 @@ def qualified_slots() -> Bool:
   +answer = {Constraints.EvidenceAnswer{represented, Constraints.RepresentedType{M.U32Ty{}}} : Constraints.EvidenceAnswer}
   +choices = Map.set(&2, Mono.Choice, chosen(), "q1", Mono.QualifiedChoice{[represented], [answer]})
   +needs : List<&2, Infer.Coverage> = [Infer.OperationNeed{1n, M.TypeId{"cache", "operation"}, [M.U32Ty{}], M.UnitTy{}, "old site"}, Infer.QualifiedNeed{1n, represented, "first predicate"}, Infer.QualifiedNeed{1n, other, "second predicate"}]
-  qualified_slots_result(Mono.unresolved(needs, choices))
+  +cached = {Mono.PendingCache{0n, Mono.unresolved(needs, chosen())} : Mono.PendingCache}
+  +selected = specialization(Nil{}, Types.empty(), choices)
+  Bool.and(qualified_slots_result(Mono.unresolved(needs, choices)), qualified_slots_result(Mono.cached_needs(Mono.refresh_after_change(selected, cached, Mono.QualifiedChoiceChanged{1n, represented}))))
 
 def closed_qualified_answer(found: Maybe<&2, Mono.Choice>) -> Bool:
   match found:
@@ -123,7 +126,9 @@ def check() -> Bool:
   +refreshed : List<&2, Infer.Coverage> = Mono.cached_needs(Mono.refresh_pending(expanded, cache))
   +shrunk : Mono.Specialization = specialization([old], Types.empty(), chosen())
   +invalid_count : List<&2, Infer.Coverage> = Mono.cached_needs(Mono.refresh_pending(shrunk, Mono.PendingCache{2n, refreshed}))
-  Bool.and(ordered(identities(refreshed)), Bool.and(only_second(identities(invalid_count)), Bool.and(changed_substitutions(old), Bool.and(qualified_slots(), late_evidence()))))
+  +changed : List<&2, Infer.Coverage> = Mono.cached_needs(Mono.refresh_after_change(expanded, cache, Mono.OrdinaryChoiceChanged{1n}))
+  +changed_invalid : List<&2, Infer.Coverage> = Mono.cached_needs(Mono.refresh_after_change(shrunk, Mono.PendingCache{2n, changed}, Mono.OrdinaryChoiceChanged{1n}))
+  Bool.and(Bool.and(ordered(identities(changed)), only_second(identities(changed_invalid))), Bool.and(ordered(identities(refreshed)), Bool.and(only_second(identities(invalid_count)), Bool.and(changed_substitutions(old), Bool.and(qualified_slots(), late_evidence())))))
 
 def valid() -> Bool:
   check()

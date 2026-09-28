@@ -1,15 +1,16 @@
 # Compile-speed experiments
 
 The [active plan](../PLAN.md) measures small changes before expanding the
-compiler redesign. Installed Bend-source improvements brought the observed
-native gdev cold median from 126.9 to 62.3 seconds, about 51%, across the three
-matched-version experiments below. A fourth batch shortens dependency and
-predicate lookups and skips retained operation prefixes: its fresh cold control
-improves from 41.37 to 39.98 seconds. Host conditions changed between batches;
-the overnight difference from 62.3 seconds is not attributed to this change.
-Generated C and JavaScript remain unchanged. These changes are separate from the
-M3 redesign, whose game speedup remains unproven. The earlier experiments in
-this report use the JavaScript compiler.
+compiler redesign. The latest installed Bend-source change updates pending
+requirements from the selected choice: native gdev cold compilation improves
+from 37.65 to 33.11 seconds and body edits from 37.75 to 33.23 seconds, both
+12%, in three alternating pairs each. Earlier batches improve string and numeric
+traversal, stop completed searches, and skip retained operation prefixes. Host
+conditions changed between batches, so each result uses its own matched control;
+the overnight difference from the earlier 62.3-second result is not attributed
+to source changes. Generated C and JavaScript remain unchanged. These changes
+are separate from the M3 redesign, whose game speedup remains unproven. The
+earlier experiments in this report use the JavaScript compiler.
 
 ## Native regression: traverse string indexes without branch closures
 
@@ -325,6 +326,78 @@ Evidence:
 [integrated proof](../build/gdev-shared-20260928/integrated-proof.log),
 [game behavior](../build/gdev-shared-20260928/guest-checks.log), and
 [installation identities](../build/gdev-shared-20260928/integration.json). The
+`build/` evidence remains local and excluded from Git.
+
+## Shared constants: update pending work from the selected choice
+
+2026-09-28: a detailed trace of the preceding checkpoint identifies five shared
+constants. The first four finish quickly; the fifth spends about 9.9 seconds in
+solving, 5.4 in finalization, and 2.7 in expansion. Accepting its result is
+cheap. The solver previously refreshed its pending cache by looking up every old
+requirement in the choice map after each successful selection.
+
+Each selector changes one ordinary choice or adds one solved predicate at a
+qualified site. The old cache is already unresolved against all other choices.
+The solver now carries that change through selection and removes matching
+requirements by numeric site, comparing predicates only at the affected
+qualified site. Ordinary and qualified namespaces remain separate, including
+when they share a numeric site. Fresh definitions still use the full choice map
+and retain their order before the older pending requirements. Unknown changes or
+shrinking definition counts retain the full-refresh fallback. The existing
+full-refresh implementation remains available as a test oracle.
+
+The control is commit `8213821`, including the prior lookup and merge changes.
+Both sides use matching Bend 2.0.32 compiler, Base, and official JS loader with
+unchanged generated output. The same frozen 25-module game still matches current
+source. Three alternating cold pairs and three alternating body-edit pairs use
+fresh four-worker processes, 100,000 const steps, and `analysis: false`. Loading
+and startup are separate; the benchmark normalizes only its own process tree's
+scheduling, with other desktop work continuing.
+
+| Request / measure              |  Control | Candidate | Reduction |
+| ------------------------------ | -------: | --------: | --------: |
+| Cold compile wall, median      | 37.649 s |  33.112 s |     12.0% |
+| Cold native CPU, median        | 39.160 s |  34.620 s |     11.6% |
+| Body-edit compile wall, median | 37.753 s |  33.229 s |     12.0% |
+| Body-edit native CPU, median   | 39.260 s |  34.760 s |     11.5% |
+
+Every pair improves wall and CPU time. Cold wall samples span 37.58–37.99
+seconds for the control and 33.04–33.33 for the candidate. Edited samples span
+37.61–37.81 versus 32.95–33.37 seconds. Peak native RSS stays around 280 MiB:
+median 279.6 versus 278.8 MiB cold, and 279.8 versus 280.7 MiB edited. This is a
+reduction in repeated lookup work, with no consistent memory reduction.
+
+A separate matched debugger trace reduces the fifth constant's solver interval
+from 9.66 to 5.16 seconds and the shared-constant interval from 20.03 to 15.49
+seconds. Its initial inference remains about 1.76 seconds, finalization about
+5.1 seconds, and expansion about 2.6 seconds. Both complete native responses
+match exactly. These diagnostic timings are excluded from the benchmark medians.
+Initial checking and finalization remain substantial work; dependency order and
+worker scheduling are unchanged.
+
+All twelve Wasm artifacts retain the exact expected cold or edited hash and
+1,161,014-byte size. Game create/frame checks pass for both sides and variants,
+including schema, draw and solid counts, and the expected ambient change. Full
+Bend proof, all 930 compiler tests, and native regressions with one and four
+workers pass. The new tests compare the change-based refresh with the full
+refresh over 200 randomized cases, duplicate requirements, both namespaces,
+maximum Nat48 sites, newly inferred execution needs, and fallback conditions.
+Native regressions also exercise changed substitutions, qualified predicates,
+new-definition ordering, and shrinking counts. Verified source and matching
+native/JS artifacts are installed; the integrated proof passes again.
+
+Evidence:
+[measurement plan](../build/gdev-pending-20260928/measurement-plan.json),
+[samples](../build/gdev-pending-20260928/pairs.json),
+[summary](../build/gdev-pending-20260928/pairs-summary.json),
+[source identities](../build/gdev-pending-20260928/source-identities.json),
+[toolchain](../build/gdev-pending-20260928/toolchain.json),
+[phase comparison](../build/gdev-pending-20260928/diagnostics-summary.json),
+[full suite](../build/gdev-pending-20260928/full-tests.log),
+[native regressions](../build/gdev-pending-20260928/native-regressions.json),
+[integrated proof](../build/gdev-pending-20260928/integrated-proof.log),
+[game checks](../build/gdev-pending-20260928/guest-checks.log), and
+[installation identities](../build/gdev-pending-20260928/integration.json). The
 `build/` evidence remains local and excluded from Git.
 
 ## Current gdev baseline: first working sample

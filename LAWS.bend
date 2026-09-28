@@ -854,6 +854,20 @@ law pending_cache_preserves_requirements:
   for +needs: List<&2, Infer.Coverage>
   {Mono.cached_needs(Mono.PendingCache{count, needs}) == needs : List<&2, Infer.Coverage>}
 
+law empty_pending_change_has_no_requirements:
+  for change: Mono.ChoiceChange
+  {Mono.remaining_after_change(Nil{}, change) == Nil{} : List<&2, Infer.Coverage>}
+
+law different_qualified_site_stays_pending:
+  for predicate: M.Predicate
+  for selected: M.Predicate
+  {Mono.qualified_pending_after_change(False{}, predicate, selected) == True{} : Bool}
+
+law unknown_choice_change_uses_full_refresh:
+  for +selected: Mono.Specialization
+  for +cache: Mono.PendingCache
+  {Mono.refresh_after_change(selected, cache, Mono.UnknownChoiceChange{}) == Mono.refresh_pending(selected, cache) : Mono.PendingCache}
+
 law empty_coverage_preserves_pending_tail:
   for choices: Map<&2, Mono.Choice>
   for +rest: List<&2, Infer.Coverage>

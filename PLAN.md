@@ -8,7 +8,7 @@ semantics remain in [CONSTRAINTS.md](compiler/CONSTRAINTS.md).
 
 ## Next result
 
-Native regression triage now has four measured Bend-source batches: replacing
+Native regression triage now has five measured Bend-source batches: replacing
 string-index branch closures with a direct tail loop reduced matching-version
 gdev cold compilation from 126.9 to 85.4 seconds (three alternating pairs), with
 identical Wasm and a similar body-edit improvement. Retaining owning string
@@ -36,13 +36,24 @@ compiler tests, Bend proofs, native ownership checks, and game behavior checks
 pass, with identical Wasm. The overnight change from the previous batch is not
 attributed to this source change.
 
-The next bounded investigation remains within shared-constant preparation. A
-separate matched trace shortens its interval from 22.27 to 21.05 seconds; almost
-all of it falls after the fifth shared constant begins. Distinguish that
-constant's inference and solver work from preparation following it before
-widening parallelism: each accepted constant changes the module, inferred
+The fifth batch updates pending requirements from the one choice changed by
+selection, avoiding another choice-map lookup for every old requirement. Three
+alternating cold pairs improve the median from 37.65 to 33.11 seconds; three
+edited pairs improve 37.75 to 33.23 seconds, both 12%. Every pair improves wall
+and CPU time. Peak native memory stays around 280 MiB. All 930 compiler tests,
+Bend proofs, native regressions at one and four workers, and game behavior
+checks pass, with identical Wasm. Source and matching artifacts are installed.
+
+A separate matched trace reduces the fifth shared constant's solver interval
+from 9.66 to 5.16 seconds and the shared-constant interval from 20.03 to 15.49
+seconds. Finalization remains about 5.1 seconds and expansion about 2.6 seconds;
+initial module checking is also substantial. Profile those remaining phases
+before widening parallelism. Each accepted constant changes the module, inferred
 shapes, and identity counter needed by later constants. Preserve dependency
-order, exact diagnostics, and deterministic identities.
+order, exact diagnostics, and deterministic identities. The pending-cache
+shortcut relies on each selector changing only one choice and the existing cache
+already excluding all previously solved requirements; fresh definitions continue
+to consult the complete choice map.
 
 The first two Blot-side identity catalog experiments are complete and parked.
 Both pass targeted correctness and game behavior checks, but neither improves
