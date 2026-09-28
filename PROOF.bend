@@ -8,6 +8,8 @@ import ./compiler/native_session.bend as Session
 import ./compiler/wasm.bend as Wasm
 import ./compiler/patterns.bend as Patterns
 import ./compiler/monomorph.bend as Mono
+import ./compiler/dependency.bend as Dependency
+import ./compiler/infer.bend as Infer
 
 def Laws.declaration_tag_preserves_origin_and_operands(offset, function, value):
   {==}
@@ -577,6 +579,15 @@ def Laws.frontier_reuse_excludes_retained_tasks(position, checked):
 def Laws.pending_cache_preserves_requirements(count, needs):
   {==}
 
+def Laws.empty_pending_change_has_no_requirements(change):
+  {==}
+
+def Laws.different_qualified_site_stays_pending(predicate, selected):
+  {==}
+
+def Laws.unknown_choice_change_uses_full_refresh(selected, cache):
+  {==}
+
 def Laws.empty_coverage_preserves_pending_tail(choices, rest):
   {==}
 
@@ -616,6 +627,30 @@ def Laws.state_membership_work_stops_after_hit(rest, identity):
       {==}
     case M.OperationInstance{template, arguments} <> tail:
       {==}
+
+def Laws.dependency_lookup_stops_after_match(rest, name, found):
+  match rest:
+    case Nil{}:
+      {==}
+    case Dependency.Node{node_name, references, lambdas} <> tail:
+      {==}
+
+def Laws.definition_predicates_stop_after_match(rest, name, found):
+  match rest:
+    case Nil{}:
+      {==}
+    case Infer.Definition{definition_name, inference} <> tail:
+      {==}
+
+def Laws.empty_operation_merge_preserves_catalog(operations):
+  match operations:
+    case Nil{}:
+      {==}
+    case head <> tail:
+      {==}
+
+def Laws.zero_distance_index_advance_preserves_suffix(suffix):
+  {==}
 
 def Laws.variable_membership_work_stops_after_hit(rest, variable):
   match rest:

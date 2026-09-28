@@ -34,6 +34,17 @@ def found_value(-V: Data, equal: Bool, value: V) -> Maybe<&2, V>:
     case True{}:
       Some{value}
 
+# Several branches can inspect different bits of the same character. Check
+# the distance first so a zero-distance advance leaves the suffix untouched.
+def advance_suffix(distance: Nat, remaining: String) -> String:
+  match distance remaining:
+    case 0n suffix:
+      suffix
+    case 1n+rest SNil{}:
+      SNil{}
+    case 1n+rest SCon{head, tail}:
+      advance_suffix(rest, tail)
+
 # Select the child as data, then move the key and suffix into one tail call.
 # Branch closures duplicate both strings and allocate continuations per hop.
 # Fuel proves termination of the computed child; the full Nat address range
@@ -48,7 +59,7 @@ def find_loop(-V: Data, fuel: Nat, index: Map<&2, V>, name: String, remaining: S
       found_value(V, M.name_equal(key, name), value)
     case 1n+rest MNode{+position, left, right}:
       +character = Nat.div(position, 33n)
-      +suffix = String.drop(remaining, Nat.sub(character, cursor))
+      +suffix = advance_suffix(Nat.sub(character, cursor), remaining)
       next = Bool.pick(Map<&2, V>, string_bit(suffix, 0n, Nat.mod(position, 33n)), right, left)
       find_loop(V, rest, next, name, suffix, character)
 

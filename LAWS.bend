@@ -854,6 +854,20 @@ law pending_cache_preserves_requirements:
   for +needs: List<&2, Infer.Coverage>
   {Mono.cached_needs(Mono.PendingCache{count, needs}) == needs : List<&2, Infer.Coverage>}
 
+law empty_pending_change_has_no_requirements:
+  for change: Mono.ChoiceChange
+  {Mono.remaining_after_change(Nil{}, change) == Nil{} : List<&2, Infer.Coverage>}
+
+law different_qualified_site_stays_pending:
+  for predicate: M.Predicate
+  for selected: M.Predicate
+  {Mono.qualified_pending_after_change(False{}, predicate, selected) == True{} : Bool}
+
+law unknown_choice_change_uses_full_refresh:
+  for +selected: Mono.Specialization
+  for +cache: Mono.PendingCache
+  {Mono.refresh_after_change(selected, cache, Mono.UnknownChoiceChange{}) == Mono.refresh_pending(selected, cache) : Mono.PendingCache}
+
 law empty_coverage_preserves_pending_tail:
   for choices: Map<&2, Mono.Choice>
   for +rest: List<&2, Infer.Coverage>
@@ -901,6 +915,26 @@ law state_membership_work_stops_after_hit:
   for rest: List<&2, M.Operation>
   for identity: M.TypeId
   {StateSpecialize.contains_work(rest, identity, True{}) == True{} : Bool}
+
+law dependency_lookup_stops_after_match:
+  for rest: List<&2, Dependency.Node>
+  for name: String
+  for +found: List<&2, String>
+  {Dependency.lookup_work(rest, name, True{}, found) == found : List<&2, String>}
+
+law definition_predicates_stop_after_match:
+  for rest: List<&2, Infer.Definition>
+  for name: String
+  for +found: List<&2, M.Predicate>
+  {Globals.definition_predicates_work(rest, name, True{}, found) == found : List<&2, M.Predicate>}
+
+law empty_operation_merge_preserves_catalog:
+  for +operations: List<&2, M.Operation>
+  {StateSpecialize.merge(Nil{}, operations) == operations : List<&2, M.Operation>}
+
+law zero_distance_index_advance_preserves_suffix:
+  for +suffix: String
+  {Index.advance_suffix(0n, suffix) == suffix : String}
 
 law variable_membership_work_stops_after_hit:
   for rest: List<&2, Nat>
