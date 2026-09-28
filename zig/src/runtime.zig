@@ -241,25 +241,31 @@ pub const Context = struct {
         }
     }
     pub fn nextClosure(self: *Context, fn_value: Value, args: []const Value) Step {
-        assert(kind(fn_value) == .closure);
-        const h = ptr(*const Header, fn_value);
-        const captures = objectFields(fn_value);
-        const arity = generated.arities[h.identity];
-        assert(captures.len <= arity);
-        const needed = arity - captures.len;
-        var values: [64]Value = undefined;
-        const consumed = @min(needed, args.len);
-        assert(captures.len + consumed <= values.len);
-        @memcpy(values[0..captures.len], captures);
-        @memcpy(values[captures.len..][0..consumed], args[0..consumed]);
-        const complete = values[0 .. captures.len + consumed];
-        if (args.len < needed) return .{ .value = self.closure(h.identity, complete) };
-        if (args.len == needed) return self.next(h.identity, complete);
-        // Uncurried call syntax also applies curried lambda chains.
-        // Keep the remainder independent of trampoline scratch arguments.
-        const remainder = self.allocator().dupe(Value, args[consumed..]) catch @panic("out of memory");
-        const intermediate = self.call(h.identity, complete);
-        return .{ .value = self.invoke(intermediate, remainder) };
+        var current = fn_value;
+        var remaining = args;
+        while (true) {
+            assert(kind(current) == .closure);
+            const h = ptr(*const Header, current);
+            const captures = objectFields(current);
+            const arity = generated.arities[h.identity];
+            assert(captures.len <= arity);
+            const needed = arity - captures.len;
+            var values: [64]Value = undefined;
+            const consumed = @min(needed, remaining.len);
+            assert(captures.len + consumed <= values.len);
+            @memcpy(values[0..captures.len], captures);
+            @memcpy(values[captures.len..][0..consumed], remaining[0..consumed]);
+            const complete = values[0 .. captures.len + consumed];
+            if (remaining.len < needed) return .{ .value = self.closure(h.identity, complete) };
+            if (remaining.len == needed) return self.next(h.identity, complete);
+            // Uncurried syntax can apply several curried stages. Evaluate only
+            // intermediate stages here; the final stage must return to the
+            // caller's trampoline, including in unoptimized Debug builds.
+            // Nested calls overwrite pending, so snapshot the unapplied suffix.
+            const remainder = self.allocator().dupe(Value, remaining[consumed..]) catch @panic("out of memory");
+            current = self.call(h.identity, complete);
+            remaining = remainder;
+        }
     }
     pub fn invoke(self: *Context, fn_value: Value, args: []const Value) Value {
         const step = self.nextClosure(fn_value, args);

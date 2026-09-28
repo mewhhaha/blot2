@@ -12,6 +12,10 @@ BASE_CTORS = {'Nil':0,'Cons':2,'SNil':0,'SCon':2,'Chr':1,'Unit':0,
               'True':0,'False':0,'Some':1,'None':0,'Done':1,'Fail':1,
               'LT':0,'EQ':0,'GT':0,'Pair':2,'MTip':0,'MLeaf':2,'MNode':3,
               'U32':1,'F32':1}
+# A 946-node dispatcher used a 50 KiB frame in Debug. Split well before
+# that point so ordinary nested expressions do not exhaust the main stack.
+MATCH_OUTLINE_NODES = 128
+
 BASE_TYPES = set('Nat U32 F32 Char String Bool Cmp Unit Data Type List Maybe Result Map Set Array IO'.split())
 # Keep the primitive surface explicit: an unknown function must stop generation.
 PRIMITIVES = set('''Array.get Array.new Array.set Bool.and Bool.not Bool.or Bool.pick Bool.xor
@@ -249,7 +253,7 @@ class Generator:
             # not the sum of every arm in a large semantic dispatcher. This
             # also prevents giant LLVM optimization units. The dispatcher
             # returns through the trampoline before the arm starts executing.
-            outline=target is None and sum(1 for _ in walk(n)) >= 1000
+            outline=target is None and sum(1 for _ in walk(n)) >= MATCH_OUTLINE_NODES
             for pats,body in n.value:
                 if len(pats)==1 and pats[0].kind=='id' and pats[0].value=='_': pats=pats*len(values)
                 if len(pats)!=len(values):raise ParseError(f'{self.current}:{n.line}: match arity {len(pats)} != {len(values)}')

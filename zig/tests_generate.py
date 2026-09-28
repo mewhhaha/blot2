@@ -43,6 +43,23 @@ class GenerationTests(unittest.TestCase):
         self.assertNotIn('IO.read', PRIMITIVES)
         self.assertNotIn('IO.write', PRIMITIVES)
 
+    def test_medium_recursive_dispatchers_are_outlined_before_debug_frames_grow(self):
+        # This dispatcher was just below the former 1,000-node cutoff. Its
+        # 50 KiB Debug frame overflowed on an ordinary 96-term expression.
+        generator = Generator(Path(__file__).resolve().parent.parent)
+        function = generator.functions['monomorph.expand']
+        generator.mod = generator.mods[function.module]
+        generator.current = 'monomorph.expand'
+        generator.emit(function.body, {p: f'arg_{p}' for p in function.params}, None, None)
+        self.assertGreater(generator.arms, 0)
+        # The dispatcher hands off to the selected arm before evaluating it.
+        self.assertNotIn('ctx.call(', '\n'.join(generator.lines))
+        self.assertIn('return ctx.next(', '\n'.join(generator.lines))
+
+    def test_differential_config_uses_the_same_package_registry(self):
+        root = Path(__file__).resolve().parent.parent
+        self.assertEqual((root / '.npmrc').read_text(), (root / 'zig/.npmrc').read_text())
+
     def test_generated_semantics_are_native_and_have_bounded_arity(self):
         import json
         directory = Path(__file__).resolve().parent / 'src/generated'

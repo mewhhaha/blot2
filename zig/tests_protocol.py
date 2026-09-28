@@ -3,6 +3,7 @@
 from pathlib import Path
 import os
 import random
+import resource
 import shlex
 import struct
 import subprocess
@@ -80,9 +81,16 @@ def answer_module():
 
 
 class ProtocolTests(unittest.TestCase):
-    def run_compiler(self, payload=b'', *args):
+    def run_compiler(self, payload=b'', *args, stack_bytes=None):
+        def limit_stack():
+            # Zig's startup may raise a soft limit to the ELF stack reservation.
+            # Constrain both limits, and only in this disposable child process.
+            resource.setrlimit(resource.RLIMIT_STACK, (stack_bytes, stack_bytes))
+            resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+
         return subprocess.run([*RUNNER, str(BINARY), *args], input=payload,
-                              capture_output=True, timeout=30 if RUNNER else 10)
+                              capture_output=True, timeout=30 if RUNNER else 10,
+                              preexec_fn=limit_stack if stack_bytes is not None else None)
 
     def test_clean_eof_and_handshake(self):
         result = self.run_compiler()
@@ -178,6 +186,21 @@ class ProtocolTests(unittest.TestCase):
         # A mutation can remain valid; recovery must always return valid analysis.
         for response in output[2::2]:
             self.assertEqual(response, (MAGIC, VERSION, 1, 0, 0, 10000, 0))
+
+    def test_curried_dictionary_tail_calls_use_bounded_native_stack(self):
+        # Each distinct text creates a dictionary entry and a curried bind.
+        # Irrelevant CST children leave the semantic program empty, isolating
+        # the decoder from type-checker recursion. The second request checks
+        # that trampoline scratch has not corrupted the next frame.
+        root = node('program', children=[
+            node('ignored', text=str(i)) for i in range(1024)
+        ])
+        result = self.run_compiler(request(0, root) + request(0),
+                                   '--threads', '1', stack_bytes=1024 * 1024)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, b'')
+        expected = (MAGIC, VERSION, 1, 0, 0, 10000, 0)
+        self.assertEqual(packets(result.stdout), [(MAGIC, VERSION), expected, expected])
 
     def test_retained_session_accepts_multiple_complete_requests(self):
         result = self.run_compiler(request(2) + request(3) * 3,
