@@ -1,3 +1,5 @@
+const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
+
 const scalarTypes = ["Unit", "U32", "Bool", "F32"] as const;
 export type ScalarType = typeof scalarTypes[number];
 export type ScalarValue<T extends ScalarType = ScalarType> = T extends "Unit"
@@ -365,10 +367,22 @@ function arrayToWasm(
   // Allocation may grow memory, so acquire a fresh view only afterwards.
   const view = new DataView(arena.memory.buffer);
   view.setUint32(pointer, values.length, true);
-  for (let index = 0; index < values.length; index++) {
-    const offset = pointer + 4 + index * 4;
-    if (type === "Array U32") view.setUint32(offset, values[index], true);
-    else view.setFloat32(offset, values[index], true);
+  if (littleEndian) {
+    // Byte copies avoid boxing every element and preserve F32 payload bits.
+    // Use the view's range, not its entire possibly shared backing buffer.
+    new Uint8Array(arena.memory.buffer, pointer + 4, values.byteLength).set(
+      new Uint8Array(values.buffer, values.byteOffset, values.byteLength),
+    );
+  } else {
+    // Wasm memory is little-endian; typed-array storage is host-endian.
+    const input = new DataView(
+      values.buffer,
+      values.byteOffset,
+      values.byteLength,
+    );
+    for (let index = 0; index < values.length; index++) {
+      view.setUint32(pointer + 4 + index * 4, input.getUint32(index * 4), true);
+    }
   }
   return pointer;
 }
@@ -386,11 +400,20 @@ function arrayFromWasm(
   const values = type === "Array U32"
     ? new Uint32Array(length)
     : new Float32Array(length);
-  for (let index = 0; index < length; index++) {
-    const offset = pointer + 4 + index * 4;
-    values[index] = type === "Array U32"
-      ? view.getUint32(offset, true)
-      : view.getFloat32(offset, true);
+  if (littleEndian) {
+    // Still copy out: the arena is reset/reused after the invocation, and a
+    // host callback must never receive a mutable alias into guest storage.
+    new Uint8Array(values.buffer).set(
+      new Uint8Array(arena.memory.buffer, pointer + 4, values.byteLength),
+    );
+  } else {
+    const output = new DataView(values.buffer);
+    for (let index = 0; index < length; index++) {
+      output.setUint32(
+        index * 4,
+        view.getUint32(pointer + 4 + index * 4, true),
+      );
+    }
   }
   return values;
 }

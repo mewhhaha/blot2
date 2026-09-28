@@ -1,3 +1,4 @@
+import { parserSource } from "./parser_source.ts";
 import {
   type CompactFrontendProgram,
   CpuFrontend,
@@ -36,33 +37,6 @@ export interface ParseRange {
   readonly end?: number;
   readonly tokenStart?: number;
   readonly tokenEnd?: number;
-}
-
-// Preserve the original source for CST text and diagnostics. Baba's compact
-// parser applies a signed-I32 policy to INTEGER tokens, unlike Blot's U32s.
-function parserSource(prepared: PreparedSource, range: ParseRange = {}) {
-  const start = range.start ?? 0;
-  const neutral = prepared.source.slice(start, range.end).split("");
-  // Keep source width and offsets unchanged. The parser sees a distinct marker
-  // only at an annotation's `where {`; CST text still comes from real source.
-  for (const position of prepared.clauseMarkers) {
-    if (
-      position >= start && position + 5 <= (range.end ?? prepared.source.length)
-    ) {
-      neutral[position - start + 4] = "E";
-    }
-  }
-  for (
-    let index = range.tokenStart ?? 0;
-    index < (range.tokenEnd ?? prepared.tokens.length);
-    index++
-  ) {
-    const token = prepared.tokens[index];
-    if (token.type === "named" && token.kind === "INTEGER") {
-      neutral.fill("0", token.span.start - start, token.span.end - start);
-    }
-  }
-  return neutral.join("");
 }
 
 function annotationWhere(

@@ -41,6 +41,39 @@ async function exercise(bytes: Uint8Array<ArrayBuffer>) {
       ok(output instanceof Uint32Array || output instanceof Float32Array);
       ok(output.buffer !== input.buffer);
     }
+    // Views may cover only a middle range of a larger backing buffer.
+    for (
+      const [name, input] of [
+        [
+          "integers",
+          new Uint32Array([123, 0, 0x12345678, 0xffffffff, 456]).subarray(1, 4),
+        ],
+        [
+          "floats",
+          new Float32Array([123, -0, Infinity, 1.25, 456]).subarray(1, 4),
+        ],
+      ] as const
+    ) {
+      const output = guest.call(name, input);
+      equal(output, input);
+      ok(output instanceof Uint32Array || output instanceof Float32Array);
+      equal(output.length, 3);
+      ok(output.buffer !== input.buffer);
+      input[0] = 99;
+      ok(!Object.is(output[0], 99));
+    }
+    // No numeric conversion should quiet a signaling NaN or lose payload bits
+    // during an otherwise identity round trip through the array ABI.
+    const bits = new Uint32Array([
+      0x7f800001,
+      0x7fc12345,
+      0xffc12345,
+      0x80000000,
+      0x3f800001,
+    ]);
+    const bitResult = guest.call("floats", new Float32Array(bits.buffer));
+    ok(bitResult instanceof Float32Array);
+    equal(new Uint32Array(bitResult.buffer), bits);
     const output = guest.call("change", floats);
     equal(floats[0], 0);
     ok(output instanceof Float32Array);

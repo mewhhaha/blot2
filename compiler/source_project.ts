@@ -1,3 +1,4 @@
+import { Fifo } from "./fifo.ts";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { bendArray, bendList } from "./bend_list.ts";
@@ -96,7 +97,7 @@ async function loadProject(
   const modules = new Map<string, SourceModule>();
   const visiting: string[] = [];
   const reads = new Map<string, Promise<PromiseSettledResult<string>>>();
-  const waiting: (() => void)[] = [];
+  const waiting = new Fifo<() => void>();
   let activeReads = 0;
   function prefetch(url: URL): Promise<PromiseSettledResult<string>> {
     const existing = reads.get(url.href);

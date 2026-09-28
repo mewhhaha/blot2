@@ -658,12 +658,15 @@ def runtime_array_max_count() -> U32:
 def runtime_memory_max_pages() -> Nat:
   65536n
 
-# Values occupy full words, so memory.fill cannot implement generic fills.
-# Validate the count before multiplication and skip the store loop for empties.
+# Seed at most 32 words, then double the initialized prefix with memory.copy.
+# memory.fill repeats bytes, not words; copying the seed preserves every U32,
+# F32 and reference bit pattern. Each copy is bounded by the remaining count.
+# Tiny fills retain a short store loop without the bulk-copy setup cost.
 def array_fill_code(+first: Nat) -> Code:
   +value = {1n+first : Nat}
   +pointer = {2n+first : Nat}
   +index = {3n+first : Nat}
+  +chunk = {4n+first : Nat}
   Code{[
     Bytes{join([
       local_get(first), i32_constant(runtime_array_max_count()), [75, 4, 64, 0, 11],
@@ -674,11 +677,20 @@ def array_fill_code(+first: Nat) -> Code:
       34 <> unsigned_leb(pointer), local_get(first), [54, 2, 0],
       [65, 0], 33 <> unsigned_leb(index), [2, 64, 3, 64],
       local_get(index), local_get(first), [79, 13, 1],
+      local_get(index), [65, 32, 79, 13, 1],
       local_get(pointer), local_get(index), [65, 4, 108, 106], local_get(value), [54, 2, 4],
       local_get(index), [65, 1, 106], 33 <> unsigned_leb(index), [12, 0, 11, 11],
-      local_get(pointer)
+      [2, 64, 3, 64],
+      local_get(index), local_get(first), [79, 13, 1],
+      local_get(first), local_get(index), [107], 33 <> unsigned_leb(chunk),
+      local_get(chunk), local_get(index), [75, 4, 64],
+      local_get(index), 33 <> unsigned_leb(chunk), [11],
+      local_get(pointer), [65, 4, 106], local_get(index), [65, 4, 108, 106],
+      local_get(pointer), [65, 4, 106], local_get(chunk), [65, 4, 108, 252, 10, 0, 0],
+      local_get(index), local_get(chunk), [106], 33 <> unsigned_leb(index),
+      [12, 0, 11, 11], local_get(pointer)
     ])}
-  ], 4n+first}
+  ], 5n+first}
 
 # The destination is allocated once. Callback allocations share the arena but
 # cannot change existing addresses or the immutable values they return.
@@ -942,7 +954,7 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
         case ExpressionWork{I.ArrayFillExpr{count, value}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
-            operands : Code <- emit_expr(rest, ScrutineesWork{[count, value], first, Nil{}, 0n}, reserve(context, 4n))
+            operands : Code <- emit_expr(rest, ScrutineesWork{[count, value], first, Nil{}, 0n}, reserve(context, 5n))
             return append_code(operands, array_fill_code(first), Nil{}, Nil{})
         case ExpressionWork{I.ArrayGetExpr{array, index}}:
           +first = context_next(context)
