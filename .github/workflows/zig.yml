@@ -136,6 +136,11 @@ jobs:
           path: generated/compiler/*.js
           retention-days: 7
           if-no-files-found: error
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2
+        with:
+          deno-version: v2.5.2
+      - name: Type-check the native APIs and differential adapter
+        run: deno check compiler/cli.ts compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts
 
   compatibility:
     needs: [native, reference]
@@ -173,10 +178,6 @@ jobs:
         with:
           name: zig-reference-modules
           path: generated/compiler
-      - name: Type-check the native APIs and differential adapter
-        if: matrix.shard == 0
-        run: |
-          deno check --cached-only compiler/cli.ts compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts
       - name: Select a disjoint shard of the complete retained suite
         run: |
           tests=(compiler/*.test.ts)
