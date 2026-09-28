@@ -27,7 +27,11 @@ deno task blot:zig build examples/syntax.blot build/syntax.wasm
 (cd zig && zig build -Doptimize=ReleaseSafe)
 ```
 
-Release builds strip debug information by default; `-Dstrip=false` retains it.
+Builds target baseline CPU instructions by default, so an artifact is not tied
+to the CPU of the build machine. `-Dcpu=native` explicitly opts into host-only
+instructions for a local build. Release builds strip debug information by default;
+`-Dstrip=false` retains it.
+
 The executable itself (`zig/zig-out/bin/blotc-zig`) is the framed compiler
 service, not a source-file CLI. Use the Deno command above, or explicitly select
 it in any of the native stateless, incremental, or project factories:
@@ -86,6 +90,14 @@ excludes only generated code and build outputs. Its ownership contract
 identifies arena allocators; three local directives explain temporary
 arena-owned buffers.
 
+Both Debug and ReleaseSafe run the complete compatibility gates below, split
+into four disjoint test-file shards per mode. The native APIs and test adapter
+are also type-checked. The optimized binary also runs protocol regressions under
+a baseline QEMU x86-64 CPU. This
+covers valid analysis, deterministic Wasm emission, retained sessions, diagnostic
+recovery, malformed frames and thread limits without relying on the build host's
+CPU extensions.
+
 Compatibility is checked separately from those runtime tests:
 
 - Standalone tests run all three native APIs **before** JavaScript reference
@@ -116,9 +128,10 @@ zig-analyzer check --no-cache .
 To replay the complete suites locally, first build the unmodified JS reference,
 then select the Zig executable at `generated/compiler/blotc`. This path is an
 ignored development output, not a source change. CI shows the exact commands and
-uploads test logs alongside the compiler artifacts.
+uploads test logs alongside the compiler artifacts. All logged test pipelines
+propagate failures; a successful `tee` cannot turn a failing suite green.
 
 The port retains generic tagged values and source-derived semantic algorithms.
 Replacing them with specialized Zig data structures, replacing the source
 frontend, and claiming speed improvements over Bend are separate optimization
-work; they are not prerequisites disguised as completed parts of this port.
+work. This port does not claim a measured speedup over the original backend.
