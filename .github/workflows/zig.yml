@@ -151,7 +151,7 @@ jobs:
       matrix:
         mode: [Debug, ReleaseSafe]
     env:
-      DENO_DIR: ${{ runner.temp }}/deno-cache
+      DENO_DIR: /tmp/blot-zig-deno-cache
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
