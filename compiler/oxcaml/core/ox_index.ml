@@ -1,4 +1,7 @@
-(* Native semantic port of compiler/index.bend.
+(* Native index operations, initially ported from compiler/index.bend.
+
+   Bit tests and direct default lookups are hand-maintained, allocation-checked
+   native paths. The option-returning helpers remain semantic test oracles.
 
    Source SHA-256: 5646363ee5335784c1e7849a80c14ee677e324f2165f3de172361872c872fda8
 
@@ -10,16 +13,12 @@ open Base
 
 module M = Ox_model
 
-let rec (* index.bend:5 *)
-f_character_bit : Base.char32 -> int -> bool =
-fun v_character v_offset ->
-(match (v_character, v_offset) with
-| ((Chr (v_value)), 0) ->
-true
-| ((Chr (v_value)), __nat_1) when __nat_1 >= 1 ->
-(let v_bit = (__nat_1 - 1) in
-(Base.u32_is_ne ((Base.u32_and ((Base.u32_shrn (v_value) ((Base.nat_sub (31) (v_bit))))) (0x00000001l))) (0x00000000l))))
-and (* index.bend:12 *)
+(* Positions are scalar bits, not byte offsets. Nat's saturating subtraction
+   means offsets above 32 retain the low-bit behavior of the reference. *)
+let[@zero_alloc strict] rec f_character_bit : Base.char32 -> int -> bool =
+fun (Chr value) offset ->
+  offset = 0 || ((Int32.to_int value lsr max 0 (32 - offset)) land 1 <> 0)
+and[@zero_alloc strict] (* index.bend:12 *)
 f_string_bit : Base.text -> int -> int -> bool =
 fun v_name v_character v_offset ->
 (match (v_name, v_character) with
@@ -80,7 +79,17 @@ fun v_found v_otherwise ->
 v_otherwise
 | (Some (v_value)) ->
 v_value)
-and (* index.bend:68 *)
-f_get : 'v. ('v) Base.map -> Base.text -> 'v -> 'v =
-fun v_index v_name v_otherwise ->
-(f_fallback ((f_find (v_index) (v_name))) (v_otherwise))
+and[@zero_alloc strict] (* Native lookup returning a default directly, without a transient Some.
+       Preserve the original traversal budget and first matching leaf. *)
+f_get_loop : 'v. int -> 'v Base.map -> Base.text -> Base.text -> int -> 'v -> 'v =
+fun fuel index name remaining cursor otherwise ->
+  if fuel = 0 then otherwise else match index with
+  | MTip -> otherwise
+  | MLeaf(key,value) -> if M.f_name_equal key name then value else otherwise
+  | MNode(position,left,right) ->
+    let character = Base.nat_div position 33 in
+    let suffix = Base.string_drop remaining (Base.nat_sub character cursor) in
+    let next = if f_string_bit suffix 0 (Base.nat_mod position 33) then right else left in
+    f_get_loop (fuel-1) next name suffix character otherwise
+and[@zero_alloc strict] f_get : 'v. 'v Base.map -> Base.text -> 'v -> 'v =
+fun index name otherwise -> f_get_loop (M.f_max_nat ()) index name name 0 otherwise

@@ -8,15 +8,15 @@ PARALLEL := $(shell test "$(OCAML_MAJOR)" -ge 5 && echo domains || echo serial)
 OCAMLDEP ?= $(if $(filter 4,$(OCAML_MAJOR)),ocamldep,$(OCAMLOPT) -depend)
 MODULES := $(shell cat core/modules.txt 2>/dev/null)
 NATIVE := native_runtime native_parallel base $(MODULES) driver
-TESTS := test_bytes test_runtime test_names test_parallel $(if $(filter domains,$(PARALLEL)),test_domains)
-SOURCES := $(addprefix $(BUILD)/,$(addsuffix .ml,$(NATIVE) wasm_bytes $(TESTS) bench_names))
+TESTS := test_bytes test_runtime test_names test_builders test_scalars test_packet test_parallel $(if $(filter domains,$(PARALLEL)),test_domains test_parallel_stress)
+SOURCES := $(addprefix $(BUILD)/,$(addsuffix .ml,$(NATIVE) wasm_bytes $(TESTS) bench_names bench_parallel))
 OBJECTS := $(addprefix $(BUILD)/,$(addsuffix .cmx,$(NATIVE)))
 CONFIG := $(BUILD)/.configuration
 COMPILE_FLAGS := $(OCAMLFLAGS) -I +threads $(if $(filter 4,$(OCAML_MAJOR)),,-I +unix)
 
 .DEFAULT_GOAL := all
 .DELETE_ON_ERROR:
-.PHONY: all install bootstrap test test-build bench-names clean FORCE
+.PHONY: all install bootstrap test test-build bench-names bench-parallel clean FORCE
 all: $(BUILD)/blotc
 
 # Explicit opt-in replacement at the existing native host path. The ordinary
@@ -85,6 +85,24 @@ $(BUILD)/test_runtime: $(addprefix $(BUILD)/,base.cmx ox_model.cmx ox_numeric_li
 $(BUILD)/test_names: $(addprefix $(BUILD)/,base.cmx ox_model.cmx test_names.cmx)
 	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -o test_names $(notdir $^)
 
+$(BUILD)/test_builders: $(addprefix $(BUILD)/,base.cmx ox_model.cmx ox_index.cmx test_builders.cmx)
+	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -o test_builders $(notdir $^)
+
+$(BUILD)/test_scalars: $(addprefix $(BUILD)/,base.cmx test_scalars.cmx)
+	cd $(BUILD) && $(OCAMLOPT) $(OCAMLFLAGS) -o test_scalars $(notdir $^)
+
+$(BUILD)/test_packet: $(filter-out $(BUILD)/driver.cmx,$(OBJECTS)) $(BUILD)/runtime_stubs.o $(BUILD)/test_packet.cmx
+	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o test_packet unix.cmxa threads.cmxa $(notdir $^)
+
+$(BUILD)/test_parallel_stress: $(BUILD)/native_parallel.cmx $(BUILD)/test_parallel_stress.cmx
+	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o test_parallel_stress unix.cmxa threads.cmxa $(notdir $^)
+
+$(BUILD)/bench_parallel: $(BUILD)/native_parallel.cmx $(BUILD)/bench_parallel.cmx
+	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o bench_parallel unix.cmxa threads.cmxa $(notdir $^)
+
+bench-parallel: $(BUILD)/bench_parallel
+	$(BUILD)/bench_parallel 4 12 256 false
+
 $(BUILD)/bench_names: $(addprefix $(BUILD)/,base.cmx ox_model.cmx bench_names.cmx)
 	cd $(BUILD) && $(OCAMLOPT) $(COMPILE_FLAGS) -o bench_names unix.cmxa $(notdir $^)
 
@@ -101,8 +119,11 @@ test: all $(addprefix $(BUILD)/,$(TESTS))
 	$(BUILD)/test_bytes
 	$(BUILD)/test_runtime
 	$(BUILD)/test_names
+	$(BUILD)/test_builders
+	$(BUILD)/test_scalars
+	$(BUILD)/test_packet
 	$(BUILD)/test_parallel $(PARALLEL)
-	$(if $(filter domains,$(PARALLEL)),$(BUILD)/test_domains,true)
+	$(if $(filter domains,$(PARALLEL)),$(BUILD)/test_domains && $(BUILD)/test_parallel_stress,true)
 	python3 test_transport.py $(BUILD)/blotc
 
 test-build:

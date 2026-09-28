@@ -1,0 +1,61 @@
+name: OxCaml checked native memory migration
+on:
+  push:
+    branches: [rebuild/oxcaml-memory-staging]
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  materialize:
+    if: github.ref == 'refs/heads/rebuild/oxcaml-memory-staging'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Materialize only the reviewed native word representation
+        run: |
+          test "$(git rev-parse HEAD)" = '${{ github.sha }}'
+          mkdir -p native-migration-results
+          python3 compiler/oxcaml/bootstrap/materialize_words.py | tee native-migration-results/migration.txt
+      - run: sudo apt-get update && sudo apt-get install -y opam autoconf build-essential
+      - uses: actions/cache@v4
+        with:
+          path: ~/.opam
+          key: oxcaml-5.2.0-ox-${{ runner.os }}-${{ runner.arch }}-v1
+      - name: Select actual OxCaml
+        run: |
+          git config --global maintenance.auto false
+          git config --global gc.auto 0
+          opam init --bare --disable-sandboxing -y
+          if ! opam switch list --short | grep -Fxq 5.2.0+ox; then
+            opam switch create 5.2.0+ox --repos ox=git+https://github.com/oxcaml/opam-repository.git,default -y
+          fi
+          opam exec --switch 5.2.0+ox -- ocamlopt -config | tee native-migration-results/compiler.txt
+      - name: Native semantic, scalar, allocation, concurrency and build checks
+        run: opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml test test-build | tee native-migration-results/native-tests.txt
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Standalone source and Wasm without the reference compiler
+        run: |
+          test ! -f generated/compiler/compiler.js
+          deno run --allow-all compiler/oxcaml/smoke.ts | tee native-migration-results/smoke.txt
+          deno task blot:oxcaml build examples/arrays.blot build/arrays.wasm
+      - name: Commit tested native source on the temporary branch only
+        run: |
+          git add compiler/oxcaml/core compiler/oxcaml/ox_native_transport.ml compiler/oxcaml/test_names.ml compiler/oxcaml/test_runtime.ml compiler/oxcaml/bench_names.ml compiler/oxcaml/test_build.py compiler/oxcaml/test_existing.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Materialize hash-verified typed immediate words in the native compiler'
+          git push origin HEAD:rebuild/oxcaml-memory-staging
+          git rev-parse HEAD > native-migration-results/commit.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oxcaml-native-migration-results
+          path: native-migration-results/
+          retention-days: 7

@@ -14,34 +14,59 @@ let f_receive () () =
     if count > max_words then failwith "native protocol: frame exceeds 16777216 words";
     let bytes = Bytes.create (count * 4) in
     read_exact bytes 0 (Bytes.length bytes);
-    let rec capacity n = if n >= count then n else capacity (n*2) in
-    let words = Array.make (capacity 1) 0l in
-    for i = 0 to count - 1 do words.(i) <- Bytes.get_int32_le bytes (i*4) done;
-    Some (Ox_native_io.Frame(words, Int32.of_int count))
-let f_send word_count header blocks () =
+    Some (Ox_native_io.Frame(bytes, Int32.of_int count))
+(* Validate the complete packet before publishing its prefix. Output is then
+   streamed through a bounded scratch buffer instead of a response-sized copy.
+   Packet lists are immutable; the buffer belongs solely to this call. *)
+let write_packet write word_count header blocks =
   let count = u32_to_nat word_count in
   if count > max_words then failwith "native response exceeds 16M words";
   let total = count * 4 in
-  let output = Bytes.make (4 + total) '\000' in
-  Bytes.set_int32_le output 0 word_count;
-  let position = ref 4 in
-  let add_word word size =
-    if size < 0 || size > 4 || !position + size > Bytes.length output then
+  let position = ref 0 in
+  let advance size =
+    if size < 0 || size > 4 || !position + size > total then
       failwith "native response length mismatch";
-    for i = 0 to size - 1 do
-      Bytes.set output (!position+i) (Char.chr (Int32.to_int (Int32.logand (Int32.shift_right_logical word (i*8)) 255l)))
-    done;
     position := !position + size
   in
-  List.iter (fun w -> add_word w 4) header;
-  List.iter (fun (Ox_native_output.Block(length,words)) ->
+  List.iter (fun _ -> advance 4) header;
+  List.iter (fun (Ox_native_output.Block(length, words)) ->
     let remaining = ref length in
-    List.iter (fun w ->
+    List.iter (fun _ ->
       if !remaining <= 0 then failwith "native block has excess words";
-      let size = min 4 !remaining in add_word w size; remaining := !remaining - size
-    ) words;
-    if !remaining <> 0 then failwith "native block is truncated"
-  ) blocks;
-  if Bytes.length output - !position > 3 then failwith "native response has excess padding";
-  output_bytes stdout output;
+      let size = min 4 !remaining in
+      advance size;
+      remaining := !remaining - size) words;
+    if !remaining <> 0 then failwith "native block is truncated") blocks;
+  let padding = total - !position in
+  if padding > 3 then failwith "native response has excess padding";
+  let buffer = Bytes.create (min 65536 (4 + total)) in
+  let used = ref 0 in
+  let flush () = if !used > 0 then (write buffer 0 !used; used := 0) in
+  let byte value =
+    if !used = Bytes.length buffer then flush ();
+    Bytes.set buffer !used value;
+    incr used
+  in
+  let word value size =
+    if size = 4 then begin
+      if !used + 4 > Bytes.length buffer then flush ();
+      Bytes.set_int32_le buffer !used value;
+      used := !used + 4
+    end else
+      for offset = 0 to size - 1 do
+        byte (Char.chr ((Int32.to_int value lsr (offset * 8)) land 255))
+      done
+  in
+  word word_count 4;
+  List.iter (fun value -> word value 4) header;
+  List.iter (fun (Ox_native_output.Block(length, words)) ->
+    let remaining = ref length in
+    List.iter (fun value ->
+      let size = min 4 !remaining in
+      word value size;
+      remaining := !remaining - size) words) blocks;
+  for _ = 1 to padding do byte '\000' done;
+  flush ()
+let f_send word_count header blocks () =
+  write_packet (output stdout) word_count header blocks;
   flush stdout

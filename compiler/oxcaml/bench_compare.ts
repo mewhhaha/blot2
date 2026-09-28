@@ -30,10 +30,41 @@ if (
   new Set(threads).size !== threads.length
 ) {
   throw new Error(
-    "Usage: bench_compare.ts <baseline> <candidate> <report.json> [samples:1..100] [threads:1..64,...] [workload-substring]",
+    "Usage: bench_compare.ts <baseline> <candidate> <report.json> [samples:1..100] [threads:1..64,...] [workload-substring|example:ecs]",
   );
 }
-const workloads = benchmarkWorkloads.filter((w) => w.name.includes(filter));
+interface Workload {
+  name: string;
+  source: string;
+  changed: string;
+  expected: number;
+  changedExpected?: number;
+  prelude?: "none" | "default";
+  ecs?: boolean;
+}
+let workloads: Workload[];
+if (filter === "example:ecs") {
+  const ecs = await Deno.readTextFile(
+    new URL("../../examples/ecs.blot", import.meta.url),
+  );
+  const initializer = "Time { seconds: 0.5 }";
+  if (ecs.split(initializer).length !== 2) {
+    throw new Error("Expected one ECS time initializer");
+  }
+  const adapter =
+    "\nentry const entry_0 = fn (ignored: U32) -> F32 => run 100\n";
+  workloads = [{
+    name: "example_ecs",
+    source: ecs + adapter,
+    changed: ecs.replace(initializer, "Time { seconds: 1.0 }") + adapter,
+    expected: 633,
+    changedExpected: 1233,
+    prelude: "default",
+    ecs: true,
+  }];
+} else {
+  workloads = benchmarkWorkloads.filter((w) => w.name.includes(filter));
+}
 if (!workloads.length) {
   throw new Error(`No workloads match ${JSON.stringify(filter)}`);
 }
@@ -58,11 +89,21 @@ const distribution = (values: number[]) => {
     samples_ms: values,
   };
 };
-async function execute(artifact: AnalyzedArtifact, expected: number) {
+async function execute(
+  artifact: AnalyzedArtifact,
+  expected: number,
+  workload: Workload,
+) {
   const module = await WebAssembly.compile(artifact.bytes);
   equal(WebAssembly.Module.imports(module), []);
   const instance = await WebAssembly.instantiate(module);
   equal((instance.exports.entry_0 as (x: number) => number)(0), expected);
+  if (workload.ecs) {
+    equal((instance.exports.run as (ticks: number) => number)(100), expected);
+    equal((instance.exports.run as (ticks: number) => number)(0), 33);
+    equal((instance.exports.ghost_count as (ticks: number) => number)(1), 4);
+    equal((instance.exports.snapshot as () => number)(), (expected - 33) / 100);
+  }
 }
 const phases = [
   "startup",
@@ -80,6 +121,9 @@ const report = {
   workload_definitions_sha256: await hash(
     await Deno.readFile(new URL("../benchmark_workloads.ts", import.meta.url)),
   ),
+  prelude_sha256: await hash(
+    await Deno.readFile(new URL("../../std/prelude.blot", import.meta.url)),
+  ),
   measured_at: new Date().toISOString(),
   runtime: Deno.version,
   system: {
@@ -93,7 +137,7 @@ const report = {
   samples,
   warmups,
   timing:
-    "Sequential alternating baseline/candidate pairs. Source-to-Wasm includes the common frontend and transport. Startup is separate; fresh_process_compile is the first request in a new compiler process, not a cold OS page cache or fresh Deno runtime. Other phases use persistent processes. Parsing, verification, and Wasm execution outside each timed operation are excluded. native_roundtrip replays a pre-encoded request and includes native decoding/compilation/encoding plus pipe transport, but excludes frontend parsing and host response decoding. Synthetic compiler workloads, not an application benchmark.",
+    "Sequential alternating baseline/candidate pairs. Source-to-Wasm includes the common frontend and transport. Startup is separate; fresh_process_compile is the first request in a new compiler process, not a cold OS page cache or fresh Deno runtime. Other phases use persistent processes. Parsing, verification, and Wasm execution outside each timed operation are excluded. native_roundtrip replays a pre-encoded request and includes native decoding/compilation/encoding plus pipe transport, but excludes frontend parsing and host response decoding. Synthetic compiler workloads by default. example:ecs measures the repository headless ECS example with its default prelude and an equal-width time-initializer edit; it is not the graphical application or gdev.",
   rows,
 };
 await Deno.mkdir(dirname(output), { recursive: true });
@@ -101,12 +145,14 @@ for (const workload of workloads) {
   for (const workers of threads) {
     const options = (i: number) => ({
       executable: paths[i],
-      prelude: "none" as const,
+      prelude: workload.prelude ?? "none",
       threads: workers,
     });
     const natives: Awaited<ReturnType<typeof createNativeCompiler>>[] = [];
     const transports: NativeProcess[] = [];
-    const frontend = await createSourceFrontend({ prelude: "none" });
+    const frontend = await createSourceFrontend({
+      prelude: workload.prelude ?? "none",
+    });
     const payload = (await frontend.prepareNative(workload.source)).encode(
       "compile",
       10_000n,
@@ -128,8 +174,12 @@ for (const workload of workloads) {
       }
       const original = await natives[0].compile(workload.source);
       const changed = await natives[0].compile(workload.changed);
-      await execute(original, workload.expected);
-      await execute(changed, workload.expected + 1);
+      await execute(original, workload.expected, workload);
+      await execute(
+        changed,
+        workload.changedExpected ?? workload.expected + 1,
+        workload,
+      );
       equal(await natives[1].compile(workload.source), original);
       equal(await natives[1].compile(workload.changed), changed);
       let editStats: unknown;
@@ -225,6 +275,7 @@ for (const workload of workloads) {
       }));
       const row = {
         workload: workload.name,
+        prelude: workload.prelude ?? "none",
         threads: workers,
         source_sha256: await sourceHash(workload.source),
         changed_source_sha256: await sourceHash(workload.changed),

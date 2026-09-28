@@ -2,9 +2,15 @@
    Strings contain Unicode scalar values, not UTF-8 bytes. F32 values retain
    their IEEE-754 bits, including signed zero. Maps retain Bend's Patricia
    layout because compiler/index.bend deliberately reads it directly. *)
-(* Keep the exact 32-bit scalar representation, but not a second heap box
-   around it. The constructor remains type-safe at every existing call site. *)
-type char32 = Chr of int32 [@@unboxed]
+(* Internal words remain distinct from Nat48 but occupy one immediate value.
+   Every constructor below and every translated literal preserves [0,2^32-1].
+   This backend requires a 64-bit process, as its Nat48 representation already did. *)
+type word32 = W32 of int [@@unboxed]
+type char32 = Chr of word32 [@@unboxed]
+let () = if Sys.int_size <> 63 then failwith "Blot requires 63-bit native ints"
+let[@zero_alloc strict] word_of_int value = W32 (value land 0xffff_ffff)
+let word_of_int32 value = W32 (Int32.to_int value land 0xffff_ffff)
+let word_to_int32 (W32 value) = Int32.of_int value
 type text = SNil | SCon of char32 * text
 type cmp = LT | EQ | GT
 type ('e, 'a) result_ = Fail of 'e | Done of 'a
@@ -13,27 +19,27 @@ type set = unit map
 type 'a io = unit -> 'a
 
 let cmp n = if n < 0 then LT else if n > 0 then GT else EQ
-let unsigned x = Int64.logand (Int64.of_int32 x) 0xffff_ffffL
-let u32_to_nat x = Int64.to_int (unsigned x)
-let u32_from_nat = Int32.of_int
-let u32_add = Int32.add
-let u32_sub = Int32.sub
-let u32_mul = Int32.mul
-let u32_and = Int32.logand
-let u32_or = Int32.logor
-let u32_cmp a b = cmp (Int64.compare (unsigned a) (unsigned b))
-let u32_is_eq = Int32.equal
-let u32_is_ne a b = a <> b
-let u32_is_lt a b = unsigned a < unsigned b
-let u32_is_le a b = unsigned a <= unsigned b
-let u32_is_gt a b = unsigned a > unsigned b
-let u32_is_ge a b = unsigned a >= unsigned b
-let u32_div a b = if b = 0l then 0l else Int64.to_int32 (Int64.div (unsigned a) (unsigned b))
-let u32_mod a b = if b = 0l then a else Int64.to_int32 (Int64.rem (unsigned a) (unsigned b))
+let unsigned (W32 x) = Int64.of_int x
+let[@zero_alloc strict] u32_to_nat (W32 x) = x
+let[@zero_alloc strict] u32_from_nat x = word_of_int x
+let[@zero_alloc strict] u32_add (W32 a) (W32 b) = word_of_int (a + b)
+let[@zero_alloc strict] u32_sub (W32 a) (W32 b) = word_of_int (a - b)
+let[@zero_alloc strict] u32_mul (W32 a) (W32 b) = word_of_int (a * b)
+let[@zero_alloc strict] u32_and (W32 a) (W32 b) = W32 (a land b)
+let[@zero_alloc strict] u32_or (W32 a) (W32 b) = W32 (a lor b)
+let[@zero_alloc strict] u32_cmp (W32 a) (W32 b) = cmp (Int.compare a b)
+let[@zero_alloc strict] u32_is_eq (W32 a) (W32 b) = a = b
+let u32_is_ne (W32 a) (W32 b) = a <> b
+let[@zero_alloc strict] u32_is_lt (W32 a) (W32 b) = a < b
+let[@zero_alloc strict] u32_is_le (W32 a) (W32 b) = a <= b
+let[@zero_alloc strict] u32_is_gt (W32 a) (W32 b) = a > b
+let[@zero_alloc strict] u32_is_ge (W32 a) (W32 b) = a >= b
+let[@zero_alloc strict] u32_div (W32 a) (W32 b) = W32 (if b = 0 then 0 else a / b)
+let[@zero_alloc strict] u32_mod (W32 a) (W32 b) = W32 (if b = 0 then a else a mod b)
 let u32_max a b = if u32_is_ge a b then a else b
-let u32_shrn x n = if n >= 32 then 0l else Int32.shift_right_logical x n
-let u32_shln x n = if n >= 32 then 0l else Int32.shift_left x n
-let u32_shr x = Int32.shift_right_logical x 1
+let[@zero_alloc strict] u32_shrn (W32 x) n = if n >= 32 then W32 0 else W32 (x lsr n)
+let[@zero_alloc strict] u32_shln (W32 x) n = if n >= 32 then W32 0 else word_of_int (x lsl n)
+let[@zero_alloc strict] u32_shr (W32 x) = W32 (x lsr 1)
 
 (* The reference native protocol uses 48-bit natural numbers. *)
 let nat_mask = 0xffff_ffff_ffff
@@ -71,7 +77,7 @@ let text_of_utf8 s =
     c land 0x3f
   in
   let rec scan i acc =
-    if i = n then List.fold_left (fun t c -> SCon (Chr (Int32.of_int c), t)) SNil acc
+    if i = n then List.fold_left (fun t c -> SCon (Chr (W32 c), t)) SNil acc
     else
       let a = get i in
       let code, size, minimum =
@@ -107,9 +113,18 @@ let text_to_utf8 text =
 let string_reverse text =
   let rec loop acc = function SNil -> acc | SCon (c,t) -> loop (SCon(c,acc)) t in
   loop SNil text
-let string_append left right =
+(* TMC constructs only the output spine. OCaml 4.13 ignores this attribute,
+   so keep its explicitly stack-safe reverse/append portability path. *)
+let supports_tmc =
+  let major, minor = Scanf.sscanf Sys.ocaml_version "%d.%d" (fun a b -> a,b) in
+  major > 4 || (major = 4 && minor >= 14)
+let[@tail_mod_cons] rec string_append_tmc left right =
+  match left with SNil -> right | SCon(c,t) -> SCon(c,string_append_tmc t right)
+let string_append_portable left right =
   let rec loop acc = function SNil -> acc | SCon(c,t) -> loop (SCon(c,acc)) t in
   loop right (string_reverse left)
+let string_append = if supports_tmc then string_append_tmc else string_append_portable
+
 let string_length text =
   let rec loop n = function SNil -> n | SCon(_,t) -> loop (n+1) t in loop 0 text
 let rec string_drop text n =
@@ -118,7 +133,7 @@ let rec string_compare a b =
   if a == b then 0 else match a,b with
   | SNil,SNil -> 0 | SNil,_ -> -1 | _,SNil -> 1
   | SCon(Chr a,at),SCon(Chr b,bt) ->
-    let order = Int64.compare (unsigned a) (unsigned b) in
+    let order = Int.compare (u32_to_nat a) (u32_to_nat b) in
     if order = 0 then string_compare at bt else order
 (* Equality needs neither unsigned ordering nor an ownership-carrying result.
    Shared immutable tails can stop immediately. The strict OxCaml check keeps
@@ -126,7 +141,7 @@ let rec string_compare a b =
 let[@zero_alloc strict] rec string_eq left right =
   left == right || match left, right with
   | SCon (Chr a, at), SCon (Chr b, bt) ->
-    Int32.equal a b && string_eq at bt
+    u32_is_eq a b && string_eq at bt
   | _ -> false
 let string_is_lt a b = string_compare a b < 0
 let string_is_le a b = string_compare a b <= 0
@@ -140,28 +155,33 @@ let string_split text delimiter =
     | SCon(c,t) -> loop t (SCon(c,current)) parts
   in loop text SNil []
 let string_join parts delimiter =
-  match parts with [] -> SNil | first::rest ->
-    List.fold_left (fun acc part -> string_append (string_append acc delimiter) part) first rest
+  (* Copy every nonfinal part once, rather than repeatedly copying the growing
+     prefix. Keep raw scalar text, including non-Unicode values used internally. *)
+  match List.rev parts with
+  | [] -> SNil
+  | last :: rest -> List.fold_left
+      (fun acc part -> string_append part (string_append delimiter acc)) last rest
+
 let nat_show n = text_of_utf8 (string_of_int n)
 let u32_show n = text_of_utf8 (Int64.to_string (unsigned n))
 let nat_read text =
   let rec loop n = function
     | SNil -> Some n
-    | SCon(Chr c,t) when c >= 48l && c <= 57l ->
-      let d = Int32.to_int c - 48 in
+    | SCon(Chr c,t) when u32_to_nat c >= 48 && u32_to_nat c <= 57 ->
+      let d = u32_to_nat c - 48 in
       if n > (nat_mask-d)/10 then None else loop (n*10+d) t
     | _ -> None
   in match text with SNil -> None | _ -> loop 0 text
 
-let float = Int32.float_of_bits
-let bits = Int32.bits_of_float
+let float word = Int32.float_of_bits (word_to_int32 word)
+let bits value = word_of_int32 (Int32.bits_of_float value)
 let f32_bits x = x
 let f32_add a b = bits (float a +. float b)
 let f32_sub a b = bits (float a -. float b)
 let f32_mul a b = bits (float a *. float b)
 let f32_div a b = bits (float a /. float b)
-let f32_neg a = Int32.logxor a Int32.min_int
-let f32_abs a = Int32.logand a Int32.max_int
+let[@zero_alloc strict] f32_neg (W32 a) = W32 (a lxor 0x8000_0000)
+let[@zero_alloc strict] f32_abs (W32 a) = W32 (a land 0x7fff_ffff)
 let f32_sqrt a = bits (sqrt (float a))
 let f32_floor a = bits (floor (float a))
 let f32_ceil a = bits (ceil (float a))
@@ -174,17 +194,20 @@ let f32_is_gt a b = float a > float b
 let f32_is_ge a b = float a >= float b
 let f32_to_u32 a =
   let a = float a in
-  if Float.is_nan a || a <= 0. then 0l
-  else if a >= 4294967296. then Int32.minus_one
-  else Int64.to_int32 (Int64.of_float a)
-let u32_to_f32 a = bits (Int64.to_float (unsigned a))
+  if Float.is_nan a || a <= 0. then W32 0
+  else if a >= 4294967296. then W32 0xffff_ffff
+  else W32 (int_of_float a)
+let u32_to_f32 (W32 a) = bits (float_of_int a)
 let f32_read text = Option.map bits (float_of_string_opt (text_to_utf8 text))
 
 let list_length = List.length
 let list_is_empty = function [] -> true | _ -> false
 let list_reverse = List.rev
 let list_reverse_go = List.rev_append
-let list_append xs ys = List.rev_append (List.rev xs) ys
+let[@tail_mod_cons] rec list_append_tmc xs ys =
+  match xs with [] -> ys | x::rest -> x :: list_append_tmc rest ys
+let list_append_portable xs ys = List.rev_append (List.rev xs) ys
+let list_append = if supports_tmc then list_append_tmc else list_append_portable
 let rec list_drop xs n = if n = 0 then xs else match xs with [] -> [] | _::t -> list_drop t (n-1)
 let list_take xs n =
   let rec loop xs n acc = match xs with
@@ -205,13 +228,17 @@ let key_bit key pos =
   match string_drop key (pos / 33) with
   | SNil -> false
   | SCon(Chr c,_) -> let offset = pos mod 33 in
-    offset = 0 || Int32.logand (Int32.shift_right_logical c (32-offset)) 1l <> 0l
+    offset = 0 || (u32_to_nat c lsr (32-offset)) land 1 <> 0
 let rec map_find m key = match m with
   | MTip -> None
   | MLeaf(k,v) -> if string_eq k key then Some v else None
   | MNode(pos,lo,hi) -> map_find (if key_bit key pos then hi else lo) key
 let map_new () = MTip
-let map_get default m key = m, Option.value (map_find m key) ~default
+let rec map_find_or default map key = match map with
+  | MTip -> default
+  | MLeaf(k,value) -> if string_eq k key then value else default
+  | MNode(pos,left,right) -> map_find_or default (if key_bit key pos then right else left) key
+let map_get default m key = m, map_find_or default m key
 let map_set m key value =
   let leaf = MLeaf(key,value) in
   let rec seek = function
@@ -233,9 +260,9 @@ let map_set m key value =
       | SCon (Chr a, at), SCon (Chr b, bt) ->
         if a = b then differing (offset + 33) at bt
         else
-          let xor = Int32.logxor a b in
+          let xor = u32_to_nat a lxor u32_to_nat b in
           let rec leading bit =
-            if Int32.logand xor (Int32.shift_left 1l (31-bit)) <> 0l
+            if xor land (1 lsl (31-bit)) <> 0
             then bit else leading (bit+1)
           in offset + 1 + leading 0
       | SNil, SNil -> assert false (* Equal keys were handled above. *)
@@ -254,13 +281,23 @@ let map_bindings m =
     | MLeaf(k,v)::rest -> loop rest ((k,v)::acc)
     | MNode(_,lo,hi)::rest -> loop (lo::hi::rest) acc
   in loop [m] []
-let map_values m = List.map snd (map_bindings m)
-let map_union left right = List.fold_left (fun acc (k,v) -> map_set acc k v) left (map_bindings right)
+(* Ordered traversal without materializing (key,value) tuples and two extra
+   lists. Persistent inputs stay immutable and right-biased union is unchanged. *)
+let map_fold f initial tree =
+  let rec visit tree pending acc = match tree with
+    | MTip -> next pending acc
+    | MLeaf(key,value) -> next pending (f acc key value)
+    | MNode(_,left,right) -> visit left (right::pending) acc
+  and next pending acc = match pending with
+    | [] -> acc | tree::rest -> visit tree rest acc
+  in visit tree [] initial
+let map_values m = List.rev (map_fold (fun values _ value -> value::values) [] m)
+let map_union left right = map_fold (fun acc key value -> map_set acc key value) left right
 let set_new () = MTip
 let set_add set key = map_set set key ()
 let set_from_list keys = List.fold_left set_add MTip keys
-let set_to_list set = List.map fst (map_bindings set)
-let set_size set = List.length (map_bindings set)
+let set_to_list set = List.rev (map_fold (fun keys key _ -> key::keys) [] set)
+let set_size set = map_fold (fun count _ _ -> count+1) 0 set
 
 (* Arrays here belong solely to the linear request decoder. No compiler value
    or published incremental cache contains one of these mutable buffers. *)

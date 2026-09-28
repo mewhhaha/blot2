@@ -9,4 +9,4 @@
 open Base
 
 type t_Frame =
-  | Frame of (int32) array * int32
+  | Frame of bytes * int32
