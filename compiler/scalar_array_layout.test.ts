@@ -29,6 +29,15 @@ entry const references = fn (limit: U32) => do:
     if @u32.eq turn limit:
       return [turn, @array.get (@array.get previous 0) 0, @array.get original 0]
     state := (@u32.add turn 1, @array.fill 16 (@array.fill 16 (@u32.add turn 1)))
+entry const captured = fn (limit: U32) => do:
+  let original = @array.fill 16 7
+  let state = (0, @array.fill 16 (fn () => @array.get original 0))
+  for ever:
+    let (turn, callbacks) = state
+    if @u32.eq turn limit:
+      return [turn, (@array.get callbacks 15) (), @array.get original 0]
+    let cells = @array.fill 16 (@u32.add turn 1)
+    state := (@u32.add turn 1, @array.fill 16 (fn () => @array.get cells 15))
 `;
 
 for (const backend of ["javascript", "native"] as const) {
@@ -60,7 +69,7 @@ for (const backend of ["javascript", "native"] as const) {
       const loops = await compiler.compile(loopSource);
       const guest = await instantiateGuest(loops.bytes);
       try {
-        for (const name of ["run", "references"]) {
+        for (const name of ["run", "references", "captured"]) {
           equal(guest.call(name, 10000), new Uint32Array([10000, 10000, 7]));
           ok(
             guest.memoryBytes() <= 256 * 1024,
