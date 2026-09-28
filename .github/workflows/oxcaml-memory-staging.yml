@@ -4,6 +4,9 @@ on:
     branches: [rebuild/oxcaml-memory-staging]
 permissions:
   contents: read
+concurrency:
+  group: oxcaml-memory-staging
+  cancel-in-progress: true
 defaults:
   run:
     shell: bash
@@ -11,32 +14,54 @@ jobs:
   materialize:
     if: github.ref == 'refs/heads/rebuild/oxcaml-memory-staging'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
+      - name: Stop only the superseded staging run if still active
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          url = 'https://api.github.com/repos/mewhhaha/blot2/actions/runs/36466142748'
+          headers = {'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json'}
+          with urllib.request.urlopen(urllib.request.Request(url, headers=headers)) as response:
+              status = json.load(response)['status']
+          if status != 'completed':
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url + '/cancel', headers=headers, method='POST')):
+                      print('Cancelled the superseded staging run')
+              except urllib.error.HTTPError as error:
+                  if error.code != 409:
+                      raise
+          PY
       - name: Materialize only the reviewed native word representation
         run: |
           test "$(git rev-parse HEAD)" = '${{ github.sha }}'
           mkdir -p native-migration-results
           python3 compiler/oxcaml/bootstrap/materialize_words.py | tee native-migration-results/migration.txt
-      - run: sudo apt-get update && sudo apt-get install -y opam autoconf build-essential
-      - uses: actions/cache@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: ~/.opam
-          key: oxcaml-5.2.0-ox-${{ runner.os }}-${{ runner.arch }}-v1
-      - name: Select actual OxCaml
+          name: oxcaml-development-snapshot
+          run-id: 36457320047
+          github-token: ${{ github.token }}
+          path: pinned-snapshot
+      - name: Select the pinned actual OxCaml used for the local experiments
         run: |
-          git config --global maintenance.auto false
-          git config --global gc.auto 0
-          opam init --bare --disable-sandboxing -y
-          if ! opam switch list --short | grep -Fxq 5.2.0+ox; then
-            opam switch create 5.2.0+ox --repos ox=git+https://github.com/oxcaml/opam-repository.git,default -y
-          fi
-          opam exec --switch 5.2.0+ox -- ocamlopt -config | tee native-migration-results/compiler.txt
+          test "$(cat pinned-snapshot/source.sha)" = '29bc94d0320d1ca35c47ee7b3695e587a01a8daf'
+          mkdir -p pinned-toolchain
+          tar -C pinned-toolchain -xzf pinned-snapshot/toolchain.tar.gz
+          chmod +x pinned-toolchain/bin/ocamlopt
+          echo "$PWD/pinned-toolchain/bin" >> "$GITHUB_PATH"
+          echo "OCAMLLIB=$PWD/pinned-toolchain/lib/ocaml" >> "$GITHUB_ENV"
+          sha256sum pinned-snapshot/toolchain.tar.gz > native-migration-results/toolchain-sha256.txt
       - name: Native semantic, scalar, allocation, concurrency and build checks
-        run: opam exec --switch 5.2.0+ox -- make -C compiler/oxcaml test test-build | tee native-migration-results/native-tests.txt
+        run: |
+          ocamlopt -config | tee native-migration-results/compiler.txt
+          make -C compiler/oxcaml test test-build | tee native-migration-results/native-tests.txt
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
