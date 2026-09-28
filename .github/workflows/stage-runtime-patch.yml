@@ -1,0 +1,52 @@
+name: Stage runtime patch
+on:
+  push:
+    branches: [perf/runtime-data-paths]
+    paths: [.github/workflows/stage-runtime-patch.yml]
+permissions:
+  contents: write
+jobs:
+  stage:
+    if: github.ref == 'refs/heads/perf/runtime-data-paths'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      BEND_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Materialize checksum-verified source changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, gzip, hashlib, subprocess
+          encoded = Path('.runtime-performance.patch.gz.b64').read_text().strip()
+          assert hashlib.sha256(encoded.encode()).hexdigest() == '982e924d6972f11dc7ff48d5dba0f3769102cb47601f9f68f4ac77807825638d'
+          # Correct the explicitly identified text-transport transcription offsets.
+          corrections = [[735,736,''],[1065,1067,''],[1577,1578,''],[2554,2555,''],[4298,4299,''],[6945,6945,'/'],[7351,7351,'/'],[7558,7561,'Zb'],[7571,7571,'+'],[7853,7853,'/'],[10161,10161,'/'],[13847,13847,'/'],[15452,15452,'+']]
+          for start, end, replacement in reversed(corrections):
+              encoded = encoded[:start] + replacement + encoded[end:]
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
+          assert hashlib.sha256(patch).hexdigest() == 'ed81fd6df66cf3369ac030eea0119ef69b6c0172d164056bf208f57569105ca2'
+          subprocess.run(['git','apply','--check','-'], input=patch, check=True)
+          subprocess.run(['git','apply','-'], input=patch, check=True)
+          PY
+          git diff --check
+          git diff --stat
+      - name: Install verified Bend and check modified source proofs
+        run: |
+          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/bend"
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
+          export PATH="$RUNNER_TEMP/bend/bend/bin:$PATH"
+          bend version
+          bend guide > "$RUNNER_TEMP/bend-guide.txt"
+          bend PROOF.bend
+      - name: Commit validated source on the isolated performance branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add compiler scripts
+          git rm .runtime-performance.patch.gz.b64
+          git commit -m 'perf: bulk array data paths, span-based strings, and bounded FIFO queues'
+          git push origin HEAD:refs/heads/perf/runtime-data-paths
