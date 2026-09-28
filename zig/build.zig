@@ -11,6 +11,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .link_libc = true,
+        .strip = b.option(bool, "strip", "Strip release debug information") orelse (optimize != .Debug),
     });
     const executable = b.addExecutable(.{ .name = "blotc-zig", .root_module = module });
     executable.step.dependOn(&generate.step);

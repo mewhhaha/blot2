@@ -1,11 +1,11 @@
+import { includesAnalysis } from "./options.ts";
 import { bendArray, bendList } from "./bend_list.ts";
-import {
-  type AnalyzedArtifact,
-  type AnalyzedArtifactOptions,
-  type Artifact,
-  type ArtifactOptions,
-  type CompileOptions,
-  includesAnalysis,
+import type {
+  AnalyzedArtifact,
+  AnalyzedArtifactOptions,
+  Artifact,
+  ArtifactOptions,
+  CompileOptions,
 } from "./host.ts";
 import { sameDeclaration } from "./native_incremental.ts";
 import type { NativeCompilerOptions } from "./native.ts";

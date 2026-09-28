@@ -1,72 +1,124 @@
-# Zig compiler rebuild
+# Zig compiler
 
-The existing Bend compiler and Deno APIs remain the reference and default until
-compatibility tests establish parity. No language features are intentionally
-removed, and the Zig executable never falls back to Bend or JavaScript.
+A native Zig backend for Blot's existing source language, guest ABI and
+version-13 compiler protocol. It does not invoke Bend, embed Bend's runtime, or
+fall back to JavaScript. The existing Deno/Baba source frontend is retained, not
+reimplemented. The original backend remains available; selecting Zig does not
+replace it.
 
-## Build
+## Build and use
 
-The initial supported development target is x86-64 Linux. Install Zig **0.16.0**
-and Python **3.10+**, then run from the repository root:
+The supported development target is **x86-64 Linux**, with **Zig 0.16.0** and
+**Python 3.10+**. Source-file commands additionally need the repository's
+Deno/Baba frontend dependencies. Bend and the generated JavaScript reference are
+not needed for these commands.
+
+From the repository root:
+
+```sh
+(cd zig && zig build)
+deno task blot:zig check examples/syntax.blot
+deno task blot:zig build examples/syntax.blot build/syntax.wasm
+```
+
+`zig build` is the quick, checked Debug build. For optimized compiler execution:
+
+```sh
+(cd zig && zig build -Doptimize=ReleaseSafe)
+```
+
+Release builds strip debug information by default; `-Dstrip=false` retains it.
+The executable itself (`zig/zig-out/bin/blotc-zig`) is the framed compiler
+service, not a source-file CLI. Use the Deno command above, or explicitly select
+it in any of the native stateless, incremental, or project factories:
+
+```ts
+import { createNativeCompiler } from "./compiler/native.ts";
+
+const compiler = await createNativeCompiler({
+  executable: "zig/zig-out/bin/blotc-zig",
+  threads: 4,
+});
+try {
+  const { bytes } = await compiler.compile("entry const answer = fn () => 42");
+  const { instance } = await WebAssembly.instantiate(bytes);
+  console.log((instance.exports.answer as () => number)()); // 42
+} finally {
+  await compiler.dispose();
+}
+```
+
+## Implementation
+
+This is a **mechanical semantic port with a native runtime**, rather than a
+hand-rewritten implementation of every compiler stage. `tools/port.py` reads the
+retained pure algorithms and `tools/generate.py` emits ordinary Zig functions.
+Generation rejects unsupported syntax, unknown primitives, and excessive arity.
+The generated manifest records source hashes, function counts, outlined match
+arms, parallel tasks and the maximum call arity. Generated files are build
+outputs, not manually edited source.
+
+The native layer implements unsigned and binary32 values, Unicode strings,
+persistent Patricia maps, lists and sorting, closures and curried application, a
+tail-call trampoline, binary framing and retained session state. Large match
+arms are outlined into separate native functions so a recursive call does not
+reserve stack space for every alternative in its dispatcher.
+
+`--threads 1..64` controls a persistent bounded worker pool. The existing
+explicit parallel batches become tasks; results retain source order. A joining
+thread helps execute queued work to avoid nested fork/join starvation. Tasks
+have independent trampoline scratch and share a thread-safe request arena. All
+tasks are joined before the arena can be destroyed. Worker stacks reserve 64 MiB
+of virtual address space, committed on demand.
+
+Only the live session graph is copied into the next arena, preserving sharing.
+There is no mid-request garbage collection. Requests are bounded to 16,777,216
+wire words. Allocation sizes and framing arithmetic are checked before use.
+Linux scheduling restoration is best effort; `--inherit-priority` preserves the
+launcher's policy on the main thread and its workers.
+
+## Validation
+
+The `Zig compiler` workflow builds Debug and ReleaseSafe, runs native tests and
+protocol/generator regressions, checks deterministic generation, and runs pinned
+**zig-analyzer 0.16.0-4** on handwritten Zig. The analyzer configuration
+excludes only generated code and build outputs. Its ownership contract
+identifies arena allocators; three local directives explain temporary
+arena-owned buffers.
+
+Compatibility is checked separately from those runtime tests:
+
+- Standalone tests run all three native APIs **before** JavaScript reference
+  modules exist, including failed revisions, imports and process recycling.
+- The complete existing compiler suite runs with the Zig executable at the
+  native process boundary, including Wasm execution, host capabilities,
+  incremental/project caches, framing, diagnostics and scheduling.
+- A second run redirects source-compiler calls through `source_adapter.ts`. Each
+  operation compares Zig with the unchanged JavaScript reference, checks exact
+  outputs or diagnostics, and returns Zig's artifact to the original test. Guest
+  tests therefore execute Zig-produced Wasm. Calls exercise 1, 2, 4 and 8
+  compilation threads.
+
+The JavaScript reference is generated by the matched Bend 2.0.32 loader without
+patches. Its source proof check is a separate CI gate. The differential adapter
+is test-only; it is never a fallback in the native compiler.
+
+Local runtime checks:
 
 ```sh
 cd zig
-zig build
 zig build test
 python3 tests_protocol.py -v
-./zig-out/bin/blotc-zig --version
+python3 tests_generate.py -v
+zig-analyzer check --no-cache .
 ```
 
-Use `zig build -Doptimize=ReleaseSafe` for an optimized build with safety checks.
-The binary serves the existing framed native protocol, version 13, on stdin and
-stdout. It is not a source-file CLI. The existing native Deno factories accept
-`{ executable: "zig/zig-out/bin/blotc-zig" }` as an explicit backend selection.
-Their existing frontend dependencies must be installed separately.
+To replay the complete suites locally, first build the unmodified JS reference,
+then select the Zig executable at `generated/compiler/blotc`. This path is an
+ignored development output, not a source change. CI shows the exact commands and
+uploads test logs alongside the compiler artifacts.
 
-## What is implemented
-
-The first pass is a **mechanical semantic port**, not yet an idiomatic rewrite
-of each compiler stage. `tools/port.py` parses the retained pure algorithms and
-`tools/generate.py` emits ordinary Zig functions. The build invokes Python, not
-Bend. The executable contains native Zig code, not a Bend interpreter, embedded
-Bend runtime, generated C, or generated JavaScript.
-
-At this revision generation covers 70 source modules, 3,425 native functions
-(including 165 closure bodies), and 96 explicit primitives. Generated code and
-source hashes are available in CI artifacts under `src/generated/`. Keeping the
-algorithms traceable makes differential failures easier to isolate before
-changing the compiler's data structures or scheduling.
-
-The handwritten native layer includes unsigned and binary32 values, Unicode
-strings, persistent Patricia maps, lists and sorting, closures and curried
-application, a tail-call trampoline, framed binary IO, and retained session
-state. Each request owns an arena; only the live session graph is copied into
-the next arena, preserving graph sharing. There is no mid-request collection.
-
-## Checked so far
-
-Five Zig tests cover values, persistent maps, retained sharing, strict decimal
-parsing, byte-block output and malformed-request diagnostics. Five process-level
-tests cover handshake, multiple invalid requests on one stream, truncated and
-oversized frames, and command-line validation. CI builds and runs these in Debug
-and ReleaseSafe and checks deterministic source generation.
-
-These tests are **not full language parity**. Source-level differential tests,
-valid and invalid programs, Wasm execution, guest ABI and incremental-session
-regressions are the next gate. A translated function count is not test coverage.
-
-## Remaining migration gates
-
-- Preserve accepted and rejected source programs, imports and source prelude.
-- Verify type/effect inference, const evaluation, nominal and associated types.
-- Verify closures, tags, tuples, records, arrays, loops and effect providers.
-- Verify emitted Wasm, entry roots, host capabilities and `blot:abi` metadata.
-- Verify stateless, incremental and project APIs, cache reuse and rollback.
-- Implement actual parallel scheduling. `--threads 1..64` is currently accepted
-  for protocol-client compatibility, but this first port executes serially.
-- Measure stack depth, request peak memory, build time and compilation speed.
-- Replace transitional generated structures only behind compatibility tests.
-
-Do not switch the default compiler or mark this migration complete until the
-compatibility gates pass. The source parser remains the existing Deno/Baba
-frontend; replacing it is a separate stage, not a hidden change in this port.
+The port retains generic tagged values and source-derived semantic algorithms.
+Replacing them with specialized Zig data structures, replacing the source
+frontend, and claiming speed improvements over Bend are separate optimization
+work; they are not prerequisites disguised as completed parts of this port.

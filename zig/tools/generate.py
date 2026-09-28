@@ -72,7 +72,7 @@ class Generator:
         self.functions={f'{m.name}.{f.name}':f for m in self.mods.values() for f in m.functions}
         self.types={f'{m.name}.{t}' for m in self.mods.values() for t in m.types}
         self.ctors={f'{m.name}.{c}':len(fields) for m in self.mods.values() for c,fields in m.ctors.items()}|BASE_CTORS
-        self.ids={};self.todo=[];self.output=[];self.lambdas=0;self.primitives=set()
+        self.ids={};self.todo=[];self.output=[];self.lambdas=0;self.forks=0;self.arms=0;self.primitives=set()
         self.temp=0;self.indent=0;self.lines=[];self.current='';self.mod=None
         self.primitive_arities={};self.primitive_wrappers={}
         for mod in self.mods.values():
@@ -223,8 +223,19 @@ class Generator:
                     self.bind(p,value,env)
                     if i==len(n.children)-1:raise ParseError('final binding has no expression')
                 elif s.kind=='parallel_bind':
-                    count=s.value;vals=[self.value(rhs,env) for rhs in s.children[count:]]
-                    for p,v in zip(s.children[:count],vals):self.bind(p,v,env)
+                    count=s.value
+                    # All RHSs capture the same pre-binding scope. Only pure
+                    # semantic batches use parallel bindings in the retained
+                    # compiler; request decoding and Array mutation are serial.
+                    thunks=[]
+                    for rhs in s.children[count:]:
+                        captures=sorted(free(rhs) & env.keys())
+                        self.forks+=1;name=f'{self.mod.name}.$fork{self.forks}'
+                        self.functions[name]=Function(self.mod.name,name.split('.',1)[1],captures,rhs,rhs.line)
+                        thunks.append(self.save(f'ctx.closure({self.request(name)}, &.{{{", ".join(env[c] for c in captures)}}})'))
+                    result=self.tmp('parallel')
+                    self.line(f'const {result} = ctx.parallel({count}, .{{{", ".join(thunks)}}});')
+                    for index,p in enumerate(s.children[:count]):self.bind(p,f'{result}[{index}]',env)
                 elif i==len(n.children)-1:self.emit(s,env,target,monad)
                 else:self.value(s,env)
             return
@@ -234,6 +245,11 @@ class Generator:
         if k=='match':
             values=[self.value(c,env) for c in n.children]
             exhaustive=False
+            # Keep Debug stack frames proportional to the selected match arm,
+            # not the sum of every arm in a large semantic dispatcher. This
+            # also prevents giant LLVM optimization units. The dispatcher
+            # returns through the trampoline before the arm starts executing.
+            outline=target is None and sum(1 for _ in walk(n)) >= 1000
             for pats,body in n.value:
                 if len(pats)==1 and pats[0].kind=='id' and pats[0].value=='_': pats=pats*len(values)
                 if len(pats)!=len(values):raise ParseError(f'{self.current}:{n.line}: match arity {len(pats)} != {len(values)}')
@@ -243,7 +259,13 @@ class Generator:
                 self.line(f'if ({" and ".join(conditions) if conditions else "true"}) {{');self.indent+=1
                 scope=env.copy()
                 for name,v in bindings:scope[name]=self.save(v)
-                self.emit(body,scope,target,monad)
+                if outline:
+                    captures=sorted(free(body) & scope.keys())
+                    self.arms+=1;name=f'{self.mod.name}.$arm{self.arms}'
+                    wrapper=Node('do',monad,[body],body.line) if monad else body
+                    self.functions[name]=Function(self.mod.name,name.split('.',1)[1],captures,wrapper,body.line)
+                    self.line(f'return ctx.next({self.request(name)}, &.{{{", ".join(scope[c] for c in captures)}}});')
+                else:self.emit(body,scope,target,monad)
                 self.indent-=1;self.line('}')
                 if not conditions:exhaustive=True
             if not exhaustive:self.line(f'@panic({quote("non-exhaustive semantic match: "+self.current+":"+str(n.line))});')
@@ -265,6 +287,7 @@ class Generator:
         while cursor<len(self.todo):
             name=self.todo[cursor];cursor+=1;f=self.functions[name];self.current=name;self.mod=self.mods[f.module]
             self.lines=[];self.indent=0;self.temp=0
+            if len(f.params)>64:raise ParseError(f'{name}: arity exceeds native trampoline capacity')
             self.line(f'// {f.module}.bend:{f.line} {f.name}')
             self.line(f'fn fun_{self.ids[name]}(ctx: *r.Context, args: []const V) r.Step {{');self.indent=1
             self.line('@setEvalBranchQuota(100000);');self.line('r.ignoreContext(ctx);');self.line(f'r.assert(args.len == {len(f.params)});')
@@ -281,8 +304,8 @@ class Generator:
         (directory/'tags.zig').write_text('// Generated constructor identities; source module identity is preserved.\npub const Tag = enum(u16) {\n'+''.join(f'    {ident(n)},\n' for n in sorted(self.ctors))+'};\n')
         (directory/'primitives.zig').write_text('// Explicit native primitive surface.\npub const Primitive = enum {\n'+''.join(f'    {ident(n)},\n' for n in sorted(self.primitives))+'};\n')
         manifest={m.name:hashlib.sha256(m.path.read_bytes()).hexdigest() for m in sorted(self.mods.values(),key=lambda m:m.name)}
-        (directory/'manifest.json').write_text(json.dumps({'sources':manifest,'functions':len(self.ids),'closures':self.lambdas,'constructors':len(self.ctors)},indent=2)+'\n')
-        print(f'Generated {len(self.ids)} native Zig functions ({self.lambdas} closures), {len(self.ctors)} constructors, {len(self.primitives)} primitives.')
+        (directory/'manifest.json').write_text(json.dumps({'sources':manifest,'functions':len(self.ids),'max_arity':max(len(self.functions[n].params) for n in self.ids),'closures':self.lambdas,'parallel_tasks':self.forks,'outlined_arms':self.arms,'constructors':len(self.ctors)},indent=2)+'\n')
+        print(f'Generated {len(self.ids)} native Zig functions ({self.lambdas} closures, {self.forks} parallel tasks, {self.arms} outlined arms), {len(self.ctors)} constructors, {len(self.primitives)} primitives.')
 
 if __name__=='__main__':
     try:Generator(Path(__file__).resolve().parents[2]).run()

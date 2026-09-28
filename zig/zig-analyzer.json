@@ -1,0 +1,4 @@
+{
+  "check": { "exclude": ["src/generated", ".zig-cache", "zig-out"] },
+  "contracts": { "arena-allocators": ["Context.allocator"] }
+}

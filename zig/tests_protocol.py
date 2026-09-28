@@ -52,12 +52,12 @@ class ProtocolTests(unittest.TestCase):
             with self.subTest(payload=payload):
                 result = self.run_compiler(payload)
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn(b'TruncatedFrame', result.stderr)
+                self.assertIn(b'native protocol: truncated frame', result.stderr)
 
     def test_oversized_frames_fail_before_allocating_the_body(self):
         result = self.run_compiler(struct.pack('<I', 16 * 1024 * 1024 + 1))
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn(b'FrameTooLarge', result.stderr)
+        self.assertIn(b'native protocol: frame exceeds 16777216 words', result.stderr)
 
     def test_options_validate_values(self):
         for args in [('--threads', '0'), ('--threads', '65'), ('--threads',), ('--unknown',)]:
