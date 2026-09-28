@@ -1,0 +1,62 @@
+name: Import validated Carp port
+
+on:
+  push:
+    branches: [experiment/carp-compiler]
+    paths: ['.carp-import/**']
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: carp-validated-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    if: github.repository == 'mewhhaha/blot2'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '10957205459'
+          run-id: '36392777690'
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/carp-semantic-input
+          merge-multiple: true
+      - name: Verify and apply the exact authored-source patch
+        run: python3 .carp-import/install.py apply
+      - name: Restore checksum-verified generation dependency
+        run: |
+          curl --fail --location --retry 3 https://registry.npmjs.org/acorn/-/acorn-8.15.0.tgz -o "$RUNNER_TEMP/acorn.tgz"
+          mkdir -p compiler/carp/port/vendor
+          tar -xOf "$RUNNER_TEMP/acorn.tgz" package/dist/acorn.js > compiler/carp/port/vendor/acorn.cjs
+          python3 .carp-import/install.py vendor
+      - name: Regenerate and compare every generated source byte
+        run: |
+          node compiler/carp/port/generate.cjs "$RUNNER_TEMP/carp-semantic-input/reference.mjs" compiler/carp/port/generated
+          python3 .carp-import/install.py generated
+          python3 compiler/carp/port/verify.py
+          node compiler/carp/port/optimization_test.cjs "$RUNNER_TEMP/carp-semantic-input/reference.mjs"
+          git diff --check
+      - name: Publish only if the PR branch has not moved
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          test "$(git ls-remote origin refs/heads/experiment/carp-compiler | cut -f1)" = "$EXPECTED_HEAD"
+          rm -rf .carp-import
+          rm .github/workflows/carp-import.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Port full compiler semantics to Carp and reduce allocation and rebuild overhead'
+          git push origin HEAD:refs/heads/experiment/carp-compiler
