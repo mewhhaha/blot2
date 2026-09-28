@@ -1,0 +1,52 @@
+name: Carp semantic port input
+
+on:
+  pull_request:
+    paths:
+      - 'compiler/carp/port_reference.bend'
+      - '.github/workflows/carp-port-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: carp-port-input-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semantic-input:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      BEND_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install checksum-verified reference toolchain
+        run: |
+          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/bend-toolchain"
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend-toolchain"
+          BEND=$(find "$RUNNER_TEMP/bend-toolchain" -type f -name bend -perm -u+x -print -quit)
+          test -n "$BEND"
+          echo "$(dirname "$BEND")" >> "$GITHUB_PATH"
+          "$BEND" version
+          "$BEND" guide > "$RUNNER_TEMP/bend-guide.txt"
+      - name: Emit unchanged pure semantic input
+        run: |
+          mkdir -p generated/carp-port
+          bend version
+          /usr/bin/time -v bend compiler/carp/port_reference.bend -o generated/carp-port/reference.mjs
+          test -s generated/carp-port/reference.mjs
+          sha256sum generated/carp-port/reference.mjs > generated/carp-port/reference.sha256
+          git rev-parse HEAD > generated/carp-port/source-commit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: carp-semantic-port-input
+          path: generated/carp-port/
+          retention-days: 7
+      - name: Check original proofs
+        run: bend PROOF.bend
