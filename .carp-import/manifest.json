@@ -1,0 +1,10 @@
+{
+  "base_commit": "700c698bdb65db048e38dc87f059559be18023e2",
+  "parts": ["part00.xz", "part01.xz", "part02.xz", "part03.xz", "part04.xz", "part05.xz", "part06.xz"],
+  "compressed_sha256": "f8c7b2f727d27ed40e4613ec7e0f3c5843dd890ffa79cbb66274c09c31cba3a5",
+  "patch_bytes": 290307,
+  "patch_sha256": "76079bc520fb92ab50e6fad332581e9456f114995a86a5c123641974518ec2cc",
+  "generated_manifest_sha256": "006d358e214341e606fcc32ff9ae1cfb53a58132f58c894c957c4dd2aa5c70c0",
+  "vendor_sha256": "fdb08546776ec6228b03e8d02b40d4ab3255bae5f401adba7ff5dad927ac5c9c",
+  "final_tree": "475906f97c4d8dbaea280e7bed44e32b090bd3b0"
+}

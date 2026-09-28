@@ -29,8 +29,8 @@ jobs:
           node-version: '22.16.0'
       - uses: actions/download-artifact@v4
         with:
-          artifact-ids: '10957205459'
-          run-id: '36392777690'
+          artifact-ids: '10984472835'
+          run-id: '36454338270'
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/carp-semantic-input
           merge-multiple: true
