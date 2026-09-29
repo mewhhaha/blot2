@@ -68,15 +68,23 @@ try {
 }
 ```
 
+## Native IR migration
+
+Type resolution, replacement and renaming now use compact, structurally interned
+Zig type/row IDs and iterative traversals. The stage is on the production path;
+complex types no longer fall back to the generated resolver. See [IR.md](IR.md)
+for the exact migrated boundary, lifetime rules and differential tests. The
+remaining compiler stages are still being migrated.
+
 ## Implementation
 
-This is a **mechanical semantic port with a native runtime**, rather than a
-hand-rewritten implementation of every compiler stage. `tools/port.py` reads the
-retained pure algorithms and `tools/generate.py` emits ordinary Zig functions.
-Generation rejects unsupported syntax, unknown primitives, and excessive arity.
-The generated manifest records source hashes, function counts, outlined match
-arms, parallel tasks and the maximum call arity. Generated files are build
-outputs, not manually edited source.
+This is a **staged native rewrite**, not yet a hand-rewritten implementation of
+every compiler stage. `tools/port.py` reads the retained pure algorithms and
+`tools/generate.py` emits ordinary Zig functions. Generation rejects unsupported
+syntax, unknown primitives, and excessive arity. The generated manifest records
+source hashes, function counts, outlined match arms, parallel tasks and the
+maximum call arity. Generated files are build outputs, not manually edited
+source.
 
 The native layer implements unsigned and binary32 values, Unicode strings,
 persistent Patricia maps, lists and sorting, closures and curried application, a

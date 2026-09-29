@@ -185,3 +185,7 @@ test "malformed complete input returns a compiler diagnostic" {
     try std.testing.expectEqual(r.Tag.native_main_Reply, r.tag(reply));
     _ = try packetBytes(&ctx, r.field(reply, 1));
 }
+
+test {
+    _ = @import("type_ir_tests.zig");
+}

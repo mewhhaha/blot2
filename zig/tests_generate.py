@@ -110,6 +110,21 @@ class GenerationTests(unittest.TestCase):
                 function.body = body
                 generator.protocol_version()
 
+    def test_type_ir_oracles_are_transitively_independent(self):
+        import re
+        source = (Path(__file__).resolve().parent / 'src/generated/functions.zig').read_text()
+        names = dict((int(i), n) for i, n in re.findall(r'&fun_(\d+), // ([^\n]+)', source))
+        pieces = re.split(r'(?m)^fn fun_(\d+)\(', source)
+        for i in range(1, len(pieces), 2):
+            function = names[int(pieces[i])]
+            body = pieces[i + 1].split('pub const table', 1)[0]
+            oracle = '.$oracle_' in function
+            if oracle:
+                self.assertNotIn('native.', body, function)
+            for target in re.findall(r'ctx\.(?:call|next|closure)\((\d+)', body):
+                self.assertEqual(oracle, '.$oracle_' in names[int(target)],
+                                 (function, names[int(target)]))
+
     def test_generated_semantics_are_native_and_have_bounded_arity(self):
         import json
         directory = Path(__file__).resolve().parent / 'src/generated'

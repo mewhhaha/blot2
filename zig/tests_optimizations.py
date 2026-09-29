@@ -64,7 +64,7 @@ class OptimizationTests(unittest.TestCase):
                     patched = modules | {name: SimpleNamespace(path=changed)}
                     enabled = native_functions(patched)
                     self.assertFalse(any(fn.startswith(name + '.') for fn in enabled))
-                    if name in ('model', 'nat_index'):
+                    if name in ('model', 'nat_index', 'effect_rows'):
                         self.assertFalse(any(fn.startswith('types.') for fn in enabled))
                     if name in ('model', 'cst', 'native_response', 'native_io', 'native_session'):
                         self.assertNotIn('native_request.decode', enabled)
@@ -72,17 +72,22 @@ class OptimizationTests(unittest.TestCase):
     def test_missing_modules_do_not_enable_native_algorithms(self):
         self.assertEqual(native_functions({}), {})
 
-    def test_native_decode_and_source_resolver_bridge_are_explicit(self):
+    def test_native_type_ir_has_no_compound_resolver_fallback(self):
         source = (ROOT / 'zig/src/generated/functions.zig').read_text()
         manifest = json.loads((ROOT / 'zig/src/generated/manifest.json').read_text())
         if 'native_request.decode' in manifest['native_functions']:
             self.assertIn('native.decode(ctx, args)', source)
-        self.assertIn('pub const fallback_types_resolve:', source)
-        self.assertIn('// types.$source_resolve', source)
+        self.assertNotIn('fallback_types_resolve', source)
+        self.assertNotIn('$source_resolve', source)
+        self.assertIn('native.resolveType(ctx, ', source)
+        self.assertIn('native.resolveTypes(ctx, ', source)
+        self.assertIn('native.rewriteTypes(ctx, ', source)
+        self.assertIn('native.renameTypes(ctx, ', source)
+        self.assertIn('pub const oracle_types_resolve_work_reference:', source)
 
     def test_new_handwritten_zig_is_formatted(self):
         result = subprocess.run([ZIG, 'fmt', '--check', 'src/semantic.zig',
-                                 'src/wire.zig', 'src/variables.zig'], cwd=ROOT / 'zig',
+                                 'src/wire.zig', 'src/variables.zig', 'src/type_ir.zig', 'src/type_bridge.zig', 'src/type_ir_tests.zig'], cwd=ROOT / 'zig',
                                 capture_output=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

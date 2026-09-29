@@ -194,6 +194,7 @@ pub const Context = struct {
     pub const Pool = @import("pool.zig").Pool;
     const Job = @import("pool.zig").Job;
     pool: ?*Pool = null,
+    type_state: ?*@import("type_bridge.zig").State = null,
     shared_allocator: ?std.mem.Allocator = null,
     arena: std.heap.ArenaAllocator,
     // A Context runs on exactly one thread at a time. Small semantic values
@@ -208,6 +209,7 @@ pub const Context = struct {
         return .{ .arena = std.heap.ArenaAllocator.init(backing) };
     }
     pub fn deinit(self: *Context) void {
+        if (self.type_state) |types| types.deinit();
         self.arena.deinit();
     }
     pub fn allocator(self: *Context) std.mem.Allocator {

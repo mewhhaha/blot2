@@ -11,6 +11,7 @@ import hashlib
 # Native algorithms are valid only for these retained source definitions. A
 # source edit deoptimizes its entire module rather than silently changing meaning.
 NATIVE_MODULE_HASHES = {
+    'effect_rows': 'ee075f75680328a1a74c7fb06ff3d7e28d4635f12774c289b7fc3effef6a7959',
     'types': 'f37bf621a0f4378fb982874116cb48404e5fea504c22332d33606b820701ddd7',
     'native_request': '62da0ead06c5edf07c813c1c9a955cf3a72de916694c33d498e1ea3cd486bebc',
     'native_response': 'ae77f19fd57a6cdb88c7e2d47faccc9b18c744cb31edf0c98f3332b5f48b948b',
@@ -22,11 +23,20 @@ NATIVE_MODULE_HASHES = {
     'nat_index': '5a8dc29f32904dc4fee7f0f9ced2e18075fd1e112b2b01be0c3bb2489e007b82',
     'cst': '1e07cd287f8501ccbdbf02a520787b76d87dc894f55932ab047ebe7b8d6d7c0e',
 }
-# Exact source bodies remain callable for the native leaf resolver's compound
-# cases. This is an ordinary Zig call, not a second runtime or backend.
-NATIVE_FALLBACKS = {'types.resolve': 'types.$source_resolve'}
+# Independent source algorithms are emitted as differential test oracles only.
+# They are not fallback paths for any native entry point.
+TYPE_IR_ORACLES = {
+    'types.resolve_work_reference', 'types.rewrite', 'types.rename_work',
+    'types.resolve_row_at', 'types.from_list',
+}
+def oracle_name(name):
+    module, name = name.split('.', 1)
+    return module + '.$oracle_' + name
+
 NATIVE_FUNCTIONS = {
     'types.resolve': 'resolveType', 'types.first_type': 'firstType',
+    'types.resolve_work': 'resolveTypes', 'types.resolve_row_at': 'resolveRowAt',
+    'types.rewrite': 'rewriteTypes', 'types.rename_work': 'renameTypes',
     'types.substitution_count': 'substitutionCount',
     'types.contains': 'variableContains', 'types.put': 'variablePut',
     'types.wide_variables': 'variableWide', 'types.union': 'variableUnion',
@@ -48,7 +58,7 @@ def native_functions(mods):
     if 'model' not in valid:
         valid.discard('index')
         valid.discard('cst')
-    if not {'model', 'nat_index'} <= valid:
+    if not {'model', 'nat_index', 'effect_rows'} <= valid:
         valid.discard('types')
     if not set(('model', 'cst', 'native_response', 'native_io', 'native_session')) <= valid:
         valid.discard('native_request')
@@ -122,6 +132,7 @@ class Generator:
     def __init__(self, root):
         self.root=root;self.mods=load(root);self.native=native_functions(self.mods)
         self.functions={f'{m.name}.{f.name}':f for m in self.mods.values() for f in m.functions}
+        self.functions.update({oracle_name(n): f for n, f in list(self.functions.items())})
         self.types={f'{m.name}.{t}' for m in self.mods.values() for t in m.types}
         self.ctors={f'{m.name}.{c}':len(fields) for m in self.mods.values() for c,fields in m.ctors.items()}|BASE_CTORS
         self.ids={};self.todo=[];self.output=[];self.lambdas=0;self.forks=0;self.arms=0;self.primitives=set()
@@ -137,10 +148,18 @@ class Generator:
     def resolve(self,name):
         mod=self.mod
         first,sep,rest=name.partition('.')
-        if first in mod.imports and sep: return mod.imports[first]+'.'+rest
-        if f'{mod.name}.{name}' in self.functions|self.ctors or f'{mod.name}.{name}' in self.types:
-            return f'{mod.name}.{name}'
-        return name
+        if first in mod.imports and sep:
+            result=mod.imports[first]+'.'+rest
+        elif f'{mod.name}.{name}' in self.functions|self.ctors or f'{mod.name}.{name}' in self.types:
+            result=f'{mod.name}.{name}'
+        else:
+            result=name
+        if '.$oracle_' in self.current and result in self.functions:
+            return oracle_name(result)
+        return result
+    def synthetic_name(self, name):
+        prefix = '$oracle_' if '.$oracle_' in self.current else '$'
+        return f'{self.mod.name}.{prefix}{name}'
     def request(self,name):
         if name not in self.ids:
             self.ids[name]=len(self.ids);self.todo.append(name)
@@ -168,7 +187,7 @@ class Generator:
             if name in PRIMITIVES:
                 if name not in self.primitive_wrappers:
                     params=[f'arg{i}' for i in range(self.primitive_arities[name])]
-                    wrapper=f'{self.mod.name}.$primitive_{ident(name)}'
+                    wrapper=self.synthetic_name(f'primitive_{ident(name)}')
                     self.functions[wrapper]=Function(self.mod.name,wrapper.split('.',1)[1],params,Node('call',children=[Node('id',name),*[Node('id',p) for p in params]]),n.line)
                     self.primitive_wrappers[name]=wrapper
                 return self.save(f'ctx.closure({self.request(self.primitive_wrappers[name])}, &.{{}})')
@@ -201,7 +220,7 @@ class Generator:
             return self.save(f'ctx.arrayRepeat({a}, r.toNat({b}))')
         if k=='lambda':
             captures=sorted(free(n.children[0],{n.value}) & env.keys())
-            self.lambdas+=1;name=f'{self.mod.name}.$lambda{self.lambdas}'
+            self.lambdas+=1;name=self.synthetic_name(f'lambda{self.lambdas}')
             self.functions[name]=Function(self.mod.name,name.split('.',1)[1],[*captures,n.value],n.children[0],n.line)
             return self.save(f'ctx.closure({self.request(name)}, &.{{{", ".join(env[c] for c in captures)}}})')
         if k=='call':return self.call(n,env,False)
@@ -286,7 +305,7 @@ class Generator:
                     thunks=[]
                     for rhs in s.children[count:]:
                         captures=sorted(free(rhs) & env.keys())
-                        self.forks+=1;name=f'{self.mod.name}.$fork{self.forks}'
+                        self.forks+=1;name=self.synthetic_name(f'fork{self.forks}')
                         self.functions[name]=Function(self.mod.name,name.split('.',1)[1],captures,rhs,rhs.line)
                         thunks.append(self.save(f'ctx.closure({self.request(name)}, &.{{{", ".join(env[c] for c in captures)}}})'))
                     result=self.tmp('parallel')
@@ -317,7 +336,7 @@ class Generator:
                 for name,v in bindings:scope[name]=self.save(v)
                 if outline:
                     captures=sorted(free(body) & scope.keys())
-                    self.arms+=1;name=f'{self.mod.name}.$arm{self.arms}'
+                    self.arms+=1;name=self.synthetic_name(f'arm{self.arms}')
                     wrapper=Node('do',monad,[body],body.line) if monad else body
                     self.functions[name]=Function(self.mod.name,name.split('.',1)[1],captures,wrapper,body.line)
                     self.line(f'return ctx.next({self.request(name)}, &.{{{", ".join(scope[c] for c in captures)}}});')
@@ -349,9 +368,7 @@ class Generator:
     def run(self):
         protocol_version = self.protocol_version()
         roots=['native_main.respond','native_request.decode']
-        for name, alias in NATIVE_FALLBACKS.items():
-            self.functions[alias] = self.functions[name]
-            self.request(alias)
+        for name in sorted(TYPE_IR_ORACLES):self.request(oracle_name(name))
         for name in roots:self.request(name)
         cursor=0
         while cursor<len(self.todo):
@@ -375,7 +392,7 @@ class Generator:
         table+='pub const arities = [_]u8{'+','.join(str(len(self.functions[n].params)) for n in self.ids)+'};\n'
         table+='pub const names = [_][]const u8{'+','.join(quote(n) for n in self.ids)+'};\n'
         for root in roots:table+=f'pub const {ident(root)}: u32 = {self.ids[root]};\n'
-        for name, alias in NATIVE_FALLBACKS.items():table+=f'pub const fallback_{ident(name)}: u32 = {self.ids[alias]};\n'
+        for name in sorted(TYPE_IR_ORACLES):table+=f'pub const oracle_{ident(name)}: u32 = {self.ids[oracle_name(name)]};\n'
         (directory/'functions.zig').write_text(header+'\n\n'.join(self.output)+table)
         (directory/'tags.zig').write_text('// Generated constructor identities; source module identity is preserved.\npub const Tag = enum(u16) {\n'+''.join(f'    {ident(n)},\n' for n in sorted(self.ctors))+'};\n')
         (directory/'primitives.zig').write_text('// Explicit native primitive surface.\npub const Primitive = enum {\n'+''.join(f'    {ident(n)},\n' for n in sorted(PRIMITIVES))+'};\n')

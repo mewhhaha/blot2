@@ -280,29 +280,13 @@ pub fn firstType(ctx: *r.Context, args: []const V) V {
     if (r.tag(values) == .Cons and r.tag(r.field(values, 1)) == .Nil) return ctx.node(.Done, &.{r.field(values, 0)});
     return ctx.node(.Fail, &.{ctx.node(.model_Diagnostic, &.{ r.literal("internal_error"), r.literal("inference"), r.literal("type rewrite did not produce exactly one type") })});
 }
-pub fn resolveType(ctx: *r.Context, args: []const V) V {
-    std.debug.assert(args.len >= 2);
-    const substitutions = args[0];
-    const ty = args[1];
-    r.assert(r.tag(substitutions) == .types_Substitutions);
-    // No substitutions means even a large compound type can be shared intact.
-    // Closed leaves cannot change under either value or row substitutions.
-    if (r.toNat(r.field(substitutions, 3)) == 0) return ctx.node(.Done, &.{ty});
-    switch (r.tag(ty)) {
-        .model_UnitTy,
-        .model_U32Ty,
-        .model_BoolTy,
-        .model_NeverTy,
-        .model_F32Ty,
-        .model_ParameterTy,
-        .model_FreeTy,
-        .model_EffectDescriptorTy,
-        .model_EffectSetTy,
-        => return ctx.node(.Done, &.{ty}),
-        // Compound types still use the exact chronological row/type resolver.
-        else => return ctx.call(@import("generated/functions.zig").fallback_types_resolve, args),
-    }
-}
+// Native typed-IR entry points. No generated compound-type fallback.
+const type_bridge = @import("type_bridge.zig");
+pub const resolveType = type_bridge.resolveType;
+pub const resolveTypes = type_bridge.resolveWork;
+pub const resolveRowAt = type_bridge.resolveRowAt;
+pub const rewriteTypes = type_bridge.rewrite;
+pub const renameTypes = type_bridge.rename;
 
 test "type leaf fast paths retain identities and exact first-type diagnostics" {
     var ctx = r.Context.init(std.testing.allocator);
