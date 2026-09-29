@@ -598,11 +598,30 @@ Compile-time initializers cannot read top-level `let` values or functions.
 Runtime initializers must handle their effects with providers; module startup
 does not supply implicit handlers.
 
+Monadic blocks use an ordinary prelude adapter:
+
+```blot
+const try = monad Maybe
+const sequence = fn candidate => do try:
+  use value <- candidate
+  return value + 1
+entry const answer = fn () => Maybe.unwrap_or 0 (sequence (#Some 41))
+```
+
+`use` calls the selected type's `bind` with the remaining block as a function.
+`return` calls `pure`; `return $` forwards an existing wrapped result. A failed
+`Maybe` or `Result` bind skips subsequent effects and loop iterations. The
+resolver expression runs once, nested `do` blocks have independent rules, and
+unrelated effects remain visible. The same adapter accepts imported types and
+user-defined data types with `pure` and `bind` members. Type-constructor values
+can be aliased or passed through ordinary functions.
+
+Monadic loops currently use recursive continuation calls, so large loops are
+subject to backend stack limits.
+
 Not yet executable: array spread syntax, array patterns, general text, F64/SIMD,
-arbitrary monadic `do` resolvers, and `return $` forwarding. Do not infer
-availability from editor highlighting or design examples. Use record
-fields/patterns, array functions, thunks, and `Maybe.bind`/`Result.bind`
-instead.
+general type-valued computation, and resumable handlers. Do not infer
+availability from editor highlighting or design examples.
 
 Hosts use `compiler/guest.ts` and guest ABI 2. Numeric arrays cross as copied
 typed arrays; host callbacks are explicit scalar or numeric-array capabilities.

@@ -46,6 +46,14 @@ provider runs its implementation in the outer scope, so forwarding to an older
 provider does not recurse into itself. Escaping functions retain their effects
 and do not capture the provider chain.
 
+Monadic resolvers are also supported: `do (monad Maybe):` uses `Maybe.bind` for
+`use`, `Maybe.pure` for `return`, and forwards an existing wrapper with
+`return $`. A failed bind skips the remaining block, including later effects and
+loop iterations. The adapter is an ordinary prelude function backed by a generic
+resolver protocol; user-defined data types can provide their own `pure` and
+`bind`. It preserves unrelated effect requirements. Nested plain `do:` blocks
+retain direct sequencing and return rules.
+
 Ordinary providers return each operation result directly. A source-declared
 effect family gives each concrete state type its own read/write operations:
 

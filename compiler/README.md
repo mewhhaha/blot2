@@ -864,10 +864,11 @@ larger JavaScript stack. See the
 
 Array patterns, spread syntax, destructuring function parameters, general
 Text/F64, SIMD, inferred generic effect-family labels in explicit polymorphic
-rows, type-valued consts, and resumptions are not implemented.
-`do monad Maybe:`/`return $` remain design syntax, not implemented monad
-resolution. An unconstrained provider parameter cannot infer an unknown
-operation identity in this first closed-label slice.
+rows, general type-valued computation, and resumptions are not implemented.
+`do monad Maybe:` and `return $` execute through source-defined `pure`/`bind`
+members; declared nominal type constructors can be passed as values. An
+unconstrained provider parameter cannot infer an unknown operation identity in
+this first closed-label slice.
 
 [Controlled host IO](effects-and-io.md#controlled-host-io) uses explicit
 callbacks and the [guest adapter](guest-abi.md). Generic libraries can declare

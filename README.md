@@ -131,7 +131,7 @@ through an asynchronous host callback. See the
 [guest ABI](compiler/guest-abi.md) for callback setup and bounded numeric-array
 loop state.
 
-SIMD, explicit polymorphic effect-row annotations such as `! {State a}`,
+SIMD, explicit polymorphic effect-row annotations such as `! {State a}`, general
 type-valued const programming, resumptions, capability bundles, and persistent
 guest handles remain future work. Entry functions accept scalars, numeric
 arrays, or one scalar/numeric-array callback and return a scalar or numeric

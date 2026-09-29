@@ -85,6 +85,8 @@ def scan_work(fuel: Nat, pending: List<&2, ScanWork>, names: List<&2, String>, m
       scan_work(rest, ScanExpressions{values} <> tail, callee <> names, members)
     case 1n+rest ScanExpressions{M.CallExpr{callee, argument} <> values} <> tail:
       scan_work(rest, ScanExpressions{argument <> values} <> tail, callee <> names, members)
+    case 1n+rest ScanExpressions{M.AssociatedExpr{identity, dispatch, "@do.monad", templates, left, right} <> values} <> tail:
+      scan_work(rest, ScanExpressions{left <> right <> values} <> tail, names, "pure" <> "bind" <> members)
     case 1n+rest ScanExpressions{M.AssociatedExpr{identity, dispatch, member, templates, left, right} <> values} <> tail:
       scan_work(rest, ScanExpressions{left <> right <> values} <> tail, names, M.source_member(member) <> members)
     case 1n+rest ScanExpressions{M.QualifiedExpr{offset, annotation, predicates, value} <> values} <> tail:

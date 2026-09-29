@@ -1,5 +1,6 @@
 import Base
 import ./model.bend as M
+import ./resolvers.bend as Resolvers
 import ./types.bend as T
 import ./state_specialize.bend as State
 import ./closures.bend as Closures
@@ -301,5 +302,7 @@ def prepare_if(needed: Bool, module: M.Module) -> Result<&2, &2, M.Diagnostic, M
     case True{}:
       prepare_full(module)
 
-def prepare(+module: M.Module) -> Result<&2, &2, M.Diagnostic, M.Module>:
-  prepare_if(required(module), module)
+def prepare(original: M.Module) -> Result<&2, &2, M.Diagnostic, M.Module>:
+  do Result<&2, &2, M.Diagnostic, M.Module>:
+    +module : M.Module <- Resolvers.prepare(original)
+    prepare_if(required(module), module)

@@ -1052,3 +1052,19 @@ def Laws.demand_free_elaboration_preserves_expression(expression):
 
 def Laws.conditional_without_successors_preserves_sequence(prefix, branch, next):
   {==}
+
+def Laws.resolver_return_discards_continuation(label, offset, value, next):
+  {==}
+
+def Laws.resolver_forward_does_not_lift(label, offset, value):
+  {==}
+
+def Laws.resolver_bind_delays_continuation(label, offset, name, value, body):
+  {==}
+
+def Laws.resolver_type_token_preserves_nominal_owner(identity):
+  match identity:
+    case M.TypeId{module_name, SNil{}}:
+      {==}
+    case M.TypeId{module_name, SCon{head, tail}}:
+      {==}

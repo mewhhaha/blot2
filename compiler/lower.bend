@@ -10,6 +10,7 @@ import ./index.bend as Index
 import ./effect_families.bend as Families
 import ./dependency.bend as D
 import ./closures.bend as Closures
+import ./resolvers.bend as Resolvers
 
 type Local is Data:
   Local{source: String, core: String}
@@ -324,11 +325,43 @@ def require_value_marker(value: M.Expr, node: C.Cst) -> Result<&2, &2, M.Diagnos
     case _:
       Done{Unit{}}
 
-def resolve_value(+context: Context, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+def resolve_ordinary_value(+context: Context, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
   do Result<&2, &2, M.Diagnostic, M.Expr>:
     +value : M.Expr <- resolve(context, node)
     checked : Unit <- require_value_marker(value, node)
     return value
+
+# Types may be passed as ordinary values without confusing their unmarked name
+# with the explicitly marked constructor. Locals and ordinary globals win.
+def type_value_shadow(found: Maybe<&2, Global>) -> Bool:
+  match found:
+    case None{}:
+      False{}
+    case Some{Global{source, core, ConstructorName{}}}:
+      False{}
+    case Some{Global{source, core, RecordConstructorName{fields}}}:
+      False{}
+    case _:
+      True{}
+
+def resolve_type_value(found: Maybe<&2, T.Header>, shadowed: Bool, context: Context, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match found shadowed:
+    case Some{T.Header{source, identity, parameters}} False{}:
+      Done{Resolvers.token_value(identity)}
+    case _ _:
+      resolve_ordinary_value(context, node)
+
+def type_value_local(locals: List<&2, Local>, nodes: List<&2, C.Cst>) -> Bool:
+  match nodes:
+    case root <> tail:
+      Maybe.is_some(&2, String, lookup_local(locals, C.text_of(root)))
+    case Nil{}:
+      False{}
+
+def resolve_value(+context: Context, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  Context{globals, headers, fixities, locals, label, variables} = context
+  +name = C.name_of(node)
+  resolve_type_value(T.lookup_header(headers, name), Bool.or(type_value_local(locals, C.children_of(node)), type_value_shadow(lookup_global(globals, name))), context, node)
 
 def template_reference(local: Maybe<&2, String>, found: Maybe<&2, Global>) -> Maybe<&2, TemplateReference>:
   match local found:
@@ -707,6 +740,24 @@ def with_label(context: Context, label: Maybe<&2, Nat>) -> Context:
   Context{globals, headers, fixities, locals, old_label, annotation_variables} = context
   Context{globals, headers, fixities, locals, label, annotation_variables}
 
+def block_scope(context: Context, +label: Nat, resolved: Bool) -> Context:
+  match resolved:
+    case False{}:
+      with_label(context, Some{label})
+    case True{}:
+      bind(with_label(context, Some{label}), Local{"$resolver", Resolvers.scope(label)})
+
+def resolver_scope(found: Maybe<&2, String>, label: Maybe<&2, Nat>) -> Bool:
+  match found label:
+    case Some{name} Some{label}:
+      M.name_equal(name, Resolvers.scope(label))
+    case _ _:
+      False{}
+
+def has_resolver(context: Context) -> Bool:
+  Context{globals, headers, fixities, locals, label, variables} = context
+  resolver_scope(lookup_local(locals, "$resolver"), label)
+
 def unique_name(+node: C.Cst) -> String:
   C.text_of(node) ++ "$" ++ Nat.show(C.offset_of(node))
 
@@ -1020,13 +1071,16 @@ def effect_family_intrinsic(+name: String, +node: C.Cst) -> Result<&2, &2, M.Dia
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.reader"), Done{EffectFamilyPrimitive{name, 1n, 3n}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@effect.writer"), Done{EffectFamilyPrimitive{name, 1n, 3n}}, ordinary_intrinsic(name, node))))
 
-def deferred_intrinsic(+name: String, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Primitive>:
+def existing_deferred_intrinsic(+name: String, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Primitive>:
   Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@type.same"), Done{DeferredPrimitive{name, 2n}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@state.get"), Done{DeferredPrimitive{name, 1n}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@state.set"), Done{DeferredPrimitive{name, 1n}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@state.run"), Done{DeferredPrimitive{name, 2n}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@state.reader"), Done{DeferredPrimitive{name, 3n}},
     Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@state.writer"), Done{DeferredPrimitive{name, 3n}}, effect_family_intrinsic(name, node)))))))
+
+def deferred_intrinsic(+name: String, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Primitive>:
+  Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@do.monad"), Done{DeferredPrimitive{name, 1n}}, existing_deferred_intrinsic(name, node))
 
 def intrinsic(+name: String, +node: C.Cst) -> Result<&2, &2, M.Diagnostic, Primitive>:
   Bool.pick(Result<&2, &2, M.Diagnostic, Primitive>, M.name_equal(name, "@type.result"), Done{ResultPrimitive{}},
@@ -1430,7 +1484,21 @@ def require_plain_return(markers: List<&2, C.Cst>) -> Result<&2, &2, M.Diagnosti
     case Nil{}:
       Done{Unit{}}
     case node <> tail:
-      Fail{C.diagnostic(node, "resolver_required", "return $ requires monad resolution, which is not implemented; provider blocks return plain values")}
+      Fail{C.diagnostic(node, "resolver_required", "return $ requires a monad resolver on the nearest do block")}
+
+def require_resolved_return(markers: List<&2, C.Cst>, resolved: Bool) -> Result<&2, &2, M.Diagnostic, Unit>:
+  match resolved:
+    case True{}:
+      Done{Unit{}}
+    case False{}:
+      require_plain_return(markers)
+
+def forwarded(context: Context, yes: Bool, value: M.Expr, offset: Nat) -> M.Expr:
+  match context yes:
+    case Context{globals, headers, fixities, locals, Some{label}, variables} True{}:
+      Resolvers.call(label, offset, "forward", value)
+    case _ _:
+      value
 
 def returning(context: Context, value: M.Expr, node: C.Cst) -> Result<&2, &2, M.Diagnostic, M.Expr>:
   match context:
@@ -1463,9 +1531,9 @@ def binding(guarded: Bool, pattern: M.Pattern, value: M.Expr, alternative: M.Exp
 def effect_target(names: List<&2, C.Cst>, offset: Nat) -> Result<&2, &2, M.Diagnostic, Local>:
   match names:
     case Nil{}:
-      Done{Local{"_", "$discard$" ++ Nat.show(offset)}}
+      Done{Local{"_", "$use$discard$" ++ Nat.show(offset)}}
     case +name <> Nil{}:
-      Done{Local{C.text_of(name), unique_name(name)}}
+      Done{Local{C.text_of(name), "$use$" ++ unique_name(name)}}
     case _:
       Fail{M.Diagnostic{"internal_cst", "parser", "invalid use binding"}}
 
@@ -2275,7 +2343,7 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
         case Expression{Block{}, +node}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             suite : C.Cst <- C.one(C.field_values(node, "body"))
-            body : M.Expr <- lower(remaining, Statements{statement_nodes(suite), Nil{}}, with_label(context, Some{C.offset_of(node)}))
+            body : M.Expr <- lower(remaining, Statements{statement_nodes(suite), Nil{}}, block_scope(context, C.offset_of(node), C.present(C.field_values(node, "resolver"))))
             lower(remaining, ResolvedBlock{C.field_values(node, "resolver"), body, C.offset_of(node)}, context)
         case ResolvedBlock{Nil{}, body, +offset}:
           Done{located(offset, M.BlockExpr{offset, body})}
@@ -2384,10 +2452,10 @@ def lower(+fuel: Nat, work: Work, +context: Context) -> Result<&2, &2, M.Diagnos
         case Statement{Return{}, +node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:
             valid : Unit <- reachable(tail)
-            plain : Unit <- require_plain_return(C.field_values(node, "forwarding"))
+            plain : Unit <- require_resolved_return(C.field_values(node, "forwarding"), has_resolver(context))
             value_node : C.Cst <- C.one(C.field_values(node, "value"))
             value : M.Expr <- lower(remaining, visit(value_node), context)
-            result : M.Expr <- returning(context, value, node)
+            result : M.Expr <- returning(context, forwarded(context, C.present(C.field_values(node, "forwarding")), value, C.offset_of(node)), node)
             return located(C.offset_of(node), result)
         case Statement{Conditional{}, +node, tail, carried}:
           do Result<&2, &2, M.Diagnostic, M.Expr>:

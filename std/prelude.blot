@@ -45,6 +45,9 @@ type Type witness is data = #Type witness
 
 // The expected result selects its type's ordinary `from` member.
 const from = fn value => @type.result "from" value
+
+// A resolver sequences through the selected type's ordinary pure/bind members.
+const monad = fn constructor => @do.monad constructor
 const F32.from = fn value => value.to_f32
 const U32.from = fn value => value.to_u32
 const F32.to_f32 = fn (value: F32) => value

@@ -1,0 +1,22 @@
+// The adapter is an ordinary prelude function. Named resolver values work too.
+const try = monad Maybe
+
+const add_present = fn left => fn right => do try:
+  use first <- left
+  use second <- right
+  return first + second
+
+entry const present = fn () =>
+  Maybe.unwrap_or 0 (add_present (#Some 40) (#Some 2))
+
+const stop = fn () => do monad Maybe:
+  use #Nothing
+  return @panic "a failed bind skips this continuation"
+
+entry const absent = fn () => Maybe.unwrap_or 42 (stop ())
+
+const checked = fn candidate => do monad Result:
+  use value <- candidate
+  return $ #Ok (value + 2)
+
+entry const result = fn () => Result.unwrap_or 0 (checked (#Ok 40))

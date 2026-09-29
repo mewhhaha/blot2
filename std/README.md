@@ -134,8 +134,27 @@ entry const inspect = fn () => case #Some (#Some 42) of
 
 Matches must be exhaustive. `if let` binds only in its successful branch;
 `let pattern = value else:` requires an exiting failure branch. The RHS is pure
-and evaluated once. Use ordinary calls to `Maybe.bind`/`Result.bind` for now:
-`do monad Maybe:` and `return $` do not execute custom resolvers yet.
+and evaluated once. Monadic blocks use the same source-defined `pure` and `bind`
+functions:
+
+```blot
+const try = monad Maybe
+const add_present = fn left => fn right => do try:
+  use first <- left
+  use second <- right
+  return first + second
+```
+
+`#Nothing` skips the rest of the block. `monad Result` propagates `#Err` in the
+same way. `return value` lifts with `pure`; `return $ candidate` forwards an
+already wrapped result. `use candidate` binds and discards its successful
+payload, so it still short-circuits. Falling through lifts Unit. Ordinary `let`
+and expression statements do not unwrap values. Nested `do` blocks select their
+own rules, and unrelated effects still require providers.
+
+`monad` is an ordinary prelude function. Declared data-type constructors such as
+`Maybe` can be aliased, imported, and passed through functions; user-defined
+monads supply their own associated `pure` and `bind` functions.
 
 `unwrap_or` is eager. `Maybe.unwrap_or_else fallback candidate` has a demand
 parameter: it evaluates `fallback` only for `#Nothing`, once per captured
@@ -222,7 +241,7 @@ entry const callback_example = fn () => invoke $ fn value => value + 1
 
 An infix RHS can also be a `do:` block or `case` expression without parentheses.
 `return f $ value` returns the call result; the existing `return $ value`
-resolver-forwarding syntax remains separate and is still unimplemented.
+resolver-forwarding syntax passes through an already wrapped monadic result.
 
 ## F32 and game math
 
@@ -345,12 +364,13 @@ See [the executable array example](../examples/arrays.blot).
 
 This prelude is a useful executable core, not the complete standard library. It
 does not yet provide array spread/pattern syntax, general text values, F64,
-SIMD, type-valued programming, or resumable handlers. The generic core supports
-closed source-declared operations, scoped providers, and compile-time effect
-descriptors. The [3D sandbox](../case-study/ecs/README.md) is paused while its
-compiler-specific backend is replaced by a source-defined ECS and explicit
-entrypoint IO capabilities. Literal strings are accepted as panic messages, not
-as general runtime `Text` values or privileged asset/window operations.
+SIMD, general type-valued programming, or resumable handlers. The generic core
+supports closed source-declared operations, scoped providers, and compile-time
+effect descriptors. The [3D sandbox](../case-study/ecs/README.md) is paused
+while its compiler-specific backend is replaced by a source-defined ECS and
+explicit entrypoint IO capabilities. Literal strings are accepted as panic
+messages, not as general runtime `Text` values or privileged asset/window
+operations.
 
 For a complete small program, see
 [examples/prelude.blot](../examples/prelude.blot).

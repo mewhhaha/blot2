@@ -1,5 +1,6 @@
 import Base
 import ./model.bend as M
+import ./resolvers.bend as Resolvers
 import ./types.bend as T
 import ./index.bend as Index
 import ./type_data.bend as D
@@ -1017,6 +1018,7 @@ def infer_pattern(value: M.Pattern, expected: M.Ty, context: Context, state: Sta
   infer_pattern_work(U32.to_nat(65536), [PatternValue{value, expected}], context, state, Nil{}, Nil{})
 
 type Work is Data:
+  Resolver{direct: Bool, provider: Typing, resolved: M.Ty, body: M.Expr}
   Expression{value: M.Expr}
   MatchArms{values: List<&2, M.MatchArm<M.Expr>>, scrutinees: List<&2, M.Ty>}
   MatchValues{values: List<&2, M.Expr>, types: List<&2, M.Ty>, arms: List<&2, M.MatchArm<M.Expr>>, accumulated: Inference}
@@ -1547,11 +1549,23 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
     case 1n+rest Expression{M.HandleExpr{provider, body}}:
       do Result<&2, &2, M.Diagnostic, Typing>:
         +p : Typing <- expr_work(rest, Expression{provider}, context, state)
-        resolved : M.Ty <- T.resolve(substitutions_of(state_of(p)), type_of(p))
+        +resolved : M.Ty <- T.resolve(substitutions_of(state_of(p)), type_of(p))
+        expr_work(rest, Resolver{Resolvers.direct(resolved), p, resolved, body}, context, state_of(p))
+    case 1n+rest Resolver{True{}, +p, resolved, +body}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        valid : Unit <- Resolvers.validate_direct(body)
         +supplied : Provider <- require_provider(resolved, context_subject(context))
-        prepared : State <- prepare_provider(supplied, context, state_of(p))
+        prepared : State <- prepare_provider(supplied, context, state)
         +b : Typing <- expr_work(rest, Expression{body}, handled_context(context, supplied), prepared)
         return Typing{sequence(inference_of(p), inference_of(b), flow(type_of(p), handled_result(supplied, type_of(b)))), state_of(b)}
+    case 1n+rest Resolver{False{}, +p, resolved, M.BlockExpr{+label, body}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        valid : Unit <- Resolvers.validate(resolved, context_subject(context))
+        transformed : M.Expr <- Resolvers.action(body, label)
+        +b : Typing <- expr_work(rest, Expression{transformed}, extend(context, [Binding{Resolvers.scope(label), type_of(p), Nil{}, Nil{}}]), state)
+        return Typing{sequence(inference_of(p), inference_of(b), flow(type_of(p), type_of(b))), state_of(b)}
+    case 1n+rest Resolver{False{}, p, resolved, body}:
+      Fail{M.Diagnostic{"invalid_provider", context_subject(context), "do requires an effect provider or monad resolver"}}
     case 1n+rest Expression{M.OperationDescriptorExpr{+identity}}:
       do Result<&2, &2, M.Diagnostic, Typing>:
         known : Unit <- D.valid_effect_label(context_operations(context), identity)

@@ -2,7 +2,7 @@ import Base
 
 # Internal result-directed requests retain their source member for reachability.
 def source_member(+member: String) -> String:
-  Bool.pick(String, String.starts_with(member, "@result."), String.drop(member, 8n), member)
+  Bool.pick(String, String.starts_with(member, "@result."), String.drop(member, 8n), Bool.pick(String, String.starts_with(member, "@do."), String.drop(member, 4n), member))
 
 type TypeId is Data:
   TypeId{module_name: String, declaration: String}

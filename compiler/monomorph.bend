@@ -2,6 +2,7 @@ import Base
 import ./demand_elaboration.bend as Demand
 import ./core_rebuild.bend as Rebuild
 import ./model.bend as M
+import ./resolvers.bend as Resolvers
 import ./closures.bend as F
 import ./dependency.bend as D
 import ./infer.bend as I
@@ -137,6 +138,9 @@ def has_deferred(fuel: Nat, pending: List<&2, M.Expr>) -> Bool:
     case 1n+rest M.GenericOperationExpr{identity, template, arguments} <> tail:
       True{}
     case 1n+rest M.QualifiedExpr{offset, annotation, predicates, value} <> tail:
+      True{}
+    case 1n+rest M.HandleExpr{provider, M.BlockExpr{label, body}} <> tail:
+      # Inference may discover a resolver protocol through a generic parameter.
       True{}
     case 1n+rest head <> tail:
       has_deferred(rest, List.reverse.go(&2, M.Expr, List.reverse(&2, M.Expr, F.children(head)), tail))
@@ -1545,12 +1549,53 @@ def select_result(need: I.Coverage, +left: M.Ty, +right: M.Ty, specialization: S
     case _ _:
       Fail{M.Diagnostic{"internal_error", "@type.result", "expected a result-directed requirement"}}
 
+def resolver_reference(owner_id: Maybe<&2, M.TypeId>, member: String, entry: String, shapes: List<&2, I.Binding>, subject: String) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match owner_id:
+    case None{}:
+      Done{M.UnitExpr{}}
+    case Some{identity}:
+      do Result<&2, &2, M.Diagnostic, M.Expr>:
+        name : String <- receiver_method(owner(M.AppliedTy{identity, Nil{}}, entry), member, shapes, subject)
+        return M.FunctionExpr{name}
+
+# The selected source pure/bind is expanded and checked like any ordinary
+# member. No name in the source language selects this protocol implicitly.
+def select_resolver(need: I.Coverage, +left: M.Ty, +right: M.Ty, specialization: Specialization, +configuration: Configuration, +shapes: List<&2, I.Binding>, schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, Specialization>:
+  match need specialization:
+    case I.AssociatedNeed{identity, dispatch, +member, effect_templates, old_left, old_right, result, invocation, +ambient, +subject} Specialization{M.Module{+constants, +original_functions, +types, +operations}, +environment, choices, counter, certificates}:
+      Configuration{+originals, templates, +entry, locals, affected, +stride, constant_values, family_templates, +step, schema} = configuration
+      do Result<&2, &2, M.Diagnostic, Specialization>:
+        +plan : Resolvers.Plan <- Resolvers.plan(member, left, subject)
+        selected : M.Expr <- resolver_reference(Resolvers.plan_owner(plan), Resolvers.plan_member(plan), entry, shapes, subject)
+        +expanded : Expansion <- expand(65536n, Expression{selected}, configuration, Nil{}, 0n, counter)
+        reference : M.Expr <- one(expressions(expanded))
+        +name : String = "$resolver[" ++ Nat.show(next(expanded)) ++ "]." ++ String.drop(member, 4n)
+        +wrapper : M.Function = M.Function{name, False{}, "$resolver$left", Resolvers.parameter_annotation(member, left, name), None{}, M.LambdaExpr{Nat.mul(next(expanded), stride), "$resolver$right", None{}, None{}, Resolvers.checked_body(Resolvers.monad_owner(left), member, Resolvers.plan_body(plan, reference, name, member, 1n+Nat.mul(next(expanded), stride)), types, name)}}
+        +created : List<&2, M.Function> = List.append(&2, M.Function, functions(expanded), [wrapper])
+        +all_functions : List<&2, M.Function> = List.append(&2, M.Function, original_functions, created)
+        expanded_environment : G.Environment <- infer_pending_optional(List.append(&2, G.Declaration, G.function_declarations(functions(expanded)), G.constant_declarations(emitted_constants(expanded))), shapes, environment, operations, types, G.function_names(G.function_declarations(List.append(&2, M.Function, originals, all_functions))), schemes, stride)
+        +inferred : G.Environment <- infer_generated(wrapper, expanded_environment, operations, types, G.function_names(G.function_declarations(List.append(&2, M.Function, originals, all_functions))))
+        +instance : I.SelectedInstantiation <- I.instantiate_binding_selected(I.lookup_binding(G.env_bindings(inferred), name), G.env_state(inferred), name, subject)
+        +target : I.Typing = I.selected_typing(instance)
+        +unified : I.State <- I.unify(I.type_of(target), M.FunctionTy{left, M.FunctionTy{right, result, ambient}, ambient}, I.state_of(target), subject)
+        signature : M.Ty <- T.resolve(I.substitutions_of(unified), I.selected_exact(instance))
+        return Specialization{M.Module{List.append(&2, M.Constant, constants, emitted_constants(expanded)), all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Map.set(&2, Choice, choices, Nat.show(identity), FunctionChoice{name, signature}), Nat.add(next(expanded), step), certificates}
+    case _ _:
+      Fail{M.Diagnostic{"internal_error", "resolver", "expected a resolver requirement"}}
+
+def select_ordinary_binary(resolver: Bool, +member: String, need: I.Coverage, left: M.Ty, right: M.Ty, specialization: Specialization, configuration: Configuration, shapes: List<&2, I.Binding>, schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, Specialization>:
+  match resolver:
+    case True{}:
+      select_resolver(need, left, right, specialization, configuration, shapes, schemes)
+    case False{}:
+      select_type_request(M.name_equal(member, "@type.same"), State.request(member), need, left, right, specialization, configuration, shapes, schemes)
+
 def select_binary(result_directed: Bool, +member: String, need: I.Coverage, left: M.Ty, right: M.Ty, specialization: Specialization, configuration: Configuration, shapes: List<&2, I.Binding>, schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, Specialization>:
   match result_directed:
     case True{}:
       select_result(need, left, right, specialization, configuration, shapes, schemes)
     case False{}:
-      select_type_request(M.name_equal(member, "@type.same"), State.request(member), need, left, right, specialization, configuration, shapes, schemes)
+      select_ordinary_binary(Resolvers.request(member), member, need, left, right, specialization, configuration, shapes, schemes)
 
 def select(+need: I.Coverage, left: M.Ty, right: M.Ty, specialization: Specialization, configuration: Configuration, shapes: List<&2, I.Binding>, schemes: List<&2, Staging.Scheme>) -> Result<&2, &2, M.Diagnostic, Specialization>:
   match need:
@@ -1709,7 +1754,7 @@ def state_request_ready(request: Maybe<&2, State.Request>, left: M.Ty, right: M.
 def request_ready(dispatch: M.Dispatch, +member: String, +left: M.Ty, +right: M.Ty, +entry: String) -> Bool:
   match dispatch:
     case M.BinaryDispatch{}:
-      Bool.pick(Bool, String.starts_with(member, "@result."), Maybe.is_some(&2, String, owner(result_destination(right), entry)), Bool.pick(Bool, M.name_equal(member, "@type.same"), Bool.not(polymorphic(65536n, [State.witness(65536n, left), State.witness(65536n, right)])), state_request_ready(State.request(member), left, right, entry)))
+      Bool.pick(Bool, Resolvers.request(member), Resolvers.ready(left), Bool.pick(Bool, String.starts_with(member, "@result."), Maybe.is_some(&2, String, owner(result_destination(right), entry)), Bool.pick(Bool, M.name_equal(member, "@type.same"), Bool.not(polymorphic(65536n, [State.witness(65536n, left), State.witness(65536n, right)])), state_request_ready(State.request(member), left, right, entry))))
     case _:
       Maybe.is_some(&2, String, owner(left, entry))
 
@@ -2067,13 +2112,48 @@ def replace(+fuel: Nat, work: ExpandWork, +choices: Map<&2, Choice>) -> Result<&
     case _ _:
       Fail{M.Diagnostic{"internal_error", "monomorphization", "unexpected replacement work"}}
 
+def materialized_block(selected: Bool, provider: M.Expr, body: M.Expr, label: Nat) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match selected:
+    case True{}:
+      Resolvers.block(provider, body, label)
+    case False{}:
+      Done{M.HandleExpr{provider, M.BlockExpr{label, body}}}
+
+def materialized_node(value: M.Expr, choices: Map<&2, Choice>) -> Result<&2, &2, M.Diagnostic, M.Expr>:
+  match value:
+    case M.HandleExpr{provider, M.BlockExpr{+label, body}}:
+      materialized_block(Maybe.is_some(&2, Choice, choice(choices, Resolvers.run_id(label))), provider, body, label)
+    case other:
+      Done{other}
+
+def materialize(+fuel: Nat, work: ExpandWork, +choices: Map<&2, Choice>) -> Result<&2, &2, M.Diagnostic, List<&2, M.Expr>>:
+  match fuel work:
+    case 0n _:
+      Fail{M.Diagnostic{"resolver_complexity", "resolver", "resolver materialization exceeded its structural limit"}}
+    case 1n+rest Expression{expression}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Expr>>:
+        +prepared : M.Expr <- materialized_node(expression, choices)
+        children : List<&2, M.Expr> <- materialize(rest, Expressions{F.children(prepared)}, choices)
+        rebuilt : M.Expr <- rebuild(prepared, children, 0n)
+        return [rebuilt]
+    case 1n+rest Expressions{Nil{}}:
+      Done{Nil{}}
+    case 1n+rest Expressions{head <> tail}:
+      do Result<&2, &2, M.Diagnostic, List<&2, M.Expr>>:
+        first : List<&2, M.Expr> <- materialize(rest, Expression{head}, choices)
+        rest : List<&2, M.Expr> <- materialize(rest, Expressions{tail}, choices)
+        return List.append(&2, M.Expr, first, rest)
+    case _ _:
+      Fail{M.Diagnostic{"internal_error", "resolver", "unexpected resolver materialization work"}}
+
 def replace_functions(pending: List<&2, M.Function>, +choices: Map<&2, Choice>, +calls: Set()) -> Result<&2, &2, M.Diagnostic, List<&2, M.Function>>:
   match pending:
     case Nil{}:
       Done{Nil{}}
     case M.Function{name, exported, parameter, p, r, body} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, M.Function>>:
-        prepared : M.Expr <- Demand.expression(body, calls)
+        lowered : M.Expr <- Result.bind(&2, &2, M.Diagnostic, List<&2, M.Expr>, M.Expr, materialize(1048576n, Expression{body}, choices), one)
+        prepared : M.Expr <- Demand.expression(lowered, calls)
         expressions : List<&2, M.Expr> <- replace(65536n, Expression{prepared}, choices)
         value : M.Expr <- one(expressions)
         rest : List<&2, M.Function> <- replace_functions(tail, choices, calls)
@@ -2085,7 +2165,8 @@ def replace_constants(pending: List<&2, M.Constant>, +choices: Map<&2, Choice>, 
       Done{Nil{}}
     case M.Constant{name, exported, annotation, value} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, M.Constant>>:
-        prepared : M.Expr <- Demand.expression(value, calls)
+        lowered : M.Expr <- Result.bind(&2, &2, M.Diagnostic, List<&2, M.Expr>, M.Expr, materialize(1048576n, Expression{value}, choices), one)
+        prepared : M.Expr <- Demand.expression(lowered, calls)
         expressions : List<&2, M.Expr> <- replace(65536n, Expression{prepared}, choices)
         result : M.Expr <- one(expressions)
         rest : List<&2, M.Constant> <- replace_constants(tail, choices, calls)

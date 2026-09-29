@@ -1,6 +1,7 @@
 import Base
 import ./compiler/schema_stage.bend as Schema
 import ./compiler/model.bend as M
+import ./compiler/resolvers.bend as Resolvers
 import ./compiler/constraints.bend as Constraints
 import ./compiler/effects.bend as Effects
 import ./compiler/const_eval.bend as Const
@@ -1732,3 +1733,32 @@ law conditional_without_successors_preserves_sequence:
   for branch: M.Expr
   for next: M.Expr
   {Lower.conditional_successors(Nil{}, prefix, branch, next) == M.SequenceExpr{branch, next} : M.Expr}
+
+# A resolved return discards the enclosing suite's continuation and lifts once.
+law resolver_return_discards_continuation:
+  for label: Nat
+  for offset: Nat
+  for value: U32
+  for next: Resolvers.Continuation
+  {Resolvers.lower(1n, Resolvers.Expression{M.ReturnExpr{label, M.U32Expr{value}}, next, offset}, label) == Done{[Resolvers.call(label, offset, "pure", M.U32Expr{value})]} : Result<&2, &2, M.Diagnostic, List<&2, M.Expr>>}
+
+# Forwarding an already wrapped result must not introduce a second pure call.
+law resolver_forward_does_not_lift:
+  for label: Nat
+  for offset: Nat
+  for value: M.Expr
+  {Resolvers.returned(label, offset, Resolvers.call(label, offset, "forward", value)) == Resolvers.call(label, offset, "forward", value) : M.Expr}
+
+# Bind receives the suffix as a function value; it alone decides whether and
+# how often to invoke it. Lowering does not execute that suffix eagerly.
+law resolver_bind_delays_continuation:
+  for label: Nat
+  for offset: Nat
+  for name: String
+  for value: M.Expr
+  for body: M.Expr
+  {Resolvers.lower(1n, Resolvers.Binding{True{}, name, value, body, offset}, label) == Done{[Resolvers.call(label, offset, "bind", M.ProductExpr{[Resolvers.unannotated(value), M.LambdaExpr{Nat.add(Nat.mul(offset, 16n), 7n), name, Resolvers.annotation(value), None{}, body}]})]} : Result<&2, &2, M.Diagnostic, List<&2, M.Expr>>}
+
+law resolver_type_token_preserves_nominal_owner:
+  for identity: M.TypeId
+  {Resolvers.token_owner(M.AppliedTy{Resolvers.token_identity(identity), Nil{}}) == Some{identity} : Maybe<&2, M.TypeId>}

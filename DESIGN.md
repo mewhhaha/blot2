@@ -126,7 +126,7 @@ around that expression are optional; named const values work the same way:
 ```blot
 const try = monad Maybe
 
-const chain_maybe = fn (my_maybe, my_other_maybe) => do:
+const chain_maybe = fn my_maybe => fn my_other_maybe => do:
   let smth = do try:
     use value <- my_maybe
     return $ my_other_maybe value
@@ -157,8 +157,8 @@ The inner block above is equivalent to:
 
 ```blot
 case my_maybe of
-  Nothing => Nothing
-  Some value => my_other_maybe value
+  #Nothing => #Nothing
+  #Some value => my_other_maybe value
 ```
 
 This is immediate sequencing, not a deferred action object. The resolver
@@ -178,11 +178,18 @@ direct value bindings. The complete RHS of an outer `let` must be pure after the
 resolver has done its work, including effects of evaluating the resolver itself.
 Unresolved effects remain visible to callers and scheduling.
 
-The lowering target for `Maybe`/`Result` is ordinary branching after resolving
-the source operations. This is not a claim that arbitrary resolvers are free or
-that general resumable handlers are implemented. The compiler currently parses
-resolver headers and forwarding returns but reports unsupported resolver
-execution; it does not special-case `Maybe` or aliases such as `try`.
+Monadic blocks execute through ordinary calls to the selected source `bind` and
+`pure` functions. Each bind receives the remaining computation as a function,
+including subsequent loop iterations. A source implementation may skip that
+function or invoke it more than once. Resolver expressions are evaluated once.
+Monadic loops currently use recursive continuation calls and are subject to the
+backend's stack limits. Ordinary provider loops retain their iterative lowering.
+The prelude defines `monad` using the generic `@do.monad` adapter; neither
+`Maybe`, `Result`, nor resolver aliases have special compiler-recognized names.
+
+Declared data-type constructors can be passed through ordinary functions and
+stored in bindings, including imported and renamed constructors. General
+type-valued computation and partial type applications remain future work.
 
 ### Demand-driven parameters
 
@@ -975,40 +982,39 @@ production.
 
 The repository contains a Deno project, Baba 9.0.1, generated lexer/parser
 artifacts, and a [Bend compiler](compiler/README.md). The executable
-`grammar.baba`/`baba.json` describe the generic functional core plus recognized
-resolver syntax with explicit unsupported-lowering diagnostics. They no longer
-claim to accept the old Blot language. The broader syntax design is preserved
-here and in the case-study source proposals. Files under `examples/` use the
-currently supported language.
+`grammar.baba`/`baba.json` describe the generic functional core and executable
+provider and monadic resolver blocks. They no longer claim to accept the old
+Blot language. The broader syntax design is preserved here and in the case-study
+source proposals. Files under `examples/` use the currently supported language.
 
 A separate, permissive Tree-sitter grammar supports Helix highlighting of the
 showcase, including proposals. It is editor support, not a validating compiler
 frontend; see the [Helix setup](README.md#helix-highlighting).
 
-| Area                    | Current status                                                                                                                               |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Deno and Baba           | Generated lexer, general CPU parser, compact-CST schema, and binding checks.                                                                 |
-| Helix highlighting      | Separate editor grammar covers the syntax showcase.                                                                                          |
-| Annotations             | Scalars, tuples, arrays, concrete applied nominal types, and effect-annotated arrows.                                                        |
-| Modules                 | Implicit prelude; relative/explicitly mapped file imports; module scopes; public top-level bindings.                                         |
-| Data declarations       | Generic `data` with mandatory `#Constructor` markers in declarations, values and patterns; no `type` aliases yet.                            |
-| Pattern narrowing       | Single/multi-value `case … of`, alternatives and guards, nested tuple/record patterns, `if let`, guarded `let`.                              |
-| Closed unions           | Design/editor examples only; no union inference or runtime representation.                                                                   |
-| Operators and demand    | Source fixities/operators backed by ordinary functions; memoized `~` parameters and `@force`.                                                |
-| Backtick calls          | Ordinary curried function calls with source fixity/default left precedence 80.                                                               |
-| Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.                                                                 |
-| Text interpolation      | Target design only; literal strings currently serve generic panic messages.                                                                  |
-| `self`                  | Previous value of a local binding or field/index path during immutable rebinding.                                                            |
-| Layout and AST          | Indented continuations, a structure-preserving formatter, Baba CST; Bend name resolution and core lowering.                                  |
-| Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                                                                   |
-| Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                                                                   |
-| Resolver blocks         | Scoped effect providers execute; monad resolvers and `return $` remain future.                                                               |
-| Scheduling              | Source-library responsibility; no compiler-generated ECS scheduler.                                                                          |
-| Const evaluation        | Scalars, tuples, arrays, data, closures, and matching with one shared evaluation budget.                                                     |
-| Tags and const types    | Expression tags transform `const`/`let` values; closed const effect descriptors; no declaration-descriptor transforms or type-valued consts. |
-| Arrays and SIMD         | Immutable arrays, checked indexing, alias-preserving updates with local storage reuse; SIMD remains future.                                  |
-| Wasm compilation        | Private arena; scalars, copied numeric arrays, and explicit scalar callbacks via guest ABI 2.                                                |
-| Game runtime and reload | Sandbox paused pending source ECS, capability bundles and persistent-state ABI.                                                              |
+| Area                    | Current status                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Deno and Baba           | Generated lexer, general CPU parser, compact-CST schema, and binding checks.                                                                                                         |
+| Helix highlighting      | Separate editor grammar covers the syntax showcase.                                                                                                                                  |
+| Annotations             | Scalars, tuples, arrays, concrete applied nominal types, and effect-annotated arrows.                                                                                                |
+| Modules                 | Implicit prelude; relative/explicitly mapped file imports; module scopes; public top-level bindings.                                                                                 |
+| Data declarations       | Generic `data` with mandatory `#Constructor` markers in declarations, values and patterns; no `type` aliases yet.                                                                    |
+| Pattern narrowing       | Single/multi-value `case … of`, alternatives and guards, nested tuple/record patterns, `if let`, guarded `let`.                                                                      |
+| Closed unions           | Design/editor examples only; no union inference or runtime representation.                                                                                                           |
+| Operators and demand    | Source fixities/operators backed by ordinary functions; memoized `~` parameters and `@force`.                                                                                        |
+| Backtick calls          | Ordinary curried function calls with source fixity/default left precedence 80.                                                                                                       |
+| Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.                                                                                                         |
+| Text interpolation      | Target design only; literal strings currently serve generic panic messages.                                                                                                          |
+| `self`                  | Previous value of a local binding or field/index path during immutable rebinding.                                                                                                    |
+| Layout and AST          | Indented continuations, a structure-preserving formatter, Baba CST; Bend name resolution and core lowering.                                                                          |
+| Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                                                                                                           |
+| Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                                                                                                           |
+| Resolver blocks         | Scoped effect providers, source-defined monad resolvers, and `return $` execute.                                                                                                     |
+| Scheduling              | Source-library responsibility; no compiler-generated ECS scheduler.                                                                                                                  |
+| Const evaluation        | Scalars, tuples, arrays, data, closures, and matching with one shared evaluation budget.                                                                                             |
+| Tags and const types    | Expression tags transform `const`/`let` values; closed const effect descriptors; nominal type-constructor values; no declaration-descriptor transforms or general type computations. |
+| Arrays and SIMD         | Immutable arrays, checked indexing, alias-preserving updates with local storage reuse; SIMD remains future.                                                                          |
+| Wasm compilation        | Private arena; scalars, copied numeric arrays, and explicit scalar callbacks via guest ABI 2.                                                                                        |
+| Game runtime and reload | Sandbox paused pending source ECS, capability bundles and persistent-state ABI.                                                                                                      |
 
 `generated/wasm` belongs to Baba's lexer/parser tooling. Separately, `just demo`
 compiles [examples/prelude.blot](examples/prelude.blot) and executes it as Wasm.
