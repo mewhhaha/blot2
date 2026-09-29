@@ -19,6 +19,9 @@ pub const Pool = struct {
     workers: [63]std.Thread = undefined,
     worker_count: usize = 0,
     worker_jobs: std.atomic.Value(u64) = .init(0),
+    // Semantic batches reserve spare-worker slots. Nested batches execute
+    // locally when those slots are occupied instead of flooding the queue.
+    fork_slots: std.atomic.Value(usize) = .init(0),
 
     /// The calling thread is included in `threads`. Keep this Pool at a stable
     /// address from start() until deinit(); workers retain its address.
@@ -33,6 +36,23 @@ pub const Pool = struct {
             );
             self.worker_count += 1;
         }
+        self.fork_slots.store(self.worker_count, .monotonic);
+    }
+
+    pub fn reserve(self: *Pool, maximum: usize) usize {
+        var available = self.fork_slots.load(.monotonic);
+        while (available != 0) {
+            const count = @min(available, maximum);
+            if (self.fork_slots.cmpxchgWeak(available, available - count, .monotonic, .monotonic)) |actual| {
+                available = actual;
+            } else return count;
+        }
+        return 0;
+    }
+
+    pub fn release(self: *Pool, count: usize) void {
+        const previous = self.fork_slots.fetchAdd(count, .monotonic);
+        std.debug.assert(previous + count <= self.worker_count);
     }
 
     pub fn deinit(self: *Pool) void {
@@ -160,4 +180,18 @@ test "worker limits include the calling thread" {
     var invalid: Pool = .{};
     try std.testing.expectError(error.InvalidThreadCount, invalid.start(0));
     try std.testing.expectError(error.InvalidThreadCount, invalid.start(65));
+}
+
+test "fork reservations bound queued batches and return capacity after joins" {
+    var pool: Pool = .{};
+    try pool.start(4);
+    defer pool.deinit();
+    try std.testing.expectEqual(@as(usize, 0), pool.reserve(0));
+    try std.testing.expectEqual(@as(usize, 2), pool.reserve(2));
+    try std.testing.expectEqual(@as(usize, 1), pool.reserve(7));
+    try std.testing.expectEqual(@as(usize, 0), pool.reserve(1));
+    pool.release(2);
+    try std.testing.expectEqual(@as(usize, 2), pool.reserve(7));
+    pool.release(3);
+    try std.testing.expectEqual(@as(usize, 3), pool.fork_slots.load(.monotonic));
 }

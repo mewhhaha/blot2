@@ -2,15 +2,25 @@
 //! Every compilation owns an arena; retained session state is copied between
 //! revisions, preserving graph sharing. No Bend runtime or generated C is used.
 const std = @import("std");
+const builtin = @import("builtin");
 const generated = @import("generated/functions.zig");
 pub const Tag = @import("generated/tags.zig").Tag;
 pub const Primitive = @import("generated/primitives.zig").Primitive;
 pub const Value = u64;
 pub const assert = std.debug.assert;
 pub const mask: u64 = (1 << 48) - 1;
-const Kind = enum(u16) { natural, integer, real, char, constant, object, string, closure, array };
+const Kind = enum(u16) { natural, integer, real, char, constant, object, string, closure, array, tail };
 const Header = extern struct { identity: u32, length: u32 };
-pub const Step = union(enum) { value: Value, tail: u32 };
+// One register carries either a semantic value or an internal tail target.
+// The protocol cannot construct the reserved tail kind. Keeping Step scalar
+// also permits LLVM's guaranteed native tail calls (no aggregate sret slot).
+pub const Step = Value;
+pub inline fn done(value: Value) Step {
+    return value;
+}
+inline fn isTail(step: Step) bool {
+    return step >> 48 == @intFromEnum(Kind.tail);
+}
 pub const erased: Value = empty(.Unit);
 pub inline fn ignore(_: Value) void {}
 pub inline fn ignoreContext(_: *Context) void {}
@@ -66,6 +76,10 @@ fn objectFields(v: Value) []Value {
     const head = ptr(*Header, v);
     const values: [*]Value = @ptrFromInt((v & mask) + @sizeOf(Header));
     return values[0..head.length];
+}
+pub fn arrayValues(value: Value) []const Value {
+    assert(kind(value) == .array);
+    return objectFields(value);
 }
 pub inline fn tag(v: Value) Tag {
     return switch (kind(v)) {
@@ -182,6 +196,10 @@ pub const Context = struct {
     pool: ?*Pool = null,
     shared_allocator: ?std.mem.Allocator = null,
     arena: std.heap.ArenaAllocator,
+    // A Context runs on exactly one thread at a time. Small semantic values
+    // use a private bump cursor; only chunk refills touch the shared arena.
+    slab: []align(16) u8 = &.{},
+    slab_used: usize = 0,
     pending: [64]Value = undefined,
     pending_len: usize = 0,
     calls: u64 = 0,
@@ -195,10 +213,19 @@ pub const Context = struct {
     pub fn allocator(self: *Context) std.mem.Allocator {
         return self.shared_allocator orelse self.arena.allocator();
     }
-    fn allocate(self: *Context, comptime T: type, n: usize) []T {
+    inline fn allocate(self: *Context, comptime T: type, n: usize) []T {
         const bytes = std.math.mul(usize, n, @sizeOf(T)) catch @panic("allocation size overflow");
         self.allocated = std.math.add(usize, self.allocated, bytes) catch @panic("allocation accounting overflow");
-        return self.allocator().alloc(T, n) catch @panic("Zig compiler ran out of memory");
+        comptime assert(@alignOf(T) <= 16);
+        if (bytes > 16 * 1024) return self.allocator().alloc(T, n) catch @panic("Zig compiler ran out of memory");
+        var start = std.mem.alignForward(usize, self.slab_used, @alignOf(T));
+        if (start > self.slab.len or bytes > self.slab.len - start) {
+            self.slab = self.allocator().alignedAlloc(u8, .@"16", 64 * 1024) catch @panic("Zig compiler ran out of memory");
+            start = 0;
+        }
+        self.slab_used = start + bytes;
+        const data: [*]T = @ptrCast(@alignCast(self.slab.ptr + start));
+        return data[0..n];
     }
     fn rawNode(self: *Context, k: Kind, identity: u32, fields: []const Value) Value {
         const storage = self.allocate(Value, fields.len + 1);
@@ -207,7 +234,7 @@ pub const Context = struct {
         @memcpy(storage[1..], fields);
         return pointer(k, storage.ptr);
     }
-    pub fn node(self: *Context, t: Tag, fields: []const Value) Value {
+    pub inline fn node(self: *Context, comptime t: Tag, fields: []const Value) Value {
         if (fields.len == 0) return empty(t);
         return switch (t) {
             .Chr => character(toWord(fields[0])),
@@ -219,11 +246,22 @@ pub const Context = struct {
     pub fn closure(self: *Context, function: u32, captures: []const Value) Value {
         return self.rawNode(.closure, function, captures);
     }
-    pub fn next(self: *Context, function: u32, args: []const Value) Step {
+    /// Queue a dynamic closure target for the stack-bounded dispatcher.
+    inline fn queue(self: *Context, function: u32, args: []const Value) Step {
         assert(args.len <= self.pending.len);
         @memcpy(self.pending[0..args.len], args);
         self.pending_len = args.len;
-        return .{ .tail = function };
+        return pack(.tail, function);
+    }
+    /// Generated calls use this only in tail position. Arguments move out of
+    /// the dying stack frame before the jump. Debug and non-LLVM builds retain
+    /// the portable trampoline; optimized LLVM builds jump directly to code.
+    pub inline fn next(self: *Context, comptime function: u32, args: []const Value) Step {
+        const target = self.queue(function, args);
+        if (comptime builtin.zig_backend == .stage2_llvm and builtin.mode != .Debug) {
+            return @call(.always_tail, generated.table[function], .{ self, self.pending[0..args.len] });
+        }
+        return target;
     }
     pub fn call(self: *Context, function: u32, args: []const Value) Value {
         var id = function;
@@ -231,13 +269,9 @@ pub const Context = struct {
         while (true) {
             self.calls += 1;
             const step = generated.table[id](self, arguments);
-            switch (step) {
-                .value => |v| return v,
-                .tail => |next_id| {
-                    id = next_id;
-                    arguments = self.pending[0..self.pending_len];
-                },
-            }
+            if (!isTail(step)) return step;
+            id = @truncate(step);
+            arguments = self.pending[0..self.pending_len];
         }
     }
     pub fn nextClosure(self: *Context, fn_value: Value, args: []const Value) Step {
@@ -256,8 +290,8 @@ pub const Context = struct {
             @memcpy(values[0..captures.len], captures);
             @memcpy(values[captures.len..][0..consumed], remaining[0..consumed]);
             const complete = values[0 .. captures.len + consumed];
-            if (remaining.len < needed) return .{ .value = self.closure(h.identity, complete) };
-            if (remaining.len == needed) return self.next(h.identity, complete);
+            if (remaining.len < needed) return done(self.closure(h.identity, complete));
+            if (remaining.len == needed) return self.queue(h.identity, complete);
             // Uncurried syntax can apply several curried stages. Evaluate only
             // intermediate stages here; the final stage must return to the
             // caller's trampoline, including in unoptimized Debug builds.
@@ -269,17 +303,15 @@ pub const Context = struct {
     }
     pub fn invoke(self: *Context, fn_value: Value, args: []const Value) Value {
         const step = self.nextClosure(fn_value, args);
-        return switch (step) {
-            .value => |v| v,
-            .tail => |id| self.call(id, self.pending[0..self.pending_len]),
-        };
+        return if (isTail(step)) self.call(@truncate(step), self.pending[0..self.pending_len]) else step;
     }
-    /// Each task has independent trampoline scratch. Its immutable result is
-    /// allocated in the parent's request arena, whose allocator is thread-safe
-    /// in Zig 0.16. No arena can be destroyed until every task has been joined.
+    /// Tasks use independent bump cursors backed by the request's shared arena.
+    /// Reserve only spare-worker capacity; unqueued siblings run on this Context.
+    /// Joining every submitted job remains the lifetime boundary for its storage.
     pub fn parallel(self: *Context, comptime count: usize, thunks: [count]Value) [count]Value {
+        comptime assert(count > 0);
         const Task = struct {
-            context: Context,
+            context: Context align(64),
             thunk: Value,
             result: Value = undefined,
             fn run(raw: *anyopaque) void {
@@ -288,31 +320,47 @@ pub const Context = struct {
             }
         };
         var results: [count]Value = undefined;
-        const pool = self.pool;
-        if (pool == null or pool.?.worker_count == 0) {
+        const spawned = if (self.pool) |pool| pool.reserve(count - 1) else 0;
+        if (spawned == 0) {
             for (thunks, &results) |thunk, *result| result.* = self.invoke(thunk, &.{});
             return results;
         }
-        var tasks: [count]Task = undefined;
-        var jobs: [count]Job = undefined;
-        for (thunks, &tasks, &jobs) |thunk, *task, *job| {
+        const pool = self.pool.?;
+        defer pool.release(spawned);
+        var tasks: [count - 1]Task = undefined;
+        var jobs: [count - 1]Job = undefined;
+        for (thunks[1..][0..spawned], tasks[0..spawned], jobs[0..spawned]) |thunk, *task, *job| {
             task.* = .{ .context = Context.init(std.heap.page_allocator), .thunk = thunk };
             task.context.pool = pool;
             task.context.shared_allocator = self.allocator();
             job.* = .{ .run = Task.run, .data = task };
+            pool.submit(job);
         }
-        // Keep the first task on this thread, and expose the remaining siblings.
-        // Waiting threads help execute queued work, including nested batches.
-        for (jobs[1..]) |*job| pool.?.submit(job);
-        Task.run(&tasks[0]);
-        for (jobs[1..]) |*job| pool.?.wait(job);
-        for (&tasks, &results) |*task, *result| {
+        results[0] = self.invoke(thunks[0], &.{});
+        for (thunks[spawned + 1 ..], results[spawned + 1 ..]) |thunk, *result| result.* = self.invoke(thunk, &.{});
+        for (jobs[0..spawned]) |*job| pool.wait(job);
+        for (tasks[0..spawned], results[1..][0..spawned]) |*task, *result| {
             result.* = task.result;
             self.calls += task.context.calls;
             self.allocated += task.context.allocated;
             task.context.deinit();
         }
         return results;
+    }
+    /// Reverse freshly built list cells that have not escaped their owner.
+    /// Never call this on a published/shared semantic list.
+    pub fn reverseOwnedList(value: Value) Value {
+        var cursor = value;
+        var result = empty(.Nil);
+        while (tag(cursor) == .Cons) {
+            const fields = objectFields(cursor);
+            const next_value = fields[1];
+            fields[1] = result;
+            result = cursor;
+            cursor = next_value;
+        }
+        assert(tag(cursor) == .Nil);
+        return result;
     }
     pub fn fromCodepoints(self: *Context, points: []const u32) Value {
         const result = self.allocate(u32, points.len + 1);
@@ -351,7 +399,7 @@ pub const Context = struct {
         result[i] = 0xffffffff;
         return pointer(.string, result.ptr);
     }
-    fn reverse(self: *Context, value: Value, suffix: Value, cons: Tag) Value {
+    pub fn reverse(self: *Context, value: Value, suffix: Value, comptime cons: Tag) Value {
         var result = suffix;
         var cursor = value;
         while (tag(cursor) == cons) : (cursor = field(cursor, 1)) result = self.node(cons, &.{ field(cursor, 0), result });
@@ -543,7 +591,7 @@ pub const Context = struct {
         if (value >= 4294967296.0) return 0xffffffff;
         return @intFromFloat(@trunc(value));
     }
-    pub fn primitive(self: *Context, op: Primitive, args: []const Value) Value {
+    pub fn primitive(self: *Context, comptime op: Primitive, args: []const Value) Value {
         const a: Value = if (args.len == 0) erased else args[0];
         const b: Value = if (args.len < 2) erased else args[1];
         return switch (op) {
@@ -585,6 +633,8 @@ pub const Context = struct {
             },
             .U32_and => word(toWord(a) & toWord(b)),
             .U32_or => word(toWord(a) | toWord(b)),
+            .U32_xor => word(toWord(a) ^ toWord(b)),
+            .Map_diff_chr => nat(1 + @as(u64, @clz(toWord(a)))),
             .U32_from_nat => word(@truncate(toNat(a))),
             .U32_to_nat => nat(toWord(a)),
             .U32_to_f32 => float(@floatFromInt(toWord(a))),
@@ -611,6 +661,7 @@ pub const Context = struct {
             },
             .Maybe_is_none => boolean(tag(args[2]) == .None),
             .Maybe_is_some => boolean(tag(args[2]) == .Some),
+            .Maybe_map => if (tag(args[4]) == .Some) self.node(.Some, &.{self.invoke(args[3], &.{field(args[4], 0)})}) else empty(.None),
             .Maybe_or => if (tag(args[2]) == .Some) args[2] else args[3],
             .List_is_empty => boolean(tag(args[2]) == .Nil),
             .List_length => nat(length(args[2], .Cons)),
@@ -773,4 +824,33 @@ test "right-biased map union and strict bounded decimal naturals" {
         try std.testing.expectEqual(empty(.None), ctx.primitive(.Nat_read, &.{text}));
     }
     try std.testing.expectEqual(nat(mask), field(ctx.primitive(.Nat_read, &.{literal("281474976710655")}), 0));
+}
+
+test "small value slabs preserve alignment and contents across refill and large allocations" {
+    var ctx = Context.init(std.testing.allocator);
+    defer ctx.deinit();
+    const first = ctx.allocate(u8, 3);
+    @memcpy(first, "abc");
+    const words = ctx.allocate(u64, 1024);
+    @memset(words, 0x0102030405060708);
+    for (0..5000) |i| _ = ctx.node(.Pair, &.{ nat(i), empty(.Unit) });
+    const large = ctx.allocate(u32, 20000);
+    @memset(large, 42);
+    try std.testing.expectEqualStrings("abc", first);
+    for (words) |value| try std.testing.expectEqual(@as(u64, 0x0102030405060708), value);
+    try std.testing.expectEqual(@as(u32, 42), large[large.len - 1]);
+    try std.testing.expectEqual(@as(usize, 0), ctx.allocate(u64, 0).len);
+}
+
+test "current Base primitives preserve word boundaries and absent Maybe mapping" {
+    var ctx = Context.init(std.testing.allocator);
+    defer ctx.deinit();
+    try std.testing.expectEqual(word(0xffffffff), ctx.primitive(.U32_xor, &.{ word(0xaaaaaaaa), word(0x55555555) }));
+    try std.testing.expectEqual(nat(33), ctx.primitive(.Map_diff_chr, &.{word(0)}));
+    for (0..32) |bit| {
+        const value = @as(u32, 1) << @as(u5, @intCast(bit));
+        try std.testing.expectEqual(nat(32 - bit), ctx.primitive(.Map_diff_chr, &.{word(value)}));
+    }
+    // An erased value is not callable: None must not evaluate its mapper.
+    try std.testing.expectEqual(empty(.None), ctx.primitive(.Maybe_map, &.{ erased, erased, erased, erased, empty(.None) }));
 }

@@ -21,7 +21,12 @@ pub fn build(b: *std.Build) void {
     const tests = b.addTest(.{ .root_module = module });
     tests.step.dependOn(&generate.step);
     const run_tests = b.addRunArtifact(tests);
-    b.step("test", "Run native compiler and protocol tests").dependOn(&run_tests.step);
+    const regressions = b.addSystemCommand(&.{ "python3", "tests_optimizations.py", "--compiler" });
+    regressions.addArtifactArg(executable);
+    regressions.addArgs(&.{ "--zig-exe", b.graph.zig_exe, "-v" });
+    const test_step = b.step("test", "Run native compiler, memory, and protocol regressions");
+    test_step.dependOn(&run_tests.step);
+    test_step.dependOn(&regressions.step);
     const run = b.addRunArtifact(executable);
     if (b.args) |args| run.addArgs(args);
     b.step("run", "Run the native compiler process").dependOn(&run.step);

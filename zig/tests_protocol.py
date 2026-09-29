@@ -10,7 +10,7 @@ import subprocess
 import unittest
 
 BINARY = Path(__file__).resolve().parent / 'zig-out/bin/blotc-zig'
-MAGIC, VERSION = 0x424C4F54, 13
+MAGIC, VERSION = 0x424C4F54, 14
 # Optional CPU emulator prefix. CI uses QEMU without build-host extensions.
 RUNNER = shlex.split(os.environ.get('BLOT_ZIG_RUNNER', ''))
 
@@ -218,7 +218,7 @@ class ProtocolTests(unittest.TestCase):
     def test_version_is_text_without_a_protocol_handshake(self):
         result = self.run_compiler(b'', '--version')
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, b'blotc-zig 0.1.0 (protocol 13)\n')
+        self.assertEqual(result.stdout, f'blotc-zig 0.1.0 (protocol {VERSION})\n'.encode())
         self.assertEqual(result.stderr, b'')
 
     def test_options_validate_values(self):

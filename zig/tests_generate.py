@@ -86,6 +86,30 @@ class GenerationTests(unittest.TestCase):
             with self.subTest(files=files, group=group), self.assertRaises(ValueError):
                 select(files, group)
 
+    def test_protocol_version_has_one_source_of_truth(self):
+        import json
+        import re
+        root = Path(__file__).resolve().parent.parent
+        generator = Generator(root)
+        version = generator.protocol_version()
+        manifest = json.loads((root / 'zig/src/generated/manifest.json').read_text())
+        self.assertEqual(version, manifest['protocol_version'])
+        self.assertIn(f'pub const version: u32 = {version};',
+                      (root / 'zig/src/generated/protocol.zig').read_text())
+        host = (root / 'compiler/native_protocol.ts').read_text()
+        self.assertEqual(int(re.search(r'nativeProtocolVersion = (\d+)', host)[1]), version)
+
+    def test_nonliteral_or_unrepresentable_protocol_version_is_rejected(self):
+        from port import ParseError
+        generator = Generator(Path(__file__).resolve().parent.parent)
+        function = generator.functions['native_response.version']
+        for body in [name('computed'), Node('block', children=[]),
+                     Node('block', children=[Node('number', '4294967296')]),
+                     Node('block', children=[Node('number', '14n')])]:
+            with self.subTest(body=body), self.assertRaises(ParseError):
+                function.body = body
+                generator.protocol_version()
+
     def test_generated_semantics_are_native_and_have_bounded_arity(self):
         import json
         directory = Path(__file__).resolve().parent / 'src/generated'
