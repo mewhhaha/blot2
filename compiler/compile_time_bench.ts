@@ -1,6 +1,12 @@
 import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import { dirname, resolve } from "node:path";
 import { cpus } from "node:os";
+import {
+  nativeCpuHz,
+  nativeCpuMilliseconds,
+  nativeCpuSample,
+  nativeScheduler,
+} from "./native_cpu_bench.ts";
 import { benchmarkWorkloads } from "./benchmark_workloads.ts";
 import { createNativeCompiler } from "./native.ts";
 import { createNativeIncrementalCompiler } from "./native_incremental.ts";
@@ -98,7 +104,7 @@ if (selected.length === 0) throw new Error(`No workloads match ${filter}`);
 const rows: unknown[] = [];
 const report = {
   methodology:
-    "Two unrecorded pairs then alternating pairs. Fresh native process/frontend for full compilation and for each initial/edit/unchanged/revert sequence. Warm Deno host and filesystem; no cache flush. analysis:false. Timers include parser, IPC, inference, specialization, Wasm emission and response decoding; process/frontend startup is separate. Execution and byte comparisons are outside timers. No timing thresholds.",
+    "Two unrecorded pairs then alternating pairs. Fresh native process/frontend for full compilation and for each initial/edit/unchanged/revert sequence. Warm Deno host and filesystem; no cache flush. analysis:false. Timers include parser, IPC, inference, specialization, Wasm emission and response decoding; process/frontend startup is separate. Execution, byte comparisons and Linux proc sampling are outside wall timers. Native CPU excludes frontend work; its tick resolution is reported. No timing thresholds.",
   baseline: {
     executable: executables[0],
     sha256: await hash(await Deno.readFile(executables[0])),
@@ -114,6 +120,7 @@ const report = {
     cpu: cpus()[0]?.model,
     logical_cpus: cpus().length,
   },
+  native_cpu_tick_ms: nativeCpuHz === undefined ? null : 1000 / nativeCpuHz,
   samples,
   threadCounts,
   rows,
@@ -125,6 +132,11 @@ async function save() {
 for (const workload of selected) {
   for (const threads of threadCounts) {
     const full: number[][] = [[], []];
+    const fullCpu: number[][] = [[], []];
+    const initialCpu: number[][] = [[], []];
+    const editCpu: number[][] = [[], []];
+    const revertCpu: number[][] = [[], []];
+    const schedulers: unknown[][] = [[], []];
     const startups: number[][] = [[], []];
     const initial: number[][] = [[], []];
     const edits: number[][] = [[], []];
@@ -147,11 +159,15 @@ for (const workload of selected) {
         const compiler = await createNativeCompiler(options);
         const startupMs = performance.now() - start;
         try {
+          const pid = Deno.build.os === "linux" ? compiler.pid : undefined;
+          const before = await nativeCpuSample(pid);
           start = performance.now();
           const artifact = await compiler.compile(workload.source, {
             analysis: false,
           });
           const ms = performance.now() - start;
+          const after = await nativeCpuSample(pid);
+          const cpu = nativeCpuMilliseconds(before, after);
           reference ??= artifact.bytes;
           equal(
             artifact.bytes,
@@ -161,6 +177,11 @@ for (const workload of selected) {
           await workload.verify(artifact, false);
           if (sample >= 0) {
             full[side].push(ms);
+            if (cpu !== null) fullCpu[side].push(cpu);
+            schedulers[side].push({
+              before: nativeScheduler(before),
+              after: nativeScheduler(after),
+            });
             startups[side].push(startupMs);
           }
         } finally {
@@ -171,17 +192,21 @@ for (const workload of selected) {
         const session = await createNativeIncrementalCompiler(options);
         const sessionStartupMs = performance.now() - start;
         try {
+          const pid = Deno.build.os === "linux" ? session.pid : undefined;
+          const beforeFirst = await nativeCpuSample(pid);
           start = performance.now();
           const first = await session.compile(workload.source, {
             analysis: false,
           });
           const firstMs = performance.now() - start;
+          const afterFirst = await nativeCpuSample(pid);
           equal(first.artifact.bytes, reference);
           start = performance.now();
           const edited = await session.compile(workload.changed, {
             analysis: false,
           });
           const editMs = performance.now() - start;
+          const afterEdit = await nativeCpuSample(pid);
           changedReference ??= edited.artifact.bytes;
           equal(
             edited.artifact.bytes,
@@ -201,13 +226,24 @@ for (const workload of selected) {
           equal(cached.artifact.bytes, changedReference);
           equal(cached.stats.result_reused, true);
           equal(cached.stats.groups_checked, 0);
+          const beforeRevert = await nativeCpuSample(pid);
           start = performance.now();
           const reverted = await session.compile(workload.source, {
             analysis: false,
           });
           const revertMs = performance.now() - start;
+          const afterRevert = await nativeCpuSample(pid);
           equal(reverted.artifact.bytes, reference);
           if (sample >= 0) {
+            const firstCpu = nativeCpuMilliseconds(beforeFirst, afterFirst);
+            const editedCpu = nativeCpuMilliseconds(afterFirst, afterEdit);
+            const revertedCpu = nativeCpuMilliseconds(
+              beforeRevert,
+              afterRevert,
+            );
+            if (firstCpu !== null) initialCpu[side].push(firstCpu);
+            if (editedCpu !== null) editCpu[side].push(editedCpu);
+            if (revertedCpu !== null) revertCpu[side].push(revertedCpu);
             initial[side].push(firstMs);
             edits[side].push(editMs);
             unchanged[side].push(cachedMs);
@@ -223,8 +259,9 @@ for (const workload of selected) {
     const compare = (values: number[][]) => ({
       baseline: distribution(values[0]),
       candidate: distribution(values[1]),
-      speedup: distribution(values[0]).median_ms /
-        distribution(values[1]).median_ms,
+      speedup: distribution(values[1]).median_ms === 0
+        ? null
+        : distribution(values[0]).median_ms / distribution(values[1]).median_ms,
     });
     const row = {
       workload: workload.name,
@@ -238,9 +275,17 @@ for (const workload of selected) {
       wasm_sha256: await hash(reference!),
       changed_wasm_sha256: changedReference && await hash(changedReference),
       full: compare(full),
+      native_cpu: nativeCpuHz === undefined
+        ? undefined
+        : { full: compare(fullCpu), schedulers },
       startup: compare(startups),
       incremental: workload.changed === undefined ? undefined : {
         initial: compare(initial),
+        native_cpu: nativeCpuHz === undefined ? undefined : {
+          initial: compare(initialCpu),
+          edit: compare(editCpu),
+          revert: compare(revertCpu),
+        },
         edit: compare(edits),
         unchanged: compare(unchanged),
         revert: compare(reverts),
@@ -256,6 +301,11 @@ for (const workload of selected) {
       full_ms: [row.full.baseline.median_ms, row.full.candidate.median_ms],
       full_speedup: row.full.speedup,
       edit_speedup: row.incremental?.edit.speedup,
+      native_cpu_ms: row.native_cpu &&
+        [
+          row.native_cpu.full.baseline.median_ms,
+          row.native_cpu.full.candidate.median_ms,
+        ],
     }));
   }
 }

@@ -1,13 +1,23 @@
 name: Compiler throughput
 on:
   pull_request:
-    paths: ['compiler/**', 'scripts/**', 'std/**', 'LAWS.bend', 'PROOF.bend', 'baba.json', 'deno.json', 'deno.lock', '.github/workflows/compiler-throughput.yml']
+    paths: [
+      "compiler/**",
+      "scripts/**",
+      "std/**",
+      "LAWS.bend",
+      "PROOF.bend",
+      "baba.json",
+      "deno.json",
+      "deno.lock",
+      ".github/workflows/compiler-throughput.yml",
+    ]
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
   group: compiler-throughput-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 defaults:
   run:
     shell: bash
@@ -20,7 +30,7 @@ jobs:
       matrix:
         revision: [baseline, candidate]
     env:
-      BEND_NO_TELEMETRY: '1'
+      BEND_NO_TELEMETRY: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -108,7 +118,7 @@ jobs:
           tar -xzf compiler-candidate.tar.gz
           chmod +x generated/compiler/blotc
           mkdir -p build
-          deno fmt --check compiler/annotation_scan_fusion.test.ts compiler/generalization_fast_path.test.ts compiler/COMPILATION_PERFORMANCE.md
+          deno fmt --check .github/workflows/compiler-throughput.yml compiler/annotation_scan_fusion.test.ts compiler/generalization_fast_path.test.ts compiler/native_diagnostics.test.ts compiler/compile_time_bench.ts compiler/native.ts compiler/native_incremental.ts compiler/COMPILATION_PERFORMANCE.md
           deno check compiler/demo.ts compiler/host_demo.ts compiler/ecs_demo.ts compiler/cli.ts compiler/bench.ts compiler/native_bench.ts compiler/parallel_grain_bench.ts compiler/cpu_scaling_bench.ts compiler/cpu_scaling_trace.ts compiler/worker.ts compiler/syntax_worker.ts compiler/compile_time_bench.ts
           deno test --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts 2>&1 | tee build/compiler-tests.log
       - uses: actions/upload-artifact@v4

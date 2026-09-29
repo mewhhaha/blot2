@@ -68,7 +68,10 @@ startup measurements. Source reading for the two checked-in examples happens
 before timing. Wasm byte equality and executable results are checked outside
 timed regions. Compiler executable hashes, source/artifact hashes, CPU identity,
 raw timings and cache statistics are retained in JSON. Ratios are diagnostic,
-not CI timing thresholds.
+not CI timing thresholds. On Linux the report also records native child CPU
+separately, with the detected clock-tick resolution and scheduler/nice values.
+Process discovery and CPU sampling are outside wall timers. Native CPU excludes
+frontend work; sub-tick requests cannot yield precise CPU ratios.
 
 CI builds both source versions and checks the complete candidate compiler suite,
 including native/reference parity and existing invalid-program tests. The

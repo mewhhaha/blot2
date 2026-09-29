@@ -95,6 +95,10 @@ export async function createNativeCompiler(
     return response.artifact;
   }
   return {
+    /** Owned child identifier for diagnostic CPU/RSS sampling. */
+    get pid(): number {
+      return process.pid;
+    },
     async analyze(
       source: SourceInput,
       options: CompileOptions = {},
