@@ -83,6 +83,8 @@ type Expr is Data:
   ArraySetExpr{array: Expr, index: Expr, value: Expr}
   ArrayReuseExpr{array: Expr, index: Expr, value: Expr}
   ArrayLengthExpr{array: Expr}
+  MemoExpr{computation: Expr}
+  ForceExpr{value: Expr}
 
 type Work is Data:
   ExpressionWork{expression: M.Expr}
@@ -134,6 +136,10 @@ def rebuild_arms(arms: List<&2, M.MatchArm<M.Expr>>, bodies: List<&2, Expr>) -> 
 
 def rebuild(original: M.Expr, children: List<&2, Expr>) -> Result<&2, &2, M.Diagnostic, Expr>:
   match original children:
+    case M.MemoExpr{computation} value <> Nil{}:
+      Done{MemoExpr{value}}
+    case M.ForceExpr{original} value <> Nil{}:
+      Done{ForceExpr{value}}
     case M.UnitExpr{} Nil{}:
       Done{UnitExpr{}}
     case M.U32Expr{value} Nil{}:

@@ -47,16 +47,19 @@ the native regression gate.
 python3 scripts/build_runtime_reference.py
 deno task generate:parser
 
-# In the new checkout; baseline is the previous PR head f46baf4, not main.
+# In the new checkout; baseline is the main checkpoint 2d44737.
 deno run --allow-read --allow-write=build compiler/layout_bench.ts /path/to/before
 ```
 
-The layout workflow independently builds both revisions and records exact source
-identities. Eight runtime cases use eleven alternating samples, at least 200 ms
-and 32 warmup calls per implementation, and identical batch lengths. Every
-measured result is checked outside the timer. Memory high-water marks and Wasm
-sizes are retained. Two separate full-source-compilation cases report the cost
-of doing the analysis, rather than conflating runtime gains with compiler speed.
+The integration workflow compares all runtime changes against main checkpoint
+`2d44737` with Bend 2.0.34 and matching Base/loader. It independently builds
+both revisions and records their identities. The earlier `f46baf4` comparison
+isolated only layout propagation; its timings remain historical. Eight runtime
+cases use eleven alternating samples, at least 200 ms and 32 warmup calls per
+implementation, and identical batch lengths. Every measured result is checked
+outside the timer. Memory high-water marks and Wasm sizes are retained. Two
+separate full-source-compilation cases report the cost of doing the analysis,
+rather than conflating runtime gains with compiler speed.
 
 Retained-buffer cases deliberately isolate repeated conservative scanning and
 can produce large ratios. They are not application-wide speedup claims. Unknown
@@ -67,8 +70,10 @@ Timing ratios are diagnostic and do not decide whether CI passes.
 
 Tagging every tiny product regressed the existing ECS workload by roughly 3-6%
 in local repeated measurements. The eight-word guard removes that extra store:
-the final benchmark asserts that the complete `examples/ecs.blot` Wasm is byte
-identical to the previous PR compiler, alongside execution checks. Larger
+the original layout-only comparison produced byte-identical ECS Wasm. The
+integration comparison includes collector and memo-root changes, so it records
+Wasm identity and verifies ABI and execution for both compilers. The allocation
+flag regressions continue to require that small products are not tagged. Larger
 products and scalar arrays retain the tracing optimization. This threshold is a
 measured heuristic, not a universal hardware crossover. Tests cover 7, 8, 9 and
 16 fields, and small-product field evidence remains available to later arrays.

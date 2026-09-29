@@ -2,23 +2,23 @@
 // Capability records are guest values, not composite arguments in the host ABI.
 // Title and frame numbers stand in for the proposed Text and RenderFrame ABI.
 
-type WindowIo is data = WindowIo { set_title: U32 -> U32 ! {Foreign} }
-type RenderIo is data = RenderIo { submit: U32 -> U32 ! {Foreign} }
-type Io is data = Io { window: WindowIo, render: RenderIo }
+type WindowIo is data = #WindowIo { set_title: U32 -> U32 ! {Foreign} }
+type RenderIo is data = #RenderIo { submit: U32 -> U32 ! {Foreign} }
+type Io is data = #Io { window: WindowIo, render: RenderIo }
 
 const title = fn window => do:
-  let WindowIo { set_title } = window
+  let #WindowIo { set_title } = window
   use status <- set_title 7
   return status
 
 // Only rendering authority reaches this function, not the whole Io bundle.
 const render_frame = fn render => fn frame => do:
-  let RenderIo { submit } = render
+  let #RenderIo { submit } = render
   use status <- submit frame
   return status
 
 const launch = fn io => do:
-  let Io { window, render } = io
+  let #Io { window, render } = io
   use status <- title window
   if status != 0:
     return status
@@ -38,13 +38,13 @@ entry const main = fn (dispatch: U32 -> U32 ! {Foreign}) => do:
       return 1
     use status <- dispatch (2000 + frame)
     return status
-  use status <- launch (Io {
-    window: WindowIo { set_title },
-    render: RenderIo { submit },
+  use status <- launch (#Io {
+    window: #WindowIo { set_title },
+    render: #RenderIo { submit },
   })
   return status
 
 entry const render_only = fn (submit: U32 -> U32 ! {Foreign}) =>
-  render_frame (RenderIo { submit }) 42
+  render_frame (#RenderIo { submit }) 42
 
 entry const uses_host = @effect.has (@effect.of main) Foreign

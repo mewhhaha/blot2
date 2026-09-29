@@ -16,6 +16,10 @@ def children(expression: I.Expr) -> List<&2, I.Expr>:
   match expression:
     case I.ConstructExpr{constructor, Some{payload}}:
       [payload]
+    case I.MemoExpr{computation}:
+      [computation]
+    case I.ForceExpr{value}:
+      [value]
     case I.ApplyExpr{callee, argument}:
       [callee, argument]
     case I.CallExpr{key, argument}:
@@ -96,6 +100,10 @@ def rebuild(original: I.Expr, children: List<&2, I.Expr>) -> Result<&2, &2, M.Di
   match original children:
     case I.ConstructExpr{constructor, Some{payload}} payload_new <> Nil{}:
       Done{I.ConstructExpr{constructor, Some{payload_new}}}
+    case I.MemoExpr{computation} value <> Nil{}:
+      Done{I.MemoExpr{value}}
+    case I.ForceExpr{original} value <> Nil{}:
+      Done{I.ForceExpr{value}}
     case I.ApplyExpr{callee, argument} callee_new <> argument_new <> Nil{}:
       Done{I.ApplyExpr{callee_new, argument_new}}
     case I.CallExpr{key, argument} argument_new <> Nil{}:

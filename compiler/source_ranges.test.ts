@@ -4,7 +4,7 @@ import { sourceDeclarationRanges } from "./source_ranges.ts";
 Deno.test("source partitions keep attributes, delimiters, escaped strings and comments together", () => {
   const first = '// fn ignored\nconst text = "\\"[ // not a comment"\n';
   const second =
-    "#[component]\n// attached attribute\n#[other]\ndata Pair = Pair {\n  first: U32,\n  second: U32,\n}\n";
+    "#[component]\n// attached attribute\n#[other]\ndata Pair = #Pair {\n  first: U32,\n  second: U32,\n}\n";
   const third =
     "const answer = fn () => do:\n  let values = [\n    1, // )\n    2,\n  ]\n  return 42\n";
   for (const ending of ["\n", "\r\n", "\r"]) {

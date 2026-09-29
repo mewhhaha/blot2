@@ -1,7 +1,16 @@
 name: Layout propagation
 on:
   pull_request:
-    paths: ['compiler/**', 'scripts/**', 'std/**', 'LAWS.bend', 'PROOF.bend', 'deno.json', 'deno.lock', '.github/workflows/layout-performance.yml']
+    paths: [
+      "compiler/**",
+      "scripts/**",
+      "std/**",
+      "LAWS.bend",
+      "PROOF.bend",
+      "deno.json",
+      "deno.lock",
+      ".github/workflows/layout-performance.yml",
+    ]
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,7 +29,7 @@ jobs:
       matrix:
         revision: [before, candidate]
     env:
-      BEND_NO_TELEMETRY: '1'
+      BEND_NO_TELEMETRY: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,8 +41,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - name: Install verified matching Bend toolchain
         run: |
-          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
-          echo "5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
+          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
           mkdir -p "$RUNNER_TEMP/bend"
           tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
           echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
@@ -46,7 +55,7 @@ jobs:
           source="$GITHUB_WORKSPACE"
           if [ "$REVISION" = before ]; then
             source="$RUNNER_TEMP/before"
-            git worktree add --detach "$source" f46baf4983a34ecb7fe3845c02eefd7fbe162059
+            git worktree add --detach "$source" 2d44737bbe265d75b0264bad78b810c87ff6c024
           fi
           python3 "$GITHUB_WORKSPACE/scripts/build_runtime_reference.py" "$source"
           (cd "$source" && deno task generate:parser)
@@ -85,7 +94,7 @@ jobs:
           deno check compiler/layout_bench.ts
           deno test --allow-read=compiler,generated,examples,std compiler/codegen_layout.test.ts compiler/codegen.test.ts 2>&1 | tee build/layout-unit.log
           deno test --allow-read=compiler,generated,examples,std --filter javascript compiler/layout_propagation.test.ts 2>&1 | tee build/layout-source.log
-      - name: Compare with previously verified scalar-array implementation
+      - name: Compare runtime changes with the main checkpoint
         run: |
           deno run --allow-read --allow-write=build compiler/layout_bench.ts "$RUNNER_TEMP/before" 2>&1 | tee build/layout-bench.log
           cp generated/compiler/source-revision.txt build/candidate-revision.txt

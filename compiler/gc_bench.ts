@@ -1,5 +1,5 @@
-/** Runtime loop/collection measurements. Compare to the previous PR head to
- * isolate layout-aware tracing from the earlier array and host-copy changes.
+/** Runtime loop/collection measurements against a built baseline checkout.
+ * Integration CI compares the complete runtime changes with main 2d44737.
  * deno run --allow-read --allow-write=build compiler/gc_bench.ts /path/to/baseline
  */
 import { deepStrictEqual as equal, ok } from "node:assert/strict";

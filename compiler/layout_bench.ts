@@ -1,5 +1,5 @@
-/** Layout propagation measurements. Compare to the previous scalar-array PR
- * head f46baf4, not main, to isolate this pass from earlier optimizations.
+/** Layout propagation measurements against a built baseline checkout.
+ * Integration CI compares the complete runtime changes with main 2d44737.
  * deno run --allow-read --allow-write=build compiler/layout_bench.ts /path/to/baseline
  */
 import { deepStrictEqual as equal, ok } from "node:assert/strict";
@@ -274,34 +274,38 @@ entry const f${i} = fn (input: U32) => do:
       }x)`,
     );
   }
-  // A real workload caught the cost of tagging tiny products. Require the
-  // guarded emitter to preserve its exact prior Wasm, not just a noisy time.
+  // The integration baseline also differs in its collector implementation.
+  // Record byte identity and check both implementations against the ECS contract;
+  // allocation-flag tests separately guard against tagging tiny products.
   const ecsOld = await baseline.createSourceCompiler();
   const ecsNew = await createSourceCompiler();
-  let ecsBytes = 0;
+  let ecsBytes = 0, ecsBaselineBytes = 0, ecsIdentical = false;
   try {
     const ecsSource = await Deno.readTextFile(
       new URL("../examples/ecs.blot", import.meta.url),
     );
     const old = ecsOld.compile(ecsSource), current = ecsNew.compile(ecsSource);
-    equal(
-      current.bytes,
-      old.bytes,
-      "ECS emitted code must not regress for small products",
-    );
+    ecsIdentical = current.bytes.length === old.bytes.length &&
+      current.bytes.every((byte, index) => byte === old.bytes[index]);
+    ecsBaselineBytes = old.bytes.length;
     ecsBytes = current.bytes.length;
-    const guest = await instantiateGuest(current.bytes);
+    const guests = await Promise.all(
+      [old, current].map((artifact) => instantiateGuest(artifact.bytes)),
+    );
     try {
-      equal(guest.call("snapshot", null), 6);
-      equal(guest.call("ghost_count", 1), 4);
-      for (const turns of [0, 100, 1000]) {
-        equal(guest.call("run", turns), 33 + 6 * turns);
+      equal(guests[0].abi, guests[1].abi);
+      for (const guest of guests) {
+        equal(guest.call("snapshot", null), 6);
+        equal(guest.call("ghost_count", 1), 4);
+        for (const turns of [0, 100, 1000]) {
+          equal(guest.call("run", turns), 33 + 6 * turns);
+        }
       }
     } finally {
-      guest.dispose();
+      for (const guest of guests) guest.dispose();
     }
     console.log(
-      `ECS control: byte-identical Wasm (${ecsBytes} bytes), execution checks passed`,
+      `ECS control: ${ecsBaselineBytes} -> ${ecsBytes} bytes (identical: ${ecsIdentical}), ABI and execution checks passed`,
     );
   } finally {
     ecsOld.dispose();
@@ -326,7 +330,8 @@ entry const f${i} = fn (input: U32) => do:
         compilation_rows: compilationRows,
         application_control: {
           source: "examples/ecs.blot",
-          wasm_byte_identical: true,
+          wasm_byte_identical: ecsIdentical,
+          baseline_wasm_bytes: ecsBaselineBytes,
           wasm_bytes: ecsBytes,
         },
       },

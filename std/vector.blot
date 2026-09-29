@@ -1,0 +1,43 @@
+// Small geometry values. Import the types; their operators follow their owner.
+type Vec2 is data = #Vec2 { x: F32, y: F32 }
+type Vec3 is data = #Vec3 { x: F32, y: F32, z: F32 }
+
+const Vec2.add: Vec2 -> Vec2 -> Vec2 = fn a => fn b =>
+  #Vec2 { x: a.x + b.x, y: a.y + b.y }
+const Vec2.sub: Vec2 -> Vec2 -> Vec2 = fn a => fn b =>
+  #Vec2 { x: a.x - b.x, y: a.y - b.y }
+const Vec2.mul: Vec2 -> F32 -> Vec2 = fn value => fn scale =>
+  #Vec2 { x: value.x * scale, y: value.y * scale }
+const Vec2.div: Vec2 -> F32 -> Vec2 = fn value => fn scale =>
+  #Vec2 { x: value.x / scale, y: value.y / scale }
+const Vec2.lerp: Vec2 -> Vec2 -> F32 -> Vec2 = fn a => fn b => fn weight =>
+  a + (b - a) * weight
+const Vec2.dot: Vec2 -> Vec2 -> F32 = fn a => fn b => a.x * b.x + a.y * b.y
+const Vec2.length_squared = fn value => Vec2.dot value value
+const Vec2.length = fn value => sqrt (Vec2.length_squared value)
+// Zero normalizes to zero. Other inputs follow F32 arithmetic.
+const Vec2.normalized = fn value => do:
+  let length = Vec2.length value
+  return if length == 0.0 then value else value / length
+
+const Vec3.add: Vec3 -> Vec3 -> Vec3 = fn a => fn b =>
+  #Vec3 { x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }
+const Vec3.sub: Vec3 -> Vec3 -> Vec3 = fn a => fn b =>
+  #Vec3 { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z }
+const Vec3.mul: Vec3 -> F32 -> Vec3 = fn value => fn scale =>
+  #Vec3 { x: value.x * scale, y: value.y * scale, z: value.z * scale }
+const Vec3.div: Vec3 -> F32 -> Vec3 = fn value => fn scale =>
+  #Vec3 { x: value.x / scale, y: value.y / scale, z: value.z / scale }
+const Vec3.lerp: Vec3 -> Vec3 -> F32 -> Vec3 = fn a => fn b => fn weight =>
+  a + (b - a) * weight
+const Vec3.dot: Vec3 -> Vec3 -> F32 = fn a => fn b => a.x * b.x + a.y * b.y + a.z * b.z
+const Vec3.cross: Vec3 -> Vec3 -> Vec3 = fn a => fn b => #Vec3 {
+  x: a.y * b.z - a.z * b.y,
+  y: a.z * b.x - a.x * b.z,
+  z: a.x * b.y - a.y * b.x,
+}
+const Vec3.length_squared = fn value => Vec3.dot value value
+const Vec3.length = fn value => sqrt (Vec3.length_squared value)
+const Vec3.normalized = fn value => do:
+  let length = Vec3.length value
+  return if length == 0.0 then value else value / length

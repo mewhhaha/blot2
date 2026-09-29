@@ -139,7 +139,7 @@ export class SourceError extends Error {
     readonly code: string,
     message: string,
     readonly start: number,
-    readonly end = start,
+    readonly end: number = start,
     readonly origin?: { readonly filename: string; readonly source: string },
   ) {
     super(message);
@@ -175,7 +175,17 @@ export function layout(source: string, lexer: ParserInstance) {
   for (let index = 0; index < lexed.tokenTape.length; index++) {
     const token = lexed.tokenTape.token(index);
     if (!token) throw new Error(`Baba omitted token ${index}`);
-    if (token.channel === "main" && token.type !== "eof") tokens.push(token);
+    if (token.channel === "main" && token.type !== "eof") {
+      if (token.text === "·") {
+        throw new SourceError(
+          "reserved_selector_marker",
+          "Use '.' for a field selector",
+          token.span.start,
+          token.span.end,
+        );
+      }
+      tokens.push(token);
+    }
   }
   const insertions = new Map<number, string>();
   const frames = [{ indent: 0, depth: 0 }];
@@ -254,14 +264,13 @@ export function layout(source: string, lexer: ParserInstance) {
           }
           insertions.set(token.span.start, newline + indent);
           frames.push({ indent: width, depth });
-        } else if (width > frame.indent) {
-          if (!["=>", "=", "<-"].includes(previous.text)) {
-            throw new SourceError(
-              "layout_indent",
-              "Unexpected indentation; use parentheses for continued expressions",
-              token.span.start,
-            );
-          }
+        } else if (
+          width > frame.indent ||
+          (width === frame.indent && token.text === "|")
+        ) {
+          // An indented continuation extends the preceding expression. Only
+          // ':' and 'of' open suites. Leading | also joins pattern alternatives
+          // aligned with their first row.
         } else {
           let markers = newline;
           while (width < frames.at(-1)!.indent) {
@@ -444,6 +453,9 @@ export async function createFrontend() {
     );
   }
   return {
+    lex(source: string) {
+      return lexer.lex(source, { preserveTrivia: true });
+    },
     prepare,
     parsePrepared,
     encodePrepared(

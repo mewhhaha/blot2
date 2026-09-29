@@ -75,7 +75,7 @@ const with_answer = fn transform => transform 42
 entry const answer = U32.mul 2 $ U32.add 1 $ 20
 entry const arithmetic = fn () => identity $ 2 + 4 * 10
 entry const named = fn () => identity $ 20 \`combine\` 22
-entry const generic = fn () => Maybe.unwrap_or 0 $ Maybe.map identity $ Some $ 42
+entry const generic = fn () => Maybe.unwrap_or 0 $ Maybe.map identity $ #Some $ 42
 entry const partial = fn () => apply (U32.add 40) 2
 entry const eager = fn (enabled: Bool) => always 42 $ do:
   if enabled:
@@ -87,8 +87,8 @@ entry const block = fn (enabled: Bool) => identity $ do:
     return 42
   return 7
 entry const matched = fn (enabled: Bool) => identity $ case enabled of
-  True => 42
-  False => 7
+  #True => 42
+  #False => 7
 `,
     );
     equal((exports.answer as WebAssembly.Global).value, 42);

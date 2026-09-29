@@ -1001,13 +1001,27 @@ def update_evaluated(state: State, mode: Mode, checked: M.CheckedModule, evaluat
   next = {State{prelude, scope_key, declarations, planning, groups, constants, entries, specialization, catalog_version} : State}
   finish(mode, next, Main.Analysis{checked, bindings, remaining}, declaration_counts, group_counts, constant_counts)
 
-def update_checked(state: State, mode: Mode, +module: M.Module, +completed: CheckedGroups, declaration_counts: Counts, steps: Nat, hosts: List<&2, Entries.Entry>) -> Result<&2, &2, M.Diagnostic, Completion>:
+def evaluate_demand_graph(+constants: List<&2, M.CheckedConstant>, steps: Nat, context: Const.Context) -> Result<&2, &2, M.Diagnostic, Evaluated>:
+  +count = List.length(&2, M.CheckedConstant, constants)
+  do Result<&2, &2, M.Diagnostic, Evaluated>:
+    values : Const.Constants <- Const.evaluate_constants_selected(True{}, constants, steps, context)
+    return Evaluated{Map.new(&2, Cached<Const.Constants>), values, Counts{count, 0n}}
+
+def evaluate_checked_constants(demands: Bool, constants: List<&2, M.CheckedConstant>, steps: Nat, context: Const.Context, closures: Map<&2, Set()>, base_keys: Map<&2, List<&2, U32>>, previous: Map<&2, Cached<Const.Constants>>) -> Result<&2, &2, M.Diagnostic, Evaluated>:
+  match demands:
+    case True{}:
+      evaluate_demand_graph(constants, steps, context)
+    case False{}:
+      evaluate_constants(constants, steps, context, closures, base_keys, previous, Map.new(&2, Cached<Const.Constants>), Nil{}, Counts{0n, 0n})
+
+def update_checked(state: State, mode: Mode, +module: M.Module, +completed: CheckedGroups, declaration_counts: Counts, +steps: Nat, hosts: List<&2, Entries.Entry>) -> Result<&2, &2, M.Diagnostic, Completion>:
   State{prelude, scope_key, declarations, planning, previous_groups, previous_constants, entries, specialization, catalog_version} = state
   CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, group_counts} = completed
   do Result<&2, &2, M.Diagnostic, Completion>:
     +checked : M.CheckedModule <- assemble(module, completed)
     valid : Unit <- Entries.verify(hosts, checked)
-    evaluated : Evaluated <- evaluate_constants(Main.checked_constants(checked), steps, Main.const_context(module, checked), closures, base_keys, previous_constants, Map.new(&2, Cached<Const.Constants>), Nil{}, Counts{0n, 0n})
+    +context : Const.Context = Main.const_context(module, checked)
+    evaluated : Evaluated <- evaluate_checked_constants(Const.has_demands(context), Main.checked_constants(checked), steps, context, closures, base_keys, previous_constants)
     update_evaluated(State{prelude, scope_key, declarations, planning, groups, Map.new(&2, Cached<Const.Constants>), entries, specialization, catalog_version}, mode, checked, evaluated, declaration_counts, group_counts)
 
 def lowered_fragments(values: List<&2, Lowered>) -> List<&2, M.Module>:

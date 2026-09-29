@@ -10,16 +10,16 @@ import { SourceError } from "./syntax.ts";
 
 Deno.test("rebinding composes const builders and preserves previous closure captures", async () => {
   const source = `
-data Builder = Builder U32
+data Builder = #Builder U32
 const append = fn amount => fn builder => case builder of
-  Builder value => Builder (value * 10 + amount)
+  #Builder value => #Builder (value * 10 + amount)
 const built = do:
-  let application = Builder 1
+  let application = #Builder 1
   application := append 2 self
   application := append 3 self
   return application
 entry const composed = fn () => case built of
-  Builder value => value
+  #Builder value => value
 entry const captures = fn (value: U32) => do:
   let before = fn () => value
   value := self + 1
@@ -43,9 +43,9 @@ entry const nested = fn () => do:
     inner := self + 3
     return self + inner
   return self + value
-entry const local_scope = fn () => do:
+entry const branch_successor = fn () => do:
   let value = 1
-  if True:
+  if #True:
     value := self + 1
   return value
 `;
@@ -62,7 +62,7 @@ entry const local_scope = fn () => do:
         ["different_type", undefined, 42],
         ["captured_self", undefined, 42],
         ["nested", undefined, 106],
-        ["local_scope", undefined, 1],
+        ["branch_successor", undefined, 2],
       ] as const
     ) {
       equal(

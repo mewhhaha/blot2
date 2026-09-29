@@ -413,7 +413,7 @@ type Attempt is Data:
 # Plain associated members; type identity and typed-state requests keep their
 # own specialization.
 def plain_member(+member: String) -> Bool:
-  Bool.and(Bool.not(M.name_equal(member, "@type.same")), Bool.not(Maybe.is_some(&2, State.Request, State.request(member))))
+  Bool.and(Bool.not(String.starts_with(member, "@result.")), Bool.and(Bool.not(M.name_equal(member, "@type.same")), Bool.not(Maybe.is_some(&2, State.Request, State.request(member)))))
 
 # Receiver selection depends only on the receiver's nominal head (its owner,
 # its constructors' fields and its linked-schema evidence), never on arguments.

@@ -40,7 +40,7 @@ const unicodeProject = await loadSourceProject(entry, {
 });
 const witnessHelper = (body: string) => `
 const helper = fn () => ${body}
-const witness_matches_u32 = Type.eq (Type (helper ())) (Type 0)
+const witness_matches_u32 = Type.eq (#Type (helper ())) (#Type 0)
 entry const answer = fn () => witness_matches_u32
 `;
 const providerRows = `
@@ -87,11 +87,11 @@ const cases: OracleCase[] = [
   {
     name: "nominal type",
     source:
-      "type Maybe<T> = Some(T) | Nothing\nentry const answer = fn x => Some x\n",
+      "type Maybe t is data = #Some t | #Nothing\nentry const answer = fn x => #Some x\n",
   },
   {
     name: "unification failure",
-    source: "entry const answer = fn () => @u32.add True 1\n",
+    source: "entry const answer = fn () => @u32.add #True 1\n",
   },
   { name: "occurs failure", source: "entry const answer = fn x => x x\n" },
   {
@@ -109,12 +109,12 @@ const cases: OracleCase[] = [
   {
     name: "distinct nominal type witnesses",
     source: `
-type Count is data = Count U32
-type Other is data = Other U32
-const same = Type.eq (Type (Count 1)) (Type (Count 2))
-const different = Type.eq (Type (Count 1)) (Type (Other 2))
+type Count is data = #Count U32
+type Other is data = #Other U32
+const same = Type.eq (#Type (#Count 1)) (#Type (#Count 2))
+const different = Type.eq (#Type (#Count 1)) (#Type (#Other 2))
 entry const answer = fn () => case same, different of
-  True, False => 42
+  #True, #False => 42
   _, _ => 0
 `,
     expected: "success",
@@ -134,9 +134,9 @@ entry const answer = fn () => case same, different of
     name: "shared monomorphic argument conflict",
     source: `
 const use_u32 = fn apply => @u32.add (apply 1) 1
-const use_bool = fn apply => case apply True of
-  True => 1
-  False => 0
+const use_bool = fn apply => case apply #True of
+  #True => 1
+  #False => 0
 entry const answer = fn apply => @u32.add (use_u32 apply) (use_bool apply)
 `,
     expected: "type_mismatch",
@@ -192,15 +192,15 @@ entry const answer = fn () => alias 21
     name: "qualified FreeRow clones remain distinct",
     source: `
 type Tick is effect = Unit -> Unit
-type Box is data = Box U32
+type Box is data = #Box U32
 const Box.add: Box -> (Box -> Box ! {Tick}) = fn (left: Box) => fn (right: Box) => do:
   use Tick ()
-  return Box 42
+  return #Box 42
 const twice: a -> a ! {| e} where { associated "add" a a a ! {| e} } = fn value => value + value
 entry const integer = fn () => twice 21
 entry const boxed = fn () => do (@effect.provider Tick (fn () => ())):
-  use result <- twice (Box 21)
-  let Box value = result
+  use result <- twice (#Box 21)
+  let #Box value = result
   return value
 `,
     expected: "success",

@@ -6,18 +6,18 @@ import { loadSourceProject } from "./source_project.ts";
 const executable = new URL("../generated/compiler/blotc", import.meta.url);
 const entry = new URL("file:///virtual-schema-cache/main.blot");
 const library = new URL("file:///virtual-schema-cache/schema.blot");
-const schema = `type End is data = End
-type Entry { head, tail } is data = Entry { head, tail }
-const End.contains = fn (end: End) => fn witness => False
+const schema = `type End is data = #End
+type Entry { head, tail } is data = #Entry { head, tail }
+const End.contains = fn (end: End) => fn witness => #False
 const Entry.contains = fn entry => fn witness => do:
-  let Entry { head, tail } = entry
-  if Type head == Type witness:
-    return True
+  let #Entry { head, tail } = entry
+  if #Type head == #Type witness:
+    return #True
   return tail.contains(witness)
-const schema = Entry { head: True, tail: Entry { head: 7, tail: End } }
+const schema = #Entry { head: #True, tail: #Entry { head: 7, tail: #End } }
 `;
 const main = `import * as s from "./schema"
-entry const answer_bool = s.schema.contains(True)
+entry const answer_bool = s.schema.contains(#True)
 entry const answer_u32 = s.schema.contains(7)
 entry const answer_f32 = s.schema.contains(1.0)
 entry const ask_bool = fn () => answer_bool
@@ -62,19 +62,22 @@ for (const threads of [1, 4]) {
       let first = true;
       const revisions: readonly [string, number[]][] = [
         [schema, [1, 1, 0]],
-        [edit("return tail.contains(witness)", "return False"), [1, 0, 0]],
+        [edit("return tail.contains(witness)", "return #False"), [1, 0, 0]],
         [
           edit(
-            "const End.contains = fn (end: End) => fn witness => False",
-            "const End.contains = fn (end: End) => fn witness => True",
+            "const End.contains = fn (end: End) => fn witness => #False",
+            "const End.contains = fn (end: End) => fn witness => #True",
           ),
           [1, 1, 1],
         ],
-        [edit("type End is data = End", "type End is data = End | Another"), [
-          1,
-          1,
-          0,
-        ]],
+        [
+          edit("type End is data = #End", "type End is data = #End | #Another"),
+          [
+            1,
+            1,
+            0,
+          ],
+        ],
         [schema, [1, 1, 0]],
       ];
       for (const [revision, expected] of revisions) {

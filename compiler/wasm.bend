@@ -101,13 +101,14 @@ type BytePlan is Data:
   BytePlan{length: Nat, chunks: List<&2, List<&2, U32>>}
 
 type Heap is Data:
-  Heap{next: Nat, chunks: List<&2, List<&2, U32>>}
+  Heap{next: Nat, chunks: List<&2, List<&2, U32>>, memos: Map<&2, Maybe<&2, U32>>}
 
 type Serialized is Data:
   Serialized{words: List<&2, U32>, heap: Heap}
 
 type Serialization is Data:
   ValueWork{value: C.Value}
+  MemoWork{found: Maybe<&2, U32>, slot: Nat, computed: Bool, value: C.Value}
   ValuesWork{values: List<&2, C.Value>}
 
 type StaticConstants is Data:
@@ -554,6 +555,20 @@ def opcode(operator: M.ScalarOp) -> U32:
       94
     case M.F32GreaterEqual{}:
       96
+    case M.U32Divide{}:
+      110
+    case M.U32Remainder{}:
+      112
+    case M.U32BitAnd{}:
+      113
+    case M.U32BitOr{}:
+      114
+    case M.U32BitXor{}:
+      115
+    case M.U32ShiftLeft{}:
+      116
+    case M.U32ShiftRight{}:
+      118
 
 def unary_opcode(operator: M.UnaryOp) -> List<&2, U32>:
   match operator:
@@ -632,6 +647,31 @@ def construct_code(tag: Fragment, payload: Code, +slot: Nat) -> Code:
 
 def local_get(slot: Nat) -> List<&2, U32>:
   32 <> unsigned_leb(slot)
+
+# Memo cells are ordinary traced arena blocks: state, callback, cached word.
+def memo_code(computation: Code, +slot: Nat) -> Code:
+  Code{fragments, locals} = computation
+  +pointer = Nat.add(slot, 1n)
+  Code{fragments_join([fragments, [Bytes{join([33 <> unsigned_leb(slot), i32_constant(12)])}, Allocate{}, Bytes{join([34 <> unsigned_leb(pointer), [65, 0, 54, 2, 0], local_get(pointer), local_get(slot), [54, 2, 4], local_get(pointer), [65, 0, 54, 2, 8], local_get(pointer)])}]]), Nat.max(locals, 2n+slot)}
+
+def force_code(value: Code, +slot: Nat, provider: Nat) -> Code:
+  +closure = Nat.add(slot, 1n)
+  +result = Nat.add(slot, 2n)
+  bytes = join([
+    33 <> unsigned_leb(slot),
+    # Forcing a memo below the startup floor may install persistent heap edges.
+    local_get(slot), [65, 0, 40, 2, 0, 73, 4, 64, 65, 20, 65, 1, 54, 2, 0, 11],
+    local_get(slot), [40, 2, 0, 65, 2, 70, 4, 127],
+    local_get(slot), [40, 2, 8, 5],
+    # Re-entering a running demand is a black hole, just as in const evaluation.
+    local_get(slot), [40, 2, 0, 4, 64, 0, 11],
+    local_get(slot), [65, 1, 54, 2, 0],
+    local_get(slot), [40, 2, 4], 34 <> unsigned_leb(closure), [65, 0],
+    local_get(provider), local_get(closure), [40, 2, 0, 17, 0, 0],
+    33 <> unsigned_leb(result), local_get(slot), local_get(result), [54, 2, 8],
+    local_get(slot), [65, 2, 54, 2, 0], local_get(slot), [65, 0, 54, 2, 4],
+    local_get(result), [11]])
+  require_locals(append_code(value, byte_code(bytes, 3n+slot), Nil{}, Nil{}), 3n+slot)
 
 def element_stores(count: Nat, +pointer: Nat, first: Nat, offset: Nat, reversed: List<&2, List<&2, U32>>) -> List<&2, U32>:
   match count:
@@ -1074,6 +1114,16 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             value : Code <- emit_expr(rest, ExpressionWork{payload}, reserve(context, 2n))
             return construct_code(ConstructorIndex{constructor}, value, context_next(context))
+        case ExpressionWork{I.MemoExpr{computation}}:
+          +slot = context_next(context)
+          do Result<&2, &2, M.Diagnostic, Code>:
+            value : Code <- emit_expr(rest, ExpressionWork{computation}, reserve(context, 2n))
+            return memo_code(value, slot)
+        case ExpressionWork{I.ForceExpr{value}}:
+          +slot = context_next(context)
+          do Result<&2, &2, M.Diagnostic, Code>:
+            suspended : Code <- emit_expr(rest, ExpressionWork{value}, reserve(context, 3n))
+            return force_code(suspended, slot, context_provider(context))
         case ExpressionWork{I.ApplyExpr{callee, argument}}:
           +slot = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
@@ -1163,9 +1213,9 @@ def words_bytes(words: List<&2, U32>) -> List<&2, U32>:
       concat(word_bytes(head), words_bytes(tail))
 
 def heap_allocate(+words: List<&2, U32>, heap: Heap) -> Result<&2, &2, M.Diagnostic, Serialized>:
-  Heap{+next, chunks} = heap
+  Heap{+next, chunks, memos} = heap
   +end = Nat.add(next, Nat.mul(4n, List.length(&2, U32, words)))
-  Bool.pick(Result<&2, &2, M.Diagnostic, Serialized>, Nat.is_le(end, U32.to_nat(16777216)), Done{Serialized{[U32.from_nat(next)], Heap{end, words_bytes(words) <> chunks}}}, Fail{M.Diagnostic{"backend_limit", "constant", "static constants exceed the 16 MiB bootstrap arena"}})
+  Bool.pick(Result<&2, &2, M.Diagnostic, Serialized>, Nat.is_le(end, U32.to_nat(16777216)), Done{Serialized{[U32.from_nat(next)], Heap{end, words_bytes(words) <> chunks, memos}}}, Fail{M.Diagnostic{"backend_limit", "constant", "static constants exceed the 16 MiB bootstrap arena"}})
 
 def capture_values(names: List<&2, String>, +environment: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, List<&2, C.Value>>:
   match names:
@@ -1200,16 +1250,51 @@ def static_heap(encoded: StaticConstants) -> Heap:
   StaticConstants{slots, heap} = encoded
   heap
 
+def heap_memo(heap: Heap, slot: Nat) -> Maybe<&2, U32>:
+  Heap{next, chunks, memos} = heap
+  Index.get(Maybe<&2, U32>, memos, Nat.show(slot), None{})
+
+def remember_memo(heap: Heap, slot: Nat, +word: U32) -> Heap:
+  Heap{next, chunks, memos} = heap
+  Heap{next, chunks, Map.set(&2, Maybe<&2, U32>, Map.set(&2, Maybe<&2, U32>, memos, Nat.show(slot), Some{word}), "head", Some{word})}
+
+def memo_pointer(found: Maybe<&2, U32>) -> U32:
+  match found:
+    case None{}:
+      0
+    case Some{value}:
+      value
+
+def memo_head(memos: Map<&2, Maybe<&2, U32>>) -> U32:
+  memo_pointer(Index.get(Maybe<&2, U32>, memos, "head", None{}))
+
+def heap_memo_head(heap: Heap) -> U32:
+  Heap{next, chunks, memos} = heap
+  memo_head(memos)
+
 def heap_end(heap: Heap) -> Nat:
-  Heap{next, chunks} = heap
+  Heap{next, chunks, memos} = heap
   next
 
-def serialize(+fuel: Nat, work: Serialization, +catalog: StaticCatalog, heap: Heap) -> Result<&2, &2, M.Diagnostic, Serialized>:
+def serialize(+fuel: Nat, work: Serialization, +catalog: StaticCatalog, +heap: Heap) -> Result<&2, &2, M.Diagnostic, Serialized>:
   match fuel:
     case 0n:
       Fail{M.Diagnostic{"backend_limit", "constant", "constant serialization exceeded its structural depth limit"}}
     case 1n+rest:
       match work:
+        case ValueWork{C.DemandValue{slot, computation}}:
+          Fail{M.Diagnostic{"internal_error", "demand", "an unsnapshotted memo escaped constant evaluation"}}
+        case ValueWork{C.MemoValue{+slot, computed, value}}:
+          serialize(rest, MemoWork{heap_memo(heap, slot), slot, computed, value}, catalog, heap)
+        case MemoWork{Some{word}, slot, computed, value}:
+          Done{Serialized{[word], heap}}
+        case MemoWork{None{}, +slot, +computed, value}:
+          do Result<&2, &2, M.Diagnostic, Serialized>:
+            +child : Serialized <- serialize(rest, ValueWork{value}, catalog, heap)
+            +word : U32 <- only_word(serialized_words(child))
+            +cell : Serialized <- heap_allocate([Bool.pick(U32, computed, 2, 0), Bool.pick(U32, computed, 0, word), Bool.pick(U32, computed, word, 0), heap_memo_head(serialized_heap(child))], serialized_heap(child))
+            +pointer : U32 <- only_word(serialized_words(cell))
+            return Serialized{[pointer], remember_memo(serialized_heap(cell), slot, pointer)}
         case ValueWork{C.UnitValue{}}:
           Done{Serialized{[0], heap}}
         case ValueWork{C.U32Value{value}}:
@@ -1957,8 +2042,13 @@ def arena_floor(initialized: Bool, heap_start: Nat) -> List<&2, U32>:
 def clear_free_bins() -> List<&2, U32>:
   join([i32_constant(32), [65, 0], i32_constant(132), [252, 11, 0]])
 
-def wrapper_reset(parameter: AbiParameter, heap_start: Nat, initialized: Bool) -> List<&2, U32>:
-  Bool.pick(List<&2, U32>, array_parameter(parameter), Nil{}, join([arena_floor(initialized, heap_start), [36, 0], clear_free_bins()]))
+# Ephemeral calls keep the cheap arena rewind. Once a persistent memo has been
+# forced, collect instead so its cached graph survives subsequent guest calls.
+def reset_arena(+heap_start: Nat, +initialized: Bool, imports: Nat) -> List<&2, U32>:
+  join([[65, 20, 40, 2, 0, 4, 64, 65, 0], arena_floor(initialized, heap_start), [65, 0, 16], unsigned_leb(2n+imports), [26, 5], arena_floor(initialized, heap_start), [36, 0], clear_free_bins(), [11]])
+
+def wrapper_reset(parameter: AbiParameter, heap_start: Nat, initialized: Bool, imports: Nat) -> List<&2, U32>:
+  Bool.pick(List<&2, U32>, array_parameter(parameter), Nil{}, reset_arena(heap_start, initialized, imports))
 
 def abi_parameter_bytes(parameter: AbiParameter) -> List<&2, U32>:
   match parameter:
@@ -2049,7 +2139,7 @@ def wrapper_bodies(functions: List<&2, AbiFunction>, +slots: Map<&2, Maybe<&2, N
         index : Nat <- lookup_symbol(slots, "fn:" ++ name)
         argument : List<&2, U32> <- wrapper_argument(parameter, callbacks, entries)
         rest : List<&2, BytePlan> <- wrapper_bodies(tail, slots, heap_start, callbacks, entries, initialized)
-        return byte_plan(body_bytes(join([wrapper_reset(parameter, heap_start, initialized), argument, [65, 0, 16], unsigned_leb(3n+Nat.add(imports, index)), wrapper_return(callbacks, result)]), Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n), 1n)) <> rest
+        return byte_plan(body_bytes(join([wrapper_reset(parameter, heap_start, initialized, imports), argument, [65, 0, 16], unsigned_leb(3n+Nat.add(imports, index)), wrapper_return(callbacks, result)]), Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n), 1n)) <> rest
 
 def function_exports(functions: List<&2, AbiFunction>, index: Nat) -> List<&2, List<&2, U32>>:
   match functions:
@@ -2103,8 +2193,10 @@ def table_indices(count: Nat, start: Nat) -> List<&2, U32>:
       concat(unsigned_leb(index), table_indices(rest, 1n+index))
 
 def data_section(heap: Heap) -> BytePlan:
-  Heap{heap_start, chunks} = heap
-  plan_section(11, plan_prefix([1, 0, 65, 0, 11], plan_sized(BytePlan{heap_start, List.reverse(&2, List<&2, U32>, chunks)})))
+  Heap{+heap_start, chunks, memos} = heap
+  plan_section(11, plan_vector([
+    plan_prefix([0, 65, 0, 11], plan_sized(BytePlan{heap_start, List.reverse(&2, List<&2, U32>, chunks)})),
+    byte_plan(join([[0, 65, 0, 11], sized(words_bytes([U32.from_nat(heap_start), 0, 0, 0, memo_head(memos), 0]))]))]))
 
 def callback_types(callbacks: List<&2, Callback>) -> List<&2, List<&2, U32>>:
   match callbacks:
@@ -2173,16 +2265,16 @@ def arena_exports(enabled: Bool, allocator_index: Nat, reset_index: Nat) -> List
       ]
 
 
-def arena_reset_body(enabled: Bool, +heap_start: Nat, +initialized: Bool) -> List<&2, BytePlan>:
+def arena_reset_body(enabled: Bool, heap_start: Nat, initialized: Bool, imports: Nat) -> List<&2, BytePlan>:
   match enabled:
     case False{}:
       Nil{}
     case True{}:
-      [byte_plan(body_bytes(join([arena_floor(initialized, heap_start), [36, 0], clear_free_bins(), arena_floor(initialized, heap_start)]), 1n, 1n))]
+      [byte_plan(body_bytes(join([reset_arena(heap_start, initialized, imports), [35, 0]]), 1n, 1n))]
 
 def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePlan>, names: List<&2, ExportedConstant>, values: List<&2, List<&2, U32>>, heap: Heap, +startup: List<&2, BytePlan>) -> BytePlan:
   Abi{+functions, constants, +callbacks} = abi
-  Heap{+heap_start, chunks} = heap
+  Heap{+heap_start, chunks, +memos} = heap
   +count = List.length(&2, BytePlan, bodies)
   +imports = List.length(&2, Callback, callbacks)
   +wrapper_count = List.length(&2, BytePlan, wrappers)
@@ -2204,8 +2296,8 @@ def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePla
     byte_plan(section(7, vector(List.append(&2, List<&2, U32>, function_exports(functions, 3n+Nat.add(imports, count)), List.append(&2, List<&2, U32>, global_exports(names, Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n)), arena_exports(arrays, imports, 3n+Nat.add(imports, Nat.add(count, wrapper_count)))))))),
     byte_plan(Bool.pick(List<&2, U32>, initialized, section(8, unsigned_leb(start_index)), Nil{})),
     byte_plan(section(9, join([[1, 0, 65, 0, 11], unsigned_leb(count), table_indices(count, 3n+imports)]))),
-    plan_section(10, plan_vector(byte_plan(allocator()) <> byte_plan(sized(Arena.mark(imports))) <> byte_plan(sized(Arena.collect(imports))) <> List.append(&2, BytePlan, bodies, List.append(&2, BytePlan, wrappers, List.append(&2, BytePlan, arena_reset_body(arrays, heap_start, initialized), startup))))),
-    data_section(Heap{heap_start, chunks}),
+    plan_section(10, plan_vector(byte_plan(allocator()) <> byte_plan(sized(Arena.mark(imports))) <> byte_plan(sized(Arena.collect(imports))) <> List.append(&2, BytePlan, bodies, List.append(&2, BytePlan, wrappers, List.append(&2, BytePlan, arena_reset_body(arrays, heap_start, initialized, imports), startup))))),
+    data_section(Heap{heap_start, chunks, memos}),
     abi_section(abi)
   ])
 
@@ -2474,7 +2566,7 @@ def prepare_catalog(runtime: Reachable.Runtime, safe_loops: Set()) -> Result<&2,
     +jobs : List<&2, CodegenJob> = List.append(&2, CodegenJob, normal, operation_jobs(needed_operations))
     +slots : Map<&2, Maybe<&2, Nat>> = slot_index(job_slots(jobs, 0n))
     +operation_ids : Map<&2, Maybe<&2, Nat>> = slot_index(operation_slots(needed_operations, 0n))
-    +serialized : StaticConstants <- serialize_constants(constants, StaticCatalog{slots, projection, operation_ids}, Heap{256n, [List.replicate(U32, 256n, 0)]})
+    +serialized : StaticConstants <- serialize_constants(constants, StaticCatalog{slots, projection, operation_ids}, Heap{256n, [List.replicate(U32, 256n, 0)], Map.new(&2, Maybe<&2, U32>)})
     return Prepared{jobs, Catalog{slots, E.catalog_constructors(declarations), slot_index(static_slots(serialized)), operation_ids, runtime_globals(initializers, names, 1n+List.length(&2, ExportedConstant, names), MTip{})}, functions, names, static_heap(serialized), initializers}
 
 def prepare(+checked: M.CheckedModule, constants: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, Prepared>:

@@ -22,9 +22,19 @@ import {
 export interface NativeCompilerOptions
   extends SourceCompilerOptions, NativeProcessOptions {}
 
+export interface NativeCompiler {
+  analyze(source: SourceInput, options?: CompileOptions): Promise<Analysis>;
+  compile(
+    source: SourceInput,
+    options?: AnalyzedArtifactOptions,
+  ): Promise<AnalyzedArtifact>;
+  compile(source: SourceInput, options?: ArtifactOptions): Promise<Artifact>;
+  dispose(): Promise<void>;
+}
+
 export async function createNativeCompiler(
   options: NativeCompilerOptions = {},
-) {
+): Promise<NativeCompiler> {
   const frontend = await createSourceFrontend(options);
   let process: NativeProcess;
   try {

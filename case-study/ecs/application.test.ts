@@ -90,8 +90,8 @@ Deno.test("an unrelated Blot app owns its scene, ordered systems, input and rend
         "use @render.clear 0.2 0.1 0.05 1.0",
       )
       .replace(
-        "#[component]\ndata OrbitX = OrbitX F32\n#[component]\ndata LumenTint = LumenTint U32",
-        "#[component]\ndata LumenTint = LumenTint U32\n#[component]\ndata OrbitX = OrbitX F32",
+        "#[component]\ndata OrbitX = #OrbitX F32\n#[component]\ndata LumenTint = #LumenTint U32",
+        "#[component]\ndata LumenTint = #LumenTint U32\n#[component]\ndata OrbitX = #OrbitX F32",
       );
     assert.notEqual(revisedSource, source);
     const revised = await compiler.compileApp(revisedSource);

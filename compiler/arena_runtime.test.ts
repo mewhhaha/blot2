@@ -279,3 +279,22 @@ Deno.test("arena mixed leaf graphs match exact reachability across collections",
     }
   }
 });
+
+Deno.test("arena collector retains dynamic graphs cached in static memo cells", async () => {
+  const a = await arena();
+  const memo = 256;
+  a.write(16, memo);
+  a.write(memo, 2);
+  a.write(memo + 4, 0);
+  a.write(memo + 12, 0);
+  const value = a.allocate(8);
+  a.write(value, 42);
+  a.write(memo + 8, value);
+  a.collect(0, 65536, 0);
+  const next = a.allocate(8);
+  ok(next !== value);
+  equal(a.read(value), 42);
+  a.write(memo + 8, 0);
+  a.collect(next, 65536, 0);
+  equal(a.allocate(8), value);
+});

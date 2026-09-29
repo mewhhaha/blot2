@@ -8,50 +8,50 @@ import { Input, FocusLost, PointerDown, PointerUp, Secondary, PointerMoved, Scro
 import { Vec3, wrap_angle } from "./spatial"
 
 #[resource]
-type OrbitCamera is data = OrbitCamera { yaw: F32, pitch: F32, distance: F32 }
+type OrbitCamera is data = #OrbitCamera { yaw: F32, pitch: F32, distance: F32 }
 #[resource]
-type Orbiting is data = Orbiting Bool
+type Orbiting is data = #Orbiting Bool
 #[resource]
-type OrbitControls is data = OrbitControls {
+type OrbitControls is data = #OrbitControls {
   left: U32, right: U32, inward: U32, outward: U32, speed: F32,
 }
 
 const half_fov_tangent = F32.tan 0.5235987756
 
 const axis = fn keys => fn negative => fn positive => case input.held keys negative, input.held keys positive of
-  True, False => -1.0
-  False, True => 1.0
+  #True, #False => -1.0
+  #False, #True => 1.0
   _, _ => 0.0
 
 const receive = fn () => do:
-  use controls <- ecs.get Input
-  use orbiting_value <- ecs.get Orbiting
-  use camera <- ecs.get OrbitCamera
-  let Orbiting orbiting = orbiting_value
+  use controls <- ecs.get #Input
+  use orbiting_value <- ecs.get #Orbiting
+  use camera <- ecs.get #OrbitCamera
+  let #Orbiting orbiting = orbiting_value
   let (next, active) = case controls.event, orbiting of
-    FocusLost, _ => (camera, False)
-    PointerDown Secondary, _ => (camera, True)
-    PointerUp Secondary, _ => (camera, False)
-    Scrolled wheel, _ => do:
+    #FocusLost, _ => (camera, #False)
+    #PointerDown #Secondary, _ => (camera, #True)
+    #PointerUp #Secondary, _ => (camera, #False)
+    #Scrolled wheel, _ => do:
       let next = camera
       next.distance := F32.clamp 3.0 24.0 (self + wheel * 0.005)
       return (next, orbiting)
-    PointerMoved, True => do:
+    #PointerMoved, #True => do:
       let next = camera
       next.yaw := wrap_angle (self - controls.delta.x * 0.006)
       next.pitch := F32.clamp 0.15 1.35 (self + controls.delta.y * 0.005)
-      return (next, True)
+      return (next, #True)
     _, _ => (camera, orbiting)
   use ecs.set next
-  use ecs.set (Orbiting active)
+  use ecs.set (#Orbiting active)
   return ()
 
 const tick = fn () => do:
   use frame_value <- ecs.get Frame
-  use controls <- ecs.get OrbitControls
-  use keys <- ecs.get Input
-  use camera <- ecs.get OrbitCamera
-  let Frame frame = frame_value
+  use controls <- ecs.get #OrbitControls
+  use keys <- ecs.get #Input
+  use camera <- ecs.get #OrbitCamera
+  let #Frame frame = frame_value
   let turn = axis keys.held controls.left controls.right
   let zoom = axis keys.held controls.inward controls.outward
   let next = camera
@@ -63,9 +63,9 @@ const tick = fn () => do:
 // No hit includes a minimized viewport, a parallel ray or a plane behind the eye.
 const ground_point = fn camera => fn viewport => fn pointer => fn ground_height => do:
   if Bool.not (F32.gt viewport.width 0.0):
-    return Nothing
+    return #Nothing
   if Bool.not (F32.gt viewport.height 0.0):
-    return Nothing
+    return #Nothing
   let sin_yaw = F32.sin camera.yaw
   let cos_yaw = F32.cos camera.yaw
   let sin_pitch = F32.sin camera.pitch
@@ -81,23 +81,23 @@ const ground_point = fn camera => fn viewport => fn pointer => fn ground_height 
   let direction_y = cos_pitch * y - sin_pitch
   let direction_z = (F32.neg back_z) - sin_yaw * x - cos_yaw * sin_pitch * y
   if F32.lt (F32.abs direction_y) 1e-6:
-    return Nothing
+    return #Nothing
   let length = (ground_height - eye_y) / direction_y
   if F32.le length 0.0:
-    return Nothing
+    return #Nothing
   let ground_x = eye_x + direction_x * length
   let ground_z = eye_z + direction_z * length
   if Bool.not (F32.is_finite ground_x):
-    return Nothing
+    return #Nothing
   if Bool.not (F32.is_finite ground_z):
-    return Nothing
-  return Some (Vec3 { x: ground_x, y: ground_height, z: ground_z })
+    return #Nothing
+  return #Some (#Vec3 { x: ground_x, y: ground_height, z: ground_z })
 
 const project = fn () => do:
   use frame_value <- ecs.get Frame
-  use current <- ecs.get OrbitCamera
-  use previous <- ecs.previous OrbitCamera
-  let Frame frame = frame_value
+  use current <- ecs.get #OrbitCamera
+  use previous <- ecs.previous #OrbitCamera
+  let #Frame frame = frame_value
   let width = frame.viewport.width
   let height = frame.viewport.height
   let yaw = F32.lerp_angle previous.yaw current.yaw frame.alpha
@@ -144,8 +144,8 @@ const project = fn () => do:
 const plugin = fn initial => fn controls => fn builder => do:
   let next = app.insert_resource initial builder
   next := app.insert_resource controls self
-  next := app.insert_resource (Orbiting False) self
-  next := app.add_system Event receive self
-  next := app.add_system Update tick self
-  next := app.add_system Render project self
+  next := app.insert_resource (#Orbiting #False) self
+  next := app.add_system #Event receive self
+  next := app.add_system #Update tick self
+  next := app.add_system #Render project self
   return next

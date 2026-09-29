@@ -14,7 +14,7 @@ const filled = @array.fill 3 seed
 const callbacks = @array.fill 2 (fn value => value + 2)
 entry const count = @array.length filled
 entry const constant = (@array.get callbacks 1) 40
-entry const empty = fn () => @array.length (@array.fill 0 True)
+entry const empty = fn () => @array.length (@array.fill 0 #True)
 entry const high = fn (count: U32) => @array.get (@array.fill count 4294967295) 0
 entry const size = fn (count: U32) => @array.length (@array.fill count 7)
 entry const closures = fn () => do:
@@ -135,7 +135,7 @@ Deno.test("array fill validates counts, arity, limits and const budgets", async 
   try {
     for (
       const [text, code] of [
-        ["const invalid = @array.fill True 0", "type_mismatch"],
+        ["const invalid = @array.fill #True 0", "type_mismatch"],
         ["const invalid = @array.fill 2", "call_arity"],
         ["const invalid = @array.fill 2 0 0", "call_arity"],
         ["const invalid = @array.fill 4294967295 0", "backend_limit"],

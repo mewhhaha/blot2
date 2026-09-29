@@ -27,19 +27,19 @@ const executable = new URL("../generated/compiler/blotc", import.meta.url);
 const entry = new URL("file:///virtual-schema-evaluation/main.blot");
 const library = new URL("file:///virtual-schema-evaluation/schema.blot");
 
-const schema = `type End is data = End
-type Entry { head, tail } is data = Entry { head, tail }
-const End.contains = fn (end: End) => fn witness => False
+const schema = `type End is data = #End
+type Entry { head, tail } is data = #Entry { head, tail }
+const End.contains = fn (end: End) => fn witness => #False
 const Entry.contains = fn entry => fn witness => do:
-  let Entry { head, tail } = entry
-  if Type head == Type witness:
-    return True
+  let #Entry { head, tail } = entry
+  if #Type head == #Type witness:
+    return #True
   return tail.contains(witness)
-const schema = Entry { head: True, tail: Entry { head: 7, tail: End } }
+const schema = #Entry { head: #True, tail: #Entry { head: 7, tail: #End } }
 `;
 
 const query = `import * as s from "./schema"
-const answer = s.schema.contains(True)
+const answer = s.schema.contains(#True)
 entry const read_answer = fn () => answer
 `;
 
@@ -91,9 +91,9 @@ Deno.test("schema selection evaluates typed receiver and witness operands and ch
           `import * as s from "./schema"
 entry const answer = do:
   let witness = do:
-    if True:
+    if #True:
       return @panic "witness operand reached"
-    return True
+    return #True
   return s.schema.contains(witness)
 `,
           "witness operand reached",
@@ -102,10 +102,10 @@ entry const answer = do:
           `import * as s from "./schema"
 entry const answer = do:
   let receiver = do:
-    if True:
+    if #True:
       return @panic "receiver operand reached"
     return s.schema
-  return receiver.contains(True)
+  return receiver.contains(#True)
 `,
           "receiver operand reached",
         ],

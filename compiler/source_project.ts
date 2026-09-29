@@ -230,7 +230,14 @@ async function loadProject(
 }
 
 /** Retain validated per-file syntax while re-reading the import graph each load. */
-export async function createSourceProjectLoader(options: ProjectOptions = {}) {
+export interface SourceProjectLoader {
+  load(entry: string | URL): Promise<SourceProject>;
+  dispose(): void;
+}
+
+export async function createSourceProjectLoader(
+  options: ProjectOptions = {},
+): Promise<SourceProjectLoader> {
   const configured: ProjectOptions = {
     ...options,
     imports: options.imports && Object.fromEntries(

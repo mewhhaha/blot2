@@ -85,17 +85,17 @@ type State a is effect = {
   get: Unit -> a
   set: a -> Unit
 }
-type Counter is data = Counter U32
+type Counter is data = #Counter U32
 const get = fn (witness: p -> a) -> a => State.get ()
 const set = fn value => State.set value
 
 const advance = fn () => do:
-  use counter <- get Counter
-  let Counter value = counter
-  return set (Counter (value + 1))
+  use counter <- get #Counter
+  let #Counter value = counter
+  return set (#Counter (value + 1))
 
 const answer = fn () => do:
-  let (Counter next, _) = @effect.run State.get State.set (Counter 41) advance
+  let (#Counter next, _) = @effect.run State.get State.set (#Counter 41) advance
   return next
 ```
 

@@ -4,7 +4,7 @@ import { createNativeCompiler } from "./native.ts";
 import { instantiateGuest } from "./guest.ts";
 
 const source = `
-type Pair is data = Pair { x: U32, y: U32 }
+type Pair is data = #Pair { x: U32, y: U32 }
 entry const lexical = fn (count: U32) => do:
   let value = @u32.add count 1
   return @array.fill 8 value
@@ -42,8 +42,8 @@ entry const pointer_tuple = fn (count: U32) => do:
   return @array.get a 0
 entry const record = fn (count: U32) => do:
   let value = @u32.add count 1
-  let pair = Pair { x: value, y: @u32.add count 2 }
-  let Pair { x, y } = pair
+  let pair = #Pair { x: value, y: @u32.add count 2 }
+  let #Pair { x, y } = pair
   return @u32.add x y
 `;
 const loops = `

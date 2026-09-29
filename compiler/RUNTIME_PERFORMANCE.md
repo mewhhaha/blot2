@@ -1,6 +1,7 @@
 # Runtime data-path review
 
-Baseline: main `ac59fb68f98780e168ce01fa39410b1a6ef54efd`.
+Integration baseline: main `2d44737bbe265d75b0264bad78b810c87ff6c024`. The
+recorded earlier measurements retain their original revision identities.
 
 This change distinguishes execution of emitted Wasm, the guest/host boundary,
 and compiler throughput. It does not claim to eliminate every performance
@@ -49,7 +50,9 @@ rescanning markers belonging to earlier declarations. The lexer remains the
 source of truth; this is not a second parser or a change to string semantics.
 
 Differential tests compare the exact old/new parser input, including Unicode,
-CRLF, high U32 literals, annotation clauses and declaration-sized reparses.
+CRLF, high U32 literals, annotation clauses, contextual imports, selectors, and
+declaration-sized reparses. Static memo-cell roots remain traced by the
+collector alongside the new layout bits.
 
 ### Work queues and concurrency
 
@@ -67,7 +70,7 @@ ordering contract. This PR does not add threads to generated guest code.
 ## Measurement and validation
 
 The Runtime performance workflow builds both the pinned baseline and candidate
-with Bend 2.0.32 and its matching official loader. Generated Bend C/JavaScript
+with Bend 2.0.34 and its matching official loader. Generated Bend C/JavaScript
 is not patched. Reference module builds are sequential to bound CI peak memory.
 A separate native job runs the compiler regression suite. Its status must be
 checked independently of the JavaScript hot-path benchmark.

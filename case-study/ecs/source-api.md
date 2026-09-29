@@ -63,13 +63,13 @@ const sandbox = do:
   let application = app.new "Blot — PLAY"
   application := input.plugin self
   // camera.plugin registers its resources and Event/Update/Render systems.
-  application := app.insert_resource (Editor {
-    mode: Play, selected: Nothing, grab_offset: Nothing,
+  application := app.insert_resource (#Editor {
+    mode: #Play, selected: #Nothing, grab_offset: #Nothing,
   }) self
-  application := app.add_system Start seed_scene self
-  application := app.add_system Event edit_scene self
-  application := app.add_system Update animate self
-  application := app.add_system Render boxes.draw_mesh self
+  application := app.add_system #Start seed_scene self
+  application := app.add_system #Event edit_scene self
+  application := app.add_system #Update animate self
+  application := app.add_system #Render boxes.draw_mesh self
   return app.build application
 
 const main = fn (io: Io) => app.bind sandbox io
@@ -170,8 +170,8 @@ polymorphic functions.
 
 The specimen also uses type-valued names such as `ecs.get Surface`. Current
 typed selectors take constructor/function witnesses instead: for
-`type Surface is data = Brass | Blue`, use `read (fn () => Brass)`. A type name
-without a same-named constructor is not a value witness.
+`type Surface is data = #Brass | #Blue`, use `read (fn () => #Brass)`. A type
+name without a same-named constructor is not a value witness.
 
 `render.collect callback` handles source packet-building effects and returns
 `(RenderFrame, callback_result)`, forwarding ECS effects to the enclosing scope.

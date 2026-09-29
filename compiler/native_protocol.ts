@@ -18,7 +18,7 @@ import type {
 import type { Cst, CstList } from "./syntax.ts";
 
 export const nativeProtocolMagic = 0x424C4F54;
-export const nativeProtocolVersion = 13;
+export const nativeProtocolVersion = 14;
 export const nativeProtocolMaxWords = 16 * 1024 * 1024;
 const littleEndian = new Uint8Array(new Uint32Array([1]).buffer)[0] === 1;
 
@@ -757,6 +757,13 @@ class WordReader {
         "F32LessEqual",
         "F32GreaterThan",
         "F32GreaterEqual",
+        "U32Divide",
+        "U32Remainder",
+        "U32BitAnd",
+        "U32BitOr",
+        "U32BitXor",
+        "U32ShiftLeft",
+        "U32ShiftRight",
       ]),
     });
 
@@ -933,8 +940,20 @@ class WordReader {
       "ForeverExpr",
       "QualifiedExpr",
       "InstantiationExpr",
+      "MemoExpr",
+      "ForceExpr",
     ]);
     switch ($) {
+      case "MemoExpr":
+        this.fields(
+          [this.expression],
+          (computation) => ({ $, computation }),
+          receive,
+        );
+        return;
+      case "ForceExpr":
+        this.fields([this.expression], (value) => ({ $, value }), receive);
+        return;
       case "StateProviderExpr":
         this.fields(
           [this.identity, this.identity, this.expression],
@@ -1277,8 +1296,19 @@ class WordReader {
       "ProductValue",
       "ArrayValue",
       "StateProviderValue",
+      "MemoValue",
     ]);
     switch ($) {
+      case "MemoValue": {
+        const slot = this.nat();
+        const computed = this.boolean();
+        this.fields(
+          [this.value],
+          (value) => ({ $, slot, computed, value }),
+          receive,
+        );
+        return;
+      }
       case "StateProviderValue":
         this.fields(
           [this.identity, this.identity, this.value],

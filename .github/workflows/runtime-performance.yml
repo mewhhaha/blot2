@@ -2,7 +2,17 @@ name: Runtime performance
 
 on:
   pull_request:
-    paths: ["compiler/**", "scripts/**", "std/**", "LAWS.bend", "PROOF.bend", "deno.json", "deno.lock", "baba.json", ".github/workflows/runtime-performance.yml"]
+    paths: [
+      "compiler/**",
+      "scripts/**",
+      "std/**",
+      "LAWS.bend",
+      "PROOF.bend",
+      "deno.json",
+      "deno.lock",
+      "baba.json",
+      ".github/workflows/runtime-performance.yml",
+    ]
   workflow_dispatch:
 
 permissions:
@@ -23,7 +33,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        revision: [baseline, previous, candidate]
+        revision: [baseline, candidate]
     env:
       BEND_NO_TELEMETRY: "1"
     steps:
@@ -37,8 +47,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - name: Install verified Bend release
         run: |
-          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
-          echo "5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
+          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
           mkdir -p "$RUNNER_TEMP/bend"
           tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
           echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
@@ -63,10 +73,7 @@ jobs:
           source="$GITHUB_WORKSPACE"
           if [ "$REVISION" = baseline ]; then
             source="$RUNNER_TEMP/baseline"
-            git worktree add --detach "$source" ac59fb68f98780e168ce01fa39410b1a6ef54efd
-          elif [ "$REVISION" = previous ]; then
-            source="$RUNNER_TEMP/previous"
-            git worktree add --detach "$source" 4bfca4ab37f370d1dd715d41de920cff31f85560
+            git worktree add --detach "$source" 2d44737bbe265d75b0264bad78b810c87ff6c024
           fi
           python3 "$GITHUB_WORKSPACE/scripts/build_runtime_reference.py" "$source"
           (cd "$source" && deno task generate:parser)
@@ -92,8 +99,8 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - name: Install verified Bend release
         run: |
-          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
-          echo "5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
+          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
           mkdir -p "$RUNNER_TEMP/bend"
           tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
           echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
@@ -110,7 +117,7 @@ jobs:
         id: native-cache
         with:
           path: generated/compiler/blotc
-          key: runtime-native-v1-ubuntu24-${{ runner.arch }}-bend2.0.32-${{ steps.toolchain.outputs.clang }}-${{ hashFiles('compiler/**/*.bend', 'LAWS.bend', 'PROOF.bend', 'scripts/build_compiler.ts') }}
+          key: runtime-native-v1-ubuntu24-${{ runner.arch }}-bend2.0.34-${{ steps.toolchain.outputs.clang }}-${{ hashFiles('compiler/**/*.bend', 'LAWS.bend', 'PROOF.bend', 'scripts/build_compiler.ts') }}
       - name: Build native and matching reference
         env:
           CACHE_HIT: ${{ steps.native-cache.outputs.cache-hit }}
@@ -157,17 +164,12 @@ jobs:
           path: ${{ runner.temp }}
       - uses: actions/download-artifact@v4
         with:
-          name: runtime-previous
-          path: ${{ runner.temp }}
-      - uses: actions/download-artifact@v4
-        with:
           name: runtime-candidate
           path: ${{ runner.temp }}
       - name: Restore exact generated compilers
         run: |
-          mkdir -p "$RUNNER_TEMP/baseline" "$RUNNER_TEMP/previous"
+          mkdir -p "$RUNNER_TEMP/baseline"
           tar -xzf "$RUNNER_TEMP/baseline.tar.gz" -C "$RUNNER_TEMP/baseline"
-          tar -xzf "$RUNNER_TEMP/previous.tar.gz" -C "$RUNNER_TEMP/previous"
           tar -xzf "$RUNNER_TEMP/candidate.tar.gz"
       - name: Test changed data paths against rebuilt compiler
         run: |
@@ -179,10 +181,9 @@ jobs:
         run: |
           mkdir -p build
           deno run --allow-read --allow-write=build compiler/runtime_bench.ts "$RUNNER_TEMP/baseline" 2>&1 | tee build/runtime-bench.log
-          deno run --allow-read --allow-write=build compiler/gc_bench.ts "$RUNNER_TEMP/previous" 2>&1 | tee build/gc-bench.log
+          deno run --allow-read --allow-write=build compiler/gc_bench.ts "$RUNNER_TEMP/baseline" 2>&1 | tee build/gc-bench.log
           cp generated/compiler/source-revision.txt build/candidate-revision.txt
           cp "$RUNNER_TEMP/baseline/generated/compiler/source-revision.txt" build/baseline-revision.txt
-          cp "$RUNNER_TEMP/previous/generated/compiler/source-revision.txt" build/previous-revision.txt
           cp generated/compiler/runtime-reference-version.txt build/bend-version.txt
       - uses: actions/upload-artifact@v4
         if: always()

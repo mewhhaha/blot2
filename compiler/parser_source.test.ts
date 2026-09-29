@@ -5,27 +5,60 @@ import {
   declarationRanges,
   type ParseRange,
   type PreparedSource,
+  SourceError,
 } from "./syntax.ts";
 
 // Frozen pre-optimization implementation: compare the exact parser input, not
 // just successful parsing. This also catches any change in UTF-16 positions.
 function previous(prepared: PreparedSource, range: ParseRange = {}) {
   const start = range.start ?? 0;
-  const end = range.end ?? prepared.source.length;
-  const neutral = prepared.source.slice(start, end).split("");
+  const neutral = prepared.source.slice(start, range.end).split("");
+  // Keep source width and offsets unchanged. The parser sees a distinct marker
+  // only at an annotation's `where {`; CST text still comes from real source.
   for (const position of prepared.clauseMarkers) {
-    if (position >= start && position + 5 <= end) {
+    if (
+      position >= start && position + 5 <= (range.end ?? prepared.source.length)
+    ) {
       neutral[position - start + 4] = "E";
     }
   }
+  let importDeclaration = false;
   for (
-    let i = range.tokenStart ?? 0;
-    i < (range.tokenEnd ?? prepared.tokens.length);
-    i++
+    let index = range.tokenStart ?? 0;
+    index < (range.tokenEnd ?? prepared.tokens.length);
+    index++
   ) {
-    const token = prepared.tokens[i];
+    const token = prepared.tokens[index];
     if (token.type === "named" && token.kind === "INTEGER") {
       neutral.fill("0", token.span.start - start, token.span.end - start);
+    }
+    // Contextual import keyword: `from` remains available to ordinary source
+    // functions. A selector's spaced/leading dot is distinct from `value.field`.
+    if (token.text === "import") importDeclaration = true;
+    if (token.text === "\uE000") importDeclaration = false;
+    if (
+      importDeclaration && token.text === "froM" &&
+      prepared.tokens[index + 1]?.text.startsWith('"')
+    ) {
+      throw new SourceError(
+        "reserved_import_marker",
+        "Use 'from' in an import declaration",
+        prepared.originalOffsets[token.span.start],
+        prepared.originalOffsets[token.span.end],
+      );
+    }
+    if (
+      importDeclaration && token.text === "from" &&
+      prepared.tokens[index + 1]?.text.startsWith('"')
+    ) {
+      neutral[token.span.start - start + 3] = "M";
+    }
+    if (token.text === ".") {
+      const previous = prepared.tokens[index - 1];
+      if (
+        previous?.span.end !== token.span.start ||
+        !/[a-zA-Z0-9_\])}]/.test(prepared.source[token.span.start - 1] ?? "")
+      ) neutral[token.span.start - start] = "·";
     }
   }
   return neutral.join("");
@@ -36,7 +69,12 @@ Deno.test("parser span builder preserves integers, Unicode, clauses and declarat
   try {
     const declarations = [
       "// Unicode 🙂 café; numbers in comments: 4294967295",
+      'import { value } from "./values.blot"',
       'const text = "🙂 where { 123 }"',
+      "const from = fn value => value",
+      "const selector = .add",
+      "const selected = value |> .x",
+      "const adjacent = value.field",
       "const high = 4_294_967_295",
       "const hex = 0xFFFF_FFFF",
       "const decimal = 2147483648",

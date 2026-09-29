@@ -89,6 +89,10 @@ def children(expression: M.Expr) -> List<&2, M.Expr>:
       [array]
     case M.LambdaExpr{identity, parameter, parameter_type, result_type, body}:
       [body]
+    case M.MemoExpr{computation}:
+      [computation]
+    case M.ForceExpr{value}:
+      [value]
     case M.ApplyExpr{callee, argument}:
       [callee, argument]
     case M.TagExpr{offset, callee, argument}:

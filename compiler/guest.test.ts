@@ -90,7 +90,7 @@ Deno.test("all sixteen scalar callback signatures use checked canonical values",
   const literals: Record<ScalarType, string> = {
     Unit: "()",
     U32: "4_294_967_295",
-    Bool: "True",
+    Bool: "#True",
     F32: "(-0.0)",
   };
   const arguments_: Record<ScalarType, ScalarValue> = {
@@ -314,7 +314,7 @@ entry const integer = fn (value: U32) => value
 entry const boolean = fn (value: Bool) => value
 entry const float = fn (value: F32) => value
 entry const unit = fn () => ()
-entry const flag = True
+entry const flag = #True
 entry const maximum = 4_294_967_295
 entry const fraction = 1.25
 entry const nothing = ()
