@@ -1,0 +1,37 @@
+name: OxCaml integration source snapshot
+on:
+  push:
+    branches: [rebuild/oxcaml-compiler]
+    paths: ['.github/workflows/oxcaml-sync-snapshot.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Export source inputs with exact identities
+        env:
+          MAIN_SHA: ac59fb68f98780e168ce01fa39410b1a6ef54efd
+        run: |
+          set -euo pipefail
+          mkdir source-snapshot
+          git archive --format=tar.gz HEAD > source-snapshot/branch.tar.gz
+          git archive --format=tar.gz "$MAIN_SHA" > source-snapshot/main.tar.gz
+          git rev-parse HEAD > source-snapshot/branch.sha
+          printf '%s\n' "$MAIN_SHA" > source-snapshot/main.sha
+          git diff --binary 832e92be7ef227be202771d582d4cdd16967561f "$MAIN_SHA" > source-snapshot/main.patch
+          git ls-tree -r HEAD > source-snapshot/branch-tree.txt
+          git ls-tree -r "$MAIN_SHA" > source-snapshot/main-tree.txt
+          git bundle create source-snapshot/repository.bundle --all
+          sha256sum source-snapshot/* > source-snapshot/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: oxcaml-integration-sources
+          path: source-snapshot/
+          retention-days: 3
+          if-no-files-found: error
