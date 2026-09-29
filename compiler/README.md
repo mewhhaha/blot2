@@ -190,10 +190,24 @@ Read-only string indexes select a child as data and carry the key and its
 remaining suffix through one Bend tail loop. This avoids allocating branch
 closures and keeps native and JavaScript lookup on the same implementation. Name
 equality retains its owning string roots while separate cursors traverse their
-characters, enabling borrowed reads in the full native compiler. The
-[native gdev measurements](COMPILE_SPEED_RESULTS.md) record cold compilation
-falling from 126.9 to 78.8 seconds across these two Bend 2.0.32 experiments,
-with identical Wasm.
+characters, enabling borrowed reads in the full native compiler. Numeric
+Patricia lookup also uses one tail loop while preserving prefix checks, and
+string suffixes are left untouched when the next branch inspects another bit of
+the same character. The [native gdev measurements](COMPILE_SPEED_RESULTS.md)
+record cold compilation falling from 126.9 to 62.3 seconds across three Bend
+2.0.32 experiments, with identical Wasm. The third batch improves its own
+control from 75.8 to 62.3 seconds; peak native memory remains about 279 MiB. A
+scheduler experiment that exposed more inner parallelism was parked after
+slowing the actual game.
+
+Dependency and definition-predicate lookups stop at the first match. Bend's
+`Bool.pick` evaluates its result arguments eagerly, so recursive searches use an
+explicit match state instead of passing a recursive call as an alternative.
+Operation merging skips a retained catalog prefix before falling back to the
+ordinary ordered merge. Together these changes improve a fresh matched cold
+control from 41.37 to 39.98 seconds. Body-edit timing is mixed and peak memory
+remains about 280 MiB; the overnight change from the earlier batch is not
+counted as an improvement from these changes.
 
 Type and row substitutions use persistent indexes instead of scanning the entire
 substitution history on every lookup. Each index retains replacement order,
@@ -209,13 +223,17 @@ scope. Checker branches inherit dependency interfaces for lookup and publish
 only interfaces they produce, avoiding repeated merges of the shared
 environment.
 
-The specialization solver keeps an ordered list of unresolved operation and
-associated requirements. After it selects an implementation, it filters the
-previous list against the new choices and prepends requirements from newly
-inferred definitions. Definitions remain in the same order as the full scan;
-type arguments are resolved against the current substitution state when each
-requirement is consumed. If the number of definitions shrinks unexpectedly, the
-solver repeats the full scan.
+The specialization solver keeps an ordered list of unresolved operation,
+associated, and qualified requirements. A successful selection changes one
+ordinary choice or adds one predicate at a qualified site. The solver removes
+matching old requirements using that numeric site, keeping the two namespaces
+separate and comparing predicates only at the affected qualified site. Newly
+inferred definitions still consult all choices and precede older requirements in
+the original order. Type arguments are resolved against the current
+substitutions when consumed. Unknown changes or shrinking definition counts use
+the full-refresh fallback. This improves a fresh matched gdev control from 37.65
+to 33.11 seconds cold and 37.75 to 33.23 seconds after a body edit, both 12%,
+with unchanged Wasm and roughly 280 MiB peak native memory.
 
 Both clean builds and native sessions infer dependency-ready groups in balanced
 Bend batches. Ordinarily, single-consumer dependency chains advance on their own
@@ -400,21 +418,20 @@ Incremental rows include `base_revision_ms` and `base_cache` for the preceding
 revision; the first warmup row records the first session compile separately from
 warm body-edit latency.
 
-For separate phase diagnostics:
+For separate phase diagnostics, attach GDB to the native process reported by
+`NativeProcess.pid` and sample stacks or set breakpoints on named Bend wrappers:
 
 ```sh
-BEND_NO_TELEMETRY=1 bend compiler/native_main.bend -o build/cpu-phases.c
-deno run --allow-read --allow-write compiler/cpu_scaling_trace.ts build/cpu-phases.c build/cpu-phases-trace.c build/phase-events
-clang -std=c11 -O3 build/cpu-phases-trace.c -lpthread -lm -o build/cpu-phases-trace
-deno run --allow-all compiler/cpu_scaling_bench.ts build/cpu-phases.json . 3 1,8 balanced_64,clustered_64 full build/cpu-phases-trace
+gdb --quiet generated/compiler/blotc -p <native-pid>
 ```
 
-The injector requires unique named phase boundaries and fails on changed
-generated structure. The trace executable is the seventh argument to the
-benchmark driver; never use instrumented timings as the production headline
-benchmark. Logs are flushed before the response payload is written, so immediate
-host disposal cannot lose the last trace. The final `send` interval measures
-frame preparation and header writing, not payload writing or log-file IO.
+For example, `thread apply all bt 16` shows active worker stacks, and
+`break WL_FID_MONOMORPH_SHARE_CONSTANTS` stops at shared-constant preparation.
+Disable a breakpoint after its first hit when recording first phase entries. Use
+the original executable and generated output unchanged. Debugger pauses and
+stack samples belong in separate diagnostic runs; keep them out of latency
+comparisons. Saved gdev diagnostics and their limitations are described in
+[COMPILE_SPEED_RESULTS.md](COMPILE_SPEED_RESULTS.md).
 
 Changed source undergoes a conservative declaration-boundary scan. After the
 first edit warms the fragment cache, unchanged raw fragments reuse validated
@@ -726,6 +743,30 @@ inferred effects; `return $ value` remains separate resolver forwarding syntax.
 Plain `do:` functions already fall through to Unit without an explicit
 `return ()`; expression-bodied functions return their expression.
 
+## Readability syntax
+
+Leading-dot selectors (`.position`), type witnesses (`:value`), and value
+conditionals (`if condition then left else right`) are executable. Pattern arms
+support alternatives and guards, such as `#First x | #Second x if x > 0 => x`.
+Alternatives must bind the same names; guards do not establish exhaustiveness.
+Rebinding an outer local in `if`/`if let` carries its successor past the branch.
+The [language guide](guide.md#selectors-conversion-and-type-witnesses) gives
+examples and layout rules. `blot fmt file.blot [--check]` preserves parsed
+structure while normalizing spacing.
+
+`from` is a source-defined prelude function backed by general result-directed
+associated dispatch (`@type.result`). Its expected result determines the owning
+type. U32 division, remainder, bitwise operations, and shifts have matching
+constant-evaluation and Wasm implementations.
+
+`fn ~value => ...` declares a memoized demand parameter; `@force value` demands
+it. `~T` in a function annotation preserves that mode through higher-order
+calls. Inference retains latent effects, and checked-call elaboration inserts
+ordinary Unit callbacks wrapped in memo cells. Source-defined `and`/`or` supply
+`&&`/`||`. Memo cells survive escaping closures, constant aliases, collection,
+and guest calls. Modules with demands evaluate their constants as one shared
+graph; per-constant native cache reuse is currently disabled for that graph.
+
 ## Evaluation and Wasm representation
 
 Const evaluation has an explicit shared step budget. Handled operations use the
@@ -815,11 +856,17 @@ emitter does not yet require newer proposals, SIMD, or Wasm-GC.
 
 ## Deliberate limits
 
+The JavaScript reference backend can exceed Deno's default call stack on a
+project the size of gdev. The linked gdev package uses the native backend. Some
+wide-list traversals now use loops; remaining recursive traversals still need a
+larger JavaScript stack. See the
+[Bend runtime limitation](../BUGS.md#runtime-limitation-javascript-list-helpers-exhaust-the-stack-2032).
+
 Array patterns, spread syntax, destructuring function parameters, general
 Text/F64, SIMD, inferred generic effect-family labels in explicit polymorphic
-rows, demand parameters, type-valued consts, and resumptions are not
-implemented. `do monad Maybe:`/`return $` remain design syntax, not implemented
-monad resolution. An unconstrained provider parameter cannot infer an unknown
+rows, type-valued consts, and resumptions are not implemented.
+`do monad Maybe:`/`return $` remain design syntax, not implemented monad
+resolution. An unconstrained provider parameter cannot infer an unknown
 operation identity in this first closed-label slice.
 
 [Controlled host IO](effects-and-io.md#controlled-host-io) uses explicit

@@ -7,15 +7,15 @@ import { createSourceProjectLoader } from "./source_project.ts";
 
 type Node = { $: string; [key: string]: any };
 const api = candidate as any;
-const source = `type End is data = End
-type Entry { head, tail } is data = Entry { head, tail }
-const End.contains = fn (end: End) => fn witness => False
+const source = `type End is data = #End
+type Entry { head, tail } is data = #Entry { head, tail }
+const End.contains = fn (end: End) => fn witness => #False
 const Entry.contains = fn entry => fn witness => do:
-  let Entry { head, tail } = entry
-  if Type head == Type witness:
-    return True
+  let #Entry { head, tail } = entry
+  if #Type head == #Type witness:
+    return #True
   return tail.contains(witness)
-const run = fn () => Entry { head: True, tail: End }.contains(True)
+const run = fn () => #Entry { head: #True, tail: #End }.contains(#True)
 `;
 const row = {
   $: "model.EffectRow",
@@ -161,7 +161,7 @@ Deno.test("independently checked linked schema reduces concrete chains only", as
 });
 
 Deno.test("changed checked source does not establish schema evidence", async () => {
-  const changed = source.replace("fn witness => False", "fn witness => True");
+  const changed = source.replace("fn witness => #False", "fn witness => #True");
   assert.notEqual(changed, source);
   const { module, checked } = await checkedSource(changed)();
   assert.equal(
@@ -206,11 +206,11 @@ Deno.test("shadowed schema binder and colliding constructor fields reject captur
     );
   }
   const shadowed = source.replace(
-    "let Entry { head, tail } = entry",
-    "let Entry { head: witness, tail } = entry",
+    "let #Entry { head, tail } = entry",
+    "let #Entry { head: witness, tail } = entry",
   ).replace(
-    "if Type head == Type witness:",
-    "if Type witness == Type witness:",
+    "if #Type head == #Type witness:",
+    "if #Type witness == #Type witness:",
   );
   assert.notEqual(shadowed, source);
   const lowered = await checkedSource(shadowed)();

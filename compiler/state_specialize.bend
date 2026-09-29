@@ -145,15 +145,36 @@ def merge_operation(present: Bool, operations: List<&2, M.Operation>, operation:
     case False{}:
       List.append(&2, M.Operation, operations, [operation])
 
-def merge(incoming: List<&2, M.Operation>, +operations: List<&2, M.Operation>) -> List<&2, M.Operation>:
+def merge_remaining(incoming: List<&2, M.Operation>, +operations: List<&2, M.Operation>) -> List<&2, M.Operation>:
   match incoming:
     case Nil{}:
       operations
     case M.Operation{+identity, parameter, result} <> tail:
       +operation : M.Operation = M.Operation{identity, parameter, result}
-      merge(tail, merge_operation(contains(operations, identity), operations, operation))
+      merge_remaining(tail, merge_operation(contains(operations, identity), operations, operation))
     case head <> tail:
-      merge(tail, operations)
+      merge_remaining(tail, operations)
+
+# Expanded constants retain the operation catalog they were inferred against.
+# Skip an aligned prefix using one identity comparison per operation. Retain
+# the original catalog so a mismatch falls back to ordinary ordered merging.
+def merge_prefix(+incoming: List<&2, M.Operation>, cursor: List<&2, M.Operation>, +operations: List<&2, M.Operation>, matched: Bool, unmatched: List<&2, M.Operation>) -> List<&2, M.Operation>:
+  match incoming cursor matched:
+    case _ _ False{}:
+      merge_remaining(unmatched, operations)
+    case Nil{} _ True{}:
+      operations
+    case M.Operation{identity, parameter, result} <> tail M.Operation{known, p, r} <> rest True{}:
+      merge_prefix(tail, rest, operations, M.type_id_equal(identity, known), incoming)
+    case M.Operation{identity, parameter, result} <> tail Nil{} True{}:
+      merge_remaining(incoming, operations)
+    case M.Operation{identity, parameter, result} <> tail head <> rest True{}:
+      merge_prefix(incoming, rest, operations, True{}, Nil{})
+    case head <> tail remaining True{}:
+      merge_prefix(tail, remaining, operations, True{}, Nil{})
+
+def merge(incoming: List<&2, M.Operation>, +operations: List<&2, M.Operation>) -> List<&2, M.Operation>:
+  merge_prefix(incoming, operations, operations, True{}, Nil{})
 
 def operations(+key: String, +ty: M.Ty, existing: List<&2, M.Operation>) -> List<&2, M.Operation>:
   merge([M.Operation{read_identity(key), M.UnitTy{}, ty}, M.Operation{write_identity(key), ty, M.UnitTy{}}], existing)

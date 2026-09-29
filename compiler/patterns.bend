@@ -181,6 +181,8 @@ def check(constraints: List<&2, I.Coverage>, +substitutions: T.Substitutions, +t
     case I.AssociatedNeed{identity, dispatch, member, templates, left, right, result, invocation, ambient, subject} <> tail:
       # Monomorphization discharges these; this pass checks pattern coverage.
       check(tail, substitutions, types)
+    case I.DemandCall{site} <> tail:
+      check(tail, substitutions, types)
     case I.LetGeneralized{witness} <> tail:
       check(tail, substitutions, types)
     case I.QualifiedBoundary{offset, declared, subject} <> tail:

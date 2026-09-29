@@ -55,7 +55,7 @@ jobs:
           zig build test -Doptimize=${{ matrix.mode }} -j2 --summary all
           python3 tests_protocol.py -v
           python3 tests_generate.py -v
-          zig fmt --check build.zig src/main.zig src/runtime.zig src/pool.zig
+          zig fmt --check build.zig src/*.zig
       - name: Run protocol regressions on a baseline x86-64 CPU
         if: matrix.mode == 'ReleaseSafe'
         working-directory: zig
@@ -101,13 +101,13 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: '1.2.22'
-      - name: Install checksum-verified reference Bend 2.0.32
+      - name: Install checksum-verified reference Bend 2.0.34
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/bend-release"
           cd "$RUNNER_TEMP/bend-release"
-          curl --fail --location --retry 3 --output bend.tar.gz https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz
-          echo '5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  bend.tar.gz' | sha256sum --check
+          curl --fail --location --retry 3 --output bend.tar.gz https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz
+          echo '78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  bend.tar.gz' | sha256sum --check
           tar -xzf bend.tar.gz
           binary=$(find "$PWD" -type f -name bend -perm -u+x | head -n 1)
           test -n "$binary"
@@ -120,11 +120,11 @@ jobs:
       - name: Build unchanged JavaScript reference modules
         run: |
           set -euo pipefail
-          mkdir -p generated/compiler/bend-2.0.32
+          mkdir -p generated/compiler/bend-2.0.34
           for name in main.ts bend.ts comp.ts safe.ts base.bend; do
-            curl --fail --location --retry 3 --output "generated/compiler/bend-2.0.32/$name" "https://raw.githubusercontent.com/bendlang/bend/v2.0.32/bend2/$name"
+            curl --fail --location --retry 3 --output "generated/compiler/bend-2.0.34/$name" "https://raw.githubusercontent.com/bendlang/bend/v2.0.34/bend2/$name"
           done
-          loader="file://$GITHUB_WORKSPACE/generated/compiler/bend-2.0.32/main.ts"
+          loader="file://$GITHUB_WORKSPACE/generated/compiler/bend-2.0.34/main.ts"
           for module in main native_session native_output; do
             output="$module"
             test "$module" != main || output=compiler
@@ -142,8 +142,8 @@ jobs:
           deno-version: v2.5.2
       - name: Type-check the native APIs and differential adapter
         run: |
-          deno check compiler/cli.ts compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts zig/check_test_partition.ts
-          deno fmt --check zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts zig/check_test_partition.ts zig/differential.json zig/README.md zig/zig-analyzer.json
+          deno check compiler/cli.ts compiler/native.ts compiler/native_incremental.ts compiler/native_project.ts zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts zig/syntax_compat.test.ts zig/check_test_partition.ts
+          deno fmt --check zig/cli.ts zig/source_adapter.ts zig/standalone.test.ts zig/syntax_compat.test.ts zig/check_test_partition.ts zig/differential.json zig/README.md zig/zig-analyzer.json
 
   compatibility:
     needs: [native, reference]
@@ -177,7 +177,7 @@ jobs:
         if: matrix.shard == 0 && matrix.suite == 'native'
         run: |
           test ! -e generated/compiler/compiler.js
-          deno test --cached-only --no-check --allow-read --allow-run=zig/zig-out/bin/blotc-zig zig/standalone.test.ts 2>&1 | tee build/zig-validation/standalone.log
+          deno test --cached-only --no-check --allow-read --allow-run=zig/zig-out/bin/blotc-zig zig/standalone.test.ts zig/syntax_compat.test.ts 2>&1 | tee build/zig-validation/standalone.log
           deno task blot:zig check examples/syntax.blot
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:

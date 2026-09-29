@@ -100,14 +100,37 @@ def within(-V: Data, same: Bool, found: Unit -> Maybe<&2, V>) -> Maybe<&2, V>:
     case False{}:
       None{}
 
-def find(-V: Data, index: Index<V>, +key: Nat) -> Maybe<&2, V>:
-  match index:
-    case Empty{}:
+def found_value(-V: Data, equal: Bool, value: V) -> Maybe<&2, V>:
+  match equal:
+    case False{}:
       None{}
-    case Leaf{found, value}:
-      Bool.pick(Maybe<&2, V>, Nat.is_eq(found, key), Some{value}, None{})
-    case Branch{sample, +mask, low, high}:
-      within(V, same_prefix(key, sample, mask), unit => choose(V, high_bit(key, mask), unit => find(V, high, key), unit => find(V, low, key)))
+    case True{}:
+      Some{value}
+
+def next_branch(-V: Data, within: Bool, key: Nat, mask: Nat, low: Index<V>, high: Index<V>) -> Index<V>:
+  match within:
+    case False{}:
+      Empty{}
+    case True{}:
+      Bool.pick(Index<V>, high_bit(key, mask), high, low)
+
+# Preserve the prefix rejection, but select a child as data rather than
+# allocating three branch closures. A Nat48 Patricia path has at most 48
+# branches, followed by one leaf or empty node, so find supplies 49 steps.
+def find_loop(-V: Data, fuel: Nat, index: Index<V>, +key: Nat) -> Maybe<&2, V>:
+  match fuel index:
+    case 0n _:
+      None{}
+    case 1n+rest Empty{}:
+      None{}
+    case 1n+rest Leaf{found, value}:
+      found_value(V, Nat.is_eq(found, key), value)
+    case 1n+rest Branch{sample, +mask, low, high}:
+      next = next_branch(V, same_prefix(key, sample, mask), key, mask, low, high)
+      find_loop(V, rest, next, key)
+
+def find(-V: Data, index: Index<V>, key: Nat) -> Maybe<&2, V>:
+  find_loop(V, 49n, index, key)
 
 def fallback(-V: Data, found: Maybe<&2, V>, otherwise: V) -> V:
   match found:

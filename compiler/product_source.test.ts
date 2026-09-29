@@ -4,14 +4,14 @@ import { createSourceCompiler } from "./source.ts";
 import { SourceError } from "./syntax.ts";
 
 Deno.test("source tuples retain heterogeneous fields through annotations, ADTs, and closures", async () => {
-  const source = `data Payload = Payload (U32, Bool)
+  const source = `data Payload = #Payload (U32, Bool)
 const first = fn (pair: (U32, Bool)) => @product.get pair 0
 const unwrap = fn value => case value of
-  Payload pair => first pair
-const stored = Payload (40, True)
+  #Payload pair => first pair
+const stored = #Payload (40, #True)
 entry const expected = unwrap stored + 2
 entry const answer = fn () => do:
-  let captured = (unwrap stored, False)
+  let captured = (unwrap stored, #False)
   let select = fn () => first captured
   return select () + 2
 `;
@@ -39,9 +39,9 @@ Deno.test("source projection reports unknown shapes and requires an in-bounds li
           "const read = fn value => @product.get value 0\n",
           "unknown_product_shape",
         ],
-        ["const read = fn () => @product.get (1, True) 2\n", "product_index"],
+        ["const read = fn () => @product.get (1, #True) 2\n", "product_index"],
         [
-          "const read = fn index => @product.get (1, True) index\n",
+          "const read = fn index => @product.get (1, #True) index\n",
           "product_index_literal",
         ],
       ]

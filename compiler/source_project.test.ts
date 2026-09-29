@@ -138,10 +138,10 @@ Deno.test("source projects canonicalize equivalent file URL spellings before loa
     "main.blot": `import * as direct from "./library.blot"
 import { Box as EscapedBox } from "./%6cibrary%2Eblot"
 const unpack = fn (value: direct.Box) => case value of
-  EscapedBox inner => inner
-entry const answer = fn () => unpack (EscapedBox 42)
+  #EscapedBox inner => inner
+entry const answer = fn () => unpack (#EscapedBox 42)
 `,
-    "library.blot": "data Box = Box U32\n",
+    "library.blot": "data Box = #Box U32\n",
   }, new URL("file:///blot-project/%6dain.blot"));
   const input = await loaded;
   equal(reads, ["main.blot", "library.blot"]);
@@ -177,10 +177,10 @@ const x = fn (point: geometry.Point) => coordinate point
 const y = fn (point: Position) => x point
 entry const answer = fn () => y (make 42)
 `,
-    "geometry.blot": `data Point = Point U32
-const make = fn value => Point value
+    "geometry.blot": `data Point = #Point U32
+const make = fn value => #Point value
 const coordinate = fn point => case point of
-  Point value => value
+  #Point value => value
 `,
   });
   const compiler = await createSourceCompiler();
@@ -197,16 +197,16 @@ Deno.test("source project namespace constructors work in case and guarded patter
   const { loaded } = project({
     "main.blot": `import * as geometry from "./geometry"
 const case_point = fn point => case point of
-  geometry.Point value => value
+  #geometry.Point value => value
 const guard_point = fn point => do:
-  let geometry.Point value = point else:
+  let #geometry.Point value = point else:
     return 0
-  if let geometry.Point copied = point:
+  if let #geometry.Point copied = point:
     return @u32.add value copied
   return 0
-entry const answer = fn () => @u32.add (case_point (geometry.Point 14)) (guard_point (geometry.Point 14))
+entry const answer = fn () => @u32.add (case_point (#geometry.Point 14)) (guard_point (#geometry.Point 14))
 `,
-    "geometry.blot": "data Point = Point U32\n",
+    "geometry.blot": "data Point = #Point U32\n",
   });
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
@@ -294,7 +294,7 @@ Deno.test("source project namespace names cannot merge or collide with bare bind
         "main.blot": source,
         "left.blot": "const left = 20\n",
         "right.blot": "const right = 22\n",
-        "types.blot": "data Point = Make U32\n",
+        "types.blot": "data Point = #Make U32\n",
         "empty.blot": "",
       });
       const input = await loaded;
@@ -462,7 +462,7 @@ Deno.test("large independent module bodies preserve native artifacts and nominal
     "\nentry const answer = fn (value: U32) => part0.answer value\n";
   for (let module = 0; module < 8; module++) {
     sources[`part${module}.blot`] = Array.from({ length: 8 }, (_, index) =>
-      `data T${index} = C${index} ${
+      `data T${index} = #C${index} ${
         index ? `T${index - 1}` : "U32"
       }\nconst identity${index} = fn (value: T${index}) => value\n`).join("") +
       "const answer = fn value => " + Array.from({ length: 96 }, () =>

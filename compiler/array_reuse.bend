@@ -16,6 +16,10 @@ def children(expression: I.Expr) -> List<&2, I.Expr>:
   match expression:
     case I.ConstructExpr{constructor, Some{payload}}:
       [payload]
+    case I.MemoExpr{computation}:
+      [computation]
+    case I.ForceExpr{value}:
+      [value]
     case I.ApplyExpr{callee, argument}:
       [callee, argument]
     case I.CallExpr{key, argument}:
@@ -96,6 +100,10 @@ def rebuild(original: I.Expr, children: List<&2, I.Expr>) -> Result<&2, &2, M.Di
   match original children:
     case I.ConstructExpr{constructor, Some{payload}} payload_new <> Nil{}:
       Done{I.ConstructExpr{constructor, Some{payload_new}}}
+    case I.MemoExpr{computation} value <> Nil{}:
+      Done{I.MemoExpr{value}}
+    case I.ForceExpr{original} value <> Nil{}:
+      Done{I.ForceExpr{value}}
     case I.ApplyExpr{callee, argument} callee_new <> argument_new <> Nil{}:
       Done{I.ApplyExpr{callee_new, argument_new}}
     case I.CallExpr{key, argument} argument_new <> Nil{}:
@@ -161,7 +169,7 @@ type Usage is Data:
 
 def reference_count(usage: Usage, name: String, borrowed: Bool, position: Nat, usages: Map<&2, Usage>) -> Map<&2, Usage>:
   Usage{escapes, last} = usage
-  Map.set(&2, Usage, usages, name, Usage{Nat.add(escapes, Bool.pick(Nat, borrowed, 0n, 1n)), position})
+  Index.set(Usage, usages, name, Usage{Nat.add(escapes, Bool.pick(Nat, borrowed, 0n, 1n)), position})
 
 def reference(+name: String, borrowed: Bool, position: Nat, +usages: Map<&2, Usage>) -> Map<&2, Usage>:
   reference_count(Index.get(Usage, usages, name, Usage{0n, 0n}), name, borrowed, position, usages)
@@ -268,7 +276,7 @@ def rewrite(fuel: Nat, work: Work, +ownership: Map<&2, Bool>, +usages: Map<&2, U
       do Result<&2, &2, M.Diagnostic, Edited>:
         +v : Edited <- rewrite(rest, Expression{value}, ownership, usages, 1n+position)
         value : I.Expr <- one(expressions(v))
-        +b : Edited <- rewrite(rest, Expression{body}, Map.set(&2, Bool, ownership, name, owned(v)), usages, next(v))
+        +b : Edited <- rewrite(rest, Expression{body}, Index.set(Bool, ownership, name, owned(v)), usages, next(v))
         body : I.Expr <- one(expressions(b))
         return Edited{[I.LetExpr{name, value, body}], owned(b), next(b)}
     case 1n+ +rest Expression{I.ForExpr{index, start, end, +state, initial, body}}:
@@ -279,7 +287,7 @@ def rewrite(fuel: Nat, work: Work, +ownership: Map<&2, Bool>, +usages: Map<&2, U
         end : I.Expr <- one(expressions(e))
         +i : Edited <- rewrite(rest, Expression{initial}, ownership, usages, next(e))
         initial : I.Expr <- one(expressions(i))
-        +b : Edited <- rewrite(rest, Expression{body}, Map.set(&2, Bool, Map.new(&2, Bool), state, owned(i)), usages, next(i))
+        +b : Edited <- rewrite(rest, Expression{body}, Index.set(Bool, Map.new(&2, Bool), state, owned(i)), usages, next(i))
         body : I.Expr <- one(expressions(b))
         return Edited{[I.ForExpr{index, start, end, state, initial, body}], Bool.and(owned(i), owned(b)), next(b)}
     case 1n+ +rest Expression{I.ForeverExpr{+state, initial, body, compact}}:
@@ -288,7 +296,7 @@ def rewrite(fuel: Nat, work: Work, +ownership: Map<&2, Bool>, +usages: Map<&2, U
         prepared : I.Expr <- one(expressions(i))
         # The backedge may select a borrowed array even when the initial value
         # is fresh. Ownership needs an invariant across every iteration.
-        +b : Edited <- rewrite(rest, Expression{body}, Map.set(&2, Bool, Map.new(&2, Bool), state, False{}), usages, next(i))
+        +b : Edited <- rewrite(rest, Expression{body}, Index.set(Bool, Map.new(&2, Bool), state, False{}), usages, next(i))
         rewritten : I.Expr <- one(expressions(b))
         return Edited{[I.ForeverExpr{state, prepared, rewritten, compact}], Bool.and(owned(i), owned(b)), next(b)}
     case 1n+ +rest Expression{I.ArraySetExpr{+array, index, value}}:

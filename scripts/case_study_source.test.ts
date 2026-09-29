@@ -91,7 +91,7 @@ Deno.test("game composes an application from plugins, resources and ordered syst
   ok(game.includes('let application = app.new "Blot — PLAY"'));
   ok(game.includes("application := input.plugin self"));
   ok(game.includes("application := camera.plugin"));
-  ok(game.includes("application := app.insert_resource (Editor {"));
+  ok(game.includes("application := app.insert_resource (#Editor {"));
   for (
     const [stage, system] of [
       ["Start", "seed_scene"],
@@ -103,10 +103,10 @@ Deno.test("game composes an application from plugins, resources and ordered syst
       ["Render", "describe_mode"],
     ]
   ) {
-    ok(game.includes(`app.add_system ${stage} ${system} self`));
+    ok(game.includes(`app.add_system #${stage} ${system} self`));
   }
   ok(game.indexOf("input.plugin") < game.indexOf("camera.plugin"));
-  ok(game.indexOf("camera.plugin") < game.indexOf("app.add_system Event"));
+  ok(game.indexOf("camera.plugin") < game.indexOf("app.add_system #Event"));
   ok(game.includes("return app.build application"));
   ok(
     !/ecs\.(?:build|scope|checkpoint)|snapshot\.|\.submit|set_title/.test(game),
@@ -137,7 +137,7 @@ Deno.test("lifecycle scopes successor worlds and narrows captured host capabilit
       ["render_frame", "Render"],
     ]
   ) {
-    ok(body(app, name).includes(`simulation.run ${stage}`));
+    ok(body(app, name).includes(`simulation.run #${stage}`));
   }
   const render = body(app, "render_frame");
   ok(render.includes("let (_, (packet, title)) = do ecs.scope world"));
@@ -155,13 +155,15 @@ Deno.test("input edges, selection and edit commands use typed state and flat mat
   const receive = body("engine/input.blot", "receive");
   ok(receive.includes("case event.kind, was_held of"));
   ok(
-    receive.includes("1, False => (KeyPressed code, [...previous.held, code])"),
+    receive.includes(
+      "1, #False => (#KeyPressed code, [...previous.held, code])",
+    ),
   );
   ok(
-    receive.includes("2, _ => (KeyReleased code, without previous.held code)"),
+    receive.includes("2, _ => (#KeyReleased code, without previous.held code)"),
   );
-  ok(receive.includes("3, _ => (FocusLost, [])"));
-  ok(receive.includes("_, _ => (Ignored, previous.held)"));
+  ok(receive.includes("3, _ => (#FocusLost, [])"));
+  ok(receive.includes("_, _ => (#Ignored, previous.held)"));
   ok(body("engine/input.blot", "key").includes("return code - 32"));
   const game = source("game.blot");
   ok(game.includes("selected: Maybe ecs.EntityId, grab_offset: Maybe Vec2"));
@@ -186,7 +188,7 @@ Deno.test("input edges, selection and edit commands use typed state and flat mat
   );
   ok(
     body("engine/camera.blot", "receive").includes(
-      "FocusLost, _ => (camera, False)",
+      "#FocusLost, _ => (camera, #False)",
     ),
   );
 });
@@ -248,7 +250,7 @@ Deno.test("camera and model matrices preserve column-major frame layouts", () =>
     "1.0",
   ]);
   const outline = body("engine/boxes.blot", "outline");
-  ok(outline.includes("for axis in [X, Y, Z]:"));
+  ok(outline.includes("for axis in [#X, #Y, #Z]:"));
   ok(
     outline.includes(
       "for (first, second) in [(-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)]:",
@@ -258,7 +260,7 @@ Deno.test("camera and model matrices preserve column-major frame layouts", () =>
   ok(outline.includes("position: spatial.offset transform local"));
   ok(
     body("game.blot", "draw_scene").includes(
-      "scale: Vec3 { x: 5.0, y: 0.1, z: 4.0 }",
+      "scale: #Vec3 { x: 5.0, y: 0.1, z: 4.0 }",
     ),
   );
 });
@@ -269,11 +271,11 @@ Deno.test("save/load stays in source, clears requests and checkpoints restored w
   ok(event.includes("files.write bytes"));
   ok(event.includes("files.read ()"));
   ok(event.includes("snapshot.decode (simulation.schema, bytes)"));
-  ok(event.includes("Result.map_error InvalidSnapshot"));
+  ok(event.includes("Result.map_error #InvalidSnapshot"));
   ok(event.includes("Result.map ecs.checkpoint"));
-  ok(event.indexOf("ecs.set Idle") < event.indexOf("files.write"));
+  ok(event.indexOf("ecs.set #Idle") < event.indexOf("files.write"));
   ok(
-    event.indexOf("ecs.set (PendingInput Nothing)") <
+    event.indexOf("ecs.set (#PendingInput #Nothing)") <
       event.indexOf("files.write"),
   );
   ok(!/files\.(read|write)\s+(?:world|next_world)/.test(event));

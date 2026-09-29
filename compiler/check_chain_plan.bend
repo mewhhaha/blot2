@@ -39,7 +39,7 @@ def publish(names: List<&2, String>, +value: Nat, indexed: Map<&2, Nat>) -> Map<
     case Nil{}:
       indexed
     case name <> tail:
-      publish(tail, value, Map.set(&2, Nat, indexed, name, value))
+      publish(tail, value, Index.set(Nat, indexed, name, value))
 
 def parent_with(previous: Parent, +position: Nat) -> Parent:
   match previous:
@@ -69,7 +69,7 @@ def dependencies(names: List<&2, String>, +position: Nat, +owners: Map<&2, Nat>,
         +owner : Nat <- required(Nat, Index.find(Nat, owners, name), name)
         +key : String = Nat.show(owner)
         consumer : Consumer = consumer_with(Index.find(Consumer, consumers, key), position)
-        dependencies(tail, position, owners, Relations{parent_with(parent, owner), Map.set(&2, Consumer, consumers, key, consumer)})
+        dependencies(tail, position, owners, Relations{parent_with(parent, owner), Index.set(Consumer, consumers, key, consumer)})
 
 def relation_parent(related: Relations) -> Parent:
   Relations{parent, consumers} = related
@@ -160,7 +160,7 @@ def build(jobs: List<&2, Linked>, +consumers: Map<&2, Consumer>, +heads: Map<&2,
       do Result<&2, &2, M.Diagnostic, List<&2, Chain>>:
         +chain : Chain <- next_chain(continuation(parent, position, consumers), position, job, heads, chains, levels)
         +head : Nat = chain_head(chain)
-        build(tail, consumers, Map.set(&2, Nat, heads, Nat.show(position), head), Map.set(&2, Chain, chains, Nat.show(head), chain), publish(members, chain_level(chain), levels))
+        build(tail, consumers, Index.set(Nat, heads, Nat.show(position), head), Index.set(Chain, chains, Nat.show(head), chain), publish(members, chain_level(chain), levels))
 
 def build_topology(linked_plan: Topology) -> Result<&2, &2, M.Diagnostic, List<&2, Chain>>:
   Topology{linked, consumers} = linked_plan

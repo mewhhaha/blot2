@@ -61,3 +61,19 @@ Deno.test("numeric Patricia index agrees with Map through mixed updates and read
     }
   }
 });
+
+Deno.test("numeric Patricia lookup reaches the leaf below all 48 branching bits", () => {
+  const keys = [
+    0n,
+    ...Array.from({ length: 48 }, (_, bit) => 1n << BigInt(bit)),
+  ];
+  let current = index["nat_index.new"]();
+  for (const [position, key] of keys.entries()) {
+    current = index["nat_index.set"](current, key, BigInt(position + 1));
+  }
+  for (const [position, key] of keys.entries()) {
+    equal(index["nat_index.get"](current, key, 0n), BigInt(position + 1));
+  }
+  equal(index["nat_index.get"](current, 3n, 0n), 0n);
+  equal(index["nat_index.get"](current, limit, 0n), 0n);
+});

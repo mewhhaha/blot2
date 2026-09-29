@@ -5,7 +5,7 @@
 (where_clause "where" @keyword.control)
 ["infixl" "infixr" "infix" "prefix"] @keyword.directive
 "rec" @keyword.storage.modifier
-["if" "else" "case" "of"] @keyword.control.conditional
+["if" "then" "else" "case" "of"] @keyword.control.conditional
 ["for" "in" "continue"] @keyword.control.repeat
 (ever_loop "ever" @keyword.control.repeat)
 ["return" "break"] @keyword.control.return
@@ -36,6 +36,7 @@
 (infix_function qualifier: (identifier) @namespace)
 (lambda_header parameter: (identifier) @variable.parameter)
 (deferred_parameter (identifier) @variable.parameter)
+(deferred_parameter (parenthesized (identifier) @variable.parameter))
 (lambda_header parameter: (parenthesized (identifier) @variable.parameter))
 (record_field name: (identifier) @variable.other.member)
 (type_parameter_field name: (identifier) @variable.other.member)
@@ -50,3 +51,5 @@
 (text_fragment) @string
 (escape_sequence) @constant.character.escape
 (interpolation "${" @punctuation.special "}" @punctuation.special)
+
+(constructor_marker) @punctuation.special

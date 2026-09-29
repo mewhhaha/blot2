@@ -317,6 +317,8 @@ def rename_invocation(invocation: Maybe<&2, M.EffectRow>, +mapping: NatIndex.Ind
 
 def coverage_free(coverage: I.Coverage) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
   match coverage:
+    case I.DemandCall{site}:
+      Done{Nil{}}
     case I.QualifiedBoundary{offset, declared, subject}:
       C.free_list(declared)
     case I.QualifiedNeed{site, predicate, subject}:
@@ -383,6 +385,8 @@ def rename_types(types: List<&2, M.Ty>, +mapping: NatIndex.Index<Nat>) -> Result
 
 def rename_coverage(coverage: I.Coverage, +mapping: NatIndex.Index<Nat>) -> Result<&2, &2, M.Diagnostic, I.Coverage>:
   match coverage:
+    case I.DemandCall{site}:
+      Done{I.DemandCall{site}}
     case I.QualifiedBoundary{offset, declared, subject}:
       do Result<&2, &2, M.Diagnostic, I.Coverage>:
         needs : List<&2, M.Predicate> <- C.rename_list(mapping, declared)

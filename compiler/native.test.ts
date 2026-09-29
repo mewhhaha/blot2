@@ -66,12 +66,12 @@ for (const prelude of ["none", "default"] as const) {
 
 Deno.test("native const values preserve closures, captures, and nested ADTs", async () => {
   const source = `
-data Maybe a = Some a | Nothing
+data Maybe a = #Some a | #Nothing
 const identity = fn value => value
-const empty = Nothing
-const nested = Some (Some 42)
+const empty = #Nothing
+const nested = #Some (#Some 42)
 const reference = identity
-const constructor = Some
+const constructor = #Some
 const closure = (fn captured => fn value => @u32.add captured value) 2
 entry const answer = fn () => closure 40
 entry const probe = fn () => do:
@@ -118,7 +118,7 @@ Deno.test("native diagnostics retain source offsets, budgets, and recovery", asy
   try {
     const cases = [
       { source: "// 😀\r\nconst answer = fn () => missing\r\n" },
-      { source: "const answer = fn () => @u32.add True 1\n" },
+      { source: "const answer = fn () => @u32.add #True 1\n" },
       { source: "const answer = 42\n", const_steps: 0n },
       { source: "entry const answer = fn () => do:\n  return 42\n" },
     ];
@@ -212,7 +212,7 @@ for (const threads of [1, 4]) {
           guest.dispose();
         }
       }
-      const invalid = "const answer = fn () => @u32.add True 1\n";
+      const invalid = "const answer = fn () => @u32.add #True 1\n";
       const expected = await native.compile(invalid).then(
         () => undefined,
         diagnostic,

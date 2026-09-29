@@ -181,7 +181,7 @@ def prepare_module(+node: C.Cst, +entry: String, prelude_scope: Lower.Context, +
     imported : Lower.Context <- imported_scope(C.field_values(body, "imports"), scopes, own)
     +scope : Lower.Context = Lower.combine_context(imported, prelude_scope)
     fixities : List<&2, O.Fixity> <- Lower.collect_fixities(declarations, scope, False{})
-    return ModulePreparation{ModuleTask{declarations, prefix, name, is_entry, Lower.with_fixities(scope, fixities)}, Map.set(&2, Lower.Context, scopes, name, own)}
+    return ModulePreparation{ModuleTask{declarations, prefix, name, is_entry, Lower.with_fixities(scope, fixities)}, Index.set(Lower.Context, scopes, name, own)}
 
 def module_weight(prepared: Result<&2, &2, M.Diagnostic, ModuleTask>) -> Nat:
   match prepared:

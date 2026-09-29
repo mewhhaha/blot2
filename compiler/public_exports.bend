@@ -97,7 +97,7 @@ def binding_index(bindings: List<&2, I.Binding>, index: Map<&2, I.Binding>) -> M
     case Nil{}:
       index
     case I.Binding{+name, ty, variables, predicates} <> tail:
-      binding_index(tail, Map.set(&2, I.Binding, index, name, I.Binding{name, ty, variables, predicates}))
+      binding_index(tail, Index.set(I.Binding, index, name, I.Binding{name, ty, variables, predicates}))
 
 def inferred(found: Maybe<&2, I.Binding>, name: String) -> Result<&2, &2, M.Diagnostic, M.Ty>:
   match found:

@@ -5,7 +5,7 @@ const r = @import("runtime.zig");
 const core = @import("generated/functions.zig");
 const max_words: u32 = 16 * 1024 * 1024;
 const magic: u32 = 0x424c4f54;
-const version: u32 = 13;
+const version = @import("generated/protocol.zig").version;
 const Failure = error{ ReadFailed, WriteFailed, TruncatedFrame, FrameTooLarge, InvalidPacket, InvalidArgument };
 
 fn readExact(bytes: []u8, allow_eof: bool) Failure!bool {
@@ -124,7 +124,7 @@ fn serve(init: std.process.Init.Minimal) !void {
             continue;
         }
         if (std.mem.eql(u8, arg, "--version")) {
-            try writeExact("blotc-zig 0.1.0 (protocol 13)\n");
+            try writeExact(std.fmt.comptimePrint("blotc-zig 0.1.0 (protocol {d})\n", .{version}));
             return;
         }
         return error.InvalidArgument;

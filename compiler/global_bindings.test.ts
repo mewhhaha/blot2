@@ -24,6 +24,14 @@ const api = compiled as unknown as {
     names: List<string>,
   ): List<Binding>;
   "globals.lookup"(declarations: List<unknown>, name: string): unknown;
+  "types.empty"(): unknown;
+  "globals.generalize_bindings_indexed"(
+    bindings: List<Binding>,
+    members: unknown,
+    definitions: List<unknown>,
+    context: unknown,
+    state: unknown,
+  ): { $: "Done"; value: List<Binding> };
 };
 function list<T>(items: readonly T[]): List<T> {
   return items.reduceRight<List<T>>(
@@ -41,6 +49,46 @@ function binding(name: string, index: number): Binding {
     variables: list([BigInt(index)]),
   };
 }
+
+Deno.test("generalization preserves unrelated bindings across a wide environment", () => {
+  const source = Array.from(
+    { length: 20_000 },
+    (_, i) => binding(`global_${i}`, i),
+  );
+  const nil = { $: "Nil" } as const;
+  const result = api["globals.generalize_bindings_indexed"](
+    list(source),
+    { $: "MTip" },
+    nil,
+    {
+      $: "infer.Context",
+      globals: nil,
+      locals: nil,
+      labels: nil,
+      data_types: nil,
+      operations: nil,
+      subject: "wide environment",
+      function_names: nil,
+      ambient: {
+        $: "model.EffectRow",
+        operations: nil,
+        tail: { $: "model.ClosedRow" },
+      },
+    },
+    {
+      $: "infer.State",
+      substitutions: api["types.empty"](),
+      next: 20_000n,
+      annotations: { $: "MTip" },
+    },
+  );
+  equal(result.$, "Done");
+  const actual: Binding[] = [];
+  for (let cursor = result.value; cursor.$ === "Con"; cursor = cursor.tail) {
+    actual.push(cursor.head);
+  }
+  equal(actual, source);
+});
 
 Deno.test("global binding index preserves source order, duplicate bindings and shared snapshots", () => {
   const bindings = list(["z", "same", "unused", "same", "a"].map(binding));

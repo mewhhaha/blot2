@@ -1,4 +1,4 @@
-type Listed [head, tail] is data = Listed (head, tail)
+type Listed [head, tail] is data = #Listed (head, tail)
 // <- keyword.storage.type
 //   ^ type
 //          ^ punctuation.bracket
@@ -7,17 +7,17 @@ type Listed [head, tail] is data = Listed (head, tail)
 //                       ^ keyword.storage.type
 //                          ^ keyword.storage.type
 
-type Paired (head, tail) is data = Paired (head, tail)
+type Paired (head, tail) is data = #Paired (head, tail)
 //          ^ punctuation.bracket
 //           ^ type.parameter
 //                 ^ type.parameter
 
-type Entry { head, tail } is data = Entry { head, tail }
+type Entry { head, tail } is data = #Entry { head, tail }
 //         ^ punctuation.bracket
 //           ^ type.parameter
 //                 ^ type.parameter
 
-type Nested { pair: (a, b), rest: [c, d] } is data = Nested (a, b, c, d)
+type Nested { pair: (a, b), rest: [c, d] } is data = #Nested (a, b, c, d)
 //            ^ variable.other.member
 //                   ^ type.parameter
 //                      ^ type.parameter
@@ -25,7 +25,7 @@ type Nested { pair: (a, b), rest: [c, d] } is data = Nested (a, b, c, d)
 //                                 ^ type.parameter
 //                                    ^ type.parameter
 
-type Curried a => type [b, c] is data = Curried (a, b, c)
+type Curried a => type [b, c] is data = #Curried (a, b, c)
 //           ^ type.parameter
 //             ^ operator
 //                ^ keyword.storage.type
@@ -49,12 +49,12 @@ type State a is effect = { get: Unit -> a, set: a -> Unit }
 //                         ^ variable.other.member
 //                                         ^ variable.other.member
 
-type Empty () is data = Empty
+type Empty () is data = #Empty
 //         ^ punctuation.bracket
 //          ^ punctuation.bracket
 //            ^ keyword.storage.type
 
-type Ping [] is effect = Unit -> U32
+type Ping [] is effect = #Unit -> U32
 //        ^ punctuation.bracket
 //         ^ punctuation.bracket
 //              ^ keyword.storage.type

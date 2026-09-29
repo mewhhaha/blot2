@@ -6,19 +6,19 @@ Deno.test("nested const builders retain only live captures and transport grows l
   try {
     const layers = 24;
     const source = `
-data Builder = Builder { run: U32 -> U32, version: U32 }
+data Builder = #Builder { run: U32 -> U32, version: U32 }
 const extend = fn builder => do:
-  let Builder { run, version } = builder
-  return Builder {
+  let #Builder { run, version } = builder
+  return #Builder {
     run: fn value => @u32.add (run value) 1,
     version: @u32.add version 1,
   }
 const built = do:
-  let builder = Builder { run: fn value => value, version: 0 }
+  let builder = #Builder { run: fn value => value, version: 0 }
 ${Array.from({ length: layers }, () => "  builder := extend self").join("\n")}
   return builder
 entry const run = fn (value: U32) => do:
-  let Builder { run } = built
+  let #Builder { run } = built
   return run value
 `;
     const artifact = compiler.compile(source);

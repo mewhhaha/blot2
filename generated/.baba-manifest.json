@@ -3,7 +3,7 @@
   "manifestVersion": 1,
   "files": {
     "queries/generated-highlights.scm": {
-      "hash": "6b76d98eaff7721f98d967a935948018ca81bab2f4bc7d8d1c87a8119aed3eda",
+      "hash": "4e7ca34e338a64e30d4a57cd3b262559216af8d100549c91e5e964f87ef8326d",
       "ownership": "generated",
       "encoding": "utf-8",
       "kind": "query"
@@ -33,7 +33,7 @@
       "kind": "source"
     },
     "wasm/parser.plan": {
-      "hash": "35c94199d8ad382b8c09dd5db6ad8b1121c645993ee32897627b7bafc2ca27d4",
+      "hash": "7a15ba057fa57d72e6e088f7f0051b93059fbe3f5af586559b47f36b01be319d",
       "ownership": "generated",
       "encoding": "binary",
       "kind": "binary"
@@ -45,7 +45,7 @@
       "kind": "binary"
     },
     "wasm/syntax.ts": {
-      "hash": "ffcf3d5e6a08d905d664db5ab12b226a72da06858768b234a25990d5677fb05a",
+      "hash": "a2ee20416818ac32d78f5e464358be6b3c0f9af4b84a7c11d674f1ef4429b7cb",
       "ownership": "generated",
       "encoding": "utf-8",
       "kind": "source"

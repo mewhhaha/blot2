@@ -41,7 +41,7 @@ if (
 
 const cells = (count: number) => Array.from({ length: count }, (_, i) => i);
 const common = (count: number) => `
-${cells(count).map((i) => `type Cell${i} is data = Cell${i} U32`).join("\n")}
+${cells(count).map((i) => `type Cell${i} is data = #Cell${i} U32`).join("\n")}
 type State a is effect = {
   get: Unit -> a
   set: a -> Unit
@@ -51,15 +51,15 @@ const set = fn value => State.set value
 const action = fn delta => fn () => do:
 ${
   cells(count).map((i) =>
-    `  use value${i} <- get Cell${i}
-  let Cell${i} number${i} = value${i}
+    `  use value${i} <- get #Cell${i}
+  let #Cell${i} number${i} = value${i}
   use set (Cell${i} (number${i} + delta))`
   ).join("\n")
 }
 ${
   cells(count).map((i) =>
-    `  use updated${i} <- get Cell${i}
-  let Cell${i} result${i} = updated${i}`
+    `  use updated${i} <- get #Cell${i}
+  let #Cell${i} result${i} = updated${i}`
   ).join("\n")
 }
   return ${cells(count).map((i) => `result${i}`).join(" + ")}
@@ -67,41 +67,41 @@ ${
 
 function builder(count: number): string {
   return `${common(count)}
-type Builder [world, scope, checkpoint, schema] is data = Builder { initial: world, scope: world -> scope, checkpoint: checkpoint, schema: schema }
-type End is data = End
+type Builder [world, scope, checkpoint, schema] is data = #Builder { initial: world, scope: world -> scope, checkpoint: checkpoint, schema: schema }
+type End is data = #End
 const empty = fn () => do:
   let scope = fn world => fn operation => do:
     use result <- operation ()
     return (world, result)
-  return Builder { initial: (), scope, checkpoint: fn () => (), schema: End }
+  return #Builder { initial: (), scope, checkpoint: fn () => (), schema: #End }
 const insert_cell = fn initial => fn builder => do:
-  let Builder { initial: previous_initial, scope: previous_scope, checkpoint, schema } = builder
+  let #Builder { initial: previous_initial, scope: previous_scope, checkpoint, schema } = builder
   let scope = fn world => fn operation => do:
     let (current, previous) = world
     use outcome <- @effect.run State.get State.set current (fn () => previous_scope previous operation)
     let (next, (previous_next, result)) = outcome
     return ((next, previous_next), result)
-  return Builder { initial: (initial, previous_initial), scope, checkpoint, schema }
+  return #Builder { initial: (initial, previous_initial), scope, checkpoint, schema }
 const built = do:
   let builder = empty ()
 ${
-    cells(count).map((i) => `  builder := insert_cell (Cell${i} ${i}) self`)
+    cells(count).map((i) => `  builder := insert_cell (#Cell${i} ${i}) self`)
       .join("\n")
   }
   return builder
 const entry = fn (delta: U32) => do:
-  let Builder { initial, scope } = built
+  let #Builder { initial, scope } = built
   let (world, result) = scope initial (action delta)
   return result
 `;
 }
 
 const worldType = (count: number) =>
-  `type World is data = World { ${
+  `type World is data = #World { ${
     cells(count).map((i) => `c${i}: Cell${i}`).join(", ")
   } }`;
 const worldInitial = (count: number) =>
-  `World { ${cells(count).map((i) => `c${i}: Cell${i} ${i}`).join(", ")} }`;
+  `#World { ${cells(count).map((i) => `c${i}: #Cell${i} ${i}`).join(", ")} }`;
 
 function fixedHandlers(count: number): string {
   const nested = cells(count).reduceRight(
@@ -116,10 +116,12 @@ function fixedHandlers(count: number): string {
   return `${common(count)}
 ${worldType(count)}
 const run = fn world => fn action => do:
-  let World { ${cells(count).map((i) => `c${i}: cell${i}`).join(", ")} } = world
+  let #World { ${
+    cells(count).map((i) => `c${i}: cell${i}`).join(", ")
+  } } = world
   use outcome <- ${nested}
   let ${result} = outcome
-  return (World { ${
+  return (#World { ${
     cells(count).map((i) => `c${i}: next${i}`).join(", ")
   } }, result)
 const entry = fn (delta: U32) => do:
@@ -130,29 +132,33 @@ const entry = fn (delta: U32) => do:
 
 function directRecord(count: number): string {
   return `${
-    cells(count).map((i) => `type Cell${i} is data = Cell${i} U32`).join("\n")
+    cells(count).map((i) => `type Cell${i} is data = #Cell${i} U32`).join("\n")
   }
 ${worldType(count)}
 const entry = fn (delta: U32) => do:
   let initial = ${worldInitial(count)}
-  let World { ${
+  let #World { ${
     cells(count).map((i) => `c${i}: cell${i}`).join(", ")
   } } = initial
-${cells(count).map((i) => `  let Cell${i} number${i} = cell${i}`).join("\n")}
-  let updated = World { ${
+${cells(count).map((i) => `  let #Cell${i} number${i} = cell${i}`).join("\n")}
+  let updated = #World { ${
     cells(count).map((i) => `c${i}: Cell${i} (number${i} + delta)`).join(", ")
   } }
-  let World { ${
+  let #World { ${
     cells(count).map((i) => `c${i}: updated${i}`).join(", ")
   } } = updated
-${cells(count).map((i) => `  let Cell${i} result${i} = updated${i}`).join("\n")}
+${
+    cells(count).map((i) => `  let #Cell${i} result${i} = updated${i}`).join(
+      "\n",
+    )
+  }
   return ${cells(count).map((i) => `result${i}`).join(" + ")}
 `;
 }
 
 function directAccessors(count: number): string {
   return `${
-    cells(count).map((i) => `type Cell${i} is data = Cell${i} U32`).join("\n")
+    cells(count).map((i) => `type Cell${i} is data = #Cell${i} U32`).join("\n")
   }
 ${worldType(count)}
 ${
@@ -167,12 +173,14 @@ const entry = fn (delta: U32) => do:
   let world0 = ${worldInitial(count)}
 ${
     cells(count).map((i) =>
-      `  let Cell${i} number${i} = get${i} world${i}
+      `  let #Cell${i} number${i} = get${i} world${i}
   let world${i + 1} = set${i} (Cell${i} (number${i} + delta)) world${i}`
     ).join("\n")
   }
 ${
-    cells(count).map((i) => `  let Cell${i} result${i} = get${i} world${count}`)
+    cells(count).map((i) =>
+      `  let #Cell${i} result${i} = get${i} world${count}`
+    )
       .join("\n")
   }
   return ${cells(count).map((i) => `result${i}`).join(" + ")}

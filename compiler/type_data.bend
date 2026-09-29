@@ -199,9 +199,9 @@ def validate_work(+fuel: Nat, work: T.TypeWork, +parameters: Maybe<&2, Nat>, +op
       free_annotation(parameters, subject)
     case 1n+rest T.OneType{M.ParameterTy{index}}:
       require(valid_parameter(parameters, index), subject, "type parameter index is outside its data declaration")
-    case 1n+rest T.OneType{M.AppliedTy{identity, +arguments}}:
+    case 1n+rest T.OneType{M.AppliedTy{+identity, +arguments}}:
       do Result<&2, &2, M.Diagnostic, Unit>:
-        arity : Unit <- valid_arity(lookup(types, identity), List.length(&2, M.Ty, arguments), subject)
+        arity : Unit <- Bool.pick(Result<&2, &2, M.Diagnostic, Unit>, M.type_id_equal(identity, M.demand_identity()), require(Nat.is_eq(List.length(&2, M.Ty, arguments), 1n), subject, "demand requires one computation type"), valid_arity(lookup(types, identity), List.length(&2, M.Ty, arguments), subject))
         validate_work(rest, T.ManyTypes{arguments}, parameters, operations, types, subject)
     case 1n+rest T.OneType{M.ProductTy{+elements}}:
       do Result<&2, &2, M.Diagnostic, Unit>:

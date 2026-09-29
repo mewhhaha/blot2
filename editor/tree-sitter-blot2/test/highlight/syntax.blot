@@ -18,13 +18,13 @@ const identity = fn value => value
 //               ^ keyword.function
 //                  ^ variable.parameter
 
-data Maybe a = Some a | Nothing
+data Maybe a = #Some a | #Nothing
 // <- keyword.storage.type
 //   ^ type
-//             ^ type
-//                    ^ operator
+//              ^ type
+//                     ^ operator
 
-type Maybe a is data = Some a | Nothing
+type Maybe a is data = #Some a | #Nothing
 // <- keyword.storage.type
 //   ^ type
 //           ^ keyword.storage.type
@@ -37,23 +37,23 @@ type State a is effect = { get: Unit -> a, set: a -> Unit }
 //              ^ keyword.storage.type
 //                         ^ variable.other.member
 
-type Get a is effect = Unit -> a
+type Get a is effect = #Unit -> a
 // <- keyword.storage.type
 //   ^ type
 //         ^ keyword.storage.type
 //            ^ keyword.storage.type
 
-type Positions = Array Vec2
+type Positions = #Array Vec2
 // <- keyword.storage.type
 //   ^ type
-//               ^ type
+//                ^ type
 
-type Reading = F64 | Text
+type Reading = #F64 | #Text
 // <- keyword.storage.type
 //   ^ type
-//             ^ type
-//                 ^ operator
-//                   ^ type
+//              ^ type
+//                  ^ operator
+//                     ^ type
 
 const read_score = fn (ready: Bool) -> F64 | Text => do:
 //                 ^ keyword.function
@@ -63,31 +63,31 @@ const read_score = fn (ready: Bool) -> F64 | Text => do:
 //                                         ^ operator
 //                                           ^ type
 
-if let Some(x) = y:
+if let #Some(x) = y:
 // <- keyword.control.conditional
 // ^ keyword.storage.type
-//     ^ type
-//         ^ punctuation.bracket
-//          ^ variable
-//             ^ operator
-//               ^ variable
+//      ^ type
+//          ^ punctuation.bracket
+//           ^ variable
+//              ^ operator
+//                ^ variable
   return x
 
-let Some(x) = y else:
+let #Some(x) = y else:
 // <- keyword.storage.type
-//  ^ type
-//      ^ punctuation.bracket
-//       ^ variable
-//          ^ operator
-//            ^ variable
-//              ^ keyword.control.conditional
+//   ^ type
+//       ^ punctuation.bracket
+//        ^ variable
+//           ^ operator
+//             ^ variable
+//               ^ keyword.control.conditional
   return 0
 //^ keyword.control.return
 
-if let Some x = y:
+if let #Some x = y:
 // <- keyword.control.conditional
-//     ^ type
-//          ^ variable
+//      ^ type
+//           ^ variable
   return x
 else:
 // <- keyword.control.conditional
@@ -133,8 +133,8 @@ case first, second, third of
 //   ^ variable
 //        ^ punctuation.delimiter
 //                        ^ keyword.control.conditional
-  Some value, True, _ => value
-//^ type
+  #Some value, #True, _ => value
+// ^ type
 
 "if let Some(x) = y else: F64 | Text"
 // <- string
@@ -194,7 +194,7 @@ const or = fn left => fn ~right => do:
 //                       ^ operator
 //                        ^ variable.parameter
   if left:
-    return True
+    return #True
   return @force right
 //       ^ function.builtin
 
@@ -320,11 +320,11 @@ point.x := self + 1.0
 //    ^ comment
 //            ^ comment
 
-const enabled = True
-//              ^ constant.builtin.boolean
-
-const disabled = False
+const enabled = #True
 //               ^ constant.builtin.boolean
+
+const disabled = #False
+//                ^ constant.builtin.boolean
 
 "@force and ~right are text, ${@force right}"
 // <- string
@@ -353,11 +353,11 @@ effect Random.next: Unit -> U32
 #[component]
 // <- punctuation.special
 //^ attribute
-data Position = Position { x: F32 }
+data Position = #Position { x: F32 }
 
 #[resource]
 //^ attribute
-data Time = Time { seconds: F32 }
+data Time = #Time { seconds: F32 }
 
 "// still text ${world}"
 // <- string

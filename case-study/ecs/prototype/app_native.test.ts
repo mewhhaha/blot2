@@ -5,8 +5,8 @@ import { createNativeIncrementalCompiler } from "./native_incremental.ts";
 import type { EcsArtifact } from "./host.ts";
 
 const source = (component: string) => `
-#[component] data Position = Position F32
-#[component] data Velocity = Velocity F32
+#[component] data Position = #Position F32
+#[component] data Velocity = #Velocity F32
 const touch = fn () => do:
   use value <- @ecs.previous ${component}
   return ()

@@ -307,7 +307,7 @@ def publish_nominals(values: List<&2, Lowered>, next: Map<&2, Lowered>) -> Resul
     case Lowered{+node, fuel, fragment, scanned, Some{Cached{keys, +found}}} <> tail:
       value = {Lowered{node, fuel, fragment, scanned, Some{Cached{keys, found}}} : Lowered}
       do Result<&2, &2, M.Diagnostic, NominalRevision>:
-        rest : NominalRevision <- publish_nominals(tail, Map.set(&2, Lowered, next, Nat.show(C.offset_of(node)), value))
+        rest : NominalRevision <- publish_nominals(tail, Index.set(Lowered, next, Nat.show(C.offset_of(node)), value))
         return merge_nominal_revision(found, rest)
 
 def nominal_declarations(revision: NominalRevision) -> Map<&2, Lowered>:
@@ -332,7 +332,7 @@ def index_lowered(values: List<&2, Lowered>, next: Map<&2, Lowered>) -> Map<&2, 
     case Nil{}:
       next
     case Lowered{+node, fuel, fragment, scanned, nominals} <> tail:
-      index_lowered(tail, Map.set(&2, Lowered, next, Nat.show(C.offset_of(node)), Lowered{node, fuel, fragment, scanned, None{}}))
+      index_lowered(tail, Index.set(Lowered, next, Nat.show(C.offset_of(node)), Lowered{node, fuel, fragment, scanned, None{}}))
 
 type PreparedPlanning is Data:
   PreparedPlanning{declarations: Map<&2, Lowered>, plan: G.Planning}
@@ -428,7 +428,7 @@ def publish_closure(names: List<&2, String>, +closure: Set(), known: Map<&2, Set
     case Nil{}:
       known
     case name <> tail:
-      publish_closure(tail, closure, Map.set(&2, Set(), known, name, closure))
+      publish_closure(tail, closure, Index.set(Set(), known, name, closure))
 
 def group_owner(members: List<&2, String>) -> Result<&2, &2, M.Diagnostic, String>:
   match members:
@@ -450,7 +450,7 @@ def publish_group(state: CheckedGroups, owner: String, members: List<&2, String>
   +value = selected_value(G.CheckedGroup, selected)
   +checked = checked_group_checked(value)
   +name = owner
-  CheckedGroups{Map.set(&2, Cached<G.CheckedGroup>, groups, name, Cached{keys, value}), Scheduler.publish_interfaces(checked_group_interfaces(value), interfaces), Scheduler.publish_functions(Main.checked_functions(checked), functions), Scheduler.publish_constants(Main.checked_constants(checked), constants), publish_closure(members, closure, closures), Map.set(&2, List<&2, U32>, base_keys, name, base_key), count(counts, selected_reused(G.CheckedGroup, selected))}
+  CheckedGroups{Index.set(Cached<G.CheckedGroup>, groups, name, Cached{keys, value}), Scheduler.publish_interfaces(checked_group_interfaces(value), interfaces), Scheduler.publish_functions(Main.checked_functions(checked), functions), Scheduler.publish_constants(Main.checked_constants(checked), constants), publish_closure(members, closure, closures), Index.set(List<&2, U32>, base_keys, name, base_key), count(counts, selected_reused(G.CheckedGroup, selected))}
 
 type GroupSelection is Data:
   GroupHit{checked: G.CheckedGroup}
@@ -827,7 +827,7 @@ def evaluate_constants(constants: List<&2, M.CheckedConstant>, +steps: Nat, +con
         +keys : List<&2, List<&2, U32>> = budget <> dependencies
         +chosen : Selected<Const.Constants> <- select_constant(cached(Const.Constants, Index.find(Cached<Const.Constants>, previous, name), keys), M.CheckedConstant{M.Constant{name, exported, annotation, expression}, ty, variables}, steps, context)
         +value : Const.Constants = selected_value(Const.Constants, chosen)
-        evaluate_constants(tail, constant_remaining(value), context, closures, base_keys, previous, Map.set(&2, Cached<Const.Constants>, next, name, Cached{keys, value}), List.append(&2, Const.Binding<Const.Value>, List.reverse(&2, Const.Binding<Const.Value>, constant_bindings(value)), reversed), count(counts, selected_reused(Const.Constants, chosen)))
+        evaluate_constants(tail, constant_remaining(value), context, closures, base_keys, previous, Index.set(Cached<Const.Constants>, next, name, Cached{keys, value}), List.append(&2, Const.Binding<Const.Value>, List.reverse(&2, Const.Binding<Const.Value>, constant_bindings(value)), reversed), count(counts, selected_reused(Const.Constants, chosen)))
 
 type CompiledEntries is Data:
   CompiledEntries{entries: Map<&2, Cached<W.EntryCode>>, values: List<&2, W.EntryCode>, counts: Counts}
@@ -897,12 +897,12 @@ def publish_entries(selections: List<&2, EntrySelection>, compiled: List<&2, W.E
     case Nil{} Nil{}:
       finish_entries(failure, next, reversed, counts)
     case ReusedEntry{+name, key, +value} <> tail _:
-      publish_entries(tail, compiled, failure, Map.set(&2, Cached<W.EntryCode>, next, name, Cached{[key], value}), value <> reversed, count(counts, True{}))
+      publish_entries(tail, compiled, failure, Index.set(Cached<W.EntryCode>, next, name, Cached{[key], value}), value <> reversed, count(counts, True{}))
     case FreshEntry{+name, key} <> tail W.EntryCode{+found, code} <> rest:
       do Result<&2, &2, M.Diagnostic, CompiledEntries>:
         valid : Unit <- W.matching_entry(M.name_equal(name, found), name)
         +value : W.EntryCode = W.EntryCode{found, code}
-        publish_entries(tail, rest, failure, Map.set(&2, Cached<W.EntryCode>, next, name, Cached{[key], value}), value <> reversed, count(counts, False{}))
+        publish_entries(tail, rest, failure, Index.set(Cached<W.EntryCode>, next, name, Cached{[key], value}), value <> reversed, count(counts, False{}))
     case _ _:
       Fail{M.Diagnostic{"internal_error", "codegen", "incremental codegen results do not match the miss plan"}}
 
@@ -948,7 +948,7 @@ def publish_compiled_entries(entries: List<&2, Result<&2, &2, M.Diagnostic, Prep
       W.EntryCode{found, code} = value
       do Result<&2, &2, M.Diagnostic, CompiledEntries>:
         valid : Unit <- W.matching_entry(M.name_equal(name, found), name)
-        publish_compiled_entries(tail, Map.set(&2, Cached<W.EntryCode>, next, name, Cached{[key], value}), value <> reversed, count(counts, reused))
+        publish_compiled_entries(tail, Index.set(Cached<W.EntryCode>, next, name, Cached{[key], value}), value <> reversed, count(counts, reused))
 
 # Keying and cache-miss compilation share a worker. Ordered publication keeps
 # an earlier compilation error ahead of a later key error, despite speculation.
@@ -1001,13 +1001,27 @@ def update_evaluated(state: State, mode: Mode, checked: M.CheckedModule, evaluat
   next = {State{prelude, scope_key, declarations, planning, groups, constants, entries, specialization, catalog_version} : State}
   finish(mode, next, Main.Analysis{checked, bindings, remaining}, declaration_counts, group_counts, constant_counts)
 
-def update_checked(state: State, mode: Mode, +module: M.Module, +completed: CheckedGroups, declaration_counts: Counts, steps: Nat, hosts: List<&2, Entries.Entry>) -> Result<&2, &2, M.Diagnostic, Completion>:
+def evaluate_demand_graph(+constants: List<&2, M.CheckedConstant>, steps: Nat, context: Const.Context) -> Result<&2, &2, M.Diagnostic, Evaluated>:
+  +count = List.length(&2, M.CheckedConstant, constants)
+  do Result<&2, &2, M.Diagnostic, Evaluated>:
+    values : Const.Constants <- Const.evaluate_constants_selected(True{}, constants, steps, context)
+    return Evaluated{Map.new(&2, Cached<Const.Constants>), values, Counts{count, 0n}}
+
+def evaluate_checked_constants(demands: Bool, constants: List<&2, M.CheckedConstant>, steps: Nat, context: Const.Context, closures: Map<&2, Set()>, base_keys: Map<&2, List<&2, U32>>, previous: Map<&2, Cached<Const.Constants>>) -> Result<&2, &2, M.Diagnostic, Evaluated>:
+  match demands:
+    case True{}:
+      evaluate_demand_graph(constants, steps, context)
+    case False{}:
+      evaluate_constants(constants, steps, context, closures, base_keys, previous, Map.new(&2, Cached<Const.Constants>), Nil{}, Counts{0n, 0n})
+
+def update_checked(state: State, mode: Mode, +module: M.Module, +completed: CheckedGroups, declaration_counts: Counts, +steps: Nat, hosts: List<&2, Entries.Entry>) -> Result<&2, &2, M.Diagnostic, Completion>:
   State{prelude, scope_key, declarations, planning, previous_groups, previous_constants, entries, specialization, catalog_version} = state
   CheckedGroups{groups, interfaces, functions, constants, closures, base_keys, group_counts} = completed
   do Result<&2, &2, M.Diagnostic, Completion>:
     +checked : M.CheckedModule <- assemble(module, completed)
     valid : Unit <- Entries.verify(hosts, checked)
-    evaluated : Evaluated <- evaluate_constants(Main.checked_constants(checked), steps, Main.const_context(module, checked), closures, base_keys, previous_constants, Map.new(&2, Cached<Const.Constants>), Nil{}, Counts{0n, 0n})
+    +context : Const.Context = Main.const_context(module, checked)
+    evaluated : Evaluated <- evaluate_checked_constants(Const.has_demands(context), Main.checked_constants(checked), steps, context, closures, base_keys, previous_constants)
     update_evaluated(State{prelude, scope_key, declarations, planning, groups, Map.new(&2, Cached<Const.Constants>), entries, specialization, catalog_version}, mode, checked, evaluated, declaration_counts, group_counts)
 
 def lowered_fragments(values: List<&2, Lowered>) -> List<&2, M.Module>:

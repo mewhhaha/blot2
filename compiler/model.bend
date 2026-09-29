@@ -1,5 +1,9 @@
 import Base
 
+# Internal result-directed requests retain their source member for reachability.
+def source_member(+member: String) -> String:
+  Bool.pick(String, String.starts_with(member, "@result."), String.drop(member, 8n), member)
+
 type TypeId is Data:
   TypeId{module_name: String, declaration: String}
 
@@ -75,6 +79,13 @@ type ScalarOp is Data:
   F32LessEqual{}
   F32GreaterThan{}
   F32GreaterEqual{}
+  U32Divide{}
+  U32Remainder{}
+  U32BitAnd{}
+  U32BitOr{}
+  U32BitXor{}
+  U32ShiftLeft{}
+  U32ShiftRight{}
 
 type UnaryOp is Data:
   F32Negate{}
@@ -154,6 +165,8 @@ type Expr is Data:
   TagExpr{offset: Nat, callee: Expr, argument: Expr}
   QualifiedExpr{offset: Nat, annotation: Ty, predicates: List<&2, Predicate>, value: Expr}
   InstantiationExpr{site: Nat, value: Expr}
+  MemoExpr{computation: Expr}
+  ForceExpr{value: Expr}
 
 type Function is Data:
   Function{
@@ -344,6 +357,20 @@ def type_show(ty: Ty) -> String:
 
 def scalar_result(operator: ScalarOp) -> Ty:
   match operator:
+    case U32Divide{}:
+      U32Ty{}
+    case U32Remainder{}:
+      U32Ty{}
+    case U32BitAnd{}:
+      U32Ty{}
+    case U32BitOr{}:
+      U32Ty{}
+    case U32BitXor{}:
+      U32Ty{}
+    case U32ShiftLeft{}:
+      U32Ty{}
+    case U32ShiftRight{}:
+      U32Ty{}
     case Add{}:
       U32Ty{}
     case Subtract{}:
@@ -367,6 +394,20 @@ def scalar_result(operator: ScalarOp) -> Ty:
 
 def scalar_parameter(operator: ScalarOp) -> Ty:
   match operator:
+    case U32Divide{}:
+      U32Ty{}
+    case U32Remainder{}:
+      U32Ty{}
+    case U32BitAnd{}:
+      U32Ty{}
+    case U32BitOr{}:
+      U32Ty{}
+    case U32BitXor{}:
+      U32Ty{}
+    case U32ShiftLeft{}:
+      U32Ty{}
+    case U32ShiftRight{}:
+      U32Ty{}
     case Add{}:
       U32Ty{}
     case Subtract{}:
@@ -405,3 +446,31 @@ def reference_expr(reference: ValueReference) -> Expr:
 # Worklists keep their existing finite budget without a parsing-internal API.
 def max_nat() -> Nat:
   Nat.mul(U32.to_nat(16777215), U32.to_nat(16777217))
+
+# A demand parameter is opaque; its Unit callback carries the latent effects.
+def demand_identity() -> TypeId:
+  TypeId{"blot:compiler", "Demand"}
+
+def demand_type(computation: Ty) -> Ty:
+  AppliedTy{demand_identity(), [computation]}
+
+def is_demand_type(ty: Ty) -> Bool:
+  match ty:
+    case AppliedTy{identity, computation <> Nil{}}:
+      type_id_equal(identity, demand_identity())
+    case _:
+      False{}
+
+def demand_callee(ty: Ty) -> Bool:
+  match ty:
+    case FunctionTy{parameter, result, effects}:
+      is_demand_type(parameter)
+    case _:
+      False{}
+
+def suspend_argument(site: Nat, argument: Expr) -> Expr:
+  match argument:
+    case MemoExpr{computation}:
+      MemoExpr{computation}
+    case value:
+      MemoExpr{LambdaExpr{site, "$demand$unit", Some{UnitTy{}}, None{}, value}}

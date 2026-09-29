@@ -231,8 +231,8 @@ Deno.test("runtime rejects invalid source, layout, and first-frame values withou
     assert.equal(test.runtime.game.runtime, owner);
     let layout = replace(
       test.source,
-      "data Spin = Spin F32",
-      "data Spin = Spin U32",
+      "data Spin = #Spin F32",
+      "data Spin = #Spin U32",
     );
     layout = layout.replaceAll(
       "@ecs.insert (Spin 1.0)",

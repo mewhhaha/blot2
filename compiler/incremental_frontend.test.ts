@@ -185,19 +185,19 @@ Deno.test("warm frontend lexes only changed fragments and evicts removed fragmen
 
 Deno.test("frontend islands retain nested suites, delimiters, records and token spellings", () =>
   withFrontends((_incremental, _clean, equivalent) => {
-    const source = `data Pair = Pair { left: U32, right: U32 }
+    const source = `data Pair = #Pair { left: U32, right: U32 }
 const text = "const fake = fn () => [case value of] // still text"
 const choose = fn input => do:
   let values = [
-    Pair { left: 1, right: 2 },
-    Pair { left: 3, right: 4 },
+    #Pair { left: 1, right: 2 },
+    #Pair { left: 3, right: 4 },
   ]
-  if True:
+  if #True:
     return case input of
-      (True, number) => number
-      (False, _) => 0
+      (#True, number) => number
+      (#False, _) => 0
   return @array.length values
-const answer = fn () => choose (True, 41)
+const answer = fn () => choose (#True, 41)
 `;
     equivalent(source);
     for (

@@ -66,6 +66,11 @@ try {
           ].includes(opcode)
         ) {
           unsigned();
+        } else if (opcode === 0xfc) {
+          const extended = unsigned();
+          if (extended !== 11 || unsigned() !== 0) {
+            throw new Error(`Unsupported bulk-memory opcode at ${opcodeAt}`);
+          }
         } else if ([0x28, 0x36].includes(opcode)) {
           unsigned();
           unsigned();

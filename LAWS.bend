@@ -9,6 +9,7 @@ import ./compiler/lower.bend as Lower
 import ./compiler/types.bend as Substitutions
 import ./compiler/wasm.bend as Wasm
 import ./compiler/codegen_ir.bend as Codegen
+import ./compiler/codegen_layout.bend as Layout
 import ./compiler/codegen_saturation.bend as Saturation
 import ./compiler/index.bend as Index
 import ./compiler/native_request.bend as NativeRequest
@@ -49,6 +50,9 @@ import ./compiler/entry_points.bend as Entries
 import ./compiler/loop_memory.bend as LoopMemory
 import ./compiler/raw_core_qualification.bend as RawQualification
 import ./compiler/effect_rows.bend as Rows
+import ./compiler/source_types.bend as SourceTypes
+
+import ./compiler/demand_elaboration.bend as Demand
 
 # Raw core has no evidence selector, so a nonempty qualification cannot be
 # erased by constant evaluation. Empty metadata remains transparent.
@@ -403,7 +407,7 @@ law native_trailing_words_fail:
   {Result.is_done(&2, &1, NativeRequest.ScanFailure, Unit, NativeRequest.end(NativeRequest.Cursor{words, offset, 1n+remaining, [SNil{} : String*1n], 0})) == False{} : Bool}
 
 law native_response_failure_keeps_protocol_version:
-  {List.take(&2, U32, NativeResponse.finish(Fail{M.Diagnostic{"native_protocol", "native_response", "response exceeds 16M words"}}), 3n) == [1112297300, 13, 0] : List<&2, U32>}
+  {List.take(&2, U32, NativeResponse.finish(Fail{M.Diagnostic{"native_protocol", "native_response", "response exceeds 16M words"}}), 3n) == [1112297300, 14, 0] : List<&2, U32>}
 
 # A Wasm-only (Emit) request runs the same compile pipeline and session caches
 # as Compile, so its Wasm is identical; only the reply drops the analysis.
@@ -476,14 +480,14 @@ law block_return_skips_the_tail:
   for value: U32
   for next: M.Expr
   for context: Const.Context
-  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.SequenceExpr{M.ReturnExpr{0n, M.U32Expr{value}}, next}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.SequenceExpr{M.ReturnExpr{0n, M.U32Expr{value}}, next}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}, Nil{}, 0n, None{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 # Matching evaluates each column only if preceding columns complete normally.
 law match_return_skips_remaining_scrutinees:
   for value: U32
   for next: M.Expr
   for context: Const.Context
-  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.MatchExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next], Nil{}}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.MatchExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next], Nil{}}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}, Nil{}, 0n, None{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law product_projection_selects_first:
   for first: Const.Value
@@ -506,13 +510,13 @@ law product_retains_mixed_fields:
   for number: U32
   for flag: Bool
   for context: Const.Context
-  {Const.evaluate(3n, 3n, M.ProductExpr{[M.U32Expr{number}, M.BoolExpr{flag}]}, context) == Done{Const.Evaluation{Const.ProductValue{[Const.U32Value{number}, Const.BoolValue{flag}]}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.evaluate(3n, 3n, M.ProductExpr{[M.U32Expr{number}, M.BoolExpr{flag}]}, context) == Done{Const.Evaluation{Const.ProductValue{[Const.U32Value{number}, Const.BoolValue{flag}]}, Const.Budget{0n, Nil{}, Nil{}, 0n, None{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law product_return_skips_remaining_elements:
   for value: U32
   for next: M.Expr
   for context: Const.Context
-  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.ProductExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next]}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.ProductExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next]}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}, Nil{}, 0n, None{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law empty_array_length_is_zero:
   for steps: Const.Budget
@@ -533,19 +537,19 @@ law array_set_preserves_other_elements:
   for first: Const.Value
   for second: Const.Value
   for replacement: Const.Value
-  {Const.array_set(Const.ArrayValue{[first, second]}, Const.U32Value{0}, replacement, Const.Budget{2n, Nil{}}) == Done{Const.Evaluation{Const.ArrayValue{[replacement, second]}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.array_set(Const.ArrayValue{[first, second]}, Const.U32Value{0}, replacement, Const.Budget{2n, Nil{}, Nil{}, 0n, None{}}) == Done{Const.Evaluation{Const.ArrayValue{[replacement, second]}, Const.Budget{0n, Nil{}, Nil{}, 0n, None{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law array_copy_requires_per_element_budget:
   for first: Const.Value
   for second: Const.Value
   for replacement: Const.Value
-  {Result.is_done(&2, &2, M.Diagnostic, Const.Evaluation, Const.array_set(Const.ArrayValue{[first, second]}, Const.U32Value{0}, replacement, Const.Budget{1n, Nil{}})) == False{} : Bool}
+  {Result.is_done(&2, &2, M.Diagnostic, Const.Evaluation, Const.array_set(Const.ArrayValue{[first, second]}, Const.U32Value{0}, replacement, Const.Budget{1n, Nil{}, Nil{}, 0n, None{}})) == False{} : Bool}
 
 law array_return_skips_remaining_elements:
   for value: U32
   for next: M.Expr
   for context: Const.Context
-  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.ArrayExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next]}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.evaluate(4n, 4n, M.BlockExpr{0n, M.ArrayExpr{[M.ReturnExpr{0n, M.U32Expr{value}}, next]}}, context) == Done{Const.Evaluation{Const.U32Value{value}, Const.Budget{0n, Nil{}, Nil{}, 0n, None{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law tuple_pattern_binds_fields_in_order:
   for first: Const.Value
@@ -733,7 +737,7 @@ law state_scope_returns_successor:
   for result: U32
   for steps: Nat
   for outer: List<&2, Const.StateCell>
-  {Const.finish_state_scope(Const.Evaluation{Const.U32Value{result}, Const.Budget{steps, Const.StateCell{0n, current} <> outer}}, 0n) == Done{Const.Evaluation{Const.ProductValue{[current, Const.U32Value{result}]}, Const.Budget{steps, outer}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.finish_state_scope(Const.Evaluation{Const.U32Value{result}, Const.Budget{steps, Const.StateCell{0n, current} <> outer, Nil{}, 0n, None{}}}, 0n) == Done{Const.Evaluation{Const.ProductValue{[current, Const.U32Value{result}]}, Const.Budget{steps, outer, Nil{}, 0n, None{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 law state_scope_preserves_nonlocal_return:
   for current: Const.Value
@@ -741,7 +745,7 @@ law state_scope_preserves_nonlocal_return:
   for label: Nat
   for steps: Nat
   for outer: List<&2, Const.StateCell>
-  {Const.finish_state_scope(Const.Evaluation{Const.ReturnValue{label, result}, Const.Budget{steps, Const.StateCell{0n, current} <> outer}}, 0n) == Done{Const.Evaluation{Const.ReturnValue{label, result}, Const.Budget{steps, outer}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+  {Const.finish_state_scope(Const.Evaluation{Const.ReturnValue{label, result}, Const.Budget{steps, Const.StateCell{0n, current} <> outer, Nil{}, 0n, None{}}}, 0n) == Done{Const.Evaluation{Const.ReturnValue{label, result}, Const.Budget{steps, outer, Nil{}, 0n, None{}}}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
 
 # Multiple escaping references require a copy, even after the last read.
 law shared_array_is_not_consumed:
@@ -854,6 +858,20 @@ law pending_cache_preserves_requirements:
   for +needs: List<&2, Infer.Coverage>
   {Mono.cached_needs(Mono.PendingCache{count, needs}) == needs : List<&2, Infer.Coverage>}
 
+law empty_pending_change_has_no_requirements:
+  for change: Mono.ChoiceChange
+  {Mono.remaining_after_change(Nil{}, change) == Nil{} : List<&2, Infer.Coverage>}
+
+law different_qualified_site_stays_pending:
+  for predicate: M.Predicate
+  for selected: M.Predicate
+  {Mono.qualified_pending_after_change(False{}, predicate, selected) == True{} : Bool}
+
+law unknown_choice_change_uses_full_refresh:
+  for +selected: Mono.Specialization
+  for +cache: Mono.PendingCache
+  {Mono.refresh_after_change(selected, cache, Mono.UnknownChoiceChange{}) == Mono.refresh_pending(selected, cache) : Mono.PendingCache}
+
 law empty_coverage_preserves_pending_tail:
   for choices: Map<&2, Mono.Choice>
   for +rest: List<&2, Infer.Coverage>
@@ -901,6 +919,26 @@ law state_membership_work_stops_after_hit:
   for rest: List<&2, M.Operation>
   for identity: M.TypeId
   {StateSpecialize.contains_work(rest, identity, True{}) == True{} : Bool}
+
+law dependency_lookup_stops_after_match:
+  for rest: List<&2, Dependency.Node>
+  for name: String
+  for +found: List<&2, String>
+  {Dependency.lookup_work(rest, name, True{}, found) == found : List<&2, String>}
+
+law definition_predicates_stop_after_match:
+  for rest: List<&2, Infer.Definition>
+  for name: String
+  for +found: List<&2, M.Predicate>
+  {Globals.definition_predicates_work(rest, name, True{}, found) == found : List<&2, M.Predicate>}
+
+law empty_operation_merge_preserves_catalog:
+  for +operations: List<&2, M.Operation>
+  {StateSpecialize.merge(Nil{}, operations) == operations : List<&2, M.Operation>}
+
+law zero_distance_index_advance_preserves_suffix:
+  for +suffix: String
+  {Index.advance_suffix(0n, suffix) == suffix : String}
 
 law variable_membership_work_stops_after_hit:
   for rest: List<&2, Nat>
@@ -1563,3 +1601,134 @@ law saturated_counted_loop_is_not_inlineable:
   for initial: M.Expr
   for body: M.Expr
   {Saturation.body_cost(256n, [M.ForExpr{index, start, end, state, initial, body}], 0n) == 97n : Nat}
+
+# With no free type or predicate variables, environment exclusion is empty.
+law closed_generalization_has_no_candidates:
+  for context: Infer.Context
+  for state: Infer.State
+  for blocked: List<&2, Nat>
+  {Infer.generalizable_variables(Nil{}, context, state, blocked) == Done{Nil{}} : Result<&2, &2, M.Diagnostic, List<&2, Nat>>}
+
+law nested_annotation_binding_hides_children:
+  for field: String
+  for text: String
+  for offset: Nat
+  for children: List<&2, Cst.Cst>
+  {SourceTypes.variable_children(Cst.Cst{"binding", field, text, offset, children}, SourceTypes.NestedScope{}) == Nil{} : List<&2, Cst.Cst>}
+
+law root_annotation_binding_keeps_children:
+  for field: String
+  for text: String
+  for offset: Nat
+  for children: List<&2, Cst.Cst>
+  {SourceTypes.variable_children(Cst.Cst{"binding", field, text, offset, children}, SourceTypes.RootScope{}) == children : List<&2, Cst.Cst>}
+
+# Scalar fast paths do not allocate new inference identities or rewrite the
+# chronological substitution history. Variables and open rows still solve.
+law ground_resolution_does_not_visit_history:
+  for substitutions: Substitutions.Substitutions
+  {Substitutions.resolve(substitutions, M.U32Ty{}) == Done{M.U32Ty{}} : Result<&2, &2, M.Diagnostic, M.Ty>}
+
+law ground_unification_preserves_state:
+  for +substitutions: Substitutions.Substitutions
+  for +next: Nat
+  for subject: String
+  {Substitutions.unify_at(M.U32Ty{}, M.U32Ty{}, substitutions, next, subject) == Done{Substitutions.Solution{substitutions, next}} : Result<&2, &2, M.Diagnostic, Substitutions.Solution>}
+
+law empty_rows_preserve_state:
+  for +substitutions: Substitutions.Substitutions
+  for +next: Nat
+  for subject: String
+  {Substitutions.unify_rows_at(M.EffectRow{Nil{}, M.ClosedRow{}}, M.EffectRow{Nil{}, M.ClosedRow{}}, substitutions, next, subject) == Done{Substitutions.Solution{substitutions, next}} : Result<&2, &2, M.Diagnostic, Substitutions.Solution>}
+
+law symbol_insertion_into_empty_map:
+  for +key: String
+  for +value: Nat
+  {Index.set(Nat, MTip{}, key, value) == MLeaf{key, value} : Map<&2, Nat>}
+
+# Collector layout hints are justified by expression constructors, never by
+# pointer-looking bits or the names of erased local bindings.
+law scalar_u32_result_is_pointer_free:
+  for value: U32
+  {Wasm.scalar_word(Codegen.U32Expr{value}) == True{} : Bool}
+
+law unknown_local_result_keeps_conservative_tracing:
+  for name: String
+  {Wasm.scalar_word(Codegen.LocalExpr{name}) == False{} : Bool}
+
+law closure_result_keeps_conservative_tracing:
+  for key: String
+  for captures: List<&2, String>
+  {Wasm.scalar_word(Codegen.ClosureExpr{key, captures}) == False{} : Bool}
+
+law projected_array_element_keeps_conservative_tracing:
+  for array: Codegen.Expr
+  for index: Codegen.Expr
+  {Wasm.scalar_word(Codegen.ArrayGetExpr{array, index}) == False{} : Bool}
+
+# Layout propagation can forget evidence, never manufacture scalar words from
+# pointers, nonlocal returns, or an exhausted analysis budget.
+law layout_unknown_join_is_conservative:
+  {Layout.meet(1n, Layout.Scalar{}, Layout.Unknown{}) == Layout.Unknown{} : Layout.Shape}
+
+law layout_array_pointer_is_not_scalar:
+  {Layout.scalar(Layout.ScalarArray{}) == False{} : Bool}
+
+law layout_product_pointer_is_not_scalar:
+  for fields: List<&2, Layout.Shape>
+  {Layout.scalar(Layout.Product{fields}) == False{} : Bool}
+
+law layout_block_result_is_unknown:
+  for label: Nat
+  for body: Codegen.Expr
+  for locals: Map<&2, Layout.Shape>
+  {Layout.expression(1n, Codegen.BlockExpr{label, body}, locals) == Layout.Unknown{} : Layout.Shape}
+
+law layout_budget_exhaustion_is_unknown:
+  for value: Codegen.Expr
+  for locals: Map<&2, Layout.Shape>
+  {Layout.expression(0n, value, locals) == Layout.Unknown{} : Layout.Shape}
+
+law layout_unknown_fields_are_not_empty_scalars:
+  {Layout.scalar_fields(Layout.Unknown{}) == False{} : Bool}
+
+# A ready demand returns its cached result without repeating effects or using
+# evaluation steps, even when the original computation would fail.
+law demand_ready_preserves_budget_and_effects:
+  for depth: Nat
+  for slot: Nat
+  for computation: Const.Value
+  for value: Const.Value
+  for steps: Const.Budget
+  for context: Const.Context
+  {Const.evaluate_work(depth, 1n, Nil{}, steps, Const.DemandState{slot, computation, Const.Ready{value}}, context) == Done{Const.Evaluation{value, steps}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+law demand_recursive_force_is_rejected:
+  for depth: Nat
+  for slot: Nat
+  for computation: Const.Value
+  for steps: Const.Budget
+  for context: Const.Context
+  {Const.evaluate_work(depth, 1n, Nil{}, steps, Const.DemandState{slot, computation, Const.Forcing{}}, context) == Fail{M.Diagnostic{"recursive_demand", "demand", "a suspended argument forced itself before producing a value"}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+law integer_division_by_zero_is_rejected:
+  for numerator: U32
+  for steps: Const.Budget
+  {Const.scalar(M.U32Divide{}, Const.U32Value{numerator}, Const.U32Value{0}, steps) == Fail{M.Diagnostic{"integer_divide_by_zero", "const", "integer division and remainder require a nonzero divisor"}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+# Wasm masks U32 shift counts to five bits; constant folding must agree.
+law integer_shift_count_wraps_at_thirty_two:
+  for steps: Const.Budget
+  {Const.scalar(M.U32ShiftLeft{}, Const.U32Value{1}, Const.U32Value{33}, steps) == Done{Const.Evaluation{Const.U32Value{2}, steps}} : Result<&2, &2, M.Diagnostic, Const.Evaluation>}
+
+law demand_free_elaboration_preserves_expression:
+  for expression: M.Expr
+  {Demand.expression(expression, MTip{}) == Done{expression} : Result<&2, &2, M.Diagnostic, M.Expr>}
+
+# Source schema certificates recognize ordinary sequencing. A conditional
+# without outgoing successors must not introduce an unused result binding.
+law conditional_without_successors_preserves_sequence:
+  for prefix: String
+  for branch: M.Expr
+  for next: M.Expr
+  {Lower.conditional_successors(Nil{}, prefix, branch, next) == M.SequenceExpr{branch, next} : M.Expr}

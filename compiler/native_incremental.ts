@@ -250,6 +250,10 @@ export async function createNativeIncrementalCompiler(
     }
   }
   return {
+    /** Owned child identifier for diagnostic CPU/RSS sampling. */
+    get pid(): number {
+      return native.pid;
+    },
     async analyze(source: string, options: CompileOptions = {}) {
       const { result, stats } = await run("analyze", source, options);
       if (result.operation !== "analyze") {

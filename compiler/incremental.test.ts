@@ -120,7 +120,7 @@ incrementalTest(
   "incremental no-op and trivia edits preserve prelude artifacts without rechecking",
   async (session, clean) => {
     const source =
-      "entry const answer = fn () => Maybe.unwrap_or 0 (Some (identity 42))\n";
+      "entry const answer = fn () => Maybe.unwrap_or 0 (#Some (identity 42))\n";
     const first = await session.compile(source);
     equivalent(first.artifact, clean.compile(source));
     equal(await answer(first.artifact), 42);
@@ -187,7 +187,7 @@ incrementalTest(
     const source =
       "entry const transform = fn value => @u32.add value 1\nentry const answer = fn () => @u32.add (transform 41) 0\n";
     const first = await session.compile(source);
-    const invalid = source.replace("@u32.add value 1", "True");
+    const invalid = source.replace("@u32.add value 1", "#True");
     await rejects(() => session.compile(invalid), diagnostic("type_mismatch"));
     const recovered = await session.compile(source);
     equivalent(recovered.artifact, clean.compile(source));

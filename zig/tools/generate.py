@@ -8,6 +8,54 @@ from __future__ import annotations
 from port import *
 import hashlib
 
+# Native algorithms are valid only for these retained source definitions. A
+# source edit deoptimizes its entire module rather than silently changing meaning.
+NATIVE_MODULE_HASHES = {
+    'types': 'f37bf621a0f4378fb982874116cb48404e5fea504c22332d33606b820701ddd7',
+    'native_request': '62da0ead06c5edf07c813c1c9a955cf3a72de916694c33d498e1ea3cd486bebc',
+    'native_response': 'ae77f19fd57a6cdb88c7e2d47faccc9b18c744cb31edf0c98f3332b5f48b948b',
+    'native_io': 'f607001bd2b41d31a0314affbb058701f5633c1a4f04a570165ba4a070382fca',
+    'native_session': 'c7f00a2b19a20b5cf5db61ed0345df9f0319f8ea9decf72f9cdaa48f51d6a1d2',
+
+    'model': '051c3fb473823d7d8621a8c3ac11a859aba515b77833ef990116ba6e4215325a',
+    'index': '58f680aebe3ec29797f93a11b8a5e60f5297fac8c8e3dbc2e842ca47d582e4f4',
+    'nat_index': '5a8dc29f32904dc4fee7f0f9ced2e18075fd1e112b2b01be0c3bb2489e007b82',
+    'cst': '1e07cd287f8501ccbdbf02a520787b76d87dc894f55932ab047ebe7b8d6d7c0e',
+}
+# Exact source bodies remain callable for the native leaf resolver's compound
+# cases. This is an ordinary Zig call, not a second runtime or backend.
+NATIVE_FALLBACKS = {'types.resolve': 'types.$source_resolve'}
+NATIVE_FUNCTIONS = {
+    'types.resolve': 'resolveType', 'types.first_type': 'firstType',
+    'types.substitution_count': 'substitutionCount',
+    'types.contains': 'variableContains', 'types.put': 'variablePut',
+    'types.wide_variables': 'variableWide', 'types.union': 'variableUnion',
+    'types.difference': 'variableDifference',
+    'native_request.decode': 'decode',
+    'model.name_equal': 'nameEqual', 'model.type_id_equal': 'typeIdEqual',
+    'index.find': 'stringFind', 'index.get': 'stringGet',
+    'nat_index.find': 'natFind', 'nat_index.get': 'natGet', 'nat_index.set': 'natSet',
+    'cst.children_of': 'childrenOf', 'cst.kind_of': 'kindOf',
+    'cst.text_of': 'textOf', 'cst.offset_of': 'offsetOf',
+    'cst.fields': 'fields', 'cst.fields_reversed': 'fieldsReversed',
+    'cst.field_values': 'fieldValues',
+}
+
+def native_functions(mods):
+    valid = {name for name, expected in NATIVE_MODULE_HASHES.items()
+             if name in mods and hashlib.sha256(mods[name].path.read_bytes()).hexdigest() == expected}
+    # String-index equality depends on model.name_equal as well as index itself.
+    if 'model' not in valid:
+        valid.discard('index')
+        valid.discard('cst')
+    if not {'model', 'nat_index'} <= valid:
+        valid.discard('types')
+    if not set(('model', 'cst', 'native_response', 'native_io', 'native_session')) <= valid:
+        valid.discard('native_request')
+    return {name: target for name, target in NATIVE_FUNCTIONS.items()
+            if name.split('.', 1)[0] in valid}
+
+
 BASE_CTORS = {'Nil':0,'Cons':2,'SNil':0,'SCon':2,'Chr':1,'Unit':0,
               'True':0,'False':0,'Some':1,'None':0,'Done':1,'Fail':1,
               'LT':0,'EQ':0,'GT':0,'Pair':2,'MTip':0,'MLeaf':2,'MNode':3,
@@ -29,7 +77,7 @@ Nat.mod Nat.mul Nat.read Nat.show Nat.sub Set.add Set.from_list Set.new Set.size
 Set.to_list String.drop String.is_le String.is_lt String.join String.length
 String.reverse String.split String.starts_with U32.add U32.and U32.cmp U32.div
 U32.from_nat U32.is_eq U32.is_ge U32.is_gt U32.is_le U32.is_lt U32.is_ne U32.mod
-U32.mul U32.or U32.shln U32.show U32.shr U32.shrn U32.sub U32.to_f32 U32.to_nat'''.split())
+Map.diff.chr Maybe.map U32.xor U32.mul U32.or U32.shln U32.show U32.shr U32.shrn U32.sub U32.to_f32 U32.to_nat'''.split())
 
 def ident(s): return re.sub(r'[^a-zA-Z0-9_]','_',s)
 def quote(s):
@@ -72,7 +120,7 @@ def free(n, names=frozenset()):
 
 class Generator:
     def __init__(self, root):
-        self.root=root;self.mods=load(root)
+        self.root=root;self.mods=load(root);self.native=native_functions(self.mods)
         self.functions={f'{m.name}.{f.name}':f for m in self.mods.values() for f in m.functions}
         self.types={f'{m.name}.{t}' for m in self.mods.values() for t in m.types}
         self.ctors={f'{m.name}.{c}':len(fields) for m in self.mods.values() for c,fields in m.ctors.items()}|BASE_CTORS
@@ -173,10 +221,14 @@ class Generator:
         if name in self.functions:
             if len(args)!=len(self.functions[name].params):
                 raise ParseError(f'{self.current}:{n.line}: arity {name} got {len(args)}, need {len(self.functions[name].params)}')
-            method='next' if tail else 'call';expr=f'ctx.{method}({self.request(name)}, &.{{{values}}})'
+            if name in self.native:
+                expr=f'native.{self.native[name]}(ctx, &.{{{values}}})'
+                if tail:expr='r.done('+expr+')'
+            else:
+                method='next' if tail else 'call';expr=f'ctx.{method}({self.request(name)}, &.{{{values}}})'
         elif name in PRIMITIVES:
             self.primitives.add(name);expr=f'ctx.primitive(.{ident(name)}, &.{{{values}}})'
-            if tail:expr='.{ .value = '+expr+' }'
+            if tail:expr='r.done('+expr+')'
         elif indirect is not None:
             method='nextClosure' if tail else 'invoke';expr=f'ctx.{method}({indirect}, &.{{{values}}})'
         else:raise ParseError(f'{self.current}:{n.line}: unknown call {name}')
@@ -211,7 +263,7 @@ class Generator:
         if conditions and assertions:self.line(f'r.assert({" and ".join(conditions)});')
         for name,v in bindings:env[name]=self.save(v)
     def finish(self,v,target):
-        if target is None:self.line('return .{ .value = '+v+' };')
+        if target is None:self.line('return r.done('+v+');')
         else:self.line(f'break :{target} {v};')
     def emit(self,n,env,target,monad):
         k=n.kind
@@ -284,8 +336,22 @@ class Generator:
             name=self.resolve(n.children[0].value) if n.children[0].kind=='id' and n.children[0].value not in env else None
             if name not in self.types and name not in BASE_TYPES:self.call(n,env,True);return
         self.finish(self.value(n,env),target)
+    def protocol_version(self):
+        version = self.functions['native_response.version'].body
+        if (version.kind != 'block' or len(version.children) != 1 or
+                version.children[0].kind != 'number' or
+                not version.children[0].value.isdecimal()):
+            raise ParseError('native_response.version must be one U32 literal')
+        protocol_version = int(version.children[0].value)
+        if not 0 <= protocol_version <= 0xffffffff:
+            raise ParseError('native protocol version is outside U32')
+        return protocol_version
     def run(self):
+        protocol_version = self.protocol_version()
         roots=['native_main.respond','native_request.decode']
+        for name, alias in NATIVE_FALLBACKS.items():
+            self.functions[alias] = self.functions[name]
+            self.request(alias)
         for name in roots:self.request(name)
         cursor=0
         while cursor<len(self.todo):
@@ -296,19 +362,25 @@ class Generator:
             self.line(f'fn fun_{self.ids[name]}(ctx: *r.Context, args: []const V) r.Step {{');self.indent=1
             self.line('@setEvalBranchQuota(100000);');self.line('r.ignoreContext(ctx);');self.line(f'r.assert(args.len == {len(f.params)});')
             env={p:self.save(f'args[{i}]') for i,p in enumerate(f.params)}
-            self.emit(f.body,env,None,None);self.indent=0;self.line('}')
+            if name in self.native:
+                self.line(f'return r.done(native.{self.native[name]}(ctx, args));')
+            else:
+                self.emit(f.body,env,None,None)
+            self.indent=0;self.line('}')
             self.output.append('\n'.join(self.lines))
         directory=self.root/'zig/src/generated';directory.mkdir(parents=True,exist_ok=True)
-        header='// Generated by zig/tools/generate.py. Do not hand-edit.\nconst r = @import("../runtime.zig");\nconst V = r.Value;\n'
+        (directory/'protocol.zig').write_text(f'// From native_response.version; do not hand-edit.\npub const version: u32 = {protocol_version};\n')
+        header='// Generated by zig/tools/generate.py. Do not hand-edit.\nconst r = @import("../runtime.zig");\nconst V = r.Value;\nconst native = @import("../semantic.zig");\n'
         table='\npub const table = [_]*const fn (*r.Context, []const V) r.Step {\n'+''.join(f'    &fun_{i}, // {name}\n' for name,i in self.ids.items())+'};\n'
         table+='pub const arities = [_]u8{'+','.join(str(len(self.functions[n].params)) for n in self.ids)+'};\n'
         table+='pub const names = [_][]const u8{'+','.join(quote(n) for n in self.ids)+'};\n'
         for root in roots:table+=f'pub const {ident(root)}: u32 = {self.ids[root]};\n'
+        for name, alias in NATIVE_FALLBACKS.items():table+=f'pub const fallback_{ident(name)}: u32 = {self.ids[alias]};\n'
         (directory/'functions.zig').write_text(header+'\n\n'.join(self.output)+table)
         (directory/'tags.zig').write_text('// Generated constructor identities; source module identity is preserved.\npub const Tag = enum(u16) {\n'+''.join(f'    {ident(n)},\n' for n in sorted(self.ctors))+'};\n')
-        (directory/'primitives.zig').write_text('// Explicit native primitive surface.\npub const Primitive = enum {\n'+''.join(f'    {ident(n)},\n' for n in sorted(self.primitives))+'};\n')
+        (directory/'primitives.zig').write_text('// Explicit native primitive surface.\npub const Primitive = enum {\n'+''.join(f'    {ident(n)},\n' for n in sorted(PRIMITIVES))+'};\n')
         manifest={m.name:hashlib.sha256(m.path.read_bytes()).hexdigest() for m in sorted(self.mods.values(),key=lambda m:m.name)}
-        (directory/'manifest.json').write_text(json.dumps({'sources':manifest,'functions':len(self.ids),'max_arity':max(len(self.functions[n].params) for n in self.ids),'closures':self.lambdas,'parallel_tasks':self.forks,'outlined_arms':self.arms,'constructors':len(self.ctors)},indent=2)+'\n')
+        (directory/'manifest.json').write_text(json.dumps({'protocol_version':protocol_version,'native_functions':sorted(self.native),'sources':manifest,'functions':len(self.ids),'max_arity':max(len(self.functions[n].params) for n in self.ids),'closures':self.lambdas,'parallel_tasks':self.forks,'outlined_arms':self.arms,'constructors':len(self.ctors)},indent=2)+'\n')
         print(f'Generated {len(self.ids)} native Zig functions ({self.lambdas} closures, {self.forks} parallel tasks, {self.arms} outlined arms), {len(self.ctors)} constructors, {len(self.primitives)} primitives.')
 
 if __name__=='__main__':

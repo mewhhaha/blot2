@@ -8,6 +8,8 @@ import ./compiler/native_session.bend as Session
 import ./compiler/wasm.bend as Wasm
 import ./compiler/patterns.bend as Patterns
 import ./compiler/monomorph.bend as Mono
+import ./compiler/dependency.bend as Dependency
+import ./compiler/infer.bend as Infer
 
 def Laws.declaration_tag_preserves_origin_and_operands(offset, function, value):
   {==}
@@ -488,9 +490,9 @@ def Laws.array_fill_rejects_oversized_count(count, value, steps):
 
 def Laws.empty_array_generation_skips_callback(steps, generator, context):
   match steps:
-    case Const.Budget{0n, cells}:
+    case Const.Budget{0n, cells, memos, next_memo, cache}:
       {==}
-    case Const.Budget{1n+rest, cells}:
+    case Const.Budget{1n+rest, cells, memos, next_memo, cache}:
       {==}
 
 def Laws.associated_left_precedence(left, right, name, other, subject, description):
@@ -577,6 +579,15 @@ def Laws.frontier_reuse_excludes_retained_tasks(position, checked):
 def Laws.pending_cache_preserves_requirements(count, needs):
   {==}
 
+def Laws.empty_pending_change_has_no_requirements(change):
+  {==}
+
+def Laws.different_qualified_site_stays_pending(predicate, selected):
+  {==}
+
+def Laws.unknown_choice_change_uses_full_refresh(selected, cache):
+  {==}
+
 def Laws.empty_coverage_preserves_pending_tail(choices, rest):
   {==}
 
@@ -616,6 +627,30 @@ def Laws.state_membership_work_stops_after_hit(rest, identity):
       {==}
     case M.OperationInstance{template, arguments} <> tail:
       {==}
+
+def Laws.dependency_lookup_stops_after_match(rest, name, found):
+  match rest:
+    case Nil{}:
+      {==}
+    case Dependency.Node{node_name, references, lambdas} <> tail:
+      {==}
+
+def Laws.definition_predicates_stop_after_match(rest, name, found):
+  match rest:
+    case Nil{}:
+      {==}
+    case Infer.Definition{definition_name, inference} <> tail:
+      {==}
+
+def Laws.empty_operation_merge_preserves_catalog(operations):
+  match operations:
+    case Nil{}:
+      {==}
+    case head <> tail:
+      {==}
+
+def Laws.zero_distance_index_advance_preserves_suffix(suffix):
+  {==}
 
 def Laws.variable_membership_work_stops_after_hit(rest, variable):
   match rest:
@@ -931,4 +966,89 @@ def Laws.saturated_compaction_loop_is_not_inlineable(state, initial, body):
   {==}
 
 def Laws.saturated_counted_loop_is_not_inlineable(index, start, end, state, initial, body):
+  {==}
+
+def Laws.closed_generalization_has_no_candidates(context, state, blocked):
+  {==}
+
+def Laws.nested_annotation_binding_hides_children(field, text, offset, children):
+  {==}
+
+def Laws.root_annotation_binding_keeps_children(field, text, offset, children):
+  {==}
+
+def Laws.ground_resolution_does_not_visit_history(substitutions):
+  {==}
+
+def Laws.ground_unification_preserves_state(substitutions, next, subject):
+  {==}
+
+def Laws.empty_rows_preserve_state(substitutions, next, subject):
+  {==}
+
+def Laws.symbol_insertion_into_empty_map(key, value):
+  {==}
+
+def Laws.scalar_u32_result_is_pointer_free(value):
+  {==}
+
+def Laws.unknown_local_result_keeps_conservative_tracing(name):
+  {==}
+
+def Laws.closure_result_keeps_conservative_tracing(key, captures):
+  {==}
+
+def Laws.projected_array_element_keeps_conservative_tracing(array, index):
+  {==}
+
+def Laws.layout_unknown_join_is_conservative():
+  {==}
+
+def Laws.layout_array_pointer_is_not_scalar():
+  {==}
+
+def Laws.layout_product_pointer_is_not_scalar(fields):
+  {==}
+
+def Laws.layout_block_result_is_unknown(label, body, locals):
+  {==}
+
+def Laws.layout_budget_exhaustion_is_unknown(value, locals):
+  {==}
+
+def Laws.layout_unknown_fields_are_not_empty_scalars():
+  {==}
+
+def Laws.demand_ready_preserves_budget_and_effects(depth, slot, computation, value, steps, context):
+  match depth steps:
+    case 0n Const.Budget{0n, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 0n Const.Budget{1n+remaining, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 1n+rest Const.Budget{0n, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 1n+rest Const.Budget{1n+remaining, cells, memos, next_memo, constant_cache}:
+      {==}
+
+def Laws.demand_recursive_force_is_rejected(depth, slot, computation, steps, context):
+  match depth steps:
+    case 0n Const.Budget{0n, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 0n Const.Budget{1n+remaining, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 1n+rest Const.Budget{0n, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 1n+rest Const.Budget{1n+remaining, cells, memos, next_memo, constant_cache}:
+      {==}
+
+def Laws.integer_division_by_zero_is_rejected(numerator, steps):
+  {==}
+
+def Laws.integer_shift_count_wraps_at_thirty_two(steps):
+  {==}
+
+def Laws.demand_free_elaboration_preserves_expression(expression):
+  {==}
+
+def Laws.conditional_without_successors_preserves_sequence(prefix, branch, next):
   {==}

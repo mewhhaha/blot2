@@ -27,15 +27,15 @@ Deno.test("top-level const, let, type, constructor and effect bindings are impor
 import { offset, started, Box, unwrap, Read } from "./library"
 entry const answer = fn () => do (@effect.provider Read (fn () => started)):
   use value <- Read ()
-  return unwrap (Box (@u32.add offset value))
+  return unwrap (#Box (@u32.add offset value))
 `,
     "/public/library.blot": `
-type Box is data = Box U32
+type Box is data = #Box U32
 type Read is effect = Unit -> U32
 const offset = 1
 let started = @u32.add 40 1
 const unwrap = fn (value: Box) => case value of
-  Box number => number
+  #Box number => number
 `,
   };
   const project = await loadSourceProject(new URL("file:///public/main.blot"), {
@@ -48,12 +48,12 @@ const unwrap = fn (value: Box) => case value of
 
 Deno.test("public generic, curried and structural helpers do not become invalid Wasm roots", async () => {
   const exports = await compileBoth(`
-type Box is data = Box U32
+type Box is data = #Box U32
 const identity = fn value => value
 const add = fn left => fn right => @u32.add left right
-const boxed = Box 40
+const boxed = #Box 40
 const unwrap = fn (value: Box) => case value of
-  Box number => number
+  #Box number => number
 entry const answer = fn () => add (identity (unwrap boxed)) 2
 `);
   equal(Object.keys(exports), ["answer"]);
@@ -92,8 +92,8 @@ Deno.test("public input types constrained by associated equality retain their ca
   const exports = await compileBoth(
     `
 entry const boolean = fn (value: Bool) => case value of
-  True => 42
-  False => 0
+  #True => 42
+  #False => 0
 entry const flag = fn actual => boolean (actual == 7)
 `,
     { prelude: "default" },
@@ -118,11 +118,11 @@ entry const answer = fn () => do (@effect.provider (Read U32) (fn () => 42)):
 Deno.test("generic associated helpers defer dispatch until their nominal caller is known", async () => {
   const exports = await compileBoth(
     `
-type Box is data = Box U32
+type Box is data = #Box U32
 const Box.offset = fn (box: Box) => fn amount => case box of
-  Box value => @u32.add value amount
+  #Box value => @u32.add value amount
 const offset = fn value => @type.call "offset" value 1
-entry const answer = fn () => offset (Box 41)
+entry const answer = fn () => offset (#Box 41)
 `,
     { prelude: "default" },
   );
@@ -148,14 +148,14 @@ Deno.test("associated callback dispatch preserves ordinary effects in public hel
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 const get = fn (witness: p -> a) -> a => State.get ()
 const set = fn value => State.set value
-type Input is data = Input F32
+type Input is data = #Input F32
 const edit = fn transform => do:
-  use input <- get Input
-  let Input x = input
-  return set (Input (transform x))
+  use input <- get #Input
+  let #Input x = input
+  return set (#Input (transform x))
 const first = fn () => edit (fn x => x + 4.0)
 entry const answer = fn () => do:
-  let (Input value, _) = do (@effect.state (State.get Input) (State.set Input) (Input 38.0)):
+  let (#Input value, _) = do (@effect.state (State.get Input) (State.set Input) (#Input 38.0)):
     return first ()
   return value
 `,
