@@ -1,6 +1,0 @@
-_build/
-semantic/
-__pycache__/
-*.cmi
-*.cmx
-*.o

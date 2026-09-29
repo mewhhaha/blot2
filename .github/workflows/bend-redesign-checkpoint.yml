@@ -1,0 +1,26 @@
+name: Bend redesign checkpoint
+on:
+  push:
+    branches: [redesign/typed-compiler-core]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive exact committed source
+        run: |
+          mkdir -p "$RUNNER_TEMP/checkpoint"
+          git rev-parse HEAD > "$RUNNER_TEMP/checkpoint/revision.txt"
+          git archive --format=tar.gz HEAD > "$RUNNER_TEMP/checkpoint/source.tar.gz"
+          (cd "$RUNNER_TEMP/checkpoint" && sha256sum source.tar.gz > source.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bend-source-${{ github.sha }}
+          path: ${{ runner.temp }}/checkpoint/
+          retention-days: 30
