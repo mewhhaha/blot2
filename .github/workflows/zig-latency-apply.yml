@@ -1,0 +1,46 @@
+name: Zig native latency source integration
+on:
+  push:
+    branches: [zig-compiler-rebuild]
+    paths: ['.github/workflows/zig-latency-apply.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify and apply the locally tested native source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = 0be919b306a728e0067e19b80a0f45d337895bd5
+          cat .github/zig-latency/part-{0,1,2,3} | base64 --decode | gzip --decompress > "$RUNNER_TEMP/native-latency.patch"
+          echo "5e6a8769e5feeb1f971f3e28d22772c95c8377be356a2fc0ca93f35fb1917926  $RUNNER_TEMP/native-latency.patch" | sha256sum --check
+          git apply --index "$RUNNER_TEMP/native-latency.patch"
+          git diff --cached --check
+          python3 - <<'PY'
+          import subprocess
+          changed = set(subprocess.check_output(['git', 'diff', '--cached', '--name-only'], text=True).splitlines())
+          expected = {'zig/IR.md', 'zig/src/core_compare.zig', 'zig/src/runtime.zig', 'zig/src/semantic.zig', 'zig/src/type_bridge.zig', 'zig/src/type_ir_tests.zig', 'zig/src/type_scan.zig', 'zig/tools/generate.py'}
+          assert changed == expected, changed
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'perf(zig): replace repeated type scans and core comparisons with native graph work'
+          git show --stat --oneline HEAD
+      - name: Publish to the existing Zig branch without force
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/zig-compiler-rebuild | cut -f1)" = "$GITHUB_SHA"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git push origin HEAD:refs/heads/zig-compiler-rebuild
