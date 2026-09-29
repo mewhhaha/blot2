@@ -1,0 +1,67 @@
+name: Typed compiler core
+on:
+  push:
+    branches: [redesign/typed-compiler-core]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: typed-core-${{ github.ref }}
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      BEND_NO_TELEMETRY: "1"
+      DENO_DIR: ${{ github.workspace }}/.development-cache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive exact source
+        run: git archive --format=tar.gz HEAD > "$RUNNER_TEMP/typed-core-source.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: typed-core-source
+          path: ${{ runner.temp }}/typed-core-source.tar.gz
+          retention-days: 7
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.2"
+      - name: Install verified reference toolchain
+        run: |
+          mkdir -p development-tools/bend development-tools/bin
+          curl -fL --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  $RUNNER_TEMP/bend.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C development-tools/bend
+          echo "$PWD/development-tools/bend/bend/bin" >> "$GITHUB_PATH"
+          cp "$(command -v deno)" "$(command -v bun)" development-tools/bin/
+          deno cache generated/wasm/mod.ts
+          tar -czf "$RUNNER_TEMP/typed-core-tools.tar.gz" development-tools .development-cache
+      - uses: actions/upload-artifact@v4
+        with:
+          name: typed-core-tools
+          path: ${{ runner.temp }}/typed-core-tools.tar.gz
+          retention-days: 3
+      - name: Build native baseline and official reference
+        run: |
+          bend version
+          bend guide > "$RUNNER_TEMP/bend-guide.txt"
+          deno task generate:parser
+          deno task build:compiler
+          python3 scripts/build_compiler_reference.py
+          git rev-parse HEAD > generated/compiler/source-revision.txt
+          sha256sum generated/compiler/blotc > generated/compiler/executable-sha256.txt
+          tar -czf "$RUNNER_TEMP/typed-core-baseline.tar.gz" compiler generated std examples scripts deno.json deno.lock baba.json AGENTS.md LAWS.bend PROOF.bend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: typed-core-baseline
+          path: ${{ runner.temp }}/typed-core-baseline.tar.gz
+          retention-days: 7
