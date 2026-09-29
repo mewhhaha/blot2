@@ -52,7 +52,7 @@ def main() -> int:
         parser.error('--threads must be in [1,64]')
     executable = args.executable.resolve(strict=True)
     if not (ROOT / 'generated/compiler/compiler.js').is_file():
-        parser.error('build the unchanged JavaScript reference first: python3 compiler/core/build_reference.py')
+        parser.error('build the unchanged JavaScript reference first: python3 scripts/build_compiler_reference.py')
     selected = args.tests or select_tests(args.suite)
     if not selected:
         parser.error('no test files were selected')

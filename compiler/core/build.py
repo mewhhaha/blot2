@@ -7,6 +7,7 @@ Each successful build records exact source, generator and toolchain identities.
 """
 from __future__ import annotations
 import argparse
+import fcntl
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
@@ -41,7 +42,7 @@ def write_changed(path: Path, data: bytes) -> None:
     temporary.replace(path)
 
 
-def build(compiler: str, jobs: int) -> Path:
+def build_locked(compiler: str, jobs: int) -> Path:
     compiler = str(Path(shutil.which(compiler) or compiler).resolve(strict=True))
     version = run([compiler, '-version'], HERE, True).strip()
     if int(version.split('.')[0]) < 5:
@@ -49,6 +50,9 @@ def build(compiler: str, jobs: int) -> Path:
     output = HERE / '_build'
     output.mkdir(exist_ok=True)
     config = run([compiler, '-config'], HERE, True)
+    settings = dict(line.split(': ', 1) for line in config.splitlines() if ': ' in line)
+    if settings.get('word_size') != '64':
+        raise RuntimeError('Native core requires a 64-bit OCaml toolchain')
     configuration = hashlib.sha256((compiler + config + repr(FLAGS) + digest(Path(compiler))).encode()).hexdigest()
     state_path = output / 'build-manifest.json'
     old = json.loads(state_path.read_text()) if state_path.exists() else {}
@@ -64,6 +68,16 @@ def build(compiler: str, jobs: int) -> Path:
         for name, source in source_files.items():
             write_changed(output / name, source.read_bytes())
         hashes = {name: digest(source) for name, source in source_files.items()}
+        for module in semantic_manifest:
+            name = 'sem_' + module['module'] + '.ml'
+            if hashes.get(name) != module['native_sha256']:
+                raise RuntimeError('Generated source does not match its manifest: ' + name)
+        # Never let a removed migration module leak into later test/link scans.
+        for name in set(old.get('sources', {})) - set(source_files):
+            if Path(name).name != name or not name.endswith('.ml'):
+                raise RuntimeError('Invalid cached module path')
+            for extension in ['.ml', '.cmi', '.cmx', '.o']:
+                (output / (Path(name).stem + extension)).unlink(missing_ok=True)
         order = run([str(Path(compiler).with_name('ocamldep')), '-sort', *sorted(source_files)], output, True).split()
         deps = {}
         for line in run([str(Path(compiler).with_name('ocamldep')), '-modules', *sorted(source_files)], output, True).splitlines():
@@ -110,13 +124,32 @@ def build(compiler: str, jobs: int) -> Path:
             run([compiler, *FLAGS, '-o', str(temporary), 'unix.cmxa', 'threads.cmxa',
                  'runtime_stubs.o', *objects], output)
             temporary.replace(executable)
+        input_paths = set(source for source in source_files.values() if source.parent == HERE)
+        input_paths.update((HERE / 'bootstrap').glob('*.py'))
+        input_paths.update(HERE.parent / (module['module'] + '.bend') for module in semantic_manifest)
+        # native_transport's implementation is hand-written, but its protocol
+        # source remains an input to the migration's dependency/schema checks.
+        input_paths.update([HERE.parent / 'native_transport.bend', stub, Path(__file__)])
+        inputs = {str(path.relative_to(ROOT)): digest(path) for path in sorted(input_paths)}
         manifest = {'configuration': configuration, 'ocaml': version, 'flags': FLAGS,
+                    'inputs': inputs,
+                    'toolchain_config': config,
                     'sources': hashes, 'semantic_sources': semantic_manifest,
                     'bootstrap': {p.name: digest(p) for p in sorted((HERE / 'bootstrap').glob('*.py'))},
                     'stub': stub_hash, 'executable_sha256': digest(executable)}
         write_changed(state_path, (json.dumps(manifest, indent=2, sort_keys=True) + '\n').encode())
         print(f'Native core: {len(stale)} modules compiled; linked={linked}; SHA-256={manifest["executable_sha256"]}', flush=True)
     return executable
+
+
+def build(compiler: str, jobs: int) -> Path:
+    output = HERE / '_build'
+    output.mkdir(exist_ok=True)
+    # Build products are private to this checkout. Serialize concurrent builds
+    # rather than racing compiler output, temporary executables and manifests.
+    with (output / '.build.lock').open('a') as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        return build_locked(compiler, jobs)
 
 
 def main() -> None:

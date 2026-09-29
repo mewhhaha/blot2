@@ -37,3 +37,22 @@ The full redesign remains a draft. Checkpoint artifacts contain committed source
 build provenance, generated native modules, executables, and test logs. The
 recovered source is being revalidated; earlier local test totals do not certify
 a different recovered build. See RECOVERY.md for the publication history.
+
+## Checkpoints
+
+```sh
+make -C compiler/core test-build test-no-reference
+python3 compiler/core/checkpoint.py --output build/core-checkpoint.zip \
+  --base <previous-commit> --evidence build/core-parity.json
+```
+
+Checkpointing rejects uncommitted changes, modified inputs, changed generated
+modules, or an executable that differs from its manifest. The incremental Git
+bundle can be fetched into another checkout; generated sources and a Linux
+executable are packaged separately from version-controlled source. Native builds
+in one checkout are serialized to protect temporary products and manifests.
+
+The Native typed core workflow tests the actual native executable, including a
+clean source compilation without any JavaScript compiler files. Its differential
+suite separately builds the pinned, unchanged Bend oracle. The Core checkpoint
+workflow continues to save source on each push independently of validation.
