@@ -250,12 +250,12 @@ for (const workload of selected) {
     };
     rows.push(row);
     await save();
-    console.log(
-      `${workload.name} threads=${threads}: full ${
-        row.full.baseline.median_ms.toFixed(2)
-      } -> ${row.full.candidate.median_ms.toFixed(2)} ms (${row.full.speedup.toFixed(2)}x), edit ${
-        row.incremental?.edit.speedup.toFixed(2) ?? "n/a"
-      }x`,
-    );
+    console.log(JSON.stringify({
+      workload: row.workload,
+      threads,
+      full_ms: [row.full.baseline.median_ms, row.full.candidate.median_ms],
+      full_speedup: row.full.speedup,
+      edit_speedup: row.incremental?.edit.speedup,
+    }));
   }
 }

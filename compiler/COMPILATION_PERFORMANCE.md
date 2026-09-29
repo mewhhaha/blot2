@@ -1,32 +1,32 @@
 # Blot compilation work reduction
 
-Baseline: main `ac59fb68f98780e168ce01fa39410b1a6ef54efd`.
-This is separate from the generated-runtime optimizations in PR #4.
+Baseline: main `ac59fb68f98780e168ce01fa39410b1a6ef54efd`. This is separate from
+the generated-runtime optimizations in PR #4.
 
 ## Closed generalization
 
 Previously every let generalization resolved and scanned all environment and
-annotation bindings, even when the resolved type and residual predicates had
-no free variables. In a chain of scalar lets this repeatedly traversed a growing
+annotation bindings, even when the resolved type and residual predicates had no
+free variables. In a chain of scalar lets this repeatedly traversed a growing
 environment just to subtract its free variables from an empty set.
 
 The candidate computes the union of type and predicate variables first. An empty
 union needs no environment exclusion. Nonempty candidates use the same complete
-environment, annotation, blocked-variable and ambient-effect-row checks as before.
-Type and predicate resolution, predicate canonicalization, covariant row closing
-and the final binding construction remain unchanged. There is no global memo,
-mutable inference cache, or relaxation of polymorphism/effect rules.
+environment, annotation, blocked-variable and ambient-effect-row checks as
+before. Type and predicate resolution, predicate canonicalization, covariant row
+closing and the final binding construction remain unchanged. There is no global
+memo, mutable inference cache, or relaxation of polymorphism/effect rules.
 
-The regression oracle implements the previous algorithm through ordinary exported
-Bend functions and compares 900 combinations of types, contexts, substitutions,
-residual predicates and blocked variables. A constructor-level law checks the
-empty-candidate branch. This is not a formal equivalence proof for malformed
-internal environments, nor a proof of the full inference engine.
+The regression oracle implements the previous algorithm through ordinary
+exported Bend functions and compares 900 combinations of types, contexts,
+substitutions, residual predicates and blocked variables. A constructor-level
+law checks the empty-candidate branch. This is not a formal equivalence proof
+for malformed internal environments, nor a proof of the full inference engine.
 
 ## Annotation traversal fusion
 
-Lowering previously copied a syntax subtree while erasing children of nested
-let bindings, then scanned that copy for annotation variables. The new scanner
+Lowering previously copied a syntax subtree while erasing children of nested let
+bindings, then scanned that copy for annotation variables. The new scanner
 handles the scope boundary directly. A root binding retains its children; a
 nested binding owns a separate annotation scope. Ordinary whole-tree callers
 retain their original traversal. Variable and diagnostic ordering are unchanged
@@ -81,5 +81,6 @@ and all compiler tests.
 ## Scope
 
 These changes remove work from lowering and generalization. They do not solve
-all specialization costs, change the emitted Wasm runtime, add guest concurrency,
-or make an unchanged artifact-cache hit a measure of compiler throughput.
+all specialization costs, change the emitted Wasm runtime, add guest
+concurrency, or make an unchanged artifact-cache hit a measure of compiler
+throughput.
