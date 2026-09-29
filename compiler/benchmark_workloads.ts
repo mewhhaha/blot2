@@ -23,7 +23,7 @@ export function arithmeticSource(
 
 export function readerSource(count: number, changed: boolean): string {
   return [
-    "effect Reader.ask: Unit -> U32",
+    "type Reader is effect = { ask: Unit -> U32 }",
     "const reader = @effect.provider Reader.ask (fn () => 1)",
     ...Array.from(
       { length: count },
@@ -134,7 +134,7 @@ export function nominalSource(changed: boolean): string {
   return Array.from(
     { length: 256 },
     (_, index) =>
-      `data T${index} = C${index} ${
+      `type T${index} is data = #C${index} ${
         index % 16 ? `T${index - 1}` : "U32"
       }\nconst f${index} = fn (value: T${index}) => value`,
   ).join("\n") +

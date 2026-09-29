@@ -50,6 +50,8 @@ import ./compiler/entry_points.bend as Entries
 import ./compiler/loop_memory.bend as LoopMemory
 import ./compiler/raw_core_qualification.bend as RawQualification
 import ./compiler/effect_rows.bend as Rows
+import ./compiler/source_types.bend as SourceTypes
+
 import ./compiler/demand_elaboration.bend as Demand
 
 # Raw core has no evidence selector, so a nonempty qualification cannot be
@@ -1599,6 +1601,50 @@ law saturated_counted_loop_is_not_inlineable:
   for initial: M.Expr
   for body: M.Expr
   {Saturation.body_cost(256n, [M.ForExpr{index, start, end, state, initial, body}], 0n) == 97n : Nat}
+
+# With no free type or predicate variables, environment exclusion is empty.
+law closed_generalization_has_no_candidates:
+  for context: Infer.Context
+  for state: Infer.State
+  for blocked: List<&2, Nat>
+  {Infer.generalizable_variables(Nil{}, context, state, blocked) == Done{Nil{}} : Result<&2, &2, M.Diagnostic, List<&2, Nat>>}
+
+law nested_annotation_binding_hides_children:
+  for field: String
+  for text: String
+  for offset: Nat
+  for children: List<&2, Cst.Cst>
+  {SourceTypes.variable_children(Cst.Cst{"binding", field, text, offset, children}, SourceTypes.NestedScope{}) == Nil{} : List<&2, Cst.Cst>}
+
+law root_annotation_binding_keeps_children:
+  for field: String
+  for text: String
+  for offset: Nat
+  for children: List<&2, Cst.Cst>
+  {SourceTypes.variable_children(Cst.Cst{"binding", field, text, offset, children}, SourceTypes.RootScope{}) == children : List<&2, Cst.Cst>}
+
+# Scalar fast paths do not allocate new inference identities or rewrite the
+# chronological substitution history. Variables and open rows still solve.
+law ground_resolution_does_not_visit_history:
+  for substitutions: Substitutions.Substitutions
+  {Substitutions.resolve(substitutions, M.U32Ty{}) == Done{M.U32Ty{}} : Result<&2, &2, M.Diagnostic, M.Ty>}
+
+law ground_unification_preserves_state:
+  for +substitutions: Substitutions.Substitutions
+  for +next: Nat
+  for subject: String
+  {Substitutions.unify_at(M.U32Ty{}, M.U32Ty{}, substitutions, next, subject) == Done{Substitutions.Solution{substitutions, next}} : Result<&2, &2, M.Diagnostic, Substitutions.Solution>}
+
+law empty_rows_preserve_state:
+  for +substitutions: Substitutions.Substitutions
+  for +next: Nat
+  for subject: String
+  {Substitutions.unify_rows_at(M.EffectRow{Nil{}, M.ClosedRow{}}, M.EffectRow{Nil{}, M.ClosedRow{}}, substitutions, next, subject) == Done{Substitutions.Solution{substitutions, next}} : Result<&2, &2, M.Diagnostic, Substitutions.Solution>}
+
+law symbol_insertion_into_empty_map:
+  for +key: String
+  for +value: Nat
+  {Index.set(Nat, MTip{}, key, value) == MLeaf{key, value} : Map<&2, Nat>}
 
 # Collector layout hints are justified by expression constructors, never by
 # pointer-looking bits or the names of erased local bindings.

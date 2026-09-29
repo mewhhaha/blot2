@@ -19,7 +19,7 @@ def build(bindings: List<&2, I.Binding>, +position: Nat, index: Map<&2, List<&2,
       I.Binding{+name, ty, variables, predicates} = binding
       +known = index
       prior = Index.get(List<&2, Entry>, known, name, Nil{})
-      build(tail, 1n+position, Map.set(&2, List<&2, Entry>, known, name, Entry{position, binding} <> prior))
+      build(tail, 1n+position, Index.set(List<&2, Entry>, known, name, Entry{position, binding} <> prior))
 
 def choose(before: Bool, first: Unit -> List<&2, Entry>, later: Unit -> List<&2, Entry>) -> List<&2, Entry>:
   match before:

@@ -31,7 +31,7 @@ def compressed(key: String, +root: String, rank: Nat, forest: Map<&2, Link>, sam
     case True{}:
       Resolved{root, rank, forest}
     case False{}:
-      Resolved{root, rank, Map.set(&2, Link, forest, key, Parent{root})}
+      Resolved{root, rank, Index.set(Link, forest, key, Parent{root})}
 
 def compress(key: String, parent: String, resolved: Resolved) -> Resolved:
   Resolved{+root, rank, forest} = resolved
@@ -55,11 +55,11 @@ def join_roots(+left: String, left_rank: Nat, right: String, right_rank: Nat, fo
     case True{} _:
       forest
     case False{} LT{}:
-      Map.set(&2, Link, forest, left, Parent{right})
+      Index.set(Link, forest, left, Parent{right})
     case False{} GT{}:
-      Map.set(&2, Link, forest, right, Parent{left})
+      Index.set(Link, forest, right, Parent{left})
     case False{} EQ{}:
-      Map.set(&2, Link, Map.set(&2, Link, forest, right, Parent{left}), left, Root{1n+left_rank})
+      Index.set(Link, Index.set(Link, forest, right, Parent{left}), left, Root{1n+left_rank})
 
 # Union by rank and path compression find weak components without constructing
 # a symmetric graph, running two SCC walks, or sorting each component again.
@@ -144,7 +144,7 @@ def collect(chains: List<&2, Chains.Chain>, +fuel: Nat, +forest: Map<&2, Link>, 
         +resolved : Resolved <- resolve(fuel, key, forest, Index.find(Link, forest, key))
         +root : String = root_key(resolved)
         members : List<&2, Chains.Chain> = Index.get(List<&2, Chains.Chain>, groups, root, Nil{})
-        collect(tail, fuel, root_forest(resolved), Map.set(&2, List<&2, Chains.Chain>, groups, root, chain <> members))
+        collect(tail, fuel, root_forest(resolved), Index.set(List<&2, Chains.Chain>, groups, root, chain <> members))
 
 def partition_remaining(+chains: List<&2, Chains.Chain>, settled: Map<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, Region>>:
   +fuel = List.length(&2, Chains.Chain, chains)

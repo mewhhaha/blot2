@@ -24,7 +24,7 @@ def identity_present(index: IdentitySet(), identity: M.TypeId) -> Bool:
 
 def identity_add(+index: IdentitySet(), identity: M.TypeId) -> IdentitySet():
   M.TypeId{+module_name, declaration} = identity
-  Map.set(&2, Set(), index, module_name, Set.add(identity_members(index, module_name), declaration))
+  Index.set(Set(), index, module_name, Set.add(identity_members(index, module_name), declaration))
 
 def identity_mark(present: Bool, index: IdentitySet(), identity: M.TypeId) -> IdentitySet():
   match present:

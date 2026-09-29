@@ -483,7 +483,33 @@ def generalization_variables(generalized: Generalization) -> List<&2, Nat>:
   Generalization{binding, variables} = generalized
   variables
 
+# A closed inferred type and closed residual requirements have nothing to
+# quantify. In particular, scalar let chains must not re-resolve every older
+# binding just to subtract its variables from an empty set. Open candidates
+# retain the complete environment, annotation, blocked-variable and row checks.
+def generalizable_variables(candidates: List<&2, Nat>, +context: Context, +state: State, blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+  match candidates:
+    case Nil{}:
+      Done{Nil{}}
+    case head <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+        excluded : List<&2, Nat> <- binding_free(List.append(&2, Binding, environment_bindings(context), annotation_bindings(annotation_types(state))), substitutions_of(state))
+        return T.difference(head <> tail, T.union(blocked, T.union(excluded, T.row_free(T.resolve_row(substitutions_of(state), context_row(context))))))
+
 def generalization_qualified_excluding(ty: M.Ty, predicates: List<&2, M.Predicate>, +context: Context, +state: State, name: String, +blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, Generalization>:
+  do Result<&2, &2, M.Diagnostic, Generalization>:
+    +resolved : M.Ty <- T.resolve(substitutions_of(state), ty)
+    resolved_needs : List<&2, M.Predicate> <- C.resolve_list(substitutions_of(state), predicates)
+    +needs : List<&2, M.Predicate> = C.canonical_predicates(resolved_needs, Nil{})
+    type_free : List<&2, Nat> <- T.free(resolved)
+    +predicate_free : List<&2, Nat> <- C.free_list(needs)
+    +variables : List<&2, Nat> <- generalizable_variables(T.union(type_free, predicate_free), context, state, blocked)
+    +closed : M.Ty <- T.close_covariant(resolved, variables, predicate_free)
+    remaining : List<&2, Nat> <- T.free(closed)
+    return Generalization{Binding{name, closed, T.difference(variables, T.difference(variables, T.union(remaining, predicate_free))), needs}, variables}
+
+# Retained slow oracle for differential tests of the closed-type fast path.
+def generalization_qualified_excluding_reference(ty: M.Ty, predicates: List<&2, M.Predicate>, +context: Context, +state: State, name: String, +blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, Generalization>:
   do Result<&2, &2, M.Diagnostic, Generalization>:
     +resolved : M.Ty <- T.resolve(substitutions_of(state), ty)
     resolved_needs : List<&2, M.Predicate> <- C.resolve_list(substitutions_of(state), predicates)
@@ -575,7 +601,7 @@ def annotation_variable(found: Maybe<&2, M.Ty>, key: String, state: State) -> Ty
       Typing{pure(ty), state}
     case None{}:
       State{substitutions, +next, annotations} = state
-      Typing{pure(M.VariableTy{next}), State{substitutions, 1n+next, Map.set(&2, M.Ty, annotations, key, M.VariableTy{next})}}
+      Typing{pure(M.VariableTy{next}), State{substitutions, 1n+next, Index.set(M.Ty, annotations, key, M.VariableTy{next})}}
 
 def annotation_instance(parameters: List<&2, M.Ty>, ty: M.Ty, +state: State) -> Result<&2, &2, M.Diagnostic, Typing>:
   match parameters:

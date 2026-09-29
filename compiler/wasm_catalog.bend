@@ -32,7 +32,7 @@ def constructor_index_go(slots: List<&2, ConstructorSlot>, indexed: Map<&2, Mayb
     case Nil{}:
       indexed
     case ConstructorSlot{+name, tag, payload} <> tail:
-      constructor_index_go(tail, Map.set(&2, Maybe<&2, ConstructorSlot>, indexed, name, Some{ConstructorSlot{name, tag, payload}}))
+      constructor_index_go(tail, Index.set(Maybe<&2, ConstructorSlot>, indexed, name, Some{ConstructorSlot{name, tag, payload}}))
 
 def type_catalog(types: List<&2, M.DataType>) -> TypeCatalog:
   +variants = constructor_slots(types, 0n)

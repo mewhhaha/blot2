@@ -275,7 +275,7 @@ def adjacency(nodes: List<&2, Node>, edges: Map<&2, List<&2, String>>) -> Map<&2
     case Nil{}:
       edges
     case Node{name, refs, lambdas} <> tail:
-      adjacency(tail, Map.set(&2, List<&2, String>, edges, name, refs))
+      adjacency(tail, Index.set(List<&2, String>, edges, name, refs))
 
 def neighbors(edges: Map<&2, List<&2, String>>, name: String) -> List<&2, String>:
   Index.get(List<&2, String>, edges, name, Nil{})
@@ -285,7 +285,7 @@ def transpose_edges(refs: List<&2, String>, +name: String, +edges: Map<&2, List<
     case Nil{}:
       edges
     case +head <> tail:
-      transpose_edges(tail, name, Map.set(&2, List<&2, String>, edges, head, name <> neighbors(edges, head)))
+      transpose_edges(tail, name, Index.set(List<&2, String>, edges, head, name <> neighbors(edges, head)))
 
 def transpose(nodes: List<&2, Node>, edges: Map<&2, List<&2, String>>) -> Map<&2, List<&2, String>>:
   match nodes:
@@ -411,7 +411,7 @@ def compact_catalog(nodes: List<&2, Node>, +next: Nat, known: CompactCatalog) ->
       known
     case Node{+name, references, lambdas} <> tail:
       CompactCatalog{ids, names} = known
-      compact_catalog(tail, 1n+next, CompactCatalog{Map.set(&2, Nat, ids, name, next), NatIndex.set(String, names, next, name)})
+      compact_catalog(tail, 1n+next, CompactCatalog{Index.set(Nat, ids, name, next), NatIndex.set(String, names, next, name)})
 
 def compact_numbered_reference(found: Maybe<&2, Nat>, rest: List<&2, Nat>) -> List<&2, Nat>:
   match found:

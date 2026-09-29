@@ -787,7 +787,7 @@ def remember_answer(previous: Specialization, selected: Specialization, +site: N
   # generated-body inference add definitions, not further choices. Start from
   # the previous map so a numeric site collision cannot overwrite an ordinary
   # dispatch choice; keep the qualified answer in its own key namespace.
-  Specialization{module, environment, Map.set(&2, Choice, choices, qualified_key(site), QualifiedChoice{original <> solved, answer <> answers}), next, certificates}
+  Specialization{module, environment, Index.set(Choice, choices, qualified_key(site), QualifiedChoice{original <> solved, answer <> answers}), next, certificates}
 
 def field_owner(receiver: M.Ty, member: String, accessor: String, signature: M.Ty) -> Result<&2, &2, M.Diagnostic, C.Evidence>:
   match receiver:
@@ -943,7 +943,7 @@ def select_associated(need: I.Coverage, +left: M.Ty, +right: M.Ty, specializatio
         +target : I.Typing = I.selected_typing(selected_instance)
         +unified : I.State <- I.unify(I.type_of(target), M.FunctionTy{left, M.FunctionTy{right, result, ambient}, ambient}, I.state_of(target), subject)
         signature : M.Ty <- T.resolve(I.substitutions_of(unified), I.selected_exact(selected_instance))
-        return Specialization{M.Module{List.append(&2, M.Constant, constants, emitted_constants(expanded)), all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Map.set(&2, Choice, choices, Nat.show(identity), FunctionChoice{name, signature}), next(expanded), certificates}
+        return Specialization{M.Module{List.append(&2, M.Constant, constants, emitted_constants(expanded)), all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Index.set(Choice, choices, Nat.show(identity), FunctionChoice{name, signature}), next(expanded), certificates}
     case _ _:
       Fail{M.Diagnostic{"internal_error", "monomorphization", "selection expected an associated requirement"}}
 
@@ -1003,7 +1003,7 @@ def select_method_original(need: I.Coverage, +left: M.Ty, right: M.Ty, specializ
         +target : I.Typing = I.selected_typing(selected_instance)
         +unified : I.State <- I.unify(I.type_of(target), receiver_signature(dispatch, left, right, result, ambient), I.state_of(target), subject)
         signature : M.Ty <- T.resolve(I.substitutions_of(unified), I.selected_exact(selected_instance))
-        return Specialization{M.Module{List.append(&2, M.Constant, constants, emitted_constants(expanded)), all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Map.set(&2, Choice, choices, Nat.show(identity), receiver_choice(dispatch, name, signature)), next(expanded), certificates}
+        return Specialization{M.Module{List.append(&2, M.Constant, constants, emitted_constants(expanded)), all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Index.set(Choice, choices, Nat.show(identity), receiver_choice(dispatch, name, signature)), next(expanded), certificates}
     case _ _:
       Fail{M.Diagnostic{"internal_error", "member", "selection expected a receiver requirement"}}
 
@@ -1085,7 +1085,7 @@ def schema_generated(+name: String, answer: Bool, identity: Nat, +dispatch: M.Di
     +target : I.Typing = I.selected_typing(selected_instance)
     +unified : I.State <- I.unify(I.type_of(target), receiver_signature(dispatch, left, right, result, ambient), I.state_of(target), subject)
     signature : M.Ty <- T.resolve(I.substitutions_of(unified), I.selected_exact(selected_instance))
-    return Specialization{M.Module{constants, all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Map.set(&2, Choice, choices, Nat.show(identity), receiver_choice(dispatch, name, signature)), Nat.add(counter, step), certificates}
+    return Specialization{M.Module{constants, all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Index.set(Choice, choices, Nat.show(identity), receiver_choice(dispatch, name, signature)), Nat.add(counter, step), certificates}
 
 def schema_choice_space(fits: Bool, +name: String, answer: Bool, identity: Nat, dispatch: M.Dispatch, member: String, left: M.Ty, right: M.Ty, result: M.Ty, ambient: M.EffectRow, subject: String, specialization: Specialization, configuration: Configuration) -> Maybe<&2, Specialization>:
   match fits:
@@ -1188,7 +1188,7 @@ def select_field_site(need: I.Coverage, +left: M.Ty, right: M.Ty, specialization
         +target : I.Typing = I.selected_typing(selected_instance)
         +unified : I.State <- I.unify(I.type_of(target), receiver_signature(dispatch, left, right, result, ambient), I.state_of(target), subject)
         signature : M.Ty <- T.resolve(I.substitutions_of(unified), I.selected_exact(selected_instance))
-        return Specialization{M.Module{constants, all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Map.set(&2, Choice, choices, Nat.show(identity), receiver_choice(dispatch, name, signature)), Nat.add(counter, step), List.append(&2, Core.Certificate, new_certificates, certificates)}
+        return Specialization{M.Module{constants, all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Index.set(Choice, choices, Nat.show(identity), receiver_choice(dispatch, name, signature)), Nat.add(counter, step), List.append(&2, Core.Certificate, new_certificates, certificates)}
     case _ _:
       Fail{M.Diagnostic{"internal_error", "field", "selection expected a field requirement"}}
 
@@ -1229,7 +1229,7 @@ def reuse_field(+name: String, need: I.Coverage, +left: M.Ty, right: M.Ty, speci
         +target : I.Typing = I.selected_typing(selected_instance)
         +unified : I.State <- I.unify(I.type_of(target), receiver_signature(dispatch, left, right, result, ambient), I.state_of(target), subject)
         signature : M.Ty <- T.resolve(I.substitutions_of(unified), I.selected_exact(selected_instance))
-        return Specialization{module, G.Environment{G.env_bindings(environment), G.env_definitions(environment), unified}, Map.set(&2, Choice, choices, Nat.show(identity), receiver_choice(dispatch, name, signature)), Nat.add(counter, step), certificates}
+        return Specialization{module, G.Environment{G.env_bindings(environment), G.env_definitions(environment), unified}, Index.set(Choice, choices, Nat.show(identity), receiver_choice(dispatch, name, signature)), Nat.add(counter, step), certificates}
     case _ _:
       Fail{M.Diagnostic{"internal_error", "field", "selection expected a field requirement"}}
 
@@ -1279,7 +1279,7 @@ def create_field(found: Maybe<&2, FieldEvidence>, +generated: M.Function, need: 
         +target : I.Typing = I.selected_typing(selected_instance)
         +unified : I.State <- I.unify(I.type_of(target), receiver_signature(dispatch, left, right, result, ambient), I.state_of(target), subject)
         signature : M.Ty <- T.resolve(I.substitutions_of(unified), I.selected_exact(selected_instance))
-        return Specialization{M.Module{constants, List.append(&2, M.Function, functions, [generated]), types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Map.set(&2, Choice, choices, Nat.show(identity), receiver_choice(dispatch, name, signature)), Nat.add(counter, step), List.append(&2, Core.Certificate, field_certificates(field), certificates)}
+        return Specialization{M.Module{constants, List.append(&2, M.Function, functions, [generated]), types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Index.set(Choice, choices, Nat.show(identity), receiver_choice(dispatch, name, signature)), Nat.add(counter, step), List.append(&2, Core.Certificate, field_certificates(field), certificates)}
     case _ _ _:
       Fail{M.Diagnostic{"internal_error", "field", "selection expected a field requirement"}}
 
@@ -1451,7 +1451,7 @@ def select_state(+request: State.Request, need: I.Coverage, +left: M.Ty, +right:
         +target : I.Typing = I.selected_typing(selected_instance)
         +unified : I.State <- I.unify(I.type_of(target), M.FunctionTy{left, M.FunctionTy{right, result, ambient}, ambient}, I.state_of(target), subject)
         signature : M.Ty <- T.resolve(I.substitutions_of(unified), I.selected_exact(selected_instance))
-        return Specialization{M.Module{constants, all_functions, types, catalog}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Map.set(&2, Choice, choices, Nat.show(identity), FunctionChoice{name, signature}), Nat.add(counter, step), certificates}
+        return Specialization{M.Module{constants, all_functions, types, catalog}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Index.set(Choice, choices, Nat.show(identity), FunctionChoice{name, signature}), Nat.add(counter, step), certificates}
     case _ _:
       Fail{M.Diagnostic{"internal_error", "state", "selection expected a typed state requirement"}}
 
@@ -1476,7 +1476,7 @@ def select_operation(need: I.Coverage, arguments: List<&2, M.Ty>, specialization
         +selected_type : M.Ty = I.operation_type(operation, I.next_of(state))
         +unified : I.State <- I.unify(function_type, selected_type, I.with_next(state, 1n+I.next_of(state)), subject)
         signature : M.Ty <- T.resolve(I.substitutions_of(unified), exact_operation_type(operation))
-        return Specialization{M.Module{constants, functions, types, State.merge([operation], operations)}, G.Environment{G.env_bindings(environment), G.env_definitions(environment), unified}, Map.set(&2, Choice, choices, Nat.show(identity), OperationChoice{concrete, signature}), counter, certificates}
+        return Specialization{M.Module{constants, functions, types, State.merge([operation], operations)}, G.Environment{G.env_bindings(environment), G.env_definitions(environment), unified}, Index.set(Choice, choices, Nat.show(identity), OperationChoice{concrete, signature}), counter, certificates}
     case _ _:
       Fail{M.Diagnostic{"internal_error", "effect", "selection expected a generic operation requirement"}}
 
@@ -1502,7 +1502,7 @@ def select_type_same(need: I.Coverage, +left: M.Ty, +right: M.Ty, specialization
         +target : I.Typing = I.selected_typing(selected_instance)
         +unified : I.State <- I.unify(I.type_of(target), M.FunctionTy{left, M.FunctionTy{right, result, ambient}, ambient}, I.state_of(target), subject)
         signature : M.Ty <- T.resolve(I.substitutions_of(unified), I.selected_exact(selected_instance))
-        return Specialization{M.Module{constants, all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Map.set(&2, Choice, choices, Nat.show(identity), FunctionChoice{name, signature}), Nat.add(counter, step), certificates}
+        return Specialization{M.Module{constants, all_functions, types, operations}, G.Environment{G.env_bindings(inferred), G.env_definitions(inferred), unified}, Index.set(Choice, choices, Nat.show(identity), FunctionChoice{name, signature}), Nat.add(counter, step), certificates}
     case _ _:
       Fail{M.Diagnostic{"internal_error", "@type.same", "selection expected a type comparison requirement"}}
 
@@ -2165,7 +2165,7 @@ def selected_edges(definitions: List<&2, I.Definition>, +choices: Map<&2, Choice
     case Nil{}:
       edges
     case I.Definition{+name, I.Inference{ty, coverage, exits, reflections, predicates, uses}} <> tail:
-      selected_edges(tail, choices, Map.set(&2, List<&2, String>, edges, name, List.append(&2, String, selected_references(List.append(&2, I.Coverage, coverage, I.execution_needs(uses)), choices), D.neighbors(edges, name))))
+      selected_edges(tail, choices, Index.set(List<&2, String>, edges, name, List.append(&2, String, selected_references(List.append(&2, I.Coverage, coverage, I.execution_needs(uses)), choices), D.neighbors(edges, name))))
 
 def required_function_roots(functions: List<&2, M.Function>, +originals: List<&2, String>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, String>>:
   match functions:
@@ -2360,7 +2360,7 @@ def finalize_coverage(needs: List<&2, I.Coverage>, +substitutions: T.Substitutio
     case I.QualifiedNeed{+site, predicate, subject} <> tail:
       do Result<&2, &2, M.Diagnostic, Map<&2, Choice>>:
         selected : Choice <- finalize_qualified_choice(qualified_choice(choices, site), substitutions, subject)
-        finalize_coverage(tail, substitutions, Map.set(&2, Choice, choices, qualified_key(site), selected))
+        finalize_coverage(tail, substitutions, Index.set(Choice, choices, qualified_key(site), selected))
     case head <> tail:
       finalize_coverage(tail, substitutions, choices)
 
@@ -2498,7 +2498,7 @@ def refresh_type_eq_qualified(found: Maybe<&2, Choice>, substitutions: T.Substit
 def store_type_eq_choice(found: Maybe<&2, Choice>, key: String, choices: Map<&2, Choice>) -> Map<&2, Choice>:
   match found:
     case Some{selected}:
-      Map.set(&2, Choice, choices, key, selected)
+      Index.set(Choice, choices, key, selected)
     case None{}:
       choices
 
@@ -2720,7 +2720,7 @@ def finalize_coverage_scoped(needs: List<&2, I.Coverage>, +substitutions: T.Subs
     case I.QualifiedNeed{+site, predicate, subject} <> tail:
       do Result<&2, &2, M.Diagnostic, Map<&2, Choice>>:
         selected : Choice <- finalize_choice_scoped_certified(qualified_choice(choices, site), substitutions, subject, bound, module, choices, bindings, certified)
-        finalize_coverage_scoped(tail, substitutions, Map.set(&2, Choice, choices, qualified_key(site), selected), bound, module, bindings, certified)
+        finalize_coverage_scoped(tail, substitutions, Index.set(Choice, choices, qualified_key(site), selected), bound, module, bindings, certified)
     case head <> tail:
       do Result<&2, &2, M.Diagnostic, Map<&2, Choice>>:
         selected : Map<&2, Choice> <- finalize_coverage([head], substitutions, choices)
@@ -3984,7 +3984,7 @@ def task_index(tasks: List<&2, CachedTask>, index: Map<&2, CachedTask>) -> Map<&
     case Nil{}:
       index
     case CachedTask{+at, name, dependencies, result} <> tail:
-      task_index(tail, Map.set(&2, CachedTask, index, Nat.show(at), CachedTask{at, name, dependencies, result}))
+      task_index(tail, Index.set(CachedTask, index, Nat.show(at), CachedTask{at, name, dependencies, result}))
 
 def reusable_match(equal: Bool, tasks: List<&2, CachedTask>, sources: Map<&2, List<&2, U32>>) -> Reusable:
   match equal:
@@ -4070,7 +4070,7 @@ def function_source_keys(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2,
       M.Function{+name, exported, parameter, input, output, body} = function
       do Result<&2, &2, M.Diagnostic, Map<&2, List<&2, U32>>>:
         words : List<&2, U32> <- key(M.Module{Nil{}, [function], Nil{}, Nil{}})
-        function_source_keys(~key, rest, Map.set(&2, List<&2, U32>, acc, name, words))
+        function_source_keys(~key, rest, Index.set(List<&2, U32>, acc, name, words))
 
 def constant_source_keys(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, constants: List<&2, M.Constant>, +acc: Map<&2, List<&2, U32>>) -> Result<&2, &2, M.Diagnostic, Map<&2, List<&2, U32>>>:
   match constants:
@@ -4080,7 +4080,7 @@ def constant_source_keys(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2,
       M.Constant{+name, exported, annotation, value} = constant
       do Result<&2, &2, M.Diagnostic, Map<&2, List<&2, U32>>>:
         words : List<&2, U32> <- key(M.Module{[constant], Nil{}, Nil{}, Nil{}})
-        constant_source_keys(~key, rest, Map.set(&2, List<&2, U32>, acc, name, words))
+        constant_source_keys(~key, rest, Index.set(List<&2, U32>, acc, name, words))
 
 def source_keys(~key: M.Module -> Result<&2, &2, M.Diagnostic, List<&2, U32>>, functions: List<&2, M.Function>, constants: List<&2, M.Constant>) -> Result<&2, &2, M.Diagnostic, Map<&2, List<&2, U32>>>:
   do Result<&2, &2, M.Diagnostic, Map<&2, List<&2, U32>>>:

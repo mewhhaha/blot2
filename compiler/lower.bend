@@ -1219,7 +1219,7 @@ def record_pattern_field(result: PatternResult, constructor: String, fields: Lis
   PatternResult{pattern, +locals} = result
   do Result<&2, &2, M.Diagnostic, NodeKind>:
     valid : Unit <- unique_pattern_locals(locals, previous, name)
-    return PatternRecordFields{constructor, fields, Map.set(&2, M.Pattern, patterns, C.text_of(name), pattern), List.append(&2, Local, locals, previous)}
+    return PatternRecordFields{constructor, fields, Index.set(M.Pattern, patterns, C.text_of(name), pattern), List.append(&2, Local, locals, previous)}
 
 def record_pattern_fields(fields: List<&2, String>, +patterns: Map<&2, M.Pattern>) -> List<&2, M.Pattern>:
   match fields:
@@ -1885,9 +1885,7 @@ def inherited_annotation_variables(scanned: List<&2, T.Variable>, +previous: Lis
 def annotation_scope(+node: C.Cst, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, Context>:
   Context{globals, headers, fixities, locals, label, previous} = context
   do Result<&2, &2, M.Diagnostic, Context>:
-    scoped : List<&2, C.Cst> <- annotation_scan_work(1048576n, ScanNode{node, True{}})
-    root : C.Cst <- C.one(scoped)
-    scanned : List<&2, T.Variable> <- T.free_variables(root, scope)
+    scanned : List<&2, T.Variable> <- T.scoped_free_variables(node, scope)
     variables : List<&2, T.Variable> <- inherited_annotation_variables(scanned, previous, node)
     return Context{globals, headers, fixities, locals, label, variables}
 
@@ -2436,7 +2434,7 @@ def declaration_name(node: C.Cst) -> Result<&2, &2, M.Diagnostic, String>:
 def require_fresh(found: Maybe<&2, Global>, context: Context, global: Global, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Context>:
   match found context global:
     case None{} Context{globals, headers, fixities, locals, label, annotation_variables} Global{+source, core, kind}:
-      Done{Context{Map.set(&2, Global, globals, source, Global{source, core, kind}), headers, fixities, locals, label, annotation_variables}}
+      Done{Context{Index.set(Global, globals, source, Global{source, core, kind}), headers, fixities, locals, label, annotation_variables}}
     case _ _ _:
       Fail{C.diagnostic(node, "duplicate_name", "duplicate value or constructor declaration")}
 
@@ -2447,7 +2445,7 @@ def add_global(+context: Context, +source: String, core: String, kind: GlobalKin
 def add_header(found: Maybe<&2, T.Header>, context: Context, header: T.Header, node: C.Cst) -> Result<&2, &2, M.Diagnostic, Context>:
   match found context header:
     case None{} Context{globals, headers, fixities, locals, label, annotation_variables} T.Header{+source, identity, parameters}:
-      Done{Context{globals, Map.set(&2, T.Header, headers, source, T.Header{source, identity, parameters}), fixities, locals, label, annotation_variables}}
+      Done{Context{globals, Index.set(T.Header, headers, source, T.Header{source, identity, parameters}), fixities, locals, label, annotation_variables}}
     case _ _ _:
       Fail{C.diagnostic(node, "duplicate_type", "duplicate type declaration")}
 

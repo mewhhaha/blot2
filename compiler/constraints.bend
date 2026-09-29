@@ -535,7 +535,7 @@ def bucket_seed(seen: List<&2, M.Predicate>, +buckets: Map<&2, List<&2, M.Predic
     case +head <> tail:
       +key = predicate_bucket(head)
       +values = bucket_values(Index.find(List<&2, M.Predicate>, buckets, key))
-      bucket_seed(tail, Map.set(&2, List<&2, M.Predicate>, buckets, key, head <> values))
+      bucket_seed(tail, Index.set(List<&2, M.Predicate>, buckets, key, head <> values))
 
 type CanonicalBuckets is Data:
   CanonicalBuckets{seen: List<&2, M.Predicate>, buckets: Map<&2, List<&2, M.Predicate>>}
@@ -545,7 +545,7 @@ def canonical_next(present: Bool, +head: M.Predicate, seen: List<&2, M.Predicate
     case True{}:
       CanonicalBuckets{seen, buckets}
     case False{}:
-      CanonicalBuckets{head <> seen, Map.set(&2, List<&2, M.Predicate>, buckets, key, head <> values)}
+      CanonicalBuckets{head <> seen, Index.set(List<&2, M.Predicate>, buckets, key, head <> values)}
 
 def canonical_indexed(pending: List<&2, M.Predicate>, state: CanonicalBuckets) -> List<&2, M.Predicate>:
   match pending state:

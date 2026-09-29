@@ -1,0 +1,163 @@
+name: Compiler throughput
+on:
+  pull_request:
+    paths: [
+      "compiler/**",
+      "scripts/**",
+      "std/**",
+      "LAWS.bend",
+      "PROOF.bend",
+      "baba.json",
+      "deno.json",
+      "deno.lock",
+      ".github/workflows/compiler-throughput.yml",
+    ]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: compiler-throughput-${{ github.ref }}
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [baseline, candidate]
+    env:
+      BEND_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: oven-sh/setup-bun@v2
+      - name: Install verified Bend toolchain
+        run: |
+          curl -fL --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  $RUNNER_TEMP/bend.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bend"
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
+          echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
+      - name: Prepare exact source and cache identity
+        id: inputs
+        env:
+          REVISION: ${{ matrix.revision }}
+        run: |
+          source="$RUNNER_TEMP/source"
+          mkdir -p "$source"
+          revision="$(git rev-parse HEAD)"
+          if [ "$REVISION" = baseline ]; then revision=0c390be4e9039a307b9bbf556083be26c9a6f25f; fi
+          git archive "$revision" | tar -x -C "$source"
+          echo "$revision" > "$RUNNER_TEMP/source-revision.txt"
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          from pathlib import Path
+          import hashlib, os, subprocess
+          root = Path(os.environ['RUNNER_TEMP']) / 'source'
+          digest = hashlib.sha256()
+          for file in sorted([*root.rglob('*.bend'), root / 'scripts/build_compiler.ts']):
+              digest.update(str(file.relative_to(root)).encode() + b'\0' + file.read_bytes() + b'\0')
+          digest.update(subprocess.check_output(['bend', 'version']))
+          digest.update(subprocess.check_output(['clang', '--version']))
+          print('key=' + digest.hexdigest())
+          PY
+          bend version
+          deno --version
+          bun --version
+          clang --version
+          bend guide > "$RUNNER_TEMP/bend-guide.txt"
+      - uses: actions/cache@v4
+        id: native-cache
+        with:
+          path: ${{ runner.temp }}/source/generated/compiler/blotc
+          key: compile-throughput-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.inputs.outputs.key }}
+      - name: Build native compiler or recheck cached inputs
+        run: |
+          cd "$RUNNER_TEMP/source"
+          deno task generate:parser
+          if [ -f generated/compiler/blotc ]; then
+            chmod +x generated/compiler/blotc
+            bend PROOF.bend
+          else
+            deno task build:compiler
+          fi
+      - name: Build matching reference sequentially and archive
+        run: |
+          python3 scripts/build_compiler_reference.py "$RUNNER_TEMP/source"
+          cp "$RUNNER_TEMP/source-revision.txt" "$RUNNER_TEMP/source/generated/compiler/source-revision.txt"
+          tar -czf "$RUNNER_TEMP/compiler-${{ matrix.revision }}.tar.gz" -C "$RUNNER_TEMP/source" generated/compiler generated/wasm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: compiler-${{ matrix.revision }}
+          path: ${{ runner.temp }}/compiler-${{ matrix.revision }}.tar.gz
+          retention-days: 7
+  regression:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: compiler-candidate
+      - name: Run full native and reference regression suite
+        run: |
+          tar -xzf compiler-candidate.tar.gz
+          chmod +x generated/compiler/blotc
+          mkdir -p build
+          deno fmt --check .github/workflows/compiler-throughput.yml compiler/annotation_scan_fusion.test.ts compiler/generalization_fast_path.test.ts compiler/native_diagnostics.test.ts compiler/compile_time_bench.ts compiler/native.ts compiler/native_incremental.ts compiler/COMPILATION_PERFORMANCE.md
+          deno check compiler/demo.ts compiler/host_demo.ts compiler/ecs_demo.ts compiler/cli.ts compiler/bench.ts compiler/native_bench.ts compiler/parallel_grain_bench.ts compiler/cpu_scaling_bench.ts compiler/cpu_scaling_trace.ts compiler/worker.ts compiler/syntax_worker.ts compiler/compile_time_bench.ts
+          deno test --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts 2>&1 | tee build/compiler-tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compiler-regression-results
+          path: build/
+          retention-days: 7
+  benchmarks:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: compiler-candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: compiler-baseline
+      - name: Compare complete source compilation and edits
+        run: |
+          mkdir -p build/baseline
+          tar -xzf compiler-candidate.tar.gz
+          tar -xzf compiler-baseline.tar.gz -C build/baseline
+          chmod +x generated/compiler/blotc build/baseline/generated/compiler/blotc
+          deno run --allow-all compiler/compile_time_bench.ts build/baseline/generated/compiler/blotc generated/compiler/blotc build/compile-time.json 7 1,4 2>&1 | tee build/compile-time.log
+          cp generated/compiler/source-revision.txt build/candidate-revision.txt
+          cp build/baseline/generated/compiler/source-revision.txt build/baseline-revision.txt
+          cp generated/compiler/reference-version.txt build/toolchain.txt
+          rm -rf build/baseline
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: compiler-throughput-results
+          path: build/
+          retention-days: 7
