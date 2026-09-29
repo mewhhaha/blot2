@@ -79,7 +79,7 @@ def analyze_source(+root: Cst.Cst, prelude: Cst.Cst, fuel: Nat, steps: Nat) -> R
   do Result<&2, &2, M.Diagnostic, Analysis>:
     +sourced : SourceModules.Sourced <- SourceModules.source_module_core(M.name_equal(Cst.kind_of(root), "source_project"), root, prelude, fuel)
     +prepared : Core.Prepared = SourceModules.sourced_prepared(sourced)
-    inferred : M.CheckedModule <- CheckScheduler.check_module_core(Core.prepared_module(prepared), Core.prepared_certificates(prepared))
+    inferred : M.CheckedModule <- CheckScheduler.check_prepared(prepared)
     +checked : M.CheckedModule = Public.select_checked(inferred)
     valid : Unit <- Entries.verify(SourceModules.sourced_entries(sourced), checked)
     raw : M.Module = Public.unchecked_module(checked)

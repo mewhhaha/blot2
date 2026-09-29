@@ -4530,7 +4530,7 @@ def prepare_templates_deferred(templates: List<&2, String>, +module: M.Module, +
 def prepare_initial_templates(templates: List<&2, String>, +module: M.Module, entry: String, family_templates: List<&2, M.Operation>, +initial: Scheduler.Initial) -> Result<&2, &2, M.Diagnostic, Core.Prepared>:
   match templates:
     case Nil{}:
-      Done{Core.Prepared{concrete_module(module), Core.ready_certificates(Scheduler.initial_certificates(initial))}}
+      Done{Core.retain_unchanged(concrete_module(module), Scheduler.initial_checked(initial), Scheduler.initial_certificates(initial))}
     case head <> tail:
       Scheduler.Initial{+checked, certificates, needs} = initial
       do Result<&2, &2, M.Diagnostic, Core.Prepared>:

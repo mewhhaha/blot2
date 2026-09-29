@@ -1732,3 +1732,21 @@ law conditional_without_successors_preserves_sequence:
   for branch: M.Expr
   for next: M.Expr
   {Lower.conditional_successors(Nil{}, prefix, branch, next) == M.SequenceExpr{branch, next} : M.Expr}
+
+# The whole checked snapshot, not just its signatures, crosses the stage boundary.
+law checked_handoff_preserves_snapshot:
+  for module: M.Module
+  for certificates: List<&2, CheckedCore.Certificate>
+  for checked: M.CheckedModule
+  {Scheduler.check_prepared(CheckedCore.CheckedPrepared{module, certificates, checked}) == Done{checked} : Result<&2, &2, M.Diagnostic, M.CheckedModule>}
+
+law changed_handoff_uses_ordinary_checking:
+  for module: M.Module
+  for certificates: List<&2, CheckedCore.Certificate>
+  for checked: M.CheckedModule
+  {CheckedCore.retain_unchanged_if(False{}, module, checked, certificates) == CheckedCore.Prepared{module, CheckedCore.ready_certificates(certificates)} : CheckedCore.Prepared}
+
+law unchecked_preparation_is_not_checked:
+  for module: M.Module
+  for certificates: List<&2, CheckedCore.Certificate>
+  {CheckedCore.prepared_is_checked(CheckedCore.Prepared{module, certificates}) == False{} : Bool}

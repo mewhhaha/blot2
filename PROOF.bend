@@ -1052,3 +1052,12 @@ def Laws.demand_free_elaboration_preserves_expression(expression):
 
 def Laws.conditional_without_successors_preserves_sequence(prefix, branch, next):
   {==}
+
+def Laws.checked_handoff_preserves_snapshot(module, certificates, checked):
+  {==}
+
+def Laws.changed_handoff_uses_ordinary_checking(module, certificates, checked):
+  {==}
+
+def Laws.unchecked_preparation_is_not_checked(module, certificates):
+  {==}
