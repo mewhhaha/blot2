@@ -53,6 +53,22 @@ are not a proof of the entire compiler. Full native parity and performance are
 separate validation gates; no speedup is established by the implementation
 alone.
 
+## Current eligibility
+
+A direct probe of the exact Bend JavaScript reference exercises the new variant
+for all five synthetic compilation workloads (`lexical_256`, `balanced_64`,
+`reader_64`, `chain_64`, and `nominal_256`). The generic-effects and ECS
+examples still take ordinary final checking. This is a branch-eligibility
+result, not a performance measurement. Extending reuse through actual
+specialization remains separate work.
+
+The first hosted checkpoint passed the Bend proofs and reference rebuild but
+failed integration: the new test supplied `ty` instead of `instantiated_type` in
+a use-plan fixture, and two existing native tests were scheduled before building
+the native executable. The fixture is corrected; all five focused reference
+tests now pass locally. The permanent workflow builds both native compilers
+before testing and benchmarking and retains failures as artifacts.
+
 ## Checkpoints
 
 The Bend redesign checkpoint workflow archives the exact committed source and
