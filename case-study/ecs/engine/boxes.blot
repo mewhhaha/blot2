@@ -8,14 +8,14 @@ import { Vec3, Transform } from "./spatial"
 import { Frame } from "./app"
 
 #[component]
-type Mesh is data = Mesh { geometry: GeometryRef, material: MaterialRef }
-type Axis is data = X | Y | Z
+type Mesh is data = #Mesh { geometry: GeometryRef, material: MaterialRef }
+type Axis is data = #X | #Y | #Z
 
 const draw = fn mesh => fn transform => fn pick_entity => do:
   let pickable = case pick_entity of
-    Some _ => True
-    Nothing => False
-  use render.draw (Draw {
+    #Some _ => #True
+    #Nothing => #False
+  use render.draw (#Draw {
     geometry: mesh.geometry, material: mesh.material,
     pickable: pickable, entity: Maybe.unwrap_or 0 pick_entity,
     transform: spatial.matrix transform,
@@ -24,9 +24,9 @@ const draw = fn mesh => fn transform => fn pick_entity => do:
 
 const interpolated = fn () => do:
   use frame_value <- ecs.get Frame
-  use current <- ecs.get Transform
-  use previous <- ecs.previous Transform
-  let Frame frame = frame_value
+  use current <- ecs.get #Transform
+  use previous <- ecs.previous #Transform
+  let #Frame frame = frame_value
   if Bool.not (F32.gt current.scale.x 0.0):
     use @panic "Transform scale must be positive"
   if Bool.not (F32.gt current.scale.y 0.0):
@@ -37,9 +37,9 @@ const interpolated = fn () => do:
 
 const draw_mesh = fn () => do:
   use entity <- ecs.entity ()
-  use mesh <- ecs.get Mesh
+  use mesh <- ecs.get #Mesh
   use transform <- interpolated ()
-  use draw mesh transform (Some entity)
+  use draw mesh transform (#Some entity)
   return ()
 
 // Four signs per axis describe all twelve edges, without sentinel edge IDs.
@@ -48,16 +48,16 @@ const outline = fn mesh => fn transform => fn entity => do:
   let x = transform.scale.x * 1.025
   let y = transform.scale.y * 1.025
   let z = transform.scale.z * 1.025
-  for axis in [X, Y, Z]:
+  for axis in [#X, #Y, #Z]:
     for (first, second) in [(-1.0, -1.0), (-1.0, 1.0), (1.0, -1.0), (1.0, 1.0)]:
       let (local, extent) = case axis of
-        X => (Vec3 { x: 0.0, y: first * y, z: second * z },
-          Vec3 { x: x, y: 0.018, z: 0.018 })
-        Y => (Vec3 { x: second * x, y: 0.0, z: first * z },
-          Vec3 { x: 0.018, y: y, z: 0.018 })
-        Z => (Vec3 { x: first * x, y: second * y, z: 0.0 },
-          Vec3 { x: 0.018, y: 0.018, z: z })
-      use draw mesh (Transform {
+        #X => (#Vec3 { x: 0.0, y: first * y, z: second * z },
+          #Vec3 { x: x, y: 0.018, z: 0.018 })
+        #Y => (#Vec3 { x: second * x, y: 0.0, z: first * z },
+          #Vec3 { x: 0.018, y: y, z: 0.018 })
+        #Z => (#Vec3 { x: first * x, y: second * y, z: 0.0 },
+          #Vec3 { x: 0.018, y: 0.018, z: z })
+      use draw mesh (#Transform {
         position: spatial.offset transform local, scale: extent, yaw: transform.yaw,
-      }) (Some entity)
+      }) (#Some entity)
   return ()

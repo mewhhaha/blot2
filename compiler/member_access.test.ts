@@ -10,11 +10,11 @@ import { SourceError } from "./syntax.ts";
 
 Deno.test("receiver members support partial application, fields, generic wrappers, and call precedence", async () => {
   const source = `
-type Count is data = Count { value: U32 }
-const Count.add = fn receiver => fn amount => Count { value: receiver.value + amount }
+type Count is data = #Count { value: U32 }
+const Count.add = fn receiver => fn amount => #Count { value: receiver.value + amount }
 const increment = fn receiver => receiver.add(2)
-const make = fn value => Count { value }
-entry const folded = (Count { value: 40 }).add(2).value
+const make = fn value => #Count { value }
+entry const folded = (#Count { value: 40 }).add(2).value
 entry const run = fn () => do:
   let counter = make(40)
   let bound = counter.add
@@ -22,12 +22,12 @@ entry const run = fn () => do:
   return increment(make(next.value - 2)).value
 entry const precedence = fn () => do:
   let sum = fn x => fn y => x + y
-  let counts = [Count { value: 40 }]
+  let counts = [#Count { value: 40 }]
   return sum counts[0].value 2
 entry const function_field = fn () => do:
-  let action = Action { run: fn x => x + 2 }
+  let action = #Action { run: fn x => x + 2 }
   return action.run(40)
-type Action is data = Action { run: U32 -> U32 }
+type Action is data = #Action { run: U32 -> U32 }
 `;
   const js = await createSourceCompiler();
   const native = await createNativeCompiler({ threads: 8 });
@@ -51,9 +51,9 @@ type Action is data = Action { run: U32 -> U32 }
 
 Deno.test("receiver selection follows nominal ownership across imports and lexical shadowing", async () => {
   const sources: Record<string, string> = {
-    "/members/count.blot": `type Count is data = Count { value: U32 }
-const Count.add = fn receiver => fn amount => Count { value: receiver.value + amount }
-const seed = Count { value: 40 }
+    "/members/count.blot": `type Count is data = #Count { value: U32 }
+const Count.add = fn receiver => fn amount => #Count { value: receiver.value + amount }
+const seed = #Count { value: 40 }
 `,
     "/members/main.blot": `import * as counter from "./count"
 entry const run = fn () => do:
@@ -82,11 +82,11 @@ entry const run = fn () => do:
 
 Deno.test("member receivers and chained indices evaluate once in source order", async () => {
   const source = `
-type Box is data = Box { values: Array U32 }
+type Box is data = #Box { values: Array U32 }
 const Box.pick = fn receiver => fn index => receiver.values[index]
 const make = fn (probe: U32 -> U32 ! {Foreign}) => do:
   use probe 1
-  return Box { values: [40, 42] }
+  return #Box { values: [40, 42] }
 entry const run = fn (probe: U32 -> U32 ! {Foreign}) => make(probe).pick(probe(2) - 1)
 `;
   const js = await createSourceCompiler();
@@ -124,15 +124,15 @@ Deno.test("member diagnostics reject missing members and ambiguous fields withou
       const [source, code] of [
         ["const run = fn () => [1].missing", "missing_member"],
         [
-          "type Box is data = Box { value: U32 }\nconst Box.value = fn box => 0\nconst run = fn () => (Box { value: 1 }).value",
+          "type Box is data = #Box { value: U32 }\nconst Box.value = fn box => 0\nconst run = fn () => (#Box { value: 1 }).value",
           "ambiguous_member",
         ],
         [
-          "type Left is data = Left\ntype Right is data = Right\nconst Right.combine = fn left => fn right => 42\nconst run = fn () => Left.combine(Right)",
+          "type Left is data = #Left\ntype Right is data = #Right\nconst Right.combine = fn left => fn right => 42\nconst run = fn () => (#Left).combine(#Right)",
           "missing_member",
         ],
         [
-          "type Box is data = Box U32\nentry const run = fn () => do:\n  let box = Box 0\n  box.value := 1\n  return box",
+          "type Box is data = #Box U32\nentry const run = fn () => do:\n  let box = #Box 0\n  box.value := 1\n  return box",
           "missing_field",
         ],
       ] as const
@@ -158,7 +158,7 @@ Deno.test("field access tracks reordered declarations in both incremental compil
         const fields of ["x: U32, y: U32", "y: U32, x: U32", "x: U32, y: U32"]
       ) {
         const source =
-          `type Pair is data = Pair { ${fields} }\nconst read = fn pair => pair.x\nentry const run = fn () => read (Pair { x: 42, y: 7 })`;
+          `type Pair is data = #Pair { ${fields} }\nconst read = fn pair => pair.x\nentry const run = fn () => read (#Pair { x: 42, y: 7 })`;
         const { artifact } = await session.compile(source);
         equal(artifact, clean.compile(source));
         const { instance } = await WebAssembly.instantiate(artifact.bytes);

@@ -12,23 +12,23 @@ Deno.test("type constructors accept one list, tuple, or named record argument", 
   const reference = await createSourceCompiler({ prelude: "none" });
   const native = await createNativeCompiler({ prelude: "none", threads: 8 });
   const source = `
-type Listed [head, tail] is data = Listed (head, tail)
-type Paired (head, tail) is data = Paired (head, tail)
-type Entry { head, tail } is data = Entry { head, tail }
-type Nested { pair: (a, b), rest: [c, d] } is data = Nested (a, b, c, d)
+type Listed [head, tail] is data = #Listed (head, tail)
+type Paired (head, tail) is data = #Paired (head, tail)
+type Entry { head, tail } is data = #Entry { head, tail }
+type Nested { pair: (a, b), rest: [c, d] } is data = #Nested (a, b, c, d)
 const listed = fn (value: Listed [U32, a]) => do:
-  let Listed (head, tail) = value
+  let #Listed (head, tail) = value
   return head
 const paired = fn (value: Paired (U32, a)) => do:
-  let Paired (head, tail) = value
+  let #Paired (head, tail) = value
   return head
 const entry = fn (value: Entry { tail: a, head: U32 }) => do:
-  let Entry { head } = value
+  let #Entry { head } = value
   return head
 const nested = fn (value: Nested { rest: [Bool, Unit], pair: (U32, F32) }) => do:
-  let Nested (first, second, third, fourth) = value
+  let #Nested (first, second, third, fourth) = value
   return first
-entry const answer = fn () => @u32.add (listed (Listed (10, True))) (@u32.add (paired (Paired (10, 0.5))) (@u32.add (entry (Entry { tail: (), head: 10 })) (nested (Nested (12, 0.5, True, ())))))
+entry const answer = fn () => @u32.add (listed (#Listed (10, #True))) (@u32.add (paired (#Paired (10, 0.5))) (@u32.add (entry (#Entry { tail: (), head: 10 })) (nested (#Nested (12, 0.5, #True, ())))))
 `;
   try {
     const artifact = reference.compile(source);
@@ -47,11 +47,11 @@ Deno.test("explicit curry stages preserve partial constructors through groups", 
   const reference = await createSourceCompiler({ prelude: "none" });
   const native = await createNativeCompiler({ prelude: "none" });
   const source = `
-type Curried a => type [b, c] is data = Curried (a, b, c)
+type Curried a => type [b, c] is data = #Curried (a, b, c)
 const unpack = fn (value: (Curried U32) [Bool, a]) => do:
-  let Curried (first, second, third) = value
+  let #Curried (first, second, third) = value
   return first
-entry const answer = fn () => unpack (Curried (42, True, ()))
+entry const answer = fn () => unpack (#Curried (42, #True, ()))
 `;
   try {
     const artifact = reference.compile(source);
@@ -70,15 +70,15 @@ Deno.test("free annotation names share declaration scope and generalize across c
   const reference = await createSourceCompiler();
   const native = await createNativeCompiler({ threads: 8 });
   const source = `
-type Pair [left, right] is data = Pair (left, right)
+type Pair [left, right] is data = #Pair (left, right)
 const identity = fn (value: a) -> a => do:
   let copy: a = value
   return (fn (inner: a) -> a => inner) copy
 const add = fn (left: a) => fn (right: a) -> a => left + right
 const same = fn (value: Pair [a, a]) -> a => do:
-  let Pair (first, second) = value
+  let #Pair (first, second) = value
   return identity first
-entry const number = fn () => add (same (Pair (40, 1))) (identity 2)
+entry const number = fn () => add (same (#Pair (40, 1))) (identity 2)
 entry const fraction = fn () => add (identity 1.25) (identity 0.5)
 `;
   try {
@@ -92,7 +92,7 @@ entry const fraction = fn () => add (identity 1.25) (identity 0.5)
     throws(() =>
       reference.compile(`
 const wrong = fn (value: a) => do:
-  let incompatible: a = True
+  let incompatible: a = #True
   return @u32.add value 1
 `), (error) => error instanceof SourceError && error.code === "type_mismatch");
   } finally {
@@ -117,16 +117,16 @@ const record_call: Unit -> Bool ! {Named { output: Bool, input: U32 }} = fn () =
 const curried_call: Unit -> Bool ! {(Curried U32) Bool} = fn () => do:
   use result <- (Curried U32) Bool 2
   return result
-entry const answer = fn () => do (@effect.provider (Exchange [U32, Bool]) (fn value => True)):
-  return do (@effect.provider ((Curried U32) Bool) (fn value => True)):
-    return do (@effect.provider (Named { input: U32, output: Bool }) (fn value => True)):
+entry const answer = fn () => do (@effect.provider (Exchange [U32, Bool]) (fn value => #True)):
+  return do (@effect.provider ((Curried U32) Bool) (fn value => #True)):
+    return do (@effect.provider (Named { input: U32, output: Bool }) (fn value => #True)):
       use first <- list_call ()
       use second <- curried_call ()
       use third <- record_call ()
       if first:
         if second:
           return third
-      return False
+      return #False
 `;
   try {
     const artifact = reference.compile(source);
@@ -145,11 +145,11 @@ Deno.test("empty argument patterns still require explicit type and effect applic
   const reference = await createSourceCompiler({ prelude: "none" });
   const native = await createNativeCompiler({ prelude: "none", threads: 8 });
   const source = `
-type Token () is data = Token
+type Token () is data = #Token
 type Ping () is effect = Unit -> U32
 const token = fn (value: Token ()) => value
 entry const answer = fn () => do (@effect.provider (Ping ()) (fn value => 42)):
-  let value = token Token
+  let value = token #Token
   use result <- Ping () ()
   return result
 `;
@@ -163,7 +163,7 @@ entry const answer = fn () => do (@effect.provider (Ping ()) (fn value => 42)):
     throws(
       () =>
         reference.compile(
-          "type Token () is data = Token\nconst bad = fn (value: Token) => value",
+          "type Token () is data = #Token\nconst bad = fn (value: Token) => value",
         ),
       (error) => error instanceof SourceError && error.code === "type_arity",
     );
@@ -180,30 +180,30 @@ Deno.test("type argument shapes and unsaturated constructors have useful diagnos
     for (
       const [source, code] of [
         [
-          "type Pair [a, b] is data = Pair (a, b)\nconst bad = fn (value: Pair U32 Bool) => ()",
+          "type Pair [a, b] is data = #Pair (a, b)\nconst bad = fn (value: Pair U32 Bool) => ()",
           "type_argument",
         ],
         [
-          "type Pair [a, b] is data = Pair (a, b)\nconst bad = fn (value: Pair [U32]) => ()",
+          "type Pair [a, b] is data = #Pair (a, b)\nconst bad = fn (value: Pair [U32]) => ()",
           "type_argument",
         ],
         [
-          "type Pair [a, b] is data = Pair (a, b)\nconst bad = fn (value: Pair (U32, Bool)) => ()",
+          "type Pair [a, b] is data = #Pair (a, b)\nconst bad = fn (value: Pair (U32, Bool)) => ()",
           "type_argument",
         ],
         [
-          "type Pair a => type b is data = Pair (a, b)\nconst bad = fn (value: Pair U32) => ()",
+          "type Pair a => type b is data = #Pair (a, b)\nconst bad = fn (value: Pair U32) => ()",
           "type_arity",
         ],
         [
-          "type Entry { a, b } is data = Entry (a, b)\nconst bad = fn (value: Entry { a: U32, c: Bool }) => ()",
+          "type Entry { a, b } is data = #Entry (a, b)\nconst bad = fn (value: Entry { a: U32, c: Bool }) => ()",
           "type_argument",
         ],
         [
-          "type Entry { a, b } is data = Entry (a, b)\nconst bad = fn (value: Entry { a: U32, a: Bool }) => ()",
+          "type Entry { a, b } is data = #Entry (a, b)\nconst bad = fn (value: Entry { a: U32, a: Bool }) => ()",
           "duplicate_type_field",
         ],
-        ["type Pair [a, a] is data = Pair a", "duplicate_type_parameter"],
+        ["type Pair [a, a] is data = #Pair a", "duplicate_type_parameter"],
       ]
     ) {
       throws(
@@ -237,10 +237,10 @@ Deno.test("imported type argument patterns retain nominal identity and currying"
     [
       "file:///type-arguments/library.blot",
       `
-type Entry { head, tail } is data = Entry { head, tail }
-type Pair a => type b is data = Pair (a, b)
+type Entry { head, tail } is data = #Entry { head, tail }
+type Pair a => type b is data = #Pair (a, b)
 const first = fn (entry: Entry { head: a, tail: b }) -> a => do:
-  let Entry { head } = entry
+  let #Entry { head } = entry
   return head
 `,
     ],
@@ -250,9 +250,9 @@ const first = fn (entry: Entry { head: a, tail: b }) -> a => do:
 import { Entry as entry_type, Pair as Curried, first } from "./library"
 const use_entry = fn (entry: entry_type { head: U32, tail: Bool }) => first entry
 const use_pair = fn (pair: (Curried U32) Bool) => do:
-  let Curried (first, second) = pair
+  let #Curried (first, second) = pair
   return first
-entry const answer = fn () => @u32.add (use_entry (entry_type { tail: True, head: 40 })) (use_pair (Curried (2, True)))
+entry const answer = fn () => @u32.add (use_entry (#entry_type { tail: #True, head: 40 })) (use_pair (#Curried (2, #True)))
 `,
     ],
   ]);
@@ -290,11 +290,11 @@ Deno.test("changing a parameter pattern invalidates dependent native lowering", 
     threads: 8,
   });
   const source = `
-type Pair [a, b] is data = Pair (a, b)
+type Pair [a, b] is data = #Pair (a, b)
 const first = fn (pair: Pair [U32, Bool]) => do:
-  let Pair (first, second) = pair
+  let #Pair (first, second) = pair
   return first
-entry const answer = fn () => first (Pair (42, True))
+entry const answer = fn () => first (#Pair (42, #True))
 `;
   try {
     const before = await compiler.compile(source);

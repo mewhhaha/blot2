@@ -19,6 +19,7 @@ type NodeKind is Data:
   Application{}
   Wrapper{}
   Group{}
+  DemandNode{}
   ArrayNode{}
   RecordNode{}
   FieldNode{}
@@ -34,6 +35,7 @@ type Work is Data:
   Prefix{node: C.Cst, operators: List<&2, C.Cst>}
 
 def classify(+kind: String) -> NodeKind:
+  Bool.pick(NodeKind, M.name_equal(kind, "demand_type"), DemandNode{},
   Bool.pick(NodeKind, Bool.or(M.name_equal(kind, "type_expression"), M.name_equal(kind, "effect_signature")), Expression{},
     Bool.pick(NodeKind, Bool.or(M.name_equal(kind, "type_application"), Bool.or(M.name_equal(kind, "application"), M.name_equal(kind, "effect_signature_application"))), Application{},
     Bool.pick(NodeKind, Bool.or(M.name_equal(kind, "type_atom"), Bool.or(M.name_equal(kind, "atom"), Bool.or(M.name_equal(kind, "expression"), M.name_equal(kind, "effect_signature_atom")))), Wrapper{},
@@ -42,7 +44,7 @@ def classify(+kind: String) -> NodeKind:
     Bool.pick(NodeKind, Bool.or(M.name_equal(kind, "type_record"), M.name_equal(kind, "record_values")), RecordNode{},
     Bool.pick(NodeKind, Bool.or(M.name_equal(kind, "type_field"), M.name_equal(kind, "record_value")), FieldNode{},
     Bool.pick(NodeKind, M.name_equal(kind, "infix_expression"), InfixNode{},
-    Bool.pick(NodeKind, M.name_equal(kind, "prefix_expression"), PrefixNode{}, Name{})))))))))
+    Bool.pick(NodeKind, M.name_equal(kind, "prefix_expression"), PrefixNode{}, Name{}))))))))))
 
 def visit(+node: C.Cst) -> Work:
   Node{classify(C.kind_of(node)), node}
@@ -300,6 +302,12 @@ def evaluate(~Scope: Data, ~resolve_effect: Scope -> String -> List<&2, A.Value>
       do Result<&2, &2, M.Diagnostic, List<&2, A.Value>>:
         child : C.Cst <- C.one(C.children_of(node))
         evaluate(~Scope, ~resolve_effect, remaining, visit(child), headers, variables, scope)
+    case 1n+remaining Node{DemandNode{}, +node}:
+      do Result<&2, &2, M.Diagnostic, List<&2, A.Value>>:
+        values : List<&2, A.Value> <- evaluate(~Scope, ~resolve_effect, remaining, Nodes{C.field_values(node, "value")}, headers, variables, scope)
+        types : List<&2, M.Ty> <- A.types(65536n, A.ValueTypes{values}, node)
+        value : M.Ty <- one(types)
+        return [A.Concrete{M.demand_type(M.FunctionTy{M.UnitTy{}, value, M.EffectRow{Nil{}, M.FreeRow{"$demand$type$" ++ Nat.show(C.offset_of(node)), "effects"}}})}]
     case 1n+remaining Node{Group{}, +node}:
       do Result<&2, &2, M.Diagnostic, List<&2, A.Value>>:
         elements : List<&2, A.Value> <- evaluate(~Scope, ~resolve_effect, remaining, Nodes{C.field_values(node, "value")}, headers, variables, scope)

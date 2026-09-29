@@ -1,22 +1,22 @@
 import { component } from "engine/ecs"
 
-type Vec2 is data = Vec2 { x: F32, y: F32 }
-type Vec3 is data = Vec3 { x: F32, y: F32, z: F32 }
+type Vec2 is data = #Vec2 { x: F32, y: F32 }
+type Vec3 is data = #Vec3 { x: F32, y: F32, z: F32 }
 // The sandbox uses yaw-only transforms; this is deliberately not a full TRS API.
 #[component]
-type Transform is data = Transform { position: Vec3, scale: Vec3, yaw: F32 }
+type Transform is data = #Transform { position: Vec3, scale: Vec3, yaw: F32 }
 
-const one = Vec3 { x: 1.0, y: 1.0, z: 1.0 }
+const one = #Vec3 { x: 1.0, y: 1.0, z: 1.0 }
 
 const wrap_angle = fn angle => F32.wrap 6.283185307 angle
 
-const lerp = fn previous => fn current => fn alpha => Vec3 {
+const lerp = fn previous => fn current => fn alpha => #Vec3 {
   x: F32.lerp previous.x current.x alpha,
   y: F32.lerp previous.y current.y alpha,
   z: F32.lerp previous.z current.z alpha,
 }
 
-const interpolate = fn previous => fn current => fn alpha => Transform {
+const interpolate = fn previous => fn current => fn alpha => #Transform {
   position: lerp previous.position current.position alpha,
   scale: lerp previous.scale current.scale alpha,
   yaw: F32.lerp_angle previous.yaw current.yaw alpha,
@@ -33,7 +33,7 @@ const matrix = fn transform => do:
   ]
 
 // Rotate an offset in world-size box coordinates; do not scale it twice.
-const offset = fn transform => fn local => Vec3 {
+const offset = fn transform => fn local => #Vec3 {
   x: transform.position.x + ((F32.cos transform.yaw) * local.x + (F32.sin transform.yaw) * local.z),
   y: transform.position.y + local.y,
   z: transform.position.z + ((F32.cos transform.yaw) * local.z - (F32.sin transform.yaw) * local.x),

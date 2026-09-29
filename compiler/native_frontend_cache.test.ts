@@ -130,7 +130,7 @@ Deno.test("native unchanged cache keys include operation and const budget, with 
     const restoredMode = await compiler.compile(source, { const_steps: 101n });
     equal(restoredMode.stats.result_reused, false);
     equal(restoredMode.artifact.bytes, clean.compile(source).bytes);
-    const invalid = "// revised\n" + source.replace("40 2", "True 2");
+    const invalid = "// revised\n" + source.replace("40 2", "#True 2");
     await rejects(
       () => compiler.compile(invalid),
       sourceError("type_mismatch"),

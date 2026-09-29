@@ -108,6 +108,8 @@ def rewrite_types(values: List<&2, M.Ty>, +rewrite: Rewrite) -> Result<&2, &2, M
 
 def rewrite_coverage(value: I.Coverage, +rewrite: Rewrite) -> Result<&2, &2, M.Diagnostic, I.Coverage>:
   match value:
+    case I.DemandCall{site}:
+      Done{I.DemandCall{rewrite_identity(site, rewrite)}}
     case I.QualifiedBoundary{offset, declared, subject}:
       do Result<&2, &2, M.Diagnostic, I.Coverage>:
         needs : List<&2, M.Predicate> <- rewrite_predicates(declared, rewrite)

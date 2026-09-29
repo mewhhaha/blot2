@@ -53,14 +53,14 @@ entry const requirement_count = @effect.count (@effect.of ask)
 entry const answer = fn () => do reader:
   return ask ()
 `,
-    `data Maybe a = Some a | Nothing
+    `data Maybe a = #Some a | #Nothing
 const identity = fn value => value
-entry const answer = fn () => case identity (Some 42) of
-  Some number => number
-  Nothing => 0
+entry const answer = fn () => case identity (#Some 42) of
+  #Some number => number
+  #Nothing => 0
 `,
     `entry const answer = fn (flag: Bool) => case flag of
-  True => 1
+  #True => 1
 `,
     `const transform = fn value => @u32.add value 1
 entry const metadata = fn () => @effect.count (@effect.of transform)

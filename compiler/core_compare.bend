@@ -143,6 +143,20 @@ def compare_work(fuel: Nat, matching: Bool, pending: List<&2, Work>) -> Bool:
       compare_work(rest, True{}, PatternListPair{a0, b0} <> tail)
     case 1n+rest True{} MatchArmPair{M.MatchArm{a0, a1}, M.MatchArm{b0, b1}} <> tail:
       compare_work(rest, True{}, PatternListPair{a0, b0} <> ExprPair{a1, b1} <> tail)
+    case 1n+rest True{} ScalarOpPair{M.U32Divide{}, M.U32Divide{}} <> tail:
+      compare_work(rest, True{}, tail)
+    case 1n+rest True{} ScalarOpPair{M.U32Remainder{}, M.U32Remainder{}} <> tail:
+      compare_work(rest, True{}, tail)
+    case 1n+rest True{} ScalarOpPair{M.U32BitAnd{}, M.U32BitAnd{}} <> tail:
+      compare_work(rest, True{}, tail)
+    case 1n+rest True{} ScalarOpPair{M.U32BitOr{}, M.U32BitOr{}} <> tail:
+      compare_work(rest, True{}, tail)
+    case 1n+rest True{} ScalarOpPair{M.U32BitXor{}, M.U32BitXor{}} <> tail:
+      compare_work(rest, True{}, tail)
+    case 1n+rest True{} ScalarOpPair{M.U32ShiftLeft{}, M.U32ShiftLeft{}} <> tail:
+      compare_work(rest, True{}, tail)
+    case 1n+rest True{} ScalarOpPair{M.U32ShiftRight{}, M.U32ShiftRight{}} <> tail:
+      compare_work(rest, True{}, tail)
     case 1n+rest True{} ScalarOpPair{M.Add{}, M.Add{}} <> tail:
       compare_work(rest, True{}, tail)
     case 1n+rest True{} ScalarOpPair{M.Subtract{}, M.Subtract{}} <> tail:
@@ -289,6 +303,10 @@ def compare_work(fuel: Nat, matching: Bool, pending: List<&2, Work>) -> Bool:
       compare_work(rest, True{}, ExprPair{a0, b0} <> ExprPair{a1, b1} <> tail)
     case 1n+rest True{} ExprPair{M.ArraySetExpr{a0, a1, a2}, M.ArraySetExpr{b0, b1, b2}} <> tail:
       compare_work(rest, True{}, ExprPair{a0, b0} <> ExprPair{a1, b1} <> ExprPair{a2, b2} <> tail)
+    case 1n+rest True{} ExprPair{M.MemoExpr{a}, M.MemoExpr{b}} <> tail:
+      compare_work(rest, True{}, ExprPair{a, b} <> tail)
+    case 1n+rest True{} ExprPair{M.ForceExpr{a}, M.ForceExpr{b}} <> tail:
+      compare_work(rest, True{}, ExprPair{a, b} <> tail)
     case 1n+rest True{} ExprPair{M.ArrayLengthExpr{a0}, M.ArrayLengthExpr{b0}} <> tail:
       compare_work(rest, True{}, ExprPair{a0, b0} <> tail)
     case 1n+rest True{} ExprPair{M.AssociatedExpr{a0, a1, a2, a3, a4, a5}, M.AssociatedExpr{b0, b1, b2, b3, b4, b5}} <> tail:

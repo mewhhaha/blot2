@@ -490,9 +490,9 @@ def Laws.array_fill_rejects_oversized_count(count, value, steps):
 
 def Laws.empty_array_generation_skips_callback(steps, generator, context):
   match steps:
-    case Const.Budget{0n, cells}:
+    case Const.Budget{0n, cells, memos, next_memo, cache}:
       {==}
-    case Const.Budget{1n+rest, cells}:
+    case Const.Budget{1n+rest, cells, memos, next_memo, cache}:
       {==}
 
 def Laws.associated_left_precedence(left, right, name, other, subject, description):
@@ -978,4 +978,68 @@ def Laws.empty_rows_preserve_state(substitutions, next, subject):
   {==}
 
 def Laws.symbol_insertion_into_empty_map(key, value):
+  {==}
+
+def Laws.scalar_u32_result_is_pointer_free(value):
+  {==}
+
+def Laws.unknown_local_result_keeps_conservative_tracing(name):
+  {==}
+
+def Laws.closure_result_keeps_conservative_tracing(key, captures):
+  {==}
+
+def Laws.projected_array_element_keeps_conservative_tracing(array, index):
+  {==}
+
+def Laws.layout_unknown_join_is_conservative():
+  {==}
+
+def Laws.layout_array_pointer_is_not_scalar():
+  {==}
+
+def Laws.layout_product_pointer_is_not_scalar(fields):
+  {==}
+
+def Laws.layout_block_result_is_unknown(label, body, locals):
+  {==}
+
+def Laws.layout_budget_exhaustion_is_unknown(value, locals):
+  {==}
+
+def Laws.layout_unknown_fields_are_not_empty_scalars():
+  {==}
+
+def Laws.demand_ready_preserves_budget_and_effects(depth, slot, computation, value, steps, context):
+  match depth steps:
+    case 0n Const.Budget{0n, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 0n Const.Budget{1n+remaining, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 1n+rest Const.Budget{0n, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 1n+rest Const.Budget{1n+remaining, cells, memos, next_memo, constant_cache}:
+      {==}
+
+def Laws.demand_recursive_force_is_rejected(depth, slot, computation, steps, context):
+  match depth steps:
+    case 0n Const.Budget{0n, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 0n Const.Budget{1n+remaining, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 1n+rest Const.Budget{0n, cells, memos, next_memo, constant_cache}:
+      {==}
+    case 1n+rest Const.Budget{1n+remaining, cells, memos, next_memo, constant_cache}:
+      {==}
+
+def Laws.integer_division_by_zero_is_rejected(numerator, steps):
+  {==}
+
+def Laws.integer_shift_count_wraps_at_thirty_two(steps):
+  {==}
+
+def Laws.demand_free_elaboration_preserves_expression(expression):
+  {==}
+
+def Laws.conditional_without_successors_preserves_sequence(prefix, branch, next):
   {==}

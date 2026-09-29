@@ -53,11 +53,11 @@ type Left a is effect = Unit -> a
 type Right a is effect = Unit -> a
 const read_left = fn (witness: p -> a) -> a => Left ()
 const read_right = fn () -> U32 => Right ()
-type Box is data = Box U32
-entry const answer = fn () => do (@effect.provider (Left Box) (fn () => Box 40)):
+type Box is data = #Box U32
+entry const answer = fn () => do (@effect.provider (Left Box) (fn () => #Box 40)):
   return do (@effect.provider (Right U32) (fn () => 2)):
-    use boxed <- read_left Box
-    let Box left = boxed
+    use boxed <- read_left #Box
+    let #Box left = boxed
     use right <- read_right ()
     return @u32.add left right
 `;

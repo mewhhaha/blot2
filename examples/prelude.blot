@@ -8,18 +8,18 @@ entry const doubled = fn value => value * 2
 entry const add_two = U32.add 2
 entry const transform = compose doubled increment
 
-entry const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ Some 20
+entry const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ #Some 20
 
 entry const answer = fn () => do:
-  let candidate = Maybe.map add_two (Some 40)
-  let Some(value) = candidate else:
+  let candidate = Maybe.map add_two (#Some 40)
+  let #Some(value) = candidate else:
     return 0
-  return Result.unwrap_or 0 $ Result.map identity $ Ok value
+  return Result.unwrap_or 0 $ Result.map identity $ #Ok value
 
 // One generic function and one local lambda each work at distinct types.
 entry const generic_identity = fn () => do:
   let same = fn value => value
-  let enabled = same (identity True)
+  let enabled = same (identity #True)
   if enabled:
     return same (identity 42)
   return 0
@@ -31,18 +31,18 @@ entry const named_operator = fn () => 20 `plus` 22
 entry const inspect = fn (enabled: Bool) => do:
   let candidate = do:
     if enabled:
-      return Some (Some 42)
-    return Some Nothing
+      return #Some (#Some 42)
+    return #Some #Nothing
   return case candidate of
-    Some (Some value) => value
-    Some Nothing => 0
-    Nothing => 0
+    #Some (#Some value) => value
+    #Some #Nothing => 0
+    #Nothing => 0
 
 entry const recover = fn (enabled: Bool) => do:
   let candidate = do:
     if enabled:
-      return Ok 42
-    return Err False
-  if let Ok(value) = candidate:
+      return #Ok 42
+    return #Err #False
+  if let #Ok(value) = candidate:
     return value
   return 0

@@ -118,6 +118,10 @@ def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, 
       Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.QualifiedExpr{offset, annotation, predicates, value}}:
       Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
+    case 1n+rest Expression{M.MemoExpr{value}}:
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
+    case 1n+rest Expression{M.ForceExpr{value}}:
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.InstantiationExpr{site, value}}:
       Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.StateProviderExpr{read, write, initial}}:

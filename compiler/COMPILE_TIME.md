@@ -1,10 +1,12 @@
 # Blot source compilation latency
 
-Baseline: main `ac59fb68f98780e168ce01fa39410b1a6ef54efd`.
+Integration baseline: updated runtime PR #4
+`ce3ac61d707c2d374cf491ae01142e8ea868e42e`.
 
 This work measures compilation of Blot source to Wasm. It is separate from
 building the compiler executable and from executing the generated program. The
-runtime-performance PR is not included in this branch.
+runtime changes from PR #4 are included in both sides of the comparison. Both
+compilers use Bend 2.0.34 and the matching official Base and JavaScript loader.
 
 ## Changes under measurement
 
@@ -35,8 +37,8 @@ updates, and exercise empty, prefix, Unicode and long qualified names. A native
 regression checks nested payload ownership at one and four workers. Inference
 tests compare results and diagnostics with the retained slow routines, including
 chronological substitutions, residual predicates, open rows and annotations.
-Four constructor-level laws guard simple fast paths; they are not a formal
-proof of the entire inference engine or persistent map.
+Four constructor-level laws guard simple fast paths; they are not a formal proof
+of the entire inference engine or persistent map.
 
 The CI builds baseline and candidate with the same verified Bend release, Base,
 official JavaScript loader and clang toolchain. Generated Bend C and JavaScript
@@ -56,9 +58,9 @@ deno run --allow-all compiler/compile_time_bench.ts \
 
 The report separates fresh native-process compilation, persistent-session body
 edits and unchanged artifact reuse. Startup and project loading are recorded
-separately. The Deno host stays alive and filesystem caches are not flushed.
-One warmup pair precedes five alternating measured pairs. Exact Wasm comparisons
-and execution checks run outside the timer. Native CPU has Linux clock-tick
+separately. The Deno host stays alive and filesystem caches are not flushed. One
+warmup pair precedes five alternating measured pairs. Exact Wasm comparisons and
+execution checks run outside the timer. Native CPU has Linux clock-tick
 resolution and excludes frontend/host work; small samples may round to zero.
 
 The public compiler workloads cover lexical depth, nominal types, effect

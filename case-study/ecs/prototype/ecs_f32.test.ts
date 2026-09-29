@@ -14,19 +14,19 @@ const velocity = identity("Velocity");
 const time = identity("Time");
 const source = `
 #[component]
-data Position = Position F32
+data Position = #Position F32
 #[component]
-data Velocity = Velocity F32
+data Velocity = #Velocity F32
 #[resource]
-data Time = Time F32
+data Time = #Time F32
 const move = fn () => do:
-  use wrapped_position <- @ecs.get Position
-  use wrapped_velocity <- @ecs.get Velocity
-  use wrapped_time <- @ecs.get Time
-  let Position position = wrapped_position
-  let Velocity velocity = wrapped_velocity
-  let Time time = wrapped_time
-  use @ecs.set (Position (@f32.add position (@f32.mul velocity time)))
+  use wrapped_position <- @ecs.get #Position
+  use wrapped_velocity <- @ecs.get #Velocity
+  use wrapped_time <- @ecs.get #Time
+  let #Position position = wrapped_position
+  let #Velocity velocity = wrapped_velocity
+  let #Time time = wrapped_time
+  use @ecs.set (#Position (@f32.add position (@f32.mul velocity time)))
   return ()
 `;
 

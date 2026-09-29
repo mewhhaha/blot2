@@ -340,7 +340,7 @@ def predicate_members(predicates: List<&2, M.Predicate>) -> List<&2, String>:
     case Nil{}:
       Nil{}
     case M.AssociatedPredicate{member, templates, left, right, result, row} <> tail:
-      member <> predicate_members(tail)
+      M.source_member(member) <> predicate_members(tail)
     case M.ReceiverPredicate{member, templates, receiver, argument, result, row} <> tail:
       member <> predicate_members(tail)
     case M.FieldPredicate{member, receiver, result} <> tail:

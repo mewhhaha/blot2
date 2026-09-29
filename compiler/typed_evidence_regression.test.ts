@@ -50,12 +50,12 @@ async function checkRevisions(
 
 Deno.test("typed evidence follows associated selection despite one generic call shape", async () => {
   const source = (left: string) => `
-data Left = Left F32
-data Right = Right F32
+data Left = #Left F32
+data Right = #Right F32
 ${left}
 const Right.add = fn (left: Left) => fn (right: Right) => 20.0
 const combine = fn left => fn right => left + right
-entry const run = fn (value: F32) => combine (Left value) (Right value)
+entry const run = fn (value: F32) => combine (#Left value) (#Right value)
 `;
   await checkRevisions([
     {
@@ -78,15 +78,15 @@ entry const run = fn (value: F32) => combine (Left value) (Right value)
 
 Deno.test("typed evidence distinguishes nominal owners with the same payload and result type", async () => {
   const source = (owner: string, both = false) => `
-data First = First F32
-data Second = Second F32
+data First = #First F32
+data Second = #Second F32
 const First.distance = fn (left: First) => fn (right: First) => 10.0
 const Second.distance = fn (left: Second) => fn (right: Second) => 20.0
 const distance = fn left => fn right => @type.call "distance" left right
 entry const run = fn (value: F32) => ${
     both
-      ? "distance (First value) (First value) + distance (Second value) (Second value)"
-      : `distance (${owner} value) (${owner} value)`
+      ? "distance (#First value) (#First value) + distance (#Second value) (#Second value)"
+      : `distance (#${owner} value) (#${owner} value)`
   }
 `;
   await checkRevisions([
@@ -151,11 +151,11 @@ Deno.test("failed typed-evidence edits keep exact diagnostics and recover", asyn
   const clean = await createNativeCompiler(options);
   const independent = await createSourceCompiler(options);
   const valid = `entry const classify = fn (flag: Bool) => case flag of
-  True => 1
-  False => 0
-entry const run = fn () => classify True
+  #True => 1
+  #False => 0
+entry const run = fn () => classify #True
 `;
-  const invalid = valid.replace("  False => 0\n", "");
+  const invalid = valid.replace("  #False => 0\n", "");
   const detail = (error: unknown) => {
     ok(error instanceof SourceError, String(error));
     return [error.code, error.message, error.start, error.end];
@@ -193,10 +193,10 @@ Deno.test("failed associated selection after a catalog edit cannot reuse a solve
   const clean = await createNativeCompiler(options);
   const independent = await createSourceCompiler(options);
   const source = (implementation: string) => `
-data Box = Box F32
+data Box = #Box F32
 ${implementation}
 const combine = fn left => fn right => left + right
-entry const run = fn (value: F32) => combine (Box value) (Box value)
+entry const run = fn (value: F32) => combine (#Box value) (#Box value)
 `;
   const valid = source(
     "const Box.add = fn (left: Box) => fn (right: Box) => 42.0",

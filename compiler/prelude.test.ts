@@ -114,12 +114,12 @@ preludeTest(
   async (compiler) => {
     const allocations = Array.from(
       { length: 64 },
-      (_, index) => `  use Some ${index}`,
+      (_, index) => `  use #Some ${index}`,
     ).join("\n");
     const { exports } = await instantiate(
       compiler,
       `
-const stored = Some (U32.add 40)
+const stored = #Some (U32.add 40)
 entry const churn = fn (remaining: U32) => do:
   if remaining == 0:
     return ()
@@ -128,8 +128,8 @@ ${allocations}
 entry const answer = fn () => do:
   use churn 256
   return case stored of
-    Some add_forty => add_forty 2
-    Nothing => 0
+    #Some add_forty => add_forty 2
+    #Nothing => 0
 `,
     );
     // Each call crosses a Wasm page; together they exceed the private arena.
@@ -148,7 +148,7 @@ preludeTest(
 const same = fn value => value
 entry const answer = fn () => do:
   let local_same = fn value => value
-  let enabled = same (local_same True)
+  let enabled = same (local_same #True)
   if enabled:
     return local_same (same 42)
   return 0
@@ -170,15 +170,15 @@ preludeTest(
       compiler,
       `
 const inspect = fn candidate => case candidate of
-  Ok (Some value) => value
-  Ok Nothing => 1
-  Err True => 2
-  Err False => 3
-entry const some = fn () => inspect (Ok (Some 42))
-entry const nothing = fn () => inspect (Ok Nothing)
-entry const failed = fn () => inspect (Err False)
-entry const mapped_error = fn () => inspect (Result.map_error Bool.not (Err False))
-entry const bound = fn () => Maybe.unwrap_or 0 (Maybe.bind (Some 41) (fn value => Some (value + 1)))
+  #Ok (#Some value) => value
+  #Ok #Nothing => 1
+  #Err #True => 2
+  #Err #False => 3
+entry const some = fn () => inspect (#Ok (#Some 42))
+entry const nothing = fn () => inspect (#Ok #Nothing)
+entry const failed = fn () => inspect (#Err #False)
+entry const mapped_error = fn () => inspect (Result.map_error Bool.not (#Err #False))
+entry const bound = fn () => Maybe.unwrap_or 0 (Maybe.bind (#Some 41) (fn value => #Some (value + 1)))
 `,
     );
     equal(call(exports, "some"), 42);
@@ -195,13 +195,13 @@ preludeTest(
     const { exports } = await instantiate(
       compiler,
       `
-const candidate: Maybe (Result [U32, Bool]) = Some (Ok 42)
+const candidate: Maybe (Result [U32, Bool]) = #Some (#Ok 42)
 const apply = fn (transform: U32 -> U32) => transform 42
 entry const answer = fn () => apply (fn value => value)
 entry const nested = fn () => case candidate of
-  Some (Ok value) => value
-  Some (Err _) => 0
-  Nothing => 0
+  #Some (#Ok value) => value
+  #Some (#Err _) => 0
+  #Nothing => 0
 `,
     );
     equal(call(exports, "answer"), 42);
@@ -243,7 +243,7 @@ preludeTest(
       "const invalid = fn () => 1 < 2 < 3\n",
       "operator_associativity",
     );
-    rejects(compiler, "const invalid = fn () => 1 ^ 2\n", "unknown_operator");
+    rejects(compiler, "const invalid = fn () => 1 ? 2\n", "unknown_operator");
   },
 );
 
@@ -254,7 +254,7 @@ preludeTest(
       compiler,
       `
 const Bool.not = fn value => value
-entry const local_not = fn () => Bool.not True
+entry const local_not = fn () => Bool.not #True
 entry const prelude_not = fn () => U32.ne 7 7
 `,
     );
@@ -269,10 +269,10 @@ preludeTest(
     const { exports } = await instantiate(
       compiler,
       `
-data Maybe a = Some a | Nothing
-entry const local_answer = fn () => case Some 42 of
-  Some value => value
-  Nothing => 0
+data Maybe a = #Some a | #Nothing
+entry const local_answer = fn () => case #Some 42 of
+  #Some value => value
+  #Nothing => 0
 entry const prelude_answer = fn () => Maybe.unwrap_or 0 (Maybe.pure 42)
 `,
     );
@@ -281,10 +281,10 @@ entry const prelude_answer = fn () => Maybe.unwrap_or 0 (Maybe.pure 42)
     rejects(
       compiler,
       `
-data Maybe a = Some a | Nothing
+data Maybe a = #Some a | #Nothing
 const invalid = fn () => case Maybe.pure 42 of
-  Some value => value
-  Nothing => 0
+  #Some value => value
+  #Nothing => 0
 `,
       "type_mismatch",
     );
@@ -297,27 +297,27 @@ preludeTest(
     rejects(
       compiler,
       `
-const invalid = fn () => case Some 42 of
-  Some => 0
-  Nothing => 0
+const invalid = fn () => case #Some 42 of
+  #Some => 0
+  #Nothing => 0
 `,
       "constructor_arity",
     );
     rejects(
       compiler,
       `
-const invalid = fn () => case Nothing of
-  Some _ => 0
-  Nothing value => value
+const invalid = fn () => case #Nothing of
+  #Some _ => 0
+  #Nothing value => value
 `,
       "constructor_arity",
     );
     rejects(
       compiler,
-      "const invalid: Maybe U32 = Some True\n",
+      "const invalid: Maybe U32 = #Some #True\n",
       "type_mismatch",
     );
-    rejects(compiler, "const invalid: Maybe = Nothing\n", "type_arity");
+    rejects(compiler, "const invalid: Maybe = #Nothing\n", "type_arity");
   },
 );
 
@@ -328,8 +328,8 @@ preludeTest(
       compiler,
       `
 const invalid = fn candidate => case candidate of
-  Some (Some value) => value
-  Nothing => 0
+  #Some (#Some value) => value
+  #Nothing => 0
 `,
       "non_exhaustive_match",
     );
@@ -337,8 +337,8 @@ const invalid = fn candidate => case candidate of
       compiler,
       `
 const invalid = fn candidate => case candidate of
-  Some True => 1
-  Nothing => 0
+  #Some #True => 1
+  #Nothing => 0
 `,
       "non_exhaustive_match",
     );
@@ -352,7 +352,7 @@ preludeTest(
       compiler,
       `
 const invalid = fn () => do:
-  let Some(value) = Some 42 else:
+  let #Some(value) = #Some 42 else:
     0
   return value
 `,
@@ -362,7 +362,7 @@ const invalid = fn () => do:
       compiler,
       `
 const invalid = fn () => do:
-  let Some(value) = Some 42 else:
+  let #Some(value) = #Some 42 else:
     do:
       return 0
   return value
@@ -373,7 +373,7 @@ const invalid = fn () => do:
       compiler,
       `
 const invalid = fn () => do:
-  let Some(value) = Some 42
+  let #Some(value) = #Some 42
   return value
 `,
       "non_exhaustive_match",

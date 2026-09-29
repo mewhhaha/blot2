@@ -200,3 +200,101 @@ Deno.test("arena caches block starts across reuse and rebuilds them after bump a
   equal(a.read(a.read(a.read(root))), 42);
   equal(a.read(a.read(fresh)), 42);
 });
+
+Deno.test("arena leaf layouts skip scalar collisions and survive marking and bin reuse", async () => {
+  const a = await arena();
+  const floor = a.allocate(0);
+  const scalar = a.allocate(4), child = a.allocate(4);
+  a.write(scalar - 8, 2); // Compiler-proven pointer-free payload.
+  a.write(scalar, child); // Numerically equals a pointer, but is scalar data.
+  a.write(child, 42);
+  a.collect(scalar, floor, 0);
+  equal(a.read(scalar - 8), 2, "sweep must preserve the leaf layout bit");
+  equal(a.read(scalar), child, "scalar bits are never rewritten");
+  equal(
+    a.allocate(4),
+    child,
+    "a leaf's scalar collision must not retain a child",
+  );
+  a.write(child, 99);
+  a.collect(child, floor, 0);
+  equal(a.allocate(4), scalar);
+  equal(a.read(scalar - 8), 0, "reuse must reset the previous leaf layout");
+  a.write(scalar, child);
+  a.collect(scalar, floor, 0);
+  equal(
+    a.read(child - 12),
+    4,
+    "a reused pointerful object must trace its child",
+  );
+  equal(a.read(child), 99);
+  a.collect(0, floor, 0);
+  equal(new Set([a.allocate(4), a.allocate(4)]), new Set([scalar, child]));
+});
+
+Deno.test("arena mixed leaf graphs match exact reachability across collections", async () => {
+  const a = await arena();
+  const pinned = a.allocate(16), floor = a.allocate(0);
+  const objects = new Map<number, { leaf: boolean; words: number[] }>();
+  objects.set(pinned, { leaf: false, words: [0, 0, 0, 0] });
+  let random = 0x12345678;
+  const next = () => random = (Math.imul(random, 1664525) + 1013904223) >>> 0;
+  for (let turn = 0; turn < 80; turn++) {
+    for (let index = 0; index < 24; index++) {
+      const pointer = a.allocate(16);
+      equal(a.read(pointer - 8), 0);
+      const leaf = (next() & 3) === 0;
+      a.write(pointer - 8, leaf ? 2 : 0);
+      objects.set(pointer, { leaf, words: [0, 0, 0, 0] });
+    }
+    const pointers = [...objects.keys()];
+    for (const [pointer, object] of objects) {
+      object.words = object.words.map(() => {
+        // Leaves deliberately contain pointer-looking scalar values too.
+        const n = next();
+        return (n & 7) < 3 ? pointers[n % pointers.length] : n | 1;
+      });
+      object.words.forEach((word, index) => a.write(pointer + index * 4, word));
+    }
+    const root = pointers[next() % pointers.length];
+    const live = new Set<number>();
+    const pending = [pinned, root];
+    while (pending.length) {
+      const pointer = pending.pop()!;
+      if (live.has(pointer)) continue;
+      const object = objects.get(pointer);
+      if (!object) continue;
+      live.add(pointer);
+      if (!object.leaf) pending.push(...object.words);
+    }
+    equal(a.collect(root, floor, 0), root);
+    for (const [pointer, object] of objects) {
+      equal(a.read(pointer - 12) !== 0, live.has(pointer));
+      if (live.has(pointer)) {
+        equal(a.read(pointer - 8), object.leaf ? 2 : 0);
+        object.words.forEach((word, index) =>
+          equal(a.read(pointer + index * 4), word >>> 0)
+        );
+      } else objects.delete(pointer);
+    }
+  }
+});
+
+Deno.test("arena collector retains dynamic graphs cached in static memo cells", async () => {
+  const a = await arena();
+  const memo = 256;
+  a.write(16, memo);
+  a.write(memo, 2);
+  a.write(memo + 4, 0);
+  a.write(memo + 12, 0);
+  const value = a.allocate(8);
+  a.write(value, 42);
+  a.write(memo + 8, value);
+  a.collect(0, 65536, 0);
+  const next = a.allocate(8);
+  ok(next !== value);
+  equal(a.read(value), 42);
+  a.write(memo + 8, 0);
+  a.collect(next, 65536, 0);
+  equal(a.allocate(8), value);
+});

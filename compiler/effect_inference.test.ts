@@ -118,7 +118,7 @@ effect Reader.ask: Unit -> U32
 const answer = fn () => do:
   let invoke = fn action => action ()
   use value <- invoke Reader.ask
-  let unrelated = invoke (fn () => True)
+  let unrelated = invoke (fn () => #True)
   if unrelated:
     return value
   return 0

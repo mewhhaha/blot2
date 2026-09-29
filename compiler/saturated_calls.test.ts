@@ -6,8 +6,8 @@ const source = `
 const pair = fn (left: U32) => fn (right: U32) => left * 10 + right
 const triple = fn (a: U32) => fn (b: U32) => fn (c: U32) => a * 100 + b * 10 + c
 const count = fn (left: U32) => fn (right: U32) => case left == 0 of
-  True => right
-  False => count (left - 1) (right + 1)
+  #True => right
+  #False => count (left - 1) (right + 1)
 const choose = fn (left: U32) => fn (right: U32) => do:
   if left > right:
     return left
@@ -29,8 +29,8 @@ entry const wrapping = fn (value: U32) => value + 1
 entry const floating = fn (value: F32) => value * 2.0 + 1.0
 entry const signed_zero = fn (value: F32) => value * 2.0
 entry const comparison = fn (value: F32) => case value < 1.0 of
-  True => 7
-  False => 9
+  #True => 7
+  #False => 9
 entry const array_export = fn (value: U32) => [value]
 `;
 

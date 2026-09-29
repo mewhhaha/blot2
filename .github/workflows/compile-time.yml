@@ -1,7 +1,16 @@
 name: Blot compilation performance
 on:
   pull_request:
-    paths: ["compiler/**", "scripts/**", "std/**", "LAWS.bend", "PROOF.bend", "deno.json", "deno.lock", ".github/workflows/compile-time.yml"]
+    paths: [
+      "compiler/**",
+      "scripts/**",
+      "std/**",
+      "LAWS.bend",
+      "PROOF.bend",
+      "deno.json",
+      "deno.lock",
+      ".github/workflows/compile-time.yml",
+    ]
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,7 +29,7 @@ jobs:
       matrix:
         revision: [baseline, candidate]
     env:
-      BEND_NO_TELEMETRY: '1'
+      BEND_NO_TELEMETRY: "1"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,18 +41,18 @@ jobs:
         run: |
           cp scripts/build_compile_reference.py "$RUNNER_TEMP/build-reference.py"
           if [ "$REVISION" = baseline ]; then
-            git checkout --detach ac59fb68f98780e168ce01fa39410b1a6ef54efd
+            git checkout --detach ce3ac61d707c2d374cf491ae01142e8ea868e42e
           fi
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.9.7
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.4.2'
+          bun-version: "1.4.2"
       - name: Install verified Bend
         run: |
-          curl -fL --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
-          echo "5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  $RUNNER_TEMP/bend.tar.gz" | sha256sum -c -
+          curl -fL --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  $RUNNER_TEMP/bend.tar.gz" | sha256sum -c -
           mkdir -p "$RUNNER_TEMP/bend"
           tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
           echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
@@ -64,7 +73,7 @@ jobs:
           path: |
             generated/compiler/blotc
             generated/compiler/native-backend-regression
-          key: compile-native-v1-${{ runner.os }}-${{ runner.arch }}-bend2.0.32-${{ steps.tools.outputs.clang }}-${{ hashFiles('compiler/**/*.bend', 'LAWS.bend', 'PROOF.bend', 'scripts/build_compiler.ts') }}
+          key: compile-native-v1-${{ runner.os }}-${{ runner.arch }}-bend2.0.34-${{ steps.tools.outputs.clang }}-${{ hashFiles('compiler/**/*.bend', 'LAWS.bend', 'PROOF.bend', 'scripts/build_compiler.ts') }}
       - name: Build exact native compiler
         if: steps.native.outputs.cache-hit != 'true'
         run: deno task build:compiler

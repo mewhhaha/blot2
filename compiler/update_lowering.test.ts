@@ -69,7 +69,7 @@ function members(body: Node, dispatch: string): string[] {
 Deno.test("terminal field replacement needs only its explicit update predicate", async () => {
   const { module, body } = await lowered(
     `
-type Box a is data = Box { value: a }
+type Box a is data = #Box { value: a }
 const replace: a -> b -> c where { update "value" a b c } = fn box => fn value => do:
   let current = box
   current.value := value
@@ -111,10 +111,10 @@ const increment: a -> a where { ${where} } = fn box => do:
 Deno.test("nested field update reads its parent, but not an unused old leaf", async () => {
   const { body } = await lowered(
     `
-type Inner is data = Inner { value: U32 }
-type Outer is data = Outer { inner: Inner }
+type Inner is data = #Inner { value: U32 }
+type Outer is data = #Outer { inner: Inner }
 entry const run = fn () => do:
-  let current = Outer { inner: Inner { value: 0 } }
+  let current = #Outer { inner: #Inner { value: 0 } }
   current.inner.value := 42
   return current.inner.value
 `,

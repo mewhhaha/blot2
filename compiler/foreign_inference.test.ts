@@ -230,9 +230,9 @@ const mixed = fn (callback: U32 -> U32 ! {Reader.ask, Foreign, Reader.ask}) => c
 const provider = @effect.provider Reader.ask (fn value => value)
 const supplied = fn (callback: U32 -> U32 ! {Reader.ask}) => do provider:
   return callback 1
-data Callback = Callback (U32 -> U32 ! {Foreign})
+data Callback = #Callback (U32 -> U32 ! {Foreign})
 const unwrap = fn wrapped => case wrapped of
-  Callback io => io
+  #Callback io => io
 const mixed_requirements = @effect.of mixed
 entry const mixed_count = @effect.count mixed_requirements
 entry const mixed_has_reader = @effect.has mixed_requirements Reader.ask

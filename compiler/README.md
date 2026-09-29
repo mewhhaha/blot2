@@ -743,6 +743,30 @@ inferred effects; `return $ value` remains separate resolver forwarding syntax.
 Plain `do:` functions already fall through to Unit without an explicit
 `return ()`; expression-bodied functions return their expression.
 
+## Readability syntax
+
+Leading-dot selectors (`.position`), type witnesses (`:value`), and value
+conditionals (`if condition then left else right`) are executable. Pattern arms
+support alternatives and guards, such as `#First x | #Second x if x > 0 => x`.
+Alternatives must bind the same names; guards do not establish exhaustiveness.
+Rebinding an outer local in `if`/`if let` carries its successor past the branch.
+The [language guide](guide.md#selectors-conversion-and-type-witnesses) gives
+examples and layout rules. `blot fmt file.blot [--check]` preserves parsed
+structure while normalizing spacing.
+
+`from` is a source-defined prelude function backed by general result-directed
+associated dispatch (`@type.result`). Its expected result determines the owning
+type. U32 division, remainder, bitwise operations, and shifts have matching
+constant-evaluation and Wasm implementations.
+
+`fn ~value => ...` declares a memoized demand parameter; `@force value` demands
+it. `~T` in a function annotation preserves that mode through higher-order
+calls. Inference retains latent effects, and checked-call elaboration inserts
+ordinary Unit callbacks wrapped in memo cells. Source-defined `and`/`or` supply
+`&&`/`||`. Memo cells survive escaping closures, constant aliases, collection,
+and guest calls. Modules with demands evaluate their constants as one shared
+graph; per-constant native cache reuse is currently disabled for that graph.
+
 ## Evaluation and Wasm representation
 
 Const evaluation has an explicit shared step budget. Handled operations use the
@@ -832,11 +856,17 @@ emitter does not yet require newer proposals, SIMD, or Wasm-GC.
 
 ## Deliberate limits
 
+The JavaScript reference backend can exceed Deno's default call stack on a
+project the size of gdev. The linked gdev package uses the native backend. Some
+wide-list traversals now use loops; remaining recursive traversals still need a
+larger JavaScript stack. See the
+[Bend runtime limitation](../BUGS.md#runtime-limitation-javascript-list-helpers-exhaust-the-stack-2032).
+
 Array patterns, spread syntax, destructuring function parameters, general
 Text/F64, SIMD, inferred generic effect-family labels in explicit polymorphic
-rows, demand parameters, type-valued consts, and resumptions are not
-implemented. `do monad Maybe:`/`return $` remain design syntax, not implemented
-monad resolution. An unconstrained provider parameter cannot infer an unknown
+rows, type-valued consts, and resumptions are not implemented.
+`do monad Maybe:`/`return $` remain design syntax, not implemented monad
+resolution. An unconstrained provider parameter cannot infer an unknown
 operation identity in this first closed-label slice.
 
 [Controlled host IO](effects-and-io.md#controlled-host-io) uses explicit
