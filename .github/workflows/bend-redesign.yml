@@ -1,0 +1,157 @@
+name: Bend architecture validation
+on:
+  push:
+    branches: [redesign/typed-compiler-core]
+    paths: ['compiler/**', 'scripts/**', 'std/**', 'LAWS.bend', 'PROOF.bend', 'deno.json', 'deno.lock', 'baba.json', '.github/workflows/bend-redesign.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: bend-redesign-${{ github.ref }}
+  cancel-in-progress: false
+defaults:
+  run:
+    shell: bash
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [baseline, candidate]
+    env:
+      BEND_NO_TELEMETRY: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Select exact source
+        if: matrix.revision == 'baseline'
+        run: git checkout --detach 5c2640493987c4b8c2335b7b05ad99b654689ac4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - name: Install verified Bend release
+        run: |
+          curl -fL --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  $RUNNER_TEMP/bend.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bend"
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
+          echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
+      - name: Record source and toolchain
+        id: tools
+        run: |
+          mkdir -p build/handoff generated/compiler
+          git rev-parse HEAD > build/handoff/revision.txt
+          bend version | tee build/handoff/toolchain.txt
+          deno --version >> build/handoff/toolchain.txt
+          bun --version >> build/handoff/toolchain.txt
+          clang --version >> build/handoff/toolchain.txt
+          bend guide > build/handoff/bend-guide.txt
+          echo "clang=$(clang --version | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: native
+        with:
+          path: |
+            generated/compiler/blotc
+            generated/compiler/native-backend-regression
+          key: bend-redesign-v1-${{ runner.os }}-${{ runner.arch }}-2.0.34-${{ steps.tools.outputs.clang }}-${{ hashFiles('compiler/**/*.bend', 'LAWS.bend', 'PROOF.bend', 'scripts/build_compiler.ts') }}
+      - name: Build exact native compiler
+        if: steps.native.outputs.cache-hit != 'true'
+        run: |
+          bend version
+          deno task build:compiler 2>&1 | tee build/handoff/native-build.log
+      - name: Recheck proofs and ownership on cache hit
+        if: steps.native.outputs.cache-hit == 'true'
+        run: |
+          bend version
+          bend PROOF.bend 2>&1 | tee build/handoff/proofs.log
+          generated/compiler/native-backend-regression --threads 1
+          generated/compiler/native-backend-regression --threads 4
+      - name: Build matching official reference and parser
+        run: |
+          bend version
+          python3 scripts/build_compiler_reference.py 2>&1 | tee build/handoff/reference-build.log
+          deno task generate:parser
+          sha256sum generated/compiler/blotc > build/handoff/executable.sha256
+      - name: Archive exact compiler and source
+        run: tar -czf "$RUNNER_TEMP/bend-${{ matrix.revision }}.tar.gz" compiler generated std examples scripts deno.json deno.lock baba.json AGENTS.md LAWS.bend PROOF.bend build/handoff
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bend-redesign-${{ matrix.revision }}
+          path: ${{ runner.temp }}/bend-${{ matrix.revision }}.tar.gz
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bend-build-log-${{ matrix.revision }}
+          path: build/handoff/
+          retention-days: 30
+  regression:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+      - uses: actions/download-artifact@v4
+        with:
+          name: bend-redesign-candidate
+          path: ${{ runner.temp }}
+      - name: Restore exact candidate
+        run: tar -xzf "$RUNNER_TEMP/bend-candidate.tar.gz"
+      - name: Formatting and type checks
+        run: |
+          deno fmt --check compiler/checked_handoff.test.ts compiler/BEND_REDESIGN.md
+          deno check compiler/demo.ts compiler/host_demo.ts compiler/ecs_demo.ts compiler/cli.ts compiler/bench.ts compiler/native_bench.ts compiler/parallel_grain_bench.ts compiler/cpu_scaling_bench.ts compiler/cpu_scaling_trace.ts compiler/worker.ts compiler/syntax_worker.ts compiler/compile_time_bench.ts
+      - name: Run all compiler tests with the native executable available
+        run: deno test --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts 2>&1 | tee build/handoff/all-tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bend-redesign-tests
+          path: build/handoff/
+          retention-days: 30
+  benchmarks:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+      - uses: actions/download-artifact@v4
+        with:
+          name: bend-redesign-baseline
+          path: ${{ runner.temp }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: bend-redesign-candidate
+          path: ${{ runner.temp }}
+      - name: Restore exact measured compilers
+        run: |
+          mkdir -p "$RUNNER_TEMP/baseline"
+          tar -xzf "$RUNNER_TEMP/bend-baseline.tar.gz" -C "$RUNNER_TEMP/baseline"
+          tar -xzf "$RUNNER_TEMP/bend-candidate.tar.gz"
+          cp "$RUNNER_TEMP/baseline/build/handoff/revision.txt" build/handoff/baseline-revision.txt
+          cp "$RUNNER_TEMP/baseline/build/handoff/executable.sha256" build/handoff/baseline-executable.sha256
+      - name: Compare complete compilation, body edits, and unchanged reuse
+        run: deno run --allow-all compiler/compile_time_bench.ts "$RUNNER_TEMP/baseline/generated/compiler/blotc" generated/compiler/blotc build/handoff/compile-times.json 7 1,4 2>&1 | tee build/handoff/compile-times.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bend-redesign-timings
+          path: build/handoff/
+          retention-days: 30

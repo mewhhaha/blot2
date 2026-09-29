@@ -165,7 +165,7 @@ Deno.test("checked handoff rejects unresolved use and interface requirements", a
           $: "constraints.UsePlan",
           site: 1n,
           subject: "run",
-          ty: { $: "model.U32Ty" },
+          instantiated_type: { $: "model.U32Ty" },
           predicates: bendList([predicate]),
         }]),
       ],
