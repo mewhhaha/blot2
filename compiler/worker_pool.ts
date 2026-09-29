@@ -1,3 +1,4 @@
+import { Fifo } from "./fifo.ts";
 import { CompilerError } from "./host.ts";
 import {
   type CheckedGroup,
@@ -30,7 +31,7 @@ export class CompilerWorkers {
   readonly #workers: Worker[] = [];
   readonly #idle: Worker[] = [];
   readonly #active = new Map<Worker, Pending>();
-  readonly #queue: Pending[] = [];
+  readonly #queue = new Fifo<Pending>();
   readonly #starting = new Map<Worker, (error: Error) => void>();
   #next = 0;
   #closed: Error | undefined;
@@ -132,10 +133,8 @@ export class CompilerWorkers {
     this.#closed = error;
     for (const reject of this.#starting.values()) reject(error);
     this.#starting.clear();
-    for (const pending of [...this.#queue, ...this.#active.values()]) {
-      pending.reject(error);
-    }
-    this.#queue.length = 0;
+    while (this.#queue.length) this.#queue.shift()!.reject(error);
+    for (const pending of this.#active.values()) pending.reject(error);
     this.#active.clear();
     this.#idle.length = 0;
     for (const worker of this.#workers) worker.terminate();

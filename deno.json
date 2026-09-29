@@ -63,6 +63,7 @@
       "compiler/native_process.ts",
       "compiler/native_protocol.ts",
       "compiler/packaged_native.ts",
+      "compiler/parser_source.ts",
       "compiler/source.ts",
       "compiler/source_frontend.ts",
       "compiler/source_project.ts",

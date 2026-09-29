@@ -1,3 +1,4 @@
+import { parserSource } from "./parser_source.ts";
 import {
   type CompactFrontendProgram,
   CpuFrontend,
@@ -36,62 +37,6 @@ export interface ParseRange {
   readonly end?: number;
   readonly tokenStart?: number;
   readonly tokenEnd?: number;
-}
-
-// Preserve the original source for CST text and diagnostics. Baba's compact
-// parser applies a signed-I32 policy to INTEGER tokens, unlike Blot's U32s.
-function parserSource(prepared: PreparedSource, range: ParseRange = {}) {
-  const start = range.start ?? 0;
-  const neutral = prepared.source.slice(start, range.end).split("");
-  // Keep source width and offsets unchanged. The parser sees a distinct marker
-  // only at an annotation's `where {`; CST text still comes from real source.
-  for (const position of prepared.clauseMarkers) {
-    if (
-      position >= start && position + 5 <= (range.end ?? prepared.source.length)
-    ) {
-      neutral[position - start + 4] = "E";
-    }
-  }
-  let importDeclaration = false;
-  for (
-    let index = range.tokenStart ?? 0;
-    index < (range.tokenEnd ?? prepared.tokens.length);
-    index++
-  ) {
-    const token = prepared.tokens[index];
-    if (token.type === "named" && token.kind === "INTEGER") {
-      neutral.fill("0", token.span.start - start, token.span.end - start);
-    }
-    // Contextual import keyword: `from` remains available to ordinary source
-    // functions. A selector's spaced/leading dot is distinct from `value.field`.
-    if (token.text === "import") importDeclaration = true;
-    if (token.text === "\uE000") importDeclaration = false;
-    if (
-      importDeclaration && token.text === "froM" &&
-      prepared.tokens[index + 1]?.text.startsWith('"')
-    ) {
-      throw new SourceError(
-        "reserved_import_marker",
-        "Use 'from' in an import declaration",
-        prepared.originalOffsets[token.span.start],
-        prepared.originalOffsets[token.span.end],
-      );
-    }
-    if (
-      importDeclaration && token.text === "from" &&
-      prepared.tokens[index + 1]?.text.startsWith('"')
-    ) {
-      neutral[token.span.start - start + 3] = "M";
-    }
-    if (token.text === ".") {
-      const previous = prepared.tokens[index - 1];
-      if (
-        previous?.span.end !== token.span.start ||
-        !/[a-zA-Z0-9_\])}]/.test(prepared.source[token.span.start - 1] ?? "")
-      ) neutral[token.span.start - start] = "·";
-    }
-  }
-  return neutral.join("");
 }
 
 function annotationWhere(

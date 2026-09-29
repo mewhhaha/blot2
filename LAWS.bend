@@ -9,6 +9,7 @@ import ./compiler/lower.bend as Lower
 import ./compiler/types.bend as Substitutions
 import ./compiler/wasm.bend as Wasm
 import ./compiler/codegen_ir.bend as Codegen
+import ./compiler/codegen_layout.bend as Layout
 import ./compiler/codegen_saturation.bend as Saturation
 import ./compiler/index.bend as Index
 import ./compiler/native_request.bend as NativeRequest
@@ -1598,6 +1599,52 @@ law saturated_counted_loop_is_not_inlineable:
   for initial: M.Expr
   for body: M.Expr
   {Saturation.body_cost(256n, [M.ForExpr{index, start, end, state, initial, body}], 0n) == 97n : Nat}
+
+# Collector layout hints are justified by expression constructors, never by
+# pointer-looking bits or the names of erased local bindings.
+law scalar_u32_result_is_pointer_free:
+  for value: U32
+  {Wasm.scalar_word(Codegen.U32Expr{value}) == True{} : Bool}
+
+law unknown_local_result_keeps_conservative_tracing:
+  for name: String
+  {Wasm.scalar_word(Codegen.LocalExpr{name}) == False{} : Bool}
+
+law closure_result_keeps_conservative_tracing:
+  for key: String
+  for captures: List<&2, String>
+  {Wasm.scalar_word(Codegen.ClosureExpr{key, captures}) == False{} : Bool}
+
+law projected_array_element_keeps_conservative_tracing:
+  for array: Codegen.Expr
+  for index: Codegen.Expr
+  {Wasm.scalar_word(Codegen.ArrayGetExpr{array, index}) == False{} : Bool}
+
+# Layout propagation can forget evidence, never manufacture scalar words from
+# pointers, nonlocal returns, or an exhausted analysis budget.
+law layout_unknown_join_is_conservative:
+  {Layout.meet(1n, Layout.Scalar{}, Layout.Unknown{}) == Layout.Unknown{} : Layout.Shape}
+
+law layout_array_pointer_is_not_scalar:
+  {Layout.scalar(Layout.ScalarArray{}) == False{} : Bool}
+
+law layout_product_pointer_is_not_scalar:
+  for fields: List<&2, Layout.Shape>
+  {Layout.scalar(Layout.Product{fields}) == False{} : Bool}
+
+law layout_block_result_is_unknown:
+  for label: Nat
+  for body: Codegen.Expr
+  for locals: Map<&2, Layout.Shape>
+  {Layout.expression(1n, Codegen.BlockExpr{label, body}, locals) == Layout.Unknown{} : Layout.Shape}
+
+law layout_budget_exhaustion_is_unknown:
+  for value: Codegen.Expr
+  for locals: Map<&2, Layout.Shape>
+  {Layout.expression(0n, value, locals) == Layout.Unknown{} : Layout.Shape}
+
+law layout_unknown_fields_are_not_empty_scalars:
+  {Layout.scalar_fields(Layout.Unknown{}) == False{} : Bool}
 
 # A ready demand returns its cached result without repeating effects or using
 # evaluation steps, even when the original computation would fail.

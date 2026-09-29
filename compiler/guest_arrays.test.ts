@@ -41,6 +41,62 @@ async function exercise(bytes: Uint8Array<ArrayBuffer>) {
       ok(output instanceof Uint32Array || output instanceof Float32Array);
       ok(output.buffer !== input.buffer);
     }
+    // Views may cover only a middle range of a larger backing buffer.
+    for (
+      const [name, input] of [
+        [
+          "integers",
+          new Uint32Array([123, 0, 0x12345678, 0xffffffff, 456]).subarray(1, 4),
+        ],
+        [
+          "floats",
+          new Float32Array([123, -0, Infinity, 1.25, 456]).subarray(1, 4),
+        ],
+      ] as const
+    ) {
+      const output = guest.call(name, input);
+      equal(output, input);
+      ok(output instanceof Uint32Array || output instanceof Float32Array);
+      equal(output.length, 3);
+      ok(output.buffer !== input.buffer);
+      input[0] = 99;
+      ok(!Object.is(output[0], 99));
+    }
+    // No numeric conversion should quiet a signaling NaN or lose payload bits
+    // during an otherwise identity round trip through the array ABI.
+    const bits = new Uint32Array([
+      0x7f800001,
+      0x7fc12345,
+      0xffc12345,
+      0x80000000,
+      0x3f800001,
+    ]);
+    const bitResult = guest.call("floats", new Float32Array(bits.buffer));
+    ok(bitResult instanceof Float32Array);
+    equal(new Uint32Array(bitResult.buffer), bits);
+    // Exercise both sides of the bulk-copy threshold with ordinary and shared
+    // offset views. Shared inputs use word reads, not independently racing bytes.
+    for (const Buffer of [ArrayBuffer, SharedArrayBuffer]) {
+      for (const length of [0, 1, 32, 33, 4096]) {
+        const storage = new Buffer((length + 2) * 4);
+        const words = new Uint32Array(storage, 4, length);
+        for (let index = 0; index < length; index++) {
+          words[index] = bits[index % bits.length];
+        }
+        const snapshot = new Uint32Array(words);
+        const integerCopy = guest.call("integers", words);
+        const floatCopy = guest.call(
+          "floats",
+          new Float32Array(storage, 4, length),
+        );
+        equal(integerCopy, snapshot);
+        ok(floatCopy instanceof Float32Array);
+        equal(new Uint32Array(floatCopy.buffer), snapshot);
+        words.fill(0);
+        equal(integerCopy, snapshot);
+        equal(new Uint32Array(floatCopy.buffer), snapshot);
+      }
+    }
     const output = guest.call("change", floats);
     equal(floats[0], 0);
     ok(output instanceof Float32Array);

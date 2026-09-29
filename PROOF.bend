@@ -968,6 +968,36 @@ def Laws.saturated_compaction_loop_is_not_inlineable(state, initial, body):
 def Laws.saturated_counted_loop_is_not_inlineable(index, start, end, state, initial, body):
   {==}
 
+def Laws.scalar_u32_result_is_pointer_free(value):
+  {==}
+
+def Laws.unknown_local_result_keeps_conservative_tracing(name):
+  {==}
+
+def Laws.closure_result_keeps_conservative_tracing(key, captures):
+  {==}
+
+def Laws.projected_array_element_keeps_conservative_tracing(array, index):
+  {==}
+
+def Laws.layout_unknown_join_is_conservative():
+  {==}
+
+def Laws.layout_array_pointer_is_not_scalar():
+  {==}
+
+def Laws.layout_product_pointer_is_not_scalar(fields):
+  {==}
+
+def Laws.layout_block_result_is_unknown(label, body, locals):
+  {==}
+
+def Laws.layout_budget_exhaustion_is_unknown(value, locals):
+  {==}
+
+def Laws.layout_unknown_fields_are_not_empty_scalars():
+  {==}
+
 def Laws.demand_ready_preserves_budget_and_effects(depth, slot, computation, value, steps, context):
   match depth steps:
     case 0n Const.Budget{0n, cells, memos, next_memo, constant_cache}:
