@@ -32,3 +32,10 @@ from the inherited Bend-only workflows, which do not validate the native core.
 Source snapshots stay in Git; executables and generated code stay in artifacts.
 No automatic merge is configured. A session without GitHub write access can
 produce verifiable local commits and bundles, but cannot claim remote publication.
+
+## Type-graph checkpoint
+
+`core_levels.ml` adds the rollback-safe, level-aware checking kernel and an
+independent randomized test oracle. It is compiled and tested with the native
+core but is not substituted for the existing source inference engine yet.
+See TYPE_GRAPH.md for its contract, validation and remaining integration work.

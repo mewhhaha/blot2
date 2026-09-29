@@ -13,7 +13,7 @@ output = HERE / '_build'
 sources = [p.name for p in output.glob('*.ml') if not p.name.startswith('test_')]
 order = run([str(Path(compiler).with_name('ocamldep')), '-sort', *sources], output, True).split()
 objects = [str(Path(name).with_suffix('.cmx')) for name in order if name != 'driver.ml']
-for name, arguments in [('test_storage', []), ('test_parallel', ['domains']), ('test_domains', [])]:
+for name, arguments in [('test_storage', []), ('test_levels', []), ('test_parallel', ['domains']), ('test_domains', [])]:
     shutil.copyfile(HERE / (name + '.ml'), output / (name + '.ml'))
     run([compiler, *FLAGS, '-c', name + '.ml'], output)
     run([compiler, *FLAGS, '-o', name, 'unix.cmxa', 'threads.cmxa',

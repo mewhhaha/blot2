@@ -21,7 +21,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 FLAGS = ['-O2', '-g', '-w', '-8-11-26-27', '-I', '+threads', '-I', '+unix']
 SUPPORT = ['core_nodes', 'core_text', 'core_index', 'base', 'core_symbols',
-           'core_scopes', 'native_runtime', 'sem_native_transport', 'driver']
+           'core_scopes', 'core_levels', 'native_runtime', 'sem_native_transport', 'driver']
 
 
 def digest(path: Path) -> str:

@@ -56,3 +56,10 @@ The Native typed core workflow tests the actual native executable, including a
 clean source compilation without any JavaScript compiler files. Its differential
 suite separately builds the pinned, unchanged Bend oracle. The Core checkpoint
 workflow continues to save source on each push independently of validation.
+
+## New inference kernel
+
+`Core_levels` implements task-local type-variable links, rollback-safe path
+compression, lexical levels, multiplicity-preserving effect rows and immutable
+DAG schemes. It is a tested migration component, not yet a replacement for the
+source compiler's existing inference algorithm. See [TYPE_GRAPH.md](TYPE_GRAPH.md).
