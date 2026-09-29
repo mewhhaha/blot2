@@ -1,0 +1,54 @@
+name: Compiler throughput
+on:
+  push:
+    branches: [perf/compiler-throughput]
+  workflow_dispatch:
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      BEND_NO_TELEMETRY: '1'
+      DENO_DIR: ${{ github.workspace }}/.compiler-cache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ac59fb68f98780e168ce01fa39410b1a6ef54efd
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: oven-sh/setup-bun@v2
+      - name: Install verified toolchain and capture development inputs
+        run: |
+          mkdir -p tools/bend tools/bin generated/compiler/bend-2.0.34
+          curl -fL --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o /tmp/bend.tar.gz
+          echo '78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  /tmp/bend.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/bend.tar.gz -C tools/bend
+          cp "$(command -v deno)" "$(command -v bun)" tools/bin/
+          export PATH="$PWD/tools/bend/bend/bin:$PATH"
+          echo "$PWD/tools/bend/bend/bin" >> "$GITHUB_PATH"
+          bend version
+          bend guide > tools/bend-guide.txt
+          for file in main.ts bend.ts comp.ts safe.ts base.bend; do
+            curl -fL --retry 3 "https://raw.githubusercontent.com/bendlang/bend/v2.0.34/bend2/$file" -o "generated/compiler/bend-2.0.34/$file"
+          done
+          deno task generate:parser
+          tar -czf /tmp/compiler-tools.tar.gz tools .compiler-cache generated/wasm generated/compiler/bend-2.0.34
+      - uses: actions/upload-artifact@v4
+        with:
+          name: compiler-development-tools
+          path: /tmp/compiler-tools.tar.gz
+          retention-days: 3
+      - name: Build unchanged native baseline
+        run: deno task build:compiler
+      - uses: actions/upload-artifact@v4
+        with:
+          name: compiler-native-baseline
+          path: generated/compiler/blotc
+          retention-days: 7
