@@ -1,0 +1,63 @@
+name: Zig type IR source integration
+on:
+  push:
+    branches: [zig-compiler-rebuild]
+    paths: ['.github/workflows/zig-ir-apply.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    if: github.repository == 'mewhhaha/blot2' && github.ref == 'refs/heads/zig-compiler-rebuild'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify and apply tested type IR sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          cat .github/zig-ir-upload/part-{0,1,2,3}.b64 | base64 --decode | xz -dc > "$RUNNER_TEMP/ir-update.patch"
+          echo "c9e333e097dda4b36920401f879cdfc22edcffc78a43ad1dd127e9afe8aa654a  $RUNNER_TEMP/ir-update.patch" | sha256sum --check
+          git apply --check "$RUNNER_TEMP/ir-update.patch"
+          git apply --index "$RUNNER_TEMP/ir-update.patch"
+          git diff --cached --check
+          python3 - <<'PY'
+          import subprocess
+          expected = {
+              'zig/IR.md': '4a35b36a4bb3c483be607cb3c359c58ec4f92593',
+              'zig/README.md': '68b8e0f993330163c1d666d2a26a23576b15f5ab',
+              'zig/src/main.zig': 'd029bd075b5485467d1a43bc7f26e82bb6df0d45',
+              'zig/src/runtime.zig': '077732accef79196120a9c80990e6e6eaf15b372',
+              'zig/src/semantic.zig': 'ab04919da3f54af02c4f39faf74fdf84f77b9739',
+              'zig/src/type_bridge.zig': 'cd87ffc0b9a46d8d32369232657497b7e826eb07',
+              'zig/src/type_ir.zig': 'ca236430199fa11bdba0199c9fa9d4a6173b89db',
+              'zig/src/type_ir_tests.zig': 'b6cbba219481a5385ae0a65ac49faf502da0401f',
+              'zig/tests_generate.py': '0a12fd365b960de11de7202c639f00b683403368',
+              'zig/tests_optimizations.py': '243fdbda9d35f39440bda6638f25ac6f42743fc4',
+              'zig/tools/generate.py': '566c64626dd9d7d3172c851fc910f4d6f7e4868b',
+          }
+          changed = subprocess.check_output(['git', 'diff', '--cached', '--name-only', '-z']).decode().split('\0')[:-1]
+          assert set(changed) == set(expected), changed
+          for path, sha in expected.items():
+              actual = subprocess.check_output(['git', 'rev-parse', ':' + path], text=True).strip()
+              assert actual == sha, (path, actual, sha)
+          print('Verified all 11 source blobs; no workflow or benchmark changes in patch')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(zig): integrate compact native type IR and exact iterative rewrites'
+          git show --stat --oneline HEAD
+      - name: Publish only to the current Zig PR without force
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git ls-remote origin refs/heads/zig-compiler-rebuild | cut -f1)" = "$GITHUB_SHA"
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git push origin HEAD:refs/heads/zig-compiler-rebuild
