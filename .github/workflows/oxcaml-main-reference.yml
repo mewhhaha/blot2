@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      MAIN_SHA: ac59fb68f98780e168ce01fa39410b1a6ef54efd
+      MAIN_SHA: 5c2640493987c4b8c2335b7b05ad99b654689ac4
       BEND_NO_TELEMETRY: '1'
-      DENO_DIR: ${{ github.workspace }}/.reference-cache
+      DENO_DIR: ${{ github.workspace }}/reference-main/.reference-cache
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,31 +24,33 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.2'
-      - name: Select exact main Bend sources
+      - name: Select exact main sources
         run: |
-          git restore --source "$MAIN_SHA" -- '*.bend'
-          mkdir -p main-reference
+          git worktree add --detach reference-main "$MAIN_SHA"
+          mkdir -p reference-main/compiler/oxcaml main-reference
+          cp compiler/oxcaml/build_reference.py reference-main/compiler/oxcaml/
           printf '%s\n' "$MAIN_SHA" > main-reference/main.sha
-          git diff --binary > main-reference/source-changes.patch
-      - name: Install the matching reference release
+      - name: Install verified reference toolchain
         run: |
-          mkdir -p reference-tools/bend reference-tools/bin
-          curl -fL https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o /tmp/bend.tar.gz
-          echo '5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  /tmp/bend.tar.gz' | sha256sum -c -
-          tar -xzf /tmp/bend.tar.gz -C reference-tools/bend
-          executable="$(find "$PWD/reference-tools/bend" -type f -name bend | head -n1)"
+          mkdir -p reference-main/reference-tools/bend reference-main/reference-tools/bin
+          curl -fL https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o /tmp/bend.tar.gz
+          echo '78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  /tmp/bend.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/bend.tar.gz -C reference-main/reference-tools/bend
+          executable="$(find "$PWD/reference-main/reference-tools/bend" -type f -name bend | head -n1)"
           chmod +x "$executable"
           echo "$(dirname "$executable")" >> "$GITHUB_PATH"
-          cp "$(command -v deno)" "$(command -v bun)" reference-tools/bin/
+          cp "$(command -v deno)" "$(command -v bun)" reference-main/reference-tools/bin/
+          cd reference-main
           deno cache generated/wasm/mod.ts
       - name: Prove and build unchanged reference outputs
         run: |
           set -euo pipefail
+          cd reference-main
           bend version
-          python3 compiler/oxcaml/build_reference.py 2>&1 | tee main-reference/build.txt
-          sha256sum compiler/*.bend LAWS.bend PROOF.bend generated/compiler/bend-*/{main.ts,bend.ts,comp.ts,safe.ts,base.bend} > main-reference/inputs.sha256
-          sha256sum generated/compiler/{compiler,native_session,native_output}.js > main-reference/outputs.sha256
-          tar -czf main-reference/reference.tar.gz reference-tools .reference-cache generated/compiler
+          python3 compiler/oxcaml/build_reference.py 2>&1 | tee ../main-reference/build.txt
+          sha256sum compiler/*.bend LAWS.bend PROOF.bend generated/compiler/bend-*/{main.ts,bend.ts,comp.ts,safe.ts,base.bend} > ../main-reference/inputs.sha256
+          sha256sum generated/compiler/{compiler,native_session,native_output}.js > ../main-reference/outputs.sha256
+          tar -czf ../main-reference/reference.tar.gz reference-tools .reference-cache generated/compiler
       - uses: actions/upload-artifact@v4
         if: always()
         with:
