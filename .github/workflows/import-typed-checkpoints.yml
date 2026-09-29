@@ -1,0 +1,85 @@
+name: Publish saved typed-core checkpoints
+
+on:
+  push:
+    branches: [publish/typed-core-checkpoint-06]
+    paths: [".checkpoint-import/**", ".github/workflows/import-typed-checkpoints.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: import-typed-core-checkpoint-06
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  import:
+    if: github.repository == 'mewhhaha/blot2' && github.ref == 'refs/heads/publish/typed-core-checkpoint-06'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reassemble and verify the saved Git bundle
+        run: |
+          python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          parts = [Path('.checkpoint-import') / f'part-{i:02d}' for i in range(1, 20)]
+          data = b''.join(p.read_bytes() for p in parts)
+          assert len(data) == 45706, len(data)
+          digest = hashlib.sha256(data).hexdigest()
+          assert digest == '5e009c4a0ff8b0d3faa7c4df893d4f2f709ea655e51b2e8c79517f6eb3604f02', digest
+          output = Path(os.environ['RUNNER_TEMP']) / 'typed-core-import'
+          output.mkdir()
+          (output / 'checkpoints.bundle').write_bytes(data)
+          (output / 'SHA256SUMS').write_text(digest + '  checkpoints.bundle\n')
+          PY
+          git bundle verify "$RUNNER_TEMP/typed-core-import/checkpoints.bundle"
+      - name: Import and validate all six original commits
+        run: |
+          git fetch "$RUNNER_TEMP/typed-core-import/checkpoints.bundle" HEAD
+          test "$(git rev-parse FETCH_HEAD)" = 1ec8f1ecebe9726d8da5c1f17cb729cfc29b2205
+          git merge-base --is-ancestor 457b7963a96bd1e48d62d83e59b7d4371279e761 FETCH_HEAD
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          base = '457b7963a96bd1e48d62d83e59b7d4371279e761'
+          tip = '1ec8f1ecebe9726d8da5c1f17cb729cfc29b2205'
+          expected = [
+            '057b370a16493711652c3889bd0d2290e80b6985',
+            'a6eab1b6a9cc2ca13704c02369913dc7ea5d44c4',
+            '789f8c5885ec6a13d6e5358d826dd242834a26f5',
+            '7963104143833a1744bf1d07214cc75f00f821e3',
+            '3512a79cec8167ed72c1f408888aedad6f7688f3',
+            tip,
+          ]
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          actual = git('rev-list', '--reverse', f'{base}..{tip}').splitlines()
+          assert actual == expected, actual
+          tree = git('rev-parse', tip + '^{tree}')
+          assert tree == '808f69423b2f1e6fc08c66c4e0a9408347ba0345', tree
+          output = Path(os.environ['RUNNER_TEMP']) / 'typed-core-import'
+          report = {'base': base, 'tip': tip, 'tree': tree, 'commits': actual,
+                    'note': 'Exact history import; this job does not assert compiler tests passed.'}
+          (output / 'import-verification.json').write_text(json.dumps(report, indent=2) + '\n')
+          print(json.dumps(report, indent=2))
+          PY
+      - name: Publish the verified checkpoint without changing the PR branch
+        run: |
+          tip=1ec8f1ecebe9726d8da5c1f17cb729cfc29b2205
+          git push origin "$tip:refs/tags/typed-core/checkpoint-1ec8f1e"
+          git archive --format=tar.gz "$tip" > "$RUNNER_TEMP/typed-core-import/source.tar.gz"
+          git log --reverse --format='%H %s' 457b7963a96bd1e48d62d83e59b7d4371279e761.."$tip" > "$RUNNER_TEMP/typed-core-import/commits.txt"
+          (cd "$RUNNER_TEMP/typed-core-import" && sha256sum source.tar.gz import-verification.json commits.txt >> SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: typed-core-checkpoint-06-import
+          path: ${{ runner.temp }}/typed-core-import/
+          retention-days: 30
