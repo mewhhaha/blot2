@@ -1,0 +1,58 @@
+name: OxCaml main reference
+on:
+  push:
+    branches: [rebuild/oxcaml-compiler]
+    paths: ['.github/workflows/oxcaml-main-reference.yml']
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      MAIN_SHA: ac59fb68f98780e168ce01fa39410b1a6ef54efd
+      BEND_NO_TELEMETRY: '1'
+      DENO_DIR: ${{ github.workspace }}/.reference-cache
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - name: Select exact main Bend sources
+        run: |
+          git restore --source "$MAIN_SHA" -- '*.bend'
+          mkdir -p main-reference
+          printf '%s\n' "$MAIN_SHA" > main-reference/main.sha
+          git diff --binary > main-reference/source-changes.patch
+      - name: Install the matching reference release
+        run: |
+          mkdir -p reference-tools/bend reference-tools/bin
+          curl -fL https://github.com/bendlang/bend/releases/download/v2.0.32/bend-2.0.32-linux-x64.tar.gz -o /tmp/bend.tar.gz
+          echo '5c365ddb12954d0933cef751802e0f7d9875f842edcb80f9661f89cd1a9ff7b6  /tmp/bend.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/bend.tar.gz -C reference-tools/bend
+          executable="$(find "$PWD/reference-tools/bend" -type f -name bend | head -n1)"
+          chmod +x "$executable"
+          echo "$(dirname "$executable")" >> "$GITHUB_PATH"
+          cp "$(command -v deno)" "$(command -v bun)" reference-tools/bin/
+          deno cache generated/wasm/mod.ts
+      - name: Prove and build unchanged reference outputs
+        run: |
+          set -euo pipefail
+          bend version
+          python3 compiler/oxcaml/build_reference.py 2>&1 | tee main-reference/build.txt
+          sha256sum compiler/*.bend LAWS.bend PROOF.bend generated/compiler/bend-*/{main.ts,bend.ts,comp.ts,safe.ts,base.bend} > main-reference/inputs.sha256
+          sha256sum generated/compiler/{compiler,native_session,native_output}.js > main-reference/outputs.sha256
+          tar -czf main-reference/reference.tar.gz reference-tools .reference-cache generated/compiler
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: oxcaml-current-main-reference
+          path: main-reference/
+          retention-days: 3
+          if-no-files-found: error

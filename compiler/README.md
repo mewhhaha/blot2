@@ -1,5 +1,9 @@
 # Compiler core
 
+`just build` builds the OxCaml compiler and installs the standalone `blot`
+command. The Bend backend remains available through `deno task build:compiler`;
+the details below describe that backend.
+
 Bend owns language semantics; Deno supplies layout, Baba's field-labelled CST,
 native process transport, workers, and execution tests. The compiler
 deliberately has no ECS, game, window, rendering, asset, or input vocabulary.

@@ -1,10 +1,13 @@
-# Build, test, and install Blot syntax highlighting for Helix.
+# Blot compiler and editor tasks.
 install:
   deno task helix:install
 
-# Build the native Bend compiler executable used by Deno.
+# Build OxCaml and install the standalone blot command in ~/.local/bin.
 build:
-  deno task build:compiler
+  deno task build:compiler:oxcaml
+  mkdir -p build
+  DENO_DIR=build/.deno-cache deno compile --allow-read --allow-write --allow-run --include compiler/guide.md --include generated/wasm/parser.wasm --include generated/wasm/parser.plan --include std --include generated/compiler/blotc-oxcaml --output build/blot compiler/installed_cli.ts
+  install_dir="${BLOT_INSTALL_DIR:-$HOME/.local/bin}"; install -d "$install_dir"; staged="$(mktemp "$install_dir/.blot-XXXXXX")"; trap 'rm -f "$staged"' EXIT; install -m 755 build/blot "$staged"; mv -f "$staged" "$install_dir/blot"
 
 # Print the compact executable-language reference for people and LLMs.
 guide:
@@ -48,3 +51,15 @@ bench-grains iterations="32" samples="3" phases="codegen,check,prepare":
 # Compile the implemented source-language core to Wasm.
 compile source="examples/prelude.blot" output="build/example.wasm":
   deno task blot build {{quote(source)}} {{quote(output)}}
+
+# Build OxCaml and select it for Deno without installing the standalone command.
+build-oxcaml:
+  deno task build:compiler:oxcaml
+
+# Native runtime, incremental-build and standalone source checks.
+test-oxcaml:
+  deno task test:compiler:oxcaml
+
+# Compile with the isolated OxCaml executable without changing the default.
+compile-oxcaml source="examples/prelude.blot" output="build/example.wasm":
+  deno task blot:oxcaml build {{quote(source)}} {{quote(output)}}

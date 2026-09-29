@@ -1,11 +1,11 @@
-import {
-  type Analysis,
-  type AnalyzedArtifact,
-  type AnalyzedArtifactOptions,
-  type Artifact,
-  type ArtifactOptions,
-  type CompileOptions,
-  includesAnalysis,
+import { includesAnalysis } from "./artifact_options.ts";
+import type {
+  Analysis,
+  AnalyzedArtifact,
+  AnalyzedArtifactOptions,
+  Artifact,
+  ArtifactOptions,
+  CompileOptions,
 } from "./host.ts";
 import type { SourceInput } from "./source_project.ts";
 import { NativeProcess, type NativeProcessOptions } from "./native_process.ts";
@@ -22,9 +22,19 @@ import {
 export interface NativeCompilerOptions
   extends SourceCompilerOptions, NativeProcessOptions {}
 
+export interface NativeCompiler {
+  analyze(source: SourceInput, options?: CompileOptions): Promise<Analysis>;
+  compile(
+    source: SourceInput,
+    options?: AnalyzedArtifactOptions,
+  ): Promise<AnalyzedArtifact>;
+  compile(source: SourceInput, options?: ArtifactOptions): Promise<Artifact>;
+  dispose(): Promise<void>;
+}
+
 export async function createNativeCompiler(
   options: NativeCompilerOptions = {},
-) {
+): Promise<NativeCompiler> {
   const frontend = await createSourceFrontend(options);
   let process: NativeProcess;
   try {
