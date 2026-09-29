@@ -5,6 +5,7 @@ import ./closures.bend as F
 import ./wasm_catalog.bend as E
 import ./codegen_ir.bend as I
 import ./array_reuse.bend as Reuse
+import ./codegen_layout.bend as Layout
 import ./index.bend as Index
 import ./runtime_reachable.bend as Reachable
 import ./runtime_initialization.bend as Init
@@ -44,7 +45,7 @@ type StaticCatalog is Data:
   StaticCatalog{entries: Map<&2, Maybe<&2, Nat>>, projection: I.Metadata, operations: Map<&2, Maybe<&2, Nat>>}
 
 type Context is Data:
-  Context{locals: List<&2, Local>, next_local: Nat, labels: List<&2, Maybe<&2, Nat>>, provider: Nat}
+  Context{locals: List<&2, Local>, next_local: Nat, labels: List<&2, Maybe<&2, Nat>>, provider: Nat, layouts: Map<&2, Layout.Shape>}
 
 type PatternWork is Data:
   OnePattern{pattern: M.Pattern, location: Location}
@@ -100,13 +101,14 @@ type BytePlan is Data:
   BytePlan{length: Nat, chunks: List<&2, List<&2, U32>>}
 
 type Heap is Data:
-  Heap{next: Nat, chunks: List<&2, List<&2, U32>>}
+  Heap{next: Nat, chunks: List<&2, List<&2, U32>>, memos: Map<&2, Maybe<&2, U32>>}
 
 type Serialized is Data:
   Serialized{words: List<&2, U32>, heap: Heap}
 
 type Serialization is Data:
   ValueWork{value: C.Value}
+  MemoWork{found: Maybe<&2, U32>, slot: Nat, computed: Bool, value: C.Value}
   ValuesWork{values: List<&2, C.Value>}
 
 type StaticConstants is Data:
@@ -120,7 +122,7 @@ type Prepared is Data:
 
 type Emission is Data:
   ExpressionWork{expression: I.Expr}
-  ArmsWork{arms: List<&2, M.MatchArm<I.Expr>>, first: Nat}
+  ArmsWork{arms: List<&2, M.MatchArm<I.Expr>>, first: Nat, shapes: List<&2, Layout.Shape>}
   ScrutineesWork{values: List<&2, I.Expr>, first: Nat, reversed: List<&2, Fragment>, locals: Nat}
 
 type AbiScalar is Data:
@@ -336,7 +338,7 @@ def slot_index_go(slots: List<&2, Slot>, indexed: Map<&2, Maybe<&2, Nat>>) -> Ma
     case Nil{}:
       indexed
     case Slot{name, position} <> tail:
-      slot_index_go(tail, Map.set(&2, Maybe<&2, Nat>, indexed, name, Some{position}))
+      slot_index_go(tail, Index.set(Maybe<&2, Nat>, indexed, name, Some{position}))
 
 def slot_index(slots: List<&2, Slot>) -> Map<&2, Maybe<&2, Nat>>:
   slot_index_go(List.reverse(&2, Slot, slots), Map.new(&2, Maybe<&2, Nat>))
@@ -408,31 +410,63 @@ def constant_reference(found: Maybe<&2, RuntimeGlobal>, name: String, symbols: C
         return i32_constant(U32.from_nat(word))
 
 def context_locals(context: Context) -> List<&2, Local>:
-  Context{locals, next_local, labels, provider} = context
+  Context{locals, next_local, labels, provider, layouts} = context
   locals
 
 def context_next(context: Context) -> Nat:
-  Context{locals, next_local, labels, provider} = context
+  Context{locals, next_local, labels, provider, layouts} = context
   next_local
 
 def reserve(context: Context, count: Nat) -> Context:
-  Context{locals, next_local, labels, provider} = context
-  Context{locals, Nat.add(next_local, count), labels, provider}
+  Context{locals, next_local, labels, provider, layouts} = context
+  Context{locals, Nat.add(next_local, count), labels, provider, layouts}
 
-def bind(context: Context, name: String, location: Location) -> Context:
-  Context{locals, next_local, labels, provider} = context
-  Context{Local{name, location} <> locals, next_local, labels, provider}
+def bind(context: Context, +name: String, location: Location) -> Context:
+  Context{locals, next_local, labels, provider, layouts} = context
+  Context{Local{name, location} <> locals, next_local, labels, provider, Layout.bind(layouts, name, Layout.Unknown{})}
+
+def context_layouts(context: Context) -> Map<&2, Layout.Shape>:
+  Context{locals, next_local, labels, provider, layouts} = context
+  layouts
+
+def with_layouts(context: Context, layouts: Map<&2, Layout.Shape>) -> Context:
+  Context{locals, next_local, labels, provider, previous} = context
+  Context{locals, next_local, labels, provider, layouts}
+
+def bind_known(context: Context, +name: String, location: Location, shape: Layout.Shape) -> Context:
+  Context{locals, next_local, labels, provider, layouts} = context
+  Context{Local{name, location} <> locals, next_local, labels, provider, Layout.bind(layouts, name, shape)}
+
+def expression_shape(expression: I.Expr, context: Context) -> Layout.Shape:
+  Layout.expression(32n, expression, context_layouts(context))
+
+def scalar_word_in(expression: I.Expr, context: Context) -> Bool:
+  Layout.scalar(expression_shape(expression, context))
+
+# Sibling width must not consume the host stack. Short-circuiting this pure
+# classification does not skip evaluation of any emitted array operand.
+def scalar_words_in_go(elements: List<&2, I.Expr>, +context: Context, scalars: Bool) -> Bool:
+  match elements scalars:
+    case _ False{}:
+      False{}
+    case Nil{} True{}:
+      True{}
+    case head <> tail True{}:
+      scalar_words_in_go(tail, context, scalar_word_in(head, context))
+
+def scalar_words_in(elements: List<&2, I.Expr>, context: Context) -> Bool:
+  scalar_words_in_go(elements, context, True{})
 
 def control(context: Context, label: Maybe<&2, Nat>) -> Context:
-  Context{locals, next_local, labels, provider} = context
-  Context{locals, next_local, label <> labels, provider}
+  Context{locals, next_local, labels, provider, layouts} = context
+  Context{locals, next_local, label <> labels, provider, layouts}
 
 def with_provider(context: Context, provider: Nat) -> Context:
-  Context{locals, next_local, labels, previous} = context
-  Context{locals, next_local, labels, provider}
+  Context{locals, next_local, labels, previous, layouts} = context
+  Context{locals, next_local, labels, provider, layouts}
 
 def context_provider(context: Context) -> Nat:
-  Context{locals, next_local, labels, provider} = context
+  Context{locals, next_local, labels, provider, layouts} = context
   provider
 
 def label_depth(labels: List<&2, Maybe<&2, Nat>>, +wanted: Nat, depth: Nat) -> Result<&2, &2, M.Diagnostic, Nat>:
@@ -446,7 +480,7 @@ def label_depth(labels: List<&2, Maybe<&2, Nat>>, +wanted: Nat, depth: Nat) -> R
       Bool.pick(Result<&2, &2, M.Diagnostic, Nat>, Nat.is_eq(label, wanted), Done{index}, label_depth(tail, wanted, 1n+index))
 
 def return_depth(context: Context, label: Nat) -> Result<&2, &2, M.Diagnostic, Nat>:
-  Context{locals, next_local, labels, provider} = context
+  Context{locals, next_local, labels, provider, layouts} = context
   label_depth(labels, label, 0n)
 
 def loads(offsets: List<&2, Nat>) -> List<&2, U32>:
@@ -480,13 +514,13 @@ def pattern_bindings_work(+fuel: Nat, work: PatternWork, context: Context) -> Re
       Done{context}
     case 1n+rest ProductFields{head <> tail, +location, +offset}:
       do Result<&2, &2, M.Diagnostic, Context>:
-        bound : Context <- pattern_bindings_work(rest, OnePattern{head, field_location(location, offset)}, context)
+        +bound : Context <- pattern_bindings_work(rest, OnePattern{head, field_location(location, offset)}, context)
         pattern_bindings_work(rest, ProductFields{tail, location, 4n+offset}, bound)
     case 1n+rest RowPatterns{Nil{}, first}:
       Done{context}
     case 1n+rest RowPatterns{head <> tail, +first}:
       do Result<&2, &2, M.Diagnostic, Context>:
-        bound : Context <- pattern_bindings_work(rest, OnePattern{head, Location{first, Nil{}}}, context)
+        +bound : Context <- pattern_bindings_work(rest, OnePattern{head, Location{first, Nil{}}}, context)
         pattern_bindings_work(rest, RowPatterns{tail, 1n+first}, bound)
 
 def opcode(operator: M.ScalarOp) -> U32:
@@ -521,6 +555,20 @@ def opcode(operator: M.ScalarOp) -> U32:
       94
     case M.F32GreaterEqual{}:
       96
+    case M.U32Divide{}:
+      110
+    case M.U32Remainder{}:
+      112
+    case M.U32BitAnd{}:
+      113
+    case M.U32BitOr{}:
+      114
+    case M.U32BitXor{}:
+      115
+    case M.U32ShiftLeft{}:
+      116
+    case M.U32ShiftRight{}:
+      118
 
 def unary_opcode(operator: M.UnaryOp) -> List<&2, U32>:
   match operator:
@@ -600,6 +648,31 @@ def construct_code(tag: Fragment, payload: Code, +slot: Nat) -> Code:
 def local_get(slot: Nat) -> List<&2, U32>:
   32 <> unsigned_leb(slot)
 
+# Memo cells are ordinary traced arena blocks: state, callback, cached word.
+def memo_code(computation: Code, +slot: Nat) -> Code:
+  Code{fragments, locals} = computation
+  +pointer = Nat.add(slot, 1n)
+  Code{fragments_join([fragments, [Bytes{join([33 <> unsigned_leb(slot), i32_constant(12)])}, Allocate{}, Bytes{join([34 <> unsigned_leb(pointer), [65, 0, 54, 2, 0], local_get(pointer), local_get(slot), [54, 2, 4], local_get(pointer), [65, 0, 54, 2, 8], local_get(pointer)])}]]), Nat.max(locals, 2n+slot)}
+
+def force_code(value: Code, +slot: Nat, provider: Nat) -> Code:
+  +closure = Nat.add(slot, 1n)
+  +result = Nat.add(slot, 2n)
+  bytes = join([
+    33 <> unsigned_leb(slot),
+    # Forcing a memo below the startup floor may install persistent heap edges.
+    local_get(slot), [65, 0, 40, 2, 0, 73, 4, 64, 65, 20, 65, 1, 54, 2, 0, 11],
+    local_get(slot), [40, 2, 0, 65, 2, 70, 4, 127],
+    local_get(slot), [40, 2, 8, 5],
+    # Re-entering a running demand is a black hole, just as in const evaluation.
+    local_get(slot), [40, 2, 0, 4, 64, 0, 11],
+    local_get(slot), [65, 1, 54, 2, 0],
+    local_get(slot), [40, 2, 4], 34 <> unsigned_leb(closure), [65, 0],
+    local_get(provider), local_get(closure), [40, 2, 0, 17, 0, 0],
+    33 <> unsigned_leb(result), local_get(slot), local_get(result), [54, 2, 8],
+    local_get(slot), [65, 2, 54, 2, 0], local_get(slot), [65, 0, 54, 2, 4],
+    local_get(result), [11]])
+  require_locals(append_code(value, byte_code(bytes, 3n+slot), Nil{}, Nil{}), 3n+slot)
+
 def element_stores(count: Nat, +pointer: Nat, first: Nat, offset: Nat, reversed: List<&2, List<&2, U32>>) -> List<&2, U32>:
   match count:
     case 0n:
@@ -610,10 +683,17 @@ def element_stores(count: Nat, +pointer: Nat, first: Nat, offset: Nat, reversed:
       bytes = join([local_get(pointer), local_get(slot), [54, 2], unsigned_leb(at)])
       element_stores(rest, pointer, 1n+slot, 4n+at, bytes <> reversed)
 
-def product_code(elements: Code, +count: Nat, +first: Nat) -> Code:
+# Only use this immediately after allocating a fresh dynamic object. Constants
+# and host-provided pointers need not have this private arena header.
+def scalar_array_header(leaf: Bool, pointer: Nat) -> List<&2, U32>:
+  Bool.pick(List<&2, U32>, leaf, join([local_get(pointer), [65, 8, 107, 65, 2, 54, 2, 0]]), Nil{})
+
+# Tiny products often die before tracing; avoid an extra header store for
+# less than eight words. Representation evidence still flows through them.
+def product_code(elements: Code, +count: Nat, +first: Nat, leaf: Bool) -> Code:
   Code{fragments, locals} = elements
   +pointer = Nat.add(first, count)
-  Code{fragments_join([fragments, [Bytes{i32_constant(U32.from_nat(Nat.mul(4n, count)))}, Allocate{}, Bytes{concat(33 <> unsigned_leb(pointer), element_stores(count, pointer, first, 0n, Nil{}))}]]), Nat.max(locals, 1n+pointer)}
+  Code{fragments_join([fragments, [Bytes{i32_constant(U32.from_nat(Nat.mul(4n, count)))}, Allocate{}, Bytes{join([33 <> unsigned_leb(pointer), scalar_array_header(Bool.and(leaf, Nat.is_ge(count, 8n)), pointer), element_stores(count, pointer, first, 0n, Nil{})])}]]), Nat.max(locals, 1n+pointer)}
 
 def product_arity(count: Nat) -> Result<&2, &2, M.Diagnostic, Unit>:
   match count:
@@ -641,11 +721,44 @@ def checked_array_size(allowed: Bool, count: Nat) -> Result<&2, &2, M.Diagnostic
 def array_size(+count: Nat) -> Result<&2, &2, M.Diagnostic, U32>:
   checked_array_size(Nat.is_lt(count, U32.to_nat(4194304)), count)
 
-def array_code(elements: Code, +count: Nat, size: U32, +first: Nat) -> Code:
+# This is a sufficient, not exhaustive, proof of a non-pointer result. Never
+# guess from the bits of a Local, Constant, projection, call or array element.
+# The checked array element type is homogeneous, so later valid updates cannot
+# put a reference into an array created from one of these scalar expressions.
+def scalar_word(expression: I.Expr) -> Bool:
+  match expression:
+    case I.UnitExpr{}:
+      True{}
+    case I.U32Expr{value}:
+      True{}
+    case I.F32Expr{value}:
+      True{}
+    case I.BoolExpr{value}:
+      True{}
+    case I.ScalarExpr{operator, left, right}:
+      True{}
+    case I.UnaryExpr{operator, value}:
+      True{}
+    case I.ArrayLengthExpr{array}:
+      True{}
+    case _:
+      False{}
+
+# Checking every element also keeps the low-level instruction API conservative:
+# it does not need to assume that a hand-built ArrayExpr was type checked.
+def scalar_words(elements: List<&2, I.Expr>) -> Bool:
+  match elements:
+    case Nil{}:
+      True{}
+    case head <> tail:
+      Bool.and(scalar_word(head), scalar_words(tail))
+
+def array_code(elements: Code, +count: Nat, size: U32, +first: Nat, leaf: Bool) -> Code:
   Code{fragments, locals} = elements
   +pointer = Nat.add(first, count)
   Code{fragments_join([fragments, [Bytes{i32_constant(size)}, Allocate{}, Bytes{join([
     34 <> unsigned_leb(pointer), i32_constant(U32.from_nat(count)), [54, 2, 0],
+    scalar_array_header(leaf, pointer),
     element_stores(count, pointer, first, 4n, Nil{})
   ])}]]), Nat.max(locals, 1n+pointer)}
 
@@ -658,12 +771,15 @@ def runtime_array_max_count() -> U32:
 def runtime_memory_max_pages() -> Nat:
   65536n
 
-# Values occupy full words, so memory.fill cannot implement generic fills.
-# Validate the count before multiplication and skip the store loop for empties.
-def array_fill_code(+first: Nat) -> Code:
+# Seed at most 32 words, then double the initialized prefix with memory.copy.
+# memory.fill repeats bytes, not words; copying the seed preserves every U32,
+# F32 and reference bit pattern. Each copy is bounded by the remaining count.
+# Tiny fills retain a short store loop without the bulk-copy setup cost.
+def array_fill_code(+first: Nat, leaf: Bool) -> Code:
   +value = {1n+first : Nat}
   +pointer = {2n+first : Nat}
   +index = {3n+first : Nat}
+  +chunk = {4n+first : Nat}
   Code{[
     Bytes{join([
       local_get(first), i32_constant(runtime_array_max_count()), [75, 4, 64, 0, 11],
@@ -672,13 +788,23 @@ def array_fill_code(+first: Nat) -> Code:
     Allocate{},
     Bytes{join([
       34 <> unsigned_leb(pointer), local_get(first), [54, 2, 0],
+      scalar_array_header(leaf, pointer),
       [65, 0], 33 <> unsigned_leb(index), [2, 64, 3, 64],
       local_get(index), local_get(first), [79, 13, 1],
+      local_get(index), [65, 32, 79, 13, 1],
       local_get(pointer), local_get(index), [65, 4, 108, 106], local_get(value), [54, 2, 4],
       local_get(index), [65, 1, 106], 33 <> unsigned_leb(index), [12, 0, 11, 11],
-      local_get(pointer)
+      [2, 64, 3, 64],
+      local_get(index), local_get(first), [79, 13, 1],
+      local_get(first), local_get(index), [107], 33 <> unsigned_leb(chunk),
+      local_get(chunk), local_get(index), [75, 4, 64],
+      local_get(index), 33 <> unsigned_leb(chunk), [11],
+      local_get(pointer), [65, 4, 106], local_get(index), [65, 4, 108, 106],
+      local_get(pointer), [65, 4, 106], local_get(chunk), [65, 4, 108, 252, 10, 0, 0],
+      local_get(index), local_get(chunk), [106], 33 <> unsigned_leb(index),
+      [12, 0, 11, 11], local_get(pointer)
     ])}
-  ], 4n+first}
+  ], 5n+first}
 
 # The destination is allocated once. Callback allocations share the arena but
 # cannot change existing addresses or the immutable values they return.
@@ -712,7 +838,7 @@ def array_get_code(+first: Nat) -> Code:
 
 # Bounds precede address arithmetic. The copied length is checked before the
 # byte count is formed, independently of the allocator's end-address checks.
-def array_set_code(+first: Nat) -> Code:
+def array_set_code(+first: Nat, leaf: Bool) -> Code:
   +index = {1n+first : Nat}
   +value = {2n+first : Nat}
   +length = {3n+first : Nat}
@@ -727,6 +853,7 @@ def array_set_code(+first: Nat) -> Code:
     Allocate{},
     Bytes{join([
       33 <> unsigned_leb(pointer),
+      scalar_array_header(leaf, pointer),
       local_get(pointer), local_get(first), local_get(length), [65, 1, 106, 65, 4, 108, 252, 10, 0, 0],
       local_get(pointer), local_get(index), [65, 4, 108, 106], local_get(value), [54, 2, 4],
       local_get(pointer)
@@ -907,7 +1034,7 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             valid : Unit <- product_arity(count)
             values : Code <- emit_expr(rest, ScrutineesWork{elements, first, Nil{}, 0n}, reserve(context, 1n+count))
-            return product_code(values, count, first)
+            return product_code(values, count, first, scalar_words_in(elements, context))
         case ExpressionWork{I.ProjectExpr{value, +index}}:
           do Result<&2, &2, M.Diagnostic, Code>:
             compiled : Code <- emit_expr(rest, ExpressionWork{value}, context)
@@ -919,10 +1046,10 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             size : U32 <- array_size(count)
             values : Code <- emit_expr(rest, ScrutineesWork{elements, first, Nil{}, 0n}, reserve(context, 1n+count))
-            return array_code(values, count, size, first)
+            return array_code(values, count, size, first, scalar_words_in(elements, context))
         case ExpressionWork{I.ForExpr{index, start, end, state, initial, body}}:
           +first = context_next(context)
-          +nested = control(control(bind(bind(reserve(context, 3n), index, Location{first, Nil{}}), state, Location{2n+first, Nil{}}), None{}), None{})
+          +nested = control(control(bind(bind_known(reserve(context, 3n), index, Location{first, Nil{}}, Layout.Scalar{}), state, Location{2n+first, Nil{}}), None{}), None{})
           do Result<&2, &2, M.Diagnostic, Code>:
             operands : Code <- emit_expr(rest, ScrutineesWork{[start, end, initial], first, Nil{}, 0n}, reserve(context, 3n))
             iteration : Code <- emit_expr(rest, ExpressionWork{body}, nested)
@@ -939,21 +1066,21 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             operands : Code <- emit_expr(rest, ScrutineesWork{[count, generator], first, Nil{}, 0n}, reserve(context, 4n))
             return append_code(operands, array_generate_code(first, context_provider(context)), Nil{}, Nil{})
-        case ExpressionWork{I.ArrayFillExpr{count, value}}:
+        case ExpressionWork{I.ArrayFillExpr{count, +value}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
-            operands : Code <- emit_expr(rest, ScrutineesWork{[count, value], first, Nil{}, 0n}, reserve(context, 4n))
-            return append_code(operands, array_fill_code(first), Nil{}, Nil{})
+            operands : Code <- emit_expr(rest, ScrutineesWork{[count, value], first, Nil{}, 0n}, reserve(context, 5n))
+            return append_code(operands, array_fill_code(first, scalar_word_in(value, context)), Nil{}, Nil{})
         case ExpressionWork{I.ArrayGetExpr{array, index}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
             operands : Code <- emit_expr(rest, ScrutineesWork{[array, index], first, Nil{}, 0n}, reserve(context, 2n))
             return append_code(operands, array_get_code(first), Nil{}, Nil{})
-        case ExpressionWork{I.ArraySetExpr{array, index, value}}:
+        case ExpressionWork{I.ArraySetExpr{array, index, +value}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
             operands : Code <- emit_expr(rest, ScrutineesWork{[array, index, value], first, Nil{}, 0n}, reserve(context, 5n))
-            return append_code(operands, array_set_code(first), Nil{}, Nil{})
+            return append_code(operands, array_set_code(first, scalar_word_in(value, context)), Nil{}, Nil{})
         case ExpressionWork{I.ArrayReuseExpr{array, index, value}}:
           +first = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
@@ -987,6 +1114,16 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             value : Code <- emit_expr(rest, ExpressionWork{payload}, reserve(context, 2n))
             return construct_code(ConstructorIndex{constructor}, value, context_next(context))
+        case ExpressionWork{I.MemoExpr{computation}}:
+          +slot = context_next(context)
+          do Result<&2, &2, M.Diagnostic, Code>:
+            value : Code <- emit_expr(rest, ExpressionWork{computation}, reserve(context, 2n))
+            return memo_code(value, slot)
+        case ExpressionWork{I.ForceExpr{value}}:
+          +slot = context_next(context)
+          do Result<&2, &2, M.Diagnostic, Code>:
+            suspended : Code <- emit_expr(rest, ExpressionWork{value}, reserve(context, 3n))
+            return force_code(suspended, slot, context_provider(context))
         case ExpressionWork{I.ApplyExpr{callee, argument}}:
           +slot = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
@@ -1005,11 +1142,11 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             compiled : Code <- emit_expr(rest, ExpressionWork{value}, context)
             return append_code(compiled, byte_code(join([scalar_from_word(M.unary_parameter(operator)), unary_opcode(operator), scalar_to_word(M.unary_result(operator))]), 0n), Nil{}, Nil{})
-        case ExpressionWork{I.LetExpr{name, value, body}}:
+        case ExpressionWork{I.LetExpr{name, +value, body}}:
           +slot = context_next(context)
           do Result<&2, &2, M.Diagnostic, Code>:
             v : Code <- emit_expr(rest, ExpressionWork{value}, context)
-            b : Code <- emit_expr(rest, ExpressionWork{body}, bind(reserve(context, 1n), name, Location{slot, Nil{}}))
+            b : Code <- emit_expr(rest, ExpressionWork{body}, bind_known(reserve(context, 1n), name, Location{slot, Nil{}}, expression_shape(value, context)))
             return require_locals(append_code(v, b, 33 <> unsigned_leb(slot), Nil{}), 1n+slot)
         case ExpressionWork{I.IfExpr{condition, consequent, alternative}}:
           do Result<&2, &2, M.Diagnostic, Code>:
@@ -1027,16 +1164,16 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           +count = List.length(&2, I.Expr, values)
           do Result<&2, &2, M.Diagnostic, Code>:
             v : Code <- emit_expr(rest, ScrutineesWork{values, slot, Nil{}, 0n}, reserve(context, count))
-            b : Code <- emit_expr(rest, ArmsWork{arms, slot}, reserve(context, count))
+            b : Code <- emit_expr(rest, ArmsWork{arms, slot, Layout.expressions(32n, values, context_layouts(context))}, reserve(context, count))
             return require_locals(append_code(v, b, Nil{}, Nil{}), Nat.add(slot, count))
-        case ExpressionWork{I.GuardExpr{+pattern, value, alternative, body}}:
+        case ExpressionWork{I.GuardExpr{+pattern, +value, alternative, body}}:
           +slot = context_next(context)
           +nested = control(reserve(context, 1n), None{})
           do Result<&2, &2, M.Diagnostic, Code>:
             v : Code <- emit_expr(rest, ExpressionWork{value}, reserve(context, 1n))
             test : List<&2, Fragment> <- pattern_test_work(rest, PatternTest{pattern, Location{slot, Nil{}}}, context_locals(context))
-            bound : Context <- pattern_bindings_work(rest, OnePattern{pattern, Location{slot, Nil{}}}, nested)
-            yes : Code <- emit_expr(rest, ExpressionWork{body}, bound)
+            +bound : Context <- pattern_bindings_work(rest, OnePattern{pattern, Location{slot, Nil{}}}, nested)
+            yes : Code <- emit_expr(rest, ExpressionWork{body}, with_layouts(bound, Layout.pattern(32n, pattern, expression_shape(value, context), context_layouts(bound))))
             no : Code <- emit_expr(rest, ExpressionWork{alternative}, nested)
             return require_locals(append_code(append_code(v, Code{test, 0n}, 33 <> unsigned_leb(slot), Nil{}), append_code(yes, no, [5], [11]), [4, 127], Nil{}), 1n+slot)
         case ExpressionWork{I.BlockExpr{label, body}}:
@@ -1054,15 +1191,15 @@ def emit_expr(+fuel: Nat, work: Emission, +context: Context) -> Result<&2, &2, M
           do Result<&2, &2, M.Diagnostic, Code>:
             value : Code <- emit_expr(rest, ExpressionWork{head}, context)
             emit_expr(rest, next_scrutinee(tail, first, value, reversed, locals), context)
-        case ArmsWork{Nil{}, first}:
+        case ArmsWork{Nil{}, first, shapes}:
           Done{byte_code([0], 0n)}
-        case ArmsWork{M.MatchArm{+patterns, body} <> tail, +first}:
+        case ArmsWork{M.MatchArm{+patterns, body} <> tail, +first, +shapes}:
           +nested = control(context, None{})
           do Result<&2, &2, M.Diagnostic, Code>:
             test : List<&2, Fragment> <- pattern_test_work(rest, RowTests{patterns, first}, context_locals(context))
-            bound : Context <- pattern_bindings_work(rest, RowPatterns{patterns, first}, nested)
-            yes : Code <- emit_expr(rest, ExpressionWork{body}, bound)
-            no : Code <- emit_expr(rest, ArmsWork{tail, first}, nested)
+            +bound : Context <- pattern_bindings_work(rest, RowPatterns{patterns, first}, nested)
+            yes : Code <- emit_expr(rest, ExpressionWork{body}, with_layouts(bound, Layout.patterns(32n, patterns, shapes, context_layouts(bound))))
+            no : Code <- emit_expr(rest, ArmsWork{tail, first, shapes}, nested)
             return append_code(Code{test, 0n}, append_code(yes, no, [5], [11]), [4, 127], Nil{})
 
 def word_bytes(+word: U32) -> List<&2, U32>:
@@ -1076,9 +1213,9 @@ def words_bytes(words: List<&2, U32>) -> List<&2, U32>:
       concat(word_bytes(head), words_bytes(tail))
 
 def heap_allocate(+words: List<&2, U32>, heap: Heap) -> Result<&2, &2, M.Diagnostic, Serialized>:
-  Heap{+next, chunks} = heap
+  Heap{+next, chunks, memos} = heap
   +end = Nat.add(next, Nat.mul(4n, List.length(&2, U32, words)))
-  Bool.pick(Result<&2, &2, M.Diagnostic, Serialized>, Nat.is_le(end, U32.to_nat(16777216)), Done{Serialized{[U32.from_nat(next)], Heap{end, words_bytes(words) <> chunks}}}, Fail{M.Diagnostic{"backend_limit", "constant", "static constants exceed the 16 MiB bootstrap arena"}})
+  Bool.pick(Result<&2, &2, M.Diagnostic, Serialized>, Nat.is_le(end, U32.to_nat(16777216)), Done{Serialized{[U32.from_nat(next)], Heap{end, words_bytes(words) <> chunks, memos}}}, Fail{M.Diagnostic{"backend_limit", "constant", "static constants exceed the 16 MiB bootstrap arena"}})
 
 def capture_values(names: List<&2, String>, +environment: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, List<&2, C.Value>>:
   match names:
@@ -1113,16 +1250,51 @@ def static_heap(encoded: StaticConstants) -> Heap:
   StaticConstants{slots, heap} = encoded
   heap
 
+def heap_memo(heap: Heap, slot: Nat) -> Maybe<&2, U32>:
+  Heap{next, chunks, memos} = heap
+  Index.get(Maybe<&2, U32>, memos, Nat.show(slot), None{})
+
+def remember_memo(heap: Heap, slot: Nat, +word: U32) -> Heap:
+  Heap{next, chunks, memos} = heap
+  Heap{next, chunks, Map.set(&2, Maybe<&2, U32>, Map.set(&2, Maybe<&2, U32>, memos, Nat.show(slot), Some{word}), "head", Some{word})}
+
+def memo_pointer(found: Maybe<&2, U32>) -> U32:
+  match found:
+    case None{}:
+      0
+    case Some{value}:
+      value
+
+def memo_head(memos: Map<&2, Maybe<&2, U32>>) -> U32:
+  memo_pointer(Index.get(Maybe<&2, U32>, memos, "head", None{}))
+
+def heap_memo_head(heap: Heap) -> U32:
+  Heap{next, chunks, memos} = heap
+  memo_head(memos)
+
 def heap_end(heap: Heap) -> Nat:
-  Heap{next, chunks} = heap
+  Heap{next, chunks, memos} = heap
   next
 
-def serialize(+fuel: Nat, work: Serialization, +catalog: StaticCatalog, heap: Heap) -> Result<&2, &2, M.Diagnostic, Serialized>:
+def serialize(+fuel: Nat, work: Serialization, +catalog: StaticCatalog, +heap: Heap) -> Result<&2, &2, M.Diagnostic, Serialized>:
   match fuel:
     case 0n:
       Fail{M.Diagnostic{"backend_limit", "constant", "constant serialization exceeded its structural depth limit"}}
     case 1n+rest:
       match work:
+        case ValueWork{C.DemandValue{slot, computation}}:
+          Fail{M.Diagnostic{"internal_error", "demand", "an unsnapshotted memo escaped constant evaluation"}}
+        case ValueWork{C.MemoValue{+slot, computed, value}}:
+          serialize(rest, MemoWork{heap_memo(heap, slot), slot, computed, value}, catalog, heap)
+        case MemoWork{Some{word}, slot, computed, value}:
+          Done{Serialized{[word], heap}}
+        case MemoWork{None{}, +slot, +computed, value}:
+          do Result<&2, &2, M.Diagnostic, Serialized>:
+            +child : Serialized <- serialize(rest, ValueWork{value}, catalog, heap)
+            +word : U32 <- only_word(serialized_words(child))
+            +cell : Serialized <- heap_allocate([Bool.pick(U32, computed, 2, 0), Bool.pick(U32, computed, 0, word), Bool.pick(U32, computed, word, 0), heap_memo_head(serialized_heap(child))], serialized_heap(child))
+            +pointer : U32 <- only_word(serialized_words(cell))
+            return Serialized{[pointer], remember_memo(serialized_heap(cell), slot, pointer)}
         case ValueWork{C.UnitValue{}}:
           Done{Serialized{[0], heap}}
         case ValueWork{C.U32Value{value}}:
@@ -1361,7 +1533,7 @@ def body_plan(instructions: BytePlan, locals: Nat, parameters: Nat) -> BytePlan:
 def compile_entry(job: CodegenJob) -> Result<&2, &2, M.Diagnostic, EntryCode>:
   CodegenJob{key, parameter, body, captures} = job
   do Result<&2, &2, M.Diagnostic, EntryCode>:
-    compiled : Code <- emit_expr(U32.to_nat(16384), ExpressionWork{body}, Context{Local{parameter, Location{1n, Nil{}}} <> capture_locals(captures, 4n), 3n, Nil{}, 2n})
+    compiled : Code <- emit_expr(U32.to_nat(16384), ExpressionWork{body}, Context{Local{parameter, Location{1n, Nil{}}} <> capture_locals(captures, 4n), 3n, Nil{}, 2n, Layout.empty()})
     return EntryCode{key, compiled}
 
 def merge_entries(left: Result<&2, &2, M.Diagnostic, List<&2, EntryCode>>, right: Result<&2, &2, M.Diagnostic, List<&2, EntryCode>>) -> Result<&2, &2, M.Diagnostic, List<&2, EntryCode>>:
@@ -1870,8 +2042,13 @@ def arena_floor(initialized: Bool, heap_start: Nat) -> List<&2, U32>:
 def clear_free_bins() -> List<&2, U32>:
   join([i32_constant(32), [65, 0], i32_constant(132), [252, 11, 0]])
 
-def wrapper_reset(parameter: AbiParameter, heap_start: Nat, initialized: Bool) -> List<&2, U32>:
-  Bool.pick(List<&2, U32>, array_parameter(parameter), Nil{}, join([arena_floor(initialized, heap_start), [36, 0], clear_free_bins()]))
+# Ephemeral calls keep the cheap arena rewind. Once a persistent memo has been
+# forced, collect instead so its cached graph survives subsequent guest calls.
+def reset_arena(+heap_start: Nat, +initialized: Bool, imports: Nat) -> List<&2, U32>:
+  join([[65, 20, 40, 2, 0, 4, 64, 65, 0], arena_floor(initialized, heap_start), [65, 0, 16], unsigned_leb(2n+imports), [26, 5], arena_floor(initialized, heap_start), [36, 0], clear_free_bins(), [11]])
+
+def wrapper_reset(parameter: AbiParameter, heap_start: Nat, initialized: Bool, imports: Nat) -> List<&2, U32>:
+  Bool.pick(List<&2, U32>, array_parameter(parameter), Nil{}, reset_arena(heap_start, initialized, imports))
 
 def abi_parameter_bytes(parameter: AbiParameter) -> List<&2, U32>:
   match parameter:
@@ -1962,7 +2139,7 @@ def wrapper_bodies(functions: List<&2, AbiFunction>, +slots: Map<&2, Maybe<&2, N
         index : Nat <- lookup_symbol(slots, "fn:" ++ name)
         argument : List<&2, U32> <- wrapper_argument(parameter, callbacks, entries)
         rest : List<&2, BytePlan> <- wrapper_bodies(tail, slots, heap_start, callbacks, entries, initialized)
-        return byte_plan(body_bytes(join([wrapper_reset(parameter, heap_start, initialized), argument, [65, 0, 16], unsigned_leb(3n+Nat.add(imports, index)), wrapper_return(callbacks, result)]), Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n), 1n)) <> rest
+        return byte_plan(body_bytes(join([wrapper_reset(parameter, heap_start, initialized, imports), argument, [65, 0, 16], unsigned_leb(3n+Nat.add(imports, index)), wrapper_return(callbacks, result)]), Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n), 1n)) <> rest
 
 def function_exports(functions: List<&2, AbiFunction>, index: Nat) -> List<&2, List<&2, U32>>:
   match functions:
@@ -2016,8 +2193,10 @@ def table_indices(count: Nat, start: Nat) -> List<&2, U32>:
       concat(unsigned_leb(index), table_indices(rest, 1n+index))
 
 def data_section(heap: Heap) -> BytePlan:
-  Heap{heap_start, chunks} = heap
-  plan_section(11, plan_prefix([1, 0, 65, 0, 11], plan_sized(BytePlan{heap_start, List.reverse(&2, List<&2, U32>, chunks)})))
+  Heap{+heap_start, chunks, memos} = heap
+  plan_section(11, plan_vector([
+    plan_prefix([0, 65, 0, 11], plan_sized(BytePlan{heap_start, List.reverse(&2, List<&2, U32>, chunks)})),
+    byte_plan(join([[0, 65, 0, 11], sized(words_bytes([U32.from_nat(heap_start), 0, 0, 0, memo_head(memos), 0]))]))]))
 
 def callback_types(callbacks: List<&2, Callback>) -> List<&2, List<&2, U32>>:
   match callbacks:
@@ -2086,16 +2265,16 @@ def arena_exports(enabled: Bool, allocator_index: Nat, reset_index: Nat) -> List
       ]
 
 
-def arena_reset_body(enabled: Bool, +heap_start: Nat, +initialized: Bool) -> List<&2, BytePlan>:
+def arena_reset_body(enabled: Bool, heap_start: Nat, initialized: Bool, imports: Nat) -> List<&2, BytePlan>:
   match enabled:
     case False{}:
       Nil{}
     case True{}:
-      [byte_plan(body_bytes(join([arena_floor(initialized, heap_start), [36, 0], clear_free_bins(), arena_floor(initialized, heap_start)]), 1n, 1n))]
+      [byte_plan(body_bytes(join([reset_arena(heap_start, initialized, imports), [35, 0]]), 1n, 1n))]
 
 def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePlan>, names: List<&2, ExportedConstant>, values: List<&2, List<&2, U32>>, heap: Heap, +startup: List<&2, BytePlan>) -> BytePlan:
   Abi{+functions, constants, +callbacks} = abi
-  Heap{+heap_start, chunks} = heap
+  Heap{+heap_start, chunks, +memos} = heap
   +count = List.length(&2, BytePlan, bodies)
   +imports = List.length(&2, Callback, callbacks)
   +wrapper_count = List.length(&2, BytePlan, wrappers)
@@ -2117,8 +2296,8 @@ def assemble(+abi: Abi, +bodies: List<&2, BytePlan>, +wrappers: List<&2, BytePla
     byte_plan(section(7, vector(List.append(&2, List<&2, U32>, function_exports(functions, 3n+Nat.add(imports, count)), List.append(&2, List<&2, U32>, global_exports(names, Bool.pick(Nat, Nat.is_eq(imports, 0n), 1n, 2n)), arena_exports(arrays, imports, 3n+Nat.add(imports, Nat.add(count, wrapper_count)))))))),
     byte_plan(Bool.pick(List<&2, U32>, initialized, section(8, unsigned_leb(start_index)), Nil{})),
     byte_plan(section(9, join([[1, 0, 65, 0, 11], unsigned_leb(count), table_indices(count, 3n+imports)]))),
-    plan_section(10, plan_vector(byte_plan(allocator()) <> byte_plan(sized(Arena.mark(imports))) <> byte_plan(sized(Arena.collect(imports))) <> List.append(&2, BytePlan, bodies, List.append(&2, BytePlan, wrappers, List.append(&2, BytePlan, arena_reset_body(arrays, heap_start, initialized), startup))))),
-    data_section(Heap{heap_start, chunks}),
+    plan_section(10, plan_vector(byte_plan(allocator()) <> byte_plan(sized(Arena.mark(imports))) <> byte_plan(sized(Arena.collect(imports))) <> List.append(&2, BytePlan, bodies, List.append(&2, BytePlan, wrappers, List.append(&2, BytePlan, arena_reset_body(arrays, heap_start, initialized, imports), startup))))),
+    data_section(Heap{heap_start, chunks, memos}),
     abi_section(abi)
   ])
 
@@ -2326,7 +2505,7 @@ def runtime_globals(initializers: List<&2, Init.Initializer>, +names: List<&2, E
       indexed
     case Init.Initializer{+name, value} <> tail:
       +global = runtime_position(exported_global(names, name, 1n), next)
-      runtime_globals(tail, names, Nat.add(next, Bool.pick(Nat, Nat.is_eq(runtime_global_index(global), next), 1n, 0n)), Map.set(&2, RuntimeGlobal, indexed, name, global))
+      runtime_globals(tail, names, Nat.add(next, Bool.pick(Nat, Nat.is_eq(runtime_global_index(global), next), 1n, 0n)), Index.set(RuntimeGlobal, indexed, name, global))
 
 def required_runtime(found: Maybe<&2, RuntimeGlobal>, name: String) -> Result<&2, &2, M.Diagnostic, RuntimeGlobal>:
   match found:
@@ -2387,7 +2566,7 @@ def prepare_catalog(runtime: Reachable.Runtime, safe_loops: Set()) -> Result<&2,
     +jobs : List<&2, CodegenJob> = List.append(&2, CodegenJob, normal, operation_jobs(needed_operations))
     +slots : Map<&2, Maybe<&2, Nat>> = slot_index(job_slots(jobs, 0n))
     +operation_ids : Map<&2, Maybe<&2, Nat>> = slot_index(operation_slots(needed_operations, 0n))
-    +serialized : StaticConstants <- serialize_constants(constants, StaticCatalog{slots, projection, operation_ids}, Heap{256n, [List.replicate(U32, 256n, 0)]})
+    +serialized : StaticConstants <- serialize_constants(constants, StaticCatalog{slots, projection, operation_ids}, Heap{256n, [List.replicate(U32, 256n, 0)], Map.new(&2, Maybe<&2, U32>)})
     return Prepared{jobs, Catalog{slots, E.catalog_constructors(declarations), slot_index(static_slots(serialized)), operation_ids, runtime_globals(initializers, names, 1n+List.length(&2, ExportedConstant, names), MTip{})}, functions, names, static_heap(serialized), initializers}
 
 def prepare(+checked: M.CheckedModule, constants: List<&2, C.Binding<C.Value>>) -> Result<&2, &2, M.Diagnostic, Prepared>:

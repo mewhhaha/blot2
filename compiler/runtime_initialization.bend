@@ -21,7 +21,7 @@ def index(initializers: List<&2, Initializer>, indexed: Map<&2, Initializer>) ->
       indexed
     case +initializer <> tail:
       Initializer{name, value} = initializer
-      index(tail, Map.set(&2, Initializer, indexed, name, initializer))
+      index(tail, Index.set(Initializer, indexed, name, initializer))
 
 def function_nodes(functions: List<&2, M.CheckedFunction>) -> Result<&2, &2, M.Diagnostic, List<&2, D.Node>>:
   match functions:

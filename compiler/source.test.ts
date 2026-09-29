@@ -131,7 +131,7 @@ entry const answer = do:
   return result
 entry const twice_next = fn (value: U32) => do:
   use value <- next value
-  if True:
+  if #True:
     use value <- 0
     value
   return @u32.add value value
@@ -256,7 +256,7 @@ sourceTest(
     rejects(compiler, discarded, "unknown_value", discarded.lastIndexOf("_"));
     rejects(
       compiler,
-      "const bad = fn () => do:\n  if True:\n    use hidden <- 42\n  return hidden",
+      "const bad = fn () => do:\n  if #True:\n    use hidden <- 42\n  return hidden",
       "unknown_value",
     );
     for (const binding of ["use value = 42", "let value <- 42"]) {
@@ -370,7 +370,7 @@ sourceTest(
       `entry const answer = fn () => @u32.add (do:
   return 20
 ) (do:
-  if False:
+  if #False:
     return 0
   return 22)
 `,
@@ -384,7 +384,12 @@ sourceTest(
   async (compiler) => {
     const { exports } = await instantiate(
       compiler,
-      `// header\r\nentry const truth = True\r\nentry const nothing = ()\r\nentry const answer = fn () => (@u32.add\r\n  20\r\n  22) // end`,
+      `// header\r
+entry const truth = #True\r
+entry const nothing = ()\r
+entry const answer = fn () => (@u32.add\r
+  20\r
+  22) // end`,
     );
     equal(call(exports, "answer"), 42);
     equal((exports.truth as WebAssembly.Global).value, 1);
@@ -452,7 +457,7 @@ sourceTest(
     rejects(compiler, "const f = fn () => 1\nconst f = 2", "duplicate_name");
     rejects(
       compiler,
-      "const f = fn () => do:\n  if True:\n    let hidden = 1\n  return hidden",
+      "const f = fn () => do:\n  if #True:\n    let hidden = 1\n  return hidden",
       "unknown_value",
     );
     rejects(
@@ -466,7 +471,11 @@ sourceTest(
 sourceTest(
   "source rejects unsupported intrinsics, arity, and dead statements",
   (compiler) => {
-    rejects(compiler, "const f = fn () => @u32.div 1 2", "unknown_intrinsic");
+    rejects(
+      compiler,
+      "const f = fn () => @u32.unknown 1 2",
+      "unknown_intrinsic",
+    );
     rejects(compiler, "const f = fn () => @u32.add 1", "call_arity");
     rejects(compiler, "const f = fn () => @u32.add 1 2 3", "call_arity");
     rejects(
@@ -522,12 +531,12 @@ sourceTest(
     }
     rejects(
       compiler,
-      "#[component]\ndata Position = Position U32",
+      "#[component]\ndata Position = #Position U32",
       "unsupported_attribute",
     );
     rejects(
       compiler,
-      "#[resource]\ndata Clock = Clock U32",
+      "#[resource]\ndata Clock = #Clock U32",
       "unsupported_attribute",
     );
   },
@@ -558,7 +567,7 @@ sourceTest(
         "const try = 0\nconst example = fn () => do try:\n  return 42",
         "const try = 0\nconst example = do try:\n  return 42",
         "const try = 0\nconst example = fn () => do:\n  let result = do try:\n    return 42\n  return result",
-        "const try = 0\nconst example = fn () => do:\n  if False:\n    use do try:\n      return 42\n  return 0",
+        "const try = 0\nconst example = fn () => do:\n  if #False:\n    use do try:\n      return 42\n  return 0",
       ]
     ) {
       rejects(
@@ -576,7 +585,7 @@ sourceTest(
     for (
       const source of [
         "const example = fn () => do:\n  return $ 42",
-        "const example = fn () => do:\n  if True:\n    return $ 42\n  return 0",
+        "const example = fn () => do:\n  if #True:\n    return $ 42\n  return 0",
         "const example = fn () => do:\n  use do:\n    return $ 42\n  return 0",
       ]
     ) {

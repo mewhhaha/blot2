@@ -1,18 +1,37 @@
 import { basename, dirname } from "node:path";
-import { createNativeCompiler, type NativeCompilerOptions } from "./native.ts";
+import { createNativeCompiler } from "./native.ts";
 import { formatDiagnostic } from "./source_frontend.ts";
 import { SourceError } from "./syntax.ts";
 import { loadSourceProject } from "./source_project.ts";
+import { formatSource } from "./format.ts";
 
-export async function runCli(
-  args: readonly string[],
-  options: NativeCompilerOptions = {},
-): Promise<number> {
-  const [command, filename, output, ...extra] = args;
-  if (command === "guide" && args.length === 1) {
+export async function runCli(executable?: string | URL): Promise<number> {
+  const [command, filename, output, ...extra] = Deno.args;
+  if (command === "guide" && Deno.args.length === 1) {
     console.log(
       await Deno.readTextFile(new URL("./guide.md", import.meta.url)),
     );
+    return 0;
+  }
+  if (
+    command === "fmt" && filename && !extra.length &&
+    (!output || output === "--check")
+  ) {
+    try {
+      const source = await Deno.readTextFile(filename);
+      const formatted = await formatSource(source);
+      if (output === "--check") {
+        if (formatted !== source) {
+          console.error(`${filename}: needs formatting`);
+          return 1;
+        }
+      } else if (formatted !== source) {
+        await Deno.writeTextFile(filename, formatted);
+      }
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      return 1;
+    }
     return 0;
   }
   if (
@@ -20,7 +39,7 @@ export async function runCli(
     (command === "check" && output)
   ) {
     console.error(
-      "Usage: deno task blot guide | check <source.blot> | build <source.blot> [build/output.wasm]",
+      "Usage: blot guide | fmt <source.blot> [--check] | check <source.blot> | build <source.blot> [build/output.wasm]",
     );
     return 2;
   }
@@ -33,7 +52,7 @@ export async function runCli(
     source = project.modules.find((module) =>
       module.name === project.entry
     )!.source;
-    const compiler = await createNativeCompiler(options);
+    const compiler = await createNativeCompiler({ executable });
     try {
       if (command === "check") {
         // Every declaration is type checked; the analysis lists what the
@@ -65,8 +84,7 @@ export async function runCli(
     } else throw error;
     return 1;
   }
-
   return 0;
 }
 
-if (import.meta.main) Deno.exit(await runCli(Deno.args));
+if (import.meta.main) Deno.exitCode = await runCli();

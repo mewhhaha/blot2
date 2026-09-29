@@ -7,16 +7,16 @@ import { loadSourceProject } from "./source_project.ts";
 import { SourceError } from "./syntax.ts";
 
 const identityProgram = `
-data Count = Count U32
-data Other = Other U32
-data Cell value = Cell value
+data Count = #Count U32
+data Other = #Other U32
+data Cell value = #Cell value
 const same = fn left => fn right => @type.same left right
-entry const constructor = same Count (Count 42)
-entry const nominal = same Count Other
-entry const generic = same (Cell 1) (Cell 1.0)
+entry const constructor = same #Count (#Count 42)
+entry const nominal = same #Count #Other
+entry const generic = same (#Cell 1) (#Cell 1.0)
 entry const array = same [1, 2] [42]
-entry const product = same (1, True) (1.0, True)
-entry const run = fn () => same (Cell 42) (fn () -> Cell U32 => @panic "witness was called")
+entry const product = same (1, #True) (1.0, #True)
+entry const run = fn () => same (#Cell 42) (fn () -> Cell U32 => @panic "witness was called")
 `;
 
 Deno.test("type comparison specializes concrete nominal, generic and structural witnesses", async () => {
@@ -49,7 +49,7 @@ Deno.test("type comparison evaluates witness expressions once in order without i
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compile(`
-data Count = Count U32
+data Count = #Count U32
 effect Trace: U32 -> U32
 const witness = fn index => do:
   use Trace index
@@ -82,9 +82,9 @@ Deno.test("type comparison preserves nominal module ownership", async () => {
   const files: Record<string, string> = {
     "file:///types/main.blot": `import { Box as Left } from "./left"
 import { Box as Right } from "./right"
-entry const run = fn () => @type.same Left Right`,
-    "file:///types/left.blot": "data Box = Box U32",
-    "file:///types/right.blot": "data Box = Box U32",
+entry const run = fn () => @type.same #Left #Right`,
+    "file:///types/left.blot": "data Box = #Box U32",
+    "file:///types/right.blot": "data Box = #Box U32",
   };
   const project = await loadSourceProject(new URL("file:///types/main.blot"), {
     readSource: (url) => Promise.resolve(files[url.href]),
@@ -104,34 +104,34 @@ entry const run = fn () => @type.same Left Right`,
 });
 
 const schemaProgram = `
-data End = End
-type Entry { head, tail } is data = Entry { head, tail }
-data Builder schema = Builder { schema: schema }
-data Count = Count U32
-data Clock = Clock U32
-data Cell value = Cell value
-const End.contains = fn entries => fn witness => False
+data End = #End
+type Entry { head, tail } is data = #Entry { head, tail }
+data Builder schema = #Builder { schema: schema }
+data Count = #Count U32
+data Clock = #Clock U32
+data Cell value = #Cell value
+const End.contains = fn entries => fn witness => #False
 const Entry.contains = fn entries => fn witness => do:
-  let Entry { head, tail } = entries
+  let #Entry { head, tail } = entries
   if @type.same head witness:
-    return True
+    return #True
   return tail.contains(witness)
 const register = fn initial => fn builder => do:
-  let Builder { schema } = builder
+  let #Builder { schema } = builder
   if schema.contains(initial):
     return @panic "duplicate resource type"
-  return Builder { schema: Entry { head: initial, tail: schema } }
-const empty = Builder { schema: End }
+  return #Builder { schema: #Entry { head: initial, tail: schema } }
+const empty = #Builder { schema: #End }
 const registered = do:
   let builder = empty
-  builder := register (Count 1) self
-  builder := register (Clock 2) self
-  builder := register (Cell 3) self
-  builder := register (Cell 4.0) self
+  builder := register (#Count 1) self
+  builder := register (#Clock 2) self
+  builder := register (#Cell 3) self
+  builder := register (#Cell 4.0) self
   return builder
 entry const run = fn () => do:
-  let Builder { schema } = registered
-  return schema.contains(Count)
+  let #Builder { schema } = registered
+  return schema.contains(#Count)
 `;
 
 Deno.test("value schemas reject duplicate resource types during const composition", async () => {
@@ -148,7 +148,7 @@ Deno.test("value schemas reject duplicate resource types during const compositio
       () =>
         compiler.compile(
           schemaProgram +
-            "\nconst duplicate = register (Count 9) registered" +
+            "\nconst duplicate = register (#Count 9) registered" +
             "\nentry const probe = fn () => @array.length [duplicate]",
         ),
       (error: unknown) => {

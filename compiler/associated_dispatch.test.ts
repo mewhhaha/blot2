@@ -28,11 +28,11 @@ entry const compare = fn (value: F32) => value >= 4.0
   {
     name: "associated implementations can themselves use generic operators",
     source: `
-data Box = Box F32
+data Box = #Box F32
 const Box.add = fn (left: Box) => fn (right: Box) => case (left, right) of
-  (Box a, Box b) => Box (a + b)
-entry const run = fn (value: F32) => case Box value + Box 3.0 of
-  Box answer => answer
+  (#Box a, #Box b) => #Box (a + b)
+entry const run = fn (value: F32) => case #Box value + #Box 3.0 of
+  #Box answer => answer
 `,
     expected: 7,
   },
@@ -40,32 +40,32 @@ entry const run = fn (value: F32) => case Box value + Box 3.0 of
     name:
       "right-side fallback checks both parameter types and preserves argument order",
     source: `
-data Box = Box F32
+data Box = #Box F32
 const Box.add = fn (left: F32) => fn (right: Box) => case right of
-  Box value => left - value
-entry const run = fn (value: F32) => value + Box 3.0
+  #Box value => left - value
+entry const run = fn (value: F32) => value + #Box 3.0
 `,
     expected: 1,
   },
   {
     name: "left-side implementation wins when both sides accept the operands",
     source: `
-data Left = Left F32
-data Right = Right F32
+data Left = #Left F32
+data Right = #Right F32
 const Left.add = fn (left: Left) => fn (right: Right) => 10.0
 const Right.add = fn (left: Left) => fn (right: Right) => 20.0
-entry const run = fn (value: F32) => Left value + Right value
+entry const run = fn (value: F32) => #Left value + #Right value
 `,
     expected: 10,
   },
   {
     name: "compile-time dispatch supports arbitrary member names",
     source: `
-data Box = Box F32
+data Box = #Box F32
 const Box.distance = fn (left: Box) => fn (right: Box) => case (left, right) of
-  (Box a, Box b) => F32.abs (a - b)
+  (#Box a, #Box b) => F32.abs (a - b)
 const distance = fn left => fn right => @type.call "distance" left right
-entry const run = fn (value: F32) => distance (Box value) (Box 9.0)
+entry const run = fn (value: F32) => distance (#Box value) (#Box 9.0)
 `,
     expected: 5,
   },
@@ -116,18 +116,18 @@ entry const run = fn (value: F32) => do:
   {
     name: "generic nominal implementations specialize their payload arithmetic",
     source: `
-data Box value = Box value
+data Box value = #Box value
 const Box.add = fn left => fn right => case (left, right) of
-  (Box a, Box b) => Box (a + b)
-entry const run = fn (value: F32) => case Box value + Box 3.0 of
-  Box answer => answer
+  (#Box a, #Box b) => #Box (a + b)
+entry const run = fn (value: F32) => case #Box value + #Box 3.0 of
+  #Box answer => answer
 `,
     expected: 7,
   },
   {
     name: "associated lookup also resolves nominal prelude types",
     source: `
-entry const run = fn (value: F32) => Maybe.unwrap_or 0.0 (@type.call "map" (fn x => x + 1.0) (Some value))
+entry const run = fn (value: F32) => Maybe.unwrap_or 0.0 (@type.call "map" (fn x => x + 1.0) (#Some value))
 `,
     expected: 5,
   },
@@ -180,14 +180,14 @@ Deno.test("generic associated helpers stay importable while unsupported calls fa
     // are entries: an unreachable call is only type checked.
     for (
       const [source, code] of [
-        ["entry const run = fn () => True + False", "missing_associated"],
+        ["entry const run = fn () => #True + #False", "missing_associated"],
         ["entry const run = fn () => 1 + 2.0", "missing_associated"],
         [
-          `data Left = Left F32
-data Right = Right F32
+          `data Left = #Left F32
+data Right = #Right F32
 const Left.add = fn (left: Left) => fn (right: Right) => 10
 const Right.add = fn (left: Left) => fn (right: Right) => 20.0
-entry const run = fn (value: F32) => F32.add (Left value + Right value) 0.0`,
+entry const run = fn (value: F32) => F32.add (#Left value + #Right value) 0.0`,
           "type_mismatch",
         ],
       ]
@@ -209,11 +209,11 @@ entry const run = fn (value: F32) => F32.add (Left value + Right value) 0.0`,
 Deno.test("associated calls follow nominal type ownership across imports", async () => {
   const files: Record<string, string> = {
     "file:///dispatch/main.blot": `import { Box as Renamed } from "./box"
-entry const run = fn (value: F32) => case Renamed value + Renamed 3.0 of
-  Renamed answer => answer`,
-    "file:///dispatch/box.blot": `data Box = Box F32
+entry const run = fn (value: F32) => case #Renamed value + #Renamed 3.0 of
+  #Renamed answer => answer`,
+    "file:///dispatch/box.blot": `data Box = #Box F32
 const Box.add = fn (left: Box) => fn (right: Box) => case (left, right) of
-  (Box a, Box b) => Box (a + b)`,
+  (#Box a, #Box b) => #Box (a + b)`,
   };
   const project = await loadSourceProject(
     new URL("file:///dispatch/main.blot"),
@@ -265,12 +265,12 @@ Deno.test("incremental compilation reselects associated methods after declaratio
         ["const Left.add = fn (left: Left) => fn (right: Right) => 40.0", 40],
       ] as const
     ) {
-      const source = `data Left = Left F32
-data Right = Right F32
+      const source = `data Left = #Left F32
+data Right = #Right F32
 ${implementation}
 const Right.add = fn (left: Left) => fn (right: Right) => 20.0
 const combine = fn left => fn right => left + right
-entry const run = fn (value: F32) => combine (Left value) (Right value)`;
+entry const run = fn (value: F32) => combine (#Left value) (#Right value)`;
       const expected = await reference.compile(source);
       const actual = await native.compile(source);
       equal(actual.artifact, expected.artifact);
@@ -286,16 +286,16 @@ entry const run = fn (value: F32) => combine (Left value) (Right value)`;
 Deno.test("associated dispatch evaluates operands once before either implementation stage", async () => {
   const source = `
 effect Read : U32 -> F32
-data Box = Box F32
+data Box = #Box F32
 const read = fn index => do:
   use value <- Read index
-  return Box value
+  return #Box value
 const Box.add = fn (left: Box) => do:
   use first <- Read 3
   return fn (right: Box) => do:
     use second <- Read 4
-    let Box a = left
-    let Box b = right
+    let #Box a = left
+    let #Box b = right
     return a * 10.0 + b + first + second
 entry const run = fn (probe: U32 -> F32 ! {Foreign}) => do (@effect.provider Read probe):
   return read 1 + read 2

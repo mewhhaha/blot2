@@ -46,7 +46,7 @@ def definitions(functions: List<&2, M.CheckedFunction>, indexed: Map<&2, Maybe<&
     case Nil{}:
       indexed
     case M.CheckedFunction{M.Function{+name, exported, parameter, p, r, body}, signature, effects} <> tail:
-      definitions(tail, Map.set(&2, Maybe<&2, Definition>, indexed, name, definition(256n, "fn:" ++ name, body, [parameter])))
+      definitions(tail, Index.set(Maybe<&2, Definition>, indexed, name, definition(256n, "fn:" ++ name, body, [parameter])))
 
 def application(fuel: Nat, expression: M.Expr, arguments: List<&2, M.Expr>) -> Application:
   match fuel expression:

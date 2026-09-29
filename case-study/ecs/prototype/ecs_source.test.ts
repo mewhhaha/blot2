@@ -93,11 +93,11 @@ Deno.test("ECS get resolves a type name independently of its constructor", async
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compileEcs(`
-#[component] data Position = At U32
+#[component] data Position = #At U32
 const move = fn () => do:
-  use position <- @ecs.get Position
-  let At value = position
-  use @ecs.set (At (value + 1))
+  use position <- @ecs.get #Position
+  let #At value = position
+  use @ecs.set (#At (value + 1))
   return ()
 `);
     equal(artifact.storage[0].identity, identity("Position"));
@@ -120,26 +120,26 @@ const move = fn () => do:
 Deno.test("ECS source rejects unsupported tags, implicit providers and invalid accesses", async () => {
   const compiler = await createSourceCompiler();
   try {
-    const declaration = "#[component]\ndata Position = Position U32\n";
+    const declaration = "#[component]\ndata Position = #Position U32\n";
     const cases = [
-      ["#[anything]\ndata Position = Position U32", "unsupported_attribute"],
+      ["#[anything]\ndata Position = #Position U32", "unsupported_attribute"],
       ["#[component]\nconst move = fn () => ()", "storage_attribute"],
       [
-        "#[component]\n#[resource]\ndata Position = Position U32",
+        "#[component]\n#[resource]\ndata Position = #Position U32",
         "storage_attribute",
       ],
-      ["#[component]\ndata Box a = Box a", "generic_storage_type"],
+      ["#[component]\ndata Box a = #Box a", "generic_storage_type"],
       [
-        "data Position = Position U32\nconst move = fn () => @ecs.get Position",
+        "data Position = #Position U32\nconst move = fn () => @ecs.get #Position",
         "unknown_storage",
       ],
       [declaration + "const move = fn () => @ecs.get missing", "storage_type"],
       [
-        declaration + "const move = fn () => @ecs.get (Position 1)",
+        declaration + "const move = fn () => @ecs.get (#Position 1)",
         "storage_type",
       ],
       [
-        declaration + "const move = fn () => @ecs.get Position Position",
+        declaration + "const move = fn () => @ecs.get #Position #Position",
         "call_arity",
       ],
       [declaration + "const move = fn () => @ecs.set", "call_arity"],
@@ -147,10 +147,10 @@ Deno.test("ECS source rejects unsupported tags, implicit providers and invalid a
         declaration + "const move = fn () => @ecs.set 1",
         "invalid_storage_access",
       ],
-      [declaration + "const position = @ecs.get Position", "const_effect"],
+      [declaration + "const position = @ecs.get #Position", "const_effect"],
       [
         declaration +
-        "const move = fn () => do:\n  let position = @ecs.get Position\n  return ()",
+        "const move = fn () => do:\n  let position = @ecs.get #Position\n  return ()",
         "let_effect",
       ],
     ];
@@ -164,7 +164,7 @@ Deno.test("ECS source rejects unsupported tags, implicit providers and invalid a
     throws(
       () =>
         compiler.compile(
-          declaration + "const move = fn () => @ecs.set (Position 1)",
+          declaration + "const move = fn () => @ecs.set (#Position 1)",
         ),
       (error) =>
         error instanceof SourceError && error.code === "backend_effect",
@@ -211,7 +211,7 @@ Deno.test("ECS nominal diagnostics point to their source type declaration", asyn
         ["Box a = Box a", "", "generic_storage_type"],
         [
           "Position = Position Bool",
-          "const set_position = fn () => @ecs.set (Position True)",
+          "const set_position = fn () => @ecs.set (#Position #True)",
           "backend_ecs_layout",
         ],
       ]

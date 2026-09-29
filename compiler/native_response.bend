@@ -4,9 +4,9 @@ import ./const_eval.bend as Const
 import ./main.bend as Main
 
 def version() -> U32:
-  13
+  14
 
-# This is the version-13 word protocol paired with native_protocol.ts. Fields
+# This is the version-14 word protocol paired with native_protocol.ts. Fields
 # follow public Analysis order; compiler-only checked declarations stay native.
 type Work is Data:
   Word{value: U32}
@@ -263,6 +263,20 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{13} <> tail, room, reversed)
     case 1n+rest Operator{M.F32GreaterEqual{}} <> tail room:
       encode_work(rest, Word{14} <> tail, room, reversed)
+    case 1n+rest Operator{M.U32Divide{}} <> tail room:
+      encode_work(rest, Word{15} <> tail, room, reversed)
+    case 1n+rest Operator{M.U32Remainder{}} <> tail room:
+      encode_work(rest, Word{16} <> tail, room, reversed)
+    case 1n+rest Operator{M.U32BitAnd{}} <> tail room:
+      encode_work(rest, Word{17} <> tail, room, reversed)
+    case 1n+rest Operator{M.U32BitOr{}} <> tail room:
+      encode_work(rest, Word{18} <> tail, room, reversed)
+    case 1n+rest Operator{M.U32BitXor{}} <> tail room:
+      encode_work(rest, Word{19} <> tail, room, reversed)
+    case 1n+rest Operator{M.U32ShiftLeft{}} <> tail room:
+      encode_work(rest, Word{20} <> tail, room, reversed)
+    case 1n+rest Operator{M.U32ShiftRight{}} <> tail room:
+      encode_work(rest, Word{21} <> tail, room, reversed)
     case 1n+rest UnaryOperator{M.F32Negate{}} <> tail room:
       encode_work(rest, Word{0} <> tail, room, reversed)
     case 1n+rest UnaryOperator{M.F32Absolute{}} <> tail room:
@@ -327,6 +341,10 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{20} <> Natural{offset} <> OptionalType{annotation} <> Expression{value} <> tail, room, reversed)
     case 1n+rest Expression{M.QualifiedExpr{offset, annotation, predicates, value}} <> tail room:
       encode_work(rest, Word{47} <> Natural{offset} <> TypeValue{annotation} <> Predicates{predicates} <> Expression{value} <> tail, room, reversed)
+    case 1n+rest Expression{M.MemoExpr{computation}} <> tail room:
+      encode_work(rest, Word{49} <> Expression{computation} <> tail, room, reversed)
+    case 1n+rest Expression{M.ForceExpr{value}} <> tail room:
+      encode_work(rest, Word{50} <> Expression{value} <> tail, room, reversed)
     case 1n+rest Expression{M.InstantiationExpr{site, value}} <> tail room:
       encode_work(rest, Word{48} <> Natural{site} <> Expression{value} <> tail, room, reversed)
     case 1n+rest Expression{M.F32Expr{value}} <> tail room:
@@ -415,6 +433,10 @@ def encode_work(fuel: Nat, pending: List<&2, Work>, remaining: Nat, reversed: Li
       encode_work(rest, Word{7} <> Word{F32.bits(value)} <> tail, room, reversed)
     case 1n+rest Value{Const.OperationValue{identity}} <> tail room:
       encode_work(rest, Word{8} <> Identity{identity} <> tail, room, reversed)
+    case 1n+rest Value{Const.DemandValue{slot, computation}} <> tail room:
+      Fail{M.Diagnostic{"internal_error", "demand", "an unsnapshotted memo escaped constant evaluation"}}
+    case 1n+rest Value{Const.MemoValue{slot, computed, value}} <> tail room:
+      encode_work(rest, Word{15} <> Natural{slot} <> Word{bool_word(computed)} <> Value{value} <> tail, room, reversed)
     case 1n+rest Value{Const.StateProviderValue{read, write, initial}} <> tail room:
       encode_work(rest, Word{14} <> Identity{read} <> Identity{write} <> Value{initial} <> tail, room, reversed)
     case 1n+rest Value{Const.StateReadValue{slot}} <> tail room:

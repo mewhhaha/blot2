@@ -5,30 +5,30 @@ import { createSourceCompiler } from "./source.ts";
 // A tuple carries two versions of a data value containing nested arrays.
 // Alternate acceptance/rejection while retaining shared pre-loop aliases.
 const source = `
-type World is data = World { rows: Array (Array F32) }
+type World is data = #World { rows: Array (Array F32) }
 const value = fn world => do:
-  let World { rows } = world
+  let #World { rows } = world
   return @array.get (@array.get rows 0) 0
 const bump = fn world => do:
-  let World { rows } = world
+  let #World { rows } = world
   let first = @array.get rows 0
   let changed = @array.set first 0 (@array.get first 0 + 1.0)
-  return World { rows: [changed, @array.get rows 1] }
+  return #World { rows: [changed, @array.get rows 1] }
 entry const run = fn (limit: U32) => do:
   let original = @array.fill 1024 7.0
   let captured = fn () => @array.get original 1023
-  let initial = World { rows: [original, original] }
-  let state = (initial, initial, True, 0)
+  let initial = #World { rows: [original, original] }
+  let state = (initial, initial, #True, 0)
   for ever:
     let (committed, candidate, accept, step) = state
     if @array.get original 0 != 7.0:
       return @panic "candidate mutated a shared pre-loop array"
     if step >= limit:
-      let World { rows } = committed
+      let #World { rows } = committed
       return [value committed, value candidate, @array.get (@array.get rows 1) 0, captured ()]
     let selected = case accept of
-      True => candidate
-      False => committed
+      #True => candidate
+      #False => committed
     state := (selected, bump selected, Bool.not accept, step + 1)
 const inner = fn held => do:
   let state = (held, 0)

@@ -17,35 +17,35 @@ type Cell a is effect = {
   get: Unit -> a
   set: a -> Unit
 }
-type Box a is data = Box a
+type Box a is data = #Box a
 
 const get = fn (witness: p -> a) -> a => Cell.get ()
 const set = fn value => Cell.set value
 const run = fn initial => fn action => @effect.run Cell.get Cell.set initial action
 
 const advance = fn () => do:
-  use integer <- get (fn () => Box 0)
-  let Box count = integer
-  use fraction <- get (fn () => Box 0.0)
-  let Box amount = fraction
-  use set (Box (@u32.add count 1))
-  use set (Box (@f32.add amount 0.5))
+  use integer <- get (fn () => #Box 0)
+  let #Box count = integer
+  use fraction <- get (fn () => #Box 0.0)
+  let #Box amount = fraction
+  use set (#Box (@u32.add count 1))
+  use set (#Box (@f32.add amount 0.5))
   return count
 
 entry const answer = fn () => do:
-  let (Box count, (Box amount, previous)) = run (Box 40) (fn () =>
-    run (Box 1.0) advance)
+  let (#Box count, (#Box amount, previous)) = run (#Box 40) (fn () =>
+    run (#Box 1.0) advance)
   return @f32.add (@f32.add (@u32.to_f32 count) amount) (@u32.to_f32 previous)
 
-entry const custom_reader = fn () => @effect.reader Cell.get (fn () => Box 0) (fn () => Box 7) (fn () => do:
-  use boxed <- get (fn () => Box 0)
-  let Box value = boxed
+entry const custom_reader = fn () => @effect.reader Cell.get (fn () => #Box 0) (fn () => #Box 7) (fn () => do:
+  use boxed <- get (fn () => #Box 0)
+  let #Box value = boxed
   return value)
 
 entry const custom_writer = fn () => do:
-  let (Box written, answer) = run (Box 0) (fn () =>
-    @effect.writer Cell.set (fn () => Box 0) (fn value => set value) (fn () => do:
-      use set (Box 42)
+  let (#Box written, answer) = run (#Box 0) (fn () =>
+    @effect.writer Cell.set (fn () => #Box 0) (fn value => set value) (fn () => do:
+      use set (#Box 42)
       return 42))
   return @u32.add answer written
 

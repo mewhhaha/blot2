@@ -22,9 +22,21 @@ import {
 export interface NativeCompilerOptions
   extends SourceCompilerOptions, NativeProcessOptions {}
 
+export interface NativeCompiler {
+  /** Owned child identifier for diagnostic CPU/RSS sampling. */
+  readonly pid: number;
+  analyze(source: SourceInput, options?: CompileOptions): Promise<Analysis>;
+  compile(
+    source: SourceInput,
+    options?: AnalyzedArtifactOptions,
+  ): Promise<AnalyzedArtifact>;
+  compile(source: SourceInput, options?: ArtifactOptions): Promise<Artifact>;
+  dispose(): Promise<void>;
+}
+
 export async function createNativeCompiler(
   options: NativeCompilerOptions = {},
-) {
+): Promise<NativeCompiler> {
   const frontend = await createSourceFrontend(options);
   let process: NativeProcess;
   try {
@@ -95,6 +107,10 @@ export async function createNativeCompiler(
     return response.artifact;
   }
   return {
+    /** Owned child identifier for diagnostic CPU/RSS sampling. */
+    get pid(): number {
+      return process.pid;
+    },
     async analyze(
       source: SourceInput,
       options: CompileOptions = {},

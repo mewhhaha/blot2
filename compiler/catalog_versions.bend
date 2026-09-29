@@ -33,7 +33,7 @@ def entry(index: Map<&2, Map<&2, TypeVersion>>, identity: M.TypeId) -> Maybe<&2,
 def put(+index: Map<&2, Map<&2, TypeVersion>>, identity: M.TypeId, value: TypeVersion) -> Map<&2, Map<&2, TypeVersion>>:
   M.TypeId{+module_name, declaration} = identity
   nested = Index.get(Map<&2, TypeVersion>, index, module_name, Map.new(&2, TypeVersion))
-  Map.set(&2, Map<&2, TypeVersion>, index, module_name, Map.set(&2, TypeVersion, nested, declaration, value))
+  Index.set(Map<&2, TypeVersion>, index, module_name, Index.set(TypeVersion, nested, declaration, value))
 
 def select_same(same: Bool, words: List<&2, U32>, token: Nat, +next: Nat) -> TypeVersion & Nat:
   match same:

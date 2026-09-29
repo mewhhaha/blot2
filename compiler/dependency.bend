@@ -118,6 +118,10 @@ def reference_step(+fuel: Nat, work: Work, pending: List<&2, PendingReference>, 
       Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.QualifiedExpr{offset, annotation, predicates, value}}:
       Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
+    case 1n+rest Expression{M.MemoExpr{value}}:
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
+    case 1n+rest Expression{M.ForceExpr{value}}:
+      Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.InstantiationExpr{site, value}}:
       Done{ReferenceStep{PendingReference{rest, Expression{value}} <> pending, reversed}}
     case 1n+rest Expression{M.StateProviderExpr{read, write, initial}}:
@@ -231,12 +235,19 @@ def contains_work(names: List<&2, String>, +name: String, found: Bool) -> Bool:
 def contains(names: List<&2, String>, name: String) -> Bool:
   contains_work(names, name, False{})
 
-def lookup(nodes: List<&2, Node>, +name: String) -> List<&2, String>:
-  match nodes:
-    case Nil{}:
+# Keep the decision outside Bool.pick: its result arguments are evaluated
+# eagerly, including the otherwise-unused scan after the first matching node.
+def lookup_work(nodes: List<&2, Node>, +name: String, matched: Bool, found: List<&2, String>) -> List<&2, String>:
+  match nodes matched:
+    case _ True{}:
+      found
+    case Nil{} False{}:
       Nil{}
-    case Node{found, +refs, lambdas} <> tail:
-      Bool.pick(List<&2, String>, M.name_equal(found, name), refs, lookup(tail, name))
+    case Node{candidate, refs, lambdas} <> tail False{}:
+      lookup_work(tail, name, M.name_equal(candidate, name), refs)
+
+def lookup(nodes: List<&2, Node>, name: String) -> List<&2, String>:
+  lookup_work(nodes, name, False{}, Nil{})
 
 def edge_count(nodes: List<&2, Node>) -> Nat:
   match nodes:
@@ -264,7 +275,7 @@ def adjacency(nodes: List<&2, Node>, edges: Map<&2, List<&2, String>>) -> Map<&2
     case Nil{}:
       edges
     case Node{name, refs, lambdas} <> tail:
-      adjacency(tail, Map.set(&2, List<&2, String>, edges, name, refs))
+      adjacency(tail, Index.set(List<&2, String>, edges, name, refs))
 
 def neighbors(edges: Map<&2, List<&2, String>>, name: String) -> List<&2, String>:
   Index.get(List<&2, String>, edges, name, Nil{})
@@ -274,7 +285,7 @@ def transpose_edges(refs: List<&2, String>, +name: String, +edges: Map<&2, List<
     case Nil{}:
       edges
     case +head <> tail:
-      transpose_edges(tail, name, Map.set(&2, List<&2, String>, edges, head, name <> neighbors(edges, head)))
+      transpose_edges(tail, name, Index.set(List<&2, String>, edges, head, name <> neighbors(edges, head)))
 
 def transpose(nodes: List<&2, Node>, edges: Map<&2, List<&2, String>>) -> Map<&2, List<&2, String>>:
   match nodes:
@@ -400,7 +411,7 @@ def compact_catalog(nodes: List<&2, Node>, +next: Nat, known: CompactCatalog) ->
       known
     case Node{+name, references, lambdas} <> tail:
       CompactCatalog{ids, names} = known
-      compact_catalog(tail, 1n+next, CompactCatalog{Map.set(&2, Nat, ids, name, next), NatIndex.set(String, names, next, name)})
+      compact_catalog(tail, 1n+next, CompactCatalog{Index.set(Nat, ids, name, next), NatIndex.set(String, names, next, name)})
 
 def compact_numbered_reference(found: Maybe<&2, Nat>, rest: List<&2, Nat>) -> List<&2, Nat>:
   match found:

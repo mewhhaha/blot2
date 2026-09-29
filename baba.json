@@ -463,6 +463,48 @@
           "open": "[",
           "close": "]"
         }
+      },
+      {
+        "rule": "selector",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "type_witness",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "if_expression",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "pattern_row",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "demand_type",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "constructor_reference",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "boolean_constructor_pattern",
+        "boundary": {
+          "kind": "root"
+        }
       }
     ],
     "semantics": {

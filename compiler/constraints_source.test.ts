@@ -116,8 +116,8 @@ const record = where { value: 42 }
 Deno.test("qualified local let inside a record value keeps its clause", async () => {
   const frontend = await createFrontend();
   try {
-    const source = `type Box is data = Box { value: U32 }
-entry const answer = fn () => Box { value: do:
+    const source = `type Box is data = #Box { value: U32 }
+entry const answer = fn () => #Box { value: do:
   let number: U32 where { type_rep U32 } = 42
   return number
 }
@@ -147,7 +147,7 @@ Deno.test("qualified annotations constrain the final tagged result", async () =>
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const source = `
-#[fn value => True] entry const answer: Bool where { type_rep Bool } = 42
+#[fn value => #True] entry const answer: Bool where { type_rep Bool } = 42
 `;
     const artifact = compiler.compile(source);
     const exports =
@@ -319,15 +319,15 @@ entry const answer = fn () => do (@effect.provider Tick (fn () => ())):
 
     const effectful = compiler.compile(`
 type Tick is effect = Unit -> Unit
-type Box is data = Box U32
+type Box is data = #Box U32
 const Box.add = fn (left: Box) => fn (right: Box) => do:
   use Tick ()
-  let Box a = left
-  let Box b = right
-  return Box (@u32.add a b)
+  let #Box a = left
+  let #Box b = right
+  return #Box (@u32.add a b)
 entry const answer = fn () => do (@effect.provider Tick (fn () => ())):
-  use boxed <- Box 20 + Box 22
-  let Box result = boxed
+  use boxed <- #Box 20 + #Box 22
+  let #Box result = boxed
   return result
 `);
     const effectfulExports =
@@ -446,15 +446,15 @@ Deno.test("concrete qualified clones select separate pure and Tick effects", asy
   try {
     const artifact = compiler.compile(`
 type Tick is effect = Unit -> Unit
-type Box is data = Box U32
+type Box is data = #Box U32
 const Box.add: Box -> (Box -> Box ! {Tick}) = fn (left: Box) => fn (right: Box) => do:
   use Tick ()
-  return Box 42
+  return #Box 42
 const twice: a -> a ! {| e} where { associated "add" a a a ! {| e} } = fn value => value + value
 entry const integer = fn () => twice 21
 entry const boxed = fn () => do (@effect.provider Tick (fn () => ())):
-  use result <- twice (Box 21)
-  let Box value = result
+  use result <- twice (#Box 21)
+  let #Box value = result
   return value
 `);
     const exports = new WebAssembly.Instance(
@@ -478,13 +478,13 @@ Deno.test("ordinary arithmetic closes invocation from the selected numeric choic
 
     const effectful = compiler.compile(`
 type Tick is effect = Unit -> Unit
-type Box is data = Box U32
+type Box is data = #Box U32
 const Box.add: Box -> (Box -> Box ! {Tick}) = fn (left: Box) => fn (right: Box) => do:
   use Tick ()
-  return Box 42
+  return #Box 42
 entry const answer = fn () => do (@effect.provider Tick (fn () => ())):
-  use boxed <- Box 20 + Box 22
-  let Box result = boxed
+  use boxed <- #Box 20 + #Box 22
+  let #Box result = boxed
   return result
 `);
     const effectfulExports = new WebAssembly.Instance(
@@ -501,14 +501,14 @@ Deno.test("a curried selected add retains pure outer and Tick inner rows", async
   try {
     const artifact = compiler.compile(`
 type Tick is effect = Unit -> Unit
-type Box is data = Box U32
+type Box is data = #Box U32
 const Box.add = fn (left: Box) => fn (right: Box) => do:
   use Tick ()
-  return Box 42
+  return #Box 42
 const twice: Box -> Box ! {Tick} where { associated "add" Box Box Box ! {Tick} } = fn value => value + value
 entry const answer = fn () => do (@effect.provider Tick (fn () => ())):
-  use boxed <- twice (Box 21)
-  let Box result = boxed
+  use boxed <- twice (#Box 21)
+  let #Box result = boxed
   return result
 `);
     const exports =
@@ -525,17 +525,17 @@ Deno.test("qualified invocation rows preserve duplicate Tick effects", async () 
   try {
     const header = `
 type Tick is effect = Unit -> Unit
-type Box is data = Box U32
+type Box is data = #Box U32
 const Box.add: Box -> (Box -> Box ! {Tick, Tick}) = fn (left: Box) => fn (right: Box) => do:
   use Tick ()
   use Tick ()
-  return Box 42
+  return #Box 42
 `;
     const body = `
 entry const answer = fn () => do (@effect.provider Tick (fn () => ())):
   return do (@effect.provider Tick (fn () => ())):
-    use boxed <- twice (Box 21)
-    let Box result = boxed
+    use boxed <- twice (#Box 21)
+    let #Box result = boxed
     return result
 `;
     const artifact = compiler.compile(
@@ -590,12 +590,12 @@ Deno.test("a bound member retained as a callable resolves receiver evidence", as
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const artifact = compiler.compile(`
-type Box is data = Box { value: U32 }
+type Box is data = #Box { value: U32 }
 const Box.plus = fn box => fn delta => @u32.add box.value delta
 const invoke: a -> U32 where { receiver "plus" a Unit (U32 -> U32) } = fn box => do:
   let bound = box.plus
   return bound 1
-entry const answer = fn () => invoke (Box { value: 41 })
+entry const answer = fn () => invoke (#Box { value: 41 })
 `);
     const exports =
       new WebAssembly.Instance(new WebAssembly.Module(artifact.bytes))
@@ -613,13 +613,13 @@ Deno.test("a bound member cannot claim a pure returned closure when its selected
       () =>
         compiler.compile(`
 type Tick is effect = Unit -> Unit
-type Box is data = Box { value: U32 }
+type Box is data = #Box { value: U32 }
 const Box.plus = fn box => fn delta => do:
   use Tick ()
   return @u32.add box.value delta
 const bind: a -> (U32 -> U32 ! {}) where { receiver "plus" a Unit (U32 -> U32 ! {}) } = fn box => box.plus
 entry const answer = fn () => do:
-  let bound = bind (Box { value: 41 })
+  let bound = bind (#Box { value: 41 })
   return bound 1
 `),
       (error) =>
@@ -634,12 +634,12 @@ Deno.test("a qualified constructor value instantiates at two concrete types", as
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const artifact = compiler.compile(`
-type Box a is data = Box a
-const make: a -> Box a where { type_rep a } = Box
+type Box a is data = #Box a
+const make: a -> Box a where { type_rep a } = #Box
 entry const integer = fn () => case make 42 of
-  Box value => value
+  #Box value => value
 entry const fraction = fn () => case make 1.0 of
-  Box value => value
+  #Box value => value
 `);
     const exports =
       new WebAssembly.Instance(new WebAssembly.Module(artifact.bytes))
@@ -693,9 +693,9 @@ Deno.test("mutual SCC aliases carry transitive qualified requirements at creatio
 const first: a -> a = fn value => do:
   let alias = second
   return alias value
-const second: a -> a where { associated "add" a a a } = fn value => case True of
-  True => value + value
-  False => first value
+const second: a -> a where { associated "add" a a a } = fn value => case #True of
+  #True => value + value
+  #False => first value
 entry const answer = fn () => first 21
 `);
     const exports =
@@ -712,9 +712,9 @@ Deno.test("mutual SCC propagates an inferred peer requirement", async () => {
   try {
     const artifact = compiler.compile(`
 const first: a -> a = fn value => second value
-const second: a -> a = fn value => case True of
-  True => value + value
-  False => first value
+const second: a -> a = fn value => case #True of
+  #True => value + value
+  #False => first value
 entry const answer = fn () => first 21
 `);
     const exports =
@@ -731,9 +731,9 @@ Deno.test("mutual SCC preserves a variable mentioned only by a predicate", async
   try {
     const artifact = compiler.compile(`
 const first: U32 -> U32 = fn value => second value
-const second: U32 -> U32 where { associated "add" U32 U32 a } = fn value => case True of
-  True => value
-  False => first value
+const second: U32 -> U32 where { associated "add" U32 U32 a } = fn value => case #True of
+  #True => value
+  #False => first value
 entry const answer = fn () => first 42
 `);
     const exports =
@@ -753,9 +753,9 @@ const first: a -> a = fn value => do:
   let alias: a -> a where { ${clause} } = second
   return alias value
 const second: a -> a = fn value => third value
-const third: a -> a = fn value => case True of
-  True => value + value
-  False => first value
+const third: a -> a = fn value => case #True of
+  #True => value + value
+  #False => first value
 entry const answer = fn () => first 21
 `;
     throws(() => compiler.compile(source("")), (error) => {
@@ -785,9 +785,9 @@ const first: a -> a = fn value => do:
     let inner: a -> a where { ${inner} } = second
     return inner
   return alias value
-const second: a -> a where { associated "add" a a a } = fn value => case True of
-  True => value + value
-  False => first value
+const second: a -> a where { associated "add" a a a } = fn value => case #True of
+  #True => value + value
+  #False => first value
 entry const answer = fn () => first 21
 `;
     throws(
@@ -872,7 +872,7 @@ Deno.test("row/type name collision and higher-rank clauses have source diagnosti
           "where",
         ],
         [
-          "type Box is data = Box { value: U32 }\nentry const bad = Box { value: fn (callback: U32 -> U32 where { type_rep U32 }) => 42 }\n",
+          "type Box is data = #Box { value: U32 }\nentry const bad = #Box { value: fn (callback: U32 -> U32 where { type_rep U32 }) => 42 }\n",
           "higher_rank_constraint",
           "where",
         ],

@@ -86,7 +86,7 @@ def add_names(names: List<&2, String>, +witness: Witness, +indexed: Map<&2, List
       indexed
     case +name <> tail:
       previous = Index.get(List<&2, Witness>, indexed, name, Nil{})
-      add_names(tail, witness, Map.set(&2, List<&2, Witness>, indexed, name, witness <> previous))
+      add_names(tail, witness, Index.set(List<&2, Witness>, indexed, name, witness <> previous))
 
 def add(found: Maybe<&2, Witness>, indexed: Map<&2, List<&2, Witness>>) -> Map<&2, List<&2, Witness>>:
   match found:
@@ -104,7 +104,7 @@ def add_need(names: List<&2, String>, +need: G.GroupNeeds, +indexed: Map<&2, Lis
       indexed
     case +name <> tail:
       previous = Index.get(List<&2, G.GroupNeeds>, indexed, name, Nil{})
-      add_need(tail, need, Map.set(&2, List<&2, G.GroupNeeds>, indexed, name, need <> previous))
+      add_need(tail, need, Index.set(List<&2, G.GroupNeeds>, indexed, name, need <> previous))
 
 def need_index(needs: List<&2, G.GroupNeeds>, indexed: Map<&2, List<&2, G.GroupNeeds>>) -> Map<&2, List<&2, G.GroupNeeds>>:
   match needs:

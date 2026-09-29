@@ -85,11 +85,11 @@ Deno.test("tag diagnostics point at the tag and unused tagged consts do not eval
       const [source, code] of [
         ["#[1] entry const answer = 42\n", "type_mismatch"],
         [
-          "#[fn value => @u32.add True 1] entry const answer = 42\n",
+          "#[fn value => @u32.add #True 1] entry const answer = 42\n",
           "type_mismatch",
         ],
         [
-          "#[fn value => True + False] entry const answer = 42\n",
+          "#[fn value => #True + #False] entry const answer = 42\n",
           "missing_associated",
         ],
         [
@@ -97,7 +97,7 @@ Deno.test("tag diagnostics point at the tag and unused tagged consts do not eval
           "const_panic",
         ],
         ["#[fn value => value] entry const answer = answer\n", "recursive_tag"],
-        ["#[fn value => value] data Box = Box U32\n", "unsupported_attribute"],
+        ["#[fn value => value] data Box = #Box U32\n", "unsupported_attribute"],
       ] as const
     ) {
       let expected: SourceError | undefined;
@@ -125,8 +125,8 @@ Deno.test("deferred pattern diagnostics distinguish tags from their original val
   const cases = [
     {
       source: `#[fn value => case value of
-  True => 1
-] entry const answer = True
+  #True => 1
+] entry const answer = #True
 `,
       code: "non_exhaustive_match",
       subject: "#[",
@@ -142,11 +142,11 @@ Deno.test("deferred pattern diagnostics distinguish tags from their original val
       subject: "#[",
     },
     {
-      source: `#[fn value => value] entry const answer = case True of
-  True => 1
+      source: `#[fn value => value] entry const answer = case #True of
+  #True => 1
 `,
       code: "non_exhaustive_match",
-      subject: "case True of",
+      subject: "case #True of",
     },
     {
       source: `const expected = (1, 2)

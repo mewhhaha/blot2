@@ -163,7 +163,7 @@ Deno.test("native request headers preserve exact validation order and Nat offset
     [
       [nativeProtocolMagic, 0],
       1,
-      "unsupported native protocol version; expected 13",
+      "unsupported native protocol version; expected 14",
     ],
     [
       [nativeProtocolMagic, nativeProtocolVersion, 10],
@@ -513,7 +513,7 @@ Deno.test("dictionary compression preserves frame limits for unique strings", ()
 });
 
 Deno.test("protocol thirteen has only generic analyze/compile/emit session operations", () => {
-  equal(nativeProtocolVersion, 13);
+  equal(nativeProtocolVersion, 14);
   const opcode = (payload: Uint8Array) =>
     new DataView(payload.buffer, payload.byteOffset, payload.byteLength)
       .getUint32(8, true);

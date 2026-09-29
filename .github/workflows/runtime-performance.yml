@@ -1,0 +1,193 @@
+name: Runtime performance
+
+on:
+  pull_request:
+    paths: [
+      "compiler/**",
+      "scripts/**",
+      "std/**",
+      "LAWS.bend",
+      "PROOF.bend",
+      "deno.json",
+      "deno.lock",
+      "baba.json",
+      ".github/workflows/runtime-performance.yml",
+    ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        revision: [baseline, candidate]
+    env:
+      BEND_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: oven-sh/setup-bun@v2
+      - name: Install verified Bend release
+        run: |
+          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/bend"
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
+          echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
+      - name: Record toolchain
+        run: |
+          bend version
+          deno --version
+          bun --version
+          bend guide > "$RUNNER_TEMP/bend-guide.txt"
+      - name: Check readable runtime matches its checked-in encoding
+        if: matrix.revision == 'candidate'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wabt
+          wat2wasm --version
+          deno run -A scripts/generate_arena_runtime.ts
+          git diff --exit-code -- compiler/arena_runtime.bend
+      - name: Build exact comparison source
+        env:
+          REVISION: ${{ matrix.revision }}
+        run: |
+          source="$GITHUB_WORKSPACE"
+          if [ "$REVISION" = baseline ]; then
+            source="$RUNNER_TEMP/baseline"
+            git worktree add --detach "$source" 2d44737bbe265d75b0264bad78b810c87ff6c024
+          fi
+          python3 "$GITHUB_WORKSPACE/scripts/build_runtime_reference.py" "$source"
+          (cd "$source" && deno task generate:parser)
+          git -C "$source" rev-parse HEAD > "$source/generated/compiler/source-revision.txt"
+          tar -czf "$RUNNER_TEMP/$REVISION.tar.gz" -C "$source" compiler generated std scripts deno.json deno.lock baba.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runtime-${{ matrix.revision }}
+          path: ${{ runner.temp }}/${{ matrix.revision }}.tar.gz
+          retention-days: 3
+  native-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      BEND_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: oven-sh/setup-bun@v2
+      - name: Install verified Bend release
+        run: |
+          curl --fail --location --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
+          echo "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  $RUNNER_TEMP/bend.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/bend"
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
+          echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
+      - name: Record toolchain
+        id: toolchain
+        run: |
+          bend version
+          deno --version
+          bun --version
+          clang --version
+          echo "clang=$(clang --version | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          bend guide > "$RUNNER_TEMP/bend-guide.txt"
+      - uses: actions/cache@v4
+        id: native-cache
+        with:
+          path: generated/compiler/blotc
+          key: runtime-native-v1-ubuntu24-${{ runner.arch }}-bend2.0.34-${{ steps.toolchain.outputs.clang }}-${{ hashFiles('compiler/**/*.bend', 'LAWS.bend', 'PROOF.bend', 'scripts/build_compiler.ts') }}
+      - name: Build native and matching reference
+        env:
+          CACHE_HIT: ${{ steps.native-cache.outputs.cache-hit }}
+        run: |
+          deno task generate:parser
+          if [ "$CACHE_HIT" != true ]; then
+            deno task build:compiler
+          else
+            bend PROOF.bend
+          fi
+          python3 scripts/build_runtime_reference.py
+      - name: Typecheck and run compiler regressions
+        run: |
+          mkdir -p build
+          # Match test:compiler entry points, then check both new benchmarks.
+          deno check compiler/demo.ts compiler/host_demo.ts compiler/ecs_demo.ts compiler/cli.ts compiler/bench.ts compiler/native_bench.ts compiler/parallel_grain_bench.ts compiler/cpu_scaling_bench.ts compiler/cpu_scaling_trace.ts compiler/worker.ts compiler/syntax_worker.ts compiler/runtime_bench.ts compiler/gc_bench.ts
+          deno test --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts 2>&1 | tee build/runtime-tests.log
+          git rev-parse HEAD > build/native-revision.txt
+          sha256sum generated/compiler/blotc > build/native-sha256.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-native-results
+          path: |
+            build/runtime-tests.log
+            build/native-revision.txt
+            build/native-sha256.txt
+            generated/compiler/blotc
+          retention-days: 3
+  benchmarks:
+    needs: reference
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: runtime-baseline
+          path: ${{ runner.temp }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: runtime-candidate
+          path: ${{ runner.temp }}
+      - name: Restore exact generated compilers
+        run: |
+          mkdir -p "$RUNNER_TEMP/baseline"
+          tar -xzf "$RUNNER_TEMP/baseline.tar.gz" -C "$RUNNER_TEMP/baseline"
+          tar -xzf "$RUNNER_TEMP/candidate.tar.gz"
+      - name: Test changed data paths against rebuilt compiler
+        run: |
+          deno fmt --check compiler/fifo*.ts compiler/parser_source*.ts compiler/worker_pool*.ts compiler/guest.ts compiler/guest_arrays.test.ts compiler/array_fill.test.ts compiler/source_project.ts compiler/syntax.ts compiler/runtime_bench.ts compiler/gc_bench.ts compiler/arena_runtime.test.ts compiler/scalar_array_layout.test.ts compiler/RUNTIME_PERFORMANCE.md scripts/generate_arena_runtime.ts
+          deno test --allow-read=compiler,generated,examples,std --filter '/^(parser span|FIFO|compiler worker FIFO|JS numeric array ABI|array fill executes|layout line|kinded declarations)/' compiler/parser_source.test.ts compiler/fifo.test.ts compiler/worker_pool.test.ts compiler/guest_arrays.test.ts compiler/array_fill.test.ts compiler/syntax.test.ts
+          deno test --allow-read=compiler,generated,examples,std compiler/arena_runtime.test.ts
+          deno test --allow-read=compiler,generated,examples,std --filter javascript compiler/scalar_array_layout.test.ts
+      - name: Run alternating paired benchmarks
+        run: |
+          mkdir -p build
+          deno run --allow-read --allow-write=build compiler/runtime_bench.ts "$RUNNER_TEMP/baseline" 2>&1 | tee build/runtime-bench.log
+          deno run --allow-read --allow-write=build compiler/gc_bench.ts "$RUNNER_TEMP/baseline" 2>&1 | tee build/gc-bench.log
+          cp generated/compiler/source-revision.txt build/candidate-revision.txt
+          cp "$RUNNER_TEMP/baseline/generated/compiler/source-revision.txt" build/baseline-revision.txt
+          cp generated/compiler/runtime-reference-version.txt build/bend-version.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-performance-results
+          path: build/
+          retention-days: 7

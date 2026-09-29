@@ -48,8 +48,8 @@ function sessionTest(
 sessionTest(
   "native planner invalidates an operation-only nominal catalog revision",
   async (session, clean) => {
-    const source = `type Box is data = Box U32
-type Wrap is data = Wrap U32
+    const source = `type Box is data = #Box U32
+type Wrap is data = #Wrap U32
 effect Unused : Unit -> Box
 entry const answer = 7
 `;
@@ -118,15 +118,15 @@ sessionTest(
         `const first: a -> a = fn value => do:
   let alias = second
   return alias value
-const second: a -> a where { associated "add" a a a } = fn value => case True of
-  True => value + value
-  False => first value
+const second: a -> a where { associated "add" a a a } = fn value => case #True of
+  #True => value + value
+  #False => first value
 entry const answer = fn () => first 21
 `,
         `const first: U32 -> U32 = fn value => second value
-const second: U32 -> U32 where { associated "add" U32 U32 a } = fn value => case True of
-  True => value
-  False => first value
+const second: U32 -> U32 where { associated "add" U32 U32 a } = fn value => case #True of
+  #True => value
+  #False => first value
 entry const answer = fn () => first 42
 `,
       ]
@@ -145,18 +145,18 @@ entry const answer = fn () => first 42
 sessionTest(
   "predicate-only field and type-changing update results resolve at concrete uses",
   async (session, clean) => {
-    const source = `type Box a is data = Box { value: a }
+    const source = `type Box a is data = #Box { value: a }
 const read: a -> b where { field "value" a b } = fn box => box.value
 const replace: a -> b -> c where { update "value" a b c } = fn box => fn value => do:
   let current = box
   current.value := value
   return current
-entry const field_result = fn () => read (Box { value: 42 })
+entry const field_result = fn () => read (#Box { value: 42 })
 entry const changed_result = fn () => do:
-  let changed = replace (Box { value: 0 }) True
+  let changed = replace (#Box { value: 0 }) #True
   return case changed.value of
-    True => 42
-    False => 0
+    #True => 42
+    #False => 0
 `;
     const artifact = await session.compile(source);
     equivalent(artifact.artifact, await clean.compile(source));
@@ -247,17 +247,17 @@ sessionTest(
   "native tuple-pattern edits invalidate retained closures without losing field patterns",
   async (session, clean) => {
     const source = `const choose = (fn fallback => fn pair => case pair of
-  (True, value) => value
-  (False, _) => fallback) 0
-entry const answer = fn () => choose (True, 42)
+  (#True, value) => value
+  (#False, _) => fallback) 0
+entry const answer = fn () => choose (#True, 42)
 `;
     for (
       const [revision, expected] of [
         [source, 42],
         [
-          source.replace("(True, value)", "(False, value)").replace(
-            "(False, _)",
-            "(True, _)",
+          source.replace("(#True, value)", "(#False, value)").replace(
+            "(#False, _)",
+            "(#True, _)",
           ),
           0,
         ],
@@ -401,7 +401,7 @@ sessionTest(
   "native session retains prelude and reuses trivia-only revisions",
   async (session, clean) => {
     const source =
-      "entry const answer = fn () => Maybe.unwrap_or 0 (Some (identity 42))\n";
+      "entry const answer = fn () => Maybe.unwrap_or 0 (#Some (identity 42))\n";
     const first = await session.compile(source);
     equivalent(first.artifact, await clean.compile(source));
     const js = await createSourceCompiler();
@@ -436,16 +436,16 @@ sessionTest(
   "native session reuses the initial checked groups and still validates coverage",
   async (session, clean) => {
     const source = `entry const classify = fn (flag: Bool) => case flag of
-  True => 1
-  False => 0
-entry const answer = fn () => classify True
+  #True => 1
+  #False => 0
+entry const answer = fn () => classify #True
 `;
     const first = await session.compile(source);
     equivalent(first.artifact, await clean.compile(source));
     ok(first.stats.groups_reused > 0);
     equal(await answer(first.artifact), 1);
 
-    const invalid = source.replace("  False => 0\n", "");
+    const invalid = source.replace("  #False => 0\n", "");
     await rejects(
       () => session.compile(invalid),
       diagnostic("non_exhaustive_match"),
@@ -537,7 +537,7 @@ sessionTest(
       "entry const transform = fn value => @u32.add value 1\nentry const answer = fn () => @u32.add (transform 41) 0\n";
     await session.compile(source);
     await rejects(
-      () => session.compile(source.replace("@u32.add value 1", "True")),
+      () => session.compile(source.replace("@u32.add value 1", "#True")),
       diagnostic("type_mismatch"),
     );
     await rejects(
@@ -547,7 +547,7 @@ sessionTest(
     await rejects(
       () =>
         session.compile(
-          source + "const unused = fn value => @u32.add True 1\n",
+          source + "const unused = fn value => @u32.add #True 1\n",
         ),
       diagnostic("type_mismatch"),
     );
@@ -578,21 +578,21 @@ sessionTest(
 sessionTest(
   "warm dispatch failures preserve source errors and roll back to the last success",
   async (session, clean) => {
-    const source = `type Box is data = Box { value: U32 }
+    const source = `type Box is data = #Box { value: U32 }
 entry const stable = fn () -> U32 => 1
 const get = fn (box: Box) => box.value
-entry const answer = fn () -> U32 => @u32.add (get (Box { value: 41 })) (stable ())
+entry const answer = fn () -> U32 => @u32.add (get (#Box { value: 41 })) (stable ())
 `;
     const first = await session.compile(source);
     equivalent(first.artifact, await clean.compile(source));
     const invalid = source.replace(
       "stable = fn () -> U32 => 1",
-      "stable = fn () -> U32 => True",
+      "stable = fn () -> U32 => #True",
     );
     for (
       const revision of [
         invalid,
-        invalid + "const later = fn () -> U32 => True\n",
+        invalid + "const later = fn () -> U32 => #True\n",
         "// offset shift\n" + invalid,
       ]
     ) {
@@ -625,7 +625,7 @@ entry const answer = fn () -> U32 => @u32.add (get (Box { value: 41 })) (stable 
 sessionTest(
   "no-dispatch success retains source evidence across failing edits and a new dispatch",
   async (session, clean) => {
-    const source = `type Box is data = Box { value: U32 }
+    const source = `type Box is data = #Box { value: U32 }
 entry const stable = fn () -> U32 => 1
 entry const independent = fn () -> U32 => 2
 entry const answer = fn () -> U32 => stable ()
@@ -634,11 +634,11 @@ entry const answer = fn () -> U32 => stable ()
     equivalent(first.artifact, await clean.compile(source));
     const noDispatchError = source.replace(
       "stable = fn () -> U32 => 1",
-      "stable = fn () -> U32 => True",
+      "stable = fn () -> U32 => #True",
     );
     const dispatchError = source.replace(
       "entry const answer = fn () -> U32 => stable ()",
-      "entry const answer = fn () -> U32 => (Box { value: 41 }).missing",
+      "entry const answer = fn () -> U32 => (#Box { value: 41 }).missing",
     );
     for (const revision of [noDispatchError, dispatchError]) {
       const warmError = await session.compile(revision).then(

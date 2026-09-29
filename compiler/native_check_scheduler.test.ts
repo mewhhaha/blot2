@@ -11,23 +11,23 @@ import {
 } from "./benchmark_workloads.ts";
 
 const genericSource = `effect Reader.ask: Unit -> U32
-data Maybe a = Some a | Nothing
+data Maybe a = #Some a | #Nothing
 const identity = fn value => value
 const defer = fn action => fn () => action ()
 const ask = fn () => Reader.ask ()
 entry const read_handler = fn () => 40
 const reader = @effect.provider Reader.ask read_handler
 entry const even = fn value => case @u32.eq value 0 of
-  True => True
-  False => odd (@u32.sub value 1)
+  #True => #True
+  #False => odd (@u32.sub value 1)
 entry const odd = fn value => case @u32.eq value 0 of
-  True => False
-  False => even (@u32.sub value 1)
+  #True => #False
+  #False => even (@u32.sub value 1)
 entry const reader_effects = @effect.count (@effect.of ask)
 entry const answer = fn () => do reader:
   use value <- (defer ask) ()
-  return case identity (Some value), identity True, even 4 of
-    Some number, True, True => @u32.add number 2
+  return case identity (#Some value), identity #True, even 4 of
+    #Some number, #True, #True => @u32.add number 2
     _, _, _ => 0
 `;
 
@@ -108,18 +108,18 @@ Deno.test("retained nominal scans follow constructor moves, edits, failures and 
           index === 0 ? "value" : `value_${index - 1}`
         } 0`,
     ),
-    "  return Carry value_63",
+    "  return #Carry value_63",
   ].join("\n");
-  const original = `data Left = Carry U32 | EmptyLeft
-data Right = EmptyRight
+  const original = `data Left = #Carry U32 | #EmptyLeft
+data Right = #EmptyRight
 ${wrap}
 entry const answer = fn () => case wrap 40 of
-  Carry value => @u32.add value 2
+  #Carry value => @u32.add value 2
   _ => 0
 `;
   const moved = original.replace(
-    "data Left = Carry U32 | EmptyLeft\ndata Right = EmptyRight",
-    "data Left = EmptyLeft\ndata Right = Carry U32 | EmptyRight",
+    "data Left = #Carry U32 | #EmptyLeft\ndata Right = #EmptyRight",
+    "data Left = #EmptyLeft\ndata Right = #Carry U32 | #EmptyRight",
   );
   const edited = moved.replace("wrap 40", "wrap 41");
   const reference = await createSourceCompiler({ prelude: "none" });
@@ -135,7 +135,7 @@ entry const answer = fn () => case wrap 40 of
             original,
             moved,
             edited,
-            moved.replace(wrap, "const wrap = fn value => Carry value"),
+            moved.replace(wrap, "const wrap = fn value => #Carry value"),
             original,
           ]
         ) {
@@ -190,7 +190,7 @@ Deno.test("dependency chains preserve artifacts, cache counts and rollback at on
   const edited = staggeredSource(true);
   const broken = edited.replace(
     "value_0 = @u32.add value 2",
-    "value_0 = @u32.add True 2",
+    "value_0 = @u32.add #True 2",
   );
   try {
     const firstExpected = reference.compile(original);
@@ -262,7 +262,7 @@ for (
       "const join_0_7 = fn value => @f32.add",
     ).replace(
       /const seed_7 = fn value => [^\n]+/,
-      "const seed_7 = fn value => @u32.add True 1",
+      "const seed_7 = fn value => @u32.add #True 1",
     );
     const reference = await createSourceCompiler({ prelude: "none" });
     try {
@@ -323,7 +323,10 @@ Deno.test("native ready batches retain interface hits and roll back all caches a
   try {
     const original = fanout();
     const edited = original.replace("seed = fn () => 40", "seed = fn () => 41");
-    const broken = edited.replace("seed = fn () => 41", "seed = fn () => True");
+    const broken = edited.replace(
+      "seed = fn () => 41",
+      "seed = fn () => #True",
+    );
     const expected = reference.compile(edited);
     const expectedDiagnostic = await diagnostic(() =>
       reference.compile(broken)
@@ -389,15 +392,15 @@ entry const right = fn () => seed ()
 entry const answer = fn () => @u32.add (left ()) (right ())`,
     `entry const seed = fn () => 40
 entry const left = fn value => case @u32.eq value 0 of
-  True => seed ()
-  False => right (@u32.sub value 1)
+  #True => seed ()
+  #False => right (@u32.sub value 1)
 entry const right = fn value => left value
 entry const answer = fn () => right 2`,
     `entry const answer = fn () => right 2
 entry const right = fn value => left value
 entry const left = fn value => case @u32.eq value 0 of
-  True => seed ()
-  False => right (@u32.sub value 1)
+  #True => seed ()
+  #False => right (@u32.sub value 1)
 entry const seed = fn () => 40`,
   ];
   for (const threads of [1, 8]) {

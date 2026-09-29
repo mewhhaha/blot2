@@ -85,15 +85,15 @@ entry const run = fn (value: F32) => do:
   let ignored = untouched 42
   return twice value
 `,
-    `data Cell = Cell U32
+    `data Cell = #Cell U32
 const pick = fn values => @array.get values 0
-entry const run = fn () => case pick [Cell 42] of
-  Cell answer => answer
+entry const run = fn () => case pick [#Cell 42] of
+  #Cell answer => answer
 `,
-    `data Cell = Cell U32
+    `data Cell = #Cell U32
 const read = fn witness => @state.get witness
 entry const run = fn () => do:
-  let (_, Cell answer) = @state.run (Cell 42) (fn () => read Cell)
+  let (_, #Cell answer) = @state.run (#Cell 42) (fn () => read #Cell)
   return answer
 `,
   ];

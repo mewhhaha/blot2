@@ -99,28 +99,28 @@ function checkedWithInterfaces(
 const cases = [
   {
     name: "type changing generic setter",
-    source: `type Box a is data = Box { value: a }
+    source: `type Box a is data = #Box { value: a }
 entry const run = fn () => do:
-  let box = Box { value: 40 }
-  box.value := True
+  let box = #Box { value: 40 }
+  box.value := #True
   return case box.value of
-    True => 42
-    False => 0
+    #True => 42
+    #False => 0
 `,
   },
   {
     name: "nested nominal field",
-    source: `type Inner a is data = Inner { value: a }
-type Outer a is data = Outer { inner: Inner a }
-entry const run = fn () => (Outer { inner: Inner { value: 42 } }).inner.value
+    source: `type Inner a is data = #Inner { value: a }
+type Outer a is data = #Outer { inner: Inner a }
+entry const run = fn () => (#Outer { inner: #Inner { value: 42 } }).inner.value
 `,
   },
   {
     name: "shared field across variants",
     source:
-      `type Choice a is data = Low { value: a } | High { value: a, tag: U32 }
+      `type Choice a is data = #Low { value: a } | #High { value: a, tag: U32 }
 entry const run = fn () => do:
-  let item = High { value: 40, tag: 1 }
+  let item = #High { value: 40, tag: 1 }
   item.value := @u32.add self 2
   return item.value
 `,
@@ -128,11 +128,11 @@ entry const run = fn () => do:
   {
     name: "latent effect row in field payload",
     source: `effect Reader.ask: Unit -> U32
-type Holder is data = Holder { callback: Unit -> U32 ! {Reader.ask} }
+type Holder is data = #Holder { callback: Unit -> U32 ! {Reader.ask} }
 const read = fn holder => holder.callback
 const provider = @effect.provider Reader.ask (fn () => 42)
 entry const run = fn () => do provider:
-  return (read (Holder { callback: fn () => Reader.ask () })) ()
+  return (read (#Holder { callback: fn () => Reader.ask () })) ()
 `,
   },
 ];
@@ -342,21 +342,21 @@ Deno.test("field helper capture preserves ambiguity and incompatible variant dia
     for (
       const [source, expected] of [
         [
-          `type Box is data = Box { value: U32 }
+          `type Box is data = #Box { value: U32 }
 const Box.value = fn box => 0
-const run = fn () => (Box { value: 1 }).value
+const run = fn () => (#Box { value: 1 }).value
 `,
           {
             $: "model.Diagnostic",
             code: "ambiguous_member",
-            subject: "offset:109",
+            subject: "offset:111",
             message: "field and associated function share the name value",
           },
         ],
         [
-          `type Choice is data = Left { value: U32 } | Right { value: Bool }
+          `type Choice is data = #Left { value: U32 } | #Right { value: Bool }
 const run = fn item => item.value
-const test = run (Left { value: 42 })
+const test = run (#Left { value: 42 })
 `,
           {
             $: "model.Diagnostic",

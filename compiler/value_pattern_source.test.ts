@@ -20,11 +20,11 @@ Deno.test("value patterns match constants, parameters and lexical bindings in JS
   const native = await createNativeCompiler({ threads: 4 });
   const source = `
 entry const tab = @u32.add 0x110100 4
-data Event = Event { key: U32 }
+data Event = #Event { key: U32 }
 const record = fn actual => do:
   let expected = 7
   return case actual of
-    Event { key: ^expected } => 42
+    #Event { key: ^expected } => 42
     _ => 0
 entry const key_action = fn code => case code of
   ^tab => 42
@@ -38,16 +38,16 @@ const compare = fn (expected: U32) => fn actual => case actual of
 const nested = fn actual => do:
   let expected = 7
   return case actual of
-    Some (expected, ^expected) => expected
+    #Some (expected, ^expected) => expected
     _ => 0
 const guarded = fn actual => do:
   let expected = 7
-  let Some ^expected = actual else:
+  let #Some ^expected = actual else:
     return 0
   return 42
 const conditional = fn actual => do:
   let expected = 7
-  if let Some ^expected = actual:
+  if let #Some ^expected = actual:
     return 42
   return 0
 const make_matcher = fn (expected: U32) => fn actual => case actual of
@@ -55,7 +55,7 @@ const make_matcher = fn (expected: U32) => fn actual => case actual of
   _ => 0
 entry const captured = make_matcher 7
 entry const boolean = fn (actual: Bool) => do:
-  let expected = True
+  let expected = #True
   return case actual of
     ^expected => 42
     _ => 0
@@ -65,20 +65,20 @@ entry const correlated = fn actual => do:
     ^expected, 8 => 0
     _, ^expected => 42
     _, _ => 0
-entry const evaluated_record = record (Event { key: 7 })
+entry const evaluated_record = record (#Event { key: 7 })
 entry const evaluated = key_action tab
 entry const evaluated_capture = captured 7
-entry const evaluated_nested = nested (Some (42, 7))
-entry const evaluated_miss = nested (Some (7, 42))
-entry const evaluated_guard = guarded (Some 7)
-entry const evaluated_bool = boolean False
-entry const record_key = fn code => record (Event { key: code })
+entry const evaluated_nested = nested (#Some (42, 7))
+entry const evaluated_miss = nested (#Some (7, 42))
+entry const evaluated_guard = guarded (#Some 7)
+entry const evaluated_bool = boolean #False
+entry const record_key = fn code => record (#Event { key: code })
 entry const inferred_key = fn code => inferred code
 entry const key = fn code => key_action code
 entry const parameter = fn actual => compare 7 actual
-entry const shadow = fn actual => nested (Some (42, actual))
-entry const guard = fn actual => guarded (Some actual)
-entry const condition = fn actual => conditional (Some actual)
+entry const shadow = fn actual => nested (#Some (42, actual))
+entry const guard = fn actual => guarded (#Some actual)
+entry const condition = fn actual => conditional (#Some actual)
 entry const closure = fn actual => (make_matcher 7) actual
 entry const const_closure = fn actual => captured actual
 entry const flag = fn actual => boolean (actual == 7)
@@ -152,7 +152,7 @@ Deno.test("value patterns diagnose invalid references, types and incomplete cove
       "value_pattern_type",
     ],
     [
-      "const expected = True\nconst test = fn x => case x of\n  ^expected => 1\n",
+      "const expected = #True\nconst test = fn x => case x of\n  ^expected => 1\n",
       "non_exhaustive_match",
     ],
     [

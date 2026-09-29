@@ -242,12 +242,19 @@ def external_names(members: List<&2, String>, +nodes: List<&2, D.Node>) -> List<
     case head <> tail:
       List.append(&2, String, D.lookup(nodes, head), external_names(tail, nodes))
 
-def definition_predicates(definitions: List<&2, I.Definition>, +wanted: String) -> List<&2, M.Predicate>:
-  match definitions:
-    case Nil{}:
+# A matching definition with no predicates still wins over every later
+# definition. Carry a separate matched flag rather than using an empty result.
+def definition_predicates_work(definitions: List<&2, I.Definition>, +wanted: String, matched: Bool, found: List<&2, M.Predicate>) -> List<&2, M.Predicate>:
+  match definitions matched:
+    case _ True{}:
+      found
+    case Nil{} False{}:
       Nil{}
-    case I.Definition{+name, inference} <> tail:
-      Bool.pick(List<&2, M.Predicate>, M.name_equal(name, wanted), I.inference_predicates(inference), definition_predicates(tail, wanted))
+    case I.Definition{name, inference} <> tail False{}:
+      definition_predicates_work(tail, wanted, M.name_equal(name, wanted), I.inference_predicates(inference))
+
+def definition_predicates(definitions: List<&2, I.Definition>, wanted: String) -> List<&2, M.Predicate>:
+  definition_predicates_work(definitions, wanted, False{}, Nil{})
 
 def generalize_member(member: Bool, binding: I.Binding, +definitions: List<&2, I.Definition>, context: I.Context, state: I.State) -> Result<&2, &2, M.Diagnostic, I.Binding>:
   match member:
@@ -257,15 +264,17 @@ def generalize_member(member: Bool, binding: I.Binding, +definitions: List<&2, I
       I.Binding{+name, ty, variables, predicates} = binding
       I.generalize_qualified(ty, definition_predicates(definitions, name), context, state, name)
 
-def generalize_bindings_indexed(bindings: List<&2, I.Binding>, +members: Set(), +definitions: List<&2, I.Definition>, +context: I.Context, +state: I.State) -> Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
+def generalize_bindings_reversed(bindings: List<&2, I.Binding>, +members: Set(), +definitions: List<&2, I.Definition>, +context: I.Context, +state: I.State, reversed: List<&2, I.Binding>) -> Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
   match bindings:
     case Nil{}:
-      Done{Nil{}}
+      Done{List.reverse(&2, I.Binding, reversed)}
     case I.Binding{+name, ty, variables, predicates} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
         head : I.Binding <- generalize_member(D.member(members, name), I.Binding{name, ty, variables, predicates}, definitions, context, state)
-        rest : List<&2, I.Binding> <- generalize_bindings_indexed(tail, members, definitions, context, state)
-        return head <> rest
+        generalize_bindings_reversed(tail, members, definitions, context, state, head <> reversed)
+
+def generalize_bindings_indexed(bindings: List<&2, I.Binding>, members: Set(), definitions: List<&2, I.Definition>, context: I.Context, state: I.State) -> Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
+  generalize_bindings_reversed(bindings, members, definitions, context, state, Nil{})
 
 def generalize_bindings(bindings: List<&2, I.Binding>, members: List<&2, String>, context: I.Context, state: I.State) -> Result<&2, &2, M.Diagnostic, List<&2, I.Binding>>:
   generalize_bindings_indexed(bindings, reference_set(members, Set.new()), Nil{}, context, state)

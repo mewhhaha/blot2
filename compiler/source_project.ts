@@ -1,3 +1,4 @@
+import { Fifo } from "./fifo.ts";
 import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { bendArray, bendList } from "./bend_list.ts";
@@ -96,7 +97,7 @@ async function loadProject(
   const modules = new Map<string, SourceModule>();
   const visiting: string[] = [];
   const reads = new Map<string, Promise<PromiseSettledResult<string>>>();
-  const waiting: (() => void)[] = [];
+  const waiting = new Fifo<() => void>();
   let activeReads = 0;
   function prefetch(url: URL): Promise<PromiseSettledResult<string>> {
     const existing = reads.get(url.href);
@@ -229,7 +230,14 @@ async function loadProject(
 }
 
 /** Retain validated per-file syntax while re-reading the import graph each load. */
-export async function createSourceProjectLoader(options: ProjectOptions = {}) {
+export interface SourceProjectLoader {
+  load(entry: string | URL): Promise<SourceProject>;
+  dispose(): void;
+}
+
+export async function createSourceProjectLoader(
+  options: ProjectOptions = {},
+): Promise<SourceProjectLoader> {
   const configured: ProjectOptions = {
     ...options,
     imports: options.imports && Object.fromEntries(

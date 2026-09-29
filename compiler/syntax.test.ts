@@ -2,6 +2,38 @@ import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import { createFrontend, type Cst, SourceError } from "./syntax.ts";
 import { bendArray } from "./bend_list.ts";
 
+Deno.test("selector markers remain ordinary text inside comments and strings", async () => {
+  const frontend = await createFrontend();
+  try {
+    frontend.parse('// a · b\nconst failure = fn () => @panic "a · b"\n');
+    throws(() => frontend.parse("const field = ·name\n"), (error) => {
+      ok(error instanceof SourceError);
+      equal(error.code, "reserved_selector_marker");
+      return true;
+    });
+  } finally {
+    frontend.dispose();
+  }
+});
+
+Deno.test("from is contextual to imports and the internal marker cannot bypass its spelling", async () => {
+  const frontend = await createFrontend();
+  try {
+    frontend.parse(
+      'import { value } from "./value"\nconst from = fn value => value\nconst converted = from 1\n',
+    );
+    const source = '// before\nimport { value } froM "./value"\n';
+    throws(() => frontend.parse(source), (error) => {
+      ok(error instanceof SourceError);
+      equal(error.code, "reserved_import_marker");
+      equal(source.slice(error.start, error.end), "froM");
+      return true;
+    });
+  } finally {
+    frontend.dispose();
+  }
+});
+
 function normalizedNodes(root: Cst, source: string) {
   const pending = [root];
   const nodes = [];
@@ -24,8 +56,8 @@ Deno.test("kinded declarations and applied effect rows preserve their CST shape"
   const frontend = await createFrontend();
   try {
     const root = frontend.parse(`
-data Old a = Old a
-type Maybe a is data = Some a | Nothing
+data Old a = #Old a
+type Maybe a is data = #Some a | #Nothing
 type Get a is effect = Unit -> a
 type State a is effect = {
   get: Unit -> a,

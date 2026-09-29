@@ -136,12 +136,12 @@ Deno.test("entry const and entry let export exactly the entry declarations", asy
 
 Deno.test("entry is a contextual keyword and an ordinary name elsewhere", async () => {
   const source = `
-type Holder is data = Holder { entry: U32 }
+type Holder is data = #Holder { entry: U32 }
 const entry = fn (entry: U32) => do:
   let (first, second) = (entry, entry)
   return @u32.add first second
 const pick = fn holder => case holder of
-  Holder { entry } => entry
+  #Holder { entry } => entry
 const bind = fn (value: U32) => do:
   let entry = value
   return case entry of
@@ -149,8 +149,8 @@ const bind = fn (value: U32) => do:
 const project = fn (holder: Holder) => holder.entry
 const lambda = fn entry => entry
 entry const run = fn (value: U32) => do:
-  let holder = Holder { entry: entry value }
-  let Holder { entry: field } = holder
+  let holder = #Holder { entry: entry value }
+  let #Holder { entry: field } = holder
   return @u32.add (pick holder) (@u32.add (bind field) (project (lambda holder)))
 `;
   const frontend = await createFrontend();
@@ -179,10 +179,10 @@ entry const run = fn (value: U32) => do:
 });
 
 const library = `
-type Box is data = Box U32
+type Box is data = #Box U32
 const base = 40
 const unbox = fn (box: Box) => case box of
-  Box value => value
+  #Box value => value
 const unused = fn (value: U32) => value
 `;
 
@@ -190,7 +190,7 @@ const application = `
 import * as lib from "./lib"
 import { base, Box } from "./lib"
 const local = fn (value: U32) => value + 1
-entry const answer = fn () => lib.unbox (Box (local (base + 1)))
+entry const answer = fn () => lib.unbox (#Box (local (base + 1)))
 entry const twice = fn (value: U32) => value + value
 entry const four = fn () => twice 2
 const also = fn () => four ()
@@ -327,7 +327,7 @@ Deno.test("entry diagnostics cover ABI misfits, runtime values, missing entries 
     equal(reference.analyze(library).functions, []);
     equal(await native.analyze(library), reference.analyze(library));
     // Every declaration still passes the initial type check.
-    const typeError = "const unused = fn () => @u32.add True 1\n" +
+    const typeError = "const unused = fn () => @u32.add #True 1\n" +
       "entry const answer = fn () => 42\n";
     throws(() => reference.compile(typeError), sourceError("type_mismatch"));
     await rejects(
@@ -351,13 +351,13 @@ Deno.test("unreachable declarations are not evaluated, specialized, initialized 
   try {
     const source = `
 const count = fn (value: U32) => case @u32.eq value 0 of
-  True => 0
-  False => count (@u32.sub value 1)
+  #True => 0
+  #False => count (@u32.sub value 1)
 const exhausted = count 100000000
 const panicked: U32 = @panic "never evaluated"
 let startup: U32 = @panic "never initialized"
 const generic = fn value => value + value
-const mismatched = fn () => True + False
+const mismatched = fn () => #True + #False
 entry const answer = fn () => 42
 entry const doubled = fn (value: U32) => value * 2
 `;
@@ -425,7 +425,7 @@ entry const doubled = fn (value: U32) => value * 2
 Deno.test("unused constructor and effect wrappers add no Wasm code", async () => {
   const base = "entry const run = fn () => 42\n";
   const unused = base +
-    "type Dead is data = Dead U32\n" +
+    "type Dead is data = #Dead U32\n" +
     "effect Unused.ping: Unit -> Unit\n";
   const reference = await createSourceCompiler({ prelude: "none" });
   const native = await createNativeCompiler({ prelude: "none" });
@@ -447,9 +447,9 @@ Deno.test("unused constructor and effect wrappers add no Wasm code", async () =>
 });
 
 Deno.test("a reached constructor value keeps its wrapper", async () => {
-  const source = "type Box is data = Box U32\n" +
-    "const make = Box\n" +
-    "entry const run = fn () => case make 42 of\n  Box value => value\n";
+  const source = "type Box is data = #Box U32\n" +
+    "const make = #Box\n" +
+    "entry const run = fn () => case make 42 of\n  #Box value => value\n";
   const reference = await createSourceCompiler({ prelude: "none" });
   const native = await createNativeCompiler({ prelude: "none" });
   try {

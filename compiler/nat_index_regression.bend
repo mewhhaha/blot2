@@ -8,7 +8,7 @@ def missing(found: Maybe<&2, U32>) -> Bool:
     case Some{value}:
       False{}
 
-def valid() -> Bool:
+def boundary_valid() -> Bool:
   +highest = Nat.mul(16777216n, 8388608n)
   +last = Nat.add(highest, Nat.sub(highest, 1n))
   +base = {N.set(U32, N.new(U32), 0n, 10) : N.Index<U32>}
@@ -24,6 +24,26 @@ def valid() -> Bool:
     Bool.and(U32.is_eq(N.get(U32, wide, 1n, 0), 11),
     Bool.and(U32.is_eq(N.get(U32, updated, 1n, 0), 21),
       missing(N.find(U32, updated, Nat.add(highest, 1n))))))))))
+
+# Zero lies below every branching bit when each one-bit key is also present.
+def path_index(remaining: Nat, +bit: Nat, index: N.Index<U32>) -> N.Index<U32>:
+  match remaining:
+    case 0n:
+      index
+    case 1n+rest:
+      path_index(rest, Nat.div(bit, 2n), N.set(U32, index, bit, 42))
+
+def path_keys_valid(remaining: Nat, +bit: Nat, +index: N.Index<U32>) -> Bool:
+  match remaining:
+    case 0n:
+      U32.is_eq(N.get(U32, index, 0n, 0), 99)
+    case 1n+rest:
+      Bool.and(U32.is_eq(N.get(U32, index, bit, 0), 42), path_keys_valid(rest, Nat.div(bit, 2n), index))
+
+def valid() -> Bool:
+  +highest = Nat.mul(16777216n, 8388608n)
+  +index = path_index(48n, highest, N.set(U32, N.new(U32), 0n, 99))
+  Bool.and(boundary_valid(), Bool.and(path_keys_valid(48n, highest, index), missing(N.find(U32, index, 3n))))
 
 def finish(ok: Bool) -> IO(Unit):
   match ok:

@@ -6,19 +6,19 @@ type Cell a is effect = {
   get: Unit -> a
   set: a -> Unit
 }
-type Box a is data = Box a
+type Box a is data = #Box a
 
 const get = fn (witness: p -> a) -> a => Cell.get ()
 const set = fn value => Cell.set value
 const run = fn initial => fn action => @effect.run Cell.get Cell.set initial action
 
 entry const nested_reader_writer = fn () => do:
-  let (Box written, result) = run (Box 0) (fn () =>
-    @effect.reader Cell.get (fn () => Box 0) (fn () => Box 7) (fn () => do:
-      use boxed <- get (fn () => Box 0)
-      let Box count = boxed
-      return @effect.writer Cell.set (fn () => Box 0) (fn value => set value) (fn () => do:
-        use set (Box (@u32.add count 1))
+  let (#Box written, result) = run (#Box 0) (fn () =>
+    @effect.reader Cell.get (fn () => #Box 0) (fn () => #Box 7) (fn () => do:
+      use boxed <- get (fn () => #Box 0)
+      let #Box count = boxed
+      return @effect.writer Cell.set (fn () => #Box 0) (fn value => set value) (fn () => do:
+        use set (#Box (@u32.add count 1))
         return count)))
   return @u32.add written result
 `;

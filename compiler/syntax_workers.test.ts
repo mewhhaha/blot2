@@ -79,7 +79,7 @@ Deno.test("compact parallel frontend preserves exact request bytes, offsets, fue
           `// Unicode 🙂\n${large}`,
           large.replaceAll("\n", "\r\n"),
           `import { external } from "./module"\n${large}`,
-          `data Pair = Pair { first: U32, second: U32 }\n${large}\nconst pair = Pair { first: 0xFFFF_FFFF, second: 2147483648 }`,
+          `data Pair = #Pair { first: U32, second: U32 }\n${large}\nconst pair = #Pair { first: 0xFFFF_FFFF, second: 2147483648 }`,
         ]
       ) {
         const expected = reference(frontend, source);

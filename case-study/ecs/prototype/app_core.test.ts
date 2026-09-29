@@ -26,22 +26,22 @@ const matrix =
   "1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0 0.0 0.0 0.0 0.0 1.0";
 
 const application = `
-#[component] data Position = Position F32
-#[component] data Velocity = Velocity F32
-#[resource] data Counter = Counter U32
+#[component] data Position = #Position F32
+#[component] data Velocity = #Velocity F32
+#[resource] data Counter = #Counter U32
 const cube: MeshAsset = @asset.mesh "models/cube.mesh.json"
 const brass: MaterialAsset = @asset.material "materials/brass.json"
 
 const store = fn value => @ecs.set value
 const move = fn () => do:
-  use position <- @ecs.get Position
+  use position <- @ecs.get #Position
   use store position
   return ()
 const draw = fn () => do:
-  use previous <- @ecs.previous Position
-  use velocity <- @ecs.get Velocity
+  use previous <- @ecs.previous #Position
+  use velocity <- @ecs.get #Velocity
   use entity <- @ecs.entity ()
-  use @render.draw cube brass True entity ${matrix}
+  use @render.draw cube brass #True entity ${matrix}
   return ()
 const start = fn () => do:
   use @window.title "Blot guest"
@@ -49,9 +49,9 @@ const start = fn () => do:
   use @ecs.at entity initialize
   return ()
 const initialize = fn () => do:
-  use @ecs.insert (Position 1.0)
-  use @ecs.insert (Velocity 2.0)
-  use @ecs.set (Counter 0)
+  use @ecs.insert (#Position 1.0)
+  use @ecs.insert (#Velocity 2.0)
+  use @ecs.set (#Counter 0)
   return ()
 const event = fn () => do:
   use kind <- @input.event_kind ()
@@ -268,11 +268,11 @@ Deno.test("engine operations cannot escape purity or typed static dispatch bound
       ["const path = 1\nconst mesh = @asset.mesh path", "literal_required"],
       ['const mesh: MaterialAsset = @asset.mesh "cube"', "type_mismatch"],
       [
-        `const f = fn () => @render.draw (@asset.material "x") (@asset.mesh "x") True 0 ${matrix}`,
+        `const f = fn () => @render.draw (@asset.material "x") (@asset.mesh "x") #True 0 ${matrix}`,
         "type_mismatch",
       ],
       [
-        "data Position = Position F32\nconst f = fn () => @ecs.previous Position",
+        "data Position = #Position F32\nconst f = fn () => @ecs.previous #Position",
         "unknown_storage",
       ],
       [
@@ -280,7 +280,7 @@ Deno.test("engine operations cannot escape purity or typed static dispatch bound
         "let_effect",
       ],
       [
-        "const unused = fn () => @render.clear True 0.0 0.0 1.0\nconst start = fn () => ()",
+        "const unused = fn () => @render.clear #True 0.0 0.0 1.0\nconst start = fn () => ()",
         "type_mismatch",
       ],
     ];
@@ -306,7 +306,7 @@ const validate = fn value => do:
   if value:
     use @panic "invalid value"
   return 42
-const answer = fn () => validate False
+const answer = fn () => validate #False
 `);
     equal(checked.functions[0].result, { $: "U32Ty" });
     equal(checked.functions[1].result, { $: "U32Ty" });

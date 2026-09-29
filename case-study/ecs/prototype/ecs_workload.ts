@@ -7,7 +7,7 @@ export function ecsWorkload(systemCount: number): string {
   ) {
     throw new RangeError("ECS workload requires 1..256 systems");
   }
-  const declarations = ["#[resource]\ndata DeltaTime = DeltaTime U32"];
+  const declarations = ["#[resource]\ndata DeltaTime = #DeltaTime U32"];
   for (let index = 0; index < systemCount; index++) {
     declarations.push(`
 #[component]

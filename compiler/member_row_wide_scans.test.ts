@@ -1,6 +1,6 @@
 import { deepStrictEqual as equal } from "node:assert/strict";
 import compiled from "../generated/compiler/compiler.js";
-import { type BendList, bendList } from "./bend_list.ts";
+import { bendArray, type BendList, bendList } from "./bend_list.ts";
 
 type Node = { readonly $: string; readonly [field: string]: unknown };
 type Maybe<T> = { readonly $: "None" } | {
@@ -10,6 +10,16 @@ type Maybe<T> = { readonly $: "None" } | {
 
 const api = compiled as unknown as {
   "types.empty": () => Node;
+  "monomorph.pending": (environment: Node) => BendList<Node>;
+  "monomorph.scan_budget": (needs: BendList<Node>) => bigint;
+  "monomorph.unresolved": (
+    needs: BendList<Node>,
+    choices: Node,
+  ) => BendList<Node>;
+  "monomorph.remaining_after_change": (
+    needs: BendList<Node>,
+    change: Node,
+  ) => BendList<Node>;
   "monomorph.member_definition_count": (
     definitions: BendList<Node>,
     name: string,
@@ -30,11 +40,91 @@ const api = compiled as unknown as {
     owned: BendList<string>,
     definitions: BendList<Node>,
   ) => boolean;
+  "monomorph.recheckable_member_choices": (
+    choices: BendList<Node>,
+    substitutions: Node,
+    index: bigint,
+    owned: BendList<string>,
+    definitions: BendList<Node>,
+  ) => boolean;
+  "monomorph.all_member_bindings_accounted": (
+    bindings: BendList<Node>,
+    owned: BendList<string>,
+    index: bigint,
+    definitions: BendList<Node>,
+    substitutions: Node,
+  ) => boolean;
 };
 
 const nil = bendList<Node>([]);
 const u32: Node = { $: "model.U32Ty" };
 const empty = api["types.empty"]();
+
+Deno.test("pending constraints preserve source order across a large module", () => {
+  const predicate: Node = { $: "model.TypeRepPredicate", represented: u32 };
+  const need = (site: number): Node => ({
+    $: "infer.QualifiedNeed",
+    site: BigInt(site),
+    predicate,
+    subject: "wide module",
+  });
+  const definitions = Array.from({ length: 200 }, (_, group) => ({
+    $: "infer.Definition",
+    name: `group_${group}`,
+    inference: {
+      $: "infer.Inference",
+      inferred_type: u32,
+      coverage: bendList(
+        Array.from({ length: 100 }, (_, i) => need(group * 100 + i)),
+      ),
+      exits: nil,
+      reflections: nil,
+      predicates: nil,
+      uses: group === 199
+        ? bendList([{
+          $: "constraints.UsePlan",
+          site: 20_000n,
+          subject: "wide module",
+          instantiated_type: u32,
+          predicates: bendList([predicate]),
+        }])
+        : nil,
+    },
+  }));
+  const found = api["monomorph.pending"]({
+    $: "globals.Environment",
+    bindings: nil,
+    definitions: bendList(definitions),
+    state: {
+      $: "infer.State",
+      substitutions: empty,
+      next: 20_001n,
+      annotations: { $: "MTip" },
+    },
+  });
+  equal(
+    bendArray(found).map((value) => value.site),
+    Array.from({ length: 20_001 }, (_, i) => BigInt(i)),
+  );
+  equal(api["monomorph.scan_budget"](found), 160_016n);
+  equal(
+    bendArray(api["monomorph.unresolved"](found, { $: "MTip" })).map((value) =>
+      value.site
+    ),
+    Array.from({ length: 20_001 }, (_, i) => BigInt(i)),
+  );
+  const remaining = api["monomorph.remaining_after_change"](found, {
+    $: "monomorph.QualifiedChoiceChanged",
+    site: 10_000n,
+    predicate,
+  });
+  equal(
+    bendArray(remaining).map((value) => value.site),
+    Array.from({ length: 20_001 }, (_, i) => BigInt(i)).filter((site) =>
+      site !== 10_000n
+    ),
+  );
+});
 
 function definition(name: string, type: Node = u32): Node {
   return {
@@ -203,5 +293,75 @@ Deno.test("receiver answers stop at a matching selection in a wide list", () => 
       definitions,
     ),
     true,
+  );
+});
+
+Deno.test("wide selected-member scans find late matches without growing the host stack", () => {
+  const unrelated: Node = {
+    $: "monomorph.QualifiedChoice",
+    solved: nil,
+    answers: nil,
+  };
+  const choices = Array<Node>(20_000).fill(unrelated);
+  const owned = bendList(["seven"]);
+  const definitions = bendList([definition("seven", signature(7n))]);
+  equal(
+    api["monomorph.recheckable_member_choices"](
+      bendList(choices),
+      empty,
+      7n,
+      owned,
+      definitions,
+    ),
+    false,
+  );
+  for (
+    const pending of [
+      [...choices, selected("seven", 7n)],
+      [selected("seven", 7n), ...choices],
+    ]
+  ) {
+    equal(
+      api["monomorph.recheckable_member_choices"](
+        bendList(pending),
+        empty,
+        7n,
+        owned,
+        definitions,
+      ),
+      true,
+    );
+  }
+});
+
+Deno.test("wide member binding checks retain late failures without growing the host stack", () => {
+  const binding = (name: string, type: Node): Node => ({
+    $: "infer.Binding",
+    name,
+    inferred_type: type,
+    variables: nil,
+    predicates: nil,
+  });
+  const bindings = Array<Node>(20_000).fill(binding("outside", u32));
+  const owned = bendList(["unverified"]);
+  equal(
+    api["monomorph.all_member_bindings_accounted"](
+      bendList(bindings),
+      owned,
+      7n,
+      nil,
+      empty,
+    ),
+    true,
+  );
+  equal(
+    api["monomorph.all_member_bindings_accounted"](
+      bendList([...bindings, binding("unverified", signature(7n))]),
+      owned,
+      7n,
+      nil,
+      empty,
+    ),
+    false,
   );
 });

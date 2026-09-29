@@ -12,6 +12,7 @@ From the Blot repository:
 just guide                                  # this reference; no compiler build
 deno task blot guide                        # same CLI command
 just build                                 # build the native compiler
+deno task blot fmt examples/syntax.blot      # normalize spacing
 deno task blot check examples/syntax.blot    # check a source project
 deno task blot build examples/syntax.blot build/example.wasm
 ```
@@ -29,15 +30,15 @@ comment. Values use `snake_case`; types/constructors use `PascalCase`. Names are
 lexically scoped and values immutable. `F32.sqrt` names a function, not a method
 on an implicit receiver.
 
-Scalars: `Unit` (`()`), `Bool` (`True`, `False`), `U32` (`42`, `0xFF`, `4_096`),
-and `F32` (`1.0`, `1e-5`). No implicit numeric conversion. U32 arithmetic wraps
-at 32 bits; F32 rounds to binary32 and can yield infinity or NaN. Prefix `-`
-negates F32; parenthesize negative arguments: `F32.abs (-2.0)`.
+Scalars: `Unit` (`()`), `Bool` (`#True`, `#False`), `U32` (`42`, `0xFF`,
+`4_096`), and `F32` (`1.0`, `1e-5`). No implicit numeric conversion. U32
+arithmetic wraps at 32 bits; F32 rounds to binary32 and can yield infinity or
+NaN. Prefix `-` negates F32; parenthesize negative arguments: `F32.abs (-2.0)`.
 
-Functions take one argument; curry explicitly for several. Eager calls associate
-left: `f a b` means `(f a) b`. Application binds tighter than infix operators.
-`f(x)` also calls a function; `f(a, b)` passes one tuple. Unit thunks defer work
-until called with `()`, without memoization. Recursion is supported.
+Functions take one argument; curry explicitly for several. Calls associate left:
+`f a b` means `(f a) b`. Application binds tighter than infix operators. `f(x)`
+also calls a function; `f(a, b)` passes one tuple. Unit thunks defer work until
+called with `()`, without memoization. Recursion is supported.
 
 ```blot
 const twice = fn value => value + value
@@ -69,30 +70,32 @@ annotates it. `name := expression` shadows an existing local or parameter.
 Inside its RHS, `self` and the old name refer to the previous binding. Earlier
 closures keep old captures; aliases are not mutated. The new binding can have a
 different type and is visible in the remaining suite. An outer `self` is
-restored after the RHS. Rebinding requires purity, like `let`, and currently
-supports whole names, not record-field paths.
+restored after the RHS. Rebinding requires purity, like `let`; record and array
+paths such as `world.camera.position := self + offset` are supported.
 
 `return` exits the nearest `do` block in the current function. Falling through
 returns Unit; a last expression statement is discarded. Branch-local bindings do
-not escape. `if` is a statement; use `case` for a value-producing choice.
+not escape. Rebinding an existing outer name flows out of `if` and `if let`; a
+branch that leaves it alone carries its previous value. Both outcomes must have
+the same type. For a value, use `if condition then value else alternative`.
 
 ```blot
-type Builder is data = Builder U32
+type Builder is data = #Builder U32
 const add_step = fn amount => fn builder => case builder of
-  Builder value => Builder (value + amount)
+  #Builder value => #Builder (value + amount)
 const plugin = fn builder => do:
   builder := add_step 10 self
   builder := add_step 20 self
   return builder
 
 const application = do:
-  let builder = Builder 0
+  let builder = #Builder 0
   builder := plugin self
   builder := add_step 12 self
   return builder
 
 entry const answer = fn () => case application of
-  Builder value => value
+  #Builder value => value
 ```
 
 Plugins/builders are ordinary source functions/types. The compiler has no
@@ -112,8 +115,8 @@ continue running.
 An outer local rebound directly in the loop with `:=` carries its new value to
 the next iteration and after the loop. Its type must stay the same across
 iterations. New locals and the index remain inside the loop. Nested loops carry
-successors through their enclosing loop. Ordinary `if`/`do` suites still use
-local shadowing; put a conditional expression on a carried rebinding's RHS.
+successors through their enclosing loop. Rebindings inside `if`/`if let`
+branches also carry outward. A separately nested `do:` keeps its own scope.
 `return` exits the enclosing `do`; a loop creates no new return boundary. There
 is no `break` or `continue` yet.
 
@@ -140,10 +143,11 @@ entry const first_five = fn () => do:
 ## Data, records, tuples, patterns
 
 Declare nominal algebraic types with `type ... is data`, including generic
-parameters: `type Tree a is data = Leaf a | Branch (Tree a, Tree a)`.
+parameters: `type Tree a is data = #Leaf a | #Branch (Tree a, Tree a)`.
 Constructors have zero or one payload; use a tuple or named fields for several
 values. Constructors themselves are values/functions. The prelude defines
-`Maybe a = Some a | Nothing` and `Result [value, error] = Ok value | Err error`.
+`Maybe a = #Some a | #Nothing` and
+`Result [value, error] = #Ok value | #Err error`.
 
 A type or effect constructor takes at most one argument pattern. Use a list,
 tuple, or record to bind several types. These shapes can nest; record arguments
@@ -151,16 +155,16 @@ match by field name. Record constructor declarations also support field
 shorthand.
 
 ```blot
-type Entry { head, tail } is data = Entry { head, tail }
-type Pair [left, right] is data = Pair (left, right)
-type Curried left => type right is data = Curried (left, right)
+type Entry { head, tail } is data = #Entry { head, tail }
+type Pair [left, right] is data = #Pair (left, right)
+type Curried left => type right is data = #Curried (left, right)
 const first = fn (entry: Entry { head: U32, tail: a }) -> U32 => do:
-  let Entry { head } = entry
+  let #Entry { head } = entry
   return head
 const number = fn (pair: (Curried U32) Bool) => do:
-  let Curried (value, flag) = pair
+  let #Curried (value, flag) = pair
   return value
-entry const answer = fn () => first (Entry { head: 42, tail: True })
+entry const answer = fn () => first (#Entry { head: 42, tail: #True })
 ```
 
 Currying is explicit in the declaration. `Curried U32` remains a constructor;
@@ -186,33 +190,35 @@ existing U32/Bool local, parameter, or constant instead of binding a new name.
 failure branch.
 
 ```blot
-type Vec2 is data = Vec2 { x: F32, y: F32 }
+type Vec2 is data = #Vec2 { x: F32, y: F32 }
 entry const selected = 7
 const length = fn position => do:
-  let Vec2 { x, y } = position
+  let #Vec2 { x, y } = position
   return F32.sqrt (x * x + y * y)
 const unpack = fn candidate => do:
-  let Some value = candidate else:
+  let #Some value = candidate else:
     return 0
   return value
 
-entry const distance = fn () => length (Vec2 { y: 4.0, x: 3.0 })
-entry const classify = fn (key: U32) => case key, True of
-  ^selected, True => unpack (Some 42)
+entry const distance = fn () => length (#Vec2 { y: 4.0, x: 3.0 })
+entry const classify = fn (key: U32) => case key, #True of
+  ^selected, #True => unpack (#Some 42)
   _, _ => 0
 entry const conditional = fn () => do:
-  if let Some (number, True) = Some (42, True):
+  if let #Some (number, #True) = #Some (42, #True):
     return number
   return 0
 ```
 
 ## Operators and compile-time associated dispatch
 
-Default precedence, weakest first: `$` (0, right-associative), comparisons
-`== != < <= > >=` (30, non-associative), `+ -` (60, left), `* /` (70, left),
-then application. `f $ g x` means `f (g x)` and does not delay evaluation.
-Backticks call ordinary functions infix. Declare custom fixities before other
-declarations: `infixl 60 (++) = combine`, `infixr 50 (**) = power`, or
+Default precedence, weakest first: `$` (0), `|>` (5), `||` (20), `&&` (25),
+comparisons `== != < <= > >=` (30), bitwise `|` (40), `^` (45), `&` (50), shifts
+`<< >>` (55), `+ -` (60), `* / %` (70), then application. `$`, `&&`, and `||`
+associate right; comparisons are non-associative; the others associate left.
+`f $ g x` means `f (g x)` and does not delay evaluation. Backticks call ordinary
+functions infix. Declare custom fixities before other declarations:
+`infixl 60 (++) = combine`, `infixr 50 (**) = power`, or
 `infix 30 (~=) = close`. A backtick function can also have a fixity declaration.
 
 Arithmetic/comparison operators call generic prelude functions. `add` uses
@@ -227,7 +233,7 @@ Receiver syntax selects a member from the receiver's type:
 then `witness`. `tail.contains` is a bound function; `values.length` is
 `Array.length values`. This lookup never falls back to an argument's type. A
 lexical receiver shadows a same-named module namespace. Ordinary qualified names
-such as `Array.get` and `geometry.Point` still work.
+such as `Array.get` and `geometry.Point.add` still work.
 
 Named constructor fields support `point.x`. A field must exist on every
 constructor of its type; use a pattern when a field is variant-specific. A field
@@ -246,40 +252,41 @@ inside the function by annotations, literals, primitives or other calls resolves
 once at the function itself, so the function compiles once instead of once per
 caller; only dispatch on types a caller supplies is specialized per use. Each
 field access through the same nominal type and field shares one accessor. For
-type identity, use the prelude's ordinary `Type` wrapper:
-`Type head == Type witness` or `Type head != Type witness`. When both bindings
-already contain wrapped witnesses, `head == witness` works directly. `Type.eq`
-uses `@type.same left_witness right_witness` to compare concrete types at
-compile time, including nominal module identity and generic arguments. A witness
-may be a value or an uncalled constructor/function describing its final result
-type; both witness expressions still evaluate once, left to right. Witnesses are
-value expressions, not type literals: `Type 0` represents U32. Ordinary value
-equality keeps using each value type's `eq` implementation. Exported functions
-need enough type information to resolve dispatch; annotate unconstrained
-parameters. `1 + 2` selects `U32.add`; `1.0 + 2.0` selects `F32.add`. Mixed
-operands fail unless an implementation explicitly accepts them. `/` currently
-supports F32. Bool/record equality is not automatically derived.
+type identity, use the prelude's ordinary `Type` wrapper: `:head == :witness` or
+`:head != :witness`. When both bindings already contain wrapped witnesses,
+`head == witness` works directly. `Type.eq` uses
+`@type.same left_witness right_witness` to compare concrete types at compile
+time, including nominal module identity and generic arguments. A witness may be
+a value or an uncalled constructor/function describing its final result type;
+both witness expressions still evaluate once, left to right. Witnesses are value
+expressions, not type literals: `:0` represents U32. Ordinary value equality
+keeps using each value type's `eq` implementation. Exported functions need
+enough type information to resolve dispatch; annotate unconstrained parameters.
+`1 + 2` selects `U32.add`; `1.0 + 2.0` selects `F32.add`. Mixed operands fail
+unless an implementation explicitly accepts them. `/` supports F32 and U32; U32
+division truncates and a zero divisor fails/traps. Bool/record equality is not
+automatically derived.
 
 ```blot
-type Count is data = Count U32
-type Other is data = Other U32
+type Count is data = #Count U32
+type Other is data = #Other U32
 entry const same_value = 1 == 2
-entry const same_type = Type 1 == Type 2
-entry const same_nominal = Type Count == Type (Count 42)
-entry const different = Type Count != Type Other
+entry const same_type = #Type 1 == #Type 2
+entry const same_nominal = #Type #Count == #Type (#Count 42)
+entry const different = #Type #Count != #Type #Other
 entry const compare = fn () => do:
-  let head = Type Count
-  let witness = Type (Count 0)
+  let head = #Type #Count
+  let witness = #Type (#Count 0)
   return head == witness
 ```
 
 ```blot
-type Box a is data = Box a
+type Box a is data = #Box a
 const Box.add = fn left => fn right => case left, right of
-  Box a, Box b => Box (a + b)
+  #Box a, #Box b => #Box (a + b)
 const twice = fn value => value + value
-entry const answer = fn (value: F32) => case twice (Box value) of
-  Box result => result
+entry const answer = fn (value: F32) => case twice (#Box value) of
+  #Box result => result
 ```
 
 ## Arrays and libraries
@@ -293,9 +300,9 @@ aliases remain unchanged. Indexing binds more tightly than application:
 space (`f [1]`), or write `f([1])`.
 
 Direct reads and updates check bounds at runtime and fail during constant
-evaluation for an invalid index. `values.get(index)` returns `Some value` or
-`Nothing`; `values.set(index)(replacement)` returns `Some updated_array` or
-`Nothing`. These are ordinary functions, including their bounds checks. A guard
+evaluation for an invalid index. `values.get(index)` returns `#Some value` or
+`#Nothing`; `values.set(index)(replacement)` returns `#Some updated_array` or
+`#Nothing`. These are ordinary functions, including their bounds checks. A guard
 such as `if index < values.length:` is also useful. Direct accesses keep their
 bounds checks inside guards; no proof token is required.
 
@@ -338,8 +345,25 @@ The implicit prelude supplies `identity`, `apply`, `always`, `compose`, `flip`,
 `clamp low high value`, `lerp left right weight`, `is_finite`, `sin/cos/tan`,
 `wrap period value`, and `lerp_angle left right weight`.
 
-Arguments are eager, including `Maybe.unwrap_or` fallbacks. Use `case` or Unit
-thunks for short-circuiting. There are no built-in `&&`/`||` operators.
+Ordinary arguments are eager, including `Maybe.unwrap_or` fallbacks. `&&` and
+`||` call the source-defined `and` and `or`, whose right parameters use `~`.
+`Maybe.unwrap_or_else fallback candidate` also defers its fallback.
+
+`std/array` also supplies `map`, `filter`, `filter_map`, `slice start count`,
+`concat`, `flatten`, `push`, `zip`, `unzip`, and `unzip3`. Collection arguments
+come last for pipelines. Construction callbacks are pure; use `fold_left` or a
+loop to sequence effects. Import `Vec2` and `Vec3` from `std/vector` for vector
+operators and receiver members such as `dot`, `length`, and `normalized`.
+
+```blot
+import * as array from "std/array"
+import { Vec2 } from "std/vector"
+
+entry const total_length = fn () =>
+  [#Vec2 { x: 3.0, y: 4.0 }, #Vec2 { x: 0.0, y: 0.0 }]
+  |> array.map .length
+  |> array.fold_left .add 0.0
+```
 
 ## Effects and host capabilities
 
@@ -423,18 +447,18 @@ type State a is effect = {
   get: Unit -> a
   set: a -> Unit
 }
-type Counter is data = Counter U32
+type Counter is data = #Counter U32
 
 const get = fn (witness: p -> a) -> a => State.get ()
 const set = fn value => State.set value
 
 const increment = fn () => do:
-  use counter <- get Counter
-  let Counter value = counter
-  return set (Counter (value + 1))
+  use counter <- get #Counter
+  let #Counter value = counter
+  return set (#Counter (value + 1))
 
 entry const answer = fn () => do:
-  let (Counter next, _) = @effect.run State.get State.set (Counter 41) increment
+  let (#Counter next, _) = @effect.run State.get State.set (#Counter 41) increment
   return next
 ```
 
@@ -493,7 +517,7 @@ In gdev, const resource/component registrations determine the nested world type;
 `ecs.build` discards registration metadata and retains initial state, scope and
 checkpoint closures. Storage values remain runtime state. Its `get`, `previous`,
 column and query helpers require a unary constructor/function witness; wrap a
-nullary constructor as `(fn () => Idle)`.
+nullary constructor as `(fn () => #Idle)`.
 
 ## Expression tags
 
@@ -547,7 +571,7 @@ Compilation keeps only what the entries reach. Every declaration is type
 checked, but unreachable ones are never specialized, const-evaluated, run at
 startup or emitted: an unused constant that would panic or exhaust the step
 budget no longer fails the build. Associated dispatch is selected while
-specializing, so a missing implementation such as `True + False` is reported
+specializing, so a missing implementation such as `#True + #False` is reported
 only in reachable code.
 
 Functions are ordinary values: write `const name = fn argument => body` or
@@ -575,9 +599,9 @@ Runtime initializers must handle their effects with providers; module startup
 does not supply implicit handlers.
 
 Not yet executable: array spread syntax, array patterns, general text, F64/SIMD,
-demand parameters, arbitrary monadic `do` resolvers, and `return $` forwarding.
-Do not infer availability from editor highlighting or design examples. Use
-record fields/patterns, array functions, thunks, and `Maybe.bind`/`Result.bind`
+arbitrary monadic `do` resolvers, and `return $` forwarding. Do not infer
+availability from editor highlighting or design examples. Use record
+fields/patterns, array functions, thunks, and `Maybe.bind`/`Result.bind`
 instead.
 
 Hosts use `compiler/guest.ts` and guest ABI 2. Numeric arrays cross as copied
@@ -587,3 +611,85 @@ state. Records, general arrays and persistent guest handles are not host ABI
 values yet. There are no implicit window/filesystem/network imports. For details
 read `compiler/guest-abi.md`, `compiler/effects-and-io.md`,
 `compiler/README.md`, and `std/README.md`.
+
+## Selectors, conversion, and type witnesses
+
+`.name` is a function that selects a field or associated member. Chained
+selectors such as `.position.x` select both fields from the eventual argument.
+Write member access without a space (`point.x`); write a separate selector with
+a space (`array.map .x points`). `.add` selects a receiver's `add` member and
+returns its remaining curried function. It is useful in
+`array.fold_left .add 0 values`. Uppercase names are allowed when the owning
+type actually declares that member.
+
+`from` is defined in the prelude as `fn value => @type.result "from" value`. The
+expected result type chooses that type's ordinary `from` function. Primitive
+implementations use `to_f32`/`to_u32`; custom types can define their own
+conversions. There is no default target when the context leaves it ambiguous.
+
+```blot
+entry const normalized = fn (first: U32) => from first / 6555.0
+entry const explicit = fn (value: U32) => do:
+  let converted: F32 = from value
+  return converted
+entry const different = if :1 == :2.0 then #False else #True
+```
+
+`:value` abbreviates `#Type value`; `:(expression)` groups a larger expression.
+The existing witness rules apply: a constructor/function witness describes its
+final result type. Its body is not called; an ordinary witness expression is
+evaluated once. Type names belong in annotations, constructors in expressions
+and patterns. Constructors require `#` in declarations, expressions and
+patterns, including qualified names (`#time.Clock`) and Boolean constructors
+(`#True`, `#False`). Type names and explicit type arguments stay unmarked.
+
+`value |> transform` calls `transform value`. Both `pipe` and its fixity are
+ordinary prelude declarations. For longer builder sequences, `:=` keeps each
+step on its own line.
+
+## Demand parameters
+
+`fn ~value => body` captures an argument without evaluating it. A typed
+parameter is `fn ~(value: U32) => body`. `@force value` evaluates the captured
+expression once; later forces share its result. Returning a closure that
+captures a demand is supported. Merely referencing a demand does not force it.
+
+```blot
+const twice = fn ~(value: U32) => @force value + @force value
+const call_lazy = fn (callback: ~U32 -> U32) => callback (20 + 1)
+entry const answer = fn () => call_lazy twice
+entry const skipped = #False && (@panic "unreachable")
+```
+
+Demand mode is part of the function type and survives aliases and partial
+application. `~T` denotes a demand for a result of type `T`; latent effects are
+inferred. Forcing requires those effects in the surrounding function, using the
+providers active at the first force. An unused demand needs no provider. To
+forward an existing demand to another lazy parameter, pass `@force value`. Unit
+callbacks remain available for work that should run on every call.
+
+## Pattern alternatives and layout
+
+Alternative rows bind the same names and share one body. A failed guard falls
+through to the next arm. Guards do not count toward exhaustiveness: retain an
+unguarded fallback covering their cases.
+
+```blot
+type Choice is data =
+  | #First U32
+  | #Second U32
+  | #Empty
+
+entry const answer = fn value => case #Second value of
+  #First amount | #Second amount if amount >= 40 => amount
+  #First amount | #Second amount => amount + 2
+  #Empty => 0
+```
+
+Indented expression continuations extend the preceding expression; `:` and `of`
+open statement and case suites. Leading `|` can align with the first alternative
+in a case arm. Parentheses also allow continuation across lines.
+`blot fmt path.blot` normalizes spacing and blank lines, separates long data
+alternatives, and removes parentheses that do not affect expression grouping.
+`--check` checks without writing. The formatter verifies that the parsed
+structure is unchanged before writing.
