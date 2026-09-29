@@ -55,12 +55,12 @@ let on = combine
 //  ^ variable
 //  ^ !keyword
 
-False `and` (values[0] > 0.0)
-// <- constant.builtin.boolean
-//     ^ function
-//          ^ punctuation.bracket
-//                     ^ operator
-//                       ^ constant.numeric.float
+#False `and` (values[0] > 0.0)
+//  ^ constant.builtin.boolean
+//      ^ function
+//           ^ punctuation.bracket
+//                      ^ operator
+//                        ^ constant.numeric.float
 
 use left `combine` right
 // <- keyword.storage.type

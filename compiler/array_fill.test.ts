@@ -14,7 +14,7 @@ const filled = @array.fill 3 seed
 const callbacks = @array.fill 2 (fn value => value + 2)
 entry const count = @array.length filled
 entry const constant = (@array.get callbacks 1) 40
-entry const empty = fn () => @array.length (@array.fill 0 True)
+entry const empty = fn () => @array.length (@array.fill 0 #True)
 entry const high = fn (count: U32) => @array.get (@array.fill count 4294967295) 0
 entry const size = fn (count: U32) => @array.length (@array.fill count 7)
 entry const closures = fn () => do:
@@ -26,6 +26,16 @@ entry const unchanged = fn () => do:
   let changed = @array.set (@array.get original 0) 1 22
   return @array.get (@array.get original 1) 1 + @array.get changed 1
 entry const float = fn () => @array.get (@array.fill 2 1.25) 1
+entry const packet = fn (count: U32) => @array.fill count 0x12345678
+entry const float_packet = fn (count: U32) => @array.fill count 1.25
+entry const many_closures = fn (count: U32) => do:
+  let offset = 2
+  let functions = @array.fill count (fn value => value + offset)
+  return (@array.get functions (@u32.sub count 1)) 40
+entry const many_shared = fn (count: U32) => do:
+  let arrays = @array.fill count (@array.fill 2 20)
+  let changed = @array.set (@array.get arrays 0) 1 22
+  return @array.get (@array.get arrays (@u32.sub count 1)) 1 + @array.get changed 1
 `;
 
 async function exercise(bytes: Uint8Array<ArrayBuffer>) {
@@ -41,6 +51,40 @@ async function exercise(bytes: Uint8Array<ArrayBuffer>) {
     const name of ["closures", "unchanged"]
   ) {
     equal(call(name), 42);
+  }
+  const memory = instance.exports["blot:memory"] as WebAssembly.Memory;
+  for (
+    const count of [
+      0,
+      1,
+      2,
+      31,
+      32,
+      33,
+      63,
+      64,
+      65,
+      127,
+      128,
+      129,
+      8191,
+      8192,
+      8193,
+    ]
+  ) {
+    const pointer = call("packet", count) >>> 0;
+    const words = new Uint32Array(memory.buffer, pointer, count + 1);
+    equal(words[0], count);
+    equal(words.subarray(1), new Uint32Array(count).fill(0x12345678));
+    const floats = call("float_packet", count) >>> 0;
+    equal(
+      new Float32Array(memory.buffer, floats + 4, count),
+      new Float32Array(count).fill(1.25),
+    );
+    if (count > 0) {
+      equal(call("many_closures", count), 42);
+      equal(call("many_shared", count), 42);
+    }
   }
   equal(call("size", 8192), 8192);
   equal(call("size", 4_194_304), 4_194_304);
@@ -91,7 +135,7 @@ Deno.test("array fill validates counts, arity, limits and const budgets", async 
   try {
     for (
       const [text, code] of [
-        ["const invalid = @array.fill True 0", "type_mismatch"],
+        ["const invalid = @array.fill #True 0", "type_mismatch"],
         ["const invalid = @array.fill 2", "call_arity"],
         ["const invalid = @array.fill 2 0 0", "call_arity"],
         ["const invalid = @array.fill 4294967295 0", "backend_limit"],

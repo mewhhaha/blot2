@@ -558,10 +558,26 @@ def resolve_work_flat(+substitutions: Substitutions, +fuel: Nat, +work: TypeWork
 def resolve_work(substitutions: Substitutions, fuel: Nat, work: TypeWork) -> Result<&2, &2, M.Diagnostic, List<&2, M.Ty>>:
   resolve_work_flat(substitutions, fuel, work)
 
-def resolve(substitutions: Substitutions, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
+def resolve_reference(substitutions: Substitutions, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
   do Result<&2, &2, M.Diagnostic, M.Ty>:
     xs : List<&2, M.Ty> <- resolve_work(substitutions, Nat.mul(256n, 256n), OneType{ty})
     first_type(xs)
+
+# Ground leaves cannot contain a substitution target or exceed the traversal
+# budget. Return them without constructing a worklist and continuation frames.
+# Compound types, variables and row-bearing providers retain the exact resolver.
+def resolve(substitutions: Substitutions, ty: M.Ty) -> Result<&2, &2, M.Diagnostic, M.Ty>:
+  match ty:
+    case M.UnitTy{}: Done{M.UnitTy{}}
+    case M.U32Ty{}: Done{M.U32Ty{}}
+    case M.F32Ty{}: Done{M.F32Ty{}}
+    case M.BoolTy{}: Done{M.BoolTy{}}
+    case M.NeverTy{}: Done{M.NeverTy{}}
+    case M.EffectDescriptorTy{}: Done{M.EffectDescriptorTy{}}
+    case M.EffectSetTy{}: Done{M.EffectSetTy{}}
+    case M.ParameterTy{index}: Done{M.ParameterTy{index}}
+    case M.FreeTy{scope, name}: Done{M.FreeTy{scope, name}}
+    case other: resolve_reference(substitutions, other)
 
 def contains(variables: List<&2, Nat>, variable: Nat) -> Bool:
   variable_contains_work(variables, variable, False{})
@@ -1159,11 +1175,32 @@ def solve(equations: List<&2, Equation>, substitutions: Substitutions) -> Result
     solved : Solution <- solve_work(U32.to_nat(65536), pending, previous, above(first, above(second, 0n)))
     return solution_substitutions(solved)
 
-def unify_at(left: M.Ty, right: M.Ty, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
+def unify_at_reference(left: M.Ty, right: M.Ty, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
   solve_work(U32.to_nat(65536), [Equation{left, right, subject}], substitutions, next)
 
-def unify_rows_at(left: M.EffectRow, right: M.EffectRow, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
+def unify_rows_at_reference(left: M.EffectRow, right: M.EffectRow, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
   solve_work(U32.to_nat(65536), [RowEquation{left, right, subject}], substitutions, next)
+
+# Equality of identical ground scalar constructors needs no constraint queue.
+# Do not extend this to variables or row-bearing types: their substitutions and
+# fresh-row accounting must still run through solve_work.
+def unify_at(left: M.Ty, right: M.Ty, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
+  match left right:
+    case M.UnitTy{} M.UnitTy{}: Done{Solution{substitutions, next}}
+    case M.U32Ty{} M.U32Ty{}: Done{Solution{substitutions, next}}
+    case M.F32Ty{} M.F32Ty{}: Done{Solution{substitutions, next}}
+    case M.BoolTy{} M.BoolTy{}: Done{Solution{substitutions, next}}
+    case M.NeverTy{} M.NeverTy{}: Done{Solution{substitutions, next}}
+    case M.EffectDescriptorTy{} M.EffectDescriptorTy{}: Done{Solution{substitutions, next}}
+    case M.EffectSetTy{} M.EffectSetTy{}: Done{Solution{substitutions, next}}
+    case a b: unify_at_reference(a, b, substitutions, next, subject)
+
+def unify_rows_at(left: M.EffectRow, right: M.EffectRow, substitutions: Substitutions, next: Nat, subject: String) -> Result<&2, &2, M.Diagnostic, Solution>:
+  match left right:
+    case M.EffectRow{Nil{}, M.ClosedRow{}} M.EffectRow{Nil{}, M.ClosedRow{}}:
+      Done{Solution{substitutions, next}}
+    case a b:
+      unify_rows_at_reference(a, b, substitutions, next, subject)
 
 def unify(left: M.Ty, right: M.Ty, substitutions: Substitutions, subject: String) -> Result<&2, &2, M.Diagnostic, Substitutions>:
   solve([Equation{left, right, subject}], substitutions)

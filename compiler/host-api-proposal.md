@@ -19,15 +19,15 @@ ordinary exported function selected by the host, not a privileged declaration.
 The compiler knows neither name and does not inject capabilities.
 
 ```blot
-data WindowIo = WindowIo {
+data WindowIo = #WindowIo {
   set_title: Text -> Result [Unit, IoError] ! {Foreign},
 }
 
-data RenderIo = RenderIo {
+data RenderIo = #RenderIo {
   submit: RenderFrame -> Result [Unit, IoError] ! {Foreign},
 }
 
-data Io = Io {
+data Io = #Io {
   window: WindowIo,
   render: RenderIo,
 }
@@ -35,8 +35,8 @@ data Io = Io {
 const main = fn (io: Io) => do:
   use titled <- io.window.set_title "Blot sandbox"
   return case titled of
-    Err error => Err error
-    Ok () => Ok (Application {
+    #Err error => #Err error
+    #Ok () => #Ok (#Application {
       create: create_world,
       update: update io.render,
     })

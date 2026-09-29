@@ -84,7 +84,14 @@ export type ScalarOp = {
     | "F32LessThan"
     | "F32LessEqual"
     | "F32GreaterThan"
-    | "F32GreaterEqual";
+    | "F32GreaterEqual"
+    | "U32Divide"
+    | "U32Remainder"
+    | "U32BitAnd"
+    | "U32BitOr"
+    | "U32BitXor"
+    | "U32ShiftLeft"
+    | "U32ShiftRight";
 };
 export type UnaryOp = {
   readonly $:
@@ -182,6 +189,8 @@ export interface MatchArm {
 }
 
 export type Expr =
+  | { readonly $: "MemoExpr"; readonly computation: Expr }
+  | { readonly $: "ForceExpr"; readonly value: Expr }
   | { readonly $: "UnitExpr" }
   | { readonly $: "U32Expr"; readonly value: number }
   | { readonly $: "F32Expr"; readonly value: number }
@@ -351,6 +360,12 @@ export interface CoreModule {
 }
 
 export type ConstantValue =
+  | {
+    readonly $: "MemoValue";
+    readonly slot: bigint;
+    readonly computed: boolean;
+    readonly value: ConstantValue;
+  }
   | { readonly $: "UnitValue" }
   | { readonly $: "U32Value"; readonly value: number }
   | { readonly $: "F32Value"; readonly value: number }
@@ -535,6 +550,8 @@ type WirePattern =
   };
 
 type WireExpr =
+  | { readonly $: "MemoExpr"; readonly computation: WireExpr }
+  | { readonly $: "ForceExpr"; readonly value: WireExpr }
   | { readonly $: "ProductExpr"; readonly elements: List<WireExpr> }
   | { readonly $: "ArrayExpr"; readonly elements: List<WireExpr> }
   | {
@@ -735,11 +752,18 @@ interface WireDataType {
 }
 
 type WireValue =
+  | {
+    readonly $: "MemoValue";
+    readonly slot: bigint;
+    readonly computed: boolean;
+    readonly value: WireValue;
+  }
   | { readonly $: "MatchValuesValue"; readonly values: List<WireValue> }
   | Exclude<
     ConstantValue,
     {
       readonly $:
+        | "MemoValue"
         | "DataValue"
         | "ClosureValue"
         | "ProviderValue"
@@ -1260,6 +1284,13 @@ function encodeExpr(expression: Expr): WireExpr {
           expression.payload === null ? null : encodeExpr(expression.payload),
         ),
       };
+    case "MemoExpr":
+      return {
+        $: expression.$,
+        computation: encodeExpr(expression.computation),
+      };
+    case "ForceExpr":
+      return { $: expression.$, value: encodeExpr(expression.value) };
     case "LambdaExpr":
       return {
         $: expression.$,
@@ -1299,6 +1330,13 @@ function encodeExpr(expression: Expr): WireExpr {
           "F32LessEqual",
           "F32GreaterThan",
           "F32GreaterEqual",
+          "U32Divide",
+          "U32Remainder",
+          "U32BitAnd",
+          "U32BitOr",
+          "U32BitXor",
+          "U32ShiftLeft",
+          "U32ShiftRight",
         ].includes(
           expression.operator.$,
         )
@@ -1532,6 +1570,10 @@ function decodeExpr(expression: WireExpr): Expr {
           ? null
           : decodeExpr(expression.payload.value),
       };
+    case "MemoExpr":
+      return { ...expression, computation: decodeExpr(expression.computation) };
+    case "ForceExpr":
+      return { ...expression, value: decodeExpr(expression.value) };
     case "LambdaExpr":
       return {
         ...expression,
@@ -1664,6 +1706,8 @@ function decodeValue(value: WireValue): ConstantValue {
     case "OperationValue":
     case "EffectDescriptorValue":
       return value;
+    case "MemoValue":
+      return { ...value, value: decodeValue(value.value) };
     case "StateProviderValue":
       return { ...value, initial: decodeValue(value.initial) };
     case "ProviderValue":

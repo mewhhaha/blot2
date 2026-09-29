@@ -143,16 +143,16 @@ Deno.test("native project session rolls back invalid imported edits and const bu
 Deno.test("native project session invalidates schema and import-target changes", async () => {
   const main =
     'import * as lib from "./lib"\nentry const answer = fn () => lib.read (lib.make ())\n';
-  const firstLibrary = `type Box is data = Box U32
-const make = fn () => Box 40
+  const firstLibrary = `type Box is data = #Box U32
+const make = fn () => #Box 40
 const read = fn (box: Box) => case box of
-  Box value => value
+  #Box value => value
 `;
-  const secondLibrary = `type Box is data = Box Bool
-const make = fn () => Box True
+  const secondLibrary = `type Box is data = #Box Bool
+const make = fn () => #Box #True
 const read = fn (box: Box) => case box of
-  Box True => 41
-  Box False => 0
+  #Box #True => 41
+  #Box #False => 0
 `;
   const { files, readSource } = virtualProject(
     new Map([

@@ -1,4 +1,5 @@
 import Base
+import ./index.bend as Index
 import ./model.bend as M
 import ./dependency.bend as D
 import ./check.bend as Check
@@ -42,7 +43,7 @@ def function_costs(functions: List<&2, M.Function>, costs: Map<&2, Nat>) -> Map<
       costs
     case M.Function{+name, exported, parameter, p, r, body} <> tail:
       cost = Scheduler.module_cost(M.Module{Nil{}, [M.Function{name, exported, parameter, p, r, body}], Nil{}, Nil{}})
-      function_costs(tail, Map.set(&2, Nat, costs, name, cost))
+      function_costs(tail, Index.set(Nat, costs, name, cost))
 
 def constant_costs(constants: List<&2, M.Constant>, costs: Map<&2, Nat>) -> Map<&2, Nat>:
   match constants:
@@ -50,7 +51,7 @@ def constant_costs(constants: List<&2, M.Constant>, costs: Map<&2, Nat>) -> Map<
       costs
     case M.Constant{+name, exported, annotation, value} <> tail:
       cost = Scheduler.module_cost(M.Module{[M.Constant{name, exported, annotation, value}], Nil{}, Nil{}, Nil{}})
-      constant_costs(tail, Map.set(&2, Nat, costs, name, cost))
+      constant_costs(tail, Index.set(Nat, costs, name, cost))
 
 def scan(module: M.Module) -> Scanned:
   M.Module{+constants, +functions, types, operations} = module

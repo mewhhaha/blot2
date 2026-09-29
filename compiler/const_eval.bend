@@ -29,12 +29,22 @@ type Value is Data:
   PatternBindingsValue{bindings: Maybe<&2, List<&2, Binding<Value>>>}
   ProductValue{elements: List<&2, Value>}
   ArrayValue{elements: List<&2, Value>}
+  DemandValue{slot: Nat, computation: Value}
+  MemoValue{slot: Nat, computed: Bool, value: Value}
 
 type StateCell is Data:
   StateCell{slot: Nat, value: Value}
 
+type MemoState is Data:
+  Waiting{}
+  Forcing{}
+  Ready{value: Value}
+
+type MemoCell is Data:
+  MemoCell{slot: Nat, state: MemoState}
+
 type Budget is Data:
-  Budget{remaining: Nat, cells: List<&2, StateCell>}
+  Budget{remaining: Nat, cells: List<&2, StateCell>, memos: List<&2, MemoCell>, next_memo: Nat, constant_cache: Maybe<&2, List<&2, Binding<Value>>>}
 
 type Evaluation is Data:
   Evaluation{value: Value, remaining: Budget}
@@ -65,6 +75,9 @@ type PatternProgress is Data:
   PatternRejected{}
 
 type EvaluationWork is Data:
+  CachedConstant{name: String, found: Maybe<&2, Value>}
+  DemandForce{value: Value}
+  DemandState{slot: Nat, computation: Value, state: MemoState}
   HandleValue{provider: Value, body: M.Expr}
   Expression{expression: M.Expr}
   ForBounds{index: String, start: Value, end: Value, state: String, initial: Value, body: M.Expr}
@@ -129,12 +142,12 @@ def eval_value(evaluation: Evaluation) -> Value:
   value
 
 def eval_remaining(evaluation: Evaluation) -> Nat:
-  Evaluation{value, Budget{remaining, cells}} = evaluation
+  Evaluation{value, Budget{remaining, cells, memos, next_memo, constant_cache}} = evaluation
   remaining
 
 def spend_budget(budget: Budget) -> Budget:
-  Budget{remaining, cells} = budget
-  Budget{Nat.sub(remaining, 1n), cells}
+  Budget{remaining, cells, memos, next_memo, constant_cache} = budget
+  Budget{Nat.sub(remaining, 1n), cells, memos, next_memo, constant_cache}
 
 def eval_budget(evaluation: Evaluation) -> Budget:
   Evaluation{value, budget} = evaluation
@@ -219,6 +232,24 @@ def scalar(operator: M.ScalarOp, left: Value, right: Value, remaining: Budget) -
       Done{Evaluation{BoolValue{U32.is_eq(a, b)}, remaining}}
     case M.LessThan{} U32Value{a} U32Value{b}:
       Done{Evaluation{BoolValue{U32.is_lt(a, b)}, remaining}}
+    case M.U32Divide{} U32Value{a} U32Value{0}:
+      Fail{M.Diagnostic{"integer_divide_by_zero", "const", "integer division and remainder require a nonzero divisor"}}
+    case M.U32Divide{} U32Value{a} U32Value{b}:
+      Done{Evaluation{U32Value{U32.div(a, b)}, remaining}}
+    case M.U32Remainder{} U32Value{a} U32Value{0}:
+      Fail{M.Diagnostic{"integer_divide_by_zero", "const", "integer division and remainder require a nonzero divisor"}}
+    case M.U32Remainder{} U32Value{a} U32Value{b}:
+      Done{Evaluation{U32Value{U32.mod(a, b)}, remaining}}
+    case M.U32BitAnd{} U32Value{a} U32Value{b}:
+      Done{Evaluation{U32Value{U32.and(a, b)}, remaining}}
+    case M.U32BitOr{} U32Value{a} U32Value{b}:
+      Done{Evaluation{U32Value{U32.or(a, b)}, remaining}}
+    case M.U32BitXor{} U32Value{a} U32Value{b}:
+      Done{Evaluation{U32Value{U32.xor(a, b)}, remaining}}
+    case M.U32ShiftLeft{} U32Value{a} U32Value{b}:
+      Done{Evaluation{U32Value{U32.shln(a, U32.to_nat(U32.and(b, 31)))}, remaining}}
+    case M.U32ShiftRight{} U32Value{a} U32Value{b}:
+      Done{Evaluation{U32Value{U32.shrn(a, U32.to_nat(U32.and(b, 31)))}, remaining}}
     case M.F32Add{} F32Value{a} F32Value{b}:
       Done{Evaluation{F32Value{F32.add(a, b)}, remaining}}
     case M.F32Subtract{} F32Value{a} F32Value{b}:
@@ -412,6 +443,42 @@ def continue_value(evaluation: Evaluation, continuation: Value -> Budget -> Resu
     case Evaluation{value, remaining}:
       continuation(value, remaining)
 
+# Memo cells share the evaluation budget, but outlive a particular force or
+# resolver scope. State resolvers therefore retain their existing stack rules.
+def memo_state_work(cells: List<&2, MemoCell>, +wanted: Nat, found: Maybe<&2, MemoState>) -> Result<&2, &2, M.Diagnostic, MemoState>:
+  match cells found:
+    case _ Some{state}:
+      Done{state}
+    case Nil{} None{}:
+      Fail{M.Diagnostic{"internal_error", "demand", "lost a suspended computation"}}
+    case MemoCell{slot, state} <> tail None{}:
+      memo_state_work(tail, wanted, Bool.pick(Maybe<&2, MemoState>, Nat.is_eq(slot, wanted), Some{state}, None{}))
+
+def memo_state(cells: List<&2, MemoCell>, wanted: Nat) -> Result<&2, &2, M.Diagnostic, MemoState>:
+  memo_state_work(cells, wanted, None{})
+
+def memo_replace(cells: List<&2, MemoCell>, +wanted: Nat, +replacement: MemoState) -> List<&2, MemoCell>:
+  match cells:
+    case Nil{}:
+      Nil{}
+    case MemoCell{+slot, state} <> tail:
+      MemoCell{slot, Bool.pick(MemoState, Nat.is_eq(slot, wanted), replacement, state)} <> memo_replace(tail, wanted, replacement)
+
+def memo_set(budget: Budget, slot: Nat, state: MemoState) -> Budget:
+  Budget{remaining, cells, memos, next_memo, constant_cache} = budget
+  Budget{remaining, cells, memo_replace(memos, slot, state), next_memo, constant_cache}
+
+def memo_new(computation: Value, budget: Budget) -> Evaluation:
+  Budget{remaining, cells, memos, +next_memo, constant_cache} = budget
+  Evaluation{DemandValue{next_memo, computation}, Budget{remaining, cells, MemoCell{next_memo, Waiting{}} <> memos, 1n+next_memo, constant_cache}}
+
+def memo_finish(evaluation: Evaluation, slot: Nat) -> Result<&2, &2, M.Diagnostic, Evaluation>:
+  match evaluation:
+    case Evaluation{ReturnValue{label, value}, budget}:
+      Fail{M.Diagnostic{"internal_error", "demand", "a return escaped a suspended argument"}}
+    case Evaluation{+value, budget}:
+      Done{Evaluation{value, memo_set(budget, slot, Ready{value})}}
+
 def state_cell(cells: List<&2, StateCell>, +wanted: Nat) -> Result<&2, &2, M.Diagnostic, Value>:
   match cells:
     case Nil{}:
@@ -430,16 +497,16 @@ def replace_state(cells: List<&2, StateCell>, +wanted: Nat, +replacement: Value)
           return StateCell{slot, value} <> next)
 
 def read_state(slot: Nat, +budget: Budget) -> Result<&2, &2, M.Diagnostic, Evaluation>:
-  Budget{remaining, cells} = budget
+  Budget{remaining, cells, memos, next_memo, constant_cache} = budget
   do Result<&2, &2, M.Diagnostic, Evaluation>:
     value : Value <- state_cell(cells, slot)
     return Evaluation{value, budget}
 
 def write_state(slot: Nat, value: Value, budget: Budget) -> Result<&2, &2, M.Diagnostic, Evaluation>:
-  Budget{remaining, cells} = budget
+  Budget{remaining, cells, memos, next_memo, constant_cache} = budget
   do Result<&2, &2, M.Diagnostic, Evaluation>:
     next : List<&2, StateCell> <- replace_state(cells, slot, value)
-    return Evaluation{UnitValue{}, Budget{remaining, next}}
+    return Evaluation{UnitValue{}, Budget{remaining, next, memos, next_memo, constant_cache}}
 
 def state_scope(read: M.TypeId, write: M.TypeId, +slot: Nat, context: Context) -> Context:
   Context{constants, functions, locals, data_types, providers, checked_functions} = context
@@ -454,8 +521,8 @@ def state_result(state: Value, result: Value) -> Value:
 
 def finish_state_scope(evaluation: Evaluation, +wanted: Nat) -> Result<&2, &2, M.Diagnostic, Evaluation>:
   match evaluation:
-    case Evaluation{result, Budget{remaining, StateCell{+slot, state} <> cells}}:
-      Bool.pick(Result<&2, &2, M.Diagnostic, Evaluation>, Nat.is_eq(slot, wanted), Done{Evaluation{state_result(state, result), Budget{remaining, cells}}}, Fail{M.Diagnostic{"internal_error", "state", "resolver scopes completed out of order"}})
+    case Evaluation{result, Budget{remaining, StateCell{+slot, state} <> cells, memos, next_memo, constant_cache}}:
+      Bool.pick(Result<&2, &2, M.Diagnostic, Evaluation>, Nat.is_eq(slot, wanted), Done{Evaluation{state_result(state, result), Budget{remaining, cells, memos, next_memo, constant_cache}}}, Fail{M.Diagnostic{"internal_error", "state", "resolver scopes completed out of order"}})
     case _:
       Fail{M.Diagnostic{"internal_error", "state", "resolver lost its state before completion"}}
 
@@ -575,10 +642,10 @@ def array_fill_elements(count: Nat, +value: Value, elements: List<&2, Value>, st
   match count steps:
     case 0n _:
       Done{Evaluation{ArrayValue{elements}, steps}}
-    case 1n+rest Budget{0n, cells}:
+    case 1n+rest Budget{0n, cells, memos, next_memo, constant_cache}:
       Fail{M.Diagnostic{"const_budget", "const", "compile-time evaluation exhausted its step budget while filling an array"}}
-    case 1n+rest Budget{1n+remaining, cells}:
-      remaining = {Budget{remaining, cells} : Budget}
+    case 1n+rest Budget{1n+remaining, cells, memos, next_memo, constant_cache}:
+      remaining = {Budget{remaining, cells, memos, next_memo, constant_cache} : Budget}
       array_fill_elements(rest, value, value <> elements, remaining)
 
 def array_fill_checked(allowed: Bool, count: U32, value: Value, remaining: Budget) -> Result<&2, &2, M.Diagnostic, Evaluation>:
@@ -634,10 +701,10 @@ def array_copy(elements: List<&2, Value>, +index: Nat, +replacement: Value, +off
   match elements steps:
     case Nil{} _:
       Done{Evaluation{ArrayValue{List.reverse(&2, Value, reversed)}, steps}}
-    case head <> tail Budget{0n, cells}:
+    case head <> tail Budget{0n, cells, memos, next_memo, constant_cache}:
       Fail{M.Diagnostic{"const_budget", "const", "compile-time evaluation exhausted its step budget while copying an array"}}
-    case head <> tail Budget{1n+remaining, cells}:
-      remaining = {Budget{remaining, cells} : Budget}
+    case head <> tail Budget{1n+remaining, cells, memos, next_memo, constant_cache}:
+      remaining = {Budget{remaining, cells, memos, next_memo, constant_cache} : Budget}
       array_copy(tail, index, replacement, 1n+offset, Bool.pick(Value, Nat.is_eq(index, offset), replacement, head) <> reversed, remaining)
 
 def array_set_checked(valid: Bool, elements: List<&2, Value>, index: Nat, replacement: Value, steps: Budget) -> Result<&2, &2, M.Diagnostic, Evaluation>:
@@ -746,12 +813,67 @@ def budget_diagnostic(expression: M.Expr) -> M.Diagnostic:
     case _:
       M.Diagnostic{"const_budget", "const", "compile-time evaluation exhausted its step budget"}
 
+def cached_constant_values(values: List<&2, Binding<Value>>, +name: String, found: Maybe<&2, Value>) -> Maybe<&2, Value>:
+  match values found:
+    case _ Some{value}:
+      Some{value}
+    case Nil{} None{}:
+      None{}
+    case Binding{key, value} <> tail None{}:
+      cached_constant_values(tail, name, Bool.pick(Maybe<&2, Value>, M.name_equal(name, key), Some{value}, None{}))
+
+def cached_constant(cache: Maybe<&2, List<&2, Binding<Value>>>, name: String) -> Maybe<&2, Value>:
+  match cache:
+    case None{}:
+      None{}
+    case Some{values}:
+      cached_constant_values(values, name, None{})
+
+def budget_constant(budget: Budget, name: String) -> Maybe<&2, Value>:
+  Budget{remaining, cells, memos, next_memo, cache} = budget
+  cached_constant(cache, name)
+
+def remember_constant(name: String, evaluation: Evaluation) -> Evaluation:
+  match evaluation:
+    case Evaluation{+value, Budget{remaining, cells, memos, next_memo, Some{cache}}}:
+      Evaluation{value, Budget{remaining, cells, memos, next_memo, Some{Binding{name, value} <> cache}}}
+    case value:
+      value
+
 def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +steps: Budget, work: EvaluationWork, +context: Context) -> Result<&2, &2, M.Diagnostic, Evaluation>:
   match depth matching_fuel pending steps work:
-    case _ 1n+scope_rest _ Budget{remaining, +cells} HandleValue{StateProviderValue{read, write, initial}, body}:
+    case _ 1n+rest _ _ CachedConstant{name, Some{value}}:
+      Done{Evaluation{value, steps}}
+    case _ 1n+rest _ _ CachedConstant{+name, None{}}:
+      do Result<&2, &2, M.Diagnostic, Evaluation>:
+        value : M.Expr <- lookup_constant(context_constants(context), name)
+        checked : Evaluation <- evaluate_work(depth, rest, Nil{}, steps, Expression{value}, without_locals(context))
+        completed : Evaluation <- complete_definition(checked)
+        return remember_constant(name, completed)
+    case _ 0n _ _ CachedConstant{name, found}:
+      Fail{M.Diagnostic{"const_budget", name, "constant evaluation exhausted its depth budget"}}
+    case _ 1n+rest _ Budget{remaining, cells, +memos, next_memo, constant_cache} DemandForce{DemandValue{+slot, computation}}:
+      do Result<&2, &2, M.Diagnostic, Evaluation>:
+        state : MemoState <- memo_state(memos, slot)
+        evaluate_work(depth, rest, Nil{}, steps, DemandState{slot, computation, state}, context)
+    case _ 1n+rest _ _ DemandState{slot, computation, Ready{value}}:
+      Done{Evaluation{value, steps}}
+    case _ 1n+rest _ _ DemandState{slot, computation, Forcing{}}:
+      Fail{M.Diagnostic{"recursive_demand", "demand", "a suspended argument forced itself before producing a value"}}
+    case _ 1n+rest _ _ DemandState{+slot, computation, Waiting{}}:
+      do Result<&2, &2, M.Diagnostic, Evaluation>:
+        call : Application <- application(computation, UnitValue{}, context)
+        resolved : Application <- resolve_application(context_providers(context), call, context)
+        result : Evaluation <- complete_application(resolved, memo_set(steps, slot, Forcing{}), body => scope => budget => evaluate_work(depth, rest, Nil{}, budget, Expression{body}, scope))
+        memo_finish(result, slot)
+    case _ _ _ _ DemandForce{value}:
+      Fail{M.Diagnostic{"internal_error", "demand", "@force requires a suspended argument"}}
+    case _ 0n _ _ DemandState{slot, computation, state}:
+      Fail{M.Diagnostic{"const_budget", "demand", "forcing a suspended computation exhausted its depth budget"}}
+    case _ 1n+scope_rest _ Budget{remaining, +cells, memos, next_memo, constant_cache} HandleValue{StateProviderValue{read, write, initial}, body}:
       +slot = List.length(&2, StateCell, cells)
       do Result<&2, &2, M.Diagnostic, Evaluation>:
-        result : Evaluation <- evaluate_work(depth, scope_rest, Nil{}, Budget{remaining, StateCell{slot, initial} <> cells}, Expression{body}, state_scope(read, write, slot, context))
+        result : Evaluation <- evaluate_work(depth, scope_rest, Nil{}, Budget{remaining, StateCell{slot, initial} <> cells, memos, next_memo, constant_cache}, Expression{body}, state_scope(read, write, slot, context))
         finish_state_scope(result, slot)
     case _ 1n+scope_rest _ _ HandleValue{provider, body}:
       do Result<&2, &2, M.Diagnostic, Evaluation>:
@@ -765,18 +887,18 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
       Fail{M.Diagnostic{"internal_error", "for", "checked loop lost its U32 bounds"}}
     case _ 0n _ _ ForIterations{index, current, state, value, body}:
       Done{Evaluation{value, steps}}
-    case _ 1n+rest _ Budget{0n, cells} ForIterations{index, current, state, value, body}:
+    case _ 1n+rest _ Budget{0n, cells, memos, next_memo, constant_cache} ForIterations{index, current, state, value, body}:
       Fail{M.Diagnostic{"const_budget", "for", "compile-time evaluation exhausted its step budget in a loop"}}
-    case _ 1n+rest _ Budget{1n+remaining, cells} ForIterations{+index, +current, +state, value, +body}:
-      remaining = {Budget{remaining, cells} : Budget}
+    case _ 1n+rest _ Budget{1n+remaining, cells, memos, next_memo, constant_cache} ForIterations{+index, +current, +state, value, +body}:
+      remaining = {Budget{remaining, cells, memos, next_memo, constant_cache} : Budget}
       do Result<&2, &2, M.Diagnostic, Evaluation>:
         checked : Evaluation <- evaluate_work(depth, rest, Nil{}, remaining, Expression{body}, with_local(with_local(context, index, U32Value{current}), state, value))
         continue_value(checked, successor => next_steps =>
           evaluate_work(depth, rest, Nil{}, next_steps, ForIterations{index, (current + 1 : U32), state, successor, body}, context))
-    case _ _ _ Budget{0n, cells} ForeverIterations{state, value, body}:
+    case _ _ _ Budget{0n, cells, memos, next_memo, constant_cache} ForeverIterations{state, value, body}:
       Fail{M.Diagnostic{"const_budget", "for ever", "compile-time evaluation exhausted its step budget in an unbounded loop"}}
-    case 1n+limit _ _ Budget{1n+remaining, cells} ForeverIterations{+state, value, +body}:
-      remaining = {Budget{remaining, cells} : Budget}
+    case 1n+limit _ _ Budget{1n+remaining, cells, memos, next_memo, constant_cache} ForeverIterations{+state, value, +body}:
+      remaining = {Budget{remaining, cells, memos, next_memo, constant_cache} : Budget}
       do Result<&2, &2, M.Diagnostic, Evaluation>:
         checked : Evaluation <- evaluate_work(limit, matching_fuel, Nil{}, remaining, Expression{body}, with_local(context, state, value))
         continue_value(checked, successor => next_steps =>
@@ -785,10 +907,10 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
       Fail{M.Diagnostic{"const_budget", "for ever", "compile-time evaluation exhausted its structural depth in an unbounded loop"}}
     case _ 0n _ _ GenerateElements{generator, index, reversed}:
       Done{Evaluation{ArrayValue{List.reverse(&2, Value, reversed)}, steps}}
-    case _ 1n+rest _ Budget{0n, cells} GenerateElements{generator, index, reversed}:
+    case _ 1n+rest _ Budget{0n, cells, memos, next_memo, constant_cache} GenerateElements{generator, index, reversed}:
       Fail{M.Diagnostic{"const_budget", "const", "compile-time evaluation exhausted its step budget while generating an array"}}
-    case _ 1n+rest _ Budget{1n+remaining, cells} GenerateElements{+generator, +index, +reversed}:
-      remaining = {Budget{remaining, cells} : Budget}
+    case _ 1n+rest _ Budget{1n+remaining, cells, memos, next_memo, constant_cache} GenerateElements{+generator, +index, +reversed}:
+      remaining = {Budget{remaining, cells, memos, next_memo, constant_cache} : Budget}
       do Result<&2, &2, M.Diagnostic, Evaluation>:
         call : Application <- application(generator, U32Value{index}, context)
         resolved : Application <- resolve_application(context_providers(context), call, context)
@@ -842,7 +964,7 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
             continue_value(collected, values => remaining => prepend_collected_value(value, values, remaining)))
     case 0n _ _ _ Expression{expression}:
       Fail{budget_diagnostic(expression)}
-    case _ _ _ Budget{0n, cells} Expression{expression}:
+    case _ _ _ Budget{0n, cells, memos, next_memo, constant_cache} Expression{expression}:
       Fail{budget_diagnostic(expression)}
     # These wrappers carry checking metadata, not an evaluated step. Budget
     # failure above is independent of their shape, so it also reduces for a
@@ -851,11 +973,19 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
       evaluate_work(depth, matching_fuel, pending, steps, Expression{value}, context)
     case _ _ _ _ Expression{M.InstantiationExpr{site, value}}:
       evaluate_work(depth, matching_fuel, pending, steps, Expression{value}, context)
-    case 1n+limit _ _ Budget{1n+remaining, cells} Expression{expression}:
+    case 1n+limit _ _ Budget{1n+remaining, cells, memos, next_memo, constant_cache} Expression{expression}:
       match expression:
         # Budget guards must reduce without inspecting symbolic expressions in proofs.
         case M.RuntimeInitExpr{value}:
           Fail{M.Diagnostic{"const_runtime_dependency", "let", "a const initializer cannot read a top-level let value initialized at module startup"}}
+        case M.MemoExpr{computation}:
+          do Result<&2, &2, M.Diagnostic, Evaluation>:
+            suspended : Evaluation <- evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), Expression{computation}, context)
+            continue_value(suspended, value => budget => Done{memo_new(value, budget)})
+        case M.ForceExpr{value}:
+          do Result<&2, &2, M.Diagnostic, Evaluation>:
+            suspended : Evaluation <- evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), Expression{value}, context)
+            continue_value(suspended, computation => budget => evaluate_work(limit, U32.to_nat(65536), Nil{}, budget, DemandForce{computation}, context))
         case M.UnitExpr{}:
           Done{Evaluation{UnitValue{}, spend_budget(steps)}}
         case M.U32Expr{value}:
@@ -870,10 +1000,8 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
           do Result<&2, &2, M.Diagnostic, Evaluation>:
             value : Value <- lookup_local(context_locals(context), name)
             return Evaluation{value, spend_budget(steps)}
-        case M.ConstantExpr{name}:
-          do Result<&2, &2, M.Diagnostic, Evaluation>:
-            value : M.Expr <- lookup_constant(context_constants(context), name)
-            evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), Expression{value}, without_locals(context))
+        case M.ConstantExpr{+name}:
+          evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), CachedConstant{name, budget_constant(steps, name)}, context)
         case M.FunctionExpr{+name}:
           do Result<&2, &2, M.Diagnostic, Evaluation>:
             function : M.Function <- lookup_function(context_functions(context), name)
@@ -1099,6 +1227,107 @@ def evaluate_work(+depth: Nat, +matching_fuel: Nat, pending: List<&2, M.Expr>, +
         case M.SourceExpr{offset, annotation, value}:
           evaluate_work(limit, U32.to_nat(65536), Nil{}, spend_budget(steps), Expression{value}, context)
 
+# Preserve memo identity in escaping constant values. Serialization interns these
+# cells, so two closures capturing one demand still share its cached result.
+type SnapshotWork is Data:
+  SnapshotValue{value: Value}
+  SnapshotValues{values: List<&2, Value>}
+  SnapshotMemo{slot: Nat, computation: Value, state: MemoState}
+
+def binding_values(bindings: List<&2, Binding<Value>>) -> List<&2, Value>:
+  match bindings:
+    case Nil{}:
+      Nil{}
+    case Binding{name, value} <> tail:
+      value <> binding_values(tail)
+
+def snapshot_bindings(bindings: List<&2, Binding<Value>>, values: List<&2, Value>) -> List<&2, Binding<Value>>:
+  match bindings values:
+    case Binding{name, old} <> tail value <> rest:
+      Binding{name, value} <> snapshot_bindings(tail, rest)
+    case _ _:
+      Nil{}
+
+def snapshot_one(values: List<&2, Value>) -> Result<&2, &2, M.Diagnostic, Value>:
+  match values:
+    case value <> Nil{}:
+      Done{value}
+    case _:
+      Fail{M.Diagnostic{"internal_error", "demand", "lost a constant value while preserving memo cells"}}
+
+def snapshot_work(+fuel: Nat, work: SnapshotWork, +memos: List<&2, MemoCell>) -> Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+  match fuel work:
+    case 0n _:
+      Fail{M.Diagnostic{"backend_limit", "demand", "constant demand graph exceeded its structural limit"}}
+    case 1n+rest SnapshotValue{DemandValue{+slot, computation}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+        state : MemoState <- memo_state(memos, slot)
+        snapshot_work(rest, SnapshotMemo{slot, computation, state}, memos)
+    case 1n+rest SnapshotMemo{slot, computation, Waiting{}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+        values : List<&2, Value> <- snapshot_work(rest, SnapshotValue{computation}, memos)
+        value : Value <- snapshot_one(values)
+        return [MemoValue{slot, False{}, value}]
+    case 1n+rest SnapshotMemo{slot, computation, Ready{cached}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+        values : List<&2, Value> <- snapshot_work(rest, SnapshotValue{cached}, memos)
+        value : Value <- snapshot_one(values)
+        return [MemoValue{slot, True{}, value}]
+    case 1n+rest SnapshotMemo{slot, computation, Forcing{}}:
+      Fail{M.Diagnostic{"recursive_demand", "demand", "a constant contains an unfinished force"}}
+    case 1n+rest SnapshotValue{DataValue{constructor, Some{payload}}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+        values : List<&2, Value> <- snapshot_work(rest, SnapshotValue{payload}, memos)
+        value : Value <- snapshot_one(values)
+        return [DataValue{constructor, Some{value}}]
+    case 1n+rest SnapshotValue{ProductValue{elements}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+        values : List<&2, Value> <- snapshot_work(rest, SnapshotValues{elements}, memos)
+        return [ProductValue{values}]
+    case 1n+rest SnapshotValue{ArrayValue{elements}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+        values : List<&2, Value> <- snapshot_work(rest, SnapshotValues{elements}, memos)
+        return [ArrayValue{values}]
+    case 1n+rest SnapshotValue{ClosureValue{identity, parameter, body, +environment}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+        values : List<&2, Value> <- snapshot_work(rest, SnapshotValues{binding_values(environment)}, memos)
+        return [ClosureValue{identity, parameter, body, snapshot_bindings(environment, values)}]
+    case 1n+rest SnapshotValue{ProviderValue{identity, implementation}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+        values : List<&2, Value> <- snapshot_work(rest, SnapshotValue{implementation}, memos)
+        value : Value <- snapshot_one(values)
+        return [ProviderValue{identity, value}]
+    case 1n+rest SnapshotValue{StateProviderValue{read, write, initial}}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+        values : List<&2, Value> <- snapshot_work(rest, SnapshotValue{initial}, memos)
+        value : Value <- snapshot_one(values)
+        return [StateProviderValue{read, write, value}]
+    case 1n+rest SnapshotValue{value}:
+      Done{[value]}
+    case 1n+rest SnapshotValues{Nil{}}:
+      Done{Nil{}}
+    case 1n+rest SnapshotValues{head <> tail}:
+      do Result<&2, &2, M.Diagnostic, List<&2, Value>>:
+        first : List<&2, Value> <- snapshot_work(rest, SnapshotValue{head}, memos)
+        remaining : List<&2, Value> <- snapshot_work(rest, SnapshotValues{tail}, memos)
+        return List.append(&2, Value, first, remaining)
+
+def snapshot_memos(evaluation: Evaluation) -> Result<&2, &2, M.Diagnostic, Evaluation>:
+  Evaluation{value, +budget} = evaluation
+  Budget{remaining, cells, memos, next_memo, constant_cache} = budget
+  do Result<&2, &2, M.Diagnostic, Evaluation>:
+    values : List<&2, Value> <- snapshot_work(65536n, SnapshotValue{value}, memos)
+    result : Value <- snapshot_one(values)
+    return Evaluation{result, budget}
+
+def snapshot(evaluation: Evaluation) -> Result<&2, &2, M.Diagnostic, Evaluation>:
+  match evaluation:
+    case Evaluation{value, Budget{remaining, cells, Nil{}, next_memo, constant_cache}}:
+      Done{Evaluation{value, Budget{remaining, cells, Nil{}, next_memo, constant_cache}}}
+    case value:
+      snapshot_memos(value)
+
+
 def evaluate(depth: Nat, steps: Nat, expression: M.Expr, context: Context) -> Result<&2, &2, M.Diagnostic, Evaluation>:
   # Keep exhausted entry budgets independent of the recursive work matcher.
   match depth steps:
@@ -1107,22 +1336,97 @@ def evaluate(depth: Nat, steps: Nat, expression: M.Expr, context: Context) -> Re
     case _ 0n:
       Fail{budget_diagnostic(expression)}
     case 1n+remaining_depth 1n+remaining_steps:
-      evaluate_work(1n+remaining_depth, U32.to_nat(65536), Nil{}, Budget{1n+remaining_steps, Nil{}}, Expression{expression}, context)
+      do Result<&2, &2, M.Diagnostic, Evaluation>:
+        result : Evaluation <- evaluate_work(1n+remaining_depth, U32.to_nat(65536), Nil{}, Budget{1n+remaining_steps, Nil{}, Nil{}, 0n, None{}}, Expression{expression}, context)
+        snapshot(result)
 
 def prepend_constant(name: String, value: Value, constants: Constants) -> Constants:
   Constants{bindings, remaining} = constants
   Constants{Binding{name, value} <> bindings, remaining}
 
-def evaluate_constants(constants: List<&2, M.CheckedConstant>, steps: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, Constants>:
+def evaluate_separate_constants(constants: List<&2, M.CheckedConstant>, steps: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, Constants>:
   match constants:
     case Nil{}:
       Done{Constants{Nil{}, steps}}
     case M.CheckedConstant{M.Constant{name, exported, annotation, M.RuntimeInitExpr{value}}, ty, variables} <> tail:
-      evaluate_constants(tail, steps, context)
+      evaluate_separate_constants(tail, steps, context)
     case M.CheckedConstant{M.Constant{name, exported, annotation, value}, ty, variables} <> tail:
       +budget = steps
       do Result<&2, &2, M.Diagnostic, Constants>:
         checked : Evaluation <- evaluate(budget, budget, value, context)
         +head : Evaluation <- complete_definition(checked)
-        rest : Constants <- evaluate_constants(tail, eval_remaining(head), context)
+        rest : Constants <- evaluate_separate_constants(tail, eval_remaining(head), context)
         return prepend_constant(name, eval_value(head), rest)
+
+
+# A demand can outlive its constant initializer. Evaluate such modules in one
+# graph so aliases and dependencies share the same memo cells. Ordinary modules
+# retain their per-constant budgets and incremental cache entries.
+def demand_expressions(fuel: Nat, expressions: List<&2, M.Expr>) -> Bool:
+  match fuel expressions:
+    case _ Nil{}:
+      False{}
+    case 0n _:
+      True{}
+    case 1n+rest M.MemoExpr{computation} <> tail:
+      True{}
+    case 1n+rest M.ForceExpr{value} <> tail:
+      True{}
+    case 1n+rest head <> tail:
+      demand_expressions(rest, List.append(&2, M.Expr, F.children(head), tail))
+
+def constant_expressions(constants: List<&2, M.Constant>) -> List<&2, M.Expr>:
+  match constants:
+    case Nil{}:
+      Nil{}
+    case M.Constant{name, exported, annotation, value} <> tail:
+      value <> constant_expressions(tail)
+
+def function_expressions(functions: List<&2, M.Function>) -> List<&2, M.Expr>:
+  match functions:
+    case Nil{}:
+      Nil{}
+    case M.Function{name, exported, parameter, p, r, body} <> tail:
+      body <> function_expressions(tail)
+
+def has_demands(context: Context) -> Bool:
+  Context{constants, functions, locals, types, providers, checked} = context
+  demand_expressions(1048576n, List.append(&2, M.Expr, constant_expressions(constants), function_expressions(functions)))
+
+def budget_steps(budget: Budget) -> Nat:
+  Budget{steps, cells, memos, next_memo, cache} = budget
+  steps
+
+def snapshot_constants(bindings: List<&2, Binding<Value>>, budget: Budget) -> Result<&2, &2, M.Diagnostic, Constants>:
+  Budget{remaining, cells, memos, next_memo, cache} = budget
+  +ordered = List.reverse(&2, Binding<Value>, bindings)
+  do Result<&2, &2, M.Diagnostic, Constants>:
+    values : List<&2, Value> <- snapshot_work(65536n, SnapshotValues{binding_values(ordered)}, memos)
+    return Constants{snapshot_bindings(ordered, values), remaining}
+
+def evaluate_shared_constants(constants: List<&2, M.CheckedConstant>, +budget: Budget, +context: Context, reversed: List<&2, Binding<Value>>) -> Result<&2, &2, M.Diagnostic, Constants>:
+  match constants:
+    case Nil{}:
+      snapshot_constants(reversed, budget)
+    case M.CheckedConstant{M.Constant{name, exported, annotation, M.RuntimeInitExpr{value}}, ty, variables} <> tail:
+      evaluate_shared_constants(tail, budget, context, reversed)
+    case M.CheckedConstant{M.Constant{+name, exported, annotation, value}, ty, variables} <> tail:
+      do Result<&2, &2, M.Diagnostic, Constants>:
+        +head : Evaluation <- evaluate_work(budget_steps(budget), 65536n, Nil{}, budget, CachedConstant{name, budget_constant(budget, name)}, context)
+        evaluate_shared_constants(tail, eval_budget(head), context, Binding{name, eval_value(head)} <> reversed)
+
+def evaluate_constants_selected(demands: Bool, constants: List<&2, M.CheckedConstant>, steps: Nat, context: Context) -> Result<&2, &2, M.Diagnostic, Constants>:
+  match demands:
+    case True{}:
+      evaluate_shared_constants(constants, Budget{steps, Nil{}, Nil{}, 0n, Some{Nil{}}}, context, Nil{})
+    case False{}:
+      evaluate_separate_constants(constants, steps, context)
+
+def evaluate_constants(constants: List<&2, M.CheckedConstant>, +steps: Nat, +context: Context) -> Result<&2, &2, M.Diagnostic, Constants>:
+  match constants:
+    case Nil{}:
+      Done{Constants{Nil{}, steps}}
+    case M.CheckedConstant{M.Constant{name, exported, annotation, M.RuntimeInitExpr{value}}, ty, variables} <> tail:
+      evaluate_constants(tail, steps, context)
+    case values:
+      evaluate_constants_selected(has_demands(context), values, steps, context)

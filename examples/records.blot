@@ -1,22 +1,22 @@
-type Vec2 is data = Vec2 { x: F32, y: F32 }
-type Body a is data = Body { position: Vec2, payload: a }
-type Selection is data = Selected { index: U32 } | Cleared {}
+type Vec2 is data = #Vec2 { x: F32, y: F32 }
+type Body a is data = #Body { position: Vec2, payload: a }
+type Selection is data = #Selected { index: U32 } | #Cleared {}
 
 const Vec2.add = fn left => fn right => do:
-  let Vec2 { x: left_x, y: left_y } = left
-  let Vec2 { x: right_x, y: right_y } = right
-  return Vec2 {
+  let #Vec2 { x: left_x, y: left_y } = left
+  let #Vec2 { x: right_x, y: right_y } = right
+  return #Vec2 {
     x: left_x + right_x,
     y: left_y + right_y,
   }
 
 const coordinate = fn body => case body of
-  Body { position: Vec2 { x }, payload: Selected { index } } => x + U32.to_f32 index
-  Body { payload: Cleared {} } => 0.0
+  #Body { position: #Vec2 { x }, payload: #Selected { index } } => x + U32.to_f32 index
+  #Body { payload: #Cleared {} } => 0.0
 
-const origin = Vec2 { y: 2.0, x: 20.0 }
-const movement = Vec2 { x: 20.0, y: 1.0 }
-const bodies = [Body { payload: Selected { index: 2 }, position: origin + movement }]
+const origin = #Vec2 { y: 2.0, x: 20.0 }
+const movement = #Vec2 { x: 20.0, y: 1.0 }
+const bodies = [#Body { payload: #Selected { index: 2 }, position: origin + movement }]
 
 entry const expected = coordinate (@array.get bodies 0)
 entry const answer = fn () => coordinate (@array.get bodies 0)

@@ -55,7 +55,7 @@ jobs:
           source="$RUNNER_TEMP/source"
           mkdir -p "$source"
           revision="$(git rev-parse HEAD)"
-          if [ "$REVISION" = baseline ]; then revision=ac59fb68f98780e168ce01fa39410b1a6ef54efd; fi
+          if [ "$REVISION" = baseline ]; then revision=0c390be4e9039a307b9bbf556083be26c9a6f25f; fi
           git archive "$revision" | tar -x -C "$source"
           echo "$revision" > "$RUNNER_TEMP/source-revision.txt"
           python3 - <<'PY' >> "$GITHUB_OUTPUT"

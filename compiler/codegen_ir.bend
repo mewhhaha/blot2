@@ -13,7 +13,7 @@ def lambda_index_go(lambdas: List<&2, F.Lambda>, indexed: Map<&2, Maybe<&2, F.La
     case Nil{}:
       indexed
     case F.Lambda{+identity, parameter, body, captures} <> tail:
-      lambda_index_go(tail, Map.set(&2, Maybe<&2, F.Lambda>, indexed, Nat.show(identity), Some{F.Lambda{identity, parameter, body, captures}}))
+      lambda_index_go(tail, Index.set(Maybe<&2, F.Lambda>, indexed, Nat.show(identity), Some{F.Lambda{identity, parameter, body, captures}}))
 
 def metadata(lambdas: List<&2, F.Lambda>, constructors: Map<&2, Maybe<&2, E.ConstructorSlot>>) -> Metadata:
   Metadata{lambda_index_go(List.reverse(&2, F.Lambda, lambdas), Map.new(&2, Maybe<&2, F.Lambda>)), constructors, Set.new(), Saturation.empty()}
@@ -83,6 +83,8 @@ type Expr is Data:
   ArraySetExpr{array: Expr, index: Expr, value: Expr}
   ArrayReuseExpr{array: Expr, index: Expr, value: Expr}
   ArrayLengthExpr{array: Expr}
+  MemoExpr{computation: Expr}
+  ForceExpr{value: Expr}
 
 type Work is Data:
   ExpressionWork{expression: M.Expr}
@@ -134,6 +136,10 @@ def rebuild_arms(arms: List<&2, M.MatchArm<M.Expr>>, bodies: List<&2, Expr>) -> 
 
 def rebuild(original: M.Expr, children: List<&2, Expr>) -> Result<&2, &2, M.Diagnostic, Expr>:
   match original children:
+    case M.MemoExpr{computation} value <> Nil{}:
+      Done{MemoExpr{value}}
+    case M.ForceExpr{original} value <> Nil{}:
+      Done{ForceExpr{value}}
     case M.UnitExpr{} Nil{}:
       Done{UnitExpr{}}
     case M.U32Expr{value} Nil{}:

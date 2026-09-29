@@ -4,36 +4,36 @@
 infixl 60 `add`
 infixl 70 (><) = dot
 
-type Vec2 is data = Vec2 { x: F32, y: F32 }
-type Mode is data = Running | Paused
-type Event is data = Tick U32 | SetMode Mode | Reset
+type Vec2 is data = #Vec2 { x: F32, y: F32 }
+type Mode is data = #Running | #Paused
+type Event is data = #Tick U32 | #SetMode Mode | #Reset
 
 const add = fn left => fn right => U32.add left right
 const dot = fn left => fn right => do:
-  let Vec2 { x: lx, y: ly } = left
-  let Vec2 { x: rx, y: ry } = right
+  let #Vec2 { x: lx, y: ly } = left
+  let #Vec2 { x: rx, y: ry } = right
   return lx * rx + ly * ry
 
 const Vec2.scaled = fn value => fn factor => do:
-  let Vec2 { x, y } = value
-  return Vec2 { x: x * factor, y: y * factor }
+  let #Vec2 { x, y } = value
+  return #Vec2 { x: x * factor, y: y * factor }
 
 // Explicit thunks delay evaluation; they do not promise memoization.
 const and_then = fn left => fn right => case left of
-  False => False
-  True => right ()
+  #False => #False
+  #True => right ()
 
 const unwrap_or_else = fn candidate => fn fallback => case candidate of
-  Some value => value
-  Nothing => fallback ()
+  #Some value => value
+  #Nothing => fallback ()
 
 entry const short_circuit = fn () => do:
   let empty: Array U32 = []
-  return and_then False (fn () => (@array.get empty 0) > 0)
+  return and_then #False (fn () => (@array.get empty 0) > 0)
 
 entry const lazy_fallback = fn () => do:
   let empty: Array U32 = []
-  return unwrap_or_else (Some 42) (fn () => @array.get empty 0)
+  return unwrap_or_else (#Some 42) (fn () => @array.get empty 0)
 
 entry const factorial = fn value => do:
   if value <= 1:
@@ -41,28 +41,28 @@ entry const factorial = fn value => do:
   return value * factorial (value - 1)
 
 const choose = fn first => fn enabled => fn fallback => case first, enabled, fallback of
-  Some value, True, _ => value
-  _, _, Some value => value
+  #Some value, #True, _ => value
+  _, _, #Some value => value
   _, _, _ => 0
 
 const double_or_zero = fn candidate => do:
-  let Some(value) = candidate else:
+  let #Some(value) = candidate else:
     return 0
   return value * 2
 
 const react = fn event => fn ticks => case event of
-  Tick count => ticks + count
-  SetMode Running => ticks
-  SetMode Paused => ticks
-  Reset => 0
+  #Tick count => ticks + count
+  #SetMode #Running => ticks
+  #SetMode #Paused => ticks
+  #Reset => 0
 
 entry const operator_example = 1 `add` 2 * 3
 entry const recursive_example = fn (value: U32) => factorial value
-entry const matching_example = fn () => choose Nothing False (Some (double_or_zero (Some 21)))
-entry const event_example = fn () => react (Tick 2) 40
+entry const matching_example = fn () => choose #Nothing #False (#Some (double_or_zero (#Some 21)))
+entry const event_example = fn () => react (#Tick 2) 40
 
 entry const vector_example = fn () => do:
-  let position = Vec2 { x: 3.0, y: 4.0 }
+  let position = #Vec2 { x: 3.0, y: 4.0 }
   let scaled = Vec2.scaled position 2.0
   return position >< scaled
 

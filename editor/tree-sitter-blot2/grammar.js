@@ -7,13 +7,16 @@ export default grammar({
   extras: ($) => [/\s+/, $.comment],
   word: ($) => $.identifier,
 
-  conflicts: ($) => [[$.function_binding, $._syntax]],
+  conflicts: (
+    $,
+  ) => [[$.function_binding, $._syntax], [$.import_declaration, $.keyword]],
 
   rules: {
     source_file: ($) => repeat($._syntax),
 
     _syntax: ($) =>
       choice(
+        $.import_declaration,
         $.function_binding,
         $.lambda_header,
         $.type_header,
@@ -21,6 +24,7 @@ export default grammar({
         $.infix_function,
         $.forward_return,
         $.declaration_tag,
+        $.constructor_marker,
         $.where_clause,
         $.parenthesized,
         $.bracketed,
@@ -41,6 +45,17 @@ export default grammar({
         $.type_identifier,
         $.operator,
         $.separator,
+      ),
+
+    import_declaration: ($) =>
+      prec.dynamic(
+        3,
+        seq(
+          "import",
+          choice(seq("*", "as", $.identifier), $.braced),
+          "from",
+          $.text_literal,
+        ),
       ),
 
     function_binding: ($) =>
@@ -92,7 +107,7 @@ export default grammar({
         $.deferred_parameter,
       ),
 
-    deferred_parameter: ($) => seq("~", $.identifier),
+    deferred_parameter: ($) => seq("~", choice($.identifier, $.parenthesized)),
 
     binding_keyword: (_) => choice("const", "let"),
 
@@ -174,6 +189,8 @@ export default grammar({
 
     forward_return: (_) => seq("return", "$"),
 
+    constructor_marker: (_) => prec(-1, "#"),
+
     declaration_tag: ($) =>
       seq(
         "#",
@@ -233,7 +250,6 @@ export default grammar({
     keyword: (_) =>
       choice(
         "import",
-        "from",
         "as",
         "data",
         "type",
@@ -248,6 +264,7 @@ export default grammar({
         "do",
         "return",
         "if",
+        "then",
         "else",
         "case",
         "of",

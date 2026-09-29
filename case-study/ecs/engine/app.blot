@@ -6,24 +6,24 @@ import * as snapshot from "engine/snapshot"
 import { Io, FileIo, WindowIo, RenderIo, Application, HostError, InvalidSnapshot, FrameInput, Viewport, InputEvent } from "./platform"
 
 #[resource]
-type Frame is data = Frame FrameInput
+type Frame is data = #Frame FrameInput
 #[resource]
-type PendingInput is data = PendingInput (Maybe InputEvent)
+type PendingInput is data = #PendingInput (Maybe InputEvent)
 #[resource]
-type Title is data = Title Text
+type Title is data = #Title Text
 #[resource]
-type SnapshotRequest is data = Idle | Save | Load
+type SnapshotRequest is data = #Idle | #Save | #Load
 
 // Descriptor values exist at const time; they are not boxed runtime systems.
-type Builder is data = Builder { registrations: Array ecs.Descriptor }
+type Builder is data = #Builder { registrations: Array ecs.Descriptor }
 
-const new = fn title => Builder {
+const new = fn title => #Builder {
   registrations: [
-    ecs.resource (Title title),
-    ecs.resource Idle,
-    ecs.resource (PendingInput Nothing),
-    ecs.resource (Frame (FrameInput {
-      seconds: 0.0, alpha: 0.0, viewport: Viewport { width: 1.0, height: 1.0 },
+    ecs.resource (#Title title),
+    ecs.resource #Idle,
+    ecs.resource (#PendingInput #Nothing),
+    ecs.resource (#Frame (#FrameInput {
+      seconds: 0.0, alpha: 0.0, viewport: #Viewport { width: 1.0, height: 1.0 },
     })),
   ],
 }
@@ -45,7 +45,7 @@ const build = fn (const builder: Builder) => ecs.build builder.registrations
 
 const create_world = fn (const simulation) => fn () => do:
   let (world, ()) = do ecs.scope (simulation.create ()):
-    use simulation.run Start
+    use simulation.run #Start
     return ()
   return ecs.checkpoint world
 
@@ -57,31 +57,31 @@ const advance_world = fn (const simulation) => fn world => fn frame => do:
   if F32.gt frame.seconds 0.25:
     use @panic "Delta time must be between 0 and 0.25 seconds"
   let (next_world, ()) = do ecs.scope (ecs.checkpoint world):
-    use ecs.set (Frame frame)
-    use simulation.run Update
+    use ecs.set (#Frame frame)
+    use simulation.run #Update
     return ()
   return next_world
 
 const apply_event = fn (const simulation) => fn (files: FileIo) => fn world => fn event => do:
   let (next_world, request) = do ecs.scope world:
-    use ecs.set (PendingInput (Some event))
-    use simulation.run Event
+    use ecs.set (#PendingInput (#Some event))
+    use simulation.run #Event
     use request <- ecs.get SnapshotRequest
-    use ecs.set Idle
-    use ecs.set (PendingInput Nothing)
+    use ecs.set #Idle
+    use ecs.set (#PendingInput #Nothing)
     return request
   return case request of
-    Idle => Ok next_world
-    Save => do:
+    #Idle => #Ok next_world
+    #Save => do:
       let bytes = snapshot.encode (simulation.schema, next_world)
       use written <- files.write bytes
-      return Result.map (fn () => next_world) (Result.map_error HostError written)
-    Load => do:
+      return Result.map (fn () => next_world) (Result.map_error #HostError written)
+    #Load => do:
       use loaded <- files.read ()
       return case loaded of
-        Err error => Err (HostError error)
-        Ok bytes => Result.map ecs.checkpoint
-          (Result.map_error InvalidSnapshot (snapshot.decode (simulation.schema, bytes)))
+        #Err error => #Err (#HostError error)
+        #Ok bytes => Result.map ecs.checkpoint
+          (Result.map_error #InvalidSnapshot (snapshot.decode (simulation.schema, bytes)))
 
 const render_frame = fn (const simulation) => fn (window: WindowIo) => fn (renderer: RenderIo) => fn world => fn frame => do:
   if Bool.not (F32.is_finite frame.alpha):
@@ -91,21 +91,21 @@ const render_frame = fn (const simulation) => fn (window: WindowIo) => fn (rende
   if F32.gt frame.alpha 1.0:
     use @panic "Interpolation alpha must be between 0 and 1"
   let (_, (packet, title)) = do ecs.scope world:
-    use ecs.set (Frame frame)
+    use ecs.set (#Frame frame)
     use collected <- render.collect (fn () => do:
-      use simulation.run Render
-      use title_value <- ecs.get Title
-      let Title title = title_value
+      use simulation.run #Render
+      use title_value <- ecs.get #Title
+      let #Title title = title_value
       return title)
     return collected
   use titled <- window.set_title title
-  let Ok () = titled else:
-    return Result.map_error HostError titled
+  let #Ok () = titled else:
+    return Result.map_error #HostError titled
   use submitted <- renderer.submit packet
-  return Result.map_error HostError submitted
+  return Result.map_error #HostError submitted
 
 // create is first-launch only. Reload rebinds capabilities around retained state.
-const bind = fn (const simulation) => fn (io: Io) => Application {
+const bind = fn (const simulation) => fn (io: Io) => #Application {
   create: create_world simulation,
   event: apply_event simulation io.files,
   update: advance_world simulation,

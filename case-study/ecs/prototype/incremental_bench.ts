@@ -101,8 +101,8 @@ const edits = [
     name: "layout",
     source: replaceOnce(
       baseline,
-      "data CompileMarker = CompileMarker U32",
-      "data CompileMarker = CompileMarker U32 | CompileMarkerEmpty",
+      "data CompileMarker = #CompileMarker U32",
+      "data CompileMarker = #CompileMarker U32 | #CompileMarkerEmpty",
     ),
   },
   {

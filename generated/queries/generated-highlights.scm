@@ -20,13 +20,18 @@
 "{" @punctuation.bracket
 "|" @operator
 "}" @punctuation.bracket
-(atom "False" @keyword)
-(atom "True" @keyword)
+"~" @operator
+"·" @operator
 (binding_else "else" @keyword)
 (binding "let" @keyword)
+(boolean_constructor_pattern value: "False" @keyword)
+(boolean_constructor_pattern value: "True" @keyword)
+(case_arm "if" @keyword)
 (case_expression "case" @keyword)
 (case_expression "of" @keyword)
 (conditional "if" @keyword)
+(constructor_reference value: "False" @keyword)
+(constructor_reference value: "True" @keyword)
 (data_type "data" @keyword)
 (data_type "is" @keyword)
 (data_type "type" @keyword)
@@ -43,8 +48,11 @@
 (for_statement "for" @keyword)
 (for_statement "in" @keyword)
 (for_statement "let" @keyword)
+(if_expression "else" @keyword)
+(if_expression "if" @keyword)
+(if_expression "then" @keyword)
 (import_binding alias: "as" @keyword)
-(import_declaration "from" @keyword)
+(import_declaration "froM" @keyword)
 (import_declaration "import" @keyword)
 (lambda "fn" @keyword)
 (named_fixity associativity: "infix" @keyword)
@@ -53,8 +61,6 @@
 (namespace_import "as" @keyword)
 (pattern_conditional "if" @keyword)
 (pattern_conditional "let" @keyword)
-(pattern "False" @keyword)
-(pattern "True" @keyword)
 (range_statement "for" @keyword)
 (result "return" @keyword)
 (symbolic_fixity associativity: "infix" @keyword)
@@ -70,12 +76,15 @@
 (type_field) @variable.other.member
 (type_expression) @type
 (type_application) @type
+(demand_type) @type
 (type_atom) @type
 (type_group) @type
 (member_access) @variable.other.member
+(type_witness) @type
 (record) @type
 (record_values) @type
 (record_value) @type
+(boolean_constructor_pattern) @constant.builtin
 (record_pattern) @type
 (record_pattern_field) @variable.other.member
 (TYPE_IDENT) @type

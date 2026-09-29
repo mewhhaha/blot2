@@ -9,8 +9,8 @@ Deno.test("selected callback rows specialize independently for pure and handled 
     const artifact = compiler.compile(`
 effect Tick: Unit -> U32
 const provider = @effect.provider Tick (fn () => 10)
-const apply = fn transform => fn value => @type.call "map" transform (Some value)
-const unused = fn transform => fn value => @type.call "map" transform (Some value)
+const apply = fn transform => fn value => @type.call "map" transform (#Some value)
+const unused = fn transform => fn value => @type.call "map" transform (#Some value)
 const tick = fn value => do:
   use amount <- Tick ()
   return value + amount
@@ -30,12 +30,12 @@ Deno.test("ordinary selected operators prove concrete curried rows before relink
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compile(`
-type Box a is data = Box a
+type Box a is data = #Box a
 const Box.add = fn left => fn right => case left, right of
-  Box a, Box b => Box (a + b)
+  #Box a, #Box b => #Box (a + b)
 const twice = fn value => value + value
-entry const answer = fn (value: F32) => case twice (Box value) of
-  Box result => result
+entry const answer = fn (value: F32) => case twice (#Box value) of
+  #Box result => result
 `);
     const guest = await instantiateGuest(artifact.bytes);
     try {
@@ -47,14 +47,14 @@ entry const answer = fn (value: F32) => case twice (Box value) of
       () =>
         compiler.compile(`
 effect Tick: Unit -> Unit
-type Box a is data = Box a
+type Box a is data = #Box a
 const Box.add = fn left => fn right => do:
   use Tick ()
   return case left, right of
-    Box a, Box b => Box (a + b)
+    #Box a, #Box b => #Box (a + b)
 const twice = fn value => value + value
-entry const answer: F32 -> F32 ! {} = fn value => case twice (Box value) of
-  Box result => result
+entry const answer: F32 -> F32 ! {} = fn value => case twice (#Box value) of
+  #Box result => result
 `),
       (error) =>
         error instanceof SourceError && error.code === "effect_mismatch",

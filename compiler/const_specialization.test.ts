@@ -5,34 +5,34 @@ import { instantiateGuest } from "./guest.ts";
 import { SourceError } from "./syntax.ts";
 
 const typedBuilder = `
-type Builder [world, scope] is data = Builder { initial: world, scope: scope }
-data Counter = Counter U32
-const new = fn () => Builder { initial: (), scope: fn world => fn action => (world, action ()) }
+type Builder [world, scope] is data = #Builder { initial: world, scope: scope }
+data Counter = #Counter U32
+const new = fn () => #Builder { initial: (), scope: fn world => fn action => (world, action ()) }
 const insert_resource = fn initial => fn builder => do:
-  let Builder { initial: previous_initial, scope: previous_scope } = builder
+  let #Builder { initial: previous_initial, scope: previous_scope } = builder
   let scope = fn world => fn action => do:
     let (current, previous) = world
     use outcome <- @state.run current (fn () => previous_scope previous action)
     let (next, (previous_next, result)) = outcome
     return ((next, previous_next), result)
-  return Builder { initial: (initial, previous_initial), scope }
+  return #Builder { initial: (initial, previous_initial), scope }
 const scoped = fn builder => fn world => fn action => do:
-  let Builder { scope } = builder
+  let #Builder { scope } = builder
   return scope world action
 const create = fn builder => fn action => do:
-  let Builder { initial } = builder
+  let #Builder { initial } = builder
   return scoped builder initial action
-const application = insert_resource (Counter 40) (new ())
+const application = insert_resource (#Counter 40) (new ())
 entry const run = fn () => do:
   let (initial, _) = create application (fn () => ())
   let (next, integer) = scoped application initial (fn () => do:
-    use counter <- @state.get Counter
-    let Counter value = counter
-    use @state.set (Counter (value + 2))
+    use counter <- @state.get #Counter
+    let #Counter value = counter
+    use @state.set (#Counter (value + 2))
     return value)
   let (_, floating) = scoped application next (fn () => do:
-    use counter <- @state.get Counter
-    let Counter value = counter
+    use counter <- @state.get #Counter
+    let #Counter value = counter
     return U32.to_f32 value + 0.5)
   return U32.to_f32 integer + floating
 entry const folded = run ()
@@ -84,10 +84,10 @@ Deno.test("const callable fields defer dispatch that requires each caller's type
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compile(`
-data Box action = Box action
-const doubled = Box (fn value => value + value)
+data Box action = #Box action
+const doubled = #Box (fn value => value + value)
 const double = fn value => do:
-  let Box apply = doubled
+  let #Box apply = doubled
   return apply value
 entry const run = fn () => U32.to_f32 (double 20) + double 1.25
 `);
@@ -106,13 +106,13 @@ Deno.test("const callable fields retain shared dependency values", async () => {
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compile(`
-data Scope action = Scope action
+data Scope action = #Scope action
 const wrapped = do:
-  let Scope invoke = scope
-  return Scope (fn action => invoke action)
-const scope = Scope (fn action => (40 + 2, action ()))
+  let #Scope invoke = scope
+  return #Scope (fn action => invoke action)
+const scope = #Scope (fn action => (40 + 2, action ()))
 const invoke = fn action => do:
-  let Scope apply = wrapped
+  let #Scope apply = wrapped
   return apply action
 entry const run = fn () => do:
   let (_, ignored) = invoke (fn () => ())
@@ -146,11 +146,11 @@ Deno.test("const callable fields validate reached resolved initializers", async 
           `do:
   if 1 + 1 == 2:
     return @panic "invalid builder"
-  return Scope (fn action => (40 + 2, action ()))`,
+  return #Scope (fn action => (40 + 2, action ()))`,
           "const_panic",
         ],
         [
-          "Scope (fn action => (True + False, action ()))",
+          "#Scope (fn action => (#True + #False, action ()))",
           "missing_associated",
         ],
       ]
@@ -158,7 +158,7 @@ Deno.test("const callable fields validate reached resolved initializers", async 
       throws(
         () =>
           compiler.compile(
-            `data Scope action = Scope action\nconst invalid = ${body}\nentry const probe = fn () => do:\n  let kept = invalid\n  return 0\n`,
+            `data Scope action = #Scope action\nconst invalid = ${body}\nentry const probe = fn () => do:\n  let kept = invalid\n  return 0\n`,
           ),
         (error: unknown) => {
           ok(error instanceof SourceError);
@@ -199,10 +199,10 @@ Deno.test("const callable fields preserve independent generic results with ordin
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compile(`
-data Scope action = Scope action
-const scope = Scope (fn action => (40 + 2, action ()))
+data Scope action = #Scope action
+const scope = #Scope (fn action => (40 + 2, action ()))
 const invoke = fn action => do:
-  let Scope call = scope
+  let #Scope call = scope
   return call action
 entry const run = fn () => do:
   let (_, ignored) = invoke (fn () => ())
@@ -224,12 +224,12 @@ Deno.test("const callable specialization preserves foreign callback effects", as
   const compiler = await createSourceCompiler();
   try {
     const artifact = compiler.compile(`
-data Scope action = Scope action
-const scope = Scope (fn action => do:
+data Scope action = #Scope action
+const scope = #Scope (fn action => do:
   use result <- action ()
   return (40 + 2, result))
 const invoke = fn action => do:
-  let Scope call = scope
+  let #Scope call = scope
   use result <- call action
   return result
 entry const run = fn (probe: Unit -> F32 ! {Foreign}) => do:

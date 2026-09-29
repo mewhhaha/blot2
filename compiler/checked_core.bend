@@ -130,14 +130,14 @@ def first_type_index(types: List<&2, M.DataType>, indexed: Map<&2, M.DataType>) 
     case Nil{}:
       indexed
     case +head <> tail:
-      Map.set(&2, M.DataType, first_type_index(tail, indexed), Groups.type_key(type_identity(head)), head)
+      Index.set(M.DataType, first_type_index(tail, indexed), Groups.type_key(type_identity(head)), head)
 
 def first_operation_index(operations: List<&2, M.Operation>, indexed: Map<&2, M.Operation>) -> Map<&2, M.Operation>:
   match operations:
     case Nil{}:
       indexed
     case +head <> tail:
-      Map.set(&2, M.Operation, first_operation_index(tail, indexed), Groups.type_key(operation_identity(head)), head)
+      Index.set(M.Operation, first_operation_index(tail, indexed), Groups.type_key(operation_identity(head)), head)
 
 def find_operation(+identity: M.TypeId, operations: List<&2, M.Operation>) -> Maybe<&2, M.Operation>:
   match operations:
@@ -213,9 +213,9 @@ def names(module: M.Module) -> List<&2, String>:
 def insert(+certificate: Certificate, +indexed: Map<&2, List<&2, Certificate>>, name: String, previous: Maybe<&2, List<&2, Certificate>>) -> Map<&2, List<&2, Certificate>>:
   match previous:
     case None{}:
-      Map.set(&2, List<&2, Certificate>, indexed, name, [certificate])
+      Index.set(List<&2, Certificate>, indexed, name, [certificate])
     case Some{old}:
-      Map.set(&2, List<&2, Certificate>, indexed, name, certificate <> old)
+      Index.set(List<&2, Certificate>, indexed, name, certificate <> old)
 
 def add_names(members: List<&2, String>, +certificate: Certificate, +indexed: Map<&2, List<&2, Certificate>>) -> Map<&2, List<&2, Certificate>>:
   match members:

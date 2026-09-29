@@ -85,7 +85,7 @@ entry const direct = fn () => do:
       : await createNativeCompiler();
     try {
       const artifact = await compiler.compile(`
-type Game [step] is data = Game {step: step}
+type Game [step] is data = #Game {step: step}
 const run = fn game => fn schema => fn (host: F32 -> F32 ! {Foreign}) => do:
   let state: Array F32 = @array.fill 1024 (U32.to_f32 schema)
   for ever:
@@ -93,7 +93,7 @@ const run = fn game => fn schema => fn (host: F32 -> F32 ! {Foreign}) => do:
     if amount >= 10003.0:
       return amount
     state := game.step self
-const game = Game {step: fn state => @array.fill 1024 (@array.get state 0 + 1.0)}
+const game = #Game {step: fn state => @array.fill 1024 (@array.get state 0 + 1.0)}
 entry const main = fn host => run game 3 host
 `);
       const guest = await instantiateGuest(artifact.bytes);

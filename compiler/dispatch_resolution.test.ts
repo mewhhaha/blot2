@@ -67,8 +67,8 @@ entry const main = fn (value: U32) -> U32 => top1 (top0 (value))
 Deno.test("a generic helper whose comparison operands are closed is not cloned", async () => {
   const source = `const leaf = fn (values: Array a) => fn (index: U32) => do:
   if index < Array.length values:
-    return Some (@array.get values index)
-  return Nothing
+    return #Some (@array.get values index)
+  return #Nothing
 const mid0 = fn values => fn i => leaf values i
 const mid1 = fn values => fn i => leaf values i
 entry const pick = fn (i: U32) -> U32 => do:
@@ -77,7 +77,7 @@ entry const pick = fn (i: U32) -> U32 => do:
   let a = mid0 integers i
   let b = mid1 floats i
   return case (a, b) of
-    (Some x, Some y) => x + F32.to_u32 y
+    (#Some x, #Some y) => x + F32.to_u32 y
     _ => 0
 `;
   const reference = await createSourceCompiler();
@@ -117,7 +117,7 @@ entry const run = fn () -> U32 => count [1, 2] + count [1.0]
 });
 
 Deno.test("field accessors are shared per receiver type and field", async () => {
-  const source = `type Point is data = Point { x: F32, y: F32 }
+  const source = `type Point is data = #Point { x: F32, y: F32 }
 const sum = fn (p: Point) -> F32 => p.x + p.y + p.x
 const other = fn (p: Point) -> F32 => p.x
 const get_x = fn p => p.x
@@ -126,7 +126,7 @@ const moved = fn (p: Point) -> Point => do:
   q.x := self + 1.0
   q.x := self + 1.0
   return q
-entry const run = fn (value: F32) -> F32 => sum (Point { x: value, y: 2.0 }) + other (Point { x: 1.0, y: value }) + get_x (moved (Point { x: 3.0, y: 0.0 }))
+entry const run = fn (value: F32) -> F32 => sum (#Point { x: value, y: 2.0 }) + other (#Point { x: 1.0, y: value }) + get_x (moved (#Point { x: 3.0, y: 0.0 }))
 `;
   const reference = await createSourceCompiler();
   const native = await createNativeCompiler();
@@ -150,11 +150,11 @@ entry const run = fn (value: F32) -> F32 => sum (Point { x: value, y: 2.0 }) + o
 
 Deno.test("resolved members, fields and operators evaluate operands once in source order", async () => {
   const source = `
-type Box is data = Box { values: Array U32 }
+type Box is data = #Box { values: Array U32 }
 const Box.pick = fn receiver => fn index => receiver.values[index]
 const make = fn (probe: U32 -> U32 ! {Foreign}) => do:
   use probe 1
-  return Box { values: [40, 42] }
+  return #Box { values: [40, 42] }
 entry const run = fn (probe: U32 -> U32 ! {Foreign}) => probe(5) - probe(3) + make(probe).pick(probe(2) - 1) - 2
 `;
   const reference = await createSourceCompiler();
@@ -186,17 +186,17 @@ entry const run = fn (probe: U32 -> U32 ! {Foreign}) => probe(5) - probe(3) + ma
 
 // A prelude-free operator whose implementation is a user type's member.
 const localNum =
-  'infixl 60 (+) = add\nconst add = fn left => fn right => @type.call "add" left right\ntype Num is data = Num U32\nconst Num.add = fn (a: Num) => fn (b: Num) => a\n';
+  'infixl 60 (+) = add\nconst add = fn left => fn right => @type.call "add" left right\ntype Num is data = #Num U32\nconst Num.add = fn (a: Num) => fn (b: Num) => a\n';
 // A receiver member that performs an effect.
 const localPing =
-  "effect Ping: Unit -> U32\ntype Box is data = Box { value: U32 }\nconst Box.ping = fn (box: Box) => do:\n  use value <- Ping ()\n  return value\nconst pure_only = fn (callback: Unit -> U32) => callback ()\n";
+  "effect Ping: Unit -> U32\ntype Box is data = #Box { value: U32 }\nconst Box.ping = fn (box: Box) => do:\n  use value <- Ping ()\n  return value\nconst pure_only = fn (callback: Unit -> U32) => callback ()\n";
 // A receiver member whose selection equates the receiver's two type arguments.
 const localPair =
-  "type Pair [a, b] is data = Pair (a, b)\nconst Pair.same = fn (p: Pair [a, a]) => 0\n";
+  "type Pair [a, b] is data = #Pair (a, b)\nconst Pair.same = fn (p: Pair [a, a]) => 0\n";
 
 Deno.test("source-first checking preserves a valid local operator forwarder", async () => {
   const source = localNum +
-    "entry const run = fn () => case Num 40 + Num 2 of\n  Num value => value\n";
+    "entry const run = fn () => case #Num 40 + #Num 2 of\n  #Num value => value\n";
   const reference = await createSourceCompiler({ prelude: "none" });
   const native = await createNativeCompiler({ prelude: "none" });
   try {
@@ -216,8 +216,10 @@ Deno.test("unchanged member requirements survive checking an inlined operator ca
   try {
     for (const value of [40, 41]) {
       const source = localNum +
-        "const member = fn (value: Num) => value.add (Num 1)\n" +
-        `entry const run = fn () => case member (Num ${value}) + Num 2 of\n  Num result => result\n`;
+        "const member = fn (value: Num) => value.add (#Num 1)\n" +
+        `entry const run = fn () => case member (#Num ${value}) + #Num 2 of
+  #Num result => result
+`;
       const artifact = reference.compile(source);
       equal(await native.compile(source), artifact);
       const { instance } = await WebAssembly.instantiate(artifact.bytes);
@@ -244,35 +246,35 @@ const diagnostics: readonly {
     name: "closed missing member",
     prelude: "none",
     source:
-      "type Box is data = Box { value: U32 }\nconst run = fn () => (Box { value: 1 }).missing\n",
+      "type Box is data = #Box { value: U32 }\nconst run = fn () => (#Box { value: 1 }).missing\n",
     code: "missing_member",
-    at: 78,
+    at: 80,
     message: "no associated member Box.missing",
   },
   {
     name: "closed field and method clash",
     prelude: "none",
     source:
-      "type Box is data = Box { value: U32 }\nconst Box.value = fn box => 0\nconst run = fn () => (Box { value: 1 }).value\n",
+      "type Box is data = #Box { value: U32 }\nconst Box.value = fn box => 0\nconst run = fn () => (#Box { value: 1 }).value\n",
     code: "ambiguous_member",
-    at: 108,
+    at: 110,
     message: "field and associated function share the name value",
   },
   {
     name: "closed missing writable field",
     prelude: "none",
     source:
-      "type Box is data = Box { value: U32 }\nconst run = fn () => do:\n  let box = Box { value: 1 }\n  box.missing := 2\n  return box.value\n",
+      "type Box is data = #Box { value: U32 }\nconst run = fn () => do:\n  let box = #Box { value: 1 }\n  box.missing := 2\n  return box.value\n",
     code: "missing_field",
-    at: 97,
+    at: 99,
     message: "no writable field missing on main::Box",
   },
   {
     name: "closed operands without an implementation",
     prelude: "default",
-    source: "const run = fn () => True + False\n",
+    source: "const run = fn () => #True + #False\n",
     code: "missing_associated",
-    at: 26,
+    at: 27,
     message:
       "no compatible add for Bool and Bool; left: unknown value $prelude.Bool.add; right: unknown value $prelude.Bool.add",
   },
@@ -289,9 +291,9 @@ const diagnostics: readonly {
     name: "closed left implementation whose result conflicts",
     prelude: "default",
     source:
-      "data Left = Left F32\ndata Right = Right F32\nconst Left.add = fn (left: Left) => fn (right: Right) => 10\nconst Right.add = fn (left: Left) => fn (right: Right) => 20.0\nconst run = fn (value: F32) => F32.add (Left value + Right value) 0.0\n",
+      "data Left = #Left F32\ndata Right = #Right F32\nconst Left.add = fn (left: Left) => fn (right: Right) => 10\nconst Right.add = fn (left: Left) => fn (right: Right) => 20.0\nconst run = fn (value: F32) => F32.add (#Left value + #Right value) 0.0\n",
     code: "type_mismatch",
-    at: 218,
+    at: 221,
     message: "cannot unify U32 with F32",
   },
   {
@@ -326,36 +328,36 @@ const diagnostics: readonly {
     name: "missing member on a resolved field result",
     prelude: "none",
     source:
-      "type Inner is data = Inner { value: U32 }\ntype Outer is data = Outer { inner: Inner }\nconst run = fn () => (Outer { inner: Inner { value: 42 } }).inner.missing\n",
+      "type Inner is data = #Inner { value: U32 }\ntype Outer is data = #Outer { inner: Inner }\nconst run = fn () => (#Outer { inner: #Inner { value: 42 } }).inner.missing\n",
     code: "missing_member",
-    at: 152,
+    at: 156,
     message: "no associated member Inner.missing",
   },
   {
     name: "generic receiver constrained by a monomorphic method",
     prelude: "none",
     source:
-      "type Box a is data = Box a\nconst Box.get = fn (box: Box U32) => 1\nconst f = fn b => b.get\nconst g = fn () => f (Box 1.0)\n",
+      "type Box a is data = #Box a\nconst Box.get = fn (box: Box U32) => 1\nconst f = fn b => b.get\nconst g = fn () => f (#Box 1.0)\n",
     code: "type_mismatch",
-    at: 86,
+    at: 87,
     message: "cannot unify U32 with F32",
   },
   {
     name: "missing writable field in a generic function",
     prelude: "none",
     source:
-      "type Box is data = Box { value: U32 }\nconst touch = fn box => do:\n  box.nothing := 1\n  return box\nconst run = fn () => touch (Box { value: 1 })\n",
+      "type Box is data = #Box { value: U32 }\nconst touch = fn box => do:\n  box.nothing := 1\n  return box\nconst run = fn () => touch (#Box { value: 1 })\n",
     code: "missing_field",
-    at: 71,
+    at: 72,
     message: "no writable field nothing on main::Box",
   },
   {
     name: "field and method clash through a generic caller",
     prelude: "none",
     source:
-      "type Box is data = Box { value: U32 }\nconst Box.value = fn box => 0\nconst read = fn box => box.value\nconst run = fn () => read (Box { value: 1 })\n",
+      "type Box is data = #Box { value: U32 }\nconst Box.value = fn box => 0\nconst read = fn box => box.value\nconst run = fn () => read (#Box { value: 1 })\n",
     code: "ambiguous_member",
-    at: 95,
+    at: 96,
     message: "field and associated function share the name value",
   },
   // A local `let` generalizes what its value leaves open. Selecting a site
@@ -375,36 +377,36 @@ const diagnostics: readonly {
     name: "local helper result conflicts with its caller in a single round",
     prelude: "none",
     source: localNum +
-      "const run = fn () => do:\n  let helper = fn (x: Num) => x + Num 1\n  return @f32.add (helper (Num 1)) 2.0\n",
+      "const run = fn () => do:\n  let helper = fn (x: Num) => x + #Num 1\n  return @f32.add (helper (#Num 1)) 2.0\n",
     code: "type_mismatch",
-    at: 215,
+    at: 216,
     message: "cannot unify main::Num with F32",
   },
   {
     name: "function-valued local let conflicts with its caller",
     prelude: "none",
     source: localNum +
-      "const konst = fn a => fn b => a\nconst run = fn (x: Num) => do:\n  let f = konst (x + Num 1)\n  return @f32.add (f 0) 2.0\n",
+      "const konst = fn a => fn b => a\nconst run = fn (x: Num) => do:\n  let f = konst (x + #Num 1)\n  return @f32.add (f 0) 2.0\n",
     code: "type_mismatch",
-    at: 240,
+    at: 241,
     message: "cannot unify main::Num with F32",
   },
   {
     name: "local generic receiver constrained by a monomorphic method",
     prelude: "none",
     source:
-      "type Box a is data = Box a\nconst Box.get = fn (box: Box U32) => 1\nconst g = fn () => do:\n  let f = fn b => (Box b).get\n  return f 1.0\n",
+      "type Box a is data = #Box a\nconst Box.get = fn (box: Box U32) => 1\nconst g = fn () => do:\n  let f = fn b => (#Box b).get\n  return f 1.0\n",
     code: "type_mismatch",
-    at: 115,
+    at: 117,
     message: "cannot unify U32 with F32",
   },
   {
     name: "local function made effectful by its resolved member",
     prelude: "none",
     source: localPing +
-      "const run = fn () => do:\n  let f = fn (b: Box) => b.ping\n  return pure_only (fn () => f (Box { value: 1 }))\n",
+      "const run = fn () => do:\n  let f = fn (b: Box) => b.ping\n  return pure_only (fn () => f (#Box { value: 1 }))\n",
     code: "effect_mismatch",
-    at: 251,
+    at: 252,
     message: "cannot unify effect rows and ! {main::Ping}",
   },
   // Selecting Pair.same binds the outer parameter's type variable (a group
@@ -416,9 +418,9 @@ const diagnostics: readonly {
       "outer parameter tied to a local let's parameter by its resolved member",
     prelude: "none",
     source: localPair +
-      "const run = fn x => do:\n  let f = fn b => @u32.add (Pair (x, b)).same 1\n  return @u32.add (f 1) (f 2.0)\nconst go = fn () -> U32 => run 1\n",
+      "const run = fn x => do:\n  let f = fn b => @u32.add (#Pair (x, b)).same 1\n  return @u32.add (f 1) (f 2.0)\nconst go = fn () -> U32 => run 1\n",
     code: "type_mismatch",
-    at: 147,
+    at: 149,
     message: "cannot unify U32 with F32",
   },
 ];
@@ -495,14 +497,14 @@ Deno.test("sites inside local lets resolve without changing what the let means",
     {
       prelude: "none",
       source:
-        "type Box a is data = Box a\nconst Box.get = fn (box: Box U32) => 7\nentry const g = fn () -> U32 => do:\n  let f = fn b => (Box b).get\n  return f 1\n",
+        "type Box a is data = #Box a\nconst Box.get = fn (box: Box U32) => 7\nentry const g = fn () -> U32 => do:\n  let f = fn b => (#Box b).get\n  return f 1\n",
       run: "g",
       expected: 7,
     },
     {
       prelude: "none",
       source: localPing +
-        "entry const run = fn () => do (@effect.provider Ping (fn () => 40)):\n  let f = fn (b: Box) => b.ping\n  use value <- f (Box { value: 1 })\n  return value\n",
+        "entry const run = fn () => do (@effect.provider Ping (fn () => 40)):\n  let f = fn (b: Box) => b.ping\n  use value <- f (#Box { value: 1 })\n  return value\n",
       run: "run",
       expected: 40,
     },
@@ -525,7 +527,7 @@ Deno.test("sites inside local lets resolve without changing what the let means",
     {
       prelude: "none",
       source:
-        "type Box a is data = Box a\nconst Box.size = fn (box: Box a) => 0\nentry const run = fn () -> U32 => do:\n  let f = fn b => @u32.add (Box b).size 1\n  return @u32.add (f 1) (f 2.0)\n",
+        "type Box a is data = #Box a\nconst Box.size = fn (box: Box a) => 0\nentry const run = fn () -> U32 => do:\n  let f = fn b => @u32.add (#Box b).size 1\n  return @u32.add (f 1) (f 2.0)\n",
       run: "run",
       expected: 2,
       origin: "run",
@@ -536,7 +538,7 @@ Deno.test("sites inside local lets resolve without changing what the let means",
     {
       prelude: "none",
       source: localPair +
-        "entry const run = fn x => do:\n  let f = fn b => @u32.add (Pair (x, b)).same 1\n  return @u32.add (f 1) (f 2)\nentry const go = fn () -> U32 => run 1\n",
+        "entry const run = fn x => do:\n  let f = fn b => @u32.add (#Pair (x, b)).same 1\n  return @u32.add (f 1) (f 2)\nentry const go = fn () -> U32 => run 1\n",
       run: "go",
       expected: 2,
       origin: "run",
@@ -576,7 +578,7 @@ Deno.test("sites inside local lets resolve without changing what the let means",
 Deno.test("a lexical receiver still shadows a same-named namespace when resolved", async () => {
   const files: Record<string, string> = {
     "/members/count.blot":
-      "type Count is data = Count { value: U32 }\nconst Count.add = fn receiver => fn amount => Count { value: receiver.value + amount }\nconst seed = Count { value: 40 }\nconst extra = 2\n",
+      "type Count is data = #Count { value: U32 }\nconst Count.add = fn receiver => fn amount => #Count { value: receiver.value + amount }\nconst seed = #Count { value: 40 }\nconst extra = 2\n",
     "/members/main.blot":
       'import * as counter from "./count"\nentry const run = fn () => do:\n  let counter = counter.seed\n  return counter.extra\n',
   };

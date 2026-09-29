@@ -1,7 +1,8 @@
 # Blot compilation work reduction
 
-Baseline: main `ac59fb68f98780e168ce01fa39410b1a6ef54efd`. This is separate from
-the generated-runtime optimizations in PR #4.
+Integration baseline: updated PR #5 `0c390be4e9039a307b9bbf556083be26c9a6f25f`.
+Runtime PR #4 and the symbol/scalar inference changes from PR #5 are present in
+both compilers. The earlier standalone PR #6 measurements remain historical.
 
 ## Closed generalization
 
@@ -9,6 +10,10 @@ Previously every let generalization resolved and scanned all environment and
 annotation bindings, even when the resolved type and residual predicates had no
 free variables. In a chain of scalar lets this repeatedly traversed a growing
 environment just to subtract its free variables from an empty set.
+
+PRs #5 and #6 overlap in closed generalization. The integrated implementation
+uses #6's shared variable-selection helper, retaining covariance closing and
+binding construction on both paths, plus #5's independent slow oracle.
 
 The candidate computes the union of type and predicate variables first. An empty
 union needs no environment exclusion. Nonempty candidates use the same complete

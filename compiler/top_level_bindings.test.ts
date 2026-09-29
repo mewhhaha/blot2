@@ -33,8 +33,8 @@ Deno.test("grouped top-level lambdas retain mutually recursive function bindings
     const artifact = compiler.compile(`
 entry const recurse = (fn (value: U32) -> U32 => step value)
 entry const step = fn (value: U32) -> U32 => case @u32.eq value 0 of
-  True => 42
-  False => recurse (@u32.sub value 1)
+  #True => 42
+  #False => recurse (@u32.sub value 1)
 entry const answer = fn () => recurse 5
 `);
     const exports =
@@ -49,11 +49,11 @@ Deno.test("qualified top-level function bindings use ordinary annotations and ca
   const compiler = await createSourceCompiler({ prelude: "none" });
   try {
     const artifact = compiler.compile(`
-type Counter is data = Counter U32
+type Counter is data = #Counter U32
 const Counter.increment: Counter -> Counter = fn value => case value of
-  Counter number => Counter (@u32.add number 1)
-entry const answer = fn () => case Counter.increment (Counter 41) of
-  Counter number => number
+  #Counter number => #Counter (@u32.add number 1)
+entry const answer = fn () => case Counter.increment (#Counter 41) of
+  #Counter number => number
 `);
     const exports =
       new WebAssembly.Instance(new WebAssembly.Module(artifact.bytes)).exports;

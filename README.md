@@ -68,6 +68,17 @@ imports, and precede an `entry` declaration.
 
 ## Current boundary
 
+Data constructors require `#` in declarations, values, and patterns. Type names
+stay unmarked:
+
+```blot
+type Maybe x is data = #Some x | #Nothing
+const value: Maybe U32 = #Some 42
+```
+
+Qualified constructors put the marker first: `#time.Clock`. Boolean constructors
+are `#True` and `#False`.
+
 `type Reader a is effect = { ask: Unit -> a }`,
 `@effect.provider (Reader.ask U32) implementation`, and `do provider:` form the
 generic effect core. Function values retain latent effect requirements; creating
@@ -86,16 +97,16 @@ constant, parameter, or `let` binding. Qualified references work too:
 ```blot
 const tab = 0x110104
 const key_action = fn code => case code of
-  ^tab => True
-  _ => False
+  ^tab => #True
+  _ => #False
 
 const matches = fn (expected: U32) => fn actual => case actual of
-  ^expected => True
-  _ => False
+  ^expected => #True
+  _ => #False
 ```
 
 Value patterns currently support `U32` and `Bool`, including nested patterns
-such as `Some ^expected` and imported names such as `^keys.tab`. The referenced
+such as `#Some ^expected` and imported names such as `^keys.tab`. The referenced
 binding comes from the surrounding scope, never a sibling pattern. Its type must
 match the scrutinee. Value patterns are refutable even when naming a constant,
 so other arms must cover the remaining values. They also work in `if let` and
@@ -154,3 +165,22 @@ descriptions in Blot source. JavaScript will supply capability-scoped platform
 services, assets/GPU submission, and code/resource reloading. The
 [case-study plan](case-study/ecs/PLAN.md) records that migration; old ECS
 timings are historical measurements, not results for the new generic core.
+
+## Local package development
+
+`@mewhhaha/blot` provides the compiler API, guest API, and CLI in one package.
+The adjacent `gdev` checkout links this package through its Deno `links`
+setting. Run `deno task package:build` after changing Bend compiler sources to
+rebuild both backends and the bundled native executable. Standard library and
+TypeScript changes are read directly from the linked checkout.
+
+The bundled native executable targets Linux x86-64. Other platforms can supply
+their own executable to `createNativeCompiler({ executable })` or use
+`createSourceCompiler()` for the JavaScript reference backend.
+
+`just build` rebuilds and repacks the native compiler used by gdev. Use
+`deno task package:build` when the JavaScript reference backend also needs to be
+regenerated.
+
+`deno task package:check` prepares the package and performs a release dry run.
+Publishing remains a separate `deno publish` step.

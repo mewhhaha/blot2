@@ -29,9 +29,12 @@ def checked_constants(checked: M.CheckedModule) -> List<&2, M.CheckedConstant>:
   M.CheckedModule{constants, functions, data_types, operations} = checked
   constants
 
-def const_context(module: M.Module, checked: M.CheckedModule) -> Const.Context:
+def const_context_prepared(module: M.Module, checked: M.CheckedModule) -> Const.Context:
   M.Module{constants, functions, data_types, operations} = module
   Const.Context{constants, functions, Nil{}, data_types, Nil{}, checked_functions(checked)}
+
+def const_context(module: M.Module, +checked: M.CheckedModule) -> Const.Context:
+  const_context_prepared(Public.unchecked_module(checked), checked)
 
 def finish_analysis(checked: M.CheckedModule, constants: Const.Constants) -> Analysis:
   Const.Constants{bindings, remaining} = constants
@@ -41,7 +44,7 @@ def analyze(+module: M.Module, steps: Nat) -> Result<&2, &2, M.Diagnostic, Analy
   do Result<&2, &2, M.Diagnostic, Analysis>:
     +checked : M.CheckedModule <- CheckScheduler.check_module(module)
     qualified : Unit <- RawQualification.check(module)
-    constants : Const.Constants <- Const.evaluate_constants(checked_constants(checked), steps, const_context(module, checked))
+    constants : Const.Constants <- Const.evaluate_constants(checked_constants(checked), steps, const_context(Public.unchecked_module(checked), checked))
     return finish_analysis(checked, constants)
 
 def analysis_checked(analysis: Analysis) -> M.CheckedModule:
