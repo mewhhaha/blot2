@@ -30,16 +30,22 @@ are local validation, not a claim that the new commits passed hosted CI.
   saved before publishing native responses, including sessions later disposed by
   SIGTERM. Quiet EOF and the framed stdout protocol are preserved.
 
-The following checkpoint adds isolated archive recovery tests, a shared
-build/package lock, raw commit objects and committed-input verification. Source,
-native generated modules and executable hashes are checked together. Failed
+- `7963104`: add isolated archive recovery tests, a shared build/package lock,
+  raw commit objects and committed-input verification.
+- `3512a79`: dispatch verification before the solver call so disabled
+  verification has no unused post-call continuation; add explicit
+  enabled/disabled checks.
+
+The final checkpoint adds the explicit `blot:core` CLI, no-fallback CLI tests,
+source-only archive recovery and the final validation reports. Source, native
+generated modules and executable hashes are checked together. Failed
 builds/tests are not converted into successful checkpoint status.
 
 ## Reproduced validation
 
-Executable from `789f8c5`, unchanged by the packaging/documentation checkpoint:
+Executable from `3512a79`, unchanged by the final CLI/packaging checkpoint:
 
-`9d77d114201116ff62d2157904d2253ad0ebb446e2c9d5c1ed04cb537f2ffc9e`
+`3b902b20966dab00b7c9fbd320de1e7d63560fc2ecc93b301d2d61a5fef2992c`
 
 Toolchain: 64-bit OCaml 5.3.0, Deno 2.9.7, unchanged merged-main Bend 2.0.34
 reference. No Bend C or JavaScript output is patched. The default Bend compiler
@@ -55,7 +61,7 @@ and the existing compiler tests are unchanged.
 | Four-worker source corpus                    | 333 literals with both prelude settings: 362 matching artifacts and 304 matching diagnostics        |
 | Native storage                               | 55,957 assertions passed                                                                            |
 | Type-variable graph                          | 287,805 assertions passed                                                                           |
-| Graph versus semantic-model solvers          | 26,006 assertions passed                                                                            |
+| Graph versus semantic-model solvers          | 26,012 assertions passed                                                                            |
 | Fork/join                                    | 177 assertions plus concurrent-domain synchronization/exception checks passed                       |
 | Framing                                      | 6 checks passed                                                                                     |
 | Clean/incremental/failed/concurrent builds   | 19 checks passed                                                                                    |

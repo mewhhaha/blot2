@@ -1,4 +1,4 @@
-.PHONY: all test test-build test-no-reference test-checkpoint parity graph-parity clean
+.PHONY: all test test-build test-no-reference test-checkpoint test-cli parity graph-parity clean
 all:
 	python3 build.py
 test: all
@@ -7,6 +7,8 @@ test: all
 	deno run --allow-all smoke.ts
 test-build:
 	python3 test_build.py
+test-cli: all
+	python3 test_cli.py
 test-no-reference: all
 	python3 test_no_reference.py
 graph-parity: all

@@ -43,6 +43,8 @@ jobs:
         run: |
           opam exec -- python3 compiler/core/test_build.py 2>&1 | tee build/core/build-tests.log
           python3 compiler/core/test_no_reference.py 2>&1 | tee build/core/no-reference.log
+          deno check compiler/core/cli.ts
+          python3 compiler/core/test_cli.py 2>&1 | tee build/core/cli.log
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.2'

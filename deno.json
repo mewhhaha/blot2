@@ -23,7 +23,10 @@
     "check": "deno fmt --check && deno check generated/wasm/mod.ts scripts/setup_helix.ts scripts/build_compiler.ts scripts/generate_parser.ts && deno task test",
     "package:pack": "deno run --allow-read=generated/compiler --allow-write=generated/compiler scripts/pack_native.ts",
     "package:build": "deno task build:compiler:all && deno task package:pack",
-    "package:check": "deno task package:build && deno publish --dry-run --allow-dirty"
+    "package:check": "deno task package:build && deno publish --dry-run --allow-dirty",
+    "build:compiler:core": "python3 compiler/core/build.py && deno task generate:parser",
+    "blot:core": "deno run --allow-read --allow-write --allow-run=compiler/core/_build/blotc compiler/core/cli.ts",
+    "test:compiler:core": "deno task build:compiler:core && python3 compiler/core/test_native.py && python3 compiler/core/test_transport.py compiler/core/_build/blotc && python3 compiler/core/test_no_reference.py && python3 compiler/core/test_cli.py"
   },
   "imports": {
     "@mewhhaha/baba": "npm:@jsr/mewhhaha__baba@9.0.1"

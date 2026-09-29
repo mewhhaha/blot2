@@ -61,6 +61,8 @@ def reconstruct(path: Path, archive: Path, revision: str, commit: bytes) -> None
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('checkpoint', type=Path)
+    parser.add_argument('--source-only', action='store_true',
+                        help='Restore from the self-contained source archive, without a base repository')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='core-restore-test-') as directory:
         scratch = Path(directory)
@@ -79,7 +81,7 @@ def main() -> None:
         revision = record['revision']
         commit = (envelope / 'commit.txt').read_bytes() if (envelope / 'commit.txt').exists() else git(ROOT, 'cat-file', 'commit', revision)
         stage = scratch / 'source'
-        if record.get('base') and (envelope / 'changes.bundle').exists():
+        if not args.source_only and record.get('base') and (envelope / 'changes.bundle').exists():
             base = record['base']
             base_archive = scratch / 'base.tar.gz'
             base_archive.write_bytes(git(ROOT, 'archive', '--format=tar.gz', base))

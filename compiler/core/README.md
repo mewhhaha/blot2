@@ -15,6 +15,21 @@ Requires a 64-bit OCaml 5 installation, a C toolchain, and Python 3:
 make -C compiler/core
 ```
 
+For the source CLI (Deno is also required), use the explicit core tasks:
+
+```sh
+deno task build:compiler:core
+deno task blot:core check examples/generic_effects.blot
+deno task blot:core build examples/scalar.blot build/scalar.wasm
+deno task test:compiler:core
+```
+
+These tasks do not install or overwrite the default compiler. `blot:core` uses
+only the core executable; a missing executable is an error, not a fallback. The
+ordinary source grammar, diagnostics, formatting and guide are shared with the
+existing CLI. The core task tests do not require Bend or a JavaScript compiler
+backend; the full differential suites below separately require their oracle.
+
 The executable is `compiler/core/_build/blotc`. Build output includes generated
 semantic source and `build-manifest.json` with input and executable hashes.
 Unchanged builds do not recompile or relink; changed modules and their
@@ -82,4 +97,6 @@ changes.
 
 ```sh
 python3 compiler/core/test_checkpoint.py /path/to/checkpoint.zip
+# Also verify restoration without any existing Git base:
+python3 compiler/core/test_checkpoint.py /path/to/checkpoint.zip --source-only
 ```
