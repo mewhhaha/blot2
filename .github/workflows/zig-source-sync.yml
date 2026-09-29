@@ -1,0 +1,54 @@
+name: Zig syntax integration inputs
+
+on:
+  push:
+    branches: [zig-compiler-rebuild]
+    paths: ['.github/workflows/zig-source-sync.yml']
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Capture exact repository history
+        run: |
+          mkdir -p "$RUNNER_TEMP/zig-inputs"
+          git update-ref refs/snapshot/main 5c2640493987c4b8c2335b7b05ad99b654689ac4
+          git bundle create "$RUNNER_TEMP/zig-inputs/source.bundle" HEAD refs/snapshot/main
+          git checkout --detach 5c2640493987c4b8c2335b7b05ad99b654689ac4
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed
+        with:
+          deno-version: v2.5.2
+      - name: Capture public frontend dependencies
+        env:
+          DENO_DIR: ${{ runner.temp }}/zig-frontend-cache
+        run: |
+          deno cache compiler/syntax.ts
+          tar -czf "$RUNNER_TEMP/zig-inputs/frontend-cache.tar.gz" -C "$DENO_DIR" .
+      - name: Capture checksum-verified reference toolchain
+        run: |
+          cd "$RUNNER_TEMP/zig-inputs"
+          curl --fail --location --retry 3 -o bend.tar.gz https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz
+          echo '78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  bend.tar.gz' | sha256sum --check
+          mkdir bend-loader
+          for name in main.ts bend.ts comp.ts safe.ts base.bend; do
+            curl --fail --location --retry 3 -o "bend-loader/$name" "https://raw.githubusercontent.com/bendlang/bend/v2.0.34/bend2/$name"
+          done
+          sha256sum source.bundle bend.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: zig-syntax-integration-inputs
+          path: ${{ runner.temp }}/zig-inputs/
+          retention-days: 1
+          if-no-files-found: error
