@@ -475,6 +475,19 @@ def generalization_variables(generalized: Generalization) -> List<&2, Nat>:
   Generalization{binding, variables} = generalized
   variables
 
+# A closed inferred type and closed residual requirements have nothing to
+# quantify. In particular, scalar let chains must not re-resolve every older
+# binding just to subtract its variables from an empty set. Open candidates
+# retain the complete environment, annotation, blocked-variable and row checks.
+def generalizable_variables(candidates: List<&2, Nat>, +context: Context, +state: State, blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+  match candidates:
+    case Nil{}:
+      Done{Nil{}}
+    case head <> tail:
+      do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
+        excluded : List<&2, Nat> <- binding_free(List.append(&2, Binding, environment_bindings(context), annotation_bindings(annotation_types(state))), substitutions_of(state))
+        return T.difference(head <> tail, T.union(blocked, T.union(excluded, T.row_free(T.resolve_row(substitutions_of(state), context_row(context))))))
+
 def generalization_qualified_excluding(ty: M.Ty, predicates: List<&2, M.Predicate>, +context: Context, +state: State, name: String, +blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, Generalization>:
   do Result<&2, &2, M.Diagnostic, Generalization>:
     +resolved : M.Ty <- T.resolve(substitutions_of(state), ty)
@@ -482,8 +495,7 @@ def generalization_qualified_excluding(ty: M.Ty, predicates: List<&2, M.Predicat
     +needs : List<&2, M.Predicate> = C.canonical_predicates(resolved_needs, Nil{})
     type_free : List<&2, Nat> <- T.free(resolved)
     +predicate_free : List<&2, Nat> <- C.free_list(needs)
-    excluded : List<&2, Nat> <- binding_free(List.append(&2, Binding, environment_bindings(context), annotation_bindings(annotation_types(state))), substitutions_of(state))
-    +variables : List<&2, Nat> = T.difference(T.union(type_free, predicate_free), T.union(blocked, T.union(excluded, T.row_free(T.resolve_row(substitutions_of(state), context_row(context))))))
+    +variables : List<&2, Nat> <- generalizable_variables(T.union(type_free, predicate_free), context, state, blocked)
     +closed : M.Ty <- T.close_covariant(resolved, variables, predicate_free)
     remaining : List<&2, Nat> <- T.free(closed)
     return Generalization{Binding{name, closed, T.difference(variables, T.difference(variables, T.union(remaining, predicate_free))), needs}, variables}

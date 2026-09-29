@@ -383,8 +383,29 @@ def annotation(~Scope: Data, ~resolve_effect: Scope -> String -> List<&2, A.Valu
     case _:
       Fail{M.Diagnostic{"internal_cst", "parser", "invalid type annotation field"}}
 
+# Whole-tree callers retain the original scan. Lowering uses RootScope once;
+# only its descendants stop at a nested binding's independently owned scope.
+type VariableBoundary is Data:
+  WholeTree{}
+  RootScope{}
+  NestedScope{}
+
 type VariableScan is Data:
-  VariableScan{nodes: List<&2, C.Cst>, annotation: Bool}
+  VariableScan{nodes: List<&2, C.Cst>, annotation: Bool, boundary: VariableBoundary}
+
+def descendant_boundary(boundary: VariableBoundary) -> VariableBoundary:
+  match boundary:
+    case WholeTree{}:
+      WholeTree{}
+    case _:
+      NestedScope{}
+
+def variable_children(node: C.Cst, boundary: VariableBoundary) -> List<&2, C.Cst>:
+  match node boundary:
+    case C.Cst{"binding", field, text, offset, children} NestedScope{}:
+      Nil{}
+    case C.Cst{kind, field, text, offset, children} _:
+      children
 
 def variable_kind(variable: Variable) -> VariableKind:
   Variable{source, value, kind} = variable
@@ -458,24 +479,29 @@ def scan_variables(fuel: Nat, pending: List<&2, VariableScan>, variables: List<&
       Fail{M.Diagnostic{"type_argument", "parser", "annotation scope exceeds the source-tree limit"}}
     case 1n+rest Nil{}:
       Done{variables}
-    case 1n+rest VariableScan{Nil{}, annotation} <> tail:
+    case 1n+rest VariableScan{Nil{}, annotation, boundary} <> tail:
       scan_variables(rest, tail, variables, scope)
-    case 1n+rest VariableScan{C.Cst{"effect_row", field, text, offset, children} <> siblings, +annotation} <> tail:
+    case 1n+rest VariableScan{C.Cst{"effect_row", field, text, offset, children} <> siblings, +annotation, +boundary} <> tail:
       +node = {C.Cst{"effect_row", field, text, offset, children} : C.Cst}
       do Result<&2, &2, M.Diagnostic, List<&2, Variable>>:
         arguments : List<&2, C.Cst> = scan_row_arguments(C.field_values(node, "labels"))
         next : List<&2, Variable> <- scan_row_tail(C.field_values(node, "tail"), variables, scope)
-        scan_variables(rest, VariableScan{arguments, True{}} <> VariableScan{siblings, annotation} <> tail, next, scope)
-    case 1n+rest VariableScan{C.Cst{"constraint_predicate", field, text, offset, children} <> siblings, +annotation} <> tail:
+        scan_variables(rest, VariableScan{arguments, True{}, descendant_boundary(boundary)} <> VariableScan{siblings, annotation, boundary} <> tail, next, scope)
+    case 1n+rest VariableScan{C.Cst{"constraint_predicate", field, text, offset, children} <> siblings, +annotation, +boundary} <> tail:
       +node = {C.Cst{"constraint_predicate", field, text, offset, children} : C.Cst}
       +arguments = predicate_arguments(node)
-      scan_variables(rest, VariableScan{arguments, True{}} <> VariableScan{C.field_values(node, "effects"), False{}} <> VariableScan{siblings, annotation} <> tail, variables, scope)
-    case 1n+rest VariableScan{+node <> siblings, +annotation} <> tail:
+      scan_variables(rest, VariableScan{arguments, True{}, descendant_boundary(boundary)} <> VariableScan{C.field_values(node, "effects"), False{}, descendant_boundary(boundary)} <> VariableScan{siblings, annotation, boundary} <> tail, variables, scope)
+    case 1n+rest VariableScan{+node <> siblings, +annotation, +boundary} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, Variable>>:
         +kind : String = C.kind_of(node)
         +nested : Bool = Bool.or(annotation, M.name_equal(kind, "type_expression"))
         next : List<&2, Variable> <- scan_type_name(Bool.and(nested, M.name_equal(kind, "IDENT")), node, scope, variables)
-        scan_variables(rest, VariableScan{C.children_of(node), nested} <> VariableScan{siblings, annotation} <> tail, next, scope)
+        scan_variables(rest, VariableScan{variable_children(node, boundary), nested, descendant_boundary(boundary)} <> VariableScan{siblings, annotation, boundary} <> tail, next, scope)
 
 def free_variables(node: C.Cst, scope: String) -> Result<&2, &2, M.Diagnostic, List<&2, Variable>>:
-  scan_variables(1048576n, [VariableScan{[node], False{}}], Nil{}, scope)
+  scan_variables(1048576n, [VariableScan{[node], False{}, WholeTree{}}], Nil{}, scope)
+
+# Fuse scope pruning with variable collection. Do not clone the complete CST
+# merely to erase nested let children before immediately scanning it again.
+def scoped_free_variables(node: C.Cst, scope: String) -> Result<&2, &2, M.Diagnostic, List<&2, Variable>>:
+  scan_variables(1048576n, [VariableScan{[node], False{}, RootScope{}}], Nil{}, scope)

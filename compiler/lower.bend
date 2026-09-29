@@ -1636,9 +1636,7 @@ def inherited_annotation_variables(scanned: List<&2, T.Variable>, +previous: Lis
 def annotation_scope(+node: C.Cst, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, Context>:
   Context{globals, headers, fixities, locals, label, previous} = context
   do Result<&2, &2, M.Diagnostic, Context>:
-    scoped : List<&2, C.Cst> <- annotation_scan_work(1048576n, ScanNode{node, True{}})
-    root : C.Cst <- C.one(scoped)
-    scanned : List<&2, T.Variable> <- T.free_variables(root, scope)
+    scanned : List<&2, T.Variable> <- T.scoped_free_variables(node, scope)
     variables : List<&2, T.Variable> <- inherited_annotation_variables(scanned, previous, node)
     return Context{globals, headers, fixities, locals, label, variables}
 

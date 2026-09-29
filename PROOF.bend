@@ -967,3 +967,12 @@ def Laws.saturated_compaction_loop_is_not_inlineable(state, initial, body):
 
 def Laws.saturated_counted_loop_is_not_inlineable(index, start, end, state, initial, body):
   {==}
+
+def Laws.closed_generalization_has_no_candidates(context, state, blocked):
+  {==}
+
+def Laws.nested_annotation_binding_hides_children(field, text, offset, children):
+  {==}
+
+def Laws.root_annotation_binding_keeps_children(field, text, offset, children):
+  {==}
