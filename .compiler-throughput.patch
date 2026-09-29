@@ -1,0 +1,171 @@
+diff --git a/LAWS.bend b/LAWS.bend
+--- a/LAWS.bend
++++ b/LAWS.bend
+@@ -49,6 +49,7 @@
+ import ./compiler/loop_memory.bend as LoopMemory
+ import ./compiler/raw_core_qualification.bend as RawQualification
+ import ./compiler/effect_rows.bend as Rows
++import ./compiler/source_types.bend as SourceTypes
+ 
+ # Raw core has no evidence selector, so a nonempty qualification cannot be
+ # erased by constant evaluation. Empty metadata remains transparent.
+@@ -1597,3 +1598,24 @@
+   for initial: M.Expr
+   for body: M.Expr
+   {Saturation.body_cost(256n, [M.ForExpr{index, start, end, state, initial, body}], 0n) == 97n : Nat}
++
++# With no free type or predicate variables, environment exclusion is empty.
++law closed_generalization_has_no_candidates:
++  for context: Infer.Context
++  for state: Infer.State
++  for blocked: List<&2, Nat>
++  {Infer.generalizable_variables(Nil{}, context, state, blocked) == Done{Nil{}} : Result<&2, &2, M.Diagnostic, List<&2, Nat>>}
++
++law nested_annotation_binding_hides_children:
++  for field: String
++  for text: String
++  for offset: Nat
++  for children: List<&2, Cst.Cst>
++  {SourceTypes.variable_children(Cst.Cst{"binding", field, text, offset, children}, SourceTypes.NestedScope{}) == Nil{} : List<&2, Cst.Cst>}
++
++law root_annotation_binding_keeps_children:
++  for field: String
++  for text: String
++  for offset: Nat
++  for children: List<&2, Cst.Cst>
++  {SourceTypes.variable_children(Cst.Cst{"binding", field, text, offset, children}, SourceTypes.RootScope{}) == children : List<&2, Cst.Cst>}
+diff --git a/PROOF.bend b/PROOF.bend
+--- a/PROOF.bend
++++ b/PROOF.bend
+@@ -967,3 +967,12 @@
+ 
+ def Laws.saturated_counted_loop_is_not_inlineable(index, start, end, state, initial, body):
+   {==}
++
++def Laws.closed_generalization_has_no_candidates(context, state, blocked):
++  {==}
++
++def Laws.nested_annotation_binding_hides_children(field, text, offset, children):
++  {==}
++
++def Laws.root_annotation_binding_keeps_children(field, text, offset, children):
++  {==}
+diff --git a/compiler/infer.bend b/compiler/infer.bend
+--- a/compiler/infer.bend
++++ b/compiler/infer.bend
+@@ -475,6 +475,19 @@
+   Generalization{binding, variables} = generalized
+   variables
+ 
++# A closed inferred type and closed residual requirements have nothing to
++# quantify. In particular, scalar let chains must not re-resolve every older
++# binding just to subtract its variables from an empty set. Open candidates
++# retain the complete environment, annotation, blocked-variable and row checks.
++def generalizable_variables(candidates: List<&2, Nat>, +context: Context, +state: State, blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
++  match candidates:
++    case Nil{}:
++      Done{Nil{}}
++    case head <> tail:
++      do Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
++        excluded : List<&2, Nat> <- binding_free(List.append(&2, Binding, environment_bindings(context), annotation_bindings(annotation_types(state))), substitutions_of(state))
++        return T.difference(head <> tail, T.union(blocked, T.union(excluded, T.row_free(T.resolve_row(substitutions_of(state), context_row(context))))))
++
+ def generalization_qualified_excluding(ty: M.Ty, predicates: List<&2, M.Predicate>, +context: Context, +state: State, name: String, +blocked: List<&2, Nat>) -> Result<&2, &2, M.Diagnostic, Generalization>:
+   do Result<&2, &2, M.Diagnostic, Generalization>:
+     +resolved : M.Ty <- T.resolve(substitutions_of(state), ty)
+@@ -482,8 +495,7 @@
+     +needs : List<&2, M.Predicate> = C.canonical_predicates(resolved_needs, Nil{})
+     type_free : List<&2, Nat> <- T.free(resolved)
+     +predicate_free : List<&2, Nat> <- C.free_list(needs)
+-    excluded : List<&2, Nat> <- binding_free(List.append(&2, Binding, environment_bindings(context), annotation_bindings(annotation_types(state))), substitutions_of(state))
+-    +variables : List<&2, Nat> = T.difference(T.union(type_free, predicate_free), T.union(blocked, T.union(excluded, T.row_free(T.resolve_row(substitutions_of(state), context_row(context))))))
++    +variables : List<&2, Nat> <- generalizable_variables(T.union(type_free, predicate_free), context, state, blocked)
+     +closed : M.Ty <- T.close_covariant(resolved, variables, predicate_free)
+     remaining : List<&2, Nat> <- T.free(closed)
+     return Generalization{Binding{name, closed, T.difference(variables, T.difference(variables, T.union(remaining, predicate_free))), needs}, variables}
+diff --git a/compiler/lower.bend b/compiler/lower.bend
+--- a/compiler/lower.bend
++++ b/compiler/lower.bend
+@@ -1636,9 +1636,7 @@
+ def annotation_scope(+node: C.Cst, context: Context, scope: String) -> Result<&2, &2, M.Diagnostic, Context>:
+   Context{globals, headers, fixities, locals, label, previous} = context
+   do Result<&2, &2, M.Diagnostic, Context>:
+-    scoped : List<&2, C.Cst> <- annotation_scan_work(1048576n, ScanNode{node, True{}})
+-    root : C.Cst <- C.one(scoped)
+-    scanned : List<&2, T.Variable> <- T.free_variables(root, scope)
++    scanned : List<&2, T.Variable> <- T.scoped_free_variables(node, scope)
+     variables : List<&2, T.Variable> <- inherited_annotation_variables(scanned, previous, node)
+     return Context{globals, headers, fixities, locals, label, variables}
+ 
+diff --git a/compiler/source_types.bend b/compiler/source_types.bend
+--- a/compiler/source_types.bend
++++ b/compiler/source_types.bend
+@@ -383,8 +383,29 @@
+     case _:
+       Fail{M.Diagnostic{"internal_cst", "parser", "invalid type annotation field"}}
+ 
++# Whole-tree callers retain the original scan. Lowering uses RootScope once;
++# only its descendants stop at a nested binding's independently owned scope.
++type VariableBoundary is Data:
++  WholeTree{}
++  RootScope{}
++  NestedScope{}
++
+ type VariableScan is Data:
+-  VariableScan{nodes: List<&2, C.Cst>, annotation: Bool}
++  VariableScan{nodes: List<&2, C.Cst>, annotation: Bool, boundary: VariableBoundary}
++
++def descendant_boundary(boundary: VariableBoundary) -> VariableBoundary:
++  match boundary:
++    case WholeTree{}:
++      WholeTree{}
++    case _:
++      NestedScope{}
++
++def variable_children(node: C.Cst, boundary: VariableBoundary) -> List<&2, C.Cst>:
++  match node boundary:
++    case C.Cst{"binding", field, text, offset, children} NestedScope{}:
++      Nil{}
++    case C.Cst{kind, field, text, offset, children} _:
++      children
+ 
+ def variable_kind(variable: Variable) -> VariableKind:
+   Variable{source, value, kind} = variable
+@@ -458,24 +479,29 @@
+       Fail{M.Diagnostic{"type_argument", "parser", "annotation scope exceeds the source-tree limit"}}
+     case 1n+rest Nil{}:
+       Done{variables}
+-    case 1n+rest VariableScan{Nil{}, annotation} <> tail:
++    case 1n+rest VariableScan{Nil{}, annotation, boundary} <> tail:
+       scan_variables(rest, tail, variables, scope)
+-    case 1n+rest VariableScan{C.Cst{"effect_row", field, text, offset, children} <> siblings, +annotation} <> tail:
++    case 1n+rest VariableScan{C.Cst{"effect_row", field, text, offset, children} <> siblings, +annotation, +boundary} <> tail:
+       +node = {C.Cst{"effect_row", field, text, offset, children} : C.Cst}
+       do Result<&2, &2, M.Diagnostic, List<&2, Variable>>:
+         arguments : List<&2, C.Cst> = scan_row_arguments(C.field_values(node, "labels"))
+         next : List<&2, Variable> <- scan_row_tail(C.field_values(node, "tail"), variables, scope)
+-        scan_variables(rest, VariableScan{arguments, True{}} <> VariableScan{siblings, annotation} <> tail, next, scope)
+-    case 1n+rest VariableScan{C.Cst{"constraint_predicate", field, text, offset, children} <> siblings, +annotation} <> tail:
++        scan_variables(rest, VariableScan{arguments, True{}, descendant_boundary(boundary)} <> VariableScan{siblings, annotation, boundary} <> tail, next, scope)
++    case 1n+rest VariableScan{C.Cst{"constraint_predicate", field, text, offset, children} <> siblings, +annotation, +boundary} <> tail:
+       +node = {C.Cst{"constraint_predicate", field, text, offset, children} : C.Cst}
+       +arguments = predicate_arguments(node)
+-      scan_variables(rest, VariableScan{arguments, True{}} <> VariableScan{C.field_values(node, "effects"), False{}} <> VariableScan{siblings, annotation} <> tail, variables, scope)
+-    case 1n+rest VariableScan{+node <> siblings, +annotation} <> tail:
++      scan_variables(rest, VariableScan{arguments, True{}, descendant_boundary(boundary)} <> VariableScan{C.field_values(node, "effects"), False{}, descendant_boundary(boundary)} <> VariableScan{siblings, annotation, boundary} <> tail, variables, scope)
++    case 1n+rest VariableScan{+node <> siblings, +annotation, +boundary} <> tail:
+       do Result<&2, &2, M.Diagnostic, List<&2, Variable>>:
+         +kind : String = C.kind_of(node)
+         +nested : Bool = Bool.or(annotation, M.name_equal(kind, "type_expression"))
+         next : List<&2, Variable> <- scan_type_name(Bool.and(nested, M.name_equal(kind, "IDENT")), node, scope, variables)
+-        scan_variables(rest, VariableScan{C.children_of(node), nested} <> VariableScan{siblings, annotation} <> tail, next, scope)
++        scan_variables(rest, VariableScan{variable_children(node, boundary), nested, descendant_boundary(boundary)} <> VariableScan{siblings, annotation, boundary} <> tail, next, scope)
+ 
+ def free_variables(node: C.Cst, scope: String) -> Result<&2, &2, M.Diagnostic, List<&2, Variable>>:
+-  scan_variables(1048576n, [VariableScan{[node], False{}}], Nil{}, scope)
++  scan_variables(1048576n, [VariableScan{[node], False{}, WholeTree{}}], Nil{}, scope)
++
++# Fuse scope pruning with variable collection. Do not clone the complete CST
++# merely to erase nested let children before immediately scanning it again.
++def scoped_free_variables(node: C.Cst, scope: String) -> Result<&2, &2, M.Diagnostic, List<&2, Variable>>:
++  scan_variables(1048576n, [VariableScan{[node], False{}, RootScope{}}], Nil{}, scope)
