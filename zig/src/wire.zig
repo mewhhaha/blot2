@@ -43,6 +43,7 @@ const Decoder = struct {
             const length = try self.read("dictionary string length");
             const available = @min(length, self.words.len - self.position);
             const points = self.ctx.allocator().alloc(u32, available) catch @panic("out of memory");
+            defer self.ctx.allocator().free(points);
             // Check available scalars before reporting a truncated string: an
             // earlier invalid scalar has priority in the reference decoder.
             for (points) |*point| {

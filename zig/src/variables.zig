@@ -27,15 +27,19 @@ fn seed(ctx: *r.Context, set: *Set, values: V) void {
     }
 }
 pub fn has(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 2);
     return r.boolean(contains(args[0], args[1]));
 }
 pub fn put(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 2);
     return if (contains(args[0], args[1])) args[0] else ctx.node(.Cons, &.{ args[1], args[0] });
 }
 pub fn isWide(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 1);
     return r.boolean(wide(args[0]));
 }
 pub fn merge(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 2);
     var left = args[0];
     var result = args[1];
     if (!wide(left)) {
@@ -59,6 +63,7 @@ pub fn merge(ctx: *r.Context, args: []const V) V {
     return result;
 }
 pub fn difference(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 2);
     var cursor = args[0];
     const excluded = args[1];
     if (r.tag(excluded) == .Nil) return cursor;

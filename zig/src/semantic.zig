@@ -12,13 +12,16 @@ pub const variableUnion = variables.merge;
 pub const variableDifference = variables.difference;
 
 pub fn decode(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 1);
     return @import("wire.zig").decode(ctx, args[0]);
 }
 
 pub fn nameEqual(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 2);
     return r.boolean(r.stringEqual(args[0], args[1]));
 }
 pub fn typeIdEqual(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 2);
     r.assert(r.tag(args[0]) == .model_TypeId and r.tag(args[1]) == .model_TypeId);
     return r.boolean(r.stringEqual(r.field(args[0], 0), r.field(args[1], 0)) and
         r.stringEqual(r.field(args[0], 1), r.field(args[1], 1)));
@@ -45,9 +48,11 @@ fn stringLookup(root: V, key: V) ?V {
     return null;
 }
 pub fn stringFind(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 3);
     return if (stringLookup(args[1], args[2])) |value| ctx.node(.Some, &.{value}) else r.empty(.None);
 }
 pub fn stringGet(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 4);
     return stringLookup(args[1], args[2]) orelse args[3];
 }
 
@@ -74,9 +79,11 @@ fn natLookup(root: V, key: u64) ?V {
     return null;
 }
 pub fn natFind(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 3);
     return if (natLookup(args[1], r.toNat(args[2]))) |value| ctx.node(.Some, &.{value}) else r.empty(.None);
 }
 pub fn natGet(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 4);
     return natLookup(args[1], r.toNat(args[2])) orelse args[3];
 }
 fn link(ctx: *r.Context, key: u64, leaf: V, sample: u64, other: V) V {
@@ -86,6 +93,7 @@ fn link(ctx: *r.Context, key: u64, leaf: V, sample: u64, other: V) V {
     return ctx.node(.nat_index_Branch, &.{ r.nat(key), r.nat(mask), if (key & mask == 0) leaf else other, if (key & mask == 0) other else leaf });
 }
 pub fn natSet(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 4);
     const Frame = struct { node: V, high: bool };
     var path: [48]Frame = undefined;
     var depth: usize = 0;
@@ -130,18 +138,22 @@ pub fn natSet(ctx: *r.Context, args: []const V) V {
 }
 
 pub inline fn childrenOf(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 1);
     r.assert(r.tag(args[0]) == .cst_Cst);
     return r.field(args[0], 4);
 }
 pub inline fn kindOf(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 1);
     r.assert(r.tag(args[0]) == .cst_Cst);
     return r.field(args[0], 0);
 }
 pub inline fn textOf(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 1);
     r.assert(r.tag(args[0]) == .cst_Cst);
     return r.field(args[0], 2);
 }
 pub inline fn offsetOf(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 1);
     r.assert(r.tag(args[0]) == .cst_Cst);
     return r.field(args[0], 3);
 }
@@ -156,12 +168,15 @@ fn selectFields(ctx: *r.Context, nodes: V, label: V, initial: V) V {
     return ctx.reverse(reversed, r.empty(.Nil), .Cons);
 }
 pub fn fields(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 2);
     return selectFields(ctx, args[0], args[1], r.empty(.Nil));
 }
 pub fn fieldsReversed(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 3);
     return selectFields(ctx, args[0], args[1], args[2]);
 }
 pub fn fieldValues(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 2);
     r.assert(r.tag(args[0]) == .cst_Cst);
     return selectFields(ctx, r.field(args[0], 4), args[1], r.empty(.Nil));
 }
@@ -255,15 +270,18 @@ test "native CST field scans preserve order and the reversed prefix" {
 }
 
 pub inline fn substitutionCount(_: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 1);
     r.assert(r.tag(args[0]) == .types_Substitutions);
     return r.field(args[0], 3);
 }
 pub fn firstType(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 1);
     const values = args[0];
     if (r.tag(values) == .Cons and r.tag(r.field(values, 1)) == .Nil) return ctx.node(.Done, &.{r.field(values, 0)});
     return ctx.node(.Fail, &.{ctx.node(.model_Diagnostic, &.{ r.literal("internal_error"), r.literal("inference"), r.literal("type rewrite did not produce exactly one type") })});
 }
 pub fn resolveType(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len >= 2);
     const substitutions = args[0];
     const ty = args[1];
     r.assert(r.tag(substitutions) == .types_Substitutions);
