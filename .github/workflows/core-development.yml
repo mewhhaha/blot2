@@ -1,0 +1,36 @@
+name: Core development inputs
+on:
+  push:
+    branches: [redesign/typed-compiler-core]
+    paths: [.github/workflows/core-development.yml]
+permissions:
+  contents: read
+jobs:
+  inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: c5e4d08e20c701231b63fb2aefc8eb6e1ee68919
+      - name: Archive audited semantic-port scaffolding
+        run: tar -czf "$RUNNER_TEMP/core-scaffold.tar.gz" compiler/oxcaml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-scaffold
+          path: ${{ runner.temp }}/core-scaffold.tar.gz
+          retention-days: 3
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.3.0"
+      - name: Export native development toolchain
+        run: |
+          opam exec -- ocamlopt -config
+          prefix="$(opam var prefix)"
+          tar -czf "$RUNNER_TEMP/core-ocaml-tools.tar.gz" -C "$prefix" bin lib/ocaml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-ocaml-tools
+          path: ${{ runner.temp }}/core-ocaml-tools.tar.gz
+          retention-days: 3
