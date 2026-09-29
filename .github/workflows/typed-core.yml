@@ -12,56 +12,68 @@ defaults:
   run:
     shell: bash
 jobs:
-  baseline:
+  native:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     env:
       BEND_NO_TELEMETRY: "1"
-      DENO_DIR: ${{ github.workspace }}/.development-cache
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Archive exact source
-        run: git archive --format=tar.gz HEAD > "$RUNNER_TEMP/typed-core-source.tar.gz"
-      - uses: actions/upload-artifact@v4
+      - uses: ocaml/setup-ocaml@v3
         with:
-          name: typed-core-source
-          path: ${{ runner.temp }}/typed-core-source.tar.gz
-          retention-days: 7
+          ocaml-compiler: "5.3.0"
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.9.7
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.4.2"
-      - name: Install verified reference toolchain
+      - name: Build explicit native compiler and record identity
         run: |
-          mkdir -p development-tools/bend development-tools/bin
+          mkdir -p build/core
+          git rev-parse HEAD > build/core/source-revision.txt
+          opam exec -- ocamlopt -config > build/core/ocaml-config.txt
+          opam exec -- make -C compiler/core all 2>&1 | tee build/core/build.log
+          sha256sum compiler/core/_build/blotc > build/core/executable-sha256.txt
+      - name: Native storage, concurrency, framing and source smoke tests
+        run: |
+          deno task generate:parser
+          opam exec -- make -C compiler/core test 2>&1 | tee build/core/native-tests.log
+      - name: Preserve generated source and executable before differential checks
+        if: always()
+        run: |
+          mkdir -p build/core/native
+          if test -d compiler/core/_build; then
+            find compiler/core/_build -maxdepth 1 -type f \( -name '*.ml' -o -name 'build-manifest.json' -o -name 'blotc' \) -exec cp '{}' build/core/native/ \;
+          fi
+          tar -czf "$RUNNER_TEMP/core-native.tar.gz" -C build/core .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: core-native-${{ github.sha }}
+          path: ${{ runner.temp }}/core-native.tar.gz
+          retention-days: 30
+          if-no-files-found: error
+      - name: Install exact reference toolchain
+        run: |
           curl -fL --retry 3 https://github.com/bendlang/bend/releases/download/v2.0.34/bend-2.0.34-linux-x64.tar.gz -o "$RUNNER_TEMP/bend.tar.gz"
           echo "78106a97af242429dcc057258eb8d10f69cddebcd5e263022185a52d003e09bf  $RUNNER_TEMP/bend.tar.gz" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C development-tools/bend
-          echo "$PWD/development-tools/bend/bend/bin" >> "$GITHUB_PATH"
-          cp "$(command -v deno)" "$(command -v bun)" development-tools/bin/
-          deno cache generated/wasm/mod.ts
-          tar -czf "$RUNNER_TEMP/typed-core-tools.tar.gz" development-tools .development-cache
-      - uses: actions/upload-artifact@v4
-        with:
-          name: typed-core-tools
-          path: ${{ runner.temp }}/typed-core-tools.tar.gz
-          retention-days: 3
-      - name: Build native baseline and official reference
+          mkdir -p "$RUNNER_TEMP/bend"
+          tar -xzf "$RUNNER_TEMP/bend.tar.gz" -C "$RUNNER_TEMP/bend"
+          echo "$RUNNER_TEMP/bend/bend/bin" >> "$GITHUB_PATH"
+      - name: Build unchanged reference and verify all source operations
         run: |
-          bend version
-          bend guide > "$RUNNER_TEMP/bend-guide.txt"
-          deno task generate:parser
-          deno task build:compiler
-          python3 scripts/build_compiler_reference.py
-          git rev-parse HEAD > generated/compiler/source-revision.txt
-          sha256sum generated/compiler/blotc > generated/compiler/executable-sha256.txt
-          tar -czf "$RUNNER_TEMP/typed-core-baseline.tar.gz" compiler generated std examples scripts deno.json deno.lock baba.json AGENTS.md LAWS.bend PROOF.bend
+          bend version | tee build/core/bend-version.txt
+          bend guide > build/core/bend-guide.txt
+          python3 scripts/build_compiler_reference.py 2>&1 | tee build/core/reference-build.log
+          python3 compiler/core/test_existing.py --report build/core/parity.json 2>&1 | tee build/core/parity.log
+          deno run --allow-all compiler/core/corpus.ts compiler/core/_build/blotc 4 build/core/corpus.json 2>&1 | tee build/core/corpus.log
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: typed-core-baseline
-          path: ${{ runner.temp }}/typed-core-baseline.tar.gz
-          retention-days: 7
+          name: core-validation-${{ github.sha }}
+          path: build/core/
+          retention-days: 30
+          if-no-files-found: error
