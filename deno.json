@@ -15,12 +15,15 @@
     "bench": "deno task build:compiler:js && deno bench --allow-read=generated/wasm,examples,std compiler/bench.ts",
     "bench:native": "deno task build:compiler:all && deno run --allow-read=generated,examples,std --allow-write=build --allow-sys=cpus --allow-run=generated/compiler/blotc compiler/native_bench.ts",
     "bench:cpu": "deno task build:compiler:all && deno run --allow-all compiler/cpu_scaling_bench.ts",
-    "blot": "deno run --allow-read --allow-write=build --allow-run=generated/compiler/blotc compiler/cli.ts",
+    "blot": "deno run --allow-read --allow-write --allow-run=generated/compiler/blotc compiler/cli.ts",
     "test:editor": "deno test --allow-read=editor scripts/helix_languages.test.ts",
     "test:study-source": "deno test --allow-read=case-study/ecs/game.blot,case-study/ecs/engine scripts/case_study_source.test.ts",
     "test:compiler": "deno task build:compiler:all && deno check compiler/demo.ts compiler/host_demo.ts compiler/ecs_demo.ts compiler/cli.ts compiler/bench.ts compiler/native_bench.ts compiler/parallel_grain_bench.ts compiler/cpu_scaling_bench.ts compiler/cpu_scaling_trace.ts compiler/worker.ts compiler/syntax_worker.ts && deno test --allow-read=compiler,generated,examples,std,scripts --allow-run=generated/compiler/blotc,chrt,nice,ionice,ps,prlimit,setsid compiler/*.test.ts",
     "test": "deno task test:editor && deno task test:study-source && deno task test:compiler",
-    "check": "deno fmt --check && deno check generated/wasm/mod.ts scripts/setup_helix.ts scripts/build_compiler.ts scripts/generate_parser.ts && deno task test"
+    "check": "deno fmt --check && deno check generated/wasm/mod.ts scripts/setup_helix.ts scripts/build_compiler.ts scripts/generate_parser.ts && deno task test",
+    "package:pack": "deno run --allow-read=generated/compiler --allow-write=generated/compiler scripts/pack_native.ts",
+    "package:build": "deno task build:compiler:all && deno task package:pack",
+    "package:check": "deno task package:build && deno publish --dry-run --allow-dirty"
   },
   "imports": {
     "@mewhhaha/baba": "npm:@jsr/mewhhaha__baba@9.0.1"
@@ -29,6 +32,54 @@
     "exclude": [
       "generated",
       "editor/tree-sitter-blot2/src"
+    ]
+  },
+  "name": "@mewhhaha/blot",
+  "version": "0.2.0",
+  "exports": {
+    ".": "./mod.ts",
+    "./cli": "./compiler/installed_cli.ts",
+    "./guest": "./compiler/guest.ts",
+    "./project": "./compiler/source_project.ts",
+    "./source": "./compiler/source.ts",
+    "./format": "./compiler/format.ts"
+  },
+  "publish": {
+    "include": [
+      "LICENSE",
+      "README.md",
+      "mod.ts",
+      "compiler/bend_abi.ts",
+      "compiler/bend_list.ts",
+      "compiler/cli.ts",
+      "compiler/compact_cst.ts",
+      "compiler/diagnostics.ts",
+      "compiler/fifo.ts",
+      "compiler/guest.ts",
+      "compiler/guide.md",
+      "compiler/host.ts",
+      "compiler/installed_cli.ts",
+      "compiler/native.ts",
+      "compiler/native_process.ts",
+      "compiler/native_protocol.ts",
+      "compiler/packaged_native.ts",
+      "compiler/source.ts",
+      "compiler/source_frontend.ts",
+      "compiler/source_project.ts",
+      "compiler/source_ranges.ts",
+      "compiler/syntax.ts",
+      "compiler/syntax_worker.ts",
+      "compiler/syntax_workers.ts",
+      "compiler/worker_pool.ts",
+      "generated/compiler/blotc.gz",
+      "generated/compiler/compiler.js",
+      "generated/wasm/cst-schema.json",
+      "generated/wasm/mod.ts",
+      "generated/wasm/parser.plan",
+      "generated/wasm/parser.wasm",
+      "generated/wasm/syntax.ts",
+      "std/*.blot",
+      "compiler/format.ts"
     ]
   }
 }

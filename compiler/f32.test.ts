@@ -213,7 +213,7 @@ Deno.test("F32 primitive traversal preserves latent operation effects on functio
 const sourceMath = `
 const make_offset = fn captured => fn value => F32.add captured value
 entry const offset = make_offset (-0.25)
-const nested = Some (Some 0.125)
+const nested = #Some (#Some 0.125)
 entry const rounded = F32.add 16_777_216.0 1.0
 entry const negative_zero = -0.0
 entry const infinity = F32.div 1.0 0.0
@@ -222,7 +222,7 @@ entry const negative = fn (value: F32) => -value
 entry const length = fn () => F32.length3 2.0 3.0 6.0
 entry const partial = fn (value: F32) => offset (identity value)
 entry const extract = fn () => case nested of
-  Some (Some value) => value
+  #Some (#Some value) => value
   _ => 0.0
 entry const decimal = fn () => 1_2.5_0e-1
 entry const integer = fn (value: F32) => F32.to_u32 value

@@ -6,6 +6,24 @@ upstream issue without the user's explicit approval.** Record the Bend version,
 the observed behavior, the expected behavior, and a way to reproduce it before
 proposing a report.
 
+## Runtime limitation: JavaScript list helpers exhaust the stack (2.0.32)
+
+The published Bend 2.0.32 JavaScript loader emits recursive calls for
+`Base.List.append` and `Base.List.length`. Processing 20,000 elements throws
+`RangeError: Maximum call stack size exceeded` on Deno's default stack. This is
+a size limit in the JavaScript backend; no incorrect result was observed.
+
+The standalone [reproducer](compiler/repros/bend_js_wide_lists.bend) exports
+`append()` and `length()`. Generate it with the release's unmodified `main.ts`
+loader, then call either function from Deno. `append()` appends `[20000n]` to
+`List.range(20000n)`; the expected result has 20,001 elements. `length()` should
+return `20000n`. This also occurred while collecting and counting gdev's pending
+specialization constraints. Blot now joins that module-wide list through its
+existing tail-recursive `inference_batch.join` helper and counts it in a loop.
+The [wide-module regression](compiler/member_row_wide_scans.test.ts) verifies
+the order of all 20,001 constraints. No generated output was modified and no
+upstream report was filed.
+
 ## Candidate: unnecessary work when traversing strings
 
 **Status:** Local investigation; no upstream issue filed for this specific

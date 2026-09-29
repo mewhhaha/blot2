@@ -65,9 +65,9 @@ Deno.test("source arrays diagnose element, index, annotation, arity and const bo
   try {
     for (
       const [source, code] of [
-        ["const values = [1, True]\n", "type_mismatch"],
-        ["const invalid = fn () => @array.get [1] False\n", "type_mismatch"],
-        ["const invalid = fn () => @array.set [1] 0 True\n", "type_mismatch"],
+        ["const values = [1, #True]\n", "type_mismatch"],
+        ["const invalid = fn () => @array.get [1] #False\n", "type_mismatch"],
+        ["const invalid = fn () => @array.set [1] 0 #True\n", "type_mismatch"],
         ["const values: Array = []\n", "type_arity"],
         ["const values: Array U32 Bool = []\n", "type_arity"],
         [

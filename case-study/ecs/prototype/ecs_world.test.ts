@@ -27,19 +27,19 @@ async function createRuntime() {
   try {
     const artifact = compiler.compileEcs(`
 #[component]
-data Position = Position U32
+data Position = #Position U32
 #[component]
-data Velocity = Velocity U32
+data Velocity = #Velocity U32
 #[resource]
-data Time = Time U32
+data Time = #Time U32
 const move = fn () => do:
-  use wrapped_position <- @ecs.get Position
-  use wrapped_velocity <- @ecs.get Velocity
-  use wrapped_time <- @ecs.get Time
-  let Position position = wrapped_position
-  let Velocity velocity = wrapped_velocity
-  let Time time = wrapped_time
-  use @ecs.set (Position (@u32.add position (@u32.mul velocity time)))
+  use wrapped_position <- @ecs.get #Position
+  use wrapped_velocity <- @ecs.get #Velocity
+  use wrapped_time <- @ecs.get #Time
+  let #Position position = wrapped_position
+  let #Velocity velocity = wrapped_velocity
+  let #Time time = wrapped_time
+  use @ecs.set (#Position (@u32.add position (@u32.mul velocity time)))
   return ()
 `);
     return { runtime: await createEcsRuntime(artifact), artifact };

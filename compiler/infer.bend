@@ -28,6 +28,7 @@ type Reflection is Data:
 # one kind per index), so every renaming and resolution of types and rows
 # carries it along.
 type Coverage is Data:
+  DemandCall{site: Nat}
   OperationNeed{identity: Nat, template: M.TypeId, arguments: List<&2, M.Ty>, function_type: M.Ty, subject: String}
   AssociatedNeed{identity: Nat, dispatch: M.Dispatch, member: String, templates: List<&2, M.TypeId>, left: M.Ty, right: M.Ty, result: M.Ty, invocation: Maybe<&2, M.EffectRow>, ambient: M.EffectRow, subject: String}
   ValuePatternType{inferred_type: M.Ty, subject: String}
@@ -401,6 +402,13 @@ def associated_shape(same: Bool, request: Maybe<&2, TypedState.Request>, +left: 
         witnessed : M.Ty <- T.resolve(substitutions_of(state), left)
         associated_witness_shape(TypedState.witness(65536n, witnessed), result, state, subject)
     case _ _:
+      Done{state}
+
+def result_shape(result_dispatch: Bool, +right: M.Ty, +result: M.Ty, state: State, subject: String) -> Result<&2, &2, M.Diagnostic, State>:
+  match result_dispatch:
+    case True{}:
+      unify(right, M.FunctionTy{M.UnitTy{}, result, M.EffectRow{Nil{}, M.ClosedRow{}}}, state, subject)
+    case False{}:
       Done{state}
 
 def binding_free(bindings: List<&2, Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, Nat>>:
@@ -1327,6 +1335,31 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
         +value : Typing <- expr_work(rest, Expression{body}, in_lambda(context, parameter, parameter_ty, row), s2)
         next : State <- unify(type_of(value), result_ty, state_of(value), context_subject(context))
         return Typing{lambda_value(inference_of(value), parameter_ty, result_ty, row), next}
+    case 1n+rest Expression{M.MemoExpr{computation}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        +value : Typing <- expr_work(rest, Expression{computation}, context, state)
+        +result : M.Ty = M.VariableTy{next_of(state_of(value))}
+        +latent : M.EffectRow = R.variable_row(1n+next_of(state_of(value)))
+        next : State <- unify(type_of(value), M.FunctionTy{M.UnitTy{}, result, latent}, with_next(state_of(value), 2n+next_of(state_of(value))), context_subject(context))
+        return Typing{join(inference_of(value), pure(M.UnitTy{}), M.demand_type(M.FunctionTy{M.UnitTy{}, result, latent})), next}
+    case 1n+rest Expression{M.ForceExpr{value}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        +suspended : Typing <- expr_work(rest, Expression{value}, context, state)
+        +result : M.Ty = M.VariableTy{next_of(state_of(suspended))}
+        next : State <- unify(type_of(suspended), M.demand_type(M.FunctionTy{M.UnitTy{}, result, context_row(context)}), with_next(state_of(suspended), 1n+next_of(state_of(suspended))), context_subject(context))
+        return Typing{join(inference_of(suspended), pure(M.UnitTy{}), flow(type_of(suspended), result)), next}
+    case 1n+rest Expression{M.InstantiationExpr{+site, M.ApplyExpr{callee, +argument}}}:
+      do Result<&2, &2, M.Diagnostic, Typing>:
+        +fn : Typing <- expr_work(rest, Expression{callee}, context, state)
+        resolved : M.Ty <- T.resolve(substitutions_of(state_of(fn)), type_of(fn))
+        +lazy : Bool = M.demand_callee(resolved)
+        +arg : Typing <- expr_work(rest, Expression{Bool.pick(M.Expr, lazy, M.suspend_argument(site, argument), argument)}, context, state_of(fn))
+        +result : M.Ty = M.VariableTy{next_of(state_of(arg))}
+        next : State <- unify(type_of(fn), M.FunctionTy{type_of(arg), result, context_row(context)}, with_next(state_of(arg), 1n+next_of(state_of(arg))), context_subject(context))
+        joined : Inference = sequence(inference_of(fn), inference_of(arg), flow(type_of(fn), flow(type_of(arg), result)))
+        return Typing{with_use(with_pattern_constraints(joined, Bool.pick(List<&2, Coverage>, lazy, [DemandCall{site}], Nil{})), site, context_subject(context)), next}
+    case 1n+rest Expression{M.InstantiationExpr{+site, M.CallExpr{callee, argument}}}:
+      expr_work(rest, Expression{M.InstantiationExpr{site, M.ApplyExpr{M.FunctionExpr{callee}, argument}}}, context, state)
     case 1n+rest Expression{M.ApplyExpr{callee, argument}}:
       do Result<&2, &2, M.Diagnostic, Typing>:
         +fn : Typing <- expr_work(rest, Expression{callee}, context, state)
@@ -1356,7 +1389,8 @@ def expr_work(+fuel: Nat, work: Work, +context: Context, +state: State) -> Resul
         +r : Typing <- expr_work(rest, Expression{right}, context, state_of(l))
         +result : M.Ty = M.VariableTy{next_of(state_of(r))}
         +joined : Inference = sequence(inference_of(l), inference_of(r), flow(type_of(l), flow(type_of(r), result)))
-        +shaped : State <- associated_shape(M.name_equal(member, "@type.same"), TypedState.request(member), type_of(l), type_of(r), result, with_next(state_of(r), 1n+next_of(state_of(r))), context_subject(context))
+        ordinary : State <- associated_shape(M.name_equal(member, "@type.same"), TypedState.request(member), type_of(l), type_of(r), result, with_next(state_of(r), 1n+next_of(state_of(r))), context_subject(context))
+        +shaped : State <- result_shape(String.starts_with(member, "@result."), type_of(r), result, ordinary, context_subject(context))
         +invocation : M.EffectRow = R.variable_row(next_of(shaped))
         +need : M.Predicate = associated_predicate(dispatch, member, templates, type_of(l), type_of(r), result, invocation)
         return Typing{with_predicate(with_pattern_constraints(joined, [AssociatedNeed{identity, dispatch, member, templates, type_of(l), type_of(r), result, Some{invocation}, context_row(context), context_subject(context)}]), need), with_next(shaped, 1n+next_of(shaped))}

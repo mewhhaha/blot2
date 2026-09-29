@@ -1,4 +1,5 @@
 import Base
+import ./demand_elaboration.bend as Demand
 import ./model.bend as M
 import ./types.bend as T
 import ./constraints.bend as C
@@ -233,7 +234,7 @@ def signature_effects(signature: M.Signature) -> List<&2, M.Effect>:
   M.Signature{name, parameter, result, variables, effects} = signature
   R.metadata(R.operation_set(effects))
 
-def function_results(functions: List<&2, M.Function>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, M.CheckedFunction>>:
+def function_results(functions: List<&2, M.Function>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions, +calls: Set()) -> Result<&2, &2, M.Diagnostic, List<&2, M.CheckedFunction>>:
   match functions:
     case Nil{}:
       Done{Nil{}}
@@ -241,22 +242,24 @@ def function_results(functions: List<&2, M.Function>, +bindings: List<&2, I.Bind
       do Result<&2, &2, M.Diagnostic, List<&2, M.CheckedFunction>>:
         binding : I.Binding <- resolve_binding(I.lookup_binding(bindings, name), substitutions, name)
         +signature : M.Signature <- binding_signature(binding)
-        rest : List<&2, M.CheckedFunction> <- function_results(tail, bindings, substitutions)
-        return M.CheckedFunction{M.Function{name, exported, parameter, p, r, body}, signature, signature_effects(signature)} <> rest
+        rest : List<&2, M.CheckedFunction> <- function_results(tail, bindings, substitutions, calls)
+        prepared : M.Expr <- Demand.expression(body, calls)
+        return M.CheckedFunction{M.Function{name, exported, parameter, p, r, prepared}, signature, signature_effects(signature)} <> rest
 
 def checked_constant(constant: M.Constant, binding: I.Binding) -> M.CheckedConstant:
   I.Binding{name, ty, variables, predicates} = binding
   M.CheckedConstant{constant, ty, variables}
 
-def constant_results(constants: List<&2, M.Constant>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions) -> Result<&2, &2, M.Diagnostic, List<&2, M.CheckedConstant>>:
+def constant_results(constants: List<&2, M.Constant>, +bindings: List<&2, I.Binding>, +substitutions: T.Substitutions, +calls: Set()) -> Result<&2, &2, M.Diagnostic, List<&2, M.CheckedConstant>>:
   match constants:
     case Nil{}:
       Done{Nil{}}
     case M.Constant{+name, exported, annotation, value} <> tail:
       do Result<&2, &2, M.Diagnostic, List<&2, M.CheckedConstant>>:
         binding : I.Binding <- resolve_binding(I.lookup_binding(bindings, name), substitutions, name)
-        rest : List<&2, M.CheckedConstant> <- constant_results(tail, bindings, substitutions)
-        return checked_constant(M.Constant{name, exported, annotation, value}, binding) <> rest
+        rest : List<&2, M.CheckedConstant> <- constant_results(tail, bindings, substitutions, calls)
+        prepared : M.Expr <- Demand.expression(value, calls)
+        return checked_constant(M.Constant{name, exported, annotation, prepared}, binding) <> rest
 
 def coverage_constraints(definitions: List<&2, I.Definition>) -> List<&2, I.Coverage>:
   match definitions:
@@ -310,8 +313,9 @@ def finish(module: M.Module, +environment: G.Environment) -> Result<&2, &2, M.Di
     +substitutions : T.Substitutions = I.substitutions_of(G.env_state(environment))
     coverage : Unit <- P.check(coverage_constraints(definitions), substitutions, types)
     reflection : Unit <- check_reflections(reflection_constraints(definitions), bindings, substitutions)
-    checked_fns : List<&2, M.CheckedFunction> <- function_results(functions, bindings, substitutions)
-    checked_consts : List<&2, M.CheckedConstant> <- constant_results(constants, bindings, substitutions)
+    +calls : Set() = Demand.sites(coverage_constraints(definitions), Set.new())
+    checked_fns : List<&2, M.CheckedFunction> <- function_results(functions, bindings, substitutions, calls)
+    checked_consts : List<&2, M.CheckedConstant> <- constant_results(constants, bindings, substitutions, calls)
     return M.CheckedModule{checked_consts, checked_fns, types, operations}
 
 def check_module(+module: M.Module) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:

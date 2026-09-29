@@ -2,9 +2,10 @@
 install:
   deno task helix:install
 
-# Build the native Bend compiler executable used by Deno.
+# Build the native Bend compiler and refresh the binary used by linked packages.
 build:
   deno task build:compiler
+  deno task package:pack
 
 # Print the compact executable-language reference for people and LLMs.
 guide:
@@ -48,3 +49,7 @@ bench-grains iterations="32" samples="3" phases="codegen,check,prepare":
 # Compile the implemented source-language core to Wasm.
 compile source="examples/prelude.blot" output="build/example.wasm":
   deno task blot build {{quote(source)}} {{quote(output)}}
+
+# Normalize spacing while preserving parsed structure.
+fmt source:
+  deno task blot fmt {{quote(source)}}

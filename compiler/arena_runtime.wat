@@ -4,6 +4,7 @@
 ;; mark flag, and free/work-list link. The first 164 memory bytes are reserved.
 ;; Dynamic blocks begin at or above 64 KiB to avoid common low-ID false roots.
 ;; Word 12 caches the allocation-start bitmap; bump allocation invalidates it.
+;; Word 16 links static memo cells; word 20 selects persistent-root collection.
 ;; All user pointers address the payload. Scalar words are never rewritten.
 (module
   (type $unary (func (param i32) (result i32)))
@@ -115,6 +116,15 @@
           (br $indexing)))
         (i32.store (i32.const 12) (local.get $end))))
     (i32.store (i32.const 8) (i32.const 0))
+    ;; Static memo cells have no allocator header. Their callback and cached
+    ;; value are roots; offset 12 links the next cell emitted by the compiler.
+    (local.set $slot (i32.load (i32.const 16)))
+    (block $static_done (loop $static_memos
+      (br_if $static_done (i32.eqz (local.get $slot)))
+      (drop (call $mark (i32.load offset=4 (local.get $slot)) (local.get $index) (local.get $count)))
+      (drop (call $mark (i32.load offset=8 (local.get $slot)) (local.get $index) (local.get $count)))
+      (local.set $slot (i32.load offset=12 (local.get $slot)))
+      (br $static_memos)))
     ;; Scan pinned pre-loop objects too: an owned update may install a newer
     ;; object in them. Merely exempting these blocks from sweep is insufficient.
     (local.set $head (i32.load (i32.const 4)))

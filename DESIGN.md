@@ -66,7 +66,7 @@ const squared = fn (value: F32) => do:
 
 let initial_position = do:
   let spawn = choose_spawn level
-  return Vec2 { x: spawn.x, y: spawn.y + 1.0 }
+  return #Vec2 { x: spawn.x, y: spawn.y + 1.0 }
 ```
 
 In plain `do:`, `return` supplies that expression's result and falling through
@@ -87,8 +87,8 @@ another is a type error; no optional/union result is invented.
 
 ```blot
 const move = fn () => do:
-  use velocity <- ecs.get Velocity
-  use position <- ecs.get Position
+  use velocity <- ecs.get #Velocity
+  use position <- ecs.get #Position
   let next = advance (position, velocity)
   use _ <- ecs.set next
   return ()
@@ -140,16 +140,17 @@ resolver from its source-defined `bind` and `pure` operations.
 
 For `monad Maybe`:
 
-- `use value <- expression` expects `Maybe a`. `Some value` continues the block;
-  `Nothing` ends that block with `Nothing` without running its remainder.
+- `use value <- expression` expects `Maybe a`. `#Some value` continues the
+  block; `#Nothing` ends that block with `#Nothing` without running its
+  remainder.
 - `use expression` has the same behavior, discarding the successful payload. In
-  particular, `use Nothing` still short-circuits.
-- `return value` lifts the value with `Maybe.pure`, producing `Some value`.
+  particular, `use #Nothing` still short-circuits.
+- `return value` lifts the value with `Maybe.pure`, producing `#Some value`.
 - `return $ expression` forwards an existing `Maybe` result without another
   wrapper. `$` here is return syntax, not an overloadable application operator.
 - `let value = expression` stays an ordinary pure binding and does not unwrap
   anything. There is no implicit choice between lifting and binding a value.
-- Falling through lifts Unit, producing `Some ()`. Ordinary expression
+- Falling through lifts Unit, producing `#Some ()`. Ordinary expression
   statements merely discard their result; use `use` to perform a monadic bind.
 
 The inner block above is equivalent to:
@@ -190,13 +191,13 @@ execution; it does not special-case `Maybe` or aliases such as `try`.
 ```blot
 const unwrap_or_else = fn value => fn ~fallback =>
   case value of
-    Some found => found
-    Nothing => @force fallback
+    #Some found => found
+    #Nothing => @force fallback
 
 const duplicate_if = fn enabled => fn ~value =>
   case enabled of
-    False => Nothing
-    True => Some (@force value, @force value)
+    #False => #Nothing
+    #True => #Some (@force value, @force value)
 ```
 
 Calling such a function captures the argument expression without evaluating it.
@@ -210,8 +211,9 @@ demand mode.
 Demand mode belongs in the function's checked signature so higher-order calls
 and partial application preserve it. Deferred computations retain their effects;
 functions that may demand them must account for those effects. This is not a way
-to make an effectful computation pure. Explicit signature notation, escaping
-deferred bindings, and their ownership/lifetime rules remain to be specified.
+to make an effectful computation pure. The executable signature notation is
+`~T`. Escaping closures retain their deferred bindings; the first force uses the
+providers active at that force. Cached values survive later guest calls.
 
 ## Modules
 
@@ -229,7 +231,7 @@ import { Vec2 } from "./math.blot"
 import { clamp as clamp_value } from "./numeric.blot"
 import * as render from "engine/render"
 
-const origin = Vec2 { x: 0.0, y: 0.0 }
+const origin = #Vec2 { x: 0.0, y: 0.0 }
 const identity = fn value => value
 ```
 
@@ -243,37 +245,39 @@ struct is the one-constructor case. Separate `struct` and `enum` declarations
 are unnecessary.
 
 ```blot
-data Vec2 = Vec2 { x: F32, y: F32 }
+data Vec2 = #Vec2 { x: F32, y: F32 }
 
-data Maybe a = Some a | Nothing
+data Maybe a = #Some a | #Nothing
 
-type Result [value, error] is data = Ok value | Err error
+type Result [value, error] is data = #Ok value | #Err error
 
-data EntityId = EntityId U32
+data EntityId = #EntityId U32
 
 data Contact =
-  | Separated
-  | Touching { point: Vec2, normal: Vec2 }
-  | Overlapping { depth: F32, normal: Vec2 }
+  | #Separated
+  | #Touching { point: Vec2, normal: Vec2 }
+  | #Overlapping { depth: F32, normal: Vec2 }
 ```
 
 Construction mirrors the declaration:
 
 ```blot
-let position = Vec2 { x: 1.0, y: 2.0 }
-let selected = Some position
+let position = #Vec2 { x: 1.0, y: 2.0 }
+let selected = #Some position
 ```
 
-Uppercase constructor names replace the old `#Some` spelling. Generic type
-application uses forms such as `Maybe Vec2` and `Array (Maybe Vec2)`.
+Data constructor names require `#` in declarations, construction, and patterns,
+including `#Some`, `#Nothing`, `#True`, and `#False`. Qualified constructors put
+the marker before the whole name: `#math.Vec3`. Types stay unmarked; generic
+type application uses forms such as `Maybe Vec2` and `Array (Maybe Vec2)`.
 
 Types and effects accept at most one argument at each application stage, like
 functions. A list, tuple, or record can bind several type values:
 
 ```blot
-type Pair [left, right] is data = Pair (left, right)
-type Entry { head, tail } is data = Entry { head, tail }
-type Curried left => type right is data = Curried (left, right)
+type Pair [left, right] is data = #Pair (left, right)
+type Entry { head, tail } is data = #Entry { head, tail }
+type Curried left => type right is data = #Curried (left, right)
 ```
 
 These argument shapes can nest. Record arguments match by field name.
@@ -293,8 +297,8 @@ type Transform a = a -> a
 `Position` and `Vec2` are interchangeable and share associated operations.
 `EntityId` and `U32` are distinct types despite the wrapper's simple payload.
 
-Booleans use PascalCase constructors: `data Bool = True | False`, rather than
-separate lowercase literal spellings.
+Booleans use PascalCase constructors: `type Bool is data = #True | #False`,
+rather than separate lowercase literal spellings.
 
 The data model does not require a runtime tag or heap allocation for every
 constructor. A single-constructor plain record can have an inline representation
@@ -309,8 +313,8 @@ inputs. Single-input cases also use `of`, not `:`.
 ```blot
 const choose = fn first => fn enabled => fn fallback =>
   case first, enabled, fallback of
-    Some value, True, _ => value
-    _, _, Some value => value
+    #Some value, #True, _ => value
+    _, _, #Some value => value
     _, _, _ => 0
 ```
 
@@ -323,18 +327,18 @@ require a heap allocation.
 ## Pattern tests and guarded bindings
 
 `if let pattern = expression:` tests a pattern and introduces its bindings in
-the successful branch. `Some(x)` and `Some x` spell the same constructor
+the successful branch. `#Some(x)` and `#Some x` spell the same constructor
 pattern; parentheses group its payload, not a new multi-argument calling form.
 
 ```blot
 const double_if_present = fn (candidate: Maybe U32) -> U32 => do:
-  if let Some(value) = candidate:
+  if let #Some(value) = candidate:
     return value * 2
   else:
     return 0
 
 const double_or_zero = fn (candidate: Maybe U32) -> U32 => do:
-  let Some(value) = candidate else:
+  let #Some(value) = candidate else:
     return 0
   return value * 2
 ```
@@ -360,7 +364,7 @@ adapted to Blot's nearest-`do` return boundary and its selected resolver.
 
 Ordinary `let pattern = expression` requires a pattern that cannot fail for the
 currently known type. Refutable patterns need `else` or a conditional match;
-there is no implicit panic or `Nothing` result on failure.
+there is no implicit panic or `#Nothing` result on failure.
 
 Narrowing tracks finite constructor/union alternatives of immutable bindings,
 not arbitrary predicates. It can also describe a stable field path of an
@@ -369,10 +373,11 @@ creates a new version; facts about the old version do not automatically apply to
 it. At joins, retain only facts valid on every reachable incoming path.
 
 Failed partial patterns must not remove a whole constructor. For example,
-failure of `Some(Some(x))` still allows `Some Nothing`; only a pattern covering
-every payload of `Some` can exclude that constructor on failure. Guards likewise
-do not prove a constructor absent when only the guard fails. This bounded flow
-analysis does not reinstate the deferred predicate-refinement solver.
+failure of `#Some(#Some(x))` still allows `#Some #Nothing`; only a pattern
+covering every payload of `#Some` can exclude that constructor on failure.
+Guards likewise do not prove a constructor absent when only the guard fails.
+This bounded flow analysis does not reinstate the deferred predicate-refinement
+solver.
 
 ## Closed unions
 
@@ -464,7 +469,7 @@ const Vec2.magnitude = fn (value: Vec2) -> F32 =>
   sqrt (value.x * value.x + value.y * value.y)
 
 const Vec2.scaled = fn (value: Vec2) => fn (factor: F32) -> Vec2 =>
-  Vec2 { x: value.x * factor, y: value.y * factor }
+  #Vec2 { x: value.x * factor, y: value.y * factor }
 
 let distance = Vec2.magnitude position
 let enlarged = Vec2.scaled position 2.0
@@ -583,17 +588,17 @@ Short-circuiting follows from demand-driven parameters, not from compiler
 knowledge of particular operator spellings:
 
 ```blot
-infixr 22 (||) = or
-infixr 24 (&&) = and
+infixr 20 (||) = or
+infixr 25 (&&) = and
 
 const and = fn (left: Bool) => fn ~right => do:
   if left:
     return @force right
-  return False
+  return #False
 
 const or = fn (left: Bool) => fn ~right => do:
   if left:
-    return True
+    return #True
   return @force right
 ```
 
@@ -628,8 +633,8 @@ This is exactly ordinary curried application, not a tuple call, implicit method
 receiver, or a wrapper function. The callee resolves like an ordinary name,
 including a local function value or parameter. Its argument types, effects,
 evaluation order, and demand modes are unchanged. In particular,
-``False `and` expensive ()`` does not force the second argument when `and` has a
-`~right` parameter. Bind possibly effectful call results with `use`, as usual.
+``#False `and` expensive ()`` does not force the second argument when `and` has
+a `~right` parameter. Bind possibly effectful call results with `use`, as usual.
 
 The default fixity is left-associative precedence 80, between the showcase's
 multiplication at 70 and prefix operators at 90. Function application, field
@@ -953,8 +958,8 @@ These are not settled by the baseline above:
 - Rebinding scope and how branches and loops carry successor bindings.
 - Operator header import/export and conflict rules, prelude loading, and the
   exact spelling and limits of static associated-function lookup.
-- Explicit demand-mode signatures, escaping deferred bindings, and their
-  ownership/lifetime rules.
+- Ownership and optimization guarantees for demand captures beyond the current
+  memoized `~T` implementation.
 - Named-function recursion, forward references, and any local named definitions.
 - Further associated-function receiver inference and import visibility beyond
   the implemented static member calls and inferred operation constraints.
@@ -986,15 +991,15 @@ frontend; see the [Helix setup](README.md#helix-highlighting).
 | Helix highlighting      | Separate editor grammar covers the syntax showcase.                                                                                          |
 | Annotations             | Scalars, tuples, arrays, concrete applied nominal types, and effect-annotated arrows.                                                        |
 | Modules                 | Implicit prelude; relative/explicitly mapped file imports; module scopes; public top-level bindings.                                         |
-| Data declarations       | Generic `data`, including named record construction/patterns; no `type` aliases yet.                                                         |
-| Pattern narrowing       | Single/multi-value `case … of`, nested tuple/record patterns, `if let`, guarded `let`.                                                       |
+| Data declarations       | Generic `data` with mandatory `#Constructor` markers in declarations, values and patterns; no `type` aliases yet.                            |
+| Pattern narrowing       | Single/multi-value `case … of`, alternatives and guards, nested tuple/record patterns, `if let`, guarded `let`.                              |
 | Closed unions           | Design/editor examples only; no union inference or runtime representation.                                                                   |
-| Operators and demand    | Source fixities/operators backed by ordinary functions; demands remain future.                                                               |
+| Operators and demand    | Source fixities/operators backed by ordinary functions; memoized `~` parameters and `@force`.                                                |
 | Backtick calls          | Ordinary curried function calls with source fixity/default left precedence 80.                                                               |
 | Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.                                                                 |
 | Text interpolation      | Target design only; literal strings currently serve generic panic messages.                                                                  |
 | `self`                  | Previous value of a local binding or field/index path during immutable rebinding.                                                            |
-| Layout and AST          | Host layout/source mapping and Baba CST; Bend name resolution and core lowering.                                                             |
+| Layout and AST          | Indented continuations, a structure-preserving formatter, Baba CST; Bend name resolution and core lowering.                                  |
 | Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                                                                   |
 | Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                                                                   |
 | Resolver blocks         | Scoped effect providers execute; monad resolvers and `return $` remain future.                                                               |

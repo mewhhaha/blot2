@@ -216,6 +216,10 @@ def walk_steps(fuel: Nat, step: Result<&2, &2, M.Diagnostic, Step>, +catalog: Ca
       walk_steps(rest, Done{Step{ValuesWork{elements} <> pending, state}}, catalog)
     case 1n+rest Done{Step{ValueWork{C.ArrayValue{elements}} <> pending, state}}:
       walk_steps(rest, Done{Step{ValuesWork{elements} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.MemoValue{slot, computed, value}} <> pending, state}}:
+      walk_steps(rest, Done{Step{ValueWork{value} <> pending, state}}, catalog)
+    case 1n+rest Done{Step{ValueWork{C.DemandValue{slot, computation}} <> pending, state}}:
+      Fail{M.Diagnostic{"internal_error", "demand", "an unsnapshotted memo escaped constant evaluation"}}
     case 1n+rest Done{Step{ValueWork{C.StateProviderValue{read, write, initial}} <> pending, state}}:
       walk_steps(rest, Done{Step{ValueWork{initial} <> pending, use_operation(use_operation(state, read), write)}}, catalog)
     case 1n+rest Done{Step{ValueWork{C.ProviderValue{identity, implementation}} <> pending, state}}:

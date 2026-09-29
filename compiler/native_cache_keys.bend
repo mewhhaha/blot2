@@ -237,6 +237,10 @@ def flatten(fuel: Nat, pending: List<&2, Work>, reversed: List<&2, R.Work>) -> R
       flatten(rest, Field{R.Word{20}} <> Field{R.Natural{offset}} <> Field{R.OptionalType{annotation}} <> Expression{value} <> tail, reversed)
     case 1n+rest Expression{M.QualifiedExpr{offset, annotation, predicates, value}} <> tail:
       flatten(rest, Field{R.Word{48}} <> Field{R.Natural{offset}} <> Field{R.TypeValue{annotation}} <> Predicates{predicates} <> Expression{value} <> tail, reversed)
+    case 1n+rest Expression{M.MemoExpr{computation}} <> tail:
+      flatten(rest, Field{R.Word{50}} <> Expression{computation} <> tail, reversed)
+    case 1n+rest Expression{M.ForceExpr{value}} <> tail:
+      flatten(rest, Field{R.Word{51}} <> Expression{value} <> tail, reversed)
     case 1n+rest Expression{M.InstantiationExpr{site, value}} <> tail:
       flatten(rest, Field{R.Word{49}} <> Field{R.Natural{site}} <> Expression{value} <> tail, reversed)
     case 1n+rest Expression{M.F32Expr{value}} <> tail:
@@ -397,6 +401,10 @@ def flatten(fuel: Nat, pending: List<&2, Work>, reversed: List<&2, R.Work>) -> R
       flatten(rest, Field{R.Word{27}} <> Runtime{array} <> Runtime{index} <> Runtime{value} <> tail, reversed)
     case 1n+rest Runtime{I.ArrayReuseExpr{array, index, value}} <> tail:
       flatten(rest, Field{R.Word{33}} <> Runtime{array} <> Runtime{index} <> Runtime{value} <> tail, reversed)
+    case 1n+rest Runtime{I.MemoExpr{computation}} <> tail:
+      flatten(rest, Field{R.Word{35}} <> Runtime{computation} <> tail, reversed)
+    case 1n+rest Runtime{I.ForceExpr{value}} <> tail:
+      flatten(rest, Field{R.Word{36}} <> Runtime{value} <> tail, reversed)
     case 1n+rest Runtime{I.ArrayLengthExpr{array}} <> tail:
       flatten(rest, Field{R.Word{28}} <> Runtime{array} <> tail, reversed)
     case 1n+rest Runtimes{Nil{}} <> tail:

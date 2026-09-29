@@ -12,13 +12,13 @@ const programs = [
 entry const folded = [40, 42][1]
 entry const run = fn () => do:
   let a = [40, 2]
-  let Some first = a.get(0) else:
+  let #Some first = a.get(0) else:
     return 0
-  let Nothing = a.get(a.length) else:
+  let #Nothing = a.get(a.length) else:
     return 0
-  let Nothing = a.set(4294967295)(99) else:
+  let #Nothing = a.set(4294967295)(99) else:
     return 0
-  let Some changed = a.set(1)(42) else:
+  let #Some changed = a.set(1)(42) else:
     return 0
   if 1 < changed.length:
     return changed[1]
@@ -37,27 +37,27 @@ entry const empty = fn () => do:
     name:
       "nested array and record updates preserve aliases and bind self to the old leaf",
     source: `
-type Grid a is data = Grid { rows: Array (Array a), count: U32 }
+type Grid a is data = #Grid { rows: Array (Array a), count: U32 }
 entry const run = fn () => do:
-  let grid = Grid { rows: [[1, 2], [3, 4]], count: 0 }
+  let grid = #Grid { rows: [[1, 2], [3, 4]], count: 0 }
   let old = grid
   let row = grid.rows[0]
   grid.rows[0][1] := self + 40
   grid.count := self + 1
   return old.rows[0][1] * 1000 + row[1] * 100 + grid.rows[0][1] + grid.count
 entry const single = fn () => do:
-  let pair = Pair { values: (40, 2) }
+  let pair = #Pair { values: (40, 2) }
   let old = pair
   pair.values := (41, 1)
   let (a, b) = pair.values
   let (x, y) = old.values
   return a + b + x + y
-type Pair is data = Pair { values: (U32, U32) }
+type Pair is data = #Pair { values: (U32, U32) }
 entry const common = fn () => do:
-  let count = High { value: 40, tag: 0 }
+  let count = #High { value: 40, tag: 0 }
   count.value := self + 2
   return count.value
-type Count is data = Low { value: U32 } | High { value: U32, tag: U32 }
+type Count is data = #Low { value: U32 } | #High { value: U32, tag: U32 }
 `,
     calls: { run: 2243, single: 84, common: 42 },
   },

@@ -88,12 +88,12 @@ Deno.test("native cached bodies relink when callback imports appear, reorder, an
   const clean = await createNativeCompiler({ prelude: "none", threads: 1 });
   const js = await createSourceCompiler({ prelude: "none" });
   const scalar = `
-data Maybe a = Some a | Nothing
-const saved = Some 7
+data Maybe a = #Some a | #Nothing
+const saved = #Some 7
 entry const compute = fn value => @u32.add value 1
 entry const pure = fn () => case saved of
-  Some value => compute value
-  Nothing => 0
+  #Some value => compute value
+  #Nothing => 0
 entry const count = 12
 `;
   const integer = (value: number) => `

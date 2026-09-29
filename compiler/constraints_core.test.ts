@@ -544,9 +544,9 @@ Deno.test("mutual SCC exports transitive predicates and fills peer creation plan
 const first: U32 -> U32 = fn value => do:
   let alias = second
   return alias value
-const second: U32 -> U32 where { associated "add" U32 U32 a } = fn value => case True of
-  True => value
-  False => first value
+const second: U32 -> U32 where { associated "add" U32 U32 a } = fn value => case #True of
+  #True => value
+  #False => first value
 entry const answer = fn () => first 42
 `);
     const module = unwrap(core["lower.source_module"](
@@ -592,9 +592,9 @@ const first: a -> a = fn value => do:
   let alias: a -> a where { ${clause} } = second
   return alias value
 const second: a -> a = fn value => third value
-const third: a -> a = fn value => case True of
-  True => @type.call "add" value value
-  False => first value
+const third: a -> a = fn value => case #True of
+  #True => @type.call "add" value value
+  #False => first value
 entry const answer = fn () => first 21
 `);
       const module = unwrap(core["lower.source_module"](
@@ -742,9 +742,9 @@ Deno.test("a computed qualified let keeps one monomorphic evidence instance", as
     const artifact = compiler.compile(`
 const twice: a -> a where { associated "add" a a a } = fn value => value + value
 entry const run = fn () => do:
-  let selected = case True of
-    True => twice
-    False => twice
+  let selected = case #True of
+    #True => twice
+    #False => twice
   return selected 21
 `);
     const exports = new WebAssembly.Instance(
@@ -762,9 +762,9 @@ Deno.test("a computed qualified let retains the baseline mixed-type mismatch", a
     const source = `
 const twice: a -> a where { associated "add" a a a } = fn value => value + value
 entry const run = fn () => do:
-  let selected = case True of
-    True => twice
-    False => twice
+  let selected = case #True of
+    #True => twice
+    #False => twice
   return @f32.add (@u32.to_f32 (selected 21)) (selected 1.5)
 `;
     throws(() => compiler.compile(source), (error) => {
@@ -792,12 +792,12 @@ entry const run = fn () => do:
     let tick = fn () => do:
       use current <- Cell.get ()
       use Cell.set (@u32.add current 1)
-      return True
+      return #True
     return do (@effect.provider Tick tick):
       use flag <- Tick ()
       let selected = case flag of
-        True => twice
-        False => twice
+        #True => twice
+        #False => twice
       return selected 21
   return @u32.add count result
 `);

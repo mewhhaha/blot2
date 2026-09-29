@@ -13,5 +13,5 @@ entry const unchanged = fn () => do:
 entry const checked = fn index => Maybe.unwrap_or 0 $ array.get index numbers
 
 entry const nested = fn () => do:
-  let rows: Array (U32, Bool) = [(42, True), (7, False)]
+  let rows: Array (U32, Bool) = [(42, #True), (7, #False)]
   return @product.get (array.at 0 rows) 0

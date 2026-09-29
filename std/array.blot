@@ -10,6 +10,111 @@ const replace = fn index => fn value => fn values => @array.set values index val
 const get = fn index => fn values => Array.get values index
 const set = fn index => fn value => fn values => Array.set values index value
 
+const map = fn transform => fn values =>
+  generate values.length (fn index => transform values[index])
+
+// start/count, followed by the collection, like at/get/replace/set above.
+const slice = fn start => fn count => fn values => do:
+  if start > values.length:
+    return @panic "array slice starts outside the array"
+  if count > values.length - start:
+    return @panic "array slice extends outside the array"
+  return generate count (fn index => values[start + index])
+
+// Inclusive scan. Each pass constructs its output once, avoiding repeated
+// copying of immutable arrays while keeping the original ordering.
+const prefix_sums = fn (values: Array U32) => do:
+  let sums = values
+  for pass in 0..32:
+    let previous = sums
+    let stride = 1 << pass
+    sums := case stride < previous.length of
+      #True => generate previous.length (fn index => case index < stride of
+        #True => previous[index]
+        #False => previous[index] + previous[index - stride])
+      #False => previous
+  return sums
+
+// Stable indices of True flags, with one carried array in the scatter loop.
+const indices = fn (keep: Array Bool) => do:
+  if keep.is_empty:
+    return []
+  let ranks = prefix_sums (map (fn flag => case flag of
+    #True => 1
+    #False => 0) keep)
+  let count = ranks[keep.length - 1]
+  let slots = fill (count + 1) 0
+  for step in 0..keep.length:
+    let index = keep.length - 1 - step
+    slots[ranks[index]] := index
+  return generate count (fn index => slots[index + 1])
+
+const filter = fn predicate => fn values => do:
+  let selected = indices (map predicate values)
+  return generate selected.length (fn index => values[selected[index]])
+
+const filter_map = fn transform => fn values => do:
+  let candidates = map transform values
+  let selected = indices (map Maybe.is_some candidates)
+  return generate selected.length (fn index => case candidates[selected[index]] of
+    #Some value => value
+    #Nothing => @panic "array filter_map selected an empty candidate")
+
+const flatten = fn chunks => do:
+  let ends = prefix_sums (map .length chunks)
+  let seed = #Nothing
+  for chunk in chunks:
+    seed := case self, chunk.is_empty of
+      #Nothing, #False => #Some chunk[0]
+      _, _ => self
+  return case seed of
+    #Nothing => []
+    #Some first => do:
+      let joined = fill ends[chunks.length - 1] first
+      for index in 0..chunks.length:
+        let chunk = chunks[index]
+        let start = ends[index] - chunk.length
+        for offset in 0..chunk.length:
+          joined[start + offset] := chunk[offset]
+      return joined
+
+const concat = fn left => fn right => do:
+  if @array.length left == 0:
+    return right
+  if @array.length right == 0:
+    return left
+  return flatten [left, right]
+
+const push = fn value => fn values => do:
+  let count = values.length
+  return generate (count + 1) (fn index =>
+    if index < count then values[index] else value)
+
+// zip stops at the end of the shorter input.
+const zip = fn left => fn right =>
+  generate (min left.length right.length) (fn index => (left[index], right[index]))
+
+const unzip = fn values => do:
+  let left = map (fn pair => do:
+    let (left, _) = pair
+    return left) values
+  let right = map (fn pair => do:
+    let (_, right) = pair
+    return right) values
+  return (left, right)
+
+const unzip3 = fn values => do:
+  let first = map (fn triple => do:
+    let (value, _, _) = triple
+    return value) values
+  let second = map (fn triple => do:
+    let (_, value, _) = triple
+    return value) values
+  let third = map (fn triple => do:
+    let (_, _, value) = triple
+    return value) values
+  return (first, second, third)
+
 const fold_left = fn reduce => fn initial => fn values => do:
   let state = initial
   for value in values:
@@ -21,12 +126,12 @@ const any = fn predicate => fn values => do:
   for value in values:
     use found <- predicate value
     if found:
-      return True
-  return False
+      return #True
+  return #False
 
 const all = fn predicate => fn values => do:
   for value in values:
     use accepted <- predicate value
     if Bool.not accepted:
-      return False
-  return True
+      return #False
+  return #True

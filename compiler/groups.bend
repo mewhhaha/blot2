@@ -780,6 +780,10 @@ def usage(+fuel: Nat, work: UsageWork, +types: Map<&2, M.TypeId>) -> Result<&2, 
         b : Usage <- usage(rest, PredicatesUsage{predicates}, types)
         c : Usage <- usage(rest, ExpressionUsage{value}, types)
         return combine_usage(a, combine_usage(b, c))
+    case 1n+rest ExpressionUsage{M.MemoExpr{value}}:
+      usage(rest, ExpressionUsage{value}, types)
+    case 1n+rest ExpressionUsage{M.ForceExpr{value}}:
+      usage(rest, ExpressionUsage{value}, types)
     case 1n+rest ExpressionUsage{M.InstantiationExpr{site, value}}:
       usage(rest, ExpressionUsage{value}, types)
     case 1n+rest ExpressionUsage{M.TagExpr{offset, callee, argument}}:

@@ -218,15 +218,15 @@ effectTest(
   "generic operations support nominal ADTs and F32 arguments/results",
   async (reference, native) => {
     const source = `
-data Box = Box U32
+data Box = #Box U32
 effect Boxes.wrap: U32 -> Box
 effect Numbers.double: F32 -> F32
-const boxes = @effect.provider Boxes.wrap Box
+const boxes = @effect.provider Boxes.wrap #Box
 const numbers = @effect.provider Numbers.double (fn value => @f32.mul value 2.0)
 entry const answer = fn () => do boxes:
   use wrapped <- Boxes.wrap 42
   return case wrapped of
-    Box value => value
+    #Box value => value
 entry const doubled = fn (value: F32) => do numbers:
   return Numbers.double value
 entry const expected_box = answer ()
@@ -310,7 +310,7 @@ effect Reader.ask: Unit -> U32
 const bad_provider = fn () => @panic "reader should not run"
 const provider = @effect.provider Reader.ask bad_provider
 entry const answer = fn () => do provider:
-  if False:
+  if #False:
     use Reader.ask ()
   return 42
 entry const expected = answer ()
@@ -321,7 +321,7 @@ entry const expected = answer ()
     await rejectSource(
       reference,
       native,
-      source.replace("if False:", "if True:"),
+      source.replace("if #False:", "if #True:"),
       "const_panic",
     );
   },
@@ -332,7 +332,7 @@ effectTest(
   async (reference, native) => {
     for (
       const source of [
-        "effect Reader.ask: Unit -> U32\nconst wrong = @effect.provider Reader.ask (fn () => True)\n",
+        "effect Reader.ask: Unit -> U32\nconst wrong = @effect.provider Reader.ask (fn () => #True)\n",
         "effect Reader.ask: Unit -> U32\nconst wrong = @effect.provider Reader.ask (fn (value: U32) => value)\n",
         "effect Reader.ask: Unit -> U32\nconst wrong = Reader.ask 1\n",
       ]
@@ -438,18 +438,18 @@ effectTest(
   "multi-column matching selects complete rows with nested bindings",
   async (reference, native) => {
     const source = `
-data Maybe a = Some a | Nothing
+data Maybe a = #Some a | #Nothing
 const classify = fn left => fn right => fn enabled => case left, right, enabled of
-  Some (Some first), Some second, True => @u32.add first second
-  Some (Some _), Some _, False => 1
-  Some Nothing, _, _ => 2
-  Nothing, _, _ => 3
-  _, Nothing, _ => 4
-entry const answer = fn () => classify (Some (Some 40)) (Some 2) True
-entry const disabled = fn () => classify (Some (Some 40)) (Some 2) False
-entry const nested_missing = fn () => classify (Some Nothing) Nothing True
-entry const left_missing = fn () => classify Nothing (Some 2) False
-entry const right_missing = fn () => classify (Some (Some 40)) Nothing True
+  #Some (#Some first), #Some second, #True => @u32.add first second
+  #Some (#Some _), #Some _, #False => 1
+  #Some #Nothing, _, _ => 2
+  #Nothing, _, _ => 3
+  _, #Nothing, _ => 4
+entry const answer = fn () => classify (#Some (#Some 40)) (#Some 2) #True
+entry const disabled = fn () => classify (#Some (#Some 40)) (#Some 2) #False
+entry const nested_missing = fn () => classify (#Some #Nothing) #Nothing #True
+entry const left_missing = fn () => classify #Nothing (#Some 2) #False
+entry const right_missing = fn () => classify (#Some (#Some 40)) #Nothing #True
 entry const expected = answer ()
 `;
     const { exports } = await compile(reference, native, source);
@@ -467,7 +467,7 @@ effectTest(
   async (reference, native) => {
     for (
       const source of [
-        "const wrong = fn left => fn right => case left, right of\n  True, True => 1\n  False, False => 0\n",
+        "const wrong = fn left => fn right => case left, right of\n  #True, #True => 1\n  #False, #False => 0\n",
         "const wrong = fn left => fn right => case left, right of\n  value => value\n",
         "const wrong = fn left => fn right => case left, right of\n  value, value => value\n",
         "const wrong = fn value => case value:\n  True => 1\n  False => 0\n",

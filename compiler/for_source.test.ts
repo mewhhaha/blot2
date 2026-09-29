@@ -231,7 +231,7 @@ entry const run = fn () => sum 100000
 
 const invalidPrograms = [
   ["for index in 0.0..3:", "type_mismatch"],
-  ["for index in 0..False:", "type_mismatch"],
+  ["for index in 0..#False:", "type_mismatch"],
   ["for index in 3:", "type_mismatch"],
   ["for (a, b) in [1]:", "type_mismatch"],
 ] as const;
@@ -251,7 +251,7 @@ Deno.test("for loops reject invalid iterables, bounds, escaping locals and state
         "unknown_value",
       ],
       [
-        "entry const run = fn () => do:\n  let total = 0\n  for index in 0..3:\n    total := True\n  return total",
+        "entry const run = fn () => do:\n  let total = 0\n  for index in 0..3:\n    total := #True\n  return total",
         "type_mismatch",
       ],
     ];

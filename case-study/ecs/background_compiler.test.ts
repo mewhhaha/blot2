@@ -3,11 +3,11 @@ import { createBackgroundCompiler } from "./background_compiler.ts";
 import { CompilationFailure } from "./compile_protocol.ts";
 
 const source = `#[resource]
-data Clock = Clock U32
+data Clock = #Clock U32
 const tick = fn () => do:
-  use wrapped <- @ecs.get Clock
-  let Clock value = wrapped
-  use @ecs.set (Clock (value + 1))
+  use wrapped <- @ecs.get #Clock
+  let #Clock value = wrapped
+  use @ecs.set (#Clock (value + 1))
   return ()
 `;
 

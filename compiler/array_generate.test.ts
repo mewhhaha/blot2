@@ -101,7 +101,7 @@ Deno.test("array generate rejects invalid counts, callbacks, effects, limits and
     for (
       const [source, code] of [
         [
-          "const invalid = @array.generate True (fn index => index)",
+          "const invalid = @array.generate #True (fn index => index)",
           "type_mismatch",
         ],
         ["const invalid = @array.generate 2 3", "type_mismatch"],

@@ -1,4 +1,5 @@
 import {
+  type Analysis,
   type AnalyzedArtifact,
   type AnalyzedArtifactOptions,
   analyzeSourceTree,
@@ -22,9 +23,19 @@ export {
 
 // Synchronous JavaScript reference backend. User-facing native compilation is
 // asynchronous and lives in native.ts.
+export interface SourceCompiler {
+  analyze(source: SourceInput, options?: CompileOptions): Analysis;
+  compile(
+    source: SourceInput,
+    options?: AnalyzedArtifactOptions,
+  ): AnalyzedArtifact;
+  compile(source: SourceInput, options?: ArtifactOptions): Artifact;
+  dispose(): void;
+}
+
 export async function createSourceCompiler(
   options: SourceCompilerOptions = {},
-) {
+): Promise<SourceCompiler> {
   const frontend = await createSourceFrontend(options);
   function run<T>(
     source: SourceInput,
