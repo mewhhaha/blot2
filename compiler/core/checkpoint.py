@@ -9,11 +9,13 @@ not converted into an invented passing test result.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 from pathlib import Path
 import subprocess
 import tempfile
+import tarfile
 from zipfile import ZipFile, ZIP_DEFLATED
 
 HERE = Path(__file__).resolve().parent
@@ -41,12 +43,19 @@ def verify_build() -> dict:
     return manifest
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--base', help='Known ancestor for an incremental Git bundle')
-    parser.add_argument('--evidence', nargs='*', type=Path, default=[])
-    args = parser.parse_args()
+def verify_archive(archive: Path, manifest: dict) -> None:
+    """Tie the tested build to Git's immutable snapshot, not just the worktree."""
+    with tarfile.open(archive, 'r:gz') as source:
+        for name, expected in manifest['inputs'].items():
+            member = source.getmember(name)
+            if not member.isfile():
+                raise RuntimeError(f'Compiler input is not a committed file: {name}')
+            stream = source.extractfile(member)
+            if stream is None or hashlib.sha256(stream.read()).hexdigest() != expected:
+                raise RuntimeError(f'Committed compiler input differs from build: {name}')
+
+
+def package(args: argparse.Namespace) -> None:
     manifest = verify_build()
     status = subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=all'], cwd=ROOT)
     if status.strip():
@@ -63,7 +72,7 @@ def main() -> None:
         path = file.resolve(strict=True)
         name = 'evidence/' + path.name
         if name in paths:
-            parser.error('Duplicate evidence basename: ' + path.name)
+            raise ValueError('Duplicate evidence basename: ' + path.name)
         paths[name] = path
     destination = args.output.resolve()
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -72,7 +81,11 @@ def main() -> None:
         archive = temporary / 'source.tar.gz'
         with archive.open('wb') as output:
             subprocess.run(['git', 'archive', '--format=tar.gz', revision], cwd=ROOT, stdout=output, check=True)
+        verify_archive(archive, manifest)
         paths['source.tar.gz'] = archive
+        commit = temporary / 'commit.txt'
+        commit.write_bytes(subprocess.check_output(['git', 'cat-file', 'commit', revision], cwd=ROOT))
+        paths['commit.txt'] = commit
         if args.base:
             bundle = temporary / 'changes.bundle'
             subprocess.run(['git', 'bundle', 'create', str(bundle), 'HEAD', '^' + args.base], cwd=ROOT, check=True)
@@ -98,6 +111,21 @@ def main() -> None:
         finally:
             zip_path.unlink(missing_ok=True)
     print(f'Checkpoint {revision}: {destination} ({destination.stat().st_size} bytes)')
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--base', help='Known ancestor for an incremental Git bundle')
+    parser.add_argument('--evidence', nargs='*', type=Path, default=[])
+    args = parser.parse_args()
+    # The builder holds this exact lock while regenerating modules, replacing
+    # the executable and writing its manifest. Keep all checkpoint reads under
+    # it too, so concurrent builds cannot mix two otherwise valid revisions.
+    BUILD.mkdir(parents=True, exist_ok=True)
+    with (BUILD / '.build.lock').open('a') as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        package(args)
 
 
 if __name__ == '__main__':

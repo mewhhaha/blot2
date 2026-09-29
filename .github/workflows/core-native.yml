@@ -35,7 +35,7 @@ jobs:
           opam exec -- ocamlopt -config > build/core/toolchain.txt
           opam exec -- python3 compiler/core/build.py -j 2 2>&1 | tee build/core/build.log
           deno task generate:parser
-      - name: Native storage, concurrency and framing
+      - name: Native storage, type graphs, concurrency and framing
         run: |
           opam exec -- python3 compiler/core/test_native.py 2>&1 | tee build/core/native.log
           python3 compiler/core/test_transport.py compiler/core/_build/blotc 2>&1 | tee build/core/transport.log
@@ -67,6 +67,9 @@ jobs:
         run: |
           shopt -s nullglob
           python3 compiler/core/checkpoint.py --output build/core/checkpoint.zip --evidence build/core/*.log build/core/*.json build/core/revision.txt build/core/toolchain.txt
+      - name: Restore and validate the saved checkpoint
+        if: always()
+        run: python3 compiler/core/test_checkpoint.py build/core/checkpoint.zip 2>&1 | tee build/core/checkpoint-recovery.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

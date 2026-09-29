@@ -37,7 +37,8 @@ The full redesign remains a draft. Checkpoint artifacts contain committed
 source, build provenance, generated native modules, executables, and test logs.
 The recovered source has been revalidated; results for each newer checkpoint
 remain bound to its own executable hash and attached logs. See RECOVERY.md for
-the publication history.
+the publication history and [PROGRESS.md](PROGRESS.md) for the latest verified
+implementation boundary.
 
 ## Checkpoints
 
@@ -71,3 +72,14 @@ real source and native session compilation against the new graph. It leaves
 production results and diagnostics with the compatibility solver and fails on a
 disagreement. The native checkpoint workflow runs both the ordinary suite and
 this verification suite and retains their separate reports.
+
+A checkpoint also carries the raw Git commit object. Packaging holds the same
+lock as the builder and verifies build inputs against the committed archive.
+`test_checkpoint.py` verifies its archive, restores the exact tree/commit (and
+fast-forwards its bundle when present), runs the saved executable, and rejects
+modified build inputs, generated sources, executables and uncommitted source
+changes.
+
+```sh
+python3 compiler/core/test_checkpoint.py /path/to/checkpoint.zip
+```
