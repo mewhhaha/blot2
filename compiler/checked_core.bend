@@ -6,6 +6,7 @@ import ./core_compare.bend as Compare
 import ./globals.bend as Globals
 import ./closures.bend as Closures
 import ./constraints.bend as C
+import ./public_exports.bend as Public
 
 # A certificate comes from a successful independent check of one complete SCC.
 # Its imported principal schemes are frozen at that boundary.
@@ -13,16 +14,34 @@ import ./constraints.bend as C
 type Certificate is Data:
   Certificate{module: M.Module, checked: Groups.CheckedGroup, imports: List<&2, Groups.Interface>}
 
+# Prepared is a stage boundary, not just another unchecked module. A complete
+# checked result may cross it only when the exact body/catalog snapshot is
+# unchanged and no deferred requirement remains. Transformed bodies keep the
+# certificate-based checking path.
 type Prepared is Data:
   Prepared{module: M.Module, certificates: List<&2, Certificate>}
+  CheckedPrepared{module: M.Module, certificates: List<&2, Certificate>, checked: M.CheckedModule}
 
 def prepared_module(prepared: Prepared) -> M.Module:
-  Prepared{module, certificates} = prepared
-  module
+  match prepared:
+    case Prepared{module, certificates}:
+      module
+    case CheckedPrepared{module, certificates, checked}:
+      module
 
 def prepared_certificates(prepared: Prepared) -> List<&2, Certificate>:
-  Prepared{module, certificates} = prepared
-  certificates
+  match prepared:
+    case Prepared{module, certificates}:
+      certificates
+    case CheckedPrepared{module, certificates, checked}:
+      certificates
+
+def prepared_is_checked(prepared: Prepared) -> Bool:
+  match prepared:
+    case Prepared{module, certificates}:
+      False{}
+    case CheckedPrepared{module, certificates, checked}:
+      True{}
 
 def deferred(fuel: Nat, pending: List<&2, M.Expr>) -> Bool:
   match fuel pending:
@@ -318,3 +337,32 @@ def lookup(indexed: Map<&2, List<&2, Certificate>>, job: Groups.Job, subset: M.M
       None{}
     case name <> tail:
       available_candidates(Index.find(List<&2, Certificate>, indexed, name), subset, imports)
+
+# Unlike ready_certificates, this rejects the whole handoff on any unresolved
+# use or interface. Checking still produced all signatures before this test.
+def all_ready_work(certificates: List<&2, Certificate>, ready: Bool) -> Bool:
+  match certificates ready:
+    case _ False{}:
+      False{}
+    case Nil{} True{}:
+      True{}
+    case Certificate{module, checked, imports} <> tail True{}:
+      all_ready_work(tail, ready_group(checked))
+
+def all_ready(certificates: List<&2, Certificate>) -> Bool:
+  all_ready_work(certificates, True{})
+
+def retain_unchanged_if(same: Bool, +module: M.Module, checked: M.CheckedModule, certificates: List<&2, Certificate>) -> Prepared:
+  match same:
+    case True{}:
+      CheckedPrepared{module, certificates, checked}
+    case False{}:
+      Prepared{module, ready_certificates(certificates)}
+
+# Called with the successful initial check belonging to this source request.
+# A same-name or same-signature body is insufficient. Exact ordered module
+# equality also covers nominal/operation catalogs, annotations and source sites.
+# If specialization, demand elaboration or catalog filtering changed anything,
+# use ordinary checking. This is not a cross-revision cache or a hash-only key.
+def retain_unchanged(+module: M.Module, +checked: M.CheckedModule, +certificates: List<&2, Certificate>) -> Prepared:
+  retain_unchanged_if(Bool.and(source_ready(module), Bool.and(all_ready(certificates), Compare.same_module(module, Public.unchecked_module(checked)))), module, checked, certificates)

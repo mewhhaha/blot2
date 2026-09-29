@@ -1151,3 +1151,13 @@ def check_module_evidenced(module: M.Module) -> Result<&2, &2, M.Diagnostic, Ini
 # Direct IR checking and warm shape passes use the ordinary checker.
 def check_module(module: M.Module) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
   check_module_core(module, Nil{})
+
+# A checked handoff owns the already validated exact snapshot. Do not rebuild
+# its dependency graph, SCC/catalog plan, task queues or checked-group indexes.
+# The ordinary path still validates transformed/unproven modules as before.
+def check_prepared(prepared: Core.Prepared) -> Result<&2, &2, M.Diagnostic, M.CheckedModule>:
+  match prepared:
+    case Core.Prepared{module, certificates}:
+      check_module_core(module, certificates)
+    case Core.CheckedPrepared{module, certificates, checked}:
+      Done{checked}
