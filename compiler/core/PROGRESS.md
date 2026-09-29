@@ -4,17 +4,20 @@
 
 This work continues `redesign/typed-compiler-core`, PR #7, from the exact remote
 commit `457b7963a96bd1e48d62d83e59b7d4371279e761`. The recovered archive's Git
-tree is `ae9ed76806796f77e25c980e20eb4e2c37015cca`. All new local commits
-descend from that commit; no history is rewritten and no change to `main` is
-made.
+tree is `ae9ed76806796f77e25c980e20eb4e2c37015cca`. All six implementation
+checkpoints now appear on that remote branch with their original commit hashes,
+ending at `1ec8f1ecebe9726d8da5c1f17cb729cfc29b2205`. They were published on
+September 29, 2026, using a non-forced fast-forward; `main` was not changed.
 
-The working session's GitHub connection exposes reads but no publishing actions.
-These new commits have **not** been pushed. Each checkpoint is therefore saved
-as a source/executable/evidence ZIP plus an incremental Git bundle. The supplied
-bundle can be fetched into a checkout containing the base and merged with
-`git merge --ff-only FETCH_HEAD`; a later remote change is never
-force-overwritten. The new native CI workflow is committed, but these results
-are local validation, not a claim that the new commits passed hosted CI.
+The earlier claim that the GitHub connection had no publishing actions was
+incorrect. Publication was completed using the available GitHub write actions.
+The saved bundle's SHA-256 and all six original commit hashes were verified,
+along with final tree `808f69423b2f1e6fc08c66c4e0a9408347ba0345`.
+
+Each checkpoint also has a source/executable/evidence ZIP and an incremental
+Git bundle. The new native CI workflow is now on the remote branch. The test
+results below remain the previously recorded local validation: publication and
+archive-integrity checks do not establish that hosted compiler CI passed.
 
 ## Completed implementation checkpoints
 
@@ -29,17 +32,16 @@ are local validation, not a claim that the new commits passed hosted CI.
   and diagnostics. Disagreements are independent hard failures. Counters are
   saved before publishing native responses, including sessions later disposed by
   SIGTERM. Quiet EOF and the framed stdout protocol are preserved.
-
 - `7963104`: add isolated archive recovery tests, a shared build/package lock,
   raw commit objects and committed-input verification.
 - `3512a79`: dispatch verification before the solver call so disabled
   verification has no unused post-call continuation; add explicit
   enabled/disabled checks.
+- `1ec8f1e`: add the explicit `blot:core` CLI, no-fallback CLI tests,
+  source-only archive recovery and the final validation reports.
 
-The final checkpoint adds the explicit `blot:core` CLI, no-fallback CLI tests,
-source-only archive recovery and the final validation reports. Source, native
-generated modules and executable hashes are checked together. Failed
-builds/tests are not converted into successful checkpoint status.
+Source, native generated modules and executable hashes are checked together.
+Failed builds/tests are not converted into successful checkpoint status.
 
 ## Reproduced validation
 
