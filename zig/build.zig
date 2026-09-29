@@ -1,0 +1,33 @@
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    // Artifacts run on machines other than the build host. Do not silently
+    // require that host's optional CPU instructions; -Dcpu=native opts in.
+    const target = b.standardTargetOptions(.{ .default_target = .{ .cpu_model = .baseline } });
+    const optimize = b.standardOptimizeOption(.{});
+    // Transitional source migration; generated output is ordinary native Zig.
+    // Python reads the retained algorithms but never invokes the Bend compiler.
+    const generate = b.addSystemCommand(&.{ "python3", "tools/generate.py" });
+    const module = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+        .strip = b.option(bool, "strip", "Strip release debug information") orelse (optimize != .Debug),
+    });
+    const executable = b.addExecutable(.{ .name = "blotc-zig", .root_module = module });
+    executable.step.dependOn(&generate.step);
+    b.installArtifact(executable);
+    const tests = b.addTest(.{ .root_module = module });
+    tests.step.dependOn(&generate.step);
+    const run_tests = b.addRunArtifact(tests);
+    const regressions = b.addSystemCommand(&.{ "python3", "tests_optimizations.py", "--compiler" });
+    regressions.addArtifactArg(executable);
+    regressions.addArgs(&.{ "--zig-exe", b.graph.zig_exe, "-v" });
+    const test_step = b.step("test", "Run native compiler, memory, and protocol regressions");
+    test_step.dependOn(&run_tests.step);
+    test_step.dependOn(&regressions.step);
+    const run = b.addRunArtifact(executable);
+    if (b.args) |args| run.addArgs(args);
+    b.step("run", "Run the native compiler process").dependOn(&run.step);
+}

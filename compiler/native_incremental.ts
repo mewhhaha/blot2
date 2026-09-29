@@ -1,10 +1,10 @@
-import {
-  type AnalyzedArtifact,
-  type AnalyzedArtifactOptions,
-  type Artifact,
-  type ArtifactOptions,
-  type CompileOptions,
-  includesAnalysis,
+import { includesAnalysis } from "./options.ts";
+import type {
+  AnalyzedArtifact,
+  AnalyzedArtifactOptions,
+  Artifact,
+  ArtifactOptions,
+  CompileOptions,
 } from "./host.ts";
 import { bendArray } from "./bend_list.ts";
 import {

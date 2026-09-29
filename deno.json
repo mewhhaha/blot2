@@ -23,7 +23,8 @@
     "check": "deno fmt --check && deno check generated/wasm/mod.ts scripts/setup_helix.ts scripts/build_compiler.ts scripts/generate_parser.ts && deno task test",
     "package:pack": "deno run --allow-read=generated/compiler --allow-write=generated/compiler scripts/pack_native.ts",
     "package:build": "deno task build:compiler:all && deno task package:pack",
-    "package:check": "deno task package:build && deno publish --dry-run --allow-dirty"
+    "package:check": "deno task package:build && deno publish --dry-run --allow-dirty",
+    "blot:zig": "deno run --allow-read --allow-write --allow-run=zig/zig-out/bin/blotc-zig zig/cli.ts"
   },
   "imports": {
     "@mewhhaha/baba": "npm:@jsr/mewhhaha__baba@9.0.1"

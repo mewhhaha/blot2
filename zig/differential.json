@@ -1,0 +1,7 @@
+{
+  "lock": "../deno.lock",
+  "imports": {
+    "../compiler/source.ts": "./source_adapter.ts",
+    "@mewhhaha/baba": "npm:@jsr/mewhhaha__baba@9.0.1"
+  }
+}
