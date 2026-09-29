@@ -308,3 +308,11 @@ test "type leaf fast paths retain identities and exact first-type diagnostics" {
     try std.testing.expectEqual(leaf, r.field(firstType(&ctx, &.{one}), 0));
     try std.testing.expectEqual(r.Tag.Fail, r.tag(firstType(&ctx, &.{ctx.node(.Cons, &.{ leaf, one })})));
 }
+
+pub const compareCoreWork = @import("core_compare.zig").compareWork;
+
+pub const freeTypeVariables = @import("type_bridge.zig").freeVariables;
+pub const parameterKinds = @import("type_bridge.zig").parameterKinds;
+pub const annotationNames = @import("type_bridge.zig").annotationNames;
+
+pub const expressionChildren = @import("core_compare.zig").expressionChildren;

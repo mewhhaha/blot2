@@ -11,6 +11,8 @@ import hashlib
 # Native algorithms are valid only for these retained source definitions. A
 # source edit deoptimizes its entire module rather than silently changing meaning.
 NATIVE_MODULE_HASHES = {
+    'closures': 'f26b676262ca66d7a656c9fb95c73fa8514cdaee6bf3750bc5715b1b3a910d49',
+    'core_compare': '6b2f8e1c7ffae2288b0b6b63592ba3fa5ac2ebe48b3a8d9b370367cbd39ce79d',
     'effect_rows': 'ee075f75680328a1a74c7fb06ff3d7e28d4635f12774c289b7fc3effef6a7959',
     'types': 'f37bf621a0f4378fb982874116cb48404e5fea504c22332d33606b820701ddd7',
     'native_request': '62da0ead06c5edf07c813c1c9a955cf3a72de916694c33d498e1ea3cd486bebc',
@@ -26,7 +28,8 @@ NATIVE_MODULE_HASHES = {
 # Independent source algorithms are emitted as differential test oracles only.
 # They are not fallback paths for any native entry point.
 TYPE_IR_ORACLES = {
-    'types.resolve_work_reference', 'types.rewrite', 'types.rename_work',
+    'types.free_work', 'types.parameter_kinds', 'types.annotation_names',
+    'core_compare.compare_work', 'closures.children', 'types.resolve_work_reference', 'types.rewrite', 'types.rename_work',
     'types.resolve_row_at', 'types.from_list',
 }
 def oracle_name(name):
@@ -34,6 +37,11 @@ def oracle_name(name):
     return module + '.$oracle_' + name
 
 NATIVE_FUNCTIONS = {
+    'types.free_work': 'freeTypeVariables',
+    'types.parameter_kinds': 'parameterKinds',
+    'types.annotation_names': 'annotationNames',
+    'core_compare.compare_work': 'compareCoreWork',
+    'closures.children': 'expressionChildren',
     'types.resolve': 'resolveType', 'types.first_type': 'firstType',
     'types.resolve_work': 'resolveTypes', 'types.resolve_row_at': 'resolveRowAt',
     'types.rewrite': 'rewriteTypes', 'types.rename_work': 'renameTypes',
@@ -56,6 +64,8 @@ def native_functions(mods):
              if name in mods and hashlib.sha256(mods[name].path.read_bytes()).hexdigest() == expected}
     # String-index equality depends on model.name_equal as well as index itself.
     if 'model' not in valid:
+        valid.discard('core_compare')
+        valid.discard('closures')
         valid.discard('index')
         valid.discard('cst')
     if not {'model', 'nat_index', 'effect_rows'} <= valid:

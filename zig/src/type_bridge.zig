@@ -5,10 +5,14 @@ const std = @import("std");
 const ir = @import("type_ir.zig");
 const r = @import("runtime.zig");
 const V = r.Value;
+const scan_ir = @import("type_scan.zig");
+const ScanList = struct { span: scan_ir.Span, types: bool };
 const Allocator = std.mem.Allocator;
 
 pub const State = struct {
     store: ir.Store,
+    scans: scan_ir.State,
+    scan_lists: std.AutoHashMapUnmanaged(ScanList, V) = .empty,
     types: std.AutoHashMapUnmanaged(V, ir.Type) = .empty,
     rows: std.AutoHashMapUnmanaged(V, ir.Row) = .empty,
     names: std.AutoHashMapUnmanaged(V, ir.Name) = .empty,
@@ -25,7 +29,7 @@ pub const State = struct {
     import_bytes: std.ArrayList(u8) = .empty,
     import_list: std.ArrayList(ir.Type) = .empty,
     pub fn init(allocator: Allocator) State {
-        return .{ .store = ir.Store.init(allocator) };
+        return .{ .store = ir.Store.init(allocator), .scans = scan_ir.State.init(allocator) };
     }
     pub fn deinit(self: *State) void {
         const a = self.store.allocator;
@@ -43,6 +47,8 @@ pub const State = struct {
         self.import_labels.deinit(a);
         self.import_bytes.deinit(a);
         self.import_list.deinit(a);
+        self.scan_lists.deinit(a);
+        self.scans.deinit();
         self.store.deinit();
     }
     fn grow(self: *State, values: *std.ArrayList(V), n: usize) ir.Error!void {
@@ -426,4 +432,41 @@ pub fn rewrite(ctx: *r.Context, args: []const V) V {
 pub fn rename(ctx: *r.Context, args: []const V) V {
     std.debug.assert(args.len == 4);
     return rewriteResult(ctx, args, true) catch |err| failure(ctx, err);
+}
+
+fn scanList(s: *State, ctx: *r.Context, span: scan_ir.Span, types: bool) ir.Error!V {
+    if (span.len == 0) return r.empty(.Nil);
+    const key: ScanList = .{ .span = span, .types = types };
+    if (s.scan_lists.get(key)) |value| return value;
+    var result = r.empty(.Nil);
+    var i = span.len;
+    while (i > 0) {
+        i -= 1;
+        const id = s.scans.items(span)[i];
+        result = ctx.node(.Cons, &.{ if (types) try s.typeValue(ctx, @enumFromInt(id)) else r.nat(id), result });
+    }
+    try s.scan_lists.put(s.store.allocator, key, result);
+    return result;
+}
+fn scanResult(ctx: *r.Context, args: []const V, kind: scan_ir.Kind) ir.Error!V {
+    const fuel = r.toNat(args[0]);
+    if (fuel == 0) return error.TypeComplexity;
+    const s = try state(ctx);
+    const input = try s.importWork(args[1]);
+    const result = try s.scans.scan(&s.store, kind, input, fuel);
+    const first = try scanList(s, ctx, result.first, kind == .annotation_names);
+    const value = if (kind == .parameter_kinds) ctx.node(.types_ParameterKinds, &.{ first, try scanList(s, ctx, result.second, false) }) else first;
+    return ctx.node(.Done, &.{value});
+}
+pub fn freeVariables(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len == 2);
+    return scanResult(ctx, args, .free_variables) catch |err| failure(ctx, err);
+}
+pub fn parameterKinds(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len == 2);
+    return scanResult(ctx, args, .parameter_kinds) catch |err| failure(ctx, err);
+}
+pub fn annotationNames(ctx: *r.Context, args: []const V) V {
+    std.debug.assert(args.len == 2);
+    return scanResult(ctx, args, .annotation_names) catch |err| failure(ctx, err);
 }

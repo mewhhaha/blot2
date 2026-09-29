@@ -25,7 +25,7 @@ fn equal(a: V, b: V) !void {
         }
         const count: usize = switch (tag) {
             .Done, .Fail, .model_VariableTy, .model_ParameterTy, .model_ArrayTy, .model_ProductTy, .model_RowVariable, .model_RowParameter => 1,
-            .Cons, .model_TypeId, .model_FreeTy, .model_FreeRow, .model_EffectRow, .model_AppliedTy, .model_ProviderTy => 2,
+            .types_ParameterKinds, .Cons, .model_TypeId, .model_FreeTy, .model_FreeRow, .model_EffectRow, .model_AppliedTy, .model_ProviderTy => 2,
             .model_FunctionTy, .model_StateProviderTy, .model_Diagnostic => 3,
             else => 0,
         };
@@ -246,4 +246,49 @@ test "bridge preserves deep shared graphs and returns original unchanged types" 
         cursor = r.field(cursor, 0);
     }
     try std.testing.expectEqual(r.empty(.model_BoolTy), cursor);
+}
+
+fn compareScans(ctx: *r.Context, fuel: u64, work: V) !void {
+    const args = [_]V{ r.nat(fuel), work };
+    try equal(ctx.call(core.oracle_types_free_work, &args), bridge.freeVariables(ctx, &args));
+    try equal(ctx.call(core.oracle_types_parameter_kinds, &args), bridge.parameterKinds(ctx, &args));
+    try equal(ctx.call(core.oracle_types_annotation_names, &args), bridge.annotationNames(ctx, &args));
+}
+test "native type scans retain ordering, duplicate annotations and exact fuel" {
+    var random = std.Random.DefaultPrng.init(0x7363616e);
+    for (0..256) |_| {
+        var ctx = r.Context.init(std.testing.allocator);
+        defer ctx.deinit();
+        const a = randomType(&ctx, random.random(), 6);
+        const b = randomType(&ctx, random.random(), 4);
+        const work = ctx.node(.types_ManyTypes, &.{list(&ctx, &.{ a, b, a })});
+        for ([_]u64{ 128, 0, 1, 2, 3, 4, 5, 8, 12, 64 }) |fuel| {
+            try compareScans(&ctx, fuel, work);
+            try compareScans(&ctx, fuel, ctx.node(.types_OneType, &.{a}));
+        }
+    }
+}
+test "native type scans preserve wide identities and do not expand exhausted DAGs" {
+    var ctx = r.Context.init(std.testing.allocator);
+    defer ctx.deinit();
+    var variables: [48]V = undefined;
+    for (&variables, 0..) |*v, i| v.* = variable(&ctx, @as(u64, 1) << @as(u6, @intCast(i)));
+    try compareScans(&ctx, 128, ctx.node(.types_ManyTypes, &.{list(&ctx, &variables)}));
+    const empty_row = row(&ctx, &.{}, r.empty(.model_ClosedRow));
+    var dag = ctx.node(.model_FreeTy, &.{ r.literal("😀"), r.literal("a") });
+    for (0..48) |_| dag = ctx.node(.model_FunctionTy, &.{ dag, dag, empty_row });
+    const args = [_]V{ r.nat(2), ctx.node(.types_OneType, &.{dag}) };
+    const actual = bridge.annotationNames(&ctx, &args);
+    try std.testing.expectEqual(r.Tag.Fail, r.tag(actual));
+    try equal(ctx.call(core.oracle_types_annotation_names, &args), actual);
+    var chain = variable(&ctx, 0xffffffffffff);
+    for (0..4096) |_| chain = ctx.node(.model_ArrayTy, &.{chain});
+    const before = ctx.type_state.?.scans.visits;
+    const result = bridge.freeVariables(&ctx, &.{ r.nat(8192), ctx.node(.types_OneType, &.{chain}) });
+    try std.testing.expectEqual(r.Tag.Done, r.tag(result));
+    try std.testing.expectEqual(r.nat(0xffffffffffff), r.field(r.field(result, 0), 0));
+    const after = ctx.type_state.?.scans.visits;
+    try std.testing.expect(after - before <= 4097);
+    _ = bridge.freeVariables(&ctx, &.{ r.nat(8192), ctx.node(.types_OneType, &.{chain}) });
+    try std.testing.expectEqual(after, ctx.type_state.?.scans.visits);
 }

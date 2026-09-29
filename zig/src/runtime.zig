@@ -194,6 +194,7 @@ pub const Context = struct {
     pub const Pool = @import("pool.zig").Pool;
     const Job = @import("pool.zig").Job;
     pool: ?*Pool = null,
+    core_compare_state: ?*@import("core_compare.zig").State = null,
     type_state: ?*@import("type_bridge.zig").State = null,
     shared_allocator: ?std.mem.Allocator = null,
     arena: std.heap.ArenaAllocator,
@@ -209,6 +210,7 @@ pub const Context = struct {
         return .{ .arena = std.heap.ArenaAllocator.init(backing) };
     }
     pub fn deinit(self: *Context) void {
+        if (self.core_compare_state) |comparisons| comparisons.deinit();
         if (self.type_state) |types| types.deinit();
         self.arena.deinit();
     }

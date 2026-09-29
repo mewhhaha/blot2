@@ -3,8 +3,9 @@
 The type **resolution, replacement and renaming** stage now runs on compact
 native Zig IDs. This is an integrated stage of the compiler, not a second
 compiler selected only by tests. It is **not the completed whole-compiler IR
-rewrite**: lowering, constraint solving, generalization, specialization,
-compile-time evaluation and Wasm emission still use source-derived algorithms.
+rewrite**: lowering, constraint solving, generalization orchestration,
+specialization, compile-time evaluation and Wasm emission still use
+source-derived algorithms.
 
 ## Representation
 
@@ -102,3 +103,48 @@ Next stages must carry IDs through constraint solving and generalization,
 followed by the expression/declaration IR, specialization, compile-time
 execution and code generation. The bridge should shrink as those consumers
 become native; adding more conversion boundaries is not the final architecture.
+
+## Native scan and core-comparison stages
+
+The next latency pass replaces five more generated operations:
+
+- `types.free_work`, `types.parameter_kinds` and `types.annotation_names` now
+  scan native type IDs. Worker-local summaries retain the exact ordered results
+  and each operation's minimum structural fuel. The function/list rules differ
+  between these scans and are tracked separately. Output lists are materialized
+  only at the remaining legacy boundary and reused within the same context.
+- `core_compare.compare_work` uses flat typed pair frames and memoized
+  successful subtree comparisons, instead of allocating a semantic worklist for
+  every visited field. Each cached pair carries its complete reference traversal
+  cost. A shared graph therefore still misses when the original tree budget
+  expires. Identity, offsets, annotations, list order, duplicate labels and
+  floating-point bits remain significant. This is not pointer equality or a
+  hash-only match.
+- `closures.children` uses a cached native child view with the original
+  ordering. Its expression shape information is shared with the exact core
+  comparator.
+
+Scans check complexity before expanding annotation-name lists. A scan of one
+small type does not materialize summaries of unrelated types. Unaffected
+subtrees return empty summaries, but only after preserving the full depth and
+list-width check. Names remain duplicated where the language requires it;
+variable collections retain the original ordered-union convention.
+
+The comparator still reads immutable legacy core objects; it does not replace
+expression/declaration storage with compact IDs. Both its caches and the type
+scan caches are local to a task/request and destroyed before raw object
+addresses can be reused. Nothing crosses a retained-session revision by raw
+pointer.
+
+Tests independently compare all 133 core constructor shapes and their fields,
+all expression-child variants, exact cached fuel boundaries, signed zero and NaN
+payloads, and seeded type scans. Shared and deep graphs have bounded native
+stacks. Allocation-failure tests cover every new buffer and map owner.
+
+The engineering target is 100 ms for representative complete source-to-Wasm
+compilations in ReleaseSafe, with the default prelude included for examples.
+Cold process startup, a fresh stateless compilation in a persistent process, and
+incremental edits must be reported separately. An unchanged cached request is
+not evidence of this target. Large synthetic sources are reported separately;
+this is not an input-size-independent latency guarantee. No benchmark job is
+added to CI.
