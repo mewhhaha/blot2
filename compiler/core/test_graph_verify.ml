@@ -81,6 +81,23 @@ let () =
   let a=M.make_AppliedTy(identity 9)[M.U32Ty] and b=M.make_AppliedTy(identity 9)[M.U32Ty] in
   Core_nodes.enabled:=original;
   check "nominal content witnesses" (V.probe(V.Value a)(V.Value b)=V.Accepted);
+  (* The production branch must not execute graph normalization or counters.
+     Enable the gate explicitly and exercise actual compiler entry points. *)
+  let previous_enabled= !V.enabled in
+  V.enabled:=false;
+  let before=Atomic.get V.attempts in
+  check "disabled verification keeps the production solver result"
+    (accepted(T.f_unify_at M.U32Ty M.U32Ty (T.f_empty()) 100 (text "disabled")));
+  check "disabled verification performs no graph attempts" (Atomic.get V.attempts=before);
+  V.enabled:=true;
+  check "enabled verification preserves accepted solver result"
+    (accepted(T.f_unify_at M.U32Ty M.U32Ty (T.f_empty()) 100 (text "enabled")));
+  check "enabled verification visits the graph" (Atomic.get V.attempts>before);
+  let rejected_before=Atomic.get V.rejected in
+  check "enabled verification preserves rejected solver result"
+    (not(accepted(T.f_unify_at M.U32Ty M.BoolTy (T.f_empty()) 100 (text "enabled error"))));
+  check "enabled rejected constraint is accounted" (Atomic.get V.rejected>rejected_before);
+  V.enabled:=previous_enabled;
   let raised=try
     V.verify (text "injected disagreement") (Error "type_mismatch") (V.Value M.U32Ty)(V.Value M.U32Ty);false
     with Failure message -> String.starts_with ~prefix:"CORE_GRAPH_MISMATCH" message in

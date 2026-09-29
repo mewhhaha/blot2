@@ -104,3 +104,14 @@ specialization, and the new dependency-sensitive query/linking engine remain
 unimplemented. This checkpoint does not claim a finished compiler redesign, a
 new language, parallel guest execution or a new source-to-Wasm performance
 improvement.
+
+## Production-path continuation check
+
+A subsequent native-generator change dispatches the verification flag before the
+solver call. Disabled verification no longer keeps the solver's original inputs
+alive for an unused post-call continuation. The six additional native
+regressions check unchanged accepted/rejected results and independent accounting
+when verification is enabled or disabled. Its native storage/kernel/model tests
+pass (26,012 model assertions); full-suite and paired timing results are
+recorded separately for that new executable, not inferred from the earlier
+checkpoint.
