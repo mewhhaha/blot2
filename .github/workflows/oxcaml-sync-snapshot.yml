@@ -16,7 +16,7 @@ jobs:
           persist-credentials: false
       - name: Export source inputs with exact identities
         env:
-          MAIN_SHA: ac59fb68f98780e168ce01fa39410b1a6ef54efd
+          MAIN_SHA: 5c2640493987c4b8c2335b7b05ad99b654689ac4
         run: |
           set -euo pipefail
           mkdir source-snapshot
