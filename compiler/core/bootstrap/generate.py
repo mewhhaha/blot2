@@ -276,6 +276,12 @@ end)''']
   | None -> CompleteString(Base.text_of_words words offset v_count, Cursor(words,offset+v_count,remaining-v_count,strings,string_count))
  else """+body+')'
   if self.module.name=='types':
+   if name in ('unify_at','unify_rows_at'):
+    if name=='unify_at':
+     norm='match f_resolve v_substitutions v_left, f_resolve v_substitutions v_right with\n | Done left, Done right -> Core_graph_verify.verify v_subject expected (Core_graph_verify.Value left) (Core_graph_verify.Value right)\n | _ -> Core_graph_verify.normalization_failure ()'
+    else:
+     norm='Core_graph_verify.verify v_subject expected (Core_graph_verify.Effect (f_resolve_row v_substitutions v_left)) (Core_graph_verify.Effect (f_resolve_row v_substitutions v_right))'
+    return '(let answer = '+body+' in\n if !Core_graph_verify.enabled then begin\n  let expected=match answer with Done _ -> Ok () | Fail (M.Diagnostic(code,_,_)) -> Error (Base.text_to_utf8 code) in\n  '+norm+'\n end; answer)'
    if name=='resolve_reference':return '(if M.type_flags v_ty = 0 && M.type_cost v_ty <= 65536 then (Core_nodes.note "resolve.ground"; Done v_ty) else PairCache.memo (Domain.DLS.get resolve_cache) (id_Substitutions v_substitutions, M.id_Ty v_ty) (fun () -> '+body+'))'
    if name=='resolve_row':return '(PairCache.memo (Domain.DLS.get row_cache) (id_Substitutions v_substitutions, M.id_EffectRow v_row) (fun () -> '+body+'))'
    if name=='free':return '(TypeCache.memo (Domain.DLS.get free_cache) (M.id_Ty v_ty) (fun () -> '+body+'))'

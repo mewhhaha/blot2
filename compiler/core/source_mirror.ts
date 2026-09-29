@@ -51,12 +51,22 @@ if (!Number.isInteger(threads) || threads < 1 || threads > 64) {
     "BLOT_CORE_MIRROR_THREADS must be an integer in [1,64]",
   );
 }
+const verifyGraph = Deno.env.get("BLOT_CORE_VERIFY_TYPE_GRAPH") === "1";
 const counts = {
   operations: 0,
   native_requests: 0,
   successes: 0,
   diagnostics: 0,
   mismatches: 0,
+  graph_attempts: 0,
+  graph_accepted: 0,
+  graph_rejected: 0,
+  graph_skipped_rigid: 0,
+  graph_skipped_free_row: 0,
+  graph_skipped_kind: 0,
+  graph_skipped_resource: 0,
+  graph_skipped_normalization: 0,
+  graph_mismatches: 0,
 };
 globalThis.addEventListener("unload", () => {
   console.log(`CORE_MIRROR ${JSON.stringify({ threads, ...counts })}`);
@@ -119,6 +129,7 @@ function request(payload: Uint8Array<ArrayBuffer>) {
     "--threads",
     String(threads),
     "--inherit-priority",
+    ...(verifyGraph ? ["--verify-type-graph", "--type-graph-stderr"] : []),
   ], {
     input,
     env: {},
@@ -126,6 +137,33 @@ function request(payload: Uint8Array<ArrayBuffer>) {
     maxBuffer: nativeProtocolMaxWords * 4 + 1024,
   });
   if (result.error) throw result.error;
+  if (verifyGraph) {
+    const summaries = [
+      ...String(result.stderr).matchAll(/CORE_TYPE_GRAPH (\{[^\n]+\})/g),
+    ];
+    strictEqual(summaries.length, 1, "Missing type-graph verification report");
+    const summary = JSON.parse(summaries[0][1]);
+    for (
+      const name of [
+        "attempts",
+        "accepted",
+        "rejected",
+        "skipped_rigid",
+        "skipped_free_row",
+        "skipped_kind",
+        "skipped_resource",
+        "skipped_normalization",
+        "mismatches",
+      ] as const
+    ) {
+      const value = summary[name];
+      if (!Number.isSafeInteger(value) || value < 0) {
+        throw new Error(`Invalid type-graph counter ${name}`);
+      }
+      counts[`graph_${name}`] += value;
+    }
+    strictEqual(summary.mismatches, 0, "Type-graph constraint disagreement");
+  }
   strictEqual(
     result.status,
     0,

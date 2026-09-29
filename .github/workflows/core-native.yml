@@ -59,6 +59,9 @@ jobs:
         run: |
           python3 compiler/core/test_existing.py --report build/core/parity.json 2>&1 | tee build/core/parity.log
           deno run --allow-all compiler/core/corpus.ts compiler/core/_build/blotc 4 build/core/corpus.json 2>&1 | tee build/core/corpus.log
+      - name: Verify real inference constraints against the type graph
+        run: |
+          python3 compiler/core/test_existing.py --verify-type-graph --report build/core/graph-parity.json 2>&1 | tee build/core/graph-parity.log
       - name: Package exact build and logs
         if: always()
         run: |

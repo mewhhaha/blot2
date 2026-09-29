@@ -80,4 +80,10 @@ let write_response channel word_count header blocks =
   flush channel
 
 let f_send word_count header blocks () =
+  if !Core_graph_verify.enabled then begin
+    ignore(validate_response word_count header blocks);
+    (* NativeProcess intentionally terminates idle compilers with SIGTERM.
+       Save completed work before publishing the response, not only at exit. *)
+    !(Core_graph_verify.publish) ()
+  end;
   write_response stdout word_count header blocks

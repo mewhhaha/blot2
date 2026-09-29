@@ -107,9 +107,11 @@ end = struct
   let tag_kind = function Row _ | Empty_row | Rigid_row _ -> Effect_row | _ -> Value
   let expect_kind kind (ty:ty) = if ty.kind <> kind then raise(Error Kind_mismatch)
   let term arena tag children =
+    if List.length children > arena.max_work then raise(Error Work_limit);
     (match tag with
      | Nominal id | Provider id | Rigid id | Rigid_row id when id<0 -> invalid_arg "negative semantic identity"
      | State_provider(a,b) when a<0 || b<0 -> invalid_arg "negative semantic identity"
+     | Row labels when List.length labels > arena.max_work -> raise(Error Work_limit)
      | Row labels when List.exists(fun id -> id<0) labels -> invalid_arg "negative semantic identity"
      | _ -> ());
     List.iter (fun ty -> ignore(slot arena ty)) children;
@@ -265,7 +267,7 @@ end = struct
     let rs,rt=flatten_row arena work right in
     let ls,rs=cancel_labels work ls rs in
     if same_root lt rt then begin
-      if ls<>[] || rs<>[] then raise(Error Row_mismatch)
+      if ls<>[] || rs<>[] then raise(Error(if is_variable arena lt then Infinite_row else Row_mismatch))
     end else
     match is_variable arena lt,is_variable arena rt with
     | true,true when ls=[] && rs=[] -> bind arena work lt rt
@@ -341,14 +343,20 @@ end = struct
     check_level level;
     if scheme.weak_count>0 && arena.owner!=scheme.owner then invalid_arg "weak scheme belongs to another arena";
     transaction arena (fun () ->
+      if Stdlib.Array.length scheme.nodes > arena.max_work then raise(Error Work_limit);
+      let work=ref arena.max_work in
       let result=Stdlib.Array.make (Stdlib.Array.length scheme.nodes) None in
       let get index=match result.(index) with Some ty -> ty | None -> assert false in
       Stdlib.Array.iteri(fun index node ->
-        if index>=arena.max_work then raise(Error Work_limit);
+        tick work;
         let ty=match node with
         | Generic(kind,_) -> fresh arena kind ~level
         | Weak ty -> ignore(slot arena ty);ty
-        | Frozen(tag,children) -> term arena tag (Stdlib.Array.to_list(Stdlib.Array.map get children))
+        | Frozen(tag,children) ->
+          let count=Stdlib.Array.length children in
+          if count> !work then raise(Error Work_limit);
+          work:= !work-count;
+          term arena tag (Stdlib.Array.to_list(Stdlib.Array.map get children))
         in result.(index)<-Some ty) scheme.nodes;
       List.map get scheme.roots)
   let equivalent arena left right =

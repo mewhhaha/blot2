@@ -39,3 +39,15 @@ produce verifiable local commits and bundles, but cannot claim remote publicatio
 independent randomized test oracle. It is compiled and tested with the native
 core but is not substituted for the existing source inference engine yet.
 See TYPE_GRAPH.md for its contract, validation and remaining integration work.
+
+## Integrated graph verification checkpoint
+
+The native executable can now check real source/incremental-session unification
+constraints beside the existing solver. It records explicit comparisons and
+unsupported/resource-limited cases, and aborts on a disagreement. Counter files
+are updated before response publication, so idle process disposal cannot erase
+completed evidence. Normal framed output and quiet EOF remain unchanged.
+
+The new graph is still a migration verifier, not the authoritative source
+solver. Typed per-expression bodies, instance-driven specialization and the new
+semantic dependency/linking pipeline are not implemented by this checkpoint.

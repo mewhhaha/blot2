@@ -148,7 +148,7 @@ let rows () =
   unify a (row a [1] r) (row a [2] s);
   unify a r (closed [2;7;7]);unify a s (closed [1;7;7]);check "open rows share tail" true;
   let r=fresh a Effect_row ~level:2 in
-  expect "same tail residual mismatch" (error Row_mismatch) (fun()->unify a (row a [1] r) r);
+  expect "same tail occurs check" (error Infinite_row) (fun()->unify a (row a [1] r) r);
   check "row failure atomic" (variable a r Effect_row 2);
   (* A row cycle nested inside a function must fail through the value occurs check. *)
   let t=fresh a Value ~level:2 in
@@ -231,6 +231,16 @@ let limits_and_shapes () =
   expect "work limit" (error Work_limit) (fun()->unify a y !deep);
   check "work limit preserves nodes" ((statistics a).active_nodes=nodes);
   check "work limit preserves levels" (variable a x Value 3 && variable a y Value 0);
+  let wide=create() in
+  let v=fresh wide Value ~level:1 in
+  let many=product wide(List.init 50(fun _->v)) in
+  let s=generalize wide ~level:0 [many] in
+  let target=create ~max_work:10 () in
+  expect "shared wide instance work bound" (error Work_limit) (fun()->instantiate target ~level:1 s);
+  check "failed wide instance frees fresh variables" ((statistics target).active_nodes=0);
+  let scalar=u32 target in
+  expect "wide constructor work bound" (error Work_limit) (fun()->product target(List.init 11(fun _->scalar)));
+  check "wide constructor allocation unchanged" ((statistics target).active_nodes=1);
   let a=create() in
   let x=fresh a Value ~level:1 in
   let deep=ref x in for _=1 to 20_000 do deep:=array a !deep done;

@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import shlex
 import subprocess
 import tempfile
 
@@ -45,6 +46,7 @@ def main() -> int:
     parser.add_argument('--deno', default='deno')
     parser.add_argument('--report', type=Path)
     parser.add_argument('--suite', choices=['full', 'compiler', 'native'], default='full')
+    parser.add_argument('--verify-type-graph', action='store_true', help='Verify source/native constraints with the experimental solver')
     parser.add_argument('--threads', type=int, default=1, help='Workers per mirrored source operation')
     parser.add_argument('tests', nargs='*', help='Explicit repository-relative test paths instead of the selected suite')
     args = parser.parse_args()
@@ -66,6 +68,7 @@ def main() -> int:
         'source_mirror_sha256': digest(ROOT / 'compiler/core/source_mirror.ts'),
         'reference_version': reference_version.read_text().strip() if reference_version.exists() else None,
         'threads': args.threads,
+        'verify_type_graph': args.verify_type_graph,
         'tests': selected,
         'test_sha256': {name: digest(ROOT / name) for name in selected},
         'excluded': {str(path.relative_to(ROOT)): 'Archived/paused graphical sandbox; not part of deno task test (see README.md: Sandbox status)'
@@ -82,6 +85,17 @@ def main() -> int:
         target = stage / 'generated/compiler/blotc'
         shutil.copyfile(executable, target)
         target.chmod(0o755)
+        graph_reports = stage / 'graph-reports'
+        if args.verify_type_graph:
+            graph_reports.mkdir()
+            real = target.with_name('blotc-verified-native')
+            target.rename(real)
+            wrapper = ('#!/bin/sh\nexec ' + shlex.quote(str(real)) +
+                       ' --verify-type-graph --type-graph-report-dir ' +
+                       shlex.quote(str(graph_reports)) + ' "$@"\n')
+            target.write_text(wrapper)
+            target.chmod(0o755)
+            report['verification_wrapper_sha256'] = digest(target)
         config = json.loads((ROOT / 'deno.json').read_text())
         config['imports'] = dict(config.get('imports', {}))
         config['imports'][(stage / 'compiler/source.ts').as_uri()] = (
@@ -90,6 +104,7 @@ def main() -> int:
         # map would turn @package/subpath into an unmapped bare specifier.
         (stage / 'deno.json').write_text(json.dumps(config, indent=2) + '\n')
         environment = dict(os.environ, BLOT_CORE_MIRROR_THREADS=str(args.threads), NO_COLOR='1')
+        environment['BLOT_CORE_VERIFY_TYPE_GRAPH'] = '1' if args.verify_type_graph else '0'
         command = [args.deno, 'test', '--allow-all', '--fail-fast', *selected]
         logs: list[str] = []
         with subprocess.Popen(command, cwd=stage, env=environment, stdout=subprocess.PIPE,
@@ -105,6 +120,29 @@ def main() -> int:
             key: sum(item.get(key, 0) for item in mirrors)
             for key in ['operations', 'native_requests', 'successes', 'diagnostics', 'mismatches']
         }
+        if args.verify_type_graph:
+            names = ['attempts', 'accepted', 'rejected', 'skipped_rigid', 'skipped_free_row',
+                     'skipped_kind', 'skipped_resource', 'skipped_normalization', 'mismatches']
+            report['type_graph'] = {
+                name: sum(item.get('graph_' + name, 0) for item in mirrors) for name in names
+            }
+            if report['type_graph']['mismatches'] or not (report['type_graph']['accepted'] + report['type_graph']['rejected']):
+                print('ERROR: type-graph mismatches or no graph comparisons recorded', flush=True)
+                exit_code = exit_code or 1
+            reports = [json.loads(path.read_text()) for path in sorted(graph_reports.glob('*.json'))]
+            for item in reports:
+                values = item['graph']
+                if any(type(values.get(name)) is not int or values[name] < 0 for name in names):
+                    raise RuntimeError('Invalid native type-graph report')
+                if values['attempts'] != sum(values[name] for name in names if name != 'attempts'):
+                    raise RuntimeError('Incomplete native type-graph accounting')
+            report['native_type_graph'] = {name: sum(item['graph'][name] for item in reports) for name in names}
+            report['native_type_graph']['processes'] = len(reports)
+            report['native_type_graph_reports'] = reports
+            counts = report['native_type_graph']
+            if counts['mismatches'] or counts['accepted'] + counts['rejected'] == 0 or counts['attempts'] < report['type_graph']['attempts']:
+                print('ERROR: native graph disagreement or no native graph comparisons', flush=True)
+                exit_code = exit_code or 1
         # A negative test can catch an AssertionError. Never let that hide a
         # differential failure, nor allow a broken import map to claim parity.
         if 'CORE_MISMATCH' in log or report['mirror']['mismatches']:
@@ -121,6 +159,9 @@ def main() -> int:
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
         args.report.write_text(json.dumps(report, indent=2) + '\n')
+    if args.verify_type_graph:
+        print('Source-mirror type graph:', json.dumps(report.get('type_graph')), flush=True)
+        print('All reported native type graphs:', json.dumps(report.get('native_type_graph')), flush=True)
     print('Mirrored source operations:', json.dumps(report['mirror']), flush=True)
     return exit_code
 

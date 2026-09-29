@@ -1,7 +1,7 @@
 # Native typed compiler core
 
-Experimental compiler on PR #7. The ordinary Bend compiler is not replaced.
-The native path uses the existing parser and host protocol, with compact Unicode
+Experimental compiler on PR #7. The ordinary Bend compiler is not replaced. The
+native path uses the existing parser and host protocol, with compact Unicode
 storage, exact semantic IDs, native persistent indexes, and worker-local caches.
 The source migration bridge preserves existing inference and specialization
 algorithms while their replacement is developed; this is not the complete
@@ -33,10 +33,11 @@ python3 scripts/build_compiler_reference.py
 make -C compiler/core parity
 ```
 
-The full redesign remains a draft. Checkpoint artifacts contain committed source,
-build provenance, generated native modules, executables, and test logs. The
-recovered source is being revalidated; earlier local test totals do not certify
-a different recovered build. See RECOVERY.md for the publication history.
+The full redesign remains a draft. Checkpoint artifacts contain committed
+source, build provenance, generated native modules, executables, and test logs.
+The recovered source has been revalidated; results for each newer checkpoint
+remain bound to its own executable hash and attached logs. See RECOVERY.md for
+the publication history.
 
 ## Checkpoints
 
@@ -62,4 +63,11 @@ workflow continues to save source on each push independently of validation.
 `Core_levels` implements task-local type-variable links, rollback-safe path
 compression, lexical levels, multiplicity-preserving effect rows and immutable
 DAG schemes. It is a tested migration component, not yet a replacement for the
-source compiler's existing inference algorithm. See [TYPE_GRAPH.md](TYPE_GRAPH.md).
+source compiler's existing inference algorithm. See
+[TYPE_GRAPH.md](TYPE_GRAPH.md).
+
+The explicit `--verify-type-graph` migration gate also checks constraints from
+real source and native session compilation against the new graph. It leaves
+production results and diagnostics with the compatibility solver and fails on a
+disagreement. The native checkpoint workflow runs both the ordinary suite and
+this verification suite and retains their separate reports.
