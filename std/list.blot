@@ -4,12 +4,27 @@ const from_array = fn values => @list.from_array values
 const to_array = fn values => @array.from_list values
 const length = fn values => @list.length values
 const is_empty = fn values => List.is_empty values
-const append = fn value => fn values => [...values, value]
-const prepend = fn value => fn values => [value, ...values]
+const append = fn value => fn values => @list.append values value
+const prepend = fn value => fn values => @list.prepend values value
 const map = fn transform => fn (values: List a) => [transform value | value <- values]
 const filter = fn predicate => fn (values: List a) => [value | value <- values, predicate value]
 const fold_left = fn reduce => fn initial => fn (values: List a) => do:
   let state = initial
   for value in values:
-    state := reduce state value
+    use next <- reduce state value
+    state := next
   return state
+
+const any = fn predicate => fn (values: List a) => do:
+  for value in values:
+    use found <- predicate value
+    if found:
+      return #True
+  return #False
+
+const all = fn predicate => fn (values: List a) => do:
+  for value in values:
+    use accepted <- predicate value
+    if Bool.not accepted:
+      return #False
+  return #True

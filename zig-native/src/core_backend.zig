@@ -2547,6 +2547,124 @@ const Emitter = struct {
     computation_values: std.AutoHashMapUnmanaged(core.BindingId, layout.Id) = .empty,
     result_template: ?u32 = null,
     factory_template: bool = false,
+    inline_demands: []const InlineDemand = &.{},
+
+    const InlineDemand = struct {
+        binding: core.BindingId,
+        caller: *Emitter,
+        expression: core.Id,
+        value: ?u32 = null,
+        ready: ?u32 = null,
+        machine: wasm.ValueType,
+    };
+
+    fn inlineDemandCall(self: *Emitter, key: Key, arguments: []const core.Id, depth: usize) Error!bool {
+        const g = self.generator;
+        const source = g.unit(key.target.unit);
+        const body = source.body(key.target.binding) orelse return false;
+        if (arguments.len != key.count or body.parameters.len != key.count) return false;
+        const plan = @import("demand_inline.zig").Plan.init(source, body) orelse return false;
+        const caller = g.unit(self.unit_id);
+        for (arguments, 0..) |argument, i| {
+            if (self.hasErasedType(key.parameters[i], 0)) return false;
+            if (g.layouts.node(key.parameters[i]).tag == .demand and caller.node(argument).tag != .suspend_) return false;
+        }
+        if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target.unit);
+        var mappings: std.ArrayList(Mapping) = .empty;
+        var rows: std.ArrayList(RowMapping) = .empty;
+        defer mappings.deinit(g.allocator);
+        defer rows.deinit(g.allocator);
+        for (source.bodyParameters(body), 0..) |parameter, i| {
+            try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
+        }
+        try g.mapTypeDepth(key.target.unit, &mappings, &rows, source.typeOf(body.root), key.result, body.span, 0);
+        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .labels = self.labels };
+        defer emitter.deinit();
+        var demands: [max_parameters]InlineDemand = undefined;
+        var count: usize = 0;
+        // Eager arguments still run once, left to right. Deferred expressions
+        // retain the caller's immutable binding versions, without an object.
+        for (arguments, source.bodyParameters(body), 0..) |argument, parameter, i| {
+            const ty = g.layouts.node(key.parameters[i]);
+            if (ty.tag != .demand) {
+                const local = try self.capture(argument, depth);
+                if (parameter.binding != 0) try emitter.locals.put(g.allocator, parameter.binding, local);
+                continue;
+            }
+            if (plan.uses[i] == 0) continue;
+            const machine = g.layouts.machine(ty.a);
+            const memo = plan.uses[i] > 1;
+            demands[count] = .{
+                .binding = parameter.binding,
+                .caller = self,
+                .expression = caller.closures[caller.node(argument).a].body,
+                .value = if (memo) try self.temporary(machine) else null,
+                .ready = if (memo) try self.temporary(.i32) else null,
+                .machine = machine,
+            };
+            // The call may occur inside a loop; Wasm local initialization alone
+            // would incorrectly share a result across successive invocations.
+            if (demands[count].ready) |ready| {
+                try self.emit(.i32_const, 0);
+                try self.emit(.local_set, ready);
+            }
+            count += 1;
+        }
+        emitter.inline_demands = demands[0..count];
+        try emitter.expression(body.root, depth + 1);
+        return true;
+    }
+
+    fn inlineDemand(self: *Emitter, id: core.Id, depth: usize) Error!bool {
+        const source = self.generator.unit(self.unit_id);
+        const operand = source.node(id).a;
+        if (source.node(operand).tag != .reference) return false;
+        const reference = source.reference(operand);
+        if (reference.unit != 0 and reference.unit != self.unit_id) return false;
+        for (self.inline_demands) |demand| {
+            if (demand.binding != reference.binding) continue;
+            if (demand.ready) |ready| {
+                try self.emit(.local_get, ready);
+                try self.emit(.if_, @backingInt(demand.machine));
+                self.labels += 1;
+                try self.emit(.local_get, demand.value.?);
+                try self.emit(.else_, 0);
+            }
+            // The caller emits the deferred expression in its lexical scope,
+            // at the current branch depth and with the force-site providers.
+            const saved_labels = demand.caller.labels;
+            demand.caller.labels = self.labels;
+            defer demand.caller.labels = saved_labels;
+            try demand.caller.expression(demand.expression, depth + 1);
+            if (demand.ready) |ready| {
+                try self.emit(.local_set, demand.value.?);
+                try self.emit(.i32_const, 1);
+                try self.emit(.local_set, ready);
+                try self.emit(.local_get, demand.value.?);
+                self.labels -= 1;
+                try self.emit(.end, 0);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    fn inlineCollectionEdit(self: *Emitter, id: core.Id, key: Key, depth: usize) Error!bool {
+        const g = self.generator;
+        const plan = @import("collection_edit_call.zig").analyze(g.units, self.unit_id, id) orelse return false;
+        if (key.count != 2 or !std.meta.eql(plan.target, key.target)) return false;
+        for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0)) return false;
+        if (g.artifacts) |artifacts| try artifacts.readInlineBody(plan.target.unit);
+        const source = g.unit(self.unit_id);
+        const call = source.call(id);
+        var values: [2]u32 = undefined;
+        for (call.arguments, 0..) |argument, i| values[i] = try self.capture(argument, depth);
+        const order = plan.positions;
+        const result = try g.codeLayoutWithRows(self.unit_id, source.typeOf(id), self.mappings, self.row_mappings, source.span(id));
+        const input_list = g.layouts.node(key.parameters[order[0]]).tag == .list;
+        try self.arrayLocals(id, plan.op, &.{ values[order[0]], values[order[1]] }, &.{ g.layouts.machine(key.parameters[order[0]]), g.layouts.machine(key.parameters[order[1]]) }, result, input_list);
+        return true;
+    }
 
     fn hasErasedType(self: *const Emitter, ty: layout.Id, depth: usize) bool {
         if (depth >= 128) return true;
@@ -4384,7 +4502,7 @@ const Emitter = struct {
             .array => try self.array(id, depth),
             .array_op => try self.arrayOperation(id, depth),
             .closure, .suspend_ => try self.closure(id),
-            .force => try self.forceDemand(id, depth),
+            .force => if (!try self.inlineDemand(id, depth)) try self.forceDemand(id, depth),
             .apply => try self.apply(id, depth),
             .constructor_function => {
                 const ty = try g.codeLayoutWithRows(self.unit_id, n.ty, self.mappings, self.row_mappings, unit_.span(id));
@@ -4469,6 +4587,8 @@ const Emitter = struct {
                 const call = unit_.call(id);
                 const key = try g.signature(call.target, call.callee_type, self.unit_id, self.mappings, self.row_mappings, unit_.span(id), false);
                 if (key.count > call.arguments.len) return g.fail(self.unit_id, id, .unsupported);
+                if (try self.inlineCollectionEdit(id, key, depth)) return;
+                if (try self.inlineDemandCall(key, call.arguments, depth)) return;
                 if (try self.inlineStaticCall(key, call.arguments, depth)) return;
                 const function_id = try g.function(key);
                 for (call.arguments[0..key.count]) |argument| try self.expression(argument, depth + 1);

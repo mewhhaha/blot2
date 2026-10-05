@@ -1685,7 +1685,7 @@ const Builder = struct {
             try self.name_bytes.appendSlice(self.allocator, message);
             return self.make(source, .{ .tag = .panic, .ty = result, .a = start, .b = @intCast(message.len) });
         }
-        if (syntax.tag == .intrinsic and std.mem.eql(u8, self.names.get(syntax.a), "@force")) {
+        if (syntax.tag == .intrinsic and (std.mem.eql(u8, self.names.get(syntax.a), "@force") or std.mem.eql(u8, self.names.get(syntax.a), "@demand"))) {
             if (backwards.items.len != 1) {
                 try self.diagnostic(.invalid_call, source);
                 return 0;

@@ -18,3 +18,14 @@ Wasm and fresh-versus-retained output comparisons as correctness gates. Keep
 cold process timing, dependency population, first edit, subsequent edit, no-op
 and failed-edit recovery separate. Parallelize only after measuring a useful
 independent workload and including coordination costs.
+
+The [demand evaluation design](zig-native/DEMANDS.md) specifies the `@demand`
+spelling, predictable elimination of deferred arguments, and the effect,
+lifetime, and incremental dependency rules needed for source-defined `&&` and
+`||` to compile to ordinary branches. The compiler now eliminates cells for
+bounded expression combinators, including repeated local demands. More complex
+and escaping uses retain runtime cells; `@force` remains an alias.
+
+The [standard library audit](std/PERFORMANCE.md) covers collection construction,
+callback effects, demand lowering, math and vector allocation, with paired
+runtime measurements and a fresh gdev compilation baseline.

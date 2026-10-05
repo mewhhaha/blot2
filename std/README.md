@@ -6,16 +6,20 @@ source compiler sessions. It currently covers generic functions, `Maybe`,
 prelude names; the prelude keeps its own scope and nominal identities. Top-level
 bindings are public to other Blot modules. Only the root module's `entry const`
 and `entry let` declarations become Wasm exports; they must fit the guest ABI,
-and compilation keeps only the prelude and library declarations they reach. Use
-`{ prelude: "none" }` when creating a compiler for a freestanding module. File
-imports are supported through the CLI or `loadSourceProject`; the CLI maps
-`std/` to this directory. Raw source-string compilation does not load imports
-automatically. General module re-exports are not implemented yet.
+and Wasm emission keeps the declarations they reach. Unused source declarations
+are still checked. Use `{ prelude: null }` with `createCompiler` for a
+freestanding module, or `--prelude none` with the CLI. The project API and CLI
+resolve relative file imports and map `std/` to this directory. Configure
+additional directory aliases through `imports` or `--alias`. General module
+re-exports are not implemented yet.
 
 All examples below use the default prelude. Values/functions use `snake_case`;
 types and constructors use `PascalCase`. Functions are explicitly curried: a
 two-argument function is written `fn left => fn right => ...` and called
 `function left right`.
+
+See the [API and performance audit](PERFORMANCE.md) for measured costs,
+optimization guarantees and remaining work.
 
 ## Pure functions
 
@@ -47,7 +51,7 @@ entry const inferred = fn () => do:
 bindings generalize independently at each use. Higher-order functions propagate
 the inferred effect rows of callbacks. Creating an effectful closure is pure;
 calling it requires the corresponding provider. Demand parameters use `~` and
-are forced explicitly with `@force`. See
+are evaluated explicitly with `@demand` (`@force` remains an alias). See
 [effects and controlled IO](../compiler/effects-and-io.md).
 
 Plain `do:` blocks already return `()` when they fall through. No trailing
@@ -180,10 +184,11 @@ implementation is responsible for stack safety and any branching behavior of the
 monad. This does not make arbitrary recursion stack safe. Blocks without loops
 do not require an `iterate` member.
 
-`unwrap_or` is eager. `Maybe.unwrap_or_else fallback candidate` has a demand
-parameter: it evaluates `fallback` only for `#Nothing`, once per captured
-argument. `Maybe.filter predicate candidate` keeps a matching `#Some`, and
-`Maybe.flatten` removes one nested `Maybe`.
+`unwrap_or` is eager. `Maybe.unwrap_or_else fallback candidate` and
+`Result.unwrap_or_else fallback candidate` have a demand parameter: they
+evaluate `fallback` only for `#Nothing` or `#Err`, once per captured argument.
+`Maybe.filter predicate candidate` keeps a matching `#Some`, and `Maybe.flatten`
+removes one nested `Maybe`.
 
 ## U32 and operators
 
@@ -322,8 +327,9 @@ Trigonometry uses split-constant range reduction and F32 polynomial evaluation,
 not host calls. `sin`/`cos` support `|radians| <= 8192`; nonfinite/out-of-domain
 arguments produce NaN. `tan` divides those approximations and is ill-conditioned
 near its poles. Keep accumulated game angles wrapped. The compiled numeric
-regressions in [native prelude execution tests](../zig-native/tests/prelude_execution.test.ts) check
-native/JS parity and error over the supported domain.
+regressions in
+[native prelude execution tests](../zig-native/tests/prelude_execution.test.ts)
+check native/JS parity and error over the supported domain.
 
 Host scalar exports use actual Wasm `f32` parameters/results and return normal
 JavaScript numbers. There is no compiler-specific ECS storage ABI. See
@@ -338,18 +344,24 @@ Only arrays support indexing, indexed updates, `get`, and `set`. Numeric arrays
 remain the collection type accepted by the host ABI.
 
 Import [list.blot](list.blot) for `generate`, `fill`, `map`, `filter`,
-`fold_left`, `append`, and `prepend`. Spreads express prepend (`[value, ...values]`)
-and append (`[...values, value]`); use `#[...]` to construct an array instead.
+`fold_left`, `any`, `all`, `append`, and `prepend`, plus length and conversion
+helpers. `fold_left`, `filter`, `any`, and `all` propagate callback effects;
+`any`/`all` stop early and return false/true respectively on an empty list.
+`generate` and `map` require pure callbacks. Spreads express prepend
+(`[value, ...values]`) and append
+(`[...values, value]`); use `#[...]` to construct an array instead.
 Comprehensions and `for` loops traverse either input collection. The opening
-bracket selects a comprehension's output type: `[x * x | x <- values, x > 0]`
-is a list. Convert a list to an array when indexed access is needed.
+bracket selects a comprehension's output type: `[x * x | x <- values, x > 0]` is
+a list. Convert a list to an array when indexed access is needed.
 
 Lists use doubly linked chunks of up to 256 elements. Traversal follows dense
 spans, and exclusive append/prepend reuses end slack or links a new chunk.
-Shared edits copy the list's contents, preserving earlier values. Arrays
-remain contiguous; their append/prepend copies the contents. Chunking favors
-traversal and construction, but does not make shared edits inexpensive.
-See [the list example](../examples/lists.blot) and
+Direct `list.append`/`list.prepend` calls and their aliases preserve this
+optimization, as do ordinary wrappers whose body directly calls the intrinsic.
+Shared edits copy the list's contents, preserving earlier values. Arrays remain
+contiguous; their append/prepend copies the contents. Chunking favors traversal
+and construction, but does not make shared edits inexpensive. See
+[the list example](../examples/lists.blot) and
 [collection syntax](../compiler/guide.md#lists-arrays-and-libraries).
 
 ### Array library
@@ -409,12 +421,12 @@ See [the executable array example](../examples/arrays.blot).
 ## Current boundary
 
 This prelude is a useful executable core, not the complete standard library. It
-does not yet provide collection patterns, general text values, F64,
-SIMD, general type-valued programming, or resumable handlers. The generic core
+does not yet provide collection patterns, general text values, F64, SIMD,
+general type-valued programming, or resumable handlers. The generic core
 supports closed source-declared operations, scoped providers, and compile-time
-effect descriptors. Libraries provide application behavior through explicit entrypoint IO capabilities. Literal strings are accepted as panic
-messages, not as general runtime `Text` values or privileged asset/window
-operations.
+effect descriptors. Libraries provide application behavior through explicit
+entrypoint IO capabilities. Literal strings are accepted as panic messages, not
+as general runtime `Text` values or privileged asset/window operations.
 
 For a complete small program, see
 [examples/prelude.blot](../examples/prelude.blot).
@@ -447,13 +459,15 @@ Use a result annotation when context does not determine the destination.
 Math helpers include generic `abs`, `min`, `max`, `clamp`, `lerp`, `square`; F32
 `sqrt`, `floor`, `ceil`, `trunc`, `sin`, `cos`, `tan`, `sin_cos`, `wrap`,
 `lerp_angle`, `is_finite`, `saturate`, and `smoothstep`, plus `pi` and `tau`.
-`sin_cos` returns `(sine, cosine)` using one angle reduction.
-`smoothstep low high value` expects `low < high`; `saturate` clamps to 0..1.
+`sin_cos` returns `(sine, cosine)` using one angle reduction. `tan` also shares
+its angle reduction between sine and cosine. `smoothstep low high value` expects
+`low < high`; `saturate` clamps to 0..1.
 
 Import [vector.blot](vector.blot) for `Vec2` and `Vec3` records. Their owning
 members supply vector `+`/`-`, scalar `*`/`/` (vector on the left), `dot`,
 `length_squared`, `length`, and `normalized`; `Vec3` also supplies `cross`.
-Normalizing the zero vector returns zero.
+Normalizing the zero vector returns zero. Vector `lerp` constructs its result
+directly from scalar interpolations, avoiding intermediate vectors.
 
 Additional functions in `std/array`:
 
@@ -472,6 +486,11 @@ Additional functions in `std/array`:
 
 Filtering evaluates its predicate/transform once per element. These helpers
 handle empty arrays. An invalid slice traps or fails constant evaluation.
+Runtime filtering collects values in a private chunked list and copies once into
+the result array. `prefix_sums` sums pairs recursively, then reconstructs the
+prefixes: work and intermediate array storage are linear in both Wasm and
+constant evaluation. Constant filtering still uses immutable list appends; large
+staged constructions can reach the evaluator's limits sooner.
 
 ## Constructor spelling
 

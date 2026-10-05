@@ -385,8 +385,10 @@ entry const snapshot = fn () => do:
 const checked = fn index => squares.get(index)
 ```
 
-Import `std/list` for list construction, conversion, access, updates, mapping,
-filtering, append/prepend, and folding. Direct compiler conversions are
+Import `std/list` for `generate`, `fill`, `from_array`, `to_array`, `length`,
+`is_empty`, `map`, `filter`, `append`, `prepend`, `fold_left`, `any`, and `all`.
+The fold and predicates propagate callback effects, and `any`/`all` stop early.
+Lists have no indexed access or indexed updates. Direct compiler conversions are
 `@list.from_array` and `@array.from_list`.
 
 The implicit prelude supplies `identity`, `apply`, `always`, `compose`, `flip`,
@@ -398,7 +400,8 @@ The implicit prelude supplies `identity`, `apply`, `always`, `compose`, `flip`,
 
 Ordinary arguments are eager, including `Maybe.unwrap_or` fallbacks. `&&` and
 `||` call the source-defined `and` and `or`, whose right parameters use `~`.
-`Maybe.unwrap_or_else fallback candidate` also defers its fallback.
+`Maybe.unwrap_or_else fallback candidate` and
+`Result.unwrap_or_else fallback candidate` also defer their fallbacks.
 
 `std/array` also supplies `map`, `filter`, `filter_map`, `slice start count`,
 `concat`, `flatten`, `push`, `zip`, `unzip`, and `unzip3`. Collection arguments
@@ -411,7 +414,7 @@ import * as array from "std/array"
 import { Vec2 } from "std/vector"
 
 entry const total_length = fn () =>
-  [#Vec2 { x: 3.0, y: 4.0 }, #Vec2 { x: 0.0, y: 0.0 }]
+  #[#Vec2 { x: 3.0, y: 4.0 }, #Vec2 { x: 0.0, y: 0.0 }]
   |> array.map .length
   |> array.fold_left .add 0.0
 ```
@@ -774,12 +777,13 @@ step on its own line.
 ## Demand parameters
 
 `fn ~value => body` captures an argument without evaluating it. A typed
-parameter is `fn ~(value: U32) => body`. `@force value` evaluates the captured
-expression once; later forces share its result. Returning a closure that
-captures a demand is supported. Merely referencing a demand does not force it.
+parameter is `fn ~(value: U32) => body`. `@demand value` evaluates the captured
+expression once; later demands share its result. `@force` remains a compatible
+alias. Returning a closure that captures a demand is supported. Merely
+referencing a demand does not force it.
 
 ```blot
-const twice = fn ~(value: U32) => @force value + @force value
+const twice = fn ~(value: U32) => @u32.add (@demand value) (@demand value)
 const call_lazy = fn (callback: ~U32 -> U32) => callback (20 + 1)
 entry const answer = fn () => call_lazy twice
 entry const skipped = #False && (@panic "unreachable")
@@ -789,8 +793,16 @@ Demand mode is part of the function type and survives aliases and partial
 application. `~T` denotes a demand for a result of type `T`; latent effects are
 inferred. Forcing requires those effects in the surrounding function, using the
 providers active at the first force. An unused demand needs no provider. To
-forward an existing demand to another lazy parameter, pass `@force value`. Unit
+forward an existing demand to another lazy parameter, pass `@demand value`. Unit
 callbacks remain available for work that should run on every call.
+
+Known, fully applied small expression functions composed of parameter reads,
+primitive scalar operations, conditionals and demands can use branches and local
+values without a heap cell. This includes the prelude's `&&` and `||`, aliases,
+and equivalent user functions. Repeated reads cache the result in a local at the
+first demand; a new call starts a new cache. Escaping demands and more complex
+bodies retain the shared runtime cell. Evaluation order, capture versions and
+first-demand providers are the same in both cases.
 
 ## Pattern alternatives and layout
 

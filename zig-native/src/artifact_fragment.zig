@@ -62,10 +62,13 @@ pub const State = struct {
             else => {},
         };
         for (old.metadata.jobs.items, 1..) |job, id| {
-            const fresh = !job.reusable or switch (job.request) {
+            var fresh = !job.reusable or switch (job.request) {
                 .constant, .runtime_global => true,
                 else => false,
             };
+            for (job.inline_units.items) |unit| {
+                if (unit == 0 or unit > graphs.stable.len or !graphs.stable[unit - 1]) fresh = true;
+            }
             if (fresh) {
                 var parent: u32 = @intCast(id);
                 while (parent != 0) {
@@ -430,6 +433,11 @@ pub const State = struct {
         const template = if (job.result_template) |old| (try self.importer.importResultTemplate(g, old)) orelse return error.InvalidFunctionReference else null;
         try g.publishRetainedResult(request, template);
         if (scope) |actor| {
+            for (job.inline_units.items) |unit| {
+                const mapped = self.importer.unit_map[unit - 1];
+                if (mapped == 0) return error.InvalidFunctionReference;
+                try actor.context.readInlineBody(mapped);
+            }
             if (job.solved) {
                 var solved = (try self.importer.importSolved(g, job)) orelse return error.InvalidFunctionReference;
                 defer solved.deinit(self.allocator);

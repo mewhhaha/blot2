@@ -75,3 +75,30 @@ test "array versions with aliases captures iterator borrows and parameters are c
         for (proof.updates) |yes| try std.testing.expect(!yes);
     }
 }
+
+test "pattern-conditional append transfers ownership only without surviving aliases" {
+    const a = std.testing.allocator;
+    for ([_]bool{ false, true }) |aliased| {
+        const source = try a.print(
+            \\type Maybe a is data = #Some a | #Nothing
+            \\entry const run = fn (count: U32) => do:
+            \\  let values: List U32 = []
+            \\  for index in 0..count:
+            \\    {s}
+            \\    let candidate = if @u32.lt index 10 then #Some index else #Nothing
+            \\    if let #Some value = candidate:
+            \\      values := [...self, value]
+            \\    {s}
+            \\  return @array.from_list values
+            \\
+        , .{ if (aliased) "let before = values" else "", if (aliased) "use @list.length before" else "" });
+        defer a.free(source);
+        var module = try lower(a, source);
+        defer module.deinit(a);
+        var proof = try ownership.Proof.init(a, &.{module}, 1);
+        defer proof.deinit(a);
+        var admitted: usize = 0;
+        for (proof.updates) |yes| admitted += @intFromBool(yes);
+        try std.testing.expectEqual(@as(usize, if (aliased) 0 else 1), admitted);
+    }
+}

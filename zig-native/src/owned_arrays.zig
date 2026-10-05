@@ -1,6 +1,7 @@
 //! Immutable Core versions prove exclusive ownership at an array update.
 const std = @import("std");
 const core = @import("core.zig");
+const edit_call = @import("collection_edit_call.zig");
 const State = struct {
     first: core.BindingId = 0,
     second: core.BindingId = 0,
@@ -26,7 +27,7 @@ pub const Proof = struct {
         const module = &units[unit_id - 1];
         var has_candidate = false;
         for (module.nodes, 0..) |node, i| {
-            if ((node.tag == .update or node.tag == .array_op) and receiver(module, @intCast(i)) != null) {
+            if ((node.tag == .update or node.tag == .array_op or node.tag == .call) and receiver(units, unit_id, @intCast(i)) != null) {
                 has_candidate = true;
                 break;
             }
@@ -50,16 +51,21 @@ pub const Proof = struct {
         for (module.nodes, 0..) |node, i| {
             const id: core.Id = @intCast(i);
             switch (node.tag) {
-                .update => if (receiver(module, id)) |binding| {
+                .update => if (receiver(units, unit_id, id)) |binding| {
                     consume(&states[binding], id);
                     consumed_refs[module.updateInfo(id).root] = true;
                 },
-                .array_op => if (receiver(module, id)) |binding| {
+                .array_op => if (receiver(units, unit_id, id)) |binding| {
                     consume(&states[binding], id);
                     consumed_refs[module.children(id)[0]] = true;
                 } else if (module.arrayOperation(id) == .length or module.arrayOperation(id) == .get) {
                     const operands = module.children(id);
                     if (operands.len != 0 and module.node(operands[0]).tag == .reference) read_refs[operands[0]] = true;
+                },
+                .call => if (receiver(units, unit_id, id)) |binding| {
+                    const edit = edit_call.analyze(units, unit_id, id).?;
+                    consume(&states[binding], id);
+                    consumed_refs[edit.receiver] = true;
                 },
                 .bind => if (node.b != 0 and module.node(node.b).tag == .reference) {
                     const ref = module.reference(node.b);
@@ -98,11 +104,11 @@ pub const Proof = struct {
             // Keeping the incoming value in an untaken arm is not a second
             // simultaneous consumer. The competing update must belong to
             // the opposite arm; later reads and escapes still reject reuse.
-            const branch = module.node(merge.node);
-            if (merge.then_binding == merge.else_binding or branch.tag != .if_stmt or !consumedInside(module, branch.c, states[merge.then_binding].consume, 0))
+            const branch = branchBodies(module, merge.node);
+            if (merge.then_binding == merge.else_binding or branch == null or !consumedInside(module, branch.?.otherwise, states[merge.then_binding].consume, 0))
                 consume(&states[merge.then_binding], merge.node);
             if (merge.else_binding != merge.then_binding and
-                (branch.tag != .if_stmt or !consumedInside(module, branch.b, states[merge.else_binding].consume, 0)))
+                (branch == null or !consumedInside(module, branch.?.then, states[merge.else_binding].consume, 0)))
                 consume(&states[merge.else_binding], merge.node);
             states[merge.result].transfer = true;
             states[merge.result].first = merge.then_binding;
@@ -141,7 +147,7 @@ pub const Proof = struct {
             }
         }
         for (module.nodes, 0..) |node, i| {
-            if (node.tag == .update or node.tag == .array_op) if (receiver(module, @intCast(i))) |binding| {
+            if (node.tag == .update or node.tag == .array_op or node.tag == .call) if (receiver(units, unit_id, @intCast(i))) |binding| {
                 result.updates[i] = states[binding].owned and states[binding].anchored;
             };
         }
@@ -151,6 +157,17 @@ pub const Proof = struct {
 fn consume(state: *State, id: core.Id) void {
     state.consumers += 1;
     state.consume = id;
+}
+const BranchBodies = struct { then: core.Id, otherwise: core.Id };
+fn branchBodies(module: *const core.Module, id: core.Id) ?BranchBodies {
+    const node = module.node(id);
+    if (node.tag == .if_stmt) return .{ .then = node.b, .otherwise = node.c };
+    // `if let` lowers to a two-arm statement match. Its fallback preserves
+    // the incoming version just like an ordinary conditional's untaken arm.
+    if (node.tag != .match or !module.matchInfo(id).statement) return null;
+    const arms = module.matchArms(id);
+    if (arms.len != 2 or arms[0].guard != 0 or arms[1].guard != 0) return null;
+    return .{ .then = arms[0].body, .otherwise = arms[1].body };
 }
 fn consumedInside(module: *const core.Module, root: core.Id, consumer: core.Id, depth: usize) bool {
     if (root == 0 or consumer == 0 or depth >= 64) return false;
@@ -162,15 +179,22 @@ fn consumedInside(module: *const core.Module, root: core.Id, consumer: core.Id, 
             break :blk false;
         },
         .bind => consumedInside(module, node.b, consumer, depth + 1),
-        .if_stmt => consumedInside(module, node.b, consumer, depth + 1) or consumedInside(module, node.c, consumer, depth + 1),
+        .if_stmt, .match => if (branchBodies(module, root)) |branch|
+            consumedInside(module, branch.then, consumer, depth + 1) or consumedInside(module, branch.otherwise, consumer, depth + 1)
+        else
+            false,
         else => false,
     };
 }
-fn receiver(module: *const core.Module, id: core.Id) ?core.BindingId {
+fn receiver(units: []const core.Module, unit_id: u32, id: core.Id) ?core.BindingId {
+    const module = &units[unit_id - 1];
     const root = if (module.node(id).tag == .array_op) blk: {
         const op = module.arrayOperation(id);
         if (op != .append and op != .prepend) return null;
         break :blk module.children(id)[0];
+    } else if (module.node(id).tag == .call) blk: {
+        const plan = edit_call.analyze(units, unit_id, id) orelse return null;
+        break :blk plan.receiver;
     } else blk: {
         const selectors = module.updateSelectors(id);
         if (selectors.len != 1 or selectors[0].kind != .index) return null;
@@ -202,6 +226,9 @@ fn fresh(units: []const core.Module, unit_id: u32, id: core.Id, depth: usize) bo
         },
         .update => module.updateSelectors(id).len == 1 and module.updateSelectors(id)[0].kind == .index,
         .call => blk: {
+            // The same wrapper proof follows aliases and certifies the
+            // returned collection as a fresh or exclusively transferred value.
+            if (edit_call.analyze(units, unit_id, id) != null) break :blk true;
             const call = module.call(id);
             const target_unit = if (call.target.unit == 0) unit_id else call.target.unit;
             const target = &units[target_unit - 1];

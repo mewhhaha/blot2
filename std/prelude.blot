@@ -184,7 +184,9 @@ const F32.sin_cos = fn value => do:
   return (f32_sin_reduced angle, f32_cos_reduced angle)
 
 // Like division, tan is unbounded near odd multiples of pi/2.
-const F32.tan = fn value => F32.div (F32.sin value) (F32.cos value)
+const F32.tan = fn value => do:
+  let angle = f32_reduced_radians value
+  return F32.div (f32_sin_reduced angle) (f32_cos_reduced angle)
 
 const pi = 3.141592653589793
 const tau = 6.283185307179586
@@ -247,7 +249,7 @@ const Maybe.flatten = fn candidate => case candidate of
   #Nothing => #Nothing
 const Maybe.unwrap_or_else = fn ~fallback => fn candidate => case candidate of
   #Some value => value
-  #Nothing => @force fallback
+  #Nothing => @demand fallback
 const Maybe.to_result = fn error => fn candidate => case candidate of
   #Some value => #Ok value
   #Nothing => #Err error
@@ -276,6 +278,9 @@ const Result.iterate = fn initial => fn step => do:
 const Result.unwrap_or = fn fallback => fn candidate => case candidate of
   #Ok value => value
   #Err _ => fallback
+const Result.unwrap_or_else = fn ~fallback => fn candidate => case candidate of
+  #Ok value => value
+  #Err _ => @demand fallback
 const Result.to_maybe = fn candidate => case candidate of
   #Ok value => #Some value
   #Err _ => #Nothing
@@ -297,6 +302,6 @@ const Array.set: Array a -> U32 -> a -> Maybe (Array a) = fn values => fn index 
 
 // Ordinary source functions; the checked ~ parameter retains its demand mode.
 const and = fn (left: Bool) => fn ~(right: Bool) =>
-  if left then @force right else #False
+  if left then @demand right else #False
 const or = fn (left: Bool) => fn ~(right: Bool) =>
-  if left then #True else @force right
+  if left then #True else @demand right

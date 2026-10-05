@@ -21,44 +21,38 @@ const slice = fn start => fn count => fn values => do:
     return @panic "array slice extends outside the array"
   return generate count (fn index => values[start + index])
 
-// Inclusive scan. Each pass constructs its output once, avoiding repeated
-// copying of immutable arrays while keeping the original ordering.
-const prefix_sums = fn (values: Array U32) => do:
-  let sums = values
-  for pass in 0..32:
-    let previous = sums
-    let stride = 1 << pass
-    sums := case stride < previous.length of
-      #True => generate previous.length (fn index => case index < stride of
-        #True => previous[index]
-        #False => previous[index] + previous[index - stride])
-      #False => previous
-  return sums
+// Inclusive U32 scan. Sum pairs, scan that smaller array, then reconstruct
+// the missing prefixes. Total work and storage are linear, including const
+// evaluation, which cannot reuse an array updated repeatedly in a loop.
+const prefix_sums = fn (values: Array U32) -> Array U32 => do:
+  if values.length < 2:
+    return values
+  let pairs = generate (values.length / 2) (fn index =>
+    values[index * 2] + values[index * 2 + 1])
+  let ends = prefix_sums pairs
+  return generate values.length (fn index =>
+    if index % 2 == 1 then ends[index / 2]
+    else if index == 0 then values[0]
+    else ends[index / 2 - 1] + values[index])
 
-// Stable indices of True flags, with one carried array in the scatter loop.
+// One traversal; a private list collects the output before one array copy.
 const indices = fn (keep: Array Bool) => do:
-  if keep.is_empty:
-    return #[]
-  let ranks = prefix_sums (map (fn flag => case flag of
-    #True => 1
-    #False => 0) keep)
-  let count = ranks[keep.length - 1]
-  let slots = fill (count + 1) 0
-  for step in 0..keep.length:
-    let index = keep.length - 1 - step
-    slots[ranks[index]] := index
-  return generate count (fn index => slots[index + 1])
+  let selected: List U32 = []
+  for index in 0..keep.length:
+    if keep[index]:
+      selected := [...self, index]
+  return Array.from_list selected
 
-const filter = fn predicate => fn values => do:
-  let selected = indices (map predicate values)
-  return generate selected.length (fn index => values[selected[index]])
+const filter = fn (predicate: a -> Bool) => fn (values: Array a) =>
+  #[value | value <- values, predicate value]
 
-const filter_map = fn transform => fn values => do:
-  let candidates = map transform values
-  let selected = indices (map Maybe.is_some candidates)
-  return generate selected.length (fn index => case candidates[selected[index]] of
-    #Some value => value
-    #Nothing => @panic "array filter_map selected an empty candidate")
+const filter_map = fn transform => fn (values: Array a) => do:
+  let selected = []
+  for value in values:
+    let candidate = transform value
+    if let #Some result = candidate:
+      selected := [...self, result]
+  return Array.from_list selected
 
 const flatten = fn chunks => do:
   let ends = prefix_sums (map .length chunks)
@@ -83,12 +77,18 @@ const concat = fn left => fn right => do:
     return right
   if @array.length right == 0:
     return left
-  return flatten #[left, right]
+  let left_count = @array.length left
+  let count = left_count + @array.length right
+  if count < left_count:
+    return @panic "array concatenation length overflow"
+  let joined = fill count left[0]
+  for index in 0..left_count:
+    joined[index] := left[index]
+  for index in 0..right.length:
+    joined[left_count + index] := right[index]
+  return joined
 
-const push = fn value => fn values => do:
-  let count = values.length
-  return generate (count + 1) (fn index =>
-    if index < count then values[index] else value)
+const push = fn value => fn values => @array.append values value
 
 // zip stops at the end of the shorter input.
 const zip = fn left => fn right =>

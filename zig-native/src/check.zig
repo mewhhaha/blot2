@@ -4197,7 +4197,7 @@ const Engine = struct {
         if (std.mem.eql(u8, name, "@type.same") or std.mem.eql(u8, name, "@type.result")) return 2;
         const binary_primitives = [_][]const u8{ "@u32.add", "@u32.sub", "@u32.mul", "@u32.div", "@u32.rem", "@u32.bit_and", "@u32.bit_or", "@u32.bit_xor", "@u32.shl", "@u32.shr", "@u32.eq", "@u32.lt", "@f32.add", "@f32.sub", "@f32.mul", "@f32.div", "@f32.eq", "@f32.ne", "@f32.lt", "@f32.le", "@f32.gt", "@f32.ge", "@array.get", "@array.fill", "@array.generate", "@product.get" };
         for (binary_primitives) |member| if (std.mem.eql(u8, name, member)) return 2;
-        const unary = [_][]const u8{ "@u32.to_f32", "@f32.to_u32", "@f32.neg", "@f32.abs", "@f32.sqrt", "@f32.floor", "@f32.ceil", "@f32.trunc", "@array.length", "@panic", "@force", "@do.monad" };
+        const unary = [_][]const u8{ "@u32.to_f32", "@f32.to_u32", "@f32.neg", "@f32.abs", "@f32.sqrt", "@f32.floor", "@f32.ceil", "@f32.trunc", "@array.length", "@panic", "@force", "@demand", "@do.monad" };
         for (unary) |member| if (std.mem.eql(u8, name, member)) return 1;
         if (std.mem.eql(u8, name, "@array.set") or std.mem.eql(u8, name, "@type.call")) return 3;
         return null;
@@ -4218,7 +4218,7 @@ const Engine = struct {
             try self.diagnostic(.call_arity, id);
             return self.types.fresh();
         }
-        if (std.mem.eql(u8, text, "@force")) {
+        if ((std.mem.eql(u8, text, "@force") or std.mem.eql(u8, text, "@demand"))) {
             const element = try self.types.fresh();
             return self.types.function(try self.types.demand(element), element);
         }
@@ -4428,7 +4428,7 @@ const Engine = struct {
                     try self.appendPending(.{ .owner = self.current, .metadata = op, .value = .{ .kind = .monad_factory, .ty = token, .result = result, .source = id } });
                     break :blk result;
                 }
-                if (head.tag == .intrinsic and std.mem.eql(u8, self.pool.get(head.a), "@force")) {
+                if (head.tag == .intrinsic and (std.mem.eql(u8, self.pool.get(head.a), "@force") or std.mem.eql(u8, self.pool.get(head.a), "@demand"))) {
                     const suspended = try self.expression(node.b);
                     const result = try self.types.fresh();
                     try self.constrain(suspended, try self.types.demandWithEffects(result, self.ambient), id);

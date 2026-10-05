@@ -854,7 +854,18 @@ test "gdev dependency closure loads separate source units with the std alias" {
     var project_ = try load(a, io, entry, .{ .std_root = standard, .aliases = &.{.{ .prefix = "gdev/", .root = packages }} });
     defer project_.deinit(a);
     try expectValid(&project_);
-    try std.testing.expectEqual(@as(usize, 25), project_.units.items.len);
+    // This is a live sibling project, not a pinned file-count fixture.
+    // Check actual alias resolution and distinct unit ownership as it grows.
+    var standard_imports: usize = 0;
+    for (project_.imports.items) |imported| {
+        if (!std.mem.startsWith(u8, project_.symbols.get(imported.path), "std/")) continue;
+        standard_imports += 1;
+        try std.testing.expect(std.mem.startsWith(u8, project_.filename(imported.target), standard));
+    }
+    try std.testing.expect(standard_imports != 0);
+    for (project_.units.items, 0..) |unit_, index| {
+        for (project_.units.items[0..index]) |previous| try std.testing.expect(unit_.filename != previous.filename);
+    }
     try std.testing.expectEqual(project_.entry, project_.order.items[project_.order.items.len - 1]);
     // No checker/backend result is implied by successful source loading.
 }

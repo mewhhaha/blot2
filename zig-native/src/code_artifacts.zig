@@ -42,6 +42,9 @@ pub const Job = struct {
     /// Some inline bodies consume static values which are not yet represented
     /// in Request. Preserve the snapshot, but rebuild this job after an edit.
     reusable: bool = true,
+    /// Inlining consumes executable bodies without creating a callee job.
+    /// Validate their complete owning modules before reusing this function.
+    inline_units: std.ArrayList(u32) = .empty,
     state: State = .pending,
     function: ?u32 = null,
     target_job: u32 = 0,
@@ -53,6 +56,7 @@ pub const Job = struct {
     value: ?ValueResult = null,
     global: ?u32 = null,
     fn deinit(self: *Job, allocator: Allocator) void {
+        self.inline_units.deinit(allocator);
         allocator.free(self.mappings);
         allocator.free(self.rows);
         allocator.free(self.templates);
@@ -297,6 +301,11 @@ pub const Context = struct {
     }
     pub fn requireFreshCode(self: *Context) void {
         if (self.active_job != 0) self.jobs.items[self.active_job - 1].reusable = false;
+    }
+    pub fn readInlineBody(self: *Context, unit: u32) Allocator.Error!void {
+        if (self.active_job == 0) return;
+        const reads = &self.jobs.items[self.active_job - 1].inline_units;
+        if (std.mem.findScalar(u32, reads.items, unit) == null) try reads.append(self.allocator, unit);
     }
     fn depth(self: *const Context) usize {
         var id = self.active_job;
