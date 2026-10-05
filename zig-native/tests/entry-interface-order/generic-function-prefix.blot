@@ -1,0 +1,2 @@
+entry const earlier = fn value => value
+entry const answer = @array.get #[] 0

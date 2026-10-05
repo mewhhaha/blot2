@@ -1,0 +1,35 @@
+data Cell value = #Cell value
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      complete value =>
+        return value
+entry const answer = fn () => do:
+  let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
+    let captured = 41
+    let witness = fn ignored => #Cell captured
+    let make = fn witness => @computation (fn () => do:
+      use current <- @state.get witness
+      let #Cell stored = current
+      let #Cell captured = witness ()
+      return #Cell (@u32.add stored captured)
+    )
+    let computation = make witness
+    captured := 99
+    return handled computation
+  )
+  let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
+    let captured = 3.5
+    let witness = fn ignored => #Cell captured
+    let make = fn witness => @computation (fn () => do:
+      use current <- @state.get witness
+      let #Cell stored = current
+      let #Cell captured = witness ()
+      return #Cell (@f32.add stored captured)
+    )
+    let computation = make witness
+    captured := 199.5
+    return handled computation
+  )
+  return @f32.add (@u32.to_f32 value32) valuef
+entry const folded = answer ()

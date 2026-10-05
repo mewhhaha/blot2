@@ -1,8 +1,11 @@
 # Blot executable language guide
 
 Read this before writing Blot. This describes the current executable language;
-`DESIGN.md` and the case-study documents also contain proposals. Each `blot`
-code block below is an independent, compilable module.
+`DESIGN.md` also contains proposals. Each `blot` code block below is an
+independent, compilable module.
+
+The handwritten Zig compiler implements the language and collection syntax in
+this guide.
 
 ## Commands
 
@@ -11,10 +14,10 @@ From the Blot repository:
 ```sh
 just guide                                  # this reference; no compiler build
 deno task blot guide                        # same CLI command
-just build                                 # build the native compiler
 deno task blot fmt examples/syntax.blot      # normalize spacing
-deno task blot check examples/syntax.blot    # check a source project
-deno task blot build examples/syntax.blot build/example.wasm
+deno task build:compiler
+deno task blot check examples/lists.blot
+deno task blot build examples/lists.blot build/lists.wasm
 ```
 
 Blot compiles to Wasm; a host loads the module and calls its entrypoints, the
@@ -117,8 +120,10 @@ the next iteration and after the loop. Its type must stay the same across
 iterations. New locals and the index remain inside the loop. Nested loops carry
 successors through their enclosing loop. Rebindings inside `if`/`if let`
 branches also carry outward. A separately nested `do:` keeps its own scope.
-`return` exits the enclosing `do`; a loop creates no new return boundary. There
-is no `break` or `continue` yet.
+`return` exits the enclosing `do`; a loop creates no new return boundary.
+`break` exits the nearest loop and carries its latest local values into the
+statements after it. In a request loop it also cancels the captured computation.
+There is no `continue` statement yet.
 
 ```blot
 entry const sum_to = fn (end: U32) => do:
@@ -289,28 +294,70 @@ entry const answer = fn (value: F32) => case twice (#Box value) of
   #Box result => result
 ```
 
-## Arrays and libraries
+## Lists, arrays, and libraries
 
-Arrays are homogeneous and immutable: `[]`, `[1, 2]`, `[[1], [2]]`.
-`values.length` and `values.is_empty` are ordinary prelude members. Lengths and
-indices use U32. `values[index]` reads an element;
-`values[index] := replacement` rebinds a local array to its successor. Earlier
-aliases remain unchanged. Indexing binds more tightly than application:
+Lists and arrays are distinct homogeneous, immutable types. `[]`, `[1, 2]`, and
+`[[1], [2]]` construct `List` values. `#[]`, `#[1, 2]`, and `#[#[1], #[2]]`
+construct `Array` values. Use `List T` and `Array T` in annotations. Passing one
+to a function expecting the other is a type error. `List.from_array values` and
+`Array.from_list values` explicitly copy between representations.
+
+The Zig runtime backs lists with doubly linked chunks of up to 256 elements.
+Traversal follows dense spans; proven exclusive append/prepend reuses end slack
+or links a new chunk. A shared edit copies the list and preserves earlier
+aliases. Arrays stay contiguous with constant-time indexing; array
+append/prepend copies the contents.
+
+Both types have ordinary prelude members `values.length` and `values.is_empty`.
+Only arrays support `values[index]`, `values[index] := replacement`, `get`, and
+`set`. Lists use `for`, comprehensions, `map`, `filter`, and folds; convert with
+`Array.from_list` when positional access is required. Generic indexing therefore
+infers an Array argument, while generic traversal accepts either type. Lengths
+and indices use U32. Indexing binds more tightly than application:
 `f values[index]` passes the element to `f`. Separate an array argument with a
-space (`f [1]`), or write `f([1])`.
+space (`f #[1]`), or write `f(#[1])`.
 
-Direct reads and updates check bounds at runtime and fail during constant
+Spreads append or prepend while preserving written evaluation order:
+
+```blot
+const prepend = fn value => fn values => [value, ...values]
+const append = fn value => fn values => [...values, value]
+const surrounded = fn values => [0, ...values, 99]
+const append_array = fn value => fn values => #[...values, value]
+```
+
+The spread operand must have the same collection type as the result. One spread
+is allowed, with any number of prefix and suffix elements. The cons form
+`[head | tail]` is also accepted.
+
+Comprehensions construct the collection selected by their opening bracket:
+
+```blot
+const squares: List U32 = [x * x | x <- [1, 2, 3]]
+const pairs: Array U32 = #[x * 10 + y | x <- [1, 2], y <- #[3, 4]]
+const selected = [square | x <- [1, 2, 3], x > 1, let square = x * x]
+```
+
+Generators run from left to right, with the leftmost as the outer loop. Later
+sources can use earlier bindings. A Bool guard skips every subsequent qualifier
+and the result expression when false. Bindings stay inside the comprehension;
+each generator source sees the scope before its own binding. The output is built
+with a private growing list, then copied once if the requested result is an
+array.
+
+Direct array reads and updates check bounds at runtime and fail during constant
 evaluation for an invalid index. `values.get(index)` returns `#Some value` or
 `#Nothing`; `values.set(index)(replacement)` returns `#Some updated_array` or
 `#Nothing`. These are ordinary functions, including their bounds checks. A guard
 such as `if index < values.length:` is also useful. Direct accesses keep their
 bounds checks inside guards; no proof token is required.
 
-`@array.length`, `@array.get`, and `@array.set` remain the underlying
-primitives. `@array.fill count value` evaluates the fill value once;
-`@array.generate count
-generator` calls a pure `U32 -> T` generator in ascending
-index order. Empty arrays can need an `Array T` annotation.
+`@array.length`, `@array.get`, and `@array.set` are the underlying array
+primitives. Lists have `@list.length`, but no `@list.get` or `@list.set`.
+`@array.fill count value` evaluates the fill value once;
+`@array.generate count generator` calls a pure `U32 -> T` generator in ascending
+index order. Lists also have `@list.fill` and `@list.generate`. Empty
+collections can need a `List T` or `Array T` annotation.
 
 Wasm reuses locally allocated storage when its last reference is consumed,
 including a single array carried through a loop. It copies when uniqueness
@@ -331,12 +378,16 @@ import * as array from "std/array"
 const squares = array.generate 4 (fn index => index * index)
 entry const total = fn () => array.fold_left U32.add 0 squares
 entry const snapshot = fn () => do:
-  let values = [1, 2]
+  let values = #[1, 2]
   let original = values
   values[0] := self + 40
   return original[0] + values[0]
 const checked = fn index => squares.get(index)
 ```
+
+Import `std/list` for list construction, conversion, access, updates, mapping,
+filtering, append/prepend, and folding. Direct compiler conversions are
+`@list.from_array` and `@array.from_list`.
 
 The implicit prelude supplies `identity`, `apply`, `always`, `compose`, `flip`,
 `on`, `Bool.not`; `Maybe.map/bind/unwrap_or/is_some/to_result`;
@@ -400,6 +451,51 @@ Const reflection: `@effect.of named_function`, `@effect.descriptor Operation`,
 `@effect.has effects Operation`, `@effect.count effects`, and
 `@effect.same descriptor descriptor`. These describe closed checked effects;
 they cannot be runtime-reachable or create authority.
+
+### Request handlers
+
+`@computation thunk` captures a function taking Unit without running it.
+`for request in @requests computation:` handles the thunk's operations. Its body
+is one `case request of`, with distinct `effect` clauses and exactly one
+`complete` clause:
+
+```blot
+type Validate is effect = { check: U32 -> U32 }
+
+const checked = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        if value == 0:
+          return 0
+        yield value
+      complete value =>
+        return value
+
+entry const answer = fn () => checked (@computation (fn () => do:
+  use first <- Validate.check 40
+  use second <- Validate.check 2
+  return first + second
+))
+```
+
+Indent each clause suite after `=>`. `yield value` supplies the operation result
+and ends the clause. `return value` cancels the computation and exits the
+nearest enclosing `do`. `break` cancels the computation, exits the request loop,
+and runs the following statements. A `complete` clause receives the thunk's
+final result and must return or break; it cannot yield. Every operation clause
+must reply or exit on each path. There are no prelude constructors to import.
+
+Outer locals rebound with `:=` carry handler state between requests and after
+`break`. A captured computation can run again with fresh handler state. Calls
+through helpers use the same handler; unrelated effects remain visible. Clause
+bodies run outside the request installation, allowing forwarding to an outer
+handler or provider. Generic operation clauses name a closed instance with
+parentheses, as in `effect (Reader.ask U32) () =>`. This interface supports one
+reply per request, without an exposed continuation value. See
+[examples/requests.blot](../examples/requests.blot).
+
+### Effect families and scoped state
 
 An effect family declares operations for any type argument. Apply its name to a
 type with spaces, just like `Maybe U32`: `State U32` is the U32 instance of the
@@ -521,18 +617,18 @@ nullary constructor as `(fn () => #Idle)`.
 
 ## Expression tags
 
-Put `#[expression]` before a top-level `const` or `let` to apply the expression
+Put `@[expression]` before a top-level `const` or `let` to apply the expression
 as a function to the initializer. A tag can use local names, named imports,
 qualified imports, and function arguments. It may share the declaration line.
-With several tags, the nearest runs first: `#[f] #[g] const x = value` binds
+With several tags, the nearest runs first: `@[f] @[g] const x = value` binds
 `f (g value)`. The declaration's type annotation constrains the result of all
 tags, including when the initializer is a function.
 
 ```blot
 const add = fn amount => fn value => value + amount
-#[add 1]
-#[fn value => value * 2] entry const answer: U32 = 20
-#[add 1] entry let started: U32 = 41
+@[add 1]
+@[fn value => value * 2] entry const answer: U32 = 20
+@[add 1] entry let started: U32 = 41
 ```
 
 `const` decorators execute at compile time under the usual step budget; `let`
@@ -616,11 +712,20 @@ unrelated effects remain visible. The same adapter accepts imported types and
 user-defined data types with `pure` and `bind` members. Type-constructor values
 can be aliased or passed through ordinary functions.
 
-Monadic loops currently use recursive continuation calls, so large loops are
-subject to backend stack limits.
+Monadic loops use the selected type's `iterate initial step` member. Each step
+returns a wrapped `#Continue state` or `#Done result` using the prelude's
+`Iteration state result` type. `Maybe.iterate` and `Result.iterate` use constant
+call stack; failure skips later steps, and `return` still exits the nearest
+`do`. Custom monads need an `iterate` member only for blocks containing loops.
 
-Not yet executable: array spread syntax, array patterns, general text, F64/SIMD,
-general type-valued computation, and resumable handlers. Do not infer
+```blot
+const step = fn count =>
+  if count < 42 then #Some (#Continue (count + 1)) else #Some (#Done count)
+entry const answer = fn () => Maybe.unwrap_or 0 (Maybe.iterate 0 step)
+```
+
+Not yet executable: collection patterns, general text, F64/SIMD, general
+type-valued computation, and exposed continuation values. Do not infer
 availability from editor highlighting or design examples.
 
 Hosts use `compiler/guest.ts` and guest ABI 2. Numeric arrays cross as copied

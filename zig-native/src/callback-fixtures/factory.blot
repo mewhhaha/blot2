@@ -1,0 +1,35 @@
+type Tick is effect = { read: Unit -> F32 }
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Tick.read () =>
+        yield 1.0
+      complete value =>
+        return value
+const cancelled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Tick.read () =>
+        return 86.0
+      complete value =>
+        return value
+entry const answer = fn (host: Unit -> F32 ! {Foreign}) => do:
+  let bias = 0.0
+  let make = fn action => do:
+    let remembered = bias
+    return @computation (fn () => @f32.add (action ()) remembered)
+  let computation = make (fn () => do:
+    use value <- host ()
+    use increment <- Tick.read ()
+    return @f32.add value increment
+  )
+  bias := 99.0
+  return handled computation
+entry const cancel = fn (host: Unit -> F32 ! {Foreign}) => do:
+  let make = fn action => @computation (fn () => action ())
+  let computation = make (fn () => do:
+    use value <- host ()
+    use increment <- Tick.read ()
+    return @panic "cancelled action resumed"
+  )
+  return cancelled computation

@@ -1,10 +1,10 @@
-// Compress the generated executable as package data without changing Bend's
-// emitted C or JavaScript. Rename only after the archive is complete.
+// Package the Zig executable. Publish only a complete compressed archive.
 import { fileURLToPath } from "node:url";
 
 const directory = new URL("../generated/compiler/", import.meta.url);
-const source = new URL("blotc", directory);
+const source = new URL("../zig-native/zig-out/bin/blotc", import.meta.url);
 const destination = new URL("blotc.gz", directory);
+await Deno.mkdir(directory, { recursive: true });
 const temporary = await Deno.makeTempFile({
   dir: fileURLToPath(directory),
   prefix: ".blotc-",

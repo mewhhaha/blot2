@@ -1,0 +1,27 @@
+data Count value = #Count value
+type Tick is effect = { read: Unit -> U32 }
+const witness = fn () -> Count U32 => @panic "type witness executed"
+const make = fn () => do:
+  use previous <- @state.get witness
+  let #Count old = previous
+  use @state.set (#Count (@u32.add old 1))
+  return @computation (fn () => do:
+    use Tick.read ()
+    return @panic "cancelled unconstrained computation continued"
+  )
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Tick.read () =>
+        return 42.5
+      complete value =>
+        return value
+entry const answer = fn () => do:
+  let (#Count count, value) = @state.run (#Count 0) (fn () => do:
+    use computation <- make ()
+    let first = handled computation
+    let second = handled computation
+    return @f32.add first second
+  )
+  return @f32.add (@u32.to_f32 count) value
+entry const folded = answer ()

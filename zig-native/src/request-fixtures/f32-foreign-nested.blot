@@ -1,0 +1,36 @@
+type Outer is effect = { check: F32 -> F32 }
+type Inner is effect = { read: Unit -> F32 }
+const make = fn action => @computation action
+const inner = fn selected => fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Inner.read () =>
+        use value <- Outer.check selected
+        yield value
+      complete value =>
+        return value
+const outer = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Outer.check value =>
+        return @f32.add value 1.0
+      complete value =>
+        return value
+const invoke = fn action => fn value => action value
+const retain = fn action => fn value => invoke action value
+const calculation = make (fn () => Outer.check 41.5)
+const calculation_alias = calculation
+entry const constant_alias = fn () => outer calculation_alias
+entry const folded = constant_alias ()
+entry const answer = fn (host: F32 -> F32 ! {Foreign}) => do:
+  let callback = retain host
+  let computation = make (fn () => do:
+    use selected <- callback 40.5
+    use inner selected (make (fn () => do:
+      use Inner.read ()
+      return @panic "inner suffix executed after outer cancellation"
+    ))
+    return @panic "outer suffix executed after nested cancellation"
+  )
+  return outer computation
+entry const pure = fn () => 7

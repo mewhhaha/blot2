@@ -1,0 +1,108 @@
+==================
+Request handler clauses and contextual complete
+==================
+
+const complete = fn complete => complete
+const checked = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        yield value
+      complete value =>
+        return value
+
+---
+
+(source_file
+  (function_binding
+    (binding_keyword)
+    (identifier)
+    (operator)
+    (lambda_header
+      (identifier)))
+  (operator)
+  (identifier)
+  (function_binding
+    (binding_keyword)
+    (identifier)
+    (operator)
+    (lambda_header
+      (identifier)))
+  (operator)
+  (keyword)
+  (separator)
+  (keyword)
+  (identifier)
+  (keyword)
+  (intrinsic)
+  (identifier)
+  (separator)
+  (keyword)
+  (identifier)
+  (keyword)
+  (request_effect_header
+    (request_operation_name
+      (type_identifier)
+      (identifier)))
+  (identifier)
+  (operator)
+  (keyword)
+  (identifier)
+  (request_complete_header
+    (identifier)
+    (operator))
+  (keyword)
+  (identifier))
+
+==================
+Closed generic operation and completion break
+==================
+
+const counted = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect (Reader.ask U32) () =>
+        break
+      complete (value, count) =>
+        break
+  return 0
+
+---
+
+(source_file
+  (function_binding
+    (binding_keyword)
+    (identifier)
+    (operator)
+    (lambda_header
+      (identifier)))
+  (operator)
+  (keyword)
+  (separator)
+  (keyword)
+  (identifier)
+  (keyword)
+  (intrinsic)
+  (identifier)
+  (separator)
+  (keyword)
+  (identifier)
+  (keyword)
+  (request_effect_header
+    (parenthesized
+      (type_identifier)
+      (member
+        (identifier))
+      (type_identifier)))
+  (parenthesized)
+  (operator)
+  (keyword)
+  (request_complete_header
+    (parenthesized
+      (identifier)
+      (separator)
+      (identifier))
+    (operator))
+  (keyword)
+  (keyword)
+  (integer))

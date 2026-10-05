@@ -1,11 +1,7 @@
 import { createFrontend, type Cst } from "./syntax.ts";
 
 function children(node: Cst): Cst[] {
-  const result: Cst[] = [];
-  for (let list = node.children; list.$ === "Con"; list = list.tail) {
-    result.push(list.head);
-  }
-  return result;
+  return [...node.children];
 }
 
 const wrappers = new Set([
@@ -14,6 +10,8 @@ const wrappers = new Set([
   "prefix_expression",
   "infix_expression",
   "application",
+  "collection_expression",
+  "collection_infix",
 ]);
 
 function expressionCore(node: Cst): Cst {
@@ -258,11 +256,13 @@ export async function formatSource(source: string): Promise<string> {
         } else if ([")", "]", ","].includes(value)) space = false;
         else if (value === ":" && !witness.has(token.span.start)) space = false;
         else if (["(", "["].includes(previous.text)) space = false;
-        else if (["(", "["].includes(value)) space = !adjacent;
-        else if (value === ".") space = !adjacent;
+        else if (["(", "["].includes(value)) {
+          space = !adjacent ||
+            ["=", ":=", "=>", "<-", ","].includes(previous.text);
+        } else if (value === ".") space = !adjacent;
         else if (
           previous.text === "." || previous.text === "~" ||
-          previous.text === "#"
+          previous.text === "#" || previous.text === "..."
         ) space = false;
         else if (tightAfter.has(previous.start)) space = false;
         else if (value === "}" && previous.text === "{") space = false;

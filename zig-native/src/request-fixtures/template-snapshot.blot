@@ -1,0 +1,16 @@
+type Tick is effect = { read: U32 -> U32 }
+const make = fn action => @computation action
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Tick.read value =>
+        yield value
+      complete value =>
+        return value
+entry const answer = fn () => do:
+  let value = 41
+  let computation = make (fn () => Tick.read value)
+  value := 99
+  let read = fn () => handled computation
+  return @u32.add (read ()) 1
+entry const folded = answer ()

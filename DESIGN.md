@@ -179,17 +179,70 @@ resolver has done its work, including effects of evaluating the resolver itself.
 Unresolved effects remain visible to callers and scheduling.
 
 Monadic blocks execute through ordinary calls to the selected source `bind` and
-`pure` functions. Each bind receives the remaining computation as a function,
-including subsequent loop iterations. A source implementation may skip that
-function or invoke it more than once. Resolver expressions are evaluated once.
-Monadic loops currently use recursive continuation calls and are subject to the
-backend's stack limits. Ordinary provider loops retain their iterative lowering.
-The prelude defines `monad` using the generic `@do.monad` adapter; neither
-`Maybe`, `Result`, nor resolver aliases have special compiler-recognized names.
+`pure` functions. Each bind receives its continuation as an ordinary function.
+Inside a loop this continues the current step; `iterate` controls subsequent
+steps. A source implementation may skip the continuation or invoke it more than
+once. Resolver expressions are evaluated once.
+
+Loops additionally require `M.iterate initial step`. Its callback returns
+`M (Iteration state result)`: `#Continue state` advances to another step and
+`#Done result` finishes. The prelude supplies the nominal `Iteration` type and
+iterative implementations for `Maybe` and `Result`. Each step finishes before
+the next begins, so these loops use constant call stack. A custom implementation
+must agree with its monad's `pure` and `bind` and provide the same stack
+guarantee. Blocks without loops need only `pure` and `bind`.
+
+Loop completion and `break` run the block suffix; `break` targets the nearest
+loop and preserves its latest carried state. An early `return` exits the nearest
+`do`, including through nested loops. Failed steps and `return $` propagate the
+wrapped result without executing later iterations or the suffix. Ordinary
+provider loops retain their iterative lowering. Arbitrary recursive functions
+and general resumable effect handlers are outside this iteration protocol. The
+prelude defines `monad` using the generic `@do.monad` adapter; neither `Maybe`,
+`Result`, nor resolver aliases have special compiler-recognized names.
 
 Declared data-type constructors can be passed through ordinary functions and
 stored in bindings, including imported and renamed constructors. General
 type-valued computation and partial type applications remain future work.
+
+### Request handlers
+
+`@computation (fn () => ...)` captures a computation without executing it. An
+enclosing `do` can handle it with a request loop:
+
+```blot
+type Validate is effect = { check: U32 -> U32 }
+
+const checked = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        if value == 0:
+          return 0
+        yield value
+      complete value =>
+        return value
+```
+
+An `effect` pattern names a closed nominal operation and binds its argument.
+`yield` replies with the operation's declared result and ends the current
+clause. `return` cancels the computation and exits the nearest enclosing `do`.
+`break` cancels it and runs the statements following the request loop. There
+must be exactly one `complete` clause, receiving the computation's final result;
+it returns or breaks. No clause may fall through, and completion cannot yield.
+
+Rebindings carry immutable handler state between requests. Captured computations
+are reusable, with fresh state at each installation. Operation calls through
+helper functions use the same installation. Clause bodies execute outside that
+installation, preserving ordinary provider forwarding and outward effects.
+Replying finishes the clause before execution proceeds, so long computations do
+not accumulate suspended handler callbacks. General continuation values and
+multiple resumptions remain future work.
+
+The request forms use compiler keywords and `@` intrinsics. They need no public
+request constructors, monad adapter, or prelude declarations. See
+[the effect contract](compiler/effects-and-io.md#request-handlers) and
+[the executable example](examples/requests.blot).
 
 ### Demand-driven parameters
 
@@ -842,13 +895,13 @@ clock, network, or randomness. Cache keys must track every observed dependency.
 Reflection on unsolved type/effect variables is not allowed; cyclic dependencies
 between inference and const-generated declarations must receive a diagnostic.
 
-Value declaration tags use `#[expression]` and apply an ordinary function to the
+Value declaration tags use `@[expression]` and apply an ordinary function to the
 declaration's initializer:
 
 ```blot
 const add = fn amount => fn value => value + amount
-#[add 1]
-#[fn value => value * 2]
+@[add 1]
+@[fn value => value * 2]
 entry const answer: U32 = 20 // add 1 (multiply 2 20) = 41
 ```
 
@@ -909,10 +962,7 @@ them.
 
 The earlier compiler-coupled ECS bootstrap was retired: its `@ecs.*` and
 platform intrinsics, component/resource special cases, generated storage/query
-plans, and `compileEcs`/`compileApp` entry points have been removed. Experiments
-are preserved only in
-[the prototype archive](case-study/ecs/prototype/README.md). They are not a
-substitute for generic language machinery.
+plans, and `compileEcs`/`compileApp` entry points have been removed. The obsolete prototype was removed with the legacy compiler.
 
 Source-library scheduling should derive hazards from checked descriptors. Reads
 may share a batch, writes conflict with overlapping reads/writes, and structural
@@ -981,11 +1031,11 @@ production.
 ## Implementation status
 
 The repository contains a Deno project, Baba 9.0.1, generated lexer/parser
-artifacts, and a [Bend compiler](compiler/README.md). The executable
+artifacts, and a [Zig compiler](zig-native/README.md). The executable
 `grammar.baba`/`baba.json` describe the generic functional core and executable
-provider and monadic resolver blocks. They no longer claim to accept the old
-Blot language. The broader syntax design is preserved here and in the case-study
-source proposals. Files under `examples/` use the currently supported language.
+provider, monadic resolver, and request-handler blocks. They no longer claim to
+accept the old Blot language. The broader syntax design is preserved here. Files under `examples/` use the currently
+supported language.
 
 A separate, permissive Tree-sitter grammar supports Helix highlighting of the
 showcase, including proposals. It is editor support, not a validating compiler
@@ -1005,10 +1055,10 @@ frontend; see the [Helix setup](README.md#helix-highlighting).
 | Named functions         | Unary/curried functions, closures, static qualified names, recursive groups.                                                                                                         |
 | Text interpolation      | Target design only; literal strings currently serve generic panic messages.                                                                                                          |
 | `self`                  | Previous value of a local binding or field/index path during immutable rebinding.                                                                                                    |
-| Layout and AST          | Indented continuations, a structure-preserving formatter, Baba CST; Bend name resolution and core lowering.                                                                          |
+| Layout and AST          | Indented continuations, a structure-preserving formatter, native syntax tables; native name resolution and Core lowering.                                                                          |
 | Types and effects       | Rank-1 HM with inferred latent effect rows and source-declared operations.                                                                                                           |
 | Bindings                | Pure-RHS `let`, effect-preserving `use … <- …`; `use expression` discards.                                                                                                           |
-| Resolver blocks         | Scoped effect providers, source-defined monad resolvers, and `return $` execute.                                                                                                     |
+| Resolver blocks         | Scoped effect providers, source-defined monad resolvers, and `return $` execute; request loops handle captured computations with reply or cancellation.                              |
 | Scheduling              | Source-library responsibility; no compiler-generated ECS scheduler.                                                                                                                  |
 | Const evaluation        | Scalars, tuples, arrays, data, closures, and matching with one shared evaluation budget.                                                                                             |
 | Tags and const types    | Expression tags transform `const`/`let` values; closed const effect descriptors; nominal type-constructor values; no declaration-descriptor transforms or general type computations. |

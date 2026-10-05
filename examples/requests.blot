@@ -1,0 +1,46 @@
+// Captured computations are lazy and request handlers need no prelude data.
+type Validate is effect = { check: U32 -> U32 }
+
+const checked = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        if value == 0:
+          return 0
+        yield value
+      complete value =>
+        return value
+
+const addition = @computation (fn () => do:
+  use left <- Validate.check 40
+  use right <- Validate.check 2
+  return left + right
+)
+
+entry const completed = fn () => checked addition
+
+entry const cancelled = fn () => checked (@computation (fn () => do:
+  use Validate.check 0
+  return @panic "the handler returned before this statement"
+))
+
+// Rebindings carry handler state between requests. `break` runs the suffix.
+const count_until_zero = fn computation => do:
+  let count = 0
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        if value == 0:
+          break
+        count := self + 1
+        yield value
+      complete _ =>
+        break
+  return count
+
+entry const counted = fn () => count_until_zero (@computation (fn () => do:
+  use Validate.check 40
+  use Validate.check 2
+  use Validate.check 0
+  return @panic "the handler broke before this statement"
+))

@@ -5,11 +5,15 @@ export default grammar({
   name: "blot",
 
   extras: ($) => [/\s+/, $.comment],
-  word: ($) => $.identifier,
+  word: ($) => $._identifier,
 
   conflicts: (
     $,
-  ) => [[$.function_binding, $._syntax], [$.import_declaration, $.keyword]],
+  ) => [
+    [$.function_binding, $._syntax],
+    [$.import_declaration, $.keyword],
+    [$.request_complete_header, $.identifier],
+  ],
 
   rules: {
     source_file: ($) => repeat($._syntax),
@@ -28,6 +32,8 @@ export default grammar({
         $.where_clause,
         $.parenthesized,
         $.bracketed,
+        $.array,
+        $.spread,
         $.braced,
         $.method_call,
         $.member,
@@ -39,6 +45,8 @@ export default grammar({
         $.self,
         $.entry_binding,
         $.ever_loop,
+        $.request_effect_header,
+        $.request_complete_header,
         $.binding_keyword,
         $.keyword,
         $.identifier,
@@ -120,6 +128,47 @@ export default grammar({
 
     ever_loop: ($) => seq("for", "ever", alias(":", $.separator)),
 
+    // Keep request clauses shallow, like function and type headers. `complete`
+    // is contextual, so bindings and function parameters can still use it.
+    request_effect_header: ($) =>
+      prec(
+        4,
+        seq(
+          "effect",
+          field(
+            "operation",
+            choice(
+              $.request_operation_name,
+              $.parenthesized,
+            ),
+          ),
+        ),
+      ),
+
+    request_operation_name: ($) =>
+      prec.right(seq(
+        choice($.identifier, $.type_identifier),
+        repeat(seq(".", choice($.identifier, $.type_identifier))),
+      )),
+
+    request_complete_header: ($) =>
+      prec.dynamic(
+        1,
+        seq(
+          "complete",
+          field(
+            "parameter",
+            choice(
+              $.identifier,
+              $.parenthesized,
+              $.bracketed,
+              $.braced,
+            ),
+          ),
+          alias("=>", $.operator),
+        ),
+      ),
+
     binding_annotation: ($) =>
       seq(
         alias(":", $.separator),
@@ -193,7 +242,7 @@ export default grammar({
 
     declaration_tag: ($) =>
       seq(
-        "#",
+        "@",
         "[",
         optional(field("callee", $.tag_callee)),
         repeat($._syntax),
@@ -210,6 +259,8 @@ export default grammar({
 
     parenthesized: ($) => seq("(", repeat($._syntax), ")"),
     bracketed: ($) => seq("[", repeat($._syntax), "]"),
+    array: ($) => prec(2, seq("#", "[", repeat($._syntax), "]")),
+    spread: (_) => "...",
     braced: ($) => seq("{", repeat(choice($.record_field, $._syntax)), "}"),
     record_field: ($) => prec(1, seq(field("name", $.identifier), ":")),
     method_call: ($) =>
@@ -243,9 +294,10 @@ export default grammar({
     boolean: (_) => choice("True", "False"),
     self: (_) => "self",
     intrinsic: (_) => token(/@[a-z_][A-Za-z0-9_]*(\.[a-z_][A-Za-z0-9_]*)*/),
-    identifier: (_) => /[a-z_][A-Za-z0-9_]*/,
+    _identifier: (_) => /[a-z_][A-Za-z0-9_]*/,
+    identifier: ($) => choice($._identifier, "complete"),
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
-    operator: (_) => choice(":=", "=>", "..", "...", /[+\-*\/%=!<>|&^~?$]+/),
+    operator: (_) => choice(":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
     separator: (_) => choice(":", ",", ";"),
     keyword: (_) =>
       choice(
@@ -263,6 +315,7 @@ export default grammar({
         "rec",
         "do",
         "return",
+        "yield",
         "if",
         "then",
         "else",

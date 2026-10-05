@@ -1,0 +1,11 @@
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      complete value =>
+        return value
+entry const answer = fn () => do:
+  let make: a -> b where { type_rep a } = fn value => @computation (fn () => value)
+  let integer = handled (make 40)
+  let fraction = handled (make 2.5)
+  return @f32.add (@u32.to_f32 integer) fraction
+entry const folded = answer ()

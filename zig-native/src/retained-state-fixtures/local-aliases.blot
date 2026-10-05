@@ -1,0 +1,25 @@
+data Cell value = #Cell value
+const witness32 = fn ignored -> Cell U32 => @panic "witness called"
+const witnessf = fn ignored -> Cell F32 => @panic "witness called"
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      complete value =>
+        return value
+entry const answer = fn () => do:
+  let (#Cell state32, #Cell value32) = @state.run (#Cell 40) (fn () => do:
+    let make = fn witness => @computation (fn () => @state.get witness)
+    let alias = witness32
+    let alias_again = alias
+    let computation = make alias_again
+    return handled computation
+  )
+  let (#Cell statef, #Cell valuef) = @state.run (#Cell 2.5) (fn () => do:
+    let make = fn witness => @computation (fn () => @state.get witness)
+    let alias = witnessf
+    let alias_again = alias
+    let computation = make alias_again
+    return handled computation
+  )
+  return @f32.add (@u32.to_f32 value32) valuef
+entry const folded = answer ()

@@ -1,0 +1,12 @@
+type Read is effect = { get: Unit -> U32 }
+const make = fn value => fn other => do:
+  use seed <- Read.get ()
+  return @u32.add value (@u32.add seed other)
+const compose = fn first => fn second => fn value => first (second value)
+const add_forty = make 40
+const provider = @effect.provider Read.get (fn () => 1)
+entry const answer = fn () => do provider:
+  let increment = fn value => @u32.add value 1
+  use result <- (compose increment add_forty) 0
+  return result
+entry const folded = answer ()

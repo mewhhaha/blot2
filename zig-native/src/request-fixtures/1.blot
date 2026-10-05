@@ -1,0 +1,26 @@
+
+type Validate is effect = { check: U32 -> U32 }
+const helper = fn value => do:
+  use reply <- Validate.check value
+  if @u32.eq value 2:
+    return @panic "helper continued after cancellation"
+  return reply
+const checked = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        if @u32.eq value 2:
+          return 42
+        yield value
+      complete value =>
+        return value
+const calculation = @computation (fn () => do:
+  for index in 0 .. 4:
+    use helper index
+    if @u32.eq index 2:
+      @panic "loop continued after cancellation"
+  return @panic "computation suffix ran after cancellation"
+)
+entry const answer = fn () => checked calculation
+
+entry const checked_answer = answer ()

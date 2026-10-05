@@ -1,0 +1,19 @@
+
+type Validate is effect = { check: U32 -> U32 }
+const checked = fn computation => do:
+  let total = 1
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        total := @u32.add self value
+        yield value
+      complete value =>
+        total := @u32.add self value
+        break
+  return total
+entry const answer = fn () => checked (@computation (fn () => do:
+  use value <- Validate.check 20
+  return @u32.add value 1
+))
+
+entry const checked_answer = answer ()

@@ -1,0 +1,12 @@
+
+data Maybe a = #Some a | #Nothing
+const identity = fn value => value
+const empty = #Nothing
+const nested = #Some (#Some 42)
+const reference = identity
+const constructor = #Some
+const closure = (fn captured => fn value => @u32.add captured value) 2
+entry const answer = fn () => closure 40
+entry const probe = fn () => do:
+  let kept = (empty, nested, reference, constructor)
+  return 0

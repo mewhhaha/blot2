@@ -39,18 +39,18 @@ const run_scoped = fn simulation => fn world => fn action => do:
 
 const get = fn (witness: p -> a) -> a => State.get ()
 const set = fn value => State.set value
-const get_column = fn exemplar => get (fn () => #Column [#Some exemplar])
+const get_column = fn exemplar => get (fn () => #Column #[#Some exemplar])
 
 const simulation = do:
   let builder = empty ()
   builder := insert_cell (#Time { seconds: 0.5 }) self
-  builder := insert_cell (#Column [
+  builder := insert_cell (#Column #[
     #Some (#Position { x: 0.0, y: 0.0 }),
     #Some (#Position { x: 10.0, y: 20.0 }),
     #Nothing,
     #Some (#Position { x: 1.0, y: 2.0 }),
   ]) self
-  builder := insert_cell (#Column [
+  builder := insert_cell (#Column #[
     #Some (#Velocity { x: 2.0, y: 4.0 }),
     #Nothing,
     #Some (#Velocity { x: 1.0, y: 1.0 }),
@@ -88,7 +88,7 @@ const add_ghost = fn () => do:
   return ()
 
 const update = fn () => do:
-  for system in [move, add_ghost]:
+  for system in #[move, add_ghost]:
     use system ()
   return ()
 

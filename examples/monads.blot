@@ -20,3 +20,18 @@ const checked = fn candidate => do monad Result:
   return $ #Ok (value + 2)
 
 entry const result = fn () => Result.unwrap_or 0 (checked (#Ok 40))
+
+// Monadic loops use Maybe.iterate, whose steps finish before the next begins.
+const sum_present = fn count => do try:
+  let total = 0
+  for index in 0 .. count:
+    use value <- #Some 1
+    total := self + value
+  return total
+
+entry const large_loop = fn () => Maybe.unwrap_or 0 (sum_present 100000)
+
+// The same iteration protocol is available through ordinary function calls.
+const step = fn count =>
+  if count < 42 then #Some (#Continue (count + 1)) else #Some (#Done count)
+entry const iterated = fn () => Maybe.unwrap_or 0 (Maybe.iterate 0 step)

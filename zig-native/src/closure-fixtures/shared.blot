@@ -1,0 +1,10 @@
+infixl 60 (+) = combine
+const combine = fn left => fn right => @u32.add left right
+const U32.add = fn left => fn right => @u32.add left right
+const F32.add = fn left => fn right => @f32.add left right
+data Box a = #Box { value: a }
+const Box.get = fn receiver => receiver.value
+type Cell a is effect = { get: Unit -> a, set: a -> Unit }
+const reader = @effect.provider (Cell.get U32) (fn () => 40)
+const identity = fn value => value
+const twice = fn value => value

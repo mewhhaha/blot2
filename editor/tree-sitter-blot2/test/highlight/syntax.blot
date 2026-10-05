@@ -350,12 +350,12 @@ effect Random.next: Unit -> U32
 // <- keyword.storage.type
 //     ^ type
 
-#[component]
+@[component]
 // <- punctuation.special
 //^ attribute
 data Position = #Position { x: F32 }
 
-#[resource]
+@[resource]
 //^ attribute
 data Time = #Time { seconds: F32 }
 

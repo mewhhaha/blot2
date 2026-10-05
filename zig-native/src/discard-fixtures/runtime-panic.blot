@@ -1,0 +1,4 @@
+const identity = fn value => value
+entry const answer = fn (value: U32) => do:
+  let ignored = (identity, (fn input => @panic "runtime operand") value, @u32.div 1 0)
+  return 0

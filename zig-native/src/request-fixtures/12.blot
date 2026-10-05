@@ -1,0 +1,18 @@
+
+type Validate is effect = { check: U32 -> U32 }
+type Input is effect = { read: Unit -> U32 }
+const checked = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        yield value
+      complete value =>
+        return value
+entry const answer = fn () => do (@effect.provider Input.read (fn () => 2)):
+  return checked (@computation (fn () => do:
+    use left <- Validate.check 40
+    use right <- Input.read ()
+    return @u32.add left right
+  ))
+
+entry const checked_answer = answer ()

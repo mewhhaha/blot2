@@ -1,0 +1,212 @@
+//! A separate principal prepass importer. Ordinary artifact admission remains
+//! exact. Changed declarations never borrow old principal facts or values.
+const std = @import("std");
+const core = @import("core.zig");
+const core_eval = @import("core_eval.zig");
+const semantic = @import("type_evidence.zig");
+const types = @import("types.zig");
+const capture = @import("artifact_capture.zig");
+const importer = @import("artifact_import.zig");
+const identity = @import("runtime_identity.zig");
+const gate = @import("principal_reuse_gate.zig");
+const Allocator = std.mem.Allocator;
+
+pub const GraphMode = enum { eager, lazy, primitive };
+
+pub const Stats = struct {
+    projected_empty_hits: usize = 0,
+    projected_empty_declines: usize = 0,
+    input_image_checks: usize = 0,
+    dependency_validations: usize = 0,
+    graph_importers_initialized: usize = 0,
+    empty_hits: usize = 0,
+    primitive_hits: usize = 0,
+    primitive_fallbacks: usize = 0,
+    primitive_key_declined: usize = 0,
+    nonempty_requests: usize = 0,
+    requests: usize = 0,
+    fresh_unit_requests: usize = 0,
+    fresh_unit_hits: usize = 0,
+    hits: usize = 0,
+    changed_or_unsupported: usize = 0,
+    missing: usize = 0,
+    evidence_declined: usize = 0,
+    options_declined: usize = 0,
+    captured: usize = 0,
+    fresh_regions: usize = 0,
+};
+pub const State = struct {
+    allocator: Allocator,
+    old: *const capture.Capture,
+    gate: gate.Gate,
+    /// Borrowed current identity stays alive through this compile, like Core.
+    names: ?identity.View,
+    graphs: ?importer.Importer = null,
+    graph_mode: GraphMode,
+    reuse_projected_inputs: bool = false,
+    input_image_equal: ?bool = null,
+    last_inputs: ?*const @import("principal_inputs.zig").Key = null,
+    stats: Stats = .{},
+
+    /// Old Core and Pools stay immutable/alive through this candidate. Only
+    /// this distinct importer's stability flags receive the checked namespace
+    /// gate; retained code fragments keep their existing exact Core gate.
+    pub fn init(allocator: Allocator, old: *const capture.Capture, units: []const core.Module, names: ?identity.View, graph_mode: GraphMode) Allocator.Error!State {
+        return initWithExecution(allocator, old, units, names, graph_mode, .{});
+    }
+    pub fn initWithExecution(allocator: Allocator, old: *const capture.Capture, units: []const core.Module, names: ?identity.View, graph_mode: GraphMode, execution: gate.Gate.Execution) Allocator.Error!State {
+        var admission = try gate.Gate.initWithExecution(allocator, &old.metadata.pools.?, units, names, execution);
+        errdefer admission.deinit();
+        var result: State = .{ .allocator = allocator, .old = old, .gate = admission, .names = names, .graph_mode = graph_mode, .stats = .{ .dependency_validations = admission.dependency_validations } };
+        errdefer if (result.graphs) |*graphs| graphs.deinit();
+        if (graph_mode == .eager and !try result.ensureGraphs()) result.gate.enabled = false;
+        result.reuse_projected_inputs = execution.reuse_projected_principals;
+        return result;
+    }
+    /// Build with the original graph validation. No importer owner is published
+    /// until every allocation and structural stability update has succeeded.
+    fn ensureGraphs(self: *State) Allocator.Error!bool {
+        if (self.graphs) |*graphs| return graphs.enabled;
+        var graphs = try importer.Importer.init(self.allocator, &self.old.metadata.pools.?, self.gate.units, self.names, self.gate.units.len);
+        if (!self.gate.enabled or !graphs.enabled) {
+            graphs.deinit();
+            return false;
+        }
+        for (graphs.stable, self.gate.structural_units) |*stable, structural| stable.* = structural;
+        self.graphs = graphs;
+        self.stats.graph_importers_initialized += 1;
+        return true;
+    }
+    const PrimitiveResult = union(enum) { fallback, declined, solved: core_eval.SolvedEvidence };
+
+    /// Only admitted owner-qualified source variables and the canonical U32
+    /// leaf cross this boundary. No foreign semantic graph or value is owned.
+    fn primitiveEvidence(self: *const State, generator: anytype, owner: u32, type_maps: []const semantic.Mapping, row_maps: []const semantic.RowMapping) Allocator.Error!PrimitiveResult {
+        if (row_maps.len != 0 or type_maps.len == 0) return .fallback;
+        // Gate admission established the exact ordered producer namespace.
+        // Keep bounds explicit here before dereferencing either source owner.
+        if (generator.evaluator.units.len != self.gate.units.len or generator.evaluator.units.ptr != self.gate.units.ptr) return .declined;
+        const pools = &self.old.metadata.pools.?;
+        if (owner == 0 or owner > pools.modules.len or owner > self.gate.units.len) return .declined;
+        const pin = pools.modules[owner - 1];
+        if (pin.unit != owner or !self.gate.structural_units[owner - 1]) return .declined;
+        const previous = pin.module;
+        const current = &self.gate.units[owner - 1];
+        for (type_maps, 0..) |mapping, i| {
+            if (mapping.variable == 0 or mapping.variable >= previous.types.nodes.len or mapping.variable >= current.types.nodes.len) return .declined;
+            if (previous.types.nodes[mapping.variable].tag != .variable or current.types.nodes[mapping.variable].tag != .variable) return .declined;
+            if (!std.meta.eql(previous.types.nodes[mapping.variable], current.types.nodes[mapping.variable])) return .declined;
+            for (type_maps[0..i]) |prior| if (prior.variable == mapping.variable) return .declined;
+        }
+        const old_view = pools.evaluator.evidence.view();
+        const current_view = generator.evaluator.evidence.view();
+        if (!canonicalPrefix(old_view) or !canonicalPrefix(current_view)) return .fallback;
+        if (!sourceU32(previous) or !sourceU32(current)) return .fallback;
+        for (type_maps) |mapping| if (mapping.evidence != types.u32_type) return .fallback;
+        // Resolve the primitive through the CURRENT semantic owner. The old
+        // mapping ordinal is never itself the translated result.
+        const current_u32 = generator.evaluator.evidence.intern(.u32, 0, 0, &.{}) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else .fallback;
+        if (current_u32 >= current_view.nodes.len or !std.meta.eql(current_view.nodes[current_u32], semantic.Node{ .tag = .u32 })) return .fallback;
+        const copied = try self.allocator.alloc(semantic.Mapping, type_maps.len);
+        for (type_maps, copied) |from, *to| to.* = .{ .variable = from.variable, .evidence = current_u32 };
+        return .{ .solved = .{ .types = copied, .rows = &.{} } };
+    }
+
+    fn canonicalPrefix(view: semantic.View) bool {
+        const tags = [_]semantic.Tag{ .absent, .unit, .boolean, .u32, .f32, .never };
+        if (view.nodes.len < tags.len or view.effects.rows.len == 0) return false;
+        if (view.effects.rows[0].start != 0 or view.effects.rows[0].len != 0) return false;
+        for (view.nodes[0..tags.len], tags) |node, tag| if (!std.meta.eql(node, semantic.Node{ .tag = tag })) return false;
+        return true;
+    }
+    fn sourceU32(module: *const core.Module) bool {
+        if (module.types.nodes.len <= types.u32_type) return false;
+        const node = module.types.nodes[types.u32_type];
+        return node.tag == .u32 and node.a == 0 and node.b == 0 and node.c == 0;
+    }
+    pub fn deinit(self: *State) void {
+        if (self.graphs) |*graphs| graphs.deinit();
+        self.gate.deinit();
+        self.* = undefined;
+    }
+    fn inputImageEqual(self: *State) bool {
+        if (self.input_image_equal) |known| return known;
+        self.stats.input_image_checks += 1;
+        for (self.gate.units, self.old.metadata.pools.?.modules) |*current, previous| {
+            if (!@import("principal_input_image.zig").moduleEqual(previous.module, current)) {
+                self.input_image_equal = false;
+                return false;
+            }
+        }
+        self.input_image_equal = true;
+        return true;
+    }
+    pub fn lookup(self: *State, generator: anytype, target: core.BindingRef, options: core_eval.Options) Allocator.Error!?core_eval.SolvedEvidence {
+        self.last_inputs = null;
+        self.stats.requests += 1;
+        if (target.unit > self.old.cached_units) self.stats.fresh_unit_requests += 1;
+        const exact = self.gate.admitsPrincipal(target);
+        if (!exact and !(self.reuse_projected_inputs and self.gate.enabled)) {
+            self.stats.changed_or_unsupported += 1;
+            return null;
+        }
+        // last_inputs is consumed by the provider's record callback after
+        // lookup returns. Borrow the owned proof, never a loop-local copy.
+        for (self.old.metadata.principal_proofs.items) |*proof| {
+            if (!std.meta.eql(proof.target, target)) continue;
+            if (!std.meta.eql(proof.options, options)) {
+                self.stats.options_declined += 1;
+                return null;
+            }
+            const empty = proof.types.len == 0 and proof.rows.len == 0;
+            if (!exact) {
+                if (generator.evaluator.units.ptr != self.gate.units.ptr or generator.evaluator.units.len != self.gate.units.len) {
+                    self.stats.projected_empty_declines += 1;
+                    return null;
+                }
+                if (empty) if (proof.inputs) |*inputs| if (inputs.matches(&generator.evaluator) and self.inputImageEqual()) {
+                    self.last_inputs = inputs;
+                    self.stats.projected_empty_hits += 1;
+                    self.stats.hits += 1;
+                    self.stats.empty_hits += 1;
+                    if (target.unit > self.old.cached_units) self.stats.fresh_unit_hits += 1;
+                    return .{ .types = &.{}, .rows = &.{} };
+                };
+                self.stats.projected_empty_declines += 1;
+                return null;
+            }
+            if (!empty) self.stats.nonempty_requests += 1;
+            const solved: core_eval.SolvedEvidence = if (empty and self.graph_mode != .eager)
+                .{ .types = &.{}, .rows = &.{} }
+            else blk: {
+                if (self.graph_mode == .primitive) switch (try self.primitiveEvidence(generator, target.unit, proof.types, proof.rows)) {
+                    .solved => |facts| {
+                        self.stats.primitive_hits += 1;
+                        break :blk facts;
+                    },
+                    .declined => {
+                        self.stats.primitive_key_declined += 1;
+                        self.stats.evidence_declined += 1;
+                        return null;
+                    },
+                    .fallback => self.stats.primitive_fallbacks += 1,
+                };
+                if (!try self.ensureGraphs()) {
+                    self.stats.evidence_declined += 1;
+                    return null;
+                }
+                break :blk (try self.graphs.?.importPrincipalEvidence(generator, target.unit, proof.types, proof.rows)) orelse {
+                    self.stats.evidence_declined += 1;
+                    return null;
+                };
+            };
+            if (proof.inputs) |*inputs| self.last_inputs = inputs;
+            if (empty) self.stats.empty_hits += 1;
+            self.stats.hits += 1;
+            if (target.unit > self.old.cached_units) self.stats.fresh_unit_hits += 1;
+            return solved;
+        }
+        self.stats.missing += 1;
+        return null;
+    }
+};

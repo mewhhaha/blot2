@@ -1,0 +1,3 @@
+const make = fn (offset: U32) => fn (value: U32) => @u32.add offset value
+const saved = make 7
+entry const answer: U32 -> U32 = saved

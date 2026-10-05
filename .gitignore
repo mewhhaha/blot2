@@ -7,3 +7,6 @@ __pycache__/
 /editor/tree-sitter-blot2/*.so
 /editor/tree-sitter-blot2/*.dylib
 /editor/tree-sitter-blot2/*.dll
+
+/.zig-cache/
+/zig-out-collections/

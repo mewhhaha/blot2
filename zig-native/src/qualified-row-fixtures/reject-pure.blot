@@ -1,0 +1,16 @@
+infixl 60 (+) = add
+type Tick is effect = Unit -> Unit
+const add = fn left => fn right => @type.call "add" left right
+type Box is data = #Box U32
+const Box.add = fn left => fn right => do:
+  let #Box a=left
+  let #Box b=right
+  return #Box (@u32.add a b)
+const twice: a -> a ! {Tick} where { associated "add" a a a ! {Tick} } = fn value => do:
+  use Tick ()
+  return value + value
+entry const answer = fn () => do (@effect.provider Tick (fn () => ())):
+  use boxed <- twice (#Box 21)
+  let #Box value=boxed
+  return value
+entry const folded=answer ()

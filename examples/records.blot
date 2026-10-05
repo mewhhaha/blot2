@@ -16,7 +16,7 @@ const coordinate = fn body => case body of
 
 const origin = #Vec2 { y: 2.0, x: 20.0 }
 const movement = #Vec2 { x: 20.0, y: 1.0 }
-const bodies = [#Body { payload: #Selected { index: 2 }, position: origin + movement }]
+const bodies = #[#Body { payload: #Selected { index: 2 }, position: origin + movement }]
 
 entry const expected = coordinate (@array.get bodies 0)
 entry const answer = fn () => coordinate (@array.get bodies 0)

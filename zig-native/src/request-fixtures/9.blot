@@ -1,0 +1,15 @@
+
+type Counter is effect = { next: Unit -> U32 }
+const calculation = @computation (fn () => Counter.next ())
+const count = fn computation => do:
+  let current = 39
+  for request in @requests computation:
+    case request of
+      effect Counter.next () =>
+        current := @u32.add self 1
+        yield current
+      complete value =>
+        return value
+entry const answer = fn () => @u32.add (count calculation) (count calculation)
+
+entry const checked_answer = answer ()

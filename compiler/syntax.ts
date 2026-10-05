@@ -9,20 +9,16 @@ import {
   type Token,
 } from "../generated/wasm/mod.ts";
 import schema from "../generated/wasm/cst-schema.json" with { type: "json" };
-import { encodeCompactCst, postfixStarts } from "./compact_cst.ts";
+import { postfixStarts } from "./postfix_syntax.ts";
+import { NumericParser } from "./numeric_parser.ts";
 
-export type CstList = { readonly $: "Nil" } | {
-  readonly $: "Con";
-  readonly head: Cst;
-  readonly tail: CstList;
-};
 export interface Cst {
   readonly $: "Cst";
   readonly kind: string;
   readonly field: string;
   readonly text: string;
   readonly offset: bigint;
-  readonly children: CstList;
+  readonly children: readonly Cst[];
 }
 
 export interface PreparedSource {
@@ -37,6 +33,17 @@ export interface ParseRange {
   readonly end?: number;
   readonly tokenStart?: number;
   readonly tokenEnd?: number;
+}
+
+export interface SyntaxFrontend {
+  lex(source: string): ReturnType<ParserInstance["lex"]>;
+  prepare(source: string): PreparedSource;
+  parsePrepared(
+    prepared: PreparedSource,
+    options?: ParseRange & { readonly offsetAt?: (position: number) => bigint },
+  ): { root: Cst; nodeCount: bigint };
+  parse(source: string): { root: Cst; nodeCount: bigint };
+  dispose(): void;
 }
 
 function annotationWhere(
@@ -251,7 +258,22 @@ export function layout(source: string, lexer: ParserInstance) {
       }
     } else if (brokenLine) {
       const frame = frames.at(-1)!;
-      const suite = previous.text === ":" || previous.text === "of";
+      let requestClause = false;
+      if (previous.text === "=>") {
+        let first = index - 1;
+        while (
+          first > 0 &&
+          !/[\r\n]/.test(
+            source.slice(tokens[first - 1].span.end, tokens[first].span.start),
+          )
+        ) first--;
+        requestClause = ["effect", "complete"].includes(tokens[first].text) &&
+          !tokens.slice(first, index - 1).some((token) =>
+            ["=", "fn", "=>"].includes(token.text)
+          );
+      }
+      const suite = previous.text === ":" || previous.text === "of" ||
+        requestClause;
       if (suite || depth === frame.depth) {
         const width = lineIndent(token);
         if (suite) {
@@ -269,7 +291,7 @@ export function layout(source: string, lexer: ParserInstance) {
           (width === frame.indent && token.text === "|")
         ) {
           // An indented continuation extends the preceding expression. Only
-          // ':' and 'of' open suites. Leading | also joins pattern alternatives
+          // ':', 'of', and request-clause arrows open suites. Leading | also joins pattern alternatives
           // aligned with their first row.
         } else {
           let markers = newline;
@@ -326,8 +348,10 @@ export function layout(source: string, lexer: ParserInstance) {
   return { source: parts.join(""), originalOffsets };
 }
 
+export type SyntaxParser = Pick<CpuFrontend, "plan" | "ingest">;
+
 function materialize(
-  frontend: CpuFrontend,
+  frontend: SyntaxParser,
   program: CompactFrontendProgram,
   source: string,
   offsetAt: (position: number) => bigint,
@@ -345,8 +369,8 @@ function materialize(
     const start = program.nodes[base + 2];
     const edgeStart = program.nodes[base + 4];
     const edgeCount = program.nodes[base + 5];
-    let children: CstList = { $: "Nil" };
-    for (let index = edgeCount - 1; index >= 0; index--) {
+    const children: Cst[] = [];
+    for (let index = 0; index < edgeCount; index++) {
       const edge = (edgeStart + index) * 4;
       const fieldId = program.edges[edge];
       const label = fieldId < 0 ? "" : schema.fields[fieldId];
@@ -368,10 +392,10 @@ function materialize(
           text,
           field: label,
           offset: offsetAt(from),
-          children: { $: "Nil" },
+          children: [],
         };
       } else throw new Error(`Unknown Baba edge category ${category}`);
-      children = { $: "Con", head: child, tail: children };
+      children.push(child);
     }
     return {
       $: "Cst",
@@ -388,16 +412,16 @@ function materialize(
   return { root, nodeCount: BigInt(count + 1) };
 }
 
-export async function createFrontend() {
+export async function createFrontend(
+  makeParser: (cpu: CpuFrontend) => SyntaxParser = (cpu) =>
+    new NumericParser(cpu),
+): Promise<SyntaxFrontend> {
   const [bytes, plan] = await Promise.all([
     Deno.readFile(new URL("../generated/wasm/parser.wasm", import.meta.url)),
     Deno.readFile(new URL("../generated/wasm/parser.plan", import.meta.url)),
   ]);
   const lexer = createParser({ bytes, plan });
-  const parser = CpuFrontend.create(plan);
-  const rules = new Map(
-    parser.plan.islands.map((island) => [island.ruleId, island.ruleName]),
-  );
+  const parser = makeParser(CpuFrontend.create(plan));
   const materializeProgram = (
     program: CompactFrontendProgram,
     source: string,
@@ -458,18 +482,6 @@ export async function createFrontend() {
     },
     prepare,
     parsePrepared,
-    encodePrepared(
-      prepared: PreparedSource,
-      sourceBase: number,
-    ) {
-      return encodeCompactCst(
-        compactPrepared(prepared, {}),
-        rules,
-        prepared.source,
-        prepared.originalOffsets,
-        sourceBase,
-      );
-    },
     parse(source: string) {
       return parsePrepared(prepare(source));
     },

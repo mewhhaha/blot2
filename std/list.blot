@@ -1,0 +1,15 @@
+const generate = fn count => fn generator => @list.generate count generator
+const fill = fn count => fn value => @list.fill count value
+const from_array = fn values => @list.from_array values
+const to_array = fn values => @array.from_list values
+const length = fn values => @list.length values
+const is_empty = fn values => List.is_empty values
+const append = fn value => fn values => [...values, value]
+const prepend = fn value => fn values => [value, ...values]
+const map = fn transform => fn (values: List a) => [transform value | value <- values]
+const filter = fn predicate => fn (values: List a) => [value | value <- values, predicate value]
+const fold_left = fn reduce => fn initial => fn (values: List a) => do:
+  let state = initial
+  for value in values:
+    state := reduce state value
+  return state

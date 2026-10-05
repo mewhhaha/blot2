@@ -1,0 +1,33 @@
+data Maybe a = #Some a | #None
+entry const guard_bound = fn (flag:Bool) => do:
+  let #Some value = if flag then #Some 42 else #None else:
+    let stop = @panic "bound"
+  return value
+entry const guard_wild = fn (flag:Bool) => do:
+  let #Some value = if flag then #Some 42 else #None else:
+    let _ = @panic "wildcard"
+  return value
+entry const guard_tuple = fn (flag:Bool) => do:
+  let #Some value = if flag then #Some 42 else #None else:
+    let (left,right) = @panic "tuple"
+  return value
+entry const guard_float = fn (flag:Bool) => do:
+  let #Some value = if flag then #Some 42.5 else #None else:
+    let (left,right) = @panic "float tuple"
+  return value
+entry const tuple_panic: Unit -> U32 = fn () => do:
+  let (left,right) = @panic "never destructure"
+  return 42
+entry const tuple_float: Unit -> F32 = fn () => do:
+  let (left,right) = @panic "never destructure float"
+  return 42.5
+entry const partial_value = fn (flag:Bool) => do:
+  let value = if flag then 42 else @panic "initializer"
+  return value
+entry const folded = guard_tuple (@u32.eq 1 1)
+entry const observed = fn (host: Unit -> U32 ! {Foreign}) => do:
+  use flag <- host ()
+  let #Some value = if @u32.eq flag 0 then #None else #Some 42 else:
+    host ()
+    let (left,right) = @panic "after host"
+  return value

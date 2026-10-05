@@ -1,19 +1,17 @@
-# Bend
+# Working on Blot
 
-When using Bend:
-
-- Use the latest released Bend. Check the installed version before each build
-  batch, since the user may update it; keep the compiler, Base, and JavaScript
-  loader on the same release throughout that batch.
-- Run `bend guide` to learn it.
-- Use `LAWS.bend` to keep important rules.
-- Run `bend PROOF.bend` before committing.
-- Parallelize the code whenever possible.
-
-## Generated output and upstream issues
-
-- Use Bend's generated output unchanged. Do not patch emitted C or JavaScript.
-- Adapt Blot source or its host interfaces when integration changes are needed.
-- Record suspected Bend bugs in `BUGS.md`, with the affected version, evidence,
-  and a reproducer. Distinguish correctness bugs from performance limitations.
+- Use Zig 0.17.0. Check `zig version` before each build batch.
+- The compiler lives in `zig-native/`; Deno hosts its client, formatter and Wasm
+  guest API.
+- Read `compiler/guide.md` for language behavior and `zig-native/CONTRACT.md`
+  for ownership rules.
+- Use `deno task build:compiler` for release builds and
+  `deno task build:compiler:dev` for incremental compiler development.
+- Keep semantic regression laws in Zig and executed-Wasm tests. Run
+  `deno task test:compiler` before committing compiler changes.
+- Use `../zig-analyzer/zig-out/bin/zig-analyzer check zig-native/src` when
+  available.
+- Preserve uncommitted work. Measure fresh builds and retained edits separately.
+- Do not patch generated output to fix compiler behavior; change the compiler or
+  its inputs.
 - File or comment on upstream issues only after the user's explicit approval.

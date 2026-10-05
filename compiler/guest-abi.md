@@ -1,8 +1,7 @@
 # Guest ABI 2: numeric arrays and explicit host capabilities
 
-This is the implemented boundary, not the broader
-[record/buffer/persistent-state proposal](host-api-proposal.md). Run
-`just demo-host` for [the executable example](../examples/host_io.blot).
+This is the implemented host boundary. See
+[the executable host example](../examples/host_io.blot).
 
 ```blot
 entry const main = fn (advance: U32 -> U32 ! {Foreign}) => do:

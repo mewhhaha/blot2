@@ -1,26 +1,30 @@
-/** Blot source compiler and guest API for Deno applications. */
+/** Blot's Zig project compiler and WebAssembly guest API. */
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
-  createNativeCompiler as startNativeCompiler,
-  type NativeCompiler,
-  type NativeCompilerOptions,
-} from "./compiler/native.ts";
-import { extractNativeCompiler } from "./compiler/packaged_native.ts";
+  createZigProjectCompiler,
+  type ZigProjectCompiler,
+  type ZigProjectCompilerOptions,
+} from "./compiler/zig_project_client.ts";
+import {
+  extractNativeCompiler,
+  extractStandardLibrary,
+} from "./compiler/packaged_native.ts";
 
-export { createSourceCompiler } from "./compiler/source.ts";
+export { createZigProjectCompiler } from "./compiler/zig_project_client.ts";
+export type {
+  ZigProjectBuildOptions,
+  ZigProjectBuildResult,
+  ZigProjectBuildStats,
+  ZigProjectCompiler,
+  ZigProjectCompilerOptions,
+  ZigProjectDiagnostic,
+} from "./compiler/zig_project_client.ts";
 export {
-  createSourceProjectLoader,
-  loadSourceProject,
-} from "./compiler/source_project.ts";
-export { instantiateGuest, readGuestAbi } from "./compiler/guest.ts";
-export type {
-  NativeCompiler,
-  NativeCompilerOptions,
-} from "./compiler/native.ts";
-export type {
-  ProjectOptions,
-  SourceProject,
-  SourceProjectLoader,
-} from "./compiler/source_project.ts";
+  GuestError,
+  instantiateGuest,
+  readGuestAbi,
+} from "./compiler/guest.ts";
 export type {
   AsyncHostCallback,
   Guest,
@@ -28,39 +32,108 @@ export type {
   HostCallback,
 } from "./compiler/guest.ts";
 
-export const blotPackageRoot: URL = new URL("./", import.meta.url);
 export const blotStdRoot: URL = new URL("./std/", import.meta.url);
-export const blotNativeBinary: URL = new URL(
+/** Include this payload when bundling the host into a desktop executable. */
+export const blotCompilerBinary: URL = new URL(
   "./generated/compiler/blotc.gz",
   import.meta.url,
 );
-export const blotParserDirectory: URL = new URL(
-  "./generated/wasm/",
-  import.meta.url,
-);
+export type CompilerOptions = Omit<ZigProjectCompilerOptions, "executable"> & {
+  executable?: string | URL;
+};
 
-export async function createNativeCompiler(
-  options: NativeCompilerOptions = {},
-): Promise<NativeCompiler> {
-  if (options.executable !== undefined) return startNativeCompiler(options);
-  const native = await extractNativeCompiler();
+/** Keep this compiler open across builds to reuse unchanged project work.
+ * The packaged compiler and prelude are defaults; null disables the prelude. */
+export async function createCompiler(
+  options: CompilerOptions,
+): Promise<ZigProjectCompiler> {
+  const path = (value: string | URL): string =>
+    resolve(value instanceof URL ? fileURLToPath(value) : value);
+  // Capture paths before extracting the package or starting the child process.
+  const captured = {
+    ...options,
+    entry: path(options.entry),
+    prelude: options.prelude === null
+      ? null
+      : path(options.prelude ?? new URL("prelude.blot", blotStdRoot)),
+    stdRoot: options.stdRoot === null
+      ? null
+      : path(options.stdRoot ?? blotStdRoot),
+    dependencies: options.dependencies == null
+      ? options.dependencies
+      : path(options.dependencies),
+    imports: options.imports &&
+      Object.fromEntries(
+        Object.entries(options.imports).map((
+          [name, value],
+        ) => [name, path(value)]),
+      ),
+    executable: options.executable === undefined
+      ? undefined
+      : path(options.executable),
+  };
+  const defaultPrelude = options.prelude === undefined;
+  const defaultRoot = options.stdRoot === undefined;
+  const embeddedLibrary = Deno.build.standalone &&
+    (defaultPrelude || defaultRoot);
+  if (captured.executable !== undefined && !embeddedLibrary) {
+    return createZigProjectCompiler({
+      ...captured,
+      executable: captured.executable,
+    });
+  }
+  let native: Awaited<ReturnType<typeof extractNativeCompiler>> | undefined;
+  let library: Awaited<ReturnType<typeof extractStandardLibrary>> | undefined;
+  let cleanup: Promise<void> | undefined;
+  const remove = () =>
+    cleanup ??= (async () => {
+      try {
+        await native?.dispose();
+      } finally {
+        await library?.dispose();
+      }
+    })();
   try {
-    const compiler = await startNativeCompiler({
-      ...options,
-      executable: native.path,
+    if (embeddedLibrary) {
+      library = await extractStandardLibrary();
+      if (defaultPrelude) {
+        captured.prelude = resolve(library.path, "prelude.blot");
+      }
+      if (defaultRoot) captured.stdRoot = library.path;
+    }
+    if (captured.executable === undefined) {
+      native = await extractNativeCompiler();
+      captured.executable = native.path;
+    }
+    const compiler = await createZigProjectCompiler({
+      ...captured,
+      executable: captured.executable,
     });
     return {
-      ...compiler,
+      get pid() {
+        return compiler.pid;
+      },
+      get compilerIdentity() {
+        return compiler.compilerIdentity;
+      },
+      build: (buildOptions) => compiler.build(buildOptions),
+      async close() {
+        try {
+          await compiler.close();
+        } finally {
+          await remove();
+        }
+      },
       async dispose() {
         try {
           await compiler.dispose();
         } finally {
-          await native.dispose();
+          await remove();
         }
       },
     };
   } catch (error) {
-    await native.dispose();
+    await remove();
     throw error;
   }
 }

@@ -1,0 +1,10 @@
+const make_adder = fn value => fn other => @u32.add value other
+const compose = fn first => fn second => fn value => first (second value)
+entry const add_forty = make_adder 40
+entry const expected = add_forty 2
+entry const answer = fn () => do:
+  let value = 999
+  let increment = make_adder 1
+  let result = compose increment add_forty
+  return result 1
+entry const folded = answer ()

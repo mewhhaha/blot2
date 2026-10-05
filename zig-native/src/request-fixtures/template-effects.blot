@@ -1,0 +1,24 @@
+data Count value = #Count value
+type Tick is effect = { read: Unit -> U32 }
+const witness = fn () -> Count U32 => @panic "type witness executed"
+const counted = fn action => do:
+  use previous <- @state.get witness
+  let #Count old = previous
+  use @state.set (#Count (@u32.add old 1))
+  return @computation action
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Tick.read () =>
+        yield 20
+      complete value =>
+        return value
+entry const answer = fn () => do:
+  let (#Count count, value) = @state.run (#Count 0) (fn () => do:
+    use computation <- counted (fn () => Tick.read ())
+    let first = handled computation
+    let second = handled computation
+    return @u32.add first second
+  )
+  return @u32.add count value
+entry const folded = answer ()

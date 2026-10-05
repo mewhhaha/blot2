@@ -283,9 +283,7 @@
       {
         "rule": "array",
         "boundary": {
-          "kind": "paired",
-          "open": "[",
-          "close": "]"
+          "kind": "root"
         }
       },
       {
@@ -415,6 +413,38 @@
         }
       },
       {
+        "rule": "reply",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "loop_exit",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "request_case",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "request_case_suite",
+        "boundary": {
+          "kind": "terminated",
+          "terminal": "LAYOUT_DEDENT"
+        }
+      },
+      {
+        "rule": "request_arm",
+        "boundary": {
+          "kind": "terminated",
+          "terminal": "LAYOUT_NEWLINE"
+        }
+      },
+      {
         "rule": "pattern_conditional",
         "boundary": {
           "kind": "root"
@@ -502,6 +532,92 @@
       },
       {
         "rule": "boolean_constructor_pattern",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "list",
+        "boundary": {
+          "kind": "paired",
+          "open": "[",
+          "close": "]"
+        }
+      },
+      {
+        "rule": "collection_open",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "collection_spread",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "collection_cons",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "comprehension",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "comprehension_qualifier",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "generator",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "comprehension_binding",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "comprehension_guard",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "collection_expression",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "collection_lambda",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "collection_if",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "collection_infix",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "collection_infix_tail",
         "boundary": {
           "kind": "root"
         }

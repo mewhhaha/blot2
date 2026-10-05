@@ -8,11 +8,13 @@
 "->" @operator
 "." @punctuation.delimiter
 ".." @operator
+"..." @operator
 ":" @punctuation.delimiter
 ":=" @operator
 "<-" @operator
 "=" @operator
 "=>" @operator
+"@" @operator
 "[" @punctuation.bracket
 "]" @punctuation.bracket
 "^" @operator
@@ -29,6 +31,11 @@
 (case_arm "if" @keyword)
 (case_expression "case" @keyword)
 (case_expression "of" @keyword)
+(collection_if "else" @keyword)
+(collection_if "if" @keyword)
+(collection_if "then" @keyword)
+(collection_lambda "fn" @keyword)
+(comprehension_binding "let" @keyword)
 (conditional "if" @keyword)
 (constructor_reference value: "False" @keyword)
 (constructor_reference value: "True" @keyword)
@@ -62,6 +69,11 @@
 (pattern_conditional "if" @keyword)
 (pattern_conditional "let" @keyword)
 (range_statement "for" @keyword)
+(reply "yield" @keyword)
+(request_arm kind: "complete" @keyword)
+(request_arm kind: "effect" @keyword)
+(request_case "case" @keyword)
+(request_case "of" @keyword)
 (result "return" @keyword)
 (symbolic_fixity associativity: "infix" @keyword)
 (symbolic_fixity associativity: "infixl" @keyword)
@@ -93,6 +105,7 @@
 (STRING) @string
 (INTRINSIC) @function.builtin
 (COMMENT) @comment
+(comprehension_binding name: (IDENT) @variable)
 (data_type name: (TYPE_IDENT) @type)
 (effect_binding name: (IDENT) @variable)
 (effect_type name: (TYPE_IDENT) @type)

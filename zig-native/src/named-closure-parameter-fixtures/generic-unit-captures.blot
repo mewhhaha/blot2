@@ -1,0 +1,5 @@
+const keep = fn () => fn value => fn () => value
+const integer = keep () 42
+const floating = keep () 1.75
+entry const answer: Unit -> U32 = integer
+entry const other: Unit -> F32 = floating

@@ -127,7 +127,7 @@ export type LiteralKind =
   | "{"
   | ","
   | "}"
-  | "#"
+  | "@"
   | "["
   | "]"
   | "const"
@@ -141,6 +141,7 @@ export type LiteralKind =
   | "->"
   | "data"
   | "|"
+  | "#"
   | "infixl"
   | "infixr"
   | "infix"
@@ -160,6 +161,8 @@ export type LiteralKind =
   | "if"
   | "then"
   | "else"
+  | "..."
+  | "<-"
   | "do"
   | "case"
   | "of"
@@ -169,8 +172,10 @@ export type LiteralKind =
   | ".."
   | "ever"
   | "use"
-  | "<-"
-  | "return";
+  | "return"
+  | "yield"
+  | "break"
+  | "complete";
 
 export type AnyLiteralKind = LiteralKind extends never
   ? string
@@ -279,7 +284,16 @@ export type RuleName =
   | "record_values"
   | "record_value"
   | "group"
+  | "list"
   | "array"
+  | "collection_open"
+  | "collection_spread"
+  | "collection_cons"
+  | "comprehension"
+  | "comprehension_qualifier"
+  | "generator"
+  | "comprehension_binding"
+  | "comprehension_guard"
   | "do_block"
   | "case_expression"
   | "case_suite"
@@ -305,9 +319,19 @@ export type RuleName =
   | "effect_binding"
   | "effect_step"
   | "result"
+  | "reply"
+  | "loop_exit"
+  | "request_case"
+  | "request_case_suite"
+  | "request_arm"
   | "pattern_conditional"
   | "conditional"
-  | "else_clause";
+  | "else_clause"
+  | "collection_expression"
+  | "collection_lambda"
+  | "collection_if"
+  | "collection_infix"
+  | "collection_infix_tail";
 
 export interface TokenCursor<
   TokenType extends "named" | "literal" = "named" | "literal",
@@ -692,10 +716,73 @@ export interface GroupCursor extends RuleCursorBase<"group"> {
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
-export interface ArrayCursor extends RuleCursorBase<"array"> {
-  field(name: "elements"): ReadonlyArray<ExpressionCursor>;
+export interface ListCursor extends RuleCursorBase<"list"> {
+  field(name: "elements"): ReadonlyArray<CollectionExpressionCursor>;
   field(name: string): CursorFieldValue | undefined;
-  fieldArray(name: "elements"): ReadonlyArray<ExpressionCursor>;
+  fieldArray(name: "elements"): ReadonlyArray<CollectionExpressionCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ArrayCursor extends RuleCursorBase<"array"> {
+  field(name: "elements"): ReadonlyArray<CollectionExpressionCursor>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "elements"): ReadonlyArray<CollectionExpressionCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface CollectionOpenCursor extends RuleCursorBase<"collection_open"> {
+}
+
+export interface CollectionSpreadCursor extends RuleCursorBase<"collection_spread"> {
+  field(name: "opening"): CollectionOpenCursor;
+  field(name: "prefix"): ReadonlyArray<CollectionExpressionCursor>;
+  field(name: "suffix"): ReadonlyArray<CollectionExpressionCursor>;
+  field(name: "tail"): CollectionExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "prefix"): ReadonlyArray<CollectionExpressionCursor>;
+  fieldArray(name: "suffix"): ReadonlyArray<CollectionExpressionCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface CollectionConsCursor extends RuleCursorBase<"collection_cons"> {
+  field(name: "elements"): ReadonlyArray<CollectionExpressionCursor>;
+  field(name: "opening"): CollectionOpenCursor;
+  field(name: "tail"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "elements"): ReadonlyArray<CollectionExpressionCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ComprehensionCursor extends RuleCursorBase<"comprehension"> {
+  field(name: "body"): CollectionExpressionCursor;
+  field(name: "first"): GeneratorCursor;
+  field(name: "opening"): CollectionOpenCursor;
+  field(name: "rest"): ReadonlyArray<ComprehensionQualifierCursor>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "rest"): ReadonlyArray<ComprehensionQualifierCursor>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ComprehensionQualifierCursor extends RuleCursorBase<"comprehension_qualifier"> {
+}
+
+export interface GeneratorCursor extends RuleCursorBase<"generator"> {
+  field(name: "name"): TokenCursor<"named", "IDENT">;
+  field(name: "value"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ComprehensionBindingCursor extends RuleCursorBase<"comprehension_binding"> {
+  field(name: "name"): TokenCursor<"named", "IDENT">;
+  field(name: "value"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ComprehensionGuardCursor extends RuleCursorBase<"comprehension_guard"> {
+  field(name: "value"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
@@ -790,7 +877,7 @@ export interface SuiteCursor extends RuleCursorBase<"suite"> {
 }
 
 export interface StatementCursor extends RuleCursorBase<"statement"> {
-  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ResultCursor;
+  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | LoopExitCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -869,6 +956,37 @@ export interface ResultCursor extends RuleCursorBase<"result"> {
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
+export interface ReplyCursor extends RuleCursorBase<"reply"> {
+  field(name: "value"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface LoopExitCursor extends RuleCursorBase<"loop_exit"> {
+}
+
+export interface RequestCaseCursor extends RuleCursorBase<"request_case"> {
+  field(name: "body"): RequestCaseSuiteCursor;
+  field(name: "request"): TokenCursor<"named", "IDENT">;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface RequestCaseSuiteCursor extends RuleCursorBase<"request_case_suite"> {
+  field(name: "arms"): ReadonlyArray<RequestArmCursor>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface RequestArmCursor extends RuleCursorBase<"request_arm"> {
+  field(name: "body"): SuiteCursor;
+  field(name: "kind"): TokenCursor<"literal", "complete"> | TokenCursor<"literal", "effect">;
+  field(name: "operation"): GroupCursor | QualifiedNameCursor | null;
+  field(name: "pattern"): PatternCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
 export interface PatternConditionalCursor extends RuleCursorBase<"pattern_conditional"> {
   field(name: "consequence"): SuiteCursor;
   field(name: "fallback"): ElseClauseCursor | null;
@@ -888,6 +1006,42 @@ export interface ConditionalCursor extends RuleCursorBase<"conditional"> {
 
 export interface ElseClauseCursor extends RuleCursorBase<"else_clause"> {
   field(name: "alternative"): SuiteCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface CollectionExpressionCursor extends RuleCursorBase<"collection_expression"> {
+  field(name: "value"): CaseExpressionCursor | CollectionIfCursor | CollectionInfixCursor | CollectionLambdaCursor | DoBlockCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface CollectionLambdaCursor extends RuleCursorBase<"collection_lambda"> {
+  field(name: "body"): CollectionExpressionCursor;
+  field(name: "parameter"): ParameterCursor;
+  field(name: "result"): readonly [TokenCursor<"literal", "->">, TypeExpressionCursor] | null;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface CollectionIfCursor extends RuleCursorBase<"collection_if"> {
+  field(name: "alternative"): CollectionExpressionCursor;
+  field(name: "condition"): CollectionInfixCursor;
+  field(name: "consequence"): CollectionExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface CollectionInfixCursor extends RuleCursorBase<"collection_infix"> {
+  field(name: "head"): PrefixExpressionCursor;
+  field(name: "tails"): ReadonlyArray<CollectionInfixTailCursor>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface CollectionInfixTailCursor extends RuleCursorBase<"collection_infix_tail"> {
+  field(name: "argument"): CaseExpressionCursor | CollectionIfCursor | CollectionLambdaCursor | DoBlockCursor | PrefixExpressionCursor;
+  field(name: "operator"): TokenCursor<"literal", "$"> | TokenCursor<"literal", "*"> | TokenCursor<"literal", "^"> | NamedOperatorCursor | TokenCursor<"named", "SYMBOL">;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -943,7 +1097,16 @@ export type AnyRuleCursor =
   | RecordValuesCursor
   | RecordValueCursor
   | GroupCursor
+  | ListCursor
   | ArrayCursor
+  | CollectionOpenCursor
+  | CollectionSpreadCursor
+  | CollectionConsCursor
+  | ComprehensionCursor
+  | ComprehensionQualifierCursor
+  | GeneratorCursor
+  | ComprehensionBindingCursor
+  | ComprehensionGuardCursor
   | DoBlockCursor
   | CaseExpressionCursor
   | CaseSuiteCursor
@@ -969,9 +1132,19 @@ export type AnyRuleCursor =
   | EffectBindingCursor
   | EffectStepCursor
   | ResultCursor
+  | ReplyCursor
+  | LoopExitCursor
+  | RequestCaseCursor
+  | RequestCaseSuiteCursor
+  | RequestArmCursor
   | PatternConditionalCursor
   | ConditionalCursor
-  | ElseClauseCursor;
+  | ElseClauseCursor
+  | CollectionExpressionCursor
+  | CollectionLambdaCursor
+  | CollectionIfCursor
+  | CollectionInfixCursor
+  | CollectionInfixTailCursor;
 
 export type RuleCursor<N extends RuleName = RuleName> = Extract<
   AnyRuleCursor,

@@ -1,0 +1,17 @@
+data Count value = #Count value
+const witness = fn () -> Count U32 => @panic "witness ran"
+const identity = fn value => value
+const keep = fn ~value => fn () => @force value
+const mark = fn (digit: U32) => do:
+  use previous <- @state.get witness
+  let #Count old = previous
+  use @state.set (#Count (@u32.add (@u32.mul old 10) digit))
+  return @u32.to_f32 digit
+entry const answer = fn () => do:
+  let (#Count count, _) = @state.run (#Count 0) (fn () => do:
+    let delayed = keep (mark 7)
+    use ignored <- (identity, (mark 1, #[mark 2, mark 3], #[mark 4, mark 5, mark 6], delayed (), @array.fill 2 (mark 8), fn () => @panic "unused body ran"))
+    return ()
+  )
+  return count
+entry const folded = answer ()

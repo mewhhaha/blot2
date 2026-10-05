@@ -1,0 +1,10 @@
+
+type Inspect a is effect = a -> a
+const inspected = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect (Inspect U32) value =>
+        yield @u32.add value 2
+      complete value =>
+        return value
+entry const answer = fn () => inspected (@computation (fn () => Inspect U32 40))

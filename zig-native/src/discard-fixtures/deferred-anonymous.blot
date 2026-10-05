@@ -1,0 +1,4 @@
+const identity = fn value => value
+entry const answer = fn () => do:
+  let unused = (identity, fn value => value.no_such_member)
+  return 42

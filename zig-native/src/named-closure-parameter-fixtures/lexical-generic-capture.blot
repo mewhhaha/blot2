@@ -1,0 +1,5 @@
+const make = fn () => do:
+  let captured = 40
+  return fn (value: U32) => @u32.add captured value
+const saved = make ()
+entry const answer: U32 -> U32 = saved

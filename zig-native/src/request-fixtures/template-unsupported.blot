@@ -1,0 +1,17 @@
+type Tick is effect = { read: Unit -> U32 }
+const make = fn action => do:
+  let token = @u32.add 1 1
+  return @computation action
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Tick.read () =>
+        return 42.5
+      complete value =>
+        return value
+entry const answer = fn () => do:
+  let computation = make (fn () => do:
+    use Tick.read ()
+    return @panic "cancelled generic computation continued"
+  )
+  return handled computation

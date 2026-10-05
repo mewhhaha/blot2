@@ -1,0 +1,298 @@
+// The bootstrap prelude is ordinary Blot source. @u32.* and @f32.* are primitives.
+// Operators use ordinary functions with compile-time associated dispatch.
+infixr 0 ($) = apply
+infixr 20 (||) = or
+infixr 25 (&&) = and
+infixl 5 (|>) = pipe
+infix 30 (==) = eq
+infix 30 (!=) = ne
+infix 30 (<) = lt
+infix 30 (<=) = le
+infix 30 (>) = gt
+infix 30 (>=) = ge
+infixl 40 (|) = bit_or
+infixl 45 (^) = bit_xor
+infixl 50 (&) = bit_and
+infixl 55 (<<) = shl
+infixl 55 (>>) = shr
+infixl 60 (+) = add
+infixl 60 (-) = sub
+infixl 70 (*) = mul
+infixl 70 (/) = div
+infixl 70 (%) = rem
+
+const add = fn left => fn right => @type.call "add" left right
+const sub = fn left => fn right => @type.call "sub" left right
+const mul = fn left => fn right => @type.call "mul" left right
+const div = fn left => fn right => @type.call "div" left right
+const rem = fn left => fn right => @type.call "rem" left right
+const bit_and = fn left => fn right => @type.call "bit_and" left right
+const bit_or = fn left => fn right => @type.call "bit_or" left right
+const bit_xor = fn left => fn right => @type.call "bit_xor" left right
+const shl = fn value => fn count => @type.call "shl" value count
+const shr = fn value => fn count => @type.call "shr" value count
+const bit_not = fn value => value.bit_not
+const eq = fn left => fn right => @type.call "eq" left right
+const ne = fn left => fn right => @type.call "ne" left right
+const lt = fn left => fn right => @type.call "lt" left right
+const le = fn left => fn right => @type.call "le" left right
+const gt = fn left => fn right => @type.call "gt" left right
+const ge = fn left => fn right => @type.call "ge" left right
+
+type Maybe a is data = #Some a | #Nothing
+type Result [value, error] is data = #Ok value | #Err error
+type Iteration [state, result] is data = #Continue state | #Done result
+type Type witness is data = #Type witness
+
+// The expected result selects its type's ordinary `from` member.
+const from = fn value => @type.result "from" value
+
+// A resolver sequences through the selected type's ordinary pure/bind members.
+const monad = fn constructor => @do.monad constructor
+const F32.from = fn value => value.to_f32
+const U32.from = fn value => value.to_u32
+const F32.to_f32 = fn (value: F32) => value
+const U32.to_u32 = fn (value: U32) => value
+
+const identity = fn value => value
+const apply = fn function => fn value => function value
+const pipe = fn value => fn function => function value
+const always = fn value => fn ignored => value
+const compose = fn outer => fn inner => fn value => outer (inner value)
+const flip = fn combine => fn right => fn left => combine left right
+const on = fn combine => fn project => fn left => fn right =>
+  combine (project left) (project right)
+
+const Bool.not = fn value => case value of
+  #True => #False
+  #False => #True
+
+const Type.eq = fn left => fn right => case left, right of
+  #Type a, #Type b => @type.same a b
+const Type.ne = fn left => fn right => Bool.not (Type.eq left right)
+
+const U32.add = fn left => fn right => @u32.add left right
+const U32.sub = fn left => fn right => @u32.sub left right
+const U32.mul = fn left => fn right => @u32.mul left right
+// Division/remainder require a nonzero divisor. Shifts use the low five bits.
+const U32.div = fn left => fn right => @u32.div left right
+const U32.rem = fn left => fn right => @u32.rem left right
+const U32.bit_and = fn left => fn right => @u32.bit_and left right
+const U32.bit_or = fn left => fn right => @u32.bit_or left right
+const U32.bit_xor = fn left => fn right => @u32.bit_xor left right
+const U32.bit_not = fn value => @u32.bit_xor value 0xFFFFFFFF
+const U32.shl = fn value => fn count => @u32.shl value count
+const U32.shr = fn value => fn count => @u32.shr value count
+const U32.abs = fn value => value
+const U32.eq = fn left => fn right => @u32.eq left right
+const U32.lt = fn left => fn right => @u32.lt left right
+const U32.ne = fn left => fn right => Bool.not (U32.eq left right)
+const U32.le = fn left => fn right => Bool.not (U32.lt right left)
+const U32.gt = fn left => fn right => U32.lt right left
+const U32.ge = fn left => fn right => Bool.not (U32.lt left right)
+const U32.to_f32 = fn value => @u32.to_f32 value
+
+const F32.add = fn left => fn right => @f32.add left right
+const F32.sub = fn left => fn right => @f32.sub left right
+const F32.mul = fn left => fn right => @f32.mul left right
+const F32.div = fn left => fn right => @f32.div left right
+const F32.eq = fn left => fn right => @f32.eq left right
+const F32.ne = fn left => fn right => @f32.ne left right
+const F32.lt = fn left => fn right => @f32.lt left right
+const F32.le = fn left => fn right => @f32.le left right
+const F32.gt = fn left => fn right => @f32.gt left right
+const F32.ge = fn left => fn right => @f32.ge left right
+const F32.neg = fn value => @f32.neg value
+const F32.abs = fn value => @f32.abs value
+const F32.sqrt = fn value => @f32.sqrt value
+const F32.floor = fn value => @f32.floor value
+const F32.ceil = fn value => @f32.ceil value
+const F32.trunc = fn value => @f32.trunc value
+// Truncates toward zero and saturates; NaN/negative values become zero.
+const F32.to_u32 = fn value => @f32.to_u32 value
+const F32.min = fn left => fn right => case F32.lt left right of
+  #True => left
+  #False => right
+const F32.max = fn left => fn right => case F32.gt left right of
+  #True => left
+  #False => right
+const F32.clamp = fn low => fn high => fn value =>
+  F32.min high (F32.max low value)
+const F32.lerp = fn left => fn right => fn weight =>
+  F32.add left (F32.mul (F32.sub right left) weight)
+const F32.square = fn value => F32.mul value value
+const F32.length3 = fn x => fn y => fn z =>
+  F32.sqrt (F32.add (F32.add (F32.square x) (F32.square y)) (F32.square z))
+const F32.is_finite = fn value => F32.le (F32.abs value) 3.402823466e38
+
+// A positive finite period wraps finite values into [0, period).
+const F32.wrap = fn period => fn value => do:
+  let wrapped = F32.sub value (F32.mul period (F32.floor (F32.div value period)))
+  if F32.ge wrapped period:
+    return 0.0
+  if F32.lt wrapped 0.0:
+    return F32.add wrapped period
+  return wrapped
+
+const F32.lerp_angle = fn left => fn right => fn weight => do:
+  let difference = F32.sub (F32.wrap 6.283185307 (F32.add (F32.sub right left) 3.141592654)) 3.141592654
+  return F32.add left (F32.mul difference weight)
+
+// Split 2*pi keeps range reduction accurate for |radians| <= 8192.
+// Outside that explicit range, trig returns NaN instead of inaccurate geometry.
+const f32_reduced_radians = fn value => do:
+  if F32.gt (F32.abs value) 8192.0:
+    return F32.div 0.0 0.0
+  let turns = F32.floor (F32.add (F32.mul value 0.15915494309189535) 0.5)
+  return F32.sub (F32.sub value (F32.mul turns 6.28125)) (F32.mul turns 0.001935307179586477)
+
+// Fold to [-pi/2, pi/2], then evaluate the degree-11 Taylor polynomial.
+const f32_sin_reduced = fn angle => do:
+  let x = case F32.gt angle 1.570796327 of
+    #True => F32.sub 3.141592654 angle
+    #False => case F32.lt angle (-1.570796327) of
+      #True => F32.sub (-3.141592654) angle
+      #False => angle
+  let square = F32.square x
+  let term_9 = F32.add 2.755731922398589e-6 (F32.mul square (-2.505210838544172e-8))
+  let term_7 = F32.add (-1.984126984126984e-4) (F32.mul square term_9)
+  let term_5 = F32.add 8.333333333333333e-3 (F32.mul square term_7)
+  let term_3 = F32.add (-1.666666666666667e-1) (F32.mul square term_5)
+  return F32.mul x (F32.add 1.0 (F32.mul square term_3))
+
+const f32_cos_reduced = fn value => do:
+  let angle = F32.abs value
+  let outside = F32.gt angle 1.570796327
+  let x = case outside of
+    #True => F32.sub 3.141592654 angle
+    #False => angle
+  let square = F32.square x
+  let term_10 = F32.add (-2.755731922398589e-7) (F32.mul square 2.08767569878681e-9)
+  let term_8 = F32.add 2.48015873015873e-5 (F32.mul square term_10)
+  let term_6 = F32.add (-1.388888888888889e-3) (F32.mul square term_8)
+  let term_4 = F32.add 4.166666666666667e-2 (F32.mul square term_6)
+  let term_2 = F32.add (-0.5) (F32.mul square term_4)
+  let result = F32.add 1.0 (F32.mul square term_2)
+  return case outside of
+    #True => F32.neg result
+    #False => result
+
+const F32.sin = fn value => f32_sin_reduced (f32_reduced_radians value)
+const F32.cos = fn value => f32_cos_reduced (f32_reduced_radians value)
+const F32.sin_cos = fn value => do:
+  let angle = f32_reduced_radians value
+  return (f32_sin_reduced angle, f32_cos_reduced angle)
+
+// Like division, tan is unbounded near odd multiples of pi/2.
+const F32.tan = fn value => F32.div (F32.sin value) (F32.cos value)
+
+const pi = 3.141592653589793
+const tau = 6.283185307179586
+const abs = fn value => value.abs
+const min = fn left => fn right => case left < right of
+  #True => left
+  #False => right
+const max = fn left => fn right => case left > right of
+  #True => left
+  #False => right
+const clamp = fn low => fn high => fn value => min high (max low value)
+const lerp = fn left => fn right => @type.call "lerp" left right
+const square = fn value => value * value
+const sqrt = F32.sqrt
+const floor = F32.floor
+const ceil = F32.ceil
+const trunc = F32.trunc
+const sin = F32.sin
+const cos = F32.cos
+const tan = F32.tan
+const sin_cos = F32.sin_cos
+const wrap = F32.wrap
+const lerp_angle = F32.lerp_angle
+const is_finite = F32.is_finite
+const saturate = clamp 0.0 1.0
+const smoothstep = fn low => fn high => fn value => do:
+  let t = saturate ((value - low) / (high - low))
+  return t * t * (3.0 - 2.0 * t)
+
+const Maybe.pure = fn value => #Some value
+const Maybe.map = fn transform => fn candidate => case candidate of
+  #Some value => #Some (transform value)
+  #Nothing => #Nothing
+const Maybe.bind = fn candidate => fn next => case candidate of
+  #Some value => next value
+  #Nothing => #Nothing
+// Finish each callback before advancing, so iteration uses constant stack.
+const Maybe.iterate = fn initial => fn step => do:
+  let state = initial
+  for ever:
+    use candidate <- step state
+    if let #Some (#Done result) = candidate:
+      return #Some result
+    let #Some (#Continue next) = candidate else:
+      return #Nothing
+    state := next
+const Maybe.unwrap_or = fn fallback => fn candidate => case candidate of
+  #Some value => value
+  #Nothing => fallback
+const Maybe.is_some = fn candidate => case candidate of
+  #Some _ => #True
+  #Nothing => #False
+const Maybe.filter = fn predicate => fn candidate => case candidate of
+  #Some value => case predicate value of
+    #True => candidate
+    #False => #Nothing
+  #Nothing => #Nothing
+const Maybe.flatten = fn candidate => case candidate of
+  #Some inner => inner
+  #Nothing => #Nothing
+const Maybe.unwrap_or_else = fn ~fallback => fn candidate => case candidate of
+  #Some value => value
+  #Nothing => @force fallback
+const Maybe.to_result = fn error => fn candidate => case candidate of
+  #Some value => #Ok value
+  #Nothing => #Err error
+
+const Result.pure = fn value => #Ok value
+const Result.map = fn transform => fn candidate => case candidate of
+  #Ok value => #Ok (transform value)
+  #Err error => #Err error
+const Result.map_error = fn transform => fn candidate => case candidate of
+  #Ok value => #Ok value
+  #Err error => #Err (transform error)
+const Result.bind = fn candidate => fn next => case candidate of
+  #Ok value => next value
+  #Err error => #Err error
+const Result.iterate = fn initial => fn step => do:
+  let state = initial
+  for ever:
+    use candidate <- step state
+    let (next, finished) = case candidate of
+      #Ok (#Continue next) => (next, #Nothing)
+      #Ok (#Done result) => (state, #Some (#Ok result))
+      #Err error => (state, #Some (#Err error))
+    if let #Some result = finished:
+      return result
+    state := next
+const Result.unwrap_or = fn fallback => fn candidate => case candidate of
+  #Ok value => value
+  #Err _ => fallback
+const Result.to_maybe = fn candidate => case candidate of
+  #Ok value => #Some value
+  #Err _ => #Nothing
+
+const Array.length: Array a -> U32 = fn values => @array.length values
+const Array.is_empty: Array a -> Bool = fn values => Array.length values == 0
+const Array.get: Array a -> U32 -> Maybe a = fn values => fn index => do:
+  if index < Array.length values:
+    return #Some (@array.get values index)
+  return #Nothing
+const Array.set: Array a -> U32 -> a -> Maybe (Array a) = fn values => fn index => fn value => do:
+  if index < Array.length values:
+    return #Some (@array.set values index value)
+  return #Nothing
+
+// Ordinary source functions; the checked ~ parameter retains its demand mode.
+const and = fn (left: Bool) => fn ~(right: Bool) =>
+  if left then @force right else #False
+const or = fn (left: Bool) => fn ~(right: Bool) =>
+  if left then #True else @force right

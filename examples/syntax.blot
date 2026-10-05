@@ -28,11 +28,11 @@ const unwrap_or_else = fn candidate => fn fallback => case candidate of
   #Nothing => fallback ()
 
 entry const short_circuit = fn () => do:
-  let empty: Array U32 = []
+  let empty: Array U32 = #[]
   return and_then #False (fn () => (@array.get empty 0) > 0)
 
 entry const lazy_fallback = fn () => do:
-  let empty: Array U32 = []
+  let empty: Array U32 = #[]
   return unwrap_or_else (#Some 42) (fn () => @array.get empty 0)
 
 entry const factorial = fn value => do:
@@ -67,7 +67,7 @@ entry const vector_example = fn () => do:
   return position >< scaled
 
 entry const array_snapshot = fn () => do:
-  let original = [1, 2, 3]
+  let original = #[1, 2, 3]
   let next = @array.set original 1 20
   return (@array.get original 1) + (@array.get next 1)
 

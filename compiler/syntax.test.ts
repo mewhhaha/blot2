@@ -1,6 +1,6 @@
 import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import { createFrontend, type Cst, SourceError } from "./syntax.ts";
-import { bendArray } from "./bend_list.ts";
+const syntaxChildren = (children: readonly Cst[]) => children;
 
 Deno.test("selector markers remain ordinary text inside comments and strings", async () => {
   const frontend = await createFrontend();
@@ -38,7 +38,7 @@ function normalizedNodes(root: Cst, source: string) {
   const pending = [root];
   const nodes = [];
   for (let node = pending.pop(); node; node = pending.pop()) {
-    const children = bendArray(node.children);
+    const children = syntaxChildren(node.children);
     nodes.push({
       kind: node.kind,
       field: node.field,
@@ -73,7 +73,7 @@ const use_state = fn (unit: Unit) -> U32 ! {State U32, Reader.ask} => 1
     const nodes: Cst[] = [];
     for (let node = pending.pop(); node; node = pending.pop()) {
       nodes.push(node);
-      pending.push(...bendArray(node.children));
+      pending.push(...syntaxChildren(node.children));
     }
     equal(nodes.filter((node) => node.kind === "data_type").length, 2);
     equal(nodes.filter((node) => node.kind === "effect_type").length, 3);
@@ -86,12 +86,12 @@ const use_state = fn (unit: Unit) -> U32 ! {State U32, Reader.ask} => 1
     );
     const row = nodes.find((node) => node.kind === "effect_row");
     ok(row);
-    const labels = bendArray(row.children).filter((node) =>
+    const labels = syntaxChildren(row.children).filter((node) =>
       node.kind === "type_application" && node.field === "labels"
     );
     equal(labels.length, 2);
     equal(
-      bendArray(labels[0].children).filter((node) =>
+      syntaxChildren(labels[0].children).filter((node) =>
         node.kind === "type_atom" && node.field === "arguments"
       ).length,
       1,

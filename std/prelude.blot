@@ -41,6 +41,7 @@ const ge = fn left => fn right => @type.call "ge" left right
 
 type Maybe a is data = #Some a | #Nothing
 type Result [value, error] is data = #Ok value | #Err error
+type Iteration [state, result] is data = #Continue state | #Done result
 type Type witness is data = #Type witness
 
 // The expected result selects its type's ordinary `from` member.
@@ -220,6 +221,16 @@ const Maybe.map = fn transform => fn candidate => case candidate of
 const Maybe.bind = fn candidate => fn next => case candidate of
   #Some value => next value
   #Nothing => #Nothing
+// Finish each callback before advancing, so iteration uses constant stack.
+const Maybe.iterate = fn initial => fn step => do:
+  let state = initial
+  for ever:
+    use candidate <- step state
+    if let #Some (#Done result) = candidate:
+      return #Some result
+    let #Some (#Continue next) = candidate else:
+      return #Nothing
+    state := next
 const Maybe.unwrap_or = fn fallback => fn candidate => case candidate of
   #Some value => value
   #Nothing => fallback
@@ -251,6 +262,17 @@ const Result.map_error = fn transform => fn candidate => case candidate of
 const Result.bind = fn candidate => fn next => case candidate of
   #Ok value => next value
   #Err error => #Err error
+const Result.iterate = fn initial => fn step => do:
+  let state = initial
+  for ever:
+    use candidate <- step state
+    let (next, finished) = case candidate of
+      #Ok (#Continue next) => (next, #Nothing)
+      #Ok (#Done result) => (state, #Some (#Ok result))
+      #Err error => (state, #Some (#Err error))
+    if let #Some result = finished:
+      return result
+    state := next
 const Result.unwrap_or = fn fallback => fn candidate => case candidate of
   #Ok value => value
   #Err _ => fallback
@@ -259,6 +281,10 @@ const Result.to_maybe = fn candidate => case candidate of
   #Err _ => #Nothing
 
 const Array.length: Array a -> U32 = fn values => @array.length values
+const Array.from_list: List a -> Array a = fn values => @array.from_list values
+const List.from_array: Array a -> List a = fn values => @list.from_array values
+const List.length: List a -> U32 = fn values => @list.length values
+const List.is_empty: List a -> Bool = fn values => List.length values == 0
 const Array.is_empty: Array a -> Bool = fn values => Array.length values == 0
 const Array.get: Array a -> U32 -> Maybe a = fn values => fn index => do:
   if index < Array.length values:

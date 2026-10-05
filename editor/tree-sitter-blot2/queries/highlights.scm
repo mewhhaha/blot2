@@ -8,7 +8,8 @@
 ["if" "then" "else" "case" "of"] @keyword.control.conditional
 ["for" "in" "continue"] @keyword.control.repeat
 (ever_loop "ever" @keyword.control.repeat)
-["return" "break"] @keyword.control.return
+["return" "break" "yield"] @keyword.control.return
+(request_complete_header "complete" @keyword.control)
 ["do" "test"] @keyword.control
 
 (self) @variable.builtin
@@ -35,6 +36,7 @@
 (infix_function name: (identifier) @function)
 (infix_function qualifier: (identifier) @namespace)
 (lambda_header parameter: (identifier) @variable.parameter)
+(request_complete_header parameter: (identifier) @variable.parameter)
 (deferred_parameter (identifier) @variable.parameter)
 (deferred_parameter (parenthesized (identifier) @variable.parameter))
 (lambda_header parameter: (parenthesized (identifier) @variable.parameter))
@@ -44,7 +46,8 @@
 (method_call name: (identifier) @function.method)
 (declaration_tag callee: (tag_callee (identifier) @attribute))
 (declaration_tag callee: (tag_callee (type_identifier) @attribute))
-"#" @punctuation.special
+["#" "@"] @punctuation.special
+(spread) @operator
 (forward_return "$" @punctuation.special)
 
 (text_literal "\"" @string)

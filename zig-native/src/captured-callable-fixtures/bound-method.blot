@@ -1,0 +1,8 @@
+
+type Box is data = #Box { value: U32 }
+const Box.plus = fn box => fn delta => @u32.add box.value delta
+const invoke: a -> U32 where { receiver "plus" a Unit (U32 -> U32) } = fn box => do:
+  let bound = box.plus
+  return bound 1
+entry const answer = fn () => invoke (#Box { value: 41 })
+entry const folded = answer ()

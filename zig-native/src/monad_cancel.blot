@@ -1,0 +1,21 @@
+type Validate is effect = { check: U32 -> U32 }
+type Box value is data = #Box value
+const Box.pure = fn value => #Box value
+const Box.bind = fn candidate => fn next => case candidate of
+  #Box value => next value
+const checked = fn computation => do (@do.monad Box):
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        if @u32.eq value 0:
+          return 42.0
+        yield value
+      complete () =>
+        return 41.0
+entry const answer = fn (index: U32) => do:
+  let #Box value = checked (@computation (fn () => do:
+    use Validate.check index
+    return ()
+  ))
+  return @f32.to_u32 value
+entry const folded = answer 0

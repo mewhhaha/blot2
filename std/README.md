@@ -92,6 +92,7 @@ implementation.
 ```blot
 type Maybe a is data = #Some a | #Nothing
 type Result [value, error] is data = #Ok value | #Err error
+type Iteration [state, result] is data = #Continue state | #Done result
 ```
 
 Those declarations describe the prelude's types; do not redeclare them unless
@@ -103,6 +104,7 @@ and `#Some(value)` are equivalent in expressions and patterns.
 | `Maybe.pure value`                     | `#Some value`                                                        |
 | `Maybe.map transform candidate`        | Transforms a present value                                           |
 | `Maybe.bind candidate next`            | Calls `next` on a present value; `next` returns a `Maybe`            |
+| `Maybe.iterate initial step`           | Iterates with constant call stack; `#Nothing` stops immediately      |
 | `Maybe.unwrap_or fallback candidate`   | Extracts `#Some`, otherwise returns `fallback`                       |
 | `Maybe.is_some candidate`              | Returns a Bool                                                       |
 | `Maybe.to_result error candidate`      | Converts `#Some value` to `#Ok value`, or `#Nothing` to `#Err error` |
@@ -110,6 +112,7 @@ and `#Some(value)` are equivalent in expressions and patterns.
 | `Result.map transform candidate`       | Transforms only `#Ok`                                                |
 | `Result.map_error transform candidate` | Transforms only `#Err`                                               |
 | `Result.bind candidate next`           | Calls `next` on `#Ok`; `next` returns a `Result`                     |
+| `Result.iterate initial step`          | Iterates with constant call stack; preserves the first `#Err`        |
 | `Result.unwrap_or fallback candidate`  | Extracts `#Ok`, otherwise returns `fallback`                         |
 | `Result.to_maybe candidate`            | Keeps `#Ok` as `#Some`, discards `#Err` as `#Nothing`                |
 
@@ -155,6 +158,27 @@ own rules, and unrelated effects still require providers.
 `monad` is an ordinary prelude function. Declared data-type constructors such as
 `Maybe` can be aliased, imported, and passed through functions; user-defined
 monads supply their own associated `pure` and `bind` functions.
+
+Loops inside a monadic block also use its `iterate initial step` member. The
+callback receives a state and returns a wrapped `Iteration state result`:
+`#Continue next` advances with the next state; `#Done result` finishes with a
+result, which can have a different type. `#Nothing` or `#Err error` propagates
+immediately. Callback effects remain visible to callers. These functions also
+work as ordinary calls:
+
+```blot
+const step = fn count =>
+  if count < 42 then #Some (#Continue (count + 1)) else #Some (#Done count)
+entry const answer = fn () => Maybe.unwrap_or 0 (Maybe.iterate 0 step)
+```
+
+`Maybe.iterate` and `Result.iterate` finish each callback before starting the
+next, using constant call stack. For a custom monad `M`, `iterate` must
+implement the same result and sequencing as repeatedly binding `step state`:
+`#Continue` repeats and `#Done value` finishes with `M.pure value`. Its
+implementation is responsible for stack safety and any branching behavior of the
+monad. This does not make arbitrary recursion stack safe. Blocks without loops
+do not require an `iterate` member.
 
 `unwrap_or` is eager. `Maybe.unwrap_or_else fallback candidate` has a demand
 parameter: it evaluates `fallback` only for `#Nothing`, once per captured
@@ -298,14 +322,37 @@ Trigonometry uses split-constant range reduction and F32 polynomial evaluation,
 not host calls. `sin`/`cos` support `|radians| <= 8192`; nonfinite/out-of-domain
 arguments produce NaN. `tan` divides those approximations and is ill-conditioned
 near its poles. Keep accumulated game angles wrapped. The compiled numeric
-regressions in [prelude_math.test.ts](../compiler/prelude_math.test.ts) check
+regressions in [native prelude execution tests](../zig-native/tests/prelude_execution.test.ts) check
 native/JS parity and error over the supported domain.
 
 Host scalar exports use actual Wasm `f32` parameters/results and return normal
 JavaScript numbers. There is no compiler-specific ECS storage ABI. See
 [the ABI and lifetime boundary](../compiler/README.md#evaluation-and-wasm-representation).
 
-## Immutable arrays
+## Lists and arrays
+
+In the Zig compiler, `[1, 2]` has type `List U32`; `#[1, 2]` has type
+`Array U32`. They are separate types, with `List.from_array` and
+`Array.from_list` for explicit conversion. Both expose `length` and `is_empty`.
+Only arrays support indexing, indexed updates, `get`, and `set`. Numeric arrays
+remain the collection type accepted by the host ABI.
+
+Import [list.blot](list.blot) for `generate`, `fill`, `map`, `filter`,
+`fold_left`, `append`, and `prepend`. Spreads express prepend (`[value, ...values]`)
+and append (`[...values, value]`); use `#[...]` to construct an array instead.
+Comprehensions and `for` loops traverse either input collection. The opening
+bracket selects a comprehension's output type: `[x * x | x <- values, x > 0]`
+is a list. Convert a list to an array when indexed access is needed.
+
+Lists use doubly linked chunks of up to 256 elements. Traversal follows dense
+spans, and exclusive append/prepend reuses end slack or links a new chunk.
+Shared edits copy the list's contents, preserving earlier values. Arrays
+remain contiguous; their append/prepend copies the contents. Chunking favors
+traversal and construction, but does not make shared edits inexpensive.
+See [the list example](../examples/lists.blot) and
+[collection syntax](../compiler/guide.md#lists-arrays-and-libraries).
+
+### Array library
 
 Arrays expose prelude members without importing `std/array`: `values.length`,
 `values.is_empty`, `values.get(index)`, and `values.set(index)(replacement)`.
@@ -323,7 +370,7 @@ Import [array.blot](array.blot) for additional collection functions:
 ```blot
 import * as array from "std/array"
 
-const values: Array U32 = [10, 20, 12]
+const values: Array U32 = #[10, 20, 12]
 entry const answer = fn () => array.fold_left U32.add 0 values
 ```
 
@@ -351,10 +398,9 @@ locally owned storage when its last reference is consumed, including a single
 array carried through a loop. Shared arrays and values whose ownership is
 unknown are copied. The source folds and predicates use loops.
 
-The const evaluator stores arrays as immutable lists, so const indexing/length
-traverse elements and updates copy them. Large const folds can be quadratic
-despite constant-time Wasm reads. The step budget counts source evaluation and
-array-copy work, not elapsed time. Array spread/patterns and resizing remain
+The Zig const evaluator retains immutable collection values; append and update
+copy their elements. Large staged append loops can therefore be quadratic even
+when the runtime loop can reuse storage. Collection patterns remain
 unimplemented. Numeric arrays cross the host ABI as copied `Uint32Array` or
 `Float32Array` values; tuples and other composite values remain internal.
 
@@ -363,12 +409,10 @@ See [the executable array example](../examples/arrays.blot).
 ## Current boundary
 
 This prelude is a useful executable core, not the complete standard library. It
-does not yet provide array spread/pattern syntax, general text values, F64,
+does not yet provide collection patterns, general text values, F64,
 SIMD, general type-valued programming, or resumable handlers. The generic core
 supports closed source-declared operations, scoped providers, and compile-time
-effect descriptors. The [3D sandbox](../case-study/ecs/README.md) is paused
-while its compiler-specific backend is replaced by a source-defined ECS and
-explicit entrypoint IO capabilities. Literal strings are accepted as panic
+effect descriptors. Libraries provide application behavior through explicit entrypoint IO capabilities. Literal strings are accepted as panic
 messages, not as general runtime `Text` values or privileged asset/window
 operations.
 

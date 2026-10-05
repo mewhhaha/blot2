@@ -1,0 +1,20 @@
+
+type Validate is effect = { check: U32 -> U32 }
+const keep = fn ~value => fn () => @force value
+const checked = fn stop => fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        if @u32.eq stop 1:
+          return 40
+        yield 42
+      complete value =>
+        return value
+entry const answer = fn () => do:
+  let delayed = keep (Validate.check 0)
+  let calculation = @computation (fn () => delayed ())
+  let cancelled = checked 1 calculation
+  let completed = checked 0 calculation
+  return @u32.add cancelled completed
+
+entry const checked_answer = answer ()

@@ -1,0 +1,19 @@
+type Tick is effect = { read: Unit -> U32 }
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Tick.read () =>
+        return 42.5
+      complete value =>
+        return value
+const create = fn action => do:
+  let factory = fn callback => @computation (fn () => callback ())
+  return @computation (fn () => do:
+    let computation = factory action
+    return handled computation
+  )
+entry const answer = fn () => handled (create (fn () => do:
+  use Tick.read ()
+  return @panic "cancelled action continued"
+))
+entry const folded = answer ()

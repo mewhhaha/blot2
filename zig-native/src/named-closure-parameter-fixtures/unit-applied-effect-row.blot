@@ -1,0 +1,5 @@
+effect Read: Unit -> U32
+const make = fn () => fn () => Read ()
+const saved = make ()
+entry const answer = fn () => do (@effect.provider Read (fn () => 42)):
+  return saved ()

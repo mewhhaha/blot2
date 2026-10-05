@@ -1,0 +1,4 @@
+import { Box, Cell, reader, identity as id, twice } from "./shared"
+const integer: U32 -> U32 = fn value => do reader:
+  use saved <- Cell.get U32 ()
+  return @u32.add (twice (id (#Box { value: value }).get)) saved

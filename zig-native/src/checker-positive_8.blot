@@ -1,0 +1,16 @@
+
+type Validate is effect = { check: U32 -> U32 }
+const checked = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        if @u32.eq value 0:
+          return 42.0
+        yield value
+      complete () =>
+        return 41.0
+const calculation = @computation (fn () => do:
+  use Validate.check 0
+  return ()
+)
+entry const answer = fn () => @f32.to_u32 (checked calculation)

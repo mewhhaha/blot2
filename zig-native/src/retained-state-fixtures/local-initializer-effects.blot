@@ -1,0 +1,35 @@
+data Cell value = #Cell value
+data Count = #Count U32
+const witness32 = fn ignored -> Cell U32 => @panic "witness called"
+const witnessf = fn ignored -> Cell F32 => @panic "witness called"
+const handled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      complete value =>
+        return value
+entry const answer = fn () => do:
+  let (#Count count, result) = @state.run (#Count 0) (fn () => do:
+    use result32 <- @state.run (#Cell 40) (fn () => do:
+      let make = fn witness => do:
+        use previous_cell <- @state.get #Count
+        let #Count previous = previous_cell
+        use @state.set (#Count (@u32.add previous 1))
+        return @computation (fn () => @state.get witness)
+      use computation <- make witness32
+      return handled computation
+    )
+    let (#Cell state32, #Cell value32) = result32
+    use resultf <- @state.run (#Cell 2.5) (fn () => do:
+      let make = fn witness => do:
+        use previous_cell <- @state.get #Count
+        let #Count previous = previous_cell
+        use @state.set (#Count (@u32.add previous 1))
+        return @computation (fn () => @state.get witness)
+      use computation <- make witnessf
+      return handled computation
+    )
+    let (#Cell statef, #Cell valuef) = resultf
+    return @f32.add (@u32.to_f32 value32) valuef
+  )
+  return @f32.add result (@u32.to_f32 count)
+entry const folded = answer ()

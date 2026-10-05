@@ -1,0 +1,5 @@
+import * as left from "./left"
+import { floating as float_value } from "./right"
+import * as common from "./shared"
+entry const answer: Unit -> U32 = fn () => left.integer 1
+entry const floating: Unit -> F32 = fn () => float_value 1.25

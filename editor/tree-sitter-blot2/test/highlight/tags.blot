@@ -1,10 +1,10 @@
 const decorate = fn amount => fn value => value + amount
 
-#[decorate 1]
+@[decorate 1]
 //^ attribute
-#[library.decorate 2] entry const answer: U32 = 40
+@[library.decorate 2] entry const answer: U32 = 40
 //^ attribute
 //        ^ attribute
 
-#[fn value => value] entry let initialized = 42
+@[fn value => value] entry let initialized = 42
 // <- punctuation.special

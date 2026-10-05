@@ -1,0 +1,12 @@
+infixl 60 (+) = add
+const add = fn left => fn right => @type.call "add" left right
+const U32.add = fn left => fn right => @u32.add left right
+type Point is data = #Point {x:U32}
+type FloatPoint is data = #FloatPoint {x:F32}
+const Point.add = fn left => fn right => #Point {x: @u32.add left.x right.x}
+const coordinate = fn point => point.x
+const plus = fn left => fn right => left + right
+entry const integer = coordinate (#Point {x:42})
+entry const floating = coordinate (#FloatPoint {x:1.25})
+entry const aggregate = (plus (#Point {x:20}) (#Point {x:22})).x
+entry const scalar = @u32.add 20 22

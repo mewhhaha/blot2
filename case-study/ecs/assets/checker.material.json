@@ -1,6 +1,0 @@
-{
-  "shader": "scene.wgsl",
-  "texture": "checker.png",
-  "color": [1, 1, 1, 1],
-  "lighting": "lit"
-}

@@ -1,6 +1,6 @@
 grammar Blot
 
-// Precedence and name resolution belong to the Bend frontend, not the parser.
+// Precedence and name resolution belong to the semantic checker, not the parser.
 token IDENT = /[a-z_][a-z0-9_]*/ ;
 token TYPE_IDENT = /[A-Z][A-Za-z0-9_]*/ ;
 token INTEGER = /(0[xX][0-9A-Fa-f](_?[0-9A-Fa-f])*|[0-9](_?[0-9])*)/ ;
@@ -20,7 +20,7 @@ namespace_import = ("*" "as" name:IDENT) ;
 named_import = ("{" (bindings:import_binding ("," bindings:import_binding)* ","?)? "}") ;
 import_binding = (name:(IDENT | TYPE_IDENT) alias:("as" (IDENT | TYPE_IDENT))?) ;
 declaration = (attributes:declaration_attribute* value:(value_declaration | data_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
-declaration_attribute = ("#" body:attribute_name LAYOUT_NEWLINE?) ;
+declaration_attribute = ("@" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" value:expression "]") ;
 value_declaration = (modifier:IDENT? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
 effect_declaration = ("effect" name:qualified_name ":" signature:type_expression) ;
@@ -60,7 +60,7 @@ prefix_expression = (operator:(SYMBOL | "*" | "^")? value:application) ;
 named_operator = ("`" name:qualified_name "`") ;
 application = (head:atom arguments:(atom | member_access)*) ;
 member_access = ("." name:(IDENT | TYPE_IDENT)) ;
-atom = (FLOAT | INTEGER | STRING | INTRINSIC | selector | type_witness | constructor_reference | record | qualified_name | group | array | record_values) ;
+atom = (FLOAT | INTEGER | STRING | INTRINSIC | selector | type_witness | constructor_reference | record | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
 constructor_reference = ("#" value:(record | qualified_name | "True" | "False")) ;
 selector = ("·" name:(IDENT | TYPE_IDENT) ("." name:(IDENT | TYPE_IDENT))*) ;
 type_witness = (":" value:atom) ;
@@ -69,7 +69,16 @@ record = (name:qualified_name fields:record_values) ;
 record_values = ("{" (fields:record_value ("," fields:record_value)* ","?)? "}") ;
 record_value = (name:IDENT (":" value:expression)?) ;
 group = ("(" (value:expression ("," value:expression)*)? ")") ;
-array = ("[" (elements:expression ("," elements:expression)* ","?)? "]") ;
+list = ("[" (elements:collection_expression ("," elements:collection_expression)* ","?)? "]") ;
+array = ("#" "[" (elements:collection_expression ("," elements:collection_expression)* ","?)? "]") ;
+collection_open = ("#"? "[") ;
+collection_spread = (opening:collection_open (prefix:collection_expression ",")* "..." tail:collection_expression ("," suffix:collection_expression)* ","? "]") ;
+collection_cons = (opening:collection_open elements:collection_expression ("," elements:collection_expression)* "|" tail:expression "]") ;
+comprehension = (opening:collection_open body:collection_expression "|" first:generator ("," rest:comprehension_qualifier)* "]") ;
+comprehension_qualifier = (generator | comprehension_binding | comprehension_guard) ;
+generator = (name:IDENT "<-" value:expression) ;
+comprehension_binding = ("let" name:IDENT "=" value:expression) ;
+comprehension_guard = (value:expression) ;
 do_block = ("do" resolver:application? ":" body:suite) ;
 case_expression = ("case" values:expression ("," values:expression)* "of" body:case_suite) ;
 case_suite = (LAYOUT_NEWLINE LAYOUT_INDENT arms:case_arm* LAYOUT_DEDENT) ;
@@ -84,7 +93,7 @@ pattern_group = ("(" (value:pattern ("," value:pattern)*)? ")") ;
 record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_field)* ","?)? "}") ;
 record_pattern_field = (name:IDENT (":" value:pattern)?) ;
 suite = (LAYOUT_NEWLINE LAYOUT_INDENT statements:statement* LAYOUT_DEDENT) ;
-statement = (value:(binding | rebinding | effect_binding | effect_step | result | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
+statement = (value:(binding | rebinding | effect_binding | effect_step | result | reply | loop_exit | request_case | pattern_conditional | conditional | ever_statement | range_statement | for_statement | expression) LAYOUT_NEWLINE) ;
 binding = ("let" pattern:pattern annotation:(":" type_expression)? where:where_clause? "=" value:expression fallback:binding_else?) ;
 rebinding = (name:IDENT path:(member_access | index_access)* ":=" value:expression) ;
 index_access = ("[" index:expression "]") ;
@@ -96,6 +105,19 @@ binding_else = ("else" ":" alternative:suite) ;
 effect_binding = ("use" name:IDENT annotation:(":" type_expression)? "<-" value:expression) ;
 effect_step = ("use" value:expression) ;
 result = ("return" forwarding:"$"? value:expression) ;
+reply = ("yield" value:expression) ;
+loop_exit = ("break") ;
+request_case = ("case" request:IDENT "of" body:request_case_suite) ;
+request_case_suite = (LAYOUT_NEWLINE LAYOUT_INDENT arms:request_arm* LAYOUT_DEDENT) ;
+request_arm = (kind:"effect" operation:(qualified_name | group) pattern:pattern "=>" body:suite LAYOUT_NEWLINE | kind:"complete" pattern:pattern "=>" body:suite LAYOUT_NEWLINE) ;
 pattern_conditional = ("if" "let" pattern:pattern "=" value:expression ":" consequence:suite fallback:else_clause?) ;
 conditional = ("if" condition:expression ":" consequence:suite fallback:else_clause?) ;
 else_clause = (LAYOUT_NEWLINE? "else" ":" alternative:suite) ;
+
+// At this nesting level a pipe begins comprehension qualifiers or a cons tail.
+// Parenthesized and nested expressions retain the ordinary operator grammar.
+collection_expression = (value:(collection_lambda | do_block | case_expression | collection_if | collection_infix)) ;
+collection_lambda = ("fn" parameter:parameter result:("->" type_expression)? "=>" body:collection_expression) ;
+collection_if = ("if" condition:collection_infix "then" consequence:collection_expression "else" alternative:collection_expression) ;
+collection_infix = (head:prefix_expression tails:collection_infix_tail*) ;
+collection_infix_tail = (operator:(SYMBOL | "$" | "*" | "^" | named_operator) argument:(collection_lambda | do_block | case_expression | collection_if | prefix_expression)) ;

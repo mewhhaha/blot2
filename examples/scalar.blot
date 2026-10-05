@@ -1,4 +1,4 @@
-// Executable scalar slice: Baba parsing, Bend checking and Wasm emission.
+// Executable scalar slice: native parsing, checking and Wasm emission.
 entry const U32.increment = fn value => @u32.add value 1
 
 entry const base: U32 = @u32.add 20 21

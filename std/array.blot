@@ -38,7 +38,7 @@ const prefix_sums = fn (values: Array U32) => do:
 // Stable indices of True flags, with one carried array in the scatter loop.
 const indices = fn (keep: Array Bool) => do:
   if keep.is_empty:
-    return []
+    return #[]
   let ranks = prefix_sums (map (fn flag => case flag of
     #True => 1
     #False => 0) keep)
@@ -68,7 +68,7 @@ const flatten = fn chunks => do:
       #Nothing, #False => #Some chunk[0]
       _, _ => self
   return case seed of
-    #Nothing => []
+    #Nothing => #[]
     #Some first => do:
       let joined = fill ends[chunks.length - 1] first
       for index in 0..chunks.length:
@@ -83,7 +83,7 @@ const concat = fn left => fn right => do:
     return right
   if @array.length right == 0:
     return left
-  return flatten [left, right]
+  return flatten #[left, right]
 
 const push = fn value => fn values => do:
   let count = values.length

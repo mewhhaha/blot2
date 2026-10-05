@@ -1,0 +1,23 @@
+data Box = #Box (U32, U32)
+entry const capture = fn () => do:
+  let kept = (40, 2)
+  let use_it = fn () => @u32.add (@product.get kept 0) (@product.get kept 1)
+  return use_it ()
+entry const carry = fn () => do:
+  let kept = (40, 2)
+  for index in 0..2:
+    kept := (@u32.add (@product.get kept 0) 1, 0)
+  return @product.get kept 0
+entry const merged = fn (flag: Bool) => do:
+  let kept = (0, 0)
+  if flag:
+    kept := (40, 2)
+  else:
+    kept := (20, 22)
+  return @u32.add (@product.get kept 0) (@product.get kept 1)
+entry const value_pattern = fn () => do:
+  let needle = 41
+  let unused = (0, 0)
+  return case 41 of
+    needle => 42
+    _ => 0

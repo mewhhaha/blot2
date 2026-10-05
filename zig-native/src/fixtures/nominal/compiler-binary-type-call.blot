@@ -1,0 +1,4 @@
+infixl 60 (+) = add
+const add = fn left => fn right => @type.call "add" left right
+const U32.add = fn left => fn right => @u32.add left right
+entry const answer = @type.call "add" 20 22

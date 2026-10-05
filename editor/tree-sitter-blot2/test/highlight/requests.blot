@@ -1,0 +1,29 @@
+const complete = fn complete => complete
+//    ^ function
+//                  ^ variable.parameter
+//                              ^ variable
+
+const checked = fn computation => do:
+  for request in @requests computation:
+//               ^ function.builtin
+    case request of
+      effect Validate.check value =>
+//    ^ keyword.storage.type
+        if value == 0:
+          return 0
+        yield value
+//      ^ keyword.control.return
+      complete value =>
+//    ^ keyword.control
+//             ^ variable.parameter
+        return value
+
+const cancelled = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect (Reader.ask U32) () =>
+        break
+//      ^ keyword.control.return
+      complete _ =>
+        break
+  return 0

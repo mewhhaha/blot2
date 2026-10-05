@@ -1,0 +1,8 @@
+type Tick is effect = {read:Unit -> F32}
+type Box is data = #Box {callback:Unit -> F32 ! {Foreign}}
+entry const answer = fn (host:Unit -> F32 ! {Foreign}) => do:
+  let box=#Box {callback:host}
+  return do (@effect.provider Tick.read (fn () => 1.0)):
+    use value <- box.callback ()
+    use increment <- Tick.read ()
+    return @f32.add value increment

@@ -54,6 +54,68 @@ resolver protocol; user-defined data types can provide their own `pure` and
 `bind`. It preserves unrelated effect requirements. Nested plain `do:` blocks
 retain direct sequencing and return rules.
 
+Monadic loops call the selected type's `iterate initial step` member. Steps
+return wrapped `#Continue state` or `#Done result` values of the prelude's
+`Iteration state result` type. `Maybe` and `Result` implement this with ordinary
+loops and constant call stack, preserving early returns, error propagation, and
+callback effects. Custom monads supply `iterate` when they support loops; `pure`
+and `bind` remain sufficient for blocks without loops.
+
+## Request handlers
+
+Capture a Unit thunk with `@computation`, then handle its operations with a
+request loop. Capturing does not run the thunk. Each operation clause can reply
+with `yield`, return from the handler's enclosing `do`, or cancel with `break`:
+
+```blot
+type Validate is effect = { check: U32 -> U32 }
+
+const checked = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Validate.check value =>
+        if value == 0:
+          return 0
+        yield value
+      complete value =>
+        return value
+
+entry const answer = fn () => checked (@computation (fn () => do:
+  use left <- Validate.check 40
+  use right <- Validate.check 2
+  return left + right
+))
+```
+
+The loop contains one `case` on its request binding, with distinct operation
+clauses and exactly one `complete` clause. An operation's argument pattern and
+`yield` value follow its declared signature. A generic operation must name its
+closed instance, for example `effect (Reader.ask U32) () =>`.
+
+`yield value` supplies the pending operation's result and ends that clause. The
+computation proceeds to its next operation or completion without keeping a
+recursive chain of handler callbacks. `return value` cancels the computation and
+exits the nearest enclosing `do`; it skips the loop's suffix. `break` cancels
+the computation and runs the suffix after the request loop. The `complete`
+clause receives the computation's final value and must return or break; it
+cannot yield. Clauses cannot fall through.
+
+Rebinding an outer local with `:=` carries handler state to subsequent requests
+and to the suffix after `break`, following ordinary loop rebinding rules.
+Reusing a captured computation runs its thunk again and starts with fresh
+handler state. Handlers also intercept operations invoked through helpers and
+nested loops. Clause bodies run outside their request installation, so a call to
+the same operation forwards to an outer handler or provider. Unmatched
+operations and clause-body effects remain visible in the handler's type.
+
+These forms are compiler syntax: `@computation`, `@requests`, `effect`,
+`complete`, `yield`, `return`, and `break`. They do not require prelude request
+constructors. The API permits one reply or cancellation per request; exposing or
+invoking an arbitrary continuation remains outside this interface. See
+[the executable example](../examples/requests.blot) for cancellation and state.
+
+## Scoped state
+
 Ordinary providers return each operation result directly. A source-declared
 effect family gives each concrete state type its own read/write operations:
 

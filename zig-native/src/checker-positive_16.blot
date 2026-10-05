@@ -1,0 +1,22 @@
+
+type Counter is effect = { next: U32 -> U32 }
+const count = fn computation => do:
+  let first = 0
+  let second = 0
+  for request in @requests computation:
+    case request of
+      effect Counter.next value =>
+        if @u32.eq value 0:
+          first := @u32.add self 1
+        else:
+          second := @u32.add self 10
+        for index in 0 .. 2:
+          first := @u32.add self 1
+        yield @u32.add first second
+      complete value =>
+        return @u32.add (@u32.add first second) value
+entry const answer = fn () => count (@computation (fn () => do:
+  use Counter.next 0
+  use value <- Counter.next 1
+  return value
+))

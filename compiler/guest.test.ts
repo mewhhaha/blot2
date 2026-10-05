@@ -13,7 +13,7 @@ import {
   type ScalarType,
   type ScalarValue,
 } from "./guest.ts";
-import { createSourceCompiler } from "./source.ts";
+import { compile } from "./test_compile.ts";
 
 const source = `
 effect Number.advance: U32 -> U32
@@ -27,13 +27,8 @@ entry const pure = fn () => 7
 entry const count = 12
 `;
 
-async function compiled(text = source) {
-  const compiler = await createSourceCompiler({ prelude: "none" });
-  try {
-    return compiler.compile(text);
-  } finally {
-    compiler.dispose();
-  }
+function compiled(text = source) {
+  return compile(text);
 }
 
 function errorCode(code: GuestError["code"]) {
@@ -54,13 +49,6 @@ Deno.test("explicit capabilities implement source effects, with no domain import
   equal(WebAssembly.Module.imports(module), [
     { module: "blot:host/1", name: "call_u32_u32", kind: "function" },
   ]);
-  const fn = artifact.analysis.functions.find((fn) => fn.name === "main");
-  ok(fn);
-  equal(fn.effect_row.operations, [{
-    $: "TypeId",
-    module_name: "blot:compiler",
-    declaration: "Foreign",
-  }]);
   const guest = await instantiateGuest(module);
   try {
     equal(guest.call("main", advance(guest)), 42);

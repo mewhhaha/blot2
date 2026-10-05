@@ -1,0 +1,561 @@
+[
+  {
+    "name": "unit",
+    "ty": {
+      "$": "UnitTy"
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "u"
+    }
+  },
+  {
+    "name": "integer",
+    "ty": {
+      "$": "U32Ty"
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "i"
+    }
+  },
+  {
+    "name": "fraction",
+    "ty": {
+      "$": "F32Ty"
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "f"
+    }
+  },
+  {
+    "name": "boolean",
+    "ty": {
+      "$": "BoolTy"
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "b"
+    }
+  },
+  {
+    "name": "array",
+    "ty": {
+      "$": "ArrayTy",
+      "element": {
+        "$": "U32Ty"
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "a1:i"
+    }
+  },
+  {
+    "name": "product",
+    "ty": {
+      "$": "ProductTy",
+      "elements": {
+        "$": "Con",
+        "head": {
+          "$": "U32Ty"
+        },
+        "tail": {
+          "$": "Con",
+          "head": {
+            "$": "F32Ty"
+          },
+          "tail": {
+            "$": "Nil"
+          }
+        }
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "p6:1:i1:f"
+    }
+  },
+  {
+    "name": "unicode_nominal",
+    "ty": {
+      "$": "AppliedTy",
+      "identity": {
+        "$": "TypeId",
+        "module_name": "space 雪😀%.blot",
+        "declaration": "Packet"
+      },
+      "arguments": {
+        "$": "Nil"
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "n14:space 雪😀%.blot6:Packet0:"
+    }
+  },
+  {
+    "name": "generic_nominal",
+    "ty": {
+      "$": "AppliedTy",
+      "identity": {
+        "$": "TypeId",
+        "module_name": "producer.blot",
+        "declaration": "Box"
+      },
+      "arguments": {
+        "$": "Con",
+        "head": {
+          "$": "U32Ty"
+        },
+        "tail": {
+          "$": "Con",
+          "head": {
+            "$": "F32Ty"
+          },
+          "tail": {
+            "$": "Nil"
+          }
+        }
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "n13:producer.blot3:Box6:1:i1:f"
+    }
+  },
+  {
+    "name": "function_pure",
+    "ty": {
+      "$": "FunctionTy",
+      "parameter": {
+        "$": "UnitTy"
+      },
+      "result": {
+        "$": "U32Ty"
+      },
+      "effects": {
+        "$": "EffectRow",
+        "operations": {
+          "$": "Nil"
+        },
+        "tail": {
+          "$": "ClosedRow"
+        }
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "c1:u1:i0:"
+    }
+  },
+  {
+    "name": "function_foreign",
+    "ty": {
+      "$": "FunctionTy",
+      "parameter": {
+        "$": "UnitTy"
+      },
+      "result": {
+        "$": "U32Ty"
+      },
+      "effects": {
+        "$": "EffectRow",
+        "operations": {
+          "$": "Con",
+          "head": {
+            "$": "TypeId",
+            "module_name": "blot:compiler",
+            "declaration": "Foreign"
+          },
+          "tail": {
+            "$": "Nil"
+          }
+        },
+        "tail": {
+          "$": "ClosedRow"
+        }
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "c1:u1:i28:25:13:blot:compiler7:Foreign"
+    }
+  },
+  {
+    "name": "function_duplicate_sorted",
+    "ty": {
+      "$": "FunctionTy",
+      "parameter": {
+        "$": "U32Ty"
+      },
+      "result": {
+        "$": "F32Ty"
+      },
+      "effects": {
+        "$": "EffectRow",
+        "operations": {
+          "$": "Con",
+          "head": {
+            "$": "TypeId",
+            "module_name": "producer.blot",
+            "declaration": "zebra"
+          },
+          "tail": {
+            "$": "Con",
+            "head": {
+              "$": "TypeId",
+              "module_name": "producer.blot",
+              "declaration": "alpha"
+            },
+            "tail": {
+              "$": "Con",
+              "head": {
+                "$": "TypeId",
+                "module_name": "producer.blot",
+                "declaration": "zebra"
+              },
+              "tail": {
+                "$": "Nil"
+              }
+            }
+          }
+        },
+        "tail": {
+          "$": "ClosedRow"
+        }
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "c1:i1:f78:23:13:producer.blot5:alpha23:13:producer.blot5:zebra23:13:producer.blot5:zebra"
+    }
+  },
+  {
+    "name": "function_specialized",
+    "ty": {
+      "$": "FunctionTy",
+      "parameter": {
+        "$": "UnitTy"
+      },
+      "result": {
+        "$": "U32Ty"
+      },
+      "effects": {
+        "$": "EffectRow",
+        "operations": {
+          "$": "Con",
+          "head": {
+            "$": "TypeId",
+            "module_name": "producer.blot",
+            "declaration": "ask<1:i>"
+          },
+          "tail": {
+            "$": "Con",
+            "head": {
+              "$": "TypeId",
+              "module_name": "producer.blot",
+              "declaration": "alpha"
+            },
+            "tail": {
+              "$": "Con",
+              "head": {
+                "$": "TypeId",
+                "module_name": "producer.blot",
+                "declaration": "ask<1:i>"
+              },
+              "tail": {
+                "$": "Nil"
+              }
+            }
+          }
+        },
+        "tail": {
+          "$": "ClosedRow"
+        }
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "c1:u1:i84:23:13:producer.blot5:alpha26:13:producer.blot8:ask<1:i>26:13:producer.blot8:ask<1:i>"
+    }
+  },
+  {
+    "name": "higher_order",
+    "ty": {
+      "$": "FunctionTy",
+      "parameter": {
+        "$": "FunctionTy",
+        "parameter": {
+          "$": "UnitTy"
+        },
+        "result": {
+          "$": "U32Ty"
+        },
+        "effects": {
+          "$": "EffectRow",
+          "operations": {
+            "$": "Con",
+            "head": {
+              "$": "TypeId",
+              "module_name": "blot:compiler",
+              "declaration": "Foreign"
+            },
+            "tail": {
+              "$": "Nil"
+            }
+          },
+          "tail": {
+            "$": "ClosedRow"
+          }
+        }
+      },
+      "result": {
+        "$": "ArrayTy",
+        "element": {
+          "$": "BoolTy"
+        }
+      },
+      "effects": {
+        "$": "EffectRow",
+        "operations": {
+          "$": "Con",
+          "head": {
+            "$": "TypeId",
+            "module_name": "producer.blot",
+            "declaration": "ask<1:i>"
+          },
+          "tail": {
+            "$": "Nil"
+          }
+        },
+        "tail": {
+          "$": "ClosedRow"
+        }
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "c38:c1:u1:i28:25:13:blot:compiler7:Foreign4:a1:b29:26:13:producer.blot8:ask<1:i>"
+    }
+  },
+  {
+    "name": "function_state",
+    "ty": {
+      "$": "FunctionTy",
+      "parameter": {
+        "$": "UnitTy"
+      },
+      "result": {
+        "$": "U32Ty"
+      },
+      "effects": {
+        "$": "EffectRow",
+        "operations": {
+          "$": "Con",
+          "head": {
+            "$": "TypeId",
+            "module_name": "blot:state",
+            "declaration": "read:i"
+          },
+          "tail": {
+            "$": "Con",
+            "head": {
+              "$": "TypeId",
+              "module_name": "blot:state",
+              "declaration": "write:i"
+            },
+            "tail": {
+              "$": "Nil"
+            }
+          }
+        },
+        "tail": {
+          "$": "ClosedRow"
+        }
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "c1:u1:i49:21:10:blot:state6:read:i22:10:blot:state7:write:i"
+    }
+  },
+  {
+    "name": "opaque_demand",
+    "ty": {
+      "$": "AppliedTy",
+      "identity": {
+        "$": "TypeId",
+        "module_name": "blot:compiler",
+        "declaration": "Demand"
+      },
+      "arguments": {
+        "$": "Con",
+        "head": {
+          "$": "FunctionTy",
+          "parameter": {
+            "$": "UnitTy"
+          },
+          "result": {
+            "$": "U32Ty"
+          },
+          "effects": {
+            "$": "EffectRow",
+            "operations": {
+              "$": "Con",
+              "head": {
+                "$": "TypeId",
+                "module_name": "producer.blot",
+                "declaration": "ask<1:i>"
+              },
+              "tail": {
+                "$": "Nil"
+              }
+            },
+            "tail": {
+              "$": "ClosedRow"
+            }
+          }
+        },
+        "tail": {
+          "$": "Nil"
+        }
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Done",
+      "value": "n13:blot:compiler6:Demand42:39:c1:u1:i29:26:13:producer.blot8:ask<1:i>"
+    }
+  },
+  {
+    "name": "open_function",
+    "ty": {
+      "$": "FunctionTy",
+      "parameter": {
+        "$": "UnitTy"
+      },
+      "result": {
+        "$": "U32Ty"
+      },
+      "effects": {
+        "$": "EffectRow",
+        "operations": {
+          "$": "Nil"
+        },
+        "tail": {
+          "$": "RowVariable",
+          "index": "0"
+        }
+      }
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Fail",
+      "error": {
+        "$": "model.Diagnostic",
+        "code": "ambiguous_state",
+        "subject": "state",
+        "message": "state identity requires closed effect rows"
+      }
+    }
+  },
+  {
+    "name": "variable",
+    "ty": {
+      "$": "VariableTy",
+      "index": "0"
+    },
+    "fuel": "65536",
+    "frozen": {
+      "$": "Fail",
+      "error": {
+        "$": "model.Diagnostic",
+        "code": "ambiguous_state",
+        "subject": "state",
+        "message": "state requires a concrete runtime value type"
+      }
+    }
+  },
+  {
+    "name": "zero_fuel",
+    "ty": {
+      "$": "U32Ty"
+    },
+    "fuel": "0",
+    "frozen": {
+      "$": "Fail",
+      "error": {
+        "$": "model.Diagnostic",
+        "code": "specialization_limit",
+        "subject": "state",
+        "message": "state type exceeds its structural limit"
+      }
+    }
+  },
+  {
+    "name": "array_fuel",
+    "ty": {
+      "$": "ArrayTy",
+      "element": {
+        "$": "U32Ty"
+      }
+    },
+    "fuel": "1",
+    "frozen": {
+      "$": "Fail",
+      "error": {
+        "$": "model.Diagnostic",
+        "code": "specialization_limit",
+        "subject": "state",
+        "message": "state type exceeds its structural limit"
+      }
+    }
+  },
+  {
+    "name": "product_fuel",
+    "ty": {
+      "$": "ProductTy",
+      "elements": {
+        "$": "Con",
+        "head": {
+          "$": "U32Ty"
+        },
+        "tail": {
+          "$": "Con",
+          "head": {
+            "$": "F32Ty"
+          },
+          "tail": {
+            "$": "Nil"
+          }
+        }
+      }
+    },
+    "fuel": "3",
+    "frozen": {
+      "$": "Fail",
+      "error": {
+        "$": "model.Diagnostic",
+        "code": "specialization_limit",
+        "subject": "state",
+        "message": "state type exceeds its structural limit"
+      }
+    }
+  }
+]

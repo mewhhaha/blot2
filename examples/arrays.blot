@@ -1,17 +1,17 @@
 import * as array from "std/array"
 
-const numbers: Array U32 = [10, 20, 12]
+const numbers: Array U32 = #[10, 20, 12]
 entry const expected = array.fold_left U32.add 0 numbers
 
 entry const answer = fn () => array.fold_left U32.add 0 numbers
 
 entry const unchanged = fn () => do:
-  let original = [1, 2, 3]
+  let original = #[1, 2, 3]
   let updated = array.replace 1 40 original
   return array.at 1 original + array.at 1 updated
 
 entry const checked = fn index => Maybe.unwrap_or 0 $ array.get index numbers
 
 entry const nested = fn () => do:
-  let rows: Array (U32, Bool) = [(42, #True), (7, #False)]
+  let rows: Array (U32, Bool) = #[(42, #True), (7, #False)]
   return @product.get (array.at 0 rows) 0

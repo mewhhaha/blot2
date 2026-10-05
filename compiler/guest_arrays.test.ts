@@ -1,7 +1,6 @@
 import { deepStrictEqual as equal, ok, throws } from "node:assert/strict";
 import { GuestError, instantiateGuest } from "./guest.ts";
-import { createNativeCompiler } from "./native.ts";
-import { createSourceCompiler } from "./source.ts";
+import { compile } from "./test_compile.ts";
 
 const source = `
 entry const integers = fn (values: Array U32) => values
@@ -10,7 +9,7 @@ entry const change = fn (values: Array F32) => @array.set values 0 42.5
 entry const first = fn (values: Array F32) => @array.get values 0
 entry const filled = fn (count: U32) => @array.fill count 3.5
 entry const empty = fn () => @array.fill 0 0
-entry const constant = fn () => [1, 4_294_967_295]
+entry const constant = fn () => #[1, 4_294_967_295]
 entry const callback = fn (io: U32 -> U32 ! {Foreign}) => do:
   use value <- io 40
   return value
@@ -158,24 +157,6 @@ async function exercise(bytes: Uint8Array<ArrayBuffer>) {
   }
 }
 
-Deno.test("JS numeric array ABI copies inputs/results and resets after growth and traps", async () => {
-  const compiler = await createSourceCompiler({ prelude: "none" });
-  try {
-    await exercise(compiler.compile(source).bytes);
-  } finally {
-    compiler.dispose();
-  }
-});
-
-Deno.test("native numeric array ABI matches JS and executes copied packets", async () => {
-  const js = await createSourceCompiler({ prelude: "none" });
-  const native = await createNativeCompiler({ prelude: "none" });
-  try {
-    const artifact = await native.compile(source);
-    equal(artifact.bytes, js.compile(source).bytes);
-    await exercise(artifact.bytes);
-  } finally {
-    js.dispose();
-    await native.dispose();
-  }
+Deno.test("numeric array ABI copies inputs/results and resets after growth and traps", async () => {
+  await exercise((await compile(source)).bytes);
 });

@@ -1,0 +1,27 @@
+
+type Outer is effect = { check: U32 -> U32 }
+type Inner is effect = { read: Unit -> U32 }
+const inner = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Inner.read () =>
+        use value <- Outer.check 0
+        yield value
+      complete value =>
+        return value
+const outer = fn computation => do:
+  for request in @requests computation:
+    case request of
+      effect Outer.check value =>
+        return 42
+      complete value =>
+        return value
+entry const answer = fn () => outer (@computation (fn () => do:
+  use inner (@computation (fn () => do:
+    use Inner.read ()
+    return @panic "inner computation continued"
+  ))
+  return @panic "outer computation continued"
+))
+
+entry const expected = answer ()
