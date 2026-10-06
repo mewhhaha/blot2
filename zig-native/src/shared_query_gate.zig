@@ -1,5 +1,5 @@
 //! Internal source admission for one compileWithOptions epoch. The backend
-//! supplies the already checked principal Gate for its exact old/current pair.
+//! supplies an already checked semantic Gate for its exact old/current pair.
 //! This does not validate a new namespace, grant executable fragment validity,
 //! or reuse admission across compilations. Both Core owners remain immutable.
 const std = @import("std");

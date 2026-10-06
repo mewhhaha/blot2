@@ -1,0 +1,86 @@
+import * as array from "std/array"
+import * as list from "std/list"
+import { Vec3 } from "std/vector"
+
+type Columns is data = #Columns { values: Array U32 }
+
+entry const replace = fn (count: U32) => do:
+  let values = array.fill count 0
+  for i in 0..count:
+    values := array.replace i (i + 1) values
+  return values
+
+entry const checked = fn (count: U32) => do:
+  let values = array.fill count 0
+  for i in 0..count:
+    let #Some next = values.set(i)(i + 1) else:
+      return values
+    values := next
+  return values
+
+entry const nested = fn (count: U32) => do:
+  let world = #Columns { values: array.fill count 0 }
+  for i in 0..count:
+    world.values[i] := i + 1
+  return world.values
+
+entry const append = fn (count: U32) => do:
+  let values: List U32 = []
+  for i in 0..count:
+    values := list.append i values
+  return Array.from_list values
+
+entry const append_break = fn (count: U32) => do:
+  let values: List U32 = []
+  for i in 0..count:
+    if i == 1025:
+      break
+    values := list.append i values
+  return Array.from_list values
+
+entry const append_shared = fn (count: U32) => do:
+  let versions: List (List U32) = []
+  let values: List U32 = []
+  for i in 0..count:
+    versions := [...self, values]
+    values := [...self, i]
+  let result = 0
+  for old in versions:
+    result := self + old.length
+  return result
+
+entry const singleton_lists = fn (count: U32) => do:
+  let items = array.generate count (fn i => [i])
+  return items.length
+
+entry const singleton_arrays = fn (count: U32) => do:
+  let items = array.generate count (fn i => #[i])
+  return items.length
+
+entry const maybe_demand = fn (count: U32) => do:
+  let total = 0
+  for i in 0..count:
+    total := self + Maybe.unwrap_or_else (i + 1) (#Some i)
+  return total
+
+entry const maybe_match = fn (count: U32) => do:
+  let total = 0
+  for i in 0..count:
+    let value = #Some i
+    total := self + (case value of
+      #Some x => x
+      #Nothing => i + 1)
+  return total
+
+entry const mapped = fn (values: Array U32) => array.map (fn x => x + 1) values
+entry const mapped_loop = fn (values: Array U32) => do:
+  let result = array.fill values.length 0
+  for i in 0..values.length:
+    result[i] := values[i] + 1
+  return result
+
+entry const vector_loop = fn (count: U32) => do:
+  let v = #Vec3 { x: 1.0, y: 2.0, z: 3.0 }
+  for i in 0..count:
+    v := lerp v (#Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5
+  return #[v.x, v.y, v.z]

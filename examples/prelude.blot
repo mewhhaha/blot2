@@ -12,7 +12,7 @@ entry const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ #Some 20
 
 entry const answer = fn () => do:
   let candidate = Maybe.map add_two (#Some 40)
-  let #Some(value) = candidate else:
+  let #Some value = candidate else:
     return 0
   return Result.unwrap_or 0 $ Result.map identity $ #Ok value
 
@@ -29,20 +29,14 @@ const plus = fn left => fn right => left + right
 entry const named_operator = fn () => 20 `plus` 22
 
 entry const inspect = fn (enabled: Bool) => do:
-  let candidate = do:
-    if enabled:
-      return #Some (#Some 42)
-    return #Some #Nothing
+  let candidate = #Some (if enabled then #Some 42 else #Nothing)
   return case candidate of
     #Some (#Some value) => value
     #Some #Nothing => 0
     #Nothing => 0
 
 entry const recover = fn (enabled: Bool) => do:
-  let candidate = do:
-    if enabled:
-      return #Ok 42
-    return #Err #False
-  if let #Ok(value) = candidate:
+  let candidate = if enabled then #Ok 42 else #Err #False
+  if let #Ok value = candidate:
     return value
   return 0

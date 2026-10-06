@@ -1,9 +1,11 @@
 entry const create = fn () => 1
 // <- keyword.storage.modifier
+//    ^^^^^ keyword.storage.type
 //          ^ function
 
 entry let count: U32 = 2
 // <- keyword.storage.modifier
+//    ^^^ keyword.storage.type
 //        ^ variable
 
 const entry = fn entry => entry
@@ -17,3 +19,17 @@ const read = fn value => do:
 //    ^ variable
   return entry
 //       ^ variable
+
+entry
+// <- variable
+// <- !keyword.storage.modifier
+const next = 1
+
+entry constancy
+// <- variable
+// <- !keyword.storage.modifier
+//    ^^^^^^^^^ variable
+
+"entry const answer = 42"
+// ^ string
+// ^ !keyword.storage.modifier

@@ -1,7 +1,10 @@
 "fn" @keyword.function
 ["import" "from" "as"] @keyword.control.import
 ["data" "type" "is" "effect" "const" "let" "use"] @keyword.storage.type
-(entry_binding) @keyword.storage.modifier
+(entry_modifier) @variable
+((entry_binding (entry_modifier) @keyword.storage.modifier) @_entry
+  (#match? @_entry "^entry[ \t]+(const|let)"))
+(entry_binding (binding_keyword) @keyword.storage.type)
 (where_clause "where" @keyword.control)
 ["infixl" "infixr" "infix" "prefix"] @keyword.directive
 "rec" @keyword.storage.modifier
@@ -37,6 +40,7 @@
 (infix_function qualifier: (identifier) @namespace)
 (lambda_header parameter: (identifier) @variable.parameter)
 (request_complete_header parameter: (identifier) @variable.parameter)
+(completion_constructor_pattern (identifier) @variable.parameter)
 (deferred_parameter (identifier) @variable.parameter)
 (deferred_parameter (parenthesized (identifier) @variable.parameter))
 (lambda_header parameter: (parenthesized (identifier) @variable.parameter))
@@ -53,6 +57,7 @@
 (text_literal "\"" @string)
 (text_fragment) @string
 (escape_sequence) @constant.character.escape
-(interpolation "${" @punctuation.special "}" @punctuation.special)
 
 (constructor_marker) @punctuation.special
+(constructor_reference qualifier: (_) @namespace)
+(constructor_reference name: (type_identifier) @constructor)

@@ -1,17 +1,35 @@
-//! Dense doubly linked chunks for traversal-oriented lists.
-//! A descriptor owns its whole chain. Shared edits copy the visible values;
-//! proven exclusive edits reuse the descriptor and end chunks. Static values
-//! are always copied before mutation. Exact base pointers and zeroed spare
-//! slots let Blot's tracing collector reclaim chains, including their cycles.
+//! Persistent AVL sequence of right-sized leaves. Edits detach only a shared
+//! spine; exclusively owned nodes update in place. Cloning a branch freezes
+//! its children, so either version can subsequently be consumed independently.
+//! Every pointer is an allocation base and spare leaf words are zero for GC.
 const std = @import("std");
 const wasm = @import("wasm.zig");
 const Error = std.mem.Allocator.Error || error{ModuleTooLarge};
-pub const Runtime = struct { new: u32, address: u32, copy: u32, push: u32, set: u32, from_array: u32, to_array: u32, chunk_new: u32, edit: u32 };
-// Descriptor: length, first, last, cached chunk, cached base, immutable flag.
-// Chunk: next, previous, start, count, then 256 payload words.
+pub const Runtime = struct {
+    new: u32,
+    address: u32,
+    copy: u32,
+    push: u32,
+    set: u32,
+    from_array: u32,
+    to_array: u32,
+    chunk_new: u32,
+    edit: u32,
+    branch: u32,
+    own: u32,
+    insert: u32,
+    replace: u32,
+    refresh: u32,
+    rotate_left: u32,
+    rotate_right: u32,
+    balance: u32,
+};
+// Descriptor: length, root, cached leaf, cached base, spare, immutable.
+// Node: descriptor token (base + 1, zero if shared), height, length, capacity.
+// Tokens are not GC pointers: sharing never retains an obsolete descriptor.
+// Leaves store elements after the header; branches store left/right pointers.
 pub const header = 16;
-pub const capacity = 256;
-pub const chunk_bytes = header + capacity * 4;
+pub const capacity = 248; // Leaf + arena headers fit exactly in 1024 bytes.
 const descriptor_bytes = 24;
 const limit = 0x10000000;
 const Local = struct { id: u32 };
@@ -123,94 +141,256 @@ pub fn emit(module: *wasm.Module, arena: wasm.Arena) Error!Runtime {
         .to_array = try function(module, 1, .i32),
         .chunk_new = try function(module, 2, .i32),
         .edit = try function(module, 2, .i32),
+        .branch = try function(module, 3, .i32),
+        .own = try function(module, 2, .i32),
+        .insert = try function(module, 4, .i32),
+        .replace = try function(module, 4, .i32),
+        .refresh = try function(module, 1, .i32),
+        .rotate_left = try function(module, 2, .i32),
+        .rotate_right = try function(module, 2, .i32),
+        .balance = try function(module, 2, .i32),
     };
-    try emitChunk(code(module, r.chunk_new), arena);
+    try emitNode(code(module, r.chunk_new), r, arena);
+    try emitBranch(code(module, r.branch), r, arena);
+    try emitRefresh(code(module, r.refresh));
+    try emitOwn(code(module, r.own), arena);
+    try emitRotate(code(module, r.rotate_left), r, true);
+    try emitRotate(code(module, r.rotate_right), r, false);
+    try emitBalance(code(module, r.balance), r);
+    try emitInsert(code(module, r.insert), r);
+    try emitReplace(code(module, r.replace), r);
     try emitNew(code(module, r.new), r, arena);
     try emitAddress(code(module, r.address));
     try emitCopy(code(module, r.copy), r);
-    try emitEdit(code(module, r.edit), r);
+    try emitEdit(code(module, r.edit), arena);
     try emitPush(code(module, r.push), r);
     try emitSet(code(module, r.set), r);
     try emitConversion(code(module, r.from_array), r, arena, true);
     try emitConversion(code(module, r.to_array), r, arena, false);
     return r;
 }
-fn emitChunk(c: Code, arena: wasm.Arena) Error!void {
-    const start: Local = .{ .id = 0 };
-    const count: Local = .{ .id = 1 };
-    const chunk = try c.temp();
-    try c.set(chunk, .{ .call, arena.allocate, chunk_bytes });
-    try c.zero(chunk, chunk_bytes);
-    try c.store(chunk, 8, start);
-    try c.store(chunk, 12, count);
-    try c.value(chunk);
+fn emitNode(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
+    const count: Local = .{ .id = 0 };
+    const owner: Local = .{ .id = 1 };
+    const node = try c.temp();
+    const bucket = try c.temp();
+    const left = try c.temp();
+    const split = try c.temp();
+    try c.when(.{ .i32_eqz, count });
+    try c.ret(0);
+    try c.end();
+    try c.when(.{ .i32_gt_u, count, capacity });
+    // Split by leaf count, not element count, to keep initial leaves dense.
+    try c.set(split, .{ .i32_mul, .{ .i32_div_u, .{ .i32_div_u, .{ .i32_add, count, capacity - 1 }, capacity }, 2 }, capacity });
+    try c.set(left, .{ .call, r.chunk_new, split, owner });
+    try c.ret(.{ .call, r.branch, left, .{ .call, r.chunk_new, .{ .i32_sub, count, split }, owner }, owner });
+    try c.end();
+    try c.set(bucket, 64);
+    try c.loop(.{ .i32_lt_u, bucket, .{ .i32_add, 32, .{ .i32_mul, count, 4 } } });
+    try c.set(bucket, .{ .i32_mul, bucket, 2 });
+    try c.again();
+    try c.set(node, .{ .call, arena.allocate, .{ .i32_sub, bucket, 16 } });
+    try c.zero(node, .{ .i32_sub, bucket, 16 });
+    try c.store(node, 0, .{ .i32_add, owner, 1 });
+    try c.store(node, 8, count);
+    try c.store(node, 12, .{ .i32_div_u, .{ .i32_sub, bucket, 32 }, 4 });
+    try c.value(node);
+}
+fn emitBranch(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
+    const left: Local = .{ .id = 0 };
+    const right: Local = .{ .id = 1 };
+    const owner: Local = .{ .id = 2 };
+    const node = try c.temp();
+    try c.set(node, .{ .call, arena.allocate, 24 });
+    try c.store(node, 0, .{ .i32_add, owner, 1 });
+    try c.store(node, 12, 0);
+    try c.store(node, 16, left);
+    try c.store(node, 20, right);
+    try c.value(.{ .call, r.refresh, node });
+}
+fn emitRefresh(c: Code) Error!void {
+    const node: Local = .{ .id = 0 };
+    const left = try c.temp();
+    const right = try c.temp();
+    const height = try c.temp();
+    try c.set(left, .{ .load, node, 16 });
+    try c.set(right, .{ .load, node, 20 });
+    try c.store(node, 8, .{ .i32_add, .{ .load, left, 8 }, .{ .load, right, 8 } });
+    try c.set(height, .{ .load, left, 4 });
+    try c.when(.{ .i32_gt_u, .{ .load, right, 4 }, height });
+    try c.set(height, .{ .load, right, 4 });
+    try c.end();
+    try c.store(node, 4, .{ .i32_add, height, 1 });
+    try c.value(node);
+}
+fn emitOwn(c: Code, arena: wasm.Arena) Error!void {
+    const node: Local = .{ .id = 0 };
+    const owner: Local = .{ .id = 1 };
+    const result = try c.temp();
+    const bytes = try c.temp();
+    try c.when(.{ .i32_eq, .{ .load, node, 0 }, .{ .i32_add, owner, 1 } });
+    try c.ret(node);
+    try c.end();
+    try c.set(bytes, .{ .i32_add, header, .{ .i32_mul, .{ .load, node, 12 }, 4 } });
+    try c.when(.{ .load, node, 4 });
+    try c.set(bytes, 24);
+    try c.store(.{ .load, node, 16 }, 0, 0);
+    try c.store(.{ .load, node, 20 }, 0, 0);
+    try c.end();
+    try c.set(result, .{ .call, arena.allocate, bytes });
+    try c.copy(result, node, bytes);
+    try c.store(result, 0, .{ .i32_add, owner, 1 });
+    try c.value(result);
+}
+fn emitRotate(c: Code, r: Runtime, comptime leftward: bool) Error!void {
+    const node: Local = .{ .id = 0 };
+    const owner: Local = .{ .id = 1 };
+    const pivot = try c.temp();
+    const side = if (leftward) 20 else 16;
+    const opposite = if (leftward) 16 else 20;
+    try c.set(node, .{ .call, r.own, node, owner });
+    try c.set(pivot, .{ .call, r.own, .{ .load, node, side }, owner });
+    try c.store(node, side, .{ .load, pivot, opposite });
+    try c.store(pivot, opposite, .{ .call, r.refresh, node });
+    try c.value(.{ .call, r.refresh, pivot });
+}
+fn emitBalance(c: Code, r: Runtime) Error!void {
+    const node: Local = .{ .id = 0 };
+    const owner: Local = .{ .id = 1 };
+    const child = try c.temp();
+    try c.set(node, .{ .call, r.refresh, node });
+    inline for (.{ true, false }) |left_heavy| {
+        const side = if (left_heavy) 16 else 20;
+        const other = if (left_heavy) 20 else 16;
+        try c.when(.{ .i32_gt_u, .{ .load, .{ .load, node, side }, 4 }, .{ .i32_add, .{ .load, .{ .load, node, other }, 4 }, 1 } });
+        try c.set(child, .{ .load, node, side });
+        try c.when(.{ .i32_lt_u, .{ .load, .{ .load, child, side }, 4 }, .{ .load, .{ .load, child, other }, 4 } });
+        try c.store(node, side, .{ .call, if (left_heavy) r.rotate_left else r.rotate_right, child, owner });
+        try c.end();
+        try c.ret(.{ .call, if (left_heavy) r.rotate_right else r.rotate_left, node, owner });
+        try c.end();
+    }
+    try c.value(node);
+}
+fn emitInsert(c: Code, r: Runtime) Error!void {
+    const node: Local = .{ .id = 0 };
+    const value: Local = .{ .id = 1 };
+    const front: Local = .{ .id = 2 };
+    const owner: Local = .{ .id = 3 };
+    const count = try c.temp();
+    const added = try c.temp();
+    const child_height = try c.temp();
+    try c.when(.{ .i32_eqz, node });
+    try c.set(added, .{ .call, r.chunk_new, 1, owner });
+    try c.store(added, header, value);
+    try c.ret(added);
+    try c.end();
+    try c.when(.{ .i32_eqz, .{ .load, node, 4 } });
+    try c.set(count, .{ .load, node, 8 });
+    try c.when(.{ .i32_eq, count, capacity });
+    try c.set(added, .{ .call, r.chunk_new, 1, owner });
+    try c.store(added, header, value);
+    try c.when(front);
+    try c.ret(.{ .call, r.branch, added, node, owner });
+    try c.end();
+    try c.ret(.{ .call, r.branch, node, added, owner });
+    try c.end();
+    try c.when(.{ .i32_eq, count, .{ .load, node, 12 } });
+    try c.set(added, .{ .call, r.chunk_new, .{ .i32_add, count, 1 }, owner });
+    try c.copy(.{ .i32_add, added, header }, .{ .i32_add, node, header }, .{ .i32_mul, count, 4 });
+    try c.set(node, added);
+    try c.op(.else_, 0);
+    try c.when(.{ .i32_ne, .{ .load, node, 0 }, .{ .i32_add, owner, 1 } });
+    try c.set(node, .{ .call, r.own, node, owner });
+    try c.end();
+    try c.end();
+    try c.when(front);
+    try c.copy(.{ .i32_add, node, header + 4 }, .{ .i32_add, node, header }, .{ .i32_mul, count, 4 });
+    try c.store(node, header, value);
+    try c.op(.else_, 0);
+    try c.store(.{ .cell, node, count, header }, 0, value);
+    try c.end();
+    try c.store(node, 8, .{ .i32_add, count, 1 });
+    try c.ret(node);
+    try c.end();
+    try c.when(.{ .i32_ne, .{ .load, node, 0 }, .{ .i32_add, owner, 1 } });
+    try c.set(node, .{ .call, r.own, node, owner });
+    try c.end();
+    try c.when(front);
+    inline for (.{ 16, 20 }) |side| {
+        try c.set(child_height, .{ .load, .{ .load, node, side }, 4 });
+        try c.set(added, .{ .call, r.insert, .{ .load, node, side }, value, front, owner });
+        try c.store(node, side, added);
+        if (side == 16) try c.op(.else_, 0);
+    }
+    try c.end();
+    // Inserting into an existing leaf does not change subtree height. Update
+    // the path counts without recomputing heights or checking rotations.
+    try c.when(.{ .i32_eq, .{ .load, added, 4 }, child_height });
+    try c.store(node, 8, .{ .i32_add, .{ .load, node, 8 }, 1 });
+    try c.ret(node);
+    try c.end();
+    try c.value(.{ .call, r.balance, node, owner });
+}
+fn emitReplace(c: Code, r: Runtime) Error!void {
+    const node: Local = .{ .id = 0 };
+    const index: Local = .{ .id = 1 };
+    const value: Local = .{ .id = 2 };
+    const owner: Local = .{ .id = 3 };
+    const left_count = try c.temp();
+    try c.set(node, .{ .call, r.own, node, owner });
+    try c.when(.{ .i32_eqz, .{ .load, node, 4 } });
+    try c.store(.{ .cell, node, index, header }, 0, value);
+    try c.ret(node);
+    try c.end();
+    try c.set(left_count, .{ .load, .{ .load, node, 16 }, 8 });
+    try c.when(.{ .i32_lt_u, index, left_count });
+    try c.store(node, 16, .{ .call, r.replace, .{ .load, node, 16 }, index, value, owner });
+    try c.op(.else_, 0);
+    try c.store(node, 20, .{ .call, r.replace, .{ .load, node, 20 }, .{ .i32_sub, index, left_count }, value, owner });
+    try c.end();
+    try c.value(node);
 }
 fn emitNew(c: Code, r: Runtime, arena: wasm.Arena) Error!void {
     const count: Local = .{ .id = 0 };
     const result = try c.temp();
-    const remaining = try c.temp();
-    const previous = try c.temp();
-    const chunk = try c.temp();
-    const take = try c.temp();
     try c.trap(.{ .i32_gt_u, count, limit });
     try c.set(result, .{ .call, arena.allocate, descriptor_bytes });
     try c.zero(result, descriptor_bytes);
     try c.store(result, 0, count);
-    try c.set(remaining, count);
-    try c.loop(remaining);
-    try c.set(take, remaining);
-    try c.when(.{ .i32_gt_u, take, capacity });
-    try c.set(take, capacity);
-    try c.end();
-    try c.set(chunk, .{ .call, r.chunk_new, 0, take });
-    try c.store(chunk, 4, previous);
-    try c.when(previous);
-    try c.store(previous, 0, chunk);
-    try c.op(.else_, 0);
-    try c.store(result, 4, chunk);
-    try c.end();
-    try c.set(previous, chunk);
-    try c.set(remaining, .{ .i32_sub, remaining, take });
-    try c.again();
-    try c.store(result, 8, previous);
+    try c.store(result, 4, .{ .call, r.chunk_new, count, result });
     try c.value(result);
 }
-// Internal address lookup supports construction and iteration, not source
-// indexing. The cached span makes a monotone traversal linear in its length.
 fn emitAddress(c: Code) Error!void {
     const sequence: Local = .{ .id = 0 };
     const index: Local = .{ .id = 1 };
-    const chunk = try c.temp();
+    const node = try c.temp();
     const base = try c.temp();
+    const left = try c.temp();
+    const split = try c.temp();
     try c.trap(.{ .i32_ge_u, index, .{ .load, sequence, 0 } });
-    try c.set(chunk, .{ .load, sequence, 12 });
-    try c.set(base, .{ .load, sequence, 16 });
-    try c.when(.{ .i32_eqz, chunk });
-    try c.set(chunk, .{ .load, sequence, 4 });
-    try c.set(base, 0);
+    try c.set(node, .{ .load, sequence, 8 });
+    try c.set(base, .{ .load, sequence, 12 });
+    try c.when(node);
+    try c.when(.{ .i32_and, .{ .i32_ge_u, index, base }, .{ .i32_lt_u, .{ .i32_sub, index, base }, .{ .load, node, 8 } } });
+    try c.ret(.{ .cell, node, .{ .i32_sub, index, base }, header });
     try c.end();
-    try c.when(.{ .i32_lt_u, index, base });
-    try c.when(.{ .i32_lt_u, index, .{ .i32_sub, base, index } });
-    try c.set(chunk, .{ .load, sequence, 4 });
-    try c.set(base, 0);
     try c.end();
+    try c.set(node, .{ .load, sequence, 4 });
+    try c.set(base, 0);
+    try c.loop(.{ .load, node, 4 });
+    try c.set(left, .{ .load, node, 16 });
+    try c.set(split, .{ .i32_add, base, .{ .load, left, 8 } });
+    try c.when(.{ .i32_lt_u, index, split });
+    try c.set(node, left);
     try c.op(.else_, 0);
-    try c.when(.{ .i32_lt_u, .{ .i32_sub, .{ .load, sequence, 0 }, index }, .{ .i32_sub, index, base } });
-    try c.set(chunk, .{ .load, sequence, 8 });
-    try c.set(base, .{ .i32_sub, .{ .load, sequence, 0 }, .{ .load, chunk, 12 } });
+    try c.set(node, .{ .load, node, 20 });
+    try c.set(base, split);
     try c.end();
-    try c.end();
-    try c.loop(.{ .i32_lt_u, index, base });
-    try c.set(chunk, .{ .load, chunk, 4 });
-    try c.set(base, .{ .i32_sub, base, .{ .load, chunk, 12 } });
     try c.again();
-    try c.loop(.{ .i32_ge_u, index, .{ .i32_add, base, .{ .load, chunk, 12 } } });
-    try c.set(base, .{ .i32_add, base, .{ .load, chunk, 12 } });
-    try c.set(chunk, .{ .load, chunk, 0 });
-    try c.again();
-    try c.store(sequence, 12, chunk);
-    try c.store(sequence, 16, base);
-    try c.value(.{ .cell, chunk, .{ .i32_add, .{ .load, chunk, 8 }, .{ .i32_sub, index, base } }, header });
+    try c.store(sequence, 8, node);
+    try c.store(sequence, 12, base);
+    try c.value(.{ .cell, node, .{ .i32_sub, index, base }, header });
 }
 fn emitCopy(c: Code, r: Runtime) Error!void {
     const sequence: Local = .{ .id = 0 };
@@ -225,77 +405,35 @@ fn emitCopy(c: Code, r: Runtime) Error!void {
     try c.again();
     try c.value(result);
 }
-fn emitEdit(c: Code, r: Runtime) Error!void {
+fn emitEdit(c: Code, arena: wasm.Arena) Error!void {
     const sequence: Local = .{ .id = 0 };
     const owned: Local = .{ .id = 1 };
+    const result = try c.temp();
     try c.when(.{ .i32_and, owned, .{ .i32_eqz, .{ .load, sequence, 20 } } });
     try c.ret(sequence);
     try c.end();
-    try c.value(.{ .call, r.copy, sequence, .{ .load, sequence, 0 } });
-}
-fn finishPush(c: Code, sequence: Local) Error!void {
-    try c.store(sequence, 0, .{ .i32_add, .{ .load, sequence, 0 }, 1 });
-    // Topology or positions may have changed. Do not retain a borrowed cursor.
-    try c.store(sequence, 12, 0);
-    try c.store(sequence, 16, 0);
-    try c.ret(sequence);
+    try c.set(result, .{ .call, arena.allocate, descriptor_bytes });
+    try c.copy(result, sequence, descriptor_bytes);
+    try c.store(result, 8, 0);
+    try c.store(result, 20, 0);
+    try c.when(.{ .load, sequence, 4 });
+    // This write is metadata only: both versions retain identical contents.
+    try c.store(.{ .load, sequence, 4 }, 0, 0);
+    try c.end();
+    try c.value(result);
 }
 fn emitPush(c: Code, r: Runtime) Error!void {
     const sequence: Local = .{ .id = 0 };
     const value: Local = .{ .id = 1 };
     const front: Local = .{ .id = 2 };
     const owned: Local = .{ .id = 3 };
-    const chunk = try c.temp();
-    const start = try c.temp();
-    const count = try c.temp();
-    const added = try c.temp();
     try c.trap(.{ .i32_ge_u, .{ .load, sequence, 0 }, limit });
     try c.set(sequence, .{ .call, r.edit, sequence, owned });
-    try c.when(front);
-    inline for (.{ true, false }) |prepend| {
-        const end_offset = if (prepend) 4 else 8;
-        try c.set(chunk, .{ .load, sequence, end_offset });
-        try c.when(chunk);
-        try c.set(start, .{ .load, chunk, 8 });
-        try c.set(count, .{ .load, chunk, 12 });
-        try c.when(.{ .i32_lt_u, count, capacity });
-        if (prepend) {
-            try c.when(.{ .i32_eqz, start });
-            try c.set(start, .{ .i32_sub, capacity, count });
-            try c.copy(.{ .cell, chunk, start, header }, .{ .i32_add, chunk, header }, .{ .i32_mul, count, 4 });
-            try c.zero(.{ .i32_add, chunk, header }, .{ .i32_mul, start, 4 });
-            try c.end();
-            try c.set(start, .{ .i32_sub, start, 1 });
-            try c.store(.{ .cell, chunk, start, header }, 0, value);
-        } else {
-            try c.when(.{ .i32_eq, .{ .i32_add, start, count }, capacity });
-            try c.copy(.{ .i32_add, chunk, header }, .{ .cell, chunk, start, header }, .{ .i32_mul, count, 4 });
-            try c.zero(.{ .cell, chunk, count, header }, .{ .i32_mul, .{ .i32_sub, capacity, count }, 4 });
-            try c.set(start, 0);
-            try c.end();
-            try c.store(.{ .cell, chunk, .{ .i32_add, start, count }, header }, 0, value);
-        }
-        try c.store(chunk, 8, start);
-        try c.store(chunk, 12, .{ .i32_add, count, 1 });
-        try finishPush(c, sequence);
-        try c.end();
-        try c.end();
-        try c.set(added, .{ .call, r.chunk_new, if (prepend) capacity - 1 else 0, 1 });
-        try c.store(.{ .cell, added, if (prepend) capacity - 1 else 0, header }, 0, value);
-        try c.store(added, if (prepend) 0 else 4, chunk);
-        try c.when(chunk);
-        try c.store(chunk, if (prepend) 4 else 0, added);
-        try c.op(.else_, 0);
-        try c.store(sequence, if (prepend) 8 else 4, added);
-        try c.end();
-        try c.store(sequence, end_offset, added);
-        try finishPush(c, sequence);
-        if (prepend) try c.op(.else_, 0);
-    }
-    try c.end();
-    try c.op(.unreachable_, 0);
+    try c.store(sequence, 4, .{ .call, r.insert, .{ .load, sequence, 4 }, value, front, sequence });
+    try c.store(sequence, 0, .{ .i32_add, .{ .load, sequence, 0 }, 1 });
+    try c.store(sequence, 8, 0);
+    try c.value(sequence);
 }
-// Only compiler-private construction/update lowering uses this helper.
 fn emitSet(c: Code, r: Runtime) Error!void {
     const sequence: Local = .{ .id = 0 };
     const index: Local = .{ .id = 1 };
@@ -303,7 +441,8 @@ fn emitSet(c: Code, r: Runtime) Error!void {
     const owned: Local = .{ .id = 3 };
     try c.trap(.{ .i32_ge_u, index, .{ .load, sequence, 0 } });
     try c.set(sequence, .{ .call, r.edit, sequence, owned });
-    try c.store(.{ .call, r.address, sequence, index }, 0, value);
+    try c.store(sequence, 4, .{ .call, r.replace, .{ .load, sequence, 4 }, index, value, sequence });
+    try c.store(sequence, 8, 0);
     try c.value(sequence);
 }
 fn emitConversion(c: Code, r: Runtime, arena: wasm.Arena, to_list: bool) Error!void {
@@ -328,26 +467,35 @@ fn emitConversion(c: Code, r: Runtime, arena: wasm.Arena, to_list: bool) Error!v
     try c.again();
     try c.value(result);
 }
-// Static chains have the same layout. Every link and value pointer is recorded
-// for retained code/data relocation; forward links are known from chunk size.
-pub fn staticChunk(module: *wasm.Module, words: []const u32, previous: u32, more: bool) Error!u32 {
+pub fn staticChunk(module: *wasm.Module, words: []const u32) Error!u32 {
     std.debug.assert(words.len > 0 and words.len <= capacity);
     _ = try module.ensureArena();
-    const start: u32 = @intCast(module.data.items.len);
-    if (start > std.math.maxInt(u32) - chunk_bytes) return error.ModuleTooLarge;
     var buffer: [4 + capacity]u32 = @splat(0);
-    buffer[0] = if (more) start + chunk_bytes else 0;
-    buffer[1] = previous;
+    buffer[2] = @intCast(words.len);
     buffer[3] = @intCast(words.len);
     @memcpy(buffer[4..][0..words.len], words);
-    const address = try module.dataWords(&buffer);
-    if (more) try module.dataReference(address, .{ .role = .static_address, .value = buffer[0] });
-    if (previous != 0) try module.dataReference(address + 4, .{ .role = .static_address, .value = previous });
-    return address;
+    return module.dataWords(buffer[0 .. 4 + words.len]);
 }
-pub fn staticDescriptor(module: *wasm.Module, length: u32, first: u32, last: u32) Error!u32 {
-    const address = try module.dataWords(&.{ length, first, last, 0, 0, 1 });
-    if (first != 0) try module.dataReference(address + 4, .{ .role = .static_address, .value = first });
-    if (last != 0) try module.dataReference(address + 8, .{ .role = .static_address, .value = last });
+const StaticNode = struct { address: u32, height: u32, count: u32 };
+fn staticTree(module: *wasm.Module, leaves: []const u32) Error!StaticNode {
+    if (leaves.len == 0) return .{ .address = 0, .height = 0, .count = 0 };
+    if (leaves.len == 1) return .{
+        .address = leaves[0],
+        .height = 0,
+        .count = std.mem.readInt(u32, module.data.items[leaves[0] + 8 ..][0..4], .little),
+    };
+    const left = try staticTree(module, leaves[0 .. leaves.len / 2]);
+    const right = try staticTree(module, leaves[leaves.len / 2 ..]);
+    const height = @max(left.height, right.height) + 1;
+    const address = try module.dataWords(&.{ 0, height, left.count + right.count, 0, left.address, right.address });
+    try module.dataReference(address + 16, .{ .role = .static_address, .value = left.address });
+    try module.dataReference(address + 20, .{ .role = .static_address, .value = right.address });
+    return .{ .address = address, .height = height, .count = left.count + right.count };
+}
+pub fn staticDescriptor(module: *wasm.Module, length: u32, leaves: []const u32) Error!u32 {
+    const root = try staticTree(module, leaves);
+    std.debug.assert(root.count == length);
+    const address = try module.dataWords(&.{ length, root.address, 0, 0, 0, 1 });
+    if (root.address != 0) try module.dataReference(address + 4, .{ .role = .static_address, .value = root.address });
     return address;
 }

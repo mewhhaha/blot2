@@ -86,7 +86,7 @@ test "catalog queries survive rebuilt dependencies with exact fresh staging and 
         try std.testing.expect(pending.stats.rebuilt_seed);
         try equal(pending.result().?, &expected);
         try std.testing.expect(pending.result().?.result.compiled.completed_queries.reused > 0);
-        try std.testing.expectEqual(@as(usize, 0), pending.result().?.result.compiled.reuse.reused_named);
+        try std.testing.expect(pending.result().?.result.compiled.reuse.reused_named > 0);
         try before.unchanged(&session);
         try std.testing.expect(session.discard(pending));
         try before.unchanged(&session);
@@ -107,6 +107,9 @@ test "catalog queries survive rebuilt dependencies with exact fresh staging and 
     defer restored.deinit(a);
     try std.testing.expectEqualSlices(u8, initial.result.compiled.bytes, restored.result.compiled.bytes);
     session.reuse_rebuilt_queries = false;
+    // Code fragments also offer their pinned owner to query admission. Disable
+    // both reuse sources when checking the wholly fresh rebuilt-query lane.
+    session.reuse_rebuilt_code = false;
     const policy = try ready(&session, &fixture, .{});
     defer policy.deinit();
     try std.testing.expect(!policy.stats.reused_output);
@@ -500,7 +503,11 @@ test "List and Array prelude members retain code across real entry edits and cat
     const prelude =
         \\const List.first = fn (values: List U32) => (@array.from_list values)[0]
         \\const Array.first = fn (values: Array U32) => values[0]
-        \\const fixed = fn (value: U32) => @u32.add (List.first [value]) (Array.first #[value])
+        \\const fixed = fn (value: U32) => do:
+        \\  let result = 0
+        \\  for i in 0..1:
+        \\    result := @u32.add (List.first [value]) (Array.first #[value])
+        \\  return result
     ;
     const main_before = "entry const answer = fn (value: U32) => @u32.add (fixed value) 8\n";
     const main_after = "entry const answer = fn (value: U32) => @u32.add (fixed value) 9\n";
@@ -947,7 +954,9 @@ fn expectProjectQuery(candidate: *const retained.Candidate, expected: *const par
     try std.testing.expect(result.result.compiled.completed_queries.reused > 0);
     try std.testing.expectEqual(@as(usize, 1), result.result.compiled.completed_queries.prepared_importers);
     try std.testing.expectEqual(@as(usize, 0), result.result.compiled.completed_queries.fresh_importers);
-    try std.testing.expectEqual(@as(usize, 2), result.result.compiled.principal.dependency_validations);
+    // The executable gate validated this exact pair; principal/query reuse
+    // clones those flags rather than validating the same modules again.
+    try std.testing.expectEqual(@as(usize, 0), result.result.compiled.principal.dependency_validations);
 }
 
 test "complete project policy preserves captured queries through candidate discard retry and source error recovery" {
@@ -1313,11 +1322,13 @@ test "fresh principal capture serves the first edit and the edit after a depende
         defer candidate.deinit();
         candidate.enableProjectBuildReuse();
         candidate.reuse_rebuilt_queries = false;
+        candidate.reuse_rebuilt_code = false;
         candidate.reuse_projected_principals = projected;
         var baseline = try retained.Session.initEmpty(a, .{});
         defer baseline.deinit();
         baseline.enableProjectBuildReuse();
         baseline.reuse_rebuilt_queries = false;
+        baseline.reuse_rebuilt_code = false;
         baseline.reuse_projected_principals = projected;
         baseline.capture_fresh_principals = false;
         for (0..4) |revision| {

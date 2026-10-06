@@ -166,7 +166,7 @@ fn oldStamp(old: *const artifacts.Pools) [32]u8 {
     return artifacts.stamp(.{ old.operations, old.evaluator.evidence, old.layouts });
 }
 
-test "operation admission qualifies cached producers and State payloads without publishing tags" {
+test "operation admission qualifies cached and exact entry catalogs without publishing tags" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var producer = try Generator.init(a, &fixture);
@@ -185,8 +185,8 @@ test "operation admission qualifies cached producers and State payloads without 
     for (0..2) |_| {
         try std.testing.expect(try imports.admitOperation(&current, inputs.stable));
         try std.testing.expect(try imports.admitOperation(&current, inputs.state_stable));
-        try std.testing.expect(!try imports.admitOperation(&current, inputs.fresh));
-        try std.testing.expect(!try imports.admitOperation(&current, inputs.state_fresh));
+        try std.testing.expect(try imports.admitOperation(&current, inputs.fresh));
+        try std.testing.expect(try imports.admitOperation(&current, inputs.state_fresh));
         try std.testing.expect(!try imports.admitOperation(&current, 0));
         try std.testing.expectEqual(before, tableStamp(&current));
         try std.testing.expectEqual(old_before, oldStamp(&old));
@@ -225,7 +225,7 @@ fn journalCapture(fixture: *const Fixture, reference: Reference, id: u32) !captu
     try result.emission.freezeFunctions(result.metadata.function_jobs.items);
     return result;
 }
-test "operation admission rejects inline references and unused demands with no wrapper child" {
+test "operation admission validates exact entry catalogs in inline references and unused demands" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var producer = try Generator.init(a, &fixture);
@@ -243,7 +243,7 @@ test "operation admission rejects inline references and unused demands with no w
         defer state.deinit();
         try std.testing.expect(state.enabled);
         const hit = try state.find(&current, .{ .named = fixture.key() });
-        try std.testing.expectEqual(if (id == inputs.stable) @as(?u32, 1) else null, hit);
+        try std.testing.expectEqual(@as(?u32, 1), hit);
         try std.testing.expectEqual(before, tableStamp(&current));
     };
 }
@@ -261,7 +261,7 @@ fn allocationScenario(allocator: Allocator, fixture: *const Fixture, old: *const
         return err;
     };
     try std.testing.expect(admitted);
-    try std.testing.expect(!try imports.admitOperation(&current, inputs.state_fresh));
+    try std.testing.expect(try imports.admitOperation(&current, inputs.state_fresh));
     try std.testing.expectEqual(before, tableStamp(&current));
     try std.testing.expectEqual(old_before, oldStamp(old));
 }
@@ -300,12 +300,12 @@ test "operation admission retries failed indexing in the same owner and memoizes
     try std.testing.expect(imports.operation_labels != null);
     failures.fail_index = std.math.maxInt(usize);
     try std.testing.expect(try imports.admitOperation(&current, inputs.state_stable));
-    try std.testing.expect(!try imports.admitOperation(&current, inputs.fresh));
+    try std.testing.expect(try imports.admitOperation(&current, inputs.fresh));
     // A second hit or miss needs no scratch encoder, allocation or tag change.
     failures.fail_index = failures.alloc_index;
     try std.testing.expect(try imports.admitOperation(&current, inputs.stable));
     try std.testing.expect(try imports.admitOperation(&current, inputs.state_stable));
-    try std.testing.expect(!try imports.admitOperation(&current, inputs.fresh));
+    try std.testing.expect(try imports.admitOperation(&current, inputs.fresh));
     try std.testing.expectEqual(before, tableStamp(&current));
 }
 
@@ -394,4 +394,27 @@ test "startup dependency role imports preserve old Core across allocation failur
     var current = try namespaceFixture(true);
     defer current.deinit();
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, namespaceAdmission, .{ &old, &current, original.key() });
+}
+
+test "entry operation payloads still reject a changed nominal catalog" {
+    var original = try Fixture.init();
+    defer original.deinit();
+    var producer = try Generator.init(a, &original);
+    defer producer.deinit();
+    const inputs = try buildInputs(&producer, &original);
+    var old = try pools(&producer, &original);
+    defer old.deinit(a);
+    var changed = try Fixture.init();
+    defer changed.deinit();
+    for (changed.units[1].nominals) |*nominal| if (nominal.identity.decl != 0) {
+        nominal.identity.decl += 100;
+    };
+    var current = try Generator.init(a, &changed);
+    defer current.deinit();
+    var imports = try importer.Importer.init(a, &old, changed.units, changed.names.view(), 1);
+    defer imports.deinit();
+    const before = tableStamp(&current);
+    try std.testing.expect(!try imports.admitOperation(&current, inputs.fresh));
+    try std.testing.expect(!try imports.admitOperation(&current, inputs.state_fresh));
+    try std.testing.expectEqual(before, tableStamp(&current));
 }

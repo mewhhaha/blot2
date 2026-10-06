@@ -67,14 +67,11 @@ use left `combine` right
 //        ^ function
 
 "Sum: ${left `add` right}"
-//    ^ punctuation.special
-//           ^ operator
-//            ^ function
-//                      ^ punctuation.special
-
-"Nested: ${label "Sum: ${left `add` right}"}"
-//                             ^ function
-//                            ^ operator
+//    ^ string
+//    ^ !punctuation.special
+//           ^ string
+//           ^ !operator
+//            ^ !function
 
 "Literal left `add` right"
 // <- string
@@ -82,12 +79,6 @@ use left `combine` right
 //            ^ !operator
 //             ^ string
 //             ^ !function
-
-"Escaped \${left `add` right}"
-//       ^ constant.character.escape
-//               ^ string
-//               ^ !operator
-//                ^ !function
 
 // left `add` right
 // <- comment

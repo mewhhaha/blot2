@@ -18,22 +18,21 @@ const Vec2.scaled = fn value => fn factor => do:
   let #Vec2 { x, y } = value
   return #Vec2 { x: x * factor, y: y * factor }
 
-// Explicit thunks delay evaluation; they do not promise memoization.
-const and_then = fn left => fn right => case left of
-  #False => #False
-  #True => right ()
+// Demand parameters defer an expression and share its first result.
+const and_then = fn left => fn ~right =>
+  if left then @demand right else #False
 
-const unwrap_or_else = fn candidate => fn fallback => case candidate of
+const unwrap_or_else = fn candidate => fn ~fallback => case candidate of
   #Some value => value
-  #Nothing => fallback ()
+  #Nothing => @demand fallback
 
 entry const short_circuit = fn () => do:
   let empty: Array U32 = #[]
-  return and_then #False (fn () => (@array.get empty 0) > 0)
+  return and_then #False (empty[0] > 0)
 
 entry const lazy_fallback = fn () => do:
   let empty: Array U32 = #[]
-  return unwrap_or_else (#Some 42) (fn () => @array.get empty 0)
+  return unwrap_or_else (#Some 42) empty[0]
 
 entry const factorial = fn value => do:
   if value <= 1:
@@ -46,7 +45,7 @@ const choose = fn first => fn enabled => fn fallback => case first, enabled, fal
   _, _, _ => 0
 
 const double_or_zero = fn candidate => do:
-  let #Some(value) = candidate else:
+  let #Some value = candidate else:
     return 0
   return value * 2
 
@@ -68,8 +67,9 @@ entry const vector_example = fn () => do:
 
 entry const array_snapshot = fn () => do:
   let original = #[1, 2, 3]
-  let next = @array.set original 1 20
-  return (@array.get original 1) + (@array.get next 1)
+  let next = original
+  next[1] := 20
+  return original[1] + next[1]
 
 type Counter a is effect = { advance: a -> a }
 const local_counter = @effect.provider (Counter.advance U32) (fn value => value + 1)

@@ -48,7 +48,7 @@ test "native source pipeline retains generic bodies and deterministic scalar out
     var first = try compileSource(allocator, scalar_source);
     defer first.deinit(allocator);
     try std.testing.expectEqual(@as(?backend.Diagnostic, null), first.diagnostic);
-    try std.testing.expectEqual(@as(usize, 7), first.code_instances);
+    try std.testing.expectEqual(@as(usize, 4), first.code_instances);
     var second = try compileSource(allocator, scalar_source);
     defer second.deinit(allocator);
     try std.testing.expectEqualSlices(u8, first.bytes, second.bytes);

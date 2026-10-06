@@ -21,28 +21,33 @@ async function runtime() {
   const inspect = (list: number) => {
     const chunks: number[] = [];
     const nodes = new Set<number>();
-    let chunk = word(list + 4), previous = 0, size = 0;
-    while (chunk) {
-      ok(!nodes.has(chunk), "Forward links must not cycle");
-      nodes.add(chunk); chunks.push(chunk);
-      equal(word(chunk + 4), previous);
-      const start = word(chunk + 8), count = word(chunk + 12);
-      ok(count > 0 && count <= 256 && start + count <= 256);
-      for (let i = 0; i < start; i++) equal(word(chunk + 16 + i * 4), 0);
-      for (let i = start + count; i < 256; i++) equal(word(chunk + 16 + i * 4), 0);
-      size += count; previous = chunk; chunk = word(chunk);
-    }
-    equal(previous, word(list + 8));
-    equal(size, word(list));
+    const visit = (node: number): { size: number; height: number } => {
+      ok(!nodes.has(node), "Tree nodes cannot cycle or repeat within one version");
+      nodes.add(node);
+      const height = word(node + 4), size = word(node + 8);
+      if (height === 0) {
+        chunks.push(node);
+        const capacity = word(node + 12);
+        ok(size > 0 && size <= capacity && capacity <= 248);
+        for (let i = size; i < capacity; i++) equal(word(node + 16 + i * 4), 0);
+      } else {
+        const left = visit(word(node + 16)), right = visit(word(node + 20));
+        equal(size, left.size + right.size);
+        equal(height, Math.max(left.height, right.height) + 1);
+        ok(Math.abs(left.height - right.height) <= 1, "AVL balance");
+      }
+      return { size, height };
+    };
+    const root = word(list + 4);
+    equal(root ? visit(root).size : 0, word(list));
     return { chunks, nodes };
-
   };
   return { call, word, put, get, create, inspect };
 }
 
-Deno.test("chunk growth preserves bidirectional links and dense spans at boundaries", async () => {
+Deno.test("list growth preserves balanced trees and dense leaves at boundaries", async () => {
   const r = await runtime();
-  for (const size of [0, 1, 3, 4, 5, 255, 256, 257, 8191, 8192, 8193, 262143, 262144, 262145]) {
+  for (const size of [0, 1, 8, 9, 24, 25, 247, 248, 249, 255, 256, 257, 8191, 8192, 8193, 262143, 262144, 262145]) {
     const original = r.create(size);
     const appended = r.call("push", original, 0xfffffffe, 0, 0);
     const prepended = r.call("push", original, 0xffffffff, 1, 0);
@@ -57,23 +62,23 @@ Deno.test("chunk growth preserves bidirectional links and dense spans at boundar
   }
 });
 
-Deno.test("shared chunk edits detach the whole chain before exclusive mutation", async () => {
+Deno.test("shared list edits detach a logarithmic spine before exclusive mutation", async () => {
   const r = await runtime();
   const original = r.create(1_000_000);
   const tree = r.inspect(original);
   const before = r.call("heap");
   const changed = r.call("set", original, 123456, 42, 0);
   const copiedBytes = r.call("heap") - before;
-  ok(copiedBytes >= 4_000_000 && copiedBytes < 8_100_000, `Shared copy allocated ${copiedBytes} bytes`);
+  ok(copiedBytes > 0 && copiedBytes < 4096, `Shared copy allocated ${copiedBytes} bytes`);
   const changedTree = r.inspect(changed);
-  equal(changedTree.chunks.filter(p => tree.nodes.has(p)).length, 0);
+  equal(changedTree.chunks.filter(p => tree.nodes.has(p)).length, tree.chunks.length - 1);
   equal(r.get(original, 123456), 123456);
   equal(r.get(changed, 123456), 42);
-  // Either detached chain can subsequently be consumed without affecting the other.
+  // Either tree can subsequently be consumed without affecting the other.
   r.call("set", changed, 900000, 99, 1);
   equal(r.get(original, 900000), 900000);
   equal(r.get(changed, 900000), 99);
-  // The original chain also remains independently writable.
+  // The original tree also remains independently writable.
   r.call("set", original, 500000, 77, 1);
   equal(r.get(changed, 500000), 500000);
   equal(r.get(original, 500000), 77);
@@ -119,7 +124,7 @@ Deno.test("chunk static values conversions empty values and private bounds prese
   // Initialization reserves the arena once; subsequent empty values allocate only a descriptor.
   const tinyBefore = r.call("heap");
   const tiny = r.create(1);
-  ok(r.call("heap") - tinyBefore <= 2112);
+  ok(r.call("heap") - tinyBefore <= 128);
   ok(r.call("heap") > before);
   const frozen = r.call("static");
   const changed = r.call("set", frozen, 0, 42, 1);
@@ -153,7 +158,7 @@ Deno.test("chunk static values conversions empty values and private bounds prese
   }
 });
 
-Deno.test("owned chunk growth links both ends with output-proportional allocation", async () => {
+Deno.test("owned list growth balances both ends with output-proportional allocation", async () => {
   const r = await runtime();
   let list = r.call("new", 0);
   const before = r.call("heap");

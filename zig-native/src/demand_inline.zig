@@ -6,7 +6,9 @@ const core = @import("core.zig");
 pub const max_parameters = 16;
 pub const Plan = struct {
     uses: [max_parameters]u8 = @splat(0),
-    remaining: u8 = 48,
+    remaining: u8 = 96,
+    bindings: [64]core.BindingId = @splat(0),
+    binding_count: usize = 0,
 
     pub fn init(module: *const core.Module, body: *const core.Body) ?Plan {
         if (!body.is_function or body.parameters.len > max_parameters) return null;
@@ -27,6 +29,29 @@ pub const Plan = struct {
         }
         return null;
     }
+    fn pattern(self: *Plan, module: *const core.Module, body: *const core.Body, id: core.PatternId) bool {
+        if (self.remaining == 0) return false;
+        self.remaining -= 1;
+        const p = module.pattern(id);
+        return switch (p.tag) {
+            .wildcard, .constant => true,
+            .bind => blk: {
+                // A pattern must not smuggle a pending demand into a field.
+                if (module.types.node(p.ty).tag == .demand or self.binding_count == self.bindings.len) break :blk false;
+                self.bindings[self.binding_count] = p.a;
+                self.binding_count += 1;
+                break :blk true;
+            },
+            .value => self.visit(module, body, p.a),
+            .constructor => p.b == 0 or self.pattern(module, body, p.b),
+            .record_payload => self.pattern(module, body, p.b),
+            .product => blk: {
+                for (module.extra[p.a..][0..p.b]) |child| if (!self.pattern(module, body, child)) break :blk false;
+                break :blk true;
+            },
+            else => false,
+        };
+    }
     fn visit(self: *Plan, module: *const core.Module, body: *const core.Body, id: core.Id) bool {
         if (self.remaining == 0 or id == 0) return false;
         self.remaining -= 1;
@@ -35,8 +60,32 @@ pub const Plan = struct {
             .constant, .panic => true,
             .reference => if (parameter(module, body, id)) |index|
                 module.types.node(module.bodyParameters(body)[index].ty).tag != .demand
-            else
-                false,
+            else blk: {
+                const ref = module.reference(id);
+                if (ref.unit != 0 and ref.unit != module.unit) break :blk false;
+                for (self.bindings[0..self.binding_count]) |binding| if (ref.binding == binding) break :blk true;
+                break :blk false;
+            },
+            .project => self.visit(module, body, node.a),
+            .construct => node.b == 0 or self.visit(module, body, node.b),
+            .product, .record => blk: {
+                for (module.children(id)) |child| if (!self.visit(module, body, child)) break :blk false;
+                break :blk true;
+            },
+            .match => blk: {
+                if (module.matchInfo(id).statement) break :blk false;
+                for (module.matchInputs(id)) |subject| if (!self.visit(module, body, subject)) break :blk false;
+                for (module.matchArms(id)) |arm| {
+                    const saved = self.binding_count;
+                    defer self.binding_count = saved;
+                    for (module.armRows(arm)) |row| for (module.rowPatterns(row)) |pattern_| {
+                        if (!self.pattern(module, body, pattern_)) break :blk false;
+                    };
+                    if (arm.guard != 0 and !self.visit(module, body, arm.guard)) break :blk false;
+                    if (!self.visit(module, body, arm.body)) break :blk false;
+                }
+                break :blk true;
+            },
             .force => blk: {
                 const index = parameter(module, body, node.a) orelse break :blk false;
                 if (module.types.node(module.bodyParameters(body)[index].ty).tag != .demand) break :blk false;

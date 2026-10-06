@@ -63,9 +63,7 @@ const flip = fn combine => fn right => fn left => combine left right
 const on = fn combine => fn project => fn left => fn right =>
   combine (project left) (project right)
 
-const Bool.not = fn value => case value of
-  #True => #False
-  #False => #True
+const Bool.not = fn value => if value then #False else #True
 
 const Type.eq = fn left => fn right => case left, right of
   #Type a, #Type b => @type.same a b
@@ -110,12 +108,8 @@ const F32.ceil = fn value => @f32.ceil value
 const F32.trunc = fn value => @f32.trunc value
 // Truncates toward zero and saturates; NaN/negative values become zero.
 const F32.to_u32 = fn value => @f32.to_u32 value
-const F32.min = fn left => fn right => case F32.lt left right of
-  #True => left
-  #False => right
-const F32.max = fn left => fn right => case F32.gt left right of
-  #True => left
-  #False => right
+const F32.min = fn left => fn right => if F32.lt left right then left else right
+const F32.max = fn left => fn right => if F32.gt left right then left else right
 const F32.clamp = fn low => fn high => fn value =>
   F32.min high (F32.max low value)
 const F32.lerp = fn left => fn right => fn weight =>
@@ -148,11 +142,9 @@ const f32_reduced_radians = fn value => do:
 
 // Fold to [-pi/2, pi/2], then evaluate the degree-11 Taylor polynomial.
 const f32_sin_reduced = fn angle => do:
-  let x = case F32.gt angle 1.570796327 of
-    #True => F32.sub 3.141592654 angle
-    #False => case F32.lt angle (-1.570796327) of
-      #True => F32.sub (-3.141592654) angle
-      #False => angle
+  let x = if F32.gt angle 1.570796327 then F32.sub 3.141592654 angle
+    else if F32.lt angle (-1.570796327) then F32.sub (-3.141592654) angle
+    else angle
   let square = F32.square x
   let term_9 = F32.add 2.755731922398589e-6 (F32.mul square (-2.505210838544172e-8))
   let term_7 = F32.add (-1.984126984126984e-4) (F32.mul square term_9)
@@ -163,9 +155,7 @@ const f32_sin_reduced = fn angle => do:
 const f32_cos_reduced = fn value => do:
   let angle = F32.abs value
   let outside = F32.gt angle 1.570796327
-  let x = case outside of
-    #True => F32.sub 3.141592654 angle
-    #False => angle
+  let x = if outside then F32.sub 3.141592654 angle else angle
   let square = F32.square x
   let term_10 = F32.add (-2.755731922398589e-7) (F32.mul square 2.08767569878681e-9)
   let term_8 = F32.add 2.48015873015873e-5 (F32.mul square term_10)
@@ -173,9 +163,7 @@ const f32_cos_reduced = fn value => do:
   let term_4 = F32.add 4.166666666666667e-2 (F32.mul square term_6)
   let term_2 = F32.add (-0.5) (F32.mul square term_4)
   let result = F32.add 1.0 (F32.mul square term_2)
-  return case outside of
-    #True => F32.neg result
-    #False => result
+  return if outside then F32.neg result else result
 
 const F32.sin = fn value => f32_sin_reduced (f32_reduced_radians value)
 const F32.cos = fn value => f32_cos_reduced (f32_reduced_radians value)
@@ -191,12 +179,8 @@ const F32.tan = fn value => do:
 const pi = 3.141592653589793
 const tau = 6.283185307179586
 const abs = fn value => value.abs
-const min = fn left => fn right => case left < right of
-  #True => left
-  #False => right
-const max = fn left => fn right => case left > right of
-  #True => left
-  #False => right
+const min = fn left => fn right => if left < right then left else right
+const max = fn left => fn right => if left > right then left else right
 const clamp = fn low => fn high => fn value => min high (max low value)
 const lerp = fn left => fn right => @type.call "lerp" left right
 const square = fn value => value * value
@@ -240,9 +224,7 @@ const Maybe.is_some = fn candidate => case candidate of
   #Some _ => #True
   #Nothing => #False
 const Maybe.filter = fn predicate => fn candidate => case candidate of
-  #Some value => case predicate value of
-    #True => candidate
-    #False => #Nothing
+  #Some value => if predicate value then candidate else #Nothing
   #Nothing => #Nothing
 const Maybe.flatten = fn candidate => case candidate of
   #Some inner => inner
@@ -268,13 +250,13 @@ const Result.iterate = fn initial => fn step => do:
   let state = initial
   for ever:
     use candidate <- step state
-    let (next, finished) = case candidate of
-      #Ok (#Continue next) => (next, #Nothing)
-      #Ok (#Done result) => (state, #Some (#Ok result))
-      #Err error => (state, #Some (#Err error))
-    if let #Some result = finished:
-      return result
-    state := next
+    if let #Ok (#Continue next) = candidate:
+      state := next
+    else:
+      if let #Ok (#Done result) = candidate:
+        return #Ok result
+      if let #Err error = candidate:
+        return #Err error
 const Result.unwrap_or = fn fallback => fn candidate => case candidate of
   #Ok value => value
   #Err _ => fallback

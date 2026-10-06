@@ -1,0 +1,62 @@
+const values: List U32 = [1, 2, 3]
+//            ^^^^ type
+//                       ^ punctuation.bracket
+
+const packed: Array U32 = #[1, 2, 3]
+//            ^^^^^ type
+//                        ^ punctuation.special
+//                         ^ punctuation.bracket
+
+const filtered = [value | value <- values, value > 1]
+//                      ^ operator
+//                              ^^ operator
+
+const mapped = #[twice | value <- packed, let twice = value * 2]
+//             ^ punctuation.special
+//                     ^ operator
+//                             ^^ operator
+//                                        ^^^ keyword.storage.type
+
+const append = fn value => fn values => [...values, value]
+//                                       ^^^ operator
+
+const prepend = fn value => fn values => [value, ...values]
+//                                               ^^^ operator
+
+const named: time.Clock = #time.Clock { ticks: 42 }
+//                        ^ punctuation.special
+//                         ^^^^ namespace
+//                              ^^^^^ constructor
+//                                      ^^^^^ variable.other.member
+
+const nested = #library.time.Clock { ticks: 42 }
+//              ^^^^^^^ namespace
+//                      ^^^^ namespace
+//                           ^^^^^ constructor
+
+if let #Some value = candidate:
+//      ^^^^ constructor
+
+  return #Ok value
+//        ^^ constructor
+
+let #Done value = result else:
+//   ^^^^ constructor
+
+  return #Err 0
+//        ^^^ constructor
+
+@[library.decorate 2]
+// <- punctuation.special
+//^^^^^^^ attribute
+//        ^^^^^^^^ attribute
+
+entry const answer = 42
+// <- keyword.storage.modifier
+//    ^^^^^ keyword.storage.type
+
+"#[1] @[tag] #time.Clock @demand"
+//      ^^^ string
+//      ^^^ !attribute
+//            ^^^^ !namespace
+//                       ^^^^^^^ !function.builtin

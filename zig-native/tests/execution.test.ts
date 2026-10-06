@@ -71,7 +71,7 @@ entry const nested = fn () -> U32 => do:
         equal(guest.call("capped", 17), 17);
         equal(guest.call("capped", 80), 42);
         equal(guest.call("nested", null), 42);
-        equal((metrics.stats as Record<string, unknown>).code_instances, 7);
+        equal((metrics.stats as Record<string, unknown>).code_instances, 4);
       } finally {
         guest.dispose();
       }

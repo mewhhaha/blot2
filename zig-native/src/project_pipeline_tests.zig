@@ -124,7 +124,7 @@ test "explicit prelude producer project preserves diamond identities and dedupli
     try std.testing.expectEqual(@as(?backend.Diagnostic, null), first.output.diagnostic);
     try std.testing.expectEqual(@as(usize, 12), first.body_elaborations);
     try std.testing.expectEqual(@as(usize, 12), first.body_lowerings);
-    try std.testing.expectEqual(@as(usize, 12), first.output.code_instances);
+    try std.testing.expectEqual(@as(usize, 4), first.output.code_instances);
     try std.testing.expectEqualSlices(u8, &.{ 0, 97, 115, 109, 1, 0, 0, 0 }, first.output.bytes[0..8]);
     var second = try compileProject(a, fixture.path, fixture.prelude);
     defer second.deinit(a);
@@ -138,7 +138,7 @@ fn allocationScenario(allocator: std.mem.Allocator, path: []const u8, prelude: [
     try std.testing.expect(result.output.diagnostic == null);
     try std.testing.expectEqual(@as(usize, 12), result.body_elaborations);
     try std.testing.expectEqual(@as(usize, 12), result.body_lowerings);
-    try std.testing.expectEqual(@as(usize, 12), result.output.code_instances);
+    try std.testing.expectEqual(@as(usize, 4), result.output.code_instances);
 }
 
 test "project pipeline releases every owner for all injected allocation failures" {

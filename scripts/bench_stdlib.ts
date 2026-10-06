@@ -72,6 +72,12 @@ const cases = [
     Array.from({ length: 1025 }, (_, i) => i),
   ],
   [
+    "array_replace",
+    "fn (count: U32) => do:\n  let values = array.fill count 0\n  for i in 0..count:\n    values := array.replace i (i + 1) values\n  return values",
+    1025,
+    Array.from({ length: 1025 }, (_, i) => i + 1),
+  ],
+  [
     "vector_lerp",
     "fn (count: U32) => do:\n  let v = #Vec3 { x: 1.0, y: 2.0, z: 3.0 }\n  for i in 0..count:\n    v := lerp v (#Vec3 { x: 2.0, y: 4.0, z: 6.0 }) 0.5\n  return #[v.x, v.y, v.z]",
     8193,
@@ -197,6 +203,90 @@ for (const [name, body, argument, expected] of cases) {
     for (const { guest } of guests) guest.dispose();
   }
 }
+// Fresh processes with warm filesystem caches. These inputs expose the const
+// evaluator's storage cost, independently of runtime Wasm collection ownership.
+const staged: {
+  variant: string;
+  length: number;
+  source_sha256: string;
+  samples: {
+    success: boolean;
+    wall_ms: number;
+    compilation: Record<string, unknown>;
+    diagnostics: unknown[];
+  }[];
+}[] = [];
+for (const length of [256, 1024, 4096, 8193]) {
+  const source = `${output}/staged-${length}.blot`;
+  await Deno.writeTextFile(
+    source,
+    `const build = fn count => do:
+  let values: List U32 = []
+  for i in 0..count:
+    values := [...self, i]
+  return values
+entry const answer = (Array.from_list (build ${length}))[${length - 1}]
+`,
+  );
+  const sourceHash = await hash(await Deno.readFile(source));
+  const lanes = variants.map((variant) => ({
+    variant,
+    result: {
+      variant: variant.name,
+      length,
+      source_sha256: sourceHash,
+      samples: [] as (typeof staged)[number]["samples"],
+    },
+  }));
+  for (let sample = 0; sample < 7; sample++) {
+    const order = sample % 2 === 0 ? lanes : [...lanes].reverse();
+    for (const { variant, result } of order) {
+      const stem = `${output}/${variant.name}-staged-${length}`;
+      const start = performance.now();
+      const compiled = await new Deno.Command(variant.compiler, {
+        args: [
+          "build",
+          source,
+          `${stem}.wasm`,
+          "--prelude",
+          `${variant.std}/prelude.blot`,
+        ],
+        stdout: "piped",
+        stderr: "piped",
+      }).output();
+      const wall = performance.now() - start;
+      const log = new TextDecoder().decode(compiled.stdout);
+      await Deno.writeTextFile(`${stem}-${sample}.jsonl`, log);
+      const records = log.trim().split("\n").map((line) => JSON.parse(line));
+      const compilation = records.find((row) => row.kind === "compilation");
+      const diagnostics = records.filter((row) => row.kind === "diagnostic");
+      assert(compilation, new TextDecoder().decode(compiled.stderr));
+      assert.equal(compilation.memory.live_bytes, 0);
+      assert.equal(compilation.success, compiled.success);
+      if (compiled.success) {
+        const guest = await instantiateGuest(
+          await Deno.readFile(`${stem}.wasm`),
+        );
+        try {
+          assert.equal(guest.read("answer"), length - 1);
+        } finally {
+          guest.dispose();
+        }
+      } else {
+        assert.equal(variant.name, "baseline", log);
+        assert.equal(diagnostics.length, 1, log);
+        assert.equal(diagnostics[0].code, "constant_fuel", log);
+      }
+      result.samples.push({
+        success: compiled.success,
+        wall_ms: wall,
+        compilation,
+        diagnostics,
+      });
+    }
+  }
+  for (const { result } of lanes) staged.push(result);
+}
 for (const [path, pin] of Object.entries(pins)) {
   assert.equal(
     await hash(await Deno.readFile(path)),
@@ -209,10 +299,13 @@ await Deno.writeTextFile(
   JSON.stringify(
     {
       boundary:
-        "8,193 elements/iterations (1,025 for list_append), 1,000 warmups per variant, 31 alternating samples of 16 calls. Guest ABI copies included. Memory is committed guest pages, not total allocations or compiler RSS. Compilation records are individual warm-filesystem builds, not a cold distribution.",
+        "8,193 elements/iterations (1,025 for list_append and array_replace), 1,000 warmups per variant, 31 alternating samples of 16 calls. Guest ABI copies included. Memory is committed guest pages, not total allocations or compiler RSS. Compilation records are individual warm-filesystem builds, not a cold distribution.",
+      staged_boundary:
+        "7 alternating fresh processes per variant and length, warm filesystem caches, default evaluator limits. wall_ms includes process launch, compilation, output writing and teardown; result execution is checked outside that interval. Compilation memory counts requested compiler bytes, not allocator overhead or RSS. Baseline constant_fuel failures are retained as failures, not speedups.",
       versions: Deno.version,
       pins,
       measurements,
+      staged,
     },
     null,
     2,

@@ -41,6 +41,7 @@ pub const Importer = struct {
     unit_map: []u32,
     symbol_map: []u32,
     stable: []bool,
+    code_gate: ?@import("code_body_validity.zig").Gate = null,
     /// Only initCheckedQuery may establish exact semantic catalogs separately
     /// from executable structure. Layout and code imports still use stable.
     semantic_catalogs: bool = false,
@@ -122,6 +123,7 @@ pub const Importer = struct {
                 error.Declined => false,
             };
         }
+        result.code_gate = try @import("code_body_validity.zig").Gate.init(allocator, old, units, names, stamps);
         return result;
     }
     /// PRIVATE query-only preparation within one compileWithOptions epoch.
@@ -162,6 +164,7 @@ pub const Importer = struct {
         if (self.names) |*names| names.deinit(self.allocator);
         self.allocator.free(self.unit_map);
         self.allocator.free(self.symbol_map);
+        if (self.code_gate) |*gate| gate.deinit();
         self.allocator.free(self.stable);
         self.* = undefined;
     }
@@ -195,7 +198,7 @@ pub const Importer = struct {
             if (decl > 6) return error.Declined;
             return old_unit;
         }
-        const mapped = try self.unit(old_unit, require_stable);
+        const mapped = if (require_stable) try self.typeUnit(old_unit) else try self.unit(old_unit, false);
         const module = &self.units[mapped - 1];
         for (module.nominals) |value| if (value.identity.decl == decl and (value.identity.unit == 0 or value.identity.unit == mapped)) return mapped;
         for (module.types.operations) |value| if (value.identity.decl == decl and value.identity.unit == mapped) return mapped;
@@ -206,8 +209,35 @@ pub const Importer = struct {
         if (old_symbol == 0 or old_symbol >= self.symbol_map.len or self.symbol_map[old_symbol] == 0) return error.Declined;
         return self.symbol_map[old_symbol];
     }
+    pub fn admitsBody(self: *const Importer, value: core.BindingRef) bool {
+        if (value.unit == 0 or value.unit > self.unit_map.len) return false;
+        if (self.stable[value.unit - 1]) return true;
+        const gate = if (self.code_gate) |*owned| owned else return false;
+        return gate.body(.{ .unit = self.unit_map[value.unit - 1], .binding = value.binding });
+    }
+    fn typeUnit(self: *const Importer, source: u32) Error!u32 {
+        const exact_catalog = if (self.code_gate) |*gate| gate.catalog(source) else false;
+        return self.unit(source, !exact_catalog);
+    }
+    fn expressionUnit(self: *const Importer, source: u32, root: core.Id) Error!u32 {
+        const mapped = try self.unit(source, false);
+        if (self.stable[source - 1]) return mapped;
+        const gate = if (self.code_gate) |*owned| &owned.semantic else return error.Declined;
+        // Structural equality permits only isolated top-level scalar changes;
+        // lexical nodes, catalogs, captures and type IDs remain exact. Confirm
+        // every named read of this expression against the transitive dirty set.
+        if (!gate.enabled or !gate.structural_units[source - 1]) return error.Declined;
+        const refs = @import("declaration_dependencies.zig").expressionReferences(self.allocator, self.old.modules[source - 1].module, root) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else error.Declined;
+        defer self.allocator.free(refs);
+        for (refs) |ref| {
+            const unit_id = if (ref.unit == 0) source else ref.unit;
+            if (unit_id == 0 or unit_id >= gate.offsets.len or ref.binding >= gate.units[unit_id - 1].bindings.len or gate.dirty[gate.offsets[unit_id - 1] + ref.binding]) return error.Declined;
+        }
+        return mapped;
+    }
     fn target(self: *const Importer, value: core.BindingRef) Error!core.BindingRef {
-        const mapped = try self.unit(value.unit, true);
+        if (!self.admitsBody(value)) return error.Declined;
+        const mapped = try self.unit(value.unit, false);
         if (value.binding == 0 or value.binding >= self.units[mapped - 1].bindings.len) return error.Declined;
         if (self.units[mapped - 1].body(value.binding) == null) return error.Declined;
         return .{ .unit = mapped, .binding = value.binding };
@@ -261,7 +291,8 @@ pub const Importer = struct {
             },
             .closure => |old_key| blk: {
                 var key = old_key;
-                key.unit = try self.unit(old_key.unit, true);
+                if (old_key.unit == 0 or old_key.unit > self.old.modules.len or old_key.catalog >= self.old.modules[old_key.unit - 1].module.closures.len) return error.Declined;
+                key.unit = try self.expressionUnit(old_key.unit, self.old.modules[old_key.unit - 1].module.closures[old_key.catalog].body);
                 if (key.catalog >= self.units[key.unit - 1].closures.len) return error.Declined;
                 key.ty = try self.shape(g, key.ty, 0);
                 key.captures = try self.shape(g, key.captures, 0);
@@ -275,7 +306,7 @@ pub const Importer = struct {
             },
             .callable => |old_key| .{ .callable = .{ .target = try self.target(old_key.target), .ty = try self.closedShape(g, old_key.ty), .applied = old_key.applied } },
             .constructor => |old_key| blk: {
-                const owner = try self.unit(old_key.unit, true);
+                const owner = try self.typeUnit(old_key.unit);
                 if (old_key.catalog >= self.units[owner - 1].constructors.len) return error.Declined;
                 break :blk .{ .constructor = .{ .unit = owner, .catalog = old_key.catalog, .ty = try self.closedShape(g, old_key.ty) } };
             },
@@ -640,7 +671,7 @@ pub const Importer = struct {
         return mapped;
     }
     fn oldModule(self: *const Importer, owner: u32) Error!*const core.Module {
-        _ = try self.unit(owner, true);
+        _ = try self.typeUnit(owner);
         return self.old.modules[owner - 1].module;
     }
     fn mappingEvidence(self: *Importer, g: anytype, owner: u32, id: u32, depth: usize) Error!u32 {
@@ -703,7 +734,7 @@ pub const Importer = struct {
         if (depth >= depth_limit or id == 0 or id > self.old.captures.len) return error.Declined;
         if (self.captures.get(id)) |mapped| return mapped;
         const old_capture = self.old.captures[id - 1];
-        const owner = try self.unit(old_capture.unit, true);
+        const owner = try self.expressionUnit(old_capture.unit, old_capture.node);
         if (old_capture.node == 0 or old_capture.node >= self.units[owner - 1].nodes.len) return error.Declined;
         const imported: artifacts.CapturedTemplate = .{
             .unit = owner,

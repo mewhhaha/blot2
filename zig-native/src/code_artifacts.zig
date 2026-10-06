@@ -36,15 +36,18 @@ pub const Request = union(enum) {
 };
 pub const State = enum { pending, reserved, hit, complete, failed };
 pub const ValueResult = struct { value: core_eval.ValueId, layout: layout.Id };
+pub const StaticRead = struct { target: core.BindingRef, value: core_eval.ValueId };
 pub const Job = struct {
     parent: u32,
     request: Request,
-    /// Some inline bodies consume static values which are not yet represented
-    /// in Request. Preserve the snapshot, but rebuild this job after an edit.
+    /// Unsupported executable dependencies preserve their snapshot but force
+    /// this job to rebuild. Static reads below extend Request's validity with
+    /// exact value, evidence, callable-source and capture-graph comparison.
     reusable: bool = true,
     /// Inlining consumes executable bodies without creating a callee job.
-    /// Validate their complete owning modules before reusing this function.
-    inline_units: std.ArrayList(u32) = .empty,
+    /// Each consumed declaration has its own exact executable dependency.
+    inline_bodies: std.ArrayList(core.BindingRef) = .empty,
+    static_reads: std.ArrayList(StaticRead) = .empty,
     state: State = .pending,
     function: ?u32 = null,
     target_job: u32 = 0,
@@ -56,7 +59,8 @@ pub const Job = struct {
     value: ?ValueResult = null,
     global: ?u32 = null,
     fn deinit(self: *Job, allocator: Allocator) void {
-        self.inline_units.deinit(allocator);
+        self.inline_bodies.deinit(allocator);
+        self.static_reads.deinit(allocator);
         allocator.free(self.mappings);
         allocator.free(self.rows);
         allocator.free(self.templates);
@@ -302,10 +306,20 @@ pub const Context = struct {
     pub fn requireFreshCode(self: *Context) void {
         if (self.active_job != 0) self.jobs.items[self.active_job - 1].reusable = false;
     }
-    pub fn readInlineBody(self: *Context, unit: u32) Allocator.Error!void {
+    pub fn readInlineBody(self: *Context, target: core.BindingRef) Allocator.Error!void {
         if (self.active_job == 0) return;
-        const reads = &self.jobs.items[self.active_job - 1].inline_units;
-        if (std.mem.findScalar(u32, reads.items, unit) == null) try reads.append(self.allocator, unit);
+        const reads = &self.jobs.items[self.active_job - 1].inline_bodies;
+        for (reads.items) |read| if (std.meta.eql(read, target)) return;
+        try reads.append(self.allocator, target);
+    }
+    pub fn readStaticValue(self: *Context, target: core.BindingRef, value: core_eval.ValueId) Allocator.Error!void {
+        if (self.active_job == 0) return;
+        const reads = &self.jobs.items[self.active_job - 1].static_reads;
+        for (reads.items) |read| if (std.meta.eql(read.target, target) and read.value == value) return;
+        try reads.append(self.allocator, .{ .target = target, .value = value });
+    }
+    pub fn hasStaticValues(self: *const Context) bool {
+        return self.active_job != 0 and self.jobs.items[self.active_job - 1].static_reads.items.len != 0;
     }
     fn depth(self: *const Context) usize {
         var id = self.active_job;

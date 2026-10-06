@@ -244,7 +244,7 @@ Deno.test("the source ECS example stages heterogeneous worlds and executes their
       }
       equal(guest.call("snapshot", null), 6);
     }
-  }, { prelude: "std/prelude.blot" });
+  }, { prelude: "std/prelude.blot", stdRoot: "std" });
 });
 
 Deno.test("selected binary methods retain curried results and their invocation effects", async () => {

@@ -129,7 +129,7 @@ const nonzero = fn value => do:
 const candidate = Maybe.bind (#Some 40) nonzero
 
 entry const answer = fn () => do:
-  let #Some(value) = Maybe.map (U32.add 2) candidate else:
+  let #Some value = Maybe.map (U32.add 2) candidate else:
     return 0
   return Result.unwrap_or 0 (Maybe.to_result #False (#Some value))
 
@@ -354,13 +354,13 @@ Comprehensions and `for` loops traverse either input collection. The opening
 bracket selects a comprehension's output type: `[x * x | x <- values, x > 0]` is
 a list. Convert a list to an array when indexed access is needed.
 
-Lists use doubly linked chunks of up to 256 elements. Traversal follows dense
-spans, and exclusive append/prepend reuses end slack or links a new chunk.
-Direct `list.append`/`list.prepend` calls and their aliases preserve this
-optimization, as do ordinary wrappers whose body directly calls the intrinsic.
-Shared edits copy the list's contents, preserving earlier values. Arrays remain
-contiguous; their append/prepend copies the contents. Chunking favors traversal
-and construction, but does not make shared edits inexpensive. See
+Lists use balanced trees of dense leaves, growing from small allocations to
+248-element leaves. Exclusive append/prepend reuses available storage; shared
+edits detach one leaf and its tree path, preserving earlier versions. Direct
+`list.append`/`list.prepend` calls and their aliases preserve this optimization,
+as do ordinary wrappers whose body directly calls the intrinsic. Traversal
+caches the current leaf. Arrays remain contiguous; their append/prepend copies
+the contents. See
 [the list example](../examples/lists.blot) and
 [collection syntax](../compiler/guide.md#lists-arrays-and-libraries).
 
@@ -407,14 +407,20 @@ statically known tuple shape.
 
 Wasm stores arrays in contiguous lanes and preserves old aliases. Updates reuse
 locally owned storage when its last reference is consumed, including a single
-array carried through a loop. Shared arrays and values whose ownership is
-unknown are copied. The source folds and predicates use loops.
+array carried through a loop. Direct `array.replace` calls and aliases preserve
+this reuse, as do wrappers that pass each parameter once to `@array.set`.
+Shared arrays and values whose ownership is unknown are copied. The source folds
+and predicates use loops.
 
-The Zig const evaluator retains immutable collection values; append and update
-copy their elements. Large staged append loops can therefore be quadratic even
-when the runtime loop can reuse storage. Collection patterns remain
-unimplemented. Numeric arrays cross the host ABI as copied `Uint32Array` or
-`Float32Array` values; tuples and other composite values remain internal.
+The Zig const evaluator retains immutable collection values. Appending or
+prepending to the latest version uses unused buffer slots and grows the buffer
+geometrically, making repeated construction linear in work and storage. Earlier
+versions retain their original contents. Branching from an older version copies
+its elements; indexed updates also copy and can still make staged update loops
+quadratic. Reserved slots count against the evaluator's storage budget.
+Collection patterns remain unimplemented. Numeric arrays cross the host ABI as
+copied `Uint32Array` or `Float32Array` values; tuples and other composite values
+remain internal.
 
 See [the executable array example](../examples/arrays.blot).
 
@@ -489,8 +495,9 @@ handle empty arrays. An invalid slice traps or fails constant evaluation.
 Runtime filtering collects values in a private chunked list and copies once into
 the result array. `prefix_sums` sums pairs recursively, then reconstructs the
 prefixes: work and intermediate array storage are linear in both Wasm and
-constant evaluation. Constant filtering still uses immutable list appends; large
-staged constructions can reach the evaluator's limits sooner.
+constant evaluation. Constant filtering uses the evaluator's growth buffers,
+avoiding repeated copies of the selected prefix. Evaluator operation and storage
+limits still apply.
 
 ## Constructor spelling
 

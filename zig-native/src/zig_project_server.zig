@@ -175,6 +175,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                 .stats = .{
                     .nativeWorkSteps = result.result.compiled.constant_steps,
                     .frontend = result.result.stats,
+                    .backend = result.result.compiled.reuse,
                     .sourceBytes = result.source_bytes,
                     .freshModules = result.fresh_modules,
                     .cachedModules = result.cached_modules,

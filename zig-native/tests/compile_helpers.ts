@@ -7,7 +7,7 @@ const compiler = Deno.args[0] ?? new URL("../zig-out/bin/blotc", import.meta.url
 export async function compileAndRun(
   source: string,
   run: (guest: Awaited<ReturnType<typeof instantiateGuest>>, bytes: Uint8Array<ArrayBuffer>) => void | Promise<void>,
-  options: { prelude?: string; asynchronous?: boolean } = {},
+  options: { prelude?: string; stdRoot?: string; asynchronous?: boolean } = {},
 ): Promise<void> {
   const dir = await Deno.makeTempDir({ dir: new URL("../../build", import.meta.url).pathname, prefix: "zig-native-rich-" });
   try {
@@ -15,7 +15,7 @@ export async function compileAndRun(
     const output = `${dir}/program.wasm`;
     await Deno.writeTextFile(input, source);
     const result = await new Deno.Command(compiler, {
-      args: ["build", input, output, "--prelude", options.prelude ?? new URL("../../std/prelude.blot", import.meta.url).pathname], stdout: "piped", stderr: "piped",
+      args: ["build", input, output, "--prelude", options.prelude ?? new URL("../../std/prelude.blot", import.meta.url).pathname, ...(options.stdRoot ? ["--std-root", options.stdRoot] : [])], stdout: "piped", stderr: "piped",
     }).output();
     const text = new TextDecoder().decode(result.stdout);
     if (!result.success) throw new Error(`${text}\n${new TextDecoder().decode(result.stderr)}`);

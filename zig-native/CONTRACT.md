@@ -22,6 +22,43 @@ are immutable. Scratch state is released before final output publication.
 Historical solver semantics use dense version records and explicit cursors;
 ordinary union-find is not an assumed substitute for the reference behavior.
 
+Constant collection values publish immutable child spans. Session-owned growth
+buffers may write outside every published span and extend only the latest span
+in that buffer. Branching from an earlier version copies its visible children.
+The runtime uniqueness proof never authorizes mutation of evaluator values.
+Reserved slots count against the child budget; private growth metadata is not
+part of snapshots or imported value templates.
+
+An admitted indexed-construction region owns a separate child buffer, copied
+from its immutable input once. Finite nested loops and scalar carries use the
+ordinary evaluator; only proven unobserved indexed writes target this buffer.
+No intermediate collection reference may escape, be captured, or be read by
+an arbitrary expression. A frame-qualified private carry is never a published
+value. Freeze once at the region boundary; discard scratch on failure.
+
+Runtime lists use balanced trees with right-sized leaves and copy only an edited
+path when shared. Ownership tokens are not GC pointers. Detaching a branch
+freezes both children, so either surviving version may later be consumed
+exclusively. All pointers remain allocation bases; spare words stay zero.
+
+Small aggregate scalar replacement requires full initialization before aliasing
+and fixed field offsets. Every lexical version and loop carry owns separate
+scalar locals. ABI values, captured/escaped values and GC roots remain boxed.
+The pass transforms an assembly copy, preserving retained symbolic fragments.
+Ordinary source inlining has a four-node budget, expanded to 64 for aggregate
+results inside loops or known callback arguments. Nesting is limited to three
+levels and expansion stops past 4,096 emitted instructions. These are structural
+cost limits, independent of declaration names and source modules.
+
+Executable fragment validity records each inlined source body and every static
+value root. Exact source/catalog dependencies and complete value/evidence/capture
+graph comparison authorize reuse; unsupported providers and generative domains
+rebuild. Rebuilt dependency seeds may offer old pinned fragments for admission.
+Candidate failure must preserve the last successful revision and its owners.
+Within one compile, code and principal/query admission can share an independently
+owned copy of the same semantic validation. Source owners, current Core, allocator
+and admission options must match; executable body/value checks remain separate.
+
 ## Frontend interface
 
 `token.zig`: `Tag`, `Token { tag, start: u32, end: u32 }`. `lexer.zig`:

@@ -55,30 +55,33 @@ const filter_map = fn transform => fn (values: Array a) => do:
   return Array.from_list selected
 
 const flatten = fn chunks => do:
-  let ends = prefix_sums (map .length chunks)
+  let count = 0
   let seed = #Nothing
   for chunk in chunks:
-    seed := case self, chunk.is_empty of
-      #Nothing, #False => #Some chunk[0]
-      _, _ => self
-  return case seed of
-    #Nothing => #[]
-    #Some first => do:
-      let joined = fill ends[chunks.length - 1] first
-      for index in 0..chunks.length:
-        let chunk = chunks[index]
-        let start = ends[index] - chunk.length
-        for offset in 0..chunk.length:
-          joined[start + offset] := chunk[offset]
-      return joined
+    let next_count = count + chunk.length
+    if next_count < count:
+      return @panic "array flatten length overflow"
+    count := next_count
+    if let #Nothing = seed:
+      if Bool.not chunk.is_empty:
+        seed := #Some chunk[0]
+  let #Some first = seed else:
+    return #[]
+  let joined = fill count first
+  let start = 0
+  for chunk in chunks:
+    for offset in 0..chunk.length:
+      joined[start + offset] := chunk[offset]
+    start := self + chunk.length
+  return joined
 
 const concat = fn left => fn right => do:
-  if @array.length left == 0:
+  if left.is_empty:
     return right
-  if @array.length right == 0:
+  if right.is_empty:
     return left
-  let left_count = @array.length left
-  let count = left_count + @array.length right
+  let left_count = left.length
+  let count = left_count + right.length
   if count < left_count:
     return @panic "array concatenation length overflow"
   let joined = fill count left[0]

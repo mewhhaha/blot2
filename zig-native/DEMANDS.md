@@ -1,6 +1,6 @@
 # Predictable demand evaluation
 
-Design and implementation status, 2026-10-05. Make ordinary demand parameters
+Design and implementation status, 2026-10-06. Make ordinary demand parameters
 compile to control flow and local values when their uses are known. Keep a
 deferred value at runtime only where the compiler cannot eliminate its storage.
 The first acceptance case is source-defined `&&` and `||` producing the same
@@ -10,15 +10,18 @@ Use `@demand value` for requesting a deferred result; keep `~` on parameters and
 types. This document proposes replacing `@force`, not adding a second evaluation
 mode. **Both spellings are implemented as aliases.** The first optimization is
 also implemented: known, fully applied expression bodies consisting of parameter
-reads, scalar intrinsics, `if`, constants and demands use branches and locals.
-Analysis admits at most 48 expression nodes. It does not inspect operator names.
+reads, scalar intrinsics, `if`, constructor matches, aggregate expressions,
+constants and demands use branches and locals. Pattern locals and guards retain
+lexical scope. Analysis admits at most 96 expression/pattern nodes. It does not inspect operator names.
 Multiple reads use a local memo reset on each invocation, including inside
 loops. Other bodies use the existing cell.
 
-Inlining records the consumed module in the caller's code artifact; retained
-code validates that module and propagates the dependency across reuse. This is
-conservative module validation, not yet a separate body fingerprint. The broader
-loop, alias and escape analysis described below remains future work.
+Inlining records the consumed declaration in the caller's code artifact.
+Retained code checks its exact Core projection and transitive semantic reads,
+and carries that dependency forward across reuse. Unrelated body edits may
+retain the caller; changes to consumed bodies rebuild it. Namespace, catalog,
+and source-ID changes remain conservative. Demand forwarding, escaping demands,
+and demands revisited inside a callee loop still use ordinary runtime cells.
 
 ## Language contract
 

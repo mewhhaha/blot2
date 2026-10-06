@@ -38,6 +38,7 @@ const OutputPolicy = struct {
     share_dependency_storage: bool,
     reuse_dependency_validation: bool,
     reuse_rebuilt_queries: bool,
+    reuse_rebuilt_code: bool,
     prepare_checked_query_importer: bool,
     reuse_equivalent_validation: bool,
     transport_source_templates: bool,
@@ -249,6 +250,7 @@ pub const Session = struct {
     /// Offer retained inference receipts after rebuilding a dependency seed.
     /// Catalog, declaration and dynamic-read checks remain authoritative.
     reuse_rebuilt_queries: bool = false,
+    reuse_rebuilt_code: bool = false,
     prepare_checked_query_importer: bool = false,
     reuse_equivalent_validation: bool = false,
     transport_source_templates: bool = false,
@@ -279,6 +281,7 @@ pub const Session = struct {
             .share_dependency_storage = self.share_dependency_storage,
             .reuse_dependency_validation = self.reuse_dependency_validation,
             .reuse_rebuilt_queries = self.reuse_rebuilt_queries,
+            .reuse_rebuilt_code = self.reuse_rebuilt_code,
             .prepare_checked_query_importer = self.prepare_checked_query_importer,
             .reuse_equivalent_validation = self.reuse_equivalent_validation,
             .transport_source_templates = self.transport_source_templates,
@@ -311,6 +314,7 @@ pub const Session = struct {
         self.share_dependency_storage = true;
         self.reuse_dependency_validation = true;
         self.reuse_rebuilt_queries = true;
+        self.reuse_rebuilt_code = true;
         self.prepare_checked_query_importer = true;
         self.reuse_equivalent_validation = true;
     }
@@ -604,10 +608,11 @@ pub const Session = struct {
             },
             .ready => |*prepared| {
                 const rebuilt = candidate_seed != null;
-                // Rebuilt seeds still generate executable bodies freshly.
-                // Inference receipts have their own exact catalog, source and
-                // dynamic-input admission, independent of the seed owner.
+                // Old pins stay alive until candidate publication. The backend
+                // checks exact per-body dependencies, catalogs and static value
+                // graphs even when a dependency seed had to be rebuilt.
                 const prior_compatible = !rebuilt;
+                const code_compatible = prior_compatible or (self.reuse_rebuilt_code and std.mem.eql(u8, &self.seed_settings, &settings_key));
                 const queries_compatible = prior_compatible or (self.reuse_rebuilt_queries and std.mem.eql(u8, &self.seed_settings, &settings(snapshot.options)));
                 var result = try prepared.emitWithOptions(a, .{
                     .reuse_projected_principals = self.reuse_projected_principals,
@@ -616,7 +621,7 @@ pub const Session = struct {
                     .reuse_solver_capacity = self.reuse_solver_capacity,
                     .reuse_refinements = self.reuse_refinements,
                     .retain_artifacts = true,
-                    .previous = if (prior_compatible and self.current != null) &self.current.?.artifacts else null,
+                    .previous = if (code_compatible and self.current != null) &self.current.?.artifacts else null,
                     .query_previous = if (queries_compatible and self.current != null) &self.current.?.artifacts else null,
                     .principal_previous = if (rebuilt and self.reuse_projected_principals and self.current != null) &self.current.?.artifacts else null,
                     .cached_units = prepared.cached,

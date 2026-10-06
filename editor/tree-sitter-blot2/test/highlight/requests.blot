@@ -27,3 +27,15 @@ const cancelled = fn computation => do:
       complete _ =>
         break
   return 0
+
+complete #Some value =>
+// <- keyword.control
+//       ^^^^ constructor
+//            ^^^^^ variable.parameter
+  return value
+
+complete #Ok (#Done value) =>
+// <- keyword.control
+//       ^^ constructor
+//            ^^^^ constructor
+  return value

@@ -21,7 +21,7 @@ const identity = fn value => value
 data Maybe a = #Some a | #Nothing
 // <- keyword.storage.type
 //   ^ type
-//              ^ type
+//              ^ constructor
 //                     ^ operator
 
 type Maybe a is data = #Some a | #Nothing
@@ -46,14 +46,14 @@ type Get a is effect = #Unit -> a
 type Positions = #Array Vec2
 // <- keyword.storage.type
 //   ^ type
-//                ^ type
+//                ^ constructor
 
 type Reading = #F64 | #Text
 // <- keyword.storage.type
 //   ^ type
-//              ^ type
+//              ^ constructor
 //                  ^ operator
-//                     ^ type
+//                     ^ constructor
 
 const read_score = fn (ready: Bool) -> F64 | Text => do:
 //                 ^ keyword.function
@@ -66,7 +66,7 @@ const read_score = fn (ready: Bool) -> F64 | Text => do:
 if let #Some(x) = y:
 // <- keyword.control.conditional
 // ^ keyword.storage.type
-//      ^ type
+//      ^ constructor
 //          ^ punctuation.bracket
 //           ^ variable
 //              ^ operator
@@ -75,7 +75,7 @@ if let #Some(x) = y:
 
 let #Some(x) = y else:
 // <- keyword.storage.type
-//   ^ type
+//   ^ constructor
 //       ^ punctuation.bracket
 //        ^ variable
 //           ^ operator
@@ -86,7 +86,7 @@ let #Some(x) = y else:
 
 if let #Some x = y:
 // <- keyword.control.conditional
-//      ^ type
+//      ^ constructor
 //           ^ variable
   return x
 else:
@@ -134,7 +134,7 @@ case first, second, third of
 //        ^ punctuation.delimiter
 //                        ^ keyword.control.conditional
   #Some value, #True, _ => value
-// ^ type
+// ^ constructor
 
 "if let Some(x) = y else: F64 | Text"
 // <- string
@@ -288,32 +288,26 @@ point.x := self + 1.0
 //         ^ variable.builtin
 
 "Hello ${world}"
-// <- string
-//     ^ punctuation.special
-//       ^ variable
-//            ^ punctuation.special
+//     ^^ string
+//     ^^ !punctuation.special
+//       ^^^^^ string
+//       ^^^^^ !variable
 
 "Point ${Vec2 { x: 1.0, y: 2.0 }}!"
-//       ^ type
-//              ^ variable.other.member
-//                              ^ punctuation.special
-//                               ^ string
+//       ^^^^ string
+//       ^^^^ !type
+//              ^^ string
 
-"Message: ${greet "world"}"
-//          ^ variable
-//                 ^ string
-//                       ^ punctuation.special
+"Literal ${world}; costs $5; quote: \""
+//       ^^ string
+//                       ^^ string
+//                                  ^^ constant.character.escape
 
-"Nested ${greet "Hello ${world}"}!"
-//                       ^ variable
-//                               ^ string
-
-"Literal \${world}; costs $5; quote: \""
-//       ^ constant.character.escape
-//          ^ string
-//          ^ !variable
-//                        ^ string
-//                                   ^ constant.character.escape
+"Line\n tab\t return\r slash\\"
+//   ^^ constant.character.escape
+//         ^^ constant.character.escape
+//                  ^^ constant.character.escape
+//                          ^^ constant.character.escape
 
 // fn fake "${self}" is a comment.
 // <- comment
@@ -329,7 +323,8 @@ const disabled = #False
 "@force and ~right are text, ${@force right}"
 // <- string
 // ^ !function.builtin
-//                             ^ function.builtin
+//                             ^ string
+//                             ^ !function.builtin
 
 // @type.of and ~right stay in comments.
 // <- comment
@@ -361,4 +356,5 @@ data Time = #Time { seconds: F32 }
 
 "// still text ${world}"
 // <- string
-//               ^ variable
+//               ^ string
+//               ^ !variable

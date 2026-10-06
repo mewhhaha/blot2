@@ -964,6 +964,41 @@ test "reference arrays carry nominal and nested array handles without mutating a
     try expectValue(&module, "first", .{ .scalar = .u32, .bits = 1 });
 }
 
+fn growingCollectionScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const first = try session.richValue(target(module, "first"));
+    var frozen = try session.copySnapshot(allocator);
+    defer frozen.deinit(allocator);
+    const info = frozen.values[first];
+    const second = try session.richValue(target(module, "second"));
+    const branch = try session.richValue(target(module, "branch"));
+    const previous = try session.richValue(target(module, "previous"));
+    const changed = try session.richValue(target(module, "changed"));
+    for ([_]evaluator.ValueId{ first, second, branch, previous, changed }, [_][]const u32{ &.{20}, &.{ 20, 22 }, &.{ 10, 20 }, &.{20}, &.{99} }) |id, expected| {
+        const items = session.valueChildren(id);
+        try std.testing.expectEqual(expected.len, items.len);
+        for (items, expected) |item, value| try std.testing.expectEqual(value, session.valueScalar(item).?.bits);
+    }
+    try std.testing.expectEqual(@as(u32, 1), info.len);
+    try std.testing.expectEqual(@as(u32, 20), frozen.values[frozen.children[info.start]].bits);
+}
+
+test "growing collection values preserve captures typed views owned snapshots and branching under allocation failures" {
+    var module = try lower(
+        \\const identity = fn value => value
+        \\entry const first = @list.append [] 20
+        \\const capture = fn () => first
+        \\entry const second = @list.append (identity first) 22
+        \\entry const branch = @list.prepend first 10
+        \\entry const previous = capture ()
+        \\entry const changed = @array.set (@array.from_list first) 0 99
+    );
+    defer module.deinit(a);
+    try growingCollectionScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, growingCollectionScenario, .{&module});
+}
+
 test "reference array diagnostics preserve bounds primitive argument order and bootstrap limits" {
     const Case = struct { source: []const u8, code: evaluator.Code };
     for ([_]Case{
@@ -3052,4 +3087,28 @@ test "partial empty-array members preserve shape independent result evidence and
     try partialArrayScenario(a, &module);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, partialArrayScenario, .{&module});
     inline for (inputs, 0..) |items, index| try std.testing.expectEqualDeep(saved[index], items);
+}
+
+fn indexedRegionOwnership(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    try std.testing.expectEqual(@as(u32, 49), (try session.value(target(module, "answer"))).bits);
+    try std.testing.expect(session.indexed_region == null);
+}
+test "private nested indexed regions preserve source aliases and clean up every failed allocation" {
+    var module = try lower(
+        \\const original = @array.fill 8 7
+        \\const updated = do:
+        \\  let values = original
+        \\  let offset = 0
+        \\  for outer in 0..4:
+        \\    for inner in 0..2:
+        \\      values[@u32.add offset inner] := 42
+        \\    offset := @u32.add offset 2
+        \\  return values
+        \\entry const answer = @u32.add original[7] updated[7]
+    );
+    defer module.deinit(a);
+    try indexedRegionOwnership(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, indexedRegionOwnership, .{&module});
 }

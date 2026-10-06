@@ -220,6 +220,9 @@ const Generator = struct {
             else => return error.InvalidFunctionReference,
         }
     }
+    pub fn publishRetainedStatic(self: *Generator, function_id: u32) Error!void {
+        try self.static_closures.append(self.allocator, function_id);
+    }
     pub fn publishRetainedResult(self: *Generator, request: code_artifacts.Request, template: ?u32) Error!void {
         if (template) |id| switch (request) {
             .named => |key| try self.template_results.put(self.allocator, key, id),
@@ -585,18 +588,17 @@ const Generator = struct {
         if (info.kind == .list) {
             if (info.len > 0x10000000) return self.decline(1, .{ .start = 0, .end = 0 }, .complexity);
             const lists = @import("list_runtime.zig");
-            var first: u32 = 0;
-            var previous: u32 = 0;
+            var leaves: std.ArrayList(u32) = .empty;
+            defer leaves.deinit(self.allocator);
             var offset: usize = 0;
             while (offset < words.items.len) {
                 const end = @min(words.items.len, offset + lists.capacity);
-                const chunk = try lists.staticChunk(&self.module, words.items[offset..end], previous, end < words.items.len);
+                const chunk = try lists.staticChunk(&self.module, words.items[offset..end]);
                 for (offset..end) |index| try self.dataValueReference(chunk + lists.header + @as(u32, @intCast((index - offset) * 4)), word_values.items[index], words.items[index]);
-                if (first == 0) first = chunk;
-                previous = chunk;
+                try leaves.append(self.allocator, chunk);
                 offset = end;
             }
-            const address = try lists.staticDescriptor(&self.module, info.len, first, previous);
+            const address = try lists.staticDescriptor(&self.module, info.len, leaves.items);
             try self.serialized.put(self.allocator, key, address);
             return address;
         }
@@ -1973,7 +1975,16 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     defer if (principal_state) |*state| state.deinit();
     if (options.principal_reuse and (options.retain_artifacts or options.previous != null)) {
         if (principal_previous) |previous| if (previous.emission.sealed and previous.metadata.pools != null) {
-            principal_state = try principal_evidence_reuse.State.initWithExecution(allocator, previous, units, options.identity, options.principal_graph_mode, .{ .reuse_projected_principals = options.reuse_projected_principals, .reuse_declaration_principals = options.reuse_declaration_principals, .reuse_unaffected_modules = options.reuse_unaffected_modules, .reuse_equivalent_validation = options.reuse_equivalent_validation, .stamps = stamps });
+            // Executable admission already checked this semantic source pair.
+            // Clone only under identical admission options and owner pairing;
+            // code still needs its separate exact body/value checks. Repeating
+            // the whole dependency validation here would tax every small edit.
+            if (options.share_query_gate and options.principal_graph_mode != .eager and options.reuse_declaration_principals and options.reuse_unaffected_modules and options.reuse_equivalent_validation) if (retained) |*state| if (state.importer.code_gate) |*checked| {
+                if (try shared_query_gate.clone(allocator, &previous.metadata.pools.?, units, &checked.semantic)) |admission| {
+                    principal_state = .{ .allocator = allocator, .old = previous, .gate = admission, .names = options.identity, .graph_mode = options.principal_graph_mode, .reuse_projected_inputs = options.reuse_projected_principals };
+                }
+            };
+            if (principal_state == null) principal_state = try principal_evidence_reuse.State.initWithExecution(allocator, previous, units, options.identity, options.principal_graph_mode, .{ .reuse_projected_principals = options.reuse_projected_principals, .reuse_declaration_principals = options.reuse_declaration_principals, .reuse_unaffected_modules = options.reuse_unaffected_modules, .reuse_equivalent_validation = options.reuse_equivalent_validation, .stamps = stamps });
             generator.principal_state = &principal_state.?;
         };
         // Bind callbacks only after the Generator reaches its stable stack address.
@@ -2548,6 +2559,9 @@ const Emitter = struct {
     result_template: ?u32 = null,
     factory_template: bool = false,
     inline_demands: []const InlineDemand = &.{},
+    owned_edit: ?core.Id = null,
+    inline_depth: u8 = 0,
+    inline_loop: bool = false,
 
     const InlineDemand = struct {
         binding: core.BindingId,
@@ -2569,7 +2583,7 @@ const Emitter = struct {
             if (self.hasErasedType(key.parameters[i], 0)) return false;
             if (g.layouts.node(key.parameters[i]).tag == .demand and caller.node(argument).tag != .suspend_) return false;
         }
-        if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target.unit);
+        if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target);
         var mappings: std.ArrayList(Mapping) = .empty;
         var rows: std.ArrayList(RowMapping) = .empty;
         defer mappings.deinit(g.allocator);
@@ -2652,17 +2666,153 @@ const Emitter = struct {
     fn inlineCollectionEdit(self: *Emitter, id: core.Id, key: Key, depth: usize) Error!bool {
         const g = self.generator;
         const plan = @import("collection_edit_call.zig").analyze(g.units, self.unit_id, id) orelse return false;
-        if (key.count != 2 or !std.meta.eql(plan.target, key.target)) return false;
+        if (key.count != plan.count or !std.meta.eql(plan.target, key.target)) return false;
         for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0)) return false;
-        if (g.artifacts) |artifacts| try artifacts.readInlineBody(plan.target.unit);
+        if (g.artifacts) |artifacts| try artifacts.readInlineBody(plan.target);
         const source = g.unit(self.unit_id);
-        const call = source.call(id);
-        var values: [2]u32 = undefined;
-        for (call.arguments, 0..) |argument, i| values[i] = try self.capture(argument, depth);
+        var values: [3]u32 = undefined;
+        for (plan.arguments[0..plan.count], 0..) |argument, i| values[i] = try self.capture(argument, depth);
+        if (plan.success != null) {
+            const producer = g.unit(plan.target.unit);
+            const body = producer.body(plan.target.binding).?;
+            var mappings: std.ArrayList(Mapping) = .empty;
+            var rows: std.ArrayList(RowMapping) = .empty;
+            defer mappings.deinit(g.allocator);
+            defer rows.deinit(g.allocator);
+            for (producer.bodyParameters(body), 0..) |parameter, i| try g.mapTypeDepth(plan.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
+            try g.mapTypeDepth(plan.target.unit, &mappings, &rows, producer.typeOf(body.root), key.result, body.span, 0);
+            var emitter: Emitter = .{ .generator = g, .unit_id = plan.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .labels = self.labels, .owned_edit = if (try g.ownsArrayUpdate(self.unit_id, id)) plan.edit else null };
+            defer emitter.deinit();
+            for (producer.bodyParameters(body), 0..) |parameter, i| if (parameter.binding != 0) try emitter.locals.put(g.allocator, parameter.binding, values[i]);
+            try emitter.expression(body.root, depth + 1);
+            return true;
+        }
         const order = plan.positions;
         const result = try g.codeLayoutWithRows(self.unit_id, source.typeOf(id), self.mappings, self.row_mappings, source.span(id));
         const input_list = g.layouts.node(key.parameters[order[0]]).tag == .list;
-        try self.arrayLocals(id, plan.op, &.{ values[order[0]], values[order[1]] }, &.{ g.layouts.machine(key.parameters[order[0]]), g.layouts.machine(key.parameters[order[1]]) }, result, input_list);
+        var operands: [3]u32 = undefined;
+        var machines: [3]wasm.ValueType = undefined;
+        for (order[0..plan.count], 0..) |position, i| {
+            operands[i] = values[position];
+            machines[i] = g.layouts.machine(key.parameters[position]);
+        }
+        try self.arrayLocals(id, plan.op, operands[0..plan.count], machines[0..plan.count], result, input_list);
+        return true;
+    }
+
+    fn inlineNamedCall(self: *Emitter, key: Key, arguments: []const core.Id, depth: usize) Error!bool {
+        return self.inlineNamedValues(key, arguments, null, depth);
+    }
+    fn inlineNamedValues(self: *Emitter, key: Key, arguments: []const core.Id, captured: ?[]const u32, depth: usize) Error!bool {
+        const g = self.generator;
+        if (self.inline_depth >= 3 or g.module.functions.items[self.function_id].instructions.items.len > 4096 or (if (captured) |values| values.len != key.count else arguments.len < key.count) or key.templates != 0 or key.template_result) return false;
+        const source = g.unit(key.target.unit);
+        const body = source.body(key.target.binding) orelse return false;
+        const in_loop = self.inline_loop or self.loop_targets.items.len != 0;
+        var expose_data = in_loop and self.inlineDataType(key.result);
+        if (captured == null) for (key.parameters[0..key.count], arguments[0..key.count]) |ty, argument| {
+            expose_data = expose_data or (g.layouts.node(ty).tag == .function and self.isCallableTemplate(argument));
+        };
+        if (!body.is_function or body.parameters.len != key.count or !@import("inline_body.zig").admits(source, body.root, expose_data) or self.hasErasedType(key.result, 0)) return false;
+        for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0) or g.layouts.node(ty).tag == .demand) return false;
+        var mappings: std.ArrayList(Mapping) = .empty;
+        var rows: std.ArrayList(RowMapping) = .empty;
+        defer mappings.deinit(g.allocator);
+        defer rows.deinit(g.allocator);
+        var source_type = source.binding(key.target.binding).ty;
+        for (key.parameters[0..key.count], 0..) |ty, i| {
+            const arrow = source.types.node(source_type);
+            try g.mapTypeDepth(key.target.unit, &mappings, &rows, arrow.a, ty, body.span, 0);
+            try g.mapRow(key.target.unit, &mappings, &rows, arrow.c, key.effects[i], body.span, true);
+            source_type = arrow.b;
+        }
+        try g.mapTypeDepth(key.target.unit, &mappings, &rows, source_type, key.result, body.span, 0);
+        var full = key.result;
+        var reverse: usize = key.count;
+        while (reverse != 0) {
+            reverse -= 1;
+            full = try g.internLayoutWithEffects(.function, key.parameters[reverse], full, key.effects[reverse], &.{});
+        }
+        try g.refineMappings(key.target.unit, .{ .body = key.target }, full, &mappings, &rows, body.span);
+        if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target);
+        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = in_loop };
+        defer emitter.deinit();
+        for (source.bodyParameters(body), 0..) |parameter, i| {
+            if (captured) |values| {
+                if (parameter.binding != 0) try emitter.locals.put(g.allocator, parameter.binding, values[i]);
+                continue;
+            }
+            const argument = arguments[i];
+            if (g.layouts.node(key.parameters[i]).tag == .function and self.static_values.count() == 0 and self.isCallableTemplate(argument)) {
+                const template = (try self.callableTemplate(argument)).?;
+                if (parameter.binding != 0) try emitter.templates.put(g.allocator, parameter.binding, template);
+            } else {
+                const value = try self.capture(argument, depth);
+                if (parameter.binding != 0) try emitter.locals.put(g.allocator, parameter.binding, value);
+            }
+        }
+        const remaining = if (captured != null) &.{} else arguments[key.count..];
+        if (remaining.len != 0 and try emitter.saturatedAssociated(body.root, self, remaining, depth)) return true;
+        try emitter.expression(body.root, depth + 1);
+        var ty = key.result;
+        for (remaining) |argument| {
+            const arrow = g.layouts.node(ty);
+            const callee = try self.temporary(.i32);
+            try self.emit(.local_set, callee);
+            const value = try self.capture(argument, depth);
+            try self.emit(.local_get, callee);
+            try self.emit(.i32_load, 4);
+            try self.emit(.local_get, value);
+            try self.providerHead();
+            try self.emit(.local_get, callee);
+            try self.emit(.i32_load, 0);
+            try self.emit(.call_indirect, try g.module.internType(&.{ .i32, g.layouts.machine(arrow.a), .i32 }, g.layouts.machine(arrow.b)));
+            ty = arrow.b;
+        }
+        return true;
+    }
+
+    fn inlineDataType(self: *const Emitter, ty: layout.Id) bool {
+        return switch (self.generator.layouts.node(ty).tag) {
+            .record, .product, .nominal => true,
+            else => false,
+        };
+    }
+
+    // Fuse a fully supplied method selected by an ordinary source adapter.
+    // Selection and type evidence remain the same as the curried call path.
+    fn saturatedAssociated(self: *Emitter, id: core.Id, caller: *Emitter, extra: []const core.Id, depth: usize) Error!bool {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const node = source.node(id);
+        if (node.tag != .associated or node.op != .none or extra.len + 2 > max_parameters) return false;
+        const left = try g.codeLayoutWithRows(self.unit_id, source.typeOf(node.a), self.mappings, self.row_mappings, source.span(id));
+        const right = try g.codeLayoutWithRows(self.unit_id, source.typeOf(node.b), self.mappings, self.row_mappings, source.span(id));
+        const result = try g.codeLayoutWithRows(self.unit_id, node.ty, self.mappings, self.row_mappings, source.span(id));
+        const identity = self.dispatchIdentity(left) orelse return false;
+        var key = (try self.dispatchCandidate(id, identity, .none, node.c, left, right, result)) orelse return false;
+        const body = g.unit(key.target.unit).body(key.target.binding) orelse return false;
+        if (!body.is_function or body.parameters.len != extra.len + 2) return false;
+        var result_type = result;
+        for (extra, 2..) |_, i| {
+            const arrow = g.layouts.node(result_type);
+            if (arrow.tag != .function) return false;
+            key.parameters[i] = arrow.a;
+            key.effects[i] = arrow.c;
+            result_type = arrow.b;
+        }
+        key.count = @intCast(extra.len + 2);
+        key.result = result_type;
+        var values: [max_parameters]u32 = undefined;
+        values[0] = try self.capture(node.a, depth);
+        values[1] = try self.capture(node.b, depth);
+        for (extra, 2..) |argument, i| values[i] = try caller.capture(argument, depth);
+        if (!try self.inlineNamedValues(key, &.{}, values[0..key.count], depth)) {
+            const function = try g.function(key);
+            for (values[0..key.count]) |value| try self.emit(.local_get, value);
+            try self.providerHead();
+            try self.emit(.call, function);
+        }
         return true;
     }
 
@@ -2702,7 +2852,9 @@ const Emitter = struct {
         const target = try g.normalize(self.unit_id, reference);
         const body = g.unit(target.unit).body(target.binding) orelse return null;
         if (body.runtime or body.is_function) return null;
-        return g.evaluator.richValue(target) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.evaluationFailure();
+        const value = g.evaluator.richValue(target) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.evaluationFailure();
+        if (g.artifacts) |artifacts| try artifacts.readStaticValue(target, value);
+        return value;
     }
     /// A constant record may contain polymorphic fields which this call never
     /// observes. Keep that value in the compiler while lowering the selected
@@ -2721,7 +2873,10 @@ const Emitter = struct {
             retained = retained or values[i] != null;
         }
         if (!retained) return false;
-        if (g.artifacts) |artifacts| artifacts.requireFreshCode();
+        if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target);
+        if (g.artifacts) |artifacts| if (!artifacts.hasStaticValues()) {
+            artifacts.requireFreshCode();
+        };
         if (g.instance_depth >= 256) return g.decline(key.target.unit, body.span, .complexity);
         g.instance_depth += 1;
         defer g.instance_depth -= 1;
@@ -3063,6 +3218,27 @@ const Emitter = struct {
             try self.emit(.i32_load, 4);
             try self.emit(.local_set, container);
         }
+        if (variants.len == 1) {
+            const variant = variants[0];
+            if (wrapped) {
+                try self.emit(.local_get, owner);
+                try self.emit(.i32_load, 0);
+                try self.emit(.i32_const, variant.tag);
+                try self.emit(.i32_ne, 0);
+                try self.emit(.if_, 0);
+                try self.emit(.unreachable_, 0);
+                try self.emit(.end, 0);
+            }
+            try self.emit(.i32_const, variant.field * 4);
+            try self.emit(.local_set, offset);
+            if (size) |size_local| {
+                const slots = if (wrapped) try self.payloadSlots(projection, variant.tag, id) else g.layouts.node(try g.codeLayoutWithRows(self.unit_id, projection.source_type, self.mappings, self.row_mappings, unit_.span(id))).b;
+                if (slots > std.math.maxInt(u32) / 4) return g.fail(self.unit_id, id, .complexity);
+                try self.emit(.i32_const, slots * 4);
+                try self.emit(.local_set, size_local);
+            }
+            return .{ .owner = owner, .container = container, .offset = offset, .size = size, .wrapped = wrapped };
+        }
         try self.emit(.i32_const, std.math.maxInt(u32));
         try self.emit(.local_set, offset);
         for (variants) |variant| {
@@ -3203,7 +3379,7 @@ const Emitter = struct {
         while (index != 0) {
             index -= 1;
             const place = places.items[index];
-            const reuse = places.items.len == 1 and try g.ownsArrayUpdate(self.unit_id, id);
+            const reuse = try g.ownsArrayUpdate(self.unit_id, id);
             if (place.list_index) |element_index| {
                 const runtime = try g.module.ensureLists();
                 const container = try self.temporary(.i32);
@@ -3235,11 +3411,13 @@ const Emitter = struct {
             try self.emit(.local_get, changed);
             try self.emit(if (changed_scalar == .f32) .f32_store else .i32_store, 0);
             if (place.wrapped) {
-                const wrapper = try self.allocate(8);
-                try self.emit(.local_get, wrapper);
-                try self.emit(.local_get, place.owner);
-                try self.emit(.i32_const, 8);
-                try self.emit(.memory_copy, 0);
+                const wrapper = if (reuse) place.owner else try self.allocate(8);
+                if (!reuse) {
+                    try self.emit(.local_get, wrapper);
+                    try self.emit(.local_get, place.owner);
+                    try self.emit(.i32_const, 8);
+                    try self.emit(.memory_copy, 0);
+                }
                 try self.emit(.local_get, wrapper);
                 try self.emit(.local_get, container);
                 try self.emit(.i32_store, 4);
@@ -3347,7 +3525,7 @@ const Emitter = struct {
         try self.emit(.local_set, size);
         return size;
     }
-    fn arrayFill(self: *Emitter, count: u32, value: u32, machine: wasm.ValueType, is_generated: bool, is_list: bool) Error!void {
+    fn arrayFill(self: *Emitter, count: u32, value: u32, machine: wasm.ValueType, is_generated: bool, is_list: bool, known: ?u32) Error!void {
         const size = try self.arraySize(count);
         const arena = try self.generator.module.ensureArena();
         const array_ = try self.temporary(.i32);
@@ -3372,7 +3550,12 @@ const Emitter = struct {
             try self.emit(.local_get, index);
             try self.emit(.call, (try self.generator.module.ensureLists()).address);
         } else try self.arrayAddress(array_, index);
-        if (is_generated) {
+        if (known) |function| {
+            try self.emit(.local_get, value);
+            try self.emit(.local_get, index);
+            try self.providerHead();
+            try self.emit(.call, function);
+        } else if (is_generated) {
             const signature = try self.generator.module.internType(&.{ .i32, .i32, .i32 }, machine);
             try self.emit(.local_get, value);
             try self.emit(.i32_load, 4);
@@ -3398,6 +3581,19 @@ const Emitter = struct {
         const unit_ = g.unit(self.unit_id);
         const operands = unit_.children(id);
         if (operands.len > 3) return g.fail(self.unit_id, id, .unsupported);
+        if (unit_.arrayOperation(id) == .generate and self.static_values.count() == 0 and self.isCallableTemplate(operands[1])) {
+            const count = try self.capture(operands[0], depth);
+            const template = (try self.callableTemplate(operands[1])).?;
+            const callback = try g.codeLayoutWithRows(self.unit_id, unit_.typeOf(operands[1]), self.mappings, self.row_mappings, unit_.span(id));
+            const result = try g.codeLayoutWithRows(self.unit_id, unit_.typeOf(id), self.mappings, self.row_mappings, unit_.span(id));
+            const env = template.environment orelse blk: {
+                const local = try self.temporary(.i32);
+                try self.emit(.i32_const, 0);
+                try self.emit(.local_set, local);
+                break :blk local;
+            };
+            return self.arrayFill(count, env, g.layouts.machine(g.layouts.node(result).a), true, g.layouts.node(result).tag == .list, try self.templateFunction(template, callback));
+        }
         var locals: [3]u32 = undefined;
         var machines: [3]wasm.ValueType = undefined;
         for (operands, 0..) |operand, index| {
@@ -3428,37 +3624,40 @@ const Emitter = struct {
                 try self.emit(if (result == .f32) .f32_load else .i32_load, if (input_list) 0 else 4);
             },
             .set => {
+                const reuse = id != 0 and (self.owned_edit == id or try g.ownsArrayUpdate(self.unit_id, id));
                 if (input_list) {
                     try self.emit(.local_get, locals[0]);
                     try self.emit(.local_get, locals[1]);
                     try self.emit(.local_get, locals[2]);
                     if (machines[2] == .f32) try self.emit(.i32_reinterpret_f32, 0);
-                    try self.emit(.i32_const, 0);
+                    try self.emit(.i32_const, @intFromBool(reuse));
                     try self.emit(.call, (try g.module.ensureLists()).set);
                     return;
                 }
                 try self.arrayBounds(locals[0], locals[1]);
-                const count = try self.temporary(.i32);
-                try self.emit(.local_get, locals[0]);
-                try self.emit(.i32_load, 0);
-                try self.emit(.local_set, count);
-                const size = try self.arraySize(count);
-                const arena = try g.module.ensureArena();
-                const changed = try self.temporary(.i32);
-                try self.emit(.local_get, size);
-                try self.emit(.call, arena.allocate);
-                try self.emit(.local_set, changed);
-                try self.emit(.local_get, changed);
-                try self.emit(.local_get, locals[0]);
-                try self.emit(.local_get, size);
-                try self.emit(.memory_copy, 0);
+                const changed = if (reuse) locals[0] else try self.temporary(.i32);
+                if (!reuse) {
+                    const count = try self.temporary(.i32);
+                    try self.emit(.local_get, locals[0]);
+                    try self.emit(.i32_load, 0);
+                    try self.emit(.local_set, count);
+                    const size = try self.arraySize(count);
+                    const arena = try g.module.ensureArena();
+                    try self.emit(.local_get, size);
+                    try self.emit(.call, arena.allocate);
+                    try self.emit(.local_set, changed);
+                    try self.emit(.local_get, changed);
+                    try self.emit(.local_get, locals[0]);
+                    try self.emit(.local_get, size);
+                    try self.emit(.memory_copy, 0);
+                }
                 try self.arrayAddress(changed, locals[1]);
                 try self.emit(.local_get, locals[2]);
                 try self.emit(if (machines[2] == .f32) .f32_store else .i32_store, 4);
                 try self.emit(.local_get, changed);
             },
-            .fill => try self.arrayFill(locals[0], locals[1], machines[1], false, g.layouts.node(result_layout).tag == .list),
-            .generate => try self.arrayFill(locals[0], locals[1], g.layouts.machine(g.layouts.node(result_layout).a), true, g.layouts.node(result_layout).tag == .list),
+            .fill => try self.arrayFill(locals[0], locals[1], machines[1], false, g.layouts.node(result_layout).tag == .list, null),
+            .generate => try self.arrayFill(locals[0], locals[1], g.layouts.machine(g.layouts.node(result_layout).a), true, g.layouts.node(result_layout).tag == .list, null),
             .identity => try self.emit(.local_get, locals[0]),
             .convert => {
                 try self.emit(.local_get, locals[0]);
@@ -3882,14 +4081,20 @@ const Emitter = struct {
             try self.demandDescriptor(function_id, template.environment);
             return;
         }
-        const function_id = switch (n.tag) {
+        try self.descriptor(try self.templateFunction(template, ty), template.environment);
+    }
+    fn templateFunction(self: *Emitter, template: Template, ty: layout.Id) Error!u32 {
+        const g = self.generator;
+        const owner = if (template.unit == 0) self.unit_id else template.unit;
+        const unit_ = g.unit(owner);
+        const n = unit_.node(template.node);
+        return switch (n.tag) {
             .closure => try g.closureFunction(.{ .unit = owner, .catalog = n.a, .ty = ty, .captures = template.captures, .templates = template.templates, .evidence = template.evidence, .rows = template.rows }),
             .constructor_function => try g.constructorFunction(.{ .unit = owner, .catalog = n.a, .ty = ty }),
             .primitive_function => try g.primitiveFunction(.{ .unit = owner, .catalog = n.a, .ty = ty }),
             .reference => try g.callable(.{ .target = try g.normalize(owner, unit_.reference(template.node)), .ty = ty }),
             else => return g.fail(self.unit_id, template.node, .unsupported),
         };
-        try self.descriptor(function_id, template.environment);
     }
     fn closure(self: *Emitter, id: core.Id) Error!void {
         const g = self.generator;
@@ -3934,7 +4139,9 @@ const Emitter = struct {
         try g.refineMappings(self.unit_id, .{ .closure = .{ .unit = self.unit_id, .catalog = node.a } }, ty, &mappings, &rows, source.span(id));
         const function_id = try g.module.addFunction(&.{ .i32, g.layouts.machine(arrow.a), .i32 }, g.layouts.machine(arrow.b));
         try g.static_closures.append(g.allocator, function_id);
-        if (g.artifacts) |artifacts| artifacts.requireFreshCode();
+        if (g.artifacts) |artifacts| if (!artifacts.hasStaticValues()) {
+            artifacts.requireFreshCode();
+        };
         g.work.fresh_closures += 1;
         try g.startup_facts.request(g.allocator, function_id, .anonymous, self.unit_id, node.a, false);
         var emitter: Emitter = .{ .generator = g, .unit_id = self.unit_id, .function_id = function_id, .provider_local = 2, .mappings = mappings.items, .row_mappings = rows.items };
@@ -4270,6 +4477,26 @@ const Emitter = struct {
             return;
         }
         if (try self.partialStaticCall(id, depth)) return;
+        if (@import("known_call.zig").resolve(g.units, self.unit_id, id)) |known| {
+            if (known.signature != 0) {
+                const key = try g.signature(known.target, known.signature, self.unit_id, self.mappings, self.row_mappings, unit_.span(id), false);
+                if (key.count == known.count) {
+                    if (try self.inlineCollectionEdit(id, key, depth)) return;
+                    if (try self.inlineNamedCall(key, known.arguments[0..known.count], depth)) return;
+                }
+            }
+        }
+        if (self.static_values.count() == 0 and self.isCallableTemplate(n.a)) {
+            const template = (try self.callableTemplate(n.a)).?;
+            const ty = try g.codeLayoutWithRows(self.unit_id, unit_.typeOf(n.a), self.mappings, self.row_mappings, unit_.span(id));
+            const function = try self.templateFunction(template, ty);
+            const argument = try self.capture(n.b, depth);
+            if (template.environment) |env| try self.emit(.local_get, env) else try self.emit(.i32_const, 0);
+            try self.emit(.local_get, argument);
+            try self.providerHead();
+            try self.emit(.call, function);
+            return;
+        }
         const callee = try self.capture(n.a, depth);
         const argument = try self.capture(n.b, depth);
         const signature = try g.module.internType(&.{ .i32, (try self.scalar(n.b)).machine(), .i32 }, (try self.scalar(id)).machine());
@@ -4590,6 +4817,7 @@ const Emitter = struct {
                 if (try self.inlineCollectionEdit(id, key, depth)) return;
                 if (try self.inlineDemandCall(key, call.arguments, depth)) return;
                 if (try self.inlineStaticCall(key, call.arguments, depth)) return;
+                if (try self.inlineNamedCall(key, call.arguments, depth)) return;
                 const function_id = try g.function(key);
                 for (call.arguments[0..key.count]) |argument| try self.expression(argument, depth + 1);
                 try self.providerHead();
@@ -4803,6 +5031,10 @@ const Emitter = struct {
             const incoming = self.locals.get(carry.incoming) orelse return g.fail(self.unit_id, id, .unsupported);
             try self.emit(.local_get, incoming);
             try self.save(carry.iteration, id);
+            // Initialize the exit version before entering the loop, including
+            // its zero-iteration path. Backedges and break edges replace it.
+            try self.emit(.local_get, incoming);
+            try self.save(carry.outgoing, id);
         }
         try self.emit(.block, 0);
         const exit_label = self.labels;
@@ -4811,11 +5043,6 @@ const Emitter = struct {
         try self.emit(.loop, 0);
         const head_label = self.labels;
         self.labels += 1;
-        for (carries) |carry| {
-            const iteration = self.locals.get(carry.iteration) orelse return g.fail(self.unit_id, id, .unsupported);
-            try self.emit(.local_get, iteration);
-            try self.save(carry.outgoing, id);
-        }
         if (metadata.kind != .forever) {
             try self.emit(.local_get, counter);
             try self.emit(.local_get, end);
@@ -4863,6 +5090,10 @@ const Emitter = struct {
             while (index != 0) {
                 index -= 1;
                 try self.save(carries[index].iteration, id);
+            }
+            for (carries) |carry| {
+                try self.emit(.local_get, self.locals.get(carry.iteration).?);
+                try self.save(carry.outgoing, id);
             }
             if (floor) |local| try self.collectLoopCarries(id, carries, local, cadence.?);
             if (metadata.kind != .forever) {
@@ -5017,6 +5248,7 @@ const Emitter = struct {
                 ty = try g.internLayoutWithEffects(.function, key.parameters[reverse], ty, key.effects[reverse], &.{});
             }
             direct.result = ty;
+            if (arity == key.count and try self.inlineNamedCall(direct, arguments[0..arity], depth)) return;
             const function = try g.function(direct);
             for (arguments[0..arity]) |argument| try self.expression(argument, depth + 1);
             try self.providerHead();

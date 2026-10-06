@@ -10,8 +10,8 @@ pub fn main(init: std.process.Init) !void {
     inline for (.{ "new", "address", "copy", "push", "set", "from_array", "to_array" }) |field|
         try module.exportFunction(@field(runtime, field), field, .u32, .u32);
     const lists = @import("list_runtime.zig");
-    const static_chunk = try lists.staticChunk(&module, &.{123}, 0, false);
-    const static_list = try lists.staticDescriptor(&module, 1, static_chunk, static_chunk);
+    const static_chunk = try lists.staticChunk(&module, &.{123});
+    const static_list = try lists.staticDescriptor(&module, 1, &.{static_chunk});
     const static_function = try module.addFunction(&.{}, .i32);
     try module.emit(static_function, .{ .op = .i32_const, .operand = static_list });
     try module.exportFunction(static_function, "static", .unit, .u32);

@@ -1,6 +1,8 @@
 // Executable source ECS with component columns chosen by const-time registration.
 // Entity IDs are column indices; Nothing means that component is absent.
-// Worlds stay inside the guest. The current host ABI exchanges only scalars.
+// Worlds stay inside the guest. This example exports scalar queries.
+
+import * as array from "std/array"
 
 type Position is data = #Position { x: F32, y: F32 }
 type Velocity is data = #Velocity { x: F32, y: F32 }
@@ -56,7 +58,7 @@ const simulation = do:
     #Some (#Velocity { x: 1.0, y: 1.0 }),
     #Some (#Velocity { x: 4.0, y: 2.0 }),
   ]) self
-  builder := insert_cell (#Column (@array.generate 4 (fn index -> Maybe Ghost => #Nothing))) self
+  builder := insert_cell (#Column (array.generate 4 (fn index -> Maybe Ghost => #Nothing))) self
   return build builder
 
 const move_position = fn position => fn velocity => fn seconds =>
@@ -73,24 +75,21 @@ const move = fn () => do:
   let #Column velocities = stored_velocities
   let #Time { seconds } = time
   let next = positions
-  for index in 0..(@array.length positions):
-    next := @array.set self index (move_position (@array.get positions index) (@array.get velocities index) seconds)
+  for index in 0..positions.length:
+    next[index] := move_position positions[index] velocities[index] seconds
   use set (#Column next)
-  return ()
 
 const add_ghost = fn () => do:
   use stored <- get_column (#Ghost { remaining: 1.0 })
   let #Column ghosts = stored
   let next = ghosts
-  for index in 0..(@array.length ghosts):
-    next := @array.set self index (#Some (#Ghost { remaining: 1.0 }))
+  for index in 0..ghosts.length:
+    next[index] := #Some (#Ghost { remaining: 1.0 })
   use set (#Column next)
-  return ()
 
 const update = fn () => do:
   for system in #[move, add_ghost]:
     use system ()
-  return ()
 
 const create = fn () => do:
   let #Simulation { initial } = simulation
@@ -108,9 +107,8 @@ const checksum_scoped = fn () => do:
   let #Column positions = stored
   let total = 0.0
   for position in positions:
-    total := case position of
-      #Nothing => self
-      #Some (#Position { x, y }) => self + x + y
+    if let #Some (#Position { x, y }) = position:
+      total := self + x + y
   return total
 
 const checksum = fn world => do:
@@ -123,9 +121,8 @@ const count_ghosts = fn world => do:
     let #Column ghosts = stored
     let count = 0
     for ghost in ghosts:
-      count := case ghost of
-        #Nothing => self
-        #Some _ => self + 1
+      if let #Some _ = ghost:
+        count := self + 1
     return count)
   return count
 

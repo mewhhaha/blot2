@@ -6,7 +6,7 @@ compile-time evaluation. The handwritten Zig compiler emits WebAssembly.
 
 `[a]` is a `List a`; `#[a]` is an `Array a`. Both support comprehensions and
 append/prepend spreads. Indexing and indexed updates belong to arrays. Lists use
-linked chunks, with in-place end edits when ownership permits. Declaration tags
+balanced trees of dense leaves, sharing unchanged paths between versions. Declaration tags
 use `@[f]`. See the [language guide](compiler/guide.md).
 
 ## Build and use

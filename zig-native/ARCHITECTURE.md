@@ -38,12 +38,12 @@ scratch is released explicitly. Published immutable modules own their tables.
 The solver preserves cursor-relative chronological substitutions; replacing it
 with ordinary union-find would change semantics without an admission proof.
 
-Arrays are contiguous. A List descriptor owns doubly linked chunks of up to 256
-words. Exclusive end edits reuse slack; shared edits copy the entire chain.
-Static descriptors are immutable. Unused payload slots remain zero for the
-tracing collector, and cached chunk positions make monotone traversal linear.
-This improves owned construction but makes a shared edit expensive on long
-lists.
+Arrays are contiguous. Lists use persistent AVL trees with right-sized leaves
+of up to 248 words. Exclusive end edits reuse slack and tree nodes; shared edits
+detach one path and leaf. Branch copies freeze their children so both versions
+remain independently editable. Ownership tokens are descriptor addresses plus
+one, never tracing pointers to obsolete descriptors. Static data is immutable,
+unused slots stay zero, and descriptors cache the current traversal leaf.
 
 ## Limits and measurement
 

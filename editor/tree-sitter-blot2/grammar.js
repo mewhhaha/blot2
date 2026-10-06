@@ -1,4 +1,4 @@
-// A permissive highlighting grammar for the design specimen, not a validator.
+// A permissive highlighting grammar for Blot, not a validating compiler parser.
 // Shallow headers and balanced delimiters keep unsettled forms highlightable
 // without duplicating the compiler's layout or expression grammar.
 export default grammar({
@@ -12,6 +12,7 @@ export default grammar({
   ) => [
     [$.function_binding, $._syntax],
     [$.import_declaration, $.keyword],
+    [$.entry_binding, $.identifier],
     [$.request_complete_header, $.identifier],
   ],
 
@@ -28,6 +29,7 @@ export default grammar({
         $.infix_function,
         $.forward_return,
         $.declaration_tag,
+        $.constructor_reference,
         $.constructor_marker,
         $.where_clause,
         $.parenthesized,
@@ -119,12 +121,13 @@ export default grammar({
 
     binding_keyword: (_) => choice("const", "let"),
 
-    // `entry` is contextual: a declaration modifier only when `const` or `let`
-    // follows on the same line, and an ordinary identifier everywhere else.
-    // One token keeps `fn entry => entry` and a trailing `entry` before the
-    // next declaration's line out of it.
-    entry_binding: (_) =>
-      token(prec(1, seq("entry", /[ \t]+/, choice("const", "let")))),
+    // The query checks that both keywords are on the same line. Keeping spaces
+    // as ordinary extras avoids stealing whitespace after variable `entry`.
+    entry_binding: ($) =>
+      prec.dynamic(
+        1,
+        seq(alias("entry", $.entry_modifier), $.binding_keyword),
+      ),
 
     ever_loop: ($) => seq("for", "ever", alias(":", $.separator)),
 
@@ -160,13 +163,27 @@ export default grammar({
             "parameter",
             choice(
               $.identifier,
+              $.integer,
               $.parenthesized,
               $.bracketed,
               $.braced,
+              $.completion_constructor_pattern,
             ),
           ),
           alias("=>", $.operator),
         ),
+      ),
+
+    completion_constructor_pattern: ($) =>
+      seq(
+        $.constructor_reference,
+        optional(choice(
+          $.identifier,
+          $.integer,
+          $.parenthesized,
+          $.braced,
+          $.completion_constructor_pattern,
+        )),
       ),
 
     binding_annotation: ($) =>
@@ -239,6 +256,18 @@ export default grammar({
     forward_return: (_) => seq("return", "$"),
 
     constructor_marker: (_) => prec(-1, "#"),
+    constructor_reference: ($) =>
+      prec.right(
+        2,
+        seq(
+          $.constructor_marker,
+          repeat(seq(
+            field("qualifier", choice($.identifier, $.type_identifier)),
+            ".",
+          )),
+          field("name", choice($.type_identifier, $.boolean)),
+        ),
+      ),
 
     declaration_tag: ($) =>
       seq(
@@ -277,14 +306,13 @@ export default grammar({
         repeat(choice(
           $.text_fragment,
           $.escape_sequence,
-          $.interpolation,
-          alias(token.immediate("$"), $.text_fragment),
         )),
         '"',
       ),
-    text_fragment: (_) => token.immediate(prec(1, /[^"\\$]+/)),
-    escape_sequence: (_) => token.immediate(/\\[ntr"\\$]/),
-    interpolation: ($) => seq("${", repeat($._syntax), "}"),
+    // Native strings are single-line literals, including any `${...}` text.
+    // Keep the accepted escapes in sync with lexer.zig.
+    text_fragment: (_) => token.immediate(prec(1, /[^"\\\r\n]+/)),
+    escape_sequence: (_) => token.immediate(/\\[ntr"\\]/),
 
     float: (_) =>
       token(
@@ -295,7 +323,7 @@ export default grammar({
     self: (_) => "self",
     intrinsic: (_) => token(/@[a-z_][A-Za-z0-9_]*(\.[a-z_][A-Za-z0-9_]*)*/),
     _identifier: (_) => /[a-z_][A-Za-z0-9_]*/,
-    identifier: ($) => choice($._identifier, "complete"),
+    identifier: ($) => choice($._identifier, "complete", "entry"),
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
     operator: (_) => choice(":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
     separator: (_) => choice(":", ",", ";"),

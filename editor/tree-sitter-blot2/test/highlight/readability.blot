@@ -6,10 +6,19 @@ const from = fn value => value
 entry const normalized = fn value => from value / 6555.0
 //                                   ^ variable
 
-const and = fn left => fn ~(right: Bool) => if left then @force right else #False
+const and = fn left => fn ~(right: Bool) => if left then @demand right else #False
 //                        ^ operator
 //                         ^ punctuation.bracket
 //                                                   ^ keyword.control.conditional
+
+const demand = fn ~value => @demand value
+//    ^^^^^^ function
+//                ^ operator
+//                 ^^^^^ variable.parameter
+//                          ^^^^^^^ function.builtin
+
+const compatible = fn ~value => @force value
+//                              ^^^^^^ function.builtin
 
 const same = fn a => fn b => if :a == :b then #True else #False
 const project = .x

@@ -14,6 +14,7 @@ const provider_chain = @import("provider_chain.zig");
 const body_recipe = @import("body_recipe.zig");
 const runtime_identity = @import("runtime_identity.zig");
 const Allocator = std.mem.Allocator;
+const collection_growth = @import("eval_collection_growth.zig");
 pub const Value = scalar_ops.Value;
 pub const ValueId = u32;
 /// Source interface inquiry owns no values and performs no constant demand.
@@ -195,6 +196,14 @@ pub const RetainedCapture = struct {
 };
 pub const ProofStats = struct { proof_published: usize = 0, proof_reused: usize = 0 };
 pub const DiagnosticContext = struct { identity: ?runtime_identity.View = null, entry: u32 = 0, prelude: u32 = 0, source_mode: bool = false };
+const IndexedRegion = struct {
+    owner: usize,
+    frame: *Frame,
+    original: ValueId,
+    children: []ValueId,
+    plan: @import("eval_indexed_builder.zig").Plan,
+};
+
 pub const Session = struct {
     /// Private storage policy; no solver evidence or source owner is pooled.
     reuse_solver_capacity: bool = true,
@@ -232,6 +241,8 @@ pub const Session = struct {
     draining_pending: bool = false,
     values: std.ArrayList(ValueInfo) = .empty,
     children: std.ArrayList(ValueId) = .empty,
+    collection_buffers: collection_growth.Store = .{},
+    indexed_region: ?*IndexedRegion = null,
     closures: std.ArrayList(ClosureValue) = .empty,
     demands: std.ArrayList(Demand) = .empty,
     source_suspensions: std.ArrayList(SourceSuspension) = .empty,
@@ -322,6 +333,7 @@ pub const Session = struct {
         self.pending.deinit(self.allocator);
         self.values.deinit(self.allocator);
         self.children.deinit(self.allocator);
+        self.collection_buffers.deinit(self.allocator);
         self.closures.deinit(self.allocator);
         self.demands.deinit(self.allocator);
         self.source_suspensions.deinit(self.allocator);
@@ -1488,6 +1500,9 @@ pub const Session = struct {
         self.depth += 1;
         defer self.depth -= 1;
         const n = module.node(id);
+        if (self.indexed_region) |region| if (region.owner == owner and region.frame == frame) {
+            for (region.plan.edits[0..region.plan.edit_count]) |edit| if (edit.update == id) return self.indexedEdit(region, edit);
+        };
         switch (n.tag) {
             .constant => {
                 const scalar = if (n.ty < module.types.nodes.len) switch (module.types.node(n.ty).tag) {
@@ -1605,7 +1620,7 @@ pub const Session = struct {
                 if (second.kind != .effect_descriptor) return self.failNode(owner, id, .type_mismatch);
                 const matches = if (kind == .has) blk: {
                     if (first.kind != .effect_set) return self.failNode(owner, id, .type_mismatch);
-                    break :blk std.mem.indexOfScalar(u32, self.evidence.effects.view().rowLabels(first.bits), second.bits) != null;
+                    break :blk std.mem.findScalar(u32, self.evidence.effects.view().rowLabels(first.bits), second.bits) != null;
                 } else blk: {
                     if (first.kind != .effect_descriptor) return self.failNode(owner, id, .type_mismatch);
                     break :blk first.bits == second.bits;
@@ -1881,6 +1896,23 @@ pub const Session = struct {
         }
         return .{ .value = try self.arrayValues(owner, id, operation, values[0..arity], frame.providers) };
     }
+    fn extendCollection(self: *Session, owner: usize, source: core.Id, original: ValueId, value_: ValueId, front: bool) Error!ValueId {
+        const before = self.valueInfo(original);
+        if (before.len >= 4_194_303) return self.arrayLengthFailure(owner);
+        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId)) return self.failNode(owner, source, .constant_fuel);
+        try self.values.ensureUnusedCapacity(self.allocator, 1);
+        try self.value_evidence.ensureUnusedCapacity(self.allocator, 1);
+        try self.value_records.ensureUnusedCapacity(self.allocator, 1);
+        const span = self.collection_buffers.extend(self.allocator, &self.children, .{ .start = before.start, .len = before.len }, value_, front, self.options.max_children) catch |err| switch (err) {
+            error.Limit => return self.failNode(owner, source, .constant_fuel),
+            error.OutOfMemory => return error.OutOfMemory,
+        };
+        const id: ValueId = @intCast(self.values.items.len);
+        self.values.appendAssumeCapacity(.{ .kind = before.kind, .start = span.start, .len = span.len });
+        self.value_evidence.appendAssumeCapacity(0);
+        self.value_records.appendAssumeCapacity(0);
+        return id;
+    }
     fn arrayValues(self: *Session, owner: usize, id: core.Id, operation: core.ArrayOp, values: []const ValueId, head: provider_chain.Head) Error!ValueId {
         const kind: ValueKind = if (self.units[owner].types.node(self.units[owner].typeOf(id)).tag == .list) .list else .array;
         if (operation == .generate) {
@@ -1914,13 +1946,7 @@ pub const Session = struct {
             return self.makeAggregate(owner, id, if (array.kind == .list) .array else .list, 0, 0, copied);
         }
         if (operation == .append or operation == .prepend) {
-            if (array.len >= 4_194_303) return self.arrayLengthFailure(owner);
-            const children_ = try self.allocator.alloc(ValueId, @as(usize, array.len) + 1);
-            defer self.allocator.free(children_);
-            const front = operation == .prepend;
-            @memcpy(children_[@intFromBool(front)..][0..array.len], self.valueChildren(values[0]));
-            children_[if (front) 0 else array.len] = values[1];
-            return self.makeAggregate(owner, id, array.kind, 0, 0, children_);
+            return self.extendCollection(owner, id, values[0], values[1], operation == .prepend);
         }
         const index = try self.requireScalar(owner, id, values[1]);
         if (index.scalar != .u32) return self.failNode(owner, id, .unsupported);
@@ -2319,10 +2345,45 @@ pub const Session = struct {
         try self.break_values.appendSlice(self.allocator, values);
         return .{ .breaking = .{ .target = module.node(id).a, .values = .{ .start = start, .len = @intCast(values.len) } } };
     }
+    fn indexedEdit(self: *Session, region: *IndexedRegion, edit: @import("eval_indexed_builder.zig").Edit) Error!Flow {
+        const owner = region.owner;
+        const frame = region.frame;
+        const selected = try self.expression(owner, edit.index, frame);
+        if (selected != .value) return selected;
+        const offset = try self.requireScalar(owner, edit.update, selected.value);
+        if (offset.scalar != .u32) return self.failNode(owner, edit.update, .unsupported);
+        if (edit.bounds_first and offset.bits >= region.children.len) return self.failNode(owner, edit.update, .array_bounds);
+        if (edit.self_binding != 0) try frame.values.put(self.allocator, edit.self_binding, region.children[offset.bits]);
+        const next = try self.expression(owner, edit.value, frame);
+        if (next != .value) return next;
+        if (offset.bits >= region.children.len) return self.failNode(owner, edit.update, .array_bounds);
+        region.children[offset.bits] = next.value;
+        // This opaque carry is never observed inside an admitted region. It
+        // keeps ordinary loop/scalar evaluation intact without publishing a
+        // mutable ValueInfo or child span to a closure, cache or snapshot.
+        return .{ .value = region.original };
+    }
+    fn indexedLoop(self: *Session, owner: usize, id: core.Id, frame: *Frame, first: ValueId, begin: u32, end: u32, plan: @import("eval_indexed_builder.zig").Plan) Error!Flow {
+        const original = frame.values.get(plan.incoming) orelse return self.failNode(owner, id, .unsupported);
+        const info = self.valueInfo(original);
+        if (info.kind != .array and info.kind != .list) return self.failNode(owner, id, .unsupported);
+        try self.chargeCells(owner, id, info.len);
+        const children = try self.allocator.dupe(ValueId, self.valueChildren(original));
+        defer self.allocator.free(children);
+        var region: IndexedRegion = .{ .owner = owner, .frame = frame, .original = original, .children = children, .plan = plan };
+        const previous = self.indexed_region;
+        self.indexed_region = &region;
+        defer self.indexed_region = previous;
+        const outcome = try self.loopIterations(owner, id, frame, first, begin, end);
+        if (outcome != .value) return outcome;
+        const result = if (begin >= end) original else try self.makeAggregate(owner, id, info.kind, info.nominal, info.bits, children);
+        self.value_evidence.items[result] = self.valueEvidence(original);
+        try frame.values.put(self.allocator, plan.outgoing, result);
+        return outcome;
+    }
     fn loop(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
         const module = &self.units[owner];
         const metadata = module.loopInfo(id);
-        const carries = module.loopCarries(id);
         const first = try self.expression(owner, metadata.first, frame);
         if (first != .value) return first;
         const last = try self.expression(owner, metadata.end, frame);
@@ -2340,6 +2401,14 @@ pub const Session = struct {
             if (array.kind != .array and array.kind != .list) return self.failNode(owner, id, .unsupported);
             end = array.len;
         }
+        if (self.indexed_region == null) if (@import("eval_indexed_builder.zig").analyze(module, id)) |plan| return self.indexedLoop(owner, id, frame, first.value, index, end, plan);
+        return self.loopIterations(owner, id, frame, first.value, index, end);
+    }
+    fn loopIterations(self: *Session, owner: usize, id: core.Id, frame: *Frame, first: ValueId, begin: u32, end: u32) Error!Flow {
+        const module = &self.units[owner];
+        const metadata = module.loopInfo(id);
+        const carries = module.loopCarries(id);
+        var index = begin;
         var storage_buffer: [256]u8 align(@alignOf(usize)) = undefined;
         var storage: std.heap.BufferFirstAllocator = .init(&storage_buffer, self.allocator);
         const scratch = storage.allocator();
@@ -2350,7 +2419,7 @@ pub const Session = struct {
             try self.chargeCells(owner, id, 1);
             for (carries, current) |carry, value_| try frame.values.put(self.allocator, carry.iteration, value_);
             if (metadata.pattern != 0) {
-                const iterator = if (metadata.kind == .array) self.valueChildren(first.value)[index] else try self.makeScalar(owner, id, .{ .scalar = .u32, .bits = index });
+                const iterator = if (metadata.kind == .array) self.valueChildren(first)[index] else try self.makeScalar(owner, id, .{ .scalar = .u32, .bits = index });
                 var bound: std.ArrayList(Bound) = .empty;
                 defer bound.deinit(self.allocator);
                 if (!try self.matchPattern(owner, metadata.pattern, iterator, frame, &bound, 0)) return self.failNode(owner, id, .unsupported);
@@ -3550,11 +3619,11 @@ const ClosureRegion = struct {
         const capture_list = if (node.tag == .closure or node.tag == .suspend_) module.closures[node.a].captures else core.List{};
         const captured = module.extra[capture_list.start..][0..capture_list.len];
         for (capture.values) |value| {
-            if (value.binding == 0 or value.binding >= module.bindings.len or value.evidence >= self.session.evidence.nodes.items.len or std.mem.indexOfScalar(core.BindingId, captured, value.binding) == null) return error.UnresolvedType;
+            if (value.binding == 0 or value.binding >= module.bindings.len or value.evidence >= self.session.evidence.nodes.items.len or std.mem.findScalar(core.BindingId, captured, value.binding) == null) return error.UnresolvedType;
             try self.solver.unify(try self.importType(scope, module.binding(value.binding).ty, 0), try self.importEvidence(value.evidence, 0));
         }
         for (capture.captures) |child| {
-            if (child.binding == 0 or child.binding >= module.bindings.len or std.mem.indexOfScalar(core.BindingId, captured, child.binding) == null) return error.UnresolvedType;
+            if (child.binding == 0 or child.binding >= module.bindings.len or std.mem.findScalar(core.BindingId, captured, child.binding) == null) return error.UnresolvedType;
             const actual = try self.importRetainedCapture(child, depth + 1);
             try self.solver.unify(try self.importType(scope, module.binding(child.binding).ty, 0), try self.solver.openCovariant(try self.solver.resolve(actual, 0)));
         }
@@ -3585,7 +3654,7 @@ const ClosureRegion = struct {
         try self.expectShape(self.sources.items[scope].root, expected);
         for (captures) |capture| {
             if (capture.binding == 0 or capture.binding >= module.bindings.len) return error.UnresolvedType;
-            if (std.mem.indexOfScalar(core.BindingId, module.extra[closure.captures.start..][0..closure.captures.len], capture.binding) == null and capture.binding != closure.parameter.binding) return error.UnresolvedType;
+            if (std.mem.findScalar(core.BindingId, module.extra[closure.captures.start..][0..closure.captures.len], capture.binding) == null and capture.binding != closure.parameter.binding) return error.UnresolvedType;
             const actual = try self.importRetainedCapture(capture, 0);
             try self.solver.unify(try self.importType(scope, module.binding(capture.binding).ty, 0), try self.solver.openCovariant(try self.solver.resolve(actual, 0)));
         }
@@ -3628,7 +3697,7 @@ const ClosureRegion = struct {
         const value = module.types.node(ty);
         switch (value.tag) {
             .unit, .boolean, .u32, .f32, .never => return true,
-            .variable => return std.mem.indexOfScalar(types.Id, module.types.list(variables), ty) != null,
+            .variable => return std.mem.findScalar(types.Id, module.types.list(variables), ty) != null,
             .array, .list => return self.sourceData(owner, value.a, variables, depth + 1),
             .product => for (module.types.list(.{ .start = value.a, .len = value.b })) |child| {
                 if (!try self.sourceData(owner, child, variables, depth + 1)) return false;
@@ -4227,7 +4296,7 @@ const ClosureRegion = struct {
         const variable_count = self.variables.items.len;
         for (0..variable_count) |index| {
             const variable = self.variables.items[index];
-            if (variable.source.scope != scope or std.mem.indexOfScalar(types.Id, module.types.list(scheme.variables), variable.source.ty) != null) continue;
+            if (variable.source.scope != scope or std.mem.findScalar(types.Id, module.types.list(scheme.variables), variable.source.ty) != null) continue;
             try self.solver.unify(variable.region, try self.importType(caller, variable.source.ty, 0));
         }
         var rows: std.ArrayList(RowVariable) = .empty;
@@ -4235,7 +4304,7 @@ const ClosureRegion = struct {
         var iterator = self.row_variables.iterator();
         while (iterator.next()) |entry| {
             const key = entry.key_ptr.*;
-            if (key.scope != scope or std.mem.indexOfScalar(types.Id, module.types.list(scheme.row_variables), key.variable) != null or std.mem.indexOfScalar(types.Id, module.types.list(self.sources.items[scope].closed_rows), key.variable) != null) continue;
+            if (key.scope != scope or std.mem.findScalar(types.Id, module.types.list(scheme.row_variables), key.variable) != null or std.mem.findScalar(types.Id, module.types.list(self.sources.items[scope].closed_rows), key.variable) != null) continue;
             try rows.append(self.session.allocator, key);
         }
         for (rows.items) |row| try self.solver.unifyEffects(self.row_variables.get(row).?, try self.importRowVariable(caller, row.variable));

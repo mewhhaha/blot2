@@ -30,6 +30,7 @@ pub const State = struct {
     host: ?wasm.HostReferences = null,
     enabled: bool,
     stats: Stats = .{},
+    static_matches: std.AutoHashMapUnmanaged(artifacts.StaticRead, u32) = .empty,
 
     pub fn init(a: Allocator, old: *const capture.Capture, units: []const core.Module, names: ?identity.View, cached: usize) Allocator.Error!State {
         return initWithStamps(a, old, units, names, cached, null);
@@ -38,10 +39,10 @@ pub const State = struct {
         var graphs = try importer.Importer.initWithStamps(a, &old.metadata.pools.?, units, names, cached, stamps);
         errdefer graphs.deinit();
         var selection_stable = graphs.enabled and old.selectionStable(units, names, cached);
-        // Selection can consume another producer's catalog, even when a code
-        // job's own producer is unchanged. Require the complete imported
-        // prefix to retain its exact owner-qualified Core before any hit.
-        if (selection_stable) {
+        if (graphs.code_gate) |*gate| {
+            if (gate.semantic.enabled) selection_stable = true;
+        }
+        if (selection_stable and !(if (graphs.code_gate) |*gate| gate.semantic.enabled else false)) {
             for (graphs.stable[0..cached]) |stable| if (!stable) {
                 selection_stable = false;
                 break;
@@ -66,9 +67,9 @@ pub const State = struct {
                 .constant, .runtime_global => true,
                 else => false,
             };
-            for (job.inline_units.items) |unit| {
-                if (unit == 0 or unit > graphs.stable.len or !graphs.stable[unit - 1]) fresh = true;
-            }
+            for (job.inline_bodies.items) |target| if (!graphs.admitsBody(target)) {
+                fresh = true;
+            };
             if (fresh) {
                 var parent: u32 = @intCast(id);
                 while (parent != 0) {
@@ -110,6 +111,7 @@ pub const State = struct {
         self.allocator.free(self.imports);
         self.allocator.free(self.globals);
         self.addresses.deinit(self.allocator);
+        self.static_matches.deinit(self.allocator);
     }
     fn slots(a: Allocator, count: usize) Allocator.Error![]u32 {
         const result = try a.alloc(u32, count);
@@ -186,8 +188,9 @@ pub const State = struct {
             .function, .table_function => blk: {
                 if (operand.value >= self.old.emission.functions.len) break :blk false;
                 const function = self.old.emission.functions[operand.value];
+                if (self.staticHelper(function, owner)) break :blk true;
                 if (function.owner == 0) break :blk switch (function.role) {
-                    .arena_allocate, .arena_reset, .arena_mark, .arena_collect, .host_retain, .host_release, .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit => true,
+                    .arena_allocate, .arena_reset, .arena_mark, .arena_collect, .host_retain, .host_release, .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance => true,
                     else => false,
                 };
                 break :blk try self.importer.importRequest(g, self.old.metadata.jobs.items[function.owner - 1].request) != null;
@@ -204,6 +207,27 @@ pub const State = struct {
             else => false,
         };
     }
+    fn matchStatic(self: *State, g: anytype, read: artifacts.StaticRead) Allocator.Error!bool {
+        if (self.static_matches.contains(read)) return true;
+        const gate = if (self.importer.code_gate) |*owned| &owned.semantic else return false;
+        if (!gate.enabled or read.target.unit == 0 or read.target.unit > self.importer.unit_map.len) return false;
+        const target: core.BindingRef = .{ .unit = self.importer.unit_map[read.target.unit - 1], .binding = read.target.binding };
+        if (target.unit == 0) return false;
+        const current = g.evaluator.richValue(target) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        const inspection = try @import("source_value_template.zig").Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, gate, &.{read.value}, .source_declared);
+        var plan = inspection.plan orelse return false;
+        defer plan.deinit(self.allocator);
+        const anchors = try self.allocator.alloc(u32, self.old.metadata.pools.?.evaluator.values.len);
+        defer self.allocator.free(anchors);
+        @memset(anchors, 0);
+        const same = plan.matchInto(g, &self.importer, read.value, current, anchors) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        if (!same) return false;
+        try self.static_matches.put(self.allocator, read, current);
+        return true;
+    }
+    fn staticHelper(self: *const State, function: emitter.FunctionArtifact, owner: u32) bool {
+        return function.role == .static_closure and owner != 0 and function.resource_owner == owner and !self.blocked[owner - 1] and self.old.metadata.jobs.items[owner - 1].static_reads.items.len != 0;
+    }
     fn admit(self: *State, g: anytype, id: u32) Allocator.Error!bool {
         const first = self.starts[id - 1];
         const last = self.ends[id - 1];
@@ -214,6 +238,7 @@ pub const State = struct {
             if (event.sequence > last) break;
             switch (event.event) {
                 .enter => |child| {
+                    for (self.old.metadata.jobs.items[child - 1].static_reads.items) |read| if (!try self.matchStatic(g, read)) return false;
                     if (try self.importer.importRequest(g, self.old.metadata.jobs.items[child - 1].request) == null) return false;
                 },
                 else => {},
@@ -224,7 +249,7 @@ pub const State = struct {
             const record = self.old.emission.records.items[e];
             if (record.sequence > last) break;
             switch (record.event) {
-                .function => |item| if (self.old.emission.functions[item.id].role == .static_closure) return false,
+                .function => |item| if (self.old.emission.functions[item.id].role == .static_closure and !self.staticHelper(self.old.emission.functions[item.id], record.owner)) return false,
                 .instruction => |item| if (!try self.admitOperand(g, item.operand, record.owner)) return false,
                 .data_word => |item| if (!self.localAddress(item.address, record.owner) or !try self.admitOperand(g, item.operand, record.owner)) return false,
                 .global => |item| if (!self.knownGlobal(item.id, g.request_owner)) return false,
@@ -312,7 +337,7 @@ pub const State = struct {
         switch (function_.role) {
             .arena_allocate, .arena_reset, .arena_mark, .arena_collect => try self.ensureArena(g),
             .host_retain, .host_release => try self.ensureHost(g),
-            .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit => try self.ensureLists(g),
+            .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance => try self.ensureLists(g),
             else => return error.InvalidFunctionReference,
         }
         return self.functions[id];
@@ -378,17 +403,21 @@ pub const State = struct {
                         const actual = try g.module.addFunctionForSignature(try self.signature(g, item.signature));
                         self.functions[item.id] = actual;
                         try g.publishRetained(request, actual);
+                    } else if (self.staticHelper(fact, record.owner)) {
+                        const actual = try g.module.addFunctionForSignature(try self.signature(g, item.signature));
+                        self.functions[item.id] = actual;
+                        try g.publishRetainedStatic(actual);
                     } else switch (fact.role) {
                         .arena_allocate, .arena_reset, .arena_mark, .arena_collect => try self.ensureArena(g),
                         .host_retain, .host_release => try self.ensureHost(g),
-                        .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit => try self.ensureLists(g),
+                        .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance => try self.ensureLists(g),
                         else => return error.InvalidFunctionReference,
                     }
                 },
-                .local => |item| if (self.old.emission.functions[item.function].owner != 0) {
+                .local => |item| if (self.old.emission.functions[item.function].owner != 0 or self.staticHelper(self.old.emission.functions[item.function], record.owner)) {
                     _ = try g.module.addLocal(try self.resolveFunction(g, item.function), item.ty);
                 },
-                .instruction => |item| if (self.old.emission.functions[item.function].owner != 0) {
+                .instruction => |item| if (self.old.emission.functions[item.function].owner != 0 or self.staticHelper(self.old.emission.functions[item.function], record.owner)) {
                     const target = try self.resolveFunction(g, item.function);
                     if (item.operand.role == .operation) {
                         g.runtime_operations.emit(&g.module, target, try self.operation(g, item.operand.value)) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else error.InvalidFunctionReference;
@@ -433,10 +462,14 @@ pub const State = struct {
         const template = if (job.result_template) |old| (try self.importer.importResultTemplate(g, old)) orelse return error.InvalidFunctionReference else null;
         try g.publishRetainedResult(request, template);
         if (scope) |actor| {
-            for (job.inline_units.items) |unit| {
-                const mapped = self.importer.unit_map[unit - 1];
+            for (job.static_reads.items) |read| {
+                const value = self.static_matches.get(read) orelse return error.InvalidFunctionReference;
+                try actor.context.readStaticValue(.{ .unit = self.importer.unit_map[read.target.unit - 1], .binding = read.target.binding }, value);
+            }
+            for (job.inline_bodies.items) |target| {
+                const mapped = self.importer.unit_map[target.unit - 1];
                 if (mapped == 0) return error.InvalidFunctionReference;
-                try actor.context.readInlineBody(mapped);
+                try actor.context.readInlineBody(.{ .unit = mapped, .binding = target.binding });
             }
             if (job.solved) {
                 var solved = (try self.importer.importSolved(g, job)) orelse return error.InvalidFunctionReference;

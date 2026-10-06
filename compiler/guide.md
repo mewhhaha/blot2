@@ -302,11 +302,11 @@ construct `Array` values. Use `List T` and `Array T` in annotations. Passing one
 to a function expecting the other is a type error. `List.from_array values` and
 `Array.from_list values` explicitly copy between representations.
 
-The Zig runtime backs lists with doubly linked chunks of up to 256 elements.
-Traversal follows dense spans; proven exclusive append/prepend reuses end slack
-or links a new chunk. A shared edit copies the list and preserves earlier
-aliases. Arrays stay contiguous with constant-time indexing; array
-append/prepend copies the contents.
+The Zig runtime backs lists with balanced trees of dense leaves. Small leaves
+grow with demand, up to 248 elements. Exclusive end edits reuse storage; shared
+edits copy one leaf and its tree path, preserving earlier versions. Traversal
+caches the current leaf. Arrays stay contiguous with constant-time indexing;
+array append/prepend copies the contents.
 
 Both types have ordinary prelude members `values.length` and `values.is_empty`.
 Only arrays support `values[index]`, `values[index] := replacement`, `get`, and
@@ -365,6 +365,18 @@ cannot be established: for example, live aliases, captured arrays, function
 parameters, module values, or arrays reached through another collection. Reuse
 is an optimization, not a change to immutable semantics. Record updates
 reconstruct the record; they do not mutate it.
+
+Direct `array.replace`, `list.append` and `list.prepend` calls preserve this
+ownership optimization, including aliases and source wrappers whose body passes
+each parameter exactly once to the primitive. Arguments still evaluate in their
+written order. Arbitrary higher-order wrappers remain conservative.
+
+Constant evaluation uses a separate representation. Append/prepend can extend
+the latest collection version into unused buffer slots, with geometric growth;
+all previously published elements remain immutable. Branches from older versions
+and indexed replacements copy. Consequently, sequential staged builders are
+linear, while large staged indexed-update loops can still be quadratic. Unused
+reserved slots count against the evaluator's storage limit.
 
 Import `std/array` for `generate`, `fill`, `length`, `is_empty`,
 `at index values`, `replace index value values`, `get index values`,

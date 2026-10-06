@@ -64,7 +64,7 @@ test "array versions with aliases captures iterator borrows and parameters are c
         "entry const run = fn () => do:\n  let values = #[1, 2]\n  let before = values\n  values[1] := 9\n  return @u32.add before[1] values[1]\n",
         "entry const run = fn () => do:\n  let values = #[1, 2]\n  let read = fn () => values[1]\n  values[1] := 9\n  return @u32.add (read ()) values[1]\n",
         "entry const run = fn () => do:\n  let values = #[1, 2]\n  let sum = 0\n  for value in values:\n    values[1] := 9\n    sum := @u32.add sum value\n  return sum\n",
-        "entry const run = fn () => do:\n  let values = #[#[1], #[2]]\n  values[0][0] := 9\n  return values[0][0]\n",
+        "entry const run = fn () => do:\n  let leaf = #[1]\n  let values = #[leaf, leaf]\n  values[0][0] := 9\n  return values[0][0]\n",
     };
     const a = std.testing.allocator;
     for (cases) |source| {

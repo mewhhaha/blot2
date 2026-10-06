@@ -543,12 +543,16 @@ pub const Module = struct {
             defer body.deinit();
             for (self.functions.items) |function| {
                 body.clear();
-                try body.uleb(@intCast(function.locals.items.len));
-                for (function.locals.items) |local| {
+                var optimized = try @import("wasm_sroa.zig").run(self.allocator, self, &function);
+                defer if (optimized) |*owned| owned.deinit(self.allocator);
+                const locals = if (optimized) |owned| owned.locals.items else function.locals.items;
+                const instructions = if (optimized) |owned| owned.instructions.items else function.instructions.items;
+                try body.uleb(@intCast(locals.len));
+                for (locals) |local| {
                     try body.byte(1);
                     try body.byte(@backingInt(local));
                 }
-                for (function.instructions.items) |instruction| try encodeInstruction(&body, instruction, self.functions.items.len, self.globals.items.len, self.signatures.items.len, import_count);
+                for (instructions) |instruction| try encodeInstruction(&body, instruction, self.functions.items.len, self.globals.items.len, self.signatures.items.len, import_count);
                 try body.byte(0x0b);
                 try payload.uleb(@intCast(body.items().len));
                 try payload.raw(body.items());
