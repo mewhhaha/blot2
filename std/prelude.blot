@@ -287,3 +287,13 @@ const and = fn (left: Bool) => fn ~(right: Bool) =>
   if left then @demand right else #False
 const or = fn (left: Bool) => fn ~(right: Bool) =>
   if left then #True else @demand right
+
+// Iteration is ordinary associated dispatch. A step returns an item and the
+// next immutable cursor; retaining either cursor preserves its own position.
+const List.iter = fn values => @list.cursor values
+const Array.iter = fn values => @array.cursor values
+const Cursor.iter = fn (cursor: Cursor collection) => cursor
+const Cursor.next = fn cursor =>
+  if @cursor.has cursor
+  then #Some (@cursor.value cursor, @cursor.advance cursor)
+  else #Nothing

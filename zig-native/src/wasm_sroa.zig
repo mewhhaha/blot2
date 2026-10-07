@@ -162,7 +162,7 @@ const Analysis = struct {
                 },
                 .call => {
                     const callee = module.functions.items[inst.operand];
-                    if (module.arena != null and inst.operand == module.arena.?.allocate) {
+                    if (module.arena != null and module.arena.?.isAllocation(inst.operand)) {
                         const size = self.pop();
                         if (size.constant != null and size.constant.? != 0 and size.constant.? <= 64 and size.constant.? % 4 == 0) {
                             const id = try self.add(false, size.constant.?);
@@ -245,6 +245,14 @@ const Analysis = struct {
                 },
                 .host_ref_grow => {
                     self.escape(self.pop());
+                    self.escape(self.pop());
+                    try self.push(.{});
+                },
+                .v128_store => {
+                    self.escape(self.pop());
+                    self.escape(self.pop());
+                },
+                .v128_load, .i32x4_splat, .f32x4_splat, .i32x4_extract_lane, .f32x4_extract_lane, .f32x4_abs, .f32x4_neg, .f32x4_ceil, .f32x4_floor, .f32x4_trunc, .f32x4_sqrt, .f32x4_convert_i32x4_u, .i32x4_trunc_sat_f32x4_u => {
                     self.escape(self.pop());
                     try self.push(.{});
                 },
@@ -367,7 +375,7 @@ pub fn run(a: A, module: *const w.Module, function: *const w.Function) !?Output 
         const locals = if (output) |out| out.locals.items else function.locals.items;
         const instructions = if (output) |out| out.instructions.items else function.instructions.items;
         var allocations: usize = 0;
-        for (instructions, 0..) |inst, i| if (inst.op == .call and inst.operand == module.arena.?.allocate and i != 0 and instructions[i - 1].op == .i32_const and instructions[i - 1].operand <= 64) {
+        for (instructions, 0..) |inst, i| if (inst.op == .call and module.arena.?.isAllocation(inst.operand) and i != 0 and instructions[i - 1].op == .i32_const and instructions[i - 1].operand <= 64) {
             allocations += 1;
         };
         if (allocations == 0) break;

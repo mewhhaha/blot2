@@ -6,11 +6,91 @@
 const std = @import("std");
 const wasm = @import("wasm.zig");
 const Error = std.mem.Allocator.Error;
+// Reserved arena metadata follows the 33 free-list heads (bytes 32..164).
+// These pointer-free immutable descriptors are shared by every list helper,
+// including helpers reconstructed from a retained executable fragment.
+pub const empty_list_address: u32 = 168;
+pub const empty_scalar_list_address: u32 = 192;
 
 pub fn emit(module: *wasm.Module, arena: wasm.Arena) Error!void {
     try allocate(module, arena);
+    try allocateScalar(module, arena);
+    try recycle(module, arena);
     try mark(module, arena);
     try collect(module, arena);
+}
+
+/// The checked layout proves that every payload word is scalar. The existing
+/// leaf flag prevents integer bits from being interpreted as child pointers.
+/// Keeping this contract explicit also supplies the zero-child case for RC.
+fn allocateScalar(module: *wasm.Module, arena: wasm.Arena) Error!void {
+    const result = try module.addLocal(arena.allocate_scalar, .i32);
+    try module.emitSlice(arena.allocate_scalar, &.{
+        .{ .op = .local_get, .operand = 0 },
+        .{ .op = .call, .operand = arena.allocate },
+        .{ .op = .local_set, .operand = result },
+        // Zero-size allocation has no header and returns the arena cursor.
+        .{ .op = .local_get, .operand = 0 },
+        .{ .op = .if_ },
+        .{ .op = .local_get, .operand = result },
+        .{ .op = .i32_const, .operand = 8 },
+        .{ .op = .i32_sub },
+        .{ .op = .i32_const, .operand = 2 },
+        .{ .op = .i32_store },
+        .{ .op = .end },
+        .{ .op = .local_get, .operand = result },
+    });
+}
+
+/// Compiler-proven final ownership releases storage directly. This entry point
+/// is private: callers must prove that no pointer or borrowed address survives.
+/// It does not inspect payload words or follow children. Retained children keep
+/// their own lifetimes, and shared objects remain under the collection policy.
+fn recycle(module: *wasm.Module, arena: wasm.Arena) Error!void {
+    const pointer = 0;
+    const head = try module.addLocal(arena.recycle, .i32);
+    const size = try module.addLocal(arena.recycle, .i32);
+    const bin = try module.addLocal(arena.recycle, .i32);
+    try module.emitSlice(arena.recycle, &.{
+        .{ .op = .local_get, .operand = pointer },
+        .{ .op = .i32_const, .operand = 16 },
+        .{ .op = .i32_sub },
+        .{ .op = .local_tee, .operand = head },
+        .{ .op = .i32_load, .operand = 4 },
+        .{ .op = .i32_eqz },
+        .{ .op = .if_ },
+        .{ .op = .unreachable_ },
+        .{ .op = .end },
+        .{ .op = .local_get, .operand = head },
+        .{ .op = .i32_load },
+        .{ .op = .local_tee, .operand = size },
+        .{ .op = .i32_const, .operand = 0x80000000 },
+        .{ .op = .i32_gt_u },
+        .{ .op = .if_, .operand = 0x7f },
+        .{ .op = .i32_const, .operand = 160 },
+        .{ .op = .else_ },
+        .{ .op = .i32_const, .operand = 32 },
+        .{ .op = .local_get, .operand = size },
+        .{ .op = .i32_ctz },
+        .{ .op = .i32_const, .operand = 2 },
+        .{ .op = .i32_shl },
+        .{ .op = .i32_add },
+        .{ .op = .end },
+        .{ .op = .local_set, .operand = bin },
+        .{ .op = .local_get, .operand = head },
+        .{ .op = .i32_const, .operand = 0 },
+        .{ .op = .i32_store, .operand = 4 },
+        .{ .op = .local_get, .operand = head },
+        .{ .op = .i32_const, .operand = 0 },
+        .{ .op = .i32_store, .operand = 8 },
+        .{ .op = .local_get, .operand = head },
+        .{ .op = .local_get, .operand = bin },
+        .{ .op = .i32_load },
+        .{ .op = .i32_store, .operand = 12 },
+        .{ .op = .local_get, .operand = bin },
+        .{ .op = .local_get, .operand = head },
+        .{ .op = .i32_store },
+    });
 }
 
 fn allocate(module: *wasm.Module, arena: wasm.Arena) Error!void {
@@ -159,6 +239,12 @@ fn allocate(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .local_get, .operand = head },
         .{ .op = .i32_const, .operand = 0 },
         .{ .op = .i32_store, .operand = 12 },
+        // Count reuse as well as fresh arena growth. A wrapping counter lets
+        // loop safepoints compare traffic since their own previous collection.
+        .{ .op = .global_get, .operand = arena.allocated },
+        .{ .op = .local_get, .operand = size },
+        .{ .op = .i32_add },
+        .{ .op = .global_set, .operand = arena.allocated },
         .{ .op = .local_get, .operand = head },
         .{ .op = .i32_const, .operand = 16 },
         .{ .op = .i32_add },

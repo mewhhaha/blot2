@@ -462,7 +462,7 @@ pub const Importer = struct {
         switch (n.tag) {
             .absent, .provider, .state_provider, .resolver, .type_constructor => return error.Declined,
             .unit, .boolean, .u32, .f32, .never => if (n.a != 0 or n.b != 0 or n.c != 0) return error.Declined,
-            .array, .list => {
+            .array, .list, .cursor => {
                 if (n.b != 0 or n.c != 0) return error.Declined;
                 try self.principalType(n.a, depth + 1, remaining);
             },
@@ -555,7 +555,7 @@ pub const Importer = struct {
                 b = try self.shape(g, b, depth + 1);
                 c = try self.row(g, .layout, c, depth + 1);
             },
-            .array, .list, .resolver => {
+            .array, .list, .cursor, .resolver => {
                 if (b != 0 or c != 0) return error.Declined;
                 a = try self.shape(g, a, depth + 1);
             },
@@ -610,7 +610,7 @@ pub const Importer = struct {
                 b = try self.semanticType(g, b, depth + 1);
                 c = try self.row(g, .semantic, c, depth + 1);
             },
-            .array, .list, .resolver => {
+            .array, .list, .cursor, .resolver => {
                 if (b != 0 or c != 0) return error.Declined;
                 a = try self.semanticType(g, a, depth + 1);
             },
@@ -931,7 +931,7 @@ fn knownLayout(store: *const layout.Store, id: u32, depth: usize) bool {
         .invalid, .erased => false,
         .function => knownRow(store, n.c, depth + 1) and knownLayout(store, n.a, depth + 1) and knownLayout(store, n.b, depth + 1),
         .demand, .provider => knownRow(store, n.c, depth + 1) and knownLayout(store, n.a, depth + 1),
-        .array, .list, .resolver => knownLayout(store, n.a, depth + 1),
+        .array, .list, .cursor, .resolver => knownLayout(store, n.a, depth + 1),
         .state_provider => knownLayout(store, n.a, depth + 1) and knownLayout(store, n.b, depth + 1) and knownLayout(store, n.c, depth + 1),
         .product, .record, .nominal => blk: {
             for (store.children(id), 0..) |child, i| if (n.tag != .record or i % 2 != 0) {

@@ -110,7 +110,7 @@ fn sameShape(left: expectation.View, l: u32, right: expectation.View, r: u32, de
         .absent, .unit, .boolean, .u32, .f32, .never => return true,
         .type_constructor => return a.a == b.a and a.b == b.b,
         .function => return sameShape(left, a.a, right, b.a, depth + 1, budget) and sameShape(left, a.b, right, b.b, depth + 1, budget),
-        .array, .list, .resolver, .demand, .provider => return sameShape(left, a.a, right, b.a, depth + 1, budget),
+        .array, .list, .cursor, .resolver, .demand, .provider => return sameShape(left, a.a, right, b.a, depth + 1, budget),
         .state_provider => return sameShape(left, a.a, right, b.a, depth + 1, budget) and sameShape(left, a.b, right, b.b, depth + 1, budget) and sameShape(left, a.c, right, b.c, depth + 1, budget),
         .product, .record, .nominal => {
             if (a.tag == .nominal and (a.a != b.a or a.b != b.b)) return false;

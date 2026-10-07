@@ -43,7 +43,7 @@ const Walk = struct {
         switch (value.tag) {
             .unit, .boolean, .u32, .f32, .never => return true,
             .variable => return std.mem.findScalar(types.Id, module.types.list(variables), id) != null,
-            .array, .list => return self.data(owner, value.a, variables, depth + 1),
+            .array, .list, .cursor => return self.data(owner, value.a, variables, depth + 1),
             .product => for (module.types.list(.{ .start = value.a, .len = value.b })) |child| {
                 if (!self.data(owner, child, variables, depth + 1)) return false;
             },

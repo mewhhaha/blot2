@@ -13,7 +13,7 @@ pub const boolean: Id = 2;
 pub const u32_type: Id = 3;
 pub const f32_type: Id = 4;
 pub const never: Id = 5;
-pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, demand, type_constructor, resolver, provider, state_provider };
+pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, variable, function, product, record, nominal, array, list, cursor, demand, type_constructor, resolver, provider, state_provider };
 pub const Node = struct {
     tag: Tag,
     // Owned structural certificate, kept in the existing three padding bytes.
@@ -177,7 +177,7 @@ pub const Store = struct {
                     height = @max(height, result);
                 }
             },
-            .array, .list, .resolver => {
+            .array, .list, .cursor, .resolver => {
                 height = self.closedHeight(n.a);
                 if (height == 0) return 0;
             },
@@ -237,7 +237,7 @@ pub const Store = struct {
         return self.add(.{ .tag = .array, .a = element });
     }
     pub fn sequence(self: *Store, tag: Tag, element: Id) Error!Id {
-        std.debug.assert(tag == .array or tag == .list);
+        std.debug.assert(tag == .array or tag == .list or tag == .cursor);
         return self.add(.{ .tag = tag, .a = element });
     }
     pub fn demand(self: *Store, element: Id) Error!Id {
@@ -440,7 +440,7 @@ pub const Store = struct {
                 }
                 return if (changed) self.product(fields.items) else id;
             },
-            .array, .list, .resolver => {
+            .array, .list, .cursor, .resolver => {
                 const child = try self.resolveDepth(value.a, position, depth + 1);
                 return if (child == value.a) id else if (value.tag == .resolver) self.resolver(child) else self.sequence(value.tag, child);
             },
@@ -507,7 +507,7 @@ pub const Store = struct {
                 .variable => if (value.a == variable) return true,
                 .function => try pending.appendSlice(scratch_allocator, &.{ value.a, value.b }),
                 .product => try pending.appendSlice(scratch_allocator, self.list(.{ .start = value.a, .len = value.b })),
-                .array, .list, .demand, .resolver, .provider => try pending.append(scratch_allocator, value.a),
+                .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(scratch_allocator, value.a),
                 .state_provider => try pending.appendSlice(scratch_allocator, &.{ value.a, value.b, value.c }),
                 .record => for (0..value.b) |i| {
                     try pending.append(scratch_allocator, self.recordField(value, i).ty);
@@ -603,7 +603,7 @@ pub const Store = struct {
                     if (a.tag == .function) try pending.append(scratch_allocator, .{ .a = a.b, .b = b.b });
                     try pending.append(scratch_allocator, .{ .a = a.a, .b = b.a });
                 },
-                .array, .list, .resolver => try pending.append(scratch_allocator, .{ .a = a.a, .b = b.a }),
+                .array, .list, .cursor, .resolver => try pending.append(scratch_allocator, .{ .a = a.a, .b = b.a }),
                 .state_provider => try pending.appendSlice(scratch_allocator, &.{ .{ .a = a.a, .b = b.a }, .{ .a = a.b, .b = b.b }, .{ .a = a.c, .b = b.c } }),
                 .type_constructor => if (a.a != b.a or a.b != b.b) return false,
                 .product => {
@@ -693,7 +693,7 @@ pub const Store = struct {
                         try pending.append(scratch_allocator, .{ .a = self.extra.items[an.a + i], .b = self.extra.items[bn.a + i] });
                     }
                 },
-                .array, .list, .resolver => try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a }),
+                .array, .list, .cursor, .resolver => try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a }),
                 .demand, .provider => {
                     try pending.append(scratch_allocator, .{ .a = an.c, .b = bn.c, .effect_row = true });
                     try pending.append(scratch_allocator, .{ .a = an.a, .b = bn.a });
@@ -768,7 +768,7 @@ pub const Store = struct {
                 .variable => try values.append(self.allocator, id),
                 .function => try pending.appendSlice(temporary, &.{ value.a, value.b }),
                 .product => try pending.appendSlice(temporary, self.list(.{ .start = value.a, .len = value.b })),
-                .array, .list, .demand, .resolver, .provider => try pending.append(temporary, value.a),
+                .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(temporary, value.a),
                 .state_provider => try pending.appendSlice(temporary, &.{ value.a, value.b, value.c }),
                 .record => for (0..value.b) |i| {
                     try pending.append(temporary, self.recordField(value, i).ty);
@@ -853,7 +853,7 @@ pub const Store = struct {
                 }
                 return if (value.tag == .record) self.record(fields.items) else self.product(children.items);
             },
-            .array, .list => return self.sequence(value.tag, try self.closeCovariantDepth(value.a, generalized, protected, decisions, depth + 1)),
+            .array, .list, .cursor => return self.sequence(value.tag, try self.closeCovariantDepth(value.a, generalized, protected, decisions, depth + 1)),
             // Nominal arguments and Demand's latent computation are invariant.
             else => return root,
         }
@@ -881,7 +881,7 @@ pub const Store = struct {
             .product, .record => for (0..value.b) |i| {
                 try self.covariantInputs(if (value.tag == .record) self.recordField(value, i).ty else self.extra.items[value.a + i], out, depth + 1);
             },
-            .array, .list => try self.covariantInputs(value.a, out, depth + 1),
+            .array, .list, .cursor => try self.covariantInputs(value.a, out, depth + 1),
             else => {},
         }
     }
@@ -923,7 +923,7 @@ pub const Store = struct {
                 }
                 return if (value.tag == .record) self.record(fields.items) else self.product(children.items);
             },
-            .array, .list => return self.sequence(value.tag, try self.openCovariantDepth(value.a, depth + 1)),
+            .array, .list, .cursor => return self.sequence(value.tag, try self.openCovariantDepth(value.a, depth + 1)),
             else => return root,
         }
     }
@@ -996,7 +996,7 @@ pub const Store = struct {
                 .product => for (self.list(.{ .start = value.a, .len = value.b })) |child| {
                     try pending.append(temporary, .{ .id = child, .at = at, .depth = work.depth + 1 });
                 },
-                .array, .list, .demand, .resolver, .provider => try pending.append(temporary, .{ .id = value.a, .at = at, .depth = work.depth + 1 }),
+                .array, .list, .cursor, .demand, .resolver, .provider => try pending.append(temporary, .{ .id = value.a, .at = at, .depth = work.depth + 1 }),
                 .state_provider => {
                     try pending.append(temporary, .{ .id = value.a, .at = at, .depth = work.depth + 1 });
                     try pending.append(temporary, .{ .id = value.b, .at = at, .depth = work.depth + 1 });
@@ -1060,7 +1060,7 @@ pub const Store = struct {
                 for (0..value.b) |i| try fields.append(self.allocator, try self.substituteDepth(self.extra.items[value.a + i], old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1));
                 return self.product(fields.items);
             },
-            .array, .list => return self.sequence(value.tag, try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
+            .array, .list, .cursor => return self.sequence(value.tag, try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
             .demand => return self.demandWithEffects(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
             .provider => return self.provider(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
             .state_provider => return self.stateProvider(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substituteDepth(value.b, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substituteDepth(value.c, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),

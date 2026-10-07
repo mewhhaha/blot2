@@ -835,6 +835,33 @@ const Parser = struct {
         const pattern_ = try self.add(.pattern_name, name, 0, 0, start);
         return self.add(.let_stmt, pattern_, value, try self.extra(&.{ 0, 0, 0, 0, 0 }), start);
     }
+    fn collectionLoop(self: *Parser, pattern_: Id, value: Id, end: Id, body: Id, explicit: bool, start: u32) Error!Id {
+        var expansion: Id = 0;
+        if (end == 0) {
+            const cursor = try self.collectionName(start);
+            const cursor_ref = try self.add(.name, cursor, 0, 0, start);
+            const initialize = try self.add(.iterator_bind, cursor, try self.add(.field_access, value, try self.intern("iter"), 0, start), 0, start);
+            const step = try self.collectionName(start);
+            const next_step = try self.add(.iterator_bind, step, try self.add(.field_access, cursor_ref, try self.intern("next"), 0, start), 0, start);
+            const item = try self.collectionName(start);
+            const item_pattern = try self.add(.pattern_name, item, 0, 0, start);
+            const rest = try self.collectionName(start);
+            const rest_pattern = try self.add(.pattern_name, rest, 0, 0, start);
+            const pair = try self.listNode(.pattern_product, &.{ item_pattern, rest_pattern }, start);
+            const some = try self.add(.pattern_constructor, try self.intern("Some"), pair, 0, start);
+            const stop = try self.listNode(.block, &.{try self.add(.break_stmt, 0, 0, 0, start)}, start);
+            const unpack = try self.add(.let_stmt, some, try self.add(.name, step, 0, 0, start), try self.extra(&.{ 0, 0, 0, stop, 0 }), start);
+            const update = try self.add(.rebind_stmt, cursor_ref, try self.add(.name, rest, 0, 0, start), 0, start);
+            const bind = try self.add(.let_stmt, pattern_, try self.add(.name, item, 0, 0, start), try self.extra(&.{ 0, 0, 0, 0, 0 }), start);
+            var statements: std.ArrayList(Id) = .empty;
+            defer statements.deinit(self.allocator);
+            try statements.appendSlice(self.allocator, &.{ next_step, unpack, update, bind });
+            try statements.appendSlice(self.allocator, self.tree.children(body));
+            const iteration = try self.add(.forever_stmt, try self.listNode(.block, statements.items, start), 0, 0, start);
+            expansion = try self.listNode(.block, &.{ initialize, iteration }, start);
+        }
+        return self.add(.for_stmt, pattern_, value, try self.extra(&.{ end, body, @intFromBool(explicit), expansion }), start);
+    }
     fn collection(self: *Parser, is_list: bool, start: u32) Error!Id {
         _ = try self.expect(.l_bracket);
         var values: std.ArrayList(Id) = .empty;
@@ -914,7 +941,7 @@ const Parser = struct {
             const statement_ = switch (qualifier.kind) {
                 .generator => blk: {
                     const pattern_ = try self.add(.pattern_name, qualifier.name, 0, 0, qualifier.start);
-                    break :blk try self.add(.for_stmt, pattern_, qualifier.value, try self.extra(&.{ 0, body, 0 }), qualifier.start);
+                    break :blk try self.collectionLoop(pattern_, qualifier.value, 0, body, false, qualifier.start);
                 },
                 .guard => try self.add(.if_stmt, qualifier.value, body, 0, qualifier.start),
                 .binding => {
@@ -1131,7 +1158,7 @@ const Parser = struct {
             const end = if (self.eat(.dot_dot)) try self.expression() else 0;
             _ = try self.expect(.colon);
             const body = try self.suite();
-            return self.add(.for_stmt, pat, value, try self.extra(&.{ end, body, @intFromBool(explicit) }), start);
+            return self.collectionLoop(pat, value, end, body, explicit, start);
         }
         const first = try self.expression();
         _ = try self.expect(.dot_dot);

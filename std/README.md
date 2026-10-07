@@ -344,25 +344,69 @@ Only arrays support indexing, indexed updates, `get`, and `set`. Numeric arrays
 remain the collection type accepted by the host ABI.
 
 Import [list.blot](list.blot) for `generate`, `fill`, `map`, `filter`,
-`fold_left`, `any`, `all`, `append`, and `prepend`, plus length and conversion
-helpers. `fold_left`, `filter`, `any`, and `all` propagate callback effects;
-`any`/`all` stop early and return false/true respectively on an empty list.
-`generate` and `map` require pure callbacks. Spreads express prepend
-(`[value, ...values]`) and append
+`fold_left`, `any`, `all`, `append`, `prepend`, `concat`, `slice`, `split_at`,
+`take`, `drop`, `splice` and `splice_many`, plus length and conversion helpers. `fold_left`, `filter`,
+`any`, and `all` propagate callback effects; `any`/`all` stop early and return
+false/true respectively on an empty list. `generate` and `map` require pure
+callbacks. Spreads express prepend (`[value, ...values]`) and append
 (`[...values, value]`); use `#[...]` to construct an array instead.
 Comprehensions and `for` loops traverse either input collection. The opening
 bracket selects a comprehension's output type: `[x * x | x <- values, x > 0]` is
 a list. Convert a list to an array when indexed access is needed.
+
+`list.splice start delete_count replacement values` replaces one checked range.
+`list.splice_many edits values` accepts a list of
+`{start, delete_count, replacement}` records in original-list coordinates.
+Edits must be ordered, nonoverlapping and in bounds; insertions at the same
+position retain their written order. Both are ordinary source functions that
+share unchanged subtrees and preserve snapshots. For example:
+
+```blot
+list.splice 1 2 [20, 30, 40] [1, 2, 3, 4] // [1, 20, 30, 40, 4]
+list.splice_many [
+  {start: 1, delete_count: 1, replacement: [20, 21]},
+  {start: 3, delete_count: 0, replacement: [30]}
+] [1, 2, 3, 4] // [1, 20, 21, 3, 30, 4]
+```
 
 Lists use balanced trees of dense leaves, growing from small allocations to
 248-element leaves. Exclusive append/prepend reuses available storage; shared
 edits detach one leaf and its tree path, preserving earlier versions. Direct
 `list.append`/`list.prepend` calls and their aliases preserve this optimization,
 as do ordinary wrappers whose body directly calls the intrinsic. Traversal
-caches the current leaf. Arrays remain contiguous; their append/prepend copies
-the contents. See
+caches the current leaf; direct loops resolve once per leaf. Structural concat
+and slicing share complete subtrees and copy only boundary paths/leaves. A tiny
+slice does not keep an unused large leaf alive. Arrays remain contiguous; their
+append/prepend copies the contents. See
 [the list example](../examples/lists.blot) and
 [collection syntax](../compiler/guide.md#lists-arrays-and-libraries).
+
+### Iterators and SIMD
+
+Lists and arrays expose immutable snapshot cursors through `values.iter`.
+`cursor.next` returns the ordinary `#Some (value, next_cursor)` or `#Nothing`.
+User-defined types can provide the same associated `iter`/`next` functions and
+work in `for` and comprehensions, including effectful traversal and early exit.
+Independent cursor copies retain their own positions.
+
+Import [iter.blot](iter.blot) for source-defined `range`, `zip`, `zip_strict`,
+`enumerate`, `windows`, `take`, `take_while`, `map`, `filter`, `fold_left`,
+`any`, `all`, `collect_list` and `collect_array`. Adapters are lazy; collection
+is explicit. `windows` requires positive width and returns complete List
+windows. `zip` polls left before right and stops at either end; `zip_strict`
+traps if lengths differ.
+[The protocol and examples](../compiler/guide.md#lists-arrays-and-libraries)
+describe pull order and snapshot behavior.
+
+[simd.blot](simd.blot) supplies explicit four-lane U32/F32 operations on
+ordinary tuple aliases, checked array load/store, and ordered or explicitly
+pairwise reductions. Eligible independent numeric construction also vectorizes
+automatically. [SIMD semantics](../compiler/guide.md#simd) specify the exact
+arithmetic and admission limits.
+
+Ownership analysis removes eligible local allocations and permits safe storage
+reuse. Runtime reclamation additionally uses a tracing collector in Wasm linear
+memory; it is not an ownership-only lifetime system or the Wasm GC extension.
 
 ### Array library
 
@@ -408,9 +452,9 @@ statically known tuple shape.
 Wasm stores arrays in contiguous lanes and preserves old aliases. Updates reuse
 locally owned storage when its last reference is consumed, including a single
 array carried through a loop. Direct `array.replace` calls and aliases preserve
-this reuse, as do wrappers that pass each parameter once to `@array.set`.
-Shared arrays and values whose ownership is unknown are copied. The source folds
-and predicates use loops.
+this reuse, as do wrappers that pass each parameter once to `@array.set`. Shared
+arrays and values whose ownership is unknown are copied. The source folds and
+predicates use loops.
 
 The Zig const evaluator retains immutable collection values. Appending or
 prepending to the latest version uses unused buffer slots and grows the buffer
@@ -427,7 +471,7 @@ See [the executable array example](../examples/arrays.blot).
 ## Current boundary
 
 This prelude is a useful executable core, not the complete standard library. It
-does not yet provide collection patterns, general text values, F64, SIMD,
+does not yet provide collection patterns, general text values, F64,
 general type-valued programming, or resumable handlers. The generic core
 supports closed source-declared operations, scoped providers, and compile-time
 effect descriptors. Libraries provide application behavior through explicit

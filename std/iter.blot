@@ -1,0 +1,138 @@
+// Lazy adapters are ordinary source types and associated functions. `iter`
+// starts an iteration; `next` returns Maybe (item, next_cursor). No adapter
+// names have special meaning to the compiler.
+
+type Range is data = #Range { current: U32, end: U32 }
+const range = fn start => fn end => #Range { current: start, end }
+const Range.iter = fn (cursor: Range) => cursor
+const Range.next = fn (cursor: Range) =>
+  if cursor.current >= cursor.end then #Nothing
+  else #Some (cursor.current, #Range { current: cursor.current + 1, end: cursor.end })
+
+type Take i is data = #Take { remaining: U32, cursor: i }
+const take = fn count => fn values => #Take { remaining: count, cursor: values.iter }
+const Take.iter = fn (cursor: Take i) => cursor
+const Take.next = fn (state: Take i) => do:
+  if state.remaining == 0:
+    return #Nothing
+  use step <- state.cursor.next
+  let #Some (value, rest) = step else:
+    return #Nothing
+  return #Some (value, #Take { remaining: state.remaining - 1, cursor: rest })
+
+type TakeWhile [i, p] is data = #TakeWhile { cursor: i, predicate: p }
+const take_while = fn predicate => fn values => #TakeWhile { cursor: values.iter, predicate }
+const TakeWhile.iter = fn (cursor: TakeWhile [i, p]) => cursor
+const TakeWhile.next = fn (state: TakeWhile [i, p]) => do:
+  use step <- state.cursor.next
+  let #Some (value, rest) = step else:
+    return #Nothing
+  use accepted <- state.predicate value
+  if accepted:
+    return #Some (value, #TakeWhile { cursor: rest, predicate: state.predicate })
+  return #Nothing
+
+type Map [i, f] is data = #Map { cursor: i, transform: f }
+const map = fn transform => fn values => #Map { cursor: values.iter, transform }
+const Map.iter = fn (cursor: Map [i, f]) => cursor
+const Map.next = fn (state: Map [i, f]) => do:
+  use step <- state.cursor.next
+  let #Some (value, rest) = step else:
+    return #Nothing
+  use result <- state.transform value
+  return #Some (result, #Map { cursor: rest, transform: state.transform })
+
+type Filter [i, p] is data = #Filter { cursor: i, predicate: p }
+const filter = fn predicate => fn values => #Filter { cursor: values.iter, predicate }
+const Filter.iter = fn (cursor: Filter [i, p]) => cursor
+const Filter.next = fn (state: Filter [i, p]) => do:
+  let cursor = state.cursor
+  for ever:
+    use step <- cursor.next
+    let #Some (value, rest) = step else:
+      return #Nothing
+    use accepted <- state.predicate value
+    if accepted:
+      return #Some (value, #Filter { cursor: rest, predicate: state.predicate })
+    cursor := rest
+
+type Enumerate i is data = #Enumerate { index: U32, cursor: i }
+const enumerate = fn values => #Enumerate { index: 0, cursor: values.iter }
+const Enumerate.iter = fn (cursor: Enumerate i) => cursor
+const Enumerate.next = fn (state: Enumerate i) => do:
+  use step <- state.cursor.next
+  let #Some (value, rest) = step else:
+    return #Nothing
+  return #Some ((state.index, value), #Enumerate { index: state.index + 1, cursor: rest })
+
+type Zip [l, r] is data = #Zip { left: l, right: r }
+const zip = fn left => fn right => #Zip { left: left.iter, right: right.iter }
+const Zip.iter = fn (cursor: Zip [l, r]) => cursor
+// Pull left, then right. An exhausted left never polls the right. If right
+// ends first, the last unpaired left item has already been pulled.
+const Zip.next = fn (state: Zip [l, r]) => do:
+  use left <- state.left.next
+  let #Some (a, left_rest) = left else:
+    return #Nothing
+  use right <- state.right.next
+  let #Some (b, right_rest) = right else:
+    return #Nothing
+  return #Some ((a, b), #Zip { left: left_rest, right: right_rest })
+
+type ZipStrict [l, r] is data = #ZipStrict { left: l, right: r }
+const zip_strict = fn left => fn right => #ZipStrict { left: left.iter, right: right.iter }
+const ZipStrict.iter = fn (cursor: ZipStrict [l, r]) => cursor
+const ZipStrict.next = fn (state: ZipStrict [l, r]) => do:
+  use left <- state.left.next
+  use right <- state.right.next
+  return case left, right of
+    #Nothing, #Nothing => #Nothing
+    #Some (a, left_rest), #Some (b, right_rest) =>
+      #Some ((a, b), #ZipStrict { left: left_rest, right: right_rest })
+    _, _ => @panic "zip_strict inputs have different lengths"
+
+type Windows [i, a] is data = #Windows { width: U32, cursor: i, buffer: List a }
+// Full overlapping windows, each a persistent list snapshot. Width zero is
+// rejected, and an input shorter than the width yields no windows.
+const windows = fn width => fn values =>
+  if width == 0 then @panic "windows requires a positive width"
+  else #Windows { width, cursor: values.iter, buffer: [] }
+const Windows.iter = fn (cursor: Windows [i, a]) => cursor
+const Windows.next = fn (state: Windows [i, a]) => do:
+  let cursor = state.cursor
+  let buffer = state.buffer
+  for ever:
+    if buffer.length == state.width:
+      let rest = @list.slice buffer 1 (state.width - 1)
+      return #Some (buffer, #Windows { width: state.width, cursor, buffer: rest })
+    use step <- cursor.next
+    let #Some (value, rest) = step else:
+      return #Nothing
+    buffer := [...self, value]
+    cursor := rest
+
+const fold_left = fn reduce => fn initial => fn values => do:
+  let state = initial
+  for value in values:
+    use next <- reduce state value
+    state := next
+  return state
+
+const collect_list = fn values => do:
+  let collected = []
+  for value in values:
+    collected := [...self, value]
+  return collected
+const collect_array = fn values => Array.from_list (collect_list values)
+const any = fn predicate => fn values => do:
+  for value in values:
+    use accepted <- predicate value
+    if accepted:
+      return #True
+  return #False
+const all = fn predicate => fn values => do:
+  for value in values:
+    use accepted <- predicate value
+    if Bool.not accepted:
+      return #False
+  return #True

@@ -117,7 +117,7 @@ const Checker = struct {
         const valid = switch (n.tag) {
             .unit, .boolean, .u32, .f32, .never => n.a == 0 and n.b == 0 and n.c == 0,
             .function => self.ty(n.a, depth + 1) and self.ty(n.b, depth + 1) and self.row(n.c, depth + 1),
-            .array, .list => n.b == 0 and n.c == 0 and self.ty(n.a, depth + 1),
+            .array, .list, .cursor => n.b == 0 and n.c == 0 and self.ty(n.a, depth + 1),
             .product, .record => list: {
                 if (n.c != 0) break :list false;
                 const words: usize = if (n.tag == .record) @as(usize, n.b) * 2 else n.b;
@@ -170,7 +170,7 @@ const Checker = struct {
         if (semantic == 0) {
             self.stats.open_evidence += 1;
             switch (info.kind) {
-                .array, .list, .product, .record, .nominal, .closure => self.stats.template_holes += 1,
+                .array, .list, .cursor, .product, .record, .nominal, .closure => self.stats.template_holes += 1,
                 else => self.reject(.open_evidence),
             }
         } else if (!self.ty(semantic, 0)) {
@@ -190,6 +190,7 @@ const Checker = struct {
                 .product => shape.tag == .product and shape.b == info.len,
                 .array => shape.tag == .array,
                 .list => shape.tag == .list,
+                .cursor => shape.tag == .cursor and info.len == 1,
                 .record => shape.tag == .record and shape.b == info.len,
                 .nominal => shape.tag == .nominal and shape.a == @as(u32, @intCast(info.nominal >> 32)) and shape.b == @as(u32, @truncate(info.nominal)),
                 .closure => shape.tag == .function,
@@ -208,6 +209,14 @@ const Checker = struct {
                 else => self.reject(.domain),
             },
             .array, .list, .product, .record => {},
+            .cursor => {
+                if (info.len != 1 or snapshot.children[info.start] >= snapshot.values.len) {
+                    self.reject(.bounds);
+                } else {
+                    const source = snapshot.values[snapshot.children[info.start]];
+                    if ((source.kind != .array and source.kind != .list) or info.bits > source.len) self.reject(.bounds);
+                }
+            },
             .nominal => {
                 if (!self.nominal(@intCast(info.nominal >> 32), @truncate(info.nominal))) {
                     self.reject(.owner);

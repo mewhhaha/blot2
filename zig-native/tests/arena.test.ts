@@ -64,3 +64,64 @@ Deno.test("linear arena grows and resets without overwriting static values", asy
     equal(trapped, true);
   } finally { guest.dispose(); }
 });
+
+Deno.test("owned temporary lifetimes recycle at final borrow without running the collector", async () => {
+  const bytes = await Deno.readFile(fixture);
+  const { instance } = await WebAssembly.instantiate(bytes, { "blot:host/1": {
+    call_u32_u32: (_capability: unknown, value: number) => value,
+    call_array_f32_array_f32: (_capability: unknown, value: number) => value,
+  } });
+  const call = (name: string, value = 0) => Number((instance.exports[name] as CallableFunction)(value)) >>> 0;
+  equal(call("temporary_fold", 100000), (100000 * 99999 / 2) >>> 0);
+  const heap = call("temporary_heap");
+  equal(heap, 65536 + 256);
+  for (let i = 0; i < 100; i++) {
+    equal(call("temporary_early", 1000), 49 * 50 / 2);
+    equal(call("temporary_fold", 100), 99 * 100 / 2);
+    equal(call("temporary_heap"), heap);
+  }
+  // A sweep must not link explicitly released storage into a bin twice.
+  call("temporary_collect");
+  equal(call("temporary_fold", 100000), (100000 * 99999 / 2) >>> 0);
+  equal(call("temporary_heap"), heap);
+  for (let i = 0; i < 10000; i++) {
+    equal(call("borrowed_early", i & 1), i & 1 ? 77 : 55);
+    equal(call("borrowed_branch_value", i & 1), i & 1 ? 77 : 55);
+    equal(call("borrowed_arms", i & 1), 55);
+    equal(call("borrowed_loop", i % 7), (i % 7) * 7);
+  }
+  equal(call("temporary_heap"), heap);
+  const first = call("temporary_escape", 42);
+  const second = call("temporary_escape", 99);
+  if (first === second) throw new Error("Escaping storage was recycled prematurely");
+  const words = new DataView((instance.exports["blot:memory"] as WebAssembly.Memory).buffer);
+  equal(words.getUint32(first + 124, true), 42);
+  equal(words.getUint32(second + 124, true), 99);
+});
+
+Deno.test("closed shared and cyclic allocation groups release without a collector or double release", async () => {
+  const { instance } = await WebAssembly.instantiate(await Deno.readFile(fixture), { "blot:host/1": {
+    call_u32_u32: (_capability: unknown, value: number) => value,
+    call_array_f32_array_f32: (_capability: unknown, value: number) => value,
+  } });
+  const call = (name: string, value = 0) => Number((instance.exports[name] as CallableFunction)(value)) >>> 0;
+  equal(call("graph_fold", 100000), (100000 * 100001) >>> 0);
+  const heap = call("temporary_heap");
+  equal(heap, 65536 + 4 * 256);
+  call("temporary_collect");
+  for (let i=0; i<10; i++) {
+    equal(call("graph_fold", 10000), 10000 * 10001);
+    equal(call("temporary_heap"), heap);
+  }
+  const first = call("graph_escape", 42);
+  const second = call("graph_escape", 99);
+  equal(call("graph_fold", 10000), 10000 * 10001);
+  const words = new DataView((instance.exports["blot:memory"] as WebAssembly.Memory).buffer);
+  for (const [pointer, value] of [[first, 42], [second, 99]]) {
+    const child = words.getUint32(pointer, true);
+    const left = words.getUint32(child, true);
+    equal(words.getUint32(left, true), child);
+    equal(words.getUint32(child + 124, true), value + 2);
+    equal(words.getUint32(left + 124, true), value);
+  }
+});

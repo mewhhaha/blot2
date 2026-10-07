@@ -5,7 +5,7 @@ const arena_runtime = @import("arena_runtime.zig");
 const artifact = @import("artifact_emitter.zig");
 const Allocator = std.mem.Allocator;
 
-pub const ValueType = enum(u8) { i32 = 0x7f, f32 = 0x7d, externref = 0x6f, none = 0x40 };
+pub const ValueType = enum(u8) { i32 = 0x7f, f32 = 0x7d, v128 = 0x7b, externref = 0x6f, none = 0x40 };
 pub const Scalar = enum(u8) {
     unit = 0,
     u32 = 1,
@@ -95,6 +95,31 @@ pub const Op = enum(u8) {
     f32_max,
     i32_trunc_sat_f32_u,
     f32_convert_i32_u,
+    v128_load,
+    v128_store,
+    i32x4_splat,
+    f32x4_splat,
+    i32x4_replace_lane,
+    i32x4_extract_lane,
+    f32x4_extract_lane,
+    i32x4_add,
+    i32x4_sub,
+    i32x4_mul,
+    v128_and,
+    v128_or,
+    v128_xor,
+    f32x4_abs,
+    f32x4_neg,
+    f32x4_ceil,
+    f32x4_floor,
+    f32x4_trunc,
+    f32x4_sqrt,
+    f32x4_add,
+    f32x4_sub,
+    f32x4_mul,
+    f32x4_div,
+    f32x4_convert_i32x4_u,
+    i32x4_trunc_sat_f32x4_u,
 };
 pub const Instruction = struct { op: Op, operand: u32 = 0 };
 pub const Signature = struct { parameters: []ValueType, result: ValueType };
@@ -113,7 +138,22 @@ const Global = struct { scalar: Scalar, bits: u32, mutable: bool = false };
 const Import = struct { module: []u8, name: []u8, signature: u32 };
 pub const Callback = struct { parameter: Scalar, result: Scalar };
 const Export = struct { name: []u8, index: u32, parameter: Scalar, result: Scalar, global: bool, callback: ?Callback = null };
-pub const Arena = struct { allocate: u32, reset: u32, mark: u32, collect: u32, heap: u32, base: u32, static_end: u32 };
+pub const Arena = struct {
+    allocate: u32,
+    allocate_scalar: u32,
+    recycle: u32,
+    reset: u32,
+    mark: u32,
+    collect: u32,
+    heap: u32,
+    base: u32,
+    static_end: u32,
+    allocated: u32,
+
+    pub fn isAllocation(self: Arena, function: u32) bool {
+        return function == self.allocate or function == self.allocate_scalar;
+    }
+};
 /// Handles are indexes into an externref table, never encoded host pointers.
 /// Callers retain a cursor mark and release only handles owned by that scope.
 pub const HostReferences = struct { retain: u32, release: u32, cursor: u32 };
@@ -347,15 +387,21 @@ pub const Module = struct {
             return arena;
         }
         try self.data.appendNTimes(self.allocator, 0, 256);
+        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_list_address + 20 ..][0..4], 1, .little);
+        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + 20 ..][0..4], 1, .little);
+        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + 16 ..][0..4], 2, .little);
         if (self.artifacts) |journal| try journal.data(0, self.data.items);
         const heap = try self.addGlobal(.u32, 256, true);
         const base = try self.addGlobal(.u32, 256, true);
         const static_end = try self.addGlobal(.u32, 256, false);
+        const allocated = try self.addGlobal(.u32, 0, true);
         const allocate = try self.addFunction(&.{.i32}, .i32);
+        const allocate_scalar = try self.addFunction(&.{.i32}, .i32);
+        const recycle = try self.addFunction(&.{.i32}, .none);
         const reset = try self.addFunction(&.{.i32}, .i32);
         const mark = try self.addFunction(&.{ .i32, .i32, .i32 }, .i32);
         const collect = try self.addFunction(&.{ .i32, .i32, .i32 }, .i32);
-        const arena: Arena = .{ .heap = heap, .base = base, .static_end = static_end, .allocate = allocate, .reset = reset, .mark = mark, .collect = collect };
+        const arena: Arena = .{ .heap = heap, .base = base, .static_end = static_end, .allocated = allocated, .allocate = allocate, .allocate_scalar = allocate_scalar, .recycle = recycle, .reset = reset, .mark = mark, .collect = collect };
         try arena_runtime.emit(self, arena);
         // Reset discards post-base blocks and every free-list link into them.
         // Pre-base runtime initializers remain in the physical block chain.
@@ -541,12 +587,28 @@ pub const Module = struct {
             try payload.uleb(@intCast(self.functions.items.len));
             var body = Bytes.init(self.allocator);
             defer body.deinit();
+            var borrows = try @import("wasm_lifetimes.zig").Summaries.init(self.allocator, self);
+            defer borrows.deinit();
             for (self.functions.items) |function| {
                 body.clear();
                 var optimized = try @import("wasm_sroa.zig").run(self.allocator, self, &function);
                 defer if (optimized) |*owned| owned.deinit(self.allocator);
-                const locals = if (optimized) |owned| owned.locals.items else function.locals.items;
-                const instructions = if (optimized) |owned| owned.instructions.items else function.instructions.items;
+                var scalar_function = function;
+                if (optimized) |owned| {
+                    scalar_function.locals = owned.locals;
+                    scalar_function.instructions = owned.instructions;
+                }
+                var vectorized = try @import("wasm_vectorize.zig").run(self.allocator, self, &scalar_function);
+                defer if (vectorized) |*owned| owned.deinit(self.allocator);
+                var lifetime_function = scalar_function;
+                if (vectorized) |owned| {
+                    lifetime_function.locals = owned.locals;
+                    lifetime_function.instructions = owned.instructions;
+                }
+                var lifetimes = try @import("wasm_lifetimes.zig").runWithSummaries(self.allocator, self, &lifetime_function, &borrows);
+                defer if (lifetimes) |*owned| owned.deinit(self.allocator);
+                const locals = if (lifetimes) |owned| owned.locals.items else lifetime_function.locals.items;
+                const instructions = if (lifetimes) |owned| owned.instructions.items else lifetime_function.instructions.items;
                 try body.uleb(@intCast(locals.len));
                 for (locals) |local| {
                     try body.byte(1);
@@ -654,6 +716,22 @@ pub const Bytes = struct {
     }
 };
 fn encodeInstruction(bytes: *Bytes, inst: Instruction, functions: usize, globals: usize, signatures: usize, imports: u32) !void {
+    if (@import("wasm_simd_ops.zig").code(inst.op)) |opcode| {
+        try bytes.byte(0xfd);
+        try bytes.uleb(opcode);
+        switch (inst.op) {
+            .v128_load, .v128_store => {
+                try bytes.uleb(2);
+                try bytes.uleb(inst.operand);
+            },
+            .i32x4_replace_lane, .i32x4_extract_lane, .f32x4_extract_lane => {
+                if (inst.operand >= 4) return error.ModuleTooLarge;
+                try bytes.byte(@intCast(inst.operand));
+            },
+            else => {},
+        }
+        return;
+    }
     const code: u8 = switch (inst.op) {
         .unreachable_ => 0x00,
         .nop => 0x01,
@@ -728,6 +806,31 @@ fn encodeInstruction(bytes: *Bytes, inst: Instruction, functions: usize, globals
         .f32_max => 0x97,
         .f32_convert_i32_u => 0xb3,
         .i32_trunc_sat_f32_u => 0xfc,
+        .v128_load => unreachable,
+        .v128_store => unreachable,
+        .i32x4_splat => unreachable,
+        .f32x4_splat => unreachable,
+        .i32x4_replace_lane => unreachable,
+        .i32x4_extract_lane => unreachable,
+        .f32x4_extract_lane => unreachable,
+        .i32x4_add => unreachable,
+        .i32x4_sub => unreachable,
+        .i32x4_mul => unreachable,
+        .v128_and => unreachable,
+        .v128_or => unreachable,
+        .v128_xor => unreachable,
+        .f32x4_abs => unreachable,
+        .f32x4_neg => unreachable,
+        .f32x4_ceil => unreachable,
+        .f32x4_floor => unreachable,
+        .f32x4_trunc => unreachable,
+        .f32x4_sqrt => unreachable,
+        .f32x4_add => unreachable,
+        .f32x4_sub => unreachable,
+        .f32x4_mul => unreachable,
+        .f32x4_div => unreachable,
+        .f32x4_convert_i32x4_u => unreachable,
+        .i32x4_trunc_sat_f32x4_u => unreachable,
     };
     try bytes.byte(code);
     switch (inst.op) {

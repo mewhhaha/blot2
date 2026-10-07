@@ -104,8 +104,8 @@ const Display = struct {
                 if (!try self.ty(value.b, depth - 1) or !try self.row(value.c, depth - 1)) return false;
                 try self.append(")");
             },
-            .array, .list => {
-                try self.append(if (value.tag == .list) "List (" else "Array (");
+            .array, .list, .cursor => {
+                try self.append(if (value.tag == .cursor) "Cursor (" else if (value.tag == .list) "List (" else "Array (");
                 if (!try self.ty(value.a, depth - 1)) return false;
                 try self.append(")");
             },

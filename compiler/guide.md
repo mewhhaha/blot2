@@ -373,7 +373,8 @@ to a function expecting the other is a type error. `List.from_array values` and
 The Zig runtime backs lists with balanced trees of dense leaves. Small leaves
 grow with demand, up to 248 elements. Exclusive end edits reuse storage; shared
 edits copy one leaf and its tree path, preserving earlier versions. Traversal
-caches the current leaf. Arrays stay contiguous with constant-time indexing;
+caches the current leaf; direct list loops traverse a whole leaf before
+resolving the next one. Arrays stay contiguous with constant-time indexing;
 array append/prepend copies the contents.
 
 Both types have ordinary prelude members `values.length` and `values.is_empty`.
@@ -413,6 +414,80 @@ each generator source sees the scope before its own binding. The output is built
 with a private growing list, then copied once if the requested result is an
 array.
 
+`for` and comprehension generators also accept user-defined iterables. The
+ordinary associated `iter` function creates a cursor once; its `next` function
+returns `#Some (value, next_cursor)` or `#Nothing`. These are the usual prelude
+Maybe constructors. Iterator types and adapters receive no name-specific
+optimization.
+
+```blot
+type Countdown is data = #Countdown U32
+const Countdown.iter = fn (cursor: Countdown) => cursor
+const Countdown.next = fn (cursor: Countdown) => do:
+  let #Countdown remaining = cursor
+  return if remaining == 0 then #Nothing
+    else #Some (remaining, #Countdown (remaining - 1))
+
+entry const sum = fn count => do:
+  let total = 0
+  for value in #Countdown count:
+    total := self + value
+  return total
+```
+
+Both operations may have effects. Each pull happens before the corresponding
+body, and `break` or `return` stops further pulls. Nested loops and
+`do (monad Maybe)` retain their normal control flow. Array/list loops and
+numeric ranges keep their direct traversal paths.
+
+`values.iter` gives an immutable snapshot cursor for a List or Array. Copying a
+cursor preserves its position; advancing one never changes another. Later
+updates to the original collection preserve the cursor's snapshot. The opaque
+types are `Cursor (List a)` and `Cursor (Array a)`. The low-level operations
+`@cursor.has cursor`, `@cursor.value cursor` and `@cursor.advance cursor` expose
+the same sequential interface; value/advance on an exhausted cursor trap. They
+do not add indexing to List.
+
+`std/iter` supplies ordinary source functions. Adapters take the iterable last:
+
+```blot
+import * as iter from "std/iter"
+const selected = fn count =>
+  iter.collect_list (iter.take count
+    (iter.map (fn value => value * 2)
+      (iter.filter (fn value => value > 2) [1, 2, 3, 4, 5])))
+```
+
+The module includes `range start end`, `map`, `filter`, `take`, `take_while`,
+`enumerate`, `zip`, `zip_strict`, `windows`, `fold_left`, `any`, `all`,
+`collect_list` and `collect_array`. `take 0` never pulls its input. `zip` stops
+when either input ends and polls left before right; if the right ends first, one
+unpaired left value may have been consumed. `zip_strict` polls both and traps on
+unequal lengths. `windows width input` requires positive width and returns only
+complete sliding List windows. Saved windows remain immutable. These pipelines
+avoid intermediate collections explicitly. Bounded ordinary inlining and scalar
+replacement remove eligible local wrappers and step values; escaping or opaque
+state can still allocate.
+
+`std/list` provides structural operations with the collection last:
+
+```blot
+import * as list from "std/list"
+const joined = list.concat [1, 2, 3] [4, 5]
+const middle = list.slice 1 3 joined       // [2, 3, 4]
+const halves = list.split_at 2 joined      // ([1, 2], [3, 4, 5])
+const prefix = list.take 20 joined         // clamps to the length
+const suffix = list.drop 2 joined          // [3, 4, 5]
+```
+
+Concatenation shares complete subtrees and rebuilds the boundary paths. Slices
+copy partial boundary leaves, so a one-element slice does not retain a large
+discarded leaf or its original root. Tiny adjacent leaves may be combined with a
+bounded copy. `slice start count` and `split_at index` check their ranges;
+`take` and `drop` clamp. `@list.concat` and `@list.slice` provide the underlying
+operations. `std/array` also exposes `concat` and `slice`; arrays copy
+contiguous storage. List/array conversion copies whole leaf spans.
+
 Direct array reads and updates check bounds at runtime and fail during constant
 evaluation for an invalid index. `values.get(index)` returns `#Some value` or
 `#Nothing`; `values.set(index)(replacement)` returns `#Some updated_array` or
@@ -433,6 +508,25 @@ cannot be established: for example, live aliases, captured arrays, function
 parameters, module values, or arrays reached through another collection. Reuse
 is an optimization, not a change to immutable semantics. Record updates
 reconstruct the record; they do not mutate it.
+
+For proven local temporaries, the compiler releases storage after the final
+borrowed read or write. This also covers objects larger than the scalar
+replacement limit, branches, early returns and loop exits. Direct calls can
+borrow storage or transfer a proven fresh result to their caller. Escapes,
+unknown addresses, recursive calls without a usable summary and opaque calls
+keep the existing reclamation policy. When references stay within a proven
+group of allocations, shared children and cycles are released together after
+the group's final use. This needs no reference counting or tracing for that
+group. Numeric array payloads and
+numeric list leaves are marked as having no child pointers; integer bits do not
+become references in these payloads.
+
+Dynamic sharing and otherwise unproved lifetimes still use an arena and a nonmoving
+tracing collector in linear memory, without the Wasm GC extension. Forever
+loops collect according to allocation traffic, retaining their carries,
+providers and earlier reachable objects. The guest API resets temporary arena
+storage between completed invocations while preserving module initialization
+values. General ownership-based reclamation is still being implemented.
 
 Direct `array.replace`, `list.append` and `list.prepend` calls preserve this
 ownership optimization, including aliases and source wrappers whose body passes
@@ -498,6 +592,33 @@ entry const total_length = fn () =>
   |> array.map .length
   |> array.fold_left .add 0.0
 ```
+
+## SIMD
+
+`std/simd` exposes `U32x4` and `F32x4` as ordinary four-element product aliases.
+Construct or destructure lanes with tuples and use ordinary partial application
+on the source functions:
+
+```blot
+import * as simd from "std/simd"
+const translated = fn lanes => simd.u32_add lanes (1, 2, 3, 4)
+const scaled = fn lanes => simd.f32_mul lanes (2.0, 2.0, 2.0, 2.0)
+```
+
+The module provides U32 add/subtract/multiply and bitwise operations; F32
+arithmetic, abs/negate, sqrt and rounding; and saturating F32-to-U32 and
+U32-to-F32 conversion. `load index array` and `store index lanes array` check
+that all four elements fit and preserve array snapshots. Explicit compiler
+operations use `@simd.u32x4.*` and `@simd.f32x4.*` with their full argument
+lists, like the scalar compiler operations.
+
+Eligible independent numeric array-construction kernels automatically use
+four-lane Wasm SIMD and a scalar tail. Admission follows bounded ordinary
+function bodies; it does not recognize library names. Memory reads, effects,
+branches and potentially trapping integer division remain scalar. F32 expression
+order and U32 wrapping are preserved. No reduction is automatically regrouped:
+`f32_sum` adds left to right, while `f32_sum_pairwise` explicitly chooses
+`(a + b) + (c + d)` and can round differently.
 
 ## Effects and host capabilities
 
@@ -840,9 +961,9 @@ const step = fn count =>
 entry const answer = fn () => Maybe.unwrap_or 0 (Maybe.iterate 0 step)
 ```
 
-Not yet executable: collection patterns, general text, F64/SIMD, general
-type-valued computation, and exposed continuation values. Do not infer
-availability from editor highlighting or design examples.
+Not yet executable: collection patterns, general text, F64, general type-valued
+computation, and exposed continuation values. Do not infer availability from
+editor highlighting or design examples.
 
 Hosts use `compiler/guest.ts` and guest ABI 2. Numeric arrays cross as copied
 typed arrays; host callbacks are explicit scalar or numeric-array capabilities.

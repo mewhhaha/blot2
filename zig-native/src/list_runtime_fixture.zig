@@ -7,8 +7,19 @@ pub fn main(init: std.process.Init) !void {
     defer module.deinit();
     const runtime = try module.ensureLists();
     module.public_arena = true;
-    inline for (.{ "new", "address", "copy", "push", "set", "from_array", "to_array" }) |field|
+    inline for (.{ "address", "copy", "push", "set", "to_array", "concat", "slice" }) |field|
         try module.exportFunction(@field(runtime, field), field, .u32, .u32);
+    inline for (.{ "new", "from_array" }) |field| {
+        const numeric = try module.addFunction(&.{.i32}, .i32);
+        try module.emitSlice(numeric, &.{ .{ .op = .local_get, .operand = 0 }, .{ .op = .i32_const, .operand = 1 }, .{ .op = .call, .operand = @field(runtime, field) } });
+        try module.exportFunction(numeric, field, .u32, .u32);
+    }
+    const references = try module.addFunction(&.{.i32}, .i32);
+    try module.emitSlice(references, &.{ .{ .op = .local_get, .operand = 0 }, .{ .op = .i32_const }, .{ .op = .call, .operand = runtime.new } });
+    try module.exportFunction(references, "new_references", .u32, .u32);
+    const collect = try module.addFunction(&.{.i32}, .i32);
+    try module.emitSlice(collect, &.{ .{ .op = .local_get, .operand = 0 }, .{ .op = .global_get, .operand = module.arena.?.base }, .{ .op = .i32_const }, .{ .op = .call, .operand = module.arena.?.collect } });
+    try module.exportFunction(collect, "collect", .u32, .u32);
     const lists = @import("list_runtime.zig");
     const static_chunk = try lists.staticChunk(&module, &.{123});
     const static_list = try lists.staticDescriptor(&module, 1, &.{static_chunk});

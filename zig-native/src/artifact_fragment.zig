@@ -190,7 +190,7 @@ pub const State = struct {
                 const function = self.old.emission.functions[operand.value];
                 if (self.staticHelper(function, owner)) break :blk true;
                 if (function.owner == 0) break :blk switch (function.role) {
-                    .arena_allocate, .arena_reset, .arena_mark, .arena_collect, .host_retain, .host_release, .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance => true,
+                    .arena_allocate, .arena_allocate_scalar, .arena_recycle, .arena_reset, .arena_mark, .arena_collect, .host_retain, .host_release, .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut => true,
                     else => false,
                 };
                 break :blk try self.importer.importRequest(g, self.old.metadata.jobs.items[function.owner - 1].request) != null;
@@ -198,7 +198,7 @@ pub const State = struct {
         };
     }
     fn knownGlobal(self: *const State, id: u32, requests: ?u32) bool {
-        if (self.arena) |value| if (id == value.heap or id == value.base or id == value.static_end) return true;
+        if (self.arena) |value| if (id == value.heap or id == value.base or id == value.static_end or id == value.allocated) return true;
         if (self.host) |value| if (id == value.cursor) return true;
         // The first recorded resource is the Requests root global, when any
         // source unit contains request loops. Every other global is explicit.
@@ -285,8 +285,8 @@ pub const State = struct {
     fn ensureArena(self: *State, g: anytype) Error!void {
         const old = self.arena orelse return error.InvalidFunctionReference;
         const actual = try g.module.ensureArena();
-        inline for (.{ "heap", "base", "static_end" }) |field| self.globals[@field(old, field)] = @field(actual, field);
-        inline for (.{ "allocate", "reset", "mark", "collect" }) |field| self.functions[@field(old, field)] = @field(actual, field);
+        inline for (.{ "heap", "base", "static_end", "allocated" }) |field| self.globals[@field(old, field)] = @field(actual, field);
+        inline for (.{ "allocate", "allocate_scalar", "recycle", "reset", "mark", "collect" }) |field| self.functions[@field(old, field)] = @field(actual, field);
     }
     fn ensureLists(self: *State, g: anytype) Error!void {
         const old = self.lists orelse return error.InvalidFunctionReference;
@@ -304,7 +304,7 @@ pub const State = struct {
     fn global(self: *State, g: anytype, id: u32) Error!u32 {
         if (id >= self.globals.len) return error.InvalidGlobalReference;
         if (self.globals[id] != absent) return self.globals[id];
-        if (self.arena) |value| if (id == value.heap or id == value.base or id == value.static_end) try self.ensureArena(g);
+        if (self.arena) |value| if (id == value.heap or id == value.base or id == value.static_end or id == value.allocated) try self.ensureArena(g);
         if (self.host) |value| if (id == value.cursor) try self.ensureHost(g);
         if (self.globals[id] == absent and id == 0 and g.request_owner != null) self.globals[id] = g.request_owner.?;
         if (self.globals[id] == absent) return error.InvalidGlobalReference;
@@ -335,9 +335,9 @@ pub const State = struct {
             return self.functions[id];
         }
         switch (function_.role) {
-            .arena_allocate, .arena_reset, .arena_mark, .arena_collect => try self.ensureArena(g),
+            .arena_allocate, .arena_allocate_scalar, .arena_recycle, .arena_reset, .arena_mark, .arena_collect => try self.ensureArena(g),
             .host_retain, .host_release => try self.ensureHost(g),
-            .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance => try self.ensureLists(g),
+            .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut => try self.ensureLists(g),
             else => return error.InvalidFunctionReference,
         }
         return self.functions[id];
@@ -408,9 +408,9 @@ pub const State = struct {
                         self.functions[item.id] = actual;
                         try g.publishRetainedStatic(actual);
                     } else switch (fact.role) {
-                        .arena_allocate, .arena_reset, .arena_mark, .arena_collect => try self.ensureArena(g),
+                        .arena_allocate, .arena_allocate_scalar, .arena_recycle, .arena_reset, .arena_mark, .arena_collect => try self.ensureArena(g),
                         .host_retain, .host_release => try self.ensureHost(g),
-                        .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance => try self.ensureLists(g),
+                        .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut => try self.ensureLists(g),
                         else => return error.InvalidFunctionReference,
                     }
                 },

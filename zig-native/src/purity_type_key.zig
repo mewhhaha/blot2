@@ -151,12 +151,12 @@ pub const Context = struct {
                 defer self.allocator.free(packed_args);
                 return std.mem.concat(self.allocator, u8, &.{ "n", name, packed_args });
             },
-            .array, .list => {
+            .array, .list, .cursor => {
                 const element = try self.typeKey(node.a, rest);
                 defer self.allocator.free(element);
                 const key = try self.pack(element);
                 defer self.allocator.free(key);
-                return std.mem.concat(self.allocator, u8, &.{ if (node.tag == .list) "l" else "a", key });
+                return std.mem.concat(self.allocator, u8, &.{ if (node.tag == .cursor) "c" else if (node.tag == .list) "l" else "a", key });
             },
             .product => {
                 const elements = try self.typesKey(self.types.extra.items[node.a..][0..node.b], rest);

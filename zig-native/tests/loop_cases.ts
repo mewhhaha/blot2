@@ -234,7 +234,7 @@ entry const run = fn () => do:
   },
   {
     name: "array_scalar",
-    error: "type_mismatch",
+    error: "missing_member",
     source:
       "entry const run = fn () => do:\n  for value in 3:\n    use ()\n  return 0\n",
   },

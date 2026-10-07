@@ -1,6 +1,81 @@
 import { strict as assert } from "node:assert";
 import { compileAndRun, equal } from "./compile_helpers.ts";
 
+Deno.test("two large records share their child until the whole private group dies", async () => {
+  await compileAndRun(`
+entry const memory = fn () -> Array U32 => #[]
+entry const fold = fn (count: U32) => do:
+  let sum = 0
+  for value in 0..count:
+    let child = { a: value, b: value, c: value, d: value, e: value, f: value,
+      g: value, h: value, i: value, j: value, k: value, l: value,
+      m: value, n: value, o: value, p: value, q: value, r: value + 1 }
+    let left = { child: child, a: value, b: value, c: value, d: value, e: value,
+      f: value, g: value, h: value, i: value, j: value, k: value,
+      l: value, m: value, n: value, o: value, p: value, q: value }
+    let right = { child: child, a: value, b: value, c: value, d: value, e: value,
+      f: value, g: value, h: value, i: value, j: value, k: value,
+      l: value, m: value, n: value, o: value, p: value, q: value + 2 }
+    if value % 2 == 0:
+      let alias = left.child
+      sum := self + alias.a + right.child.r + left.q + right.q
+    else:
+      sum := self + right.child.a + left.child.r + left.q + right.q
+  return sum
+`, guest => {
+    for (const count of [0, 1, 2, 100000, 100000]) {
+      equal(guest.call("fold", count), (2 * count * count + count) >>> 0);
+      assert(guest.memoryBytes() > 0 && guest.memoryBytes() <= 192 * 1024, `Shared private children accumulated: ${guest.memoryBytes()}`);
+    }
+  });
+});
+
+Deno.test("record ownership crosses ordinary factories, borrowed calls and branches in finite loops", async () => {
+  await compileAndRun(`
+const make = fn value => { a: value, b: value, c: value, d: value, e: value, f: value,
+  g: value, h: value, i: value, j: value, k: value, l: value,
+  m: value, n: value, o: value, p: value, q: value, r: value + 1 }
+const read = fn record => record.a + record.b + record.c + record.d + record.e + record.f +
+  record.g + record.h + record.i + record.j + record.k + record.l + record.m + record.n +
+  record.o + record.p + record.q + record.r
+entry const storage_probe = fn (value: U32) => #[value]
+entry const fold = fn (count: U32) => do:
+  let sum = 0
+  for value in 0..count:
+    let record = make value
+    if value % 2 == 0:
+      sum := self + read record
+    else:
+      sum := self + read record + 1
+  return sum
+`, guest => {
+    for (const count of [0, 1, 2, 100000, 100000]) {
+      equal(guest.call("fold", count), (9 * count * (count - 1) + count + Math.floor(count / 2)) >>> 0);
+      assert(guest.memoryBytes() > 0 && guest.memoryBytes() <= 192 * 1024, `Borrowed calls retained dead records: ${guest.memoryBytes()}`);
+    }
+  });
+});
+
+Deno.test("large local records release storage after their final borrowed field read", async () => {
+  await compileAndRun(`
+entry const storage_probe = fn (value: U32) => #[value]
+entry const fold = fn (count: U32) => do:
+  let sum = 0
+  for value in 0..count:
+    let record = { a: value, b: value, c: value, d: value, e: value, f: value,
+      g: value, h: value, i: value, j: value, k: value, l: value,
+      m: value, n: value, o: value, p: value, q: value, r: value + 1 }
+    let alias = record
+    sum := self + alias.a + record.r
+  return sum
+`, guest => {
+    for (let repetition = 0; repetition < 5; repetition++) {
+      equal(guest.call("fold", 100000), (100000 * 100000) >>> 0);
+      assert(guest.memoryBytes() > 0 && guest.memoryBytes() <= 192 * 1024, `Dead record storage accumulated or arena missing: ${guest.memoryBytes()}`);
+    }
+  });
+});
+
 Deno.test("direct and wrapped array replacement use linear storage while retaining snapshots", async () => {
   await compileAndRun(
     `

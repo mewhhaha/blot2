@@ -121,10 +121,10 @@ Deno.test("chunk static values conversions empty values and private bounds prese
   const r = await runtime();
   const before = r.call("heap");
   const empty = r.call("new", 0);
-  // Initialization reserves the arena once; subsequent empty values allocate only a descriptor.
+  // Empty values reuse an immutable descriptor; tiny nonempty values detach it.
   const tinyBefore = r.call("heap");
   const tiny = r.create(1);
-  ok(r.call("heap") - tinyBefore <= 128);
+  ok(r.call("heap") - Math.max(tinyBefore, 65536) <= 128);
   ok(r.call("heap") > before);
   const frozen = r.call("static");
   const changed = r.call("set", frozen, 0, 42, 1);
@@ -158,6 +158,79 @@ Deno.test("chunk static values conversions empty values and private bounds prese
   }
 });
 
+Deno.test("empty lists allocate nothing and detach independently on writes", async () => {
+  const r = await runtime();
+  const before = r.call("heap");
+  const first = r.call("new", 0), second = r.call("new", 0);
+  equal(first, second);
+  equal(r.call("slice", first, 0, 0), first);
+  equal(r.call("concat", first, second), first);
+  equal(r.call("heap"), before);
+  const left = r.call("push", first, 11, 0, 1);
+  const right = r.call("push", second, 22, 1, 1);
+  equal(r.word(first), 0);
+  equal(r.word(second), 0);
+  equal(r.get(left, 0), 11);
+  equal(r.get(right, 0), 22);
+  const joined = r.call("concat", first, left);
+  equal(r.word(first), 0);
+  equal(r.get(joined, 0), 11);
+});
+
+Deno.test("unchanged shared list edits allocate nothing and preserve subsequent snapshots", async () => {
+  const r = await runtime();
+  const original = r.create(10000);
+  const before = r.call("heap");
+  const unchanged = r.call("set", original, 5000, 5000, 0);
+  equal(r.call("heap"), before);
+  const changed = r.call("set", unchanged, 5000, 42, 1);
+  const extended = r.call("push", original, 99, 1, 1);
+  equal(r.get(original, 5000), 5000);
+  equal(r.get(unchanged, 5000), 5000);
+  equal(r.get(changed, 5000), 42);
+  equal(r.get(extended, 5001), 5000);
+  equal(r.word(original), 10000);
+  r.inspect(changed); r.inspect(extended);
+});
+
+Deno.test("list element layouts distinguish scalar bits from owned references during reclamation", async () => {
+  for (const scalar of [true, false]) {
+    const r = await runtime();
+    const child = r.call("blot:allocate", 64);
+    r.put(child, 123456);
+    const original = r.call(scalar ? "new" : "new_references", 300);
+    for (let i = 0; i < 300; i++) r.put(r.call("address", original, i), child);
+    const sliced = r.call("slice", original, 37, 250);
+    const changed = r.call("push", sliced, child, 0, 0);
+    r.call("collect", changed);
+    equal(r.get(changed, 0), child);
+    equal(r.get(changed, 250), child);
+    equal(r.word(child - 12), scalar ? 0 : 64);
+    // A second pass must preserve the leaf's layout flag and reference values.
+    r.call("collect", changed);
+    equal(r.word(child - 12), scalar ? 0 : 64);
+    if (!scalar) equal(r.word(r.get(changed, 100)), 123456);
+  }
+});
+
+Deno.test("whole slices and concatenation with empty lists share without allocation", async () => {
+  const r = await runtime();
+  const original = r.create(5000), empty = r.call("new", 0);
+  const before = r.call("heap");
+  const full = r.call("slice", original, 0, 5000);
+  const left = r.call("concat", empty, full), right = r.call("concat", full, empty);
+  equal(r.call("heap"), before);
+  const changed = r.call("set", left, 42, 99, 1);
+  const appended = r.call("push", right, 77, 0, 1);
+  equal(r.get(changed, 42), 99);
+  equal(r.get(appended, 42), 42);
+  equal(r.get(appended, 5000), 77);
+  for (const snapshot of [original, full, left, right]) {
+    equal(r.word(snapshot), 5000);
+    equal(r.get(snapshot, 42), 42);
+  }
+});
+
 Deno.test("owned list growth balances both ends with output-proportional allocation", async () => {
   const r = await runtime();
   let list = r.call("new", 0);
@@ -170,5 +243,73 @@ Deno.test("owned list growth balances both ends with output-proportional allocat
   for (let i = 0; i < count / 2; i++) {
     equal(r.get(list, i), count - i * 2 - 1);
     equal(r.get(list, count / 2 + i), i * 2);
+  }
+});
+
+Deno.test("structural slices share interior subtrees and detach boundary leaves", async () => {
+  const r = await runtime();
+  const original = r.create(1_000_000);
+  const tree = r.inspect(original);
+  let heap = r.call("heap");
+  const sliced = r.call("slice", original, 123456, 100000);
+  ok(r.call("heap") - heap < 8192, "A slice rebuilds only its boundary spines");
+  const cut = r.inspect(sliced);
+  ok(cut.chunks.some(node => tree.nodes.has(node)), "Covered leaves remain shared");
+  equal(r.get(sliced, 0), 123456);
+  equal(r.get(sliced, 99999), 223455);
+  heap = r.call("heap");
+  const tiny = r.call("slice", original, 123456, 1);
+  ok(r.call("heap") - heap < 256, "A tiny slice owns a descriptor and small leaf");
+  const tinyTree = r.inspect(tiny);
+  equal(tinyTree.nodes.size, 1);
+  ok(!tree.nodes.has(tinyTree.chunks[0]), "A partial leaf must not retain discarded neighbors");
+  r.call("set", original, 125000, 77, 1);
+  equal(r.get(sliced, 1544), 125000);
+  r.call("set", sliced, 5000, 99, 1);
+  equal(r.get(original, 128456), 128456);
+  equal(r.get(tiny, 0), 123456);
+  equal(r.word(r.call("slice", original, 1_000_000, 0)), 0);
+});
+
+Deno.test("structural concat balances unequal trees and preserves both operands", async () => {
+  const r = await runtime();
+  const left = r.create(200000), right = r.create(1000);
+  const heap = r.call("heap");
+  const joined = r.call("concat", left, right);
+  ok(r.call("heap") - heap < 4096, "Concat must not flatten either tree");
+  r.inspect(joined);
+  equal(r.word(joined), 201000);
+  for (const index of [0, 1, 247, 248, 99999, 199999]) equal(r.get(joined, index), index);
+  for (const index of [0, 247, 248, 999]) equal(r.get(joined, 200000 + index), index);
+  r.call("set", left, 500, 17, 1);
+  r.call("set", right, 500, 18, 1);
+  equal(r.get(joined, 500), 500);
+  equal(r.get(joined, 200500), 500);
+  r.call("set", joined, 500, 19, 1);
+  equal(r.get(left, 500), 17);
+  const repeated = r.call("concat", joined, joined);
+  equal(r.get(repeated, 201500), 19);
+  r.call("set", repeated, 500, 20, 1);
+  equal(r.get(repeated, 201500), 19);
+});
+
+Deno.test("slicing and concatenating adversarial boundaries match flat sequence values", async () => {
+  const r = await runtime();
+  let list = r.create(8193);
+  let values = Array.from({length: 8193}, (_, index) => index);
+  let seed = 123;
+  for (let step = 0; step < 400; step++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const start = seed % (values.length + 1);
+    const count = (seed >>> 12) % (values.length - start + 1);
+    list = r.call("slice", list, start, count);
+    values = values.slice(start, start + count);
+    const extra = r.create(seed % 260);
+    list = step % 2 ? r.call("concat", list, extra) : r.call("concat", extra, list);
+    const added = Array.from({length: seed % 260}, (_, index) => index);
+    values = step % 2 ? [...values, ...added] : [...added, ...values];
+    r.inspect(list);
+    equal(r.word(list), values.length);
+    for (let i = 0; i < values.length; i++) equal(r.get(list, i), values[i]);
   }
 });

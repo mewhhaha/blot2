@@ -60,12 +60,17 @@ pub const Tag = enum(u32) {
     let_stmt,
     rebind_stmt,
     use_stmt,
+    // Generated iteration setup/step: a=binder symbol,b=expression. Executes
+    // normally even inside a monadic do; it is not that monad's bind.
+    iterator_bind,
     return_stmt,
     yield_stmt,
     break_stmt,
     if_expr,
     if_stmt,
     if_let_stmt,
+    // a=pattern,b=source,c=[range end,body,explicit let,iterator expansion].
+    // The expansion is a transparent suite, selected only for user iterators.
     for_stmt,
     range_stmt,
     forever_stmt,

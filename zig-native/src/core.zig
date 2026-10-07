@@ -731,7 +731,7 @@ const Builder = struct {
                 const span = try self.saveTypes(arguments.items);
                 break :blk .{ .tag = .nominal, .a = original.a, .b = original.b, .c = span.start };
             },
-            .array, .list, .resolver => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1) },
+            .array, .list, .cursor, .resolver => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1) },
             .demand, .provider => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
             .state_provider => .{ .tag = .state_provider, .a = try self.projectType(original.a, depth + 1), .b = try self.projectType(original.b, depth + 1), .c = try self.projectType(original.c, depth + 1) },
             else => original,
@@ -1895,6 +1895,13 @@ const Builder = struct {
     fn resolverStatements(self: *Builder, source: ast.Id, statements_: []const ast.Id, tail: Id, depth: usize) Error!Id {
         if (depth >= 1024) return error.CoreLimit;
         if (statements_.len == 0) return tail;
+        if (self.checked.iterator_bodies.len != 0 and self.checked.iterator_bodies[statements_[0]] != 0) {
+            var expanded: std.ArrayList(ast.Id) = .empty;
+            defer expanded.deinit(self.allocator);
+            try expanded.appendSlice(self.allocator, self.tree.children(self.checked.iterator_bodies[statements_[0]]));
+            try expanded.appendSlice(self.allocator, statements_[1..]);
+            return self.resolverStatements(source, expanded.items, tail, depth + 1);
+        }
         // Ordinary statements do not introduce a continuation. Retain them in
         // one ordered block instead of making source length become IR nesting
         // and recursively lowering an identical suffix for every statement.
@@ -2405,6 +2412,8 @@ const Builder = struct {
             return 0;
         }
         const syntax = self.tree.node(source);
+        if (self.checked.iterator_bodies.len != 0 and self.checked.iterator_bodies[source] != 0)
+            return self.suite(self.checked.iterator_bodies[source], depth + 1);
         for (self.checked.request_controls) |control| if (control.node == source) return self.requestControl(source, control, depth + 1);
         for (self.checked.request_loops) |info| if (info.node == source) return self.requestLoop(source, info, depth + 1);
         switch (syntax.tag) {
@@ -2429,7 +2438,7 @@ const Builder = struct {
                 }
                 return self.make(source, .{ .tag = .bind, .ty = T.unit, .a = binding, .b = try self.expression(value.value, depth + 1) });
             },
-            .use_stmt => {
+            .use_stmt, .iterator_bind => {
                 const value = try self.expression(syntax.b, depth + 1);
                 if (syntax.a == 0 or std.mem.eql(u8, self.names.get(syntax.a), "_")) return value;
                 const binding = self.checked.resolved[source];
@@ -2708,6 +2717,7 @@ fn arrayIntrinsic(text: []const u8) ?ArrayIntrinsic {
     return .{ .op = value.op, .arity = value.arity };
 }
 fn intrinsic(text: []const u8) ?Intrinsic {
+    if (@import("simd_intrinsics.zig").lookup(text)) |op| return .{ .op = op.op, .arity = op.arity };
     const entries = .{
         .{ "@u32.add", Op.add, 2 },        .{ "@u32.sub", Op.sub, 2 },         .{ "@u32.mul", Op.mul, 2 },                .{ "@u32.div", Op.div, 2 },       .{ "@u32.rem", Op.rem, 2 },
         .{ "@u32.eq", Op.equal, 2 },       .{ "@u32.lt", Op.less, 2 },         .{ "@u32.bit_and", Op.bit_and, 2 },        .{ "@u32.bit_or", Op.bit_or, 2 }, .{ "@u32.bit_xor", Op.bit_xor, 2 },

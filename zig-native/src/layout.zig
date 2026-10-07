@@ -10,7 +10,7 @@ pub const Id = u32;
 pub const erased: Id = 6;
 /// Unknown effects are representation-only facts, distinct from closed empty.
 pub const unknown_row: u32 = std.math.maxInt(u32);
-pub const Tag = enum(u8) { invalid, unit, boolean, u32, f32, never, product, record, nominal, array, list, function, demand, type_constructor, resolver, erased, provider, state_provider };
+pub const Tag = enum(u8) { invalid, unit, boolean, u32, f32, never, product, record, nominal, array, list, cursor, function, demand, type_constructor, resolver, erased, provider, state_provider };
 pub const Node = struct { tag: Tag, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
 pub const Mapping = struct { variable: types.Id, layout: Id };
 pub const RowMapping = struct { variable: u32, row: evidence.Effects.Id };
@@ -53,6 +53,10 @@ pub const Store = struct {
     }
     pub fn machine(self: *const Store, id: Id) wasm.ValueType {
         return if (self.node(id).tag == .f32) .f32 else .i32;
+    }
+    pub fn listInput(self: *const Store, id: Id) bool {
+        const n = self.node(id);
+        return n.tag == .list or (n.tag == .cursor and self.node(n.a).tag == .list);
     }
     pub fn scalar(self: *const Store, id: Id) ?wasm.Scalar {
         return switch (self.node(id).tag) {
@@ -189,6 +193,7 @@ pub const Store = struct {
             .unit, .boolean, .u32, .f32, .never => return id,
             .array => return target.intern(.array, try self.toEvidenceDepth(target, n.a, depth + 1, budget), 0, &.{}),
             .list => return target.intern(.list, try self.toEvidenceDepth(target, n.a, depth + 1, budget), 0, &.{}),
+            .cursor => return target.intern(.cursor, try self.toEvidenceDepth(target, n.a, depth + 1, budget), 0, &.{}),
             .demand => return target.internWithEffects(.demand, try self.toEvidenceDepth(target, n.a, depth + 1, budget), 0, try self.toEvidenceRow(target, n.c, depth + 1, budget), &.{}),
             .type_constructor => return target.intern(.type_constructor, n.a, n.b, &.{}),
             .resolver => return target.intern(.resolver, try self.toEvidenceDepth(target, n.a, depth + 1, budget), 0, &.{}),
@@ -228,6 +233,7 @@ pub const Store = struct {
             .unit, .boolean, .u32, .f32, .never => return id,
             .array => return self.internExpectation(target, .array, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
             .list => return self.internExpectation(target, .list, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
+            .cursor => return self.internExpectation(target, .cursor, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
             .demand => return self.internExpectation(target, .demand, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
             .type_constructor => return self.internExpectation(target, .type_constructor, n.a, n.b, &.{}),
             .resolver => return self.internExpectation(target, .resolver, try self.toExpectationDepth(target, n.a, depth + 1, budget), 0, &.{}),
@@ -257,6 +263,7 @@ pub const Store = struct {
             .unit, .boolean, .u32, .f32, .never => return id,
             .array => return self.intern(.array, try self.fromEvidenceDepth(view, n.a, depth + 1, budget), 0, &.{}),
             .list => return self.intern(.list, try self.fromEvidenceDepth(view, n.a, depth + 1, budget), 0, &.{}),
+            .cursor => return self.intern(.cursor, try self.fromEvidenceDepth(view, n.a, depth + 1, budget), 0, &.{}),
             .demand => return self.internWithEffects(.demand, try self.fromEvidenceDepth(view, n.a, depth + 1, budget), 0, try self.fromEvidenceRow(view, n.c, depth + 1, budget), &.{}),
             .type_constructor => return self.intern(.type_constructor, n.a, n.b, &.{}),
             .resolver => return self.intern(.resolver, try self.fromEvidenceDepth(view, n.a, depth + 1, budget), 0, &.{}),
@@ -287,6 +294,7 @@ pub const Store = struct {
             .absent => return error.UnresolvedType,
             .array => return self.intern(.array, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
             .list => return self.intern(.list, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
+            .cursor => return self.intern(.cursor, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),
             .demand => return self.internWithEffects(.demand, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, try self.fromTypeRow(module, n.c, mappings, rows, depth + 1, allow_erased), &.{}),
             .type_constructor => return self.intern(.type_constructor, n.a, n.b, &.{}),
             .resolver => return self.intern(.resolver, try self.fromTypeDepth(module, n.a, mappings, rows, depth + 1, allow_erased), 0, &.{}),

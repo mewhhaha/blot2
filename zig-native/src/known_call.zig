@@ -37,8 +37,8 @@ pub fn resolve(units: []const core.Module, unit: u32, id: core.Id) ?Call {
         const ty = m.types.node(m.typeOf(n.a));
         // These structural types cannot have a competing record field. Nominal
         // fields use the ordinary ambiguity check in the emitter.
-        if (ty.tag != .array and ty.tag != .list) return null;
-        const identity: @import("types.zig").NominalIdentity = .{ .unit = 0, .decl = std.math.maxInt(u32) - @as(u32, @intFromBool(ty.tag == .list)) };
+        if (ty.tag != .array and ty.tag != .list and ty.tag != .cursor) return null;
+        const identity: @import("types.zig").NominalIdentity = .{ .unit = 0, .decl = std.math.maxInt(u32) - @as(u32, if (ty.tag == .cursor) 2 else @intFromBool(ty.tag == .list)) };
         const projection = m.projection(n.b);
         result.target = for (m.associated) |method| {
             if (method.member == projection.field and std.meta.eql(method.identity, identity)) break method.target;

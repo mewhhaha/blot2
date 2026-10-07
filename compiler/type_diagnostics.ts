@@ -14,6 +14,7 @@ export type DiagnosticTypeKind =
   | "nominal"
   | "array"
   | "list"
+  | "cursor"
   | "demand"
   | "type_constructor"
   | "resolver"
@@ -93,6 +94,7 @@ const kinds = new Set<DiagnosticTypeKind>([
   "nominal",
   "array",
   "list",
+  "cursor",
   "demand",
   "type_constructor",
   "resolver",

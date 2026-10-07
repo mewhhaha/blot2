@@ -140,7 +140,7 @@ const Reach = struct {
                     try self.seen_values.put(self.allocator, value, {});
                     switch (self.session.valueInfo(value).kind) {
                         .scalar, .type_constructor, .resolver, .effect_set, .effect_descriptor => {},
-                        .product, .record, .nominal, .array, .list, .provider, .state_provider, .computation, .request_decision => try self.children(value),
+                        .product, .record, .nominal, .array, .list, .cursor, .provider, .state_provider, .computation, .request_decision => try self.children(value),
                         .closure => try self.closure(value),
                         .suspension => if (self.session.suspensionCached(value)) |cached|
                             try self.work.append(self.allocator, .{ .value = cached })

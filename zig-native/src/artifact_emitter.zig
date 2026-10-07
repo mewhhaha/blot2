@@ -28,7 +28,7 @@ pub const Event = union(enum) {
 };
 pub const Record = struct { sequence: u64, owner: u32, event: Event };
 pub const SymbolicInstruction = struct { op: wasm.Op, operand: Operand };
-pub const FunctionRole = enum { job, arena_allocate, arena_reset, arena_mark, arena_collect, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, static_closure };
+pub const FunctionRole = enum { job, arena_allocate, arena_allocate_scalar, arena_recycle, arena_reset, arena_mark, arena_collect, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, list_concat, list_slice, list_join, list_cut, static_closure };
 pub const FunctionArtifact = struct { owner: u32, resource_owner: u32, role: FunctionRole, signature: u32, creation_sequence: u64, locals: Span, instructions: Span };
 const Operation = struct { key: Span, foreign: bool };
 pub const Recorder = struct {
@@ -152,6 +152,8 @@ pub const Recorder = struct {
         for (self.records.items) |record| switch (record.event) {
             .arena => |arena| {
                 functions[arena.allocate].role = .arena_allocate;
+                functions[arena.allocate_scalar].role = .arena_allocate_scalar;
+                functions[arena.recycle].role = .arena_recycle;
                 functions[arena.reset].role = .arena_reset;
                 functions[arena.mark].role = .arena_mark;
                 functions[arena.collect].role = .arena_collect;
@@ -252,7 +254,7 @@ pub const Recorder = struct {
                 if (address > module.data.items.len or 4 > module.data.items.len - address) return error.InvalidArtifact;
                 std.mem.writeInt(u32, module.data.items[address..][0..4], try replay.resolve(item.operand), .little);
             },
-            .arena => |item| module.arena = .{ .allocate = try replay.get(replay.functions.items, item.allocate), .reset = try replay.get(replay.functions.items, item.reset), .mark = try replay.get(replay.functions.items, item.mark), .collect = try replay.get(replay.functions.items, item.collect), .heap = try replay.get(replay.globals.items, item.heap), .base = try replay.get(replay.globals.items, item.base), .static_end = try replay.get(replay.globals.items, item.static_end) },
+            .arena => |item| module.arena = .{ .allocate = try replay.get(replay.functions.items, item.allocate), .allocate_scalar = try replay.get(replay.functions.items, item.allocate_scalar), .recycle = try replay.get(replay.functions.items, item.recycle), .reset = try replay.get(replay.functions.items, item.reset), .mark = try replay.get(replay.functions.items, item.mark), .collect = try replay.get(replay.functions.items, item.collect), .heap = try replay.get(replay.globals.items, item.heap), .base = try replay.get(replay.globals.items, item.base), .static_end = try replay.get(replay.globals.items, item.static_end), .allocated = try replay.get(replay.globals.items, item.allocated) },
             .host_references => |item| module.host_references = .{ .retain = try replay.get(replay.functions.items, item.retain), .release = try replay.get(replay.functions.items, item.release), .cursor = try replay.get(replay.globals.items, item.cursor) },
             .lists => |item| {
                 var runtime: @TypeOf(item) = undefined;

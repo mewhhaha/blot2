@@ -305,6 +305,7 @@ pub const RequestArm = struct { node: ast.Id, loop: ast.Id, operation: T.Effects
 pub const RequestLoop = struct { node: ast.Id, computation: ast.Id, value_type: T.Id, result_type: T.Id, state_type: T.Id, action_type: T.Id, arms: T.List, completion: ast.Id, complete_pattern: ast.Id, complete_suite: ast.Id, complete_state_bindings: T.List, carried: T.List, return_scope: ast.Id };
 pub const RequestControl = struct { node: ast.Id, loop: ast.Id, kind: enum { reply, cancel, break_ }, value_type: T.Id, bindings: T.List = .{}, target_scope: ast.Id };
 pub const Checked = struct {
+    iterator_bodies: []ast.Id = &.{},
     initializer_rejected: bool = false,
     computations: []Computation = &.{},
     request_loops: []RequestLoop = &.{},
@@ -378,6 +379,7 @@ pub const Checked = struct {
         return if (origin == 0) span else tree.span(origin);
     }
     pub fn deinit(self: *Checked, allocator: Allocator) void {
+        allocator.free(self.iterator_bodies);
         allocator.free(self.computations);
         allocator.free(self.request_loops);
         allocator.free(self.request_arms);
@@ -570,6 +572,7 @@ const Engine = struct {
     resolver_join_ids: []u32 = &.{},
     resolver_loop_ids: []u32 = &.{},
     loop_carries: std.ArrayList(LoopCarry) = .empty,
+    iterator_bodies: []ast.Id = &.{},
     loop_ranges: []T.List = &.{},
     demand_calls: []bool = &.{},
     demand_types: []T.Id = &.{},
@@ -1023,6 +1026,7 @@ const Engine = struct {
             .unit => .{ .unit = 0, .decl = T.unit },
             .array => .{ .unit = 0, .decl = std.math.maxInt(u32) },
             .list => .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 },
+            .cursor => .{ .unit = 0, .decl = std.math.maxInt(u32) - 2 },
             else => null,
         };
     }
@@ -1040,7 +1044,7 @@ const Engine = struct {
                 if (self.nominals.items[index].alias == 0) identity = self.nominals.items[index].identity;
             };
             if (identity == null and self.builtin_catalog) {
-                if (std.mem.eql(u8, head, "U32")) identity = .{ .unit = 0, .decl = T.u32_type } else if (std.mem.eql(u8, head, "F32")) identity = .{ .unit = 0, .decl = T.f32_type } else if (std.mem.eql(u8, head, "Bool")) identity = .{ .unit = 0, .decl = T.boolean } else if (std.mem.eql(u8, head, "Unit")) identity = .{ .unit = 0, .decl = T.unit } else if (std.mem.eql(u8, head, "Array")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) } else if (std.mem.eql(u8, head, "List")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 };
+                if (std.mem.eql(u8, head, "U32")) identity = .{ .unit = 0, .decl = T.u32_type } else if (std.mem.eql(u8, head, "F32")) identity = .{ .unit = 0, .decl = T.f32_type } else if (std.mem.eql(u8, head, "Bool")) identity = .{ .unit = 0, .decl = T.boolean } else if (std.mem.eql(u8, head, "Unit")) identity = .{ .unit = 0, .decl = T.unit } else if (std.mem.eql(u8, head, "Array")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) } else if (std.mem.eql(u8, head, "List")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 } else if (std.mem.eql(u8, head, "Cursor")) identity = .{ .unit = 0, .decl = std.math.maxInt(u32) - 2 };
             }
             if (identity) |owner| {
                 if (owner.unit != 0 and owner.unit != self.unit) continue;
@@ -1236,7 +1240,7 @@ const Engine = struct {
                 try self.collectAnnotationNames(node.b, depth + 1);
                 try self.collectAnnotationNames(node.c, depth + 1);
             },
-            .use_stmt => {
+            .use_stmt, .iterator_bind => {
                 try self.collectAnnotationNames(node.c, depth + 1);
                 try self.collectAnnotationNames(node.b, depth + 1);
             },
@@ -2186,7 +2190,7 @@ const Engine = struct {
             .name => {
                 if (self.lookup(n.a) != null or try self.globalBinding(n.a) != null) return false;
                 const text = self.pool.get(n.a);
-                if (std.mem.eql(u8, text, "Unit") or std.mem.eql(u8, text, "Bool") or std.mem.eql(u8, text, "U32") or std.mem.eql(u8, text, "F32") or std.mem.eql(u8, text, "Array") or std.mem.eql(u8, text, "List")) return true;
+                if (std.mem.eql(u8, text, "Unit") or std.mem.eql(u8, text, "Bool") or std.mem.eql(u8, text, "U32") or std.mem.eql(u8, text, "F32") or std.mem.eql(u8, text, "Array") or std.mem.eql(u8, text, "List") or std.mem.eql(u8, text, "Cursor")) return true;
                 for (self.type_env.items) |entry| if (entry.name == n.a) return true;
                 return self.nominal_names.contains(self.catalogKey(n.a));
             },
@@ -2250,7 +2254,7 @@ const Engine = struct {
                 std.mem.reverse(ast.Id, reverse.items);
                 if (self.tree.node(head).tag != .name) return error.TypeLimit;
                 const symbol = self.tree.node(head).a;
-                if ((std.mem.eql(u8, self.pool.get(symbol), "Array") or std.mem.eql(u8, self.pool.get(symbol), "List")) and reverse.items.len == 1) return self.types.sequence(if (std.mem.eql(u8, self.pool.get(symbol), "List")) .list else .array, try self.operationTypeArgument(reverse.items[0], depth + 1));
+                if ((std.mem.eql(u8, self.pool.get(symbol), "Array") or std.mem.eql(u8, self.pool.get(symbol), "List") or std.mem.eql(u8, self.pool.get(symbol), "Cursor")) and reverse.items.len == 1) return self.types.sequence(if (std.mem.eql(u8, self.pool.get(symbol), "Cursor")) .cursor else if (std.mem.eql(u8, self.pool.get(symbol), "List")) .list else .array, try self.operationTypeArgument(reverse.items[0], depth + 1));
                 const index = self.nominal_names.get(self.catalogKey(symbol)) orelse return error.TypeLimit;
                 const nominal_ = self.nominals.items[index];
                 const shapes = try self.allocator.dupe(T.Id, self.types.list(nominal_.parameters));
@@ -2640,7 +2644,7 @@ const Engine = struct {
             .type_name => {
                 const name = self.pool.get(node.a);
                 if (name.len != 0 and (std.ascii.isLower(name[0]) or name[0] == '_') and std.mem.indexOfScalar(u8, name, '.') == null) return;
-                for ([_][]const u8{ "Unit", "Bool", "U32", "F32", "Array", "List", "EffectSet", "EffectDescriptor" }) |builtin| if (std.mem.eql(u8, name, builtin)) return;
+                for ([_][]const u8{ "Unit", "Bool", "U32", "F32", "Array", "List", "Cursor", "EffectSet", "EffectDescriptor" }) |builtin| if (std.mem.eql(u8, name, builtin)) return;
                 if (!self.nominal_names.contains(self.catalogKey(node.a))) {
                     try self.diagnostic(.unsupported_type, source);
                     self.diagnostics.items[self.diagnostics.items.len - 1].span.end = self.tree.span(source).start;
@@ -2669,7 +2673,7 @@ const Engine = struct {
     }
     fn nominalAnnotation(self: *Engine, head: ast.Id, arguments: []const ast.Id, source: ast.Id) T.Error!T.Id {
         const name = self.tree.node(head).a;
-        if (std.mem.eql(u8, self.pool.get(name), "Array") or std.mem.eql(u8, self.pool.get(name), "List")) {
+        if (std.mem.eql(u8, self.pool.get(name), "Array") or std.mem.eql(u8, self.pool.get(name), "List") or std.mem.eql(u8, self.pool.get(name), "Cursor")) {
             if (arguments.len == 0) {
                 try self.typeArity(source, .missing_array);
                 return self.types.fresh();
@@ -2684,7 +2688,7 @@ const Engine = struct {
                 try self.typeArity(source, .extra);
                 return self.types.fresh();
             }
-            return self.types.sequence(if (std.mem.eql(u8, self.pool.get(name), "List")) .list else .array, element);
+            return self.types.sequence(if (std.mem.eql(u8, self.pool.get(name), "Cursor")) .cursor else if (std.mem.eql(u8, self.pool.get(name), "List")) .list else .array, element);
         }
         for ([_][]const u8{ "Unit", "Bool", "U32", "F32", "EffectSet", "EffectDescriptor" }) |builtin| if (std.mem.eql(u8, self.pool.get(name), builtin)) {
             const before = self.diagnostics.items.len;
@@ -4445,6 +4449,7 @@ const Engine = struct {
         return self.instantiate(binding, id);
     }
     fn intrinsicArity(name: []const u8) ?usize {
+        if (@import("simd_intrinsics.zig").lookup(name)) |op| return op.arity;
         if (std.mem.eql(u8, name, "@hole")) return 0;
         if (std.mem.eql(u8, name, "@record.merge")) return 2;
         if (@import("collection_ops.zig").lookup(name)) |op| return op.arity;
@@ -4472,6 +4477,15 @@ const Engine = struct {
     }
     fn intrinsic(self: *Engine, id: ast.Id, name: symbols.Symbol) T.Error!T.Id {
         const text = self.pool.get(name);
+        if (@import("simd_intrinsics.zig").lookup(text)) |op| {
+            const element = if (op.floating) T.f32_type else T.u32_type;
+            const input = try self.types.product(&.{ element, element, element, element });
+            const output = if (op.conversion) blk: {
+                const result = if (op.floating) T.u32_type else T.f32_type;
+                break :blk try self.types.product(&.{ result, result, result, result });
+            } else input;
+            return self.types.function(input, if (op.arity == 1) output else try self.types.function(input, output));
+        }
         if (std.mem.eql(u8, text, "@hole")) {
             // Nearest visible bindings first; the 33rd entry only signals
             // truncation. Avoid copying or repeatedly searching a large scope.
@@ -4530,6 +4544,16 @@ const Engine = struct {
         }
         if (@import("collection_ops.zig").lookup(text)) |primitive| {
             const element = try self.types.fresh();
+            if (primitive.op == .cursor_has or primitive.op == .cursor_value or primitive.op == .cursor_advance) {
+                const collection = try self.types.fresh();
+                try self.constrainCollection(collection, element, id);
+                const cursor = try self.types.sequence(.cursor, collection);
+                return self.types.function(cursor, switch (primitive.op) {
+                    .cursor_has => T.boolean,
+                    .cursor_value => element,
+                    else => cursor,
+                });
+            }
             const sequence = try self.types.sequence(if (primitive.is_list) .list else .array, element);
             return switch (primitive.op) {
                 .length => self.types.function(sequence, T.u32_type),
@@ -4540,6 +4564,10 @@ const Engine = struct {
                 .append, .prepend => self.types.function(sequence, try self.types.function(element, sequence)),
                 .identity => self.types.function(sequence, sequence),
                 .convert => self.types.function(try self.types.sequence(if (primitive.is_list) .array else .list, element), sequence),
+                .cursor => self.types.function(sequence, try self.types.sequence(.cursor, sequence)),
+                .concat => self.types.function(sequence, try self.types.function(sequence, sequence)),
+                .slice => self.types.function(sequence, try self.types.function(T.u32_type, try self.types.function(T.u32_type, sequence))),
+                .cursor_has, .cursor_value, .cursor_advance => unreachable,
             };
         }
         try self.diagnostic(.unsupported, id);
@@ -5257,9 +5285,9 @@ const Engine = struct {
                 self.expr_types[id] = T.never;
                 return .{ .ty = T.never, .exits = true, .returns = true };
             },
-            .use_stmt => {
+            .use_stmt, .iterator_bind => {
                 const value = try self.expression(node.b);
-                if (self.resolver_scope.block != 0) {
+                if (node.tag == .use_stmt and self.resolver_scope.block != 0) {
                     const payload = try self.types.fresh();
                     if (node.c != 0) try self.constrain(payload, try self.annotation(node.c), id);
                     const binding = try self.addBinding(.{ .name = node.a, .declaration = id, .owner = self.owner, .kind = .local, .ty = payload, .scheme = .{ .root = payload } });
@@ -5607,6 +5635,20 @@ const Engine = struct {
         self.expr_types[id] = T.unit;
         return .{ .exits = breaks == 0, .returns = returns };
     }
+    fn iteratorStatement(self: *Engine, id: ast.Id) T.Error!Flow {
+        const expansion = self.tree.extra.items[self.tree.node(id).c + 3];
+        const base = try self.allocator.dupe(Entry, self.env.items);
+        defer self.allocator.free(base);
+        self.iterator_bodies[id] = expansion;
+        const flow = try self.suite(expansion);
+        // Publish outer rebindings, but keep generated cursor locals scoped to
+        // this one for statement. The nested loop already owns its carries.
+        for (base) |*entry| entry.binding = self.latestSuccessor(entry.binding);
+        self.env.clearRetainingCapacity();
+        try self.env.appendSlice(self.allocator, base);
+        self.expr_types[id] = if (flow.exits) T.never else T.unit;
+        return flow;
+    }
     fn loopStatement(self: *Engine, id: ast.Id) T.Error!Flow {
         if (self.depth >= 1024) return error.TypeLimit;
         self.depth += 1;
@@ -5631,6 +5673,9 @@ const Engine = struct {
                 try self.constrain(value, T.u32_type, node.b);
                 try self.constrain(try self.expression(parts[0]), T.u32_type, parts[0]);
             } else {
+                const source_tag = self.types.node(try self.types.resolve(value, 0)).tag;
+                if (source_tag != .array and source_tag != .list)
+                    return self.iteratorStatement(id);
                 element = try self.types.fresh();
                 try self.constrainCollection(value, element, node.b);
             }
@@ -6526,7 +6571,7 @@ const SchemeCopier = struct {
         const node = self.source.node(id);
         const result = switch (node.tag) {
             .absent, .unit, .boolean, .u32, .f32, .never => id,
-            .array, .list => try self.destination.sequence(node.tag, try self.copy(node.a, depth + 1)),
+            .array, .list, .cursor => try self.destination.sequence(node.tag, try self.copy(node.a, depth + 1)),
             .demand => try self.destination.demandWithEffects(try self.copy(node.a, depth + 1), try self.copyRow(node.c, depth + 1)),
             .provider => try self.destination.provider(try self.copy(node.a, depth + 1), try self.copyRow(node.c, depth + 1)),
             .state_provider => try self.destination.stateProvider(try self.copy(node.a, depth + 1), try self.copy(node.b, depth + 1), try self.copy(node.c, depth + 1)),
@@ -6841,6 +6886,9 @@ fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *sy
     engine.loop_ranges = try allocator.alloc(T.List, tree.nodes.items.len);
     errdefer allocator.free(engine.loop_ranges);
     @memset(engine.loop_ranges, .{});
+    engine.iterator_bodies = try allocator.alloc(ast.Id, tree.nodes.items.len);
+    errdefer allocator.free(engine.iterator_bodies);
+    @memset(engine.iterator_bodies, 0);
     engine.demand_calls = try allocator.alloc(bool, tree.nodes.items.len);
     errdefer allocator.free(engine.demand_calls);
     @memset(engine.demand_calls, false);
@@ -7114,7 +7162,7 @@ fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *sy
     errdefer allocator.free(body_closed_rows);
     const merges = try engine.merges.toOwnedSlice(allocator);
     errdefer allocator.free(merges);
-    var checked: Checked = .{ .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.external_targets.count() };
+    var checked: Checked = .{ .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.external_targets.count() };
     if (!source_validation and engine.initializer_rejected) {
         var rejected = try rejectedSource(allocator, checked.diagnostics);
         rejected.initializer_rejected = true;

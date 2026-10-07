@@ -48,7 +48,7 @@ pub const PrincipalProvider = struct {
     lookup: *const fn (*anyopaque, core.BindingRef, Options) Allocator.Error!?SolvedEvidence,
     record: *const fn (*anyopaque, core.BindingRef, Options, SolvedEvidence, ?*const principal_inputs.Key) Allocator.Error!void,
 };
-pub const ValueKind = enum(u8) { scalar, product, record, nominal, array, list, closure, suspension, type_constructor, resolver, provider, state_provider, effect_set, effect_descriptor, computation, request_decision };
+pub const ValueKind = enum(u8) { scalar, product, record, nominal, array, list, closure, suspension, type_constructor, resolver, provider, state_provider, effect_set, effect_descriptor, computation, request_decision, cursor };
 pub const DemandState = enum { pending, evaluating, cached };
 pub const Demand = struct { state: DemandState = .pending, value: ValueId = 0 };
 /// A creation identity within one completed source constant evaluation. This
@@ -1770,6 +1770,7 @@ pub const Session = struct {
                     .value => |value_| value_,
                     .returning, .breaking => return second,
                 };
+                if (self.valueInfo(a).kind == .product) return .{ .value = try self.simdValue(owner, id, n.op, a, b) };
                 const result = scalar_ops.evaluate(n.op, try self.requireScalar(owner, id, a), try self.requireScalar(owner, id, b)) catch |err| return self.failNode(owner, id, switch (err) {
                     error.IntegerDivideByZero => .integer_divide_by_zero,
                     error.Unsupported => .unsupported,
@@ -1995,6 +1996,16 @@ pub const Session = struct {
     }
     fn arrayValues(self: *Session, owner: usize, id: core.Id, operation: core.ArrayOp, values: []const ValueId, head: provider_chain.Head) Error!ValueId {
         const kind: ValueKind = if (self.units[owner].types.node(self.units[owner].typeOf(id)).tag == .list) .list else .array;
+        if (operation == .cursor_has or operation == .cursor_value or operation == .cursor_advance) {
+            const cursor = self.valueInfo(values[0]);
+            if (cursor.kind != .cursor or cursor.len != 1) return self.failNode(owner, id, .unsupported);
+            const source = self.valueChildren(values[0])[0];
+            const count = self.valueInfo(source).len;
+            if (operation == .cursor_has) return self.makeScalar(owner, id, .{ .scalar = .bool, .bits = @intFromBool(cursor.bits < count) });
+            if (cursor.bits >= count) return self.failNode(owner, id, .array_bounds);
+            if (operation == .cursor_value) return self.valueChildren(source)[cursor.bits];
+            return self.makeAggregate(owner, id, .cursor, 0, cursor.bits + 1, &.{source});
+        }
         if (operation == .generate) {
             const count = try self.requireScalar(owner, id, values[0]);
             if (count.scalar != .u32 or self.valueInfo(values[1]).kind != .closure) return self.failNode(owner, id, .unsupported);
@@ -2018,6 +2029,28 @@ pub const Session = struct {
         }
         const array = self.valueInfo(values[0]);
         if (array.kind != .array and array.kind != .list) return self.failNode(owner, id, .unsupported);
+        if (operation == .cursor) return self.makeAggregate(owner, id, .cursor, 0, 0, &.{values[0]});
+        if (operation == .slice) {
+            const start = try self.requireScalar(owner, id, values[1]);
+            const count = try self.requireScalar(owner, id, values[2]);
+            if (start.scalar != .u32 or count.scalar != .u32) return self.failNode(owner, id, .unsupported);
+            if (start.bits > array.len or count.bits > array.len - start.bits) return self.failNode(owner, id, .array_bounds);
+            const copied = try self.allocator.dupe(ValueId, self.valueChildren(values[0])[start.bits..][0..count.bits]);
+            defer self.allocator.free(copied);
+            return self.makeAggregate(owner, id, array.kind, 0, 0, copied);
+        }
+        if (operation == .concat) {
+            const other = self.valueInfo(values[1]);
+            if (other.kind != array.kind) return self.failNode(owner, id, .unsupported);
+            if (other.len >= 4_194_304 -| array.len) return self.arrayLengthFailure(owner);
+            const length = std.math.add(u32, array.len, other.len) catch return self.arrayLengthFailure(owner);
+            try self.chargeCells(owner, id, length);
+            const copied = try self.allocator.alloc(ValueId, length);
+            defer self.allocator.free(copied);
+            @memcpy(copied[0..array.len], self.valueChildren(values[0]));
+            @memcpy(copied[array.len..], self.valueChildren(values[1]));
+            return self.makeAggregate(owner, id, array.kind, 0, 0, copied);
+        }
         if (operation == .length) return self.makeScalar(owner, id, .{ .scalar = .u32, .bits = array.len });
         if (operation == .identity) return values[0];
         if (operation == .convert) {
@@ -2034,6 +2067,17 @@ pub const Session = struct {
         if (operation == .get) return self.valueChildren(values[0])[index.bits];
         try self.chargeCells(owner, id, array.len);
         return self.copyAggregate(owner, id, values[0], index.bits, values[2]);
+    }
+    fn simdValue(self: *Session, owner: usize, id: core.Id, op: core.Op, left: ValueId, right: ValueId) Error!ValueId {
+        if (self.valueInfo(left).len != 4 or (right != 0 and (self.valueInfo(right).kind != .product or self.valueInfo(right).len != 4))) return self.failNode(owner, id, .unsupported);
+        const a: [4]ValueId = self.valueChildren(left)[0..4].*;
+        const b: [4]ValueId = if (right == 0) @splat(0) else self.valueChildren(right)[0..4].*;
+        var values: [4]ValueId = undefined;
+        for (&values, a, b) |*result, first, second| {
+            const lane = scalar_ops.evaluate(op, try self.requireScalar(owner, id, first), try self.requireScalar(owner, id, second)) catch return self.failNode(owner, id, .unsupported);
+            result.* = try self.makeScalar(owner, id, lane);
+        }
+        return self.makeAggregate(owner, id, .product, 0, 0, &values);
     }
     fn arrayLengthFailure(self: *Session, owner: usize) Error {
         if (self.diagnostic == null) self.diagnostic = .{ .unit = self.unitId(owner), .span = .{ .start = 0, .end = 0 }, .code = .backend_limit, .detail = "array length exceeds the 16 MiB bootstrap arena" };
@@ -2100,13 +2144,17 @@ pub const Session = struct {
         };
         const selected_field: ?ValueId = if (field) |location| self.valueChildren(location.container)[location.field] else null;
         const actual = self.valueEvidence(receiver);
-        // An empty generic array has no complete element evidence, but its
-        // aggregate shape still determines the Array method family. Keep the
-        // element unresolved and solve this use in an owned private region.
-        const identity = self.evidenceIdentity(actual) orelse if (actual == 0 and (self.valueInfo(receiver).kind == .array or self.valueInfo(receiver).kind == .list))
-            types.NominalIdentity{ .unit = 0, .decl = std.math.maxInt(u32) - @as(u32, @intFromBool(self.valueInfo(receiver).kind == .list)) }
-        else
-            null;
+        // Empty collections can leave element evidence open inside a cursor
+        // or a user-defined wrapper too. Their outer identity is still known;
+        // solve only this use without completing the shared generic element.
+        const info = self.valueInfo(receiver);
+        const identity = self.evidenceIdentity(actual) orelse if (actual == 0) switch (info.kind) {
+            .array => types.NominalIdentity{ .unit = 0, .decl = std.math.maxInt(u32) },
+            .list => types.NominalIdentity{ .unit = 0, .decl = std.math.maxInt(u32) - 1 },
+            .cursor => types.NominalIdentity{ .unit = 0, .decl = std.math.maxInt(u32) - 2 },
+            .nominal => types.NominalIdentity{ .unit = @intCast(info.nominal >> 32), .decl = @truncate(info.nominal) },
+            else => null,
+        } else null;
         var method_target: ?Target = null;
         if (identity) |receiver_identity| if (try self.associatedTarget(self.unitId(owner), receiver_identity, projection.field, .none)) |method| {
             method_target = try self.target(null, method);
@@ -2562,6 +2610,7 @@ pub const Session = struct {
             .f32 => .{ .unit = 0, .decl = types.f32_type },
             .array => .{ .unit = 0, .decl = std.math.maxInt(u32) },
             .list => .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 },
+            .cursor => .{ .unit = 0, .decl = std.math.maxInt(u32) - 2 },
             else => null,
         };
     }
@@ -3155,6 +3204,7 @@ pub const Session = struct {
                     return .{ .value = try self.makeClosure(owner, source, partial, arguments[0..count]) };
                 }
                 if (primitive.kind == .array) return .{ .value = try self.arrayValues(owner, source, primitive.array_op, arguments[0..count], head) };
+                if (self.valueInfo(arguments[0]).kind == .product) return .{ .value = try self.simdValue(owner, source, primitive.op, arguments[0], if (count == 1) 0 else arguments[1]) };
                 const a = try self.requireScalar(owner, source, arguments[0]);
                 const b = if (count == 1) unit_value else try self.requireScalar(owner, source, arguments[1]);
                 const value_ = scalar_ops.evaluate(primitive.op, a, b) catch |err| return self.failNode(owner, source, switch (err) {
@@ -3761,7 +3811,7 @@ const ClosureRegion = struct {
         const value = self.session.evidence.node(evidence);
         switch (value.tag) {
             .unit, .boolean, .u32, .f32, .never => return true,
-            .array, .list => return self.firstOrderData(value.a, depth + 1),
+            .array, .list, .cursor => return self.firstOrderData(value.a, depth + 1),
             .nominal => {
                 for (self.session.evidence.children(evidence)) |argument| if (!try self.firstOrderData(argument, depth + 1)) return false;
                 return self.plainNominal(value.a, value.b, depth + 1);
@@ -3786,7 +3836,7 @@ const ClosureRegion = struct {
         switch (value.tag) {
             .unit, .boolean, .u32, .f32, .never => return true,
             .variable => return std.mem.findScalar(types.Id, module.types.list(variables), ty) != null,
-            .array, .list => return self.sourceData(owner, value.a, variables, depth + 1),
+            .array, .list, .cursor => return self.sourceData(owner, value.a, variables, depth + 1),
             .product => for (module.types.list(.{ .start = value.a, .len = value.b })) |child| {
                 if (!try self.sourceData(owner, child, variables, depth + 1)) return false;
             },
@@ -3848,7 +3898,7 @@ const ClosureRegion = struct {
         const value = module.types.node(ty);
         switch (value.tag) {
             .unit, .boolean, .u32, .f32, .never, .variable => return true,
-            .array, .list => return self.potentialData(owner, value.a, depth + 1),
+            .array, .list, .cursor => return self.potentialData(owner, value.a, depth + 1),
             .product => for (module.types.list(.{ .start = value.a, .len = value.b })) |child| {
                 if (!try self.potentialData(owner, child, depth + 1)) return false;
             },
@@ -3917,7 +3967,11 @@ const ClosureRegion = struct {
             .f32 => types.f32_type,
             .never => types.never,
             .function => self.solver.functionWithEffects(try self.importCodeExpectation(view, node.a, depth + 1), try self.importCodeExpectation(view, node.b, depth + 1), try self.solver.freshEffects()),
-            .array, .list => self.solver.sequence(if (node.tag == .list) .list else .array, try self.importCodeExpectation(view, node.a, depth + 1)),
+            .array, .list, .cursor => self.solver.sequence(switch (node.tag) {
+                .list => .list,
+                .cursor => .cursor,
+                else => .array,
+            }, try self.importCodeExpectation(view, node.a, depth + 1)),
             .demand => self.solver.demandWithEffects(try self.importCodeExpectation(view, node.a, depth + 1), try self.solver.freshEffects()),
             .provider => self.solver.provider(try self.importCodeExpectation(view, node.a, depth + 1), try self.solver.freshEffects()),
             .state_provider => self.solver.stateProvider(try self.importCodeExpectation(view, node.a, depth + 1), try self.importCodeExpectation(view, node.b, depth + 1), try self.importCodeExpectation(view, node.c, depth + 1)),
@@ -3956,7 +4010,7 @@ const ClosureRegion = struct {
             .unit, .boolean, .u32, .f32, .never => ty,
             .variable => try self.solver.fresh(),
             .function => try self.solver.functionWithEffects(try self.importType(scope, node.a, depth + 1), try self.importType(scope, node.b, depth + 1), try self.importRow(scope, node.c, depth + 1)),
-            .array, .list => try self.solver.sequence(node.tag, try self.importType(scope, node.a, depth + 1)),
+            .array, .list, .cursor => try self.solver.sequence(node.tag, try self.importType(scope, node.a, depth + 1)),
             .demand => try self.solver.demandWithEffects(try self.importType(scope, node.a, depth + 1), try self.importRow(scope, node.c, depth + 1)),
             .provider => try self.solver.provider(try self.importType(scope, node.a, depth + 1), try self.importRow(scope, node.c, depth + 1)),
             .state_provider => try self.solver.stateProvider(try self.importType(scope, node.a, depth + 1), try self.importType(scope, node.b, depth + 1), try self.importType(scope, node.c, depth + 1)),
@@ -4058,7 +4112,11 @@ const ClosureRegion = struct {
             .absent => error.UnresolvedType,
             .unit, .boolean, .u32, .f32, .never => actual,
             .function => self.solver.functionWithEffects(try self.importEvidence(node.a, depth + 1), try self.importEvidence(node.b, depth + 1), try self.importEvidenceRow(node.c, depth + 1)),
-            .array, .list => self.solver.sequence(if (node.tag == .list) .list else .array, try self.importEvidence(node.a, depth + 1)),
+            .array, .list, .cursor => self.solver.sequence(switch (node.tag) {
+                .list => .list,
+                .cursor => .cursor,
+                else => .array,
+            }, try self.importEvidence(node.a, depth + 1)),
             .demand => self.solver.demandWithEffects(try self.importEvidence(node.a, depth + 1), try self.importEvidenceRow(node.c, depth + 1)),
             .provider => self.solver.provider(try self.importEvidence(node.a, depth + 1), try self.importEvidenceRow(node.c, depth + 1)),
             .state_provider => self.solver.stateProvider(try self.importEvidence(node.a, depth + 1), try self.importEvidence(node.b, depth + 1), try self.importEvidence(node.c, depth + 1)),
@@ -4254,6 +4312,7 @@ const ClosureRegion = struct {
         const root = switch (info.kind) {
             .scalar, .type_constructor, .resolver, .provider, .state_provider => try self.importEvidence(self.session.valueEvidence(value_), 0),
             .product => try self.solver.product(children.items),
+            .cursor => if (children.items.len == 1) try self.solver.sequence(.cursor, children.items[0]) else return error.TypeMismatch,
             .record => blk: {
                 const names = self.session.recordFieldNames(value_);
                 if (names.len != children.items.len) return error.UnresolvedType;
@@ -4605,6 +4664,21 @@ const ClosureRegion = struct {
                 .if_value, .if_stmt, .state_provider => try work.appendSlice(self.session.allocator, &.{ n.a, n.b, n.c }),
                 .array_op => {
                     const args = module.children(id);
+                    const operation = module.arrayOperation(id);
+                    if (operation == .cursor_has or operation == .cursor_value or operation == .cursor_advance) {
+                        // A generic cursor retains its collection kind as well
+                        // as its element. Replay that relationship when a body
+                        // is specialized, just as the source checker does.
+                        const collection = try self.solver.fresh();
+                        try self.solver.unify(try self.importType(scope, module.typeOf(args[0]), 0), try self.solver.sequence(.cursor, collection));
+                        try self.constraints.append(self.session.allocator, .{
+                            .kind = .collection,
+                            .scope = scope,
+                            .node = id,
+                            .left = collection,
+                            .result = if (operation == .cursor_value) try self.importType(scope, n.ty, 0) else try self.solver.fresh(),
+                        });
+                    }
                     if (module.arrayOperation(id) == .get and module.types.node(module.typeOf(args[0])).tag == .variable) try self.constraints.append(self.session.allocator, .{
                         .kind = .collection,
                         .scope = scope,
@@ -4805,7 +4879,7 @@ const ClosureRegion = struct {
         if (use.tag == .variable) return false;
         if (source.tag != use.tag) return error.TypeMismatch;
         switch (source.tag) {
-            .array, .list => return self.transferDataFacts(source.a, use.a, depth + 1),
+            .array, .list, .cursor => return self.transferDataFacts(source.a, use.a, depth + 1),
             .product => {
                 if (source.b != use.b) return error.TypeMismatch;
                 var complete = true;
@@ -4847,7 +4921,7 @@ const ClosureRegion = struct {
         const node = self.solver.node(try self.solver.resolve(root, 0));
         return switch (node.tag) {
             .unit, .boolean, .u32, .f32, .never => true,
-            .array, .list => self.closedDataShape(node.a, depth + 1),
+            .array, .list, .cursor => self.closedDataShape(node.a, depth + 1),
             .product => blk: {
                 for (self.solver.list(.{ .start = node.a, .len = node.b })) |child| if (!try self.closedDataShape(child, depth + 1)) break :blk false;
                 break :blk true;
@@ -5091,6 +5165,7 @@ const ClosureRegion = struct {
             .f32 => .{ .unit = 0, .decl = types.f32_type },
             .array => .{ .unit = 0, .decl = std.math.maxInt(u32) },
             .list => .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 },
+            .cursor => .{ .unit = 0, .decl = std.math.maxInt(u32) - 2 },
             else => null,
         };
     }
@@ -5297,16 +5372,29 @@ const ClosureRegion = struct {
                 }
             }
         } else if (owner.tag == .nominal) {
+            // Keep facts in the body's imported catalog. A caller can also
+            // provide a nominal absent from that catalog; only then consult
+            // its defining unit for fields and associated-member ambiguity.
+            const family = (@as(u64, owner.a) << 32) | owner.b;
+            const nominal_owner = visible: {
+                for (module.constructors) |constructor| {
+                    const nominal = module.nominal(constructor.nominal);
+                    if (self.session.nominalIdentity(source.owner, nominal.identity.unit, nominal.identity.decl) == family)
+                        break :visible source.owner;
+                }
+                break :visible self.session.findUnit(owner.a, null) orelse return error.UnresolvedType;
+            };
+            const nominal_module = &self.session.units[nominal_owner];
             var constructors: usize = 0;
-            for (module.constructors) |constructor| {
-                const nominal = module.nominal(constructor.nominal);
-                if (self.session.nominalIdentity(source.owner, nominal.identity.unit, nominal.identity.decl) != (@as(u64, owner.a) << 32) | owner.b) continue;
+            for (nominal_module.constructors) |constructor| {
+                const nominal = nominal_module.nominal(constructor.nominal);
+                if (self.session.nominalIdentity(nominal_owner, nominal.identity.unit, nominal.identity.decl) != (@as(u64, owner.a) << 32) | owner.b) continue;
                 constructors += 1;
                 if (constructor.payload == 0) {
                     field = null;
                     break;
                 }
-                const scope = try self.typeScope(source.owner);
+                const scope = try self.typeScope(nominal_owner);
                 const arrow = self.solver.node(try self.importType(scope, constructor.scheme.root, 0));
                 if (arrow.tag != .function) return error.TypeMismatch;
                 try self.solver.unify(arrow.b, receiver);
@@ -5339,6 +5427,7 @@ const ClosureRegion = struct {
             .f32 => .{ .unit = 0, .decl = types.f32_type },
             .array => .{ .unit = 0, .decl = std.math.maxInt(u32) },
             .list => .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 },
+            .cursor => .{ .unit = 0, .decl = std.math.maxInt(u32) - 2 },
             else => null,
         };
         var method_target: ?Target = null;

@@ -1,5 +1,307 @@
 # Standard library API and performance audit
 
+## Closed shared and cyclic allocation groups
+
+Ownership now follows known pointer fields between private allocations. Shared
+children and cycles form one group whose lifetime includes every member's uses;
+each exit releases every member exactly once. The generated code needs no
+reference counts or graph walk for these groups. The proof uses allocation IDs,
+flat arrays and field-offset lookup, with no recognition of source declarations.
+
+Members must be constructed in one straight-line segment. Field loads must have
+known dominating stores; escaped parents also escape their reachable children.
+Unknown reads/copies, overlapping writes, unproved calls and cross-segment
+construction retain the existing reclamation policy. Overlap checking stops
+after 262,144 comparisons per analysis and conservatively declines remaining
+proofs, bounding compiler work for very wide records. A fresh-result summary
+cannot hide an embedded alias to its returned allocation: later shallow copies
+must not outlive the object that alias reaches.
+
+The new raw Wasm fixture repeatedly constructs two parents sharing a child,
+with a child-to-parent back edge. **No collector runs on this path.** A pressure
+allocation between reads catches premature child release. After 100,000 rounds,
+the heap ends at 66,560 bytes: the 65,536-byte arena origin plus four reused
+256-byte blocks. Additional rounds, a separate sweep and escaped graphs check
+free-list integrity and surviving aliases. A source-level law uses three large
+records above the scalar-replacement limit and stays within 192 KiB without a
+large startup value. Native laws also cover hidden aliases, transitive escapes,
+invalid field accesses, exhausted proof budgets and allocation-failure cleanup.
+
+The full compiler gate passes, including **526 guest/client tests** and the
+existing State/demand cycle, async and retained/fresh parity laws. Zig-analyzer
+reports the same 122 existing warnings, no errors, across 246 files.
+
+Baseline compiler:
+`e2a8abda6794a9fd07d692045c09c634d7a57531fccc44297244608d265ef137`.
+Qualified compiler:
+`67ed843a7e9b2ff4c39de32ae05d25f119172c82b7c0c4c3ad68be275a913e78`.
+Both use identical source and retain a million-element startup List. Ten
+warmups precede 25 alternating pairs, timing the public guest call and reset.
+
+| Runtime, 100,000 iterations | Before ms | After ms | Before guest bytes | After guest bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Cursor / take / fold | 6.772 | 6.717 | 5,898,240 | 5,898,240 |
+| Source range / fold | 4.240 | 4.228 | 5,767,168 | 5,767,168 |
+| Straight-line 18-field records | 0.470 | 0.471 | 4,456,448 | 4,456,448 |
+| Records crossing calls and branches | 0.996 | 0.974 | 4,456,448 | 4,456,448 |
+| Two large records sharing a child | 1.494 | 1.378 | 17,301,504 | 4,456,448 |
+
+The shared-record case uses about 74% less guest memory, including the unchanged
+startup List. This does **not** implement general shared RC or remove tracing
+from dynamic State/demand cycles and escaping graphs. Full effect cleanup and
+dynamic cyclic ownership remain open.
+
+On the frozen 394 KB gdev snapshot, five alternating fresh-process pairs give
+804.6 → 803.4 ms median wall time, 782.5 → 781.8 ms process CPU, and
+75,700 → 76,368 KiB median peak RSS. Wasm shrinks 621,971 → 619,633 bytes.
+Three retained sessions per variant give first edits 505.5 → 500.5 ms,
+subsequent edits 492.0 → 497.7 ms, and no-ops 2.71 → 2.71 ms. These small
+differences do not establish a compiler speedup; the 500 ms cold / 100 ms edit
+targets remain unmet. Timings from different historical runs are not paired
+comparisons. Raw samples, source manifests, compiler identities and output
+hashes are in `build/graph-ownership-review/final/{lifetimes,compiler}/report.json`;
+the drivers are `scripts/bench_lifetimes.ts` and `scripts/bench_iterators.ts`.
+
+## Control-flow ownership and list editing follow-up
+
+The next ownership stage uses a flat control-flow graph and per-assembly call
+summaries. Fixed-offset borrows can cross direct calls; a function returning a
+fresh allocation with no other escaping alias transfers that storage to its
+caller. Backward liveness inserts releases on branch/loop exits and early-return
+paths. It preserves branch-result operands and label depths. Unknown addresses,
+multiple assignments, recursive/opaque calls, shared results and arena-reset or
+collection barriers remain conservative. Analysis does not mutate retained
+instructions or cache source-specific assumptions.
+
+Executed Wasm fixtures contain **no collector calls** on their measured paths.
+Ten thousand rounds of both arms, early returns, result-carrying branches and
+loop borrows use one 256-byte allocation block. Factories and readers each
+forward ownership/borrows through two calls. Negative laws cover global escapes,
+returned aliases, oversized accesses, conditional definitions, recursive calls
+and invalidating callees; allocation-failure tests cover scratch/output cleanup.
+The full compiler gate passes with 524 guest/client tests, including real
+State/demand cycles, async host exchange and retained/fresh byte parity. The
+analyzer reports the same 122 existing warnings and no errors across 246 files.
+
+Compared with the preceding compiler
+`1d4b45a32af29a836f2355d806a52b8bdf6e345aa7eb9daf684ee188398ba783`,
+the qualified compiler is
+`e2a8abda6794a9fd07d692045c09c634d7a57531fccc44297244608d265ef137`.
+Both run identical source and retain the same million-element startup List.
+Ten warmups precede 25 alternating pairs; the public guest call/reset is timed.
+
+| Runtime, 100,000 iterations | Before ms | After ms | Before guest bytes | After guest bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Cursor / take / fold | 12.835 | 11.632 | 6,160,384 | 5,898,240 |
+| Source range / fold | 7.731 | 7.204 | 6,160,384 | 5,767,168 |
+| Straight-line 18-field records | 1.106 | 1.104 | 4,456,448 | 4,456,448 |
+| Records crossing calls and branches | 1.831 | 1.907 | 17,301,504 | 4,456,448 |
+
+The last case trades about 4% runtime for bounded storage. Without the large
+startup List, the corresponding source law stays within 192 KiB. Tracing is
+**still present** for shared/unproved graphs. This does not implement shared RC,
+general effect-frame cleanup or cycle reclamation without tracing.
+
+On the frozen 394 KB gdev snapshot, fresh-process medians are 934.3 → 939.2 ms;
+process CPU is 909.9 → 914.0 ms and peak RSS 75,552 → 75,704 KiB. Wasm grows
+615,349 → 621,971 bytes. The first retained-session experiment experienced a
+large timing shift in both variants, so its separate medians are not evidence
+of an edit speedup. A confirming run interleaves nine edit/revert pairs between
+two populated sessions: 575.3 → 577.4 ms median, with overlapping 567–590 and
+570–591 ms ranges. The 500 ms cold / 100 ms edit targets remain unmet.
+Raw samples are in `build/cfg-ownership-review/{lifetimes,compiler}/report.json`
+and `build/cfg-ownership-review/paired-edits.json`; the latter has its executable
+measurement driver beside it.
+
+The updated untracked `../list-like/LIST.md` has SHA-256
+`42ea4ca23c7fdd9d7270689cf5003c0c6b64dfc280ed4a4279f12440a391cf78`.
+Its new `bench/ascents.md` distinguishes production packet chains from tiny
+owners, paged spines and generation-cache experiments. Those prototypes are not
+an adopted storage replacement. Its coordinator-owned workers and synchronous
+borrow contracts remain relevant to later host/shared-memory work; they do not
+solve Blot's higher-order reference cycles.
+
+Adopted from that review: `list.splice` and `list.splice_many`, implemented as
+ordinary source over structural slicing/concatenation. Batches validate ordered,
+nonoverlapping original coordinates before construction, preserve same-position
+insertion order and share unchanged subtrees. Tests cover staged and runtime
+execution, snapshots, empty edits and invalid ranges. There is no compiler
+recognition of these names and no new public List indexing API.
+
+## Ownership and latest list-like review
+
+The preceding pass compared the uncommitted `../list-like/LIST.md` and packet runtime on
+2026-10-07. Its HEAD was `cbec09512aad063dd7ca3fbf7cdf2953a142ff98`; the document
+itself was untracked, SHA-256
+`5ceda3ca053c6bdadb0fb0d187cb651917498cdb947dbc9ca5ee709feec2b4ad`.
+It describes reference-counted packet/span chains with dense buffers, not RRB
+trees. Fresh materialization uses up to 4,096 integer values per span, growth up
+to 1,024, and small edit buffers. Those limits concern their integer-only
+representation; Blot lists can contain references and retain distinct Array APIs.
+
+| Technique | Blot decision |
+| --- | --- |
+| Empty values without allocation | Implemented with immutable descriptors in reserved arena metadata. |
+| No work for unchanged values/ranges | Identical-bit internal replacements, whole-list slices and empty concatenations allocate nothing. Shared descriptors freeze before reuse; subsequent consuming writes detach them. |
+| Dense span traversal and bulk copying | Already implemented as whole-leaf traversal/copying. |
+| Larger materialization buffers | Keep as a measured experiment: larger leaves would increase the cost of a shared point edit. Current million-element shared edits copy less than 4 KiB. |
+| Constant-time range views | Keep current structural slicing: partial boundary leaves detach, so a tiny slice does not retain the source backing. |
+| Sparse filter compaction | Current source filtering builds dense output leaves. Evaluate additional compaction only against measured fragmentation, rather than adding another unconditional pass. |
+| Host span borrows / reference-counted backing | Useful follow-up after precise ownership covers borrowed views, shared children and suspension. |
+| Adapter syntax and indexed lists | Keep ordinary source iterator adapters, separate List/Array types and no public list indexing. |
+
+The compiler now owns an explicit temporary-lifetime plan between symbolic Wasm
+optimization and encoding. Single-region, nonescaping allocations release their
+storage after the final borrowed access, including records larger than SROA's
+64-byte limit. Calls/control crossings, unknown addresses and escaping objects
+remain outside that proof. Numeric collection element layouts also identify
+pointer-free array payloads and list leaves, preventing integer bits from being
+mistaken for references and avoiding payload scans. Both are general compiler
+rules; neither recognizes standard-library declaration names.
+
+Paired measurements use the immediately preceding compiler
+`e8ac85b12de7e90fa1359ab489dff857b82535a1dfd75ab538270983d5bf4029`,
+identical source, ten warmups and 25 alternating pairs. Each guest retains a
+million-element startup List outside timing. Timing includes the public guest
+round trip and arena reset. An array export makes memory observable in both
+variants; zero reported memory is rejected by the harness.
+
+| Runtime, 100,000 iterations | Before ms | After ms | Before guest bytes | After guest bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Cursor / take / fold | 30.464 | 11.556 | 6,160,384 | 6,160,384 |
+| Source range / fold | 22.296 | 7.579 | 6,160,384 | 6,160,384 |
+| Temporary 18-field records | 0.941 | 0.882 | 17,301,504 | 4,456,448 |
+
+A separate executed-Wasm loop, with no collection calls, performs 100,000
+allocations using one 256-byte block. The source record regression, without the
+large startup List, remains within 192 KiB across repeated calls. Pointer-valued
+list tests distinguish actual references from identical scalar bits and repeat
+collection after structural edits. Snapshots, early return and escaping storage
+retain their behavior.
+
+The same frozen 394 KB gdev snapshot measures 810.4 → 825.7 ms fresh-process
+compilation, 511.3 → 532.0 ms first retained edit, 495.0 → 510.5 ms subsequent
+edit and 2.70 → 2.83 ms no-op. Peak RSS is 75.1 → 75.6 MiB; output is
+614,815 → 615,349 bytes. These are paired results from this run, separate from
+the earlier table below. The new analysis adds compiler work; the cold/edit
+targets remain unmet. Raw reports and source hashes are under
+`build/ownership-review/{lifetimes,compiler}/report.json`; reproduce with
+`scripts/bench_lifetimes.ts` and `scripts/bench_iterators.ts` respectively.
+
+Tracing has **not** been removed. The cycle audit found a legal heap cycle:
+forcing a demand reads a closure from State, and the memoized result points back
+to that same demand. Clearing State does not clear the demand's cached result.
+The executable law in `arena_gc_execution.test.ts` checks this behavior and
+bounded memory across 20,000 discarded cycles. Plain reference counting cannot
+be substituted for the collector. Full control-flow ownership, shared releases,
+cyclic ownership groups and suspended-effect cleanup remain required gates.
+
+Validation: the complete compiler gate passes (1,044 native tests and 521 guest/
+client tests), followed by the strengthened source-memory check and the new
+cycle-reclamation law. The analyzer reports zero errors and the same 122 existing
+warnings. No language APIs or list-indexing rules changed in this pass.
+
+## Iterator and structural-list follow-up
+
+The following measurements describe the earlier iterator checkpoint, before the
+ownership and list follow-up above.
+
+The 2026-10-07 follow-up starts at checkpoint `5f09303`. It adds ordinary
+`iter`/`next` dispatch, immutable collection cursors, source adapters in
+`std/iter`, structural list concat/slice, whole-leaf traversal and copying, and
+explicit and automatic four-lane SIMD. Optimizations inspect types, control flow
+and ownership; they do not match prelude or adapter declarations by name.
+
+Runtime reclamation already used a nonmoving tracing collector in Wasm linear
+memory. Ownership analysis enables reuse and allocation elimination, but does
+not prove all lifetimes. The loop collection policy now measures allocation
+traffic, including free-list reuse, instead of collecting every four iterations.
+Its budget includes retained startup data because that data is also traced.
+
+The paired runtime probe uses 20 warmups and 21 alternating samples. Results
+include guest ABI copying; List initialization is outside the repeated calls.
+
+| Runtime probe | Checkpoint median ms | Current median ms |
+| --- | ---: | ---: |
+| Fold a million-element List | 1.828 | 0.964 |
+| Generate a million-element numeric Array | 1.266 | 0.979 |
+
+Current-only adapter probes, with eight warmups and 15 samples, take 20.750 ms
+for a 100,000-element cursor/take/fold pipeline and 14.904 ms for a source
+range/fold. Both modules retain a million-element startup List, which increases
+collection work. These pipelines still allocate; the local scalar-replacement
+path does not establish universal allocation-free iteration. A separate
+executed-Wasm regression checks 8,193 advances through an ordinary user wrapper
+and finite loop carry within 192 KiB of committed guest memory.
+
+Structural operations share covered subtrees, rebuild boundary paths, and copy
+partial leaves. Tiny slices retain their own small leaf instead of retaining the
+source tree. Direct runtime allocation measurements exclude arena metadata
+initialization and host conversion:
+
+| Operation | New bytes |
+| --- | ---: |
+| Construct a million-element List | 4,387,392 |
+| Slice 100,000 elements from it | 1,280 |
+| Slice one element from it | 128 |
+| Concatenate that List and a 1,000-element List | 640 |
+
+The current 100,000-element slice plus array conversion/host copy takes 0.151 ms.
+Concatenating 200,000 and 1,000 retained elements plus conversion/copy takes
+0.074 ms. These are distinct from the tree-only allocation measurements above.
+Leaves retain the existing 248-element capacity; adjacent tiny leaves coalesce
+with a bounded copy. This follow-up does not replace the entire tree layout.
+
+The compiler comparison freezes the same 51 game/package sources for both
+variants, loading 53 modules including the standard library, about 394 KB total.
+Five fresh-process builds alternate variants with warm filesystem caches.
+Three retained sessions per variant each measure population, first edit, revert,
+subsequent edit and no-op; the first edited output is checked against an
+independently populated compilation. Timing separates output validation/hashing
+from the public build round trip.
+
+| Compilation boundary | Checkpoint median ms | Current median ms |
+| --- | ---: | ---: |
+| Fresh native process, including output and teardown | 900.7 | 915.7 |
+| Retained session population, including opening | 1,009.5 | 1,026.1 |
+| First retained edit | 564.7 | 576.9 |
+| Subsequent retained edit | 559.0 | 572.3 |
+| Retained no-op | 2.7 | 2.8 |
+
+The fresh-process current samples range from 904.6 to 918.3 ms. Peak process RSS
+is 73.8 MiB versus 72.4 MiB; compiler-requested peak storage is 55.7 MiB versus
+55.5 MiB, and all requested storage is released. Emission dominates the current
+fresh build at about 738 ms in the first sample. Wasm grows from 571,030 to
+614,815 bytes as inlining and runtime helpers expand. **The 500 ms cold and
+under-100 ms edit targets are not met on this larger snapshot.** Earlier tables
+below describe different, smaller frozen game workloads.
+
+Validation passed `deno task test:compiler`: the native suite and 515
+guest/client tests, including effects, early exit, monadic iteration, cursor
+snapshots, structural sharing, scalar/SIMD arithmetic parity, trapping tails,
+bounded loop memory, and retained edits/error recovery. The analyzer reports
+zero errors and 122 existing warnings. The gdev regression found during this
+work is covered by native evidence and executed generic F32 traversal tests.
+
+Reproduce using separate checkpoint/current builds and an immutable gdev source
+snapshot containing `src/` and `packages/`:
+
+```sh
+deno run --allow-read --allow-write --allow-run scripts/bench_iterators.ts \
+  zig-native/zig-out/bin/blotc std build/iterator-review \
+  /path/to/checkpoint/blotc /path/to/checkpoint/std /path/to/gdev-snapshot
+```
+
+The [raw report](../build/iterator-review/report.json) records every sample,
+source manifest, standard-library hashes, native work counters, output hashes,
+CPU/RSS and memory measurements. It is an ignored local build artifact. The
+baseline executable SHA-256 is
+`6773dd73d2930de0edee5cc8555b4706a771a25cb8325a5cee9733c9e2eb33b5`;
+the measured executable is
+`e8ac85b12de7e90fa1359ab489dff857b82535a1dfd75ab538270983d5bf4029`.
+
+## Earlier audits
+
 The October 2026 audit covers `std/prelude`, `std/array`, `std/list`,
 `std/vector`, their compiler lowering, and the Deno compiler/guest boundary.
 The changes remove avoidable demand objects, repeated collection copying and

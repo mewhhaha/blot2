@@ -105,7 +105,7 @@ const Projector = struct {
                 const span = try self.saveTypes(arguments.items);
                 break :blk .{ .tag = .nominal, .a = original.a, .b = original.b, .c = span.start };
             },
-            .array, .list, .resolver => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1) },
+            .array, .list, .cursor, .resolver => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1) },
             .demand, .provider => .{ .tag = original.tag, .a = try self.projectType(original.a, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
             .state_provider => .{ .tag = .state_provider, .a = try self.projectType(original.a, depth + 1), .b = try self.projectType(original.b, depth + 1), .c = try self.projectType(original.c, depth + 1) },
             else => .{ .tag = original.tag, .a = original.a, .b = original.b, .c = original.c },

@@ -1,0 +1,57 @@
+// Explicit four-lane operations. These aliases are ordinary product types, so
+// lanes can be constructed, destructured and passed through normal functions.
+type U32x4 = (U32, U32, U32, U32)
+type F32x4 = (F32, F32, F32, F32)
+const u32_splat = fn (value: U32) -> U32x4 => (value, value, value, value)
+const f32_splat = fn (value: F32) -> F32x4 => (value, value, value, value)
+const u32_add = fn left => fn right => @simd.u32x4.add left right
+const u32_sub = fn left => fn right => @simd.u32x4.sub left right
+const u32_mul = fn left => fn right => @simd.u32x4.mul left right
+const u32_and = fn left => fn right => @simd.u32x4.bit_and left right
+const u32_or = fn left => fn right => @simd.u32x4.bit_or left right
+const u32_xor = fn left => fn right => @simd.u32x4.bit_xor left right
+const f32_add = fn left => fn right => @simd.f32x4.add left right
+const f32_sub = fn left => fn right => @simd.f32x4.sub left right
+const f32_mul = fn left => fn right => @simd.f32x4.mul left right
+const f32_div = fn left => fn right => @simd.f32x4.div left right
+const f32_abs = fn value => @simd.f32x4.abs value
+const f32_neg = fn value => @simd.f32x4.neg value
+const f32_sqrt = fn value => @simd.f32x4.sqrt value
+const f32_ceil = fn value => @simd.f32x4.ceil value
+const f32_floor = fn value => @simd.f32x4.floor value
+const f32_trunc = fn value => @simd.f32x4.trunc value
+const to_f32 = fn value => @simd.u32x4.to_f32 value
+const to_u32 = fn value => @simd.f32x4.to_u32 value
+
+// Bounds and snapshot behavior are the ordinary Array contracts. A range check
+// precedes index arithmetic, so a wrapping index cannot select unrelated lanes.
+const load = fn index => fn values => do:
+  if index > values.length:
+    return @panic "SIMD load starts outside the array"
+  if values.length - index < 4:
+    return @panic "SIMD load requires four elements"
+  return (values[index], values[index + 1], values[index + 2], values[index + 3])
+const store = fn index => fn lanes => fn values => do:
+  if index > values.length:
+    return @panic "SIMD store starts outside the array"
+  if values.length - index < 4:
+    return @panic "SIMD store requires four elements"
+  let (a, b, c, d) = lanes
+  let result = values
+  result[index] := a
+  result[index + 1] := b
+  result[index + 2] := c
+  result[index + 3] := d
+  return result
+
+// Reductions never reassociate implicitly. The pairwise variant is an explicit
+// choice of grouping and can round differently from the left-to-right version.
+const f32_sum = fn (values: F32x4) => do:
+  let (a, b, c, d) = values
+  return ((a + b) + c) + d
+const f32_sum_pairwise = fn (values: F32x4) => do:
+  let (a, b, c, d) = values
+  return (a + b) + (c + d)
+const u32_sum = fn (values: U32x4) => do:
+  let (a, b, c, d) = values
+  return ((a + b) + c) + d

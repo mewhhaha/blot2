@@ -14,12 +14,7 @@ const map = fn transform => fn values =>
   generate values.length (fn index => transform values[index])
 
 // start/count, followed by the collection, like at/get/replace/set above.
-const slice = fn start => fn count => fn values => do:
-  if start > values.length:
-    return @panic "array slice starts outside the array"
-  if count > values.length - start:
-    return @panic "array slice extends outside the array"
-  return generate count (fn index => values[start + index])
+const slice = fn start => fn count => fn values => @array.slice values start count
 
 // Inclusive U32 scan. Sum pairs, scan that smaller array, then reconstruct
 // the missing prefixes. Total work and storage are linear, including const
@@ -54,7 +49,7 @@ const filter_map = fn transform => fn (values: Array a) => do:
       selected := [...self, result]
   return Array.from_list selected
 
-const flatten = fn chunks => do:
+const flatten = fn (chunks: Array (Array a)) => do:
   let count = 0
   let seed = #Nothing
   for chunk in chunks:
@@ -75,21 +70,7 @@ const flatten = fn chunks => do:
     start := self + chunk.length
   return joined
 
-const concat = fn left => fn right => do:
-  if left.is_empty:
-    return right
-  if right.is_empty:
-    return left
-  let left_count = left.length
-  let count = left_count + right.length
-  if count < left_count:
-    return @panic "array concatenation length overflow"
-  let joined = fill count left[0]
-  for index in 0..left_count:
-    joined[index] := left[index]
-  for index in 0..right.length:
-    joined[left_count + index] := right[index]
-  return joined
+const concat = fn left => fn right => @array.concat left right
 
 const push = fn value => fn values => @array.append values value
 
@@ -118,21 +99,21 @@ const unzip3 = fn values => do:
     return value) values
   return (first, second, third)
 
-const fold_left = fn reduce => fn initial => fn values => do:
+const fold_left = fn reduce => fn initial => fn (values: Array a) => do:
   let state = initial
   for value in values:
     use next <- reduce state value
     state := next
   return state
 
-const any = fn predicate => fn values => do:
+const any = fn predicate => fn (values: Array a) => do:
   for value in values:
     use found <- predicate value
     if found:
       return #True
   return #False
 
-const all = fn predicate => fn values => do:
+const all = fn predicate => fn (values: Array a) => do:
   for value in values:
     use accepted <- predicate value
     if Bool.not accepted:

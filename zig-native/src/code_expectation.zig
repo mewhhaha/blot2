@@ -67,7 +67,7 @@ pub const Store = struct {
                 };
             },
             .function => if (values.len != 0 or a >= self.nodes.items.len or b >= self.nodes.items.len) return error.TypeMismatch,
-            .array, .list, .demand, .resolver, .provider => if (values.len != 0 or a >= self.nodes.items.len or b != 0) return error.TypeMismatch,
+            .array, .list, .cursor, .demand, .resolver, .provider => if (values.len != 0 or a >= self.nodes.items.len or b != 0) return error.TypeMismatch,
             .state_provider => if (values.len != 0 or a >= self.nodes.items.len or b >= self.nodes.items.len or c >= self.nodes.items.len) return error.TypeMismatch,
             .product, .record => if (a != 0 or b != 0 or (tag == .record and values.len % 2 != 0)) return error.TypeMismatch,
             .nominal, .type_constructor => if (a == 0 or b == 0 or (tag == .type_constructor and values.len != 0)) return error.TypeMismatch,

@@ -64,7 +64,7 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
             for (try list(owner, .{ .start = start, .len = owner.graph.extra[node.c] })) |child| try ty(owner, child);
         },
         .type_constructor => try units(node.a, unit_count),
-        .array, .list, .resolver => try ty(owner, node.a),
+        .array, .list, .cursor, .resolver => try ty(owner, node.a),
         .demand, .provider => {
             try ty(owner, node.a);
             try require(node.c < owner.graph.rows.len);
@@ -265,7 +265,7 @@ const GraphEdges = struct {
                 .product => if (index < n.b) g.extra[n.a + index] else null,
                 .record => if (index < n.b) g.extra[n.a + index * 2 + 1] else null,
                 .nominal => if (index < g.extra[n.c]) g.extra[n.c + 1 + index] else null,
-                .array, .list, .resolver => if (index == 0) n.a else null,
+                .array, .list, .cursor, .resolver => if (index == 0) n.a else null,
                 .demand, .provider => switch (index) {
                     0 => n.a,
                     1 => self.rowStart() + n.c,

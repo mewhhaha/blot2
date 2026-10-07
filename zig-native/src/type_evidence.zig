@@ -7,7 +7,7 @@ const projections = @import("projection_cache.zig");
 pub const Effects = @import("effect_evidence.zig");
 const Allocator = std.mem.Allocator;
 pub const Id = u32;
-pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, function, product, record, nominal, array, list, demand, type_constructor, resolver, provider, state_provider };
+pub const Tag = enum(u8) { absent, unit, boolean, u32, f32, never, function, product, record, nominal, array, list, cursor, demand, type_constructor, resolver, provider, state_provider };
 pub const Node = struct { tag: Tag, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
 pub const Mapping = struct { variable: types.Id, evidence: Id };
 pub const RowMapping = struct { variable: u32, evidence: Effects.Id };
@@ -139,7 +139,7 @@ pub const Store = struct {
                 };
             },
             .function => if (values.len != 0 or a == 0 or b == 0 or a >= self.nodes.items.len or b >= self.nodes.items.len) return error.TypeMismatch,
-            .array, .list, .demand, .resolver, .provider => if (values.len != 0 or a == 0 or a >= self.nodes.items.len or b != 0) return error.TypeMismatch,
+            .array, .list, .cursor, .demand, .resolver, .provider => if (values.len != 0 or a == 0 or a >= self.nodes.items.len or b != 0) return error.TypeMismatch,
             .state_provider => if (values.len != 0 or a == 0 or b == 0 or row == 0 or a >= self.nodes.items.len or b >= self.nodes.items.len or row >= self.nodes.items.len) return error.TypeMismatch,
             .product, .record => if (a != 0 or b != 0) return error.TypeMismatch,
             .nominal => if (a == 0) return error.TypeMismatch,
@@ -254,6 +254,7 @@ pub const Store = struct {
             .variable, .absent => return error.UnresolvedType,
             .array => return self.intern(.array, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
             .list => return self.intern(.list, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
+            .cursor => return self.intern(.cursor, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
             .demand => return self.internWithEffects(.demand, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, try self.projectRowDepth(source, n.c, mappings, rows, depth + 1, budget, retained, memo, height), &.{}),
             .resolver => return self.intern(.resolver, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, &.{}),
             .provider => return self.internWithEffects(.provider, try self.projectDepth(source, n.a, mappings, rows, depth + 1, budget, retained, memo, height), 0, try self.projectRowDepth(source, n.c, mappings, rows, depth + 1, budget, retained, memo, height), &.{}),
@@ -355,6 +356,7 @@ pub const Store = struct {
             .f32 => concrete.tag == .f32,
             .array => concrete.tag == .array,
             .list => concrete.tag == .list,
+            .cursor => concrete.tag == .cursor,
             .demand => concrete.tag == .demand,
             .resolver => concrete.tag == .resolver,
             .provider => concrete.tag == .provider,
@@ -369,7 +371,7 @@ pub const Store = struct {
         if (!same) return false;
         if ((n.tag == .function or n.tag == .demand or n.tag == .provider) and !try self.matchRowDepth(source, n.c, concrete.c, mappings, rows, depth + 1, budget)) return false;
         switch (n.tag) {
-            .array, .list, .demand, .resolver, .provider => return self.matchDepth(source, n.a, concrete.a, mappings, rows, depth + 1, budget),
+            .array, .list, .cursor, .demand, .resolver, .provider => return self.matchDepth(source, n.a, concrete.a, mappings, rows, depth + 1, budget),
             .state_provider => return try self.matchDepth(source, n.a, concrete.a, mappings, rows, depth + 1, budget) and try self.matchDepth(source, n.b, concrete.b, mappings, rows, depth + 1, budget) and try self.matchDepth(source, n.c, concrete.c, mappings, rows, depth + 1, budget),
             .function => return try self.matchDepth(source, n.a, concrete.a, mappings, rows, depth + 1, budget) and try self.matchDepth(source, n.b, concrete.b, mappings, rows, depth + 1, budget),
             .product, .nominal => {

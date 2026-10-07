@@ -160,7 +160,7 @@ const answer = 42
       const preludeBodies = [...preludeSource.matchAll(/^(?:const|let) /gm)].length;
       equal(metrics.body_elaborations, 9 + preludeBodies);
       equal(metrics.body_lowerings, 9 + preludeBodies);
-      equal(metrics.code_instances, 4);
+      equal(metrics.code_instances, 2);
     } finally {
       guest.dispose();
     }

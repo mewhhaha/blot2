@@ -48,13 +48,64 @@ Runtime lists use balanced trees with right-sized leaves and copy only an edited
 path when shared. Ownership tokens are not GC pointers. Detaching a branch
 freezes both children, so either surviving version may later be consumed
 exclusively. All pointers remain allocation bases; spare words stay zero.
+Empty lists reuse immutable descriptors in reserved arena metadata. Whole slices,
+empty concatenations and identical-bit replacements may share a descriptor only
+after freezing it: later consuming edits must detach that descriptor too.
+
+The symbolic lifetime pass records one owning allocation and local/fixed-offset
+borrows. Direct-call summaries record bounded borrows and fresh owned results;
+recursive and opaque calls remain conservative. A returned allocation transfers
+ownership only when it has no other escaping or embedded alias. A single-result
+summary cannot transfer a self/back edge hidden in its returned storage.
+Structured control-flow
+liveness releases storage on every edge ending a proven lifetime, including
+branches, early returns and loop exits. Branch operands and label depths remain
+unchanged. Conditional definitions must dominate their uses; unknown or
+out-of-range offsets and multiply assigned locals reject the proof. Calls that
+can invalidate arena storage form a barrier. Assembly owns scratch and output;
+retained instructions and fragments remain immutable.
+
+Known private pointer stores and dominating exact field loads form closed
+allocation groups. Shared children and cycles may belong to one group; liveness
+is the union of its members' uses. Every member must be constructed in the same
+straight-line segment, with its own valid allocation-base local. An exit releases
+each member once, without runtime graph traversal or reference counting. Each
+individual recycle still frees only its own storage. Escaping a parent also
+escapes its reachable children. Unknown field reads/copies, overlapping writes,
+conditional field provenance, cross-segment construction and invalidating calls
+reject the proof. Reference-overlap checking has a bounded work budget and
+conservatively declines wider proofs. Dynamic shared/cyclic ownership and full
+effect cleanup remain required before tracing can be removed.
+
+Checked scalar element layouts select pointer-free array allocation and list
+leaves. The descriptor carries this fact through cloning, structural operations
+and conversion. Reference-valued elements keep tracing; machine i32 alone is
+never evidence that a word is scalar. Runtime list branches remain pointerful.
+
+State plus memoized demands can construct real cycles: a demand may read a
+closure from State and cache a result that reaches that same demand. Clearing
+the State cell must not clear the cached result. The cycle-reclamation law in
+`tests/arena_gc_execution.test.ts` preserves this behavior and bounds discarded
+cycles in a long-running loop. RC without cyclic ownership handling is not a
+valid collector replacement. In particular, do not weaken memo fields, clear
+memoized results on State writes, or assume closure graphs are always acyclic.
+
+Wasm values live in linear memory, with a nonmoving tracing arena collector and
+free lists. This does not use the Wasm GC extension. Ownership analysis permits
+in-place updates and allocation elimination; it does not prove every object's
+lifetime. Forever loops collect after allocation traffic reaches the larger of
+64 KiB and a quarter of the arena's high-water mark, including startup data.
+Their activation floor pins earlier objects, which are
+traced together with loop carries, providers and static roots. Collection must
+not run on a fixed iteration cadence: that repeatedly scans large retained
+collections even when each step allocates only a small cursor.
 
 Small aggregate scalar replacement requires full initialization before aliasing
 and fixed field offsets. Every lexical version and loop carry owns separate
 scalar locals. ABI values, captured/escaped values and GC roots remain boxed.
 The pass transforms an assembly copy, preserving retained symbolic fragments.
 Ordinary source inlining has a four-node budget, expanded to 64 for aggregate
-results inside loops or known callback arguments. Nesting is limited to three
+results inside loops or known callback arguments. Nesting is limited to six
 levels and expansion stops past 4,096 emitted instructions. These are structural
 cost limits, independent of declaration names and source modules.
 

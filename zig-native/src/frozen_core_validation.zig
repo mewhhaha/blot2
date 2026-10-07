@@ -212,7 +212,7 @@ const Bounds = struct {
                     try self.listTypes(.{ .start = start, .len = self.m.types.extra[value.c] });
                 },
                 .type_constructor => try self.identity(.{ .unit = value.a, .decl = value.b }, false),
-                .array, .list, .resolver => try self.ty(value.a),
+                .array, .list, .cursor, .resolver => try self.ty(value.a),
                 .demand, .provider => {
                     try self.ty(value.a);
                     try self.row(value.c);
@@ -778,7 +778,7 @@ const Graph = struct {
                     .product => if (slot < v.b) self.vertex(.type_, m.types.extra[v.a + slot]) else null,
                     .record => if (slot < v.b) self.vertex(.type_, m.types.extra[v.a + slot * 2 + 1]) else null,
                     .nominal => if (slot < m.types.extra[v.c]) self.vertex(.type_, m.types.extra[v.c + 1 + slot]) else null,
-                    .array, .list, .resolver => if (slot == 0) self.vertex(.type_, v.a) else null,
+                    .array, .list, .cursor, .resolver => if (slot == 0) self.vertex(.type_, v.a) else null,
                     .demand, .provider => switch (slot) {
                         0 => self.vertex(.type_, v.a),
                         1 => if (m.types.effects.rows.len == 0) null else self.vertex(.row, v.c),

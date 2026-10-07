@@ -1901,6 +1901,30 @@ test "pure frozen body and closure evidence APIs solve private fields and resolv
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, privateBodyScenario, .{&module});
 }
 
+test "generic cursor evidence retains array and list element relationships without evaluation" {
+    var module = try lowerWithOptions(
+        \\const F32.abs = fn value => @f32.abs value
+        \\const read = fn cursor => (@cursor.value cursor).abs
+        \\entry const array = fn (values: Array F32) => read (@array.cursor values)
+        \\entry const list = fn (values: List F32) => read (@list.cursor values)
+    , .{ .builtin_catalog = true });
+    defer module.deinit(a);
+    var session = try evaluator.Session.init(a, &.{module});
+    defer session.deinit();
+    for ([_][]const u8{ "array", "list" }) |name| {
+        const reference = target(&module, name);
+        const collection = try session.evidence.intern(if (std.mem.eql(u8, name, "array")) .array else .list, types.f32_type, 0, &.{});
+        const expected = try session.evidence.intern(.function, collection, types.f32_type, &.{});
+        var proof = try session.bodyEvidenceFull(reference, expected, &.{}, &.{});
+        defer proof.deinit(a);
+        const signature = try session.evidence.projectWithRows(&module.types, module.binding(reference.binding).ty, proof.types, proof.rows);
+        const arrow = session.evidence.node(signature);
+        try std.testing.expectEqual(type_evidence.Tag.function, arrow.tag);
+        try std.testing.expectEqual(types.f32_type, arrow.b);
+    }
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
 test "an absent input's independent phantom type remains unresolved instead of adopting the output type" {
     var module = try lower(
         \\type Option value is data=#Present value | #Absent

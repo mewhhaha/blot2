@@ -105,7 +105,7 @@ const Encoder = struct {
                 try self.ty(node.a, depth + 1);
                 try self.row(node.c, depth + 1);
             },
-            .array, .list, .resolver => try self.ty(node.a, depth + 1),
+            .array, .list, .cursor, .resolver => try self.ty(node.a, depth + 1),
             .state_provider => {
                 try self.ty(node.a, depth + 1);
                 try self.ty(node.b, depth + 1);

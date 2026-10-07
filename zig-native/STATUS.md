@@ -1,5 +1,22 @@
 # Zig compiler status
 
+The latest ownership work is qualified in the
+[2026-10-07 runtime report](../std/PERFORMANCE.md#closed-shared-and-cyclic-allocation-groups).
+Proven private allocations with shared children and cycles now release together
+without tracing or reference counting. This extends the existing branch/loop
+lifetimes, borrowed calls and fresh-result transfers. The shared-record benchmark
+uses 17.30 → 4.46 MB, including a retained million-element startup List.
+The full compiler gate passes, including 526 guest/client tests and the existing
+cycle/async/retained checks. On the frozen 394 KB gdev workload, paired cold
+compilation is 805 → 803 ms; retained edits remain around 500 ms. Both remain
+above the targets. Tracing remains for dynamic/unproved graphs. Shared RC,
+general effect cleanup and dynamic cycle reclamation without tracing are open.
+
+The migration qualification below records its earlier, smaller workload and
+compiler revision.
+
+## Zig-only migration qualification
+
 The Zig-only migration is complete, including `../gdev`'s host, tests, profiling
 scripts and desktop packaging. The compiler uses Zig **0.17.0** and the
 asynchronous [project API](PROJECT_CLIENT.md). The retired synchronous Bend API,
