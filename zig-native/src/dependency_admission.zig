@@ -25,6 +25,7 @@ pub fn validatePrelude(allocator: std.mem.Allocator, value: *const D.FrozenDepen
     try validation.validate(&owner.interface, value.symbols.len, value.modules.len);
     try validation.validateGraph(allocator, &owner.interface);
     try core_validation.validate(allocator, &owner.core, .{ .units = &.{&owner.core}, .symbol_count = value.symbols.len, .source_length = owner.identity.source_bytes });
+    for (owner.core.field_names) |field| try require(std.mem.eql(u8, owner.core.name(field.spelling), value.symbols[field.symbol].text));
     for (owner.interface.bindings) |binding| if (binding.external) |target| try external(value, 0, target);
     for (owner.exports) |entry| {
         try require(entry.name != 0 and entry.name < value.symbols.len);
@@ -37,6 +38,7 @@ pub fn validatePrelude(allocator: std.mem.Allocator, value: *const D.FrozenDepen
             .nominal => try require(entry.catalog != 0 and entry.catalog < owner.interface.nominals.len and owner.interface.nominals[entry.catalog].name == entry.name),
             .constructor => try require(entry.catalog != 0 and entry.catalog < owner.interface.constructors.len and owner.interface.constructors[entry.catalog].name == entry.name),
             .effect_family => try require(entry.catalog != 0 and entry.catalog < owner.interface.effect_families.len and owner.interface.effect_families[entry.catalog].name == entry.name),
+            .contract => try require(entry.catalog < owner.interface.contracts.len and owner.interface.contracts[entry.catalog].name == entry.name),
         }
     }
     for (owner.fixities) |fixity| {

@@ -507,6 +507,10 @@ fn Validator(comptime Context: type) type {
                         } else break;
                     }
                     const callee = self.tree.node(head);
+                    if (self.validateControls() and callee.tag == .name and self.tree.node(node.b).tag == .record and self.context.sourceConstructorExists(callee.a) and !self.local(callee.a)) {
+                        self.fail(.constructor_marker, id, self.tree.span(id).start, 0);
+                        return;
+                    }
                     if (callee.tag == .intrinsic) {
                         try self.primitive(id, head, argument_count, depth + 1);
                         return;
@@ -520,15 +524,11 @@ fn Validator(comptime Context: type) type {
                     try self.walk(node.b, depth + 1);
                 },
                 .record => {
-                    if (node.a == 0) {
-                        self.fail(.unsupported_expression, id, self.tree.span(id).start, 0);
-                        return;
-                    }
-                    if (!try self.recordTarget(id, node.a)) return;
+                    if (node.a != 0 and !try self.recordTarget(id, node.a)) return;
                     const fields = self.tree.children(id);
                     for (fields, 0..) |child, index| {
                         const field = self.tree.node(child).a;
-                        if (self.context.sourceRecordFieldExists(node.a, field)) |known| if (!known) {
+                        if (node.a != 0) if (self.context.sourceRecordFieldExists(node.a, field)) |known| if (!known) {
                             self.fail(.unknown_record_field, child, self.tree.span(child).start, field);
                             return;
                         };
@@ -539,18 +539,8 @@ fn Validator(comptime Context: type) type {
                         try self.walk(child, depth + 1);
                         if (self.issue != null or self.annotationsStopped()) return;
                     }
-                    if (self.context.sourceMissingRecordField(node.a, fields)) |field|
+                    if (node.a != 0) if (self.context.sourceMissingRecordField(node.a, fields)) |field|
                         self.fail(.missing_record_field, id, self.tree.span(id).start + 1, field);
-                },
-                .record_apply => if (self.validateControls()) {
-                    const kind = if (self.local(node.a)) .constructor else try self.context.sourceRecordArgumentKind(id);
-                    switch (kind) {
-                        .constructor => self.fail(.constructor_marker, id, self.tree.span(id).start, 0),
-                        .runtime_argument => self.fail(.unsupported_expression, id, self.tree.recordFieldsOrigin(id), 0),
-                        .type_argument => {},
-                    }
-                } else if (!self.context.sourceTypeApplication(node.a)) {
-                    try self.name(node.a, id, self.tree.span(id).start);
                 },
                 .product, .array => for (self.tree.children(id)) |child| try self.walk(child, depth + 1),
                 .lambda => {

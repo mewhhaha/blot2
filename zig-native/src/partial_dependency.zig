@@ -249,6 +249,7 @@ fn prepareProjectMode(a: Allocator, source: *project.Project, entry_path: []cons
     if (checked.diagnostics.len != 0) {
         const issue = checked.diagnostics[0];
         const unit = source.unit(issue.unit);
+        if (issue.hole) |hole| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .hole = hole }));
         if (issue.numeric_literal) |detail| return reject(a, source, entry_path, try consumer.publishedDiagnostic(a, issue.unit, "check-project", unit.source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message(), .actual_token = detail.actual_token }, @as([]const ast.NumericFault, &.{detail})));
         if (issue.purity) |witness| {
             if (witness.operation_name == null and !witness.foreign) return error.OperationPurityOriginRequired;

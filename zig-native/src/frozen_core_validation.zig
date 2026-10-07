@@ -201,6 +201,7 @@ const Bounds = struct {
                     try require(value.a <= self.m.types.extra.len and count <= self.m.types.extra.len - value.a);
                     for (0..value.b) |field| {
                         try self.symbol(self.m.types.extra[value.a + field * 2], false);
+                        try require(self.m.fieldSpelling(self.m.types.extra[value.a + field * 2]) != null);
                         try self.ty(self.m.types.extra[value.a + field * 2 + 1]);
                     }
                 },
@@ -580,7 +581,7 @@ const Bounds = struct {
                     try self.listNodes(.{ .start = value.a, .len = value.b });
                 },
                 .closure, .suspend_ => try index(self.m.closures.len, value.a),
-                .apply, .associated, .type_same, .effect_provider, .handle => {
+                .apply, .associated, .record_merge, .type_same, .effect_provider, .handle => {
                     try self.node(value.a, false);
                     try self.node(value.b, value.tag == .associated and value.op != .none and try scalarArity(value.op) == 1);
                     if (value.tag == .associated) try self.symbol(value.c, true);
@@ -654,6 +655,12 @@ pub fn validateBounds(module: *const core.Module, context: Context) BoundsError!
         for (context.units[0..i]) |prior| try require(prior.unit != unit.unit);
     }
     const b: Bounds = .{ .m = module, .context = context };
+    for (module.field_names, 0..) |field, index_| {
+        try b.symbol(field.symbol, false);
+        if (index_ != 0) try require(module.field_names[index_ - 1].symbol < field.symbol);
+        try range(module.names.len, field.spelling.start, field.spelling.len);
+        try require(field.spelling.len != 0);
+    }
     try b.types();
     // Node shape checks precede catalogs: target tags are now known to be valid.
     // All referenced metadata is bounded before any tag-specific second lookup.
@@ -797,7 +804,7 @@ const Graph = struct {
             .node => {
                 const v = m.nodes[id];
                 return switch (v.tag) {
-                    .scalar, .logical, .apply, .associated, .type_same, .effect_provider, .handle => switch (slot) {
+                    .scalar, .logical, .apply, .associated, .record_merge, .type_same, .effect_provider, .handle => switch (slot) {
                         0 => self.vertex(.node, v.a),
                         1 => self.vertex(.node, v.b),
                         else => null,

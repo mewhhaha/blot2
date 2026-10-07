@@ -40,7 +40,7 @@ fn children(work: *Pending, allocator: Allocator, module: *const core.Module, id
     const n = module.node(id);
     if (callables and n.tag == .apply and module.node(n.a).tag == .closure) try work.append(allocator, module.closure(n.a).body);
     switch (n.tag) {
-        .scalar, .associated, .logical, .type_same, .apply, .effect_provider, .handle => try work.appendSlice(allocator, &.{ n.a, n.b }),
+        .scalar, .associated, .logical, .record_merge, .type_same, .apply, .effect_provider, .handle => try work.appendSlice(allocator, &.{ n.a, n.b }),
         .if_value, .if_stmt, .state_provider => try work.appendSlice(allocator, &.{ n.a, n.b, n.c }),
         .block, .suite, .product, .record, .array, .array_op, .call => try work.appendSlice(allocator, module.children(id)),
         .bind => try work.append(allocator, n.b),

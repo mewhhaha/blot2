@@ -1,4 +1,6 @@
 test {
+    _ = @import("structural_record_tests.zig");
+    _ = @import("check_contract_tests.zig");
     _ = @import("collection_tests.zig");
     _ = @import("module_frontend_tests.zig");
     _ = @import("zig_project_frames.zig");
@@ -25,6 +27,8 @@ test {
     _ = @import("nominal_argument_borrow_tests.zig");
     _ = @import("solver_scratch_tests.zig");
     _ = @import("check.zig");
+    _ = @import("check_hole_tests.zig");
+    _ = @import("check_alias_tests.zig");
     _ = @import("check_tests.zig");
     _ = @import("tag_tests.zig");
     _ = @import("check_loop_tests.zig");

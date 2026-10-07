@@ -123,6 +123,9 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
         try units(obligation.qualification_unit, unit_count);
     }
     for (owner.nominals) |nominal| {
+        try ty(owner, nominal.alias);
+        for (try list(owner, nominal.alias_rows)) |row| try require(row < owner.graph.row_variable_count);
+        if (nominal.alias != 0) try require(nominal.constructors.len == 0);
         try units(nominal.identity.unit, unit_count);
         try require(nominal.name < symbol_count);
         for (try list(owner, nominal.parameters)) |id| try ty(owner, id);
@@ -131,6 +134,27 @@ pub fn validate(owner: *const PI.Interface, symbol_count: usize, unit_count: usi
         for (owner.patterns.extra[nominal.patterns.start..][0..nominal.patterns.len]) |id| try require(id < owner.patterns.nodes.len);
         try names(try list(owner, nominal.parameter_names), symbol_count);
         for (try list(owner, nominal.constructors)) |id| try require(id < owner.constructors.len);
+    }
+    for (owner.contracts) |contract| {
+        try units(contract.identity.unit, unit_count);
+        try require(contract.name < symbol_count);
+        for (try list(owner, contract.parameters)) |id| try ty(owner, id);
+        for (try list(owner, contract.variables)) |id| {
+            try ty(owner, id);
+            try require(owner.graph.nodes[id].tag == .variable);
+        }
+        for (try list(owner, contract.row_variables)) |row| try require(row < owner.graph.row_variable_count);
+        try names(try list(owner, contract.parameter_names), symbol_count);
+        try require(contract.parameter_names.len == contract.variables.len and contract.patterns.len == contract.parameters.len);
+        try range(contract.patterns.start, contract.patterns.len, owner.patterns.extra.len);
+        for (owner.patterns.extra[contract.patterns.start..][0..contract.patterns.len]) |id| try require(id < owner.patterns.nodes.len);
+        try range(contract.predicates.start, contract.predicates.len, owner.contract_predicates.len);
+    }
+    for (owner.contract_predicates) |predicate| {
+        inline for (.{ "ty", "other", "result", "signature" }) |field| try ty(owner, @field(predicate, field));
+        try require(predicate.source == 0 and predicate.name < symbol_count and predicate.explicit);
+        try units(predicate.identity.unit, unit_count);
+        try units(predicate.qualification_unit, unit_count);
     }
     for (owner.constructors) |constructor| {
         try units(constructor.identity.unit, unit_count);

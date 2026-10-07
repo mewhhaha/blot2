@@ -159,7 +159,9 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         stats.body_elaborations = checked.body_elaborations;
         if (checked.diagnostics.len != 0) {
             for (checked.diagnostics) |item| {
-                if (item.purity) |witness| {
+                if (item.hole) |hole| {
+                    try frontendDiagnostic(writer, filename, "check", source, .{ .cause = .native_detail, .code = @tagName(item.code), .span = item.span, .message = item.message() }, .{ .hole = hole });
+                } else if (item.purity) |witness| {
                     try purityDiagnostic(allocator, writer, filename, "check", source, @tagName(item.code), item.span, &names, "main", witness);
                 } else if (item.code == .module_loader_required or item.numeric_literal != null) {
                     try frontendDiagnostic(writer, filename, "check", source, .{ .cause = .native_detail, .code = @tagName(item.code), .span = item.span, .message = item.message() }, @as([]const checker.Diagnostic, &.{item}));
@@ -292,6 +294,8 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
                 const unit_ = loaded.unit(item.unit);
                 const detail = checker.sourceImportDiagnostic(&unit_.tree).?;
                 try frontendDiagnostic(writer, path, "check-project", unit_.source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message() }, @as([]const checker.Diagnostic, &.{detail}));
+            } else if (item.hole) |hole| {
+                try frontendDiagnostic(writer, path, "check-project", loaded.unit(item.unit).source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message() }, .{ .hole = hole });
             } else if (item.numeric_literal) |detail| {
                 const unit_ = loaded.unit(item.unit);
                 try frontendDiagnostic(writer, path, "check-project", unit_.source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message(), .actual_token = detail.actual_token }, @as([]const @import("ast.zig").NumericFault, &.{detail}));

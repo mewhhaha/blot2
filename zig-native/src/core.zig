@@ -14,7 +14,10 @@ pub const List = struct { start: u32 = 0, len: u32 = 0 };
 pub const Span = ast.Span;
 pub const BindingRef = struct { unit: u32 = 0, binding: BindingId };
 pub const Name = struct { start: u32 = 0, len: u32 = 0 };
-pub const Tag = enum(u8) { invalid, constant, reference, scalar, logical, call, if_value, block, suite, bind, return_, if_stmt, product, record, construct, project, match, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop, break_, type_same, result_associated, suspend_, force, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision };
+/// Only record field spellings survive in this compact symbol projection.
+/// Physical layouts use spelling, never the incidental interning order.
+pub const FieldName = struct { symbol: u32, spelling: Name };
+pub const Tag = enum(u8) { invalid, constant, reference, scalar, logical, call, if_value, block, suite, bind, return_, if_stmt, product, record, construct, project, match, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop, break_, type_same, result_associated, suspend_, force, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge };
 pub const ArrayOp = @import("collection_ops.zig").Op;
 pub const PrimitiveKind = enum(u8) { scalar, array };
 pub const Primitive = struct { kind: PrimitiveKind, op: Op = .none, array_op: ArrayOp = .length, arity: u8 };
@@ -25,6 +28,7 @@ pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less,
 /// if_value/if_stmt a=condition,b=then,c=else(0 absent statement suite).
 /// block/suite a=children start,b=len; block creates a do return boundary.
 /// bind a=local BindingId,b=value; return_ a=value,b=target block Id.
+/// record_merge a=left,b=right; right fields replace left fields.
 /// product a=values start,b=len; record adds c=destination field-index start.
 /// construct a=constructor catalog index,b=optional payload,c=1 for a canonical record argument.
 /// c=0 retains the declared storage payload; project a=value,b=projection index.
@@ -182,6 +186,7 @@ pub const Types = struct {
     }
 };
 pub const Module = struct {
+    field_names: []FieldName = &.{},
     runtime_names: []RuntimeName = &.{},
     source_names: []RuntimeName = &.{},
     declaration_dependencies: []DeclarationDependencies = &.{},
@@ -228,6 +233,7 @@ pub const Module = struct {
     diagnostics: []Diagnostic,
     body_lowerings: usize,
     pub fn deinit(self: *Module, allocator: Allocator) void {
+        allocator.free(self.field_names);
         allocator.free(self.runtime_names);
         allocator.free(self.source_names);
         allocator.free(self.declaration_dependencies);
@@ -388,6 +394,14 @@ pub const Module = struct {
     pub fn name(self: *const Module, range: Name) []const u8 {
         return self.names[range.start..][0..range.len];
     }
+    pub fn fieldSpelling(self: *const Module, symbol: u32) ?[]const u8 {
+        const index = std.sort.binarySearch(FieldName, self.field_names, symbol, struct {
+            fn compare(key: u32, value: FieldName) std.math.Order {
+                return std.math.order(key, value.symbol);
+            }
+        }.compare) orelse return null;
+        return self.name(self.field_names[index].spelling);
+    }
     pub fn nominal(self: *const Module, index: u32) Nominal {
         return self.nominals[index];
     }
@@ -498,6 +512,8 @@ const Error = Allocator.Error || error{CoreLimit};
 const ResolverLoopFrame = struct { source: ast.Id, cursor: T.Id, parameter: BindingId, finalizer: Id };
 const RequestCallbackFrame = struct { loop: ast.Id, return_target: Id, decision_type: T.Id, state_type: T.Id };
 const Builder = struct {
+    field_names: std.ArrayList(FieldName) = .empty,
+    saved_fields: std.AutoHashMapUnmanaged(u32, void) = .empty,
     request_loops: std.ArrayList(RequestLoopInfo) = .empty,
     request_arms: std.ArrayList(RequestArm) = .empty,
     request_callbacks: std.ArrayList(RequestCallbackFrame) = .empty,
@@ -570,6 +586,8 @@ const Builder = struct {
     effect_variable_count: u32 = 0,
     body_lowerings: usize = 0,
     fn deinit(self: *Builder) void {
+        self.field_names.deinit(self.allocator);
+        self.saved_fields.deinit(self.allocator);
         inline for (.{ "request_loops", "request_arms", "request_callbacks", "runtime_names", "source_names", "erased_declaration_references", "tag_calls", "nodes", "spans", "extra", "type_nodes", "type_extra", "effect_rows", "effect_labels", "effect_operations", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "name_bytes", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "visit_epochs", "associated", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures", "resolver_loop_frames" }) |field| @field(self, field).deinit(self.allocator);
         self.allocator.free(self.type_map);
         self.allocator.free(self.variable_map);
@@ -697,6 +715,8 @@ const Builder = struct {
                 defer fields.deinit(self.allocator);
                 for (0..original.b) |index| {
                     const field = self.checked.types.recordField(original, index);
+                    const saved = try self.saved_fields.getOrPut(self.allocator, field.name);
+                    if (!saved.found_existing) try self.field_names.append(self.allocator, .{ .symbol = field.name, .spelling = try self.saveName(self.names.get(field.name)) });
                     try fields.appendSlice(self.allocator, &.{ field.name, try self.projectType(field.ty, depth + 1) });
                 }
                 const span = try self.saveTypes(fields.items);
@@ -928,12 +948,12 @@ const Builder = struct {
     }
     fn recordExpression(self: *Builder, source: ast.Id, ty: T.Id, depth: usize) Error!Id {
         const catalog = if (source < self.checked.constructor_resolved.len) self.checked.constructor_resolved[source] else 0;
-        if (catalog == 0) {
+        if (catalog == 0 and self.tree.node(source).a != 0) {
             try self.diagnostic(.unresolved_binding, source);
             return 0;
         }
         const fields = self.tree.children(source);
-        if (fields.len == 0 and self.checked.constructors[catalog].payload == 0)
+        if (catalog != 0 and fields.len == 0 and self.checked.constructors[catalog].payload == 0)
             return self.make(source, .{ .tag = .construct, .ty = ty, .a = catalog });
         var values: std.ArrayList(Id) = .empty;
         defer values.deinit(self.allocator);
@@ -961,6 +981,7 @@ const Builder = struct {
         const value_range = try self.save(values.items);
         const destination_range = try self.save(destinations.items);
         const payload = try self.make(source, .{ .tag = .record, .ty = payload_ty, .a = value_range.start, .b = value_range.len, .c = destination_range.start });
+        if (catalog == 0) return payload;
         return self.make(source, .{ .tag = .construct, .ty = ty, .a = catalog, .b = payload });
     }
     fn addPattern(self: *Builder, source: ast.Id, value: Pattern) Error!PatternId {
@@ -1179,7 +1200,7 @@ const Builder = struct {
                 try self.nodeCaptures(info.body, epoch, captures, depth + 1);
                 for (carries) |carry| try self.noteCapture(carry.backedge, epoch, captures);
             },
-            .scalar, .logical, .apply, .associated, .type_same, .effect_provider, .handle => {
+            .scalar, .logical, .apply, .associated, .record_merge, .type_same, .effect_provider, .handle => {
                 try self.nodeCaptures(value.a, epoch, captures, depth + 1);
                 try self.nodeCaptures(value.b, epoch, captures, depth + 1);
             },
@@ -1692,6 +1713,15 @@ const Builder = struct {
             }
             const operand = try self.expression(backwards.items[0].value, depth + 1);
             return self.make(source, .{ .tag = .force, .ty = result, .a = operand });
+        }
+        if (syntax.tag == .intrinsic and std.mem.eql(u8, self.names.get(syntax.a), "@record.merge")) {
+            if (backwards.items.len != 2) {
+                try self.diagnostic(.invalid_call, source);
+                return 0;
+            }
+            const left = try self.expression(backwards.items[1].value, depth + 1);
+            const right = try self.expression(backwards.items[0].value, depth + 1);
+            return self.make(source, .{ .tag = .record_merge, .ty = result, .a = left, .b = right });
         }
         if (syntax.tag == .intrinsic and std.mem.eql(u8, self.names.get(syntax.a), "@type.same")) {
             if (backwards.items.len != 2) {
@@ -2615,6 +2645,12 @@ const Builder = struct {
     fn finish(self: *Builder) Allocator.Error!Module {
         var result: Module = .{ .types = .{ .nodes = &.{}, .extra = &.{} }, .nodes = &.{}, .spans = &.{}, .extra = &.{}, .bindings = &.{}, .bodies = &.{}, .parameters = &.{}, .references = &.{}, .calls = &.{}, .merges = &.{}, .merge_ranges = &.{}, .names = &.{}, .obligations = &.{}, .diagnostics = &.{}, .body_lowerings = self.body_lowerings };
         errdefer result.deinit(self.allocator);
+        std.mem.sortUnstable(FieldName, self.field_names.items, {}, struct {
+            fn less(_: void, left: FieldName, right: FieldName) bool {
+                return left.symbol < right.symbol;
+            }
+        }.less);
+        result.field_names = try self.field_names.toOwnedSlice(self.allocator);
         result.types.nodes = try self.type_nodes.toOwnedSlice(self.allocator);
         result.types.extra = try self.type_extra.toOwnedSlice(self.allocator);
         result.types.effects.rows = try self.effect_rows.toOwnedSlice(self.allocator);

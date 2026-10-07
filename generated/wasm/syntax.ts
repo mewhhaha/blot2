@@ -127,17 +127,17 @@ export type LiteralKind =
   | "{"
   | ","
   | "}"
+  | "type"
+  | "=>"
+  | "="
+  | "is"
   | "@"
   | "["
   | "]"
   | "const"
   | "let"
   | ":"
-  | "="
   | "effect"
-  | "type"
-  | "=>"
-  | "is"
   | "->"
   | "data"
   | "|"
@@ -240,6 +240,8 @@ export type RuleName =
   | "named_import"
   | "import_binding"
   | "declaration"
+  | "type_alias"
+  | "contract_type"
   | "declaration_attribute"
   | "attribute_name"
   | "value_declaration"
@@ -262,6 +264,7 @@ export type RuleName =
   | "type_expression"
   | "effect_row"
   | "where_clause"
+  | "constraint_body"
   | "constraint_predicate"
   | "type_application"
   | "demand_type"
@@ -400,8 +403,27 @@ export interface ImportBindingCursor extends RuleCursorBase<"import_binding"> {
 
 export interface DeclarationCursor extends RuleCursorBase<"declaration"> {
   field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor>;
-  field(name: "value"): DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | NamedFixityCursor | SymbolicFixityCursor | ValueDeclarationCursor;
+  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | NamedFixityCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor;
   field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface TypeAliasCursor extends RuleCursorBase<"type_alias"> {
+  field(name: "name"): TokenCursor<"named", "TYPE_IDENT">;
+  field(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
+  field(name: "value"): TypeExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ContractTypeCursor extends RuleCursorBase<"contract_type"> {
+  field(name: "body"): ConstraintBodyCursor;
+  field(name: "kind"): TokenCursor<"named", "IDENT">;
+  field(name: "name"): TokenCursor<"named", "TYPE_IDENT">;
+  field(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
@@ -565,7 +587,13 @@ export interface EffectRowCursor extends RuleCursorBase<"effect_row"> {
 }
 
 export interface WhereClauseCursor extends RuleCursorBase<"where_clause"> {
+  field(name: "body"): ConstraintBodyCursor;
   field(name: "marker"): TokenCursor<"literal", "wherE">;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ConstraintBodyCursor extends RuleCursorBase<"constraint_body"> {
   field(name: "predicates"): ReadonlyArray<ConstraintPredicateCursor>;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: "predicates"): ReadonlyArray<ConstraintPredicateCursor>;
@@ -575,7 +603,7 @@ export interface WhereClauseCursor extends RuleCursorBase<"where_clause"> {
 export interface ConstraintPredicateCursor extends RuleCursorBase<"constraint_predicate"> {
   field(name: "arguments"): ReadonlyArray<TypeAtomCursor>;
   field(name: "effects"): EffectRowCursor | null;
-  field(name: "kind"): TokenCursor<"named", "IDENT">;
+  field(name: "kind"): QualifiedNameCursor;
   field(name: "member"): TokenCursor<"named", "STRING"> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -1053,6 +1081,8 @@ export type AnyRuleCursor =
   | NamedImportCursor
   | ImportBindingCursor
   | DeclarationCursor
+  | TypeAliasCursor
+  | ContractTypeCursor
   | DeclarationAttributeCursor
   | AttributeNameCursor
   | ValueDeclarationCursor
@@ -1075,6 +1105,7 @@ export type AnyRuleCursor =
   | TypeExpressionCursor
   | EffectRowCursor
   | WhereClauseCursor
+  | ConstraintBodyCursor
   | ConstraintPredicateCursor
   | TypeApplicationCursor
   | DemandTypeCursor

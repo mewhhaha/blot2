@@ -86,7 +86,7 @@ const Capture = struct {
                     switch (n.tag) {
                         .constant, .primitive_function, .panic, .constructor_function, .type_constructor => {},
                         .reference => try self.reference(self.module.reference(id), id),
-                        .scalar, .logical, .associated, .type_same, .effect_provider, .handle => {
+                        .scalar, .logical, .associated, .record_merge, .type_same, .effect_provider, .handle => {
                             try self.node(n.b);
                             try self.node(n.a);
                             if (n.tag == .associated) try self.member(n.c, .none);

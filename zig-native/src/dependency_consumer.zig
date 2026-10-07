@@ -23,7 +23,7 @@ pub const Publication = struct {
     actual_token: ?token.Tag,
     details_json: []u8,
 };
-const Details = struct {
+pub const Details = struct {
     bytes: []const u8,
     pub fn jsonStringify(self: Details, writer: anytype) !void {
         // These bytes are produced only by std.json.Stringify.valueAlloc.
@@ -129,6 +129,7 @@ pub fn compile(allocator: Allocator, source: []const u8, pool: *symbols.Pool, de
             .nominal => .nominal,
             .constructor => .constructor,
             .effect_family => .effect_family,
+            .contract => .contract,
             .value => unreachable,
         }, .index = exported.catalog, .origin = 0 });
     }
@@ -143,6 +144,7 @@ pub fn compile(allocator: Allocator, source: []const u8, pool: *symbols.Pool, de
     defer checked.deinit(allocator);
     if (checked.diagnostics.len != 0) {
         const item = checked.diagnostics[0];
+        if (item.hole) |hole| return .{ .compiled = .{}, .stats = .{ .syntax_nodes = tree.nodes.items.len - 1, .body_elaborations = checked.body_elaborations, .body_lowerings = 0, .imported_schemes = checked.imported_schemes }, .diagnostic = try publishedDiagnostic(allocator, 1, "check", source, .{ .cause = .native_detail, .code = @tagName(item.code), .span = item.span, .message = item.message() }, .{ .hole = hole }) };
         if (item.symbol == 0) return rejected(allocator, "check", @tagName(item.code), item.span, item.message());
         const message = try allocator.print("{s}{s}{s}", .{ item.message(), if (item.code == .unknown_intrinsic or item.code == .unknown_record_field) " " else ": ", pool.get(item.symbol) });
         defer allocator.free(message);

@@ -1,5 +1,8 @@
 # Compiler direction
 
+The approved type-system and ergonomics program, including typed external
+assets, is tracked in [language evolution](zig-native/LANGUAGE_EVOLUTION.md).
+
 Blot uses the handwritten Zig 0.17 compiler and its asynchronous
 retained-project API. The targets for gdev are about 500 ms cold compilation and
 under 100 ms incremental compilation, with language, effects, staging and guest

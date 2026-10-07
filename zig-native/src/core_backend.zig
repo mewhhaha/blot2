@@ -176,6 +176,10 @@ const Generator = struct {
             else => unreachable,
         };
         errdefer layouts.deinit();
+        for (units) |*unit_| layouts.record_names.add(allocator, unit_) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.TypeMismatch => return error.Declined,
+        };
         var module = wasm.Module.init(allocator);
         module.artifacts = journal;
         errdefer module.deinit();
@@ -845,7 +849,7 @@ const Generator = struct {
         };
     }
     fn internLayout(self: *Generator, tag: layout.Tag, a: u32, b: u32, values: []const u32) Error!layout.Id {
-        return self.layouts.intern(tag, a, b, values) catch |err| switch (err) {
+        return (if (tag == .record) self.layouts.internRecord(values) else self.layouts.intern(tag, a, b, values)) catch |err| switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             else => self.decline(1, .{ .start = 0, .end = 0 }, .complexity),
         };
@@ -1578,7 +1582,7 @@ const Generator = struct {
             try emitter.emit(.local_get, 1);
             try emitter.emit(if (self.layouts.machine(fn_type.a) == .f32) .f32_store else .i32_store, 0);
             break :blk record;
-        } else null;
+        } else if (payload_type.tag == .record) try emitter.recordRepresentation(payload_type, 1, true) else null;
         const address = try emitter.allocate(8);
         try emitter.emit(.local_get, address);
         try emitter.emit(.i32_const, metadata.tag);
@@ -3090,6 +3094,39 @@ const Emitter = struct {
             },
         }
     }
+    fn recordMerge(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const node = unit_.node(id);
+        const left_type = try g.codeLayoutWithRows(self.unit_id, unit_.typeOf(node.a), self.mappings, self.row_mappings, unit_.span(id));
+        const right_type = try g.codeLayoutWithRows(self.unit_id, unit_.typeOf(node.b), self.mappings, self.row_mappings, unit_.span(id));
+        const result_type = try g.codeLayoutWithRows(self.unit_id, node.ty, self.mappings, self.row_mappings, unit_.span(id));
+        if (g.layouts.node(left_type).tag != .record or g.layouts.node(right_type).tag != .record or g.layouts.node(result_type).tag != .record) return g.fail(self.unit_id, id, .unresolved_type);
+        // Even an overwritten field's computation remains observable.
+        const left = try self.capture(node.a, depth);
+        const right = try self.capture(node.b, depth);
+        const left_fields = g.layouts.children(left_type);
+        const right_fields = g.layouts.children(right_type);
+        const fields = g.layouts.children(result_type);
+        if (left_fields.len == 0 or right_fields.len == 0) return self.emit(.local_get, if (left_fields.len == 0) right else left);
+        if (fields.len / 2 > std.math.maxInt(u32) / 4) return g.fail(self.unit_id, id, .complexity);
+        const result = try self.allocate(@intCast(fields.len * 2));
+        var a: usize = 0;
+        var b: usize = 0;
+        var out: usize = 0;
+        while (out < fields.len) : (out += 2) {
+            const from_left = a < left_fields.len and left_fields[a] == fields[out];
+            const from_right = b < right_fields.len and right_fields[b] == fields[out];
+            if (!from_left and !from_right) return g.fail(self.unit_id, id, .unresolved_type);
+            try self.emit(.local_get, result);
+            try self.emit(.local_get, if (from_right) right else left);
+            try self.emit(.i32_load, @intCast((if (from_right) b else a) * 2));
+            try self.emit(.i32_store, @intCast(out * 2));
+            if (from_left) a += 2;
+            if (from_right) b += 2;
+        }
+        try self.emit(.local_get, result);
+    }
     fn aggregate(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
@@ -3106,12 +3143,37 @@ const Emitter = struct {
         const address = try self.allocate(@intCast(children.len * 4));
         const record = unit_.node(id).tag == .record;
         const destinations = if (record) unit_.recordDestinations(id) else &.{};
+        const physical = if (record) try @import("record_order.zig").destinations(scratch_allocator, unit_.types, unit_.types.node(unit_.typeOf(id)), &g.layouts.record_names) else &.{};
+        defer scratch_allocator.free(physical);
         for (children, locals.items, 0..) |child, value, index| {
+            const declared = if (record) destinations[index] else index;
+            const slot = if (physical.len == 0) declared else physical[declared];
             try self.emit(.local_get, address);
             try self.emit(.local_get, value);
-            try self.emit(if (try self.scalar(child) == .f32) .f32_store else .i32_store, @intCast((if (record) destinations[index] else index) * 4));
+            try self.emit(if (try self.scalar(child) == .f32) .f32_store else .i32_store, @intCast(slot * 4));
         }
         try self.emit(.local_get, address);
+    }
+    /// Constructor tuple views follow declaration order, while every record
+    /// pointer follows canonical field-name order. Identity views cost nothing.
+    fn recordRepresentation(self: *Emitter, record: types.Node, value: u32, into_record: bool) Error!u32 {
+        const g = self.generator;
+        var buffer: [256]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&buffer, g.allocator);
+        const order = try @import("record_order.zig").destinations(scratch.allocator(), g.unit(self.unit_id).types, record, &g.layouts.record_names);
+        defer scratch.allocator().free(order);
+        if (order.len == 0) return value;
+        if (record.b > std.math.maxInt(u32) / 4) return g.decline(self.unit_id, .{ .start = 0, .end = 0 }, .complexity);
+        const address = try self.allocate(record.b * 4);
+        for (order, 0..) |physical, declared| {
+            const source: u32 = if (into_record) @intCast(declared) else physical;
+            const target: u32 = if (into_record) physical else @intCast(declared);
+            try self.emit(.local_get, address);
+            try self.emit(.local_get, value);
+            try self.emit(.i32_load, source * 4);
+            try self.emit(.i32_store, target * 4);
+        }
+        return address;
     }
     fn construct(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const unit_ = self.generator.unit(self.unit_id);
@@ -3127,7 +3189,7 @@ const Emitter = struct {
                 try self.emit(.local_get, payload.?);
                 try self.emit(if (floating) .f32_store else .i32_store, 0);
                 payload = address;
-            }
+            } else payload = try self.recordRepresentation(record, payload.?, true);
             floating = false;
         }
         const address = try self.allocate(8);
@@ -3205,7 +3267,7 @@ const Emitter = struct {
         var inferred_variants: std.ArrayList(core.ProjectionVariant) = .empty;
         defer inferred_variants.deinit(g.allocator);
         var variants = unit_.projectionVariants(projection_index);
-        if (variants.len == 0) {
+        if (projection.field != 0 or variants.len == 0) {
             projection = try self.resolveProjection(projection, &inferred_variants, id);
             variants = inferred_variants.items;
         }
@@ -4723,6 +4785,7 @@ const Emitter = struct {
                 try self.emit(.call, wrapper);
             },
             .product, .record => try self.aggregate(id, depth),
+            .record_merge => try self.recordMerge(id, depth),
             .construct => try self.construct(id, depth),
             .project => try self.project(id, depth),
             .update => try self.update(id, depth),
@@ -5347,6 +5410,25 @@ const Emitter = struct {
     /// The row's failure block is shared by every nested test. Binding slots
     /// may be filled before a later test fails; their checked identities are
     /// local to this arm and a successful alternative overwrites every binder.
+    fn matchProduct(self: *Emitter, source: core.Id, pattern_id: core.PatternId, value_local: u32, failure_label: u32, record: types.Node, depth: usize) Error!void {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        if (depth >= 1024) return g.decline(self.unit_id, unit_.pattern(pattern_id).span, .complexity);
+        if (unit_.patternChildren(pattern_id).len != 0) _ = try g.module.ensureArena();
+        var buffer: [256]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&buffer, g.allocator);
+        const order = if (record.tag == .record) try @import("record_order.zig").destinations(scratch.allocator(), unit_.types, record, &g.layouts.record_names) else &.{};
+        defer scratch.allocator().free(order);
+        for (unit_.patternChildren(pattern_id), 0..) |child, index| {
+            const child_pattern = unit_.pattern(child);
+            const machine = try self.patternMachine(child_pattern.ty, child_pattern.span);
+            const local = try g.module.addLocal(self.function_id, machine);
+            try self.emit(.local_get, value_local);
+            try self.emit(if (machine == .f32) .f32_load else .i32_load, @intCast((if (order.len == 0) index else order[index]) * 4));
+            try self.emit(.local_set, local);
+            try self.matchPattern(source, child, local, failure_label, depth + 1);
+        }
+    }
     fn matchPattern(self: *Emitter, source: core.Id, pattern_id: core.PatternId, value_local: u32, failure_label: u32, depth: usize) Error!void {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
@@ -5365,18 +5447,7 @@ const Emitter = struct {
                 try self.emit(if (machine == .f32) .f32_ne else .i32_ne, 0);
                 try self.emit(.br_if, self.labels - 1 - failure_label);
             },
-            .product => {
-                if (unit_.patternChildren(pattern_id).len != 0) _ = try g.module.ensureArena();
-                for (unit_.patternChildren(pattern_id), 0..) |child, index| {
-                    const child_pattern = unit_.pattern(child);
-                    const machine = try self.patternMachine(child_pattern.ty, child_pattern.span);
-                    const local = try g.module.addLocal(self.function_id, machine);
-                    try self.emit(.local_get, value_local);
-                    try self.emit(if (machine == .f32) .f32_load else .i32_load, @intCast(index * 4));
-                    try self.emit(.local_set, local);
-                    try self.matchPattern(source, child, local, failure_label, depth + 1);
-                }
-            },
+            .product => try self.matchProduct(source, pattern_id, value_local, failure_label, unit_.types.node(p.ty), depth),
             .record_payload => {
                 if (p.a == 1) {
                     _ = try g.module.ensureArena();
@@ -5387,10 +5458,13 @@ const Emitter = struct {
                     try self.emit(if (machine == .f32) .f32_load else .i32_load, 0);
                     try self.emit(.local_set, local);
                     try self.matchPattern(source, p.b, local, failure_label, depth + 1);
-                } else {
-                    // Record and canonical product slots share declaration
-                    // order. Only a one-field payload needs an unboxing load.
-                    try self.matchPattern(source, p.b, value_local, failure_label, depth + 1);
+                } else if (unit_.pattern(p.b).tag == .product) {
+                    // Destructuring only needs permuted loads, not a temporary
+                    // tuple allocation. A whole-payload binder needs the view.
+                    try self.matchProduct(source, p.b, value_local, failure_label, unit_.types.node(p.ty), depth + 1);
+                } else if (unit_.pattern(p.b).tag != .wildcard) {
+                    const product = try self.recordRepresentation(unit_.types.node(p.ty), value_local, false);
+                    try self.matchPattern(source, p.b, product, failure_label, depth + 1);
                 }
             },
             .constructor => {

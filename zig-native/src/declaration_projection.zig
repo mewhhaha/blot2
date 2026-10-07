@@ -122,7 +122,7 @@ const Scan = struct {
                 _ = try equalItem(core.Primitive, self.old.primitives, self.current.primitives, n.a);
             },
             .reference => try self.reference(try equalItem(core.BindingRef, self.old.references, self.current.references, n.a)),
-            .scalar, .logical, .associated, .type_same, .effect_provider => {
+            .scalar, .logical, .associated, .record_merge, .type_same, .effect_provider => {
                 try self.node(n.a);
                 try self.node(n.b);
             },

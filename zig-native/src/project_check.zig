@@ -9,7 +9,7 @@ const Allocator = std.mem.Allocator;
 const PI = @import("principal_interface.zig");
 const entry_cutoff = @import("entry_frontend_cutoff.zig");
 
-pub const Export = struct { name: symbols.Symbol, target: check.ExternalTarget = .{ .unit = 0, .binding = 0 }, kind: enum { value, nominal, constructor, effect_family } = .value, catalog: u32 = 0 };
+pub const Export = struct { name: symbols.Symbol, target: check.ExternalTarget = .{ .unit = 0, .binding = 0 }, kind: enum { value, nominal, constructor, effect_family, contract } = .value, catalog: u32 = 0 };
 pub const Module = struct {
     checked: check.Checked,
     exports: []Export,
@@ -32,6 +32,8 @@ pub const Diagnostic = struct {
     source_terminator: check.Diagnostic.Terminator = .none,
     numeric_literal: ?ast.NumericFault = null,
     purity: ?check.PurityWitness = null,
+    detail: ?[]const u8 = null,
+    hole: ?@import("hole_diagnostics.zig").Snapshot = null,
     source: ?project.Diagnostic = null,
 
     pub fn codeName(self: Diagnostic) []const u8 {
@@ -40,6 +42,7 @@ pub const Diagnostic = struct {
         return @tagName(self.code);
     }
     pub fn message(self: Diagnostic) []const u8 {
+        if (self.detail) |detail| return detail;
         if (self.semantic) |code| return (check.Diagnostic{ .code = code, .node = 0, .span = self.span, .type_application = self.type_application, .symbol = self.symbol, .implicit_type_witness = self.implicit_type_witness, .source_terminator = self.source_terminator }).message();
         if (self.source) |source| return source.message();
         return switch (self.code) {
@@ -74,7 +77,11 @@ pub const CheckedProject = struct {
         allocator.free(self.modules);
         allocator.free(self.reused_modules);
         allocator.free(self.interface_colors);
-        for (self.diagnostics) |diagnostic| if (diagnostic.purity) |witness| witness.deinit(allocator);
+        for (self.diagnostics) |diagnostic| {
+            if (diagnostic.purity) |witness| witness.deinit(allocator);
+            if (diagnostic.detail) |detail| allocator.free(detail);
+            if (diagnostic.hole) |hole| hole.deinit(allocator);
+        }
         allocator.free(self.diagnostics);
         self.* = .{};
     }
@@ -226,6 +233,7 @@ const Engine = struct {
             .nominal => .nominal,
             .constructor => .constructor,
             .effect_family => .effect_family,
+            .contract => .contract,
             .value => unreachable,
         }, exported.catalog, origin);
     }
@@ -249,7 +257,7 @@ const Engine = struct {
         // of the source position of a namespace import.
         for (tree.roots.items) |root| {
             const node = tree.node(root);
-            if (node.tag == .value_decl or node.tag == .data_decl or node.tag == .effect_type_decl or node.tag == .effect_decl)
+            if (node.tag == .value_decl or node.tag == .data_decl or node.tag == .type_alias_decl or node.tag == .contract_decl or node.tag == .effect_type_decl or node.tag == .effect_decl)
                 try occupied.put(self.allocator, node.a, {});
             if (node.tag == .data_decl) for (tree.children(node.b)) |constructor| {
                 try occupied.put(self.allocator, tree.node(constructor).a, {});
@@ -379,6 +387,10 @@ const Engine = struct {
         for (diagnostics) |diagnostic_| {
             const purity = if (diagnostic_.purity) |witness| try witness.clone(self.allocator) else null;
             errdefer if (purity) |witness| witness.deinit(self.allocator);
+            const detail = if (diagnostic_.detail) |text| try self.allocator.dupe(u8, text) else null;
+            errdefer if (detail) |text| self.allocator.free(text);
+            const hole = if (diagnostic_.hole) |value| try value.clone(self.allocator) else null;
+            errdefer if (hole) |value| value.deinit(self.allocator);
             try self.diagnostics.append(self.allocator, .{
                 .unit = unit,
                 .span = diagnostic_.span,
@@ -390,6 +402,8 @@ const Engine = struct {
                 .source_terminator = diagnostic_.source_terminator,
                 .numeric_literal = diagnostic_.numeric_literal,
                 .purity = purity,
+                .detail = detail,
+                .hole = hole,
             });
         }
     }
@@ -408,6 +422,9 @@ const Engine = struct {
         };
         for (catalog.effect_families[1..], 1..) |family, index| if (family.identity.unit == unit) {
             try exports.append(self.allocator, .{ .name = family.name, .kind = .effect_family, .catalog = @intCast(index) });
+        };
+        for (catalog.contracts, 0..) |contract, index| if (contract.identity.unit == unit) {
+            try exports.append(self.allocator, .{ .name = contract.name, .kind = .contract, .catalog = @intCast(index) });
         };
         try self.appendDiagnostics(unit, diagnostics);
         // All fallible transfers finish before the caller publishes its owner.
@@ -437,7 +454,11 @@ fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: c
     var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .execution = execution };
     errdefer engine.result.deinit(allocator);
     defer {
-        for (engine.diagnostics.items) |diagnostic| if (diagnostic.purity) |witness| witness.deinit(allocator);
+        for (engine.diagnostics.items) |diagnostic| {
+            if (diagnostic.purity) |witness| witness.deinit(allocator);
+            if (diagnostic.detail) |detail| allocator.free(detail);
+            if (diagnostic.hole) |hole| hole.deinit(allocator);
+        }
         engine.diagnostics.deinit(allocator);
     }
     defer engine.deinitSourceModules();

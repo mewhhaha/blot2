@@ -32,6 +32,7 @@ export default grammar({
         $.constructor_reference,
         $.constructor_marker,
         $.where_clause,
+        $.contract_header,
         $.parenthesized,
         $.bracketed,
         $.array,
@@ -204,6 +205,7 @@ export default grammar({
     // Highlight the contextual clause without treating `where` as a global
     // keyword: `const where` and `fn where =>` remain ordinary identifiers.
     where_clause: ($) => prec(4, seq("where", $.braced)),
+    contract_header: ($) => prec(4, seq("is", "contract", "=")),
 
     type_header: ($) =>
       prec.right(

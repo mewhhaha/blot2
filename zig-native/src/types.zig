@@ -43,7 +43,7 @@ pub const List = struct { start: u32 = 0, len: u32 = 0 };
 pub const Scheme = struct { root: Id = absent, variables: List = .{}, row_variables: List = .{}, closed_rows: List = .{}, obligations: List = .{} };
 pub const ClosedCovariant = struct { root: Id, closed_rows: List };
 pub const Operator = enum { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right };
-pub const ObligationKind = enum { arithmetic, ordered, equality, integer, field, writable_field, dispatch, result_dispatch, monad_factory, resolver_dispatch, resolver_shape, effect_operation, effect_handler, receiver, update, type_rep, effect_rep, type_head, collection };
+pub const ObligationKind = enum { arithmetic, ordered, equality, integer, field, writable_field, dispatch, result_dispatch, monad_factory, resolver_dispatch, resolver_shape, effect_operation, effect_handler, receiver, update, type_rep, effect_rep, type_head, collection, record_merge };
 pub const Obligation = struct { ty: Id, kind: ObligationKind, source: u32, name: u32 = 0, result: Id = 0, other: Id = 0, signature: Id = 0, operator: Operator = .none, identity: NominalIdentity = .{ .unit = 0, .decl = 0 }, explicit: bool = false, qualification_span: ?@import("ast.zig").Span = null, qualification_unit: u32 = 0 };
 pub const Version = struct { variable: u32, replacement: Id, position: Cursor, previous: u32, next: u32 = none };
 const none = std.math.maxInt(u32);
@@ -285,6 +285,33 @@ pub const Store = struct {
     pub fn recordField(self: *const Store, value: Node, index: usize) Field {
         std.debug.assert(value.tag == .record and index < value.b);
         return .{ .name = self.extra.items[value.a + index * 2], .ty = self.extra.items[value.a + index * 2 + 1] };
+    }
+    /// A deferred shape equation. Right fields replace left fields, including
+    /// their types; the remaining left fields keep their identities.
+    pub fn mergeRecords(self: *Store, left: Id, right: Id) Error!?Id {
+        const a = self.node(self.head(left, 0));
+        const b = self.node(self.head(right, 0));
+        if (a.tag == .never or b.tag == .never) return never;
+        if ((a.tag != .record and a.tag != .variable) or (b.tag != .record and b.tag != .variable)) return error.TypeMismatch;
+        if (a.tag == .variable or b.tag == .variable) return null;
+        if (a.b == 0) return right;
+        if (b.b == 0) return left;
+        var buffer: [1024]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&buffer, self.allocator);
+        const allocator = scratch.allocator();
+        var fields: std.ArrayList(Field) = .empty;
+        defer fields.deinit(allocator);
+        var slots: std.AutoHashMapUnmanaged(u32, usize) = .empty;
+        defer slots.deinit(allocator);
+        for ([_]Node{ a, b }) |shape| for (0..shape.b) |index| {
+            const field = self.recordField(shape, index);
+            const slot = try slots.getOrPut(allocator, field.name);
+            if (slot.found_existing) fields.items[slot.value_ptr.*] = field else {
+                slot.value_ptr.* = fields.items.len;
+                try fields.append(allocator, field);
+            }
+        };
+        return try self.record(fields.items);
     }
     pub fn cursor(self: *const Store) Cursor {
         return self.effects.next_position;
@@ -995,36 +1022,55 @@ pub const Store = struct {
         // A monomorphic scheme needs no type copying. Keep its raw historical
         // view; callers still reopen eligible covariant latent rows separately.
         if (old.len == 0 and old_rows.len == 0) return root;
-        return self.substituteDepth(root, old, fresh_ids, old_rows, fresh_rows, 0);
+        var scratch_buffer: [1024]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        var copied: std.AutoHashMapUnmanaged(Id, Id) = .empty;
+        defer copied.deinit(scratch.allocator());
+        return self.substituteDepth(root, old, fresh_ids, old_rows, fresh_rows, &copied, scratch.allocator(), 0);
     }
     fn substitutedRow(self: *Store, effect_row: Effects.Id, old: []const u32, replacements: []const Effects.Id) Error!Effects.Id {
         var result = effect_row;
         for (old, replacements) |variable, replacement_id| result = self.effects.substitute(result, variable, replacement_id) catch |err| return effectError(err);
         return result;
     }
-    fn substituteDepth(self: *Store, root: Id, old: []const Id, fresh_ids: []const Id, old_rows: []const u32, fresh_rows: []const Effects.Id, depth: usize) Error!Id {
+    // A type graph is a DAG. Repeated children must retain sharing during
+    // instantiation; aliases and generic signatures can otherwise expand a
+    // linear graph into an exponential tree. The memo is local to this exact
+    // substitution, so historical variable views and fresh identities stay exact.
+    fn substituteDepth(self: *Store, root: Id, old: []const Id, fresh_ids: []const Id, old_rows: []const u32, fresh_rows: []const Effects.Id, copied: *std.AutoHashMapUnmanaged(Id, Id), scratch: std.mem.Allocator, depth: usize) Error!Id {
         if (depth >= 1024) return error.TypeLimit;
-        for (old, fresh_ids) |a, b| if (root == a) return b;
+        for (old, fresh_ids) |before, after| if (root == before) return after;
+        if (root <= never) return root;
+        if (self.node(root).tag == .variable) return root;
+        // The input graph is acyclic: the initial root cannot recur beneath
+        // itself. Leaf signatures then need no memo allocation at all.
+        if (depth != 0) if (copied.get(root)) |known| return known;
+        const result = try self.substituteNode(root, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth);
+        if (depth != 0) try copied.put(scratch, root, result);
+        return result;
+    }
+    fn substituteNode(self: *Store, root: Id, old: []const Id, fresh_ids: []const Id, old_rows: []const u32, fresh_rows: []const Effects.Id, copied: *std.AutoHashMapUnmanaged(Id, Id), scratch: std.mem.Allocator, depth: usize) Error!Id {
+        if (depth >= 1024) return error.TypeLimit;
         const value = self.node(root);
         switch (value.tag) {
-            .function => return self.functionWithEffects(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, depth + 1), try self.substituteDepth(value.b, old, fresh_ids, old_rows, fresh_rows, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
+            .function => return self.functionWithEffects(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substituteDepth(value.b, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
             .product => {
                 var fields: std.ArrayList(Id) = .empty;
                 defer fields.deinit(self.allocator);
-                for (0..value.b) |i| try fields.append(self.allocator, try self.substituteDepth(self.extra.items[value.a + i], old, fresh_ids, old_rows, fresh_rows, depth + 1));
+                for (0..value.b) |i| try fields.append(self.allocator, try self.substituteDepth(self.extra.items[value.a + i], old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1));
                 return self.product(fields.items);
             },
-            .array, .list => return self.sequence(value.tag, try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, depth + 1)),
-            .demand => return self.demandWithEffects(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
-            .provider => return self.provider(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
-            .state_provider => return self.stateProvider(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, depth + 1), try self.substituteDepth(value.b, old, fresh_ids, old_rows, fresh_rows, depth + 1), try self.substituteDepth(value.c, old, fresh_ids, old_rows, fresh_rows, depth + 1)),
-            .resolver => return self.resolver(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, depth + 1)),
+            .array, .list => return self.sequence(value.tag, try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
+            .demand => return self.demandWithEffects(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
+            .provider => return self.provider(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substitutedRow(value.c, old_rows, fresh_rows)),
+            .state_provider => return self.stateProvider(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substituteDepth(value.b, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1), try self.substituteDepth(value.c, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
+            .resolver => return self.resolver(try self.substituteDepth(value.a, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1)),
             .record => {
                 var fields: std.ArrayList(Field) = .empty;
                 defer fields.deinit(self.allocator);
                 for (0..value.b) |i| {
                     const field = self.recordField(value, i);
-                    try fields.append(self.allocator, .{ .name = field.name, .ty = try self.substituteDepth(field.ty, old, fresh_ids, old_rows, fresh_rows, depth + 1) });
+                    try fields.append(self.allocator, .{ .name = field.name, .ty = try self.substituteDepth(field.ty, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1) });
                 }
                 return self.record(fields.items);
             },
@@ -1033,7 +1079,7 @@ pub const Store = struct {
                 defer self.allocator.free(prior);
                 var args: std.ArrayList(Id) = .empty;
                 defer args.deinit(self.allocator);
-                for (prior) |child| try args.append(self.allocator, try self.substituteDepth(child, old, fresh_ids, old_rows, fresh_rows, depth + 1));
+                for (prior) |child| try args.append(self.allocator, try self.substituteDepth(child, old, fresh_ids, old_rows, fresh_rows, copied, scratch, depth + 1));
                 return self.nominal(.{ .unit = value.a, .decl = value.b }, args.items);
             },
             else => return root,
@@ -1640,4 +1686,60 @@ test "variable scratch closed subgraphs retain exact nesting errors across the c
     try std.testing.expectError(error.TypeLimit, left.freeRowVariablesMode(roots[0], false));
     try std.testing.expectError(error.TypeLimit, right.freeVariables(roots[1]));
     try std.testing.expectError(error.TypeLimit, right.freeRowVariables(roots[1]));
+}
+
+fn sharedSubstitutionLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.init(allocator);
+    defer store.deinit();
+    const variable = try store.fresh();
+    var root = variable;
+    for (0..64) |_| root = try store.product(&.{ root, root });
+    const before = store.nodes.items.len;
+    var result = try store.substitute(root, &.{variable}, &.{u32_type});
+    // The output describes 2^64 leaves using 64 shared product nodes.
+    try std.testing.expect(store.nodes.items.len - before <= 64);
+    for (0..64) |_| {
+        const node_ = store.node(result);
+        try std.testing.expectEqual(Tag.product, node_.tag);
+        const fields = store.list(.{ .start = node_.a, .len = node_.b });
+        try std.testing.expectEqual(fields[0], fields[1]);
+        result = fields[0];
+    }
+    try std.testing.expectEqual(u32_type, result);
+    // A second substitution owns distinct replacements; no memo survives calls.
+    const next = try store.substitute(root, &.{variable}, &.{f32_type});
+    try std.testing.expect(next != result);
+    try std.testing.expectEqual(f32_type, try store.substitute(u32_type, &.{u32_type}, &.{f32_type}));
+}
+test "shared type substitution stays linear and releases scratch on allocation failure" {
+    try sharedSubstitutionLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sharedSubstitutionLaw, .{});
+}
+
+test "type substitution preserves historical views and independent row replacements" {
+    var store = try Store.init(std.testing.allocator);
+    defer store.deinit();
+    const variable = try store.fresh();
+    try store.appendVersion(variable, u32_type);
+    const future = try store.resolve(variable, store.cursor());
+    try store.appendVersion(variable, f32_type);
+    const root = try store.product(&.{ variable, future, future });
+    const selected = try store.substitute(root, &.{variable}, &.{boolean});
+    const node_ = store.node(selected);
+    const fields = store.list(.{ .start = node_.a, .len = node_.b });
+    try std.testing.expectEqual(boolean, fields[0]);
+    try std.testing.expectEqual(future, fields[1]);
+    try std.testing.expectEqual(future, fields[2]);
+    try std.testing.expectEqual(f32_type, try store.resolve(fields[1], 0));
+    const row_ = try store.freshEffects();
+    const callable = try store.functionWithEffects(unit, u32_type, row_);
+    const pair = try store.product(&.{ callable, callable });
+    const row_variable = store.row(row_).tail.variable;
+    const pure = try store.substituteWithRows(pair, &.{}, &.{}, &.{row_variable}, &.{0});
+    const foreign = try store.effects.row(&.{foreign_operation}, .closed);
+    const effectful = try store.substituteWithRows(pair, &.{}, &.{}, &.{row_variable}, &.{foreign});
+    const pure_function = store.node(store.list(.{ .start = store.node(pure).a, .len = 2 })[0]);
+    const effectful_function = store.node(store.list(.{ .start = store.node(effectful).a, .len = 2 })[0]);
+    try std.testing.expectEqual(@as(Effects.Id, 0), pure_function.c);
+    try std.testing.expectEqualSlices(Effects.Label, &.{foreign_operation}, store.rowLabels(effectful_function.c));
 }

@@ -11,9 +11,9 @@ Deno.test("generic public interfaces reject after concrete retained inference", 
     for (const value of [0, 21, 0xffffffff]) equal(guest.call("selected", value), (value + 21) >>> 0);
   });
 });
-Deno.test("anonymous record rejection precedes unknown children and named records remain distinct", async () => {
-  for (const source of ["entry const x = { lower: 0 }\n", "entry const x = ({ lower: missing }).lower\n"])
-    await compileExpectedFailure(source, "unsupported_expression");
+Deno.test("structural records validate children and named records remain distinct", async () => {
+  await compileExpectedFailure("entry const x = { lower: 0 }\n", "entry_type");
+  await compileExpectedFailure("entry const x = ({ lower: missing }).lower\n", "unknown_value");
   await compileExpectedFailure("entry const x = #Missing { lower: 0 }\n", "unknown_constructor");
   await compileAndRun("type Box is data = #Box { lower: U32 }\nentry const x = (#Box { lower: 42 }).lower\n", guest => equal(guest.read("x"), 42));
 });

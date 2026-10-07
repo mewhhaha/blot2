@@ -176,6 +176,26 @@ const Bound = struct { binding: core.BindingId, value: ValueId, previous: ?Value
 const FieldKey = struct { family: u64, tag: u32, name: u32 };
 const FieldLocation = struct { field: u32, len: u32 };
 const ViewKey = struct { value: ValueId, evidence: type_evidence.Id };
+// Offsets remain stable when field_names grows. The context is supplied for
+// every lookup, so no hash-table key borrows a reallocatable slice pointer.
+const RecordNames = struct {
+    words: []const u32,
+    pub fn hash(self: @This(), key: core.List) u64 {
+        return std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(self.words[key.start..][0..key.len]));
+    }
+    pub fn eql(self: @This(), a: core.List, b: core.List) bool {
+        return std.mem.eql(u32, self.words[a.start..][0..a.len], self.words[b.start..][0..b.len]);
+    }
+    const Adapter = struct {
+        words: []const u32,
+        pub fn hash(_: @This(), names: []const u32) u64 {
+            return std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(names));
+        }
+        pub fn eql(self: @This(), names: []const u32, key: core.List) bool {
+            return std.mem.eql(u32, names, self.words[key.start..][0..key.len]);
+        }
+    };
+};
 const RecordKey = struct { unit: usize, ty: types.Id };
 const unit_value: Value = .{ .scalar = .unit, .bits = 0 };
 
@@ -257,6 +277,7 @@ pub const Session = struct {
     record_layouts: std.ArrayList(core.List) = .empty,
     field_names: std.ArrayList(u32) = .empty,
     record_types: std.AutoHashMapUnmanaged(RecordKey, u32) = .empty,
+    record_shapes: std.HashMapUnmanaged(core.List, u32, RecordNames, 80) = .empty,
     break_values: std.ArrayList(ValueId) = .empty,
     field_locations: std.AutoHashMapUnmanaged(FieldKey, FieldLocation) = .empty,
     request_cells: std.ArrayList(RequestCell) = .empty,
@@ -352,6 +373,7 @@ pub const Session = struct {
         self.record_layouts.deinit(self.allocator);
         self.field_names.deinit(self.allocator);
         self.record_types.deinit(self.allocator);
+        self.record_shapes.deinit(self.allocator);
         self.break_values.deinit(self.allocator);
         self.field_locations.deinit(self.allocator);
         self.* = undefined;
@@ -696,7 +718,7 @@ pub const Session = struct {
                     if (n.c != 0 and n.b != 0) return false;
                     for ([_]core.Id{ n.a, n.b }) |id| try work.append(self.allocator, .{ .owner = key.owner, .node = id });
                 },
-                .logical, .type_same, .apply, .effect_provider, .handle => for ([_]core.Id{ n.a, n.b }) |id| {
+                .logical, .record_merge, .type_same, .apply, .effect_provider, .handle => for ([_]core.Id{ n.a, n.b }) |id| {
                     try work.append(self.allocator, .{ .owner = key.owner, .node = id });
                 },
                 .if_value, .if_stmt, .state_provider => for ([_]core.Id{ n.a, n.b, n.c }) |id| {
@@ -1129,7 +1151,7 @@ pub const Session = struct {
                         try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = module.suspension(operation.id).body } });
                     },
                     .reference => try work.append(self.allocator, .{ .binding = try self.target(operation.unit, module.reference(operation.id)) }),
-                    .scalar, .logical, .associated, .type_same, .effect_provider, .handle => {
+                    .scalar, .logical, .associated, .record_merge, .type_same, .effect_provider, .handle => {
                         if (n.b != 0) try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.b } });
                         try work.append(self.allocator, .{ .node = .{ .unit = operation.unit, .id = n.a } });
                     },
@@ -1524,6 +1546,7 @@ pub const Session = struct {
                 return .{ .value = try self.constant(resolved) };
             },
             .product, .record, .array => return self.aggregate(owner, id, frame),
+            .record_merge => return self.recordMerge(owner, id, frame),
             .array_op => return self.arrayOperation(owner, id, frame),
             .closure => {
                 const bindings = module.closureCaptures(id);
@@ -1848,22 +1871,79 @@ pub const Session = struct {
         self.value_records.items[result] = record_layout;
         return .{ .value = result };
     }
+    fn recordMerge(self: *Session, owner: usize, source: core.Id, frame: *Frame) Error!Flow {
+        const node = self.units[owner].node(source);
+        const left = try self.expression(owner, node.a, frame);
+        if (left != .value) return left;
+        const right = try self.expression(owner, node.b, frame);
+        if (right != .value) return right;
+        if (self.valueInfo(left.value).kind != .record or self.valueInfo(right.value).kind != .record) return self.failNode(owner, source, .type_mismatch);
+        if (self.valueInfo(left.value).len == 0) return right;
+        if (self.valueInfo(right.value).len == 0) return left;
+        var buffer: [1024]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&buffer, self.allocator);
+        const allocator = scratch.allocator();
+        var names: std.ArrayList(u32) = .empty;
+        defer names.deinit(allocator);
+        var children: std.ArrayList(ValueId) = .empty;
+        defer children.deinit(allocator);
+        var slots: std.AutoHashMapUnmanaged(u32, usize) = .empty;
+        defer slots.deinit(allocator);
+        for ([_]ValueId{ left.value, right.value }) |input| {
+            for (self.recordFieldNames(input), self.valueChildren(input)) |name, child| {
+                const entry = try slots.getOrPut(allocator, name);
+                if (entry.found_existing) children.items[entry.value_ptr.*] = child else {
+                    entry.value_ptr.* = children.items.len;
+                    try names.append(allocator, name);
+                    try children.append(allocator, child);
+                }
+            }
+        }
+        const shape = try self.internRecordLayout(owner, source, names.items);
+        const value_ = try self.makeAggregate(owner, source, .record, 0, 0, children.items);
+        self.value_records.items[value_] = shape;
+        // These are the surviving values' existing closed facts, including
+        // independently closed callback rows. Never infer a principal scheme
+        // from a caller's expected result or copy a discarded field's type.
+        const word_count = std.math.mul(usize, names.items.len, 2) catch return self.failNode(owner, source, .constant_fuel);
+        const words = try allocator.alloc(u32, word_count);
+        defer allocator.free(words);
+        const closed = for (names.items, children.items, 0..) |name, child, index| {
+            words[index * 2] = name;
+            words[index * 2 + 1] = self.valueEvidence(child);
+            if (words[index * 2 + 1] == 0) break false;
+        } else true;
+        if (closed) self.value_evidence.items[value_] = self.evidence.intern(.record, 0, 0, words) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
+        return .{ .value = value_ };
+    }
+    fn internRecordLayout(self: *Session, owner: usize, source: core.Id, names: []const u32) Error!u32 {
+        if (names.len == 0) return 0;
+        if (self.record_shapes.getAdapted(names, RecordNames.Adapter{ .words = self.field_names.items })) |existing| return existing;
+        if (names.len > std.math.maxInt(u32) - self.field_names.items.len or self.record_layouts.items.len >= std.math.maxInt(u32)) return self.failNode(owner, source, .constant_fuel);
+        try self.record_layouts.ensureUnusedCapacity(self.allocator, 1);
+        try self.field_names.ensureUnusedCapacity(self.allocator, names.len);
+        try self.record_shapes.ensureUnusedCapacityContext(self.allocator, 1, .{ .words = self.field_names.items });
+        const shape: u32 = @intCast(self.record_layouts.items.len);
+        const span: core.List = .{ .start = @intCast(self.field_names.items.len), .len = @intCast(names.len) };
+        self.field_names.appendSliceAssumeCapacity(names);
+        self.record_layouts.appendAssumeCapacity(span);
+        self.record_shapes.putAssumeCapacityContext(span, shape, .{ .words = self.field_names.items });
+        return shape;
+    }
     fn recordLayout(self: *Session, owner: usize, source: core.Id, ty: types.Id) Error!u32 {
         const key: RecordKey = .{ .unit = owner, .ty = ty };
         if (self.record_types.get(key)) |existing| return existing;
         const module = &self.units[owner];
         const record = module.types.node(ty);
         if (record.tag != .record) return self.failNode(owner, source, .unsupported);
-        if (record.b > std.math.maxInt(u32) - self.field_names.items.len or self.record_layouts.items.len >= std.math.maxInt(u32)) return self.failNode(owner, source, .constant_fuel);
-        try self.record_layouts.ensureUnusedCapacity(self.allocator, 1);
-        try self.field_names.ensureUnusedCapacity(self.allocator, record.b);
-        try self.record_types.ensureUnusedCapacity(self.allocator, 1);
-        const layout: u32 = @intCast(self.record_layouts.items.len);
-        const start: u32 = @intCast(self.field_names.items.len);
-        for (0..record.b) |index| self.field_names.appendAssumeCapacity(module.types.recordField(record, index).name);
-        self.record_layouts.appendAssumeCapacity(.{ .start = start, .len = record.b });
-        self.record_types.putAssumeCapacity(key, layout);
-        return layout;
+        var buffer: [256]u8 align(@alignOf(u32)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&buffer, self.allocator);
+        const names = try scratch.allocator().alloc(u32, record.b);
+        defer scratch.allocator().free(names);
+        for (names, 0..) |*name, index| name.* = module.types.recordField(record, index).name;
+        const shape = try self.internRecordLayout(owner, source, names);
+        try self.record_types.put(self.allocator, key, shape);
+        return shape;
     }
     fn filledArray(self: *Session, owner: usize, source: core.Id, count: u32, value_: ValueId, kind: ValueKind) Error!ValueId {
         if (count >= 4_194_304) return self.arrayLengthFailure(owner);
@@ -1981,6 +2061,7 @@ pub const Session = struct {
         const variants = module.projectionVariants(projection_index);
         if (projection.nominal.decl == 0 and variants.len == 0) return self.genericField(owner, source, projection.field, value_);
         const info = self.valueInfo(value_);
+        if (info.kind == .record and projection.field != 0) return self.genericField(owner, source, projection.field, value_);
         var field: ?u32 = null;
         var container = value_;
         var wrapped = false;
@@ -2193,7 +2274,13 @@ pub const Session = struct {
                 const patterns = module.patternChildren(pattern_id);
                 if (info.kind != expected_kind or info.len != patterns.len) return false;
                 for (patterns, 0..) |child, index| {
-                    const child_value = self.valueChildren(value_)[index];
+                    var field_slot = index;
+                    if (expected_kind == .record) {
+                        const name = module.types.recordField(module.types.node(pattern.ty), index).name;
+                        const names = self.recordFieldNames(value_);
+                        field_slot = std.mem.indexOfScalar(u32, names, name) orelse return false;
+                    }
+                    const child_value = self.valueChildren(value_)[field_slot];
                     if (!try self.matchPattern(owner, child, child_value, frame, bound, nesting + 1)) return false;
                 }
                 return true;
@@ -3227,7 +3314,7 @@ const ClosureRegion = struct {
     const CallKey = struct { owner: usize, binding: core.BindingId, evidence: type_evidence.Id, caller: u32 = 0 };
     const DefinitionKey = struct { owner: usize, node: core.Id };
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
-    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection };
+    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge };
     const Constraint = struct { explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, solved: bool = false };
     session: *Session,
     solver: types.Store,
@@ -3328,6 +3415,7 @@ const ClosureRegion = struct {
                 .field => .physical_field,
                 .receiver => .receiver,
                 .update => .update,
+                .record_merge => .record_merge,
                 .effect_operation => .effect_operation,
                 .type_rep => .type_rep,
                 .effect_rep => .effect_rep,
@@ -4507,12 +4595,13 @@ const ClosureRegion = struct {
                     self.startup_coverage_complete = false;
                 }
             }
+            if (n.tag == .record_merge) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .kind = .record_merge });
             if (self.source_interface and n.tag == .type_same) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = types.boolean, .kind = .type_compare });
             if (n.tag == .associated or (n.tag == .scalar and n.c != 0 and n.b != 0)) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .deferred_member = self.defer_members, .op = Session.operator(n.op), .member = if (n.tag == .associated) n.c else 0 });
             if (n.tag == .project) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .projection = n.b, .kind = .field, .deferred_member = self.defer_members });
             if (n.tag == .result_associated) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .member = n.b, .kind = .result_dispatch, .deferred_member = self.defer_members });
             switch (n.tag) {
-                .scalar, .associated, .logical, .type_same, .apply, .effect_provider, .handle => try work.appendSlice(self.session.allocator, &.{ n.a, n.b }),
+                .scalar, .associated, .logical, .record_merge, .type_same, .apply, .effect_provider, .handle => try work.appendSlice(self.session.allocator, &.{ n.a, n.b }),
                 .if_value, .if_stmt, .state_provider => try work.appendSlice(self.session.allocator, &.{ n.a, n.b, n.c }),
                 .array_op => {
                     const args = module.children(id);
@@ -4732,8 +4821,10 @@ const ClosureRegion = struct {
                 var complete = true;
                 for (0..source.b) |index| {
                     const left = self.solver.recordField(source, index);
-                    const right = self.solver.recordField(use, index);
-                    if (left.name != right.name) return error.TypeMismatch;
+                    const right = for (0..use.b) |other| {
+                        const candidate = self.solver.recordField(use, other);
+                        if (left.name == candidate.name) break candidate;
+                    } else return error.TypeMismatch;
                     complete = try self.transferDataFacts(left.ty, right.ty, depth + 1) and complete;
                 }
                 return complete;
@@ -4796,6 +4887,14 @@ const ClosureRegion = struct {
                 if (constraint.solved) continue;
                 remaining += 1;
                 if (!constraint.deferred_member) required += 1;
+                if (constraint.kind == .record_merge) {
+                    if (try self.solver.mergeRecords(constraint.left, constraint.right)) |merged| {
+                        try self.solver.unify(merged, constraint.result);
+                        self.constraints.items[index].solved = true;
+                        progress = true;
+                    }
+                    continue;
+                }
                 if (constraint.kind == .collection) {
                     const owner_type = self.solver.node(try self.solver.resolve(constraint.left, 0));
                     if (owner_type.tag == .variable) continue;
@@ -5531,7 +5630,7 @@ const ClosureRegion = struct {
             if (constraint.solved) continue;
             if (constraint.scope != scope or constraint.explicit or constraint.deferred_member) return false;
             switch (constraint.kind) {
-                .binary, .field, .result_dispatch, .physical_field, .receiver, .update, .type_compare, .collection => {},
+                .binary, .field, .result_dispatch, .physical_field, .receiver, .update, .type_compare, .collection, .record_merge => {},
                 else => return false,
             }
             for ([_]types.Id{ constraint.left, constraint.right, constraint.result, constraint.signature }) |ty| {

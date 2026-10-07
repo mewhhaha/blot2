@@ -13,6 +13,10 @@ pub const Tag = enum(u32) {
     import_decl,
     import_binding,
     data_decl,
+    // type_alias_decl(a=name,b=type body,c=[params start,len,attrs start,len]).
+    type_alias_decl,
+    // contract_decl(a=name,b=where_clause body,c=[params start,len,attrs start,len]).
+    contract_decl,
     effect_decl,
     effect_type_decl,
     fixity_decl,
@@ -47,8 +51,6 @@ pub const Tag = enum(u32) {
     block,
     // record(a=optional constructor symbol,b=list start,c=list len).
     record,
-    // Ordinary name applied to record-shaped type arguments retains its marker.
-    record_apply,
     field,
     selector,
     constructor_ref,
@@ -247,16 +249,10 @@ pub const Tree = struct {
     pub fn list(self: *const Tree, range: List) []const u32 {
         return self.extra.items[range.start..][0..range.len];
     }
-    /// record_apply owns its brace origin immediately before the field list.
-    pub fn recordFieldsOrigin(self: *const Tree, id: Id) u32 {
-        const n = self.node(id);
-        std.debug.assert(n.tag == .record_apply and n.b != 0);
-        return self.extra.items[n.b - 1];
-    }
     pub fn children(self: *const Tree, id: Id) []const Id {
         const n = self.node(id);
         return switch (n.tag) {
-            .record, .record_apply => self.list(.{ .start = n.b, .len = n.c }),
+            .record => self.list(.{ .start = n.b, .len = n.c }),
             .product, .array, .block, .constructors, .effect_operations, .pattern_product, .pattern_record, .pattern_row, .type_product, .type_array, .type_record => self.list(.{ .start = n.a, .len = n.b }),
             else => &.{},
         };

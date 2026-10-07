@@ -1,0 +1,11 @@
+const contract = fn contract => contract
+//    ^ function
+
+type Add a is contract = { associated "add" a a a }
+//            ^ keyword.storage.type
+const twice: a -> a where { Add a } = fn value => value + value
+//                  ^ keyword.control
+
+type Action a = Unit -> a ! {| e}
+const unfinished = fn (action: Action U32) => @hole
+//                                            ^ function.builtin

@@ -19,7 +19,9 @@ import_declaration = ("import" binding:(namespace_import | named_import) "froM" 
 namespace_import = ("*" "as" name:IDENT) ;
 named_import = ("{" (bindings:import_binding ("," bindings:import_binding)* ","?)? "}") ;
 import_binding = (name:(IDENT | TYPE_IDENT) alias:("as" (IDENT | TYPE_IDENT))?) ;
-declaration = (attributes:declaration_attribute* value:(value_declaration | data_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
+declaration = (attributes:declaration_attribute* value:(value_declaration | data_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
+type_alias = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "=" value:type_expression) ;
+contract_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" kind:IDENT "=" body:constraint_body) ;
 declaration_attribute = ("@" body:attribute_name LAYOUT_NEWLINE?) ;
 attribute_name = ("[" value:expression "]") ;
 value_declaration = (modifier:IDENT? kind:("const" | "let") name:qualified_name annotation:(":" type_expression)? where:where_clause? "=" value:expression) ;
@@ -44,8 +46,9 @@ type_expression = (head:type_application results:("->" type_application)* effect
 effect_row = ("!" "{" (labels:type_application ("," labels:type_application)*)? ("|" tail:IDENT)? "}") ;
 // The frontend promotes `where` to this same-width private marker only after
 // an annotation. Other uses remain ordinary IDENT, including type variables.
-where_clause = (marker:"wherE" "{" (predicates:constraint_predicate ("," predicates:constraint_predicate)* ","?)? "}") ;
-constraint_predicate = (kind:IDENT member:STRING? arguments:type_atom* effects:effect_row?) ;
+where_clause = (marker:"wherE" body:constraint_body) ;
+constraint_body = ("{" LAYOUT_NEWLINE? (predicates:constraint_predicate ("," LAYOUT_NEWLINE? predicates:constraint_predicate)* ","?)? LAYOUT_NEWLINE? "}") ;
+constraint_predicate = (kind:qualified_name member:STRING? arguments:type_atom* effects:effect_row?) ;
 type_application = (head:type_atom arguments:type_atom*) ;
 demand_type = ("~" value:type_atom) ;
 type_atom = (qualified_name | type_group | type_array | type_record | demand_type) ;
@@ -60,7 +63,7 @@ prefix_expression = (operator:(SYMBOL | "*" | "^")? value:application) ;
 named_operator = ("`" name:qualified_name "`") ;
 application = (head:atom arguments:(atom | member_access)*) ;
 member_access = ("." name:(IDENT | TYPE_IDENT)) ;
-atom = (FLOAT | INTEGER | STRING | INTRINSIC | selector | type_witness | constructor_reference | record | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
+atom = (FLOAT | INTEGER | STRING | INTRINSIC | selector | type_witness | constructor_reference | qualified_name | group | comprehension | collection_spread | collection_cons | list | array | record_values) ;
 constructor_reference = ("#" value:(record | qualified_name | "True" | "False")) ;
 selector = ("·" name:(IDENT | TYPE_IDENT) ("." name:(IDENT | TYPE_IDENT))*) ;
 type_witness = (":" value:atom) ;
@@ -84,7 +87,7 @@ case_expression = ("case" values:expression ("," values:expression)* "of" body:c
 case_suite = (LAYOUT_NEWLINE LAYOUT_INDENT arms:case_arm* LAYOUT_DEDENT) ;
 case_arm = (alternatives:pattern_row ("|" alternatives:pattern_row)* ("if" guard:expression)? "=>" body:expression LAYOUT_NEWLINE) ;
 pattern_row = (patterns:pattern ("," patterns:pattern)*) ;
-pattern = (IDENT | INTEGER | constructor_pattern | pattern_group | value_pattern | boolean_constructor_pattern) ;
+pattern = (IDENT | INTEGER | constructor_pattern | pattern_group | record_pattern | value_pattern | boolean_constructor_pattern) ;
 boolean_constructor_pattern = ("#" value:("True" | "False")) ;
 value_pattern = ("^" name:qualified_name) ;
 constructor_pattern = ("#" name:(TYPE_IDENT | qualified_constructor) (fields:record_pattern | payload:pattern)?) ;

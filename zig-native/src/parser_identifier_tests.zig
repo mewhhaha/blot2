@@ -183,11 +183,12 @@ const cases = [_]Case{
     \\entry const Answer = 42
     \\
     , .valid = true },
-    // constraint_kind_upper
+    // Named contracts now permit TYPE_IDENT here. An unknown name still fails
+    // semantic checking; capitalization does not alias a primitive predicate.
     .{ .source =
     \\entry const answer: U32 where { Type_rep U32 } = 42
     \\
-    , .valid = false, .start = 0, .end = 5 },
+    , .valid = true },
     // constraint_kind_lower
     .{ .source =
     \\entry const answer: U32 where { type_rep U32 } = 42
@@ -307,7 +308,7 @@ const cases = [_]Case{
     \\      complete value =>
     \\        return value
     \\
-    , .valid = false, .start = 35, .end = 40 },
+    , .valid = true },
     // request_grouped_record_payload
     .{ .source =
     \\type Read a is effect = ({ first: a } -> a)
@@ -319,7 +320,7 @@ const cases = [_]Case{
     \\      complete value =>
     \\        return value
     \\
-    , .valid = false, .start = 44, .end = 49 },
+    , .valid = true },
     // request_operation_selector
     .{ .source =
     \\entry const answer = fn () => do:
@@ -338,7 +339,7 @@ const cases = [_]Case{
     \\  return first
     \\entry const answer = 42
     \\
-    , .valid = false, .start = 0, .end = 5 },
+    , .valid = true },
     // constructor_record_pattern
     .{ .source =
     \\type Box is data = #Box { first: U32 }

@@ -6,6 +6,7 @@
   (#match? @_entry "^entry[ \t]+(const|let)"))
 (entry_binding (binding_keyword) @keyword.storage.type)
 (where_clause "where" @keyword.control)
+(contract_header "contract" @keyword.storage.type)
 ["infixl" "infixr" "infix" "prefix"] @keyword.directive
 "rec" @keyword.storage.modifier
 ["if" "then" "else" "case" "of"] @keyword.control.conditional

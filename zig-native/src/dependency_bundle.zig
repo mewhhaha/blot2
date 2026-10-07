@@ -38,6 +38,9 @@ pub fn freeze(allocator: Allocator, path: []const u8, source: []const u8, pool: 
     for (checked.effect_families[1..], 1..) |family, id| if (family.identity.unit == 1) {
         try exports.append(allocator, .{ .name = family.name, .target = .{ .unit = 0, .binding = 0 }, .kind = .effect_family, .catalog = @intCast(id) });
     };
+    for (checked.contracts, 0..) |contract, id| if (contract.identity.unit == 1) {
+        try exports.append(allocator, .{ .name = contract.name, .target = .{ .unit = 0, .binding = 0 }, .kind = .contract, .catalog = @intCast(id) });
+    };
     var fixities: std.ArrayList(D.Fixity) = .empty;
     defer fixities.deinit(allocator);
     for (tree.roots.items) |id| if (tree.node(id).tag == .fixity_decl) {

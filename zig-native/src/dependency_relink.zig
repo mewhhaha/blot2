@@ -1,5 +1,5 @@
-//! Relink only decoded, unpublished owners. Physical record slots keep source
-//! declaration order; semantic evidence canonicalizes names when instantiated.
+//! Relink only decoded, unpublished owners. Declaration slots stay positional;
+//! owned field spellings keep physical ordering stable across dictionaries.
 const std = @import("std");
 const symbols = @import("symbols.zig");
 const D = @import("frozen_dependency.zig");
@@ -46,6 +46,15 @@ pub fn interface(owner: *PI.Interface, names: []const u32, units: []const u32) v
         identity(units, &nominal.identity);
         nominal.name = symbol(names, nominal.name);
     }
+    for (owner.contracts) |*contract| {
+        identity(units, &contract.identity);
+        contract.name = symbol(names, contract.name);
+    }
+    for (owner.contract_predicates) |*predicate| {
+        predicate.name = symbol(names, predicate.name);
+        identity(units, &predicate.identity);
+        predicate.qualification_unit = unit(units, predicate.qualification_unit);
+    }
     for (owner.constructors) |*constructor| {
         identity(units, &constructor.identity);
         constructor.name = symbol(names, constructor.name);
@@ -65,6 +74,12 @@ pub fn interface(owner: *PI.Interface, names: []const u32, units: []const u32) v
 }
 
 pub fn module(owner: *core.Module, names: []const u32, units: []const u32) void {
+    for (owner.field_names) |*field| field.symbol = symbol(names, field.symbol);
+    std.mem.sortUnstable(core.FieldName, owner.field_names, {}, struct {
+        fn less(_: void, left: core.FieldName, right: core.FieldName) bool {
+            return left.symbol < right.symbol;
+        }
+    }.less);
     owner.unit = unit(units, owner.unit);
     typeUnits(owner.types.nodes, units);
     for (owner.types.operations) |*operation| identity(units, &operation.identity);

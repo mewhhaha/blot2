@@ -58,7 +58,7 @@ test "nested parameter pattern import releases every failed allocation" {
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, importedShapes, .{});
 }
 
-test "tuple and array type parameter shapes are distinct and structural values require a parameter" {
+test "tuple and array type parameter shapes remain distinct from structural records" {
     const cases = [_]struct { source: []const u8, code: check.Code }{
         .{ .source = "type Box (a,a) is data = #Box\n", .code = .duplicate_type_parameter },
         .{ .source = "type Box {a,a} is data = #Box\n", .code = .duplicate_type_field },
@@ -67,7 +67,6 @@ test "tuple and array type parameter shapes are distinct and structural values r
         .{ .source = "type Box (a,b) is data = #Box\nconst value: Box [U32,F32] = #Box\n", .code = .type_argument },
         .{ .source = "type Box U32 is data = #Box\n", .code = .type_parameter },
         .{ .source = "type Read is effect = Unit -> [U32,F32]\n", .code = .type_argument },
-        .{ .source = "const answer = fn (value: {a:U32}) => 42\n", .code = .type_argument },
     };
     for (cases) |case_| {
         var pool: symbols.Pool = .{};

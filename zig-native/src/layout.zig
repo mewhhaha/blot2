@@ -16,6 +16,7 @@ pub const Mapping = struct { variable: types.Id, layout: Id };
 pub const RowMapping = struct { variable: u32, row: evidence.Effects.Id };
 pub const Error = Allocator.Error || error{ UnresolvedType, LayoutLimit, TypeMismatch };
 pub const Store = struct {
+    record_names: @import("record_order.zig").Names = .{},
     allocator: Allocator,
     effects: evidence.Effects.Store,
     nodes: std.ArrayList(Node) = .empty,
@@ -31,6 +32,7 @@ pub const Store = struct {
         return self;
     }
     pub fn deinit(self: *Store) void {
+        self.record_names.deinit(self.allocator);
         self.effects.deinit();
         self.nodes.deinit(self.allocator);
         self.extra.deinit(self.allocator);
@@ -79,6 +81,34 @@ pub const Store = struct {
     }
     pub fn internStateProvider(self: *Store, read: Id, write: Id, state: Id) Error!Id {
         return self.internFields(.state_provider, read, write, state, &.{});
+    }
+    /// Executable structural records share one layout regardless of field
+    /// spelling order. Raw intern remains available for imported physical views.
+    pub fn internRecord(self: *Store, values: []const u32) Error!Id {
+        if (values.len % 2 != 0) return error.TypeMismatch;
+        var ordered = true;
+        var offset: usize = 2;
+        while (offset < values.len) : (offset += 2) if (!self.record_names.less(values[offset - 2], values[offset])) {
+            ordered = false;
+            break;
+        };
+        if (ordered) return self.intern(.record, 0, 0, values);
+        var buffer: [256]u8 align(@alignOf(u32)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&buffer, self.allocator);
+        const Field = struct {
+            name: u32,
+            ty: u32,
+            fn less(names: *const @import("record_order.zig").Names, left: @This(), right: @This()) bool {
+                return names.less(left.name, right.name);
+            }
+        };
+        const fields = try scratch.allocator().alloc(Field, values.len / 2);
+        defer scratch.allocator().free(fields);
+        for (fields, 0..) |*field, index| field.* = .{ .name = values[index * 2], .ty = values[index * 2 + 1] };
+        std.mem.sortUnstable(Field, fields, &self.record_names, Field.less);
+        for (fields[1..], fields[0 .. fields.len - 1]) |field, prior| if (field.name == prior.name) return error.TypeMismatch;
+        const words: []const u32 = @as([*]const u32, @ptrCast(fields.ptr))[0..values.len];
+        return self.intern(.record, 0, 0, words);
     }
     fn internFields(self: *Store, tag: Tag, a: u32, b: u32, row: u32, values: []const u32) Error!Id {
         if (tag != .state_provider and ((row != unknown_row and row >= self.effects.rows.items.len) or (row != 0 and tag != .function and tag != .demand and tag != .provider))) return error.TypeMismatch;
@@ -242,7 +272,8 @@ pub const Store = struct {
                 for (view.children(id), 0..) |child, index| {
                     try values.append(allocator, if (n.tag == .record and index % 2 == 0) child else try self.fromEvidenceDepth(view, child, depth + 1, budget));
                 }
-                return self.intern(if (n.tag == .product) .product else if (n.tag == .record) .record else .nominal, if (n.tag == .nominal) n.a else 0, if (n.tag == .nominal) n.b else 0, values.items);
+                if (n.tag == .record) return self.internRecord(values.items);
+                return self.intern(if (n.tag == .product) .product else .nominal, if (n.tag == .nominal) n.a else 0, if (n.tag == .nominal) n.b else 0, values.items);
             },
         }
     }
@@ -278,7 +309,8 @@ pub const Store = struct {
                     const children_ = if (n.tag == .nominal) module.types.nominalArguments(n) else module.types.list(.{ .start = n.a, .len = n.b });
                     for (children_) |child| try values.append(allocator, try self.fromTypeDepth(module, child, mappings, rows, depth + 1, allow_erased));
                 }
-                return self.intern(if (n.tag == .product) .product else if (n.tag == .record) .record else .nominal, if (n.tag == .nominal) n.a else 0, if (n.tag == .nominal) n.b else 0, values.items);
+                if (n.tag == .record) return self.internRecord(values.items);
+                return self.intern(if (n.tag == .product) .product else .nominal, if (n.tag == .nominal) n.a else 0, if (n.tag == .nominal) n.b else 0, values.items);
             },
         }
     }

@@ -827,6 +827,12 @@ pub const Importer = struct {
         if (value.* != 0) value.* = try self.symbol(value.*);
     }
     fn remapCore(self: *const Importer, module: *core.Module) Error!void {
+        for (module.field_names) |*field| try self.optionalSymbol(&field.symbol);
+        std.mem.sortUnstable(core.FieldName, module.field_names, {}, struct {
+            fn less(_: void, left: core.FieldName, right: core.FieldName) bool {
+                return left.symbol < right.symbol;
+            }
+        }.less);
         if (module.unit != 0) module.unit = try self.unit(module.unit, false);
         for (module.types.nodes) |*n| switch (n.tag) {
             .nominal, .type_constructor => if (n.a != 0 and n.a != std.math.maxInt(u32)) {

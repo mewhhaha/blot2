@@ -146,20 +146,15 @@ fn anonymousRecordScenario(allocator: std.mem.Allocator) !void {
         try std.testing.expectEqual(@as(usize, 0), syntax.diagnostics.items.len);
         var checked = try checker.check(allocator, &syntax, &pool);
         defer checked.deinit(allocator);
-        if (index == 5) {
+        if (index != 2 and index != 4) {
             try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
         } else {
             try std.testing.expectEqual(@as(usize, 1), checked.diagnostics.len);
-            try std.testing.expectEqual(if (index == 4) checker.Code.unknown_constructor else checker.Code.unsupported_expression, checked.diagnostics[0].code);
-            if (index < 4) {
-                const opening = std.mem.indexOfScalar(u8, source, '{').?;
-                try std.testing.expectEqual(@as(u32, @intCast(opening)), checked.diagnostics[0].span.start);
-                try std.testing.expectEqual(checked.diagnostics[0].span.start, checked.diagnostics[0].span.end);
-            }
+            try std.testing.expectEqual(if (index == 4) checker.Code.unknown_constructor else checker.Code.unknown_value, checked.diagnostics[0].code);
         }
     }
 }
-test "anonymous record rejection precedes children and preserves named constructor checks" {
+test "structural records validate children and preserve named constructor checks" {
     try anonymousRecordScenario(a);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, anonymousRecordScenario, .{});
 }

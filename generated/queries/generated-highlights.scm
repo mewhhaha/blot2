@@ -39,6 +39,8 @@
 (conditional "if" @keyword)
 (constructor_reference value: "False" @keyword)
 (constructor_reference value: "True" @keyword)
+(contract_type "is" @keyword)
+(contract_type "type" @keyword)
 (data_type "data" @keyword)
 (data_type "is" @keyword)
 (data_type "type" @keyword)
@@ -78,9 +80,12 @@
 (symbolic_fixity associativity: "infix" @keyword)
 (symbolic_fixity associativity: "infixl" @keyword)
 (symbolic_fixity associativity: "infixr" @keyword)
+(type_alias "type" @keyword)
 (value_declaration kind: "const" @keyword)
 (value_declaration kind: "let" @keyword)
 (where_clause marker: "wherE" @keyword)
+(type_alias) @type
+(contract_type) @type
 (effect_type) @type
 (data_type) @type
 (type_array) @type
@@ -106,6 +111,7 @@
 (INTRINSIC) @function.builtin
 (COMMENT) @comment
 (comprehension_binding name: (IDENT) @variable)
+(contract_type name: (TYPE_IDENT) @type)
 (data_type name: (TYPE_IDENT) @type)
 (effect_binding name: (IDENT) @variable)
 (effect_type name: (TYPE_IDENT) @type)
@@ -119,4 +125,5 @@
 (record_value name: (IDENT) @type)
 (record name: (qualified_name) @type)
 (symbolic_fixity target: (qualified_name) @variable)
+(type_alias name: (TYPE_IDENT) @type)
 (type_field name: (IDENT) @type)

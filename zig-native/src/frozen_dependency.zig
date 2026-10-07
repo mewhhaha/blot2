@@ -13,7 +13,7 @@ pub const Identity = struct {
 pub const Export = struct {
     name: u32,
     target: PI.ExternalTarget,
-    kind: enum { value, nominal, constructor, effect_family },
+    kind: enum { value, nominal, constructor, effect_family, contract },
     catalog: u32,
 };
 pub const Fixity = struct {

@@ -1,5 +1,14 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readTypedHole, type TypedHoleDiagnostic } from "./type_diagnostics.ts";
+import {
+  type AssetBuildStats,
+  type AssetDependency,
+  type AssetImports,
+  captureAssetImports,
+  type CompiledAsset,
+  withAssetImports,
+} from "./assets.ts";
 
 export const maxFrameBytes = 64 * 1024 * 1024;
 const maxMetadataBytes = 1024 * 1024;
@@ -22,6 +31,9 @@ export interface ZigProjectDiagnostic {
   message: string;
   offset_encoding: "utf8_bytes";
   utf16?: { start: number; end: number } | null;
+  /** Present for @hole on compiler versions publishing semantic snapshots. */
+  hole?: TypedHoleDiagnostic;
+  details?: unknown;
 }
 export type ZigProjectBuildResult =
   | {
@@ -29,6 +41,10 @@ export type ZigProjectBuildResult =
     revision: number;
     bytes: Uint8Array<ArrayBuffer>;
     stats: ZigProjectBuildStats;
+    /** Content snapshots addressed by the guest's nominal asset handles. */
+    assets?: readonly CompiledAsset[];
+    assetStats?: AssetBuildStats;
+    assetDependencies?: readonly AssetDependency[];
   }
   | {
     success: false;
@@ -45,6 +61,7 @@ export interface ZigProjectCompilerOptions {
   dependencies?: string | URL | null;
   startupTimeoutMs?: number;
   expectedCompilerIdentity?: string;
+  assets?: AssetImports;
 }
 export interface ZigProjectCompiler {
   readonly pid: number;
@@ -58,6 +75,10 @@ export interface ZigProjectBuildOptions {
   /** Complete overrides for this build. Missing keys read disk; null hides a file.
    * Paths may name new virtual files. Contents are copied before queueing. */
   sources?: Readonly<Record<string, string | null>>;
+  /** External file overrides for configured parsers, relative to the entry. */
+  assetSources?: Readonly<
+    Record<string, string | Uint8Array<ArrayBuffer> | null>
+  >;
 }
 export class ZigProjectProtocolError extends Error {
   constructor(message: string) {
@@ -152,6 +173,15 @@ function diagnostic(value: unknown): ZigProjectDiagnostic {
     if (
       natural(utf16.start, "UTF-16 start") > natural(utf16.end, "UTF-16 end")
     ) throw new ZigProjectProtocolError("Invalid UTF-16 range");
+  }
+  // This convenience field is derived only from the validated wire payload.
+  delete object.hole;
+  if (object.code === "typed_hole" && object.details != null) {
+    try {
+      object.hole = readTypedHole(record(object.details, "hole details").hole);
+    } catch {
+      throw new ZigProjectProtocolError("Invalid typed-hole diagnostic");
+    }
   }
   return object as unknown as ZigProjectDiagnostic;
 }
@@ -658,9 +688,11 @@ export async function createZigProjectCompiler(
     "dependencies",
     "startupTimeoutMs",
     "expectedCompilerIdentity",
+    "assets",
   ], "compiler");
   const executable = path(options.executable, "executable"),
     entry = path(options.entry, "entry");
+  const assets = captureAssetImports(options.assets);
   const nullablePath = (value: unknown, name: string) =>
     value == null ? null : path(value, name);
   const imports = options.imports === undefined
@@ -700,5 +732,13 @@ export async function createZigProjectCompiler(
   ) throw new RangeError("Open metadata exceeds 1 MiB");
   const process = new ProjectProcess(executable);
   await process.initialize(open, timeout, identity);
+  if (assets !== undefined) {
+    try {
+      return await withAssetImports(process, entry, assets);
+    } catch (error) {
+      await process.dispose();
+      throw error;
+    }
+  }
   return process;
 }

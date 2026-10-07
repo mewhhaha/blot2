@@ -59,3 +59,36 @@ const get=fn xs=>xs[0]
   equal(formatted.startsWith("@[identity]\n"), true);
   equal(formatted.includes("xs[0]"), true);
 });
+
+Deno.test("formatter preserves aliases, named contracts, qualified predicates and typed holes", async () => {
+  const source = `import * as contracts from "./contracts"
+type Action a=Unit->a ! {|e}
+type Add a is contract = {
+  associated "add" a a a,
+  contracts.Read a,
+}
+const contract=fn contract=>contract
+const twice:a->a where {Add a}=fn value=>value+value
+const unfinished=fn (action:Action U32)=>@hole
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(formatted.includes("type Add a is contract"), true);
+  equal(formatted.includes("contracts.Read a"), true);
+  equal(formatted.includes("@hole"), true);
+});
+
+Deno.test("formatter preserves structural record applications, patterns and merge contracts", async () => {
+  const source = `type Point={x:U32,y:F32}
+type Merge [a,b,c] is contract={merge a b c}
+const combine:a->b->c where {Merge [a,b,c]}=fn left=>fn right=>@record.merge left right
+const f=fn (point:Point)=>do:
+    let {y,x}=point
+    return combine point {x:y}
+const value=f {y:2.0,x:40}
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(formatted.includes("@record.merge left right"), true);
+  equal(formatted.includes("combine point { x: y }"), true);
+});

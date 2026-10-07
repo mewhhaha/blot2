@@ -249,6 +249,7 @@ for (
     "invalid-wasm",
     "reject-payload",
     "missing-offset",
+    "invalid-hole",
     "source-fuel",
     "missing-work",
     "fractional-work",
@@ -289,12 +290,9 @@ for (const mode of ["wrong-version", "hello-payload", "startup-stall"]) {
   Deno.test(`client reaps failed startup: ${mode}`, async () => {
     const item = await fixture(mode);
     try {
-      await rejects(
-        createZigProjectCompiler({
-          ...item.options,
-          startupTimeoutMs: mode === "startup-stall" ? 150 : 2000,
-        }),
-      );
+      // The peer must reach its intentional stall and write its PID before
+      // timeout. A 150 ms deadline can expire during Deno startup under load.
+      await rejects(createZigProjectCompiler(item.options));
       const rows = await logs(item.log);
       reaped(rows[0].pid);
     } finally {

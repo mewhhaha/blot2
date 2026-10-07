@@ -264,7 +264,7 @@ fn catalogEqual(previous: *const core.Module, current: *const core.Module) bool 
     inline for (@typeInfo(core.Module).@"struct".field_names) |name| {
         const field = @field(ModuleField, name);
         switch (field) {
-            .unit, .types, .nominals, .constructors, .associated, .operation_names, .names, .obligations => {
+            .unit, .types, .nominals, .constructors, .associated, .operation_names, .names, .field_names, .obligations => {
                 if (!equal(@field(previous, name), @field(current, name))) return false;
             },
             // Witness expressions require their own dependency projection.
@@ -445,7 +445,7 @@ fn scalarRoot(module: core.Module, id: core.Id) ?core.BindingId {
     const binding = owner orelse return null;
     for (module.bindings, 0..) |value, index| if (value.initializer == id and index != binding) return null;
     for (module.nodes) |value| switch (value.tag) {
-        .scalar, .logical, .apply, .associated, .type_same, .effect_provider, .handle => if (value.a == id or value.b == id) return null,
+        .scalar, .logical, .apply, .associated, .record_merge, .type_same, .effect_provider, .handle => if (value.a == id or value.b == id) return null,
         .if_value, .if_stmt, .state_provider => if (value.a == id or value.b == id or value.c == id) return null,
         .bind => if (value.b == id) return null,
         .return_, .force, .project, .computation, .result_associated => if (value.a == id) return null,

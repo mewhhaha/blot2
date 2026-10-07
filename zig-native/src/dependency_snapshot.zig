@@ -207,7 +207,7 @@ pub fn deinit(allocator: Allocator, owner: *PI.Interface) void {
     inline for (.{ "nodes", "extra", "rows", "labels", "operations" }) |field| allocator.free(@field(owner.graph, field));
     allocator.free(owner.patterns.nodes);
     allocator.free(owner.patterns.extra);
-    inline for (.{ "bindings", "obligations", "obligation_spans", "nominals", "constructors", "effect_families", "effect_templates", "associated" }) |field| allocator.free(@field(owner, field));
+    inline for (.{ "bindings", "obligations", "obligation_spans", "nominals", "constructors", "effect_families", "effect_templates", "associated", "contracts", "contract_predicates" }) |field| allocator.free(@field(owner, field));
     owner.* = undefined;
 }
 
@@ -261,6 +261,11 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
     result.nominals = try allocator.alloc(PI.Nominal, checked.nominals.len);
     for (checked.nominals, result.nominals) |old, *value| {
         value.* = old;
+        value.alias = try projector.projectType(old.alias, 0);
+        var alias_rows: std.ArrayList(T.Id) = .empty;
+        defer alias_rows.deinit(allocator);
+        for (checked.types.list(old.alias_rows)) |row| try alias_rows.append(allocator, try projector.projectRowVariable(row));
+        value.alias_rows = try projector.saveTypes(alias_rows.items);
         value.parameters = try projector.projectedList(old.parameters);
         value.variables = try projector.projectedList(old.variables);
         value.parameter_names = try projector.copiedList(old.parameter_names);
@@ -287,6 +292,23 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
         value.result = try projector.projectType(old.result, 0);
     }
     result.associated = try allocator.dupe(PI.Associated, checked.associated);
+    result.contracts = try allocator.alloc(PI.Contract, checked.contracts.len);
+    for (checked.contracts, result.contracts) |old, *value| {
+        value.* = old;
+        value.parameters = try projector.projectedList(old.parameters);
+        value.variables = try projector.projectedList(old.variables);
+        value.parameter_names = try projector.copiedList(old.parameter_names);
+        var rows: std.ArrayList(T.Id) = .empty;
+        defer rows.deinit(allocator);
+        for (checked.types.list(old.row_variables)) |row| try rows.append(allocator, try projector.projectRowVariable(row));
+        value.row_variables = try projector.saveTypes(rows.items);
+    }
+    result.contract_predicates = try allocator.alloc(T.Obligation, checked.contract_predicates.len);
+    for (checked.contract_predicates, result.contract_predicates) |old, *value| {
+        value.* = old;
+        inline for (.{ "ty", "other", "result", "signature" }) |field| @field(value, field) = try projector.projectType(@field(old, field), 0);
+        value.source = 0;
+    }
     result.obligations = try projector.obligations.toOwnedSlice(allocator);
     result.obligation_spans = try projector.obligation_spans.toOwnedSlice(allocator);
     result.graph.nodes = try projector.type_nodes.toOwnedSlice(allocator);

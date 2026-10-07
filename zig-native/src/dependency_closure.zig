@@ -43,6 +43,11 @@ fn checkInterfaceUnits(owner: *const PI.Interface, units: []const u32) Error!voi
         _ = try mapped(units, o.qualification_unit);
     }
     for (owner.nominals) |n| _ = try mapped(units, n.identity.unit);
+    for (owner.contracts) |c| _ = try mapped(units, c.identity.unit);
+    for (owner.contract_predicates) |p| {
+        _ = try mapped(units, p.identity.unit);
+        _ = try mapped(units, p.qualification_unit);
+    }
     for (owner.constructors) |c| _ = try mapped(units, c.identity.unit);
     for (owner.effect_families) |f| _ = try mapped(units, f.identity.unit);
     for (owner.effect_templates) |o| _ = try mapped(units, o.identity.unit);
@@ -364,6 +369,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
             stats.core_reused += 1;
         } else {
             try core_validation.validate(a, &m.core, context);
+            for (m.core.field_names) |field| try require(std.mem.eql(u8, m.core.name(field.spelling), value.symbols[field.symbol].text));
             stats.core_checked += 1;
         }
         for (m.core.bodies) |body| try require(!body.exported);
@@ -387,6 +393,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
                 .nominal => try require(exported.catalog != 0 and exported.catalog < m.interface.nominals.len and m.interface.nominals[exported.catalog].name == exported.name),
                 .constructor => try require(exported.catalog != 0 and exported.catalog < m.interface.constructors.len and m.interface.constructors[exported.catalog].name == exported.name),
                 .effect_family => try require(exported.catalog != 0 and exported.catalog < m.interface.effect_families.len and m.interface.effect_families[exported.catalog].name == exported.name),
+                .contract => try require(exported.catalog < m.interface.contracts.len and m.interface.contracts[exported.catalog].name == exported.name),
             }
         }
         for (m.fixities) |f| {

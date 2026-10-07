@@ -151,7 +151,8 @@ while (true) {
     }
     break;
   }
-  const failure = mode === "reject-first" && builds === 1 ||
+  const failure = mode === "invalid-hole" ||
+    mode === "reject-first" && builds === 1 ||
     mode === "failed-revision" || mode === "reject-payload" ||
     mode === "missing-offset";
   const next = failure ? revision : revision + 1;
@@ -172,12 +173,34 @@ while (true) {
       diagnostics: [{
         filename: "/fixture.blot",
         stage: "check",
-        code: "type_mismatch",
+        code: mode === "invalid-hole" ? "typed_hole" : "type_mismatch",
         start: 1,
         end: 2,
         message: "fixture rejection",
         offset_encoding: mode === "missing-offset" ? "utf16" : "utf8_bytes",
         utf16: { start: 1, end: 2 },
+        ...(mode === "invalid-hole"
+          ? {
+            details: {
+              hole: {
+                expected: 0,
+                nodes: [{
+                  kind: "function",
+                  name: null,
+                  identity: null,
+                  variable: null,
+                  effects: 0,
+                  children: { start: 0, len: 0 },
+                }],
+                edges: [],
+                scope: [],
+                requirements: [],
+                enclosing: { start: 0, len: 0 },
+                truncated: false,
+              },
+            },
+          }
+          : {}),
       }],
       attemptStats: mode === "reject-first" ? null : {},
     }, mode === "reject-payload" ? wasm : undefined));

@@ -367,9 +367,21 @@ const Parser = struct {
             _ = try self.expect(.kw_type);
             try params.append(self.allocator, try self.typeAtom());
         }
+        if (!old_data and self.eat(.equal)) {
+            const body = try self.typeExpression();
+            const range = try self.list(params.items);
+            return self.add(.type_alias_decl, name, body, try self.extra(&.{ range.start, range.len, attrs.start, attrs.len }), start);
+        }
         var effect = false;
         if (!old_data) {
             _ = try self.expect(.kw_is);
+            if (self.word("contract")) {
+                _ = self.advance();
+                _ = try self.expect(.equal);
+                const body = try self.predicateBody(self.current().start);
+                const range = try self.list(params.items);
+                return self.add(.contract_decl, name, body.node, try self.extra(&.{ range.start, range.len, attrs.start, attrs.len }), start);
+            }
             if (self.eat(.kw_effect)) effect = true else _ = try self.expect(.kw_data);
         }
         _ = try self.expect(.equal);
@@ -418,12 +430,16 @@ const Parser = struct {
     fn whereClause(self: *Parser) Error!Where {
         const clause_start = self.current().start;
         if (!self.eat(.kw_where)) return .{};
+        return self.predicateBody(clause_start);
+    }
+    fn predicateBody(self: *Parser, clause_start: u32) Error!Where {
         _ = try self.expect(.l_brace);
+        self.newlines();
         var predicates: std.ArrayList(Id) = .empty;
         defer predicates.deinit(self.allocator);
         while (!self.at(.r_brace)) {
             const start = self.current().start;
-            const kind = try self.lowerIdentifier();
+            const kind = try self.qualified();
             const member = if (self.at(.string)) try self.stringSymbol() else 0;
             var args: std.ArrayList(Id) = .empty;
             defer args.deinit(self.allocator);
@@ -437,7 +453,9 @@ const Parser = struct {
             const range = try self.list(args.items);
             try predicates.append(self.allocator, try self.add(.constraint, kind, member, try self.extra(&.{ range.start, range.len, row }), start));
             if (!self.eat(.comma)) break;
+            self.newlines();
         }
+        self.newlines();
         _ = try self.expect(.r_brace);
         const range = try self.list(predicates.items);
         return .{ .predicates = range, .node = try self.add(.where_clause, range.start, range.len, 0, clause_start) };
@@ -723,7 +741,6 @@ const Parser = struct {
             .identifier, .type_identifier => {
                 const token_start = self.index;
                 const name = try self.qualified();
-                if (self.at(.l_brace)) return self.record(name, start);
                 const id = try self.add(.name, name, 0, 0, start);
                 for (self.tokens[token_start..self.index], token_start..) |item, index| if (item.tag == .dot) {
                     const member = self.pool.lookup(self.text(self.tokens[index + 1])).?;
@@ -925,7 +942,7 @@ const Parser = struct {
         return self.listNode(.block, statements.items, start);
     }
     fn record(self: *Parser, name: symbols.Symbol, start: u32) Error!Id {
-        const fields_start = (try self.expect(.l_brace)).start;
+        _ = try self.expect(.l_brace);
         var fields: std.ArrayList(Id) = .empty;
         defer fields.deinit(self.allocator);
         while (!self.at(.r_brace)) {
@@ -936,12 +953,8 @@ const Parser = struct {
             if (!self.eat(.comma)) break;
         }
         _ = try self.expect(.r_brace);
-        const is_application = name != 0 and self.source[start] != '#';
-        // Retain the unnamed record argument's origin independently from its
-        // callee. Only record applications need this source-lowering boundary.
-        if (is_application) try self.tree.extra.append(self.allocator, fields_start);
         const range = try self.list(fields.items);
-        return self.add(if (is_application) .record_apply else .record, name, range.start, range.len, start);
+        return self.add(.record, name, range.start, range.len, start);
     }
     fn suite(self: *Parser) Error!Id {
         try self.enter();
@@ -1126,7 +1139,7 @@ const Parser = struct {
         _ = try self.expect(.colon);
         return self.add(.range_stmt, first, end, try self.suite(), start);
     }
-    // The primary pattern grammar permits fields only after a constructor.
+    // Named and structural record patterns share field parsing.
     fn constructorFields(self: *Parser) Error!Id {
         try self.enter();
         defer self.depth -= 1;
@@ -1162,7 +1175,7 @@ const Parser = struct {
             const payload = if (self.at(.l_brace)) try self.constructorFields() else if (patternTag(self.current().tag)) try self.pattern() else 0;
             return self.add(.pattern_constructor, name, payload, 0, start);
         }
-        if (self.at(.l_brace)) return self.identifierSyntax();
+        if (self.at(.l_brace)) return self.constructorFields();
         if (self.eat(.l_paren)) {
             var values: std.ArrayList(Id) = .empty;
             defer values.deinit(self.allocator);
@@ -1210,8 +1223,10 @@ const Parser = struct {
                     _ = try self.expect(.kw_effect);
                     const operation_token = self.current().tag;
                     if (operation_token != .identifier and operation_token != .type_identifier and operation_token != .l_paren) return self.identifierSyntax();
-                    operation = try self.atom();
-                    if (operation_token != .l_paren and self.tree.node(operation).tag != .name) return self.identifierSyntax();
+                    // Braces after an operation name belong to its payload
+                    // pattern, rather than an ordinary record application.
+                    const operation_start = self.current().start;
+                    operation = if (operation_token == .l_paren) try self.atom() else try self.add(.name, try self.qualified(), 0, 0, operation_start);
                 }
                 const pat = try self.pattern();
                 _ = try self.expect(.fat_arrow);

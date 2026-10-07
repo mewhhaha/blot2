@@ -1,17 +1,40 @@
 /** Blot's Zig project compiler and WebAssembly guest API. */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { captureAssetImports } from "./compiler/assets.ts";
 import {
   createZigProjectCompiler,
   type ZigProjectCompiler,
   type ZigProjectCompilerOptions,
 } from "./compiler/zig_project_client.ts";
+export type {
+  DiagnosticRequirement,
+  DiagnosticRequirementKind,
+  DiagnosticSpan,
+  DiagnosticType,
+  DiagnosticTypeKind,
+  TypedHoleDiagnostic,
+} from "./compiler/type_diagnostics.ts";
 import {
   extractNativeCompiler,
   extractStandardLibrary,
 } from "./compiler/packaged_native.ts";
 
 export { createZigProjectCompiler } from "./compiler/zig_project_client.ts";
+export { jsonAssetParser } from "./compiler/assets.ts";
+export type {
+  AssetBuildStats,
+  AssetContext,
+  AssetDependency,
+  AssetImport,
+  AssetImports,
+  AssetModule,
+  AssetParser,
+  AssetRecordType,
+  AssetReference,
+  AssetType,
+  CompiledAsset,
+} from "./compiler/assets.ts";
 export type {
   ZigProjectBuildOptions,
   ZigProjectBuildResult,
@@ -52,6 +75,7 @@ export async function createCompiler(
   // Capture paths before extracting the package or starting the child process.
   const captured = {
     ...options,
+    assets: captureAssetImports(options.assets),
     entry: path(options.entry),
     prelude: options.prelude === null
       ? null

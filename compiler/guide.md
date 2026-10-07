@@ -68,6 +68,23 @@ effects.
 
 ## Blocks, shadowing, and composition
 
+While editing, `@hole` stands for an unfinished expression. The checker infers
+its expected type from surrounding code, then reports `typed_hole` with that
+type and the current lexical bindings. It checks unused declarations too. Holes
+always prevent output publication; correcting one allows a retained compiler
+session to continue from its last successful revision. The client also returns
+`diagnostic.hole`: a structured type graph, the visible bindings, and the
+enclosing binding's generic requirements. Record fields, nominal identities,
+effect arguments, repeated effect labels and open row tails remain explicit. The
+graph shares repeated types and bounds its size; `truncated` signals omitted
+detail. These are diagnostic-local identities, not reusable type witnesses.
+Editor completion and implementation-selection explanations are subsequent work.
+
+```text
+const unfinished = fn (value: U32) -> F32 => @hole
+// Unfilled expression; expected: F32; in scope: value: U32
+```
+
 `let name = expression` binds a pure value; `let name: Type = expression`
 annotates it. `name := expression` shadows an existing local or parameter.
 Inside its RHS, `self` and the old name refer to the previous binding. Earlier
@@ -172,6 +189,28 @@ const number = fn (pair: (Curried U32) Bool) => do:
 entry const answer = fn () => first (#Entry { head: 42, tail: #True })
 ```
 
+Transparent aliases name an existing type without introducing a constructor or
+changing layout, equality, or associated dispatch. Aliases may refer forward to
+other types, take the same shaped parameters as data declarations, and be
+imported through either import form. Recursive alias expansion is an error;
+recursive structures still use nominal data declarations. Alias names currently
+belong in fully applied type positions, including effect-operation arguments,
+not runtime type-constructor values. Named type parameters must be declared.
+Written effect-row parameters, such as `e` in
+`type Action a = Unit -> a ! {| e}`, are fresh at each alias use and remain
+polymorphic across imports and compiled dependency files. Data and effect
+declaration bodies cannot hide an unbound effect row through an alias. Pass the
+full callable type as a type parameter, such as the `f` in
+`type Box f is data = #Box f`, or use an alias with a closed row.
+
+```blot
+type Coordinate = F32
+type Pair a = (a, a)
+type Position = Pair Coordinate
+const origin: Position = (0.0, 0.0)
+entry const horizontal = fn () => @product.get origin 0
+```
+
 Currying is explicit in the declaration. `Curried U32` remains a constructor;
 `(Curried U32) Bool` supplies its remaining argument. A free lowercase type name
 in an annotation is inferred and shared within its binding. A local `let`
@@ -180,12 +219,41 @@ annotation: a parameter's `a` and a local `let`'s `a` refer to the same type
 variable. A name introduced only in that `let` gets a fresh scope, so sibling
 `let` bindings may each use `b` independently.
 
-Records use named constructors. Supply each field once; shorthand `{ x, y }`
-uses locals. Fields evaluate in written order. Destructure with named patterns;
-fields can be reordered or omitted. Read a named field with `value.field`;
-`value.field := expression` rebinds the local root, with `self` naming the old
-field value inside the replacement. Tuples use `(a, b)`; project with patterns
-or `@product.get tuple 0` with a literal index and known tuple shape.
+Structural records use `{ x: value, y: value }`; their exact types use
+`{ x: U32, y: F32 }`. A transparent alias such as
+`type Point = { x: U32, y: F32 }` adds a name without a constructor. Named data
+declarations retain their `#Constructor { ... }` forms. Field order does not
+affect structural type equality or the executable layout.
+
+Supply each field once; shorthand `{ x, y }` uses locals. Field expressions
+execute once in written order. An ordinary call can pass a record directly:
+`function { x: 1, y: 2 }`. Destructure a known record shape with `{ x, y }`;
+fields can be reordered or omitted. An unannotated parameter's shape must be
+known before destructuring; generic `record.x` access instead infers a field
+requirement. Read a field with `value.field`; `value.field := expression`
+rebinds the local root, with `self` naming the old field value inside the
+replacement. Structural updates may change that field's type and preserve the
+remaining fields, including nested records.
+
+`@record.merge left right` constructs a structural record with all fields of
+both operands. Right-hand fields replace same-named left fields, including their
+types. Both operands execute once, left to right, even when a field is replaced.
+The operation copies field words and shares nested values; merging with an empty
+record reuses the other record. Nominal constructor values must be explicitly
+unpacked before merging. A generic function can retain this shape equation using
+a `merge Left Right Result` predicate:
+
+```blot
+type Merge [a, b, c] is contract = { merge a b c }
+const extend: a -> b -> c where { Merge [a, b, c] } =
+  fn left => fn right => @record.merge left right
+const original = { x: 40, enabled: #False }
+const updated = extend original { enabled: #True, extra: 2 }
+entry const answer = fn () => @u32.add updated.x updated.extra
+```
+
+Tuples use `(a, b)`; project with patterns or `@product.get tuple 0` with a
+literal index and known tuple shape.
 
 Matches must be exhaustive. `case a, b of` evaluates inputs once left-to-right;
 each arm has the same number of patterns. Patterns include constructors,
@@ -624,6 +692,31 @@ effects are inferred. The clause constrains the binding's callers and must cover
 the requirements of its body. Extra predicates deliberately narrow the public
 type. Parameter annotations cannot contain `where` clauses.
 
+Use `type Name parameters is contract = { ... }` to name a reusable bundle of
+predicates. Contracts can include other contracts, refer forward, take shaped or
+explicitly curried type parameters, and be imported by name or namespace. They
+introduce no runtime values or dictionaries; the ordinary evidence and
+associated-dispatch rules still choose implementations.
+
+```blot
+type Add a is contract = { associated "add" a a a }
+type Arithmetic a is contract = { Add a, associated "mul" a a a }
+type Project [owner, value] is contract = { field "value" owner value }
+type Box a is data = #Box { value: a }
+const twice: a -> a where { Arithmetic a } = fn value => value + value
+const read: a -> b where { Project [a, b] } = fn box => box.value
+entry const answer = fn () => twice (read (#Box { value: 21 }))
+```
+
+Every use instantiates the contract's type and effect-row parameters separately.
+Contracts are erased requirements, not type aliases or type-constructor values.
+Their bodies are checked even when unused. Recursive bundles, undeclared type
+parameters, wrong argument shapes, and missing requirements are errors. Existing
+rules about written function effects remain in force: use `a -> b ! {| e}` when
+a wrapper propagates effects. Associated type members and implementation
+declarations are subsequent work; output type parameters express relationships
+with the existing predicates.
+
 In gdev, const resource/component registrations determine the nested world type;
 `ecs.build` discards registration metadata and retains initial state, scope and
 checkpoint closures. Storage values remain runtime state. Its `get`, `previous`,
@@ -660,6 +753,14 @@ omit `.blot`; the CLI maps `std/` to the source library. Cycles are errors.
 Top-level declarations are public by default: every declaration of every module
 stays importable. Importing a type does not import differently named
 constructors. Imported operator functions need local fixity declarations.
+
+Hosts can register typed parsers for external files through `createCompiler`'s
+`assets` option. Source imports those virtual modules normally, for example
+`import { value } from "./settings.json"`. Parsers return type descriptions and
+values, or types and references to host resource snapshots. See
+[typed asset imports](assets.md) for JSON and shader integration. This is an
+explicit host parser boundary; the native CLI alone does not choose file
+parsers.
 
 `entry const` and `entry let` mark host entrypoints. Exactly the entry module's
 entry declarations become Wasm exports, under their own names; a build needs at

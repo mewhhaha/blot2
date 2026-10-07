@@ -121,6 +121,7 @@ const Diagnostic = struct {
     message: []const u8,
     offset_encoding: []const u8 = "utf8_bytes",
     utf16: ?ast.Span = null,
+    details: ?@import("dependency_consumer.zig").Details = null,
 };
 fn issue(result: *const partial.Result, entry: []const u8) !Diagnostic {
     const filename = result.diagnostic_filename orelse entry;
@@ -132,6 +133,7 @@ fn issue(result: *const partial.Result, entry: []const u8) !Diagnostic {
         .end = d.end,
         .message = d.message,
         .utf16 = if (d.publication) |publication| publication.utf16 else null,
+        .details = if (d.publication) |publication| if (std.mem.eql(u8, d.code, "typed_hole")) .{ .bytes = publication.details_json } else null else null,
     };
     if (result.result.compiled.diagnostic) |d| return .{
         .filename = filename,

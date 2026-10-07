@@ -10,6 +10,10 @@ The package root exports `createCompiler({ entry, executable? })`.
 retained revisions and unsaved source overrides. See
 [the project API](../zig-native/PROJECT_CLIENT.md).
 
+[Typed asset imports](assets.md) register explicit parsers that produce ordinary
+typed modules and optional host resource snapshots. JSON data, shader input
+types, and asset references share this interface.
+
 ## Prelude and operators
 
 The public API and Deno CLI load `std/prelude.blot` by default. Set

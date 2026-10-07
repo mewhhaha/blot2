@@ -73,6 +73,7 @@ pub fn collect(allocator: Allocator, owner: *const D.Module) Error!Slots {
         try list(a, value.variables, 2);
         try list(a, value.parameter_names, 1);
         try list(a, value.constructors, 2);
+        try list(a, value.alias_rows, 2);
         try list(b, value.patterns, 2);
     }
     for (iface.effect_families) |value| {
@@ -80,6 +81,13 @@ pub fn collect(allocator: Allocator, owner: *const D.Module) Error!Slots {
         try list(a, value.variables, 2);
         try list(a, value.parameter_names, 1);
         try list(a, value.operations, 2);
+        try list(b, value.patterns, 2);
+    }
+    for (iface.contracts) |value| {
+        try list(a, value.parameters, 2);
+        try list(a, value.variables, 2);
+        try list(a, value.parameter_names, 1);
+        try list(a, value.row_variables, 2);
         try list(b, value.patterns, 2);
     }
     for (iface.patterns.nodes) |node| switch (node.kind) {

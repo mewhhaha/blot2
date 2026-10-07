@@ -12,6 +12,14 @@ Source bytes are immutable UTF-8. Tokens refer to byte ranges. Identifiers use
 `symbols.Symbol = u32`; zero is absent. `symbols.Pool` owns one byte buffer with
 offset/length entries and stable numeric IDs. Hashes locate candidates; exact
 bytes decide identity. Array growth must never invalidate hash keys or handles.
+Immutable Core keeps one owned spelling for each record field symbol it uses.
+Runtime structural record slots follow UTF-8 spelling order, independent of
+source evaluation order and symbol relocation. Constructor tuple views keep
+declaration order and convert explicitly at the representation boundary.
+Evaluator records retain slot names beside their values; every projection
+matches names rather than assuming an annotation's field order. Merge results
+intern their ordered name spans, so repeated updates do not grow shape metadata.
+
 AST IDs, type IDs and instruction IDs are 32-bit indexes into contiguous owned
 tables. Lists are spans in side arrays. There are no per-character nodes,
 semantic linked lists or persistent tree maps in hot mutable state.
@@ -31,9 +39,9 @@ part of snapshots or imported value templates.
 
 An admitted indexed-construction region owns a separate child buffer, copied
 from its immutable input once. Finite nested loops and scalar carries use the
-ordinary evaluator; only proven unobserved indexed writes target this buffer.
-No intermediate collection reference may escape, be captured, or be read by
-an arbitrary expression. A frame-qualified private carry is never a published
+ordinary evaluator; only proven unobserved indexed writes target this buffer. No
+intermediate collection reference may escape, be captured, or be read by an
+arbitrary expression. A frame-qualified private carry is never a published
 value. Freeze once at the region boundary; discard scratch on failure.
 
 Runtime lists use balanced trees with right-sized leaves and copy only an edited
@@ -51,13 +59,14 @@ levels and expansion stops past 4,096 emitted instructions. These are structural
 cost limits, independent of declaration names and source modules.
 
 Executable fragment validity records each inlined source body and every static
-value root. Exact source/catalog dependencies and complete value/evidence/capture
-graph comparison authorize reuse; unsupported providers and generative domains
-rebuild. Rebuilt dependency seeds may offer old pinned fragments for admission.
-Candidate failure must preserve the last successful revision and its owners.
-Within one compile, code and principal/query admission can share an independently
-owned copy of the same semantic validation. Source owners, current Core, allocator
-and admission options must match; executable body/value checks remain separate.
+value root. Exact source/catalog dependencies and complete
+value/evidence/capture graph comparison authorize reuse; unsupported providers
+and generative domains rebuild. Rebuilt dependency seeds may offer old pinned
+fragments for admission. Candidate failure must preserve the last successful
+revision and its owners. Within one compile, code and principal/query admission
+can share an independently owned copy of the same semantic validation. Source
+owners, current Core, allocator and admission options must match; executable
+body/value checks remain separate.
 
 ## Frontend interface
 
@@ -95,6 +104,13 @@ schemes belong to declarations, instantiated evidence belongs to uses.
 types, resolved local/global identities and diagnostics. Validate unused source
 declarations too. Report unsupported semantic features explicitly; no silent
 fallback or pretending an unsupported construct is valid.
+
+Typed-hole snapshots own a bounded flat diagnostic graph and the strings inside
+its node, edge, binding and requirement arrays. Cloning copies each nested name;
+cleanup frees those names before the four arrays. No snapshot borrows source
+storage or live inference tables. Capture the nearest 32 unshadowed bindings,
+with one additional binding indicating truncation, without quadratic scope
+lookup.
 
 The CLI, native checks and executed-Wasm tests are the production gates.
 Validate all declarations, including unused ones. Keep effects, staging, guest
