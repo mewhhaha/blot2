@@ -55,8 +55,8 @@ test "fallback Core sharing matches initial changed dependency rejection recover
     defer off.deinit();
     var on = try retained.Session.initEmpty(a, .{});
     defer on.deinit();
-    on.reuse_fallback_check = true;
-    on.reuse_fallback_core = true;
+    on.policy.reuse_fallback_check = true;
+    on.policy.reuse_fallback_core = true;
     const versions = [_][]const u8{ dep, "const value:U32=43\nconst read:Unit->U32=fn () => value\n", "const value:U32=true\nconst read:Unit->U32=fn () => value\n", dep, "const read:Unit->U32=fn () => read ()\n", dep };
     for (versions, 0..) |text, index| {
         try fixture.write("dep.blot", text);
@@ -103,7 +103,7 @@ test "fallback Core-only switch conservatively preserves ordinary checking and f
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.reuse_fallback_core = true;
+    session.policy.reuse_fallback_core = true;
     var result = try session.revise(io, fixture.path, null, .{});
     defer result.deinit(a);
     try std.testing.expect(result.result.diagnostic == null and result.result.compiled.diagnostic == null);
@@ -115,8 +115,8 @@ test "fallback Core-only switch conservatively preserves ordinary checking and f
 fn initialFailure(allocator: std.mem.Allocator, fixture: *Fixture) !void {
     var session = try retained.Session.initEmpty(allocator, .{});
     defer session.deinit();
-    session.reuse_fallback_check = true;
-    session.reuse_fallback_core = true;
+    session.policy.reuse_fallback_check = true;
+    session.policy.reuse_fallback_core = true;
     const old = Before.get(&session);
     var preparation = session.prepareRevision(io, fixture.path, null, .{}) catch |err| {
         try old.unchanged(&session);
@@ -157,8 +157,8 @@ test "fallback shared Core every changed-closure and encoding allocation failure
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.reuse_fallback_check = true;
-    session.reuse_fallback_core = true;
+    session.policy.reuse_fallback_check = true;
+    session.policy.reuse_fallback_core = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     const before = Before.get(&session);

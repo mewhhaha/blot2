@@ -4,7 +4,7 @@
 //! reductions in the kernel are deliberately outside the admission rule.
 const std = @import("std");
 const w = @import("wasm.zig");
-const ops = @import("wasm_simd_ops.zig");
+const ops = @import("runtime_ir.zig");
 const A = std.mem.Allocator;
 const Id = u16;
 const none = std.math.maxInt(Id);
@@ -61,17 +61,18 @@ const Plan = struct {
                 },
                 else => blk: {
                     _ = ops.lift(inst.op) orelse return null;
-                    const unary = ops.unary(inst.op);
-                    const arity: usize = if (unary) 1 else 2;
+                    const signature = ops.fixed(inst.op);
+                    if (signature.effect != .pure or signature.may_trap) return null;
+                    const arity = signature.arity;
+                    const unary = arity == 1;
                     if (len < arity) return null;
                     const left = stack[len - arity];
                     const right = if (unary) none else stack[len - 1];
                     len -= arity;
-                    const machine: w.ValueType = switch (inst.op) {
-                        .f32_convert_i32_u => .f32,
-                        .i32_trunc_sat_f32_u => .i32,
-                        else => self.nodes[left].machine,
-                    };
+                    for (stack[len .. len + arity], signature.inputs[0..arity]) |operand, expected| {
+                        if (self.nodes[operand].machine != expected) return null;
+                    }
+                    const machine = signature.result;
                     break :blk self.add(.{ .op = inst.op, .left = left, .right = right, .machine = machine }) orelse return null;
                 },
             };
@@ -84,50 +85,41 @@ const Plan = struct {
         return if (len == 1) stack[0] else null;
     }
 };
-pub const Output = struct {
-    locals: std.ArrayList(w.ValueType) = .empty,
-    instructions: std.ArrayList(w.Instruction) = .empty,
-    pub fn deinit(self: *Output, a: A) void {
-        self.locals.deinit(a);
-        self.instructions.deinit(a);
-    }
-    fn emit(self: *Output, a: A, op: w.Op, operand: u32) A.Error!void {
-        try self.instructions.append(a, .{ .op = op, .operand = operand });
-    }
-    fn expression(self: *Output, a: A, plan: *const Plan, id: Id, ready: *[256]?u32, parameters: usize) A.Error!u32 {
-        if (ready[id]) |local| return local;
-        const node = plan.nodes[id];
-        const left = if (node.left == none) null else try self.expression(a, plan, node.left, ready, parameters);
-        const right = if (node.right == none) null else try self.expression(a, plan, node.right, ready, parameters);
-        switch (node.op) {
-            .local_get, .i32_const, .f32_const => {
-                try self.emit(a, node.op, node.operand);
-                try self.emit(a, if (node.machine == .f32) .f32x4_splat else .i32x4_splat, 0);
-                if (node.op == .local_get and node.operand == plan.index) {
-                    // Consecutive indices; no integer overflow is possible in
-                    // a four-element run admitted by count-index >= 4.
-                    try self.emit(a, .i32_const, 0);
-                    try self.emit(a, .i32x4_splat, 0);
-                    for (1..4) |lane| {
-                        try self.emit(a, .i32_const, @intCast(lane));
-                        try self.emit(a, .i32x4_replace_lane, @intCast(lane));
-                    }
-                    try self.emit(a, .i32x4_add, 0);
+pub const Output = ops.Body;
+fn expression(self: *Output, a: A, plan: *const Plan, id: Id, ready: *[256]?u32, parameters: usize) A.Error!u32 {
+    if (ready[id]) |local| return local;
+    const node = plan.nodes[id];
+    const left = if (node.left == none) null else try expression(self, a, plan, node.left, ready, parameters);
+    const right = if (node.right == none) null else try expression(self, a, plan, node.right, ready, parameters);
+    switch (node.op) {
+        .local_get, .i32_const, .f32_const => {
+            try self.emit(a, node.op, node.operand);
+            try self.emit(a, if (node.machine == .f32) .f32x4_splat else .i32x4_splat, 0);
+            if (node.op == .local_get and node.operand == plan.index) {
+                // Consecutive indices; no integer overflow is possible in
+                // a four-element run admitted by count-index >= 4.
+                try self.emit(a, .i32_const, 0);
+                try self.emit(a, .i32x4_splat, 0);
+                for (1..4) |lane| {
+                    try self.emit(a, .i32_const, @intCast(lane));
+                    try self.emit(a, .i32x4_replace_lane, @intCast(lane));
                 }
-            },
-            else => {
-                try self.emit(a, .local_get, left.?);
-                if (right) |local| try self.emit(a, .local_get, local);
-                try self.emit(a, ops.lift(node.op).?, 0);
-            },
-        }
-        const local: u32 = @intCast(parameters + self.locals.items.len);
-        try self.locals.append(a, .v128);
-        try self.emit(a, .local_set, local);
-        ready[id] = local;
-        return local;
+                try self.emit(a, .i32x4_add, 0);
+            }
+        },
+        else => {
+            try self.emit(a, .local_get, left.?);
+            if (right) |local| try self.emit(a, .local_get, local);
+            try self.emit(a, ops.lift(node.op).?, 0);
+        },
     }
-};
+    const local: u32 = @intCast(parameters + self.locals.items.len);
+    try self.locals.append(a, .v128);
+    try self.emit(a, .local_set, local);
+    ready[id] = local;
+    return local;
+}
+
 fn is(inst: w.Instruction, op: w.Op, operand: u32) bool {
     return inst.op == op and inst.operand == operand;
 }
@@ -189,7 +181,7 @@ pub fn run(a: A, module: *const w.Module, function: *const w.Function) A.Error!?
         try out.emit(a, .i32_lt_u, 0);
         try out.emit(a, .br_if, 1);
         var ready: [256]?u32 = @splat(null);
-        const vector = try out.expression(a, &plan, result, &ready, function.parameters.len);
+        const vector = try expression(&out, a, &plan, result, &ready, function.parameters.len);
         try out.instructions.appendSlice(a, source[at + 6 .. at + 11]);
         try out.emit(a, .local_get, vector);
         try out.emit(a, .v128_store, 4);

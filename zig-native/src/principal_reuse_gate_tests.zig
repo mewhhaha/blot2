@@ -496,20 +496,15 @@ test "principal gate rejects mutated pins missing metadata and malformed namespa
 
 const shared_query_gate = @import("shared_query_gate.zig");
 
-fn cloneGateFailure(allocator: std.mem.Allocator, old: *artifacts.Pools, current: *Fixture) !void {
+fn shareGateFailure(allocator: std.mem.Allocator, old: *artifacts.Pools, current: *Fixture) !void {
     var source = try Gate.init(allocator, old, current.units, current.names.view());
     defer source.deinit();
     const enabled = source.enabled;
     const bytes = artifacts.stamp(.{ source.structural_units, source.offsets, source.dirty });
-    var cloned = (shared_query_gate.clone(allocator, old, current.units, &source) catch |err| {
-        try std.testing.expectEqual(enabled, source.enabled);
-        try std.testing.expectEqualSlices(u8, &bytes, &artifacts.stamp(.{ source.structural_units, source.offsets, source.dirty }));
-        try std.testing.expect(source.admits(target(&current.units[0], "builder")));
-        return err;
-    }) orelse return error.ExpectedClone;
-    defer cloned.deinit();
-    try std.testing.expectEqualSlices(u8, &bytes, &artifacts.stamp(.{ cloned.structural_units, cloned.offsets, cloned.dirty }));
-    try std.testing.expectEqual(enabled, cloned.enabled);
+    var lease = shared_query_gate.share(allocator, old, current.units, &source) orelse return error.ExpectedLease;
+    defer lease.deinit();
+    try std.testing.expectEqualSlices(u8, &bytes, &artifacts.stamp(.{ lease.structural_units, lease.offsets, lease.dirty }));
+    try std.testing.expectEqual(enabled, lease.enabled);
 }
 
 test "shared query gate preserves exact scalar dirty closure and independent strict importer admission" {
@@ -522,19 +517,19 @@ test "shared query gate preserves exact scalar dirty closure and independent str
     defer pinned.deinit(a);
     var source = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer source.deinit();
-    var cloned = (try shared_query_gate.clone(a, &pinned.pools, after.units, &source)) orelse return error.ExpectedClone;
-    defer cloned.deinit();
-    try std.testing.expect(cloned.enabled and cloned.structural_units[0]);
-    for ([_][]const u8{ "schema", "direct", "transitive" }) |name| try std.testing.expect(!cloned.admits(target(&after.units[0], name)));
-    try std.testing.expect(cloned.admits(target(&after.units[0], "builder")));
+    var lease = (shared_query_gate.share(a, &pinned.pools, after.units, &source)) orelse return error.ExpectedLease;
+    defer lease.deinit();
+    try std.testing.expect(lease.enabled and lease.structural_units[0]);
+    for ([_][]const u8{ "schema", "direct", "transitive" }) |name| try std.testing.expect(!lease.admits(target(&after.units[0], name)));
+    try std.testing.expect(lease.admits(target(&after.units[0], "builder")));
     var strict = try @import("artifact_import.zig").Importer.init(a, &pinned.pools, after.units, after.names.view(), after.units.len);
     defer strict.deinit();
     try std.testing.expect(strict.enabled);
     try std.testing.expect(!strict.stable[0]);
-    try @import("allocation_failures.zig").checkAllAllocationFailures(a, cloneGateFailure, .{ &pinned.pools, &after });
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, shareGateFailure, .{ &pinned.pools, &after });
 }
 
-test "shared query gate refuses mismatched Pools Core and allocator owners before allocating" {
+test "shared query gate refuses mismatched Pools Core and allocator owners before sharing" {
     var before = try Fixture.init(a, &.{independent});
     defer before.deinit(a);
     var after = try Fixture.init(a, &.{independent});
@@ -547,16 +542,16 @@ test "shared query gate refuses mismatched Pools Core and allocator owners befor
     defer other_pin.deinit(a);
     var source = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer source.deinit();
-    try std.testing.expect(try shared_query_gate.clone(a, &other_pin.pools, after.units, &source) == null);
-    try std.testing.expect(try shared_query_gate.clone(a, &pinned.pools, other.units, &source) == null);
-    try std.testing.expect(try shared_query_gate.clone(a, &pinned.pools, after.units[0..0], &source) == null);
+    try std.testing.expect(shared_query_gate.share(a, &other_pin.pools, after.units, &source) == null);
+    try std.testing.expect(shared_query_gate.share(a, &pinned.pools, other.units, &source) == null);
+    try std.testing.expect(shared_query_gate.share(a, &pinned.pools, after.units[0..0], &source) == null);
     var never_allocate = std.testing.FailingAllocator.init(a, .{ .fail_index = 0 });
-    try std.testing.expect(try shared_query_gate.clone(never_allocate.allocator(), &pinned.pools, after.units, &source) == null);
+    try std.testing.expect(shared_query_gate.share(never_allocate.allocator(), &pinned.pools, after.units, &source) == null);
     try std.testing.expectEqual(@as(usize, 0), never_allocate.alloc_index);
     try std.testing.expect(source.admits(target(&after.units[0], "builder")));
 }
 
-test "shared query gate owns its arrays through independent source and clone teardown" {
+test "shared query gate owns its arrays through independent source and lease teardown" {
     var before = try Fixture.init(a, &.{independent});
     defer before.deinit(a);
     var after = try Fixture.init(a, &.{independent});
@@ -566,15 +561,15 @@ test "shared query gate owns its arrays through independent source and clone tea
     var source = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     var source_live = true;
     defer if (source_live) source.deinit();
-    var cloned = (try shared_query_gate.clone(a, &pinned.pools, after.units, &source)) orelse return error.ExpectedClone;
-    defer cloned.deinit();
-    var disposable = (try shared_query_gate.clone(a, &pinned.pools, after.units, &source)) orelse return error.ExpectedClone;
+    var lease = (shared_query_gate.share(a, &pinned.pools, after.units, &source)) orelse return error.ExpectedLease;
+    defer lease.deinit();
+    var disposable = (shared_query_gate.share(a, &pinned.pools, after.units, &source)) orelse return error.ExpectedLease;
     disposable.deinit();
     try std.testing.expect(source.admits(target(&after.units[0], "builder")));
     source.deinit();
     source_live = false;
-    try std.testing.expect(cloned.admits(target(&after.units[0], "builder")));
-    try std.testing.expectEqual(@as(usize, after.units.len), cloned.structural_units.len);
+    try std.testing.expect(lease.admits(target(&after.units[0], "builder")));
+    try std.testing.expectEqual(@as(usize, after.units.len), lease.structural_units.len);
 }
 
 test "shared query gate never strengthens disabled admission and new preparation detects old pin mutation" {
@@ -587,19 +582,19 @@ test "shared query gate never strengthens disabled admission and new preparation
     {
         var source = try Gate.init(a, &pinned.pools, after.units, after.names.view());
         defer source.deinit();
-        var cloned = (try shared_query_gate.clone(a, &pinned.pools, after.units, &source)) orelse return error.ExpectedClone;
-        defer cloned.deinit();
-        try std.testing.expect(cloned.enabled);
+        var lease = (shared_query_gate.share(a, &pinned.pools, after.units, &source)) orelse return error.ExpectedLease;
+        defer lease.deinit();
+        try std.testing.expect(lease.enabled);
     }
     // Every prior Gate is dead before changing this fixture for a new epoch.
     before.units[0].nodes[root(&before.units[0], "schema")].a = 9;
     var source = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer source.deinit();
     try std.testing.expect(!source.enabled);
-    var cloned = (try shared_query_gate.clone(a, &pinned.pools, after.units, &source)) orelse return error.ExpectedClone;
-    defer cloned.deinit();
-    try std.testing.expect(!cloned.enabled);
-    try std.testing.expect(!cloned.admits(target(&after.units[0], "builder")));
+    var lease = (shared_query_gate.share(a, &pinned.pools, after.units, &source)) orelse return error.ExpectedLease;
+    defer lease.deinit();
+    try std.testing.expect(!lease.enabled);
+    try std.testing.expect(!lease.admits(target(&after.units[0], "builder")));
 }
 
 const query_importer = @import("artifact_import.zig").Importer;
@@ -918,7 +913,7 @@ fn projectedPrincipals(allocator: std.mem.Allocator, old: *artifacts.Pools, curr
     try std.testing.expect(!gate.admitsPrincipal(target(&current.units[0], "schema")));
     try std.testing.expect(!gate.admitsPrincipal(target(&current.units[1], "dependent")));
     try std.testing.expect(gate.admitsPrincipal(target(&current.units[1], "safe")));
-    var cloned = (try @import("shared_query_gate.zig").clone(allocator, old, current.units, &gate)).?;
+    var cloned = (@import("shared_query_gate.zig").share(allocator, old, current.units, &gate)).?;
     defer cloned.deinit();
     try std.testing.expect(cloned.admitsPrincipal(builder));
     try std.testing.expect(!cloned.admits(builder));

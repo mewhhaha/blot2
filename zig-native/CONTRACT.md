@@ -74,8 +74,22 @@ individual recycle still frees only its own storage. Escaping a parent also
 escapes its reachable children. Unknown field reads/copies, overlapping writes,
 conditional field provenance, cross-segment construction and invalidating calls
 reject the proof. Reference-overlap checking has a bounded work budget and
-conservatively declines wider proofs. Dynamic shared/cyclic ownership and full
-effect cleanup remain required before tracing can be removed.
+conservatively declines wider proofs. Dynamic shared/cyclic ownership and reclamation of escaping effect payloads
+remain required before tracing can be removed.
+
+Private provider heads and State/request cell IDs never enter source values or
+closures. `runtime_cleanup.Stack` records their releases at construction and
+tracks a checkpoint at each return/break target. A normal exit emits its suffix;
+a cancellation emits all active scopes, including inherited inlining scopes.
+The cleanup calls bypass cancellation guards. Demand forcing registers a reset
+only on its cancellation path. Releasing private storage does not release its
+payload: callbacks, State values and demand memo results may outlive that scope.
+
+All optimizer passes use `runtime_ir` opcode/call contracts. New opcodes require
+an exhaustive stack/effect definition; there is no fallback binary arity. Memory
+word types do not prove pointer roles. `runtime_pipeline` owns at most the input
+and next transformed body, releasing the input after a successful replacement;
+failure must not mutate the retained function or fragment.
 
 Checked scalar element layouts select pointer-free array allocation and list
 leaves. The descriptor carries this fact through cloning, structural operations
@@ -109,14 +123,38 @@ results inside loops or known callback arguments. Nesting is limited to six
 levels and expansion stops past 4,096 emitted instructions. These are structural
 cost limits, independent of declaration names and source modules.
 
+Immutable cursors own a leaf base and its logical start, separate from the
+collection's lookup cache. Forks only consult that shared cache on a leaf
+crossing. The four-word cursor stays in the previous 32-byte allocation class.
+Serialized cursors start without a cached leaf. Every stored pointer remains an
+allocation base and published cursors are initialized once, never mutated.
+
+`function_facts` memoizes bounded source-body facts within one Generator owner.
+Unknown dispatch/calls remain unknown, and inlined bodies retain the ordinary
+executable dependency reads. A collection of up to eight scalar elements can
+use locals when all its uses are finite traversal or intrinsic length reads;
+literal-producing helpers and admitted consuming helpers share that path.
+Elements and arguments evaluate once in written order. Captures, merges,
+loop-carried collections, updates, returned values and opaque uses remain boxed.
+Small-collection uses also justify the existing 64-node inlining budget.
+
+`exact_builder` proves a private append region with up to four rectangular
+finite generators. Bounds cannot read region binders, allocate, trap or perform
+effects. The intermediate list must never escape or be observed. Admitted
+regions allocate their final List or Array directly; count overflow uses the
+ordinary path with its original failure order. Reference storage is cleared
+before element evaluation. Ragged/filtered/effectful regions remain ordinary
+builders. The packed scalar-row experiment is a separate fixture and does not
+change the production collection ABI.
+
 Executable fragment validity records each inlined source body and every static
 value root. Exact source/catalog dependencies and complete
 value/evidence/capture graph comparison authorize reuse; unsupported providers
 and generative domains rebuild. Rebuilt dependency seeds may offer old pinned
 fragments for admission. Candidate failure must preserve the last successful
 revision and its owners. Within one compile, code and principal/query admission
-can share an independently owned copy of the same semantic validation. Source
-owners, current Core, allocator and admission options must match; executable
+share immutable semantic validation arrays through independently released leases.
+Source owners, current Core, allocator and admission options must match; executable
 body/value checks remain separate.
 
 ## Frontend interface

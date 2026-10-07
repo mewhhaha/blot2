@@ -72,7 +72,7 @@ test "catalog queries survive rebuilt dependencies with exact fresh staging and 
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     session.enableProjectBuildReuse();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
@@ -106,10 +106,10 @@ test "catalog queries survive rebuilt dependencies with exact fresh staging and 
     var restored = try session.revise(io, fixture.path, null, .{});
     defer restored.deinit(a);
     try std.testing.expectEqualSlices(u8, initial.result.compiled.bytes, restored.result.compiled.bytes);
-    session.reuse_rebuilt_queries = false;
+    session.policy.reuse_rebuilt_queries = false;
     // Code fragments also offer their pinned owner to query admission. Disable
     // both reuse sources when checking the wholly fresh rebuilt-query lane.
-    session.reuse_rebuilt_code = false;
+    session.policy.reuse_rebuilt_code = false;
     const policy = try ready(&session, &fixture, .{});
     defer policy.deinit();
     try std.testing.expect(!policy.stats.reused_output);
@@ -165,7 +165,7 @@ test "catalog queries decline unrepresented imported effect operations and prese
     var pure = try retained.Session.initEmpty(a, .{});
     defer pure.deinit();
     pure.enableProjectBuildReuse();
-    pure.reuse_source_effect_queries = false;
+    pure.policy.reuse_source_effect_queries = false;
     for ([_]u8{ '7', '8', '7' }, 0..) |number, revision| {
         const text = try a.dupe(u8, producer);
         defer a.free(text);
@@ -213,8 +213,8 @@ fn initializeUnaffectedQuery(fixture: *Fixture, session: *retained.Session) !voi
     try fixture.write("dep.blot", unaffected_producer);
     try fixture.write("main.blot", unaffected_query_main);
     session.enableProjectBuildReuse();
-    session.reuse_unaffected_modules = true;
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unaffected_modules = true;
+    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(session.allocator);
     try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
@@ -392,7 +392,7 @@ test "refinement receipt preserves generic collection record State and captured 
         var session = try retained.Session.initEmpty(a, .{});
         defer session.deinit();
         session.enableProjectBuildReuse();
-        session.reuse_refinements = true;
+        session.policy.reuse_refinements = true;
         var hits: usize = 0;
         for ([_]u32{ 8, 9, 8, 9 }) |version| {
             const source = try a.print("{s}\nentry const schema: U32 = {d}\n", .{ body, version });
@@ -419,7 +419,7 @@ test "refinement receipt survives edits reverts rejected revisions and changed s
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     session.enableProjectBuildReuse();
-    session.reuse_refinements = true;
+    session.policy.reuse_refinements = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
@@ -481,7 +481,7 @@ test "refinement receipt every replay allocation failure leaves previous results
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     session.enableProjectBuildReuse();
-    session.reuse_refinements = true;
+    session.policy.reuse_refinements = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     const source = try a.dupe(u8, refinement_source);
@@ -601,7 +601,7 @@ test "unchanged-output exact reads preserve current owners through discard commi
     var session_alive = true;
     defer if (session_alive) session.deinit();
     session.enableProjectBuildReuse();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     const before = Stamp.read(&session);
@@ -640,7 +640,7 @@ test "unchanged-output entry and producer changes reject reuse and failed revisi
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     session.enableProjectBuildReuse();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     try fixture.write("main.blot", "entry const answer:U32=missing\n");
@@ -679,15 +679,15 @@ test "unchanged-output root identity policy and exact optional settings decline 
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
-    session.principal_reuse = !session.principal_reuse;
+    session.policy.principal_reuse = !session.policy.principal_reuse;
     const policy = try ready(&session, &fixture, .{});
     defer policy.deinit();
     try std.testing.expect(!policy.stats.reused_output);
     try std.testing.expect(session.discard(policy));
-    session.principal_reuse = !session.principal_reuse;
+    session.policy.principal_reuse = !session.policy.principal_reuse;
     var other_identity = try session.prepareRevision(io, fixture.path, "", .{});
     defer other_identity.deinit();
     try std.testing.expect(other_identity == .ready);
@@ -714,7 +714,7 @@ fn unchangedOutputAllocationLaw(allocator: std.mem.Allocator, fixture: *const Fi
     var session_alive = true;
     defer if (session_alive) session.deinit();
     session.enableProjectBuildReuse();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(allocator);
     const before = Stamp.read(&session);
@@ -762,7 +762,7 @@ test "unchanged-output identical bytes with a retargeted import symlink require 
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     session.enableProjectBuildReuse();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     const before = Stamp.read(&session);
@@ -796,7 +796,7 @@ test "unchanged-output owns its cached bytes independently of detached caller re
     try equal(&first, &second);
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     initial.result.compiled.bytes[0] ^= 255;
@@ -960,9 +960,6 @@ fn expectProjectQuery(candidate: *const retained.Candidate, expected: *const par
 }
 
 test "complete project policy preserves captured queries through candidate discard retry and source error recovery" {
-    const prior = metadata.buffered_stamps_enabled;
-    metadata.buffered_stamps_enabled = true;
-    defer metadata.buffered_stamps_enabled = prior;
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
@@ -1023,9 +1020,6 @@ fn projectQueryAllocationFailure(allocator: std.mem.Allocator, session: *retaine
 }
 
 test "complete project policy every queried preparation and reply encoding OOM preserves last good owners and retries" {
-    const prior = metadata.buffered_stamps_enabled;
-    metadata.buffered_stamps_enabled = true;
-    defer metadata.buffered_stamps_enabled = prior;
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
@@ -1285,15 +1279,15 @@ test "solver capacity policy stays private and changing it declines unchanged-ou
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     session.enableProjectBuildReuse();
-    try std.testing.expect(session.reuse_solver_capacity);
-    session.reuse_solver_capacity = false;
-    session.reuse_unchanged_output = true;
+    try std.testing.expect(session.policy.reuse_solver_capacity);
+    session.policy.reuse_solver_capacity = false;
+    session.policy.reuse_unchanged_output = true;
     var original_result = try session.revise(io, fixture.path, null, .{});
     defer original_result.deinit(a);
     var unchanged = try session.revise(io, fixture.path, null, .{});
     defer unchanged.deinit(a);
     try std.testing.expect(session.last.reused_output);
-    session.reuse_solver_capacity = true;
+    session.policy.reuse_solver_capacity = true;
     var enabled = try session.revise(io, fixture.path, null, .{});
     defer enabled.deinit(a);
     try std.testing.expect(!session.last.reused_output);
@@ -1301,7 +1295,7 @@ test "solver capacity policy stays private and changing it declines unchanged-ou
     var enabled_unchanged = try session.revise(io, fixture.path, null, .{});
     defer enabled_unchanged.deinit(a);
     try std.testing.expect(session.last.reused_output);
-    session.reuse_solver_capacity = false;
+    session.policy.reuse_solver_capacity = false;
     var disabled = try session.revise(io, fixture.path, null, .{});
     defer disabled.deinit(a);
     try std.testing.expect(!session.last.reused_output);
@@ -1321,16 +1315,16 @@ test "fresh principal capture serves the first edit and the edit after a depende
         var candidate = try retained.Session.initEmpty(a, .{});
         defer candidate.deinit();
         candidate.enableProjectBuildReuse();
-        candidate.reuse_rebuilt_queries = false;
-        candidate.reuse_rebuilt_code = false;
-        candidate.reuse_projected_principals = projected;
+        candidate.policy.reuse_rebuilt_queries = false;
+        candidate.policy.reuse_rebuilt_code = false;
+        candidate.policy.reuse_projected_principals = projected;
         var baseline = try retained.Session.initEmpty(a, .{});
         defer baseline.deinit();
         baseline.enableProjectBuildReuse();
-        baseline.reuse_rebuilt_queries = false;
-        baseline.reuse_rebuilt_code = false;
-        baseline.reuse_projected_principals = projected;
-        baseline.capture_fresh_principals = false;
+        baseline.policy.reuse_rebuilt_queries = false;
+        baseline.policy.reuse_rebuilt_code = false;
+        baseline.policy.reuse_projected_principals = projected;
+        baseline.policy.capture_fresh_principals = false;
         for (0..4) |revision| {
             if (revision == 1 or revision == 2) try fixture.write("main.blot", edit_source);
             if (revision == 2) {

@@ -1,16 +1,56 @@
 # Zig compiler status
 
-The latest ownership work is qualified in the
-[2026-10-07 runtime report](../std/PERFORMANCE.md#closed-shared-and-cyclic-allocation-groups).
-Proven private allocations with shared children and cycles now release together
-without tracing or reference counting. This extends the existing branch/loop
-lifetimes, borrowed calls and fresh-result transfers. The shared-record benchmark
-uses 17.30 → 4.46 MB, including a retained million-element startup List.
-The full compiler gate passes, including 526 guest/client tests and the existing
-cycle/async/retained checks. On the frozen 394 KB gdev workload, paired cold
-compilation is 805 → 803 ms; retained edits remain around 500 ms. Both remain
-above the targets. Tracing remains for dynamic/unproved graphs. Shared RC,
-general effect cleanup and dynamic cycle reclamation without tracing are open.
+The [list transfer batch](../std/PERFORMANCE.md#list-transfer-batch) is qualified
+and installed locally. Independent cursor leaf positions, small scalar
+collection elimination, exact-size rectangular builders and reusable function
+facts use general compiler proofs. The focused runtime probes improve by about
+2.7×, 85× and 96× respectively; these are not whole-application speedups.
+
+Packed scalar rows remain an isolated layout/emission prototype. Its 100,000-row
+fixture is about 4.3× faster and uses 44% less heap, with raw F32 bits preserved.
+It is not enabled in the production List/Array representation. Lists retain
+their existing AVL backing.
+
+The native suite and **534 guest/client tests** pass. Zig-analyzer checks 258
+files with 122 existing warnings and no errors. The standalone compiler builds
+the frozen 394 KB gdev workload into the same 629,240 valid Wasm bytes as the
+native binary. Qualification pins are in
+`build/list-transfer-review/qualification.json`.
+
+Paired native-process cold compilation is 1,338 → 1,323 ms, with about 73 MiB
+peak RSS. Retained edits are around 830–853 ms, with mixed changes against the
+baseline. This does not establish a compilation speedup, and the 500 ms cold /
+100 ms edit targets remain unmet. Historical timings below used earlier runs
+and cannot be compared directly with this batch.
+
+## Architecture cleanup qualification
+
+The seven architecture cleanups are qualified in the
+[2026-10-07 report](../std/PERFORMANCE.md#compiler-architecture-cleanup).
+The compiler now shares a typed runtime IR, a pass pipeline, heap layouts and
+session policies; specialization has its own semantic service. Mutable global
+switches are gone, semantic validation shares immutable storage, and conversion
+boundaries distinguish numeric handle domains.
+
+Private handler frames and cells have explicit cleanup on scope exits and
+cancellation. After 10,000 raw effect calls without collection or host resets,
+guest memory stays at 128 KiB; the committed compiler grew to 1 MiB. Escaping
+payloads retain their own lifetime, covered by an executed survival test.
+The full compiler gate passes: **1,055 native and 528 guest/client tests**.
+Zig-analyzer reports 122 existing warnings and no errors across 253 files.
+
+On the frozen 394 KB gdev workload, paired cold compilation is 808 → 813 ms,
+with about 74 MiB peak process RSS; retained edits remain around 500 ms.
+The cleanup does not establish a compilation speedup. Both latency targets
+remain unmet. Tracing remains for dynamic/unproved graphs; shared RC, escaping
+and suspended-effect ownership, and dynamic cycle reclamation are still open.
+
+The packaged standalone also builds and validates the frozen game (620,017 Wasm
+bytes). The live gdev working tree has since added generated
+`src/crystal_spots.blot`; its annotations/expressions fail with identical
+diagnostics on both compiler versions. That live build is not a passing smoke
+test. Logs and binary pins are saved in
+`build/architecture-cleanup-review/qualification.json`.
 
 The migration qualification below records its earlier, smaller workload and
 compiler revision.

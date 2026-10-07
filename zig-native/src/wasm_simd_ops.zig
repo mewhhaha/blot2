@@ -31,32 +31,3 @@ pub fn code(op: w.Op) ?u32 {
         else => null,
     };
 }
-pub fn lift(op: w.Op) ?w.Op {
-    return switch (op) {
-        .i32_add => .i32x4_add,
-        .i32_sub => .i32x4_sub,
-        .i32_mul => .i32x4_mul,
-        .i32_and => .v128_and,
-        .i32_or => .v128_or,
-        .i32_xor => .v128_xor,
-        .f32_abs => .f32x4_abs,
-        .f32_neg => .f32x4_neg,
-        .f32_ceil => .f32x4_ceil,
-        .f32_floor => .f32x4_floor,
-        .f32_trunc => .f32x4_trunc,
-        .f32_sqrt => .f32x4_sqrt,
-        .f32_add => .f32x4_add,
-        .f32_sub => .f32x4_sub,
-        .f32_mul => .f32x4_mul,
-        .f32_div => .f32x4_div,
-        .f32_convert_i32_u => .f32x4_convert_i32x4_u,
-        .i32_trunc_sat_f32_u => .i32x4_trunc_sat_f32x4_u,
-        else => null,
-    };
-}
-pub fn unary(op: w.Op) bool {
-    return switch (op) {
-        .f32_abs, .f32_neg, .f32_ceil, .f32_floor, .f32_trunc, .f32_sqrt, .f32_convert_i32_u, .i32_trunc_sat_f32_u => true,
-        else => false,
-    };
-}

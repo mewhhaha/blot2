@@ -1,5 +1,159 @@
 # Standard library API and performance audit
 
+## List transfer batch
+
+The first transfer batch from `../list-like` is implemented through general
+compiler proofs. List cursors keep their own leaf position, so forks no longer
+overwrite one shared traversal cache. Small scalar collections of up to eight
+elements can remain in locals through literal-producing and traversal-only
+helpers. Rectangular nested builders allocate their final List or Array once.
+Compile-owned function facts memoize bounded cost, behavior, length and borrowing
+analysis. None of these optimizations recognizes prelude declaration names.
+
+The proofs preserve eager evaluation order, effects, traps and escaping values.
+Unknown calls, aliases, branch/loop merges, pointer elements and unsupported
+collection uses retain the ordinary representation. Exact builders accept up to
+four independent finite loops and modern spread append; ragged loops, guards,
+early exits and intermediate observations fall back. Checked cardinality
+overflow runs the original loop rather than introducing an earlier trap.
+Function facts are conservative local summaries, not a transitive purity solver.
+
+Ten warmups precede 25 alternating pairs using identical source and prelude:
+
+| Runtime probe | Before ms | After ms | Before guest bytes | After guest bytes |
+| --- | ---: | ---: | ---: | ---: |
+| Forked cursors, 100,000 elements | 4.990 | 1.825 | 10,551,296 | 10,551,296 |
+| Small collection helpers, 100,000 calls | 3.743 | 0.044 | 12,910,592 | 65,536 |
+| Rectangular builder, 500 × 500 elements | 10.572 | 0.110 | 3,211,264 | 1,114,112 |
+
+These are fixture-specific runtime gains of about 2.7×, 85× and 96×. The helper
+and builder driver checks that the intended optimization actually fired.
+Cursor fields still fit the old allocation size class. Opaque cursor values
+can still allocate; their private leaf caches account for the first result.
+
+A separate packed-row prototype derives scalar field paths from ordinary type
+layouts, with no production collection ABI change. In an executed Wasm fixture,
+constructing and reducing 100,000 escaping three-word U32/F32/F32 rows takes
+0.672 → 0.158 ms. Heap storage falls 3,724,288 → 2,097,152 bytes, about 44%.
+Checks compare every field's raw bits, including F32 signed zero and NaN payloads.
+The planner supports nested tuples/structural records; the measured fixture is
+flat. Reference-bearing and nominal layouts are rejected. Production List and
+Array values do not yet use packed rows, and Lists retain the existing AVL tree.
+
+The same frozen gdev workload contains 394,294 source bytes across 53 files.
+Five alternating fresh-process pairs with warm filesystem caches and three
+retained sessions per variant give these medians:
+
+| Compilation measurement | Before | After |
+| --- | ---: | ---: |
+| Native process wall time | 1,337.6 ms | 1,323.5 ms |
+| Native process CPU | 1,114.5 ms | 1,126.6 ms |
+| Peak process RSS | 75,380 KiB | 74,700 KiB |
+| First retained edit | 884.1 ms | 829.5 ms |
+| Subsequent retained edit | 777.9 ms | 852.8 ms |
+| No-op | 4.96 ms | 4.00 ms |
+| Wasm size | 620,017 bytes | 629,240 bytes |
+
+Native wall time includes launch, output writing and teardown, excluding the
+Python monitor's own startup. Retained measurements include the API round trip.
+Every module is validated and first edits are compared byte-for-byte with fresh
+compilation. Peak requested compiler storage remains 58,404,972 bytes, with
+zero live requested bytes after teardown. Gdev uses six small-collection and
+twelve exact-builder optimizations; 9,350 of 9,912 function-fact requests reuse
+one of 562 analyses. Checked builder fallback branches add some emitted code.
+Mixed edit results and noisy wall times do not establish a compiler speedup.
+The 500 ms cold / 100 ms edit targets remain unmet; earlier historical timings
+are not paired comparisons with these runs.
+
+The full native compiler suite and **534 guest/client tests** pass, including
+effects, exhaustion, escaping snapshots, allocation failures and retained edits
+that change helper behavior or introduce then repair errors. Zig-analyzer checks
+258 files with 122 existing warnings and no errors. The packaged standalone
+produces exactly the same valid gdev Wasm as the measured native compiler and is
+installed at `~/.local/bin/blot` for new compiler sessions.
+
+Baseline compiler:
+`b0e50d8fd7d98bbb81580fe9be7676047a0d3348edb6490ade55727c6d874007`.
+Qualified compiler:
+`9b1d10be3fe4b0d7ab8974ed6839807fe8bcf69b36a7b5df583a26c278359164`.
+Raw samples, source/binary pins and output hashes are in
+`build/list-transfer-review/final-runtime/report.json`,
+`build/list-transfer-review/final-compiler/report.json`,
+`build/list-transfer-review/packed.json` and
+`build/list-transfer-review/qualification.json`. Drivers are
+`scripts/bench_list_transfers.ts`, `scripts/bench_iterators.ts` and
+`scripts/bench_packed_storage.ts`.
+
+## Compiler architecture cleanup
+
+The seven approved cleanups after `42cb11f` are implemented. A compact typed
+stack IR supplies shared opcode, call and allocation contracts to scalar
+replacement, SIMD and lifetime analysis. One pipeline owns transformed bodies
+and promptly releases superseded buffers. Specialization solves representation
+and effect obligations through a semantic service before emitting named bodies.
+Fixed guest heap layouts and compiler boundary handles are explicit. Execution
+policies and stamping counters belong to sessions/callers; identical semantic
+validation inputs share immutable storage through independently released leases.
+Executable and value admission still require their own proofs.
+
+Private provider frames, State cells and request frames/cells now have lexical
+cleanup obligations. Return, break and cancellation discharge the scopes they
+leave; cancelled demands reset to pending. Payload values remain independently
+owned. The executed law deliberately uses a raw Wasm Array entry, bypassing both
+the host wrapper and generated scalar-entry reset, with no source-loop collector.
+After one warmup and **10,000 calls**, the old guest grows from **131,072 to
+1,048,576 bytes**; the new guest remains at **131,072 bytes**. A second law keeps
+escaping State closures alive across cleanup and later storage reuse.
+
+`deno task test:compiler` passes **1,055 native tests and 528 guest/client tests**,
+including cancellation, State/demand cycles, async behavior, allocation failures
+and retained/fresh parity. Zig-analyzer checks 253 files with the same 122
+existing warnings and no errors. The stack IR is not SSA; dynamic selection still
+requests semantic work, and dense Core tables retain raw internal words. This
+does not implement general shared RC or eliminate tracing for dynamic cycles.
+
+Baseline compiler:
+`67ed843a7e9b2ff4c39de32ae05d25f119172c82b7c0c4c3ad68be275a913e78`.
+Qualified compiler:
+`b0e50d8fd7d98bbb81580fe9be7676047a0d3348edb6490ade55727c6d874007`.
+Both use identical source and retain the same million-element startup List.
+Ten warmups precede 25 alternating pairs, timing the public guest call and reset.
+
+| Runtime, 100,000 iterations | Before ms | After ms | Guest bytes, both |
+| --- | ---: | ---: | ---: |
+| Cursor / take / fold | 6.821 | 6.804 | 5,898,240 |
+| Source range / fold | 5.995 | 5.994 | 5,767,168 |
+| Straight-line 18-field records | 0.644 | 0.655 | 4,456,448 |
+| Records crossing calls and branches | 1.560 | 1.284 | 4,456,448 |
+| Two large records sharing a child | 2.414 | 2.426 | 4,456,448 |
+
+On the frozen 394,294-byte gdev workload (53 loaded files), five alternating
+fresh-process pairs with warm filesystem caches give these medians:
+
+| Compilation measurement | Before | After |
+| --- | ---: | ---: |
+| Cold wall time | 807.9 ms | 813.1 ms |
+| Process CPU | 784.5 ms | 789.0 ms |
+| Peak process RSS | 75,696 KiB | 75,544 KiB |
+| First retained edit | 528.1 ms | 518.9 ms |
+| Subsequent retained edit | 503.2 ms | 513.3 ms |
+| No-op | 2.97 ms | 2.82 ms |
+| Wasm size | 619,633 bytes | 620,017 bytes |
+
+Retained measurements use three independent sessions per variant and include
+the API round trip. First edits are checked against independent fresh sessions;
+every emitted module is validated. Peak requested compiler storage is unchanged
+at 58,404,972 bytes, with zero live requested bytes after cold-build teardown.
+The small timing differences do not establish a compilation speedup. The
+500 ms cold / 100 ms edit targets remain unmet. Historical runs are not paired
+comparisons with this experiment.
+
+Raw samples, source manifests, compiler identities and output hashes are in
+`build/architecture-cleanup-review/{lifetimes,compiler}/report.json` and
+`build/architecture-cleanup-review/private-frames.json`. The runtime/compiler
+drivers are `scripts/bench_lifetimes.ts` and `scripts/bench_iterators.ts`; the raw
+handler measurement driver and source are saved beside its report.
+
 ## Closed shared and cyclic allocation groups
 
 Ownership now follows known pointer fields between private allocations. Shared

@@ -12,7 +12,11 @@ const layout_bridge = @import("layout_bridge.zig");
 const substitution_keys = @import("substitution_keys.zig");
 const provider_chain = @import("provider_chain.zig");
 const layout = @import("layout.zig");
+const runtime_cleanup = @import("runtime_cleanup.zig");
 const request_runtime = @import("request_runtime.zig");
+const heap = @import("runtime_layout.zig");
+const function_facts = @import("function_facts.zig");
+const exact_builder = @import("exact_builder.zig");
 const runtime_operations = @import("runtime_operations.zig");
 const runtime_identity = @import("runtime_identity.zig");
 const owned_arrays = @import("owned_arrays.zig");
@@ -76,6 +80,7 @@ pub const Diagnostic = struct {
 };
 pub const ArtifactSummary = struct { demands: usize, jobs: usize, functions: usize, helpers: usize, emission_events: usize, metadata_events: usize, operation_symbols: usize, templates: usize, pinned_modules: usize };
 pub const Result = struct {
+    optimization: function_facts.Stats = .{},
     module_stamps: struct { computed: usize = 0, reused: usize = 0, comparisons: usize = 0, copied: usize = 0 } = .{},
     refinements: @import("refinement_receipt.zig").Stats = .{},
     completed_queries: completed_specialization_query.Stats = .{},
@@ -111,6 +116,7 @@ const ConstructorKey = code_artifacts.ConstructorKey;
 const PrimitiveKey = code_artifacts.PrimitiveKey;
 const OperationKey = code_artifacts.OperationKey;
 const SerializedKey = struct { value: core_eval.ValueId, ty: layout.Id, suspension: bool = false };
+const specialization = @import("specialization.zig");
 const refinement_receipt = @import("refinement_receipt.zig");
 const EvidenceRoot = refinement_receipt.Root;
 // Complete source plans allocate all storage first. In an unconfirmed plan,
@@ -156,6 +162,7 @@ const Generator = struct {
     startup_facts: startup_emission_facts.Store = .{},
     runtime_order: std.ArrayList(u32) = .empty,
     array_proofs: std.AutoHashMapUnmanaged(u32, owned_arrays.Proof) = .empty,
+    facts: function_facts.Store = .{},
     discard_proofs: std.AutoHashMapUnmanaged(u32, discarded_bindings.Proof) = .empty,
     request_owner: ?u32 = null,
     diagnostic: ?Diagnostic = null,
@@ -240,16 +247,16 @@ const Generator = struct {
         return &self.representation_bridge.?;
     }
     fn toEvidence(self: *Generator, id: layout.Id) type_evidence.Error!type_evidence.Id {
-        return (try self.representationBridge()).toEvidence(id);
+        return @backingInt(try (try self.representationBridge()).toEvidence(@fromBackingInt(@intCast(id))));
     }
     fn fromEvidence(self: *Generator, id: type_evidence.Id) layout.Error!layout.Id {
-        return (try self.representationBridge()).fromEvidence(id);
+        return @backingInt(try (try self.representationBridge()).fromEvidence(@fromBackingInt(@intCast(id))));
     }
     fn rowToEvidence(self: *Generator, id: type_evidence.Effects.Id) type_evidence.Error!type_evidence.Effects.Id {
-        return (try self.representationBridge()).rowToEvidence(id);
+        return @backingInt(try (try self.representationBridge()).rowToEvidence(@fromBackingInt(@intCast(id))));
     }
     fn rowFromEvidence(self: *Generator, id: type_evidence.Effects.Id) layout.Error!type_evidence.Effects.Id {
-        return (try self.representationBridge()).rowFromEvidence(id);
+        return @backingInt(try (try self.representationBridge()).rowFromEvidence(@fromBackingInt(@intCast(id))));
     }
     fn deinit(self: *Generator) void {
         self.startup_facts.deinit(self.allocator);
@@ -278,6 +285,7 @@ const Generator = struct {
         var proofs = self.array_proofs.valueIterator();
         while (proofs.next()) |proof| proof.deinit(self.allocator);
         self.array_proofs.deinit(self.allocator);
+        self.facts.deinit(self.allocator);
         var discarded = self.discard_proofs.valueIterator();
         while (discarded.next()) |proof| proof.deinit(self.allocator);
         self.discard_proofs.deinit(self.allocator);
@@ -400,9 +408,9 @@ const Generator = struct {
         try self.module.dataReference(address, .{ .role = .static_address, .value = bits });
     }
     fn closureData(self: *Generator, function_id: u32, environment: u32) Error!u32 {
-        const address = try self.module.dataWords(&.{ function_id, environment });
+        const address = try self.module.dataObject(heap.Closure{ .function = function_id, .environment = environment });
         try self.module.dataReference(address, .{ .role = .table_function, .value = function_id });
-        try self.module.dataReference(address + 4, .{ .role = .static_address, .value = environment });
+        try self.module.dataReference(address + heap.offset(heap.Closure, "environment"), .{ .role = .static_address, .value = environment });
         return address;
     }
     fn emitValue(self: *Generator, function_id: u32, value: Value) Error!void {
@@ -441,10 +449,10 @@ const Generator = struct {
             const state_type = arguments[1];
             const payload = children[0];
             const state = children[1];
-            const words = [_]u32{ info.bits, try self.serialize(payload, payload_type, depth + 1), try self.serialize(state, state_type, depth + 1) };
-            const address = try self.module.dataWords(&words);
-            try self.dataValueReference(address + 4, payload, words[1]);
-            try self.dataValueReference(address + 8, state, words[2]);
+            const decision: heap.Decision = .{ .kind = info.bits, .payload = try self.serialize(payload, payload_type, depth + 1), .state = try self.serialize(state, state_type, depth + 1) };
+            const address = try self.module.dataObject(decision);
+            try self.dataValueReference(address + heap.offset(heap.Decision, "payload"), payload, decision.payload);
+            try self.dataValueReference(address + heap.offset(heap.Decision, "state"), state, decision.state);
             try self.serialized.put(self.allocator, key, address);
             return address;
         }
@@ -459,19 +467,19 @@ const Generator = struct {
                 const implementation_type = self.fromEvidence(actual) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
                 const operation = try self.runtimeOperation(info.bits, 1, .{ .start = 0, .end = 0 });
                 const implementation = try self.serialize(child, implementation_type, depth + 1);
-                const address = try self.module.dataWords(&.{ 0, implementation });
-                try self.dataValueReference(address + 4, child, implementation);
-                try self.runtimeDataWord(address, operation);
+                const address = try self.module.dataObject(heap.Provider{ .operation = 0, .implementation = implementation });
+                try self.dataValueReference(address + heap.offset(heap.Provider, "implementation"), child, implementation);
+                try self.runtimeDataWord(address + heap.offset(heap.Provider, "operation"), operation);
                 break :ordinary address;
             } else state: {
                 if (provider_type.tag != .state_provider or info.nominal > std.math.maxInt(u32)) return self.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
                 const read = try self.runtimeOperation(info.bits, 1, .{ .start = 0, .end = 0 });
                 const write = try self.runtimeOperation(@intCast(info.nominal), 1, .{ .start = 0, .end = 0 });
                 const state_value = try self.serialize(child, provider_type.c, depth + 1);
-                const address = try self.module.dataWords(&.{ 0, 0, state_value });
-                try self.dataValueReference(address + 8, child, state_value);
-                try self.runtimeDataWord(address, read);
-                try self.runtimeDataWord(address + 4, write);
+                const address = try self.module.dataObject(heap.StateProvider{ .read = 0, .write = 0, .initial = state_value });
+                try self.dataValueReference(address + heap.offset(heap.StateProvider, "initial"), child, state_value);
+                try self.runtimeDataWord(address + heap.offset(heap.StateProvider, "read"), read);
+                try self.runtimeDataWord(address + heap.offset(heap.StateProvider, "write"), write);
                 break :state address;
             };
             try self.serialized.put(self.allocator, key, address);
@@ -501,13 +509,13 @@ const Generator = struct {
             const function_type = try self.internLayoutWithEffects(.function, 1, demanded.a, demanded.c, &.{});
             const closure_address = try self.serializeClosure(specialized, function_type, depth);
             const function_id = std.mem.readInt(u32, self.module.data.items[closure_address..][0..4], .little);
-            const environment = std.mem.readInt(u32, self.module.data.items[closure_address + 4 ..][0..4], .little);
+            const environment = std.mem.readInt(u32, self.module.data.items[closure_address + heap.offset(heap.Closure, "environment") ..][0..4], .little);
             const cached = self.evaluator.suspensionCached(id);
             const cached_word = if (cached) |value| try self.serialize(value, demanded.a, depth + 1) else 0;
-            const address = try self.module.dataWords(&.{ function_id, environment, if (cached != null) @as(u32, 2) else 0, cached_word });
+            const address = try self.module.dataObject(heap.Demand{ .function = function_id, .environment = environment, .status = if (cached != null) .ready else .pending, .cached = cached_word });
             try self.module.dataReference(address, .{ .role = .table_function, .value = function_id });
             try self.module.dataReference(address + 4, .{ .role = .static_address, .value = environment });
-            if (cached) |value| try self.dataValueReference(address + 12, value, cached_word);
+            if (cached) |value| try self.dataValueReference(address + heap.offset(heap.Demand, "cached"), value, cached_word);
             try self.serialized.put(self.allocator, key, address);
             return address;
         }
@@ -550,7 +558,7 @@ const Generator = struct {
             if (info.len != 1 or self.layouts.node(ty).tag != .cursor) return self.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
             const source = self.evaluator.valueChildren(id)[0];
             const pointer = try self.serialize(source, self.layouts.node(ty).a, depth + 1);
-            const address = try self.module.dataWords(&.{ pointer, info.bits });
+            const address = try self.module.dataObject(heap.Cursor{ .collection = pointer, .index = info.bits });
             try self.dataValueReference(address, source, pointer);
             try self.serialized.put(self.allocator, key, address);
             return address;
@@ -923,216 +931,45 @@ const Generator = struct {
         key.result = if (complete) try self.typeLayout(source, current, mappings, span) else try self.codeLayoutWithRows(source, current, mappings, rows, span);
         return key;
     }
-    fn mapType(self: *Generator, unit_id: u32, mappings: *std.ArrayList(Mapping), ty: types.Id, concrete: layout.Id, span: core.Span) Error!void {
-        return self.mapTypeDepth(unit_id, mappings, null, ty, concrete, span, 0);
+    fn specializer(self: *Generator) Allocator.Error!specialization.Service {
+        return .{ .allocator = self.allocator, .units = self.units, .evaluator = &self.evaluator, .layouts = &self.layouts, .bridge = try self.representationBridge(), .refinement_stats = &self.refinement_stats, .refinement_regions = &self.work.refinement_regions, .cache = if (self.reuse_refinements) .{ .context = self, .lookup = lookupRefinement, .record = recordRefinement } else null };
     }
-    fn refineMappings(self: *Generator, unit_id: u32, root: EvidenceRoot, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span) Error!void {
-        return self.refineMappingsCaptures(unit_id, root, expected, mappings, rows, span, &.{});
+    fn lookupRefinement(context: *anyopaque, root: EvidenceRoot, shape: @import("code_expectation.zig").View, expected: u32, seeds: []const type_evidence.Mapping, rows: []const type_evidence.RowMapping) Allocator.Error!?core_eval.SolvedEvidence {
+        const self: *Generator = @ptrCast(@alignCast(context));
+        return refinement_receipt.lookup(self, root, shape, expected, seeds, rows);
     }
-    fn refineMappingsCaptures(self: *Generator, unit_id: u32, root: EvidenceRoot, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span, captures: []const core_eval.RetainedCapture) Error!void {
-        self.refinement_stats.requests += 1;
-        var seeds: std.ArrayList(type_evidence.Mapping) = .empty;
-        defer seeds.deinit(self.allocator);
-        for (mappings.items) |mapping| {
-            const evidence = self.toEvidence(mapping.layout) catch |err| switch (err) {
-                error.UnresolvedType => continue,
-                error.OutOfMemory => return error.OutOfMemory,
-                else => return self.decline(unit_id, span, .unresolved_type),
-            };
-            try seeds.append(self.allocator, .{ .variable = mapping.variable, .evidence = evidence });
-        }
-        var row_seeds: std.ArrayList(type_evidence.RowMapping) = .empty;
-        defer row_seeds.deinit(self.allocator);
-        for (rows.items) |mapping| {
-            if (mapping.row == layout.unknown_row) continue;
-            const actual = self.rowToEvidence(mapping.row) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-            try row_seeds.append(self.allocator, .{ .variable = mapping.variable, .evidence = actual });
-        }
-        const bridge = try self.representationBridge();
-        const result = bridge.toCodeExpectation(expected) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-        const enabled = self.reuse_refinements and captures.len == 0 and self.evaluator.receipt_tape == null;
-        const cached = if (enabled) try refinement_receipt.lookup(self, root, bridge.partialView(), result, seeds.items, row_seeds.items) else null;
-        var solved = cached orelse fresh: {
-            self.work.refinement_regions += 1;
-            var tape: @import("specialization_receipt.zig").Tape = .{};
-            defer tape.deinit(self.allocator);
-            var observation: refinement_receipt.Observation = .{};
-            const old_tape = self.evaluator.receipt_tape;
-            const old_observation = self.evaluator.refinement_observation;
-            if (enabled) {
-                self.evaluator.receipt_tape = &tape;
-                self.evaluator.refinement_observation = &observation;
-            }
-            defer {
-                self.evaluator.receipt_tape = old_tape;
-                self.evaluator.refinement_observation = old_observation;
-            }
-            const before_values = self.evaluator.values.items.len;
-            const before_children = self.evaluator.children.items.len;
-            const before_steps = self.evaluator.steps;
-            var output = switch (root) {
-                .body => |target| self.evaluator.bodyEvidencePartialFull(target, bridge.partialView(), result, seeds.items, row_seeds.items),
-                .closure => |closure_| self.evaluator.closureEvidencePartialCaptures(closure_.unit, closure_.catalog, bridge.partialView(), result, seeds.items, row_seeds.items, captures),
-            } catch |err| switch (err) {
-                error.RequestUnwind => return self.evaluationFailure(),
-                error.Declined => return self.evaluationFailure(),
-                error.OutOfMemory => return error.OutOfMemory,
-            };
-            errdefer output.deinit(self.allocator);
-            if (enabled) try refinement_receipt.record(self, root, result, seeds.items, row_seeds.items, output, &tape, observation, before_values, before_children, before_steps);
-            break :fresh output;
+    fn recordRefinement(context: *anyopaque, record: specialization.Record) Allocator.Error!void {
+        const self: *Generator = @ptrCast(@alignCast(context));
+        return refinement_receipt.record(self, record.root, record.expected, record.seeds, record.rows, record.result, record.tape, record.observed, record.before_values, record.before_children, record.before_steps);
+    }
+    fn specializationFailure(self: *Generator, service: specialization.Service, err: specialization.Error) Error {
+        if (err == error.OutOfMemory) return error.OutOfMemory;
+        const failure = service.failure.?;
+        return switch (failure.code) {
+            .evaluation => self.evaluationFailure(),
+            .complexity => self.decline(failure.unit, failure.span, .complexity),
+            .unresolved_type => self.decline(failure.unit, failure.span, .unresolved_type),
         };
-        defer solved.deinit(self.allocator);
-        for (solved.types) |mapping| {
-            // A closed seed already owns its physical record slots. Semantic
-            // evidence canonicalizes field names, so round-tripping that same
-            // proof must not replace or reject the caller's storage order.
-            var retained = false;
-            for (seeds.items) |seed| if (seed.variable == mapping.variable and seed.evidence == mapping.evidence) {
-                retained = true;
-                break;
-            };
-            if (retained) continue;
-            const concrete = self.fromEvidence(mapping.evidence) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-            try self.mapTypeDepth(unit_id, mappings, rows, mapping.variable, concrete, span, 0);
-        }
-        for (solved.rows) |mapping| {
-            const concrete = self.rowFromEvidence(mapping.evidence) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-            var found = false;
-            for (rows.items) |prior| if (prior.variable == mapping.variable) {
-                const actual = self.rowToEvidence(prior.row) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-                if (actual != mapping.evidence) return self.decline(unit_id, span, .unresolved_type);
-                found = true;
-                break;
-            };
-            if (!found) try rows.append(self.allocator, .{ .variable = mapping.variable, .row = concrete });
-        }
+    }
+    fn mapType(self: *Generator, unit_id: u32, mappings: *std.ArrayList(Mapping), ty: types.Id, concrete: layout.Id, span: core.Span) Error!void {
+        var service = try self.specializer();
+        service.mapType(unit_id, mappings, ty, concrete, span) catch |err| return self.specializationFailure(service, err);
     }
     fn mapTypeDepth(self: *Generator, unit_id: u32, mappings: *std.ArrayList(Mapping), rows: ?*std.ArrayList(RowMapping), ty: types.Id, concrete: layout.Id, span: core.Span, depth: usize) Error!void {
-        if (depth >= 1024) return self.decline(unit_id, span, .complexity);
-        const source = self.unit(unit_id);
-        const n = source.types.node(ty);
-        const representation = self.layouts.node(concrete);
-        if (n.tag == .never) return;
-        if (n.tag == .variable) {
-            for (mappings.items) |*mapping| if (mapping.variable == ty) {
-                if (mapping.layout == layout.erased) mapping.layout = concrete;
-                if (concrete != layout.erased and mapping.layout != concrete) return self.decline(unit_id, span, .unresolved_type);
-                return;
-            };
-            try mappings.append(self.allocator, .{ .variable = ty, .layout = concrete });
-            return;
-        }
-        const valid = switch (n.tag) {
-            .unit => representation.tag == .unit,
-            .boolean => representation.tag == .boolean,
-            .u32 => representation.tag == .u32,
-            .f32 => representation.tag == .f32,
-            .function => representation.tag == .function,
-            .array => representation.tag == .array,
-            .list => representation.tag == .list,
-            .cursor => representation.tag == .cursor,
-            .demand => representation.tag == .demand,
-            .type_constructor => representation.tag == .type_constructor and n.a == representation.a and n.b == representation.b,
-            .resolver => representation.tag == .resolver,
-            .provider => representation.tag == .provider,
-            .state_provider => representation.tag == .state_provider,
-            .product => representation.tag == .product,
-            .record => representation.tag == .record,
-            .nominal => representation.tag == .nominal and n.a == representation.a and n.b == representation.b,
-            else => false,
-        };
-        if (!valid) return self.decline(unit_id, span, .unresolved_type);
-        switch (n.tag) {
-            .function, .array, .list, .cursor, .demand, .resolver, .provider => {
-                try self.mapTypeDepth(unit_id, mappings, rows, n.a, representation.a, span, depth + 1);
-                if (n.tag == .function) try self.mapTypeDepth(unit_id, mappings, rows, n.b, representation.b, span, depth + 1);
-                if ((n.tag == .function or n.tag == .demand or n.tag == .provider) and rows != null) try self.mapRow(unit_id, mappings, rows.?, n.c, representation.c, span, false);
-            },
-            .state_provider => {
-                try self.mapTypeDepth(unit_id, mappings, rows, n.a, representation.a, span, depth + 1);
-                try self.mapTypeDepth(unit_id, mappings, rows, n.b, representation.b, span, depth + 1);
-                try self.mapTypeDepth(unit_id, mappings, rows, n.c, representation.c, span, depth + 1);
-            },
-            .product, .nominal => {
-                const children = if (n.tag == .nominal) source.types.nominalArguments(n) else source.types.list(.{ .start = n.a, .len = n.b });
-                if (children.len != self.layouts.children(concrete).len) return self.decline(unit_id, span, .unresolved_type);
-                for (children, 0..) |child, index| try self.mapTypeDepth(unit_id, mappings, rows, child, self.layouts.children(concrete)[index], span, depth + 1);
-            },
-            .record => try self.mapRecord(unit_id, mappings, rows, n, concrete, span, depth),
-            else => {},
-        }
+        var service = try self.specializer();
+        service.mapTypeDepth(unit_id, mappings, rows, ty, concrete, span, depth) catch |err| return self.specializationFailure(service, err);
     }
     fn mapRow(self: *Generator, unit_id: u32, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), source_row: types.Effects.Id, actual_row: u32, span: core.Span, covariant: bool) Error!void {
-        if (actual_row == layout.unknown_row) return;
-        const source = &self.unit(unit_id).types;
-        const expected = source.row(source_row);
-        const actuals = try self.allocator.dupe(u32, self.layouts.effects.view().rowLabels(actual_row));
-        defer self.allocator.free(actuals);
-        const used = try self.allocator.alloc(bool, actuals.len);
-        defer self.allocator.free(used);
-        @memset(used, false);
-        var argument_ids: std.ArrayList(u32) = .empty;
-        defer argument_ids.deinit(self.allocator);
-        for (source.rowLabels(source_row)) |label| {
-            argument_ids.clearRetainingCapacity();
-            for (source.operationArguments(label)) |argument| {
-                const concrete = try self.codeLayoutWithRows(unit_id, argument, mappings.items, rows.items, span);
-                const semantic = self.toEvidence(concrete) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-                try argument_ids.append(self.allocator, semantic);
-            }
-            const identity = source.operation(label).identity;
-            var found = false;
-            for (actuals, 0..) |actual, index| {
-                if (used[index]) continue;
-                const operation = self.layouts.effects.view().operation(actual);
-                if (!std.meta.eql(identity, operation.identity)) continue;
-                const arguments = self.layouts.effects.view().operationArguments(actual);
-                if (arguments.len != argument_ids.items.len) continue;
-                var same = true;
-                for (arguments, argument_ids.items) |argument, wanted| {
-                    const semantic = self.toEvidence(argument) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-                    same = same and semantic == wanted;
-                }
-                if (same) {
-                    used[index] = true;
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) return self.decline(unit_id, span, .unresolved_type);
-        }
-        var suffix: std.ArrayList(u32) = .empty;
-        defer suffix.deinit(self.allocator);
-        for (actuals, used) |label, consumed| if (!consumed) try suffix.append(self.allocator, label);
-        switch (expected.tail) {
-            .closed => if (!covariant and suffix.items.len != 0) return self.decline(unit_id, span, .unresolved_type),
-            .parameter => return self.decline(unit_id, span, .unresolved_type),
-            .variable => |variable| {
-                const remaining = self.layouts.effects.internRow(suffix.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .complexity);
-                for (rows.items) |mapping| if (mapping.variable == variable) {
-                    const prior = self.rowToEvidence(mapping.row) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-                    const current = self.rowToEvidence(remaining) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-                    if (prior != current) return self.decline(unit_id, span, .unresolved_type);
-                    return;
-                };
-                try rows.append(self.allocator, .{ .variable = variable, .row = remaining });
-            },
-        }
+        var service = try self.specializer();
+        service.mapRow(unit_id, mappings, rows, source_row, actual_row, span, covariant) catch |err| return self.specializationFailure(service, err);
     }
-    fn mapRecord(self: *Generator, unit_id: u32, mappings: *std.ArrayList(Mapping), rows: ?*std.ArrayList(RowMapping), n: types.Node, concrete: layout.Id, span: core.Span, depth: usize) Error!void {
-        if (self.layouts.children(concrete).len != @as(usize, n.b) * 2) return self.decline(unit_id, span, .unresolved_type);
-        for (0..n.b) |i| {
-            const field = self.unit(unit_id).types.recordField(n, i);
-            var matched = false;
-            var j: usize = 0;
-            while (j < @as(usize, n.b) * 2) : (j += 2) if (self.layouts.children(concrete)[j] == field.name) {
-                try self.mapTypeDepth(unit_id, mappings, rows, field.ty, self.layouts.children(concrete)[j + 1], span, depth + 1);
-                matched = true;
-                break;
-            };
-            if (!matched) return self.decline(unit_id, span, .unresolved_type);
-        }
+    fn refineMappings(self: *Generator, unit_id: u32, root: EvidenceRoot, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span) Error!void {
+        var service = try self.specializer();
+        service.refineMappings(unit_id, root, expected, mappings, rows, span) catch |err| return self.specializationFailure(service, err);
+    }
+    fn refineMappingsCaptures(self: *Generator, unit_id: u32, root: EvidenceRoot, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span, captures: []const core_eval.RetainedCapture) Error!void {
+        var service = try self.specializer();
+        service.refineMappingsCaptures(unit_id, root, expected, mappings, rows, span, captures) catch |err| return self.specializationFailure(service, err);
     }
     fn function(self: *Generator, key: Key) Error!u32 {
         var scope: ?code_artifacts.Scope = if (self.artifacts) |context| try context.enter(.{ .named = key }) else null;
@@ -1200,7 +1037,7 @@ const Generator = struct {
                     .{ .op = .call_indirect, .operand = try self.module.internType(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b)) },
                 }) |instruction| {
                     try self.module.emit(function_id, instruction);
-                    if (instruction.op == .call_indirect) if (self.request_owner) |owner| try request_runtime.guard(&self.module, function_id, owner, null);
+                    if (instruction.op == .call_indirect) if (self.request_owner) |owner| try request_runtime.guard(&self.module, function_id, owner, &.{});
                 }
                 ty_ = arrow.b;
             }
@@ -1210,27 +1047,10 @@ const Generator = struct {
             // zig-analyzer: disable-next-line returning-local-slice
             return function_id;
         }
-        var mappings: std.ArrayList(Mapping) = .empty;
-        var rows: std.ArrayList(RowMapping) = .empty;
-        defer rows.deinit(self.allocator);
-        defer mappings.deinit(self.allocator);
-        var ty = source.binding(key.target.binding).ty;
-        for (key.parameters[0..key.count], 0..) |scalar_type, index| {
-            const n = source.types.node(ty);
-            if (n.tag != .function) return self.decline(unit_id, body.span, .unresolved_type);
-            try self.mapTypeDepth(unit_id, &mappings, &rows, n.a, scalar_type, body.span, 0);
-            try self.mapRow(unit_id, &mappings, &rows, n.c, key.effects[index], body.span, true);
-            ty = n.b;
-        }
-        try self.mapTypeDepth(unit_id, &mappings, &rows, ty, key.result, body.span, 0);
-        var full = key.result;
-        var reverse: usize = key.count;
-        while (reverse > 0) {
-            reverse -= 1;
-            full = try self.internLayoutWithEffects(.function, key.parameters[reverse], full, key.effects[reverse], &.{});
-        }
-        try self.refineMappings(unit_id, .{ .body = key.target }, full, &mappings, &rows, body.span);
-        var emitter: Emitter = .{ .generator = self, .unit_id = unit_id, .function_id = function_id, .provider_local = key.count, .mappings = mappings.items, .row_mappings = rows.items, .factory_template = key.template_result };
+        var service = try self.specializer();
+        var resolved = service.named(key) catch |err| return self.specializationFailure(service, err);
+        defer resolved.deinit(self.allocator);
+        var emitter: Emitter = .{ .generator = self, .unit_id = unit_id, .function_id = function_id, .provider_local = key.count, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items, .factory_template = key.template_result };
         defer emitter.deinit();
         for (source.bodyParameters(body), 0..) |parameter, index| if (parameter.binding != 0) {
             if (self.capturedTemplate(key.templates, parameter.binding)) |template| {
@@ -1238,14 +1058,14 @@ const Generator = struct {
             } else try emitter.locals.put(self.allocator, parameter.binding, @intCast(index));
         };
         if (key.template_result) {
-            try emitter.templateExpression(body.root, 0);
+            try emitter.templateExpression(@backingInt(resolved.root), 0);
             const template = emitter.result_template orelse return self.fail(unit_id, body.root, .unresolved_type);
             try self.template_results.put(self.allocator, key, template);
         } else {
-            try emitter.expression(body.root, 0);
+            try emitter.expression(@backingInt(resolved.root), 0);
             if (source.types.node(source.typeOf(body.root)).tag == .never) try emitter.emit(.unreachable_, 0);
         }
-        if (scope) |*actor| try actor.solved(mappings.items, rows.items, self.template_keys.get(key.templates));
+        if (scope) |*actor| try actor.solved(resolved.mappings.items, resolved.rows.items, self.template_keys.get(key.templates));
         // addFunction copied parameters into an owned signature; only its ID escapes.
         if (scope) |*actor| try actor.complete(function_id, self.template_results.get(key));
         self.startup_facts.complete(function_id);
@@ -1520,7 +1340,7 @@ const Generator = struct {
                 .{ .op = .call_indirect, .operand = try self.module.internType(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b)) },
             }) |instruction| {
                 try self.module.emit(function_id, instruction);
-                if (instruction.op == .call_indirect) if (self.request_owner) |owner| try request_runtime.guard(&self.module, function_id, owner, null);
+                if (instruction.op == .call_indirect) if (self.request_owner) |owner| try request_runtime.guard(&self.module, function_id, owner, &.{});
             }
             if (scope) |*actor| try actor.complete(function_id, null);
             return function_id;
@@ -1927,14 +1747,29 @@ const Generator = struct {
 };
 
 pub fn compile(allocator: Allocator, units: []const core.Module, entry: u32) Error!Result {
-    return compileWithOptions(allocator, units, entry, .{ .artifact_replay = artifact_replay_enabled, .artifact_dump = artifact_replay_enabled });
+    return compileWithOptions(allocator, units, entry, .{ .artifact_replay = default_artifact_replay, .artifact_dump = default_artifact_replay });
 }
 
-pub var artifact_replay_enabled = false;
-pub const CompileOptions = struct { reuse_projected_principals: bool = false, reuse_declaration_principals: bool = false, reuse_unaffected_modules: bool = false, reuse_refinements: bool = false, reuse_solver_capacity: bool = true, reuse_equivalent_validation: bool = false, prepare_checked_query_importer: bool = false, share_query_gate: bool = false, observe_startup: bool = false, reuse_query_graph_scratch: bool = false, reuse_source_effect_queries: bool = false, optimize_completed_query_admission: bool = false, reuse_completed_specializations: bool = false, transport_source_templates: bool = false, identity: ?runtime_identity.View = null, evidence_noise: bool = false, unit_order: []const u32 = &.{}, diagnostic_source_mode: bool = false, diagnostic_prelude_unit: u32 = 0, artifact_replay: bool = false, artifact_dump: bool = false, retain_artifacts: bool = false, previous: ?*const artifact_capture.Capture = null, principal_previous: ?*const artifact_capture.Capture = null, query_previous: ?*const artifact_capture.Capture = null, cached_units: usize = 0, principal_reuse: bool = true, principal_graph_mode: principal_evidence_reuse.GraphMode = .primitive };
+const default_artifact_replay = if (@hasDecl(@import("root"), "compiler_defaults")) @import("root").compiler_defaults.artifact_replay else false;
+pub const CompileOptions = struct {
+    policy: @import("execution_policy.zig").Policy = .reference,
+    observe_startup: bool = false,
+    identity: ?runtime_identity.View = null,
+    evidence_noise: bool = false,
+    unit_order: []const u32 = &.{},
+    diagnostic_source_mode: bool = false,
+    diagnostic_prelude_unit: u32 = 0,
+    artifact_replay: bool = false,
+    artifact_dump: bool = false,
+    retain_artifacts: bool = false,
+    previous: ?*const artifact_capture.Capture = null,
+    principal_previous: ?*const artifact_capture.Capture = null,
+    query_previous: ?*const artifact_capture.Capture = null,
+    cached_units: usize = 0,
+};
 
 pub fn compileWithIdentity(allocator: Allocator, units: []const core.Module, entry: u32, names: runtime_identity.View) Error!Result {
-    return compileWithOptions(allocator, units, entry, .{ .identity = names, .artifact_replay = artifact_replay_enabled, .artifact_dump = artifact_replay_enabled });
+    return compileWithOptions(allocator, units, entry, .{ .identity = names, .artifact_replay = default_artifact_replay, .artifact_dump = default_artifact_replay });
 }
 
 /// Private differential hook: irrelevant semantic proofs must not select tags.
@@ -1954,9 +1789,9 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     const recording = options.artifact_replay or options.retain_artifacts or options.previous != null or options.query_previous != null;
     const principal_previous = options.principal_previous orelse options.previous;
     const query_previous = options.query_previous orelse options.previous;
-    var module_stamps: code_artifacts.ModuleStamps = .{ .allocator = allocator, .current = units, .previous = if (query_previous) |old| if (old.metadata.pools) |*pools| pools else null else null, .compare_contents = code_artifacts.exact_stamps_enabled };
+    var module_stamps: code_artifacts.ModuleStamps = .{ .allocator = allocator, .current = units, .previous = if (query_previous) |old| if (old.metadata.pools) |*pools| pools else null else null, .compare_contents = options.policy.stamp_reuse == .exact };
     defer module_stamps.deinit();
-    const stamps: ?*code_artifacts.ModuleStamps = if (code_artifacts.scoped_stamps_enabled and module_stamps.previous != null) &module_stamps else null;
+    const stamps: ?*code_artifacts.ModuleStamps = if (options.policy.stamp_reuse != .none and module_stamps.previous != null) &module_stamps else null;
     var journal = artifact_emitter.Recorder.init(allocator);
     var journal_alive = true;
     defer if (journal_alive) journal.deinit();
@@ -1972,9 +1807,9 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     if (recording) generator.artifacts = &metadata;
     var generator_alive = true;
     defer if (generator_alive) generator.deinit();
-    generator.evaluator.reuse_solver_capacity = options.reuse_solver_capacity;
-    generator.evaluator.retain_principal_inputs = options.reuse_projected_principals;
-    generator.reuse_refinements = options.reuse_refinements and recording;
+    generator.evaluator.reuse_solver_capacity = options.policy.reuse_solver_capacity;
+    generator.evaluator.retain_principal_inputs = options.policy.reuse_projected_principals;
+    generator.reuse_refinements = options.policy.reuse_refinements and recording;
     generator.evaluator.diagnostic_context = .{ .identity = options.identity, .entry = entry, .prelude = options.diagnostic_prelude_unit, .source_mode = options.diagnostic_source_mode };
     generator.startup_facts.enabled = options.observe_startup;
     if (options.identity) |names| generator.runtime_operations = runtime_operations.Store.initProject(allocator, names);
@@ -1989,18 +1824,18 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     }
     var principal_state: ?principal_evidence_reuse.State = null;
     defer if (principal_state) |*state| state.deinit();
-    if (options.principal_reuse and (options.retain_artifacts or options.previous != null)) {
+    if (options.policy.principal_reuse and (options.retain_artifacts or options.previous != null)) {
         if (principal_previous) |previous| if (previous.emission.sealed and previous.metadata.pools != null) {
             // Executable admission already checked this semantic source pair.
             // Clone only under identical admission options and owner pairing;
             // code still needs its separate exact body/value checks. Repeating
             // the whole dependency validation here would tax every small edit.
-            if (options.share_query_gate and options.principal_graph_mode != .eager and options.reuse_declaration_principals and options.reuse_unaffected_modules and options.reuse_equivalent_validation) if (retained) |*state| if (state.importer.code_gate) |*checked| {
-                if (try shared_query_gate.clone(allocator, &previous.metadata.pools.?, units, &checked.semantic)) |admission| {
-                    principal_state = .{ .allocator = allocator, .old = previous, .gate = admission, .names = options.identity, .graph_mode = options.principal_graph_mode, .reuse_projected_inputs = options.reuse_projected_principals };
+            if (options.policy.share_query_gate and options.policy.principal_graph_mode != .eager and options.policy.reuse_declaration_principals and options.policy.reuse_unaffected_modules and options.policy.reuse_equivalent_validation) if (retained) |*state| if (state.importer.code_gate) |*checked| {
+                if (shared_query_gate.share(allocator, &previous.metadata.pools.?, units, &checked.semantic)) |admission| {
+                    principal_state = .{ .allocator = allocator, .old = previous, .gate = admission, .names = options.identity, .graph_mode = options.policy.principal_graph_mode, .reuse_projected_inputs = options.policy.reuse_projected_principals };
                 }
             };
-            if (principal_state == null) principal_state = try principal_evidence_reuse.State.initWithExecution(allocator, previous, units, options.identity, options.principal_graph_mode, .{ .reuse_projected_principals = options.reuse_projected_principals, .reuse_declaration_principals = options.reuse_declaration_principals, .reuse_unaffected_modules = options.reuse_unaffected_modules, .reuse_equivalent_validation = options.reuse_equivalent_validation, .stamps = stamps });
+            if (principal_state == null) principal_state = try principal_evidence_reuse.State.initWithExecution(allocator, previous, units, options.identity, options.policy.principal_graph_mode, .{ .reuse_projected_principals = options.policy.reuse_projected_principals, .reuse_declaration_principals = options.policy.reuse_declaration_principals, .reuse_unaffected_modules = options.policy.reuse_unaffected_modules, .reuse_equivalent_validation = options.policy.reuse_equivalent_validation, .stamps = stamps });
             generator.principal_state = &principal_state.?;
         };
         // Bind callbacks only after the Generator reaches its stable stack address.
@@ -2008,39 +1843,39 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     }
     var template_gate: ?@import("principal_reuse_gate.zig").Gate = null;
     defer if (template_gate) |*gate| gate.deinit();
-    if (options.transport_source_templates) if (options.previous) |previous| if (previous.metadata.pools) |*pools| {
+    if (options.policy.transport_source_templates) if (options.previous) |previous| if (previous.metadata.pools) |*pools| {
         if (principal_state) |*state| {
             generator.source_templates = .{ .pools = pools, .gate = &state.gate };
         } else {
-            template_gate = try @import("principal_reuse_gate.zig").Gate.initWithExecution(allocator, pools, units, options.identity, .{ .reuse_declaration_principals = options.reuse_declaration_principals, .reuse_unaffected_modules = options.reuse_unaffected_modules, .stamps = stamps });
+            template_gate = try @import("principal_reuse_gate.zig").Gate.initWithExecution(allocator, pools, units, options.identity, .{ .reuse_declaration_principals = options.policy.reuse_declaration_principals, .reuse_unaffected_modules = options.policy.reuse_unaffected_modules, .stamps = stamps });
             generator.source_templates = .{ .pools = pools, .gate = &template_gate.? };
         }
     };
     var query_state: ?completed_specialization_query.State = null;
     defer if (query_state) |*state| state.deinit();
-    generator.evaluator.retain_specialization_receipts = options.reuse_completed_specializations and recording;
-    if (options.reuse_completed_specializations) if (query_previous) |previous| if (previous.metadata.pools != null) {
+    generator.evaluator.retain_specialization_receipts = options.policy.reuse_completed_specializations and recording;
+    if (options.policy.reuse_completed_specializations) if (query_previous) |previous| if (previous.metadata.pools != null) {
         // Both States are prepared here from this compile's same immutable
         // source pair and identity. A new namespace is never admitted by a
-        // clone. Eager principal import can locally disable its Gate, so that
+        // lease. Eager principal import can locally disable its Gate, so that
         // mode retains the fresh query admission path.
-        if (options.share_query_gate and options.principal_graph_mode != .eager) if (principal_state) |*principal| {
-            if (try shared_query_gate.clone(allocator, &previous.metadata.pools.?, units, &principal.gate)) |gate| {
+        if (options.policy.share_query_gate and options.policy.principal_graph_mode != .eager) if (principal_state) |*principal| {
+            if (shared_query_gate.share(allocator, &previous.metadata.pools.?, units, &principal.gate)) |gate| {
                 query_state = .{ .allocator = allocator, .old = previous, .graph_scratch = .{ .allocator = allocator }, .gate = gate };
-                query_state.?.stats.gate_clones = 1;
-                query_state.?.stats.gate_clone_bytes = shared_query_gate.ownedBytes(&query_state.?.gate);
+                query_state.?.stats.shared_gates = 1;
+                query_state.?.stats.shared_gate_bytes = shared_query_gate.validationBytes(&query_state.?.gate);
             }
         };
         if (query_state == null) {
-            query_state = .{ .allocator = allocator, .old = previous, .graph_scratch = .{ .allocator = allocator }, .gate = try @import("principal_reuse_gate.zig").Gate.initWithExecution(allocator, &previous.metadata.pools.?, units, options.identity, .{ .reuse_declaration_principals = options.reuse_declaration_principals, .reuse_unaffected_modules = options.reuse_unaffected_modules, .stamps = stamps }) };
+            query_state = .{ .allocator = allocator, .old = previous, .graph_scratch = .{ .allocator = allocator }, .gate = try @import("principal_reuse_gate.zig").Gate.initWithExecution(allocator, &previous.metadata.pools.?, units, options.identity, .{ .reuse_declaration_principals = options.policy.reuse_declaration_principals, .reuse_unaffected_modules = options.policy.reuse_unaffected_modules, .stamps = stamps }) };
             query_state.?.stats.gate_fresh = 1;
         }
-        query_state.?.optimize_admission = options.optimize_completed_query_admission;
-        query_state.?.source_effect_rows = options.reuse_source_effect_queries;
-        query_state.?.reuse_graph_scratch = options.reuse_query_graph_scratch;
+        query_state.?.optimize_admission = options.policy.optimize_completed_query_admission;
+        query_state.?.source_effect_rows = options.policy.reuse_source_effect_queries;
+        query_state.?.reuse_graph_scratch = options.policy.reuse_query_graph_scratch;
         // The prepared importer consumes only this compile epoch's checked
         // Gate. Eager mode keeps its fresh preparation path.
-        query_state.?.prepare_checked_importer = options.prepare_checked_query_importer and options.principal_graph_mode != .eager;
+        query_state.?.prepare_checked_importer = options.policy.prepare_checked_query_importer and options.policy.principal_graph_mode != .eager;
         generator.query_state = &query_state.?;
         generator.evaluator.specialization_provider = .{ .context = &generator, .lookup = Generator.completedQueryLookup };
     };
@@ -2066,6 +1901,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         error.ModuleTooLarge => return error.ModuleTooLarge,
     };
     var result: Result = .{ .bytes = try generator.module.assemble(), .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps };
+    result.optimization = generator.facts.stats;
     errdefer result.deinit(allocator);
     if (options.observe_startup) result.startup_observation = try generator.startup_facts.capture(allocator, &generator.module);
     result.principal = generator.principalStats();
@@ -2554,10 +2390,16 @@ fn generate(g: *Generator, entry: u32, unit_order: []const u32) Error!void {
     if (exports == 0) return g.decline(entry, .{ .start = 0, .end = 0 }, .no_entry);
 }
 
-const ReturnTarget = struct { node: core.Id, label: u32, template_result: bool = false };
-const LoopTarget = struct { node: core.Id, label: u32 };
+const ReturnTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanup.Mark, template_result: bool = false };
+const LoopTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanup.Mark };
 const Template = struct { unit: u32 = 0, node: core.Id, environment: ?u32 = null, captures: layout.Id = 0, templates: substitution_keys.Id = 0, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
 const Emitter = struct {
+    const SmallCollection = struct { values: [function_facts.small_limit]u32 = undefined, len: usize = 0, machine: wasm.ValueType = .i32 };
+    small_values: std.AutoHashMapUnmanaged(core.BindingId, SmallCollection) = .empty,
+    small_result: ?struct { root: core.Id, value: *SmallCollection } = null,
+    analysis_root: core.Id = 0,
+    exact_probe: bool = false,
+    exact_build: ?struct { plan: exact_builder.Plan, storage: u32, index: u32 } = null,
     generator: *Generator,
     unit_id: u32,
     function_id: u32,
@@ -2566,6 +2408,7 @@ const Emitter = struct {
     mappings: []const Mapping,
     row_mappings: []const RowMapping = &.{},
     locals: std.AutoHashMapUnmanaged(core.BindingId, u32) = .empty,
+    cleanups: runtime_cleanup.Stack = .{},
     return_targets: std.ArrayList(ReturnTarget) = .empty,
     loop_targets: std.ArrayList(LoopTarget) = .empty,
     labels: u32 = 0,
@@ -2608,7 +2451,7 @@ const Emitter = struct {
             try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
         }
         try g.mapTypeDepth(key.target.unit, &mappings, &rows, source.typeOf(body.root), key.result, body.span, 0);
-        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .labels = self.labels };
+        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels };
         defer emitter.deinit();
         var demands: [max_parameters]InlineDemand = undefined;
         var count: usize = 0;
@@ -2662,6 +2505,8 @@ const Emitter = struct {
             }
             // The caller emits the deferred expression in its lexical scope,
             // at the current branch depth and with the force-site providers.
+            // demand_inline excludes handlers, so no intervening private cleanup
+            // scopes exist between this emitter and the lexical caller.
             const saved_labels = demand.caller.labels;
             demand.caller.labels = self.labels;
             defer demand.caller.labels = saved_labels;
@@ -2697,7 +2542,7 @@ const Emitter = struct {
             defer rows.deinit(g.allocator);
             for (producer.bodyParameters(body), 0..) |parameter, i| try g.mapTypeDepth(plan.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
             try g.mapTypeDepth(plan.target.unit, &mappings, &rows, producer.typeOf(body.root), key.result, body.span, 0);
-            var emitter: Emitter = .{ .generator = g, .unit_id = plan.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .labels = self.labels, .owned_edit = if (try g.ownsArrayUpdate(self.unit_id, id)) plan.edit else null };
+            var emitter: Emitter = .{ .generator = g, .unit_id = plan.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels, .owned_edit = if (try g.ownsArrayUpdate(self.unit_id, id)) plan.edit else null };
             defer emitter.deinit();
             for (producer.bodyParameters(body), 0..) |parameter, i| if (parameter.binding != 0) try emitter.locals.put(g.allocator, parameter.binding, values[i]);
             try emitter.expression(body.root, depth + 1);
@@ -2720,16 +2565,21 @@ const Emitter = struct {
         return self.inlineNamedValues(key, arguments, null, depth);
     }
     fn inlineNamedValues(self: *Emitter, key: Key, arguments: []const core.Id, captured: ?[]const u32, depth: usize) Error!bool {
+        return self.inlineNamedValuesMode(key, arguments, captured, depth, null);
+    }
+    fn inlineNamedValuesMode(self: *Emitter, key: Key, arguments: []const core.Id, captured: ?[]const u32, depth: usize, small_result: ?*SmallCollection) Error!bool {
         const g = self.generator;
         if (self.inline_depth >= 6 or g.module.functions.items[self.function_id].instructions.items.len > 4096 or (if (captured) |values| values.len != key.count else arguments.len < key.count) or key.templates != 0 or key.template_result) return false;
         const source = g.unit(key.target.unit);
         const body = source.body(key.target.binding) orelse return false;
+        const facts = try g.facts.get(g.allocator, g.units, key.target);
         const in_loop = self.inline_loop or self.loop_targets.items.len != 0;
-        var expose_data = in_loop and self.inlineDataType(key.result);
-        if (captured == null) for (key.parameters[0..key.count], arguments[0..key.count]) |ty, argument| {
+        var expose_data = small_result != null or (in_loop and self.inlineDataType(key.result));
+        if (captured == null) for (key.parameters[0..key.count], arguments[0..key.count], 0..) |ty, argument, i| {
             expose_data = expose_data or (g.layouts.node(ty).tag == .function and self.isCallableTemplate(argument));
+            if (i < 16 and facts.borrowed_collections & (@as(u16, 1) << @intCast(i)) != 0 and self.smallCollectionCandidate(argument)) expose_data = true;
         };
-        if (!body.is_function or body.parameters.len != key.count or !@import("inline_body.zig").admits(source, body.root, expose_data) or self.hasErasedType(key.result, 0)) return false;
+        if (!body.is_function or body.parameters.len != key.count or (facts.inline_cost orelse return false) > (if (expose_data) @as(u16, 64) else 4) or self.hasErasedType(key.result, 0)) return false;
         for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0) or g.layouts.node(ty).tag == .demand) return false;
         var mappings: std.ArrayList(Mapping) = .empty;
         var rows: std.ArrayList(RowMapping) = .empty;
@@ -2751,7 +2601,8 @@ const Emitter = struct {
         }
         try g.refineMappings(key.target.unit, .{ .body = key.target }, full, &mappings, &rows, body.span);
         if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target);
-        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = in_loop };
+        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = in_loop };
+        if (small_result) |result| emitter.small_result = .{ .root = body.root, .value = result };
         defer emitter.deinit();
         for (source.bodyParameters(body), 0..) |parameter, i| {
             if (captured) |values| {
@@ -2759,6 +2610,10 @@ const Emitter = struct {
                 continue;
             }
             const argument = arguments[i];
+            if (i < 16 and facts.borrowed_collections & (@as(u16, 1) << @intCast(i)) != 0) if (try self.captureSmallCollection(argument, depth)) |values| {
+                if (parameter.binding != 0) try emitter.small_values.put(g.allocator, parameter.binding, values);
+                continue;
+            };
             if (g.layouts.node(key.parameters[i]).tag == .function and self.static_values.count() == 0 and self.isCallableTemplate(argument)) {
                 const template = (try self.callableTemplate(argument)).?;
                 if (parameter.binding != 0) try emitter.templates.put(g.allocator, parameter.binding, template);
@@ -2777,11 +2632,11 @@ const Emitter = struct {
             try self.emit(.local_set, callee);
             const value = try self.capture(argument, depth);
             try self.emit(.local_get, callee);
-            try self.emit(.i32_load, 4);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
             try self.emit(.local_get, value);
             try self.providerHead();
             try self.emit(.local_get, callee);
-            try self.emit(.i32_load, 0);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
             try self.emit(.call_indirect, try g.module.internType(&.{ .i32, g.layouts.machine(arrow.a), .i32 }, g.layouts.machine(arrow.b)));
             ty = arrow.b;
         }
@@ -2916,7 +2771,7 @@ const Emitter = struct {
         }
         try g.mapTypeDepth(key.target.unit, &mappings, &rows, source_type, key.result, body.span, 0);
         try g.refineMappings(key.target.unit, .{ .body = key.target }, full, &mappings, &rows, body.span);
-        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .labels = self.labels };
+        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels };
         defer emitter.deinit();
         // Preserve left-to-right evaluation of every dynamic argument.
         for (arguments, source.bodyParameters(body)[0..arguments.len], 0..) |argument, parameter, index| {
@@ -3014,7 +2869,9 @@ const Emitter = struct {
         };
     }
     fn deinit(self: *Emitter) void {
+        self.small_values.deinit(self.generator.allocator);
         self.locals.deinit(self.generator.allocator);
+        self.cleanups.deinit(self.generator.allocator);
         self.return_targets.deinit(self.generator.allocator);
         self.loop_targets.deinit(self.generator.allocator);
         self.templates.deinit(self.generator.allocator);
@@ -3024,7 +2881,7 @@ const Emitter = struct {
     fn emit(self: *Emitter, op: wasm.Op, operand: u32) Error!void {
         try self.generator.module.emit(self.function_id, .{ .op = op, .operand = operand });
         if (op == .call or op == .call_indirect or op == .call_import) {
-            if (self.generator.request_owner) |owner| try request_runtime.guard(&self.generator.module, self.function_id, owner, null);
+            if (self.generator.request_owner) |owner| try request_runtime.guard(&self.generator.module, self.function_id, owner, &self.cleanups);
         }
     }
     fn referenceConstant(self: *Emitter, value: u32, role: artifact_emitter.Role) Error!void {
@@ -3051,6 +2908,14 @@ const Emitter = struct {
     }
     fn allocate(self: *Emitter, bytes: u32) Error!u32 {
         return self.allocateStorage(bytes, false);
+    }
+    fn allocatePrivate(self: *Emitter, bytes: u32) Error!u32 {
+        const local = try self.allocate(bytes);
+        try self.cleanups.append(self.generator.allocator, .{ .release = @fromBackingInt(@intCast(local)) });
+        return local;
+    }
+    fn cleanupTo(self: *Emitter, checkpoint: runtime_cleanup.Mark) Error!void {
+        try self.cleanups.emitTo(&self.generator.module, @fromBackingInt(@intCast(self.function_id)), checkpoint);
     }
     fn allocateStorage(self: *Emitter, bytes: u32, scalar_payload: bool) Error!u32 {
         const arena = try self.generator.module.ensureArena();
@@ -3537,9 +3402,88 @@ const Emitter = struct {
         try self.emit(.local_set, offset);
         return .{ .owner = array_, .container = array_, .offset = offset, .size = size, .wrapped = false };
     }
+    fn smallCollectionCandidate(self: *const Emitter, id: core.Id) bool {
+        const source = self.generator.unit(self.unit_id);
+        const n = source.node(id);
+        if (n.tag == .reference) {
+            const ref = source.reference(id);
+            return (ref.unit == 0 or ref.unit == self.unit_id) and self.small_values.contains(ref.binding);
+        }
+        const ty = source.types.node(n.ty).tag;
+        if (ty != .array and ty != .list) return false;
+        switch (source.types.node(source.types.node(n.ty).a).tag) {
+            .unit, .boolean, .u32, .f32, .variable => {},
+            else => return false,
+        }
+        if (n.tag == .array) return source.children(id).len <= function_facts.small_limit;
+        if (n.tag != .call) return false;
+        const call = source.call(id);
+        var target = call.target;
+        if (target.unit == 0) target.unit = self.unit_id;
+        for (0..16) |_| {
+            if (target.unit == 0 or target.unit > self.generator.units.len) return false;
+            const producer = self.generator.unit(target.unit);
+            if (target.binding == 0 or target.binding >= producer.bindings.len) return false;
+            const binding = producer.binding(target.binding);
+            if (binding.kind == .external) {
+                const owner = target.unit;
+                target = binding.target;
+                if (target.unit == 0) target.unit = owner;
+                continue;
+            }
+            const body = producer.body(target.binding) orelse return false;
+            return body.is_function and body.parameters.len == call.arguments.len and producer.node(body.root).tag == .array and producer.children(body.root).len <= function_facts.small_limit;
+        }
+        return false;
+    }
+    fn captureSmallCollection(self: *Emitter, id: core.Id, depth: usize) Error!?SmallCollection {
+        if (!self.smallCollectionCandidate(id)) return null;
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const n = source.node(id);
+        if (n.tag == .reference) return self.small_values.get(source.reference(id).binding);
+        const ty = g.layouts.node(try g.codeLayoutWithRows(self.unit_id, n.ty, self.mappings, self.row_mappings, source.span(id)));
+        if ((ty.tag != .array and ty.tag != .list) or g.layouts.scalar(ty.a) == null) return null;
+        var result: SmallCollection = .{ .machine = g.layouts.machine(ty.a) };
+        if (n.tag == .array) {
+            const children = source.children(id);
+            result.len = children.len;
+            for (children, 0..) |child, i| result.values[i] = try self.capture(child, depth);
+            g.facts.stats.small_collections += 1;
+            return result;
+        }
+        const call = source.call(id);
+        const key = try g.signature(call.target, call.callee_type, self.unit_id, self.mappings, self.row_mappings, source.span(id), false);
+        const producer = g.unit(key.target.unit);
+        const body = producer.body(key.target.binding) orelse return null;
+        if (producer.node(body.root).tag != .array or producer.children(body.root).len > function_facts.small_limit or call.arguments.len != key.count) return null;
+        if (!try self.inlineNamedValuesMode(key, call.arguments, null, depth, &result)) return null;
+        try self.emit(.drop, 0);
+        return result;
+    }
+    fn smallCollectionElement(self: *Emitter, values: SmallCollection, index: u32, start: usize, end: usize) Error!void {
+        if (start == end) return self.emit(.unreachable_, 0);
+        if (end - start == 1) return self.emit(.local_get, values.values[start]);
+        const middle = start + (end - start) / 2;
+        try self.emit(.local_get, index);
+        try self.emit(.i32_const, @intCast(middle));
+        try self.emit(.i32_lt_u, 0);
+        try self.emit(.if_, @backingInt(values.machine));
+        try self.smallCollectionElement(values, index, start, middle);
+        try self.emit(.else_, 0);
+        try self.smallCollectionElement(values, index, middle, end);
+        try self.emit(.end, 0);
+    }
     fn array(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
+        if (self.exact_build) |builder| if (builder.plan.initial == id) return self.emit(.local_get, builder.storage);
+        if (self.small_result) |output| if (output.root == id) {
+            output.value.* = (try self.captureSmallCollection(id, depth)).?;
+            // Keep the ordinary inlined expression's stack/result contract.
+            try self.emit(.i32_const, 0);
+            return;
+        };
         const children = unit_.children(id);
         if (children.len > 0x3ffffffe) return g.fail(self.unit_id, id, .complexity);
         var storage_buffer: [256]u8 align(@alignOf(usize)) = undefined;
@@ -3667,6 +3611,29 @@ const Emitter = struct {
         const unit_ = g.unit(self.unit_id);
         const operands = unit_.children(id);
         if (operands.len > 3) return g.fail(self.unit_id, id, .unsupported);
+        if (self.exact_build) |builder| {
+            if (builder.plan.conversion == id) return self.expression(operands[0], depth + 1);
+            if (builder.plan.append == id) {
+                const value = try self.capture(operands[1], depth);
+                const is_list = builder.plan.conversion == 0;
+                if (is_list) {
+                    try self.emit(.local_get, builder.storage);
+                    try self.emit(.local_get, builder.index);
+                    try self.emit(.call, (try g.module.ensureLists()).address);
+                } else try self.arrayAddress(builder.storage, builder.index);
+                try self.emit(.local_get, value);
+                try self.emit(if (try self.scalar(operands[1]) == .f32) .f32_store else .i32_store, if (is_list) 0 else 4);
+                try self.emit(.local_get, builder.index);
+                try self.emit(.i32_const, 1);
+                try self.emit(.i32_add, 0);
+                try self.emit(.local_set, builder.index);
+                return self.emit(.local_get, builder.storage);
+            }
+        }
+        if (unit_.arrayOperation(id) == .length) if (try self.captureSmallCollection(operands[0], depth)) |values| {
+            try self.emit(.i32_const, @intCast(values.len));
+            return;
+        };
         if (unit_.arrayOperation(id) == .generate and self.static_values.count() == 0 and self.isCallableTemplate(operands[1])) {
             const count = try self.capture(operands[0], depth);
             const template = (try self.callableTemplate(operands[1])).?;
@@ -3690,6 +3657,100 @@ const Emitter = struct {
         const source_layout = try g.codeLayoutWithRows(self.unit_id, unit_.typeOf(operands[0]), self.mappings, self.row_mappings, unit_.span(id));
         return self.arrayLocals(id, unit_.arrayOperation(id), locals[0..operands.len], machines[0..operands.len], result, g.layouts.listInput(source_layout));
     }
+    fn exactBuilder(self: *Emitter, id: core.Id, plan: exact_builder.Plan, depth: usize) Error!void {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const count = try self.temporary(.i32);
+        const eligible = try self.temporary(.i32);
+        try self.emit(.i32_const, 1);
+        try self.emit(.local_set, count);
+        try self.emit(.i32_const, 1);
+        try self.emit(.local_set, eligible);
+        for (plan.loops[0..plan.loop_count]) |loop_id| {
+            const loop = source.loopInfo(loop_id);
+            const length = try self.temporary(.i32);
+            if (loop.kind == .range) {
+                const first = try self.capture(loop.first, depth);
+                const end = try self.capture(loop.end, depth);
+                try self.emit(.local_get, end);
+                try self.emit(.local_get, first);
+                try self.emit(.i32_gt_u, 0);
+                try self.emit(.if_, @backingInt(wasm.ValueType.i32));
+                try self.emit(.local_get, end);
+                try self.emit(.local_get, first);
+                try self.emit(.i32_sub, 0);
+                try self.emit(.else_, 0);
+                try self.emit(.i32_const, 0);
+                try self.emit(.end, 0);
+            } else if (try self.captureSmallCollection(loop.first, depth)) |small| {
+                try self.emit(.i32_const, @intCast(small.len));
+            } else {
+                try self.expression(loop.first, depth + 1);
+                try self.emit(.i32_load, 0);
+            }
+            try self.emit(.local_set, length);
+            try self.emit(.local_get, count);
+            try self.emit(.if_, 0);
+            try self.emit(.local_get, length);
+            try self.emit(.i32_const, 0x10000000);
+            try self.emit(.local_get, count);
+            try self.emit(.i32_div_u, 0);
+            try self.emit(.i32_gt_u, 0);
+            try self.emit(.if_, 0);
+            try self.emit(.i32_const, 0);
+            try self.emit(.local_set, eligible);
+            try self.emit(.end, 0);
+            try self.emit(.end, 0);
+            try self.emit(.local_get, count);
+            try self.emit(.local_get, length);
+            try self.emit(.i32_mul, 0);
+            try self.emit(.local_set, count);
+        }
+        const previous_probe = self.exact_probe;
+        const previous_build = self.exact_build;
+        self.exact_probe = true;
+        defer {
+            self.exact_probe = previous_probe;
+            self.exact_build = previous_build;
+        }
+        try self.emit(.local_get, eligible);
+        try self.emit(.if_, @backingInt(wasm.ValueType.i32));
+        self.labels += 1;
+        const collection = g.layouts.node(try g.codeLayoutWithRows(self.unit_id, source.typeOf(plan.initial), self.mappings, self.row_mappings, source.span(id)));
+        const scalar_elements = g.layouts.scalar(collection.a) != null;
+        const is_list = plan.conversion == 0;
+        const size = if (is_list) count else try self.arraySize(count);
+        const storage = try self.temporary(.i32);
+        try self.emit(.local_get, size);
+        if (is_list) try self.emit(.i32_const, @intFromBool(scalar_elements));
+        const arena = try g.module.ensureArena();
+        try self.emit(.call, if (is_list) (try g.module.ensureLists()).new else if (scalar_elements) arena.allocate_scalar else arena.allocate);
+        try self.emit(.local_set, storage);
+        if (!is_list) {
+            if (!scalar_elements) {
+                try self.emit(.local_get, storage);
+                try self.emit(.i32_const, 0);
+                try self.emit(.local_get, size);
+                try self.emit(.memory_fill, 0);
+            }
+            try self.emit(.local_get, storage);
+            try self.emit(.local_get, count);
+            try self.emit(.i32_store, 0);
+        }
+        const index = try self.temporary(.i32);
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, index);
+        self.exact_build = .{ .plan = plan, .storage = storage, .index = index };
+        try self.expression(id, depth + 1);
+        try self.emit(.else_, 0);
+        self.exact_build = previous_build;
+        // Oversized/overflowing counts retain the original effects and failure
+        // order instead of introducing an early overflow trap.
+        try self.expression(id, depth + 1);
+        self.labels -= 1;
+        try self.emit(.end, 0);
+        g.facts.stats.exact_builders += 1;
+    }
     fn arrayLocals(self: *Emitter, id: core.Id, op: core.ArrayOp, locals: []const u32, machines: []const wasm.ValueType, result_layout: layout.Id, input_list: bool) Error!void {
         const g = self.generator;
         const result = g.layouts.machine(result_layout);
@@ -3704,23 +3765,19 @@ const Emitter = struct {
                     try self.emit(.call, (try g.module.ensureLists()).edit);
                     try self.emit(.local_set, snapshot);
                 }
-                const address = try self.allocate(8);
-                try self.emit(.local_get, address);
-                try self.emit(.local_get, snapshot);
-                try self.emit(.i32_store, 0);
-                try self.emit(.local_get, address);
+                const index = try self.temporary(.i32);
                 try self.emit(.i32_const, 0);
-                try self.emit(.i32_store, 4);
-                try self.emit(.local_get, address);
+                try self.emit(.local_set, index);
+                try self.cursorPosition(snapshot, index, input_list, null);
             },
             .cursor_has, .cursor_value, .cursor_advance => {
                 const source = try self.temporary(.i32);
                 const index = try self.temporary(.i32);
                 try self.emit(.local_get, locals[0]);
-                try self.emit(.i32_load, 0);
+                try self.emit(.i32_load, heap.offset(heap.Cursor, "collection"));
                 try self.emit(.local_set, source);
                 try self.emit(.local_get, locals[0]);
-                try self.emit(.i32_load, 4);
+                try self.emit(.i32_load, heap.offset(heap.Cursor, "index"));
                 try self.emit(.local_set, index);
                 if (op == .cursor_has) {
                     try self.emit(.local_get, index);
@@ -3731,22 +3788,36 @@ const Emitter = struct {
                     try self.arrayBounds(source, index);
                     if (op == .cursor_value) {
                         if (input_list) {
+                            const leaf = try self.temporary(.i32);
+                            try self.emit(.local_get, locals[0]);
+                            try self.emit(.i32_load, heap.offset(heap.Cursor, "leaf"));
+                            try self.emit(.local_tee, leaf);
+                            try self.emit(.if_, @backingInt(wasm.ValueType.i32));
+                            try self.emit(.local_get, leaf);
+                            try self.emit(.local_get, index);
+                            try self.emit(.local_get, locals[0]);
+                            try self.emit(.i32_load, heap.offset(heap.Cursor, "base"));
+                            try self.emit(.i32_sub, 0);
+                            try self.emit(.i32_const, 4);
+                            try self.emit(.i32_mul, 0);
+                            try self.emit(.i32_add, 0);
+                            try self.emit(.i32_const, @sizeOf(heap.ListNode));
+                            try self.emit(.i32_add, 0);
+                            try self.emit(.else_, 0);
+                            // Serialized positions start without a leaf cache.
                             try self.emit(.local_get, source);
                             try self.emit(.local_get, index);
                             try self.emit(.call, (try g.module.ensureLists()).address);
+                            try self.emit(.end, 0);
                         } else try self.arrayAddress(source, index);
                         try self.emit(if (result == .f32) .f32_load else .i32_load, if (input_list) 0 else 4);
                     } else {
-                        const address = try self.allocate(8);
-                        try self.emit(.local_get, address);
-                        try self.emit(.local_get, source);
-                        try self.emit(.i32_store, 0);
-                        try self.emit(.local_get, address);
+                        const next = try self.temporary(.i32);
                         try self.emit(.local_get, index);
                         try self.emit(.i32_const, 1);
                         try self.emit(.i32_add, 0);
-                        try self.emit(.i32_store, 4);
-                        try self.emit(.local_get, address);
+                        try self.emit(.local_set, next);
+                        try self.cursorPosition(source, next, input_list, locals[0]);
                     }
                 }
             },
@@ -3824,6 +3895,66 @@ const Emitter = struct {
             },
         }
     }
+    /// Construct all fields once, so local cursors still admit scalar
+    /// replacement. Stored pointers are allocation bases, never interior
+    /// addresses, and a published cursor is never mutated.
+    fn cursorPosition(self: *Emitter, source: u32, index: u32, is_list: bool, previous: ?u32) Error!void {
+        const leaf = try self.temporary(.i32);
+        const base = try self.temporary(.i32);
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, leaf);
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, base);
+        if (is_list) {
+            try self.emit(.local_get, index);
+            try self.emit(.local_get, source);
+            try self.emit(.i32_load, heap.offset(heap.ListDescriptor, "length"));
+            try self.emit(.i32_lt_u, 0);
+            try self.emit(.if_, 0);
+            if (previous) |cursor| {
+                try self.emit(.local_get, cursor);
+                try self.emit(.i32_load, heap.offset(heap.Cursor, "base"));
+                try self.emit(.local_set, base);
+                try self.emit(.local_get, cursor);
+                try self.emit(.i32_load, heap.offset(heap.Cursor, "leaf"));
+                try self.emit(.local_tee, leaf);
+                try self.emit(.if_, 0);
+                try self.emit(.local_get, index);
+                try self.emit(.local_get, base);
+                try self.emit(.i32_sub, 0);
+                try self.emit(.local_get, leaf);
+                try self.emit(.i32_load, heap.offset(heap.ListNode, "length"));
+                try self.emit(.i32_ge_u, 0);
+                try self.emit(.if_, 0);
+                try self.emit(.i32_const, 0);
+                try self.emit(.local_set, leaf);
+                try self.emit(.end, 0);
+                try self.emit(.end, 0);
+            }
+            try self.emit(.local_get, leaf);
+            try self.emit(.i32_eqz, 0);
+            try self.emit(.if_, 0);
+            try self.emit(.local_get, source);
+            try self.emit(.local_get, index);
+            try self.emit(.call, (try self.generator.module.ensureLists()).address);
+            try self.emit(.drop, 0);
+            try self.emit(.local_get, source);
+            try self.emit(.i32_load, heap.offset(heap.ListDescriptor, "cached_leaf"));
+            try self.emit(.local_set, leaf);
+            try self.emit(.local_get, source);
+            try self.emit(.i32_load, heap.offset(heap.ListDescriptor, "cached_base"));
+            try self.emit(.local_set, base);
+            try self.emit(.end, 0);
+            try self.emit(.end, 0);
+        }
+        const address = try self.allocate(@sizeOf(heap.Cursor));
+        inline for (.{ "collection", "index", "leaf", "base" }, .{ source, index, leaf, base }) |name, value| {
+            try self.emit(.local_get, address);
+            try self.emit(.local_get, value);
+            try self.emit(.i32_store, heap.offset(heap.Cursor, name));
+        }
+        try self.emit(.local_get, address);
+    }
     fn arrayPush(self: *Emitter, source: u32, value: u32, machine: wasm.ValueType, front: bool, scalar_elements: bool) Error!void {
         const count = try self.temporary(.i32);
         const result = try self.temporary(.i32);
@@ -3861,7 +3992,7 @@ const Emitter = struct {
         const scalar_type = self.generator.layouts.scalar(fields[0]) orelse return self.generator.fail(self.unit_id, 0, .unsupported);
         for (fields) |field| if (field != fields[0]) return self.generator.fail(self.unit_id, 0, .unsupported);
         const scalar_op = scalar_ops.opcode(op, scalar_type) orelse return self.generator.fail(self.unit_id, 0, .unsupported);
-        const vector_op = @import("wasm_simd_ops.zig").lift(scalar_op) orelse return self.generator.fail(self.unit_id, 0, .unsupported);
+        const vector_op = @import("runtime_ir.zig").lift(scalar_op) orelse return self.generator.fail(self.unit_id, 0, .unsupported);
         const address = try self.allocateStorage(16, true);
         try self.emit(.local_get, address);
         for (operands) |operand| {
@@ -3942,24 +4073,24 @@ const Emitter = struct {
         try self.emit(.local_get, address);
     }
     fn descriptor(self: *Emitter, function_id: u32, environment: ?u32) Error!void {
-        const address = try self.allocate(8);
+        const address = try self.allocate(@sizeOf(heap.Closure));
         try self.emit(.local_get, address);
         try self.referenceConstant(function_id, .table_function);
-        try self.emit(.i32_store, 0);
+        try self.emit(.i32_store, heap.offset(heap.Closure, "function"));
         try self.emit(.local_get, address);
         if (environment) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
-        try self.emit(.i32_store, 4);
+        try self.emit(.i32_store, heap.offset(heap.Closure, "environment"));
         try self.emit(.local_get, address);
     }
     fn demandDescriptor(self: *Emitter, function_id: u32, environment: ?u32) Error!void {
-        const address = try self.allocate(16);
+        const address = try self.allocate(@sizeOf(heap.Demand));
         try self.emit(.local_get, address);
         try self.referenceConstant(function_id, .table_function);
-        try self.emit(.i32_store, 0);
+        try self.emit(.i32_store, heap.offset(heap.Demand, "function"));
         try self.emit(.local_get, address);
         if (environment) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
-        try self.emit(.i32_store, 4);
-        for ([_]u32{ 8, 12 }) |offset| {
+        try self.emit(.i32_store, heap.offset(heap.Demand, "environment"));
+        for ([_]u32{ heap.offset(heap.Demand, "status"), heap.offset(heap.Demand, "cached") }) |offset| {
             try self.emit(.local_get, address);
             try self.emit(.i32_const, 0);
             try self.emit(.i32_store, offset);
@@ -4276,7 +4407,7 @@ const Emitter = struct {
             .computation, .reference, .call, .apply => try self.publishTemplate(try self.computationTemplate(id) orelse return g.fail(self.unit_id, id, .unresolved_type), id),
             .block => {
                 try self.emit(.block, @backingInt(wasm.ValueType.i32));
-                try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .template_result = true });
+                try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .cleanup = self.cleanups.mark(), .template_result = true });
                 self.labels += 1;
                 const terminated = try self.suite(id, depth + 1);
                 if (terminated) try self.emit(.unreachable_, 0) else return g.fail(self.unit_id, id, .unresolved_type);
@@ -4421,26 +4552,26 @@ const Emitter = struct {
         const cell = try self.temporary(.i32);
         const callback = try self.temporary(.i32);
         try self.emit(.local_get, frame);
-        try self.emit(.i32_load, 16);
+        try self.emit(.i32_load, heap.offset(heap.RequestFrame, "cell"));
         try self.emit(.local_set, cell);
         try self.emit(.local_get, frame);
-        try self.emit(.i32_load, 4);
+        try self.emit(.i32_load, heap.offset(heap.RequestFrame, "target"));
         try self.emit(.local_set, callback);
-        const pair = try self.allocate(8);
+        const pair = try self.allocate(@sizeOf(heap.Pair));
         try self.emit(.local_get, pair);
         try self.emit(.local_get, argument);
-        try self.emit(if (argument_machine == .f32) .f32_store else .i32_store, 0);
+        try self.emit(if (argument_machine == .f32) .f32_store else .i32_store, heap.offset(heap.Pair, "first"));
         try self.emit(.local_get, pair);
         try self.emit(.local_get, cell);
-        try self.emit(.i32_load, 8);
-        try self.emit(.i32_store, 4);
+        try self.emit(.i32_load, heap.offset(heap.RequestCell, "state"));
+        try self.emit(.i32_store, heap.offset(heap.Pair, "second"));
         try self.emit(.local_get, callback);
-        try self.emit(.i32_load, 4);
+        try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
         try self.emit(.local_get, pair);
         try self.emit(.local_get, frame);
-        try self.emit(.i32_load, 20);
+        try self.emit(.i32_load, heap.offset(heap.RequestFrame, "runner_outer"));
         try self.emit(.local_get, callback);
-        try self.emit(.i32_load, 0);
+        try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
         try self.emit(.call_indirect, try g.module.internType(&.{ .i32, .i32, .i32 }, .i32));
         const decision = try self.temporary(.i32);
         try self.emit(.local_set, decision);
@@ -4448,17 +4579,17 @@ const Emitter = struct {
         // independently proved state/result machines; no reply cast occurs.
         try self.emit(.local_get, cell);
         try self.emit(.local_get, decision);
-        try self.emit(.i32_load, 8);
-        try self.emit(.i32_store, 8);
+        try self.emit(.i32_load, heap.offset(heap.Decision, "state"));
+        try self.emit(.i32_store, heap.offset(heap.RequestCell, "state"));
         try self.emit(.local_get, decision);
-        try self.emit(.i32_load, 0);
+        try self.emit(.i32_load, heap.offset(heap.Decision, "kind"));
         try self.emit(.i32_eqz, 0);
         try self.emit(.if_, @backingInt(result_machine));
         try self.emit(.local_get, decision);
-        try self.emit(if (result_machine == .f32) .f32_load else .i32_load, 4);
+        try self.emit(if (result_machine == .f32) .f32_load else .i32_load, heap.offset(heap.Decision, "payload"));
         try self.emit(.else_, 0);
         try self.emit(.local_get, decision);
-        try self.emit(.i32_load, 0);
+        try self.emit(.i32_load, heap.offset(heap.Decision, "kind"));
         try self.emit(.i32_const, @backingInt(core.RequestDecisionKind.break_));
         try self.emit(.i32_gt_u, 0);
         try self.emit(.if_, 0);
@@ -4466,15 +4597,15 @@ const Emitter = struct {
         try self.emit(.end, 0);
         try self.emit(.local_get, cell);
         try self.emit(.local_get, decision);
-        try self.emit(.i32_load, 0);
-        try self.emit(.i32_store, 0);
+        try self.emit(.i32_load, heap.offset(heap.Decision, "kind"));
+        try self.emit(.i32_store, heap.offset(heap.RequestCell, "status"));
         try self.emit(.local_get, cell);
         try self.emit(.local_get, decision);
-        try self.emit(.i32_load, 4);
-        try self.emit(.i32_store, 4);
+        try self.emit(.i32_load, heap.offset(heap.Decision, "payload"));
+        try self.emit(.i32_store, heap.offset(heap.RequestCell, "exit"));
         try self.emit(.local_get, cell);
         try self.emit(.global_set, g.request_owner.?);
-        try request_runtime.dummy(&g.module, self.function_id);
+        try request_runtime.dummy(&g.module, self.function_id, &self.cleanups);
         try self.emit(.end, 0);
     }
     fn requestDecision(self: *Emitter, id: core.Id, depth: usize) Error!void {
@@ -4482,16 +4613,16 @@ const Emitter = struct {
         const node = g.unit(self.unit_id).node(id);
         const payload = if (node.b != 0) try self.capture(node.b, depth) else null;
         const state = if (node.c != 0) try self.capture(node.c, depth) else null;
-        const decision = try self.allocate(@sizeOf(request_runtime.Cell));
+        const decision = try self.allocate(@sizeOf(heap.Decision));
         try self.emit(.local_get, decision);
         try self.emit(.i32_const, node.a);
-        try self.emit(.i32_store, 0);
+        try self.emit(.i32_store, heap.offset(heap.Decision, "kind"));
         try self.emit(.local_get, decision);
         if (payload) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
-        try self.emit(if (node.b != 0 and try self.scalar(node.b) == .f32) .f32_store else .i32_store, 4);
+        try self.emit(if (node.b != 0 and try self.scalar(node.b) == .f32) .f32_store else .i32_store, heap.offset(heap.Decision, "payload"));
         try self.emit(.local_get, decision);
         if (state) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
-        try self.emit(if (node.c != 0 and try self.scalar(node.c) == .f32) .f32_store else .i32_store, 8);
+        try self.emit(if (node.c != 0 and try self.scalar(node.c) == .f32) .f32_store else .i32_store, heap.offset(heap.Decision, "state"));
         try self.emit(.local_get, decision);
     }
     fn requestStateValue(self: *Emitter, id: core.Id, binding: core.BindingId, ty: layout.Id) Error!void {
@@ -4537,6 +4668,8 @@ const Emitter = struct {
         }
     }
     fn requestLoop(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const checkpoint = self.cleanups.mark();
+        defer self.cleanups.restore(checkpoint);
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const metadata = source.requestLoopInfo(id);
@@ -4547,16 +4680,16 @@ const Emitter = struct {
         const state_machine = g.layouts.machine(state_layout);
         const value_machine = (try g.scalarWithRows(self.unit_id, metadata.value_type, self.mappings, self.row_mappings, source.span(id))).machine();
         const result_machine = (try g.scalarWithRows(self.unit_id, metadata.result_type, self.mappings, self.row_mappings, source.span(id))).machine();
-        const cell = try self.allocate(@sizeOf(request_runtime.Cell));
+        const cell = try self.allocatePrivate(@sizeOf(request_runtime.Cell));
         try self.emit(.local_get, cell);
         try self.emit(.i32_const, 0);
-        try self.emit(.i32_store, 0);
+        try self.emit(.i32_store, heap.offset(heap.RequestCell, "status"));
         try self.emit(.local_get, cell);
         try self.emit(.i32_const, 0);
-        try self.emit(.i32_store, 4);
+        try self.emit(.i32_store, heap.offset(heap.RequestCell, "exit"));
         try self.emit(.local_get, cell);
         try self.emit(.local_get, initial);
-        try self.emit(if (state_machine == .f32) .f32_store else .i32_store, 8);
+        try self.emit(if (state_machine == .f32) .f32_store else .i32_store, heap.offset(heap.RequestCell, "state"));
         const outer = try self.temporary(.i32);
         try self.providerHead();
         try self.emit(.local_set, outer);
@@ -4565,65 +4698,66 @@ const Emitter = struct {
         try self.emit(.local_set, provider);
         for (source.requestArms(id)) |arm| {
             const callback = try self.capture(arm.callback, depth);
-            const frame = try self.allocate(@sizeOf(request_runtime.Frame));
+            const frame = try self.allocatePrivate(@sizeOf(request_runtime.Frame));
             try self.emit(.local_get, frame);
             try self.operationConstant(try g.requestOperation(self.unit_id, arm.operation, self.mappings, self.row_mappings, source.span(id)));
-            try self.emit(.i32_store, 0);
+            try self.emit(.i32_store, heap.offset(heap.RequestFrame, "operation"));
             try self.emit(.local_get, frame);
             try self.emit(.local_get, callback);
-            try self.emit(.i32_store, 4);
+            try self.emit(.i32_store, heap.offset(heap.RequestFrame, "target"));
             try self.emit(.local_get, frame);
             try self.emit(.local_get, provider);
-            try self.emit(.i32_store, 8);
+            try self.emit(.i32_store, heap.offset(heap.RequestFrame, "outer"));
             try self.emit(.local_get, frame);
             try self.emit(.i32_const, request_runtime.request_kind);
-            try self.emit(.i32_store, 12);
+            try self.emit(.i32_store, heap.offset(heap.RequestFrame, "kind"));
             try self.emit(.local_get, frame);
             try self.emit(.local_get, cell);
-            try self.emit(.i32_store, 16);
+            try self.emit(.i32_store, heap.offset(heap.RequestFrame, "cell"));
             try self.emit(.local_get, frame);
             try self.emit(.local_get, outer);
-            try self.emit(.i32_store, 20);
+            try self.emit(.i32_store, heap.offset(heap.RequestFrame, "runner_outer"));
             try self.emit(.local_get, frame);
             try self.emit(.local_set, provider);
         }
         const value = try self.temporary(value_machine);
         try self.emit(.local_get, computation);
-        try self.emit(.i32_load, 4);
+        try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
         try self.emit(.i32_const, 0);
         try self.emit(.local_get, provider);
         try self.emit(.local_get, computation);
-        try self.emit(.i32_load, 0);
+        try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
         try self.emitUnguarded(.call_indirect, try g.module.internType(&.{ .i32, .i32, .i32 }, value_machine));
         try self.emit(.local_set, value);
-        try request_runtime.runner(&g.module, self.function_id, g.request_owner.?, cell);
+        try request_runtime.runner(&g.module, self.function_id, g.request_owner.?, cell, &self.cleanups);
         const state = try self.temporary(state_machine);
         try self.emit(.local_get, cell);
-        try self.emit(if (state_machine == .f32) .f32_load else .i32_load, 8);
+        try self.emit(if (state_machine == .f32) .f32_load else .i32_load, heap.offset(heap.RequestCell, "state"));
         try self.emit(.local_set, state);
         try self.emit(.block, 0);
         const exit_label = self.labels;
         self.labels += 1;
-        try self.loop_targets.append(g.allocator, .{ .node = id, .label = exit_label });
+        try self.loop_targets.append(g.allocator, .{ .node = id, .label = exit_label, .cleanup = self.cleanups.mark() });
         try self.emit(.local_get, cell);
-        try self.emit(.i32_load, 0);
+        try self.emit(.i32_load, heap.offset(heap.RequestCell, "status"));
         try self.emit(.i32_const, @backingInt(request_runtime.Status.exited));
         try self.emit(.i32_eq, 0);
         try self.emit(.if_, 0);
         self.labels += 1;
-        var return_label: ?u32 = null;
+        var return_target: ?ReturnTarget = null;
         for (self.return_targets.items) |target| if (target.node == metadata.return_target) {
-            return_label = target.label;
+            return_target = target;
             break;
         };
-        const parent_return = return_label orelse return g.fail(self.unit_id, id, .unsupported);
+        const parent_return = return_target orelse return g.fail(self.unit_id, id, .unsupported);
         try self.emit(.local_get, cell);
-        try self.emit(if (result_machine == .f32) .f32_load else .i32_load, 4);
-        try self.emit(.br, self.labels - 1 - parent_return);
+        try self.emit(if (result_machine == .f32) .f32_load else .i32_load, heap.offset(heap.RequestCell, "exit"));
+        try self.cleanupTo(parent_return.cleanup);
+        try self.emit(.br, self.labels - 1 - parent_return.label);
         self.labels -= 1;
         try self.emit(.end, 0);
         try self.emit(.local_get, cell);
-        try self.emit(.i32_load, 0);
+        try self.emit(.i32_load, heap.offset(heap.RequestCell, "status"));
         try self.emit(.i32_const, @backingInt(request_runtime.Status.broken));
         try self.emit(.i32_eq, 0);
         try self.emit(.if_, 0);
@@ -4650,6 +4784,7 @@ const Emitter = struct {
         self.labels -= 1;
         _ = self.loop_targets.pop();
         try self.emit(.end, 0);
+        try self.cleanupTo(checkpoint);
     }
     fn forceDemand(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
@@ -4658,38 +4793,43 @@ const Emitter = struct {
         const result = try self.scalar(id);
         const cached = try self.temporary(result.machine());
         try self.emit(.local_get, demand);
-        try self.emit(.i32_load, 8);
+        try self.emit(.i32_load, heap.offset(heap.Demand, "status"));
         try self.emit(.i32_const, 2);
         try self.emit(.i32_eq, 0);
         try self.emit(.if_, 0);
         self.labels += 1;
         try self.emit(.local_get, demand);
-        try self.emit(if (result == .f32) .f32_load else .i32_load, 12);
+        try self.emit(if (result == .f32) .f32_load else .i32_load, heap.offset(heap.Demand, "cached"));
         try self.emit(.local_set, cached);
         try self.emit(.else_, 0);
         try self.emit(.local_get, demand);
-        try self.emit(.i32_load, 8);
+        try self.emit(.i32_load, heap.offset(heap.Demand, "status"));
         try self.emit(.if_, 0);
         try self.emit(.unreachable_, 0);
         try self.emit(.end, 0);
         try self.emit(.local_get, demand);
         try self.emit(.i32_const, 1);
-        try self.emit(.i32_store, 8);
+        try self.emit(.i32_store, heap.offset(heap.Demand, "status"));
         try self.emit(.local_get, demand);
-        try self.emit(.i32_load, 4);
+        try self.emit(.i32_load, heap.offset(heap.Demand, "environment"));
         try self.emit(.i32_const, 0);
         try self.providerHead();
         try self.emit(.local_get, demand);
-        try self.emit(.i32_load, 0);
+        try self.emit(.i32_load, heap.offset(heap.Demand, "function"));
         try self.emitUnguarded(.call_indirect, try g.module.internType(&.{ .i32, .i32, .i32 }, result.machine()));
         try self.emit(.local_set, cached);
-        if (g.request_owner) |owner| try request_runtime.guard(&g.module, self.function_id, owner, demand);
+        if (g.request_owner) |owner| {
+            const checkpoint = self.cleanups.mark();
+            defer self.cleanups.restore(checkpoint);
+            try self.cleanups.append(g.allocator, .{ .reset_demand = @fromBackingInt(@intCast(demand)) });
+            try request_runtime.guard(&g.module, self.function_id, owner, &self.cleanups);
+        }
         try self.emit(.local_get, demand);
         try self.emit(.local_get, cached);
-        try self.emit(if (result == .f32) .f32_store else .i32_store, 12);
+        try self.emit(if (result == .f32) .f32_store else .i32_store, heap.offset(heap.Demand, "cached"));
         try self.emit(.local_get, demand);
         try self.emit(.i32_const, 2);
-        try self.emit(.i32_store, 8);
+        try self.emit(.i32_store, heap.offset(heap.Demand, "status"));
         const arena = try g.module.ensureArena();
         try self.emit(.local_get, demand);
         try self.emit(.global_get, arena.base);
@@ -4736,11 +4876,11 @@ const Emitter = struct {
         const argument = try self.capture(n.b, depth);
         const signature = try g.module.internType(&.{ .i32, (try self.scalar(n.b)).machine(), .i32 }, (try self.scalar(id)).machine());
         try self.emit(.local_get, callee);
-        try self.emit(.i32_load, 4);
+        try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
         try self.emit(.local_get, argument);
         try self.providerHead();
         try self.emit(.local_get, callee);
-        try self.emit(.i32_load, 0);
+        try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
         try self.emit(.call_indirect, signature);
     }
     fn providerValue(self: *Emitter, id: core.Id, depth: usize) Error!void {
@@ -4780,7 +4920,7 @@ const Emitter = struct {
         }
     }
     fn providerFrame(self: *Emitter, provider: u32, operation_offset: u32, target: u32, outer: ?u32, kind: provider_chain.Kind) Error!u32 {
-        const frame = try self.allocate(@sizeOf(provider_chain.Frame));
+        const frame = try self.allocatePrivate(@sizeOf(provider_chain.Frame));
         try self.emit(.local_get, frame);
         try self.emit(.local_get, provider);
         try self.emit(.i32_load, operation_offset);
@@ -4797,6 +4937,8 @@ const Emitter = struct {
         return frame;
     }
     fn effectHandle(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const checkpoint = self.cleanups.mark();
+        defer self.cleanups.restore(checkpoint);
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const n = source.node(id);
@@ -4814,7 +4956,7 @@ const Emitter = struct {
             try self.expression(n.b, depth + 1);
         } else if (ty.tag == .state_provider) {
             const state_machine = g.layouts.machine(ty.c);
-            const cell = try self.allocate(@sizeOf(provider_chain.Cell));
+            const cell = try self.allocatePrivate(@sizeOf(provider_chain.Cell));
             try self.emit(.local_get, cell);
             try self.emit(.local_get, provider);
             try self.emit(if (state_machine == .f32) .f32_load else .i32_load, @offsetOf(provider_chain.StateProvider, "initial"));
@@ -4833,6 +4975,7 @@ const Emitter = struct {
             try self.emit(if (result_machine == .f32) .f32_store else .i32_store, 4);
             try self.emit(.local_get, pair);
         } else return g.fail(self.unit_id, id, .invalid_provider);
+        try self.cleanupTo(checkpoint);
     }
     fn resolverOperation(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
@@ -4860,11 +5003,11 @@ const Emitter = struct {
             const action = try self.capture(arguments[0], depth);
             const signature = try g.module.internType(&.{ .i32, .i32, .i32 }, (try self.scalar(id)).machine());
             try self.emit(.local_get, action);
-            try self.emit(.i32_load, 4);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
             try self.emit(.i32_const, 0);
             try self.providerHead();
             try self.emit(.local_get, action);
-            try self.emit(.i32_load, 0);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
             try self.emit(.call_indirect, signature);
             return;
         }
@@ -4914,16 +5057,19 @@ const Emitter = struct {
             try self.emit(.local_set, function);
             const value = try self.capture(argument, depth);
             try self.emit(.local_get, function);
-            try self.emit(.i32_load, 4);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
             try self.emit(.local_get, value);
             try self.providerHead();
             try self.emit(.local_get, function);
-            try self.emit(.i32_load, 0);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
             try self.emit(.call_indirect, try g.module.internType(&.{ .i32, g.layouts.machine(arrow.a), .i32 }, g.layouts.machine(arrow.b)));
             ty = arrow.b;
         }
     }
     fn expression(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const previous_root = self.analysis_root;
+        if (previous_root == 0) self.analysis_root = id;
+        defer self.analysis_root = previous_root;
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         if (depth >= 1024) return g.fail(self.unit_id, id, .complexity);
@@ -5067,11 +5213,11 @@ const Emitter = struct {
                     const value = try self.capture(argument, depth);
                     const signature = try g.module.internType(&.{ .i32, g.layouts.machine(fn_type.a), .i32 }, g.layouts.machine(fn_type.b));
                     try self.emit(.local_get, callee);
-                    try self.emit(.i32_load, 4);
+                    try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
                     try self.emit(.local_get, value);
                     try self.providerHead();
                     try self.emit(.local_get, callee);
-                    try self.emit(.i32_load, 0);
+                    try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
                     try self.emit(.call_indirect, signature);
                     ty = fn_type.b;
                 }
@@ -5090,8 +5236,9 @@ const Emitter = struct {
                 _ = try self.matchExpression(id, depth + 1);
             },
             .block => {
+                if (!self.exact_probe) if (exact_builder.analyze(unit_, id)) |plan| return self.exactBuilder(id, plan, depth);
                 try self.emit(.block, @backingInt((try self.scalar(id)).machine()));
-                try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels });
+                try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .cleanup = self.cleanups.mark() });
                 self.labels += 1;
                 const terminated = try self.suite(id, depth + 1);
                 if (terminated) try self.emit(.unreachable_, 0) else try self.emit(if (try self.scalar(id) == .f32) .f32_const else .i32_const, 0);
@@ -5115,6 +5262,9 @@ const Emitter = struct {
         try self.emit(.local_set, local);
     }
     fn suite(self: *Emitter, id: core.Id, depth: usize) Error!bool {
+        const previous_root = self.analysis_root;
+        if (previous_root == 0) self.analysis_root = id;
+        defer self.analysis_root = previous_root;
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         if (depth >= 1024) return g.fail(self.unit_id, id, .complexity);
@@ -5130,6 +5280,12 @@ const Emitter = struct {
             switch (n.tag) {
                 .suite => if (try self.suite(statement, depth + 1)) return true,
                 .bind => {
+                    if (self.smallCollectionCandidate(n.b)) {
+                        if (function_facts.privateBinding(unit_, self.analysis_root, n.a)) if (try self.captureSmallCollection(n.b, depth)) |values| {
+                            try self.small_values.put(g.allocator, n.a, values);
+                            continue;
+                        };
+                    }
                     const discarded_value = unit_.node(n.b);
                     if ((discarded_value.tag == .product or discarded_value.tag == .record) and try g.unusedAggregate(self.unit_id, n.a)) {
                         try self.discardAggregateValue(n.b, depth + 1);
@@ -5187,16 +5343,15 @@ const Emitter = struct {
                     try self.emit(.drop, 0);
                 },
                 .return_ => {
-                    var target_label: ?u32 = null;
-                    var template_result = false;
+                    var return_target: ?ReturnTarget = null;
                     for (self.return_targets.items) |target| if (target.node == n.b) {
-                        target_label = target.label;
-                        template_result = target.template_result;
+                        return_target = target;
                         break;
                     };
-                    const label = target_label orelse return g.fail(self.unit_id, statement, .unsupported);
-                    if (template_result) try self.templateExpression(n.a, depth + 1) else try self.expression(n.a, depth + 1);
-                    try self.emit(.br, self.labels - 1 - label);
+                    const target = return_target orelse return g.fail(self.unit_id, statement, .unsupported);
+                    if (target.template_result) try self.templateExpression(n.a, depth + 1) else try self.expression(n.a, depth + 1);
+                    try self.cleanupTo(target.cleanup);
+                    try self.emit(.br, self.labels - 1 - target.label);
                     return true;
                 },
                 .if_stmt => {
@@ -5240,20 +5395,26 @@ const Emitter = struct {
         var end: u32 = 0;
         var array_local: u32 = 0;
         var list_span: ?[3]u32 = null; // leaf allocation base, start index, end index
+        var small: ?SmallCollection = null;
         if (metadata.kind == .range) {
             counter = try self.capture(metadata.first, depth);
             end = try self.capture(metadata.end, depth);
         } else if (metadata.kind == .array) {
-            array_local = try self.capture(metadata.first, depth);
+            small = try self.captureSmallCollection(metadata.first, depth);
+            if (small == null) array_local = try self.capture(metadata.first, depth);
             counter = try self.temporary(.i32);
             end = try self.temporary(.i32);
             try self.emit(.i32_const, 0);
             try self.emit(.local_set, counter);
-            try self.emit(.local_get, array_local);
-            try self.emit(.i32_load, 0);
+            if (small) |values| {
+                try self.emit(.i32_const, @intCast(values.len));
+            } else {
+                try self.emit(.local_get, array_local);
+                try self.emit(.i32_load, 0);
+            }
             try self.emit(.local_set, end);
             const collection = try g.codeLayoutWithRows(self.unit_id, source.typeOf(metadata.first), self.mappings, self.row_mappings, source.span(metadata.first));
-            if (g.layouts.node(collection).tag == .list) {
+            if (small == null and g.layouts.node(collection).tag == .list) {
                 list_span = .{ try self.temporary(.i32), try self.temporary(.i32), try self.temporary(.i32) };
                 // Initialize explicitly: this source loop may run inside an
                 // outer loop, so Wasm's function-entry local zeroing is not enough.
@@ -5285,7 +5446,7 @@ const Emitter = struct {
         try self.emit(.block, 0);
         const exit_label = self.labels;
         self.labels += 1;
-        try self.loop_targets.append(g.allocator, .{ .node = id, .label = exit_label });
+        try self.loop_targets.append(g.allocator, .{ .node = id, .label = exit_label, .cleanup = self.cleanups.mark() });
         try self.emit(.loop, 0);
         const head_label = self.labels;
         self.labels += 1;
@@ -5302,7 +5463,9 @@ const Emitter = struct {
                 const machine = g.layouts.machine(g.layouts.node(array_type).a);
                 element = try self.temporary(machine);
                 const is_list = g.layouts.node(array_type).tag == .list;
-                if (list_span) |span| {
+                if (small) |values| {
+                    try self.smallCollectionElement(values, counter, 0, values.len);
+                } else if (list_span) |span| {
                     // Resolve one leaf per span. Its immutable allocation base
                     // stays valid if a nested traversal changes the descriptor's
                     // lookup cache or a nested forever loop runs the collector.
@@ -5335,7 +5498,7 @@ const Emitter = struct {
                     try self.emit(.i32_mul, 0);
                     try self.emit(.i32_add, 0);
                 } else try self.arrayAddress(array_local, counter);
-                try self.emit(if (machine == .f32) .f32_load else .i32_load, if (is_list) 0 else 4);
+                if (small == null) try self.emit(if (machine == .f32) .f32_load else .i32_load, if (is_list) 0 else 4);
                 try self.emit(.local_set, element);
             }
             // Loop patterns are proved exhaustive. Keep a trap path to seal
@@ -5438,12 +5601,12 @@ const Emitter = struct {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const target = source.node(id).a;
-        var label: ?u32 = null;
+        var selected: ?LoopTarget = null;
         for (self.loop_targets.items) |loop_target| if (loop_target.node == target) {
-            label = loop_target.label;
+            selected = loop_target;
             break;
         };
-        const exit_label = label orelse return g.fail(self.unit_id, id, .unsupported);
+        const exit_target = selected orelse return g.fail(self.unit_id, id, .unsupported);
         const carries = if (source.node(target).tag == .request_loop) source.requestLoopCarries(target) else source.loopCarries(target);
         const values = source.breakValues(id);
         if (values.len != carries.len) return g.fail(self.unit_id, id, .unsupported);
@@ -5453,7 +5616,8 @@ const Emitter = struct {
             index -= 1;
             try self.save(carries[index].outgoing, id);
         }
-        try self.emit(.br, self.labels - 1 - exit_label);
+        try self.cleanupTo(exit_target.cleanup);
+        try self.emit(.br, self.labels - 1 - exit_target.label);
     }
     fn dispatchIdentity(self: *Emitter, concrete: layout.Id) ?types.NominalIdentity {
         const value = self.generator.layouts.node(concrete);
@@ -5569,11 +5733,11 @@ const Emitter = struct {
             try self.emit(.local_set, callee);
             const value = try self.capture(argument, depth);
             try self.emit(.local_get, callee);
-            try self.emit(.i32_load, 4);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
             try self.emit(.local_get, value);
             try self.providerHead();
             try self.emit(.local_get, callee);
-            try self.emit(.i32_load, 0);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
             try self.emit(.call_indirect, try g.module.internType(&.{ .i32, g.layouts.machine(arrow.a), .i32 }, g.layouts.machine(arrow.b)));
             ty = arrow.b;
         }

@@ -58,4 +58,13 @@ pub fn build(b: *std.Build) void {
     const list_fixture_file = generate_list_fixture.addOutputFileArg("list-runtime-fixture.wasm");
     const install_list_fixture = b.addInstallFile(list_fixture_file, "list-runtime-fixture.wasm");
     b.step("list-runtime-fixture", "Generate list layout and sharing execution laws").dependOn(&install_list_fixture.step);
+    const packed_fixture = b.addExecutable(.{ .name = "packed-layout-fixture", .root_module = b.createModule(.{
+        .root_source_file = b.path("src/packed_layout_fixture.zig"),
+        .target = target,
+        .optimize = optimize,
+    }), .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
+    const generate_packed = b.addRunArtifact(packed_fixture);
+    const packed_file = generate_packed.addOutputFileArg("packed-layout-fixture.wasm");
+    const install_packed = b.addInstallFile(packed_file, "packed-layout-fixture.wasm");
+    b.step("packed-layout-fixture", "Generate the experimental dense scalar row fixture").dependOn(&install_packed.step);
 }

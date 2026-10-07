@@ -64,7 +64,7 @@ test "source overlays compile new virtual modules and retain exact edits deletio
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     session.enableProjectBuildReuse();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     var first = try session.prepareRevisionWithSources(io, fixture.entry, null, .{}, &fixture.sources(original));
     defer first.deinit();
     try success(first);

@@ -35,7 +35,7 @@ const Fixture = struct {
     fn emitUsing(self: *const Fixture, allocator: std.mem.Allocator, options: backend.CompileOptions) !backend.Result {
         var configured = options;
         configured.identity = self.names.view();
-        configured.reuse_projected_principals = true;
+        configured.policy.reuse_projected_principals = true;
         return backend.compileWithOptions(allocator, &self.units, 1, configured);
     }
     fn deinit(self: *Fixture) void {
@@ -56,7 +56,7 @@ test "principal input image retains inference while current staged literals chan
     try std.testing.expect(initial.capture.?.metadata.principal_proofs.items[0].inputs != null);
     var fresh = try after.emit(.{ .retain_artifacts = true });
     defer fresh.deinit(a);
-    var candidate = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.?, .reuse_unaffected_modules = true });
+    var candidate = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.?, .policy = .{ .reuse_unaffected_modules = true } });
     defer candidate.deinit(a);
     try std.testing.expect(candidate.diagnostic == null);
     try std.testing.expect(candidate.principal.projected_empty_hits > 0);
@@ -64,7 +64,7 @@ test "principal input image retains inference while current staged literals chan
     try std.testing.expectEqualSlices(u8, fresh.bytes, candidate.bytes);
     try std.testing.expectEqual(fresh.constant_steps, candidate.constant_steps);
     try std.testing.expect(!std.mem.eql(u8, initial.bytes, candidate.bytes));
-    var reverted = try before.emit(.{ .retain_artifacts = true, .principal_previous = &candidate.capture.?, .reuse_unaffected_modules = true });
+    var reverted = try before.emit(.{ .retain_artifacts = true, .principal_previous = &candidate.capture.?, .policy = .{ .reuse_unaffected_modules = true } });
     defer reverted.deinit(a);
     try std.testing.expect(reverted.principal.projected_empty_hits > 0);
     try std.testing.expectEqualSlices(u8, initial.bytes, reverted.bytes);
@@ -81,7 +81,7 @@ test "principal input image does not hide staged errors or change the last good 
     const stamp = @import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_proofs.items);
     var fresh = try after.emit(.{ .retain_artifacts = true });
     defer fresh.deinit(a);
-    var candidate = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.?, .reuse_unaffected_modules = true });
+    var candidate = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.?, .policy = .{ .reuse_unaffected_modules = true } });
     defer candidate.deinit(a);
     try std.testing.expect(candidate.diagnostic != null);
     try std.testing.expectEqualDeep(fresh.diagnostic, candidate.diagnostic);
@@ -159,7 +159,7 @@ test "principal input recording bounds conflicting reads and frees every failing
 }
 
 fn replayFailure(allocator: std.mem.Allocator, fixture: *const Fixture, old: *const @import("artifact_capture.zig").Capture, expected: []const u8) !void {
-    var candidate = try fixture.emitUsing(allocator, .{ .retain_artifacts = true, .principal_previous = old, .reuse_unaffected_modules = true });
+    var candidate = try fixture.emitUsing(allocator, .{ .retain_artifacts = true, .principal_previous = old, .policy = .{ .reuse_unaffected_modules = true } });
     defer candidate.deinit(allocator);
     try std.testing.expect(candidate.diagnostic == null);
     try std.testing.expect(candidate.principal.projected_empty_hits > 0);

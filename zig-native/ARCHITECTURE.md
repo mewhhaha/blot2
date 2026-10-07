@@ -18,6 +18,42 @@ not parse, infer or stage source for compilation.
    dependency modules can be shared across revisions without retaining a chain
    of prior mutable solver states.
 
+Specialization lives in `specialization.zig`: it binds layout expectations,
+solves type/effect obligations and returns owned mappings for a source body.
+The service has no instruction builder or Wasm module. Retained refinement hooks
+keep the existing stable artifact-owner identity and validity checks. Dynamic
+member selection, closure captures and staging still request semantic work as
+needed; this boundary does not assume every expression was monomorphized early.
+
+`runtime_ir.zig` owns the compact typed stack representation before encoding.
+Each opcode has an exhaustive input/result/effect contract; direct/indirect calls
+resolve their signatures and allocation roles against the module. Scalar
+replacement, vectorization and lifetime analysis consume these shared facts.
+`runtime_pipeline.zig` owns transformed bodies and discards an obsolete buffer as
+soon as the next pass replaces it. This is a stack IR, not SSA, and it does not
+infer reference ownership from an arbitrary i32 word.
+
+`runtime_layout.zig` defines the guest's fixed heap structures, their field roles
+and offsets. Runtime constructors, static serialization, list helpers and arena
+headers use those definitions. `runtime_cleanup.zig` records lexical obligations
+for private provider frames, State cells, request frames/cells and demand reset.
+Normal scope exits and source branches release only exited scopes; cancellation
+unwinds the entire function, including inlined scopes. Escaping payload values
+retain their independent ownership/collector policy.
+
+Execution choices are a single session-owned `execution_policy.Policy`, with
+named reference/project defaults and explicit differential-test overrides.
+Cached-output equality includes that policy. Stamping instrumentation belongs
+to the caller; there are no mutable global compiler switches. Identical semantic
+validation inputs share immutable arrays through independent leases within one
+compilation. Executable, value and evidence admission remain separate proofs.
+
+Representation conversions distinguish layout, evidence, their respective effect
+rows and code-expectation handles. Runtime cleanup distinguishes function/local
+handles, and resolved bodies distinguish source expressions. Store-bound services
+still enforce owner identity; equal integers from different owners are not
+interchangeable. Dense legacy Core tables keep their existing word encoding.
+
 Compiled `.blotdep` files contain typed dependency modules and their admission
 metadata. Compiler identity, source changes, catalogs, nominal origins and
 compile-time dependencies participate in validity checks. Native work counters
@@ -44,6 +80,12 @@ detach one path and leaf. Branch copies freeze their children so both versions
 remain independently editable. Ownership tokens are descriptor addresses plus
 one, never tracing pointers to obsolete descriptors. Static data is immutable,
 unused slots stay zero, and descriptors cache the current traversal leaf.
+Immutable cursors also own an independent leaf cache, so interleaved forks do
+not repeatedly evict one another. Source-body facts have one compilation owner;
+bounded scalar collections can use locals and private rectangular append
+regions can allocate their exact result. These optimizations consume typed
+structure, not prelude names. The dense scalar-row fixture is experimental and
+does not change Array/List layouts used by programs.
 
 ## Limits and measurement
 

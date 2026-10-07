@@ -191,7 +191,7 @@ test "module interface cutoff preserves a transitive staged chain through discar
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     try initialize(&session, &fixture);
-    session.share_dependency_storage = false;
+    session.policy.share_dependency_storage = false;
     var original_result = try fresh(&fixture);
     defer original_result.deinit(a);
     const original_output = original_result.result.compiled.bytes;
@@ -323,18 +323,18 @@ test "module interface cutoff policy invalidates exact output reuse and retains 
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     try initialize(&session, &fixture);
     var unchanged = try session.revise(io, fixture.path, null, .{});
     defer unchanged.deinit(a);
     try std.testing.expect(session.last.reused_output);
-    session.reuse_module_interface_cutoff = false;
+    session.policy.reuse_module_interface_cutoff = false;
     var disabled = try session.revise(io, fixture.path, null, .{});
     defer disabled.deinit(a);
     try std.testing.expect(!session.last.reused_output);
     try std.testing.expectEqualSlices(u8, unchanged.result.compiled.bytes, disabled.result.compiled.bytes);
     for ([_]bool{ false, true }) |enabled| {
-        session.reuse_module_interface_cutoff = enabled;
+        session.policy.reuse_module_interface_cutoff = enabled;
         try fixture.write("changed.blot", if (enabled) original else "const value: U32 = 42\n");
         var expected = try fresh(&fixture);
         defer expected.deinit(a);
@@ -350,10 +350,10 @@ test "prepared entry Core removes the second frontend pass and keeps policy and 
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     try initialize(&session, &fixture);
     for ([_]bool{ false, true }) |reuse| {
-        session.reuse_prepared_entry = reuse;
+        session.policy.reuse_prepared_entry = reuse;
         try fixture.write("changed.blot", edited);
         var expected = try fresh(&fixture);
         defer expected.deinit(a);
@@ -378,7 +378,7 @@ test "prepared entry Core removes the second frontend pass and keeps policy and 
     var committed = try session.revise(io, fixture.path, null, .{});
     defer committed.deinit(a);
     try std.testing.expect(session.last.fallback.reused_entry_bodies > 0);
-    session.reuse_prepared_entry = false;
+    session.policy.reuse_prepared_entry = false;
     var changed_policy = try session.prepareRevision(io, fixture.path, null, .{});
     defer changed_policy.deinit();
     try std.testing.expect(changed_policy == .ready and !changed_policy.ready.stats.reused_output);
@@ -489,7 +489,7 @@ test "module frontend reuse rechecks a changed module and its readers and preser
     defer session.deinit();
     try initialize(&session, &fixture);
     // Retain coverage of the original transitive invalidation policy.
-    session.reuse_module_interface_cutoff = false;
+    session.policy.reuse_module_interface_cutoff = false;
     const seed_stamp = artifacts.stamp(session.seed);
     const code_stamp = artifacts.stamp(session.current.?.artifacts.metadata.principal_proofs.items);
     try fixture.write("changed.blot", edited);
@@ -624,12 +624,12 @@ test "module frontend policy participates in exact output reuse and preserves in
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.reuse_unchanged_output = true;
+    session.policy.reuse_unchanged_output = true;
     try initialize(&session, &fixture);
     var unchanged = try session.revise(io, fixture.path, null, .{});
     defer unchanged.deinit(a);
     try std.testing.expect(session.last.reused_output);
-    session.reuse_module_frontends = false;
+    session.policy.reuse_module_frontends = false;
     var disabled = try session.revise(io, fixture.path, null, .{});
     defer disabled.deinit(a);
     try std.testing.expect(!session.last.reused_output);
@@ -639,11 +639,11 @@ test "module frontend policy participates in exact output reuse and preserves in
     // A default session stays independent of the enabled project's policy.
     var other = try retained.Session.initEmpty(a, .{});
     defer other.deinit();
-    try std.testing.expect(!other.reuse_module_frontends);
+    try std.testing.expect(!other.policy.reuse_module_frontends);
     var other_first = try other.revise(io, fixture.path, null, .{});
     defer other_first.deinit(a);
     try fixture.write("changed.blot", edited);
-    session.reuse_module_frontends = true;
+    session.policy.reuse_module_frontends = true;
     var enabled_edit = try session.revise(io, fixture.path, null, .{});
     defer enabled_edit.deinit(a);
     try expectReuse(session.last);

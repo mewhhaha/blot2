@@ -28,9 +28,12 @@ const usage =
 ;
 const dependency_cli = @import("dependency_cli.zig");
 const compiler_identity = @import("compiler_identity");
+/// Immutable executable defaults; individual compiler invocations own options.
+pub const compiler_defaults = .{ .artifact_replay = compiler_identity.artifact_replay };
 
 const Command = enum { lex, parse, check, build, dependencies, parse_project, check_project, build_project };
 const Stats = struct {
+    optimization: @import("function_facts.zig").Stats = .{},
     source_bytes: usize = 0,
     tokens: usize = 0,
     syntax_nodes: usize = 0,
@@ -192,6 +195,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         // A declined backend still owns measured work. Preserve it before
         // reporting the diagnostic and leaving compilation.
         stats.code_instances = compiled.code_instances;
+        stats.optimization = compiled.optimization;
         stats.callable_wrappers = compiled.callable_wrappers;
         stats.emitted_functions = compiled.emitted_functions;
         stats.constant_steps = compiled.constant_steps;
@@ -236,6 +240,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var core_nodes: usize = 0;
     var body_lowerings: usize = 0;
     var code_instances: usize = 0;
+    var optimization: @import("function_facts.zig").Stats = .{};
     var callable_wrappers: usize = 0;
     var emitted_functions: usize = 0;
     var wasm_bytes: usize = 0;
@@ -352,6 +357,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
             teardown_us += elapsed(result_release_start, io);
         }
         code_instances = compiled.code_instances;
+        optimization = compiled.optimization;
         callable_wrappers = compiled.callable_wrappers;
         emitted_functions = compiled.emitted_functions;
         constant_steps = compiled.constant_steps;
@@ -391,6 +397,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .core_nodes = core_nodes,
         .body_lowerings = body_lowerings,
         .code_instances = code_instances,
+        .optimization = optimization,
         .callable_wrappers = callable_wrappers,
         .emitted_functions = emitted_functions,
         .constant_steps = constant_steps,
@@ -513,7 +520,6 @@ fn run(init: std.process.Init) !bool {
     return success;
 }
 pub fn main(init: std.process.Init) void {
-    backend.artifact_replay_enabled = @import("compiler_identity").artifact_replay;
     const success = run(init) catch |err| {
         std.debug.print("blotc: {s}\n", .{@errorName(err)});
         std.process.exit(1);

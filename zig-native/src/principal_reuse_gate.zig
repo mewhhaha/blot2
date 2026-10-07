@@ -27,9 +27,22 @@ pub const Gate = struct {
     dependency_validations: usize = 0,
     /// Exact ordered namespace/structure equality, allowing only the narrowly
     /// permitted scalar value bits. This alone does not establish proof validity.
-    structural_units: []bool,
-    offsets: []usize,
-    dirty: []bool,
+    structural_units: []const bool,
+    offsets: []const usize,
+    dirty: []const bool,
+    storage: *Storage,
+
+    // Immutable after construction. Each semantic consumer owns a lease;
+    // executable/value admission still lives in its separate gate.
+    const Storage = struct { references: usize = 1 };
+
+    pub fn retain(self: *const Gate) Gate {
+        std.debug.assert(self.storage.references != std.math.maxInt(usize));
+        self.storage.references += 1;
+        var result = self.*;
+        result.dependency_validations = 0;
+        return result;
+    }
 
     /// The caller retains immutable current Core through every admits call.
     /// Retained pins and identity remain immutable during initialization; the
@@ -53,7 +66,10 @@ pub const Gate = struct {
         const dirty = try allocator.alloc(bool, offsets[units.len]);
         errdefer allocator.free(dirty);
         @memset(dirty, false);
-        var result: Gate = .{ .allocator = allocator, .source_pools = old, .units = units, .declaration_principals = execution.reuse_declaration_principals, .structural_units = structural_units, .offsets = offsets, .dirty = dirty };
+        const storage = try allocator.create(Storage);
+        errdefer allocator.destroy(storage);
+        storage.* = .{};
+        var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .declaration_principals = execution.reuse_declaration_principals, .structural_units = structural_units, .offsets = offsets, .dirty = dirty };
 
         if (!old.project_identity or old.identity == null or names == null or old.modules.len != units.len or units.len == 0 or units.len >= std.math.maxInt(u32)) return result;
         // Check every retained pointer against its original pin before comparing
@@ -227,9 +243,13 @@ pub const Gate = struct {
     }
 
     pub fn deinit(self: *Gate) void {
-        self.allocator.free(self.structural_units);
-        self.allocator.free(self.offsets);
-        self.allocator.free(self.dirty);
+        self.storage.references -= 1;
+        if (self.storage.references == 0) {
+            self.allocator.free(self.structural_units);
+            self.allocator.free(self.offsets);
+            self.allocator.free(self.dirty);
+            self.allocator.destroy(self.storage);
+        }
         self.* = undefined;
     }
 

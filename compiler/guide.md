@@ -412,7 +412,10 @@ sources can use earlier bindings. A Bool guard skips every subsequent qualifier
 and the result expression when false. Bindings stay inside the comprehension;
 each generator source sees the scope before its own binding. The output is built
 with a private growing list, then copied once if the requested result is an
-array.
+array. For rectangular generators with total, allocation-free bounds and no
+intermediate observations, the compiler can allocate the exact final storage
+directly. Filters, ragged generators and observable intermediate values keep
+the growing-list path; iteration and element evaluation order stay the same.
 
 `for` and comprehension generators also accept user-defined iterables. The
 ordinary associated `iter` function creates a cursor once; its `next` function

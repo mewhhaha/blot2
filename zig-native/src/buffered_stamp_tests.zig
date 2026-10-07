@@ -48,25 +48,12 @@ test "buffered structural stamp preserves byte chunks and primitive writes at ev
     try same(@as([]const u64, &numbers));
 }
 test "buffered structural stamp counters preserve input stream and remove tiny Blake3 update calls without allocations" {
-    const prior_enabled = artifacts.buffered_stamps_enabled;
-    const prior_observe = artifacts.observe_stamp_counts;
-    const prior_counts = artifacts.stamp_counts;
-    defer {
-        artifacts.buffered_stamps_enabled = prior_enabled;
-        artifacts.observe_stamp_counts = prior_observe;
-        artifacts.stamp_counts = prior_counts;
-    }
     var words: [8193]u32 = undefined;
     for (&words, 0..) |*word, index| word.* = @intCast(index);
-    artifacts.observe_stamp_counts = true;
-    artifacts.buffered_stamps_enabled = false;
-    artifacts.stamp_counts = .{};
-    const reference = artifacts.stamp(@as([]const u32, &words));
-    const original = artifacts.stamp_counts;
-    artifacts.buffered_stamps_enabled = true;
-    artifacts.stamp_counts = .{};
-    const buffered = artifacts.stamp(@as([]const u32, &words));
-    const counts = artifacts.stamp_counts;
+    var original: artifacts.StampCounts = .{};
+    var counts: artifacts.StampCounts = .{};
+    const reference = (artifacts.Stamping{ .algorithm = .reference, .counts = &original }).stamp(@as([]const u32, &words));
+    const buffered = (artifacts.Stamping{ .counts = &counts }).stamp(@as([]const u32, &words));
     try std.testing.expectEqualSlices(u8, &reference, &buffered);
     try std.testing.expectEqual(original.bytes, counts.bytes);
     try std.testing.expectEqual(original.input_updates, counts.input_updates);
@@ -74,9 +61,8 @@ test "buffered structural stamp counters preserve input stream and remove tiny B
     try std.testing.expectEqual(@as(usize, 9), counts.hash_updates);
     try std.testing.expectEqual(counts.hash_updates, counts.buffer_flushes);
     try std.testing.expectEqual(@as(usize, 0), counts.direct_chunks);
-    artifacts.observe_stamp_counts = false;
-    const saved = artifacts.stamp_counts;
+    const saved = counts;
     try same(@as([]const u32, &words));
     _ = artifacts.stamp(words);
-    try std.testing.expectEqual(saved, artifacts.stamp_counts);
+    try std.testing.expectEqual(saved, counts);
 }

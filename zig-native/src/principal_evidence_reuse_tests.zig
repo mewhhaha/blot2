@@ -256,7 +256,7 @@ test "principal cache candidate allocation failures preserve old capture and a l
     const old = &initial.capture.?;
     const retained_proofs = artifacts.stamp(old.metadata.principal_proofs.items);
     const retained_emission = artifacts.stamp(old.emission.instructions);
-    var fresh = try after.emit(a, .{ .principal_reuse = false });
+    var fresh = try after.emit(a, .{ .policy = .{ .principal_reuse = false } });
     defer fresh.deinit(a);
     try allocationReuse(a, &after, old, &fresh);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, allocationReuse, .{ &after, old, &fresh });
@@ -285,7 +285,7 @@ test "principal cache failed backend candidate leaves prior captured proofs reus
     const retained_core = artifacts.stamp(before.units);
     const retained_proofs = artifacts.stamp(old.metadata.principal_proofs.items);
     const retained_emission = artifacts.stamp(old.emission.instructions);
-    var fresh_failure = try failed.emit(a, .{ .principal_reuse = false });
+    var fresh_failure = try failed.emit(a, .{ .policy = .{ .principal_reuse = false } });
     defer fresh_failure.deinit(a);
     var candidate = try failed.emit(a, .{ .previous = old, .retain_artifacts = true });
     defer candidate.deinit(a);
@@ -401,9 +401,9 @@ test "lazy empty principal proof needs no graph importer or lookup allocations a
     failures.fail_index = std.math.maxInt(usize);
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
-    var lazy = try after.emit(a, .{ .previous = old, .retain_artifacts = true, .principal_graph_mode = .lazy });
+    var lazy = try after.emit(a, .{ .previous = old, .retain_artifacts = true, .policy = .{ .principal_graph_mode = .lazy } });
     defer lazy.deinit(a);
-    var eager = try after.emit(a, .{ .previous = old, .retain_artifacts = true, .principal_graph_mode = .eager });
+    var eager = try after.emit(a, .{ .previous = old, .retain_artifacts = true, .policy = .{ .principal_graph_mode = .eager } });
     defer eager.deinit(a);
     try equalEmission(&fresh, &lazy);
     try equalEmission(&eager, &lazy);
@@ -490,9 +490,9 @@ test "lazy nonempty row principal imports keep fresh output and release every fa
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, lazyNonemptyScenario, .{ &initial.capture.?, &after, target, proof.options });
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
-    var lazy = try after.emit(a, .{ .previous = &initial.capture.?, .principal_graph_mode = .lazy });
+    var lazy = try after.emit(a, .{ .previous = &initial.capture.?, .policy = .{ .principal_graph_mode = .lazy } });
     defer lazy.deinit(a);
-    var eager = try after.emit(a, .{ .previous = &initial.capture.?, .principal_graph_mode = .eager });
+    var eager = try after.emit(a, .{ .previous = &initial.capture.?, .policy = .{ .principal_graph_mode = .eager } });
     defer eager.deinit(a);
     try equalEmission(&fresh, &lazy);
     try equalEmission(&eager, &lazy);
@@ -528,7 +528,7 @@ test "lazy principal importer construction OOM leaves no published graph and ret
     defer solved.deinit(allocator);
     try std.testing.expect(state.graphs != null and state.stats.hits == 1);
     try std.testing.expectEqualSlices(u8, &old_proofs, &artifacts.stamp(old.metadata.principal_proofs.items));
-    var reverted = try before.emit(a, .{ .previous = old, .principal_graph_mode = .lazy });
+    var reverted = try before.emit(a, .{ .previous = old, .policy = .{ .principal_graph_mode = .lazy } });
     defer reverted.deinit(a);
     try equalEmission(&initial, &reverted);
     try std.testing.expect(reverted.principal.hits > 0);
@@ -656,9 +656,9 @@ test "primitive principal copies actual U32 facts without importer with exact fr
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, primitiveScenario, .{ old, &after, target, proof.options });
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
-    var primitive = try after.emit(a, .{ .previous = old, .retain_artifacts = true, .principal_graph_mode = .primitive });
+    var primitive = try after.emit(a, .{ .previous = old, .retain_artifacts = true, .policy = .{ .principal_graph_mode = .primitive } });
     defer primitive.deinit(a);
-    var lazy = try after.emit(a, .{ .previous = old, .principal_graph_mode = .lazy });
+    var lazy = try after.emit(a, .{ .previous = old, .policy = .{ .principal_graph_mode = .lazy } });
     defer lazy.deinit(a);
     try equalEmission(&fresh, &primitive);
     try equalEmission(&lazy, &primitive);
@@ -668,7 +668,7 @@ test "primitive principal copies actual U32 facts without importer with exact fr
     const current = savedProof(&primitive.capture.?, target) orelse return error.TestExpectedPrincipalCapture;
     try std.testing.expectEqualDeep(proof.types, current.types);
     try std.testing.expect(@intFromPtr(proof.types.ptr) != @intFromPtr(current.types.ptr));
-    var reverted = try before.emit(a, .{ .previous = &primitive.capture.?, .principal_graph_mode = .primitive });
+    var reverted = try before.emit(a, .{ .previous = &primitive.capture.?, .policy = .{ .principal_graph_mode = .primitive } });
     defer reverted.deinit(a);
     try equalEmission(&initial, &reverted);
 }
@@ -881,7 +881,7 @@ test "primitive nonempty row facts fall back and retain exact fresh output" {
     try successful(&initial);
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
-    var primitive = try after.emit(a, .{ .previous = &initial.capture.?, .principal_graph_mode = .primitive });
+    var primitive = try after.emit(a, .{ .previous = &initial.capture.?, .policy = .{ .principal_graph_mode = .primitive } });
     defer primitive.deinit(a);
     try equalEmission(&fresh, &primitive);
     try std.testing.expectEqual(@as(usize, 1), primitive.principal.graph_importers_initialized);
@@ -919,7 +919,7 @@ test "primitive mapping copy OOM publishes no importer or hit and retry then rev
     try std.testing.expect(state.graphs == null);
     try std.testing.expectEqual(@as(usize, 1), state.stats.primitive_hits);
     try std.testing.expectEqualSlices(u8, &old_facts, &artifacts.stamp(old.metadata.principal_proofs.items));
-    var reverted = try before.emit(a, .{ .previous = old, .principal_graph_mode = .primitive });
+    var reverted = try before.emit(a, .{ .previous = old, .policy = .{ .principal_graph_mode = .primitive } });
     defer reverted.deinit(a);
     try equalEmission(&initial, &reverted);
 }

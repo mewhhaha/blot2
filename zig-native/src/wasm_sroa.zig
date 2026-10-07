@@ -4,20 +4,14 @@
 //! calls, unknown offsets, mutable aliases and GC roots keep ordinary storage.
 const std = @import("std");
 const w = @import("wasm.zig");
+const ir = @import("runtime_ir.zig");
 const A = std.mem.Allocator;
 const none = std.math.maxInt(u32);
 const Value = struct { id: u32 = 0, offset: u32 = 0, constant: ?u32 = null };
 const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0 };
 const Event = struct { input: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false };
 const Control = struct { height: usize, result: u32, unreachable_: bool = false, identity: usize = 0 };
-pub const Output = struct {
-    locals: std.ArrayList(w.ValueType) = .empty,
-    instructions: std.ArrayList(w.Instruction) = .empty,
-    pub fn deinit(self: *Output, a: A) void {
-        self.locals.deinit(a);
-        self.instructions.deinit(a);
-    }
-};
+pub const Output = ir.Body;
 const Analysis = struct {
     a: A,
     nodes: std.ArrayList(Node) = .empty,
@@ -161,8 +155,8 @@ const Analysis = struct {
                     if (address.id == 0 or !self.nodes.items[address.id].allocation or self.events[at].field >= 64 or self.events[at].field % 4 != 0) self.escape(address);
                 },
                 .call => {
-                    const callee = module.functions.items[inst.operand];
-                    if (module.arena != null and module.arena.?.isAllocation(inst.operand)) {
+                    const callee = ir.call(module, inst);
+                    if (callee.ownership == .allocate or callee.ownership == .allocate_scalar) {
                         const size = self.pop();
                         if (size.constant != null and size.constant.? != 0 and size.constant.? <= 64 and size.constant.? % 4 == 0) {
                             const id = try self.add(false, size.constant.?);
@@ -176,11 +170,11 @@ const Analysis = struct {
                 },
                 .call_indirect => {
                     self.escape(self.pop());
-                    const signature = module.signatures.items[inst.operand];
+                    const signature = ir.call(module, inst);
                     try self.call(signature.parameters.len, signature.result);
                 },
                 .call_import => {
-                    const signature = module.signatures.items[module.imports.items[inst.operand].signature];
+                    const signature = ir.call(module, inst);
                     try self.call(signature.parameters.len, signature.result);
                 },
                 .block, .loop, .if_ => {
@@ -235,41 +229,10 @@ const Analysis = struct {
                 .drop => {
                     _ = self.pop();
                 },
-                .global_set, .host_ref_get, .host_ref_is_null, .memory_grow => {
-                    self.escape(self.pop());
-                    if (inst.op != .global_set) try self.push(.{});
-                },
-                .host_ref_set => {
-                    self.escape(self.pop());
-                    self.escape(self.pop());
-                },
-                .host_ref_grow => {
-                    self.escape(self.pop());
-                    self.escape(self.pop());
-                    try self.push(.{});
-                },
-                .v128_store => {
-                    self.escape(self.pop());
-                    self.escape(self.pop());
-                },
-                .v128_load, .i32x4_splat, .f32x4_splat, .i32x4_extract_lane, .f32x4_extract_lane, .f32x4_abs, .f32x4_neg, .f32x4_ceil, .f32x4_floor, .f32x4_trunc, .f32x4_sqrt, .f32x4_convert_i32x4_u, .i32x4_trunc_sat_f32x4_u => {
-                    self.escape(self.pop());
-                    try self.push(.{});
-                },
-                .memory_copy, .memory_fill => {
-                    self.escape(self.pop());
-                    self.escape(self.pop());
-                    self.escape(self.pop());
-                },
-                .i32_eqz, .i32_clz, .i32_ctz, .f32_abs, .f32_neg, .f32_ceil, .f32_floor, .f32_trunc, .f32_sqrt, .i32_reinterpret_f32, .f32_reinterpret_i32, .i32_trunc_sat_f32_u, .f32_convert_i32_u => {
-                    self.escape(self.pop());
-                    try self.push(.{});
-                },
-                .nop => {},
                 else => {
-                    self.escape(self.pop());
-                    self.escape(self.pop());
-                    try self.push(.{});
+                    const contract = ir.contract(module, function, inst);
+                    for (0..contract.arity) |_| self.escape(self.pop());
+                    if (contract.result != .none) try self.push(.{});
                 },
             }
         }

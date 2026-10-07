@@ -10,18 +10,14 @@ pub const Value = u32;
 pub const Head = u32;
 pub const CellId = u32;
 pub const empty: Head = 0;
-pub const Kind = enum(u32) { callback, state_read, state_write, request };
+const heap = @import("runtime_layout.zig");
+pub const Kind = heap.ProviderKind;
 /// These four words are also the guest's provider-frame representation. Target
 /// is a callable value for callback frames and a cell handle for state frames.
-pub const Frame = extern struct {
-    operation: Operation,
-    target: u32,
-    outer: Head,
-    kind: Kind,
-};
-pub const Cell = extern struct { value: Value };
-pub const Provider = extern struct { operation: Operation, implementation: Value };
-pub const StateProvider = extern struct { read: Operation, write: Operation, initial: Value };
+pub const Frame = heap.ProviderFrame;
+pub const Cell = heap.StateCell;
+pub const Provider = heap.Provider;
+pub const StateProvider = heap.StateProvider;
 pub const Installation = struct { head: Head, cell: CellId };
 pub const Match = struct { frame: Frame };
 pub const Mark = struct { frames: usize, cells: usize };

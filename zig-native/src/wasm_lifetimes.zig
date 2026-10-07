@@ -6,6 +6,7 @@
 //! cycles. Escaping graphs and unsupported aliases remain under arena policy.
 const std = @import("std");
 const w = @import("wasm.zig");
+const ir = @import("runtime_ir.zig");
 const flow = @import("wasm_control_flow.zig");
 const A = std.mem.Allocator;
 const absent = std.math.maxInt(u32);
@@ -76,14 +77,7 @@ pub const Plan = struct {
         self.releases.deinit(a);
     }
 };
-pub const Output = struct {
-    locals: std.ArrayList(w.ValueType) = .empty,
-    instructions: std.ArrayList(w.Instruction) = .empty,
-    pub fn deinit(self: *Output, a: A) void {
-        self.locals.deinit(a);
-        self.instructions.deinit(a);
-    }
-};
+pub const Output = ir.Body;
 const Parameter = struct { escapes: bool = true, bytes: u32 = 0 };
 const Summary = struct {
     parameters: []Parameter,
@@ -428,13 +422,13 @@ const Analysis = struct {
                 .i32_load, .f32_load, .v128_load => {
                     const address = self.pop();
                     const reference = if (inst.op == .i32_load) self.field(address, inst.operand) else null;
-                    try self.memory(address, inst.operand, if (inst.op == .v128_load) 16 else 4, .read, reference orelse absent);
+                    try self.memory(address, inst.operand, ir.fixed(inst.op).bytes, .read, reference orelse absent);
                     try self.push(if (reference) |id| self.references.items[id].child else .{});
                 },
                 .i32_store, .f32_store, .v128_store => {
                     const value = self.pop();
                     const address = self.pop();
-                    try self.memory(address, inst.operand, if (inst.op == .v128_store) 16 else 4, .write, absent);
+                    try self.memory(address, inst.operand, ir.fixed(inst.op).bytes, .write, absent);
                     if (inst.op == .i32_store) try self.storeReference(address, inst.operand, value) else try self.escape(value);
                 },
                 .memory_copy, .memory_fill => {
@@ -445,8 +439,8 @@ const Analysis = struct {
                     try self.memory(self.pop(), 0, bytes.constant, .write, absent);
                 },
                 .call => {
-                    const callee = module.functions.items[inst.operand];
-                    if (module.arena != null and module.arena.?.isAllocation(inst.operand)) {
+                    const callee = ir.call(module, inst);
+                    if (callee.ownership == .allocate or callee.ownership == .allocate_scalar) {
                         const bytes = self.pop();
                         try self.escape(bytes);
                         if (bytes.constant != null and bytes.constant.? > 0) try self.allocation(bytes.constant.?) else try self.push(.{});
@@ -469,11 +463,11 @@ const Analysis = struct {
                 },
                 .call_indirect => {
                     try self.escape(self.pop());
-                    const signature = module.signatures.items[inst.operand];
+                    const signature = ir.call(module, inst);
                     try self.opaqueCall(signature.parameters.len, signature.result);
                 },
                 .call_import => {
-                    const signature = module.signatures.items[module.imports.items[inst.operand].signature];
+                    const signature = ir.call(module, inst);
                     try self.opaqueCall(signature.parameters.len, signature.result);
                 },
                 .block, .loop, .if_ => {
@@ -516,24 +510,10 @@ const Analysis = struct {
                     try self.dead();
                 },
                 .drop => try self.use(self.pop()),
-                .global_set, .host_ref_get, .host_ref_is_null, .memory_grow => {
-                    try self.escape(self.pop());
-                    if (inst.op != .global_set) try self.push(.{});
-                },
-                .host_ref_set, .host_ref_grow => {
-                    try self.escape(self.pop());
-                    try self.escape(self.pop());
-                    if (inst.op == .host_ref_grow) try self.push(.{});
-                },
-                .i32_eqz, .i32_clz, .i32_ctz, .f32_abs, .f32_neg, .f32_ceil, .f32_floor, .f32_trunc, .f32_sqrt, .i32_reinterpret_f32, .f32_reinterpret_i32, .i32_trunc_sat_f32_u, .f32_convert_i32_u, .i32x4_splat, .f32x4_splat, .i32x4_extract_lane, .f32x4_extract_lane, .f32x4_abs, .f32x4_neg, .f32x4_ceil, .f32x4_floor, .f32x4_trunc, .f32x4_sqrt, .f32x4_convert_i32x4_u, .i32x4_trunc_sat_f32x4_u => {
-                    try self.escape(self.pop());
-                    try self.push(.{});
-                },
-                .nop => {},
                 else => {
-                    try self.escape(self.pop());
-                    try self.escape(self.pop());
-                    try self.push(.{});
+                    const contract = ir.contract(module, function, inst);
+                    for (0..contract.arity) |_| try self.escape(self.pop());
+                    if (contract.result != .none) try self.push(.{});
                 },
             }
         }

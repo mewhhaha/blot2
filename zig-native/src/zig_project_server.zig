@@ -101,7 +101,7 @@ const OpenProject = struct {
         } else try retained.Session.initEmpty(a, options.options);
         session.enableProjectBuildReuse();
         // Private pilot executable only; ordinary Session defaults stay off.
-        session.reuse_unchanged_output = true;
+        session.policy.reuse_unchanged_output = true;
         return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session };
     }
     fn deinit(self: *OpenProject) void {
@@ -178,6 +178,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                     .nativeWorkSteps = result.result.compiled.constant_steps,
                     .frontend = result.result.stats,
                     .backend = result.result.compiled.reuse,
+                    .optimization = result.result.compiled.optimization,
                     .sourceBytes = result.source_bytes,
                     .freshModules = result.fresh_modules,
                     .cachedModules = result.cached_modules,
@@ -202,20 +203,6 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
 
 /// No diagnostic/metrics text is written to stdout in serve mode.
 pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compiler: [32]u8) !void {
-    // This server owns one serial stream. Buffered hashing preserves the exact
-    // structural byte stream; restore the caller's policy on every exit path.
-    const artifacts = @import("code_artifacts.zig");
-    const prior_buffered_stamps = artifacts.buffered_stamps_enabled;
-    const prior_scoped_stamps = artifacts.scoped_stamps_enabled;
-    const prior_exact_stamps = artifacts.exact_stamps_enabled;
-    artifacts.buffered_stamps_enabled = true;
-    artifacts.scoped_stamps_enabled = true;
-    artifacts.exact_stamps_enabled = true;
-    defer {
-        artifacts.buffered_stamps_enabled = prior_buffered_stamps;
-        artifacts.scoped_stamps_enabled = prior_scoped_stamps;
-        artifacts.exact_stamps_enabled = prior_exact_stamps;
-    }
     const identity = std.fmt.bytesToHex(compiler, .lower);
     try reply(a, writer, .{
         .kind = "hello",

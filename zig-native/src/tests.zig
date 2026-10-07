@@ -1,4 +1,6 @@
 test {
+    _ = @import("packed_layout.zig");
+    _ = @import("collection_optimization_tests.zig");
     _ = @import("structural_record_tests.zig");
     _ = @import("check_contract_tests.zig");
     _ = @import("collection_tests.zig");

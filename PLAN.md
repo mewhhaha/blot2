@@ -1,5 +1,29 @@
 # Compiler direction
 
+The architecture cleanup approved after checkpoint `42cb11f` covers all seven
+review findings. Preserve source behavior, fresh/retained parity and the existing
+cycle laws throughout this migration:
+
+1. A typed runtime IR shared by allocation, vectorization and lifetime passes.
+2. Explicit cleanup paths for normal return, break, cancellation and demand reset.
+3. A specialization boundary that hands resolved bodies to runtime emission.
+4. Defined production reuse policies, isolated differential controls and shared
+   revision validation inputs with distinct semantic/executable proofs.
+5. Shared heap layout definitions for construction, access and serialization.
+6. Compilation/session-owned options and instrumentation; no mutable global knobs.
+7. Distinct numeric handle domains and named accessors at compiler boundaries.
+
+These boundaries are now implemented: the compact typed stack IR and pipeline,
+private-scope cleanup ledger, semantic specialization service, shared policy and
+validation leases, centralized fixed heap schemas, caller-owned instrumentation,
+and distinct conversion/runtime handles. The full compiler gate and paired
+measurements against the committed compiler pass; the
+[qualification report](std/PERFORMANCE.md#compiler-architecture-cleanup)
+records bounded private-handler memory and unchanged compilation cost.
+The stack IR is not SSA; dynamic source
+selection still queries semantics, and legacy dense Core storage still uses raw
+words internally. These changes do not remove tracing or solve dynamic cycles.
+
 The approved next program replaces tracing with explicit ownership: full control
 flow lifetimes, temporary elimination/regions, RC for shared storage, suspended
 effect ownership and cancellation, then removal of tracing after qualification.
@@ -7,8 +31,8 @@ The implemented lifetime pass follows proven temporaries across branches, loop
 exits, borrowed direct calls and fresh-result ownership transfers. It also
 releases closed allocation groups with shared children and cycles when every
 reference and exit is proven, and records pointer-free collection element
-layouts. Shared RC, complete effect lifetime cleanup and collector removal
-remain open; do not
+layouts. Private handler scopes now clean up explicitly. Shared RC, ownership
+of escaping and suspended effect values, and collector removal remain open; do not
 describe this partial proof as universal ownership or a GC-free runtime.
 The cycle audit has an executed counterexample: State can return a closure that
 reaches the demand caching that closure. Preserve this legal behavior and its
@@ -23,6 +47,12 @@ workload and lifetime evidence before changing those contracts.
 The follow-up review adopts `splice` and ordered `splice_many` as ordinary
 source functions over structural slices/concatenation. Its paged spine, tiny
 owners and generation caches are still prototypes, not their default layout.
+
+The next transfer batch implements independent immutable cursor caches, bounded
+scalar temporary collections across helpers, rectangular exact-size builders,
+and compile-owned function facts. Packed scalar rows have a separate measured
+fixture; production ABI integration, ragged count passes, rolling reductions,
+summary trees, host span borrows and adaptive runtime workers remain future work.
 
 The list/iterator program approved on 2026-10-07 follows checkpoint `5f09303`:
 

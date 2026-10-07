@@ -31,9 +31,10 @@ pub const Stats = struct {
     owner_importers: usize = 0,
     prepared_importers: usize = 0,
     fresh_importers: usize = 0,
-    gate_clones: usize = 0,
+    shared_gates: usize = 0,
     gate_fresh: usize = 0,
-    gate_clone_bytes: usize = 0,
+    /// Validation arrays borrowed by this lease, not additional allocated bytes.
+    shared_gate_bytes: usize = 0,
     plan_inspections: usize = 0,
     plan_cache_hits: usize = 0,
     graph_scratch: graph.ScratchStats = .{},

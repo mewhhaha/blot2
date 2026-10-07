@@ -7,8 +7,11 @@ pub fn admits(m: *const core.Module, id: core.Id, expose_data: bool) bool {
     // loops or known callbacks. Other helpers stay tiny to avoid multiplying
     // code and refinement work throughout a large application. The caller also
     // bounds nesting and total emitted instructions.
-    var budget: usize = if (expose_data) 64 else 4;
-    return visit(m, id, &budget);
+    return if (cost(m, id)) |nodes| nodes <= (if (expose_data) @as(u16, 64) else 4) else false;
+}
+pub fn cost(m: *const core.Module, id: core.Id) ?u16 {
+    var budget: usize = 64;
+    return if (visit(m, id, &budget)) @intCast(64 - budget) else null;
 }
 fn visit(m: *const core.Module, id: core.Id, budget: *usize) bool {
     if (id == 0) return true;

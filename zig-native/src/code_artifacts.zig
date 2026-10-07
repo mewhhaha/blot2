@@ -489,12 +489,8 @@ fn copyIdentity(allocator: Allocator, view: runtime_identity.View) Allocator.Err
 }
 /// Deterministic structural stamps exclude pointers and padding. These qualify
 /// one pinned run only; stamps do not establish edited-source validity.
-/// Ordinary compilation keeps the reference policy. The serial project server
-/// and differential drivers select buffering; no semantic cache key changes.
-pub var buffered_stamps_enabled: bool = false;
-pub var scoped_stamps_enabled: bool = false;
-pub var exact_stamps_enabled: bool = false;
-pub var observe_stamp_counts: bool = false;
+/// Buffering is the qualified production implementation. Differential controls
+/// and counters belong to an explicit caller-owned context.
 pub const stamp_buffer_bytes = 4096;
 pub const StampCounts = struct {
     stamps: usize = 0,
@@ -509,10 +505,23 @@ pub const StampCounts = struct {
         return result;
     }
 };
-pub var stamp_counts: StampCounts = .{};
+pub const Stamping = struct {
+    algorithm: enum { buffered, reference } = .buffered,
+    counts: ?*StampCounts = null,
+
+    pub fn stamp(self: Stamping, value: anytype) [32]u8 {
+        if (self.counts) |counts| return switch (self.algorithm) {
+            .buffered => measuredStamp(value, true, counts),
+            .reference => measuredStamp(value, false, counts),
+        };
+        return switch (self.algorithm) {
+            .buffered => stampBuffered(value),
+            .reference => stampReference(value),
+        };
+    }
+};
 pub fn stamp(value: anytype) [32]u8 {
-    if (observe_stamp_counts) return if (buffered_stamps_enabled) measuredStamp(value, true) else measuredStamp(value, false);
-    return if (buffered_stamps_enabled) stampBuffered(value) else stampReference(value);
+    return (Stamping{}).stamp(value);
 }
 /// Frozen original stream/digest algorithm, used as the private reference.
 pub fn stampReference(value: anytype) [32]u8 {
@@ -617,14 +626,14 @@ pub fn stampBuffered(value: anytype) [32]u8 {
     hash.final(&result);
     return result;
 }
-fn measuredStamp(value: anytype, comptime buffered: bool) [32]u8 {
+fn measuredStamp(value: anytype, comptime buffered: bool, counts: *StampCounts) [32]u8 {
     var hash: if (buffered) BufferedHash(true) else CountedHash = .{};
     hash.update("BLOT-PINNED-ARTIFACT-1");
     bufferedHashValue(&hash, value);
     var result: [32]u8 = undefined;
     hash.final(&result);
     hash.counts.stamps = 1;
-    inline for (@typeInfo(StampCounts).@"struct".field_names) |name| @field(stamp_counts, name) += @field(hash.counts, name);
+    inline for (@typeInfo(StampCounts).@"struct".field_names) |name| @field(counts, name) += @field(hash.counts, name);
     return result;
 }
 fn bufferedHashValue(hash: anytype, value: anytype) void {

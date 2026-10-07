@@ -3,137 +3,16 @@
 const std = @import("std");
 const arena_runtime = @import("arena_runtime.zig");
 const artifact = @import("artifact_emitter.zig");
+const heap_layout = @import("runtime_layout.zig");
 const Allocator = std.mem.Allocator;
 
-pub const ValueType = enum(u8) { i32 = 0x7f, f32 = 0x7d, v128 = 0x7b, externref = 0x6f, none = 0x40 };
-pub const Scalar = enum(u8) {
-    unit = 0,
-    u32 = 1,
-    bool = 2,
-    f32 = 3,
-    array_u32 = 5,
-    array_f32 = 6,
-    pointer = 7,
-    pub fn machine(self: Scalar) ValueType {
-        return if (self == .f32) .f32 else .i32;
-    }
-};
-pub const Op = enum(u8) {
-    unreachable_,
-    nop,
-    block,
-    loop,
-    if_,
-    else_,
-    end,
-    br,
-    br_if,
-    return_,
-    call,
-    call_import,
-    call_indirect,
-    host_ref_get,
-    host_ref_set,
-    host_ref_size,
-    host_ref_grow,
-    host_ref_null,
-    host_ref_is_null,
-    drop,
-    local_get,
-    local_set,
-    local_tee,
-    global_get,
-    global_set,
-    i32_load,
-    f32_load,
-    i32_store,
-    f32_store,
-    memory_size,
-    memory_grow,
-    memory_copy,
-    memory_fill,
-    i32_reinterpret_f32,
-    f32_reinterpret_i32,
-    i32_const,
-    f32_const,
-    i32_eqz,
-    i32_eq,
-    i32_ne,
-    i32_lt_u,
-    i32_gt_u,
-    i32_le_u,
-    i32_ge_u,
-    f32_eq,
-    f32_ne,
-    f32_lt,
-    f32_gt,
-    f32_le,
-    f32_ge,
-    i32_add,
-    i32_sub,
-    i32_mul,
-    i32_div_u,
-    i32_rem_u,
-    i32_and,
-    i32_or,
-    i32_xor,
-    i32_shl,
-    i32_shr_u,
-    i32_clz,
-    i32_ctz,
-    f32_abs,
-    f32_neg,
-    f32_ceil,
-    f32_floor,
-    f32_trunc,
-    f32_sqrt,
-    f32_add,
-    f32_sub,
-    f32_mul,
-    f32_div,
-    f32_min,
-    f32_max,
-    i32_trunc_sat_f32_u,
-    f32_convert_i32_u,
-    v128_load,
-    v128_store,
-    i32x4_splat,
-    f32x4_splat,
-    i32x4_replace_lane,
-    i32x4_extract_lane,
-    f32x4_extract_lane,
-    i32x4_add,
-    i32x4_sub,
-    i32x4_mul,
-    v128_and,
-    v128_or,
-    v128_xor,
-    f32x4_abs,
-    f32x4_neg,
-    f32x4_ceil,
-    f32x4_floor,
-    f32x4_trunc,
-    f32x4_sqrt,
-    f32x4_add,
-    f32x4_sub,
-    f32x4_mul,
-    f32x4_div,
-    f32x4_convert_i32x4_u,
-    i32x4_trunc_sat_f32x4_u,
-};
-pub const Instruction = struct { op: Op, operand: u32 = 0 };
-pub const Signature = struct { parameters: []ValueType, result: ValueType };
-pub const Function = struct {
-    parameters: []ValueType,
-    result: ValueType,
-    signature: u32,
-    locals: std.ArrayList(ValueType) = .empty,
-    instructions: std.ArrayList(Instruction) = .empty,
-    fn deinit(self: *Function, allocator: Allocator) void {
-        self.locals.deinit(allocator);
-        self.instructions.deinit(allocator);
-    }
-};
+const ir = @import("runtime_ir.zig");
+pub const ValueType = ir.ValueType;
+pub const Scalar = ir.Scalar;
+pub const Op = ir.Op;
+pub const Instruction = ir.Instruction;
+pub const Signature = ir.Signature;
+pub const Function = ir.Function;
 const Global = struct { scalar: Scalar, bits: u32, mutable: bool = false };
 const Import = struct { module: []u8, name: []u8, signature: u32 };
 pub const Callback = struct { parameter: Scalar, result: Scalar };
@@ -346,6 +225,16 @@ pub const Module = struct {
         try self.demandResource(.host_references, 0, false);
         return references;
     }
+    pub fn dataObject(self: *Module, value: anytype) !u32 {
+        const T = @TypeOf(value);
+        const fields = comptime heap_layout.fields(T);
+        var words: [fields.len]u32 = undefined;
+        inline for (@typeInfo(T).@"struct".field_names, 0..) |name, i| {
+            const field = @field(value, name);
+            words[i] = if (@typeInfo(@TypeOf(field)) == .@"enum") @backingInt(field) else field;
+        }
+        return self.dataWords(&words);
+    }
     pub fn dataWords(self: *Module, words: []const u32) !u32 {
         _ = try self.ensureArena();
         if (words.len > (std.math.maxInt(u32) - self.data.items.len) / 4) return error.ModuleTooLarge;
@@ -387,9 +276,9 @@ pub const Module = struct {
             return arena;
         }
         try self.data.appendNTimes(self.allocator, 0, 256);
-        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_list_address + 20 ..][0..4], 1, .little);
-        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + 20 ..][0..4], 1, .little);
-        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + 16 ..][0..4], 2, .little);
+        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_list_address + heap_layout.offset(heap_layout.ListDescriptor, "immutable") ..][0..4], 1, .little);
+        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + heap_layout.offset(heap_layout.ListDescriptor, "immutable") ..][0..4], 1, .little);
+        std.mem.writeInt(u32, self.data.items[arena_runtime.empty_scalar_list_address + heap_layout.offset(heap_layout.ListDescriptor, "scalar_elements") ..][0..4], 2, .little);
         if (self.artifacts) |journal| try journal.data(0, self.data.items);
         const heap = try self.addGlobal(.u32, 256, true);
         const base = try self.addGlobal(.u32, 256, true);
@@ -587,28 +476,14 @@ pub const Module = struct {
             try payload.uleb(@intCast(self.functions.items.len));
             var body = Bytes.init(self.allocator);
             defer body.deinit();
-            var borrows = try @import("wasm_lifetimes.zig").Summaries.init(self.allocator, self);
-            defer borrows.deinit();
+            var passes = try @import("runtime_pipeline.zig").Session.init(self.allocator, self);
+            defer passes.deinit();
             for (self.functions.items) |function| {
                 body.clear();
-                var optimized = try @import("wasm_sroa.zig").run(self.allocator, self, &function);
+                var optimized = try passes.optimize(&function);
                 defer if (optimized) |*owned| owned.deinit(self.allocator);
-                var scalar_function = function;
-                if (optimized) |owned| {
-                    scalar_function.locals = owned.locals;
-                    scalar_function.instructions = owned.instructions;
-                }
-                var vectorized = try @import("wasm_vectorize.zig").run(self.allocator, self, &scalar_function);
-                defer if (vectorized) |*owned| owned.deinit(self.allocator);
-                var lifetime_function = scalar_function;
-                if (vectorized) |owned| {
-                    lifetime_function.locals = owned.locals;
-                    lifetime_function.instructions = owned.instructions;
-                }
-                var lifetimes = try @import("wasm_lifetimes.zig").runWithSummaries(self.allocator, self, &lifetime_function, &borrows);
-                defer if (lifetimes) |*owned| owned.deinit(self.allocator);
-                const locals = if (lifetimes) |owned| owned.locals.items else lifetime_function.locals.items;
-                const instructions = if (lifetimes) |owned| owned.instructions.items else lifetime_function.instructions.items;
+                const locals = if (optimized) |owned| owned.locals.items else function.locals.items;
+                const instructions = if (optimized) |owned| owned.instructions.items else function.instructions.items;
                 try body.uleb(@intCast(locals.len));
                 for (locals) |local| {
                     try body.byte(1);
