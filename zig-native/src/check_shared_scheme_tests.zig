@@ -186,7 +186,8 @@ test "return type polymorphism keeps flat instantiation" {
     var f = try Fixture.init(source.items);
     defer f.deinit();
     try f.valid();
-    try std.testing.expectEqual(@as(u64, 0), f.checked.counters.shared_uses);
+    // Ordinary arithmetic inside the body can still share its producer.
+    try std.testing.expect(!f.binding("from").?.summary.shareable);
     try std.testing.expect(!f.binding("wide").?.summary.shareable);
 }
 
@@ -204,6 +205,7 @@ test "mutually recursive generic functions keep flat obligations" {
     try f.valid();
     for ([_][]const u8{ "left", "right" }) |name| {
         const member = f.binding(name).?;
+        try std.testing.expect(!member.summary.shareable);
         for (f.checked.obligations[member.scheme.obligations.start..][0..member.scheme.obligations.len]) |predicate| {
             try std.testing.expect(predicate.kind != .callee_use);
         }

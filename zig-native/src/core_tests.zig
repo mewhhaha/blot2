@@ -291,11 +291,20 @@ test "one typed body retains principal numeric identity across U32 and F32 uses"
     try std.testing.expectEqual(core.Op.add, producer.op);
     try std.testing.expectEqual(@as(u32, 1), twice.scheme.obligations.len);
     const constraint = module.obligations[twice.scheme.obligations.start];
-    try std.testing.expectEqual(types.ObligationKind.dispatch, constraint.kind);
-    try std.testing.expectEqual(variable, constraint.ty);
-    try std.testing.expectEqual(variable, constraint.other);
-    try std.testing.expectEqual(signature.b, constraint.result);
-    try std.testing.expectEqual(types.Operator.add, constraint.operator);
+    try std.testing.expectEqual(types.ObligationKind.callee_use, constraint.kind);
+    try std.testing.expectEqual(selected.target.binding, constraint.identity.decl);
+    const public = module.types.node(constraint.ty);
+    const arguments = module.types.list(.{ .start = public.a, .len = public.b });
+    try std.testing.expectEqual(types.Tag.function, module.types.node(arguments[3]).tag);
+    const producer_scheme = module.body(selected.target.binding).?.scheme;
+    const producer_arrow = module.types.node(producer_scheme.root);
+    const producer_result = module.types.node(producer_arrow.b).b;
+    for (module.types.list(producer_scheme.variables), arguments[0..3]) |formal, actual| {
+        try std.testing.expectEqual(if (formal == producer_result) signature.b else variable, actual);
+    }
+    const requirement = module.obligations[producer_scheme.obligations.start];
+    try std.testing.expectEqual(types.ObligationKind.dispatch, requirement.kind);
+    try std.testing.expectEqual(types.Operator.add, requirement.operator);
     const integer = module.call(module.body(fixture.binding(1)).?.root);
     const floating = module.call(module.body(fixture.binding(2)).?.root);
     try std.testing.expectEqual(integer.target, floating.target);

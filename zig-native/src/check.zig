@@ -503,9 +503,6 @@ pub const Counters = struct {
 };
 const CalleeOutcome = struct { types: []T.Id, rows: []T.Effects.Id };
 const unchanged_output = std.math.maxInt(u32);
-/// Uses of callees whose flat obligation count exceeds this share the
-/// callee's scheme by reference. Temporary differential switch.
-pub var callee_sharing_threshold: u32 = 0;
 const State = enum { pending, active, complete };
 const Global = struct { state: State = .pending, index: u32 = 0, low: u32 = 0, on_stack: bool = false };
 const PendingObligation = struct { metadata: u32 = 0, value: T.Obligation, owner: BindingId, scope: ast.Id = 0, origin: u32 = 0, declared: bool = false, covered: bool = false, local_scheme: bool = false, direct: bool = false, method_member: bool = false, suspended: bool = false, solved: bool = false, expansion: u32 = 0 };
@@ -3837,6 +3834,13 @@ const Engine = struct {
         while (i < self.pending.items.len) : (i += 1) {
             const pending = self.pending.items[i];
             if (pending.scope != boundary.scope or pending.declared or pending.covered or pending.solved or pending.local_scheme) continue;
+            if (pending.value.kind == .callee_use) {
+                // Written clauses cover the callee's requirements at this
+                // use, including requirements hidden behind shared schemes.
+                self.pending.items[i].solved = true;
+                try self.expandUse(pending, pending.expansion);
+                continue;
+            }
             if (!sourceRequirement(pending.value.kind)) continue;
             if (!try self.requirementOpen(pending.value)) {
                 // This boundary publishes no inferred source predicates.
@@ -3926,7 +3930,7 @@ const Engine = struct {
     }
     fn scheme(self: *Engine, root: T.Id, excluded: []const T.Id, group: []const BindingId, capture_concrete: bool, certificate_owner: BindingId, qualification_scope: ast.Id) T.Error!T.Scheme {
         try self.solveFields();
-        if (capture_concrete) try self.expandInformedUses(group);
+        if (capture_concrete) try self.expandInformedUses(group, false);
         const resolved = try self.types.resolve(root, 0);
         const free = try self.types.freeVariables(resolved);
         defer self.allocator.free(free);
@@ -4098,7 +4102,7 @@ const Engine = struct {
     /// outcome is a function of closed types qualify; everything else keeps
     /// the flat instantiation.
     fn summarize(self: *Engine, principal: T.Scheme) T.Error!SchemeSummary {
-        var summary: SchemeSummary = .{ .shareable = principal.root != 0 };
+        var summary: SchemeSummary = .{ .shareable = principal.root != 0 and principal.obligations.len != 0 };
         var flat: u64 = 0;
         for (self.obligations.items[principal.obligations.start..][0..principal.obligations.len]) |constraint| {
             if (!sharedKind(constraint.kind) or constraint.explicit or constraint.qualification_span != null) summary.shareable = false;
@@ -4146,7 +4150,7 @@ const Engine = struct {
         if (principal.root == 0) return self.types.openCovariant(try self.types.resolve(self.bindings.items[binding].ty, 0));
         self.counters.instantiations += 1;
         const summary = self.bindings.items[binding].summary;
-        if (summary.shareable and summary.flat_size > callee_sharing_threshold) return self.shareScheme(binding, source);
+        if (summary.shareable) return self.shareScheme(binding, source);
         var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
         const temporary = scratch.allocator();
@@ -4197,6 +4201,14 @@ const Engine = struct {
     /// Appends the callee's own obligations for one shared use, with the
     /// use's instantiation of the public variables. Private variables are new.
     fn expandUse(self: *Engine, use: PendingObligation, expansion: u32) T.Error!void {
+        const saved_owner = self.current;
+        const saved_scope = self.qualification_scope;
+        self.current = use.owner;
+        self.qualification_scope = use.scope;
+        defer {
+            self.current = saved_owner;
+            self.qualification_scope = saved_scope;
+        }
         const binding = use.value.identity.decl;
         const callee = self.bindings.items[binding];
         const principal = callee.scheme;
@@ -4512,6 +4524,12 @@ const Engine = struct {
                 try group.append(self.allocator, member);
                 if (member == binding) break;
             }
+            var recursive = group.items.len > 1;
+            for (self.qualification_uses.items) |use| if (inList(group.items, use.owner) and inList(group.items, use.target)) {
+                recursive = true;
+                break;
+            };
+            if (recursive) try self.expandInformedUses(group.items, true);
             try self.expandQualificationUses(group.items);
             try self.solveFields();
             var qualification: usize = 0;
@@ -4520,6 +4538,7 @@ const Engine = struct {
                 const principal = try self.scheme(self.bindings.items[member].ty, &.{}, group.items, true, member, self.bindings.items[member].declaration);
                 self.bindings.items[member].scheme = principal;
                 self.bindings.items[member].summary = try self.summarize(principal);
+                if (recursive) self.bindings.items[member].summary.shareable = false;
             }
         }
         self.traceGlobal(.finished, binding);
@@ -6585,7 +6604,7 @@ const Engine = struct {
     fn closedKey(self: *Engine, ty: T.Id, out: *std.ArrayList(u8), depth: usize) T.Error!bool {
         if (depth >= 256) return false;
         const value = self.types.node(try self.types.resolve(ty, 0));
-        try out.append(self.allocator, @intFromEnum(value.tag));
+        try out.append(self.allocator, @backingInt(value.tag));
         switch (value.tag) {
             .unit, .boolean, .u32, .f32, .never => return true,
             .function => {
@@ -6674,7 +6693,7 @@ const Engine = struct {
     /// A completed global keeps a shared use only while nothing about it is
     /// known. A use with any known part is expanded now, as flat instantiation
     /// would have, so its obligations are solved and checked in this module.
-    fn expandInformedUses(self: *Engine, group: []const BindingId) T.Error!void {
+    fn expandInformedUses(self: *Engine, group: []const BindingId, recursive: bool) T.Error!void {
         var changed = true;
         while (changed) {
             changed = false;
@@ -6684,7 +6703,7 @@ const Engine = struct {
                 if (item.solved or item.suspended or item.value.kind != .callee_use or !inList(group, item.owner)) continue;
                 const product = self.types.node(try self.types.resolve(item.value.ty, 0));
                 const type_count = self.bindings.items[item.value.identity.decl].summary.public_variables.len;
-                var informed = false;
+                var informed = recursive;
                 for (self.types.list(.{ .start = product.a, .len = product.b })[0..type_count]) |part| if (self.types.node(part).tag != .variable) {
                     informed = true;
                     break;

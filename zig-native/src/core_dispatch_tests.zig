@@ -55,6 +55,7 @@ test "associated catalog and independent dispatch principal types survive fronte
     var fixture = try Fixture.init();
     const method = fixture.binding("Point.add");
     const generic = fixture.binding("combine");
+    const producer = fixture.binding("_fixity_add");
     var module = try fixture.lower(a);
     fixture.deinit();
     defer module.deinit(a);
@@ -66,7 +67,11 @@ test "associated catalog and independent dispatch principal types survive fronte
     try std.testing.expect(body.root != 0);
     try std.testing.expectEqual(@as(u32, 3), body.scheme.variables.len);
     try std.testing.expectEqual(@as(u32, 1), body.scheme.obligations.len);
-    const constraint = module.obligations[body.scheme.obligations.start];
+    const shared = module.obligations[body.scheme.obligations.start];
+    try std.testing.expectEqual(types.ObligationKind.callee_use, shared.kind);
+    try std.testing.expectEqual(producer, shared.identity.decl);
+    const principal = module.body(producer).?.scheme;
+    const constraint = module.obligations[principal.obligations.start];
     try std.testing.expectEqual(types.ObligationKind.dispatch, constraint.kind);
     try std.testing.expectEqual(types.Operator.add, constraint.operator);
     try std.testing.expectEqual(types.Tag.variable, module.types.node(constraint.ty).tag);

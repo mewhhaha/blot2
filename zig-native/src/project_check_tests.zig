@@ -124,7 +124,8 @@ test "diamond modules publish one principal body and independently copy imported
     try requireValid(&checked);
     try std.testing.expectEqual(@as(usize, 4), checked.modules.len);
     try std.testing.expectEqual(@as(usize, 8), checked.body_elaborations);
-    try std.testing.expectEqual(@as(usize, 10), checked.imported_schemes);
+    // The private arithmetic producer is copied with its shared scheme.
+    try std.testing.expectEqual(@as(usize, 11), checked.imported_schemes);
     try std.testing.expectEqual(syntax_nodes, fixture.source.unit(1).tree.nodes.items.len);
     try std.testing.expectEqual(symbols_count, fixture.source.symbols.entries.items.len);
     const shared = fixture.source.unitImports(2)[0].target;
@@ -188,7 +189,7 @@ test "imported generic constraints reject invalid uses at their own source site"
     try std.testing.expect(bad_scheme.obligations.len != 0);
     try std.testing.expect(hasDiagnostic(&checked, "type_mismatch", 1));
     try std.testing.expectEqual(@as(usize, 3), checked.module(2).checked.body_elaborations);
-    try std.testing.expectEqual(@as(usize, 2), checked.module(1).checked.imported_schemes);
+    try std.testing.expectEqual(@as(usize, 3), checked.module(1).checked.imported_schemes);
     for (checked.diagnostics) |diagnostic| if (diagnostic.unit == 1)
         try std.testing.expect(diagnostic.span.end <= fixture.source.unit(1).source.len);
 }
