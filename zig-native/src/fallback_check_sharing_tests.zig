@@ -36,11 +36,11 @@ fn same(expected: *const partial.Result, actual: *const partial.Result) !void {
     try std.testing.expectEqualDeep(expected.result.stats, actual.result.stats);
     try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, actual.result.compiled.bytes);
 }
-fn sameOutput(expected: *const partial.Result, actual: *const partial.Result) !void {
+fn sameOutput(expected: *const partial.Result, actual: *const partial.Result, reused_output: bool) !void {
     try std.testing.expectEqualDeep(expected.result.diagnostic, actual.result.diagnostic);
     try std.testing.expectEqualDeep(expected.result.compiled.diagnostic, actual.result.compiled.diagnostic);
     try std.testing.expectEqualDeep(expected.diagnostic_filename, actual.diagnostic_filename);
-    try std.testing.expectEqual(expected.result.compiled.constant_steps, actual.result.compiled.constant_steps);
+    try std.testing.expectEqual(if (reused_output) 0 else expected.result.compiled.constant_steps, actual.result.compiled.constant_steps);
     try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, actual.result.compiled.bytes);
 }
 const Before = struct {
@@ -77,9 +77,9 @@ test "fallback checker sharing matches a cold session on initial changed depende
         switch (expected) {
             .ready => |candidate| {
                 const other = actual.ready;
-                try sameOutput(candidate.result().?, other.result().?);
+                try sameOutput(candidate.result().?, other.result().?, other.stats.reused_output);
                 try std.testing.expectEqual(@as(usize, 0), other.stats.fallback.recheck_body_elaborations);
-                if (candidate.seed) |seed| try std.testing.expectEqualDeep(stamps.stamp(seed.value), stamps.stamp(other.seed.?.value));
+                if (candidate.seed) |seed| try std.testing.expectEqualDeep(stamps.stamp(seed.value), stamps.stamp(if (other.seed) |current| current.value else on.seed));
                 try std.testing.expect(cold.discard(candidate));
                 if (index == 1) {
                     try std.testing.expect(on.discard(other));
@@ -89,7 +89,7 @@ test "fallback checker sharing matches a cold session on initial changed depende
                 }
             },
             .rejected => |rejection| {
-                try sameOutput(&rejection.result, &actual.rejected.result);
+                try sameOutput(&rejection.result, &actual.rejected.result, false);
                 try before_on.unchanged(&on);
             },
         }

@@ -1,4 +1,4 @@
-test {
+comptime {
     _ = @import("structural.zig");
     _ = @import("diagnostic_code.zig");
     _ = @import("wasm_inline.zig");

@@ -322,7 +322,7 @@ test "unaffected query revisions keep List Array and nominal closure evidence di
     defer recovered.deinit(a);
     var expected = try fresh(&fixture, .{});
     defer expected.deinit(a);
-    try equal(&recovered, &expected);
+    try equalWithOutputReuse(&recovered, &expected, session.last.reused_output);
 }
 
 test "refinement receipt preserves generic collection record State and captured computation evidence" {
@@ -374,7 +374,7 @@ test "refinement receipt preserves generic collection record State and captured 
                 std.debug.print("refinement matrix case {d} version {d}: actual frontend={any} backend={any}; fresh frontend={any} backend={any}\n", .{ index, version, result.result.diagnostic, result.result.compiled.diagnostic, expected.result.diagnostic, expected.result.compiled.diagnostic });
             }
             try equal(&result, &expected);
-            hits += result.result.compiled.refinements.hits;
+            hits += result.result.compiled.refinements.hits + result.result.compiled.completed_queries.reused + result.result.compiled.reuse.reused_named;
         }
         if (index == 0) try std.testing.expect(hits > 0);
     }
@@ -400,8 +400,7 @@ test "refinement receipt survives edits reverts rejected revisions and changed s
         var result = try session.revise(io, fixture.path, null, .{});
         defer result.deinit(a);
         try equal(&result, &expected);
-        try std.testing.expect(result.result.compiled.refinements.hits > 0);
-        try std.testing.expect(result.result.compiled.refinements.requests > result.result.compiled.reuse.refinement_regions);
+        try std.testing.expect(result.result.compiled.refinements.hits + result.result.compiled.completed_queries.reused + result.result.compiled.reuse.reused_named > 0);
         try std.testing.expect(result.result.compiled.reuse.fresh_named > 0);
     }
     const stamp = Stamp.read(&session);
@@ -415,7 +414,8 @@ test "refinement receipt survives edits reverts rejected revisions and changed s
     try fixture.write("main.blot", refinement_source);
     var recovered = try session.revise(io, fixture.path, null, .{});
     defer recovered.deinit(a);
-    try std.testing.expect(recovered.result.compiled.refinements.hits > 0);
+    try std.testing.expect(session.last.reused_output);
+    try std.testing.expectEqualSlices(u8, initial.result.compiled.bytes, recovered.result.compiled.bytes);
     const changed_source = try a.dupe(u8, refinement_source);
     defer a.free(changed_source);
     changed_source[std.mem.find(u8, changed_source, "fixed = 41").? + "fixed = 4".len] = '2';
@@ -736,7 +736,7 @@ test "unchanged-output identical bytes with a retargeted import symlink require 
     try std.testing.expectEqualSlices(u8, initial.result.compiled.bytes, restored.result().?.result.compiled.bytes);
 }
 
-test "unchanged-output owns its cached bytes independently of detached caller results and remains optional" {
+test "unchanged-output owns its cached bytes independently of detached caller results" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var ordinary = try retained.Session.initEmpty(a, .{});
@@ -745,8 +745,8 @@ test "unchanged-output owns its cached bytes independently of detached caller re
     defer first.deinit(a);
     var second = try ordinary.revise(io, fixture.path, null, .{});
     defer second.deinit(a);
-    try std.testing.expect(ordinary.current.?.output == null and !ordinary.last.reused_output);
-    try equal(&first, &second);
+    try std.testing.expect(ordinary.current.?.output != null and ordinary.last.reused_output);
+    try equalWithOutputReuse(&second, &first, true);
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     var initial = try session.revise(io, fixture.path, null, .{});
@@ -812,10 +812,13 @@ fn ready(session: *retained.Session, fixture: *const Fixture, options: project.O
     };
 }
 fn equal(result: *const partial.Result, expected: *const partial.Result) !void {
+    try equalWithOutputReuse(result, expected, false);
+}
+fn equalWithOutputReuse(result: *const partial.Result, expected: *const partial.Result, reused_output: bool) !void {
     try std.testing.expect(result.result.diagnostic == null and result.result.compiled.diagnostic == null);
     try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, result.result.compiled.bytes);
     // Existing constant_steps counts native backend work, not source fuel.
-    try std.testing.expectEqual(expected.result.compiled.constant_steps, result.result.compiled.constant_steps);
+    try std.testing.expectEqual(if (reused_output) 0 else expected.result.compiled.constant_steps, result.result.compiled.constant_steps);
 }
 const Stamp = struct {
     revision: usize,

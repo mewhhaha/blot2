@@ -85,6 +85,15 @@ fn savedProof(old: *const capture.Capture, target: core.BindingRef) ?*const arti
     return null;
 }
 
+// Isolate result import from optional replay of a query's recorded inputs.
+// Principal-input and checkpoint laws cover those publications separately.
+fn resultOnly(old: *capture.Capture) void {
+    for (old.metadata.principal_proofs.items) |*proof| {
+        if (proof.inputs) |*inputs| inputs.deinit(a);
+        proof.inputs = null;
+    }
+}
+
 test "principal cache reuses unchanged nonfunction prepass after independent scalar schema edit with fresh output and evaluation" {
     var before = try Fixture.init(positive_source);
     defer before.deinit();
@@ -153,7 +162,7 @@ test "principal cache imports closed row facts from a qualified local generic bu
     try std.testing.expect(proof.rows.ptr != imported.rows.ptr);
 }
 
-test "principal cache rejects changed transitive staged dependencies and matches fresh emission" {
+test "principal cache replays projected inference but reevaluates changed transitive staged dependencies" {
     const source =
         \\const identity = fn value => value
         \\entry const schema: U32 = 7
@@ -178,9 +187,9 @@ test "principal cache rejects changed transitive staged dependencies and matches
     try equalEmission(&fresh, &reused);
     try std.testing.expect(!std.mem.eql(u8, initial.bytes, reused.bytes));
     try std.testing.expect(reused.principal.requests > 0);
-    try std.testing.expectEqual(@as(usize, 0), reused.principal.hits);
-    try std.testing.expect(reused.principal.changed_or_unsupported > 0);
-    try std.testing.expectEqual(fresh.principal.fresh_regions, reused.principal.fresh_regions);
+    try std.testing.expect(reused.principal.projected_empty_hits > 0);
+    try std.testing.expectEqual(reused.principal.projected_empty_hits, reused.principal.hits);
+    try std.testing.expect(reused.principal.fresh_regions < fresh.principal.fresh_regions);
 }
 
 test "principal cache globally rejects real type associated catalog and provider edits with identical namespaces" {
@@ -381,6 +390,7 @@ test "lazy empty principal proof needs no graph importer or lookup allocations a
     defer initial.deinit(a);
     try successful(&initial);
     const old = &initial.capture.?;
+    resultOnly(old);
     const target = before.target("builder");
     const proof = savedProof(old, target) orelse return error.TestExpectedPrincipalCapture;
     try std.testing.expect(proof.types.len == 0 and proof.rows.len == 0);
@@ -640,6 +650,7 @@ test "primitive principal copies actual U32 facts without importer with exact fr
     defer initial.deinit(a);
     try successful(&initial);
     const old = &initial.capture.?;
+    resultOnly(old);
     const target = before.target("builder");
     const proof = savedProof(old, target) orelse return error.TestExpectedPrincipalCapture;
     try std.testing.expect(proof.types.len > 0 and proof.rows.len == 0);
@@ -680,6 +691,7 @@ test "primitive empty facts preserve options owner namespace and dirty source re
     defer initial.deinit(a);
     try successful(&initial);
     const old = &initial.capture.?;
+    resultOnly(old);
     const target = before.target("builder");
     const proof = savedProof(old, target) orelse return error.TestExpectedPrincipalCapture;
     var generator = try LazyGenerator.init(a, &after);
@@ -814,6 +826,7 @@ test "primitive non U32 and generative provider facts retain original graph vali
     defer initial.deinit(a);
     try successful(&initial);
     const old = &initial.capture.?;
+    resultOnly(old);
     const target = fixture.target("builder");
     const proof = try mutablePrincipalProof(old, target);
     const original = proof.types;
@@ -887,6 +900,7 @@ test "primitive mapping copy OOM publishes no importer or hit and retry then rev
     defer initial.deinit(a);
     try successful(&initial);
     const old = &initial.capture.?;
+    resultOnly(old);
     const target = before.target("builder");
     const proof = savedProof(old, target) orelse return error.TestExpectedPrincipalCapture;
     const old_facts = artifacts.stamp(old.metadata.principal_proofs.items);

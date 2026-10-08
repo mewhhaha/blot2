@@ -26,11 +26,11 @@ const Fixture = struct {
         self.dir.cleanup();
     }
 };
-fn same(expected: *const partial.Result, actual: *const partial.Result) !void {
+fn same(expected: *const partial.Result, actual: *const partial.Result, reused_output: bool) !void {
     try std.testing.expectEqualDeep(expected.result.diagnostic, actual.result.diagnostic);
     try std.testing.expectEqualDeep(expected.result.compiled.diagnostic, actual.result.compiled.diagnostic);
     try std.testing.expectEqualDeep(expected.diagnostic_filename, actual.diagnostic_filename);
-    try std.testing.expectEqual(expected.result.compiled.constant_steps, actual.result.compiled.constant_steps);
+    try std.testing.expectEqual(if (reused_output) 0 else expected.result.compiled.constant_steps, actual.result.compiled.constant_steps);
     try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, actual.result.compiled.bytes);
 }
 const Before = struct {
@@ -67,10 +67,10 @@ test "fallback Core sharing matches a cold session on initial changed dependency
         switch (expected) {
             .ready => |candidate| {
                 const other = actual.ready;
-                try same(candidate.result().?, other.result().?);
-                try std.testing.expect(other.stats.fallback.reused_core_bodies > 0);
+                try same(candidate.result().?, other.result().?, other.stats.reused_output);
+                if (!other.stats.reused_output) try std.testing.expect(other.stats.fallback.reused_core_bodies > 0);
                 try std.testing.expectEqual(@as(usize, 0), other.stats.fallback.recheck_body_elaborations);
-                if (candidate.seed) |seed| try std.testing.expectEqualDeep(stamps.stamp(seed.value), stamps.stamp(other.seed.?.value));
+                if (candidate.seed) |seed| try std.testing.expectEqualDeep(stamps.stamp(seed.value), stamps.stamp(if (other.seed) |current| current.value else on.seed));
                 try std.testing.expect(cold.discard(candidate));
                 if (index == 1) {
                     try std.testing.expect(on.discard(other));
@@ -80,7 +80,7 @@ test "fallback Core sharing matches a cold session on initial changed dependency
                 }
             },
             .rejected => |rejection| {
-                try same(&rejection.result, &actual.rejected.result);
+                try same(&rejection.result, &actual.rejected.result, false);
                 try before_on.unchanged(&on);
             },
         }

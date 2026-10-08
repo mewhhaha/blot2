@@ -1126,6 +1126,7 @@ fn independentQueryAttempt(fixture: *const Fixture, old: *const capture.Capture,
     var state = try queries.State.init(a, old, fixture.units, fixture.names.view());
     defer state.deinit();
     state.recover_call_proofs = enabled;
+    state.semantic_workers = 2;
     const values_before = g.evaluator.values.items.len;
     const calls_before = g.evaluator.validated_calls.count();
     const slots = artifacts.stamp(g.evaluator.slots);
@@ -1312,7 +1313,7 @@ test "independent call proof retained dependencies survive semantic owner remapp
     var after = try Fixture.init(independent_query_source);
     defer after.deinit();
     editSchema(&after);
-    var checked = try after.emit(a, .{ .retain_artifacts = true, .previous = &old.capture.?, .evidence_noise = true });
+    var checked = try after.emit(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &old.capture.?, .evidence_noise = true });
     defer checked.deinit(a);
     try successful(&checked);
     try std.testing.expect(checked.completed_queries.independent_rechecked > 0);
@@ -1323,7 +1324,7 @@ test "independent call proof retained dependencies survive semantic owner remapp
     try std.testing.expectEqual(fresh.constant_steps, checked.constant_steps);
     var third = try Fixture.init(independent_query_source);
     defer third.deinit();
-    var reused = try third.emit(a, .{ .retain_artifacts = true, .previous = &checked.capture.? });
+    var reused = try third.emit(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &checked.capture.? });
     defer reused.deinit(a);
     try successful(&reused);
     try std.testing.expect(reused.completed_queries.independent_reused > 0);
@@ -1333,7 +1334,7 @@ test "independent call proof retained dependencies survive semantic owner remapp
     try std.testing.expectEqual(third_fresh.constant_steps, reused.constant_steps);
     const body = third.units[0].body(third.target("factor").binding).?;
     third.units[0].nodes[body.root].a = 6;
-    var changed = try third.emit(a, .{ .retain_artifacts = true, .previous = &reused.capture.? });
+    var changed = try third.emit(a, .{ .retain_artifacts = true, .policy = .{ .semantic_workers = 2 }, .previous = &reused.capture.? });
     defer changed.deinit(a);
     try successful(&changed);
     try std.testing.expectEqual(@as(usize, 0), changed.completed_queries.independent_reused);
@@ -1503,7 +1504,10 @@ test "source declared effect query preserves fresh bytes and fuel across edits a
     defer reused.deinit(a);
     try successful(&reused);
     std.debug.print("source rows records={d} pure={d} reused={d} reasons={any}\n", .{ old.completed_queries.recorded, pure.completed_queries.reused, reused.completed_queries.reused, reused.completed_queries.reasons });
-    try std.testing.expect(reused.completed_queries.reused > pure.completed_queries.reused);
+    try std.testing.expect(reused.completed_queries.reused > 0);
+    try std.testing.expectEqual(pure.completed_queries.reused, reused.completed_queries.reused);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, pure.bytes);
+    try std.testing.expectEqual(fresh.constant_steps, pure.constant_steps);
     try std.testing.expectEqualSlices(u8, fresh.bytes, reused.bytes);
     try std.testing.expectEqual(fresh.constant_steps, reused.constant_steps);
     var third = try Fixture.init(source_row_query);

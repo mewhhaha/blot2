@@ -177,6 +177,9 @@ pub const State = struct {
         if (self.state_owner) |owner| if (owner != @intFromPtr(self)) return null;
         if (self.generator_owner) |owner| if (owner != @intFromPtr(g)) return null;
         if (self.session_owner) |owner| if (owner != @intFromPtr(&g.evaluator)) return null;
+        // The session already owns this answer. Replaying its publication a
+        // second time would allocate another graph and replace the memo.
+        if (g.evaluator.specialized_closures.contains(.{ .value = input, .evidence = expected })) return null;
         self.state_owner = @intFromPtr(self);
         self.generator_owner = @intFromPtr(g);
         self.session_owner = @intFromPtr(&g.evaluator);

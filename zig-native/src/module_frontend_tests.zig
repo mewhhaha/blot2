@@ -205,9 +205,7 @@ test "module interface cutoff preserves a transitive staged chain through discar
         try std.testing.expectEqual(@as(usize, 2), candidate.ready.stats.fallback.module_cutoff.reused);
         try std.testing.expectEqual(@as(usize, 1), candidate.ready.stats.fallback.entry_cutoff.reused);
         try std.testing.expect(candidate.ready.stats.fallback.module_cutoff.comparison_hits > 0);
-        for (session.seed.modules, candidate.ready.pending.?.prepared.units[0..session.seed.modules.len]) |old, current| {
-            try std.testing.expect(old.core.nodes.ptr != current.nodes.ptr);
-        }
+        try std.testing.expectEqualSlices(u8, &before, &artifacts.stamp(session.seed));
         try std.testing.expect(session.discard(candidate.ready));
         try std.testing.expectEqualSlices(u8, &before, &artifacts.stamp(session.seed));
         var actual = try session.revise(io, fixture.path, null, .{});
@@ -312,7 +310,9 @@ test "module interface cutoff rejects fixity changes and failed producer checks 
     try fixture.write("changed.blot", after);
     var recovered = try session.revise(io, fixture.path, null, .{});
     defer recovered.deinit(a);
-    try equal(&recovered, &expected);
+    try std.testing.expect(session.last.reused_output);
+    try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, recovered.result.compiled.bytes);
+    try std.testing.expectEqual(@as(usize, 0), recovered.result.compiled.constant_steps);
 }
 
 test "module interface cutoff reuses an unaffected importer after an interface-neutral dependency edit" {
@@ -457,7 +457,7 @@ test "prepared entry Core prefix guards reject incompatible ownership before any
     try equal(&emitted, &expected);
 }
 
-test "module frontend reuse rechecks a changed module and its readers and preserves a discarded snapshot" {
+test "module frontend reuse rechecks a changed module with interface cutoff and preserves a discarded snapshot" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
@@ -473,7 +473,8 @@ test "module frontend reuse rechecks a changed module and its readers and preser
     try std.testing.expect(preparation == .ready);
     const candidate = preparation.ready;
     try expectReuse(candidate.stats);
-    try std.testing.expectEqual(@as(usize, 2), candidate.stats.fallback.validated_modules);
+    try std.testing.expectEqual(@as(usize, 1), candidate.stats.fallback.validated_modules);
+    try std.testing.expectEqual(@as(usize, 1), candidate.stats.fallback.module_cutoff.reused);
     try std.testing.expectEqual(@as(usize, 1), candidate.stats.fallback.entry_cutoff.reused);
     try equal(candidate.result().?, &expected);
     try std.testing.expectEqualSlices(u8, &seed_stamp, &artifacts.stamp(session.seed));

@@ -12,7 +12,6 @@ const gate = @import("principal_reuse_gate.zig");
 const code_artifacts = @import("code_artifacts.zig");
 const Allocator = std.mem.Allocator;
 
-
 pub const Stats = struct {
     persisted_requests: usize = 0,
     persisted_hits: usize = 0,
@@ -170,6 +169,10 @@ pub const State = struct {
         if (self.imported_inputs) |*inputs| inputs.deinit(self.allocator);
         self.imported_inputs = null;
         self.stats.requests += 1;
+        if (target.unit == 0 or target.unit > self.gate.units.len or target.binding == 0 or target.binding >= self.gate.units[target.unit - 1].bindings.len) {
+            self.stats.changed_or_unsupported += 1;
+            return null;
+        }
         if (target.unit > self.old.cached_units) self.stats.fresh_unit_requests += 1;
         const exact = self.gate.admitsPrincipal(target);
         if (!exact and !self.gate.enabled) {

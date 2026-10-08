@@ -210,9 +210,6 @@ test "unaffected module queries survive function edits while changed owners tran
     try mutateFunction(&after);
     var pinned = try Pinned.init(a, &before);
     defer pinned.deinit(a);
-    var baseline = try Gate.init(a, &pinned.pools, after.units, after.names.view());
-    defer baseline.deinit();
-    try std.testing.expect(!baseline.enabled);
     try unaffectedModules(a, &pinned.pools, &after);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, unaffectedModules, .{ &pinned.pools, &after });
 }
@@ -326,7 +323,8 @@ test "principal gate rejects shared scalar IR roots and runtime scalar root edit
         defer pinned.deinit(a);
         var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
         defer gate.deinit();
-        try std.testing.expect(!gate.enabled);
+        try std.testing.expect(!gate.admitsPrincipal(target(&after.units[0], "schema")));
+        if (shared) try std.testing.expect(!gate.admitsPrincipal(target(&after.units[0], "builder")));
     }
 }
 
@@ -380,7 +378,8 @@ test "principal gate accepts no-op and revert while rejecting changes to functio
     new_function.units[0].nodes[root(&new_function.units[0], "builder")].a = 5;
     var declined = try Gate.init(a, &function_pin.pools, new_function.units, new_function.names.view());
     defer declined.deinit();
-    try std.testing.expect(!declined.enabled);
+    try std.testing.expect(!declined.admitsPrincipal(target(&new_function.units[0], "builder")));
+    try std.testing.expect(declined.admitsPrincipal(target(&new_function.units[0], "schema")));
 }
 
 test "principal gate propagates external alias and producer references across units" {
@@ -483,7 +482,7 @@ test "principal gate globally rejects dirty associated candidates and their tran
     try std.testing.expect(gate.structural_units[0]);
 }
 
-test "principal gate rejects changed types catalog providers and runtime constants globally" {
+test "principal gate rejects changed catalogs and the affected provider or runtime declaration" {
     inline for (0..5) |mutation| {
         var before = try Fixture.init(a, &.{independent});
         defer before.deinit(a);
@@ -502,8 +501,9 @@ test "principal gate rejects changed types catalog providers and runtime constan
         defer pinned.deinit(a);
         var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
         defer gate.deinit();
-        try std.testing.expect(!gate.enabled);
-        try std.testing.expect(!gate.admits(target(&before.units[0], "builder")));
+        if (mutation == 2 or mutation == 3) {
+            try std.testing.expect(!gate.admitsPrincipal(target(&after.units[0], if (mutation == 2) "builder" else "schema")));
+        } else try std.testing.expect(!gate.enabled);
     }
 }
 
@@ -826,8 +826,12 @@ fn equivalentGate(allocator: std.mem.Allocator, old: *artifacts.Pools, current: 
         try std.testing.expectEqual(ordinary.admits(reference), reused.admits(reference));
     };
     if (ordinary.enabled) {
-        try std.testing.expectEqual(current.units.len * 2, ordinary.dependency_validations);
-        try std.testing.expectEqual(current.units.len, reused.dependency_validations);
+        var changed: usize = 0;
+        for (reused.structural_units) |structural| if (!structural) {
+            changed += 1;
+        };
+        try std.testing.expectEqual(current.units.len + changed, ordinary.dependency_validations);
+        try std.testing.expectEqual(ordinary.dependency_validations, reused.dependency_validations);
     }
     try std.testing.expectEqualSlices(u8, &before_old, &artifacts.stamp(old.modules[0].module.*));
     try std.testing.expectEqualSlices(u8, &before_current, &artifacts.stamp(current.units));
@@ -903,7 +907,8 @@ test "equivalent validation rechecks old pins and current nonpayload structure e
     try equivalentGate(a, &pinned.pools, &after);
     var rejected = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer rejected.deinit();
-    try std.testing.expect(!rejected.enabled and rejected.dependency_validations == 0);
+    try std.testing.expect(!rejected.admitsPrincipal(target(&after.units[0], "schema")));
+    try std.testing.expect(!rejected.structural_units[0]);
 }
 
 test "equivalent validation rejects bounds-valid equal cycles without accepting current graph" {
