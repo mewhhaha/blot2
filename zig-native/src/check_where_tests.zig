@@ -116,7 +116,7 @@ fn rejectionLaws(allocator: std.mem.Allocator) !void {
         defer checked.deinit(allocator);
         try std.testing.expect(checked.diagnostics.len != 0);
         try std.testing.expectEqual(item.code, checked.diagnostics[0].code);
-        try std.testing.expectEqual(@as(u32, @intCast(std.mem.indexOf(u8, item.source, item.marker).?)), checked.diagnostics[0].span.start);
+        try std.testing.expectEqual(@as(u32, @intCast(std.mem.find(u8, item.source, item.marker).?)), checked.diagnostics[0].span.start);
     }
 }
 
@@ -151,7 +151,7 @@ fn recursiveLaws(allocator: std.mem.Allocator) !void {
         if (clause.len == 0) {
             try std.testing.expect(checked.diagnostics.len != 0);
             try std.testing.expectEqual(check.Code.missing_predicate, checked.diagnostics[0].code);
-            try std.testing.expectEqual(@as(u32, @intCast(std.mem.indexOf(u8, text, "second\n").?)), checked.diagnostics[0].span.start);
+            try std.testing.expectEqual(@as(u32, @intCast(std.mem.find(u8, text, "second\n").?)), checked.diagnostics[0].span.start);
         } else {
             try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
             try std.testing.expect(predicates(&checked, binding(&checked, &pool, "alias")).len != 0);
@@ -218,7 +218,7 @@ fn ownedTemplateLaws(allocator: std.mem.Allocator) !void {
     const local = binding(&checked, &pool, "local");
     try std.testing.expectEqual(@as(u32, 1), local.scheme.variables.len);
     try std.testing.expectEqual(@as(usize, 1), predicates(&checked, local).len);
-    const marker: u32 = @intCast(std.mem.indexOf(u8, text, "where").?);
+    const marker: u32 = @intCast(std.mem.find(u8, text, "where").?);
     for (predicates(&checked, binding(&checked, &pool, "answer"))) |requirement| {
         if (!requirement.explicit) continue;
         try std.testing.expectEqual(marker, requirement.qualification_span.?.start);

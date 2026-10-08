@@ -262,9 +262,9 @@ test "every executable guide block parses independently" {
     defer std.testing.allocator.free(source);
     var remainder: []const u8 = source;
     var count: usize = 0;
-    while (std.mem.indexOf(u8, remainder, "```blot\n")) |start| {
+    while (std.mem.find(u8, remainder, "```blot\n")) |start| {
         remainder = remainder[start + 8 ..];
-        const end = std.mem.indexOf(u8, remainder, "```") orelse return error.TestUnexpectedResult;
+        const end = std.mem.find(u8, remainder, "```") orelse return error.TestUnexpectedResult;
         try clean(remainder[0..end]);
         remainder = remainder[end + 3 ..];
         count += 1;

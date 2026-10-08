@@ -37,46 +37,14 @@ const Allocator = std.mem.Allocator;
 const Scalar = wasm.Scalar;
 const Value = scalar_ops.Value;
 const max_parameters = 16;
-pub const Code = enum { initialization_cycle, invalid_annotation, ambiguous_state, backend_const_only, unsupported, no_entry, entry_type, entry_let_type, unresolved_type, constant_expression, integer_divide_by_zero, constant_fuel, complexity, const_runtime_dependency, array_bounds, backend_limit, const_panic, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, missing_field, ambiguous_qualified, type_mismatch, type_constructor_required, invalid_provider, effect_mismatch, infinite_effect, const_effect };
+pub const Code = @import("diagnostic_code.zig").Code;
 pub const Diagnostic = struct {
     unit: u32,
     span: core.Span,
     code: Code,
     detail: []const u8 = &.{},
     pub fn message(self: Diagnostic) []const u8 {
-        if (self.code == .const_panic) return self.detail;
-        return switch (self.code) {
-            .initialization_cycle => "top-level let initializers form a dependency cycle",
-            .backend_const_only => "Effect reflection and descriptors are available only during constant evaluation",
-            .ambiguous_state => "State requires a concrete runtime value type",
-            .unsupported => "This typed core form is not supported by native Wasm lowering",
-            .no_entry => "A build requires at least one entry declaration",
-            .entry_type => if (self.detail.len != 0) self.detail else "An entry requires one supported guest parameter and result, or a scalar constant",
-            .entry_let_type => if (self.detail.len != 0) self.detail else "A runtime-initialized entry requires a supported guest function or a scalar global",
-            .unresolved_type => "Code emission requires concrete representation evidence",
-            .constant_expression => "This compile-time value cannot be evaluated by the native evaluator",
-            .missing_field => if (self.detail.len != 0) self.detail else "This receiver has no physical field with this name",
-            .ambiguous_qualified => "An explicit predicate lacks complete concrete evidence",
-            .const_runtime_dependency => if (self.detail.len != 0) self.detail else "a const initializer cannot read a top-level let value initialized at module startup",
-            .const_effect => "A constant initializer requires a handled effect",
-            .integer_divide_by_zero => "Compile-time integer division or remainder has a zero divisor",
-            .constant_fuel => "Native constant evaluation exceeded its operation budget",
-            .complexity => "Typed-core lowering exceeds the native compiler limit",
-            .array_bounds => "Array index is outside the element range",
-            .backend_limit => if (self.detail.len != 0) self.detail else "Compile-time array length exceeds the bootstrap arena limit",
-            .const_panic => self.detail,
-            .ambiguous_operator => "This operator does not have a compatible implementation for these operand types",
-            .missing_associated => "Neither operand has a compatible associated implementation",
-            .ambiguous_associated => if (self.detail.len != 0) self.detail else "Associated result dispatch requires a known destination type",
-            .invalid_annotation => "Never is an internal control-flow type",
-            .ambiguous_member => "A field and associated function share this name",
-            .missing_member => "This receiver has no associated member with this name",
-            .type_mismatch => if (self.detail.len != 0) self.detail else "The expression has a different type from the required type",
-            .type_constructor_required => "A monad resolver requires a declared data type constructor",
-            .invalid_provider => "This computation requires an effect resolver",
-            .effect_mismatch => "Effect rows do not match",
-            .infinite_effect => "An effect row contains itself",
-        };
+        return self.code.message(self.detail);
     }
 };
 pub const ArtifactSummary = struct { demands: usize, jobs: usize, functions: usize, helpers: usize, emission_events: usize, metadata_events: usize, operation_symbols: usize, templates: usize, pinned_modules: usize };
@@ -354,29 +322,10 @@ const Generator = struct {
     }
     fn evaluationFailure(self: *Generator) Error {
         if (self.evaluator.diagnostic) |item| {
+            // The evaluator's unsupported and cycle failures have no public code of their own.
             const code: Code = switch (item.code) {
-                .invalid_annotation => .invalid_annotation,
-                .ambiguous_state => .ambiguous_state,
-                .integer_divide_by_zero => .integer_divide_by_zero,
-                .constant_fuel => .constant_fuel,
-                .array_bounds => .array_bounds,
-                .backend_limit => .backend_limit,
-                .const_panic => .const_panic,
-                .ambiguous_operator => .ambiguous_operator,
-                .ambiguous_associated => .ambiguous_associated,
-                .missing_associated => .missing_associated,
-                .ambiguous_member => .ambiguous_member,
-                .missing_member => .missing_member,
-                .missing_field => .missing_field,
-                .ambiguous_qualified => .ambiguous_qualified,
-                .type_mismatch => .type_mismatch,
-                .type_constructor_required => .type_constructor_required,
-                .invalid_provider => .invalid_provider,
-                .effect_mismatch => .effect_mismatch,
-                .infinite_effect => .infinite_effect,
-                .const_runtime_dependency => .const_runtime_dependency,
-                .const_effect => .const_effect,
-                else => .constant_expression,
+                .unsupported, .cycle => .constant_expression,
+                else => item.code,
             };
             // Reference panic diagnostics name the constant phase, with no
             // declaration offset. Preserve its detail and producer owner.

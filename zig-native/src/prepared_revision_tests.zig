@@ -13,13 +13,13 @@ const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source
 const source = @embedFile("partial-runtime-fixtures/namespace-ab.blot");
 const second_source = blk: {
     @setEvalBranchQuota(10000);
-    const at = std.mem.indexOf(u8, replace_provider, "effect Local").?;
+    const at = std.mem.find(u8, replace_provider, "effect Local").?;
     break :blk replace_provider[0..at] ++ "const unrelated=fn value=>identity value\ndata Before=#Before U32\n" ++ replace_provider[at..];
 };
 const replace_provider = blk: {
     @setEvalBranchQuota(10000);
     const needle = "fn () => 0.75";
-    const at = std.mem.indexOf(u8, source, needle).?;
+    const at = std.mem.find(u8, source, needle).?;
     break :blk source[0..at] ++ "fn () => 1.75" ++ source[at + needle.len ..];
 };
 const invalid_source = "entry const invalid=identity 4294967296\n";

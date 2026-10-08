@@ -96,6 +96,6 @@ test "tag and original initializer diagnostics retain their distinct source owne
         defer checked.deinit(a);
         try std.testing.expect(checked.diagnostics.len != 0);
         try std.testing.expectEqual(item.code, checked.diagnostics[0].code);
-        try std.testing.expectEqual(@as(u32, @intCast(std.mem.indexOf(u8, item.text, item.marker).?)), checked.diagnostics[0].span.start);
+        try std.testing.expectEqual(@as(u32, @intCast(std.mem.find(u8, item.text, item.marker).?)), checked.diagnostics[0].span.start);
     }
 }

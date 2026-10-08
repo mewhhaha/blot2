@@ -351,7 +351,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
     for (value.modules, 0..) |*m, id| {
         const shared = if (saved) |old| if (current) |owner| owner.shares(old, id) else false else false;
         const same_interface_bounds = if (saved) |old| value.symbols.len == old.value.symbols.len and value.modules.len == old.value.modules.len else false;
-        try require(std.fs.path.isAbsolute(m.identity.normalized_path));
+        try require(std.Io.Dir.path.isAbsolute(m.identity.normalized_path));
         const path = try paths.getOrPut(a, m.identity.normalized_path);
         try require(!path.found_existing);
         prelude_count += @intFromBool(m.identity.prelude);
@@ -378,7 +378,7 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
         if (m.implicit_prelude) try require(!m.identity.prelude and prelude_unit != 0 and m.imports[0] == prelude_unit);
         for (m.source_imports, m.imports[@intFromBool(m.implicit_prelude)..]) |request, unit| {
             try require(request.target == unit and request.path.len != 0 and request.path.len <= m.identity.source_bytes);
-            try require(std.unicode.utf8ValidateSlice(request.path) and std.mem.indexOfScalar(u8, request.path, 0) == null);
+            try require(std.unicode.utf8ValidateSlice(request.path) and std.mem.findScalar(u8, request.path, 0) == null);
         }
         for (m.interface.bindings) |b| if (b.external) |target| try external(value, id, target);
         for (m.exports) |exported| {

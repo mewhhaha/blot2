@@ -9,8 +9,9 @@
   `deno task build:compiler:dev` for incremental compiler development.
 - Keep semantic regression laws in Zig and executed-Wasm tests. Run
   `deno task test:compiler` before committing compiler changes.
-- Use `../zig-analyzer/zig-out/bin/zig-analyzer check zig-native/src` when
-  available.
+- Run `deno task lint:zig` (zig-analyzer from `$ZIG_ANALYZER` or
+  `../zig-analyzer/zig-out/bin/zig-analyzer`). `zig-native/src` must stay at
+  zero findings; CI enforces it.
 - Preserve uncommitted work. Measure fresh builds and retained edits separately.
 - Do not patch generated output to fix compiler behavior; change the compiler or
   its inputs.

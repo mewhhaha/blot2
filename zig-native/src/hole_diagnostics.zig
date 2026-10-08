@@ -59,7 +59,9 @@ pub const Snapshot = struct {
         };
         result.scope = try allocator.dupe(Binding, self.scope);
         for (result.scope) |*binding| binding.name = &.{};
-        for (self.scope, result.scope) |old, *new| new.name = try allocator.dupe(u8, old.name);
+        for (self.scope, result.scope) |old, *new| {
+            new.name = try allocator.dupe(u8, old.name);
+        }
         result.requirements = try allocator.dupe(Requirement, self.requirements);
         for (result.requirements) |*requirement| requirement.name = null;
         for (self.requirements, result.requirements) |old, *new| if (old.name) |name| {

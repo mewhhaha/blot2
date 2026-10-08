@@ -226,7 +226,7 @@ fn nestedScopeScenario(allocator: std.mem.Allocator, module: *const core.Module)
         const identity = types.NominalIdentity{ .unit = if (operation.identity.unit == 0) 1 else operation.identity.unit, .decl = operation.identity.decl };
         for ([_]types.Id{ types.u32_type, types.f32_type }) |argument| {
             const label = try session.evidence.effects.internOperation(identity, &.{argument});
-            if (std.mem.indexOfScalar(u32, labels.items, label) == null) try labels.append(allocator, label);
+            if (std.mem.findScalar(u32, labels.items, label) == null) try labels.append(allocator, label);
         }
     }
     const row = try session.evidence.effects.internRow(labels.items);
@@ -904,7 +904,7 @@ test "record operands execute written order before declaration-order permutation
     defer session.deinit();
     try std.testing.expectError(error.Declined, session.value(target(&module, "answer")));
     try std.testing.expectEqual(evaluator.Code.integer_divide_by_zero, session.diagnostic.?.code);
-    try std.testing.expectEqual(@as(u32, @intCast(std.mem.indexOf(u8, source, "@u32.div 2 0").?)), session.diagnostic.?.span.start);
+    try std.testing.expectEqual(@as(u32, @intCast(std.mem.find(u8, source, "@u32.div 2 0").?)), session.diagnostic.?.span.start);
 }
 
 test "product literal projections and sum-record fields follow their typed variant slot" {
@@ -2895,7 +2895,7 @@ fn partialDataAliasScenario(allocator: std.mem.Allocator, module: *const core.Mo
     const signature = try session.evidence.intern(.function, types.u32_type, types.f32_type, &.{});
     var proof = try session.bodyEvidenceFull(target(module, "mixed"), signature, &.{}, &.{});
     defer proof.deinit(allocator);
-    const start = std.mem.indexOf(u8, partial_data_alias_source, "x, identity").?;
+    const start = std.mem.find(u8, partial_data_alias_source, "x, identity").?;
     var checked = false;
     for (module.bindings) |binding| {
         if (binding.span.start != start) continue;
@@ -2951,7 +2951,7 @@ fn wideEvidenceModule() !core.Module {
     var fields: [20]types.Field = undefined;
     for (&fields, 0..) |*field, index| {
         var buffer: [32]u8 = undefined;
-        const name = try pool.intern(a, try std.fmt.bufPrint(&buffer, "field_{d:0>2}", .{index}));
+        const name = try pool.intern(a, try std.mem.print(&buffer, "field_{d:0>2}", .{index}));
         field.* = .{ .name = name, .ty = switch (index) {
             0 => try store.array(product),
             1 => nominal,

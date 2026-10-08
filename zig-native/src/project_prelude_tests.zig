@@ -10,9 +10,9 @@ fn write(dir: std.Io.Dir, file: []const u8, bytes: []const u8) !void {
     try dir.writeFile(std.testing.io, .{ .sub_path = file, .data = bytes });
 }
 fn path(dir: std.Io.Dir, file: []const u8) ![]u8 {
-    var buffer: [std.fs.max_path_bytes]u8 = undefined;
+    var buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const len = try dir.realPath(std.testing.io, &buffer);
-    return std.fs.path.join(a, &.{ buffer[0..len], file });
+    return std.Io.Dir.path.join(a, &.{ buffer[0..len], file });
 }
 fn valid(loaded: *const project.Project, checked: *const semantic.CheckedProject) !void {
     for (loaded.diagnostics.items) |item| std.debug.print("prelude source {d}: {s}\n", .{ item.unit, item.message() });

@@ -124,7 +124,7 @@ pub fn relink(allocator: Allocator, value: *D.FrozenDependency, pool: *symbols.P
     if (units.len != value.modules.len or value.symbols.len == 0 or value.symbols.len > std.math.maxInt(u32)) return error.InvalidArtifact;
     for (units, 0..) |id, index| {
         if (id == 0 or id == std.math.maxInt(u32)) return error.InvalidArtifact;
-        if (std.mem.indexOfScalar(u32, units[0..index], id) != null) return error.InvalidArtifact;
+        if (std.mem.findScalar(u32, units[0..index], id) != null) return error.InvalidArtifact;
     }
     // All new names are private until admission. A declined dictionary or an
     // allocation failure cannot alter any published caller symbol identity.

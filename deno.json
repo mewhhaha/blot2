@@ -14,7 +14,8 @@
     "test:zig-project": "deno test --allow-read --allow-write --allow-run --allow-env=BLOT_CLIENT_TEST_AMBIENT zig-native/tests/zig_project_transport.test.ts zig-native/tests/zig_project_client.test.ts -- zig-native/zig-out/bin/blotc",
     "test:compiler": "deno task build:compiler && deno task test:native && deno task test:guest",
     "test": "deno task test:editor && deno task test:compiler",
-    "check": "deno fmt --check mod.ts deno.json compiler scripts .github && deno check mod.ts compiler/cli.ts compiler/installed_cli.ts scripts/*.ts && deno task test",
+    "check": "deno fmt --check mod.ts deno.json compiler scripts .github && deno check mod.ts compiler/cli.ts compiler/installed_cli.ts scripts/*.ts && deno task lint:zig && deno task test",
+    "lint:zig": "deno run --allow-env=ZIG_ANALYZER --allow-read --allow-run scripts/lint_zig.ts",
     "package:pack": "deno run --allow-read --allow-write=generated/compiler scripts/pack_native.ts",
     "package:build": "deno task build:compiler && deno task package:pack",
     "package:check": "deno task package:build && deno publish --dry-run --allow-dirty"
@@ -28,8 +29,7 @@
       "editor/tree-sitter-blot2/src",
       "build",
       "zig-native",
-      ".zig-cache",
-      "zig-out-collections"
+      ".zig-cache"
     ]
   },
   "name": "@mewhhaha/blot",

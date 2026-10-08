@@ -26,18 +26,18 @@ fn lower(allocator: std.mem.Allocator, source: []const u8) !core.Module {
 
 fn observeOwned(allocator: std.mem.Allocator) !void {
     const source = "const read: Unit -> U32 = fn () => do:\n  for i in 0..1:\n    return second\n  return second\nlet first = read ()\nlet second: U32 = 42\nentry const answer: Unit -> U32 = fn () => @u32.add first (read ())\n";
-    var module = try lower(allocator, source);
-    var module_live = true;
-    defer if (module_live) module.deinit(allocator);
-    var ordinary = try backend.compile(allocator, &.{module}, 1);
+    var ordinary, var observed = blk: {
+        var module = try lower(allocator, source);
+        defer module.deinit(allocator);
+        var plain = try backend.compile(allocator, &.{module}, 1);
+        errdefer plain.deinit(allocator);
+        break :blk .{ plain, try backend.compileWithOptions(allocator, &.{module}, 1, .{ .observe_startup = true }) };
+    };
     defer ordinary.deinit(allocator);
-    var observed = try backend.compileWithOptions(allocator, &.{module}, 1, .{ .observe_startup = true });
     defer observed.deinit(allocator);
     try std.testing.expect(ordinary.diagnostic == null and observed.diagnostic == null);
     try std.testing.expectEqualSlices(u8, ordinary.bytes, observed.bytes);
     try std.testing.expectEqual(ordinary.constant_steps, observed.constant_steps);
-    module.deinit(allocator);
-    module_live = false;
     const snapshot = observed.startup_observation orelse return error.MissingObservation;
     var hits: usize = 0;
     var reads: usize = 0;

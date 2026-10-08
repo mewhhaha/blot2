@@ -119,7 +119,7 @@ fn rejectedRows(allocator: std.mem.Allocator) !void {
         try std.testing.expect(checked.diagnostics.len != 0);
         if (checked.diagnostics[0].code != item.code) std.debug.print("OPEN_ROW_REJECT expected {s} actual {s}\n", .{ @tagName(item.code), @tagName(checked.diagnostics[0].code) });
         try std.testing.expectEqual(item.code, checked.diagnostics[0].code);
-        try std.testing.expectEqual(@as(u32, @intCast(std.mem.indexOf(u8, item.source, item.marker).?)), checked.diagnostics[0].span.start);
+        try std.testing.expectEqual(@as(u32, @intCast(std.mem.find(u8, item.source, item.marker).?)), checked.diagnostics[0].span.start);
     }
 }
 

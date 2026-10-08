@@ -8,6 +8,11 @@ permissions:
 concurrency:
   group: compiler-${{ github.ref }}
   cancel-in-progress: true
+env:
+  # Reviewed zig-analyzer revision. Bump it deliberately: a newer revision can
+  # add rules that fail the lint:zig gate.
+  ZIG_ANALYZER_REPOSITORY: https://github.com/mewhhaha/zig-analyzer
+  ZIG_ANALYZER_COMMIT: 756bfd5c3e94b2197b08ce79ce1e7b5d110c0508
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -23,5 +28,40 @@ jobs:
           echo "1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026  $RUNNER_TEMP/zig.tar.xz" | sha256sum --check
           tar -xJf "$RUNNER_TEMP/zig.tar.xz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/zig-x86_64-linux-0.17.0" >> "$GITHUB_PATH"
+      - name: Cache Deno
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/deno
+          key: deno-${{ runner.os }}-${{ hashFiles('deno.lock') }}
+          restore-keys: deno-${{ runner.os }}-
+      - name: Cache Zig
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/zig
+            zig-native/.zig-cache
+          key: zig-${{ runner.os }}-${{ hashFiles('zig-native/**/*.zig', 'zig-native/build.zig') }}
+          restore-keys: zig-${{ runner.os }}-
+      - name: Cache zig-analyzer
+        id: analyzer
+        uses: actions/cache@v4
+        with:
+          path: ~/zig-analyzer
+          key: zig-analyzer-${{ runner.os }}-${{ env.ZIG_ANALYZER_COMMIT }}
+      - name: Build zig-analyzer
+        if: steps.analyzer.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          git clone "$ZIG_ANALYZER_REPOSITORY" "$HOME/zig-analyzer"
+          git -C "$HOME/zig-analyzer" checkout --detach "$ZIG_ANALYZER_COMMIT"
+          test "$(git -C "$HOME/zig-analyzer" rev-parse HEAD)" = "$ZIG_ANALYZER_COMMIT"
+          cd "$HOME/zig-analyzer"
+          zig build -Doptimize=fast
+          zig build backend
+      - name: Verify zig-analyzer
+        shell: bash
+        run: |
+          "$HOME/zig-analyzer/zig-out/bin/zig-analyzer" doctor
+          echo "ZIG_ANALYZER=$HOME/zig-analyzer/zig-out/bin/zig-analyzer" >> "$GITHUB_ENV"
       - run: deno task check
       - run: deno publish --dry-run --allow-dirty

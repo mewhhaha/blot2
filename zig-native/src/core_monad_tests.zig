@@ -79,9 +79,9 @@ fn verify(module: *const core.Module, resolver: core.BindingId, total: core.Bind
         try std.testing.expectEqual(T.Tag.u32, module.types.node(continuation.parameter.ty).tag);
         const captures = module.closureCaptures(args[1]);
         try std.testing.expectEqual(@as(usize, 2), captures.len);
-        try std.testing.expect(std.mem.indexOfScalar(core.BindingId, captures, resolver) != null);
-        try std.testing.expect(std.mem.indexOfScalar(core.BindingId, captures, total) != null);
-        try std.testing.expect(std.mem.indexOfScalar(core.BindingId, captures, parameter) == null);
+        try std.testing.expect(std.mem.findScalar(core.BindingId, captures, resolver) != null);
+        try std.testing.expect(std.mem.findScalar(core.BindingId, captures, total) != null);
+        try std.testing.expect(std.mem.findScalar(core.BindingId, captures, parameter) == null);
         try std.testing.expectEqual(T.Tag.function, module.types.node(info.method_type).tag);
         try std.testing.expectEqual(T.Tag.resolver, module.types.node(module.node(info.resolver).ty).tag);
     }
@@ -194,7 +194,7 @@ fn verifyIteration(module: *const core.Module, done_constructor: u32) !void {
         const cursor = module.types.node(step.parameter.ty);
         try std.testing.expectEqual(T.Tag.product, cursor.tag);
         try std.testing.expectEqual(@as(u32, 2), cursor.b);
-        try std.testing.expect(std.mem.indexOfScalar(core.BindingId, module.closureCaptures(arguments[1]), step.parameter.binding) == null);
+        try std.testing.expect(std.mem.findScalar(core.BindingId, module.closureCaptures(arguments[1]), step.parameter.binding) == null);
     }
     try std.testing.expectEqual(@as(usize, 2), iterations);
     try std.testing.expect(done_layers >= 6);

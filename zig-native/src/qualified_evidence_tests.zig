@@ -75,7 +75,7 @@ test "explicit closed extras and independent rows require proof while unused cal
             try std.testing.expect(result.diagnostic != null);
             try std.testing.expectEqual(expected, result.diagnostic.?.code);
             try std.testing.expectEqual(@as(usize, 0), result.bytes.len);
-            if (expected == .ambiguous_qualified) try std.testing.expectEqual(@as(u32, @intCast(std.mem.indexOf(u8, case.source, "where").?)), result.diagnostic.?.span.start);
+            if (expected == .ambiguous_qualified) try std.testing.expectEqual(@as(u32, @intCast(std.mem.find(u8, case.source, "where").?)), result.diagnostic.?.span.start);
         } else try std.testing.expect(result.diagnostic == null);
     }
 }

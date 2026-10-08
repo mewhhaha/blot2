@@ -191,13 +191,13 @@ const Loader = struct {
         try self.project.diagnostics.append(self.allocator, .{ .unit = origin.unit, .span = origin.span, .code = code, .target = name, .cause = cause });
     }
     fn validateAliases(self: *Loader) Allocator.Error!bool {
-        if (self.options.prelude_path) |path| if (path.len == 0 or std.mem.indexOfScalar(u8, path, 0) != null) {
+        if (self.options.prelude_path) |path| if (path.len == 0 or std.mem.findScalar(u8, path, 0) != null) {
             try self.report(.{}, .invalid_prelude, path, null);
             return false;
         };
         for (self.options.aliases, 0..) |alias, index| {
             if (alias.prefix.len == 0 or !std.mem.endsWith(u8, alias.prefix, "/") or alias.root.len == 0 or
-                std.mem.indexOfScalar(u8, alias.prefix, 0) != null or std.mem.indexOfScalar(u8, alias.root, 0) != null or
+                std.mem.findScalar(u8, alias.prefix, 0) != null or std.mem.findScalar(u8, alias.root, 0) != null or
                 std.mem.startsWith(u8, alias.prefix, "./") or std.mem.startsWith(u8, alias.prefix, "../"))
             {
                 try self.report(.{}, .invalid_alias, alias.prefix, null);
@@ -212,7 +212,7 @@ const Loader = struct {
                 return false;
             };
         }
-        if (self.options.std_root) |root| if (root.len == 0 or std.mem.indexOfScalar(u8, root, 0) != null) {
+        if (self.options.std_root) |root| if (root.len == 0 or std.mem.findScalar(u8, root, 0) != null) {
             try self.report(.{}, .invalid_alias, "std/", null);
             return false;
         };
@@ -373,12 +373,12 @@ fn hexDigit(c: u8) ?u8 {
 /// Same source import path policy for normal loading and admitted frozen catalogs.
 /// Canonical filesystem identity is checked separately by each loader owner.
 pub fn resolveImportPath(allocator: Allocator, source_filename: []const u8, raw: []const u8, options: Options) (Allocator.Error || error{InvalidPath})![]u8 {
-    if (raw.len == 0 or std.mem.indexOfScalar(u8, raw, '?') != null or std.mem.indexOfScalar(u8, raw, '#') != null)
+    if (raw.len == 0 or std.mem.findScalar(u8, raw, '?') != null or std.mem.findScalar(u8, raw, '#') != null)
         return error.InvalidPath;
     var root: []const u8 = undefined;
     var tail: []const u8 = undefined;
     if (std.mem.startsWith(u8, raw, "./") or std.mem.startsWith(u8, raw, "../")) {
-        root = std.fs.path.dirname(source_filename) orelse return error.InvalidPath;
+        root = std.Io.Dir.path.dirname(source_filename) orelse return error.InvalidPath;
         tail = raw;
     } else {
         var matched: usize = 0;
@@ -397,10 +397,10 @@ pub fn resolveImportPath(allocator: Allocator, source_filename: []const u8, raw:
     defer allocator.free(decoded);
     // Filesystem resolve must not let an alias-relative absolute spelling
     // discard its configured root.
-    if (std.fs.path.isAbsolute(decoded)) return error.InvalidPath;
+    if (std.Io.Dir.path.isAbsolute(decoded)) return error.InvalidPath;
     const full = if (std.mem.endsWith(u8, decoded, ".blot")) try allocator.dupe(u8, decoded) else try std.mem.concat(allocator, u8, &.{ decoded, ".blot" });
     defer allocator.free(full);
-    return std.fs.path.resolve(allocator, &.{ root, full });
+    return std.Io.Dir.path.resolveAlloc(allocator, &.{ root, full });
 }
 
 fn decodePath(allocator: Allocator, path: []const u8) (Allocator.Error || error{InvalidPath})![]u8 {
@@ -593,14 +593,14 @@ pub fn loadWithInputs(allocator: Allocator, io: Io, entrypath: []const u8, optio
 }
 
 fn fixtureFile(dir: Io.Dir, path: []const u8, source: []const u8) !void {
-    if (std.fs.path.dirname(path)) |parent| try dir.createDirPath(std.testing.io, parent);
+    if (std.Io.Dir.path.dirname(path)) |parent| try dir.createDirPath(std.testing.io, parent);
     try dir.writeFile(std.testing.io, .{ .sub_path = path, .data = source });
 }
 
 fn fixturePath(dir: Io.Dir, file: []const u8) ![]u8 {
-    var buffer: [std.fs.max_path_bytes]u8 = undefined;
+    var buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const count = try dir.realPath(std.testing.io, &buffer);
-    return std.fs.path.join(std.testing.allocator, &.{ buffer[0..count], file });
+    return std.Io.Dir.path.join(std.testing.allocator, &.{ buffer[0..count], file });
 }
 
 fn expectValid(project_: *const Project) !void {

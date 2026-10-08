@@ -12,6 +12,7 @@ const identity = @import("runtime_identity.zig");
 const validation = @import("frozen_core_validation.zig");
 const dependencies = @import("declaration_dependencies.zig");
 const projection = @import("declaration_projection.zig");
+const equal = @import("structural.zig").equal;
 const Allocator = std.mem.Allocator;
 const ModuleField = std.meta.FieldEnum(core.Module);
 
@@ -478,36 +479,6 @@ fn moduleEqual(previous: *const core.Module, current: *const core.Module) bool {
         if (!equal(before, normalized)) return false;
     }
     return true;
-}
-
-fn equal(left: anytype, right: @TypeOf(left)) bool {
-    const V = @TypeOf(left);
-    return switch (@typeInfo(V)) {
-        .pointer => |pointer| blk: {
-            if (pointer.size != .slice) @compileError("Principal gate compares owned structural slices only");
-            if (left.len != right.len) break :blk false;
-            for (left, right) |a, b| if (!equal(a, b)) break :blk false;
-            break :blk true;
-        },
-        .array => blk: {
-            for (left, right) |a, b| if (!equal(a, b)) break :blk false;
-            break :blk true;
-        },
-        .@"struct" => |structure| blk: {
-            inline for (structure.field_names) |name| if (!equal(@field(left, name), @field(right, name))) break :blk false;
-            break :blk true;
-        },
-        .optional => if (left) |a| if (right) |b| equal(a, b) else false else right == null,
-        .@"union" => blk: {
-            if (std.meta.activeTag(left) != std.meta.activeTag(right)) break :blk false;
-            break :blk switch (left) {
-                inline else => |value, tag| equal(value, @field(right, @tagName(tag))),
-            };
-        },
-        .int, .float, .bool, .@"enum" => left == right,
-        .void => true,
-        else => @compileError("Unsupported principal gate structural field " ++ @typeName(V)),
-    };
 }
 
 fn rangeHas(values: []const u32, range: anytype, id: core.Id) bool {

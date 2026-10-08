@@ -46,9 +46,9 @@ const Fixture = struct {
         errdefer a.free(entry);
         const root = try dir.dir.realPathFileAlloc(io, ".", a);
         defer a.free(root);
-        const artifact = try std.fs.path.join(a, &.{ root, "dependencies.blotdep" });
+        const artifact = try std.Io.Dir.path.join(a, &.{ root, "dependencies.blotdep" });
         errdefer a.free(artifact);
-        return .{ .dir = dir, .entry = entry, .artifact = artifact, .output = try std.fs.path.join(a, &.{ root, "output.wasm" }) };
+        return .{ .dir = dir, .entry = entry, .artifact = artifact, .output = try std.Io.Dir.path.join(a, &.{ root, "output.wasm" }) };
     }
     fn deinit(self: *Fixture) void {
         a.free(self.entry);
@@ -84,8 +84,8 @@ test "CLI declined admission preserves an existing destination and emits teardow
     var output: std.Io.Writer.Allocating = .init(a);
     defer output.deinit();
     try std.testing.expect(!try cli.process(io, a, &output.writer, false, f.entry, f.output, f.artifact, .{}, compiler));
-    try std.testing.expect(std.mem.indexOf(u8, output.written(), "InvalidArtifact") != null);
-    try std.testing.expect(std.mem.indexOf(u8, output.written(), "\"live_bytes\":0") != null);
+    try std.testing.expect(std.mem.find(u8, output.written(), "InvalidArtifact") != null);
+    try std.testing.expect(std.mem.find(u8, output.written(), "\"live_bytes\":0") != null);
     const kept = try f.dir.dir.readFileAlloc(io, "output.wasm", a, .limited(1024));
     defer a.free(kept);
     try std.testing.expectEqualStrings("previous complete output", kept);

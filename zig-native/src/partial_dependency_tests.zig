@@ -94,6 +94,13 @@ fn fieldSeedBytes(path: []const u8, prelude_path: []const u8, library: bool, dis
     return format.encode(a, key, frozen);
 }
 
+fn decodeFieldDependency(bytes: []const u8) !D.FrozenDependency {
+    var dependency = try format.decode(D.FrozenDependency, a, bytes, key);
+    errdefer format.deinit(a, &dependency);
+    try closure.validate(a, &dependency);
+    return dependency;
+}
+
 fn importedFieldOwners(mode: FieldMode, control: FieldControl) !void {
     var dir = std.testing.tmpDir(.{});
     defer dir.cleanup();
@@ -128,28 +135,29 @@ fn importedFieldOwners(mode: FieldMode, control: FieldControl) !void {
     const full = mode == .full or mode == .full_consumer;
     const bytes = try fieldSeedBytes(if (full) path else seed_path, prelude_path, full, if (control == .library) "library.blot" else "producer.blot");
     defer a.free(bytes);
-    var dependency = try format.decode(D.FrozenDependency, a, bytes, key);
-    var dependency_live = true;
-    defer if (dependency_live) format.deinit(a, &dependency);
-    try closure.validate(a, &dependency);
     if (mode == .full_consumer) {
         var pool: @import("symbols.zig").Pool = .{};
         defer pool.deinit(a);
-        try @import("dependency_relink.zig").relink(a, &dependency, &pool, &.{ 1, 2 });
-        var result = try @import("dependency_project_consumer.zig").compileOwned(a, std.testing.io, path, source, .{ .prelude_path = prelude_path }, &pool, &dependency);
+        // The result must outlive the decoded dependency that produced it.
+        var result = blk: {
+            var dependency = try decodeFieldDependency(bytes);
+            defer format.deinit(a, &dependency);
+            try @import("dependency_relink.zig").relink(a, &dependency, &pool, &.{ 1, 2 });
+            break :blk try @import("dependency_project_consumer.zig").compileOwned(a, std.testing.io, path, source, .{ .prelude_path = prelude_path }, &pool, &dependency);
+        };
         defer result.deinit(a);
         try std.testing.expect(result.diagnostic == null);
-        format.deinit(a, &dependency);
-        dependency_live = false;
         try fieldEnvelope(result.compiled.diagnostic orelse return error.MissingDiagnostic, 2, expected_message);
         return;
     }
-    var result = try partial.compileOwned(a, std.testing.io, path, null, .{ .prelude_path = prelude_path }, &dependency);
+    var result = blk: {
+        var dependency = try decodeFieldDependency(bytes);
+        defer format.deinit(a, &dependency);
+        break :blk try partial.compileOwned(a, std.testing.io, path, null, .{ .prelude_path = prelude_path }, &dependency);
+    };
     defer result.deinit(a);
     try std.testing.expect(result.result.diagnostic == null);
     try std.testing.expectEqual(@as(usize, if (mode == .full) 2 else 1), result.cached_modules);
-    format.deinit(a, &dependency);
-    dependency_live = false;
     try fieldEnvelope(result.result.compiled.diagnostic orelse return error.MissingDiagnostic, if (mode == .full) 2 else 3, expected_message);
     try std.testing.expect(std.mem.endsWith(u8, result.diagnostic_filename.?, producer_name));
 }

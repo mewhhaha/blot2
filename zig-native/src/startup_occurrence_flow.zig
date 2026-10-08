@@ -301,7 +301,7 @@ const Walk = struct {
                 if (metadata.identity >= module.primitives.len) return error.Incomplete;
                 const primitive = module.primitives[metadata.identity];
                 if (metadata.applied != value.children.len or metadata.applied > primitive.arity or arguments.len > primitive.arity - metadata.applied) return error.Incomplete;
-                const count = value.children.len + arguments.len;
+                const count = std.math.add(usize, value.children.len, arguments.len) catch return error.Incomplete;
                 const supplied = try self.allocator.alloc(ValueId, count);
                 defer self.allocator.free(supplied);
                 @memcpy(supplied[0..value.children.len], self.children.items[value.children.start..][0..value.children.len]);
@@ -330,7 +330,7 @@ const Walk = struct {
             if (!declaration.is_function) return error.Incomplete;
             const parameters = module.bodyParameters(declaration);
             if (metadata.applied != value.children.len or metadata.applied > parameters.len or arguments.len > parameters.len - metadata.applied) return error.Incomplete;
-            const count = value.children.len + arguments.len;
+            const count = std.math.add(usize, value.children.len, arguments.len) catch return error.Incomplete;
             if (expected != null and (!retention or parameters.len - count != 1)) return error.Incomplete;
             if (count < parameters.len and !retention) {
                 const supplied = try self.allocator.alloc(ValueId, count);

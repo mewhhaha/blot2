@@ -10,9 +10,37 @@ pub const overlays = @import("source_overlays.zig");
 comptime {
     if (@typeInfo(project.Options).@"struct".field_names.len != 7 or @typeInfo(project.Alias).@"struct".field_names.len != 2) @compileError("Extend exact unchanged-input option comparison before adding project options or alias fields");
 }
-const Outcome = union(enum) { bytes: []u8, failure: anyerror };
-const Entry = struct { key: []u8, result: Outcome };
-const Resolution = struct { source: []u8, request: []u8, result: Outcome };
+const Outcome = union(enum) {
+    bytes: []u8,
+    failure: anyerror,
+
+    fn deinit(self: Outcome, a: Allocator) void {
+        switch (self) {
+            .bytes => |bytes| a.free(bytes),
+            .failure => {},
+        }
+    }
+};
+const Entry = struct {
+    key: []u8,
+    result: Outcome,
+
+    fn deinit(self: Entry, a: Allocator) void {
+        a.free(self.key);
+        self.result.deinit(a);
+    }
+};
+const Resolution = struct {
+    source: []u8,
+    request: []u8,
+    result: Outcome,
+
+    fn deinit(self: Resolution, a: Allocator) void {
+        a.free(self.source);
+        a.free(self.request);
+        self.result.deinit(a);
+    }
+};
 pub const Counts = struct { canonical_reads: usize = 0, source_reads: usize = 0, resolutions: usize = 0 };
 
 pub const Snapshot = struct {
@@ -60,12 +88,6 @@ pub const Snapshot = struct {
         result.options.aliases = aliases;
         return result;
     }
-    fn release(a: Allocator, result: Outcome) void {
-        switch (result) {
-            .bytes => |bytes| a.free(bytes),
-            .failure => {},
-        }
-    }
     pub fn deinit(self: *Snapshot) void {
         const a = self.allocator;
         if (self.sources) |*sources| sources.deinit();
@@ -76,21 +98,11 @@ pub const Snapshot = struct {
             a.free(alias.root);
         }
         a.free(self.options.aliases);
-        for (self.paths.items) |entry| {
-            a.free(entry.key);
-            release(a, entry.result);
-        }
+        for (self.paths.items) |entry| entry.deinit(a);
         self.paths.deinit(a);
-        for (self.files.items) |entry| {
-            a.free(entry.key);
-            release(a, entry.result);
-        }
+        for (self.files.items) |entry| entry.deinit(a);
         self.files.deinit(a);
-        for (self.imports.items) |entry| {
-            a.free(entry.source);
-            a.free(entry.request);
-            release(a, entry.result);
-        }
+        for (self.imports.items) |entry| entry.deinit(a);
         self.imports.deinit(a);
         self.* = undefined;
     }
@@ -99,13 +111,11 @@ pub const Snapshot = struct {
         return null;
     }
     fn value(result: Outcome) anyerror![]const u8 {
-        return switch (result) {
-            .bytes => |bytes| bytes,
-            .failure => |err| err,
-        };
+        if (result == .failure) return result.failure;
+        return result.bytes;
     }
     fn publish(self: *Snapshot, entries: *std.ArrayList(Entry), key: []const u8, result: Outcome) Allocator.Error!Outcome {
-        errdefer release(self.allocator, result);
+        errdefer result.deinit(self.allocator);
         const owned = try self.allocator.dupe(u8, key);
         errdefer self.allocator.free(owned);
         try entries.append(self.allocator, .{ .key = owned, .result = result });
@@ -164,7 +174,7 @@ pub const Snapshot = struct {
             break :blk .{ .bytes = bytes };
         };
         var published = false;
-        errdefer if (!published) release(self.allocator, result);
+        errdefer if (!published) result.deinit(self.allocator);
         const owned_source = try self.allocator.dupe(u8, source);
         errdefer if (!published) self.allocator.free(owned_source);
         const owned_request = try self.allocator.dupe(u8, request);

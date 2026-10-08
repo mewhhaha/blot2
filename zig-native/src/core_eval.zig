@@ -112,7 +112,7 @@ pub const Options = struct {
     trace_runtime_dependencies: bool = false,
     retain_source_suspensions: bool = false,
 };
-pub const Code = enum { invalid_annotation, ambiguous_state, integer_divide_by_zero, unsupported, constant_fuel, cycle, const_runtime_dependency, array_bounds, backend_limit, const_panic, const_effect, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, missing_field, ambiguous_qualified, type_mismatch, effect_mismatch, infinite_effect, type_constructor_required, invalid_provider };
+pub const Code = @import("diagnostic_code.zig").Code;
 pub const Diagnostic = struct {
     unit: u32,
     span: core.Span,
@@ -121,31 +121,7 @@ pub const Diagnostic = struct {
     /// Tag application has already selected its public source invocation.
     tag_origin: bool = false,
     pub fn message(self: Diagnostic) []const u8 {
-        return switch (self.code) {
-            .integer_divide_by_zero => "Integer division and remainder require a nonzero divisor",
-            .ambiguous_state => "State requires a concrete runtime value type",
-            .unsupported => "This immutable core value is not supported by constant evaluation",
-            .constant_fuel => "Constant evaluation exceeded its operation or nesting budget",
-            .cycle => "Compile-time constant dependencies contain a cycle",
-            .array_bounds => "Array index is outside the element range",
-            .backend_limit => if (self.detail.len != 0) self.detail else "Array length exceeds the 16 MiB bootstrap arena",
-            .const_panic => self.detail,
-            .const_runtime_dependency => if (self.detail.len != 0) self.detail else "a const initializer cannot read a top-level let value initialized at module startup",
-            .const_effect => "Compile-time operation has no enclosing provider",
-            .ambiguous_operator => "This operator does not have a compatible implementation for these operand types",
-            .missing_associated => "Neither operand has a compatible associated implementation",
-            .ambiguous_associated => if (self.detail.len != 0) self.detail else "Associated result dispatch requires a known destination type",
-            .invalid_annotation => "Never is an internal control-flow type",
-            .missing_field => if (self.detail.len != 0) self.detail else "This receiver has no physical field with this name",
-            .ambiguous_qualified => "An explicit predicate lacks complete concrete evidence",
-            .ambiguous_member => "A field and associated function share this name",
-            .missing_member => "This receiver has no associated member with this name",
-            .type_mismatch => if (self.detail.len != 0) self.detail else "The expression has a different type from the required type",
-            .effect_mismatch => "Effect rows do not match",
-            .infinite_effect => "An effect row contains itself",
-            .type_constructor_required => "A monad resolver requires a declared data type constructor",
-            .invalid_provider => "This block requires a compatible resolver value",
-        };
+        return self.code.message(self.detail);
     }
 };
 pub const Result = struct { value: ?Value = null, diagnostic: ?Diagnostic = null, steps: usize = 0 };
@@ -2357,7 +2333,7 @@ pub const Session = struct {
                     if (expected_kind == .record) {
                         const name = module.types.recordField(module.types.node(pattern.ty), index).name;
                         const names = self.recordFieldNames(value_);
-                        field_slot = std.mem.indexOfScalar(u32, names, name) orelse return false;
+                        field_slot = std.mem.findScalar(u32, names, name) orelse return false;
                     }
                     const child_value = self.valueChildren(value_)[field_slot];
                     if (!try self.matchPattern(owner, child, child_value, frame, bound, nesting + 1)) return false;

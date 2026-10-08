@@ -100,8 +100,8 @@ fn purityModuleName(allocator: std.mem.Allocator, loaded: *const project.Project
     if (witness.identity.unit == loaded.prelude_unit) return allocator.dupe(u8, "std/prelude");
     if (loaded.input_mode == .source and witness.identity.unit == loaded.entry) return allocator.dupe(u8, "main");
     if (witness.identity.unit == 0 or witness.identity.unit > loaded.units.items.len) return error.OperationPurityOriginRequired;
-    const directory = std.fs.path.dirname(loaded.filename(loaded.entry)) orelse return error.OperationPurityOriginRequired;
-    return std.fs.path.relative(allocator, directory, null, directory, loaded.filename(witness.identity.unit));
+    const directory = std.Io.Dir.path.dirname(loaded.filename(loaded.entry)) orelse return error.OperationPurityOriginRequired;
+    return std.Io.Dir.path.relativeAlloc(allocator, directory, null, directory, loaded.filename(witness.identity.unit));
 }
 fn namedDiagnostic(allocator: std.mem.Allocator, writer: *Io.Writer, filename: []const u8, stage: []const u8, code: []const u8, span: @import("ast.zig").Span, message: []const u8, pool: *const symbols.Pool, symbol: symbols.Symbol) !void {
     if (symbol == 0) return diagnostic(writer, filename, stage, code, span.start, span.end, message);
@@ -475,7 +475,7 @@ fn run(init: std.process.Init) !bool {
             if (std.mem.eql(u8, args[at], "--std-root")) {
                 options.std_root = args[at + 1];
             } else if (std.mem.eql(u8, args[at], "--alias")) {
-                const split = std.mem.indexOfScalar(u8, args[at + 1], '=') orelse return false;
+                const split = std.mem.findScalar(u8, args[at + 1], '=') orelse return false;
                 try aliases.append(backing, .{ .prefix = args[at + 1][0..split], .root = args[at + 1][split + 1 ..] });
             } else if (std.mem.eql(u8, args[at], "--input-mode")) {
                 options.input_mode = std.meta.stringToEnum(project.InputMode, args[at + 1]) orelse return false;

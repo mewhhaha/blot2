@@ -12,6 +12,7 @@ const artifacts = @import("code_artifacts.zig");
 const identity = @import("runtime_identity.zig");
 const QueryGate = @import("principal_reuse_gate.zig").Gate;
 const runtime_operations = @import("runtime_operations.zig");
+const deepEqual = @import("structural.zig").equal;
 const Allocator = std.mem.Allocator;
 const Error = Allocator.Error || error{Declined};
 const depth_limit = 128;
@@ -1059,34 +1060,6 @@ fn copyIdentity(allocator: Allocator, view: identity.View) Allocator.Error!ident
     const names = try allocator.dupe(@typeInfo(@TypeOf(view.symbols)).pointer.child, view.symbols);
     errdefer allocator.free(names);
     return .{ .bytes = bytes, .symbols = names, .owners = try allocator.dupe(@typeInfo(@TypeOf(view.owners)).pointer.child, view.owners) };
-}
-fn deepEqual(left: anytype, right: @TypeOf(left)) bool {
-    const T = @TypeOf(left);
-    return switch (@typeInfo(T)) {
-        .pointer => |pointer| blk: {
-            if (pointer.size != .slice) @compileError("Only immutable Core slices are compared");
-            if (left.len != right.len) break :blk false;
-            for (left, right) |a, b| if (!deepEqual(a, b)) break :blk false;
-            break :blk true;
-        },
-        .array => blk: {
-            for (left, right) |a, b| if (!deepEqual(a, b)) break :blk false;
-            break :blk true;
-        },
-        .@"struct" => |structure| blk: {
-            inline for (structure.field_names) |name| if (!deepEqual(@field(left, name), @field(right, name))) break :blk false;
-            break :blk true;
-        },
-        .optional => if (left) |a| if (right) |b| deepEqual(a, b) else false else right == null,
-        .@"union" => blk: {
-            if (std.meta.activeTag(left) != std.meta.activeTag(right)) break :blk false;
-            break :blk switch (left) {
-                inline else => |a, tag| deepEqual(a, @field(right, @tagName(tag))),
-            };
-        },
-        .void => true,
-        else => left == right,
-    };
 }
 fn clone(allocator: Allocator, value: anytype) Allocator.Error!@TypeOf(value) {
     const T = @TypeOf(value);

@@ -1,4 +1,6 @@
 test {
+    _ = @import("structural.zig");
+    _ = @import("diagnostic_code.zig");
     _ = @import("wasm_inline.zig");
     _ = @import("optimized_archive_tests.zig");
     _ = @import("runtime_parallel_tests.zig");

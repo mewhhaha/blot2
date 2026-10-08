@@ -275,8 +275,8 @@ test "one typed body retains principal numeric identity across U32 and F32 uses"
     const variables = module.types.list(twice.scheme.variables);
     const variable = signature.a;
     try std.testing.expectEqual(@as(usize, 2), variables.len);
-    try std.testing.expect(std.mem.indexOfScalar(types.Id, variables, signature.a) != null);
-    try std.testing.expect(std.mem.indexOfScalar(types.Id, variables, signature.b) != null);
+    try std.testing.expect(std.mem.findScalar(types.Id, variables, signature.a) != null);
+    try std.testing.expect(std.mem.findScalar(types.Id, variables, signature.b) != null);
     try std.testing.expect(signature.a != signature.b);
     try std.testing.expectEqual(variable, module.bodyParameters(twice)[0].ty);
     const sum = module.node(twice.root);
@@ -537,7 +537,7 @@ fn longCallFixture() !Fixture {
     try source.appendSlice(a, "x\nentry const driver = fn () -> U32 => many");
     for (0..33) |index| {
         var buffer: [16]u8 = undefined;
-        try source.appendSlice(a, try std.fmt.bufPrint(&buffer, " {d}", .{index}));
+        try source.appendSlice(a, try std.mem.print(&buffer, " {d}", .{index}));
     }
     try source.appendSlice(a, "\n");
     return Fixture.init(source.items);

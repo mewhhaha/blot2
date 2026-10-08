@@ -78,9 +78,9 @@ test "initializer aliased import retains producer identity and rejects typed mod
     defer tmp.cleanup();
     try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "dependency.blot", .data = "effect ask: Unit -> U32\n" });
     try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import { ask as query } from \"./dependency\"\nlet value = do:\n  use answer <- query ()\n  return answer\nentry const answer = 42\n" });
-    var buffer: [std.fs.max_path_bytes]u8 = undefined;
+    var buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const count = try tmp.dir.realPath(std.testing.io, &buffer);
-    const path = try std.fs.path.join(a, &.{ buffer[0..count], "main.blot" });
+    const path = try std.Io.Dir.path.join(a, &.{ buffer[0..count], "main.blot" });
     defer a.free(path);
     try failedProject(a, path);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, failedProject, .{path});
@@ -109,7 +109,7 @@ fn retainedSnapshot(allocator: std.mem.Allocator, source: []const u8) !void {
     const empty_pool: symbols.Pool = .{};
     const text = try display.format(allocator, &empty_pool, "unused", snapshot);
     defer allocator.free(text);
-    try std.testing.expect(std.mem.indexOf(u8, text, "main::Reader.read<") != null);
+    try std.testing.expect(std.mem.find(u8, text, "main::Reader.read<") != null);
     try std.testing.expect(std.mem.endsWith(u8, text, "; sequence an operation with use inside a provider scope"));
 }
 test "canonical purity display source store and symbols teardown plus every failed allocation owns snapshots" {
@@ -142,17 +142,17 @@ fn specializedProjectSnapshot(allocator: std.mem.Allocator, path: []const u8) !v
     const empty_pool: symbols.Pool = .{};
     const text = try display.format(allocator, &empty_pool, "unused", witness);
     defer allocator.free(text);
-    try std.testing.expect(std.mem.indexOf(u8, text, "dependency.blot::Reader.read<") != null);
-    try std.testing.expect(std.mem.indexOf(u8, text, "dependency.blot3:Box6:1:i1:f") != null);
+    try std.testing.expect(std.mem.find(u8, text, "dependency.blot::Reader.read<") != null);
+    try std.testing.expect(std.mem.find(u8, text, "dependency.blot3:Box6:1:i1:f") != null);
 }
 test "canonical purity imported shaped nominal effect snapshots outlive all project owners and fail safely" {
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
     try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "dependency.blot", .data = "type Box {pair:(a,b)} is data=#Box (a,b)\ntype Reader a is effect={read:Unit->a}\n" });
     try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import * as api from \"./dependency\"\nlet value=api.Reader.read (api.Box ({pair:(U32,F32)})) ()\nentry const answer=42\n" });
-    var buffer: [std.fs.max_path_bytes]u8 = undefined;
+    var buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const count = try tmp.dir.realPath(std.testing.io, &buffer);
-    const path = try std.fs.path.join(a, &.{ buffer[0..count], "main.blot" });
+    const path = try std.Io.Dir.path.join(a, &.{ buffer[0..count], "main.blot" });
     defer a.free(path);
     try specializedProjectSnapshot(a, path);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, specializedProjectSnapshot, .{path});

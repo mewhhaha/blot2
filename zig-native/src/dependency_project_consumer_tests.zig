@@ -295,8 +295,8 @@ test "cached producer canonical effect witnesses outlive all input owners and re
         defer a.free(expected);
         if (case[3].len != 0) try std.testing.expectEqualStrings(case[3], expected);
         if (case[3].len == 0) {
-            try std.testing.expect(std.mem.indexOf(u8, expected, "shared.blot::Reader.read<") != null);
-            try std.testing.expect(std.mem.indexOf(u8, expected, "shared.blot3:Box6:1:i1:f") != null);
+            try std.testing.expect(std.mem.find(u8, expected, "shared.blot::Reader.read<") != null);
+            try std.testing.expect(std.mem.find(u8, expected, "shared.blot3:Box6:1:i1:f") != null);
         }
         try retainedPurity(a, owned.bytes, path, case[2], expected);
         try @import("allocation_failures.zig").checkAllAllocationFailures(a, retainedPurity, .{ owned.bytes, path, case[2], expected });

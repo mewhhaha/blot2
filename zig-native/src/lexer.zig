@@ -89,7 +89,7 @@ fn hex(c: u8) bool {
     return digit(c) or (c >= 'a' and c <= 'f') or (c >= 'A' and c <= 'F');
 }
 fn symbolic(c: u8) bool {
-    return std.mem.indexOfScalar(u8, "+*$%=!<>^&|?-", c) != null;
+    return std.mem.findScalar(u8, "+*$%=!<>^&|?-", c) != null;
 }
 
 const Number = struct { end: usize, tag: Tag };
@@ -152,7 +152,7 @@ pub fn floatBits(allocator: Allocator, text: []const u8) (Allocator.Error || err
     if (scanned.tag != .float or scanned.end != text.len) return error.InvalidFloat;
     var cleaned: std.ArrayList(u8) = .empty;
     defer cleaned.deinit(allocator);
-    const input = if (std.mem.indexOfScalar(u8, text, '_') != null) blk: {
+    const input = if (std.mem.findScalar(u8, text, '_') != null) blk: {
         try cleaned.ensureTotalCapacity(allocator, text.len);
         for (text) |c| if (c != '_') {
             cleaned.appendAssumeCapacity(c);
@@ -166,6 +166,19 @@ pub fn floatBits(allocator: Allocator, text: []const u8) (Allocator.Error || err
     return @bitCast(value);
 }
 
+/// Decodes the one code point spelled by `bytes`, whose length comes from
+/// `std.unicode.utf8ByteSequenceLength`.
+pub fn decodePoint(bytes: []const u8) error{InvalidUtf8}!u21 {
+    const decoded = switch (bytes.len) {
+        1 => return bytes[0],
+        2 => std.unicode.utf8Decode2(bytes[0..2].*),
+        3 => std.unicode.utf8Decode3(bytes[0..3].*),
+        4 => std.unicode.utf8Decode4(bytes[0..4].*),
+        else => return error.InvalidUtf8,
+    };
+    return decoded catch error.InvalidUtf8;
+}
+
 fn validateSource(allocator: Allocator, source: []const u8, result: *Result) Allocator.Error!void {
     var at: usize = 0;
     while (at < source.len) {
@@ -177,7 +190,7 @@ fn validateSource(allocator: Allocator, source: []const u8, result: *Result) All
             try diagnose(result, allocator, .invalid_utf8, at, source.len);
             return;
         }
-        const point = std.unicode.utf8Decode(source[at..][0..width]) catch {
+        const point = decodePoint(source[at..][0..width]) catch {
             try diagnose(result, allocator, .invalid_utf8, at, at + width);
             return;
         };
@@ -215,7 +228,7 @@ fn scan(allocator: Allocator, source: []const u8, result: *Result) Allocator.Err
                 }
                 if (source[at] == '\\') {
                     if (at + 1 == source.len or source[at + 1] == '\r' or source[at + 1] == '\n') break;
-                    if (std.mem.indexOfScalar(u8, "\"\\nrt", source[at + 1]) == null)
+                    if (std.mem.findScalar(u8, "\"\\nrt", source[at + 1]) == null)
                         try diagnose(result, allocator, .string_escape, at, at + 2);
                     at += 2;
                 } else at += 1;

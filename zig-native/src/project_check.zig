@@ -101,8 +101,8 @@ fn moduleOrigin(context: ?*const anyopaque, allocator: Allocator, unit: u32) @im
     if (unit == loaded.prelude_unit and unit != 0) return allocator.dupe(u8, "std/prelude");
     if (loaded.input_mode == .source and unit == loaded.entry) return allocator.dupe(u8, "main");
     if (unit == 0 or unit > loaded.units.items.len) return error.TypeLimit;
-    const directory = std.fs.path.dirname(loaded.filename(loaded.entry)) orelse return error.TypeLimit;
-    return std.fs.path.relative(allocator, directory, null, directory, loaded.filename(unit));
+    const directory = std.Io.Dir.path.dirname(loaded.filename(loaded.entry)) orelse return error.TypeLimit;
+    return std.Io.Dir.path.relativeAlloc(allocator, directory, null, directory, loaded.filename(unit));
 }
 
 pub fn diagnosticModuleOrigin(context: ?*const anyopaque, allocator: Allocator, unit: u32) @import("types.zig").Error![]u8 {

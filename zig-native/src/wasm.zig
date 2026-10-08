@@ -841,7 +841,7 @@ test "flat symbolic scalar module owns output independently" {
     defer module.allocator.free(bytes);
     module.deinit();
     try std.testing.expectEqualSlices(u8, &.{ 0, 97, 115, 109, 1, 0, 0, 0 }, bytes[0..8]);
-    try std.testing.expect(std.mem.indexOf(u8, bytes, "blot:abi") != null);
+    try std.testing.expect(std.mem.find(u8, bytes, "blot:abi") != null);
 }
 test "backend reports stale symbolic function references" {
     var module = Module.init(std.testing.allocator);
@@ -875,7 +875,7 @@ fn arenaOwnership(allocator: Allocator) !void {
     try module.exportFunction(arena.allocate, "allocate", .u32, .u32);
     const bytes = try module.assemble();
     defer module.allocator.free(bytes);
-    try std.testing.expect(std.mem.indexOf(u8, bytes, "allocate") != null);
+    try std.testing.expect(std.mem.find(u8, bytes, "allocate") != null);
 }
 test "arena allocation collection and static roots release every failed compiler allocation" {
     try arenaOwnership(std.testing.allocator);
@@ -898,7 +898,7 @@ fn importOwnership(allocator: Allocator) !void {
     try module.emit(function, .{ .op = .call_import, .operand = imported });
     const bytes = try module.assemble();
     defer module.allocator.free(bytes);
-    try std.testing.expect(std.mem.indexOf(u8, bytes, "provider") != null);
+    try std.testing.expect(std.mem.find(u8, bytes, "provider") != null);
 }
 test "imports own names and signatures through mutation and allocation failure" {
     try importOwnership(std.testing.allocator);

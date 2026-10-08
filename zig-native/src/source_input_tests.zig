@@ -11,9 +11,9 @@ const a = std.testing.allocator;
 const Io = std.Io;
 
 fn path(dir: Io.Dir, name: []const u8) ![]u8 {
-    var buffer: [std.fs.max_path_bytes]u8 = undefined;
+    var buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const count = try dir.realPath(std.testing.io, &buffer);
-    return std.fs.path.join(a, &.{ buffer[0..count], name });
+    return std.Io.Dir.path.join(a, &.{ buffer[0..count], name });
 }
 fn file(dir: Io.Dir, name: []const u8, source: []const u8) !void {
     try dir.writeFile(std.testing.io, .{ .sub_path = name, .data = source });

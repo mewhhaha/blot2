@@ -4,6 +4,7 @@
 const std = @import("std");
 const core = @import("core.zig");
 const T = @import("types.zig");
+const equal = @import("structural.zig").equal;
 pub fn moduleEqual(old: *const core.Module, current: *const core.Module) bool {
     inline for (@typeInfo(core.Module).@"struct".field_names) |name| {
         if (comptime !std.mem.eql(u8, name, "nodes")) {
@@ -18,28 +19,4 @@ pub fn moduleEqual(old: *const core.Module, current: *const core.Module) bool {
         if (!std.meta.eql(a, projected)) return false;
     }
     return true;
-}
-fn equal(a: anytype, b: @TypeOf(a)) bool {
-    return switch (@typeInfo(@TypeOf(a))) {
-        .pointer => |p| blk: {
-            if (p.size != .slice) @compileError("Owned slices required");
-            if (a.len != b.len) break :blk false;
-            for (a, b) |x, y| if (!equal(x, y)) break :blk false;
-            break :blk true;
-        },
-        .array => blk: {
-            for (a, b) |x, y| if (!equal(x, y)) break :blk false;
-            break :blk true;
-        },
-        .@"struct" => |info| blk: {
-            inline for (info.field_names) |name| if (!equal(@field(a, name), @field(b, name))) break :blk false;
-            break :blk true;
-        },
-        .optional => if (a) |x| if (b) |y| equal(x, y) else false else b == null,
-        .@"union" => if (std.meta.activeTag(a) != std.meta.activeTag(b)) false else switch (a) {
-            inline else => |x, tag| equal(x, @field(b, @tagName(tag))),
-        },
-        .void => true,
-        else => a == b,
-    };
 }

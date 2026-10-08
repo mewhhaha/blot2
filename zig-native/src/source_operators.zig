@@ -122,7 +122,7 @@ fn Validator(comptime Context: type) type {
         fn local(self: *const Self, symbol: symbols.Symbol) bool {
             for (self.locals.items[0 .. self.pattern_scope orelse self.locals.items.len]) |item| if (item == symbol) return true;
             const text = self.pool.get(symbol);
-            if (std.mem.indexOfScalar(u8, text, '.')) |separator|
+            if (std.mem.findScalar(u8, text, '.')) |separator|
                 if (self.pool.lookup(text[0..separator])) |root|
                     for (self.locals.items[0 .. self.pattern_scope orelse self.locals.items.len]) |item| if (item == root) return true;
             return false;
@@ -638,7 +638,7 @@ fn Validator(comptime Context: type) type {
                         if (self.issue != null or self.annotationsStopped()) return;
                         var same = canonical_end - saved == self.locals.items.len - canonical_end;
                         for (self.locals.items[saved..canonical_end]) |name_| {
-                            same = same and std.mem.indexOfScalar(symbols.Symbol, self.locals.items[canonical_end..], name_) != null;
+                            same = same and std.mem.findScalar(symbols.Symbol, self.locals.items[canonical_end..], name_) != null;
                         }
                         if (!same) self.fail(.alternative_bindings, row, self.tree.span(row).start, 0);
                         self.locals.shrinkRetainingCapacity(canonical_end);

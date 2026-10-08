@@ -9,6 +9,9 @@ const wasm = @import("wasm.zig");
 const core = @import("core.zig");
 const identity = @import("runtime_identity.zig");
 const Allocator = std.mem.Allocator;
+const Arena = wasm.Arena;
+const ListRuntime = @import("list_runtime.zig").Runtime;
+const HostReferences = wasm.HostReferences;
 const absent = std.math.maxInt(u32);
 const Error = Allocator.Error || error{ InvalidFunctionReference, InvalidGlobalReference, ModuleTooLarge, Declined };
 const Address = struct { original: u32, actual: u32, len: u32, owner: u32 };
@@ -25,9 +28,9 @@ pub const State = struct {
     imports: []u32,
     globals: []u32,
     addresses: std.ArrayList(Address) = .empty,
-    arena: ?wasm.Arena = null,
-    lists: ?@import("list_runtime.zig").Runtime = null,
-    host: ?wasm.HostReferences = null,
+    arena: ?Arena = null,
+    lists: ?ListRuntime = null,
+    host: ?HostReferences = null,
     enabled: bool,
     stats: Stats = .{},
     static_matches: std.AutoHashMapUnmanaged(artifacts.StaticRead, u32) = .empty,
@@ -82,9 +85,9 @@ pub const State = struct {
         var signature_count: usize = 0;
         var import_count: usize = 0;
         var global_count: usize = 0;
-        var arena: ?wasm.Arena = null;
-        var lists: ?@import("list_runtime.zig").Runtime = null;
-        var host: ?wasm.HostReferences = null;
+        var arena: ?Arena = null;
+        var lists: ?ListRuntime = null;
+        var host: ?HostReferences = null;
         for (old.emission.records.items) |record| switch (record.event) {
             .signature => |item| signature_count = @max(signature_count, @as(usize, item.id) + 1),
             .import_ => |item| import_count = @max(import_count, @as(usize, item.id) + 1),

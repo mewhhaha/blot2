@@ -89,7 +89,7 @@ test "creation frontend envelopes preserve earlier complete output and match ord
     defer a.free(path);
     const root = try dir.dir.realPathFileAlloc(io, ".", a);
     defer a.free(root);
-    const destination = try std.fs.path.join(a, &.{ root, "dependencies.blotdep" });
+    const destination = try std.Io.Dir.path.join(a, &.{ root, "dependencies.blotdep" });
     defer a.free(destination);
     for (sources) |source| {
         try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = source });
@@ -109,7 +109,7 @@ test "creation frontend envelopes preserve earlier complete output and match ord
         try std.testing.expectEqualStrings(@tagName(expected.publication.?.cause), object.get("cause").?.string);
         const utf16 = object.get("utf16").?.object;
         try std.testing.expectEqual(@as(i64, expected.publication.?.utf16.?.start), utf16.get("start").?.integer);
-        try std.testing.expect(std.mem.indexOf(u8, rendered.written(), "\"live_bytes\":0") != null);
+        try std.testing.expect(std.mem.find(u8, rendered.written(), "\"live_bytes\":0") != null);
         const kept = try dir.dir.readFileAlloc(io, "dependencies.blotdep", a, .limited(1024));
         defer a.free(kept);
         try std.testing.expectEqualStrings("previous complete artifact", kept);
@@ -130,7 +130,7 @@ fn puritySnapshot(allocator: std.mem.Allocator) !void {
     };
     defer diagnostic.deinit(allocator);
     try std.testing.expectEqualStrings("initializer_effect", diagnostic.code);
-    try std.testing.expect(std.mem.indexOf(u8, diagnostic.publication.?.details_json, "lib/雪::ask") != null);
+    try std.testing.expect(std.mem.find(u8, diagnostic.publication.?.details_json, "lib/雪::ask") != null);
     var output: std.Io.Writer.Allocating = .init(allocator);
     defer output.deinit();
     diagnostic.write(&output.writer, "main.blot") catch return error.OutOfMemory;

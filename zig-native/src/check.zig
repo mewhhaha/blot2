@@ -587,7 +587,7 @@ const Engine = struct {
 
     fn qualifiedKey(self: *const Engine, name: symbols.Symbol) ?Qualified {
         const text = self.pool.get(name);
-        const separator = std.mem.indexOfScalar(u8, text, '.') orelse return null;
+        const separator = std.mem.findScalar(u8, text, '.') orelse return null;
         return .{ .namespace = self.pool.lookup(text[0..separator]) orelse return null, .member = self.pool.lookup(text[separator + 1 ..]) orelse return null };
     }
     fn qualifiedBinding(self: *Engine, name: symbols.Symbol) Allocator.Error!?BindingId {
@@ -601,7 +601,7 @@ const Engine = struct {
         // Resolve source value paths through the lexical root first. Fixity
         // declarations use the separate immutable global catalog below.
         const text = self.pool.get(name);
-        if (std.mem.indexOfScalar(u8, text, '.')) |separator| {
+        if (std.mem.findScalar(u8, text, '.')) |separator| {
             if (self.pool.lookup(text[0..separator])) |root|
                 if (self.lookup(root) != null) return null;
         }
@@ -642,10 +642,10 @@ const Engine = struct {
         if (self.globals.contains(symbol) or self.qualified.contains(self.catalogKey(symbol)) or self.catalogOperationTemplate(symbol) != null) return false;
         const text = self.pool.get(symbol);
         var prefix_end = text.len;
-        while (std.mem.lastIndexOfScalar(u8, text[0..prefix_end], '.')) |separator| {
+        while (std.mem.findScalarLast(u8, text[0..prefix_end], '.')) |separator| {
             prefix_end = separator;
             const prefix = text[0..prefix_end];
-            const key: Qualified = if (std.mem.indexOfScalar(u8, prefix, '.')) |dot| .{ .namespace = self.pool.lookup(prefix[0..dot]) orelse continue, .member = self.pool.lookup(prefix[dot + 1 ..]) orelse continue } else .{ .namespace = 0, .member = self.pool.lookup(prefix) orelse continue };
+            const key: Qualified = if (std.mem.findScalar(u8, prefix, '.')) |dot| .{ .namespace = self.pool.lookup(prefix[0..dot]) orelse continue, .member = self.pool.lookup(prefix[dot + 1 ..]) orelse continue } else .{ .namespace = 0, .member = self.pool.lookup(prefix) orelse continue };
             if (self.effect_family_names.get(key)) |family| return !self.effect_families.items[family].callable;
         }
         return false;
@@ -749,7 +749,7 @@ const Engine = struct {
         const key = self.catalogKey(name);
         if (self.nominal_names.contains(key) or self.effect_family_names.contains(key)) return true;
         const text = self.pool.get(name);
-        const root = if (std.mem.indexOfScalar(u8, text, '.')) |separator| self.pool.lookup(text[0..separator]) orelse return false else name;
+        const root = if (std.mem.findScalar(u8, text, '.')) |separator| self.pool.lookup(text[0..separator]) orelse return false else name;
         if (root != name and try self.sourceOperatorTargetExists(root)) return true;
         if (self.nominal_names.contains(.{ .namespace = 0, .member = root }) or self.effect_family_names.contains(.{ .namespace = 0, .member = root })) return true;
         return false;
@@ -1034,7 +1034,7 @@ const Engine = struct {
         var globals = self.globals.iterator();
         while (globals.next()) |entry| {
             const text = self.pool.get(entry.key_ptr.*);
-            const dot = std.mem.lastIndexOfScalar(u8, text, '.') orelse continue;
+            const dot = std.mem.findScalarLast(u8, text, '.') orelse continue;
             const head = text[0..dot];
             const member = self.pool.lookup(text[dot + 1 ..]) orelse continue;
             var identity: ?Identity = null;
@@ -1201,7 +1201,7 @@ const Engine = struct {
             },
             .type_name => {
                 const name = self.pool.get(node.a);
-                if (name.len != 0 and (std.ascii.isLower(name[0]) or name[0] == '_') and std.mem.indexOfScalar(u8, name, '.') == null) _ = try self.typeVariable(node.a, id);
+                if (name.len != 0 and (std.ascii.isLower(name[0]) or name[0] == '_') and std.mem.findScalar(u8, name, '.') == null) _ = try self.typeVariable(node.a, id);
             },
             .effect_row => {
                 if (node.c != 0) _ = try self.rowVariable(self.tree.node(node.c).a, node.c);
@@ -1785,21 +1785,21 @@ const Engine = struct {
         return index;
     }
     fn textCatalogKey(self: *const Engine, text: []const u8) ?Qualified {
-        const separator = std.mem.indexOfScalar(u8, text, '.') orelse
+        const separator = std.mem.findScalar(u8, text, '.') orelse
             return .{ .namespace = 0, .member = self.pool.lookup(text) orelse return null };
         return .{ .namespace = self.pool.lookup(text[0..separator]) orelse return null, .member = self.pool.lookup(text[separator + 1 ..]) orelse return null };
     }
     fn operationTemplate(self: *Engine, name: symbols.Symbol) T.Error!?u32 {
         if (self.lookup(name) != null or try self.globalBinding(name) != null) return null;
         const text = self.pool.get(name);
-        const root_end = std.mem.indexOfScalar(u8, text, '.') orelse text.len;
+        const root_end = std.mem.findScalar(u8, text, '.') orelse text.len;
         if (self.pool.lookup(text[0..root_end])) |root| if (self.lookup(root) != null or self.globals.contains(root)) return null;
         return self.catalogOperationTemplate(name);
     }
     fn catalogOperationTemplate(self: *const Engine, name: symbols.Symbol) ?u32 {
         const text = self.pool.get(name);
         if (self.effect_operation_names.get(self.catalogKey(name))) |single| return single;
-        const separator = std.mem.lastIndexOfScalar(u8, text, '.') orelse return null;
+        const separator = std.mem.findScalarLast(u8, text, '.') orelse return null;
         const family_key = self.textCatalogKey(text[0..separator]) orelse return null;
         const family = self.effect_family_names.get(family_key) orelse return null;
         const member = self.pool.lookup(text[separator + 1 ..]) orelse return null;
@@ -2081,7 +2081,7 @@ const Engine = struct {
             return .{ .ty = try self.types.record(types.items), .pattern = try self.parameter_patterns.record(self.allocator, fields.items) };
         }
         const text = if (node.tag == .type_name) self.pool.get(node.a) else "";
-        if (text.len == 0 or (!std.ascii.isLower(text[0]) and text[0] != '_') or std.mem.indexOfScalar(u8, text, '.') != null) {
+        if (text.len == 0 or (!std.ascii.isLower(text[0]) and text[0] != '_') or std.mem.findScalar(u8, text, '.') != null) {
             try self.diagnostic(.type_parameter, id);
             const ty = try self.types.fresh();
             return .{ .ty = ty, .pattern = try self.parameter_patterns.add(self.allocator, .{ .kind = .binding, .a = ty }) };
@@ -2643,7 +2643,7 @@ const Engine = struct {
         switch (node.tag) {
             .type_name => {
                 const name = self.pool.get(node.a);
-                if (name.len != 0 and (std.ascii.isLower(name[0]) or name[0] == '_') and std.mem.indexOfScalar(u8, name, '.') == null) return;
+                if (name.len != 0 and (std.ascii.isLower(name[0]) or name[0] == '_') and std.mem.findScalar(u8, name, '.') == null) return;
                 for ([_][]const u8{ "Unit", "Bool", "U32", "F32", "Array", "List", "Cursor", "EffectSet", "EffectDescriptor" }) |builtin| if (std.mem.eql(u8, name, builtin)) return;
                 if (!self.nominal_names.contains(self.catalogKey(node.a))) {
                     try self.diagnostic(.unsupported_type, source);
@@ -3338,7 +3338,7 @@ const Engine = struct {
                 family_index = self.effect_templates.items[template].family;
             } else {
                 const text = self.pool.get(name.a);
-                if (std.mem.lastIndexOfScalar(u8, text, '.')) |separator| {
+                if (std.mem.findScalarLast(u8, text, '.')) |separator| {
                     if (self.textCatalogKey(text[0..separator])) |key| if (self.effect_family_names.get(key)) |family| {
                         if (self.pool.lookup(text[separator + 1 ..])) |symbol| if (self.effect_members.get(.{ .family = family, .member = symbol })) |template| {
                             family_index = family;
@@ -3432,7 +3432,7 @@ const Engine = struct {
                 if (std.mem.eql(u8, name, "Bool")) return T.boolean;
                 if (std.mem.eql(u8, name, "U32")) return T.u32_type;
                 if (std.mem.eql(u8, name, "F32")) return T.f32_type;
-                if (name.len != 0 and (std.ascii.isLower(name[0]) or name[0] == '_') and std.mem.indexOfScalar(u8, name, '.') == null) return self.typeVariable(node.a, id);
+                if (name.len != 0 and (std.ascii.isLower(name[0]) or name[0] == '_') and std.mem.findScalar(u8, name, '.') == null) return self.typeVariable(node.a, id);
                 return self.nominalAnnotation(id, &.{}, id);
             },
             .type_demand => return self.types.demand(try self.annotation(node.a)),

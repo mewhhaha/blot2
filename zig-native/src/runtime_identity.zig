@@ -37,7 +37,7 @@ pub const Metadata = struct {
         errdefer allocator.free(locations);
         @memset(locations, .{ .start = 0, .len = 0 });
         for (owners) |owner| {
-            if (owner.unit == 0 or owner.unit > unit_count or owner.path.len == 0 or !std.unicode.utf8ValidateSlice(owner.path) or std.mem.indexOfScalar(u8, owner.path, 0) != null or locations[owner.unit - 1].len != 0) return error.InvalidIdentity;
+            if (owner.unit == 0 or owner.unit > unit_count or owner.path.len == 0 or !std.unicode.utf8ValidateSlice(owner.path) or std.mem.findScalar(u8, owner.path, 0) != null or locations[owner.unit - 1].len != 0) return error.InvalidIdentity;
             const entry = try paths.getOrPut(allocator, owner.path);
             if (entry.found_existing or owner.path.len > std.math.maxInt(u32) -| length) return error.InvalidIdentity;
             locations[owner.unit - 1] = .{ .start = @intCast(length), .len = @intCast(owner.path.len) };

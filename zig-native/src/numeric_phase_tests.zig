@@ -246,11 +246,11 @@ test "numeric project failures destroy every static region before publication an
     try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "dependency.blot", .data = "const identity=fn value=>value\n" });
     try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = "const invalid:U32=#True\n" });
     try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {identity} from \"./dependency\"\nentry const answer=identity 4294967296\n" });
-    var buffer: [std.fs.max_path_bytes]u8 = undefined;
+    var buffer: [std.Io.Dir.max_path_bytes]u8 = undefined;
     const count = try tmp.dir.realPath(std.testing.io, &buffer);
-    const entry = try std.fs.path.join(a, &.{ buffer[0..count], "main.blot" });
+    const entry = try std.Io.Dir.path.join(a, &.{ buffer[0..count], "main.blot" });
     defer a.free(entry);
-    const prelude = try std.fs.path.join(a, &.{ buffer[0..count], "prelude.blot" });
+    const prelude = try std.Io.Dir.path.join(a, &.{ buffer[0..count], "prelude.blot" });
     defer a.free(prelude);
     for ([_]?[]const u8{ null, prelude }) |prelude_path| {
         try projectOwnership(a, entry, prelude_path);

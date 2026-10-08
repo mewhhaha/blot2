@@ -6,6 +6,7 @@ const std = @import("std");
 const core = @import("core.zig");
 const identity = @import("runtime_identity.zig");
 const types = @import("types.zig");
+const equal = @import("structural.zig").equal;
 
 pub const Capture = struct {
     metadata: metadata.Context,
@@ -76,29 +77,3 @@ pub const Capture = struct {
         self.* = undefined;
     }
 };
-
-fn equal(a: anytype, b: @TypeOf(a)) bool {
-    const T = @TypeOf(a);
-    return switch (@typeInfo(T)) {
-        .pointer => |pointer| blk: {
-            if (pointer.size != .slice) @compileError("Selection equality requires owned slices");
-            if (a.len != b.len) break :blk false;
-            for (a, b) |left, right| if (!equal(left, right)) break :blk false;
-            break :blk true;
-        },
-        .array => blk: {
-            for (a, b) |left, right| if (!equal(left, right)) break :blk false;
-            break :blk true;
-        },
-        .@"struct" => |structure| blk: {
-            inline for (structure.field_names) |name| if (!equal(@field(a, name), @field(b, name))) break :blk false;
-            break :blk true;
-        },
-        .optional => if (a) |left| if (b) |right| equal(left, right) else false else b == null,
-        .@"union" => if (std.meta.activeTag(a) != std.meta.activeTag(b)) false else switch (a) {
-            inline else => |left, tag| equal(left, @field(b, @tagName(tag))),
-        },
-        .void => true,
-        else => a == b,
-    };
-}

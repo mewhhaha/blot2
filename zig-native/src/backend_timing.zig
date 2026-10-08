@@ -71,10 +71,7 @@ pub const Work = struct {
         if (input.us <= self.regions[smallest].us) return;
         const record = &self.regions[smallest];
         record.* = input;
-        var len = @min(name.len, record.file_utf8.len);
-        while (len != 0 and len < name.len and name[len] & 0xc0 == 0x80) len -= 1;
-        @memcpy(record.file_utf8[0..len], name[0..len]);
-        record.file_truncated = len != name.len;
+        record.file_truncated = copyUtf8Prefix(&record.file_utf8, name);
     }
     pub fn enter(self: *Work, phase: Phase) Scope {
         self.account();
@@ -100,3 +97,11 @@ pub const Clock = struct {
         return @intCast(@max(0, elapsed));
     }
 };
+/// Copies the longest whole-code-point prefix of `name` that fits `buffer` and
+/// reports whether `name` was cut short.
+fn copyUtf8Prefix(buffer: []u8, name: []const u8) bool {
+    var len = @min(name.len, buffer.len);
+    while (len != 0 and len < name.len and name[len] & 0xc0 == 0x80) len -= 1;
+    @memcpy(buffer[0..len], name[0..len]);
+    return len != name.len;
+}

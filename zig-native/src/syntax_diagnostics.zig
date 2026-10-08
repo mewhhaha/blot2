@@ -102,7 +102,7 @@ fn utf16Offset(source: []const u8, byte_offset: u32) ?u32 {
     while (byte < byte_offset) {
         const width = std.unicode.utf8ByteSequenceLength(source[byte]) catch return null;
         if (width > byte_offset - byte) return null;
-        const point = std.unicode.utf8Decode(source[byte..][0..width]) catch return null;
+        const point = lexer.decodePoint(source[byte..][0..width]) catch return null;
         units += if (point > 0xffff) @as(u32, 2) else 1;
         byte += width;
     }

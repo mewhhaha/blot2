@@ -96,7 +96,7 @@ test "symbol handles survive growth and exact hash collisions" {
     try std.testing.expectEqual(alpha, try pool.internHashed(a, "alpha", 7));
     for (0..2048) |i| {
         var buffer: [32]u8 = undefined;
-        const text = try std.fmt.bufPrint(&buffer, "symbol_{d}", .{i});
+        const text = try std.mem.print(&buffer, "symbol_{d}", .{i});
         _ = try pool.intern(a, text);
     }
     try std.testing.expectEqualStrings("alpha", pool.get(alpha));
@@ -114,7 +114,7 @@ fn allocationScenario(allocator: std.mem.Allocator) !void {
     const first = try pool.intern(allocator, "stable");
     for (0..40) |i| {
         var buffer: [64]u8 = undefined;
-        _ = try pool.intern(allocator, try std.fmt.bufPrint(&buffer, "other_symbol_{d}", .{i}));
+        _ = try pool.intern(allocator, try std.mem.print(&buffer, "other_symbol_{d}", .{i}));
     }
     try std.testing.expectEqualStrings("stable", pool.get(first));
 }
@@ -132,7 +132,7 @@ test "a declined insertion keeps every published symbol valid" {
         var ids: [8]Symbol = undefined;
         for (&ids, 0..) |*id, index| {
             var text: [16]u8 = undefined;
-            id.* = try pool.intern(a, try std.fmt.bufPrint(&text, "entry_{d}", .{index}));
+            id.* = try pool.intern(a, try std.mem.print(&text, "entry_{d}", .{index}));
         }
         try pool.entries.shrinkAndFreePrecise(a, pool.entries.items.len);
         try pool.bytes.shrinkAndFreePrecise(a, pool.bytes.items.len);
@@ -142,7 +142,7 @@ test "a declined insertion keeps every published symbol valid" {
         try std.testing.expectEqual(@as(usize, 8), pool.entries.items.len);
         for (ids, 0..) |id, index| {
             var text: [16]u8 = undefined;
-            const original = try std.fmt.bufPrint(&text, "entry_{d}", .{index});
+            const original = try std.mem.print(&text, "entry_{d}", .{index});
             try std.testing.expectEqualStrings(original, pool.get(id));
             try std.testing.expectEqual(id, try pool.intern(a, original));
         }

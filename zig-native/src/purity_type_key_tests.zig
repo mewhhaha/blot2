@@ -89,7 +89,7 @@ test "canonical purity snapshots respect chronological cursors rollback and recy
     defer a.free(snapshot);
     store.rollback(mark);
     _ = try store.effects.row(&.{}, .closed);
-    try std.testing.expect(std.mem.indexOf(u8, snapshot, "Foreign") != null);
+    try std.testing.expect(std.mem.find(u8, snapshot, "Foreign") != null);
 }
 
 fn keyAllocationScenario(allocator: std.mem.Allocator) !void {
@@ -98,12 +98,12 @@ fn keyAllocationScenario(allocator: std.mem.Allocator) !void {
     const function_type = try caseType(&store, "higher_order");
     const key = try context(&store).typeKey(function_type, 65536);
     defer allocator.free(key);
-    try std.testing.expect(std.mem.indexOf(u8, key, "Foreign") != null);
-    try std.testing.expect(std.mem.indexOf(u8, key, "ask<1:i>") != null);
+    try std.testing.expect(std.mem.find(u8, key, "Foreign") != null);
+    try std.testing.expect(std.mem.find(u8, key, "ask<1:i>") != null);
     const nominal_type = try caseType(&store, "unicode_nominal");
     const nominal_key = try context(&store).typeKey(nominal_type, 65536);
     defer allocator.free(nominal_key);
-    try std.testing.expect(std.mem.indexOf(u8, nominal_key, "14:space 雪😀%.blot") != null);
+    try std.testing.expect(std.mem.find(u8, nominal_key, "14:space 雪😀%.blot") != null);
 }
 test "canonical purity every type row identity and key allocation failure preserves ownership" {
     try keyAllocationScenario(a);

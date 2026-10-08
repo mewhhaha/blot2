@@ -251,12 +251,12 @@ test "owned checker tables grow with declarations and uses without rechecking sh
             } else {
                 for (0..count) |i| {
                     var buffer: [40]u8 = undefined;
-                    const name = try std.fmt.bufPrint(&buffer, "function_{d}", .{i});
+                    const name = try std.mem.print(&buffer, "function_{d}", .{i});
                     const symbol = try fixture.symbol(name);
                     var body = try fixture.name("value");
                     if (shape == 2) {
                         var next_buffer: [40]u8 = undefined;
-                        const next = try std.fmt.bufPrint(&next_buffer, "function_{d}", .{(i + 1) % count});
+                        const next = try std.mem.print(&next_buffer, "function_{d}", .{(i + 1) % count});
                         body = try fixture.apply(try fixture.name(next), body);
                     }
                     const declaration = try fixture.add(.{ .tag = .value_decl, .a = symbol, .b = try fixture.lambda("value", body, 0), .c = try fixture.extra(&.{ 0, 0, 0, 0, 0, 0, 0, 0, 0 }) });
@@ -292,7 +292,7 @@ test "wide scalar let bindings avoid quadratic generalization allocations" {
         defer statements.deinit(a);
         for (0..count) |i| {
             var buffer: [32]u8 = undefined;
-            const name = try std.fmt.bufPrint(&buffer, "value_{d}", .{i});
+            const name = try std.mem.print(&buffer, "value_{d}", .{i});
             const call = try fixture.apply(try fixture.name("twice"), try fixture.integer(2));
             try statements.append(a, try fixture.bind(name, call));
         }

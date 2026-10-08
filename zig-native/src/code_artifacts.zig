@@ -11,6 +11,7 @@ const runtime_operations = @import("runtime_operations.zig");
 const runtime_identity = @import("runtime_identity.zig");
 const code_expectation = @import("code_expectation.zig");
 const provider_chain = @import("provider_chain.zig");
+const structural = @import("structural.zig");
 const Allocator = std.mem.Allocator;
 const Hash = std.crypto.hash.Blake3;
 const IdentityMetadata = runtime_identity.Metadata;
@@ -537,37 +538,10 @@ pub fn stamp(value: anytype) [32]u8 {
 pub fn stampReference(value: anytype) [32]u8 {
     var hash = Hash.init(.{});
     hash.update("BLOT-PINNED-ARTIFACT-1");
-    hashValue(&hash, value);
+    structural.hash(&hash, value);
     var result: [32]u8 = undefined;
     hash.final(&result);
     return result;
-}
-fn hashValue(hash: *Hash, value: anytype) void {
-    const T = @TypeOf(value);
-    switch (@typeInfo(T)) {
-        .pointer => |pointer| {
-            if (pointer.size != .slice) @compileError("Artifact stamps cannot contain borrowed pointers");
-            hashValue(hash, value.len);
-            if (pointer.child == u8) hash.update(value) else for (value) |item| hashValue(hash, item);
-        },
-        .array => for (value) |item| hashValue(hash, item),
-        .@"struct" => |structure| inline for (structure.field_names) |name| hashValue(hash, @field(value, name)),
-        .optional => {
-            hashValue(hash, value != null);
-            if (value) |item| hashValue(hash, item);
-        },
-        .@"union" => |union_| {
-            if (union_.tag_type == null) @compileError("Artifact stamps require tagged unions");
-            hashValue(hash, std.meta.activeTag(value));
-            switch (value) {
-                inline else => |item| hashValue(hash, item),
-            }
-        },
-        .@"enum" => hashValue(hash, @backingInt(value)),
-        .int, .float, .bool => hash.update(std.mem.asBytes(&value)),
-        .void => {},
-        else => @compileError("Unsupported artifact stamp type " ++ @typeName(T)),
-    }
 }
 /// Only batching changes. Scalars keep their original primitive asBytes
 /// representation; structs are visited field by field, never copied wholesale.
@@ -586,7 +560,7 @@ fn BufferedHash(comptime counted: bool) type {
             }
             self.len = 0;
         }
-        inline fn update(self: *@This(), source: []const u8) void {
+        pub inline fn update(self: *@This(), source: []const u8) void {
             if (counted) {
                 self.counts.input_updates += 1;
                 self.counts.bytes += source.len;
@@ -618,7 +592,7 @@ fn BufferedHash(comptime counted: bool) type {
 const CountedHash = struct {
     hash: Hash = Hash.init(.{}),
     counts: StampCounts = .{},
-    inline fn update(self: *CountedHash, bytes: []const u8) void {
+    pub inline fn update(self: *CountedHash, bytes: []const u8) void {
         self.counts.bytes += bytes.len;
         self.counts.input_updates += 1;
         self.counts.hash_updates += 1;
@@ -631,7 +605,7 @@ const CountedHash = struct {
 pub fn stampBuffered(value: anytype) [32]u8 {
     var hash: BufferedHash(false) = .{};
     hash.update("BLOT-PINNED-ARTIFACT-1");
-    bufferedHashValue(&hash, value);
+    structural.hash(&hash, value);
     var result: [32]u8 = undefined;
     hash.final(&result);
     return result;
@@ -639,39 +613,12 @@ pub fn stampBuffered(value: anytype) [32]u8 {
 fn measuredStamp(value: anytype, comptime buffered: bool, counts: *StampCounts) [32]u8 {
     var hash: if (buffered) BufferedHash(true) else CountedHash = .{};
     hash.update("BLOT-PINNED-ARTIFACT-1");
-    bufferedHashValue(&hash, value);
+    structural.hash(&hash, value);
     var result: [32]u8 = undefined;
     hash.final(&result);
     hash.counts.stamps = 1;
     inline for (@typeInfo(StampCounts).@"struct".field_names) |name| @field(counts, name) += @field(hash.counts, name);
     return result;
-}
-fn bufferedHashValue(hash: anytype, value: anytype) void {
-    const T = @TypeOf(value);
-    switch (@typeInfo(T)) {
-        .pointer => |pointer| {
-            if (pointer.size != .slice) @compileError("Artifact stamps cannot contain borrowed pointers");
-            bufferedHashValue(hash, value.len);
-            if (pointer.child == u8) hash.update(value) else for (value) |item| bufferedHashValue(hash, item);
-        },
-        .array => for (value) |item| bufferedHashValue(hash, item),
-        .@"struct" => |structure| inline for (structure.field_names) |name| bufferedHashValue(hash, @field(value, name)),
-        .optional => {
-            bufferedHashValue(hash, value != null);
-            if (value) |item| bufferedHashValue(hash, item);
-        },
-        .@"union" => |union_| {
-            if (union_.tag_type == null) @compileError("Artifact stamps require tagged unions");
-            bufferedHashValue(hash, std.meta.activeTag(value));
-            switch (value) {
-                inline else => |item| bufferedHashValue(hash, item),
-            }
-        },
-        .@"enum" => bufferedHashValue(hash, @backingInt(value)),
-        .int, .float, .bool => hash.update(std.mem.asBytes(&value)),
-        .void => {},
-        else => @compileError("Unsupported artifact stamp type " ++ @typeName(T)),
-    }
 }
 /// One backend invocation owns this memo. All current/previous Core buffers
 /// must remain alive and immutable until deinit; nothing is retained in a

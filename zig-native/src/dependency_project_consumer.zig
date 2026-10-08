@@ -36,8 +36,8 @@ const Origins = struct {
             if (unit == 0 or unit > self.bundle.modules.len) return error.TypeLimit;
             break :blk self.bundle.modules[unit - 1].identity.normalized_path;
         };
-        const directory = std.fs.path.dirname(self.entry_identity) orelse return error.TypeLimit;
-        return std.fs.path.relative(allocator, directory, null, directory, path);
+        const directory = std.Io.Dir.path.dirname(self.entry_identity) orelse return error.TypeLimit;
+        return std.Io.Dir.path.relativeAlloc(allocator, directory, null, directory, path);
     }
 };
 fn require(condition: bool) error{InvalidArtifact}!void {

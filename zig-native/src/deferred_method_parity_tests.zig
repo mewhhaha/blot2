@@ -216,23 +216,22 @@ test "method source qualification coverage keeps demanded field and receiver evi
 
 fn explicitFieldEnvelope(allocator: std.mem.Allocator) !void {
     const source = "type Box is data = #Box U32\nconst Box.read = fn value => 42\nconst select: a -> b where {field \"read\" a b} = fn value => value.read\nentry const answer = fn () => select (#Box 1)\n";
-    var module = try lower(allocator, source);
-    var module_live = true;
-    defer if (module_live) module.deinit(allocator);
-    var retained_use = false;
-    for (module.obligations) |obligation| if (obligation.explicit and obligation.kind == .field) {
-        try std.testing.expectEqual(@as(u32, 1), obligation.qualification_unit);
-        try std.testing.expectEqualStrings("read", module.name(obligation.diagnostic_name));
-        const qualification = obligation.qualification_span orelse return error.MissingQualificationOrigin;
-        try std.testing.expectEqual(@as(u32, 81), qualification.start);
-        if (obligation.span.start == 161 and obligation.span.end == 167) retained_use = true;
-    };
-    try std.testing.expect(retained_use);
-    var result = try backend.compile(allocator, &.{module}, 1);
-    defer result.deinit(allocator);
     // Public diagnostic display must outlive the owned Core too.
-    module.deinit(allocator);
-    module_live = false;
+    var result = blk: {
+        var module = try lower(allocator, source);
+        defer module.deinit(allocator);
+        var retained_use = false;
+        for (module.obligations) |obligation| if (obligation.explicit and obligation.kind == .field) {
+            try std.testing.expectEqual(@as(u32, 1), obligation.qualification_unit);
+            try std.testing.expectEqualStrings("read", module.name(obligation.diagnostic_name));
+            const qualification = obligation.qualification_span orelse return error.MissingQualificationOrigin;
+            try std.testing.expectEqual(@as(u32, 81), qualification.start);
+            if (obligation.span.start == 161 and obligation.span.end == 167) retained_use = true;
+        };
+        try std.testing.expect(retained_use);
+        break :blk try backend.compile(allocator, &.{module}, 1);
+    };
+    defer result.deinit(allocator);
     const diagnostic = result.diagnostic orelse return error.MissingDiagnostic;
     try std.testing.expectEqual(backend.Code.missing_field, diagnostic.code);
     try std.testing.expectEqual(@as(u32, 1), diagnostic.unit);
@@ -252,20 +251,16 @@ test "demanded physical field failure releases display and provenance owners on 
 fn currentFieldContextEnvelope(allocator: std.mem.Allocator) !void {
     const source = "type Box is data = #Box U32\nconst Box.read = fn value => 42\nconst select: a -> b where {field \"read\" a b} = fn value => value.read\nentry const answer = fn () => select (#Box 1)\n";
     for ([_]enum { project, source, prelude }{ .project, .source, .prelude }) |mode| {
-        var module = try lower(allocator, source);
-        var module_live = true;
-        defer if (module_live) module.deinit(allocator);
         var names: symbols.Pool = .{};
         defer names.deinit(allocator);
-        var identity = try @import("runtime_identity.zig").Metadata.capture(allocator, &names, &.{.{ .unit = 1, .path = "/project/consumer/renamed.blot" }}, 1);
-        var identity_live = true;
-        defer if (identity_live) identity.deinit(allocator);
-        var result = try backend.compileWithOptions(allocator, &.{module}, 1, .{ .identity = identity.view(), .diagnostic_source_mode = mode == .source, .diagnostic_prelude_unit = if (mode == .prelude) 1 else 0 });
+        var result = blk: {
+            var module = try lower(allocator, source);
+            defer module.deinit(allocator);
+            var identity = try @import("runtime_identity.zig").Metadata.capture(allocator, &names, &.{.{ .unit = 1, .path = "/project/consumer/renamed.blot" }}, 1);
+            defer identity.deinit(allocator);
+            break :blk try backend.compileWithOptions(allocator, &.{module}, 1, .{ .identity = identity.view(), .diagnostic_source_mode = mode == .source, .diagnostic_prelude_unit = if (mode == .prelude) 1 else 0 });
+        };
         defer result.deinit(allocator);
-        module.deinit(allocator);
-        module_live = false;
-        identity.deinit(allocator);
-        identity_live = false;
         const diagnostic = result.diagnostic orelse return error.MissingDiagnostic;
         try std.testing.expectEqual(backend.Code.missing_field, diagnostic.code);
         try std.testing.expectEqual(core.Span{ .start = 81, .end = 81 }, diagnostic.span);
