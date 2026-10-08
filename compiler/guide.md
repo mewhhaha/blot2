@@ -378,12 +378,12 @@ resolving the next one. Arrays stay contiguous with constant-time indexing;
 array append/prepend copies the contents.
 
 Lists and arrays of small, flat scalar tuples or records store the fields
-consecutively, without a separate heap object for each row. Reads still produce ordinary
-immutable values: keeping a row, capturing it or editing the array preserves
-the earlier value. Nested and reference-bearing rows retain their existing
-boxed storage. Lengths and slices count logical elements, including when a
-packed row crosses a list leaf boundary. List/Array conversion copies spans
-of words without constructing a separate object for each row.
+consecutively, without a separate heap object for each row. Reads still produce
+ordinary immutable values: keeping a row, capturing it or editing the array
+preserves the earlier value. Nested and reference-bearing rows retain their
+existing boxed storage. Lengths and slices count logical elements, including
+when a packed row crosses a list leaf boundary. List/Array conversion copies
+spans of words without constructing a separate object for each row.
 
 Both types have ordinary prelude members `values.length` and `values.is_empty`.
 Only arrays support `values[index]`, `values[index] := replacement`, `get`, and
@@ -422,8 +422,8 @@ each generator source sees the scope before its own binding. The output is built
 with a private growing list, then copied once if the requested result is an
 array. For rectangular generators with total, allocation-free bounds and no
 intermediate observations, the compiler can allocate the exact final storage
-directly. Filters, ragged generators and observable intermediate values keep
-the growing-list path; iteration and element evaluation order stay the same.
+directly. Filters, ragged generators and observable intermediate values keep the
+growing-list path; iteration and element evaluation order stay the same.
 
 `for` and comprehension generators also accept user-defined iterables. The
 ordinary associated `iter` function creates a cursor once; its `next` function
@@ -525,16 +525,15 @@ borrowed read or write. This also covers objects larger than the scalar
 replacement limit, branches, early returns and loop exits. Direct calls can
 borrow storage or transfer a proven fresh result to their caller. Escapes,
 unknown addresses, recursive calls without a usable summary and opaque calls
-keep the existing reclamation policy. When references stay within a proven
-group of allocations, shared children and cycles are released together after
-the group's final use. This needs no reference counting or tracing for that
-group. Numeric array payloads and
-numeric list leaves are marked as having no child pointers; integer bits do not
-become references in these payloads.
+keep the existing reclamation policy. When references stay within a proven group
+of allocations, shared children and cycles are released together after the
+group's final use. This needs no reference counting or tracing for that group.
+Numeric array payloads and numeric list leaves are marked as having no child
+pointers; integer bits do not become references in these payloads.
 
-Dynamic sharing and otherwise unproved lifetimes still use an arena and a nonmoving
-tracing collector in linear memory, without the Wasm GC extension. Forever
-loops collect according to allocation traffic, retaining their carries,
+Dynamic sharing and otherwise unproved lifetimes still use an arena and a
+nonmoving tracing collector in linear memory, without the Wasm GC extension.
+Forever loops collect according to allocation traffic, retaining their carries,
 providers and earlier reachable objects. The guest API resets temporary arena
 storage between completed invocations while preserving module initialization
 values. General ownership-based reclamation is still being implemented.

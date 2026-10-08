@@ -1,5 +1,46 @@
 # Compiler direction
 
+## Twenty-hill review program
+
+Approved on 2026-10-08 after checkpoint `be33230`. The review measured the
+frozen gdev workload at about 0.85–1.0 s cold CPU, with inference about 720 ms.
+One principal region (`const sandbox = game …`) costs about 420 ms. A literal
+edit costs about 228 ms. Synthetic probes expose exponential and depth cliffs.
+Each milestone commits locally after `deno task test:compiler` passes.
+
+Compile performance:
+
+1. Infer generic callees once; instantiate schemes instead of re-collecting
+   bodies per unresolved call. Diamond depth 16 under 20 ms, chains linear.
+2. Split the `sandbox` region with higher-order summaries; no gdev region over
+   50 ms.
+3. Remove the static call-depth cliff: a 255-deep direct-call chain fails with
+   `constant_fuel`. Depth limits apply only to executed compile-time code.
+4. Key specializations by body and complete evidence, not closure value IDs.
+5. Count, then fix, solver hot paths (occurs, epoch cache wipes, fixpoint scans).
+6. Literal edits re-evaluate affected constants only; body edits recheck one body.
+7. Region arenas: under 100 MB requested allocation for cold gdev.
+8. Default restart cache keyed by compiler identity.
+9. Deterministic parallel region inference once regions are small.
+10. Committed benchmark corpus, `blotc build --profile`, and counter budgets
+    that fail tests on exponential regressions.
+
+Maintenance:
+
+11. One production policy for CLI and project server; at most five options.
+12. One query/dependency/early-cutoff model for the reuse layer.
+13. Delete or promote each prototype and default-off path.
+14. Split god structs and switch functions; no function over about 120 lines.
+15. Source subdirectories, fixtures outside `src`, and a native test filter.
+16. One structural equality/hash and one diagnostic table.
+
+Cleanup:
+
+17. Zero zig-analyzer warnings, enforced in CI, with CI caching.
+18. Reclaim build and cache disk; scripts write to `build/tmp/`.
+19. Docs state current numbers; history lives in git.
+20. Remove stale leftovers (stash, empty output dirs, zeroed profile records).
+
 ## Semantic compilation performance program
 
 The next ten hills are approved after checkpoint `8b44ee6`. Preserve that
