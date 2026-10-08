@@ -34,7 +34,7 @@ remaining work. Each milestone lands as a local commit on `main` after
 | 16. Shared equality/hash, diagnostics | Done (`4dd0a0e`)                                 |
 | 17. Zero analyzer warnings in CI      | Done (`4dd0a0e`); first GitHub run pending       |
 | 18. Reclaim disk                      | Done locally; `build/` 37 → 4.5 GB               |
-| 19. Docs state current numbers        | Open                                             |
+| 19. Docs state current numbers        | Done on main; update as remaining hills land     |
 | 20. Remove stale leftovers            | Done except the `.blot` fixtures in `src`        |
 
 ### Measuring
@@ -366,6 +366,10 @@ checked: run 37381022849 succeeded at `86a527b`, before the analyzer workflow
 changes. No run of the new local workflow exists yet; nothing has been pushed.
 
 ### Hill 19: docs
+
+The current-state rewrite is on main: STATUS has one current measurement table
+and PERFORMANCE contains standard-library guidance and reproducible commands.
+The dated journals remain in git. Update the current table as later hills land.
 
 - Rewrite `zig-native/STATUS.md` as current state plus one table of current
   numbers.
