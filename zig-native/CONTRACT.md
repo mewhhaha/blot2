@@ -77,7 +77,12 @@ grants no executable or compile-time-value reuse; those dependencies rebuild.
 Call summaries give each closed first-order job its own chronological solver.
 The session drains an explicit job stack keyed by source target, complete input
 evidence and interface-checking mode. A caller imports only a fully solved
-arrow; result-directed obligations, lexical captures and higher-order boundaries
+arrow. A declared global source function with no residual scheme predicates
+already proves its quantified inputs, including callbacks and effect rows;
+ordinary call checking may import that scheme without collecting its body.
+Computed values still require capture proofs, and source-interface checking,
+selected captures and complete demand-body checking retain ordinary collection.
+Other result-directed obligations, lexical captures and higher-order boundaries
 keep ordinary collection. Active recursive targets share their inline region.
 Failed speculative jobs publish no diagnostic; fallback preserves the caller's
 argument witness sites and deferred-member context. An independently completed

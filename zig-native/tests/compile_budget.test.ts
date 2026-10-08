@@ -119,14 +119,14 @@ Deno.test("budget: chain_mono N=128 stays linear", async () => {
     await measure(chainMono(128)),
     {
       type_nodes: 10461,
-      allocated_bytes: 6784193,
-      inference_regions: 393,
+      allocated_bytes: 6354769,
+      inference_regions: 264,
       region_scopes: 396,
       max_region_scopes: 2,
       call_collections_closed: 0,
       call_collections_unresolved: 0,
-      solver_passes: 1175,
-      solver_constraint_visits: 1550,
+      solver_passes: 660,
+      solver_constraint_visits: 780,
       occurs_steps: 9,
     },
   );

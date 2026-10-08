@@ -4079,21 +4079,21 @@ const ClosureRegion = struct {
         return false;
     }
     fn publishValidatedCalls(self: *ClosureRegion) RegionError!void {
-        if (!self.session.options.reuse_validated_calls) return;
-        for (self.scratch.constraints.items) |constraint| if (!constraint.solved) return;
-        for (self.scratch.sources.items) |source| {
-            if (source.value != 0 or source.binding == 0 or source.root == 0) continue;
-            const module = &self.session.units[source.owner];
-            const binding = module.binding(source.binding);
-            if (binding.kind != .global or module.body(source.binding) == null) continue;
-            if (!try self.potentialArrow(source.owner, binding.ty)) continue;
-            const actual = try self.project(source.root);
-            if (!try self.firstOrderArrow(actual)) continue;
-            if (self.session.principal_reads) |reads| try reads.callPublish(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding }, actual);
-            if (self.session.receipt_tape) |tape| try tape.call_publications.append(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding, .evidence = actual, .present = true });
-            const entry = try self.session.validated_calls.getOrPut(self.session.allocator, .{ .target = .{ .unit = source.owner, .binding = source.binding }, .evidence = actual });
-            if (!entry.found_existing) self.session.proofs.proof_published += 1;
-        }
+        if (!self.session.options.reuse_validated_calls or !self.allConstraintsSolved()) return;
+        for (self.scratch.sources.items) |source| try self.publishValidatedSource(source);
+    }
+    fn publishValidatedSource(self: *ClosureRegion, source: Source) RegionError!void {
+        if (source.value != 0 or source.binding == 0 or source.root == 0) return;
+        const module = &self.session.units[source.owner];
+        const binding = module.binding(source.binding);
+        if (binding.kind != .global or module.body(source.binding) == null) return;
+        if (!try self.potentialArrow(source.owner, binding.ty)) return;
+        const actual = try self.project(source.root);
+        if (!try self.firstOrderArrow(actual)) return;
+        if (self.session.principal_reads) |reads| try reads.callPublish(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding }, actual);
+        if (self.session.receipt_tape) |tape| try tape.call_publications.append(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding, .evidence = actual, .present = true });
+        const entry = try self.session.validated_calls.getOrPut(self.session.allocator, .{ .target = .{ .unit = source.owner, .binding = source.binding }, .evidence = actual });
+        if (!entry.found_existing) self.session.proofs.proof_published += 1;
     }
     fn expectShape(self: *ClosureRegion, root: types.Id, expected: Expected) RegionError!void {
         switch (expected) {
@@ -4577,6 +4577,26 @@ const ClosureRegion = struct {
                 _ = try self.admitSignature(instantiated, self.scratch.sources.items[prior].root);
                 return;
             }
+        }
+        // A source function with no residual predicates is already proved for
+        // all of its quantified inputs, including function arguments and rows.
+        // Computed function values still require their actual capture proof.
+        if (!self.source_interface and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and binding.scheme.obligations.len == 0) {
+            const scope = try self.typeScope(target_.unit);
+            self.scratch.sources.items[scope].body = body_root;
+            self.scratch.sources.items[scope].binding = target_.binding;
+            self.scratch.sources.items[scope].closed_rows = definition.?.closed_rows;
+            self.scratch.sources.items[scope].root = try self.importType(scope, source_type, 0);
+            _ = try self.admitSignature(instantiated, self.scratch.sources.items[scope].root);
+            if (self.session.receipt_tape) |tape| try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
+            const actual = try self.project(self.scratch.sources.items[scope].root);
+            if (actual != 0) {
+                try self.scratch.call_instances.put(self.scratch_allocator, .{ .owner = target_.unit, .binding = target_.binding, .evidence = actual, .caller = 0 }, scope);
+                // This checked scheme has no outstanding body obligations. Its
+                // closed proof is independent of later failures in the caller.
+                if (self.session.options.reuse_validated_calls) try self.publishValidatedSource(self.scratch.sources.items[scope]);
+            }
+            return;
         }
         if (definition != null and binding.kind == .global and !self.retain_selected and try self.summaryEligible(target_)) {
             const start = self.scratch.summary_arguments.items.len;

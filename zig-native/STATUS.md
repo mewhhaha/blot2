@@ -2,7 +2,7 @@
 
 Blot's production compiler is handwritten Zig 0.17. Deno hosts the public
 compiler API, formatter and Wasm guest API. The current compiler passes the
-native suite, all 565 guest/client tests and the zero-finding Zig analyzer gate.
+native suite, all 567 guest/client tests and the zero-finding Zig analyzer gate.
 Language behavior remains defined by [the guide](../compiler/guide.md), with
 ownership rules in [CONTRACT.md](CONTRACT.md).
 
@@ -10,8 +10,10 @@ The default path shares frontend callee schemes, infers closed first-order
 callees through an iterative queue, and reuses complete semantic queries and
 executable fragments under separate dependency checks. Inference collection no
 longer consumes the executed-code depth budget: annotated chains at 300 and
-1,000, a generic chain at 300 and diamond N=16 compile and execute. Higher-order
-and recursive-component summaries remain incomplete.
+1,000, a generic chain at 300 and diamond N=16 compile and execute.
+Predicate-free source schemes also admit higher-order calls without body
+unfolding. General higher-order and recursive-component summaries remain
+incomplete.
 
 Region solvers and checker scratch use independent resettable arenas, retaining
 at most 64 MiB per pool. Published results keep durable owners. Automatic CLI
@@ -22,7 +24,7 @@ because a checkpoint file exists.
 
 ## Current measurements
 
-These are the latest qualified frozen-capture measurements on the frozen,
+These are the latest qualified parametric-scheme measurements on the frozen,
 private 394,294-byte gdev workload, from seven alternating pairs. CPU is child
 user plus system time; filesystem caches and machine load are uncontrolled.
 Fresh compilation has persistence disabled. Retained population is measured
@@ -31,28 +33,28 @@ comparable timings.
 
 | Measurement                          |                           Current value |
 | ------------------------------------ | --------------------------------------: |
-| Fresh CLI CPU                        |                                  964 ms |
-| Retained population CPU              |                                1,100 ms |
-| First retained literal edit CPU      |                                  230 ms |
+| Fresh CLI CPU                        |                                  883 ms |
+| Retained population CPU              |                                1,040 ms |
+| First retained literal edit CPU      |                                  220 ms |
 | Subsequent edit/revert CPU           |                                  220 ms |
 | No-op CPU                            | Below the process-accounting resolution |
-| Fresh requested allocation           |                                328.7 MB |
-| Peak requested live memory           |                                 79.2 MB |
+| Fresh requested allocation           |                                322.2 MB |
+| Peak requested live memory           |                                 79.1 MB |
 | Live requested memory after teardown |                                       0 |
-| Inference regions                    |                                   2,440 |
-| Largest region, scopes               |                                   7,369 |
-| Solver constraint visits             |                                  48,860 |
-| Occurs-check visits                  |                                  43,279 |
+| Inference regions                    |                                   2,036 |
+| Largest region, scopes               |                                   8,041 |
+| Solver constraint visits             |                                  35,215 |
+| Occurs-check visits                  |                                  42,410 |
 | Wasm bytes                           |                                 629,339 |
 
 Wasm matched between compilers and between fresh and retained phases. Against
-the preceding row-view implementation, fresh CPU fell 5% and retained population
-6%; first edits fell from 240 to 230 ms, while later edits rose from 210 to 220
-ms. Requested allocation fell from 335.9 to 328.7 MB. Raw samples and binary
-hashes are in ignored `build/bench/frozen-capture-proofs`. Requested allocation
-is cumulative allocator traffic, not process RSS or guest memory. The 500 ms
-cold, under-100 ms retained-edit and under-100 MB cumulative allocation targets
-remain open; the stricter literal-edit target is 30 ms.
+the preceding frozen-capture implementation, fresh CPU fell 10.4% and retained
+population 9.6%; first edits fell from 240 to 220 ms and later edits stayed at
+220 ms. Requested allocation fell from 328.7 to 322.2 MB. Raw samples and binary
+hashes are in ignored `build/bench/parametric-leaves-final`. Requested
+allocation is cumulative allocator traffic, not process RSS or guest memory. The
+500 ms cold, under-100 ms retained-edit and under-100 MB cumulative allocation
+targets remain open; the stricter literal-edit target is 30 ms.
 
 ## Building and verification
 

@@ -3147,3 +3147,41 @@ test "private nested indexed regions preserve source aliases and clean up every 
     try indexedRegionOwnership(a, &module);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, indexedRegionOwnership, .{&module});
 }
+
+fn parametricCallbackScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    for ([_][]const u8{ "integer", "floating", "answer" }, [_]types.Id{ types.u32_type, types.f32_type, types.u32_type }) |name, scalar| {
+        const original = try session.richValue(target(module, name));
+        const expected = try session.evidence.intern(.function, scalar, scalar, &.{});
+        const prior = session.valueEvidence(original);
+        const steps = session.steps;
+        const selected = try session.specializeClosure(original, expected);
+        try std.testing.expectEqual(expected, session.valueEvidence(selected));
+        try std.testing.expectEqual(prior, session.valueEvidence(original));
+        try std.testing.expectEqual(steps, session.steps);
+    }
+    // A parametric callback row remains the caller's obligation; its concrete
+    // use cannot be silently admitted as a pure function.
+    const reading = try session.richValue(target(module, "reading"));
+    const pure = try session.evidence.intern(.function, types.unit, types.u32_type, &.{});
+    try expectCaptureMismatch(&session, reading, pure);
+}
+
+test "obligation-free higher-order schemes preserve captures independent instances and callback effects" {
+    var module = try lower(
+        \\effect Read: Unit -> U32
+        \\const apply = fn callback => fn value => callback value
+        \\const compose = fn outer => fn inner => fn value => outer (inner value)
+        \\const plus = fn amount => fn value => @u32.add amount value
+        \\entry const integer = fn (value: U32) => apply (compose (plus 2) (plus 3)) value
+        \\entry const floating = fn (value: F32) => apply (fn item => @f32.add item 0.5) value
+        \\entry const reading = fn () => apply (fn () => Read ()) ()
+        \\entry const answer = fn (value: U32) => do @effect.provider Read (fn () => value):
+        \\  use result <- reading ()
+        \\  return @u32.add result 5
+    );
+    defer module.deinit(a);
+    try parametricCallbackScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, parametricCallbackScenario, .{&module});
+}

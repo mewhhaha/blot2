@@ -62,9 +62,15 @@ once their input types close, a session queue checks each target/input pair in
 an independent region. The explicit job stack avoids native recursive inference
 along deep call chains and reuses shared subgraphs. Interface preflight has its
 own summary mode so witness validation keeps its source order. Failed jobs
-replay ordinary collection for authoritative diagnostics. Recursive targets,
-lexical captures and higher-order calls still require a shared inference region.
-Occurs checks visit each resolved node once even when the type is a shared DAG.
+replay ordinary collection for authoritative diagnostics. Declared global
+functions whose checked schemes have no residual predicates admit calls from
+those schemes directly, including function parameters and quantified rows.
+Computed function values still require their actual capture proofs. Independent
+closed proofs publish before unrelated caller constraints finish; source
+interface and retained capture checks keep their existing collection rules.
+General higher-order calls, lexical captures and recursive components still
+require shared inference regions. Occurs checks visit each resolved node once
+even when the type is a shared DAG.
 
 Representation conversions distinguish layout, evidence, their respective effect
 rows and code-expectation handles. Runtime cleanup distinguishes function/local

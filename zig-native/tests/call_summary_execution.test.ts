@@ -27,6 +27,34 @@ Deno.test("summary jobs preserve executed deep chains and shared diamonds", asyn
   }
 });
 
+for (const asynchronous of [false, true]) {
+  Deno.test(`parametric callbacks retain captures and effects (${asynchronous ? "JSPI" : "sync"})`, async () => {
+    await compileAndRun(
+      `
+effect Read: Unit -> U32
+const apply = fn callback => fn value => callback value
+const compose = fn outer => fn inner => fn value => outer (inner value)
+const plus = fn amount => fn value => @u32.add amount value
+const reading = fn () => apply (fn () => Read ()) ()
+entry const integer = fn (value: U32) => apply (compose (plus 2) (plus 3)) value
+entry const floating = fn (value: F32) => apply (fn item => @f32.add item 0.5) value
+entry const answer = fn (value: U32) => do @effect.provider Read (fn () => value):
+  use result <- reading ()
+  return @u32.add result 5
+`,
+      async (guest) => {
+        const call = asynchronous ? guest.callAsync : guest.call;
+        for (const value of [0, 37, 0xffff_ffff]) {
+          assert.equal(await call("integer", value), (value + 5) >>> 0);
+          assert.equal(await call("answer", value), (value + 5) >>> 0);
+        }
+        assert.equal(await call("floating", 1.5), 2);
+      },
+      { prelude: "none", asynchronous },
+    );
+  });
+}
+
 function chain(leaf: string, depth: number): string {
   const lines = [leaf];
   for (let i = 1; i <= depth; i++) {
@@ -93,13 +121,15 @@ Deno.test("summary jobs survive dependencies checkpoints edits and failed revisi
   const library = `${directory}/library.blot`;
   const bundle = `${directory}/library.blotdep`;
   const source = (value: string) =>
-    chain(`const f_0 = fn value => @u32.add value ${value}`, 300);
+    chain(`const f_0 = fn value => @u32.add value ${value}`, 300) +
+    "const apply = fn callback => fn value => callback value\n" +
+    "const callback = fn value => apply f_300 value\n";
   const options = { executable, entry, prelude: null };
   try {
     await Deno.writeTextFile(library, source("1"));
     await Deno.writeTextFile(
       entry,
-      'import { f_300 } from "./library"\nentry const answer = fn (value: U32) => f_300 value\n',
+      'import { callback } from "./library"\nentry const answer = fn (value: U32) => callback value\n',
     );
     const packed = await new Deno.Command(executable, {
       args: ["dependencies", entry, bundle, "--prelude", "none"],

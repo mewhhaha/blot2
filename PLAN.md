@@ -16,8 +16,8 @@ remaining work. Each milestone lands as a local commit on `main` after
 
 | Hill                                  | State                                               |
 | ------------------------------------- | --------------------------------------------------- |
-| 1. Infer generic callees once         | Done for first-order callees                        |
-| 2. Split the `sandbox` region         | Open; depends on 1 and 3                            |
+| 1. Infer generic callees once         | First-order and predicate-free source schemes done  |
+| 2. Split the `sandbox` region         | Predicate-free callbacks done; general case open    |
 | 3. Remove the call-depth cliff        | Done; executed depth is separate                    |
 | 4. Canonical specialization keys      | Frozen capture proofs reused; canonical keys open   |
 | 5. Solver hot paths                   | Occurs DAG and row views done; caches/worklist open |
@@ -193,6 +193,25 @@ allocation falls from 335.9 to 328.7 MB. Inference regions fall from 2,597 to
 Results are in ignored `build/bench/frozen-capture-proofs`. This removes
 repeated proofs of already frozen captures; canonical body/evidence sharing
 remains open.
+
+Declared global functions with no residual predicates now admit calls from their
+checked parametric scheme, including function parameters and quantified effect
+rows. Computed closures, source-interface checking and selected capture proofs
+keep their existing paths. Closed independent proofs publish immediately, so a
+later caller failure cannot hide them. Native capture, effect and
+allocation-failure laws and sync/JSPI execution pass; dependencies, checkpoint
+restoration and failed-edit recovery include higher-order calls. The full gate
+passes with 567 guest/client tests and zero analyzer findings. Differential
+qualification compared 694 invocations with no differences. The monomorphic
+chain's regression budgets now reflect fewer regions and solver visits.
+
+Seven paired gdev runs measured 986 / 883 ms fresh CPU, 1,150 / 1,040 ms
+population, 240 / 220 ms first edit and 220 / 220 ms later edits. Requested
+allocation falls from 328.7 to 322.2 MB; peak requested memory is 79.1 MB.
+Inference regions fall from 2,440 to 2,036 and constraint visits from 48,860 to
+35,215. The largest region grows from 7,369 to 8,041 scopes, so the general
+higher-order partitioning target remains open. Wasm matched in every phase.
+Results are in ignored `build/bench/parametric-leaves-final`.
 
 ### Hills 1 (backend) and 3: summaries instead of unfolding
 

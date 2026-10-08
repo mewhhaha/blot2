@@ -425,7 +425,10 @@ test "refinement receipt survives edits reverts rejected revisions and changed s
     var expected = try fresh(&fixture, .{});
     defer expected.deinit(a);
     try equal(&changed_result, &expected);
-    try std.testing.expectEqual(@as(usize, 0), changed_result.result.compiled.refinements.hits);
+    // The callee's obligation-free scheme proves its types without reading
+    // the literal's bits. Reusing that proof must still rebuild changed code.
+    try std.testing.expect(changed_result.result.compiled.refinements.hits > 0);
+    try std.testing.expect(changed_result.result.compiled.reuse.fresh_named > 0);
     try std.testing.expect(!std.mem.eql(u8, expected.result.compiled.bytes, initial.result.compiled.bytes));
 }
 
