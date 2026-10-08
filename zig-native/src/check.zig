@@ -92,20 +92,64 @@ pub const ImportedCatalog = struct {
     pub fn interface(self: ImportedCatalog, id: BindingId) SchemeInterface {
         if (self.frozen) |owner| {
             const value = owner.bindings[id];
-            return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .named_function = value.named_function, .obligations = owner.obligations };
+            return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .frozen = owner } };
         }
         const owner = self.producer.?;
         const value = owner.bindings[id];
-        return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .named_function = value.named_function, .obligations = owner.obligations };
+        return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .named_function = value.named_function, .obligations = owner.obligations, .callees = .{ .live = owner } };
     }
 };
 /// Static imports cannot carry principal source-body interfaces.
 pub const SourceCatalog = struct { producer: DeclarationCatalog, declarations: []const SourceDeclaration, namespace: symbols.Symbol = 0, name: symbols.Symbol = 0, kind: @FieldType(ImportedCatalog, "kind"), index: u32, origin: ast.Id };
 pub const Kind = PI.Kind;
 pub const ExternalTarget = PI.ExternalTarget;
-pub const Binding = struct { name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0 };
+/// A completed global's scheme may reference other completed schemes by
+/// reference (`callee_use` obligations) instead of repeating their
+/// obligations. `summary` records what a use needs to share such a scheme.
+pub const SchemeSummary = struct {
+    /// Saturating count of the flat obligations this scheme stands for.
+    flat_size: u32 = 0,
+    /// Quantified variables and rows reachable from the root: the part of an
+    /// instantiation that callers observe. Everything else is private.
+    public_variables: T.List = .{},
+    public_rows: T.List = .{},
+    /// One flag per public variable: it occurs in a parameter type.
+    public_inputs: T.List = .{},
+    /// Only schemes made of position-independent obligations are shared.
+    shareable: bool = false,
+};
+pub const Binding = struct { name: symbols.Symbol, declaration: ast.Id, owner: ast.Id, kind: Kind, named_function: bool = false, ty: T.Id, scheme: T.Scheme = .{}, external: ?ExternalTarget = null, predecessor: BindingId = 0, summary: SchemeSummary = .{} };
 /// An immutable interface borrows only semantic tables, never a source body.
-pub const SchemeInterface = struct { named_function: bool = false, types: F.Source, scheme: T.Scheme, obligations: []const T.Obligation };
+pub const SchemeInterface = struct {
+    named_function: bool = false,
+    types: F.Source,
+    scheme: T.Scheme,
+    obligations: []const T.Obligation,
+    /// Where the schemes shared by this scheme's `callee_use` obligations live.
+    callees: Callees = .none,
+};
+/// The producer tables that resolve a scheme's shared callees by binding.
+pub const Callees = union(enum) {
+    none,
+    live: *const Checked,
+    frozen: *const PI.Interface,
+
+    pub fn interface(self: Callees, binding: u32) ?SchemeInterface {
+        switch (self) {
+            .none => return null,
+            .live => |owner| {
+                if (binding == 0 or binding >= owner.bindings.len) return null;
+                const value = owner.bindings[binding];
+                return .{ .types = .{ .store = &owner.types }, .scheme = value.scheme, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
+            },
+            .frozen => |owner| {
+                if (binding == 0 or binding >= owner.bindings.len) return null;
+                const value = owner.bindings[binding];
+                return .{ .types = .{ .frozen = &owner.graph }, .scheme = value.scheme, .named_function = value.named_function, .obligations = owner.obligations, .callees = self };
+            },
+        }
+    }
+};
 pub const ImportedBinding = struct {
     name: symbols.Symbol = 0,
     namespace: symbols.Symbol = 0,
@@ -334,6 +378,7 @@ pub const Checked = struct {
     diagnostics: []Diagnostic,
     body_elaborations: usize,
     imported_schemes: usize = 0,
+    counters: Counters = .{},
     unit: u32 = 1,
     associated: []Associated = &.{},
     nominals: []Nominal = &.{},
@@ -439,9 +484,31 @@ pub const Checked = struct {
     }
 };
 const Entry = struct { name: symbols.Symbol, binding: BindingId };
+/// Checker work counters, reported through the stats JSON.
+pub const Counters = struct {
+    obligations_appended: u64 = 0,
+    pending_peak: u64 = 0,
+    instantiations: u64 = 0,
+    shared_uses: u64 = 0,
+    use_expansions: u64 = 0,
+    memo_hits: u64 = 0,
+    memo_misses: u64 = 0,
+    memo_declined: u64 = 0,
+
+    pub fn add(self: *Counters, other: Counters) void {
+        inline for (@typeInfo(Counters).@"struct".field_names) |name| {
+            if (comptime std.mem.eql(u8, name, "pending_peak")) @field(self, name) = @max(@field(self, name), @field(other, name)) else @field(self, name) += @field(other, name);
+        }
+    }
+};
+const CalleeOutcome = struct { types: []T.Id, rows: []T.Effects.Id };
+const unchanged_output = std.math.maxInt(u32);
+/// Uses of callees whose flat obligation count exceeds this share the
+/// callee's scheme by reference. Temporary differential switch.
+pub var callee_sharing_threshold: u32 = 32;
 const State = enum { pending, active, complete };
 const Global = struct { state: State = .pending, index: u32 = 0, low: u32 = 0, on_stack: bool = false };
-const PendingObligation = struct { metadata: u32 = 0, value: T.Obligation, owner: BindingId, scope: ast.Id = 0, origin: u32 = 0, declared: bool = false, covered: bool = false, local_scheme: bool = false, direct: bool = false, method_member: bool = false, suspended: bool = false, solved: bool = false };
+const PendingObligation = struct { metadata: u32 = 0, value: T.Obligation, owner: BindingId, scope: ast.Id = 0, origin: u32 = 0, declared: bool = false, covered: bool = false, local_scheme: bool = false, direct: bool = false, method_member: bool = false, suspended: bool = false, solved: bool = false, expansion: u32 = 0 };
 const Qualification = struct { scope: ast.Id, owner: BindingId, clauses: T.List, value: ast.Id, checked: bool = false };
 const QualificationUse = struct { scope: ast.Id, owner: BindingId, target: BindingId, source: ast.Id };
 const LoopFrame = struct { node: ast.Id, carries: []const Entry, iterations: []const BindingId, resolver_block: ast.Id = 0, exits: usize = 0 };
@@ -494,6 +561,13 @@ const Engine = struct {
     merges: std.ArrayList(Merge) = .empty,
     obligations: std.ArrayList(T.Obligation) = .empty,
     pending: std.ArrayList(PendingObligation) = .empty,
+    counters: Counters = .{},
+    /// Closed outcomes of shared scheme uses, keyed by callee and the closed
+    /// projection of the use's instantiation. Values are owned slices.
+    callee_memo: std.StringHashMapUnmanaged(CalleeOutcome) = .empty,
+    mark_depth: u32 = 0,
+    expansion_serial: u32 = 0,
+    expansion_depth: u32 = 0,
     qualification_scope: ast.Id = 0,
     request_scope: RequestScope = .{},
     local_qualification_scope: ast.Id = 0,
@@ -657,7 +731,9 @@ const Engine = struct {
         const diagnostic_count = self.diagnostics.items.len;
         const type_names = self.type_env.items.len;
         const row_names = self.row_env.items.len;
+        self.mark_depth += 1;
         defer {
+            self.mark_depth -= 1;
             self.types.rollback(point);
             self.diagnostics.shrinkRetainingCapacity(diagnostic_count);
             self.type_env.shrinkRetainingCapacity(type_names);
@@ -875,30 +951,56 @@ const Engine = struct {
         }
         var binding = self.external_targets.get(imported.target);
         if (binding == null) {
-            const interface = imported.interface;
-            var copier: SchemeCopier = .{ .allocator = self.allocator, .source = interface.types, .destination = &self.types };
-            defer copier.deinit();
-            var variables: std.ArrayList(T.Id) = .empty;
-            defer variables.deinit(self.allocator);
-            for (copier.source.list(interface.scheme.variables)) |old| {
-                const fresh = try self.types.fresh();
-                try copier.mapping.put(self.allocator, copier.source.head(old, 0), fresh);
-                try variables.append(self.allocator, fresh);
-            }
-            const row_variables = try copier.quantifiedRows(interface.scheme.row_variables);
-            const closed_rows = try copier.quantifiedRows(interface.scheme.closed_rows);
-            const root = try copier.copy(interface.scheme.root, 0);
-            const start: u32 = @intCast(self.obligations.items.len);
-            const range = interface.scheme.obligations;
-            for (interface.obligations[range.start..][0..range.len]) |constraint| {
-                try self.obligations.append(self.allocator, .{ .ty = try copier.copy(constraint.ty, 0), .kind = constraint.kind, .source = imported.origin, .name = constraint.name, .result = if (constraint.result == 0) 0 else try copier.copy(constraint.result, 0), .other = if (constraint.other == 0) 0 else try copier.copy(constraint.other, 0), .signature = if (constraint.signature == 0) 0 else try copier.copy(constraint.signature, 0), .operator = constraint.operator, .identity = constraint.identity, .explicit = constraint.explicit, .qualification_span = constraint.qualification_span, .qualification_unit = constraint.qualification_unit });
-            }
-            const principal: T.Scheme = .{ .root = root, .variables = try self.types.saveList(variables.items), .row_variables = row_variables, .closed_rows = closed_rows, .obligations = .{ .start = start, .len = @intCast(self.obligations.items.len - start) } };
-            binding = try self.addBinding(.{ .name = if (imported.namespace == 0) imported.name else imported.member, .declaration = imported.origin, .owner = imported.origin, .kind = .external, .ty = root, .scheme = principal, .named_function = interface.named_function, .external = imported.target });
-            try self.external_targets.put(self.allocator, imported.target, binding.?);
+            binding = try self.importScheme(imported.interface, imported.target, if (imported.namespace == 0) imported.name else imported.member, imported.origin, 0);
+            if (binding == null) return;
         }
         if (!imported.expose) return;
         if (imported.namespace == 0) try self.globals.put(self.allocator, imported.name, binding.?) else try self.qualified.put(self.allocator, key, binding.?);
+    }
+    /// Copies one producer scheme. Schemes it shares are imported first, as
+    /// bindings of their own, so shared uses keep pointing at shared schemes.
+    fn importScheme(self: *Engine, interface: SchemeInterface, target: ExternalTarget, name: symbols.Symbol, origin: ast.Id, depth: usize) T.Error!?BindingId {
+        if (self.external_targets.get(target)) |existing| return existing;
+        const range = interface.scheme.obligations;
+        const constraints = interface.obligations[range.start..][0..range.len];
+        var callees: std.ArrayList(BindingId) = .empty;
+        defer callees.deinit(self.allocator);
+        for (constraints) |constraint| if (constraint.kind == .callee_use) {
+            const callee_interface = interface.callees.interface(constraint.identity.decl);
+            if (callee_interface == null or depth >= 256) {
+                try self.diagnostic(.nesting_limit, origin);
+                return null;
+            }
+            const callee = try self.importScheme(callee_interface.?, .{ .unit = target.unit, .binding = constraint.identity.decl }, 0, origin, depth + 1) orelse return null;
+            try callees.append(self.allocator, callee);
+        };
+        var copier: SchemeCopier = .{ .allocator = self.allocator, .source = interface.types, .destination = &self.types };
+        defer copier.deinit();
+        var variables: std.ArrayList(T.Id) = .empty;
+        defer variables.deinit(self.allocator);
+        for (copier.source.list(interface.scheme.variables)) |old| {
+            const fresh = try self.types.fresh();
+            try copier.mapping.put(self.allocator, copier.source.head(old, 0), fresh);
+            try variables.append(self.allocator, fresh);
+        }
+        const row_variables = try copier.quantifiedRows(interface.scheme.row_variables);
+        const closed_rows = try copier.quantifiedRows(interface.scheme.closed_rows);
+        const root = try copier.copy(interface.scheme.root, 0);
+        const start: u32 = @intCast(self.obligations.items.len);
+        var shared: usize = 0;
+        for (constraints) |constraint| {
+            var identity = constraint.identity;
+            if (constraint.kind == .callee_use) {
+                identity = .{ .unit = self.unit, .decl = callees.items[shared] };
+                shared += 1;
+            }
+            try self.obligations.append(self.allocator, .{ .ty = try copier.copy(constraint.ty, 0), .kind = constraint.kind, .source = origin, .name = constraint.name, .result = if (constraint.result == 0) 0 else try copier.copy(constraint.result, 0), .other = if (constraint.other == 0) 0 else try copier.copy(constraint.other, 0), .signature = if (constraint.signature == 0) 0 else try copier.copy(constraint.signature, 0), .operator = constraint.operator, .identity = identity, .explicit = constraint.explicit, .qualification_span = constraint.qualification_span, .qualification_unit = constraint.qualification_unit });
+        }
+        const principal: T.Scheme = .{ .root = root, .variables = try self.types.saveList(variables.items), .row_variables = row_variables, .closed_rows = closed_rows, .obligations = .{ .start = start, .len = @intCast(self.obligations.items.len - start) } };
+        const binding = try self.addBinding(.{ .name = name, .declaration = origin, .owner = origin, .kind = .external, .ty = root, .scheme = principal, .named_function = interface.named_function, .external = target });
+        self.bindings.items[binding].summary = try self.summarize(principal);
+        try self.external_targets.put(self.allocator, target, binding);
+        return binding;
     }
 
     fn appendPending(self: *Engine, item: PendingObligation) Allocator.Error!void {
@@ -906,6 +1008,8 @@ const Engine = struct {
         value.scope = self.qualification_scope;
         value.method_member = value.method_member or (value.value.kind == .receiver and !value.value.explicit);
         try self.pending.append(self.allocator, value);
+        self.counters.obligations_appended += 1;
+        self.counters.pending_peak = @max(self.counters.pending_peak, self.pending.items.len);
     }
     fn diagnostic(self: *Engine, code: Code, id: ast.Id) Allocator.Error!void {
         const origin = tagOrigin(self.tag_origins, self.tree.span(id));
@@ -1062,6 +1166,8 @@ const Engine = struct {
         try self.prepareGlobal(binding);
         const point = self.types.mark();
         const pending = self.pending.items.len;
+        self.mark_depth += 1;
+        defer self.mark_depth -= 1;
         const function = try self.instantiate(binding, source);
         const result = try self.types.fresh();
         const expected = try self.invocationBinary(left, right, result);
@@ -3820,6 +3926,7 @@ const Engine = struct {
     }
     fn scheme(self: *Engine, root: T.Id, excluded: []const T.Id, group: []const BindingId, capture_concrete: bool, certificate_owner: BindingId, qualification_scope: ast.Id) T.Error!T.Scheme {
         try self.solveFields();
+        if (capture_concrete) try self.expandInformedUses(group);
         const resolved = try self.types.resolve(root, 0);
         const free = try self.types.freeVariables(resolved);
         defer self.allocator.free(free);
@@ -3929,7 +4036,7 @@ const Engine = struct {
             progress = false;
             for (candidates.items) |*candidate| {
                 const pending = self.pending.items[candidate.index];
-                var retained = candidate.retained or pending.method_member or pending.value.explicit or (capture_concrete and (pending.value.kind == .dispatch or pending.value.kind == .result_dispatch or pending.value.kind == .monad_factory or pending.value.kind == .resolver_dispatch or pending.value.kind == .resolver_shape or pending.value.kind == .effect_operation or pending.value.kind == .effect_handler or pending.value.kind == .type_head) and !pending.suspended);
+                var retained = candidate.retained or pending.method_member or pending.value.explicit or (capture_concrete and (pending.value.kind == .dispatch or pending.value.kind == .result_dispatch or pending.value.kind == .monad_factory or pending.value.kind == .resolver_dispatch or pending.value.kind == .resolver_shape or pending.value.kind == .effect_operation or pending.value.kind == .effect_handler or pending.value.kind == .type_head or pending.value.kind == .callee_use) and !pending.suspended);
                 if (!retained) for (candidate.variables) |variable| if (inList(variables.items, variable)) {
                     retained = true;
                     break;
@@ -3981,9 +4088,65 @@ const Engine = struct {
         }
         return .{ .root = closed.root, .variables = span, .row_variables = try self.types.saveList(row_variables.items), .closed_rows = closed.closed_rows, .obligations = .{ .start = start, .len = @intCast(self.obligations.items.len - start) } };
     }
+    fn sharedKind(kind: T.ObligationKind) bool {
+        return switch (kind) {
+            .dispatch, .field, .writable_field, .collection, .record_merge, .update, .callee_use => true,
+            else => false,
+        };
+    }
+    /// Describes a completed scheme for sharing. Only obligations whose
+    /// outcome is a function of closed types qualify; everything else keeps
+    /// the flat instantiation.
+    fn summarize(self: *Engine, principal: T.Scheme) T.Error!SchemeSummary {
+        var summary: SchemeSummary = .{ .shareable = principal.root != 0 };
+        var flat: u64 = 0;
+        for (self.obligations.items[principal.obligations.start..][0..principal.obligations.len]) |constraint| {
+            if (!sharedKind(constraint.kind) or constraint.explicit or constraint.qualification_span != null) summary.shareable = false;
+            if (constraint.kind == .callee_use) {
+                const callee = self.bindings.items[constraint.identity.decl].summary;
+                if (!callee.shareable) summary.shareable = false;
+                flat += callee.flat_size;
+            } else flat += 1;
+        }
+        summary.flat_size = @intCast(@min(flat, 1 << 30));
+        if (principal.root == 0) return summary;
+        const free = try self.types.freeVariables(try self.types.resolve(principal.root, 0));
+        defer self.allocator.free(free);
+        const free_rows = try self.types.freeRowVariables(try self.types.resolve(principal.root, 0));
+        defer self.allocator.free(free_rows);
+        var public: std.ArrayList(T.Id) = .empty;
+        defer public.deinit(self.allocator);
+        for (self.types.list(principal.variables)) |variable| if (inList(free, variable)) try public.append(self.allocator, variable);
+        var public_rows: std.ArrayList(u32) = .empty;
+        defer public_rows.deinit(self.allocator);
+        for (self.types.list(principal.row_variables)) |variable| if (inList(free_rows, variable)) try public_rows.append(self.allocator, variable);
+        // Every free root variable must be quantified for an instance to be
+        // fully described by its public part.
+        if (public.items.len != free.len or public_rows.items.len != free_rows.len) summary.shareable = false;
+        var parameter_free: std.ArrayList(T.Id) = .empty;
+        defer parameter_free.deinit(self.allocator);
+        var cursor = try self.types.resolve(principal.root, 0);
+        while (self.types.node(cursor).tag == .function) {
+            const function = self.types.node(cursor);
+            const vars = try self.types.freeVariables(function.a);
+            defer self.allocator.free(vars);
+            try parameter_free.appendSlice(self.allocator, vars);
+            cursor = try self.types.resolve(function.b, 0);
+        }
+        const flags = try self.allocator.alloc(u32, public.items.len);
+        defer self.allocator.free(flags);
+        for (public.items, flags) |variable, *flag| flag.* = @intFromBool(inList(parameter_free.items, variable));
+        summary.public_inputs = try self.types.saveList(flags);
+        summary.public_variables = try self.types.saveList(public.items);
+        summary.public_rows = try self.types.saveList(public_rows.items);
+        return summary;
+    }
     fn instantiate(self: *Engine, binding: BindingId, source: ast.Id) T.Error!T.Id {
         const principal = self.bindings.items[binding].scheme;
         if (principal.root == 0) return self.types.openCovariant(try self.types.resolve(self.bindings.items[binding].ty, 0));
+        self.counters.instantiations += 1;
+        const summary = self.bindings.items[binding].summary;
+        if (summary.shareable and summary.flat_size > callee_sharing_threshold) return self.shareScheme(binding, source);
         var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
         const temporary = scratch.allocator();
@@ -3998,11 +4161,67 @@ const Engine = struct {
         defer temporary.free(fresh_rows);
         for (fresh_rows) |*row| row.* = try self.types.freshEffects();
         const value = try self.types.substituteWithRows(principal.root, old, fresh_ids, old_rows, fresh_rows);
-        for (self.obligations.items[principal.obligations.start..][0..principal.obligations.len]) |constraint| {
-            const ty = try self.types.substituteWithRows(constraint.ty, old, fresh_ids, old_rows, fresh_rows);
-            try self.appendPending(.{ .owner = self.current, .origin = try self.memberUseOrigin(constraint, source), .suspended = constraint.explicit and constraint.kind != .record_merge, .method_member = constraint.kind == .receiver and !constraint.explicit, .value = .{ .ty = ty, .kind = constraint.kind, .source = source, .name = constraint.name, .result = if (constraint.result == 0) 0 else try self.types.substituteWithRows(constraint.result, old, fresh_ids, old_rows, fresh_rows), .other = if (constraint.other == 0) 0 else try self.types.substituteWithRows(constraint.other, old, fresh_ids, old_rows, fresh_rows), .signature = if (constraint.signature == 0) 0 else try self.types.substituteWithRows(constraint.signature, old, fresh_ids, old_rows, fresh_rows), .operator = constraint.operator, .identity = constraint.identity, .explicit = constraint.explicit, .qualification_span = constraint.qualification_span, .qualification_unit = constraint.qualification_unit } });
-        }
+        try self.appendInstance(principal.obligations, old, fresh_ids, old_rows, fresh_rows, source, 0);
         return self.types.openCovariant(value);
+    }
+    /// Appends one instance of a scheme's obligations. A shared-scheme use
+    /// inside the scheme is instantiated as another use, never flattened.
+    fn appendInstance(self: *Engine, span: T.List, old: []const T.Id, fresh_ids: []const T.Id, old_rows: []const u32, fresh_rows: []const T.Effects.Id, source: ast.Id, expansion: u32) T.Error!void {
+        for (self.obligations.items[span.start..][0..span.len]) |constraint| {
+            const ty = try self.types.substituteWithRows(constraint.ty, old, fresh_ids, old_rows, fresh_rows);
+            try self.appendPending(.{ .owner = self.current, .expansion = expansion, .origin = try self.memberUseOrigin(constraint, source), .suspended = constraint.explicit and constraint.kind != .record_merge, .method_member = constraint.kind == .receiver and !constraint.explicit, .value = .{ .ty = ty, .kind = constraint.kind, .source = source, .name = constraint.name, .result = if (constraint.result == 0) 0 else try self.types.substituteWithRows(constraint.result, old, fresh_ids, old_rows, fresh_rows), .other = if (constraint.other == 0) 0 else try self.types.substituteWithRows(constraint.other, old, fresh_ids, old_rows, fresh_rows), .signature = if (constraint.signature == 0) 0 else try self.types.substituteWithRows(constraint.signature, old, fresh_ids, old_rows, fresh_rows), .operator = constraint.operator, .identity = constraint.identity, .explicit = constraint.explicit, .qualification_span = constraint.qualification_span, .qualification_unit = constraint.qualification_unit } });
+        }
+    }
+    /// Instantiates only what the caller can observe. The callee's private
+    /// variables and obligations are created when the use is resolved.
+    fn shareScheme(self: *Engine, binding: BindingId, source: ast.Id) T.Error!T.Id {
+        const callee = self.bindings.items[binding];
+        const public = try self.allocator.dupe(T.Id, self.types.list(callee.summary.public_variables));
+        defer self.allocator.free(public);
+        const public_rows = try self.allocator.dupe(u32, self.types.list(callee.summary.public_rows));
+        defer self.allocator.free(public_rows);
+        const instance = try self.allocator.alloc(T.Id, public.len + public_rows.len);
+        defer self.allocator.free(instance);
+        for (instance[0..public.len]) |*id| id.* = try self.types.fresh();
+        const fresh_rows = try self.allocator.alloc(T.Effects.Id, public_rows.len);
+        defer self.allocator.free(fresh_rows);
+        for (fresh_rows, instance[public.len..]) |*row, *carrier| {
+            row.* = try self.types.freshEffects();
+            carrier.* = try self.types.functionWithEffects(T.unit, T.unit, row.*);
+        }
+        const value = try self.types.substituteWithRows(callee.scheme.root, public, instance[0..public.len], public_rows, fresh_rows);
+        try self.appendPending(.{ .owner = self.current, .value = .{ .ty = try self.types.product(instance), .kind = .callee_use, .source = source, .identity = .{ .unit = self.unit, .decl = binding } } });
+        self.counters.shared_uses += 1;
+        return self.types.openCovariant(value);
+    }
+    /// Appends the callee's own obligations for one shared use, with the
+    /// use's instantiation of the public variables. Private variables are new.
+    fn expandUse(self: *Engine, use: PendingObligation, expansion: u32) T.Error!void {
+        const binding = use.value.identity.decl;
+        const callee = self.bindings.items[binding];
+        const principal = callee.scheme;
+        const product = self.types.node(try self.types.resolve(use.value.ty, 0));
+        const instance = try self.allocator.dupe(T.Id, self.types.list(.{ .start = product.a, .len = product.b }));
+        defer self.allocator.free(instance);
+        const public = try self.allocator.dupe(T.Id, self.types.list(callee.summary.public_variables));
+        defer self.allocator.free(public);
+        const public_rows = try self.allocator.dupe(u32, self.types.list(callee.summary.public_rows));
+        defer self.allocator.free(public_rows);
+        const old = try self.allocator.dupe(T.Id, self.types.list(principal.variables));
+        defer self.allocator.free(old);
+        const fresh_ids = try self.allocator.alloc(T.Id, old.len);
+        defer self.allocator.free(fresh_ids);
+        for (old, fresh_ids) |variable, *id| {
+            id.* = if (std.mem.indexOfScalar(T.Id, public, variable)) |at| instance[at] else try self.types.fresh();
+        }
+        const old_rows = try self.allocator.dupe(u32, self.types.list(principal.row_variables));
+        defer self.allocator.free(old_rows);
+        const fresh_rows = try self.allocator.alloc(T.Effects.Id, old_rows.len);
+        defer self.allocator.free(fresh_rows);
+        for (old_rows, fresh_rows) |variable, *row| {
+            row.* = if (std.mem.indexOfScalar(u32, public_rows, variable)) |at| self.types.node(instance[public.len + at]).c else try self.types.freshEffects();
+        }
+        try self.appendInstance(principal.obligations, old, fresh_ids, old_rows, fresh_rows, use.value.source, expansion);
     }
     fn purityIdentity(context: *anyopaque, allocator: Allocator, identity: Identity, kind: @import("purity_type_key.zig").Kind) @import("purity_type_key.zig").OriginError!@import("purity_type_key.zig").Identity {
         const self: *Engine = @ptrCast(@alignCast(context));
@@ -4300,6 +4519,7 @@ const Engine = struct {
             for (group.items) |member| {
                 const principal = try self.scheme(self.bindings.items[member].ty, &.{}, group.items, true, member, self.bindings.items[member].declaration);
                 self.bindings.items[member].scheme = principal;
+                self.bindings.items[member].summary = try self.summarize(principal);
             }
         }
         self.traceGlobal(.finished, binding);
@@ -6042,14 +6262,24 @@ const Engine = struct {
         return .{ .exits = then_flow.exits and else_flow.exits, .returns = then_flow.returns or else_flow.returns, .breaks = then_flow.breaks or else_flow.breaks };
     }
     fn solveFields(self: *Engine) T.Error!void {
+        return self.solveFieldsFrom(0);
+    }
+    /// Solves obligations at or after `start` to a fixpoint. A shared use
+    /// expands at its own chronological position, when its instantiation is
+    /// informative enough to resolve.
+    fn solveFieldsFrom(self: *Engine, start: usize) T.Error!void {
         var progress = true;
         while (progress) {
             progress = false;
-            var i: usize = 0;
+            var i: usize = start;
             while (i < self.pending.items.len) : (i += 1) {
                 const pending = self.pending.items[i];
                 if (pending.solved or pending.suspended) continue;
                 const constraint = pending.value;
+                if (constraint.kind == .callee_use) {
+                    if (try self.resolveUse(i)) progress = true;
+                    continue;
+                }
                 if (constraint.kind == .record_merge) {
                     const result = self.types.mergeRecords(constraint.ty, constraint.other) catch |err| switch (err) {
                         error.TypeMismatch => {
@@ -6191,6 +6421,283 @@ const Engine = struct {
             }
         }
     }
+    /// Resolves one shared scheme use. It stays a use while every observable
+    /// variable is still open. Once some are closed and the rest are plain
+    /// variables, the callee's closed outcome is a function of the closed
+    /// parts and is computed at most once per key. Any other shape expands the
+    /// callee's obligations in place, as an ordinary instantiation would.
+    fn resolveUse(self: *Engine, index: usize) T.Error!bool {
+        const use = self.pending.items[index];
+        const callee = self.bindings.items[use.value.identity.decl];
+        const product = self.types.node(try self.types.resolve(use.value.ty, 0));
+        const instance = try self.allocator.dupe(T.Id, self.types.list(.{ .start = product.a, .len = product.b }));
+        defer self.allocator.free(instance);
+        const type_count = callee.summary.public_variables.len;
+        var key: std.ArrayList(u8) = .empty;
+        defer key.deinit(self.allocator);
+        try key.appendSlice(self.allocator, std.mem.asBytes(&use.value.identity.decl));
+        var open: std.ArrayList(usize) = .empty;
+        defer open.deinit(self.allocator);
+        var seen_types: std.ArrayList(u32) = .empty;
+        defer seen_types.deinit(self.allocator);
+        var seen_rows: std.ArrayList(u32) = .empty;
+        defer seen_rows.deinit(self.allocator);
+        const inputs = self.types.list(callee.summary.public_inputs);
+        var input_open = false;
+        var input_partial = false;
+        var plain = true;
+        for (instance, 0..) |item, position| {
+            if (position < type_count) {
+                const value = self.types.node(item);
+                const input = inputs[position] != 0;
+                if (value.tag == .variable) {
+                    if (input) input_open = true;
+                    if (inList(seen_types.items, value.a)) plain = false else try seen_types.append(self.allocator, value.a);
+                    try open.append(self.allocator, position);
+                    try key.append(self.allocator, 0);
+                } else {
+                    try key.append(self.allocator, 1);
+                    if (!try self.closedKey(item, &key, 0)) {
+                        plain = false;
+                        if (input) input_partial = true;
+                    }
+                }
+            } else {
+                const row = try self.types.resolveEffects(self.types.node(item).c, 0);
+                const value = self.types.row(row);
+                if (value.tail == .variable and value.labels.len == 0) {
+                    if (inList(seen_rows.items, value.tail.variable)) plain = false else try seen_rows.append(self.allocator, value.tail.variable);
+                    try open.append(self.allocator, position);
+                    try key.append(self.allocator, 0);
+                } else {
+                    try key.append(self.allocator, 1);
+                    if (!try self.closedRowKey(row, &key, 0)) plain = false;
+                }
+            }
+        }
+        if (!input_partial and input_open) return false;
+        self.counters.use_expansions += 1;
+        if (input_partial or !plain or self.expansion_depth >= 64) {
+            self.pending.items[index].solved = true;
+            try self.expandUse(use, 0);
+            return true;
+        }
+        if (self.callee_memo.get(key.items)) |outcome| {
+            var matched = true;
+            for (open.items, 0..) |position, slot| {
+                if (position < type_count) {
+                    if (outcome.types[slot] != unchanged_output) self.types.unify(instance[position], outcome.types[slot]) catch |err| switch (err) {
+                        error.OutOfMemory, error.TypeLimit => return err,
+                        else => matched = false,
+                    };
+                } else {
+                    if (outcome.rows[slot] != unchanged_output) self.types.unifyEffects(self.types.node(instance[position]).c, outcome.rows[slot]) catch |err| switch (err) {
+                        error.OutOfMemory, error.TypeLimit => return err,
+                        else => matched = false,
+                    };
+                }
+            }
+            if (matched) {
+                self.counters.memo_hits += 1;
+                self.pending.items[index].solved = true;
+                return true;
+            }
+            self.pending.items[index].solved = true;
+            try self.expandUse(use, 0);
+            return true;
+        }
+        self.expansion_serial += 1;
+        const serial = self.expansion_serial;
+        const start = self.pending.items.len;
+        const diagnostics = self.diagnostics.items.len;
+        self.pending.items[index].suspended = true;
+        try self.expandUse(use, serial);
+        self.expansion_depth += 1;
+        defer self.expansion_depth -= 1;
+        try self.solveFieldsFrom(start);
+        self.pending.items[index].suspended = false;
+        self.pending.items[index].solved = true;
+        var complete = self.diagnostics.items.len == diagnostics and self.mark_depth == 0;
+        if (complete) for (self.pending.items[start..]) |item| if (item.expansion >= serial and !item.solved) {
+            complete = false;
+            break;
+        };
+        const outcome_types = try self.allocator.alloc(T.Id, open.items.len);
+        defer self.allocator.free(outcome_types);
+        const outcome_rows = try self.allocator.alloc(T.Effects.Id, open.items.len);
+        defer self.allocator.free(outcome_rows);
+        // An output the callee left unconstrained stays a variable; it is
+        // replayed as no change, provided no two outputs became one variable.
+        seen_types.clearRetainingCapacity();
+        seen_rows.clearRetainingCapacity();
+        if (complete) for (open.items, 0..) |position, slot| {
+            if (position < type_count) {
+                const closed = try self.types.resolve(instance[position], 0);
+                const shape = self.types.node(closed);
+                if (shape.tag == .variable) {
+                    if (inList(seen_types.items, shape.a)) {
+                        complete = false;
+                        break;
+                    }
+                    try seen_types.append(self.allocator, shape.a);
+                    outcome_types[slot] = unchanged_output;
+                } else if (try self.types.equalClosed(closed, closed)) {
+                    outcome_types[slot] = closed;
+                } else {
+                    complete = false;
+                    break;
+                }
+            } else {
+                const row = try self.types.resolveEffects(self.types.node(instance[position]).c, 0);
+                const shape = self.types.row(row);
+                if (shape.tail == .variable and shape.labels.len == 0) {
+                    if (inList(seen_rows.items, shape.tail.variable)) {
+                        complete = false;
+                        break;
+                    }
+                    try seen_rows.append(self.allocator, shape.tail.variable);
+                    outcome_rows[slot] = unchanged_output;
+                } else if (shape.tail == .closed) {
+                    outcome_rows[slot] = row;
+                } else {
+                    complete = false;
+                    break;
+                }
+            }
+        };
+        if (!complete) {
+            self.counters.memo_declined += 1;
+            return true;
+        }
+        if (self.callee_memo.contains(key.items)) return true;
+        const owned_key = try self.allocator.dupe(u8, key.items);
+        errdefer self.allocator.free(owned_key);
+        const types_copy = try self.allocator.dupe(T.Id, outcome_types);
+        errdefer self.allocator.free(types_copy);
+        const rows_copy = try self.allocator.dupe(T.Effects.Id, outcome_rows);
+        errdefer self.allocator.free(rows_copy);
+        try self.callee_memo.put(self.allocator, owned_key, .{ .types = types_copy, .rows = rows_copy });
+        self.counters.memo_misses += 1;
+        return true;
+    }
+    /// Canonical bytes of a closed type, or false for a type that is open or
+    /// has no canonical form. Equal bytes mean equal types.
+    fn closedKey(self: *Engine, ty: T.Id, out: *std.ArrayList(u8), depth: usize) T.Error!bool {
+        if (depth >= 256) return false;
+        const value = self.types.node(try self.types.resolve(ty, 0));
+        try out.append(self.allocator, @intFromEnum(value.tag));
+        switch (value.tag) {
+            .unit, .boolean, .u32, .f32, .never => return true,
+            .function => {
+                if (!try self.closedRowKey(try self.types.resolveEffects(value.c, 0), out, depth + 1)) return false;
+                return try self.closedKey(value.a, out, depth + 1) and try self.closedKey(value.b, out, depth + 1);
+            },
+            .product => {
+                try out.appendSlice(self.allocator, std.mem.asBytes(&value.b));
+                for (self.types.list(.{ .start = value.a, .len = value.b })) |child| if (!try self.closedKey(child, out, depth + 1)) return false;
+                return true;
+            },
+            .record => {
+                try out.appendSlice(self.allocator, std.mem.asBytes(&value.b));
+                const order = try self.allocator.alloc(usize, value.b);
+                defer self.allocator.free(order);
+                for (order, 0..) |*slot, at| slot.* = at;
+                const Context = struct {
+                    store: *const T.Store,
+                    node: T.Node,
+                    fn less(context: @This(), left: usize, right: usize) bool {
+                        return context.store.recordField(context.node, left).name < context.store.recordField(context.node, right).name;
+                    }
+                };
+                std.mem.sortUnstable(usize, order, Context{ .store = &self.types, .node = value }, Context.less);
+                for (order) |at| {
+                    const field = self.types.recordField(value, at);
+                    try out.appendSlice(self.allocator, std.mem.asBytes(&field.name));
+                    if (!try self.closedKey(field.ty, out, depth + 1)) return false;
+                }
+                return true;
+            },
+            .nominal => {
+                try out.appendSlice(self.allocator, std.mem.asBytes(&value.a));
+                try out.appendSlice(self.allocator, std.mem.asBytes(&value.b));
+                const arguments = self.types.nominalArguments(value);
+                try out.appendSlice(self.allocator, std.mem.asBytes(&arguments.len));
+                for (arguments) |child| if (!try self.closedKey(child, out, depth + 1)) return false;
+                return true;
+            },
+            .array, .list, .cursor, .resolver => return self.closedKey(value.a, out, depth + 1),
+            .type_constructor => {
+                try out.appendSlice(self.allocator, std.mem.asBytes(&value.a));
+                try out.appendSlice(self.allocator, std.mem.asBytes(&value.b));
+                return true;
+            },
+            else => return false,
+        }
+    }
+    fn closedRowKey(self: *Engine, row: T.Effects.Id, out: *std.ArrayList(u8), depth: usize) T.Error!bool {
+        const value = self.types.row(row);
+        if (value.tail != .closed) return false;
+        const labels = self.types.rowLabels(row);
+        try out.appendSlice(self.allocator, std.mem.asBytes(&labels.len));
+        if (labels.len == 0) return true;
+        const owned = try self.allocator.dupe(T.Effects.Label, labels);
+        defer self.allocator.free(owned);
+        var encoded: std.ArrayList([]u8) = .empty;
+        defer {
+            for (encoded.items) |item| self.allocator.free(item);
+            encoded.deinit(self.allocator);
+        }
+        for (owned) |label| {
+            var bytes: std.ArrayList(u8) = .empty;
+            errdefer bytes.deinit(self.allocator);
+            const operation = self.types.operation(label);
+            try bytes.appendSlice(self.allocator, std.mem.asBytes(&operation.identity.unit));
+            try bytes.appendSlice(self.allocator, std.mem.asBytes(&operation.identity.decl));
+            for (self.types.operationArguments(label)) |argument| if (!try self.closedKey(argument, &bytes, depth + 1)) {
+                bytes.deinit(self.allocator);
+                return false;
+            };
+            try encoded.ensureUnusedCapacity(self.allocator, 1);
+            encoded.appendAssumeCapacity(try bytes.toOwnedSlice(self.allocator));
+        }
+        std.mem.sortUnstable([]u8, encoded.items, {}, struct {
+            fn less(_: void, left: []u8, right: []u8) bool {
+                return std.mem.lessThan(u8, left, right);
+            }
+        }.less);
+        for (encoded.items) |item| {
+            try out.appendSlice(self.allocator, std.mem.asBytes(&item.len));
+            try out.appendSlice(self.allocator, item);
+        }
+        return true;
+    }
+    /// A completed global keeps a shared use only while nothing about it is
+    /// known. A use with any known part is expanded now, as flat instantiation
+    /// would have, so its obligations are solved and checked in this module.
+    fn expandInformedUses(self: *Engine, group: []const BindingId) T.Error!void {
+        var changed = true;
+        while (changed) {
+            changed = false;
+            var i: usize = 0;
+            while (i < self.pending.items.len) : (i += 1) {
+                const item = self.pending.items[i];
+                if (item.solved or item.suspended or item.value.kind != .callee_use or !inList(group, item.owner)) continue;
+                const product = self.types.node(try self.types.resolve(item.value.ty, 0));
+                const type_count = self.bindings.items[item.value.identity.decl].summary.public_variables.len;
+                var informed = false;
+                for (self.types.list(.{ .start = product.a, .len = product.b })[0..type_count]) |part| if (self.types.node(part).tag != .variable) {
+                    informed = true;
+                    break;
+                };
+                if (!informed) continue;
+                self.pending.items[i].solved = true;
+                self.counters.use_expansions += 1;
+                try self.expandUse(item, 0);
+                changed = true;
+            }
+            if (changed) try self.solveFields();
+        }
+    }
     fn finishHoles(self: *Engine) T.Error!void {
         const display = @import("type_display.zig");
         for (self.holes.items) |hole| {
@@ -6240,6 +6747,7 @@ const Engine = struct {
             const resolved = try self.types.resolve(pending.value.ty, 0);
             const tag = self.types.node(resolved).tag;
             if (tag == .variable and inList(quantified.items, resolved)) continue;
+            if (pending.value.kind == .callee_use) continue;
             if (pending.value.kind == .monad_factory) {
                 try self.diagnostic(.type_constructor_required, pending.value.source);
                 continue;
@@ -6964,6 +7472,15 @@ fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *sy
     defer engine.active.deinit(allocator);
     defer engine.env.deinit(allocator);
     defer engine.pending.deinit(allocator);
+    defer {
+        var outcomes = engine.callee_memo.iterator();
+        while (outcomes.next()) |entry| {
+            allocator.free(entry.key_ptr.*);
+            allocator.free(entry.value_ptr.types);
+            allocator.free(entry.value_ptr.rows);
+        }
+        engine.callee_memo.deinit(allocator);
+    }
     defer engine.qualifications.deinit(allocator);
     defer engine.qualification_uses.deinit(allocator);
     defer engine.declared_obligations.deinit(allocator);
@@ -7162,7 +7679,7 @@ fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *sy
     errdefer allocator.free(body_closed_rows);
     const merges = try engine.merges.toOwnedSlice(allocator);
     errdefer allocator.free(merges);
-    var checked: Checked = .{ .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.external_targets.count() };
+    var checked: Checked = .{ .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.external_targets.count(), .counters = engine.counters };
     if (!source_validation and engine.initializer_rejected) {
         var rejected = try rejectedSource(allocator, checked.diagnostics);
         rejected.initializer_rejected = true;

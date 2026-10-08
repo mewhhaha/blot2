@@ -68,7 +68,7 @@ fn importedValue(bundle: *const D.FrozenDependency, owner: u32, raw: PI.External
     const resolved = try target(bundle, owner, raw);
     const producer = &bundle.modules[resolved.unit - 1].interface;
     const definition = producer.bindings[resolved.binding];
-    return .{ .target = resolved, .origin = origin, .interface = .{ .types = .{ .frozen = &producer.graph }, .scheme = definition.scheme, .obligations = producer.obligations, .named_function = definition.named_function } };
+    return .{ .target = resolved, .origin = origin, .interface = .{ .types = .{ .frozen = &producer.graph }, .scheme = definition.scheme, .obligations = producer.obligations, .named_function = definition.named_function, .callees = .{ .frozen = producer } } };
 }
 fn importExport(a: Allocator, bundle: *const D.FrozenDependency, imports: *std.ArrayList(check.ImportedBinding), catalogs: *std.ArrayList(check.ImportedCatalog), owner: u32, exported: D.Export, name: u32, namespace: u32, origin: ast.Id) !void {
     if (exported.kind == .value) {

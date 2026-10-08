@@ -232,6 +232,8 @@ const Builder = struct {
                 break;
             }
             const predicate = engine.obligations.items[scheme.obligations.start + i];
+            // A shared scheme use stands for obligations shown at its callee.
+            if (predicate.kind == .callee_use) continue;
             const subject = try self.typeNode(engine, predicate.ty, 0);
             const argument = if (predicate.other != 0) try self.typeNode(engine, predicate.other, 0) else null;
             const result = if (predicate.result != 0) try self.typeNode(engine, predicate.result, 0) else null;

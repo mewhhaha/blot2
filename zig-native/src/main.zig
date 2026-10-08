@@ -60,6 +60,7 @@ const Stats = struct {
     check_us: i64 = 0,
     lower_us: i64 = 0,
     emit_us: i64 = 0,
+    checker: checker.Counters = .{},
 };
 fn now(io: Io) Io.Timestamp {
     return Io.Clock.awake.now(io);
@@ -164,6 +165,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         stats.type_versions = checked.types.versions.items.len;
         stats.bindings = checked.bindings.len - 1;
         stats.body_elaborations = checked.body_elaborations;
+        stats.checker = checked.counters;
         if (checked.diagnostics.len != 0) {
             for (checked.diagnostics) |item| {
                 if (item.hole) |hole| {
@@ -245,6 +247,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var effect_rows: usize = 0;
     var body_elaborations: usize = 0;
     var imported_schemes: usize = 0;
+    var checker_counters: checker.Counters = .{};
     var core_nodes: usize = 0;
     var body_lowerings: usize = 0;
     var code_instances: usize = 0;
@@ -304,6 +307,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
             check_occurs_steps += types_.occurs_steps;
             row_versions += types_.effects.versions.items.len;
             effect_rows += types_.effects.rows.items.len;
+            checker_counters.add(module_.checked.counters);
         };
         for (checked.diagnostics) |item| {
             const path = if (item.unit == 0) filename else loaded.filename(item.unit);
@@ -410,6 +414,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .effect_rows = effect_rows,
         .body_elaborations = body_elaborations,
         .imported_schemes = imported_schemes,
+        .checker = checker_counters,
         .core_nodes = core_nodes,
         .body_lowerings = body_lowerings,
         .code_instances = code_instances,

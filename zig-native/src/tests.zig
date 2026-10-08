@@ -275,6 +275,7 @@ test {
     _ = @import("artifact_operation_admission_tests.zig");
     _ = @import("buffered_stamp_tests.zig");
     _ = @import("check_nominal_tests.zig");
+    _ = @import("check_shared_scheme_tests.zig");
     _ = @import("core_dispatch_tests.zig");
     _ = @import("retained_catalog_tests.zig");
     _ = @import("startup_emission_facts_tests.zig");

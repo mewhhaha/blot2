@@ -92,7 +92,7 @@ pub const CheckedProject = struct {
     }
     pub fn interface(self: *const CheckedProject, target: check.ExternalTarget) check.SchemeInterface {
         const producer = &self.module(target.unit).checked;
-        return .{ .types = .{ .store = &producer.types }, .scheme = producer.bindings[target.binding].scheme, .named_function = producer.bindings[target.binding].named_function, .obligations = producer.obligations };
+        return .{ .types = .{ .store = &producer.types }, .scheme = producer.bindings[target.binding].scheme, .named_function = producer.bindings[target.binding].named_function, .obligations = producer.obligations, .callees = .{ .live = producer } };
     }
 };
 

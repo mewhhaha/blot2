@@ -124,7 +124,7 @@ pub fn compile(allocator: Allocator, source: []const u8, pool: *symbols.Pool, de
         if (occupied.contains(exported.name)) continue;
         if (exported.kind == .value) {
             const definition = dependency.interface.bindings[exported.target.binding];
-            try imports.append(allocator, .{ .name = exported.name, .target = exported.target, .origin = 0, .interface = .{ .types = .{ .frozen = &dependency.interface.graph }, .scheme = definition.scheme, .obligations = dependency.interface.obligations, .named_function = definition.named_function } });
+            try imports.append(allocator, .{ .name = exported.name, .target = exported.target, .origin = 0, .interface = .{ .types = .{ .frozen = &dependency.interface.graph }, .scheme = definition.scheme, .obligations = dependency.interface.obligations, .named_function = definition.named_function, .callees = .{ .frozen = &dependency.interface } } });
         } else try catalogs.append(allocator, .{ .frozen = &dependency.interface, .name = exported.name, .kind = switch (exported.kind) {
             .nominal => .nominal,
             .constructor => .constructor,
@@ -136,7 +136,7 @@ pub fn compile(allocator: Allocator, source: []const u8, pool: *symbols.Pool, de
     for (dependency.fixities) |value| {
         if (!value.named) {
             const definition = dependency.interface.bindings[value.producer.binding];
-            try imports.append(allocator, .{ .expose = false, .target = value.producer, .origin = 0, .interface = .{ .types = .{ .frozen = &dependency.interface.graph }, .scheme = definition.scheme, .obligations = dependency.interface.obligations, .named_function = definition.named_function } });
+            try imports.append(allocator, .{ .expose = false, .target = value.producer, .origin = 0, .interface = .{ .types = .{ .frozen = &dependency.interface.graph }, .scheme = definition.scheme, .obligations = dependency.interface.obligations, .named_function = definition.named_function, .callees = .{ .frozen = &dependency.interface } } });
         }
         try checked_fixities.append(allocator, .{ .operator = value.operator, .target = value.target, .named = value.named, .external = if (value.named) null else value.producer });
     }
