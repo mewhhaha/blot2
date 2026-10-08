@@ -505,7 +505,7 @@ const CalleeOutcome = struct { types: []T.Id, rows: []T.Effects.Id };
 const unchanged_output = std.math.maxInt(u32);
 /// Uses of callees whose flat obligation count exceeds this share the
 /// callee's scheme by reference. Temporary differential switch.
-pub var callee_sharing_threshold: u32 = 32;
+pub var callee_sharing_threshold: u32 = 0;
 const State = enum { pending, active, complete };
 const Global = struct { state: State = .pending, index: u32 = 0, low: u32 = 0, on_stack: bool = false };
 const PendingObligation = struct { metadata: u32 = 0, value: T.Obligation, owner: BindingId, scope: ast.Id = 0, origin: u32 = 0, declared: bool = false, covered: bool = false, local_scheme: bool = false, direct: bool = false, method_member: bool = false, suspended: bool = false, solved: bool = false, expansion: u32 = 0 };
@@ -4180,7 +4180,7 @@ const Engine = struct {
         defer self.allocator.free(public);
         const public_rows = try self.allocator.dupe(u32, self.types.list(callee.summary.public_rows));
         defer self.allocator.free(public_rows);
-        const instance = try self.allocator.alloc(T.Id, public.len + public_rows.len);
+        const instance = try self.allocator.alloc(T.Id, std.math.add(usize, public.len, public_rows.len) catch return error.TypeLimit);
         defer self.allocator.free(instance);
         for (instance[0..public.len]) |*id| id.* = try self.types.fresh();
         const fresh_rows = try self.allocator.alloc(T.Effects.Id, public_rows.len);
@@ -4212,14 +4212,14 @@ const Engine = struct {
         const fresh_ids = try self.allocator.alloc(T.Id, old.len);
         defer self.allocator.free(fresh_ids);
         for (old, fresh_ids) |variable, *id| {
-            id.* = if (std.mem.indexOfScalar(T.Id, public, variable)) |at| instance[at] else try self.types.fresh();
+            id.* = if (std.mem.findScalar(T.Id, public, variable)) |at| instance[at] else try self.types.fresh();
         }
         const old_rows = try self.allocator.dupe(u32, self.types.list(principal.row_variables));
         defer self.allocator.free(old_rows);
         const fresh_rows = try self.allocator.alloc(T.Effects.Id, old_rows.len);
         defer self.allocator.free(fresh_rows);
         for (old_rows, fresh_rows) |variable, *row| {
-            row.* = if (std.mem.indexOfScalar(u32, public_rows, variable)) |at| self.types.node(instance[public.len + at]).c else try self.types.freshEffects();
+            row.* = if (std.mem.findScalar(u32, public_rows, variable)) |at| self.types.node(instance[public.len + at]).c else try self.types.freshEffects();
         }
         try self.appendInstance(principal.obligations, old, fresh_ids, old_rows, fresh_rows, use.value.source, expansion);
     }
