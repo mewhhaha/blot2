@@ -12,6 +12,7 @@ const dep_loader = @import("dependency_project_loader.zig");
 const ast = @import("ast.zig");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
+const restart_cache = @import("restart_cache.zig");
 
 const Request = struct {
     kind: enum { open, build, close, checkpoint },
@@ -85,8 +86,11 @@ const OpenProject = struct {
     entry: []u8,
     options_owner: inputs.Snapshot,
     session: retained.Session,
+    cache_file: ?restart_cache.File,
+    cache_loaded: bool,
+    saved_revision: usize = 0,
 
-    fn init(a: Allocator, io: Io, request: Request, compiler: [32]u8, checkpoint_bytes: []const u8) !OpenProject {
+    fn init(a: Allocator, io: Io, request: Request, compiler: [32]u8, checkpoint_bytes: []const u8, cache_root: ?[]const u8) !OpenProject {
         const raw = try validateOpen(request);
         const entry = try a.dupe(u8, request.entry.?);
         errdefer a.free(entry);
@@ -109,15 +113,29 @@ const OpenProject = struct {
         session.profile_backend = request.profileBackend;
         session.policy.codegen_tier = request.codegenTier;
         session.policy.share_machine_code = request.shareMachineCode;
+        var cache_file: ?restart_cache.File = if (cache_root) |root| restart_cache.File.init(a, root, compiler, entry) catch null else null;
+        errdefer if (cache_file) |*file| file.deinit();
+        var cache_loaded = false;
         if (checkpoint_bytes.len != 0) session.checkpoint = @import("backend_checkpoint.zig").decode(a, compiler, checkpoint_bytes) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             else => null, // Optional candidates never replace source validation.
-        };
+        } else if (cache_file) |*file| {
+            session.checkpoint = file.load(io);
+            cache_loaded = session.checkpoint != null;
+        }
         session.policy.codegen_workers = request.codegenWorkers;
-        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session };
+        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .cache_file = cache_file, .cache_loaded = cache_loaded };
+    }
+    fn persist(self: *OpenProject, io: Io) void {
+        if (self.saved_revision == self.session.revisions) return;
+        const file = &(self.cache_file orelse return);
+        const bytes = self.session.checkpointBytes(file.compiler) catch return;
+        defer self.allocator.free(bytes);
+        if (file.save(io, bytes)) self.saved_revision = self.session.revisions;
     }
     fn deinit(self: *OpenProject) void {
         self.session.deinit();
+        if (self.cache_file) |*file| file.deinit();
         self.options_owner.deinit();
         self.allocator.free(self.entry);
         self.* = undefined;
@@ -195,6 +213,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                     .backendTiming = result.result.compiled.timing,
                     .workCounters = result.result.compiled.counters,
                     .principals = result.result.compiled.principal,
+                    .restartCacheLoaded = opened.cache_loaded,
                     .sourceBytes = result.source_bytes,
                     .freshModules = result.fresh_modules,
                     .cachedModules = result.cached_modules,
@@ -212,13 +231,16 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
             // This transfer performs no allocation or I/O. Result bytes remain
             // independently owned by Candidate until the complete reply is sent.
             if (!opened.session.commit(candidate)) return error.InvalidCandidate;
+            // Seed restarts before the first reply. Later edits keep their cheap
+            // retained path; graceful close saves the latest committed revision.
+            if (opened.session.revisions == 1) opened.persist(io);
             try frames.write(writer, metadata, result.result.compiled.bytes);
         },
     }
 }
 
 /// No diagnostic/metrics text is written to stdout in serve mode.
-pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compiler: [32]u8) !void {
+pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compiler: [32]u8, cache_root: ?[]const u8) !void {
     const identity = std.fmt.bytesToHex(compiler, .lower);
     try reply(a, writer, .{
         .kind = "hello",
@@ -245,7 +267,7 @@ pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compile
                 if (opened != null) return error.AlreadyOpen;
                 // AlreadyOpen above proves the optional owns no previous session.
                 // zig-analyzer: disable-next-line overwritten-owning-value
-                opened = try OpenProject.init(a, io, request, compiler, frame.payload());
+                opened = try OpenProject.init(a, io, request, compiler, frame.payload(), cache_root);
                 try reply(a, writer, .{ .kind = "open", .id = request.id, .epoch = epoch, .revision = 0 }, &.{});
             },
             .build, .close, .checkpoint => {
@@ -266,6 +288,7 @@ pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compile
                 }
                 if (request.kind == .close) {
                     if (request.sources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
+                    owner.persist(io);
                     try reply(a, writer, .{ .kind = "close", .id = request.id, .epoch = epoch, .revision = owner.session.revisions }, &.{});
                     return;
                 }

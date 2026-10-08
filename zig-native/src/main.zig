@@ -29,6 +29,7 @@ const usage =
 ;
 const dependency_cli = @import("dependency_cli.zig");
 const compiler_identity = @import("compiler_identity");
+const restart_cache = @import("restart_cache.zig");
 /// Immutable executable defaults; individual compiler invocations own options.
 pub const compiler_defaults = .{ .artifact_replay = compiler_identity.artifact_replay };
 
@@ -38,6 +39,8 @@ const Stats = struct {
     work_counters: @import("work_counters.zig").Counters = .{},
     optimization: @import("function_facts.zig").Stats = .{},
     runtime_optimization: @import("optimized_bodies.zig").Stats = .{},
+    principals: @import("principal_evidence_reuse.zig").Stats = .{},
+    restart_cache: struct { loaded: bool = false, saved: bool = false } = .{},
     source_bytes: usize = 0,
     tokens: usize = 0,
     syntax_nodes: usize = 0,
@@ -113,7 +116,7 @@ fn namedDiagnostic(allocator: std.mem.Allocator, writer: *Io.Writer, filename: [
     try diagnostic(writer, filename, stage, code, span.start, span.end, full);
 }
 
-fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, output_path: ?[]const u8) !bool {
+fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, output_path: ?[]const u8, cache_root: ?[]const u8) !bool {
     var tracked: memory.TrackedAllocator = .{ .backing = backing };
     const allocator = tracked.allocator();
     var stats: Stats = .{};
@@ -188,6 +191,21 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         stats.body_lowerings = lowered.body_lowerings;
         for (lowered.diagnostics) |item| try diagnostic(writer, filename, "lower", @tagName(item.code), item.span.start, item.span.end, item.message());
         if (lowered.diagnostics.len != 0) break :compilation false;
+        var cache_file: ?restart_cache.File = null;
+        defer if (cache_file) |*file| file.deinit();
+        var identity: ?@import("runtime_identity.zig").Metadata = null;
+        defer if (identity) |*owned| owned.deinit(allocator);
+        if (cache_root) |root| {
+            const absolute_entry = Io.Dir.cwd().realPathFileAlloc(io, filename, allocator) catch null;
+            defer if (absolute_entry) |path| allocator.free(path);
+            if (absolute_entry) |path| {
+                identity = @import("runtime_identity.zig").Metadata.capture(allocator, &names, &.{.{ .unit = 1, .path = path }}, 1) catch null;
+                if (identity != null) cache_file = restart_cache.File.init(allocator, root, compiler_identity.digest, path) catch null;
+            }
+        }
+        var checkpoint = if (cache_file) |*file| file.load(io) else null;
+        defer if (checkpoint) |*candidate| candidate.deinit();
+        stats.restart_cache.loaded = checkpoint != null;
         checked.deinit(allocator);
         checked_live = false;
         tree.deinit(allocator);
@@ -195,7 +213,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         allocator.free(source);
         source_live = false;
         const emit_start = now(io);
-        var compiled = try backend.compile(allocator, &.{lowered}, 1);
+        var compiled = try backend.compileWithOptions(allocator, &.{lowered}, 1, .{ .identity = if (identity) |*owned| owned.view() else null, .diagnostic_source_mode = true, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null, .artifact_replay = compiler_defaults.artifact_replay, .artifact_dump = compiler_defaults.artifact_replay });
         defer compiled.deinit(allocator);
         stats.emit_us = elapsed(emit_start, io);
         // A declined backend still owns measured work. Preserve it before
@@ -208,12 +226,16 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         stats.callable_wrappers = compiled.callable_wrappers;
         stats.emitted_functions = compiled.emitted_functions;
         stats.constant_steps = compiled.constant_steps;
+        stats.principals = compiled.principal;
         if (compiled.diagnostic) |item| {
             try diagnostic(writer, filename, "emit", @tagName(item.code), item.span.start, item.span.end, item.message());
             break :compilation false;
         }
         stats.wasm_bytes = compiled.bytes.len;
         try Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path.?, .data = compiled.bytes });
+        if (cache_file) |*file| if (compiled.capture) |*capture| {
+            stats.restart_cache.saved = file.capture(io, capture);
+        };
         break :compilation true;
     };
     // All compiler/source/result owners have been destroyed before reporting.
@@ -232,7 +254,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
     return ok;
 }
 
-fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile: bool, output_path: ?[]const u8) !bool {
+fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile: bool, output_path: ?[]const u8, cache_root: ?[]const u8) !bool {
     var tracked: memory.TrackedAllocator = .{ .backing = backing };
     const allocator = tracked.allocator();
     const start = now(io);
@@ -259,6 +281,9 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var emitted_functions: usize = 0;
     var wasm_bytes: usize = 0;
     var constant_steps: usize = 0;
+    var cache_loaded = false;
+    var cache_saved = false;
+    var principals: @import("principal_evidence_reuse.zig").Stats = .{};
     var load_us: i64 = 0;
     var check_us: i64 = 0;
     var lower_us: i64 = 0;
@@ -366,7 +391,12 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         }
         teardown_us += elapsed(release_start, io);
         const emit_start = now(io);
-        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .profile_backend = profile, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit });
+        var cache_file: ?restart_cache.File = if (cache_root) |root| restart_cache.File.init(allocator, root, compiler_identity.digest, loaded.filename(loaded.entry)) catch null else null;
+        defer if (cache_file) |*file| file.deinit();
+        var checkpoint = if (cache_file) |*file| file.load(io) else null;
+        defer if (checkpoint) |*candidate| candidate.deinit();
+        cache_loaded = checkpoint != null;
+        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .profile_backend = profile, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
         defer {
             const result_release_start = now(io);
             compiled.deinit(allocator);
@@ -380,6 +410,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         callable_wrappers = compiled.callable_wrappers;
         emitted_functions = compiled.emitted_functions;
         constant_steps = compiled.constant_steps;
+        principals = compiled.principal;
         if (compiled.diagnostic) |item| {
             try diagnostic(writer, loaded.filename(item.unit), "emit", @tagName(item.code), item.span.start, item.span.end, item.message());
             emit_us = elapsed(emit_start, io);
@@ -389,6 +420,9 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         emit_us = elapsed(emit_start, io);
         const write_start = now(io);
         try Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path.?, .data = compiled.bytes });
+        if (cache_file) |*file| if (compiled.capture) |*capture| {
+            cache_saved = file.capture(io, capture);
+        };
         write_us = elapsed(write_start, io);
         break :compilation true;
     };
@@ -425,6 +459,8 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .callable_wrappers = callable_wrappers,
         .emitted_functions = emitted_functions,
         .constant_steps = constant_steps,
+        .principals = principals,
+        .restart_cache = .{ .loaded = cache_loaded, .saved = cache_saved },
         .wasm_bytes = wasm_bytes,
         .load_us = load_us,
         .check_us = check_us,
@@ -443,6 +479,7 @@ fn run(init: std.process.Init) !bool {
     // Zig 0.17 defaults safe Init.gpa to a validating allocator.
     // Keep compiler checks, but use the standard production heap in releases.
     const backing = if (builtin.mode == .debug) init.gpa else std.heap.smp_allocator;
+    const cache_root = restart_cache.root(init.arena.allocator(), init.environ_map) catch null;
     const args = try init.minimal.args.toSlice(init.arena.allocator());
     if (args.len == 1 or std.mem.eql(u8, args[1], "--help")) {
         try Io.File.stdout().writeStreamingAll(init.io, usage);
@@ -454,7 +491,7 @@ fn run(init: std.process.Init) !bool {
         var output_buffer: [4096]u8 = undefined;
         var input = Io.File.stdin().readerStreaming(init.io, &input_buffer);
         var output = Io.File.stdout().writerStreaming(init.io, &output_buffer);
-        try @import("zig_project_server.zig").run(backing, init.io, &input.interface, &output.interface, compiler_identity.digest);
+        try @import("zig_project_server.zig").run(backing, init.io, &input.interface, &output.interface, compiler_identity.digest, cache_root);
         return true;
     }
     const command = (if (std.mem.eql(u8, args[1], "parse-project")) Command.parse_project else if (std.mem.eql(u8, args[1], "check-project")) Command.check_project else if (std.mem.eql(u8, args[1], "build-project")) Command.build_project else std.meta.stringToEnum(Command, args[1])) orelse {
@@ -525,7 +562,7 @@ fn run(init: std.process.Init) !bool {
         const inputs = if (selected == .build_project or project_command) args[2..3] else args[2..first_option];
         var success = true;
         for (inputs) |filename| {
-            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, if (selected == .build_project) args[3] else null) catch |err| {
+            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, if (selected == .build_project) args[3] else null, cache_root) catch |err| {
                 const stage = switch (selected) {
                     .parse_project => "parse-project",
                     .check_project => "check-project",
@@ -543,7 +580,7 @@ fn run(init: std.process.Init) !bool {
     var success = true;
     const inputs = if (command == .build) args[2..3] else args[2..];
     for (inputs) |filename| {
-        const ok = process(init.io, backing, &output.interface, command, filename, if (command == .build) args[3] else null) catch |err| {
+        const ok = process(init.io, backing, &output.interface, command, filename, if (command == .build) args[3] else null, cache_root) catch |err| {
             try diagnostic(&output.interface, filename, @tagName(command), @errorName(err), 0, 0, "Compiler operation failed");
             success = false;
             continue;

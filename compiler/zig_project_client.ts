@@ -69,6 +69,9 @@ export interface ZigProjectCompilerOptions {
   codegenWorkers?: number;
   /** Optional backend checkpoint from exportCheckpoint; copied at startup. */
   checkpoint?: Uint8Array<ArrayBuffer>;
+  /** Native restart cache root. Defaults to the platform cache directory when
+   * its environment is readable; false disables automatic persistence. */
+  cacheDirectory?: string | URL | false;
   startupTimeoutMs?: number;
   expectedCompilerIdentity?: string;
   assets?: AssetImports;
@@ -234,10 +237,11 @@ class ProjectProcess implements ZigProjectCompiler {
   #nextId = 1;
   #exit: Deno.CommandStatus | undefined;
 
-  constructor(executable: string) {
+  constructor(executable: string, cacheEnvironment: Record<string, string>) {
     this.#child = new Deno.Command(executable, {
       args: ["serve-project"],
       clearEnv: true,
+      env: cacheEnvironment,
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
@@ -757,6 +761,7 @@ export async function createZigProjectCompiler(
     "shareMachineCode",
     "codegenWorkers",
     "checkpoint",
+    "cacheDirectory",
     "startupTimeoutMs",
     "expectedCompilerIdentity",
     "assets",
@@ -847,7 +852,31 @@ export async function createZigProjectCompiler(
     new TextEncoder().encode(JSON.stringify({ kind: "open", id: 1, ...open }))
       .length > maxMetadataBytes
   ) throw new RangeError("Open metadata exceeds 1 MiB");
-  const process = new ProjectProcess(executable);
+  const cacheEnvironment: Record<string, string> = {};
+  if (options.cacheDirectory !== undefined) {
+    cacheEnvironment.BLOT_CACHE_DIR = options.cacheDirectory === false
+      ? ""
+      : path(options.cacheDirectory, "cache directory");
+  } else {
+    // Preserve the isolated child environment. Only cache-location variables
+    // that the caller can already read are forwarded; never prompt for access.
+    for (
+      const variable of [
+        "BLOT_CACHE_DIR",
+        "XDG_CACHE_HOME",
+        "HOME",
+        "LOCALAPPDATA",
+      ]
+    ) {
+      if (
+        Deno.permissions.querySync({ name: "env", variable }).state !==
+          "granted"
+      ) continue;
+      const value = Deno.env.get(variable);
+      if (value !== undefined) cacheEnvironment[variable] = value;
+    }
+  }
+  const process = new ProjectProcess(executable, cacheEnvironment);
   await process.initialize(open, timeout, identity, checkpoint);
   if (assets !== undefined) {
     try {

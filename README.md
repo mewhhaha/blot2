@@ -6,8 +6,8 @@ compile-time evaluation. The handwritten Zig compiler emits WebAssembly.
 
 `[a]` is a `List a`; `#[a]` is an `Array a`. Both support comprehensions and
 append/prepend spreads. Indexing and indexed updates belong to arrays. Lists use
-balanced trees of dense leaves, sharing unchanged paths between versions. Declaration tags
-use `@[f]`. See the [language guide](compiler/guide.md).
+balanced trees of dense leaves, sharing unchanged paths between versions.
+Declaration tags use `@[f]`. See the [language guide](compiler/guide.md).
 
 ## Build and use
 
@@ -58,6 +58,13 @@ the default prelude. See [project API details](zig-native/PROJECT_CLIENT.md).
 The low-level `createZigProjectCompiler` API requires explicit executable and
 prelude paths. Compilation is asynchronous; source analysis objects and the old
 synchronous compiler API are retired.
+
+The native compiler caches validated restart candidates in the platform cache
+directory. `BLOT_CACHE_DIR` selects another directory; an empty value disables
+it. The project API also accepts `cacheDirectory` (a path or `false`). Its
+default uses cache-location environment variables only when the host already has
+permission to read them. `close()` saves the latest successful revision;
+`dispose()` stops immediately. Source validation always runs.
 
 Unchanged dependencies can be compiled separately:
 

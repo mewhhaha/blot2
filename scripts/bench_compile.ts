@@ -25,12 +25,13 @@ const snapshotRoot = `${repo}/build/bench/gdev-snapshot`;
 const manifestPath = `${repo}/scripts/bench/gdev-manifest.json`;
 const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   [--runs 5] [--workload all|gdev|synthetic|NAME] [--no-retained]
-  [--out DIR] [--allow-wasm-diff] [--write-manifest]
+  [--out DIR] [--allow-wasm-diff] [--write-manifest] [--restart-cache]
 
   --baseline/--candidate  blotc executables. Pass one binary twice to measure noise.
   --workload              gdev snapshot, synthetic corpus, or one program by name.
   --no-retained           skip the retained-session phases.
   --allow-wasm-diff       report, but do not fail on, Wasm differing between binaries.
+  --restart-cache         measure isolated cold cache population and process restarts.
   --write-manifest        rewrite scripts/bench/gdev-manifest.json from the snapshot.
 Results: build/tmp/bench/<timestamp>/{results.json,samples.jsonl}.`;
 
@@ -44,6 +45,7 @@ const { values: args } = parseArgs({
     "no-retained": { type: "boolean", default: false },
     "allow-wasm-diff": { type: "boolean", default: false },
     "write-manifest": { type: "boolean", default: false },
+    "restart-cache": { type: "boolean", default: false },
     help: { type: "boolean", default: false },
   },
 });
@@ -242,7 +244,7 @@ interface Variant {
   readonly sha256: Hash;
 }
 interface FreshSample {
-  kind: "fresh";
+  kind: "fresh" | "restart";
   workload: string;
   variant: string;
   run: number;
@@ -283,6 +285,7 @@ async function freshBuild(
   variant: Variant,
   workload: Workload,
   output: string,
+  cacheDirectory = "",
 ): Promise<Omit<FreshSample, "kind" | "workload" | "variant" | "run">> {
   const log = `${output}.log`;
   const flags = [
@@ -306,7 +309,7 @@ async function freshBuild(
       output,
       ...flags,
     ],
-    env: { LC_ALL: "C" },
+    env: { LC_ALL: "C", BLOT_CACHE_DIR: cacheDirectory },
     stdout: "piped",
     stderr: "piped",
   }).output();
@@ -373,6 +376,7 @@ async function retainedSession(
     prelude: workload.prelude,
     ...(workload.stdRoot ? { stdRoot: workload.stdRoot } : {}),
     imports: aliasMap(workload),
+    cacheDirectory: false,
   });
   const samples: RetainedSample[] = [];
   try {
@@ -514,7 +518,15 @@ async function main(): Promise<number> {
       for (const variant of order) {
         const output =
           `${out}/fresh-${workload.name}-${variant.name}-${run}.wasm`;
-        const measured = await freshBuild(variant, workload, output);
+        const cacheDirectory = args["restart-cache"]
+          ? `${out}/cache/${variant.name}/${workload.name}/${run}`
+          : "";
+        const measured = await freshBuild(
+          variant,
+          workload,
+          output,
+          cacheDirectory,
+        );
         await record({
           kind: "fresh",
           workload: workload.name,
@@ -522,6 +534,20 @@ async function main(): Promise<number> {
           run,
           ...measured,
         });
+        if (args["restart-cache"]) {
+          await record({
+            kind: "restart",
+            workload: workload.name,
+            variant: variant.name,
+            run,
+            ...await freshBuild(
+              variant,
+              workload,
+              `${output}.restart.wasm`,
+              cacheDirectory,
+            ),
+          });
+        }
       }
       if (!args["no-retained"]) {
         for (const variant of order) {
@@ -549,8 +575,8 @@ async function main(): Promise<number> {
     };
     for (const sample of samples) {
       if (sample.workload !== workload.name) continue;
-      if (sample.kind === "fresh") {
-        mark("fresh", sample.variant, sample.wasm_sha256);
+      if (sample.kind !== "retained") {
+        mark(sample.kind, sample.variant, sample.wasm_sha256);
       } else mark(sample.phase, sample.variant, sample.wasm_sha256);
     }
     const edited = await editedCopy(workload, out);
@@ -565,6 +591,11 @@ async function main(): Promise<number> {
       }
     };
     for (const variant of variants.map((v) => v.name)) {
+      compare(
+        `fresh/${variant}`,
+        `restart/${variant}`,
+        "process restart changed the bytes",
+      );
       compare(
         `fresh/${variant}`,
         `population/${variant}`,
@@ -589,6 +620,7 @@ async function main(): Promise<number> {
     for (
       const key of [
         "fresh",
+        "restart",
         "population",
         "first_edit",
         "subsequent_edit",
@@ -610,11 +642,12 @@ async function main(): Promise<number> {
     median(
       samples.filter((s) =>
         s.workload === workload && s.variant === variant &&
-        (s.kind === "fresh" ? phase === "fresh" : s.phase === phase)
+        (s.kind !== "retained" ? phase === s.kind : s.phase === phase)
       ).map((s) => s.cpu_s),
     );
   const phases = [
     "fresh",
+    ...(args["restart-cache"] ? ["restart"] : []),
     "population",
     "first_edit",
     "subsequent_edit",
@@ -641,7 +674,9 @@ async function main(): Promise<number> {
   for (const workload of workloads) {
     medians[workload.name] = {};
     for (const phase of phases) {
-      if (phase !== "fresh" && args["no-retained"]) continue;
+      if (phase !== "fresh" && phase !== "restart" && args["no-retained"]) {
+        continue;
+      }
       const baseline_cpu_s = cell(workload.name, "baseline", phase);
       const candidate_cpu_s = cell(workload.name, "candidate", phase);
       // Retained phases tick at 10 ms; a zero median has no meaningful ratio.

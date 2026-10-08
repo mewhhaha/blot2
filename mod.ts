@@ -100,6 +100,10 @@ export async function createCompiler(
     dependencies: options.dependencies == null
       ? options.dependencies
       : path(options.dependencies),
+    cacheDirectory:
+      options.cacheDirectory === undefined || options.cacheDirectory === false
+        ? options.cacheDirectory
+        : path(options.cacheDirectory),
     imports: options.imports &&
       Object.fromEntries(
         Object.entries(options.imports).map((

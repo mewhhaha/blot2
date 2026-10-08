@@ -51,10 +51,10 @@ not change the optimization mode used to build the native compiler itself.
 resolved functions share one Wasm body while their source/evidence identities
 and indirect table slots remain distinct. Exported functions keep distinct
 identities. The default is `false`. On the frozen gdev workload this removes 272
-duplicate bodies and reduces Wasm size by 7.8%; no total compile-time improvement
-has been established. The
-`runtimeOptimization.shared` counter counts removed duplicate bodies. Artifact
-statistics describe the logical functions retained for replay.
+duplicate bodies and reduces Wasm size by 7.8%; no total compile-time
+improvement has been established. The `runtimeOptimization.shared` counter
+counts removed duplicate bodies. Artifact statistics describe the logical
+functions retained for replay.
 
 `codegenWorkers` requests 1–16 concurrent optimizer workers (default 1). Jobs
 read immutable function bodies and completed lifetime summaries; each worker
@@ -66,7 +66,26 @@ checking or evaluation. Four workers reduced the measured cold assembly phase
 from about 30 ms to 18 ms on gdev, but total latency was too noisy to establish
 a speedup. It remains opt-in.
 
-`exportCheckpoint()` returns portable backend cache bytes from the last
+The CLI and native project server automatically persist restart candidates under
+`$XDG_CACHE_HOME/blot` or `$HOME/.cache/blot` on Linux,
+`$HOME/Library/Caches/blot` on macOS, and `%LOCALAPPDATA%/Blot` on Windows.
+`BLOT_CACHE_DIR` overrides the complete root; an empty value disables it. The
+client accepts `cacheDirectory: "/path"` or `cacheDirectory: false`. By default
+it forwards only the cache-location environment variables it already has
+permission to read. It never requests additional environment access or inherits
+unrelated variables. With no available cache location, builds work normally
+without persistence.
+
+Files are keyed by compiler identity and entry, written atomically, and admitted
+through the same source and semantic checks as explicit checkpoints. Storage
+failures are ignored. A server saves its first successful revision before
+replying, so immediate `dispose()` still leaves restart candidates. Later edits
+avoid cache writes; `close()` saves the latest committed revision. Failed edits
+never replace the last successful checkpoint. Keep the compiler alive for
+editing; restart caching and retained edits are measured separately by
+`deno task bench:compile --restart-cache`.
+
+`exportCheckpoint()` also returns portable backend cache bytes from the last
 successful revision. It queues after earlier builds without advancing the
 revision. Pass those bytes as `checkpoint` when opening another compiler:
 
@@ -79,18 +98,17 @@ const restarted = await createCompiler({
 });
 ```
 
-The caller owns persistence; the compiler does not read or write cache files
-automatically. Startup copies the provided bytes. A checkpoint contains admitted
-principal-query proofs and optimized function bodies, not evaluated source
-values or arbitrary specializations. Compiler identity, complete source/catalog
-and symbol identities, observed semantic inputs, compilation tier and optimizer
-dependencies govern reuse. Changed or unsupported inputs compile afresh. Stale
-or corrupt cache bytes also fall back to fresh compilation. The encoded input
-must be nonempty and fit the transport frame limit (less than 63 MiB).
-Principal proofs currently require the same canonical producer paths. Moving a
-project or extracting an embedded standard library to a different directory can
-therefore lose semantic reuse even when contents match; exact optimizer-body
-reuse is checked separately.
+Explicit bytes take precedence over automatic loading and are copied at startup.
+A checkpoint contains admitted principal-query proofs and optimized function
+bodies, not evaluated source values or arbitrary specializations. Compiler
+identity, complete source/catalog and symbol identities, observed semantic
+inputs, compilation tier and optimizer dependencies govern reuse. Changed or
+unsupported inputs compile afresh. Stale or corrupt cache bytes also fall back
+to fresh compilation. The encoded input must be nonempty and fit the transport
+frame limit (less than 63 MiB). Principal proofs currently require the same
+canonical producer paths. Moving a project or extracting an embedded standard
+library to a different directory can therefore lose semantic reuse even when
+contents match; exact optimizer-body reuse is checked separately.
 
 Exporting before a successful build rejects with `NoSuccessfulRevision`; the
 session remains usable. A failed edit preserves the previous checkpoint.

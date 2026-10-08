@@ -1,4 +1,5 @@
 comptime {
+    _ = @import("restart_cache.zig");
     _ = @import("structural.zig");
     _ = @import("diagnostic_code.zig");
     _ = @import("wasm_inline.zig");

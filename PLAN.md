@@ -9,33 +9,33 @@ version of this file, with every earlier program's measurements, is
 
 ## Twenty-hill program
 
-Approved on 2026-10-08 after a review of checkpoint `be33230`. Resumed with
-the earlier backlog included. This section records completed milestones and
-the remaining work. Each milestone lands as a local commit on `main` after
+Approved on 2026-10-08 after a review of checkpoint `be33230`. Resumed with the
+earlier backlog included. This section records completed milestones and the
+remaining work. Each milestone lands as a local commit on `main` after
 `deno task test:compiler` and `deno task lint:zig` pass. Nothing is pushed.
 
-| Hill                                  | State                                       |
-| ------------------------------------- | ------------------------------------------- |
-| 1. Infer generic callees once         | Done for first-order callees     |
-| 2. Split the `sandbox` region         | Open; depends on 1 and 3                    |
-| 3. Remove the call-depth cliff        | Done; executed depth is separate    |
-| 4. Canonical specialization keys      | Open                                        |
-| 5. Solver hot paths                   | Occurs DAG visitation done; caches/worklist open                       |
-| 6. Cheap literal and body edits       | Open                                        |
-| 7. Region arenas                      | Open                                        |
-| 8. Default restart cache              | Open                                        |
-| 9. Parallel region inference          | Open; after 1–3                             |
-| 10. Benchmarks, profile, budgets      | Done (`ae14677`)                            |
-| 11. One production policy             | Done on main           |
-| 12. One reuse/query model             | Open; after 11                              |
-| 13. Delete or promote prototypes      | Done on main           |
-| 14. Split god structs and switches    | Open                                        |
-| 15. Source layout and test filter     | Test filter on main; layout open |
-| 16. Shared equality/hash, diagnostics | Done (`4dd0a0e`)                            |
-| 17. Zero analyzer warnings in CI      | Done (`4dd0a0e`); first GitHub run pending  |
-| 18. Reclaim disk                      | Done locally; `build/` 37 → 4.5 GB          |
-| 19. Docs state current numbers        | Open                                        |
-| 20. Remove stale leftovers            | Done except the `.blot` fixtures in `src`   |
+| Hill                                  | State                                            |
+| ------------------------------------- | ------------------------------------------------ |
+| 1. Infer generic callees once         | Done for first-order callees                     |
+| 2. Split the `sandbox` region         | Open; depends on 1 and 3                         |
+| 3. Remove the call-depth cliff        | Done; executed depth is separate                 |
+| 4. Canonical specialization keys      | Open                                             |
+| 5. Solver hot paths                   | Occurs DAG visitation done; caches/worklist open |
+| 6. Cheap literal and body edits       | Open                                             |
+| 7. Region arenas                      | Open                                             |
+| 8. Default restart cache              | Done on main                                     |
+| 9. Parallel region inference          | Open; after 1–3                                  |
+| 10. Benchmarks, profile, budgets      | Done (`ae14677`)                                 |
+| 11. One production policy             | Done on main                                     |
+| 12. One reuse/query model             | Open; after 11                                   |
+| 13. Delete or promote prototypes      | Done on main                                     |
+| 14. Split god structs and switches    | Open                                             |
+| 15. Source layout and test filter     | Test filter on main; layout open                 |
+| 16. Shared equality/hash, diagnostics | Done (`4dd0a0e`)                                 |
+| 17. Zero analyzer warnings in CI      | Done (`4dd0a0e`); first GitHub run pending       |
+| 18. Reclaim disk                      | Done locally; `build/` 37 → 4.5 GB               |
+| 19. Docs state current numbers        | Open                                             |
+| 20. Remove stale leftovers            | Done except the `.blot` fixtures in `src`        |
 
 ### Measuring
 
@@ -49,10 +49,11 @@ the remaining work. Each milestone lands as a local commit on `main` after
 - Attribution: `blotc build ... --profile` prints phase timings and the slowest
   inference regions. Every build prints deterministic `work_counters`.
 - Regression budgets: `zig-native/tests/compile_budget.test.ts` asserts counters
-  for the chain, generic chain, diamond and fan-out probes. Deep probes now include annotated chains at 300 and 1,000, a generic
-  chain at 300 and diamond N=16. Executed laws also cover these shapes, deep
-  diagnostics, dependencies, checkpoints and retained recovery. Tighten the
-  `today` tables whenever a hill lowers counters.
+  for the chain, generic chain, diamond and fan-out probes. Deep probes now
+  include annotated chains at 300 and 1,000, a generic chain at 300 and diamond
+  N=16. Executed laws also cover these shapes, deep diagnostics, dependencies,
+  checkpoints and retained recovery. Tighten the `today` tables whenever a hill
+  lowers counters.
 - On this machine ananicy demotes `deno` and its children to SCHED_IDLE. Compare
   CPU, never wall time, and use alternating pairs.
 
@@ -73,30 +74,57 @@ Starting point (be33230, cold CLI on the gdev snapshot):
 ### Completed qualification
 
 The production-policy cleanup and unconditional frontend callee sharing are on
-main. Both passed the full native/guest gate and zero-finding analyzer gate.
-The test filter now imports the complete suite at comptime, so a filter actually
+main. Both passed the full native/guest gate and zero-finding analyzer gate. The
+test filter now imports the complete suite at comptime, so a filter actually
 runs matching tests instead of silently running none. Frontend differential
-qualification included 672 compiler invocations and 30 guide snippets; diagnostics,
-Wasm, constant steps and code-instance counts matched. Diamond N=24 checked in
-2.3 ms. The mutable sharing threshold and closed-call policy switch are removed.
+qualification included 672 compiler invocations and 30 guide snippets;
+diagnostics, Wasm, constant steps and code-instance counts matched. Diamond N=24
+checked in 2.3 ms. The mutable sharing threshold and closed-call policy switch
+are removed.
 
 Backend summaries use a session-owned iterative queue, preserve argument witness
-sites and deferred checking on fallback, and isolate source-interface jobs.
-The full gate passed with 562 guest/client tests and zero analyzer findings.
-Two successive complete guest differential runs passed all 510 existing guest
-and client tests. Deep-chain execution, ordered diagnostic parity, dependency
-and checkpoint round trips, fresh/retained edits, recovery and allocation-failure
+sites and deferred checking on fallback, and isolate source-interface jobs. The
+full gate passed with 562 guest/client tests and zero analyzer findings. Two
+successive complete guest differential runs passed all 510 existing guest and
+client tests. Deep-chain execution, ordered diagnostic parity, dependency and
+checkpoint round trips, fresh/retained edits, recovery and allocation-failure
 laws pass. Debug and release both compile the 1,000-link annotated chain.
 
 Seven alternating gdev pairs after this change measured 748 / 759 ms fresh CPU,
 840 / 850 ms dependency population, 170 / 160 ms first edit and 150 / 150 ms
-subsequent edit (baseline / candidate). Wasm was identical in every phase.
-The 1.5% cold increase is recorded rather than claimed as a speedup; the global
-500 ms target remains open. Maximum region scopes fell from 13,863 to 7,369,
-unresolved collections to 7,356 and occurs visits to 52,251. Requested allocation
-is still about 403 MB. The remaining higher-order region and solver hot paths
-are the next performance work. Raw measurements stay in ignored
+subsequent edit (baseline / candidate). Wasm was identical in every phase. The
+1.5% cold increase is recorded rather than claimed as a speedup; the global 500
+ms target remains open. Maximum region scopes fell from 13,863 to 7,369,
+unresolved collections to 7,356 and occurs visits to 52,251. Requested
+allocation is still about 403 MB. The remaining higher-order region and solver
+hot paths are the next performance work. Raw measurements stay in ignored
 `build/bench/backend-summaries-final`.
+
+The automatic restart cache uses bounded checkpoint decoding, the existing
+source/evidence admission rules and atomic replacement. Both CLI modes and the
+project server persist candidates by compiler identity and entry. The server
+saves the first successful revision before replying and later edits at graceful
+close. Explicit checkpoints take precedence; disabled, missing, unavailable and
+corrupt caches preserve ordinary compilation. Native ownership/OOM laws and
+executed restart/edit/failure/concurrent-writer tests cover the boundary. The
+full compiler gate passes with 565 guest/client tests; the analyzer reports zero
+findings.
+
+Five alternating gdev pairs with isolated caches measured 917 / 990 ms cold
+population and 926 / 551 ms process restart (baseline / candidate). Populating
+the cache adds 8% to that first build; restart CPU falls 40.5%. Retained
+population was 1,020 / 1,020 ms, first edit 180 / 190 ms and subsequent edit 170
+/ 170 ms. Wasm matched in every phase. Cold cache population requests 483 MiB,
+so the allocation target remains open. Raw results are in ignored
+`build/bench/restart-cache`; `bench:compile --restart-cache` reproduces these
+phases and the default benchmark explicitly disables persistence.
+
+Higher-order and lexical summary experiments remain outside main. The final
+prototype passed all 522 guest differential tests and the native suite, but
+regressed fresh CPU by 36%. Its initial retained-build regression was fixed by
+recording completed call proofs and keeping lexical reuse within one region. The
+cold regression still disqualifies it. A stable closed-resolution-cache
+experiment also regressed CPU and allocation; neither experiment is production.
 
 ### Hills 1 (backend) and 3: summaries instead of unfolding
 
@@ -298,7 +326,9 @@ Do this last, because it touches every import.
 
 The first GitHub Actions run of the new workflow needs checking. It clones and
 builds zig-analyzer at `756bfd5` with caching. An uncached analyzer backend
-build took about 16 minutes on this loaded machine.
+build took about 16 minutes on this loaded machine. The latest remote run was
+checked: run 37381022849 succeeded at `86a527b`, before the analyzer workflow
+changes. No run of the new local workflow exists yet; nothing has been pushed.
 
 ### Hill 19: docs
 
