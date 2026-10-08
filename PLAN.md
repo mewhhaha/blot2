@@ -19,7 +19,7 @@ remaining work. Each milestone lands as a local commit on `main` after
 | 1. Infer generic callees once         | Done for first-order callees                        |
 | 2. Split the `sandbox` region         | Open; depends on 1 and 3                            |
 | 3. Remove the call-depth cliff        | Done; executed depth is separate                    |
-| 4. Canonical specialization keys      | Open                                                |
+| 4. Canonical specialization keys      | Frozen capture proofs reused; canonical keys open   |
 | 5. Solver hot paths                   | Occurs DAG and row views done; caches/worklist open |
 | 6. Cheap literal and body edits       | Open                                                |
 | 7. Region arenas                      | Arenas on main; allocation target open              |
@@ -176,6 +176,23 @@ from 344.0 to 335.9 MB and peak requested memory from 88.6 to 79.7 MB. Cold CPU
 increased about 1%; this is an allocation reduction, not a cold-speed claim.
 Wasm matched in all phases. Results are in ignored
 `build/bench/effect-row-views`.
+
+Completed retained specializations now publish fixed-point proofs for the
+selected header and every frozen closure or demand capture. Publication reserves
+all map entries before inserting any, and incomplete regions retain the original
+path. Native laws check idempotence, captured builders, map growth and
+allocation failure. The full native and 565-test guest/client gate and
+zero-finding analyzer pass. A separate 692-invocation differential run preserved
+diagnostics, constant steps, code instances and Wasm.
+
+Seven paired gdev runs measured 1,015 / 964 ms fresh CPU, 1,170 / 1,100 ms
+population, 240 / 230 ms first edit and 210 / 220 ms later edits. Requested
+allocation falls from 335.9 to 328.7 MB. Inference regions fall from 2,597 to
+2,440, scopes from 51,870 to 41,943, and constraint visits from 53,915 to
+48,860; the largest region still has 7,369 scopes. Wasm matched in every phase.
+Results are in ignored `build/bench/frozen-capture-proofs`. This removes
+repeated proofs of already frozen captures; canonical body/evidence sharing
+remains open.
 
 ### Hills 1 (backend) and 3: summaries instead of unfolding
 

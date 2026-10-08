@@ -1495,7 +1495,18 @@ fn builderSpecializationScenario(allocator: std.mem.Allocator, module: *const co
         try std.testing.expectEqual(steps, session.steps);
         try std.testing.expectEqual(expected, session.valueEvidence(specialized));
         try std.testing.expect(session.closureInfo(specialized).mappings.len != 0);
-        for (session.valueChildren(specialized)) |capture| if (session.valueInfo(capture).kind == .closure) try std.testing.expectEqual(expected, session.valueEvidence(capture));
+        const values = session.values.items.len;
+        const regions = session.counters.inference_regions;
+        try std.testing.expectEqual(specialized, try session.specializeClosure(specialized, expected));
+        try std.testing.expectEqual(values, session.values.items.len);
+        try std.testing.expectEqual(regions, session.counters.inference_regions);
+        try std.testing.expectEqual(steps, session.steps);
+        for (session.valueChildren(specialized)) |capture| if (session.valueInfo(capture).kind == .closure) {
+            try std.testing.expectEqual(expected, session.valueEvidence(capture));
+            try std.testing.expectEqual(capture, try session.specializeClosure(capture, expected));
+            try std.testing.expectEqual(values, session.values.items.len);
+            try std.testing.expectEqual(regions, session.counters.inference_regions);
+        };
     }
     var snapshot = try session.copySnapshot(allocator);
     defer snapshot.deinit(allocator);

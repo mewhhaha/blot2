@@ -25,6 +25,12 @@ keep the existing stable artifact-owner identity and validity checks. Dynamic
 member selection, closure captures and staging still request semantic work as
 needed; this boundary does not assume every expression was monomorphized early.
 
+A completed closure specialization also proves its frozen closure and demand
+captures at their exact evidence. The evaluator publishes those fixed points
+together, after reserving all cache entries, so later requests do not recheck or
+clone the same capture graph. A typed header or an unresolved region grants no
+such proof. Different captured values keep their own identities.
+
 `runtime_ir.zig` owns the compact typed stack representation before encoding.
 Each opcode has an exhaustive input/result/effect contract; direct/indirect
 calls resolve their signatures and allocation roles against the module. Scalar

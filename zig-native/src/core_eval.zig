@@ -667,7 +667,7 @@ pub const Session = struct {
             .views = &.{},
             .plain_facts = &.{},
         });
-        try self.cacheSpecialization(key, specialized);
+        try self.cacheCompletedSpecialization(key, specialized, &region);
         if (record) |owned| {
             self.specialization_receipts.appendAssumeCapacity(owned);
             record = null;
@@ -677,6 +677,22 @@ pub const Session = struct {
     fn cacheSpecialization(self: *Session, key: ViewKey, selected: ValueId) Allocator.Error!void {
         // Nested refinement may consume the capacity reserved before the region.
         try self.specialized_closures.put(self.allocator, key, selected);
+    }
+    fn cacheCompletedSpecialization(self: *Session, key: ViewKey, selected: ValueId, region: *const ClosureRegion) Allocator.Error!void {
+        // Every frozen child owns its solved capture graph. Publish fixed points
+        // only after all obligations are checked; a typed view is not a proof.
+        // Nested refinement may have consumed the early map reservation.
+        const complete = region.allConstraintsSolved();
+        try self.specialized_closures.ensureUnusedCapacity(self.allocator, if (complete) 2 + region.scratch.frozen.count() else 1);
+        self.specialized_closures.putAssumeCapacity(key, selected);
+        if (!complete) return;
+        self.specialized_closures.putAssumeCapacity(.{ .value = selected, .evidence = key.evidence }, selected);
+        var frozen = region.scratch.frozen.valueIterator();
+        while (frozen.next()) |value_| {
+            const kind = self.valueInfo(value_.*).kind;
+            if (kind != .closure and kind != .suspension) continue;
+            self.specialized_closures.putAssumeCapacity(.{ .value = value_.*, .evidence = self.valueEvidence(value_.*) }, value_.*);
+        }
     }
     /// Reconstruct the source-owned public interface before ordinary evaluation.
     /// The region may retain unresolved staging obligations; it never reads or
@@ -6540,17 +6556,21 @@ fn specializationCapacityScenario(specialization: bool) !void {
     try std.testing.expect(!session.specialized_closures.contains(key));
     failing.fail_index = failing.alloc_index;
     failing.resize_fail_index = failing.resize_index;
-    try std.testing.expectError(error.OutOfMemory, session.cacheSpecialization(key, selected));
+    if (specialization) {
+        try std.testing.expectError(error.OutOfMemory, session.cacheCompletedSpecialization(key, selected, &region));
+        try std.testing.expect(!session.specialized_closures.contains(.{ .value = selected, .evidence = expected }));
+    } else try std.testing.expectError(error.OutOfMemory, session.cacheSpecialization(key, selected));
     try std.testing.expect(failing.has_induced_failure);
     try std.testing.expectEqual(before, session.specialized_closures.count());
     try std.testing.expect(!session.specialized_closures.contains(key));
     try std.testing.expectEqual(previous, session.specialized_closures.get(prior_key).?);
     failing.fail_index = std.math.maxInt(usize);
     failing.resize_fail_index = std.math.maxInt(usize);
-    try session.cacheSpecialization(key, selected);
+    if (specialization) try session.cacheCompletedSpecialization(key, selected, &region) else try session.cacheSpecialization(key, selected);
     try std.testing.expectEqual(selected, session.specialized_closures.get(key).?);
     try std.testing.expectEqual(previous, session.specialized_closures.get(prior_key).?);
-    try std.testing.expectEqual(before + 1, session.specialized_closures.count());
+    if (specialization) try std.testing.expect(session.specialized_closures.count() >= before + 2) else try std.testing.expectEqual(before + 1, session.specialized_closures.count());
+    if (specialization) try std.testing.expectEqual(selected, try session.specializeClosure(selected, expected));
     // The public retry now reads the completed selected header without growth.
     const retried = if (specialization) try session.specializeClosure(raw, expected) else try session.inferClosure(raw);
     try std.testing.expectEqual(selected, retried);
