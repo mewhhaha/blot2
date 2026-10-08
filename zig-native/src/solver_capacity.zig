@@ -100,7 +100,8 @@ fn vector(total: *usize, list: anytype) bool {
 /// capacity), one metadata byte/slot, u64 keys, u32 values, alignment padding.
 pub fn storageBound(store: *const types.Store) ?usize {
     comptime {
-        if (@typeInfo(types.Store).@"struct".field_names.len != 14 or
+        // Fifteenth field is the scalar occurs_steps work counter: no storage.
+        if (@typeInfo(types.Store).@"struct".field_names.len != 15 or
             @typeInfo(types.Effects.Store).@"struct".field_names.len != 10 or
             @typeInfo(epochs.Cache).@"struct".field_names.len != 6)
             @compileError("Reaudit every owned solver buffer before changing pool accounting");

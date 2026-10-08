@@ -19,7 +19,7 @@ def digest(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--compiler", type=Path, default=ROOT / "zig-native/zig-out/bin/blotc")
-    parser.add_argument("--output", type=Path, default=ROOT / "build/zig-native-first-benchmark/final")
+    parser.add_argument("--output", type=Path, default=ROOT / "build/tmp/zig-native-first-benchmark")
     parser.add_argument("--samples", type=int, default=7)
     options = parser.parse_args()
     if options.samples < 1:

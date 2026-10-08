@@ -50,6 +50,8 @@ pub const Diagnostic = struct {
 pub const ArtifactSummary = struct { demands: usize, jobs: usize, functions: usize, helpers: usize, emission_events: usize, metadata_events: usize, operation_symbols: usize, templates: usize, pinned_modules: usize };
 pub const Result = struct {
     timing: @import("backend_timing.zig").Stats = .{},
+    /// Deterministic work counters for budgets; unlike timing, always recorded.
+    counters: @import("work_counters.zig").Counters = .{},
     optimization: function_facts.Stats = .{},
     runtime_optimization: @import("optimized_bodies.zig").Stats = .{},
     module_stamps: struct { computed: usize = 0, reused: usize = 0, comparisons: usize = 0, copied: usize = 0 } = .{},
@@ -1974,7 +1976,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
             const owned_message = try allocator.dupe(u8, detail);
             if (diagnostic_) |*item| item.detail = owned_message;
             errdefer allocator.free(owned_message);
-            return .{ .principal = generator.principalStats(), .diagnostic = diagnostic_, .owned_message = owned_message, .startup_observation = if (options.observe_startup) try generator.startup_facts.capture(allocator, &generator.module) else null, .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps };
+            return .{ .counters = generator.evaluator.counters, .principal = generator.principalStats(), .diagnostic = diagnostic_, .owned_message = owned_message, .startup_observation = if (options.observe_startup) try generator.startup_facts.capture(allocator, &generator.module) else null, .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps };
         },
         else => return err,
     };
@@ -1997,7 +1999,8 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     result.emitted_functions -= runtime_optimization.shared;
     result.runtime_optimization = runtime_optimization;
     timing.assemble_us = clock.lap();
-    timing.work = generator.work_timing.snapshot();
+    timing.profiled = options.profile_backend;
+    if (options.profile_backend) timing.work = generator.work_timing.snapshot();
     result.optimization = generator.facts.stats;
     result.optimization.region_requests = generator.evaluator.region_scratch_pool.stats.requested;
     result.optimization.region_reused = generator.evaluator.region_scratch_pool.stats.reused;
@@ -2009,6 +2012,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     result.optimization.split_attempts = generator.evaluator.split_attempts;
     result.optimization.split_accepted = generator.evaluator.split_accepted;
     result.optimization.split_declined = generator.evaluator.split_declined;
+    result.counters = generator.evaluator.counters;
     errdefer result.deinit(allocator);
     if (options.observe_startup) result.startup_observation = try generator.startup_facts.capture(allocator, &generator.module);
     result.principal = generator.principalStats();

@@ -8,6 +8,7 @@
     "generate:editor": "cd editor/tree-sitter-blot2 && tree-sitter generate --abi 14 --js-runtime native",
     "check:editor": "deno task generate:editor && cd editor/tree-sitter-blot2 && XDG_CACHE_HOME=\"$PWD/.cache\" tree-sitter test --config-path cli-config.json && XDG_CACHE_HOME=\"$PWD/.cache\" tree-sitter parse --config-path cli-config.json --grammar-path . --quiet ../../examples/syntax.blot ../../examples/ecs.blot ../../examples/host_capabilities.blot ../../examples/host_io.blot",
     "helix:install": "deno task check:editor && deno task test:editor && deno run --allow-env=HOME,XDG_CONFIG_HOME --allow-read --allow-write --allow-run=tree-sitter,hx scripts/setup_helix.ts",
+    "bench:compile": "deno run --allow-all scripts/bench_compile.ts",
     "test:editor": "deno test --allow-read=editor scripts/helix_languages.test.ts",
     "test:native": "cd zig-native && zig build test -Doptimize=safe",
     "test:guest": "deno task package:pack && deno test --allow-read --allow-write --allow-run --allow-env=BLOT_CLIENT_TEST_AMBIENT zig-native/tests compiler/*.test.ts -- zig-native/zig-out/bin/blotc",

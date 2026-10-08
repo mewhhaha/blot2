@@ -13,14 +13,15 @@ const project_check = @import("project_check.zig");
 const Io = std.Io;
 const usage =
     \\Usage: blotc lex|parse|check SOURCE [SOURCE...]
-    \\       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [project options]
+    \\       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]
     \\       blotc dependencies ENTRY OUTPUT.blotdep [project options]
     \\       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]
     \\       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]
-    \\       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]
+    \\       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]
     \\       blotc serve-project (owned project-build byte protocol)
     \\       blotc check|build also accepts explicit --prelude PATH|none (default: none).
     \\       Project options accept --input-mode project|source (default: project).
+    \\       --profile (build, build-project) adds detailed backend clocks to the stats record.
     \\
     \\Handwritten Zig source compiler. JSON-lines diagnostics and stage metrics
     \\are written to stdout. Parse coverage and executable coverage are distinct.
@@ -34,6 +35,7 @@ pub const compiler_defaults = .{ .artifact_replay = compiler_identity.artifact_r
 const Command = enum { lex, parse, check, build, dependencies, parse_project, check_project, build_project };
 const Stats = struct {
     backend_timing: @import("backend_timing.zig").Stats = .{},
+    work_counters: @import("work_counters.zig").Counters = .{},
     optimization: @import("function_facts.zig").Stats = .{},
     runtime_optimization: @import("optimized_bodies.zig").Stats = .{},
     source_bytes: usize = 0,
@@ -200,6 +202,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         stats.optimization = compiled.optimization;
         stats.runtime_optimization = compiled.runtime_optimization;
         stats.backend_timing = compiled.timing;
+        stats.work_counters = compiled.counters;
         stats.callable_wrappers = compiled.callable_wrappers;
         stats.emitted_functions = compiled.emitted_functions;
         stats.constant_steps = compiled.constant_steps;
@@ -227,7 +230,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
     return ok;
 }
 
-fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, output_path: ?[]const u8) !bool {
+fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile: bool, output_path: ?[]const u8) !bool {
     var tracked: memory.TrackedAllocator = .{ .backing = backing };
     const allocator = tracked.allocator();
     const start = now(io);
@@ -237,6 +240,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var symbol_bytes: usize = 0;
     var type_nodes: usize = 0;
     var type_versions: usize = 0;
+    var check_occurs_steps: u64 = 0;
     var row_versions: usize = 0;
     var effect_rows: usize = 0;
     var body_elaborations: usize = 0;
@@ -247,6 +251,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var optimization: @import("function_facts.zig").Stats = .{};
     var runtime_optimization: @import("optimized_bodies.zig").Stats = .{};
     var backend_timing: @import("backend_timing.zig").Stats = .{};
+    var counters: @import("work_counters.zig").Counters = .{};
     var callable_wrappers: usize = 0;
     var emitted_functions: usize = 0;
     var wasm_bytes: usize = 0;
@@ -296,6 +301,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
             const types_ = &module_.checked.types;
             type_nodes += types_.nodes.items.len;
             type_versions += types_.versions.items.len;
+            check_occurs_steps += types_.occurs_steps;
             row_versions += types_.effects.versions.items.len;
             effect_rows += types_.effects.rows.items.len;
         };
@@ -356,7 +362,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         }
         teardown_us += elapsed(release_start, io);
         const emit_start = now(io);
-        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit });
+        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .profile_backend = profile, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit });
         defer {
             const result_release_start = now(io);
             compiled.deinit(allocator);
@@ -366,6 +372,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         optimization = compiled.optimization;
         runtime_optimization = compiled.runtime_optimization;
         backend_timing = compiled.timing;
+        counters = compiled.counters;
         callable_wrappers = compiled.callable_wrappers;
         emitted_functions = compiled.emitted_functions;
         constant_steps = compiled.constant_steps;
@@ -398,6 +405,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .symbol_bytes = symbol_bytes,
         .type_nodes = type_nodes,
         .type_versions = type_versions,
+        .check_occurs_steps = check_occurs_steps,
         .row_versions = row_versions,
         .effect_rows = effect_rows,
         .body_elaborations = body_elaborations,
@@ -408,6 +416,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .optimization = optimization,
         .runtime_optimization = runtime_optimization,
         .backend_timing = backend_timing,
+        .work_counters = counters,
         .callable_wrappers = callable_wrappers,
         .emitted_functions = emitted_functions,
         .constant_steps = constant_steps,
@@ -469,9 +478,18 @@ fn run(init: std.process.Init) !bool {
         defer aliases.deinit(backing);
         var options: project.Options = .{};
         var dependency_path: ?[]const u8 = null;
+        var profile = false;
         var at = first_option;
-        while (at < args.len) : (at += 2) {
+        while (at < args.len) {
+            // Every option takes one value except the --profile flag.
+            if (std.mem.eql(u8, args[at], "--profile")) {
+                if (command != .build and command != .build_project) return false;
+                profile = true;
+                at += 1;
+                continue;
+            }
             if (at + 1 >= args.len) return false;
+            defer at += 2;
             if (std.mem.eql(u8, args[at], "--std-root")) {
                 options.std_root = args[at + 1];
             } else if (std.mem.eql(u8, args[at], "--alias")) {
@@ -488,6 +506,7 @@ fn run(init: std.process.Init) !bool {
         }
         options.aliases = aliases.items;
         if (command == .dependencies or dependency_path != null) {
+            if (profile) return false;
             const success = try dependency_cli.process(init.io, backing, &output.interface, command == .dependencies, args[2], args[3], dependency_path, options, compiler_identity.digest);
             try output.interface.flush();
             return success;
@@ -501,7 +520,7 @@ fn run(init: std.process.Init) !bool {
         const inputs = if (selected == .build_project or project_command) args[2..3] else args[2..first_option];
         var success = true;
         for (inputs) |filename| {
-            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, if (selected == .build_project) args[3] else null) catch |err| {
+            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, if (selected == .build_project) args[3] else null) catch |err| {
                 const stage = switch (selected) {
                     .parse_project => "parse-project",
                     .check_project => "check-project",

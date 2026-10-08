@@ -213,6 +213,7 @@ pub const Session = struct {
     split_attempts: usize = 0,
     split_accepted: usize = 0,
     split_declined: usize = 0,
+    counters: @import("work_counters.zig").Counters = .{},
     closed_source_types: @import("closed_source_types.zig").Facts = .{},
     closed_source_imports: usize = 0,
     closed_source_reused: usize = 0,
@@ -3443,6 +3444,8 @@ const ClosureRegion = struct {
     defer_members: bool = false,
     collect_depth: usize = 0,
     code_expectation_remaining: usize = 0,
+    /// Pooled solvers keep their occurs counter; this region owns the delta.
+    occurs_base: u64 = 0,
 
     fn init(session: *Session) types.Error!ClosureRegion {
         const timing = if (session.timing) |work| work.enter(.inference) else null;
@@ -3452,10 +3455,16 @@ const ClosureRegion = struct {
             break :blk .{ .session = session, .timing = timing, .solver = lease.solver, .solver_initial = lease.initial, .scratch_allocator = session.allocator };
         } else .{ .session = session, .timing = timing, .solver = try types.Store.initWithOptions(session.allocator, .{ .closed_graphs = true }), .scratch_allocator = session.allocator };
         if (session.reuse_region_scratch) region.scratch = session.region_scratch_pool.take(session.allocator);
+        region.occurs_base = region.solver.occurs_steps;
         return region;
     }
     fn deinit(self: *ClosureRegion) void {
         defer if (self.timing) |scope| scope.deinit();
+        const counters = &self.session.counters;
+        counters.inference_regions += 1;
+        counters.region_scopes += self.scratch.sources.items.len;
+        counters.max_region_scopes = @max(counters.max_region_scopes, self.scratch.sources.items.len);
+        counters.occurs_steps += self.solver.occurs_steps - self.occurs_base;
         if (self.timing) |scope| if (self.scratch.sources.items.len != 0 and scope.owner.clock.io != null) {
             const elapsed = scope.elapsedUs();
             if (elapsed >= 1000) {
@@ -4455,6 +4464,7 @@ const ClosureRegion = struct {
                 }
             }
             if (self.scratch.call_instances.get(.{ .owner = target_.unit, .binding = target_.binding, .evidence = known, .caller = lexical_caller })) |prior| {
+                self.session.counters.call_memo_hits += 1;
                 _ = try self.admitSignature(instantiated, self.scratch.sources.items[prior].root);
                 return;
             }
@@ -4493,10 +4503,12 @@ const ClosureRegion = struct {
         if (actual != 0) {
             const key: CallKey = .{ .owner = target_.unit, .binding = target_.binding, .evidence = actual, .caller = lexical_caller };
             if (self.scratch.call_instances.get(key)) |prior| {
+                self.session.counters.call_memo_hits += 1;
                 _ = try self.admitSignature(instantiated, self.scratch.sources.items[prior].root);
                 return;
             }
             try self.scratch.call_instances.put(self.session.allocator, key, scope);
+            self.session.counters.call_collections_closed += 1;
             try self.collect(scope, body_root);
         } else {
             if (self.scratch.unresolved_calls.get(target_)) |active| {
@@ -4507,6 +4519,7 @@ const ClosureRegion = struct {
             }
             try self.scratch.unresolved_calls.put(self.session.allocator, target_, scope);
             defer _ = self.scratch.unresolved_calls.remove(target_);
+            self.session.counters.call_collections_unresolved += 1;
             try self.collect(scope, body_root);
         }
         if (definition == null) try self.shareLexical(scope, caller, binding.scheme);
@@ -5078,6 +5091,7 @@ const ClosureRegion = struct {
     fn solveMode(self: *ClosureRegion, allow_remaining: bool) RegionError!void {
         var fallback = false;
         while (true) {
+            self.session.counters.solver_passes += 1;
             var remaining: usize = 0;
             var required: usize = 0;
             var progress = try self.solveDataAliases();
@@ -5086,6 +5100,7 @@ const ClosureRegion = struct {
                 const constraint = self.scratch.constraints.items[index];
                 if (constraint.solved) continue;
                 remaining += 1;
+                self.session.counters.solver_constraint_visits += 1;
                 if (!constraint.deferred_member) required += 1;
                 if (constraint.kind == .record_merge) {
                     if (try self.solver.mergeRecords(constraint.left, constraint.right)) |merged| {

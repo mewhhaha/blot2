@@ -48,10 +48,13 @@ entry const answer: U32 where { type_rep U32 } = @u32.div 8 (extract (#Box ${div
             JSON.stringify(principal),
           );
         }
-        const timing = rebuilt.stats.backendTiming as {
-          work: { inference_us: number };
+        // Detailed backend clocks exist only for the session that asked.
+        const profiled = result.stats.backendTiming as {
+          work?: { regions: unknown[]; inference_us: number };
         };
-        assert.equal(timing.work.inference_us, 0);
+        assert(Array.isArray(profiled.work?.regions), "profiled work");
+        const plain = rebuilt.stats.backendTiming as { work?: unknown };
+        assert.equal(plain.work, undefined);
         const guest = await instantiateGuest(result.bytes);
         try {
           assert.equal(guest.read("answer"), 8 / divisor);

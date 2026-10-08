@@ -7,7 +7,7 @@ import { instantiateGuest } from "../compiler/guest.ts";
 
 const compiler = resolve(Deno.args[0] ?? "zig-native/zig-out/bin/blotc");
 const std = resolve(Deno.args[1] ?? "std");
-const output = resolve(Deno.args[2] ?? "build/runtime-costs");
+const output = resolve(Deno.args[2] ?? "build/tmp/runtime-costs");
 const source = fileURLToPath(
   new URL("./fixtures/runtime_costs.blot", import.meta.url),
 );

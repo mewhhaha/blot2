@@ -66,6 +66,9 @@ pub const Store = struct {
     // Writes and rollback advance this clock; recycled numeric IDs never make
     // an entry from a discarded history valid again. It is not rolled back.
     mutation_epoch: u64 = 0,
+    /// Deterministic work counter: type nodes visited by occurs checks. It is
+    /// never rolled back or consulted by solving, so pooled stores accumulate.
+    occurs_steps: u64 = 0,
     use_resolution_cache: bool = true,
     resolved: epoch_cache.Cache = .{},
     allocator: std.mem.Allocator,
@@ -502,6 +505,7 @@ pub const Store = struct {
         while (pending.pop()) |id| {
             if (budget == 0) return error.TypeLimit;
             budget -= 1;
+            self.occurs_steps += 1;
             const value = self.node(id);
             switch (value.tag) {
                 .variable => if (value.a == variable) return true,
@@ -1122,6 +1126,19 @@ test "occurs and mismatch rollback preserve prior constraints" {
     try std.testing.expectError(error.TypeMismatch, store.unify(left, right));
     try std.testing.expectEqual(before, store.mark());
     try std.testing.expectEqual(a, try store.resolve(a, 0));
+}
+test "occurs steps count visited nodes and survive rollback" {
+    var store = try Store.init(std.testing.allocator);
+    defer store.deinit();
+    try std.testing.expectEqual(@as(u64, 0), store.occurs_steps);
+    const a = try store.fresh();
+    const recursive = try store.function(a, u32_type);
+    const point = store.mark();
+    try std.testing.expectError(error.InfiniteType, store.unify(a, recursive));
+    const counted = store.occurs_steps;
+    try std.testing.expect(counted >= 2);
+    store.rollback(point);
+    try std.testing.expectEqual(counted, store.occurs_steps);
 }
 test "indexed scalar histories equal sequential replacement oracle at every cursor" {
     var random = std.Random.DefaultPrng.init(0x12345678);

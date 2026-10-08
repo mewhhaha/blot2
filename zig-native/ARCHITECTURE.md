@@ -153,6 +153,11 @@ publication in public edit measurements. Report requested allocator bytes
 separately from process RSS. Keep deterministic output and executed guest checks
 alongside latency measurements. The gdev targets are approximately 500 ms cold
 and below 100 ms incremental, without a hard real-time guarantee.
-The project API's `profileBackend: true` adds nested phase timings and the eight
-slowest inference regions to `stats.backendTiming`. Detailed clocks are disabled
-by default so profiling does not tax ordinary hot paths.
+The project API's `profileBackend: true` and the CLI's `build ... --profile`
+(also `build-project`) add nested phase timings and the eight slowest inference
+regions as `backend_timing.work`. Detailed clocks are disabled by default so
+profiling does not tax ordinary hot paths, and an unprofiled record omits `work`.
+Deterministic work counters (`work_counters` in CLI stats, `workCounters` in the
+project API) are always on: inference regions, region scopes, callee body
+collections split into closed (memoized) and unresolved (re-collected), solver
+passes and constraint visits, and occurs steps. Budget on these, not wall time.

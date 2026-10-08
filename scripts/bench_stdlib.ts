@@ -6,7 +6,7 @@ import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 import { type Guest, instantiateGuest } from "../compiler/guest.ts";
 
-const output = resolve(Deno.args[2] ?? "build/stdlib-bench");
+const output = resolve(Deno.args[2] ?? "build/tmp/stdlib-bench");
 const variants = [
   {
     name: "current",

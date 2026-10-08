@@ -31,6 +31,27 @@ Lint reports 120 existing warnings and no errors across 285 files. The
 records the ten scopes, raw measurements, qualification details and binary pin.
 This batch has not been installed locally.
 
+## Compile budgets and benchmark harness
+
+`zig-native/tests/compile_budget.test.ts` compiles a synthetic corpus
+(`scripts/bench/corpus.ts`: monomorphic and generic chains, a generic diamond, a
+generic fanout) and asserts budgets on deterministic work counters and allocator
+bytes, never wall time. Budgets are 1.5x the values measured when set; later
+summary-based instantiation hills should lower the counters, and the `today`
+tables should then be tightened. Ignored probes record two cliffs: a
+monomorphic chain of 300 links is rejected with `constant_fuel` (collect depth
+256) and a generic diamond of 16 levels is exponential.
+
+`deno task bench:compile --baseline OLD/blotc --candidate NEW/blotc [--runs 5]`
+replaces the per-batch harnesses. It alternates fresh-process pairs and
+retained-session phases (population, first edit, subsequent edit, no-op),
+reports median child CPU (user + system), verifies Wasm SHA-256 equality between
+binaries and between fresh and retained builds, and writes results under
+`build/tmp/bench/<timestamp>/`. The private gdev snapshot lives in
+`build/bench/gdev-snapshot` (gitignored; never commit it) and is verified
+against `scripts/bench/gdev-manifest.json`; without it the synthetic corpus
+still runs. Pass `--profile` to `blotc build` for detailed backend clocks.
+
 ## Previous packed-row checkpoint
 
 The production packed-row transfer is implemented and tested. Lists and Arrays

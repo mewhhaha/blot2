@@ -7,7 +7,24 @@ pub const Stats = struct {
     initialize_us: u64 = 0,
     assemble_us: u64 = 0,
     capture_us: u64 = 0,
+    /// Detailed work clocks exist only when the caller requested profiling.
+    /// An unprofiled record has no `work` object rather than zero placeholders.
+    profiled: bool = false,
     work: WorkStats = .{},
+    pub fn jsonStringify(self: *const Stats, stream: *std.json.Stringify) std.Io.Writer.Error!void {
+        try stream.beginObject();
+        inline for (@typeInfo(Stats).@"struct".field_names) |name| {
+            if (comptime !std.mem.eql(u8, name, "profiled") and !std.mem.eql(u8, name, "work")) {
+                try stream.objectField(name);
+                try stream.write(@field(self, name));
+            }
+        }
+        if (self.profiled) {
+            try stream.objectField("work");
+            try stream.write(self.work);
+        }
+        try stream.endObject();
+    }
 };
 pub const Region = struct {
     file_utf8: [160]u8 = @splat(0),
@@ -29,7 +46,34 @@ pub const Region = struct {
         try stream.write(.{ .file = std.mem.sliceTo(&self.file_utf8, 0), .file_truncated = self.file_truncated, .offset = self.offset, .unit = self.unit, .binding = self.binding, .body = self.body, .scopes = self.scopes, .nodes = self.nodes, .us = self.us, .principal = self.principal, .rejected = self.rejected, .input_calls = self.input_calls, .recorded_inputs = self.recorded_inputs, .output_types = self.output_types, .output_rows = self.output_rows });
     }
 };
-pub const WorkStats = struct { regions: [8]Region = @splat(.{}), lookup_us: u64 = 0, replay_us: u64 = 0, specialization_us: u64 = 0, constants_us: u64 = 0, principals_us: u64 = 0, interfaces_us: u64 = 0, startup_us: u64 = 0, layouts_us: u64 = 0, evaluation_us: u64 = 0, inference_us: u64 = 0 };
+pub const WorkStats = struct {
+    regions: [8]Region = @splat(.{}),
+    lookup_us: u64 = 0,
+    replay_us: u64 = 0,
+    specialization_us: u64 = 0,
+    constants_us: u64 = 0,
+    principals_us: u64 = 0,
+    interfaces_us: u64 = 0,
+    startup_us: u64 = 0,
+    layouts_us: u64 = 0,
+    evaluation_us: u64 = 0,
+    inference_us: u64 = 0,
+    /// Only the slowest recorded regions are published; empty slots are not.
+    pub fn jsonStringify(self: *const WorkStats, stream: *std.json.Stringify) std.Io.Writer.Error!void {
+        try stream.beginObject();
+        try stream.objectField("regions");
+        try stream.beginArray();
+        for (self.regions) |record| if (record.us != 0) try stream.write(record);
+        try stream.endArray();
+        inline for (@typeInfo(WorkStats).@"struct".field_names) |name| {
+            if (comptime !std.mem.eql(u8, name, "regions")) {
+                try stream.objectField(name);
+                try stream.write(@field(self, name));
+            }
+        }
+        try stream.endObject();
+    }
+};
 pub const Work = struct {
     pub const Phase = enum { other, lookup, replay, specialization, constants, principals, interfaces, startup, layouts, evaluation, inference };
     clock: Clock = .{ .io = null, .previous = null },
@@ -104,4 +148,21 @@ fn copyUtf8Prefix(buffer: []u8, name: []const u8) bool {
     while (len != 0 and len < name.len and name[len] & 0xc0 == 0x80) len -= 1;
     @memcpy(buffer[0..len], name[0..len]);
     return len != name.len;
+}
+
+test "unprofiled timing publishes no work object or placeholder regions" {
+    const allocator = std.testing.allocator;
+    const plain = try std.json.Stringify.valueAlloc(allocator, Stats{}, .{});
+    defer allocator.free(plain);
+    try std.testing.expect(std.mem.find(u8, plain, "prepare_us") != null);
+    try std.testing.expect(std.mem.find(u8, plain, "work") == null);
+    try std.testing.expect(std.mem.find(u8, plain, "regions") == null);
+    var profiled: Stats = .{ .profiled = true };
+    profiled.work.inference_us = 7;
+    profiled.work.regions[3] = .{ .us = 1500, .scopes = 2 };
+    const detail = try std.json.Stringify.valueAlloc(allocator, profiled, .{});
+    defer allocator.free(detail);
+    try std.testing.expect(std.mem.find(u8, detail, "\"inference_us\":7") != null);
+    // Seven empty slots are not published; only the recorded region is.
+    try std.testing.expectEqual(@as(usize, 1), std.mem.count(u8, detail, "\"scopes\""));
 }
