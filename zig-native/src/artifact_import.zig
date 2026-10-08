@@ -136,9 +136,16 @@ pub const Importer = struct {
     /// Gate, old Pools and current Core stay immutable through preparation/use;
     /// the returned importer independently owns every copied map and spelling.
     pub fn initCheckedQuery(allocator: Allocator, old: *const artifacts.Pools, units: []const core.Module, checked: *const QueryGate) Allocator.Error!?Importer {
+        if (checked.allocator.ptr != allocator.ptr or checked.allocator.vtable != allocator.vtable) return null;
+        return initIndependentQuery(allocator, old, units, checked);
+    }
+    /// An independently owned semantic job may use its own allocator while
+    /// borrowing this exact immutable validation result. Copy all importer
+    /// maps; never retain a Gate lease or touch its non-atomic reference count.
+    pub fn initIndependentQuery(allocator: Allocator, old: *const artifacts.Pools, units: []const core.Module, checked: *const QueryGate) Allocator.Error!?Importer {
         // Pair before reading borrowed old content. Pointer equality identifies
         // this compile epoch's owners; it is not cross-compilation validation.
-        if (!checked.enabled or checked.source_pools != old or checked.units.ptr != units.ptr or checked.units.len != units.len or checked.allocator.ptr != allocator.ptr or checked.allocator.vtable != allocator.vtable) return null;
+        if (!checked.enabled or checked.source_pools != old or checked.units.ptr != units.ptr or checked.units.len != units.len) return null;
         if (old.modules.len != units.len or checked.structural_units.len != units.len or !old.project_identity or old.identity == null) return null;
         const names = old.identity.?.view();
         if (names.owners.len != units.len or names.symbols.len == 0 or names.symbols.len > std.math.maxInt(u32) or units.len >= std.math.maxInt(u32)) return null;

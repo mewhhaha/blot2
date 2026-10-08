@@ -140,7 +140,11 @@ const Generator = struct {
     source_template_stats: source_value_template.TransportStats = .{},
     query_state: ?*completed_specialization_query.State = null,
     reuse_refinements: bool = false,
+    refinement_owner: ?*code_artifacts.Context = null,
+    reuse_body_proof_cutoff: bool = false,
     refinement_stats: refinement_receipt.Stats = .{},
+    refinement_memo: refinement_receipt.Memo = .{},
+    reuse_local_refinements: bool = true,
     work: artifact_fragment.Stats = .{},
     module: wasm.Module,
     instances: std.AutoHashMapUnmanaged(Key, u32) = .empty,
@@ -227,6 +231,7 @@ const Generator = struct {
         if (self.persisted_principals) |reader| {
             result.persisted_requests = reader.stats.requests;
             result.persisted_hits = reader.stats.hits;
+            result.persisted_nonempty_hits = reader.stats.nonempty_hits;
             result.persisted_call_proofs = reader.stats.call_proofs;
             result.persisted_declines = reader.stats.declined;
         }
@@ -244,6 +249,10 @@ const Generator = struct {
             .host => |key| self.hostFunction(key),
             .constant, .runtime_global => error.InvalidFunctionReference,
         };
+    }
+    pub fn replayScalarConstant(self: *Generator, request: code_artifacts.Request) Error!void {
+        std.debug.assert(request == .constant);
+        _ = try self.constant(request.constant.target, request.constant.ty);
     }
     pub fn publishRetained(self: *Generator, request: code_artifacts.Request, function_id: u32) Error!void {
         switch (request) {
@@ -280,6 +289,7 @@ const Generator = struct {
         return @backingInt(try (try self.representationBridge()).rowFromEvidence(@fromBackingInt(@intCast(id))));
     }
     fn deinit(self: *Generator) void {
+        self.refinement_memo.deinit(self.allocator);
         self.startup_facts.deinit(self.allocator);
         if (self.representation_bridge) |*bridge| bridge.deinit();
         self.module.deinit();
@@ -1003,6 +1013,7 @@ const Generator = struct {
     }
     fn lookupRefinement(context: *anyopaque, root: EvidenceRoot, shape: @import("code_expectation.zig").View, expected: u32, seeds: []const type_evidence.Mapping, rows: []const type_evidence.RowMapping) Allocator.Error!?core_eval.SolvedEvidence {
         const self: *Generator = @ptrCast(@alignCast(context));
+        if (self.reuse_local_refinements) if (try self.refinement_memo.lookup(self, root, expected, seeds, rows)) |result| return result;
         return refinement_receipt.lookup(self, root, shape, expected, seeds, rows);
     }
     fn recordRefinement(context: *anyopaque, record: specialization.Record) Allocator.Error!void {
@@ -1914,6 +1925,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     generator.evaluator.timing = if (options.profile_backend) &generator.work_timing else null;
     // The replay gate destroys all mutable compiler state before materialization.
     if (recording) generator.artifacts = &metadata;
+    if (recording or options.policy.reuse_local_refinements) generator.refinement_owner = &metadata;
     var generator_alive = true;
     defer if (generator_alive) generator.deinit();
     generator.memoize_layout_roots = options.policy.memoize_layout_roots;
@@ -1922,20 +1934,24 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     generator.evaluator.reuse_region_scratch = options.policy.reuse_region_scratch;
     generator.evaluator.reuse_callable_definitions = options.policy.reuse_callable_definitions;
     generator.evaluator.reuse_evidence_imports = options.policy.reuse_evidence_imports;
+    generator.evaluator.reuse_closed_source_types = options.policy.reuse_closed_source_types;
+    generator.evaluator.split_closed_calls = options.policy.split_closed_calls;
     generator.evaluator.retain_principal_inputs = options.policy.reuse_projected_principals;
-    generator.reuse_refinements = options.policy.reuse_refinements and recording;
+    generator.reuse_refinements = (options.policy.reuse_refinements and recording) or options.policy.reuse_local_refinements;
+    generator.reuse_local_refinements = options.policy.reuse_local_refinements;
+    generator.reuse_body_proof_cutoff = options.policy.reuse_body_proof_cutoff;
     generator.evaluator.diagnostic_context = .{ .identity = options.identity, .entry = entry, .prelude = options.diagnostic_prelude_unit, .source_mode = options.diagnostic_source_mode };
     generator.startup_facts.enabled = options.observe_startup;
     if (options.identity) |names| generator.runtime_operations = runtime_operations.Store.initProject(allocator, names);
     if (recording) generator.runtime_operations.artifacts = &journal;
     var retained: ?artifact_fragment.State = null;
     defer if (retained) |*state| state.deinit();
-    if (options.previous) |previous| {
+    if (options.policy.reuse_code_fragments) if (options.previous) |previous| {
         if (previous.emission.sealed and previous.metadata.pools != null) {
             retained = try artifact_fragment.State.initWithStamps(allocator, previous, units, options.identity, options.cached_units, stamps);
             generator.retained = &retained.?;
         }
-    }
+    };
     var principal_state: ?principal_evidence_reuse.State = null;
     defer if (principal_state) |*state| state.deinit();
     var persisted_principals: ?@import("principal_archive.zig").Reader = if (options.checkpoint) |checkpoint| .{ .allocator = allocator, .archive = &checkpoint.principal, .units = units, .names = options.identity } else null;
@@ -1988,6 +2004,8 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
             query_state.?.stats.gate_fresh = 1;
         }
         query_state.?.optimize_admission = options.policy.optimize_completed_query_admission;
+        query_state.?.io = options.io;
+        query_state.?.semantic_workers = options.policy.semantic_workers;
         query_state.?.source_effect_rows = options.policy.reuse_source_effect_queries;
         query_state.?.reuse_graph_scratch = options.policy.reuse_query_graph_scratch;
         // The prepared importer consumes only this compile epoch's checked
@@ -2037,6 +2055,11 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     result.optimization.region_retained_bytes = generator.evaluator.region_scratch_pool.stats.retained_bytes;
     result.optimization.evidence_import_requests = generator.evaluator.evidence_import_requests;
     result.optimization.evidence_import_reused = generator.evaluator.evidence_import_reused;
+    result.optimization.closed_source_imports = generator.evaluator.closed_source_imports;
+    result.optimization.closed_source_reused = generator.evaluator.closed_source_reused;
+    result.optimization.split_attempts = generator.evaluator.split_attempts;
+    result.optimization.split_accepted = generator.evaluator.split_accepted;
+    result.optimization.split_declined = generator.evaluator.split_declined;
     errdefer result.deinit(allocator);
     if (options.observe_startup) result.startup_observation = try generator.startup_facts.capture(allocator, &generator.module);
     result.principal = generator.principalStats();
@@ -2053,6 +2076,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         result.reuse.reused_closures = state.stats.reused_closures;
         result.reuse.candidates = state.stats.candidates;
         result.reuse.declined = state.stats.declined;
+        result.reuse.reused_scalar_constants = state.stats.reused_scalar_constants;
     }
     if (recording) {
         try metadata.specialization_receipts.ensureUnusedCapacity(allocator, generator.evaluator.specialization_receipts.items.len);
@@ -2062,6 +2086,13 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
             for (state.independent_calls.items) |record| metadata.independent_calls.appendAssumeCapacity(try record.clone(allocator));
         }
         try metadata.capturePoolsWithStamps(&generator, options.identity, stamps);
+        // Publish validation only with this candidate's owned artifact pools.
+        // A failed edit leaves the previous certificate and source pins intact.
+        if (principal_state) |*state| {
+            metadata.pools.?.dependency_certificate = try state.gate.freezeValidation(allocator, metadata.pools.?.modules);
+        } else if (retained) |*state| if (state.importer.code_gate) |*checked| {
+            metadata.pools.?.dependency_certificate = try checked.semantic.freezeValidation(allocator, metadata.pools.?.modules);
+        };
         journal.seal();
         try journal.freezeFunctions(metadata.function_jobs.items);
         // These helpers capture values absent from ClosureKey. Full journal

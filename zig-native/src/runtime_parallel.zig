@@ -8,38 +8,8 @@ const retained = @import("optimized_bodies.zig");
 const sharing = @import("machine_code_sharing.zig");
 const A = std.mem.Allocator;
 
-const LockedAllocator = struct {
-    backing: A,
-    io: std.Io,
-    mutex: std.Io.Mutex = .init,
-    fn allocator(self: *LockedAllocator) A {
-        return .{ .ptr = self, .vtable = &.{ .alloc = alloc, .resize = resize, .remap = remap, .free = free } };
-    }
-    fn alloc(raw: *anyopaque, len: usize, alignment: std.mem.Alignment, ret: usize) ?[*]u8 {
-        const self: *LockedAllocator = @ptrCast(@alignCast(raw));
-        self.mutex.lockUncancelable(self.io);
-        defer self.mutex.unlock(self.io);
-        return self.backing.rawAlloc(len, alignment, ret);
-    }
-    fn resize(raw: *anyopaque, old: []u8, alignment: std.mem.Alignment, len: usize, ret: usize) bool {
-        const self: *LockedAllocator = @ptrCast(@alignCast(raw));
-        self.mutex.lockUncancelable(self.io);
-        defer self.mutex.unlock(self.io);
-        return self.backing.rawResize(old, alignment, len, ret);
-    }
-    fn remap(raw: *anyopaque, old: []u8, alignment: std.mem.Alignment, len: usize, ret: usize) ?[*]u8 {
-        const self: *LockedAllocator = @ptrCast(@alignCast(raw));
-        self.mutex.lockUncancelable(self.io);
-        defer self.mutex.unlock(self.io);
-        return self.backing.rawRemap(old, alignment, len, ret);
-    }
-    fn free(raw: *anyopaque, old: []u8, alignment: std.mem.Alignment, ret: usize) void {
-        const self: *LockedAllocator = @ptrCast(@alignCast(raw));
-        self.mutex.lockUncancelable(self.io);
-        defer self.mutex.unlock(self.io);
-        self.backing.rawFree(old, alignment, ret);
-    }
-};
+const LockedAllocator = @import("parallel_allocator.zig").LockedAllocator;
+
 const Slot = struct { needed: bool, output: ?ir.Body = null, failed: bool = false };
 const Work = struct {
     session: *const pipeline.Session,

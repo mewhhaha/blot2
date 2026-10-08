@@ -1,5 +1,63 @@
 # Compiler direction
 
+## Semantic compilation performance program
+
+The next ten hills are approved after checkpoint `8b44ee6`. Preserve that
+compiler and the gdev source snapshot for paired fresh-process and retained-edit
+measurements. The qualified starting measurements are 1,606 ms cold and 399 ms
+first edit; quieter diagnostic timings are for attribution, not claimed gains.
+
+1. Split oversized inference regions using independently valid body summaries.
+2. Deduplicate repeated semantic specialization by complete evidence.
+3. Share immutable semantic graphs while keeping solver variables region-local.
+4. Extend semantic early cutoff to general body edits with exact dependencies.
+5. Publish transactional revision deltas without rebuilding unchanged metadata.
+6. Retain evaluated constants and relocatable serialized data with exact inputs.
+7. Expand portable dependencies to eligible complete semantic artifacts.
+8. Complete the resolved backend IR boundary for calls, control flow and ownership.
+9. Remove incidental function indices from optimized-body reuse identities.
+10. Schedule independent semantic jobs with owned solver state deterministically.
+
+Status: implementation in progress. The earlier bounded paths and experiments
+below remain the reference and fallback, not evidence that these new gates are
+complete. General language rules authorize reuse; declaration names never do.
+Preserve chronological solver semantics, staging, diagnostics, provider and
+generative identities, revision recovery, and executed-Wasm behavior. Measure
+each architectural step before extending its admission or production defaults.
+
+The current implementation adds a Session-local completed-refinement index to
+both fresh CLI and retained builds, shares closed source types across lexical
+imports, retains dependency-validation certificates, imports nonempty portable
+principal results, relocates optimized direct calls, and allows exact completed
+scalar constants inside retained code fragments. Refinement receipts can now
+stop transitive invalidation at freshly checked closed-call judgments: changing
+a callee from addition to subtraction preserves eligible caller type answers
+while runtime code and staged values rebuild. Focused parity and allocation
+failure laws pass. The release build and 1,095 native tests pass; all 548
+guest/client tests pass across the full run and focused environmental retries.
+The [qualification report](std/PERFORMANCE.md#semantic-compilation-performance)
+records the final scope and pinned binary.
+
+Three broader paths remain opt-in: independent first-order call partitions,
+resolved scalar SSA with structured branches/joins, and independent semantic
+workers. The partition experiment accepts 963 gdev boundaries and reduces the
+largest diagnostic region from 13,863 to 10,335 scopes, with identical Wasm and
+evaluation counts. Initial fresh-session pairs improve, but retained-edit
+samples show no clear win. It therefore does not change production defaults.
+
+These are bounded implementations, not completion of the entire redesign.
+Higher-order/SCC summaries, general body edit identities, full metadata deltas,
+retained aggregate evaluation/serialized data, arbitrary portable semantic jobs,
+resolved calls/loops/heap ownership, and a general adaptive semantic scheduler
+remain open. Five alternating pairs show median native CPU of 1,196 → 1,182 ms
+cold, 350 → 310 ms first edit and 330 → 290 ms revert. Cold CPU is nearly
+unchanged; edit CPU improves about 11–12%. Requested allocation traffic falls
+433.6 → 425.4 MB. Host contention makes the wall samples unsuitable for proving
+the target latency; the 500 ms cold / 100 ms edit goals remain unestablished.
+The historical measurements below describe their respective checkpoints.
+
+## Existing programs
+
 The current list-like transfer order is: preserve one typed frontend and shared
 language laws; packed scalar rows and broader general fusion/SIMD; then ragged
 builders, rolling reductions and composable source summaries. Query rewrites,

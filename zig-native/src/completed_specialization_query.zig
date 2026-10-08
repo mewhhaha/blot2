@@ -15,6 +15,9 @@ pub const Stats = struct {
     independent_rechecked: usize = 0,
     independent_reused: usize = 0,
     independent_declined: usize = 0,
+    parallel_batches: usize = 0,
+    parallel_jobs: usize = 0,
+    parallel_workers: usize = 1,
     recorded: usize = 0,
     complete_records: usize = 0,
     lookups: usize = 0,
@@ -51,6 +54,8 @@ pub const State = struct {
     /// Capture/receipts and current Core/Gate are immutable until deinit.
     optimize_admission: bool = false,
     recover_call_proofs: bool = true,
+    io: ?std.Io = null,
+    semantic_workers: u8 = 1,
     source_effect_rows: bool = false,
     revalidate_plain_facts: bool = true,
     reuse_graph_scratch: bool = false,
@@ -301,7 +306,9 @@ pub const State = struct {
                 for (proofs.items) |*proof| proof.deinit(self.allocator);
                 proofs.deinit(self.allocator);
             }
-            for (record.call_reads) |read| {
+            var batch = try self.prepareCallProofs(g, maps, record.call_reads);
+            defer if (batch) |*parallel| parallel.deinit();
+            for (record.call_reads, 0..) |read, read_index| {
                 const actual = (try evidence(g, maps, read.evidence)) orelse {
                     valid = false;
                     break;
@@ -315,7 +322,8 @@ pub const State = struct {
                     }
                 };
                 if (!present and read.present and self.recover_call_proofs) {
-                    if (try independent.acquire(self, g, read, actual)) |proof| {
+                    const recovered = if (batch != null and batch.?.attempted(read_index)) batch.?.take(read_index, &self.stats) else try independent.acquire(self, g, read, actual);
+                    if (recovered) |proof| {
                         var owned = proof;
                         errdefer owned.deinit(self.allocator);
                         try proofs.append(self.allocator, owned);
@@ -491,5 +499,28 @@ pub const State = struct {
             return mapped[record.selected];
         }
         return null;
+    }
+    fn prepareCallProofs(self: *State, g: anytype, maps: *importer.Importer, reads: []const receipt.CallRead) Allocator.Error!?@import("semantic_parallel.zig").Batch {
+        if (!self.recover_call_proofs or self.semantic_workers <= 1 or reads.len < 4) return null;
+        const io = self.io orelse return null;
+        const parallel = @import("semantic_parallel.zig");
+        var requests: std.ArrayList(parallel.Request) = .empty;
+        defer requests.deinit(self.allocator);
+        var source_bytes: usize = 0;
+        for (reads, 0..) |read, read_index| {
+            if (!read.present) continue;
+            const actual = (try evidence(g, maps, read.evidence)) orelse continue;
+            if (g.evaluator.validated_calls.contains(.{ .target = .{ .unit = read.unit - 1, .binding = read.binding }, .evidence = actual })) continue;
+            if (!self.gate.admits(.{ .unit = read.unit, .binding = read.binding })) continue;
+            const body = self.gate.units[read.unit - 1].body(read.binding).?;
+            source_bytes +|= body.span.end -| body.span.start;
+            try requests.append(self.allocator, .{ .index = read_index, .read = read, .actual = actual });
+        }
+        if (requests.items.len < 4 or source_bytes < 4096) return null;
+        const batch = try parallel.run(self.allocator, io, self, g, requests.items, self.semantic_workers);
+        self.stats.parallel_batches += 1;
+        self.stats.parallel_jobs += requests.items.len;
+        self.stats.parallel_workers = @max(self.stats.parallel_workers, batch.workers);
+        return batch;
     }
 };

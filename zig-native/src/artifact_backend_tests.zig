@@ -58,6 +58,66 @@ const collection_source =
     \\  return array
 ;
 
+test "local refinement and closed source sharing preserve exact Wasm staging and effects" {
+    for ([_]bool{ false, true }) |retained| {
+        var hits: usize = 0;
+        for ([_][]const u8{ partition_source, provider_source, collection_source, @embedFile("request-fixtures/template-wrapped-reuse.blot"), @embedFile("request-fixtures/f32-foreign-nested.blot") }) |source| {
+            var module = try lower(source);
+            defer module.deinit(a);
+            var reference = try backend.compileWithOptions(a, &.{module}, 1, .{
+                .retain_artifacts = retained,
+                .policy = .{ .reuse_refinements = true, .reuse_local_refinements = false, .reuse_closed_source_types = false },
+            });
+            defer reference.deinit(a);
+            var shared = try backend.compileWithOptions(a, &.{module}, 1, .{
+                .retain_artifacts = retained,
+                .policy = .{ .reuse_refinements = true },
+            });
+            defer shared.deinit(a);
+            try std.testing.expect(reference.diagnostic == null and shared.diagnostic == null);
+            try std.testing.expectEqualSlices(u8, reference.bytes, shared.bytes);
+            try std.testing.expectEqual(reference.constant_steps, shared.constant_steps);
+            try std.testing.expectEqual(reference.code_instances, shared.code_instances);
+            try std.testing.expectEqual(retained, shared.capture != null);
+            hits += shared.refinements.local_hits;
+        }
+        try std.testing.expect(hits > 0);
+    }
+}
+
+const partition_source =
+    \\const plus = fn (value: U32) => @u32.add value 1
+    \\const twice = fn (value: U32) => @u32.add (plus value) (plus value)
+    \\const recurse = fn (value: U32) -> U32 => if @u32.eq value 0 then twice value else recurse (@u32.sub value 1)
+    \\entry const folded: U32 where { type_rep U32 } = @u32.add (twice 20) (recurse 3)
+    \\entry const answer = fn (value: U32) => @u32.add (twice value) (recurse value)
+;
+fn partitionScenario(allocator: std.mem.Allocator, module: *const core.Module, expected: []const u8) !void {
+    var result = try backend.compileWithOptions(allocator, &.{module.*}, 1, .{ .retain_artifacts = true, .policy = .{ .split_closed_calls = true } });
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.optimization.split_accepted > 0);
+    try std.testing.expectEqualSlices(u8, expected, result.bytes);
+}
+test "closed call partitions preserve recursive components staged evaluation effects and allocation failure" {
+    for ([_][]const u8{ partition_source, provider_source, collection_source, @embedFile("request-fixtures/template-wrapped-reuse.blot"), @embedFile("request-fixtures/f32-foreign-nested.blot") }, 0..) |source, index| {
+        var module = try lower(source);
+        defer module.deinit(a);
+        var reference = try backend.compileWithOptions(a, &.{module}, 1, .{ .retain_artifacts = true });
+        defer reference.deinit(a);
+        var split = try backend.compileWithOptions(a, &.{module}, 1, .{ .retain_artifacts = true, .policy = .{ .split_closed_calls = true } });
+        defer split.deinit(a);
+        try std.testing.expectEqualDeep(reference.diagnostic, split.diagnostic);
+        try std.testing.expectEqualSlices(u8, reference.bytes, split.bytes);
+        try std.testing.expectEqual(reference.constant_steps, split.constant_steps);
+        try std.testing.expectEqual(reference.code_instances, split.code_instances);
+        if (index == 0) {
+            try std.testing.expect(split.optimization.split_accepted > 0);
+            try @import("allocation_failures.zig").checkAllAllocationFailures(a, partitionScenario, .{ &module, reference.bytes });
+        }
+    }
+}
+
 test "Gate A backend reconstructs solved captures providers State Demand Foreign and result templates after all mutable owners die" {
     for ([_][]const u8{ provider_source, collection_source, @embedFile("request-fixtures/f32-foreign-nested.blot"), @embedFile("request-fixtures/suspended.blot"), @embedFile("request-fixtures/nested-owner.blot"), @embedFile("request-fixtures/template-wrapped-reuse.blot") }) |source| {
         var module = try lower(source);

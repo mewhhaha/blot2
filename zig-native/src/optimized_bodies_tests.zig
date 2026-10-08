@@ -97,6 +97,57 @@ test "optimized input and output publication releases every failed allocation" {
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, failureScenario, .{});
 }
 
+fn movedFunctions(a_: std.mem.Allocator, inserted: bool, changed: bool) !wasm.Module {
+    var module = wasm.Module.init(a_);
+    errdefer module.deinit();
+    const arena = try module.ensureArena();
+    if (inserted) {
+        const extra = try module.addFunction(&.{}, .i32);
+        try module.emit(extra, .{ .op = .i32_const, .operand = 123 });
+    }
+    const read = try module.addFunction(&.{.i32}, .i32);
+    try module.emitSlice(read, &.{ .{ .op = .local_get }, .{ .op = .i32_load } });
+    if (changed) try module.emitSlice(read, &.{ .{ .op = .i32_const, .operand = 1 }, .{ .op = .i32_add } });
+    const middle = try module.addFunction(&.{.i32}, .i32);
+    try module.emitSlice(middle, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = read } });
+    const caller = try module.addFunction(&.{}, .i32);
+    const object = try module.addLocal(caller, .i32);
+    try module.emitSlice(caller, &.{ .{ .op = .i32_const, .operand = 128 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = object }, .{ .op = .local_get, .operand = object }, .{ .op = .i32_const, .operand = 42 }, .{ .op = .i32_store }, .{ .op = .local_get, .operand = object }, .{ .op = .call, .operand = middle } });
+    const recursive = try module.addFunction(&.{.i32}, .i32);
+    try module.emitSlice(recursive, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = recursive } });
+    return module;
+}
+fn relocationScenario(a_: std.mem.Allocator) !void {
+    var module = try movedFunctions(a_, false, false);
+    defer module.deinit();
+    var old: retained.Capture = .{ .allocator = a_ };
+    defer old.deinit();
+    const before = try module.assembleWithOptions(.{ .current = &old });
+    defer a_.free(before);
+    for ([_]bool{ false, true }) |changed| {
+        var moved = try movedFunctions(a_, true, changed);
+        defer moved.deinit();
+        var current: retained.Capture = .{ .allocator = a_ };
+        defer current.deinit();
+        var stats: retained.Stats = .{};
+        const reused = try moved.assembleWithOptions(.{ .previous = &old, .current = &current, .stats = &stats });
+        defer a_.free(reused);
+        const fresh = try moved.assemble();
+        defer a_.free(fresh);
+        try std.testing.expectEqualSlices(u8, fresh, reused);
+        if (!changed) try std.testing.expectEqual(module.functions.items.len, stats.reused);
+        const caller = moved.functions.items.len - 2;
+        var matcher = try retained.Matcher.init(a_, &old, &current);
+        defer matcher.deinit();
+        try std.testing.expectEqual(!changed, matcher.matches(caller));
+        try std.testing.expect(matcher.matches(moved.functions.items.len - 1));
+    }
+}
+test "optimized body relocation preserves recursive calls cleanup and transitive changes" {
+    try relocationScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, relocationScenario, .{});
+}
+
 test "development tier keeps lifetime cleanup and rejects optimized body captures from another tier" {
     const a = std.testing.allocator;
     var module = wasm.Module.init(a);

@@ -193,6 +193,7 @@ pub const Pools = struct {
     generation: u64 = 0,
     identity: ?IdentityMetadata = null,
     modules: []ModulePin,
+    dependency_certificate: ?@import("dependency_certificate.zig").Certificate = null,
     bodies: []BodyPin,
     layouts: Layouts,
     evaluator: core_eval.Snapshot,
@@ -226,6 +227,7 @@ pub const Pools = struct {
     evaluator_traced_bodies: usize,
     evaluator_traced_nodes: usize,
     pub fn deinit(self: *Pools, allocator: Allocator) void {
+        if (self.dependency_certificate) |*certificate| certificate.deinit(allocator);
         if (self.identity) |*identity| identity.deinit(allocator);
         for (self.modules) |module| allocator.free(module.canonical_path);
         allocator.free(self.modules);
@@ -371,7 +373,7 @@ pub const Context = struct {
         errdefer self.allocator.free(mappings);
         const rows = try self.allocator.dupe(type_evidence.RowMapping, solved.rows);
         errdefer self.allocator.free(rows);
-        var input_key = if (solved.types.len == 0 and solved.rows.len == 0 and inputs != null) try inputs.?.clone(self.allocator) else null;
+        var input_key = if (inputs) |observed| try observed.clone(self.allocator) else null;
         errdefer if (input_key) |*key| key.deinit(self.allocator);
         try self.principal_proofs.append(self.allocator, .{ .target = target, .options = options, .types = mappings, .rows = rows, .inputs = input_key });
     }

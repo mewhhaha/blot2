@@ -47,6 +47,34 @@ invalidate it. Rollback, physical list edits, owner changes and saturated
 physical clocks do invalidate it. Type sharing never merges independently
 scoped variables. Pooled scratch clears these answers and their owners.
 
+Closed frozen source types may likewise share one imported graph per region,
+owner and request depth. Source classification belongs to the immutable Session;
+open type/effect variables always keep their scoped imports. Physical mutation,
+rollback and limit changes revoke the region's imported answers.
+
+Completed refinement answers may be reused within one evidence owner only under
+the same root, expected shape, type/row seeds, options and dynamic observations.
+Only complete results with no evaluation or value publication qualify. Closed
+call proofs accumulate monotonically within that Session; independently scoped
+generic variables are never used as a principal cache key.
+The receipt owner also exists in fresh CLI builds, independently of artifact
+recording. Keeping a local query answer does not enable the emission journal or
+retain a complete backend snapshot.
+
+Across revisions, a refinement receipt distinguishes collected source bodies
+from positive closed-call proof reads. An unchanged local body may survive a
+transitive runtime-body edit only when every collected source remains exact and
+every consumed call judgment has already been established in the new Session.
+The ordered namespaces, semantic catalogs, expected shape, seeds, scalar reads,
+plain-data facts and publication dependencies must still agree. This cutoff
+grants no executable or compile-time-value reuse; those dependencies rebuild.
+
+The closed-call partition experiment gives each child its own chronological
+solver. Only exact, fully solved first-order arrows may replace parent source
+collection. Recursive components, higher-order boundaries and unresolved work
+keep ordinary collection. Failed speculative checks publish no diagnostic; the
+ordinary path remains responsible for the error.
+
 Constant collection values publish immutable child spans. Session-owned growth
 buffers may write outside every published span and extend only the latest span
 in that buffer. Branching from an earlier version copies its visible children.
@@ -114,6 +142,12 @@ callee lifetime facts. Compute summaries in deterministic order before selecting
 cached bodies; cache hits must not change recursive summary observation order.
 Failed assembly discards its candidate capture and preserves the previous one.
 
+Function positions are relocations, not body identities. Relocation reuse checks
+the complete direct-call graph, including cycles, imports, globals, signatures
+and every completed lifetime summary. Each old call target must map consistently
+to one current target. Rewrite only an owned output copy; ambiguity or bounded
+proof exhaustion declines reuse.
+
 Compilation tiers belong to the session and to optimized captures. Development
 mode may omit scalar replacement and automatic vectorization, but never checking,
 evaluation or required cleanup. Cross-tier optimized bodies cannot be reused.
@@ -135,8 +169,8 @@ checksum protect the format; they do not authorize semantic reuse. Every loaded
 body still requires the ordinary exact matcher against fresh machine inputs and
 completed callee lifetime facts. Automatic disk-cache loading is not enabled.
 
-An explicit backend checkpoint also owns empty-result principal-query proofs
-and their closed call evidence. It contains no Core pointers, native capacities
+An explicit backend checkpoint also owns eligible principal-query type/row
+results and their closed call evidence. It contains no Core pointers, native capacities
 or evaluated values. Exact ordered Core/catalog and symbol/producer images
 (including literal bits) precede dynamic input validation. Re-intern imported
 closed evidence into the current session, validate all targets and reserve all
@@ -144,6 +178,11 @@ publication capacity before publishing any memo or call proof. Providers,
 generative identities and unbounded graphs decline. Source-image equality alone
 does not authorize a query whose observed inputs differ. Every lookup clears
 the preceding lookup's borrowed input key, including an in-memory hit.
+
+Portable nonempty results validate every source variable and effect-row variable,
+reject duplicates and import every evidence graph into the new owner. Complete
+dynamic input recording is required. Failed imports publish no memo or call
+certificate; ordinary compilation remains available.
 
 Only a committed successful revision can export a checkpoint. Export never
 advances its revision; failed edits preserve the last successful export. Loading
@@ -154,9 +193,11 @@ evaluation still run. The host explicitly owns cache file persistence.
 Experimental resolved scalar SSA crosses its ownership boundary only after
 ordinary specialization. Every operand refers to an earlier typed value; all
 admitted values are scalar, and instruction order and raw immediates are exact.
+Structured branches retain their condition and matching join; phi operands run
+only in their selected arm, preserving traps and evaluation order.
 Admission has bounded depth/work and emits nothing on an unsupported form.
 Emission reads only the owned IR. OOM propagates rather than silently falling
-back. Heap/control-flow ownership and overloaded selection are not admitted.
+back. Heap ownership, loops, calls and overloaded selection are not admitted.
 
 Experimental scalar live-patch images admit no globals, memory, host imports,
 startup, closures or effects. Public semantic scalar ABI and internal machine
@@ -263,6 +304,24 @@ revision and its owners. Within one compile, code and principal/query admission
 share immutable semantic validation arrays through independently released leases.
 Source owners, current Core, allocator and admission options must match; executable
 body/value checks remain separate.
+
+Successful revision candidates may retain frozen-Core/dependency validation
+certificates. They own the validated module stamps and exactly the foreign
+binding bounds and symbol/source bounds observed by validation. Retained pins
+are still checked against their bytes. A certificate saves validation work; it
+grants no interface, value or executable reuse. Only successful publication can
+make the new certificate available to a later revision.
+
+An already completed scalar constant no longer blocks its enclosing code
+fragment when source admission, layout, scalar kind and bits match. Admission
+never evaluates that constant. Replay records the ordinary constant job and
+preserves evaluation counts; aggregate data and runtime globals remain separate.
+
+Optional semantic workers reconstruct independent closed-call judgments in owned
+Sessions. They borrow immutable source, scalar inputs and validation facts, and
+copy all importer maps into private storage. They never share Gate reference
+counts, solver state, evaluated values or diagnostic publication. Every worker
+joins before the caller validates and publishes results in original input order.
 
 Static closure keys retain binding-to-value roots. Admission compares the whole
 captured graph and records only proven old-to-current value correspondences;

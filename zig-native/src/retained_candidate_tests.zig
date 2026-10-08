@@ -392,6 +392,9 @@ test "refinement receipt preserves generic collection record State and captured 
         var session = try retained.Session.initEmpty(a, .{});
         defer session.deinit();
         session.enableProjectBuildReuse();
+        // Complete code reuse skips refinement entirely. Isolate the semantic
+        // receipt boundary while retaining its ordinary inputs and outputs.
+        session.policy.reuse_code_fragments = false;
         session.policy.reuse_refinements = true;
         var hits: usize = 0;
         for ([_]u32{ 8, 9, 8, 9 }) |version| {
@@ -419,6 +422,7 @@ test "refinement receipt survives edits reverts rejected revisions and changed s
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     session.enableProjectBuildReuse();
+    session.policy.reuse_code_fragments = false;
     session.policy.reuse_refinements = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
@@ -481,6 +485,7 @@ test "refinement receipt every replay allocation failure leaves previous results
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     session.enableProjectBuildReuse();
+    session.policy.reuse_code_fragments = false;
     session.policy.reuse_refinements = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);

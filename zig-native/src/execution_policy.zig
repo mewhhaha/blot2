@@ -5,6 +5,7 @@ pub const Policy = struct {
     codegen_tier: @import("compilation_tier.zig").Tier = .optimized,
     share_machine_code: bool = false,
     codegen_workers: u8 = 1,
+    semantic_workers: u8 = 1,
     /// Experimental resolved SSA for closed straight-line scalar bodies.
     resolve_scalar_bodies: bool = false,
     /// Same-binary execution policies; none grants semantic cache admission.
@@ -12,9 +13,17 @@ pub const Policy = struct {
     reuse_region_scratch: bool = true,
     reuse_callable_definitions: bool = true,
     reuse_evidence_imports: bool = true,
+    reuse_closed_source_types: bool = true,
+    reuse_local_refinements: bool = true,
+    /// Independently solve closed first-order call boundaries. Qualification
+    /// remains opt-in while region/work-limit behavior is being measured.
+    split_closed_calls: bool = false,
     /// Successful root conversions within an immutable emitter mapping region.
     memoize_layout_roots: bool = true,
     reuse_refinements: bool = false,
+    reuse_body_proof_cutoff: bool = false,
+    /// Query-only differential runs still retain principal/refinement inputs.
+    reuse_code_fragments: bool = true,
     /// Retain the principal prepasses already executed by a fresh backend.
     capture_fresh_principals: bool = false,
     reuse_projected_principals: bool = false,
@@ -57,6 +66,7 @@ pub const Policy = struct {
         .reuse_declaration_principals = true,
         .reuse_unaffected_modules = true,
         .reuse_refinements = true,
+        .reuse_body_proof_cutoff = true,
         .optimize_completed_query_admission = true,
         .reuse_completed_specializations = true,
         .reuse_source_effect_queries = true,

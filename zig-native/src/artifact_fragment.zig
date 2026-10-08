@@ -12,7 +12,7 @@ const Allocator = std.mem.Allocator;
 const absent = std.math.maxInt(u32);
 const Error = Allocator.Error || error{ InvalidFunctionReference, InvalidGlobalReference, ModuleTooLarge, Declined };
 const Address = struct { original: u32, actual: u32, len: u32, owner: u32 };
-pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, resolved_scalar_bodies: usize = 0, resolved_scalar_values: usize = 0 };
+pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, resolved_scalar_bodies: usize = 0, resolved_scalar_values: usize = 0, reused_scalar_constants: usize = 0 };
 pub const State = struct {
     allocator: Allocator,
     old: *const capture.Capture,
@@ -64,7 +64,8 @@ pub const State = struct {
         };
         for (old.metadata.jobs.items, 1..) |job, id| {
             var fresh = !job.reusable or switch (job.request) {
-                .constant, .runtime_global => true,
+                .constant => !scalarConstant(old, job),
+                .runtime_global => true,
                 else => false,
             };
             for (job.inline_bodies.items) |target| if (!graphs.admitsBody(target)) {
@@ -117,6 +118,32 @@ pub const State = struct {
         const result = try a.alloc(u32, count);
         @memset(result, absent);
         return result;
+    }
+    fn scalarConstant(old: *const capture.Capture, job: artifacts.Job) bool {
+        if (job.request != .constant or job.state != .complete or job.value == null) return false;
+        const pools = &(old.metadata.pools orelse return false);
+        const result = job.value.?;
+        return result.value < pools.evaluator.values.len and pools.evaluator.values[result.value].kind == .scalar and
+            result.layout > 0 and result.layout <= @import("types.zig").f32_type;
+    }
+    /// Observe an already completed scalar, never demand evaluation during
+    /// admission. Exact current value/type equality protects literal operands
+    /// in the retained caller; the ordinary constant job is replayed below.
+    fn scalarConstantRequest(self: *State, g: anytype, job: artifacts.Job) Allocator.Error!?artifacts.Request {
+        if (!scalarConstant(self.old, job)) return null;
+        const request = job.request.constant;
+        if (!self.importer.admitsBody(request.target) or request.target.unit == 0 or request.target.unit > self.importer.unit_map.len) return null;
+        const unit = self.importer.unit_map[request.target.unit - 1];
+        if (unit == 0 or unit > g.evaluator.units.len or request.target.binding >= g.evaluator.units[unit - 1].bindings.len) return null;
+        const body = g.evaluator.units[unit - 1].body(request.target.binding) orelse return null;
+        if (body.runtime) return null;
+        const slot = g.evaluator.slots[g.evaluator.binding_offsets[unit - 1] + request.target.binding];
+        if (slot.state != .complete) return null;
+        const actual = g.evaluator.valueScalar(slot.value) orelse return null;
+        const prior = self.old.metadata.pools.?.evaluator.values[job.value.?.value];
+        if (actual.scalar != prior.scalar or actual.bits != prior.bits) return null;
+        const ty = (try self.importer.importLayout(g, request.ty)) orelse return null;
+        return .{ .constant = .{ .target = .{ .unit = unit, .binding = request.target.binding }, .ty = ty } };
     }
     fn metaAt(self: *const State, sequence: u64) usize {
         var left: usize = 0;
@@ -239,8 +266,10 @@ pub const State = struct {
             if (event.sequence > last) break;
             switch (event.event) {
                 .enter => |child| {
-                    for (self.old.metadata.jobs.items[child - 1].static_reads.items) |read| if (!try self.matchStatic(g, read)) return false;
-                    if (try self.importer.importRequest(g, self.old.metadata.jobs.items[child - 1].request) == null) return false;
+                    const child_job = self.old.metadata.jobs.items[child - 1];
+                    for (child_job.static_reads.items) |read| if (!try self.matchStatic(g, read)) return false;
+                    const request = if (child_job.request == .constant) try self.scalarConstantRequest(g, child_job) else try self.importer.importRequest(g, child_job.request);
+                    if (request == null) return false;
                 },
                 else => {},
             }
@@ -383,9 +412,15 @@ pub const State = struct {
                 switch (event) {
                     .enter => |child| if (child != id) {
                         const old_child = &self.old.metadata.jobs.items[child - 1];
-                        const actual_request = (try self.importer.importRequest(g, old_child.request)) orelse return error.InvalidFunctionReference;
-                        const actual = try g.replayRequest(actual_request);
-                        if (old_child.function) |function_id| self.functions[function_id] = actual;
+                        if (old_child.request == .constant) {
+                            const actual_request = (try self.scalarConstantRequest(g, old_child.*)) orelse return error.InvalidFunctionReference;
+                            try g.replayScalarConstant(actual_request);
+                            self.stats.reused_scalar_constants += 1;
+                        } else {
+                            const actual_request = (try self.importer.importRequest(g, old_child.request)) orelse return error.InvalidFunctionReference;
+                            const actual = try g.replayRequest(actual_request);
+                            if (old_child.function) |function_id| self.functions[function_id] = actual;
+                        }
                         m = self.metaAt(self.ends[child - 1] + 1);
                         e = self.emissionAt(self.ends[child - 1] + 1);
                     },

@@ -38,6 +38,11 @@ pub const Stats = struct {
     region_requests: usize = 0,
     evidence_import_requests: usize = 0,
     evidence_import_reused: usize = 0,
+    closed_source_imports: usize = 0,
+    closed_source_reused: usize = 0,
+    split_attempts: usize = 0,
+    split_accepted: usize = 0,
+    split_declined: usize = 0,
     region_reused: usize = 0,
     region_retained_bytes: usize = 0,
 };

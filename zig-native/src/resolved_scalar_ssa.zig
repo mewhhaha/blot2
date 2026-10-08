@@ -1,7 +1,7 @@
-//! First resolved SSA boundary: a straight-line scalar body with explicit
+//! Resolved scalar SSA with structured branches, explicit joins,
 //! operands, result types, trap facts and scalar ownership. Admission borrows
 //! checked Core; the completed body owns everything needed for emission.
-//! Calls, heap values and control-flow joins stay on the existing path.
+//! Calls and heap values stay on the existing path.
 const std = @import("std");
 const core = @import("core.zig");
 const types = @import("types.zig");
@@ -10,11 +10,15 @@ const scalar = @import("scalar_ops.zig");
 const A = std.mem.Allocator;
 pub const Value = enum(u32) { _ };
 pub const Node = struct {
+    kind: enum { value, branch, alternate, join } = .value,
+    /// Matching structured branch for alternate/join nodes. Phi operands are
+    /// selected by that branch, never eagerly evaluated at the join.
+    control: ?Value = null,
     instruction: ir.Instruction,
     operands: [2]Value = @splat(@fromBackingInt(0)),
     arity: u2 = 0,
     ty: ir.ValueType,
-    ownership: enum { scalar } = .scalar,
+    ownership: enum { scalar, none } = .scalar,
     may_trap: bool = false,
 };
 pub const Body = struct {
@@ -72,6 +76,17 @@ const Builder = struct {
                     if (self.nodes.items[@backingInt(operands[1])].ty != contract.inputs[1]) return error.Unsupported;
                 } else if (node.b != 0) return error.Unsupported;
                 return self.append(.{ .instruction = .{ .op = opcode }, .operands = operands, .arity = @intCast(contract.arity), .ty = result, .may_trap = contract.may_trap });
+            },
+            .if_value => {
+                if (self.source.typeOf(node.a) != types.boolean) return error.Unsupported;
+                const condition = try self.value(node.a, depth + 1);
+                const branch = try self.append(.{ .kind = .branch, .instruction = .{ .op = .if_, .operand = @backingInt(result) }, .operands = .{ condition, @fromBackingInt(0) }, .arity = 1, .ty = .none, .ownership = .none });
+                const when_true = try self.value(node.b, depth + 1);
+                if (self.nodes.items[@backingInt(when_true)].ty != result) return error.Unsupported;
+                _ = try self.append(.{ .kind = .alternate, .control = branch, .instruction = .{ .op = .else_ }, .ty = .none, .ownership = .none });
+                const when_false = try self.value(node.c, depth + 1);
+                if (self.nodes.items[@backingInt(when_false)].ty != result) return error.Unsupported;
+                return self.append(.{ .kind = .join, .control = branch, .instruction = .{ .op = .end }, .operands = .{ when_true, when_false }, .arity = 2, .ty = result });
             },
             else => return error.Unsupported,
         }

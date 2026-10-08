@@ -9,7 +9,8 @@ const source =
     \\entry const arithmetic = fn (value: U32) => @u32.add (@u32.mul value 3) (@u32.div 24 value)
     \\entry const floating = fn (value: F32) => @f32.div (-0.0) value
     \\entry const converted = fn (value: F32) => @f32.to_u32 value
-    \\entry const fallback = fn (value: U32) => if @u32.eq value 0 then 7 else 9
+    \\entry const branching = fn (value: U32) => if @u32.eq value 0 then 7 else @u32.div 24 value
+    \\entry const nested = fn (value: U32) => @u32.add 1 (if @u32.eq value 0 then 7 else if @u32.eq value 1 then 8 else @u32.div 24 value)
 ;
 const Fixture = struct {
     units: [1]core.Module,
@@ -36,7 +37,7 @@ fn scenario(allocator: std.mem.Allocator, fixture: *const Fixture, expected: []c
     var compiled = try backend.compileWithOptions(allocator, &fixture.units, 1, .{ .policy = policy, .retain_artifacts = true, .artifact_replay = true });
     defer compiled.deinit(allocator);
     try std.testing.expect(compiled.diagnostic == null);
-    try std.testing.expect(compiled.reuse.resolved_scalar_bodies >= 2);
+    try std.testing.expect(compiled.reuse.resolved_scalar_bodies >= 4);
     try std.testing.expect(compiled.reuse.resolved_scalar_values > compiled.reuse.resolved_scalar_bodies);
     try std.testing.expectEqualSlices(u8, expected, compiled.bytes);
 }

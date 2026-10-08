@@ -1,5 +1,38 @@
 # Zig compiler status
 
+The next ten compiler-performance tracks have bounded implementations. The
+default path deduplicates complete refinement queries in fresh and retained
+builds, shares closed source type imports, preserves eligible caller type
+answers across runtime-body edits, retains validation certificates, and reuses
+optimized bodies across direct-call index changes. Completed scalar constants
+can participate in enclosing code-fragment reuse. Explicit dependency
+checkpoints now include eligible nonempty principal type/row results.
+
+On five alternating frozen-gdev pairs, median native CPU is **1,196 → 1,182 ms
+cold**, **350 → 310 ms first edit**, and **330 → 290 ms revert**. Cold CPU is
+nearly unchanged; edit CPU improves about 11–12%. Allocation traffic falls
+**433.6 → 425.4 MB**, with less than 1% change in peak requested live storage.
+Population refinement regions fall **8,539 → 1,490**, but the largest remaining
+inference region still contains 267,068 nodes. Severe host contention makes the
+wall samples unsuitable for claiming a target latency. The 500 ms cold / 100 ms
+edit goals remain unestablished.
+
+Independent first-order inference partitions, scalar SSA branches/joins, and
+parallel semantic jobs remain opt-in. General higher-order/SCC summaries, full
+revision metadata deltas, aggregate evaluation retention, resolved calls/loops/
+heap ownership and an adaptive semantic scheduler remain open. These are
+general language optimizations, with no prelude-name rules.
+
+The release build and **1,095 native tests** pass. All **548 guest/client tests**
+pass across the full run and focused retries after temporary-disk exhaustion
+and artificial-peer startup timeouts. Fresh/retained gdev bytes agree exactly.
+Lint reports 120 existing warnings and no errors across 285 files. The
+[semantic performance report](../std/PERFORMANCE.md#semantic-compilation-performance)
+records the ten scopes, raw measurements, qualification details and binary pin.
+This batch has not been installed locally.
+
+## Previous packed-row checkpoint
+
 The production packed-row transfer is implemented and tested. Lists and Arrays
 store flat scalar tuples/records inline, with preserved snapshots, field order,
 floating-point bits and logical lengths. Packed cursors and direct loops reuse

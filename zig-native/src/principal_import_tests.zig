@@ -82,6 +82,7 @@ const Pinned = struct {
         // This test pin owns every pool the principal importer reads. Identity
         // and immutable Core remain owned by the enclosing fixture.
         var pools: artifacts.Pools = undefined;
+        pools.dependency_certificate = null;
         pools.project_identity = true;
         pools.identity = fixture.names;
         pools.modules = pins;

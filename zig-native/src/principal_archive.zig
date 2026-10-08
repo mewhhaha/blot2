@@ -1,4 +1,4 @@
-//! Portable candidates for empty-result principal queries. The full ordered
+//! Portable candidates for source-owned principal query results. The full ordered
 //! source/catalog image and symbol/producer namespace must match before dynamic
 //! observations are checked. Runtime values are always evaluated afresh.
 const std = @import("std");
@@ -10,7 +10,7 @@ const identity = @import("runtime_identity.zig");
 const metadata = @import("code_artifacts.zig");
 const format = @import("dependency_format.zig");
 const A = std.mem.Allocator;
-const Proof = struct { target: core.BindingRef, options: eval.Options, inputs: inputs.Key };
+const Proof = struct { target: core.BindingRef, options: eval.Options, inputs: inputs.Key, types: []const types.Mapping, rows: []const types.RowMapping };
 const Snapshot = struct {
     modules: []format.Digest,
     namespace: format.Digest,
@@ -18,7 +18,7 @@ const Snapshot = struct {
     evidence: types.Snapshot,
 };
 fn key(compiler: format.Digest) format.Key {
-    return .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v1"), .source = @splat(0), .dependencies = @splat(0) };
+    return .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v2"), .source = @splat(0), .dependencies = @splat(0) };
 }
 pub fn encode(a: A, compiler: format.Digest, context: *const metadata.Context) format.Error![]u8 {
     const pools = &(context.pools orelse return error.InvalidArtifact);
@@ -29,8 +29,7 @@ pub fn encode(a: A, compiler: format.Digest, context: *const metadata.Context) f
     var proofs: std.ArrayList(Proof) = .empty;
     defer proofs.deinit(a);
     for (context.principal_proofs.items) |proof| {
-        if (proof.types.len != 0 or proof.rows.len != 0) continue;
-        if (proof.inputs) |observed| try proofs.append(a, .{ .target = proof.target, .options = proof.options, .inputs = observed });
+        if (proof.inputs) |observed| try proofs.append(a, .{ .target = proof.target, .options = proof.options, .inputs = observed, .types = proof.types, .rows = proof.rows });
     }
     return format.encode(a, key(compiler), Snapshot{ .modules = modules, .namespace = metadata.stamp(names), .proofs = proofs.items, .evidence = pools.evaluator.evidence });
 }
@@ -45,7 +44,7 @@ pub const Archive = struct {
 pub fn decode(a: A, compiler: format.Digest, bytes: []const u8) format.Error!Archive {
     return .{ .allocator = a, .snapshot = try format.decode(Snapshot, a, bytes, key(compiler)) };
 }
-pub const Stats = struct { requests: usize = 0, hits: usize = 0, image_checks: usize = 0, declined: usize = 0, call_proofs: usize = 0 };
+pub const Stats = struct { requests: usize = 0, hits: usize = 0, nonempty_hits: usize = 0, image_checks: usize = 0, declined: usize = 0, call_proofs: usize = 0 };
 pub const Reader = struct {
     allocator: A,
     archive: *const Archive,
@@ -86,6 +85,15 @@ pub const Reader = struct {
             defer if (owned) translated.deinit(self.allocator);
             var importer: Import = .{ .allocator = self.allocator, .source = self.archive.snapshot.evidence.view(), .target = &session.evidence, .units = self.units, .names = self.names.? };
             defer importer.deinit();
+            var solved = importer.importResult(&self.units[target.unit - 1], proof.types, proof.rows) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.InvalidEvidence => {
+                    self.stats.declined += 1;
+                    continue;
+                },
+            };
+            var solved_owned = true;
+            defer if (solved_owned) solved.deinit(self.allocator);
             var valid = true;
             for (translated.call_publications) |*call| {
                 if (!validTarget(self.units, call.target)) {
@@ -121,10 +129,12 @@ pub const Reader = struct {
             }
             try translated.publish(session);
             self.stats.hits += 1;
+            self.stats.nonempty_hits += @intFromBool(solved.types.len != 0 or solved.rows.len != 0);
             self.stats.call_proofs += translated.call_publications.len;
             self.last_inputs = translated;
             owned = false;
-            return .{ .types = &.{}, .rows = &.{} };
+            solved_owned = false;
+            return solved;
         }
         return null;
     }
@@ -158,6 +168,26 @@ const Import = struct {
     fn span(values: []const u32, start: u32, len: usize) Error![]const u32 {
         if (start > values.len or len > values.len - start) return error.InvalidEvidence;
         return values[start..][0..len];
+    }
+    fn importResult(self: *Import, module: *const core.Module, source_types: []const types.Mapping, source_rows: []const types.RowMapping) Error!eval.SolvedEvidence {
+        const mappings = try self.allocator.alloc(types.Mapping, source_types.len);
+        errdefer self.allocator.free(mappings);
+        const rows = try self.allocator.alloc(types.RowMapping, source_rows.len);
+        errdefer self.allocator.free(rows);
+        var seen: std.AutoHashMapUnmanaged(u32, void) = .empty;
+        defer seen.deinit(self.allocator);
+        for (source_types, mappings) |from, *to| {
+            if (from.variable == 0 or from.variable >= module.types.nodes.len or module.types.node(from.variable).tag != .variable) return error.InvalidEvidence;
+            if ((try seen.getOrPut(self.allocator, from.variable)).found_existing) return error.InvalidEvidence;
+            to.* = .{ .variable = from.variable, .evidence = try self.typeId(from.evidence, 0) };
+        }
+        seen.clearRetainingCapacity();
+        for (source_rows, rows) |from, *to| {
+            if (from.variable >= module.types.effects.variable_count) return error.InvalidEvidence;
+            if ((try seen.getOrPut(self.allocator, from.variable)).found_existing) return error.InvalidEvidence;
+            to.* = .{ .variable = from.variable, .evidence = try self.row(from.evidence, 0) };
+        }
+        return .{ .types = mappings, .rows = rows };
     }
     fn typeId(self: *Import, id: u32, depth: usize) Error!u32 {
         if (depth >= 256 or self.remaining == 0 or id == 0 or id >= self.source.nodes.len) return error.InvalidEvidence;

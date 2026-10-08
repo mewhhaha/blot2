@@ -80,7 +80,7 @@ fn recheck(state: anytype, g: anytype, read: receipt.CallRead, actual: u32) Allo
         error.OutOfMemory => return error.OutOfMemory,
         error.Declined, error.RequestUnwind => return null,
     };
-    var maps = (try importer.Importer.initCheckedQuery(a, &state.old.metadata.pools.?, g.evaluator.units, &state.gate)) orelse return null;
+    var maps = (try importer.Importer.initIndependentQuery(a, &state.old.metadata.pools.?, g.evaluator.units, &state.gate)) orelse return null;
     defer maps.deinit();
     const expected = (try maps.importEvidence(&probe, read.evidence)) orelse return null;
     var tape: receipt.Tape = .{};

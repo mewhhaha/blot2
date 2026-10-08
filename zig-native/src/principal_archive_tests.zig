@@ -96,3 +96,61 @@ test "portable semantic checkpoints reject source settings and malformed semanti
     try std.testing.expectEqual(@as(usize, 0), declined.principal.persisted_hits);
     try std.testing.expect(declined.principal.persisted_declines > 0);
 }
+
+fn nonemptyImport(allocator: std.mem.Allocator, fixture: *const Fixture, bytes: []const u8, expected: []const u8, steps: usize) !void {
+    var loaded = try archive.decode(allocator, compiler, bytes);
+    defer loaded.deinit();
+    var compiled = try fixture.emit(allocator, &loaded);
+    defer compiled.deinit(allocator);
+    try std.testing.expect(compiled.diagnostic == null);
+    try std.testing.expect(compiled.principal.persisted_nonempty_hits > 0);
+    try std.testing.expectEqualSlices(u8, expected, compiled.bytes);
+    try std.testing.expectEqual(steps, compiled.constant_steps);
+}
+
+test "portable principal results own inferred types and effect rows through restarts invalid inputs and allocation failures" {
+    const row_source =
+        \\entry const builder: U32 where { type_rep U32 } = do:
+        \\  let local = fn value => value
+        \\  return local 42
+    ;
+    const type_source =
+        \\const from = fn value => @type.result "from" value
+        \\const U32.from = fn value => @f32.to_u32 value
+        \\const F32.from = fn value => @u32.to_f32 value
+        \\const U32.add = fn left => fn right => @u32.add left right
+        \\const F32.add = fn left => fn right => @f32.add left right
+        \\const add = fn left => fn right => @type.call "add" left right
+        \\const count = 10000
+        \\entry const builder = add (from (@f32.ceil (@f32.sqrt (from count)))) 2
+    ;
+    for ([_][]const u8{ row_source, type_source }, 0..) |text, index| {
+        const bytes = blk: {
+            var initial = try Fixture.init(text);
+            defer initial.deinit();
+            var compiled = try initial.emit(a, null);
+            defer compiled.deinit(a);
+            try std.testing.expect(compiled.diagnostic == null);
+            break :blk try archive.encode(a, compiler, &compiled.capture.?);
+        };
+        defer a.free(bytes);
+        var fixture = try Fixture.init(text);
+        defer fixture.deinit();
+        var fresh = try fixture.emit(a, null);
+        defer fresh.deinit(a);
+        try nonemptyImport(a, &fixture, bytes, fresh.bytes, fresh.constant_steps);
+        if (index == 0) try @import("allocation_failures.zig").checkAllAllocationFailures(a, nonemptyImport, .{ &fixture, bytes, fresh.bytes, fresh.constant_steps });
+        var loaded = try archive.decode(a, compiler, bytes);
+        defer loaded.deinit();
+        for (loaded.principal.snapshot.proofs) |*proof| {
+            if (index == 0 and proof.rows.len != 0) @constCast(proof.rows)[0].variable = std.math.maxInt(u32);
+            if (index == 1 and proof.types.len != 0) @constCast(proof.types)[0].variable = std.math.maxInt(u32);
+        }
+        var declined = try fixture.emit(a, &loaded);
+        defer declined.deinit(a);
+        try std.testing.expect(declined.diagnostic == null);
+        try std.testing.expectEqual(@as(usize, 0), declined.principal.persisted_nonempty_hits);
+        try std.testing.expect(declined.principal.persisted_declines > 0);
+        try std.testing.expectEqualSlices(u8, fresh.bytes, declined.bytes);
+    }
+}

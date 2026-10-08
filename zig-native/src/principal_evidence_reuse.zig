@@ -16,12 +16,14 @@ pub const GraphMode = enum { eager, lazy, primitive };
 pub const Stats = struct {
     persisted_requests: usize = 0,
     persisted_hits: usize = 0,
+    persisted_nonempty_hits: usize = 0,
     persisted_call_proofs: usize = 0,
     persisted_declines: usize = 0,
     projected_empty_hits: usize = 0,
     projected_empty_declines: usize = 0,
     input_image_checks: usize = 0,
     dependency_validations: usize = 0,
+    reused_dependency_validations: usize = 0,
     graph_importers_initialized: usize = 0,
     graph_importers_prepared: usize = 0,
     empty_hits: usize = 0,
@@ -64,7 +66,7 @@ pub const State = struct {
     pub fn initWithExecution(allocator: Allocator, old: *const capture.Capture, units: []const core.Module, names: ?identity.View, graph_mode: GraphMode, execution: gate.Gate.Execution) Allocator.Error!State {
         var admission = try gate.Gate.initWithExecution(allocator, &old.metadata.pools.?, units, names, execution);
         errdefer admission.deinit();
-        var result: State = .{ .allocator = allocator, .old = old, .gate = admission, .names = names, .graph_mode = graph_mode, .stats = .{ .dependency_validations = admission.dependency_validations } };
+        var result: State = .{ .allocator = allocator, .old = old, .gate = admission, .names = names, .graph_mode = graph_mode, .stats = .{ .dependency_validations = admission.dependency_validations, .reused_dependency_validations = admission.reused_dependency_validations } };
         errdefer if (result.graphs) |*graphs| graphs.deinit();
         if (graph_mode == .eager and !try result.ensureGraphs()) result.gate.enabled = false;
         result.reuse_projected_inputs = execution.reuse_projected_principals;

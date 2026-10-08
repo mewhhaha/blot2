@@ -25,11 +25,15 @@ pub const Gate = struct {
     /// Executable/value/receipt admission still requires structural_units.
     declaration_principals: bool = false,
     dependency_validations: usize = 0,
+    reused_dependency_validations: usize = 0,
+    dependencies_validated: bool = false,
+    validation_symbols: usize = 0,
     /// Exact ordered namespace/structure equality, allowing only the narrowly
     /// permitted scalar value bits. This alone does not establish proof validity.
     structural_units: []const bool,
     offsets: []const usize,
     dirty: []const bool,
+    local_dirty: []const bool,
     storage: *Storage,
 
     // Immutable after construction. Each semantic consumer owns a lease;
@@ -41,6 +45,7 @@ pub const Gate = struct {
         self.storage.references += 1;
         var result = self.*;
         result.dependency_validations = 0;
+        result.reused_dependency_validations = 0;
         return result;
     }
 
@@ -66,10 +71,13 @@ pub const Gate = struct {
         const dirty = try allocator.alloc(bool, offsets[units.len]);
         errdefer allocator.free(dirty);
         @memset(dirty, false);
+        const local_dirty = try allocator.alloc(bool, offsets[units.len]);
+        errdefer allocator.free(local_dirty);
+        @memset(local_dirty, true);
         const storage = try allocator.create(Storage);
         errdefer allocator.destroy(storage);
         storage.* = .{};
-        var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .declaration_principals = execution.reuse_declaration_principals, .structural_units = structural_units, .offsets = offsets, .dirty = dirty };
+        var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .declaration_principals = execution.reuse_declaration_principals, .structural_units = structural_units, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
 
         if (!old.project_identity or old.identity == null or names == null or old.modules.len != units.len or units.len == 0 or units.len >= std.math.maxInt(u32)) return result;
         // Check every retained pointer against its original pin before comparing
@@ -108,9 +116,17 @@ pub const Gate = struct {
             .{ .units = old_units, .symbol_count = previous.symbols.len },
             .{ .units = current_units, .symbol_count = current.symbols.len },
         );
-        for (units, old.modules, structural_units) |*module, pin, structural| {
-            result.dependency_validations += 1;
-            if (!try validDependencies(allocator, pin.module, old_units, previous.symbols.len)) return result;
+        const old_context: validation.Context = .{ .units = old_units, .symbol_count = previous.symbols.len };
+        const certified_context = if (old.dependency_certificate) |*certificate| certificate.matches(old_context) else false;
+        for (units, old.modules, structural_units, 0..) |*module, pin, structural, unit| {
+            if (certified_context and old.dependency_certificate.?.admits(unit, pin.stamp)) {
+                // Every pin was checked against its current immutable bytes
+                // above; the certificate also owns its original stamp.
+                result.reused_dependency_validations += 1;
+            } else {
+                result.dependency_validations += 1;
+                if (!try validDependencies(allocator, pin.module, old_units, previous.symbols.len)) return result;
+            }
             // namespaceEqual and moduleEqual proved this local graph equal
             // except isolated scalar constant payload bits. Frozen validation
             // and dependency capture never interpret a constant's payload as
@@ -123,6 +139,8 @@ pub const Gate = struct {
                 if (!try validDependencies(allocator, module, current_units, current.symbols.len)) return result;
             }
         }
+        result.dependencies_validated = true;
+        result.validation_symbols = current.symbols.len;
         // All source declarations must have complete bodies. Imported aliases
         // must resolve to such a declaration, never a lexical or absent target.
         for (units, 0..) |module, unit| for (module.bindings[1..], 1..) |binding, id| switch (binding.kind) {
@@ -163,6 +181,7 @@ pub const Gate = struct {
             }
         }
 
+        @memcpy(local_dirty, dirty);
         // A fixed point also handles recursive source declarations. External
         // aliases are vertices: a read of either the alias or its producer is
         // invalidated by the same transitive source change.
@@ -242,15 +261,66 @@ pub const Gate = struct {
         return true;
     }
 
+    /// A source collection reads this exact body. Its separately recorded
+    /// callees and dynamic facts decide whether transitive edits matter.
+    pub fn admitsLocalSource(self: *const Gate, target: core.BindingRef) bool {
+        if (!self.admitsCallIdentity(target)) return false;
+        const unit = target.unit - 1;
+        return (self.structural_units[unit] or self.declaration_principals) and !self.local_dirty[self.offsets[unit] + target.binding];
+    }
+
+    /// Identity alone permits comparing a freshly established closed judgment.
+    /// It never admits an old body, call proof, value or executable fragment.
+    pub fn admitsCallIdentity(self: *const Gate, target: core.BindingRef) bool {
+        if (!self.enabled or target.unit == 0 or target.unit > self.units.len or target.binding == 0) return false;
+        const current = &self.units[target.unit - 1];
+        const old = self.source_pools.?.modules[target.unit - 1].module;
+        if (target.binding >= current.bindings.len or target.binding >= old.bindings.len) return false;
+        const left = old.binding(target.binding);
+        const right = current.binding(target.binding);
+        if (left.kind != .global or right.kind != .global or left.ty != right.ty) return false;
+        if (!equal(old.source_names, current.source_names)) return false;
+        const before = old.body(target.binding) orelse return false;
+        const after = current.body(target.binding) orelse return false;
+        return before.runtime == after.runtime and before.is_function == after.is_function and equal(before.scheme, after.scheme);
+    }
+
+    pub fn admitsRefinement(self: *const Gate, record: anytype) bool {
+        for (record.sources) |source| if (!self.admitsLocalSource(source)) return false;
+        for (record.scalar_reads) |read| if (!self.admits(read.target)) return false;
+        for (record.call_reads) |read| {
+            const target: core.BindingRef = .{ .unit = read.unit, .binding = read.binding };
+            if (read.present) {
+                if (!self.admitsCallIdentity(target)) return false;
+            } else if (!self.admitsLocalSource(target)) return false;
+        }
+        for (record.call_publications) |call| if (!self.admitsLocalSource(.{ .unit = call.unit, .binding = call.binding })) return false;
+        return true;
+    }
+
     pub fn deinit(self: *Gate) void {
         self.storage.references -= 1;
         if (self.storage.references == 0) {
             self.allocator.free(self.structural_units);
             self.allocator.free(self.offsets);
             self.allocator.free(self.dirty);
+            self.allocator.free(self.local_dirty);
             self.allocator.destroy(self.storage);
         }
         self.* = undefined;
+    }
+
+    /// Called only while these exact current modules remain immutable. The
+    /// candidate owns the certificate; failure cannot mutate the old revision.
+    pub fn freezeValidation(self: *const Gate, a: Allocator, pins: []const artifacts.ModulePin) Allocator.Error!?@import("dependency_certificate.zig").Certificate {
+        if (!self.dependencies_validated or pins.len != self.units.len) return null;
+        const units = try a.alloc(*const core.Module, pins.len);
+        defer a.free(units);
+        for (pins, self.units, units) |pin, *module, *unit| {
+            if (pin.module != module) return null;
+            unit.* = module;
+        }
+        return try @import("dependency_certificate.zig").Certificate.capture(a, .{ .units = units, .symbol_count = self.validation_symbols }, pins);
     }
 
     fn targetDirty(self: *const Gate, owner: usize, target: core.BindingRef) bool {

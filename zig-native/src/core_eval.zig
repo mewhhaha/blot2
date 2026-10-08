@@ -231,6 +231,15 @@ pub const Session = struct {
     reuse_region_scratch: bool = true,
     reuse_callable_definitions: bool = true,
     reuse_evidence_imports: bool = true,
+    reuse_closed_source_types: bool = true,
+    split_closed_calls: bool = false,
+    split_active: std.AutoHashMapUnmanaged(Target, void) = .empty,
+    split_attempts: usize = 0,
+    split_accepted: usize = 0,
+    split_declined: usize = 0,
+    closed_source_types: @import("closed_source_types.zig").Facts = .{},
+    closed_source_imports: usize = 0,
+    closed_source_reused: usize = 0,
     evidence_import_requests: usize = 0,
     evidence_import_reused: usize = 0,
     callable_definitions: std.AutoHashMapUnmanaged(ClosureRegion.DefinitionKey, core.BindingId) = .empty,
@@ -357,6 +366,8 @@ pub const Session = struct {
         self.callable_definition_units.deinit(self.allocator);
         self.allocator.free(self.owned_diagnostic_message);
         self.body_recipes.deinit(self.allocator);
+        self.closed_source_types.deinit(self.allocator);
+        self.split_active.deinit(self.allocator);
         self.validated_calls.deinit(self.allocator);
         self.plain_nominals.deinit(self.allocator);
         self.allocator.free(self.binding_offsets);
@@ -3389,6 +3400,7 @@ const ClosureRegion = struct {
     const Scratch = struct {
         projection_cache: @import("projection_cache.zig").Cache = .{},
         evidence_import_cache: @import("evidence_import_cache.zig").Cache = .{},
+        closed_source_cache: @import("closed_source_types.zig").Cache = .{},
         sources: std.ArrayList(Source) = .empty,
         imported: std.AutoHashMapUnmanaged(Import, types.Id) = .empty,
         definitions: std.AutoHashMapUnmanaged(DefinitionKey, core.BindingId) = .empty,
@@ -4048,8 +4060,21 @@ const ClosureRegion = struct {
         if (depth >= self.session.options.max_depth or self.scratch.imported.count() >= self.session.options.max_values) return error.TypeLimit;
         const key: Import = .{ .scope = scope, .ty = ty };
         if (self.scratch.imported.get(key)) |existing| return existing;
-        const source = &self.session.units[self.scratch.sources.items[scope].owner].types;
+        const owner = self.scratch.sources.items[scope].owner;
+        const source = &self.session.units[owner].types;
         const node = source.node(ty);
+        const shared = self.session.reuse_closed_source_types and ty > types.never and
+            try self.session.closed_source_types.closed(self.session.allocator, self.session.units, owner, ty, 0);
+        const closed_key = @import("closed_source_types.zig").Cache.key(owner, ty, depth);
+        if (shared) {
+            self.session.closed_source_imports += 1;
+            if (self.scratch.closed_source_cache.activate(&self.solver, self.session.options.max_depth)) {
+                if (self.scratch.closed_source_cache.answers.get(closed_key)) |existing| {
+                    self.session.closed_source_reused += 1;
+                    return existing;
+                }
+            }
+        }
         const result = switch (node.tag) {
             .absent => return error.UnresolvedType,
             .unit, .boolean, .u32, .f32, .never => ty,
@@ -4084,7 +4109,9 @@ const ClosureRegion = struct {
                 break :blk if (node.tag == .nominal) try self.solver.nominal(.{ .unit = node.a, .decl = node.b }, values) else try self.solver.product(values);
             },
         };
-        try self.scratch.imported.put(self.session.allocator, key, result);
+        if (shared and self.scratch.closed_source_cache.activate(&self.solver, self.session.options.max_depth)) {
+            try self.scratch.closed_source_cache.answers.put(self.session.allocator, closed_key, result);
+        } else try self.scratch.imported.put(self.session.allocator, key, result);
         if (node.tag == .variable) try self.scratch.variables.append(self.session.allocator, .{ .source = key, .region = result });
         return result;
     }
@@ -4423,7 +4450,6 @@ const ClosureRegion = struct {
         const binding = module.binding(target_.binding);
         const definition = module.body(target_.binding);
         if (self.session.receipt_tape) |tape| if (binding.kind == .global) {
-            try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
             if (definition == null or (definition.?.runtime and !definition.?.is_function)) tape.unknown = true;
         };
         if (self.session.principal_reads) |reads| if (binding.kind == .global and (definition == null or (definition.?.runtime and !definition.?.is_function))) {
@@ -4447,7 +4473,7 @@ const ClosureRegion = struct {
                 const present = self.session.validated_calls.contains(.{ .target = target_, .evidence = known });
                 if (self.session.receipt_tape) |tape| try tape.call_reads.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding, .evidence = known, .present = present });
                 if (present) {
-                    if (self.session.principal_reads) |reads| reads.invalidate(.call_read);
+                    if (self.session.principal_reads) |reads| if (!reads.calls_seen.contains(.{ .target = .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding }, .evidence = known })) reads.invalidate(.call_read);
                     self.session.proofs.proof_reused += 1;
                     return;
                 }
@@ -4456,7 +4482,10 @@ const ClosureRegion = struct {
                 _ = try self.admitSignature(instantiated, self.scratch.sources.items[prior].root);
                 return;
             }
+            if (definition != null and binding.kind == .global and try self.partitionCall(target_, known)) return;
         }
+        if (self.session.receipt_tape) |tape| if (binding.kind == .global)
+            try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
         const scope = try self.typeScope(target_.unit);
         self.scratch.sources.items[scope].body = body_root;
         self.scratch.sources.items[scope].binding = target_.binding;
@@ -4505,6 +4534,50 @@ const ClosureRegion = struct {
             try self.collect(scope, body_root);
         }
         if (definition == null) try self.shareLexical(scope, caller, binding.scheme);
+    }
+    /// The closed first-order arrow is the entire boundary. No lexical solver
+    /// variable or higher-order capture enters the child region. A recursive
+    /// component stays within one region; only a complete exact arrow may
+    /// replace source collection in the parent.
+    fn partitionCall(self: *ClosureRegion, target_: Target, expected: type_evidence.Id) RegionError!bool {
+        const session = self.session;
+        if (!session.split_closed_calls or !session.options.reuse_validated_calls or self.retain_selected or self.source_interface or session.diagnostic != null or session.split_active.count() >= 32 or session.split_active.contains(target_)) return false;
+        if (!try self.firstOrderArrow(expected)) return false;
+        session.split_attempts += 1;
+        try session.split_active.put(session.allocator, target_, {});
+        defer _ = session.split_active.remove(target_);
+        var child = try ClosureRegion.init(session);
+        defer child.deinit();
+        child.collect_depth = self.collect_depth;
+        const accepted = child.closedCall(target_, expected) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => false,
+        };
+        if (!accepted) {
+            // A failed speculative source proof never owns the diagnostic.
+            // Ordinary chronological collection reports the authoritative one.
+            session.allocator.free(session.owned_diagnostic_message);
+            session.owned_diagnostic_message = &.{};
+            session.diagnostic = null;
+            session.split_declined += 1;
+            return false;
+        }
+        session.split_accepted += 1;
+        return true;
+    }
+    fn closedCall(self: *ClosureRegion, target_: Target, expected: type_evidence.Id) RegionError!bool {
+        self.include_callables = true;
+        const scope = try self.callableScope(target_);
+        const root = self.scratch.sources.items[scope].root;
+        _ = try self.admitSignature(try self.importEvidence(expected, 0), root);
+        const actual = try self.project(root);
+        if (actual != 0) try self.scratch.call_instances.put(self.session.allocator, .{ .owner = target_.unit, .binding = target_.binding, .evidence = actual }, scope);
+        try self.scratch.unresolved_calls.put(self.session.allocator, target_, scope);
+        try self.collect(scope, self.scratch.sources.items[scope].body);
+        try self.solve();
+        if (!self.allConstraintsSolved() or try self.project(root) != expected) return false;
+        try self.publishValidatedCalls();
+        return self.session.validated_calls.contains(.{ .target = target_, .evidence = expected });
     }
     fn shareLexical(self: *ClosureRegion, scope: u32, caller: u32, scheme: types.Scheme) RegionError!void {
         const module = &self.session.units[self.scratch.sources.items[scope].owner];
@@ -6529,6 +6602,55 @@ fn evidenceImportSharingScenario(allocator: Allocator) !void {
     const second = try shared.solver.fresh();
     try shared.solver.unify(second, types.f32_type);
     try std.testing.expectEqual(root, try shared.project(imported));
+}
+
+fn closedSourceSharingScenario(a: Allocator, module: *const core.Module) !void {
+    var session = try Session.init(a, @as([*]const core.Module, @ptrCast(module))[0..1]);
+    defer session.deinit();
+    var region = try ClosureRegion.init(&session);
+    defer region.deinit();
+    const left = try region.typeScope(0);
+    const right = try region.typeScope(0);
+    const concrete = module.bodies[1].scheme.root;
+    const first = try region.importType(left, concrete, 0);
+    const nodes = region.solver.nodes.items.len;
+    try std.testing.expectEqual(first, try region.importType(right, concrete, 0));
+    try std.testing.expectEqual(nodes, region.solver.nodes.items.len);
+    try std.testing.expect(session.closed_source_reused != 0);
+    const generic = module.types.node(module.bodies[2].scheme.root).a;
+    const l = try region.importType(left, generic, 0);
+    const r = try region.importType(right, generic, 0);
+    try std.testing.expect(l != r);
+    try region.solver.unify(l, types.u32_type);
+    try region.solver.unify(r, types.f32_type);
+    try std.testing.expectEqual(types.u32_type, try region.solver.resolve(l, 0));
+    try std.testing.expectEqual(types.f32_type, try region.solver.resolve(r, 0));
+    // Cached shallow success cannot hide a deeper request exceeding the quota.
+    session.options.max_depth = 1;
+    const deeper = try region.typeScope(0);
+    try std.testing.expectError(error.TypeLimit, region.importType(deeper, concrete, 0));
+    session.options.max_depth = 256;
+    var rollback = try ClosureRegion.init(&session);
+    defer rollback.deinit();
+    const scope = try rollback.typeScope(0);
+    const mark = rollback.solver.mark();
+    _ = try rollback.importType(scope, concrete, 0);
+    rollback.solver.rollback(mark);
+    _ = try rollback.solver.array(types.f32_type);
+    const restored = try rollback.importType(scope, concrete, 0);
+    try std.testing.expectEqual(try region.project(first), try rollback.project(restored));
+}
+
+test "closed source imports share immutable graphs but isolate variables limits rollback and OOM" {
+    const a = std.testing.allocator;
+    var module = try bodyRecipeLower(
+        \\const closed = fn (xs: Array { value: U32, enabled: Bool }) => xs
+        \\const generic = fn xs => xs
+        \\entry const answer = fn () => 42
+    );
+    defer module.deinit(a);
+    try closedSourceSharingScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, closedSourceSharingScenario, .{&module});
 }
 
 test "closed evidence imports share graphs and preserve semantic effects and chronology under allocation failures" {

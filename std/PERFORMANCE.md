@@ -1,5 +1,130 @@
 # Standard library API and performance audit
 
+## Semantic compilation performance
+
+This batch follows `8b44ee6` and uses the same frozen gdev workload as the
+packed-row checkpoint. Every optimization follows source, type, effect and
+ownership evidence; none recognizes prelude names.
+
+| Approved track | Implemented boundary | Remaining work |
+| --- | --- | --- |
+| Smaller inference regions | Opt-in independent checking of closed first-order calls, with recursive guards and ordinary fallback | Higher-order and recursive-component summaries |
+| Specialization deduplication | Session-local index of complete refinement answers in fresh CLI and retained builds | Reusable principal schemes for arbitrary caller-independent bodies |
+| Immutable semantic sharing | Closed source type graphs share imports within one region; variables remain scoped | Broader sharing across region owners |
+| Semantic early cutoff | Unchanged caller type answers can survive a changed runtime callee after its exact closed judgment is freshly established | Stable identities for arbitrary structural edits |
+| Transactional revision metadata | Published certificates retain successful dependency validation with exact source stamps and foreign bounds | Full metadata deltas and changed-only graph updates |
+| Constant/data retention | Completed scalar constants no longer prevent enclosing code-fragment reuse; current values and types must match | Reusing aggregate evaluation and serialized data |
+| Portable semantic artifacts | Explicit backend checkpoints include eligible nonempty principal type/row results with complete dynamic inputs | Arbitrary specialization and evaluation persistence |
+| Resolved backend IR | Opt-in scalar SSA includes structured branches and joins with selected-arm trap behavior | Calls, loops and heap ownership |
+| Relocatable optimized bodies | Bounded exact call-graph matching reuses owned optimized output across changed direct-call indices | Broader layout-independent fragment identities |
+| Parallel semantic work | Opt-in independent call judgments use private Sessions/solvers and deterministic publication order | Measured adaptive scheduling of general semantic jobs |
+
+Local refinement reuse owns its receipts even when a fresh CLI build is not
+recording backend artifacts. Keys include the root, expected shape, type/row
+seeds, evaluation options, depth and observed dynamic facts. Only complete
+answers without evaluation or value publication qualify. Results are copied
+into caller-owned storage; failed allocation cannot publish a partial answer.
+Closed source sharing never merges independently scoped variables, and rollback,
+physical mutation or changed depth limits revoke imported answers.
+
+Across revisions, receipts distinguish collected source bodies from consumed
+closed-call judgments. An unchanged caller can keep its type answer after a
+callee's runtime body changes when that judgment has already been established
+in the new Session. Executable and staged-value dependencies still rebuild.
+Dependency-validation certificates similarly prove only validation, not semantic
+or executable reuse. They belong to the successful candidate snapshot and do
+not mutate the preceding revision on failure.
+
+Portable nonempty results validate source/effect variables and reject duplicates
+before importing closed evidence into the new owner. The archive still requires
+an exact ordered Core/catalog/namespace image, including literal bits, followed
+by dynamic-input validation. Unsupported providers or generative identities
+decline. Optimized-body relocation separately checks the complete direct-call
+graph, signatures, globals, imports and lifetime summaries; it rewrites an owned
+output copy and preserves retained input bytes.
+
+Inference partitions, resolved scalar SSA and semantic workers remain opt-in.
+The partition experiment accepts 963 of 968 attempted gdev boundaries, reducing
+the largest diagnostic region from 13,863 to 10,335 scopes. Its fresh-session
+pairs improve by roughly 11–14%, but retained-edit samples show no clear win.
+These diagnostic runs are not cold CLI measurements and do not justify changing
+the default. Ordinary source inference remains the fallback. Worker tests compare
+one, two and four workers for deterministic results, with allocation-failure
+injection on the serial path. A whole-project speedup is not established.
+
+Five alternating fresh-process pairs and five retained-session pairs compare
+the default path with the frozen compiler at `8b44ee6`, on the same 53-file,
+394,294-byte gdev snapshot. The edit changes `robots.blot`'s floor extent from
+60.0 to 61.0, then reverts and repeats a no-op. Retained population excludes
+opening the session; fresh CLI includes launching the monitor/compiler, output
+writing and teardown. No builds, tests or lint from this task ran during timing.
+Filesystem caches and other host activity were uncontrolled.
+
+| Median measurement | Previous checkpoint | Candidate |
+| --- | ---: | ---: |
+| Fresh native CPU | 1,195.71 ms | 1,182.08 ms |
+| Retained population CPU | 1,520 ms | 1,470 ms |
+| First edit CPU | 350 ms | 310 ms |
+| Revert CPU | 330 ms | 290 ms |
+| Fresh CLI wall | 19,275.44 ms | 9,543.01 ms |
+| Retained population wall | 24,407.33 ms | 25,934.10 ms |
+| First edit wall | 3,723.67 ms | 3,534.58 ms |
+| Revert wall | 2,805.44 ms | 2,147.56 ms |
+| No-op wall | 56.50 ms | 30.75 ms |
+| Fresh requested allocation bytes | 433,590,389 | 425,441,209 |
+| Fresh allocation calls | 1,457,497 | 1,405,703 |
+| Peak requested live bytes | 58,404,972 | 57,907,712 |
+| Fresh peak RSS | 75,684 KiB | 76,424 KiB |
+| Retained peak RSS after revert | 160,744 KiB | 157,984 KiB |
+
+The host was severely contended. Fresh CLI ranges were 6.95–23.94 seconds before
+and 3.44–19.80 seconds after; retained population ranged from 1.96 to 36.16
+seconds across both compilers, and even no-op wall time reached 1.49 seconds.
+The apparent halving of cold wall time is **not an established latency gain**.
+Keep the CPU/work comparison separate: cold CPU is nearly unchanged, while
+median first-edit and revert CPU fall about 11% and 12%. Retained CPU uses
+10 ms process ticks; a zero no-op reading means below that measurement's
+resolution. These results do not establish the 500 ms cold / 100 ms edit goals.
+
+Structural work falls more than total CPU. Population executes 8,539 → 1,490
+refinement regions; a first edit emits 432 → 282 fresh named/closure bodies,
+reuses 691 → 841 bodies, and replays 289 completed scalar constant jobs. Source
+graph sharing reuses 150,772 imports during population. Fresh allocation traffic
+falls 1.9%, peak requested live bytes less than 1%, and tracked live storage
+after teardown remains zero. The large cold inference region is still present:
+the diagnostic profile records 13,863 scopes and 267,068 nodes for gdev's
+`sandbox` construction. Its wall timings also include contention, so they are
+not isolated CPU costs. Higher-order body summaries remain the main open
+architectural work.
+
+Every original/candidate output matches exactly, including fresh compilation
+of the edited source; all Wasm validates. Both produce 629,339-byte modules.
+Original/revert output SHA-256 is
+`ae2714abc40f1cea82105c252c10bb198f9611b9e3781267a89dbca00905981b`;
+edited output is
+`75ae524926a3e53b97e044464e2a01818362374c3a14a825a38dbd3a2d9d2fa3`.
+
+The release build and 1,095 native tests pass. All **548 guest/client tests**
+pass across the full run and focused retries. The full run initially reported
+541 passes and seven environmental failures: standalone packaging exhausted
+`/tmp`, and six artificial peers exceeded their existing two-second startup
+deadline. The standalone retry and all 35 transport tests pass without source
+changes. Zig-analyzer reports the same 120 warnings, no errors, across 285
+files. Zig formatting, the new TypeScript test's formatting/type check and
+`git diff --check` pass.
+
+Raw samples and distributions are in
+`build/compiler-hills/qualified-semantic/gdev/{samples.jsonl,summary.json}`;
+the driver is `build/compiler-hills/paired-semantic.ts` (`deno run --allow-all`
+is required for its own child-process `/proc` metrics). Retained runs resumed
+after three complete pairs following an interrupted command; completed samples
+were preserved. The diagnostic profile is `qualified-semantic-profile.jsonl`.
+Build/test/lint logs and the qualification details are recorded in
+`build/compiler-hills/semantic-final/manifest.json`. The pinned binary SHA-256 is
+`f2df77df9757a8fff122a7fb6493edca940a517b111ffdebc6f6f8a470d5c3ed`.
+These changes are not installed locally. The ten implementations above are
+bounded progress, not completion of every architectural endpoint in the plan.
+
 ## Production packed scalar rows
 
 The 2026-10-08 transfer makes flat tuples and structural records of 1–16 checked

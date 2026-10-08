@@ -68,6 +68,7 @@ const Pinned = struct {
         const pins = try allocator.alloc(artifacts.ModulePin, fixture.units.len);
         for (fixture.units, pins, 0..) |*module, *pin, i| pin.* = .{ .unit = @intCast(i + 1), .module = module, .canonical_path = @constCast(fixture.names.view().owner(@intCast(i + 1)).?), .stamp = artifacts.stamp(module.*) };
         var pools: artifacts.Pools = undefined;
+        pools.dependency_certificate = null;
         pools.project_identity = true;
         pools.identity = fixture.names;
         pools.modules = pins;
@@ -75,10 +76,64 @@ const Pinned = struct {
     }
 
     fn deinit(self: *Pinned, allocator: std.mem.Allocator) void {
+        if (self.pools.dependency_certificate) |*certificate| certificate.deinit(allocator);
         allocator.free(self.pools.modules);
         self.* = undefined;
     }
 };
+
+fn certify(allocator: std.mem.Allocator, old: *artifacts.Pools, current: *Fixture, pins: []const artifacts.ModulePin) !void {
+    var gate = try Gate.initWithExecution(allocator, old, current.units, current.names.view(), .{ .reuse_equivalent_validation = true });
+    defer gate.deinit();
+    try std.testing.expect(gate.enabled and gate.dependencies_validated);
+    var certificate = (try gate.freezeValidation(allocator, pins)).?;
+    defer certificate.deinit(allocator);
+    try std.testing.expectEqual(pins.len, certificate.modules.len);
+}
+
+test "published dependency validation certificates retain exact graphs context and failure ownership" {
+    const consumer = "entry const dependent: U32 = schema\nentry const safe = fn (value: U32) => value\n";
+    var before = try Fixture.init(a, &.{ independent, consumer });
+    defer before.deinit(a);
+    var pinned = try Pinned.init(a, &before);
+    defer pinned.deinit(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, certify, .{ &pinned.pools, &before, pinned.pools.modules });
+    var initial = try Gate.initWithExecution(a, &pinned.pools, before.units, before.names.view(), .{ .reuse_equivalent_validation = true });
+    defer initial.deinit();
+    try std.testing.expect(initial.enabled);
+    pinned.pools.dependency_certificate = (try initial.freezeValidation(a, pinned.pools.modules)).?;
+    var current = try Fixture.init(a, &.{ independent, consumer });
+    defer current.deinit(a);
+    current.units[0].nodes[root(&current.units[0], "schema")].a = 8;
+    var admitted_ = try Gate.initWithExecution(a, &pinned.pools, current.units, current.names.view(), .{ .reuse_equivalent_validation = true });
+    defer admitted_.deinit();
+    try std.testing.expect(admitted_.enabled);
+    try std.testing.expectEqual(@as(usize, 0), admitted_.dependency_validations);
+    try std.testing.expectEqual(@as(usize, 2), admitted_.reused_dependency_validations);
+    try std.testing.expect(!admitted_.admits(target(&current.units[0], "schema")));
+
+    // Changing a validator input revokes the certificate even if all pins
+    // match. Restore it and it can still be used after this discarded attempt.
+    pinned.pools.dependency_certificate.?.context.symbol_count = 0;
+    var uncached = try Gate.initWithExecution(a, &pinned.pools, current.units, current.names.view(), .{ .reuse_equivalent_validation = true });
+    defer uncached.deinit();
+    try std.testing.expect(uncached.enabled);
+    try std.testing.expectEqual(@as(usize, 2), uncached.dependency_validations);
+    pinned.pools.dependency_certificate.?.context.symbol_count = before.names.view().symbols.len;
+
+    // A changed retained graph cannot be hidden by replacing its public pin.
+    // The certificate owns the digest of the graph actually validated.
+    const node = root(&before.units[0], "schema");
+    const saved = before.units[0].nodes[node];
+    before.units[0].nodes[node].ty = std.math.maxInt(u32);
+    pinned.pools.modules[0].stamp = artifacts.stamp(before.units[0]);
+    current.units[0].nodes[node] = before.units[0].nodes[node];
+    var corrupt = try Gate.initWithExecution(a, &pinned.pools, current.units, current.names.view(), .{ .reuse_equivalent_validation = true });
+    defer corrupt.deinit();
+    try std.testing.expect(!corrupt.enabled and !corrupt.dependencies_validated);
+    try std.testing.expect((try corrupt.freezeValidation(a, pinned.pools.modules)) == null);
+    before.units[0].nodes[node] = saved;
+}
 
 fn target(module: *const core.Module, name: []const u8) core.BindingRef {
     for (module.bodies[1..]) |body| if (std.mem.eql(u8, module.name(body.export_name), name)) return .{ .unit = module.unit, .binding = body.binding };

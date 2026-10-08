@@ -533,7 +533,7 @@ pub const Module = struct {
                 }
                 body.clear();
                 const reused = if (matcher) |*matches| matches.matches(id) else false;
-                var optimized = if (reused) options.previous.?.output(id) else if (parallel) |*batch| batch.take(id) else try passes.optimize(&function);
+                var optimized = if (reused) matcher.?.output(id) else if (parallel) |*batch| batch.take(id) else try passes.optimize(&function);
                 defer if (!reused) {
                     if (optimized) |*owned| owned.deinit(self.allocator);
                 };

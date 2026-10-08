@@ -28,6 +28,35 @@ const OwnerBounds = struct {
     }
 };
 
+/// Owned projection of exactly the context observed by frozen validation.
+/// A new context field must be handled here and in equivalentContext.
+pub const ContextImage = struct {
+    const Owner = struct { unit: u32, bounds: OwnerBounds };
+    owners: []Owner,
+    symbol_count: ?usize,
+    source_length: ?u32,
+
+    pub fn capture(a: std.mem.Allocator, context: Context) std.mem.Allocator.Error!ContextImage {
+        const owners = try a.alloc(Owner, context.units.len);
+        for (context.units, owners) |module, *owner| owner.* = .{ .unit = module.unit, .bounds = OwnerBounds.of(module) };
+        return .{ .owners = owners, .symbol_count = context.symbol_count, .source_length = context.source_length };
+    }
+    pub fn deinit(self: *ContextImage, a: std.mem.Allocator) void {
+        a.free(self.owners);
+        self.* = undefined;
+    }
+    pub fn matches(self: *const ContextImage, context: Context) bool {
+        inline for (@typeInfo(Context).@"struct".field_names) |name| switch (@field(std.meta.FieldEnum(Context), name)) {
+            .units => {
+                if (self.owners.len != context.units.len) return false;
+                for (self.owners, context.units) |owner, module| if (owner.unit != module.unit or !std.meta.eql(owner.bounds, OwnerBounds.of(module))) return false;
+            },
+            .symbol_count, .source_length => if (!std.meta.eql(@field(self, name), @field(context, name))) return false,
+        };
+        return true;
+    }
+};
+
 /// Equal contexts give equal validation results for an equal local graph.
 /// This proves no local graph or semantic dependency by itself.
 pub fn equivalentContext(before: Context, after: Context) bool {

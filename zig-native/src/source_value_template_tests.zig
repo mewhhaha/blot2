@@ -875,6 +875,54 @@ fn anchorDir() !std.testing.TmpDir {
     inline for (.{ .{ "prelude.blot", "" }, .{ "values.blot", values }, .{ "main.blot", main } }) |file| try dir.dir.writeFile(std.testing.io, .{ .sub_path = file[0], .data = file[1] });
     return dir;
 }
+fn cutoffScenario(allocator: Allocator, after: *const Fixture, old: *const capture.Capture, expected: []const u8) !void {
+    var result = try after.emit(allocator, .{ .previous = old, .retain_artifacts = true, .policy = .project });
+    defer result.deinit(allocator);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expectEqualSlices(u8, expected, result.bytes);
+    try std.testing.expect(result.refinements.body_cutoff_hits > 0);
+}
+test "refinement early cutoff consumes fresh call proofs across runtime body edits" {
+    var dir = std.testing.tmpDir(.{});
+    defer dir.cleanup();
+    const main =
+        \\import * as values from "./values"
+        \\const unused = fn (value: U32) => @u32.sub value 1
+        \\entry const warm = fn (value: U32) => values.adjust value
+        \\entry const answer = fn (value: U32) => @u32.add (values.adjust value) 40
+        \\entry const folded: U32 = values.adjust 20
+    ;
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "prelude.blot", .data = "" });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = main });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "values.blot", .data = "const adjust = fn (value: U32) => @u32.add value 1\n" });
+    var before = try Fixture.project(&dir);
+    defer before.deinit();
+    var policy = @import("execution_policy.zig").Policy.project;
+    policy.reuse_body_proof_cutoff = true;
+    var initial = try before.emit(a, .{ .retain_artifacts = true, .policy = policy });
+    defer initial.deinit(a);
+    try successful(&initial);
+    for ([_][]const u8{
+        "const adjust = fn (value: U32) => @u32.add value 2\n",
+        "const adjust = fn (value: U32) => @u32.sub value 2\n",
+    }) |source| {
+        try dir.dir.writeFile(std.testing.io, .{ .sub_path = "values.blot", .data = source });
+        var after = try Fixture.project(&dir);
+        defer after.deinit();
+        var fresh = try after.emit(a, .{ .policy = policy });
+        defer fresh.deinit(a);
+        var retained = try after.emit(a, .{ .previous = &initial.capture.?, .retain_artifacts = true, .policy = policy });
+        defer retained.deinit(a);
+        try successful(&fresh);
+        try successful(&retained);
+        try std.testing.expectEqualSlices(u8, fresh.bytes, retained.bytes);
+        try std.testing.expectEqual(fresh.constant_steps, retained.constant_steps);
+        try std.testing.expect(!std.mem.eql(u8, initial.bytes, retained.bytes));
+        try std.testing.expect(retained.refinements.body_cutoff_hits > 0);
+        if (std.mem.find(u8, source, "@u32.sub") != null)
+            try @import("allocation_failures.zig").checkAllAllocationFailures(a, cutoffScenario, .{ &after, &initial.capture.?, fresh.bytes });
+    }
+}
 fn capturedArrays(session: *const eval.Session, root: u32) []const u32 {
     const read = session.valueChildren(session.valueChildren(root)[0])[0];
     return session.valueChildren(read);
@@ -1177,6 +1225,59 @@ test "independent call proof rejects wrong scalar and distinct collection arrows
         try independentQueryRead(&old.capture.?, before.target(name), true);
         try independentQueryAttempt(&after, &old.capture.?, name, true, false, false);
     }
+}
+
+fn parallelProofScenario(allocator: Allocator, fixture: *const Fixture, old: *const capture.Capture, workers: u8) !void {
+    const parallel = @import("semantic_parallel.zig");
+    var g = try Generator.initAt(allocator, fixture);
+    defer g.deinit();
+    g.evaluator.options.trace_runtime_dependencies = true;
+    _ = try g.evaluator.richValue(fixture.target("factor"));
+    var state = try @import("completed_specialization_query.zig").State.init(allocator, old, fixture.units, fixture.names.view());
+    defer state.deinit();
+    const original = old.metadata.specialization_receipts.items[0].expected;
+    const maps = try state.pairedImporter();
+    const actual = (try maps.importEvidence(&g, original)).?;
+    var requests: [4]parallel.Request = undefined;
+    for (&requests, 0..) |*request, index| {
+        const target_ = fixture.target(if (index == 2) "floating" else "checked");
+        request.* = .{ .index = index, .read = .{ .unit = target_.unit, .binding = target_.binding, .evidence = original, .present = true }, .actual = actual };
+    }
+    const slots = artifacts.stamp(g.evaluator.slots);
+    const values = artifacts.stamp(g.evaluator.values.items);
+    const steps = g.evaluator.steps;
+    const calls = g.evaluator.validated_calls.count();
+    var batch = try parallel.run(allocator, std.testing.io, &state, &g, &requests, workers);
+    defer batch.deinit();
+    for (requests, 0..) |request, index| {
+        var recovered = batch.take(index, &state.stats);
+        defer if (recovered) |*record| record.deinit(allocator);
+        try std.testing.expectEqual(index != 2, recovered != null);
+        if (recovered) |record| {
+            try std.testing.expectEqual(request.actual, record.evidence);
+            try std.testing.expectEqualDeep(fixture.target("checked"), record.target);
+        }
+    }
+    try std.testing.expectEqual(slots, artifacts.stamp(g.evaluator.slots));
+    try std.testing.expectEqual(values, artifacts.stamp(g.evaluator.values.items));
+    try std.testing.expectEqual(steps, g.evaluator.steps);
+    try std.testing.expectEqual(calls, g.evaluator.validated_calls.count());
+    try std.testing.expect(g.evaluator.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 3), state.stats.independent_rechecked);
+    try std.testing.expectEqual(@as(usize, 1), state.stats.independent_declined);
+}
+
+test "independent semantic workers retain deterministic unpublished judgments and join through allocation failures" {
+    var before = try Fixture.init(independent_query_source);
+    defer before.deinit();
+    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    defer old.deinit(a);
+    try successful(&old);
+    var current = try Fixture.init(independent_query_source);
+    defer current.deinit();
+    editSchema(&current);
+    for ([_]u8{ 1, 2, 4 }) |workers| try parallelProofScenario(a, &current, &old.capture.?, workers);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, parallelProofScenario, .{ &current, &old.capture.?, @as(u8, 1) });
 }
 
 test "independent call proof preserves List versus Array nominal identity and required effects" {
