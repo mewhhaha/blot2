@@ -4,6 +4,8 @@
 const std = @import("std");
 pub const Answer = struct { value: u32, visits: u32, height: u16 };
 pub const Cache = struct {
+    /// Optional region owner; semantic answers still belong to the target.
+    allocator: ?std.mem.Allocator = null,
     answers: std.AutoHashMapUnmanaged(u32, Answer) = .empty,
     source: ?*const anyopaque = null,
     target: ?*const anyopaque = null,
@@ -11,12 +13,12 @@ pub const Cache = struct {
     physical: u64 = 0,
 
     pub fn deinit(self: *Cache, allocator: std.mem.Allocator) void {
-        self.answers.deinit(allocator);
+        self.answers.deinit(self.allocator orelse allocator);
         self.* = undefined;
     }
     pub fn clearRetainingCapacity(self: *Cache) void {
         self.answers.clearRetainingCapacity();
-        self.* = .{ .answers = self.answers };
+        self.* = .{ .answers = self.answers, .allocator = self.allocator };
     }
     pub fn activate(self: *Cache, source: *const anyopaque, target: *const anyopaque, generation: u16, physical: u64) bool {
         if (self.source != source or self.target != target or self.generation != generation or self.physical != physical) {

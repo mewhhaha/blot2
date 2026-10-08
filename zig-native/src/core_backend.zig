@@ -1956,9 +1956,9 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     timing.profiled = options.profile_backend;
     if (options.profile_backend) timing.work = generator.work_timing.snapshot();
     result.optimization = generator.facts.stats;
-    result.optimization.region_requests = generator.evaluator.region_scratch_pool.stats.requested;
-    result.optimization.region_reused = generator.evaluator.region_scratch_pool.stats.reused;
-    result.optimization.region_retained_bytes = generator.evaluator.region_scratch_pool.stats.retained_bytes;
+    result.optimization.region_requests = generator.evaluator.region_arena_pool.stats.requested;
+    result.optimization.region_reused = generator.evaluator.region_arena_pool.stats.reused;
+    result.optimization.region_retained_bytes = generator.evaluator.region_arena_pool.stats.retained_bytes;
     result.optimization.evidence_import_requests = generator.evaluator.evidence_import_requests;
     result.optimization.evidence_import_reused = generator.evaluator.evidence_import_reused;
     result.optimization.closed_source_imports = generator.evaluator.closed_source_imports;

@@ -30,11 +30,16 @@ are immutable. Scratch state is released before final output publication.
 Historical solver semantics use dense version records and explicit cursors;
 ordinary union-find is not an assumed substitute for the reference behavior.
 
-Inference regions may return their flat scratch buffers to one session-owned
-pool capped at 512 KiB. Return clears every vector length, map entry and
-projection owner; no inference answer or source borrow remains accessible.
-Nested active regions own separate buffers. A temporary allocator wrapper cannot
-take or populate the durable allocator's slot. Oversized scratch is freed.
+Inference regions lease arenas that own their solver, constraints and scratch.
+Small buffers use bump storage; larger buffers are recycled within size classes.
+Large remapping preserves live neighboring buffers and every allocation header.
+Reset performs no allocation. One session-owned pool retains at most 64 MiB;
+oversized regions are freed. Only raw storage returns to the pool: no inference
+answer, projection owner or source borrow remains accessible. Nested active
+regions own separate arenas. A temporary allocator wrapper cannot take or
+populate the durable allocator's slot. Published evidence uses the Session's
+durable allocator. Checker pending obligations and scheme-copy spills have
+separate arena leases; published Checked tables retain their original owners.
 Callable-definition indexes read immutable Core and belong to the whole Session.
 An emitter may memoize successful layout roots only while its source owner, type
 mappings and row mappings remain immutable. Recursive conversions retain their

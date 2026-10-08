@@ -119,6 +119,14 @@ scratch is released explicitly. Published immutable modules own their tables.
 The solver preserves cursor-relative chronological substitutions; replacing it
 with ordinary union-find would change semantics without an admission proof.
 
+`region_arena.zig` owns temporary region storage. Each active inference region
+leases its own arena, exports evidence into the Session, then returns only raw
+capacity. Small allocations use bump blocks; large buffers use reusable size
+classes and can grow through the backing allocator. Reset never allocates. A
+pool retains at most 64 MiB, and temporary allocator wrappers cannot borrow or
+populate another owner's pool. Checker pending obligations and imported-scheme
+scratch use independent leases; Checked and frozen-Core tables remain durable.
+
 Arrays are contiguous. Lists use persistent AVL trees with right-sized leaves of
 up to 248 words. Exclusive end edits reuse slack and tree nodes; shared edits
 detach one path and leaf. Branch copies freeze their children so both versions

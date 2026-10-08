@@ -225,7 +225,7 @@ pub const Store = struct {
         const result = try self.projectNodeDepth(source, ty, mappings, rows, depth, budget, retained, memo, &height);
         if (retained) {
             if (parent_height) |parent| parent.* = @max(parent.*, height + 1);
-            if (ty > types.never) try memo.?.answers.put(self.allocator, ty, .{ .value = result, .visits = @intCast(before - budget.*), .height = height });
+            if (ty > types.never) try memo.?.answers.put(memo.?.allocator orelse self.allocator, ty, .{ .value = result, .visits = @intCast(before - budget.*), .height = height });
         }
         return result;
     }

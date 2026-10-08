@@ -22,7 +22,7 @@ remaining work. Each milestone lands as a local commit on `main` after
 | 4. Canonical specialization keys      | Open                                             |
 | 5. Solver hot paths                   | Occurs DAG visitation done; caches/worklist open |
 | 6. Cheap literal and body edits       | Open                                             |
-| 7. Region arenas                      | Open                                             |
+| 7. Region arenas                      | Arenas on main; allocation target open           |
 | 8. Default restart cache              | Done on main                                     |
 | 9. Parallel region inference          | Open; after 1–3                                  |
 | 10. Benchmarks, profile, budgets      | Done (`ae14677`)                                 |
@@ -142,6 +142,24 @@ count from 1.54 to 1.24 million. Five paired runs measured 919 / 925 ms fresh,
 1,030 / 1,030 ms population, 200 / 190 ms first edit and 180 / 170 ms later
 edits. Wasm matched throughout. Results are in ignored
 `build/bench/type-and-scheme-scratch`; no cold speedup is claimed.
+
+Region solvers, constraints and scratch now lease resettable arenas. Checker
+pending obligations and scheme-copy spills use independent leases. Published
+results keep durable ownership; reset cannot allocate, temporary allocator
+wrappers cannot populate another owner's pool, and retained raw capacity is
+capped at 64 MiB. Large buffers recycle or remap without retaining each obsolete
+growth buffer. The old solver and scratch pools are removed. Native ownership,
+nested-region, remapping and allocation-failure laws pass, along with 565
+guest/client tests and zero analyzer findings. Differential qualification
+preserved diagnostics, constants, code-instance counts and Wasm; dependency
+comparisons use a separate artifact for each compiler identity.
+
+Five paired gdev runs against the preceding scratch change measured 843 / 847 ms
+fresh CPU, 970 / 960 ms population, 190 / 180 ms first edit and 180 / 170 ms
+later edits. Wasm matched in every phase. Requested allocation falls from 397.0
+to 344.0 MB, while peak requested memory rises from 59.2 to 88.6 MB. The
+under-100-MB cumulative allocation target remains open. Results are in ignored
+`build/bench/region-pooled-arenas`.
 
 ### Hills 1 (backend) and 3: summaries instead of unfolding
 

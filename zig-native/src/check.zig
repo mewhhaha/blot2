@@ -2,6 +2,7 @@
 //! fresh type variables and their own numeric obligations. Every declaration is
 //! checked, including declarations not reachable from an entrypoint.
 const std = @import("std");
+const region_arena = @import("region_arena.zig");
 const ast = @import("ast.zig");
 const symbols = @import("symbols.zig");
 const T = @import("types.zig");
@@ -516,6 +517,8 @@ const Qualified = struct { namespace: symbols.Symbol, member: symbols.Symbol };
 const QualifiedResolution = struct { namespace: symbols.Symbol, binding: BindingId };
 const OperatorOverride = struct { target: symbols.Symbol, named: bool, external: ?ExternalTarget = null };
 const Engine = struct {
+    scratch_pool: region_arena.Pool,
+    pending_arena: ?*region_arena.Arena = null,
     active_aliases: std.AutoHashMapUnmanaged(u32, void) = .empty,
     holes: std.ArrayList(struct { node: ast.Id, scope: T.List, owner: BindingId }) = .empty,
     execution: PrivateExecution = .{},
@@ -971,8 +974,10 @@ const Engine = struct {
             const callee = try self.importScheme(callee_interface.?, .{ .unit = target.unit, .binding = constraint.identity.decl }, 0, origin, depth + 1) orelse return null;
             try callees.append(self.allocator, callee);
         };
+        const copier_arena = try self.scratch_pool.take(self.allocator);
+        defer self.scratch_pool.give(copier_arena);
         var copier_buffer: [4096]u8 align(@alignOf(usize)) = undefined;
-        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, self.allocator);
+        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, copier_arena.allocator());
         var copier: SchemeCopier = .{ .allocator = copier_scratch.allocator(), .source = interface.types, .destination = &self.types };
         defer copier.deinit();
         var variables: std.ArrayList(T.Id) = .empty;
@@ -1002,11 +1007,15 @@ const Engine = struct {
         return binding;
     }
 
+    fn pendingAllocator(self: *Engine) Allocator.Error!Allocator {
+        if (self.pending_arena == null) self.pending_arena = try self.scratch_pool.take(self.allocator);
+        return self.pending_arena.?.allocator();
+    }
     fn appendPending(self: *Engine, item: PendingObligation) Allocator.Error!void {
         var value = item;
         value.scope = self.qualification_scope;
         value.method_member = value.method_member or (value.value.kind == .receiver and !value.value.explicit);
-        try self.pending.append(self.allocator, value);
+        try self.pending.append(try self.pendingAllocator(), value);
         self.counters.obligations_appended += 1;
         self.counters.pending_peak = @max(self.counters.pending_peak, self.pending.items.len);
     }
@@ -1397,8 +1406,10 @@ const Engine = struct {
     fn copyNominal(self: *Engine, producer: DeclarationCatalog, source_index: u32) T.Error!u32 {
         const source = producer.nominals[source_index];
         if (self.nominalIndex(source.identity)) |index| return index;
+        const copier_arena = try self.scratch_pool.take(self.allocator);
+        defer self.scratch_pool.give(copier_arena);
         var copier_buffer: [4096]u8 align(@alignOf(usize)) = undefined;
-        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, self.allocator);
+        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, copier_arena.allocator());
         var copier: SchemeCopier = .{ .allocator = copier_scratch.allocator(), .source = producer.types, .destination = &self.types };
         defer copier.deinit();
         var variables: std.ArrayList(T.Id) = .empty;
@@ -1433,8 +1444,10 @@ const Engine = struct {
     fn copyEffectFamily(self: *Engine, producer: DeclarationCatalog, source_index: u32) T.Error!u32 {
         const source = producer.effect_families[source_index];
         if (self.effect_family_identities.get(source.identity)) |known| return known;
+        const copier_arena = try self.scratch_pool.take(self.allocator);
+        defer self.scratch_pool.give(copier_arena);
         var copier_buffer: [4096]u8 align(@alignOf(usize)) = undefined;
-        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, self.allocator);
+        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, copier_arena.allocator());
         var copier: SchemeCopier = .{ .allocator = copier_scratch.allocator(), .source = producer.types, .destination = &self.types };
         defer copier.deinit();
         var variables: std.ArrayList(T.Id) = .empty;
@@ -1524,8 +1537,10 @@ const Engine = struct {
     fn copyContract(self: *Engine, producer: DeclarationCatalog, source_index: u32) T.Error!u32 {
         const source = producer.contracts[source_index];
         if (self.contract_identities.get(source.identity)) |known| return known;
+        const copier_arena = try self.scratch_pool.take(self.allocator);
+        defer self.scratch_pool.give(copier_arena);
         var copier_buffer: [4096]u8 align(@alignOf(usize)) = undefined;
-        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, self.allocator);
+        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, copier_arena.allocator());
         var copier: SchemeCopier = .{ .allocator = copier_scratch.allocator(), .source = producer.types, .destination = &self.types };
         defer copier.deinit();
         var variables: std.ArrayList(T.Id) = .empty;
@@ -2965,7 +2980,7 @@ const Engine = struct {
                     deferred.value.source = source;
                     deferred.method_member = true;
                     if (deferred.origin == 0) deferred.origin = try self.projectionOrigin(source, name, true);
-                    try self.pending.append(self.allocator, deferred);
+                    try self.pending.append(try self.pendingAllocator(), deferred);
                 } else {
                     const start = self.pending.items.len;
                     const function = try self.instantiate(binding, source);
@@ -7327,6 +7342,7 @@ fn checkInternal(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Poo
 fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool, execution: PrivateExecution) !Checked {
     if (!source_validation and hasNumericFailure(tree)) return rejectNumericSource(allocator, tree, pool, imports, catalogs, unit, options);
     var engine: Engine = .{
+        .scratch_pool = .init(allocator),
         .execution = execution,
         .allocator = allocator,
         .tree = tree,
@@ -7341,6 +7357,7 @@ fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *sy
         .source_validation = source_validation,
         .prelude_unit = options.prelude_unit,
     };
+    defer engine.scratch_pool.deinit();
     errdefer engine.types.deinit();
     defer engine.holes.deinit(allocator);
     defer engine.active_aliases.deinit(allocator);
@@ -7498,7 +7515,10 @@ fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *sy
     defer engine.global_states.deinit(allocator);
     defer engine.active.deinit(allocator);
     defer engine.env.deinit(allocator);
-    defer engine.pending.deinit(allocator);
+    defer if (engine.pending_arena) |arena| {
+        engine.pending.deinit(arena.allocator());
+        engine.scratch_pool.give(arena);
+    };
     defer {
         var outcomes = engine.callee_memo.iterator();
         while (outcomes.next()) |entry| {

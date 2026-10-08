@@ -6,7 +6,7 @@ const principal_inputs = @import("principal_inputs.zig");
 const core = @import("core.zig");
 const scalar_ops = @import("scalar_ops.zig");
 const types = @import("types.zig");
-const solver_capacity = @import("solver_capacity.zig");
+const region_arena = @import("region_arena.zig");
 const type_evidence = @import("type_evidence.zig");
 const checked_types = @import("check.zig");
 const code_expectation = @import("code_expectation.zig");
@@ -333,8 +333,7 @@ pub const Session = struct {
     evidence_import_reused: usize = 0,
     callable_definitions: std.AutoHashMapUnmanaged(ClosureRegion.DefinitionKey, core.BindingId) = .empty,
     callable_definition_units: std.AutoHashMapUnmanaged(usize, void) = .empty,
-    region_scratch_pool: @import("scratch_pool.zig").Pool(ClosureRegion.Scratch) = .{},
-    solver_capacity_pool: solver_capacity.Pool = .{},
+    region_arena_pool: region_arena.Pool,
     retain_specialization_receipts: bool = false,
     specialization_provider: ?receipt.Provider = null,
     specialization_receipts: std.ArrayList(receipt.Record) = .empty,
@@ -445,12 +444,11 @@ pub const Session = struct {
                 }
             }
         }
-        return .{ .region_scratch_pool = .init(allocator), .solver_capacity_pool = solver_capacity.Pool.init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .values = values, .field_locations = field_locations, .value_evidence = value_evidence, .evidence = evidence, .value_records = value_records, .record_layouts = record_layouts };
+        return .{ .region_arena_pool = .init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .values = values, .field_locations = field_locations, .value_evidence = value_evidence, .evidence = evidence, .value_records = value_records, .record_layouts = record_layouts };
     }
     pub fn deinit(self: *Session) void {
         self.call_summaries.deinit(self);
-        self.solver_capacity_pool.deinit();
-        self.region_scratch_pool.deinit();
+        self.region_arena_pool.deinit();
         self.callable_definitions.deinit(self.allocator);
         self.callable_definition_units.deinit(self.allocator);
         self.allocator.free(self.owned_diagnostic_message);
@@ -3515,19 +3513,6 @@ const ClosureRegion = struct {
             inline for (@typeInfo(Scratch).@"struct".field_names) |field| @field(self, field).deinit(allocator);
             self.* = undefined;
         }
-        pub fn clearRetainingCapacity(self: *Scratch) void {
-            inline for (@typeInfo(Scratch).@"struct".field_names) |field| @field(self, field).clearRetainingCapacity();
-        }
-        pub fn storageBound(self: *const Scratch) ?usize {
-            var bytes: usize = 0;
-            inline for (@typeInfo(Scratch).@"struct".field_names) |field| {
-                const value = @field(self, field);
-                const buffer = if (comptime @hasField(@TypeOf(value), "answers")) value.answers else value;
-                const size = @import("scratch_pool.zig").bufferBound(buffer) orelse return null;
-                bytes = std.math.add(usize, bytes, size) catch return null;
-            }
-            return bytes;
-        }
     };
     profile_principal: bool = false,
     profile_rejected: u16 = 0,
@@ -3540,7 +3525,7 @@ const ClosureRegion = struct {
     scratch_allocator: Allocator,
     timing: ?@import("backend_timing.zig").Work.Scope = null,
     solver: types.Store,
-    solver_initial: ?types.Mark = null,
+    arena: *region_arena.Arena,
     retain_selected: bool = false,
     startup_coverage_complete: bool = true,
     include_callables: bool = false,
@@ -3560,11 +3545,11 @@ const ClosureRegion = struct {
     fn init(session: *Session) types.Error!ClosureRegion {
         const timing = if (session.timing) |work| work.enter(.inference) else null;
         errdefer if (timing) |scope| scope.deinit();
-        // Solver capacity and scratch storage are pooled; no solver evidence
-        // or source owner is.
-        const lease = try session.solver_capacity_pool.take(session.allocator);
-        var region: ClosureRegion = .{ .session = session, .timing = timing, .solver = lease.solver, .solver_initial = lease.initial, .scratch_allocator = session.allocator };
-        region.scratch = session.region_scratch_pool.take(session.allocator);
+        const arena = try session.region_arena_pool.take(session.allocator);
+        errdefer session.region_arena_pool.give(arena);
+        const allocator = arena.allocator();
+        var region: ClosureRegion = .{ .session = session, .timing = timing, .solver = try types.Store.initWithOptions(allocator, .{ .closed_graphs = true }), .scratch_allocator = allocator, .arena = arena };
+        region.scratch.projection_cache.allocator = allocator;
         region.occurs_base = region.solver.occurs_steps;
         return region;
     }
@@ -3588,11 +3573,9 @@ const ClosureRegion = struct {
             }
         };
         if (self.session.refinement_observation) |observation| observation.observe(self);
-        if (self.solver_initial) |initial| {
-            self.session.solver_capacity_pool.give(.{ .solver = self.solver, .initial = initial });
-            self.solver = undefined;
-        } else self.solver.deinit();
-        self.session.region_scratch_pool.give(self.scratch_allocator, self.scratch);
+        self.solver.deinit();
+        self.scratch.deinit(self.scratch_allocator);
+        self.session.region_arena_pool.give(self.arena);
         self.scratch = undefined;
     }
     fn failConstraint(self: *ClosureRegion, constraint: Constraint, code: Code) Error {
@@ -3622,7 +3605,7 @@ const ClosureRegion = struct {
                 .effect_rep => .effect_rep,
                 else => return error.UnresolvedType,
             };
-            try self.scratch.constraints.append(self.session.allocator, .{
+            try self.scratch.constraints.append(self.scratch_allocator, .{
                 .scope = scope,
                 .node = source,
                 .span = obligation.span,
@@ -3730,7 +3713,7 @@ const ClosureRegion = struct {
         const resolved = try self.session.external(target_);
         const reference: core.BindingRef = .{ .unit = self.session.unitId(resolved.unit), .binding = resolved.binding };
         for (self.scratch.selected_targets.items) |prior| if (std.meta.eql(prior, reference)) return;
-        try self.scratch.selected_targets.append(self.session.allocator, reference);
+        try self.scratch.selected_targets.append(self.scratch_allocator, reference);
     }
     fn sourceInterface(self: *ClosureRegion, target_: Target, body: *const core.Body) RegionError!SourceInterface {
         self.source_interface = true;
@@ -3744,7 +3727,7 @@ const ClosureRegion = struct {
         // or header proof and the later export check reports the missing entry.
         self.speculative_source_entry = body.is_function and !sourceEntryCandidate(&entry_module.types, entry_module.binding(body.binding).ty) and self.session.diagnostic == null and self.session.owned_diagnostic_message.len == 0;
         const scope = try self.callableScope(target_);
-        try self.scratch.unresolved_calls.put(self.session.allocator, target_, scope);
+        try self.scratch.unresolved_calls.put(self.scratch_allocator, target_, scope);
         try self.collect(scope, body.root);
         self.solveMode(true) catch |err| {
             if (!self.source_selection_failed) return err;
@@ -3774,7 +3757,7 @@ const ClosureRegion = struct {
             if (source.binding == 0 or source.binding >= module.bindings.len) continue;
             const binding = module.binding(source.binding);
             const own = if (module.body(source.binding)) |definition| definition.is_function else binding.initializer != 0 and module.node(binding.initializer).tag == .closure;
-            if (own) try self.scratch.source_functions.append(self.session.allocator, source.root);
+            if (own) try self.scratch.source_functions.append(self.scratch_allocator, source.root);
         }
         var changed = true;
         while (changed) {
@@ -4131,7 +4114,7 @@ const ClosureRegion = struct {
             .type_constructor => self.solver.typeConstructor(.{ .unit = node.a, .decl = node.b }),
             .record => blk: {
                 var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
-                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
                 const allocator = scratch.allocator();
                 const children = view.children(actual);
                 const fields = try allocator.alloc(types.Field, children.len / 2);
@@ -4141,7 +4124,7 @@ const ClosureRegion = struct {
             },
             .product, .nominal => blk: {
                 var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
-                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
                 const allocator = scratch.allocator();
                 const children = view.children(actual);
                 const values = try allocator.alloc(types.Id, children.len);
@@ -4183,7 +4166,7 @@ const ClosureRegion = struct {
             .type_constructor => try self.solver.typeConstructor(.{ .unit = node.a, .decl = node.b }),
             .record => blk: {
                 var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
-                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
                 const allocator = scratch.allocator();
                 const fields = try allocator.alloc(types.Field, node.b);
                 defer allocator.free(fields);
@@ -4196,7 +4179,7 @@ const ClosureRegion = struct {
             .product, .nominal => blk: {
                 const children = if (node.tag == .nominal) source.nominalArguments(node) else source.list(.{ .start = node.a, .len = node.b });
                 var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
-                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
                 const allocator = scratch.allocator();
                 const values = try allocator.alloc(types.Id, children.len);
                 defer allocator.free(values);
@@ -4205,9 +4188,9 @@ const ClosureRegion = struct {
             },
         };
         if (shared and self.scratch.closed_source_cache.activate(&self.solver, self.session.options.max_type_depth)) {
-            try self.scratch.closed_source_cache.answers.put(self.session.allocator, closed_key, result);
-        } else try self.scratch.imported.put(self.session.allocator, key, result);
-        if (node.tag == .variable) try self.scratch.variables.append(self.session.allocator, .{ .source = key, .region = result });
+            try self.scratch.closed_source_cache.answers.put(self.scratch_allocator, closed_key, result);
+        } else try self.scratch.imported.put(self.scratch_allocator, key, result);
+        if (node.tag == .variable) try self.scratch.variables.append(self.scratch_allocator, .{ .source = key, .region = result });
         return result;
     }
     fn importLabel(self: *ClosureRegion, scope: u32, label: types.Effects.Label, depth: usize) RegionError!types.Effects.Label {
@@ -4217,14 +4200,14 @@ const ClosureRegion = struct {
         const source = &self.session.units[self.scratch.sources.items[scope].owner].types;
         if (label == 0 or label >= source.operations.len) return error.UnresolvedType;
         var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
-        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
         const allocator = scratch.allocator();
         const original = source.operationArguments(label);
         const arguments = try allocator.alloc(types.Id, original.len);
         defer allocator.free(arguments);
         for (original, arguments) |argument, *imported| imported.* = try self.importType(scope, argument, depth + 1);
         const result = try self.solver.internOperation(source.operation(label).identity, arguments);
-        try self.scratch.imported_labels.put(self.session.allocator, key, result);
+        try self.scratch.imported_labels.put(self.scratch_allocator, key, result);
         return result;
     }
     fn importRow(self: *ClosureRegion, scope: u32, row: types.Effects.Id, depth: usize) RegionError!types.Effects.Id {
@@ -4236,7 +4219,7 @@ const ClosureRegion = struct {
         if (row >= source.effects.rows.len) return error.UnresolvedType;
         const original = source.row(row);
         var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
-        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
         const allocator = scratch.allocator();
         const source_labels = source.rowLabels(row);
         const labels = try allocator.alloc(types.Effects.Label, source_labels.len);
@@ -4253,14 +4236,14 @@ const ClosureRegion = struct {
                 const fresh = self.scratch.row_parameters.get(parameter_key) orelse fresh: {
                     if (self.scratch.row_parameters.count() >= std.math.maxInt(u32)) return error.TypeLimit;
                     const created: u32 = @intCast(self.scratch.row_parameters.count());
-                    try self.scratch.row_parameters.put(self.session.allocator, parameter_key, created);
+                    try self.scratch.row_parameters.put(self.scratch_allocator, parameter_key, created);
                     break :fresh created;
                 };
                 break :blk .{ .parameter = fresh };
             },
         };
         const result = self.solver.effects.row(labels, tail) catch |err| return types.effectError(err);
-        try self.scratch.imported_rows.put(self.session.allocator, key, result);
+        try self.scratch.imported_rows.put(self.scratch_allocator, key, result);
         return result;
     }
     fn importRowVariable(self: *ClosureRegion, scope: u32, variable: u32) RegionError!types.Effects.Id {
@@ -4269,7 +4252,7 @@ const ClosureRegion = struct {
         const key: RowVariable = .{ .scope = scope, .variable = variable };
         if (self.scratch.row_variables.get(key)) |known| return known;
         const fresh = try self.solver.freshEffects();
-        try self.scratch.row_variables.put(self.session.allocator, key, fresh);
+        try self.scratch.row_variables.put(self.scratch_allocator, key, fresh);
         return fresh;
     }
     fn importEvidence(self: *ClosureRegion, actual: type_evidence.Id, depth: usize) RegionError!types.Id {
@@ -4287,7 +4270,7 @@ const ClosureRegion = struct {
         const result = try self.importEvidenceGraph(actual, depth);
         // Construction may synchronize the solver's physical effect clock.
         self.prepareEvidenceImports();
-        if (key) |id| if (memo.key(actual, depth) != null) try memo.answers.put(self.session.allocator, id, result);
+        if (key) |id| if (memo.key(actual, depth) != null) try memo.answers.put(self.scratch_allocator, id, result);
         return result;
     }
     fn prepareEvidenceImports(self: *ClosureRegion) void {
@@ -4314,7 +4297,7 @@ const ClosureRegion = struct {
             .type_constructor => self.solver.typeConstructor(.{ .unit = node.a, .decl = node.b }),
             .record => blk: {
                 var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
-                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
                 const allocator = scratch.allocator();
                 const children = self.session.evidence.children(actual);
                 const fields = try allocator.alloc(types.Field, children.len / 2);
@@ -4324,7 +4307,7 @@ const ClosureRegion = struct {
             },
             .product, .nominal => blk: {
                 var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
-                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
                 const allocator = scratch.allocator();
                 const children = self.session.evidence.children(actual);
                 const values = try allocator.alloc(types.Id, children.len);
@@ -4341,14 +4324,14 @@ const ClosureRegion = struct {
         const source = self.session.evidence.view().effects;
         const operation = source.operation(label);
         var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
-        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
         const allocator = scratch.allocator();
         const original = source.operationArguments(label);
         const arguments = try allocator.alloc(types.Id, original.len);
         defer allocator.free(arguments);
         for (original, arguments) |argument, *imported| imported.* = try self.importEvidence(argument, depth + 1);
         const result = try self.solver.internOperation(operation.identity, arguments);
-        try self.scratch.evidence_labels.put(self.session.allocator, label, result);
+        try self.scratch.evidence_labels.put(self.scratch_allocator, label, result);
         return result;
     }
     fn importEvidenceRow(self: *ClosureRegion, row: u32, depth: usize) RegionError!types.Effects.Id {
@@ -4358,14 +4341,14 @@ const ClosureRegion = struct {
         if (self.scratch.evidence_rows.get(row)) |known| return known;
         const source = self.session.evidence.view().effects;
         var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
-        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.scratch_allocator);
         const allocator = scratch.allocator();
         const source_labels = source.rowLabels(row);
         const labels = try allocator.alloc(types.Effects.Label, source_labels.len);
         defer allocator.free(labels);
         for (source_labels, labels) |label, *imported| imported.* = try self.importEvidenceLabel(label, depth + 1);
         const result = self.solver.effects.row(labels, .closed) catch |err| return types.effectError(err);
-        try self.scratch.evidence_rows.put(self.session.allocator, row, result);
+        try self.scratch.evidence_rows.put(self.scratch_allocator, row, result);
         return result;
     }
     fn project(self: *ClosureRegion, ty: types.Id) RegionError!type_evidence.Id {
@@ -4383,7 +4366,7 @@ const ClosureRegion = struct {
         const owner = self.session.findUnit(metadata.unit, null) orelse return error.UnresolvedType;
         const module = &self.session.units[owner];
         const scope: u32 = @intCast(self.scratch.sources.items.len);
-        try self.scratch.sources.append(self.session.allocator, .{ .value = value_, .owner = owner });
+        try self.scratch.sources.append(self.scratch_allocator, .{ .value = value_, .owner = owner });
         var body: core.Id = 0;
         const root = switch (metadata.origin) {
             .anonymous => blk: {
@@ -4455,7 +4438,7 @@ const ClosureRegion = struct {
                 const actual = try self.solver.resolve(self.scratch.sources.items[child].root, 0);
                 // Admit the capture's ambient view while retaining its implementation row.
                 try self.solver.unify(formal, try self.solver.openCovariant(actual));
-                try self.scratch.edges.append(self.session.allocator, .{ .parent = scope, .child = child, .slot = @intCast(index), .formal = formal });
+                try self.scratch.edges.append(self.scratch_allocator, .{ .parent = scope, .child = child, .slot = @intCast(index), .formal = formal });
             } else {
                 const actual = self.session.valueEvidence(capture);
                 if (actual == 0) return error.UnresolvedType;
@@ -4490,7 +4473,7 @@ const ClosureRegion = struct {
             if (constructor_index == null) return error.UnresolvedType;
         }
         const scope: u32 = @intCast(self.scratch.sources.items.len);
-        try self.scratch.sources.append(self.session.allocator, .{ .owner = owner, .value = value_ });
+        try self.scratch.sources.append(self.scratch_allocator, .{ .owner = owner, .value = value_ });
         const captures = try self.session.allocator.dupe(ValueId, self.session.valueChildren(value_));
         defer self.session.allocator.free(captures);
         var children: std.ArrayList(types.Id) = .empty;
@@ -4499,7 +4482,7 @@ const ClosureRegion = struct {
             const child = try self.addValue(capture, depth + 1);
             const formal = self.scratch.sources.items[child].root;
             try children.append(self.session.allocator, formal);
-            try self.scratch.edges.append(self.session.allocator, .{ .parent = scope, .child = child, .slot = @intCast(index), .formal = formal });
+            try self.scratch.edges.append(self.scratch_allocator, .{ .parent = scope, .child = child, .slot = @intCast(index), .formal = formal });
         }
         const root = switch (info.kind) {
             .scalar, .type_constructor, .resolver, .provider, .state_provider => try self.importEvidence(self.session.valueEvidence(value_), 0),
@@ -4582,8 +4565,8 @@ const ClosureRegion = struct {
         if (definition != null and binding.kind == .global and !self.retain_selected and try self.summaryEligible(target_)) {
             const start = self.scratch.summary_arguments.items.len;
             if (arguments.len > std.math.maxInt(u32) - start) return error.TypeLimit;
-            try self.scratch.summary_arguments.appendSlice(self.session.allocator, arguments);
-            try self.scratch.constraints.append(self.session.allocator, .{ .kind = .call_summary, .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .right = callee_type, .arguments = .{ .start = @intCast(start), .len = @intCast(arguments.len) }, .deferred_member = self.defer_members });
+            try self.scratch.summary_arguments.appendSlice(self.scratch_allocator, arguments);
+            try self.scratch.constraints.append(self.scratch_allocator, .{ .kind = .call_summary, .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .right = callee_type, .arguments = .{ .start = @intCast(start), .len = @intCast(arguments.len) }, .deferred_member = self.defer_members });
             return;
         }
         try self.collectInlineCall(caller, target_, callee_type, arguments);
@@ -4614,7 +4597,7 @@ const ClosureRegion = struct {
                 // Bottom remains ordinary control flow in the solver. Witness
                 // selection owns this exact applied argument separately.
                 if (self.solver.node(try self.solver.resolve(actual, 0)).tag == .never)
-                    try self.scratch.witness_inputs.put(self.session.allocator, arrow.a, actual);
+                    try self.scratch.witness_inputs.put(self.scratch_allocator, arrow.a, actual);
                 formal = arrow.b;
             }
         }
@@ -4633,7 +4616,7 @@ const ClosureRegion = struct {
                 _ = try self.admitSignature(instantiated, self.scratch.sources.items[prior].root);
                 return;
             }
-            try self.scratch.call_instances.put(self.session.allocator, key, scope);
+            try self.scratch.call_instances.put(self.scratch_allocator, key, scope);
             self.session.counters.call_collections_closed += 1;
             try self.collect(scope, body_root);
         } else {
@@ -4643,7 +4626,7 @@ const ClosureRegion = struct {
                 _ = try self.admitSignature(instantiated, self.scratch.sources.items[active].root);
                 return;
             }
-            try self.scratch.unresolved_calls.put(self.session.allocator, target_, scope);
+            try self.scratch.unresolved_calls.put(self.scratch_allocator, target_, scope);
             defer _ = self.scratch.unresolved_calls.remove(target_);
             self.session.counters.call_collections_unresolved += 1;
             try self.collect(scope, body_root);
@@ -4773,7 +4756,7 @@ const ClosureRegion = struct {
             try self.solver.unify(arrow.a, try self.importEvidence(input, 0));
             cursor = arrow.b;
         }
-        try self.scratch.unresolved_calls.put(self.session.allocator, key.target, scope);
+        try self.scratch.unresolved_calls.put(self.scratch_allocator, key.target, scope);
         try self.collect(scope, self.scratch.sources.items[scope].body);
     }
     fn shareLexical(self: *ClosureRegion, scope: u32, caller: u32, scheme: types.Scheme) RegionError!void {
@@ -4806,7 +4789,7 @@ const ClosureRegion = struct {
         const shape = try self.solver.functionWithEffects(try self.importType(scope, closure.parameter.ty, 0), try self.importType(scope, module.typeOf(closure.body), 0), signature.c);
         try self.solver.unify(actual, envelope);
         try self.solver.unify(actual, shape);
-        if (self.source_interface) try self.scratch.source_functions.append(self.session.allocator, actual);
+        if (self.source_interface) try self.scratch.source_functions.append(self.scratch_allocator, actual);
     }
     fn operationConstraint(self: *ClosureRegion, scope: u32, id: core.Id, operation: core.OperationValue) RegionError!void {
         const owner = self.scratch.sources.items[scope].owner;
@@ -4816,9 +4799,9 @@ const ClosureRegion = struct {
         for (module.types.list(operation.arguments)) |argument| try arguments.append(self.session.allocator, try self.importType(scope, argument, 0));
         const signature = try self.importType(scope, operation.signature, 0);
         if (operation.witness != 0) {
-            try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(operation.witness), 0), .right = try self.importType(scope, operation.witness_result, 0), .result = 0, .kind = .type_head });
+            try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(operation.witness), 0), .right = try self.importType(scope, operation.witness_result, 0), .result = 0, .kind = .type_head });
         }
-        try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = signature, .right = try self.solver.product(arguments.items), .result = 0, .signature = signature, .identity = .{ .unit = if (operation.identity.unit == 0) self.session.unitId(owner) else operation.identity.unit, .decl = operation.identity.decl }, .kind = .effect_operation });
+        try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = signature, .right = try self.solver.product(arguments.items), .result = 0, .signature = signature, .identity = .{ .unit = if (operation.identity.unit == 0) self.session.unitId(owner) else operation.identity.unit, .decl = operation.identity.decl }, .kind = .effect_operation });
     }
     /// An invocation can retain a generic result while its source row already
     /// proves the operation arguments. Recover that proof only from a complete
@@ -4938,7 +4921,7 @@ const ClosureRegion = struct {
                 const reference = module.reference(id);
                 if (reference.unit == 0 or reference.unit == self.session.unitId(self.scratch.sources.items[scope].owner)) {
                     const binding = module.binding(reference.binding);
-                    if (binding.kind == .local) try self.scratch.data_aliases.append(self.session.allocator, .{ .instance = try self.importType(scope, n.ty, 0), .principal = try self.importType(scope, binding.ty, 0) });
+                    if (binding.kind == .local) try self.scratch.data_aliases.append(self.scratch_allocator, .{ .instance = try self.importType(scope, n.ty, 0), .principal = try self.importType(scope, binding.ty, 0) });
                 }
             }
             if (self.include_callables and !self.source_interface and n.tag == .reference) {
@@ -4978,7 +4961,7 @@ const ClosureRegion = struct {
             const source_signature = module.dispatchSignature(id);
             const dispatch_signature = if (source_signature == 0) 0 else try self.importType(scope, source_signature, 0);
             if (n.tag == .handle) if (module.handleEffects(id)) |handler| {
-                try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, handler.first, 0), .right = if (handler.second == 0) 0 else try self.importType(scope, handler.second, 0), .result = try self.solver.functionWithEffects(types.unit, types.unit, try self.importRow(scope, handler.residual, 0)), .signature = try self.solver.functionWithEffects(types.unit, types.unit, try self.importRow(scope, handler.extended, 0)), .kind = .effect_handler });
+                try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, handler.first, 0), .right = if (handler.second == 0) 0 else try self.importType(scope, handler.second, 0), .result = try self.solver.functionWithEffects(types.unit, types.unit, try self.importRow(scope, handler.residual, 0)), .signature = try self.solver.functionWithEffects(types.unit, types.unit, try self.importRow(scope, handler.extended, 0)), .kind = .effect_handler });
             };
             if (self.include_callables and n.tag == .call) try self.collectCall(scope, module.call(id).target, module.call(id).callee_type, module.children(id));
             if (self.include_callables and n.tag == .apply) {
@@ -4998,11 +4981,11 @@ const ClosureRegion = struct {
                     self.startup_coverage_complete = false;
                 }
             }
-            if (n.tag == .record_merge) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .kind = .record_merge });
-            if (self.source_interface and n.tag == .type_same) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = types.boolean, .kind = .type_compare });
-            if (n.tag == .associated or (n.tag == .scalar and n.c != 0 and n.b != 0)) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .deferred_member = self.defer_members, .op = Session.operator(n.op), .member = if (n.tag == .associated) n.c else 0 });
-            if (n.tag == .project) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .projection = n.b, .kind = .field, .deferred_member = self.defer_members });
-            if (n.tag == .result_associated) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .member = n.b, .kind = .result_dispatch, .deferred_member = self.defer_members });
+            if (n.tag == .record_merge) try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .kind = .record_merge });
+            if (self.source_interface and n.tag == .type_same) try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = types.boolean, .kind = .type_compare });
+            if (n.tag == .associated or (n.tag == .scalar and n.c != 0 and n.b != 0)) try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .deferred_member = self.defer_members, .op = Session.operator(n.op), .member = if (n.tag == .associated) n.c else 0 });
+            if (n.tag == .project) try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .projection = n.b, .kind = .field, .deferred_member = self.defer_members });
+            if (n.tag == .result_associated) try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .member = n.b, .kind = .result_dispatch, .deferred_member = self.defer_members });
             switch (n.tag) {
                 .scalar, .associated, .logical, .record_merge, .type_same, .apply, .effect_provider, .handle => try work.appendSlice(self.session.allocator, &.{ n.a, n.b }),
                 .if_value, .if_stmt, .state_provider => try work.appendSlice(self.session.allocator, &.{ n.a, n.b, n.c }),
@@ -5015,7 +4998,7 @@ const ClosureRegion = struct {
                         // is specialized, just as the source checker does.
                         const collection = try self.solver.fresh();
                         try self.solver.unify(try self.importType(scope, module.typeOf(args[0]), 0), try self.solver.sequence(.cursor, collection));
-                        try self.scratch.constraints.append(self.session.allocator, .{
+                        try self.scratch.constraints.append(self.scratch_allocator, .{
                             .kind = .collection,
                             .scope = scope,
                             .node = id,
@@ -5023,7 +5006,7 @@ const ClosureRegion = struct {
                             .result = if (operation == .cursor_value) try self.importType(scope, n.ty, 0) else try self.solver.fresh(),
                         });
                     }
-                    if (module.arrayOperation(id) == .get and module.types.node(module.typeOf(args[0])).tag == .variable) try self.scratch.constraints.append(self.session.allocator, .{
+                    if (module.arrayOperation(id) == .get and module.types.node(module.typeOf(args[0])).tag == .variable) try self.scratch.constraints.append(self.scratch_allocator, .{
                         .kind = .collection,
                         .scope = scope,
                         .node = id,
@@ -5054,7 +5037,7 @@ const ClosureRegion = struct {
                 .loop => {
                     const iteration = module.loopInfo(id);
                     try self.collectStartupPatterns(scope, &.{iteration.pattern});
-                    if (iteration.kind == .array and iteration.pattern != 0 and module.types.node(module.typeOf(iteration.first)).tag == .variable) try self.scratch.constraints.append(self.session.allocator, .{
+                    if (iteration.kind == .array and iteration.pattern != 0 and module.types.node(module.typeOf(iteration.first)).tag == .variable) try self.scratch.constraints.append(self.scratch_allocator, .{
                         .kind = .collection,
                         .scope = scope,
                         .node = id,
@@ -5099,9 +5082,9 @@ const ClosureRegion = struct {
                             suffix = arrow.b;
                         }
                         try self.solver.unify(suffix, try self.importType(scope, module.typeOf(id), 0));
-                        try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(metadata.resolver), 0), .right = signature, .result = try self.importType(scope, module.typeOf(id), 0), .kind = .resolver });
+                        try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(metadata.resolver), 0), .right = signature, .result = try self.importType(scope, module.typeOf(id), 0), .kind = .resolver });
                     }
-                    if (metadata.operation != .monad) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(metadata.resolver), 0), .result = try self.importType(scope, module.typeOf(id), 0), .kind = .resolver_shape });
+                    if (metadata.operation != .monad) try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(metadata.resolver), 0), .result = try self.importType(scope, module.typeOf(id), 0), .kind = .resolver_shape });
                 },
                 .update => {
                     const update = module.updateInfo(id);
@@ -5121,14 +5104,14 @@ const ClosureRegion = struct {
                             assigned = try self.importType(scope, selector.source_type, 0);
                         } else {
                             const result = if (reverse == 0) try self.importType(scope, n.ty, 0) else try self.solver.fresh();
-                            try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, selector.source_type, 0), .right = assigned, .result = result, .signature = try self.solver.function(types.unit, types.unit), .member = module.projection(selector.projection).field, .kind = .update, .deferred_member = self.defer_members });
+                            try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, selector.source_type, 0), .right = assigned, .result = result, .signature = try self.solver.function(types.unit, types.unit), .member = module.projection(selector.projection).field, .kind = .update, .deferred_member = self.defer_members });
                             assigned = result;
                         }
                     }
                     if (selectors.len != 0) for (selectors) |selector| {
                         if (selector.kind == .index) {
                             try work.append(self.session.allocator, selector.index);
-                            if (module.types.node(selector.source_type).tag == .variable) try self.scratch.constraints.append(self.session.allocator, .{
+                            if (module.types.node(selector.source_type).tag == .variable) try self.scratch.constraints.append(self.scratch_allocator, .{
                                 .kind = .collection,
                                 .scope = scope,
                                 .node = id,
@@ -5137,10 +5120,10 @@ const ClosureRegion = struct {
                             });
                             continue;
                         }
-                        try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, selector.source_type, 0), .result = try self.importType(scope, selector.result_type, 0), .projection = selector.projection, .kind = .field, .writable = true, .deferred_member = self.defer_members });
+                        try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, selector.source_type, 0), .result = try self.importType(scope, selector.result_type, 0), .projection = selector.projection, .kind = .field, .writable = true, .deferred_member = self.defer_members });
                     } else for (module.updatePath(id)) |projection_index| {
                         const projection = module.projection(projection_index);
-                        try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, projection.source_type, 0), .result = try self.importType(scope, projection.result_type, 0), .projection = projection_index, .kind = .field, .writable = true, .deferred_member = self.defer_members });
+                        try self.scratch.constraints.append(self.scratch_allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, projection.source_type, 0), .result = try self.importType(scope, projection.result_type, 0), .projection = projection_index, .kind = .field, .writable = true, .deferred_member = self.defer_members });
                     };
                 },
                 .operation_value => try self.operationConstraint(scope, id, module.operationValue(id)),
@@ -5183,7 +5166,7 @@ const ClosureRegion = struct {
                         // Only a completed exact source body can participate in
                         // retained row inference. No value/memo is created.
                         if (self.scratch.completed_demands.items.len >= self.session.options.max_values) return error.TypeLimit;
-                        try self.scratch.completed_demands.append(self.session.allocator, .{ .scope = scope, .node = id, .body = closure.body, .root = actual });
+                        try self.scratch.completed_demands.append(self.scratch_allocator, .{ .scope = scope, .node = id, .body = closure.body, .root = actual });
                     }
                 },
                 .constant, .reference, .constructor_function, .primitive_function, .panic, .type_constructor => {},
@@ -5538,7 +5521,7 @@ const ClosureRegion = struct {
         const key: CandidateKey = .{ .caller = constraint.scope, .node = constraint.node, .target = target_ };
         const scope = self.scratch.candidate_instances.get(key) orelse scope: {
             const candidate = try self.callableScope(target_);
-            try self.scratch.candidate_instances.put(self.session.allocator, key, candidate);
+            try self.scratch.candidate_instances.put(self.scratch_allocator, key, candidate);
             break :scope candidate;
         };
         const signature = self.scratch.sources.items[scope].root;
@@ -5614,7 +5597,7 @@ const ClosureRegion = struct {
                 try self.solver.unify(root, self.scratch.sources.items[prior].root);
                 return;
             }
-            try self.scratch.call_instances.put(self.session.allocator, key, scope);
+            try self.scratch.call_instances.put(self.scratch_allocator, key, scope);
         }
         try self.collect(scope, self.scratch.sources.items[scope].body);
     }
@@ -5660,7 +5643,7 @@ const ClosureRegion = struct {
     fn typeScope(self: *ClosureRegion, owner: usize) RegionError!u32 {
         if (self.scratch.sources.items.len >= self.session.options.max_values or self.scratch.sources.items.len >= std.math.maxInt(u32)) return error.TypeLimit;
         const scope: u32 = @intCast(self.scratch.sources.items.len);
-        try self.scratch.sources.append(self.session.allocator, .{ .value = 0, .owner = owner });
+        try self.scratch.sources.append(self.scratch_allocator, .{ .value = 0, .owner = owner });
         return scope;
     }
     fn callableScope(self: *ClosureRegion, target_: Target) RegionError!u32 {
@@ -5866,7 +5849,7 @@ const ClosureRegion = struct {
         invocation_.source_selection = self.deferredSourceSelection(constraint);
         invocation_.left = signature;
         invocation_.right = if (binary) 1 else 0;
-        try self.scratch.constraints.append(self.session.allocator, invocation_);
+        try self.scratch.constraints.append(self.scratch_allocator, invocation_);
     }
     fn invocation(self: *ClosureRegion, constraint: Constraint) RegionError!bool {
         const carrier = self.solver.node(try self.solver.resolve(constraint.signature, 0));
@@ -5972,7 +5955,7 @@ const ClosureRegion = struct {
             const result = try self.session.makeAggregate(source.owner, source.body, info.kind, info.nominal, info.bits, captures);
             self.session.value_records.items[result] = self.session.value_records.items[source.value];
             const typed = try self.session.typedView(source.owner, source.body, result, actual);
-            try self.scratch.frozen.put(self.session.allocator, scope, typed);
+            try self.scratch.frozen.put(self.scratch_allocator, scope, typed);
             return typed;
         }
         var metadata = self.session.closureInfo(source.value);
@@ -5986,7 +5969,7 @@ const ClosureRegion = struct {
             self.session.values.items[header].nominal = self.session.valueInfo(source.value).nominal;
         }
         const result = try self.session.typedView(source.owner, source.body, header, actual);
-        try self.scratch.frozen.put(self.session.allocator, scope, result);
+        try self.scratch.frozen.put(self.scratch_allocator, scope, result);
         return result;
     }
     fn allConstraintsSolved(self: *const ClosureRegion) bool {
@@ -6053,7 +6036,7 @@ const ClosureRegion = struct {
     fn headerVariablesOnly(self: *ClosureRegion, ty: types.Id, header: []const types.Id) RegionError!bool {
         if (ty == 0) return true;
         const variables = try self.solver.freeVariables(ty);
-        defer self.session.allocator.free(variables);
+        defer self.solver.allocator.free(variables);
         for (variables) |variable| {
             var found = false;
             for (header) |candidate| if (variable == candidate) {
@@ -6076,7 +6059,7 @@ const ClosureRegion = struct {
         }
         const root = try self.solver.product(&.{ arrow.a, arrow.b });
         const header = try self.solver.freeVariables(root);
-        defer self.session.allocator.free(header);
+        defer self.solver.allocator.free(header);
         for (self.scratch.constraints.items) |constraint| {
             if (constraint.solved) continue;
             if (constraint.scope != scope or constraint.explicit or constraint.deferred_member) return false;
@@ -6189,8 +6172,8 @@ fn lexicalSnapshotScenario(backing: Allocator, eligible: usize) !void {
     // Force the first new caller import to grow this buffer. No borrowed slice
     // or record pointer may survive that import; newly appended records must
     // not join the initial lexical snapshot.
-    const exact = try allocator.dupe(ClosureRegion.Variable, region.scratch.variables.items);
-    region.scratch.variables.deinit(allocator);
+    const exact = try region.scratch_allocator.dupe(ClosureRegion.Variable, region.scratch.variables.items);
+    region.scratch.variables.deinit(region.scratch_allocator);
     region.scratch.variables = .fromOwnedSlice(exact);
     const initial = region.scratch.variables.items.len;
     if (eligible == 0) {
@@ -6660,7 +6643,7 @@ fn solverCapacityExportsScenario(backing: Allocator) !void {
     var region_alive = true;
     defer if (region_alive) region.deinit();
     const root = try region.solver.array(types.u32_type);
-    try region.scratch.variables.append(allocator, .{ .source = .{ .scope = 0, .ty = 19 }, .region = root });
+    try region.scratch.variables.append(region.scratch_allocator, .{ .source = .{ .scope = 0, .ty = 19 }, .region = root });
     var solved = try region.exportSolved(0);
     var solved_alive = true;
     defer if (solved_alive) solved.deinit(allocator);
@@ -6673,7 +6656,7 @@ fn solverCapacityExportsScenario(backing: Allocator) !void {
     defer if (next_alive) next.deinit();
     try std.testing.expectEqual(@as(u32, 0), next.scratch.imported.count());
     try std.testing.expectEqual(@as(usize, 0), next.scratch.variables.items.len);
-    try std.testing.expectEqual(@as(usize, 1), session.region_scratch_pool.stats.reused);
+    try std.testing.expectEqual(@as(usize, 1), session.region_arena_pool.stats.reused);
     const replacement = try next.solver.array(types.f32_type);
     try std.testing.expectEqual(root, replacement);
     const newer_evidence = try next.project(replacement);
@@ -6689,11 +6672,11 @@ fn solverCapacityExportsScenario(backing: Allocator) !void {
     solved_alive = false;
     try std.testing.expectEqual(@as(usize, 0), tracked.counts.live_bytes);
 }
-test "solver capacity exports own projected evidence across region ID recycling teardown and OOM" {
+test "region arena exports own projected evidence across region ID recycling teardown and OOM" {
     try solverCapacityExportsScenario(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, solverCapacityExportsScenario, .{});
 }
-test "solver capacity regions keep fresh maps and active solvers across nested return" {
+test "region arena regions keep fresh maps and active solvers across nested return" {
     const allocator = std.testing.allocator;
     var session = try Session.init(allocator, &.{});
     defer session.deinit();
@@ -6702,29 +6685,29 @@ test "solver capacity regions keep fresh maps and active solvers across nested r
     defer if (outer_alive) outer.deinit();
     const root = try outer.solver.fresh();
     try outer.solver.appendVersion(root, types.u32_type);
-    try outer.scratch.imported.put(allocator, .{ .scope = 7, .ty = 13 }, root);
+    try outer.scratch.imported.put(outer.scratch_allocator, .{ .scope = 7, .ty = 13 }, root);
     var inner = try ClosureRegion.init(&session);
     var inner_alive = true;
     defer if (inner_alive) inner.deinit();
     try std.testing.expect(inner.solver.nodes.items.ptr != outer.solver.nodes.items.ptr);
     try std.testing.expectEqual(@as(u32, 0), inner.scratch.imported.count());
-    const inner_nodes = inner.solver.nodes.items.ptr;
+    const inner_arena = inner.arena;
     inner.deinit();
     inner_alive = false;
     try std.testing.expectEqual(types.u32_type, try outer.solver.resolve(root, 0));
     try std.testing.expectEqual(root, outer.scratch.imported.get(.{ .scope = 7, .ty = 13 }).?);
     outer.deinit();
     outer_alive = false;
-    try std.testing.expect(session.solver_capacity_pool.slot.?.solver.nodes.items.ptr == inner_nodes);
+    try std.testing.expect(session.region_arena_pool.slot.? == inner_arena);
 }
 
-test "solver capacity Session allocator swaps preserve the original durable slot" {
+test "region arena Session allocator swaps preserve the original durable slot" {
     const allocator = std.testing.allocator;
     var session = try Session.init(allocator, &.{});
     defer session.deinit();
     var first = try ClosureRegion.init(&session);
     first.deinit();
-    const retained_nodes = session.solver_capacity_pool.slot.?.solver.nodes.items.ptr;
+    const retained_arena = session.region_arena_pool.slot.?;
     var wrapper = std.testing.FailingAllocator.init(allocator, .{});
     session.allocator = wrapper.allocator();
     var temporary = ClosureRegion.init(&session) catch |err| {
@@ -6736,15 +6719,15 @@ test "solver capacity Session allocator swaps preserve the original durable slot
         session.allocator = allocator;
         if (temporary_alive) temporary.deinit();
     }
-    try std.testing.expect(temporary.solver.nodes.items.ptr != retained_nodes);
+    try std.testing.expect(temporary.arena != retained_arena);
     session.allocator = allocator;
     temporary.deinit();
     temporary_alive = false;
-    try std.testing.expect(session.solver_capacity_pool.slot.?.solver.nodes.items.ptr == retained_nodes);
+    try std.testing.expect(session.region_arena_pool.slot.? == retained_arena);
     var next = try ClosureRegion.init(&session);
     defer next.deinit();
-    try std.testing.expect(next.solver.nodes.items.ptr == retained_nodes);
-    try std.testing.expect(next.solver.allocator.ptr == allocator.ptr and next.solver.allocator.vtable == allocator.vtable);
+    try std.testing.expect(next.arena == retained_arena);
+    try std.testing.expect(next.arena.backing.ptr == allocator.ptr and next.arena.backing.vtable == allocator.vtable);
 }
 
 test "inference scratch retains bounded capacity and discards oversized regions" {
@@ -6752,15 +6735,15 @@ test "inference scratch retains bounded capacity and discards oversized regions"
     var session = try Session.init(a, &.{});
     defer session.deinit();
     var first = try ClosureRegion.init(&session);
-    try first.scratch.variables.append(a, .{ .source = .{ .scope = 0, .ty = 17 }, .region = types.u32_type });
+    try first.scratch.variables.append(first.scratch_allocator, .{ .source = .{ .scope = 0, .ty = 17 }, .region = types.u32_type });
     first.deinit();
-    try std.testing.expect(session.region_scratch_pool.slot != null);
-    try std.testing.expect(session.region_scratch_pool.stats.retained_bytes <= @import("scratch_pool.zig").limit);
+    try std.testing.expect(session.region_arena_pool.slot != null);
+    try std.testing.expect(session.region_arena_pool.stats.retained_bytes <= region_arena.limit);
     var oversized = try ClosureRegion.init(&session);
     try std.testing.expectEqual(@as(usize, 0), oversized.scratch.variables.items.len);
-    try oversized.scratch.variables.ensureTotalCapacity(a, @import("scratch_pool.zig").limit / @sizeOf(ClosureRegion.Variable) + 1);
+    try oversized.scratch.variables.ensureTotalCapacity(oversized.scratch_allocator, region_arena.limit / @sizeOf(ClosureRegion.Variable) + 1);
     oversized.deinit();
-    try std.testing.expect(session.region_scratch_pool.slot == null);
+    try std.testing.expect(session.region_arena_pool.slot == null);
     var next = try ClosureRegion.init(&session);
     defer next.deinit();
     try std.testing.expectEqual(@as(usize, 0), next.scratch.variables.items.len);

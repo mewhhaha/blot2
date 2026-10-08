@@ -1,4 +1,5 @@
 comptime {
+    _ = @import("region_arena.zig");
     _ = @import("restart_cache.zig");
     _ = @import("structural.zig");
     _ = @import("diagnostic_code.zig");
@@ -253,7 +254,6 @@ comptime {
 }
 
 comptime {
-    _ = @import("solver_capacity_tests.zig");
 }
 
 test {
