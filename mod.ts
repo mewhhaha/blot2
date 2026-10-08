@@ -72,10 +72,24 @@ export async function createCompiler(
 ): Promise<ZigProjectCompiler> {
   const path = (value: string | URL): string =>
     resolve(value instanceof URL ? fileURLToPath(value) : value);
+  if (options.checkpoint !== undefined) {
+    if (!(options.checkpoint instanceof Uint8Array)) {
+      throw new TypeError(
+        "checkpoint must contain bytes from exportCheckpoint",
+      );
+    }
+    if (
+      options.checkpoint.length === 0 ||
+      options.checkpoint.length > 63 * 1024 * 1024 - 8
+    ) {
+      throw new RangeError("Checkpoint payload exceeds protocol limits");
+    }
+  }
   // Capture paths before extracting the package or starting the child process.
   const captured = {
     ...options,
     assets: captureAssetImports(options.assets),
+    checkpoint: options.checkpoint && new Uint8Array(options.checkpoint),
     entry: path(options.entry),
     prelude: options.prelude === null
       ? null
@@ -141,6 +155,7 @@ export async function createCompiler(
         return compiler.compilerIdentity;
       },
       build: (buildOptions) => compiler.build(buildOptions),
+      exportCheckpoint: () => compiler.exportCheckpoint(),
       async close() {
         try {
           await compiler.close();

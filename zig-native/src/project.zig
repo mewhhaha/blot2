@@ -833,36 +833,32 @@ test "allocation failures release every source, syntax and traversal buffer" {
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, allocationScenario, .{path});
 }
 
-test "gdev dependency closure loads separate source units with the std alias" {
+test "package dependency closure preserves std alias resolution and source owners" {
     const a = std.testing.allocator;
     const io = std.testing.io;
-    const entry = Io.Dir.cwd().realPathFileAlloc(io, "../gdev/src/main.blot", a) catch |err| switch (err) {
-        error.FileNotFound => Io.Dir.cwd().realPathFileAlloc(io, "../../gdev/src/main.blot", a) catch |fallback| switch (fallback) {
-            error.FileNotFound => return error.SkipZigTest,
-            else => return fallback,
-        },
-        else => return err,
-    };
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try fixtureFile(tmp.dir, "src/main.blot", "import * as app from \"fixture/app\"\nimport * as numbers from \"std/numbers\"\nconst answer = app.answer\n");
+    try fixtureFile(tmp.dir, "packages/app.blot", "import * as leaf from \"./leaf\"\nimport * as numbers from \"std/numbers\"\nconst answer = leaf.answer\n");
+    try fixtureFile(tmp.dir, "packages/leaf.blot", "import * as numbers from \"std/numbers\"\nconst answer = numbers.value\n");
+    try fixtureFile(tmp.dir, "standard/numbers.blot", "const value = 42\n");
+    const entry = try fixturePath(tmp.dir, "src/main.blot");
     defer a.free(entry);
-    const packages = try std.fs.path.resolve(a, &.{ std.fs.path.dirname(entry).?, "../packages" });
+    const packages = try fixturePath(tmp.dir, "packages");
     defer a.free(packages);
-    const standard = Io.Dir.cwd().realPathFileAlloc(io, "std", a) catch |err| switch (err) {
-        error.FileNotFound => try Io.Dir.cwd().realPathFileAlloc(io, "../std", a),
-        else => return err,
-    };
+    const standard = try fixturePath(tmp.dir, "standard");
     defer a.free(standard);
-    var project_ = try load(a, io, entry, .{ .std_root = standard, .aliases = &.{.{ .prefix = "gdev/", .root = packages }} });
+    var project_ = try load(a, io, entry, .{ .std_root = standard, .aliases = &.{.{ .prefix = "fixture/", .root = packages }} });
     defer project_.deinit(a);
     try expectValid(&project_);
-    // This is a live sibling project, not a pinned file-count fixture.
-    // Check actual alias resolution and distinct unit ownership as it grows.
+    try std.testing.expectEqual(@as(usize, 4), project_.units.items.len);
     var standard_imports: usize = 0;
     for (project_.imports.items) |imported| {
         if (!std.mem.startsWith(u8, project_.symbols.get(imported.path), "std/")) continue;
         standard_imports += 1;
         try std.testing.expect(std.mem.startsWith(u8, project_.filename(imported.target), standard));
     }
-    try std.testing.expect(standard_imports != 0);
+    try std.testing.expectEqual(@as(usize, 3), standard_imports);
     for (project_.units.items, 0..) |unit_, index| {
         for (project_.units.items[0..index]) |previous| try std.testing.expect(unit_.filename != previous.filename);
     }

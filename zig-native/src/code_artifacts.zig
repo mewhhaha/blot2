@@ -16,7 +16,7 @@ const Hash = std.crypto.hash.Blake3;
 const IdentityMetadata = runtime_identity.Metadata;
 pub const max_parameters = 16;
 pub const Key = struct { target: core.BindingRef, parameters: [max_parameters]layout.Id = @splat(1), count: u8 = 0, result: layout.Id = 1, effects: [max_parameters]u32 = @splat(0), templates: substitution_keys.Id = 0, template_result: bool = false };
-pub const ClosureKey = struct { unit: u32, catalog: u32, ty: layout.Id, captures: layout.Id, templates: substitution_keys.Id = 0, evidence: u32 = 0, rows: substitution_keys.Id = 0, parameter_template: u32 = 0, template_result: bool = false };
+pub const ClosureKey = struct { unit: u32, catalog: u32, ty: layout.Id, captures: layout.Id, templates: substitution_keys.Id = 0, evidence: u32 = 0, rows: substitution_keys.Id = 0, parameter_template: u32 = 0, template_result: bool = false, static_values: substitution_keys.Id = 0 };
 pub const CapturedTemplate = struct { unit: u32 = 0, node: core.Id, captures: layout.Id, templates: substitution_keys.Id, has_environment: bool, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
 pub const CallableKey = struct { target: core.BindingRef, ty: layout.Id, applied: u32 = 0 };
 pub const ConstructorKey = struct { unit: u32, catalog: u32, ty: layout.Id };
@@ -58,6 +58,12 @@ pub const Job = struct {
     result_template: ?u32 = null,
     value: ?ValueResult = null,
     global: ?u32 = null,
+    pub fn hasStaticValues(self: *const Job) bool {
+        return self.static_reads.items.len != 0 or switch (self.request) {
+            .closure => |key| key.static_values != 0,
+            else => false,
+        };
+    }
     fn deinit(self: *Job, allocator: Allocator) void {
         self.inline_bodies.deinit(allocator);
         self.static_reads.deinit(allocator);
@@ -192,6 +198,7 @@ pub const Pools = struct {
     evaluator: core_eval.Snapshot,
     rows: Substitutions,
     templates: Substitutions,
+    static_values: Substitutions = .{ .entries = &.{}, .spans = &.{} },
     captures: []CapturedTemplate,
     bridge: ?Bridge = null,
     field_locations: []FieldLocation,
@@ -227,6 +234,7 @@ pub const Pools = struct {
         self.evaluator.deinit(allocator);
         self.rows.deinit(allocator);
         self.templates.deinit(allocator);
+        self.static_values.deinit(allocator);
         allocator.free(self.captures);
         if (self.bridge) |*bridge| bridge.deinit(allocator);
         allocator.free(self.field_locations);
@@ -319,7 +327,7 @@ pub const Context = struct {
         try reads.append(self.allocator, .{ .target = target, .value = value });
     }
     pub fn hasStaticValues(self: *const Context) bool {
-        return self.active_job != 0 and self.jobs.items[self.active_job - 1].static_reads.items.len != 0;
+        return self.active_job != 0 and self.jobs.items[self.active_job - 1].hasStaticValues();
     }
     fn depth(self: *const Context) usize {
         var id = self.active_job;
@@ -874,6 +882,8 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
     errdefer rows.deinit(allocator);
     var templates = try Substitutions.capture(allocator, &generator.template_keys);
     errdefer templates.deinit(allocator);
+    var static_values = try Substitutions.capture(allocator, &generator.static_keys);
+    errdefer static_values.deinit(allocator);
     const captures = try allocator.dupe(CapturedTemplate, generator.template_catalog.items);
     errdefer allocator.free(captures);
     var bridge: ?Bridge = if (generator.representation_bridge) |*store| try Bridge.capture(allocator, store) else null;
@@ -995,6 +1005,7 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
         .evaluator = evaluator,
         .rows = rows,
         .templates = templates,
+        .static_values = static_values,
         .captures = captures,
         .bridge = bridge,
         .field_locations = locations,

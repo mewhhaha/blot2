@@ -11,9 +11,13 @@ pub const Session = struct {
     allocator: A,
     module: *const wasm.Module,
     summaries: lifetimes.Summaries,
+    tier: @import("compilation_tier.zig").Tier = .optimized,
 
     pub fn init(a: A, module: *const wasm.Module) A.Error!Session {
-        return .{ .allocator = a, .module = module, .summaries = try lifetimes.Summaries.init(a, module) };
+        var summaries = try lifetimes.Summaries.init(a, module);
+        errdefer summaries.deinit();
+        try summaries.prepare();
+        return .{ .allocator = a, .module = module, .summaries = summaries };
     }
     pub fn deinit(self: *Session) void {
         self.summaries.deinit();
@@ -22,8 +26,12 @@ pub const Session = struct {
         var owned: ?ir.Body = null;
         errdefer if (owned) |*body| body.deinit(self.allocator);
         var view = source.*;
-        inline for (.{ "scalar", "vector", "lifetime" }) |pass| {
-            const next = if (comptime std.mem.eql(u8, pass, "scalar"))
+        inline for (.{ "inline", "scalar", "vector", "lifetime" }) |pass| {
+            const next: ?ir.Body = if (self.tier == .development and !std.mem.eql(u8, pass, "lifetime"))
+                null
+            else if (comptime std.mem.eql(u8, pass, "inline"))
+                try @import("wasm_inline.zig").run(self.allocator, self.module, &view)
+            else if (comptime std.mem.eql(u8, pass, "scalar"))
                 try @import("wasm_sroa.zig").run(self.allocator, self.module, &view)
             else if (comptime std.mem.eql(u8, pass, "vector"))
                 try @import("wasm_vectorize.zig").run(self.allocator, self.module, &view)

@@ -158,6 +158,104 @@ test "principal input recording bounds conflicting reads and frees every failing
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, recordingFailures, .{});
 }
 
+fn nominalRecording(allocator: std.mem.Allocator) !void {
+    var reads: inputs.Recorder = .{ .eligible = true, .max_reads = 3 };
+    defer reads.deinit(allocator);
+    const first: u64 = (@as(u64, 1) << 32) | 1;
+    const second: u64 = (@as(u64, 1) << 32) | 2;
+    // A recursive computation may first publish a negative, then overwrite it.
+    // Reads following either write are internal to this query, not new inputs.
+    try reads.plainRead(allocator, first, null);
+    try reads.plainPublish(allocator, first, false);
+    try reads.plainRead(allocator, first, false);
+    try reads.plainPublish(allocator, first, true);
+    try reads.plainRead(allocator, first, true);
+    try reads.plainRead(allocator, second, false);
+    try reads.scalar(allocator, .{ .unit = 1, .binding = 1 }, 0);
+    var copy = try reads.key().?.clone(allocator);
+    defer copy.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 2), copy.plain_reads.len);
+    try std.testing.expect(copy.plain_reads[0].value == null);
+    try std.testing.expectEqual(@as(?bool, false), copy.plain_reads[1].value);
+    try std.testing.expectEqualSlices(inputs.PlainPublication, &.{.{ .key = first, .value = true }}, copy.plain_publications);
+    try reads.plainRead(allocator, second, true);
+    try std.testing.expect(reads.key() == null);
+}
+
+test "principal nominal inputs retain absence negatives and final publications under allocation failures" {
+    try nominalRecording(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, nominalRecording, .{});
+}
+
+test "principal nominal replay requires exact memo inputs and publishes atomically" {
+    var fixture = try Fixture.init("type Box is data = #Box U32\nentry const answer = 7\n");
+    defer fixture.deinit();
+    var failure = std.testing.FailingAllocator.init(a, .{});
+    var session = try eval.Session.init(failure.allocator(), &fixture.units);
+    defer session.deinit();
+    const nominal: u64 = (@as(u64, 1) << 32) | fixture.units[0].nominals[0].identity.decl;
+    const key: inputs.Key = .{ .scalar_reads = &.{}, .plain_reads = &.{.{ .key = nominal, .value = null }}, .plain_publications = &.{.{ .key = nominal, .value = true }} };
+    try std.testing.expect(key.matches(&session));
+    failure.fail_index = failure.alloc_index;
+    try std.testing.expectError(error.OutOfMemory, key.publish(&session));
+    try std.testing.expect(session.plain_nominals.count() == 0);
+    failure.fail_index = std.math.maxInt(usize);
+    try key.publish(&session);
+    try std.testing.expectEqual(@as(?bool, true), session.plain_nominals.get(nominal));
+    try std.testing.expect(!key.matches(&session));
+    try session.plain_nominals.put(session.allocator, nominal, false);
+    try std.testing.expect(!key.matches(&session));
+    const negative: inputs.Key = .{ .scalar_reads = &.{}, .plain_reads = &.{.{ .key = nominal, .value = false }} };
+    try std.testing.expect(negative.matches(&session));
+}
+
+const nominal_prelude =
+    \\type Box is data = #Box U32
+    \\const extract = fn (box: Box) -> U32 => case box of
+    \\  #Box value => value
+    \\entry const answer: U32 where { type_rep U32 } = @u32.div 8 (extract (#Box
+;
+
+test "principal input replay restores nominal and closed call publications across edits errors and recovery" {
+    var before = try Fixture.init(nominal_prelude ++ " 2))\n");
+    defer before.deinit();
+    var after = try Fixture.init(nominal_prelude ++ " 4))\n");
+    defer after.deinit();
+    var invalid = try Fixture.init(nominal_prelude ++ " 0))\n");
+    defer invalid.deinit();
+    var initial = try before.emit(.{ .retain_artifacts = true });
+    defer initial.deinit(a);
+    try std.testing.expect(initial.diagnostic == null);
+    const key = initial.capture.?.metadata.principal_proofs.items[0].inputs orelse return error.TestExpectedPrincipalInputs;
+    try std.testing.expect(key.call_publications.len > 0);
+    try std.testing.expect(key.plain_reads.len > 0);
+    const stamp = @import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_proofs.items);
+    var fresh = try after.emit(.{ .retain_artifacts = true });
+    defer fresh.deinit(a);
+    var reused = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.?, .policy = .{ .reuse_unaffected_modules = true } });
+    defer reused.deinit(a);
+    try std.testing.expect(reused.diagnostic == null);
+    try std.testing.expect(reused.principal.projected_empty_hits > 0);
+    try std.testing.expect(reused.principal.call_publications_replayed > 0);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, reused.bytes);
+    try std.testing.expectEqual(fresh.constant_steps, reused.constant_steps);
+    // Replayed evidence must be owned by the current capture for the next edit.
+    var failed_fresh = try invalid.emit(.{});
+    defer failed_fresh.deinit(a);
+    var failed = try invalid.emit(.{ .retain_artifacts = true, .principal_previous = &reused.capture.?, .policy = .{ .reuse_unaffected_modules = true } });
+    defer failed.deinit(a);
+    try std.testing.expect(failed.diagnostic != null and failed.capture == null);
+    try std.testing.expect(failed.principal.call_publications_replayed > 0);
+    try std.testing.expectEqualDeep(failed_fresh.diagnostic, failed.diagnostic);
+    try std.testing.expectEqual(failed_fresh.constant_steps, failed.constant_steps);
+    var recovered = try before.emit(.{ .retain_artifacts = true, .principal_previous = &reused.capture.?, .policy = .{ .reuse_unaffected_modules = true } });
+    defer recovered.deinit(a);
+    try std.testing.expect(recovered.principal.call_publications_replayed > 0);
+    try std.testing.expectEqualSlices(u8, initial.bytes, recovered.bytes);
+    try std.testing.expectEqualSlices(u8, &stamp, &@import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_proofs.items));
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, replayFailure, .{ &after, &initial.capture.?, fresh.bytes });
+}
+
 fn replayFailure(allocator: std.mem.Allocator, fixture: *const Fixture, old: *const @import("artifact_capture.zig").Capture, expected: []const u8) !void {
     var candidate = try fixture.emitUsing(allocator, .{ .retain_artifacts = true, .principal_previous = old, .policy = .{ .reuse_unaffected_modules = true } });
     defer candidate.deinit(allocator);

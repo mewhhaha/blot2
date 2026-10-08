@@ -59,6 +59,16 @@ export interface ZigProjectCompilerOptions {
   stdRoot?: string | URL | null;
   imports?: Readonly<Record<string, string | URL>>;
   dependencies?: string | URL | null;
+  /** Collect detailed backend phase and slow inference-region timings. */
+  profileBackend?: boolean;
+  /** Development skips optional scalar/vector passes; checking and cleanup remain. */
+  codegenTier?: "optimized" | "development";
+  /** Prototype: share identical internal machine bodies while keeping table slots. */
+  shareMachineCode?: boolean;
+  /** Prototype: upper bound for coarse optimizer workers (1..16; default 1). */
+  codegenWorkers?: number;
+  /** Optional backend checkpoint from exportCheckpoint; copied at startup. */
+  checkpoint?: Uint8Array<ArrayBuffer>;
   startupTimeoutMs?: number;
   expectedCompilerIdentity?: string;
   assets?: AssetImports;
@@ -67,6 +77,8 @@ export interface ZigProjectCompiler {
   readonly pid: number;
   readonly compilerIdentity: string;
   build(options?: ZigProjectBuildOptions): Promise<ZigProjectBuildResult>;
+  /** Portable candidates from the last successful revision; does not advance it. */
+  exportCheckpoint(): Promise<Uint8Array<ArrayBuffer>>;
   close(): Promise<void>;
   dispose(): Promise<void>;
 }
@@ -216,6 +228,7 @@ class ProjectProcess implements ZigProjectCompiler {
   #closing: Promise<void> | undefined;
   #identity = "";
   #sourceOverlays = false;
+  #checkpoints = false;
   #epoch = "";
   #revision = 0;
   #nextId = 1;
@@ -349,6 +362,7 @@ class ProjectProcess implements ZigProjectCompiler {
     open: Record<string, unknown>,
     timeout: number,
     expectedIdentity?: string,
+    checkpoint?: Uint8Array<ArrayBuffer>,
   ) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -378,11 +392,17 @@ class ProjectProcess implements ZigProjectCompiler {
           ) throw new ZigProjectProtocolError("Compiler identity mismatch");
           this.#identity = hello.compilerIdentity;
           this.#sourceOverlays = capabilities.includes("source-overlays");
+          this.#checkpoints = capabilities.includes("backend-checkpoints");
+          if (checkpoint && !this.#checkpoints) {
+            throw new ZigProjectProtocolError(
+              "Compiler does not support checkpoints",
+            );
+          }
           const response = await this.#exchange({
             kind: "open",
             id: this.#id(),
             ...open,
-          });
+          }, checkpoint ? [checkpoint] : []);
           if (
             response.payload.length ||
             typeof response.metadata.epoch !== "string" ||
@@ -633,6 +653,52 @@ class ProjectProcess implements ZigProjectCompiler {
     });
     return result;
   }
+  exportCheckpoint(): Promise<Uint8Array<ArrayBuffer>> {
+    if (!this.#checkpoints) {
+      return Promise.reject(new Error("Compiler does not support checkpoints"));
+    }
+    if (!this.#accepting) {
+      return Promise.reject(this.#terminal ?? new Error("Compiler is closing"));
+    }
+    const task = this.#queue.then(async () => {
+      if (this.#terminal) throw this.#terminal;
+      let frame: Frame;
+      try {
+        frame = await this.#exchange({
+          kind: "checkpoint",
+          id: this.#id(),
+          epoch: this.#epoch,
+          revision: this.#revision,
+        });
+        const metadata = frame.metadata;
+        if (
+          metadata.epoch !== this.#epoch ||
+          metadata.revision !== this.#revision ||
+          typeof metadata.success !== "boolean" ||
+          (metadata.success
+            ? frame.payload.length === 0
+            : frame.payload.length !== 0 || typeof metadata.code !== "string")
+        ) {
+          throw new ZigProjectProtocolError(
+            "Invalid checkpoint acknowledgement",
+          );
+        }
+      } catch (error) {
+        this.#break(
+          error instanceof Error ? error : new Error(String(error)),
+          true,
+        );
+        await this.#shutdown(true);
+        throw this.#failure(error);
+      }
+      if (!frame.metadata.success) {
+        throw new Error(`Unable to export checkpoint: ${frame.metadata.code}`);
+      }
+      return frame.payload;
+    });
+    this.#queue = task.then(() => {}, () => {});
+    return task;
+  }
   close(): Promise<void> {
     if (this.#closing) return this.#closing;
     if (this.#terminal) return this.dispose();
@@ -686,6 +752,11 @@ export async function createZigProjectCompiler(
     "stdRoot",
     "imports",
     "dependencies",
+    "profileBackend",
+    "codegenTier",
+    "shareMachineCode",
+    "codegenWorkers",
+    "checkpoint",
     "startupTimeoutMs",
     "expectedCompilerIdentity",
     "assets",
@@ -693,6 +764,45 @@ export async function createZigProjectCompiler(
   const executable = path(options.executable, "executable"),
     entry = path(options.entry, "entry");
   const assets = captureAssetImports(options.assets);
+  if (
+    options.checkpoint !== undefined &&
+    !(options.checkpoint instanceof Uint8Array)
+  ) {
+    throw new TypeError("checkpoint must contain bytes from exportCheckpoint");
+  }
+  if (
+    options.checkpoint !== undefined &&
+    (options.checkpoint.length === 0 ||
+      options.checkpoint.length > maxFrameBytes - maxMetadataBytes - 8)
+  ) {
+    throw new RangeError("Checkpoint payload exceeds protocol limits");
+  }
+  const checkpoint = options.checkpoint && new Uint8Array(options.checkpoint);
+  if (
+    options.profileBackend !== undefined &&
+    typeof options.profileBackend !== "boolean"
+  ) {
+    throw new TypeError("profileBackend must be a boolean");
+  }
+  if (
+    options.codegenTier !== undefined &&
+    options.codegenTier !== "optimized" && options.codegenTier !== "development"
+  ) {
+    throw new TypeError("codegenTier must be optimized or development");
+  }
+  if (
+    options.shareMachineCode !== undefined &&
+    typeof options.shareMachineCode !== "boolean"
+  ) {
+    throw new TypeError("shareMachineCode must be a boolean");
+  }
+  if (
+    options.codegenWorkers !== undefined &&
+    (!Number.isInteger(options.codegenWorkers) || options.codegenWorkers < 1 ||
+      options.codegenWorkers > 16)
+  ) {
+    throw new RangeError("codegenWorkers must be an integer in 1..16");
+  }
   const nullablePath = (value: unknown, name: string) =>
     value == null ? null : path(value, name);
   const imports = options.imports === undefined
@@ -712,6 +822,13 @@ export async function createZigProjectCompiler(
     stdRoot: nullablePath(options.stdRoot, "stdRoot"),
     imports,
     dependencies: nullablePath(options.dependencies, "dependencies"),
+    ...(checkpoint ? { checkpoint: true } : {}),
+    ...(options.profileBackend ? { profileBackend: true } : {}),
+    ...(options.codegenTier ? { codegenTier: options.codegenTier } : {}),
+    ...(options.shareMachineCode ? { shareMachineCode: true } : {}),
+    ...(options.codegenWorkers
+      ? { codegenWorkers: options.codegenWorkers }
+      : {}),
   };
   const timeout = options.startupTimeoutMs ?? 30_000;
   if (!Number.isInteger(timeout) || timeout < 1 || timeout > 300_000) {
@@ -731,7 +848,7 @@ export async function createZigProjectCompiler(
       .length > maxMetadataBytes
   ) throw new RangeError("Open metadata exceeds 1 MiB");
   const process = new ProjectProcess(executable);
-  await process.initialize(open, timeout, identity);
+  await process.initialize(open, timeout, identity, checkpoint);
   if (assets !== undefined) {
     try {
       return await withAssetImports(process, entry, assets);

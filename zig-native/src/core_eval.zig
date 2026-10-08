@@ -225,8 +225,17 @@ const IndexedRegion = struct {
 };
 
 pub const Session = struct {
+    timing: ?*@import("backend_timing.zig").Work = null,
     /// Private storage policy; no solver evidence or source owner is pooled.
     reuse_solver_capacity: bool = true,
+    reuse_region_scratch: bool = true,
+    reuse_callable_definitions: bool = true,
+    reuse_evidence_imports: bool = true,
+    evidence_import_requests: usize = 0,
+    evidence_import_reused: usize = 0,
+    callable_definitions: std.AutoHashMapUnmanaged(ClosureRegion.DefinitionKey, core.BindingId) = .empty,
+    callable_definition_units: std.AutoHashMapUnmanaged(usize, void) = .empty,
+    region_scratch_pool: @import("scratch_pool.zig").Pool(ClosureRegion.Scratch) = .{},
     solver_capacity_pool: solver_capacity.Pool = .{},
     retain_specialization_receipts: bool = false,
     specialization_provider: ?receipt.Provider = null,
@@ -339,10 +348,13 @@ pub const Session = struct {
                 }
             }
         }
-        return .{ .solver_capacity_pool = solver_capacity.Pool.init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .values = values, .field_locations = field_locations, .value_evidence = value_evidence, .evidence = evidence, .value_records = value_records, .record_layouts = record_layouts };
+        return .{ .region_scratch_pool = .init(allocator), .solver_capacity_pool = solver_capacity.Pool.init(allocator), .allocator = allocator, .units = units, .providers = provider_chain.Store.init(allocator), .binding_offsets = binding_offsets, .node_offsets = node_offsets, .slots = slots, .visited_nodes = visited_nodes, .values = values, .field_locations = field_locations, .value_evidence = value_evidence, .evidence = evidence, .value_records = value_records, .record_layouts = record_layouts };
     }
     pub fn deinit(self: *Session) void {
         self.solver_capacity_pool.deinit();
+        self.region_scratch_pool.deinit();
+        self.callable_definitions.deinit(self.allocator);
+        self.callable_definition_units.deinit(self.allocator);
         self.allocator.free(self.owned_diagnostic_message);
         self.body_recipes.deinit(self.allocator);
         self.validated_calls.deinit(self.allocator);
@@ -419,7 +431,7 @@ pub const Session = struct {
         return if (memo.state == .cached) memo.value else null;
     }
     pub fn singleSourceSuspension(self: *const Session, producer: core.BindingRef, unit: u32, node: core.Id) ?ValueId {
-        if (self.principal_reads) |reads| reads.invalidate();
+        if (self.principal_reads) |reads| reads.invalidate(.suspension);
         // Startup creation history is not part of a completed specialization
         // receipt. A future caller under that tape must take the fresh path.
         if (self.receipt_tape) |tape| tape.unknown = true;
@@ -466,7 +478,7 @@ pub const Session = struct {
         return self.inferClosureMode(value_, true);
     }
     fn inferClosureMode(self: *Session, value_: ValueId, entry_interface: bool) Error!?ValueId {
-        if (self.principal_reads) |reads| reads.invalidate();
+        if (self.principal_reads) |reads| reads.invalidate(.specialize);
         if (self.receipt_tape) |tape| tape.nested = true;
         const kind = self.valueInfo(value_).kind;
         if (kind != .closure and (kind != .suspension or entry_interface)) return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
@@ -507,7 +519,7 @@ pub const Session = struct {
         const expected_kind: type_evidence.Tag = if (self.valueInfo(value_).kind == .suspension) .demand else .function;
         if (expected == 0 or self.evidence.node(expected).tag != expected_kind) return self.fail(owner, span, .unsupported);
         const key: ViewKey = .{ .value = value_, .evidence = expected };
-        if (self.principal_reads) |reads| reads.invalidate();
+        if (self.principal_reads) |reads| reads.invalidate(.specialize);
         if (self.receipt_tape) |tape| tape.nested = true;
         if (self.specialized_closures.get(key)) |existing| return existing;
         if (self.receipt_tape == null) if (self.specialization_provider) |provider| if (try provider.lookup(provider.context, self, value_, expected)) |selected| return selected;
@@ -548,7 +560,7 @@ pub const Session = struct {
             .children_added = self.children.items.len - children_before,
             .steps = self.steps - steps_before,
             .collected = tape.collected,
-            .source_scopes = region.sources.items.len,
+            .source_scopes = region.scratch.sources.items.len,
             .solver_nodes = region.solver.nodes.items.len,
             .complete = region.allConstraintsSolved() and self.steps == steps_before and !region.source_interface and !region.retain_selected and !region.complete_demand_bodies,
             .sources = &.{},
@@ -645,8 +657,8 @@ pub const Session = struct {
         if (!(region.firstOrderArrow(expected) catch |err| return self.evidenceFailure(target_.unit, module.span(body.root), err))) return false;
         var solved = region.bodyEvidenceFull(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .semantic = expected }, &.{}, &.{}) catch |err| return self.evidenceFailure(target_.unit, module.span(body.root), err);
         defer solved.deinit(self.allocator);
-        if (!region.allConstraintsSolved() or solved.selected.len != 0 or region.sources.items.len == 0) return false;
-        return (region.project(region.sources.items[0].root) catch |err| return self.evidenceFailure(target_.unit, module.span(body.root), err)) == expected;
+        if (!region.allConstraintsSolved() or solved.selected.len != 0 or region.scratch.sources.items.len == 0) return false;
+        return (region.project(region.scratch.sources.items[0].root) catch |err| return self.evidenceFailure(target_.unit, module.span(body.root), err)) == expected;
     }
     pub fn bodyEvidenceFull(self: *Session, reference: core.BindingRef, expected: type_evidence.Id, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping) Error!SolvedEvidence {
         const target_ = try self.external(try self.target(null, reference));
@@ -676,7 +688,7 @@ pub const Session = struct {
         const selected = solved.selected;
         solved.selected = &.{};
         var complete = region.startup_coverage_complete;
-        for (region.constraints.items) |constraint| if (!constraint.solved) {
+        for (region.scratch.constraints.items) |constraint| if (!constraint.solved) {
             complete = false;
         };
         return .{ .selected = selected, .complete = complete };
@@ -1315,7 +1327,9 @@ pub const Session = struct {
         return self.constant(try self.target(null, reference));
     }
     fn constant(self: *Session, raw: Target) Error!ValueId {
-        if (self.principal_reads) |reads| reads.invalidate();
+        const timing = if (self.timing) |work| work.enter(.evaluation) else null;
+        defer if (timing) |scope| scope.deinit();
+        if (self.principal_reads) |reads| reads.invalidate(.evaluate);
         const resolved = try self.external(raw);
         const module = &self.units[resolved.unit];
         const binding = module.binding(resolved.binding);
@@ -1386,6 +1400,9 @@ pub const Session = struct {
         defer self.principal_reads = previous_reads;
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
         defer region.deinit();
+        defer region.profile_rejected = reads.rejected;
+        region.profile_principal = true;
+        region.profile_input_calls = self.validated_calls.count();
         var solved = region.bodyEvidenceMode(resolved.unit, body.root, binding_type, body.closed_rows, body.scheme, .{ .semantic = 0 }, &.{}, &.{}, true) catch |err| switch (err) {
             // Partial source results preserve unresolved facts; ordinary fresh
             // evaluation still owns value-dependent obligations and diagnostics.
@@ -1394,6 +1411,9 @@ pub const Session = struct {
         };
         errdefer solved.deinit(self.allocator);
         const key = if (recording) reads.key() else null;
+        region.profile_recorded_inputs = key != null;
+        region.profile_output_types = solved.types.len;
+        region.profile_output_rows = solved.rows.len;
         if (self.principal_provider) |provider| try provider.record(provider.context, principal_target, self.options, solved, if (key) |*input| input else null);
         return solved;
     }
@@ -1513,7 +1533,7 @@ pub const Session = struct {
         return self.projectType(owner, id, node.ty, mappings.items, rows.items);
     }
     fn expressionInner(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
-        if (self.principal_reads) |reads| reads.invalidate();
+        if (self.principal_reads) |reads| reads.invalidate(.evaluate);
         if (id == 0) return .{ .value = 0 };
         const module = &self.units[owner];
         if (id >= module.nodes.len) return self.fail(owner, .{ .start = 0, .end = 0 }, .unsupported);
@@ -2731,7 +2751,7 @@ pub const Session = struct {
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
         defer region.deinit();
         const scope = region.typeScope(owner) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
-        region.sources.items[scope].closed_rows = scheme.closed_rows;
+        region.scratch.sources.items[scope].closed_rows = scheme.closed_rows;
         region.seed(scope, frame.mappings.items) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
         region.seedRows(scope, frame.row_mappings.items) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
         region.importScheme(scope, scheme, source) catch |err| return self.evidenceFailure(owner, self.units[owner].span(source), err);
@@ -3366,40 +3386,70 @@ const ClosureRegion = struct {
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
     const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge };
     const Constraint = struct { explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, solved: bool = false };
+    const Scratch = struct {
+        projection_cache: @import("projection_cache.zig").Cache = .{},
+        evidence_import_cache: @import("evidence_import_cache.zig").Cache = .{},
+        sources: std.ArrayList(Source) = .empty,
+        imported: std.AutoHashMapUnmanaged(Import, types.Id) = .empty,
+        definitions: std.AutoHashMapUnmanaged(DefinitionKey, core.BindingId) = .empty,
+        definition_units: std.AutoHashMapUnmanaged(usize, void) = .empty,
+        imported_rows: std.AutoHashMapUnmanaged(RowImport, types.Effects.Id) = .empty,
+        imported_labels: std.AutoHashMapUnmanaged(LabelImport, types.Effects.Label) = .empty,
+        row_variables: std.AutoHashMapUnmanaged(RowVariable, types.Effects.Id) = .empty,
+        row_parameters: std.AutoHashMapUnmanaged(RowParameter, u32) = .empty,
+        evidence_rows: std.AutoHashMapUnmanaged(u32, types.Effects.Id) = .empty,
+        evidence_labels: std.AutoHashMapUnmanaged(u32, types.Effects.Label) = .empty,
+        variables: std.ArrayList(Variable) = .empty,
+        edges: std.ArrayList(Edge) = .empty,
+        constraints: std.ArrayList(Constraint) = .empty,
+        selected_targets: std.ArrayList(core.BindingRef) = .empty,
+        data_aliases: std.ArrayList(DataAlias) = .empty,
+        frozen: std.AutoHashMapUnmanaged(u32, ValueId) = .empty,
+        call_instances: std.AutoHashMapUnmanaged(CallKey, u32) = .empty,
+        candidate_instances: std.AutoHashMapUnmanaged(CandidateKey, u32) = .empty,
+        unresolved_calls: std.AutoHashMapUnmanaged(Target, u32) = .empty,
+        source_functions: std.ArrayList(types.Id) = .empty,
+        completed_demands: std.ArrayList(CompletedDemand) = .empty,
+        witness_inputs: std.AutoHashMapUnmanaged(types.Id, types.Id) = .empty,
+
+        pub fn deinit(self: *Scratch, allocator: Allocator) void {
+            inline for (@typeInfo(Scratch).@"struct".field_names) |field| @field(self, field).deinit(allocator);
+            self.* = undefined;
+        }
+        pub fn clearRetainingCapacity(self: *Scratch) void {
+            inline for (@typeInfo(Scratch).@"struct".field_names) |field| @field(self, field).clearRetainingCapacity();
+        }
+        pub fn storageBound(self: *const Scratch) ?usize {
+            var bytes: usize = 0;
+            inline for (@typeInfo(Scratch).@"struct".field_names) |field| {
+                const value = @field(self, field);
+                const buffer = if (comptime @hasField(@TypeOf(value), "answers")) value.answers else value;
+                const size = @import("scratch_pool.zig").bufferBound(buffer) orelse return null;
+                bytes = std.math.add(usize, bytes, size) catch return null;
+            }
+            return bytes;
+        }
+    };
+    profile_principal: bool = false,
+    profile_rejected: u16 = 0,
+    profile_input_calls: usize = 0,
+    profile_recorded_inputs: bool = false,
+    profile_output_types: usize = 0,
+    profile_output_rows: usize = 0,
     session: *Session,
+    scratch: Scratch = .{},
+    scratch_allocator: Allocator,
+    timing: ?@import("backend_timing.zig").Work.Scope = null,
     solver: types.Store,
     solver_initial: ?types.Mark = null,
-    projection_cache: @import("projection_cache.zig").Cache = .{},
-    sources: std.ArrayList(Source) = .empty,
-    imported: std.AutoHashMapUnmanaged(Import, types.Id) = .empty,
-    definitions: std.AutoHashMapUnmanaged(DefinitionKey, core.BindingId) = .empty,
-    definition_units: std.AutoHashMapUnmanaged(usize, void) = .empty,
-    imported_rows: std.AutoHashMapUnmanaged(RowImport, types.Effects.Id) = .empty,
-    imported_labels: std.AutoHashMapUnmanaged(LabelImport, types.Effects.Label) = .empty,
-    row_variables: std.AutoHashMapUnmanaged(RowVariable, types.Effects.Id) = .empty,
-    row_parameters: std.AutoHashMapUnmanaged(RowParameter, u32) = .empty,
-    evidence_rows: std.AutoHashMapUnmanaged(u32, types.Effects.Id) = .empty,
-    evidence_labels: std.AutoHashMapUnmanaged(u32, types.Effects.Label) = .empty,
-    variables: std.ArrayList(Variable) = .empty,
-    edges: std.ArrayList(Edge) = .empty,
-    constraints: std.ArrayList(Constraint) = .empty,
-    selected_targets: std.ArrayList(core.BindingRef) = .empty,
     retain_selected: bool = false,
     startup_coverage_complete: bool = true,
-    data_aliases: std.ArrayList(DataAlias) = .empty,
-    frozen: std.AutoHashMapUnmanaged(u32, ValueId) = .empty,
-    call_instances: std.AutoHashMapUnmanaged(CallKey, u32) = .empty,
-    candidate_instances: std.AutoHashMapUnmanaged(CandidateKey, u32) = .empty,
-    unresolved_calls: std.AutoHashMapUnmanaged(Target, u32) = .empty,
     include_callables: bool = false,
     source_interface: bool = false,
     speculative_source_entry: bool = false,
     source_selection_failed: bool = false,
-    source_functions: std.ArrayList(types.Id) = .empty,
-    completed_demands: std.ArrayList(CompletedDemand) = .empty,
     complete_demand_bodies: bool = false,
     source_entry: ?Target = null,
-    witness_inputs: std.AutoHashMapUnmanaged(types.Id, types.Id) = .empty,
     // A generic nested lambda selects its members in its own concrete code
     // instance. Its enclosing proof still gathers mandatory effect equations.
     defer_members: bool = false,
@@ -3407,45 +3457,39 @@ const ClosureRegion = struct {
     code_expectation_remaining: usize = 0,
 
     fn init(session: *Session) types.Error!ClosureRegion {
-        if (session.reuse_solver_capacity) {
+        const timing = if (session.timing) |work| work.enter(.inference) else null;
+        errdefer if (timing) |scope| scope.deinit();
+        var region: ClosureRegion = if (session.reuse_solver_capacity) blk: {
             const lease = try session.solver_capacity_pool.take(session.allocator);
-            return .{ .session = session, .solver = lease.solver, .solver_initial = lease.initial };
-        }
-        return .{ .session = session, .solver = try types.Store.initWithOptions(session.allocator, .{ .closed_graphs = true }) };
+            break :blk .{ .session = session, .timing = timing, .solver = lease.solver, .solver_initial = lease.initial, .scratch_allocator = session.allocator };
+        } else .{ .session = session, .timing = timing, .solver = try types.Store.initWithOptions(session.allocator, .{ .closed_graphs = true }), .scratch_allocator = session.allocator };
+        if (session.reuse_region_scratch) region.scratch = session.region_scratch_pool.take(session.allocator);
+        return region;
     }
     fn deinit(self: *ClosureRegion) void {
+        defer if (self.timing) |scope| scope.deinit();
+        if (self.timing) |scope| if (self.scratch.sources.items.len != 0 and scope.owner.clock.io != null) {
+            const elapsed = scope.elapsedUs();
+            if (elapsed >= 1000) {
+                const source = self.scratch.sources.items[0];
+                const module = &self.session.units[source.owner];
+                const binding = if (source.binding != 0) source.binding else for (module.bodies[1..]) |body| {
+                    if (body.root == source.body) break body.binding;
+                } else 0;
+                const name = if (self.session.diagnostic_context.identity) |identity| identity.owner(self.session.unitId(source.owner)) orelse "" else "";
+                scope.owner.region(.{ .unit = self.session.unitId(source.owner), .binding = binding, .body = source.body, .offset = if (binding != 0) module.sourceNamePoint(binding) else if (source.body != 0) module.span(source.body).start else 0, .scopes = self.scratch.sources.items.len, .nodes = self.solver.nodes.items.len, .us = elapsed, .principal = self.profile_principal, .rejected = self.profile_rejected, .input_calls = self.profile_input_calls, .recorded_inputs = self.profile_recorded_inputs, .output_types = self.profile_output_types, .output_rows = self.profile_output_rows }, name);
+            }
+        };
         if (self.session.refinement_observation) |observation| observation.observe(self);
-        const allocator = self.session.allocator;
         if (self.solver_initial) |initial| {
             self.session.solver_capacity_pool.give(.{ .solver = self.solver, .initial = initial });
             self.solver = undefined;
         } else self.solver.deinit();
-        self.projection_cache.deinit(allocator);
-        self.sources.deinit(allocator);
-        self.source_functions.deinit(allocator);
-        self.completed_demands.deinit(allocator);
-        self.witness_inputs.deinit(allocator);
-        self.imported.deinit(allocator);
-        self.definitions.deinit(allocator);
-        self.definition_units.deinit(allocator);
-        self.imported_rows.deinit(allocator);
-        self.imported_labels.deinit(allocator);
-        self.row_variables.deinit(allocator);
-        self.row_parameters.deinit(allocator);
-        self.evidence_rows.deinit(allocator);
-        self.evidence_labels.deinit(allocator);
-        self.variables.deinit(allocator);
-        self.edges.deinit(allocator);
-        self.constraints.deinit(allocator);
-        self.selected_targets.deinit(allocator);
-        self.data_aliases.deinit(allocator);
-        self.frozen.deinit(allocator);
-        self.call_instances.deinit(allocator);
-        self.candidate_instances.deinit(allocator);
-        self.unresolved_calls.deinit(allocator);
+        if (self.session.reuse_region_scratch) self.session.region_scratch_pool.give(self.scratch_allocator, self.scratch) else self.scratch.deinit(self.scratch_allocator);
+        self.scratch = undefined;
     }
     fn failConstraint(self: *ClosureRegion, constraint: Constraint, code: Code) Error {
-        const owner = self.sources.items[constraint.scope].owner;
+        const owner = self.scratch.sources.items[constraint.scope].owner;
         if (code == .missing_field and constraint.explicit) if (constraint.qualification_span) |qualification| {
             const origin = if (constraint.qualification_unit == 0) owner else self.session.findUnit(constraint.qualification_unit, null) orelse owner;
             return self.session.fail(origin, .{ .start = qualification.start, .end = qualification.start }, code);
@@ -3457,7 +3501,7 @@ const ClosureRegion = struct {
         return if (constraint.span) |span| self.session.fail(owner, span, code) else self.session.failNode(owner, constraint.node, code);
     }
     fn importScheme(self: *ClosureRegion, scope: u32, scheme: types.Scheme, source: core.Id) RegionError!void {
-        const module = &self.session.units[self.sources.items[scope].owner];
+        const module = &self.session.units[self.scratch.sources.items[scope].owner];
         for (module.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |obligation| {
             if (!obligation.explicit) continue;
             const kind: ConstraintKind = switch (obligation.kind) {
@@ -3471,7 +3515,7 @@ const ClosureRegion = struct {
                 .effect_rep => .effect_rep,
                 else => return error.UnresolvedType,
             };
-            try self.constraints.append(self.session.allocator, .{
+            try self.scratch.constraints.append(self.session.allocator, .{
                 .scope = scope,
                 .node = source,
                 .span = obligation.span,
@@ -3486,13 +3530,13 @@ const ClosureRegion = struct {
                 .signature = if (obligation.signature == 0) 0 else try self.importType(scope, obligation.signature, 0),
                 .member = obligation.name,
                 .op = obligation.operator,
-                .identity = .{ .unit = if (obligation.identity.unit == 0) self.session.unitId(self.sources.items[scope].owner) else obligation.identity.unit, .decl = obligation.identity.decl },
+                .identity = .{ .unit = if (obligation.identity.unit == 0) self.session.unitId(self.scratch.sources.items[scope].owner) else obligation.identity.unit, .decl = obligation.identity.decl },
                 .row_carrier = obligation.kind == .dispatch or obligation.kind == .receiver or obligation.kind == .update,
             });
         }
     }
     fn seed(self: *ClosureRegion, scope: u32, mappings: []const type_evidence.Mapping) RegionError!void {
-        const module = &self.session.units[self.sources.items[scope].owner];
+        const module = &self.session.units[self.scratch.sources.items[scope].owner];
         for (mappings) |mapping| {
             if (mapping.variable == 0 or mapping.variable >= module.types.nodes.len) return error.UnresolvedType;
             try self.solver.unify(try self.importType(scope, mapping.variable, 0), try self.importEvidence(mapping.evidence, 0));
@@ -3501,7 +3545,7 @@ const ClosureRegion = struct {
     fn exportMappings(self: *ClosureRegion, scope: u32) RegionError![]type_evidence.Mapping {
         var mappings: std.ArrayList(type_evidence.Mapping) = .empty;
         errdefer mappings.deinit(self.session.allocator);
-        for (self.variables.items) |variable| if (variable.source.scope == scope) {
+        for (self.scratch.variables.items) |variable| if (variable.source.scope == scope) {
             const actual = try self.project(variable.region);
             if (actual != 0) try mappings.append(self.session.allocator, .{ .variable = variable.source.ty, .evidence = actual });
         };
@@ -3516,7 +3560,7 @@ const ClosureRegion = struct {
     fn closeCertificates(self: *ClosureRegion) RegionError!bool {
         var certified: std.AutoHashMapUnmanaged(RowVariable, void) = .empty;
         defer certified.deinit(self.session.allocator);
-        for (self.sources.items, 0..) |source, scope| {
+        for (self.scratch.sources.items, 0..) |source, scope| {
             for (self.session.units[source.owner].types.list(source.closed_rows)) |variable|
                 try certified.put(self.session.allocator, .{ .scope = @intCast(scope), .variable = variable }, {});
         }
@@ -3527,7 +3571,7 @@ const ClosureRegion = struct {
         // semantic restriction, so their residuals may receive the certificate.
         var protected: std.AutoHashMapUnmanaged(u32, void) = .empty;
         defer protected.deinit(self.session.allocator);
-        var imported = self.row_variables.iterator();
+        var imported = self.scratch.row_variables.iterator();
         while (imported.next()) |entry| {
             if (certified.contains(entry.key_ptr.*)) continue;
             const resolved = try self.solver.resolveEffects(entry.value_ptr.*, 0);
@@ -3535,7 +3579,7 @@ const ClosureRegion = struct {
             if (tail == .variable) try protected.put(self.session.allocator, tail.variable, {});
         }
         var changed = false;
-        for (self.sources.items, 0..) |source, scope| {
+        for (self.scratch.sources.items, 0..) |source, scope| {
             const module = &self.session.units[source.owner];
             for (module.types.list(source.closed_rows)) |variable| {
                 const row_variable = try self.importRowVariable(@intCast(scope), variable);
@@ -3554,7 +3598,7 @@ const ClosureRegion = struct {
         errdefer self.session.allocator.free(mappings);
         var rows: std.ArrayList(type_evidence.RowMapping) = .empty;
         errdefer rows.deinit(self.session.allocator);
-        var variables = self.row_variables.iterator();
+        var variables = self.scratch.row_variables.iterator();
         while (variables.next()) |entry| {
             if (entry.key_ptr.scope != scope) continue;
             const resolved = try self.solver.resolveEffects(entry.value_ptr.*, 0);
@@ -3570,7 +3614,7 @@ const ClosureRegion = struct {
                 return left.variable < right.variable;
             }
         }.less);
-        const selected = try self.session.allocator.dupe(core.BindingRef, self.selected_targets.items);
+        const selected = try self.session.allocator.dupe(core.BindingRef, self.scratch.selected_targets.items);
         errdefer self.session.allocator.free(selected);
         return .{ .types = mappings, .rows = try rows.toOwnedSlice(self.session.allocator), .selected = selected };
     }
@@ -3578,8 +3622,8 @@ const ClosureRegion = struct {
         if (!self.retain_selected) return;
         const resolved = try self.session.external(target_);
         const reference: core.BindingRef = .{ .unit = self.session.unitId(resolved.unit), .binding = resolved.binding };
-        for (self.selected_targets.items) |prior| if (std.meta.eql(prior, reference)) return;
-        try self.selected_targets.append(self.session.allocator, reference);
+        for (self.scratch.selected_targets.items) |prior| if (std.meta.eql(prior, reference)) return;
+        try self.scratch.selected_targets.append(self.session.allocator, reference);
     }
     fn sourceInterface(self: *ClosureRegion, target_: Target, body: *const core.Body) RegionError!SourceInterface {
         self.source_interface = true;
@@ -3593,7 +3637,7 @@ const ClosureRegion = struct {
         // or header proof and the later export check reports the missing entry.
         self.speculative_source_entry = body.is_function and !sourceEntryCandidate(&entry_module.types, entry_module.binding(body.binding).ty) and self.session.diagnostic == null and self.session.owned_diagnostic_message.len == 0;
         const scope = try self.callableScope(target_);
-        try self.unresolved_calls.put(self.session.allocator, target_, scope);
+        try self.scratch.unresolved_calls.put(self.session.allocator, target_, scope);
         try self.collect(scope, body.root);
         self.solveMode(true) catch |err| {
             if (!self.source_selection_failed) return err;
@@ -3605,30 +3649,30 @@ const ClosureRegion = struct {
             self.session.owned_diagnostic_message = &.{};
             return .{ .selected = false };
         };
-        if (!body.is_function) for (self.constraints.items) |constraint| {
+        if (!body.is_function) for (self.scratch.constraints.items) |constraint| {
             if (constraint.solved or constraint.kind != .type_compare) continue;
-            const owner = self.sources.items[constraint.scope].owner;
+            const owner = self.scratch.sources.items[constraint.scope].owner;
             const point = self.session.units[owner].span(constraint.node).start;
             const result = self.session.fail(owner, .{ .start = point, .end = point }, .ambiguous_associated);
             if (self.session.diagnostic) |*diagnostic| diagnostic.detail = "cannot select @type.same until operand types can be inferred; annotate the exported parameter or call the generic function with concrete types";
             return result;
         };
         var pending: usize = 0;
-        for (self.constraints.items) |constraint| if (!constraint.solved) {
+        for (self.scratch.constraints.items) |constraint| if (!constraint.solved) {
             pending += 1;
         };
         if (pending != 0) return .{ .pending = pending, .generic = try self.genericEntryInterface(scope) };
-        for (self.sources.items) |source| {
+        for (self.scratch.sources.items) |source| {
             const module = &self.session.units[source.owner];
             if (source.binding == 0 or source.binding >= module.bindings.len) continue;
             const binding = module.binding(source.binding);
             const own = if (module.body(source.binding)) |definition| definition.is_function else binding.initializer != 0 and module.node(binding.initializer).tag == .closure;
-            if (own) try self.source_functions.append(self.session.allocator, source.root);
+            if (own) try self.scratch.source_functions.append(self.session.allocator, source.root);
         }
         var changed = true;
         while (changed) {
             changed = false;
-            for (self.source_functions.items) |function| {
+            for (self.scratch.source_functions.items) |function| {
                 const arrow = self.solver.node(try self.solver.resolve(function, 0));
                 if (arrow.tag != .function or try self.project(arrow.a) == 0 or try self.project(arrow.b) == 0) continue;
                 const row = try self.solver.resolveEffects(arrow.c, 0);
@@ -3638,9 +3682,9 @@ const ClosureRegion = struct {
                 changed = true;
             }
         }
-        const evidence = try self.project(self.sources.items[scope].root);
+        const evidence = try self.project(self.scratch.sources.items[scope].root);
         if (evidence != 0) return .{ .evidence = evidence };
-        const head = self.solver.node(try self.solver.resolve(self.sources.items[scope].root, 0));
+        const head = self.solver.node(try self.solver.resolve(self.scratch.sources.items[scope].root, 0));
         return .{ .generic = head.tag == .variable or try self.genericEntryInterface(scope) };
     }
     fn sourceEntryDataCandidate(table: *const core.Types, id: types.Id) bool {
@@ -3665,7 +3709,7 @@ const ClosureRegion = struct {
     fn deferredSourceSelection(self: *const ClosureRegion, constraint: Constraint) bool {
         if (constraint.kind == .receiver) return true;
         if (constraint.kind != .field or constraint.writable) return false;
-        const module = &self.session.units[self.sources.items[constraint.scope].owner];
+        const module = &self.session.units[self.scratch.sources.items[constraint.scope].owner];
         return module.projection(constraint.projection).field != 0 and module.projectionVariants(constraint.projection).len == 0;
     }
     fn sourceSelectionFailure(self: *ClosureRegion, constraint: Constraint, err: RegionError) RegionError {
@@ -3709,12 +3753,12 @@ const ClosureRegion = struct {
     fn bodyEvidenceMode(self: *ClosureRegion, owner: usize, body: core.Id, root: types.Id, closed_rows: types.List, scheme: types.Scheme, expected: Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, allow_remaining: bool) RegionError!SolvedEvidence {
         self.include_callables = true;
         const scope = try self.typeScope(owner);
-        self.sources.items[scope].body = body;
-        self.sources.items[scope].closed_rows = closed_rows;
-        self.sources.items[scope].root = try self.importType(scope, root, 0);
+        self.scratch.sources.items[scope].body = body;
+        self.scratch.sources.items[scope].closed_rows = closed_rows;
+        self.scratch.sources.items[scope].root = try self.importType(scope, root, 0);
         try self.seed(scope, seeds);
         try self.seedRows(scope, row_seeds);
-        try self.expectShape(self.sources.items[scope].root, expected);
+        try self.expectShape(self.scratch.sources.items[scope].root, expected);
         try self.importScheme(scope, scheme, body);
         try self.collect(scope, body);
         try self.solveMode(allow_remaining);
@@ -3742,7 +3786,7 @@ const ClosureRegion = struct {
         if (capture.node == 0 or capture.node >= module.nodes.len) return error.UnresolvedType;
         const node = module.node(capture.node);
         const scope = try self.typeScope(owner);
-        self.sources.items[scope].root = try self.importType(scope, node.ty, 0);
+        self.scratch.sources.items[scope].root = try self.importType(scope, node.ty, 0);
         if (capture.mappings != 0) {
             if (capture.mappings >= self.session.evidence.nodes.items.len) return error.UnresolvedType;
             const words = try self.session.allocator.dupe(type_evidence.Id, self.session.evidence.children(capture.mappings));
@@ -3770,26 +3814,26 @@ const ClosureRegion = struct {
             if (node.tag == .closure) {
                 try self.alignClosure(scope, capture.node);
             } else {
-                const demanded = self.solver.node(try self.solver.resolve(self.sources.items[scope].root, 0));
+                const demanded = self.solver.node(try self.solver.resolve(self.scratch.sources.items[scope].root, 0));
                 if (demanded.tag != .demand) return error.TypeMismatch;
                 try self.solver.unify(demanded.a, try self.importType(scope, module.typeOf(closure_.body), 0));
                 if (closure_.function_type != 0) try self.solver.unify(try self.importType(scope, closure_.function_type, 0), try self.solver.functionWithEffects(types.unit, demanded.a, demanded.c));
             }
         } else if (node.tag != .reference and node.tag != .constructor_function and node.tag != .primitive_function) return error.UnresolvedType;
-        const actual = self.sources.items[scope].root;
+        const actual = self.scratch.sources.items[scope].root;
         return if (capture.computation) try self.solver.nominal(.{ .unit = std.math.maxInt(u32), .decl = 5 }, &.{actual}) else actual;
     }
     fn closureEvidenceCaptures(self: *ClosureRegion, owner: usize, closure: core.ClosureInfo, expected: Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, captures: []const RetainedCapture) RegionError!SolvedEvidence {
         self.include_callables = true;
         const scope = try self.typeScope(owner);
         const module = &self.session.units[owner];
-        self.sources.items[scope].body = closure.body;
-        self.sources.items[scope].binding = closure.qualifier;
-        self.sources.items[scope].closed_rows = closure.closed_rows;
-        self.sources.items[scope].root = if (closure.function_type != 0) try self.importType(scope, closure.function_type, 0) else try self.solver.function(try self.importType(scope, closure.parameter.ty, 0), try self.importType(scope, module.typeOf(closure.body), 0));
+        self.scratch.sources.items[scope].body = closure.body;
+        self.scratch.sources.items[scope].binding = closure.qualifier;
+        self.scratch.sources.items[scope].closed_rows = closure.closed_rows;
+        self.scratch.sources.items[scope].root = if (closure.function_type != 0) try self.importType(scope, closure.function_type, 0) else try self.solver.function(try self.importType(scope, closure.parameter.ty, 0), try self.importType(scope, module.typeOf(closure.body), 0));
         try self.seed(scope, seeds);
         try self.seedRows(scope, row_seeds);
-        try self.expectShape(self.sources.items[scope].root, expected);
+        try self.expectShape(self.scratch.sources.items[scope].root, expected);
         for (captures) |capture| {
             if (capture.binding == 0 or capture.binding >= module.bindings.len) return error.UnresolvedType;
             if (std.mem.findScalar(core.BindingId, module.extra[closure.captures.start..][0..closure.captures.len], capture.binding) == null and capture.binding != closure.parameter.binding) return error.UnresolvedType;
@@ -3852,9 +3896,9 @@ const ClosureRegion = struct {
         return true;
     }
     fn plainNominal(self: *ClosureRegion, unit_id: u32, decl: u32, depth: usize) RegionError!bool {
-        if (self.session.principal_reads) |reads| reads.invalidate();
         if (depth >= self.session.options.max_depth) return false;
         const key = (@as(u64, unit_id) << 32) | decl;
+        if (self.session.principal_reads) |reads| try reads.plainRead(self.session.allocator, key, self.session.plain_nominals.get(key));
         if (self.session.plain_nominals.get(key)) |known| {
             if (self.session.receipt_tape) |tape| try tape.plain_facts.append(self.session.allocator, .{ .key = key, .plain = known });
             return known;
@@ -3874,6 +3918,7 @@ const ClosureRegion = struct {
             }
         }
         if (self.session.receipt_tape) |tape| try tape.plain_facts.append(self.session.allocator, .{ .key = key, .plain = plain, .read = false });
+        if (self.session.principal_reads) |reads| try reads.plainPublish(self.session.allocator, key, plain);
         try self.session.plain_nominals.put(self.session.allocator, key, plain);
         return plain;
     }
@@ -3929,8 +3974,8 @@ const ClosureRegion = struct {
     }
     fn publishValidatedCalls(self: *ClosureRegion) RegionError!void {
         if (!self.session.options.reuse_validated_calls) return;
-        for (self.constraints.items) |constraint| if (!constraint.solved) return;
-        for (self.sources.items) |source| {
+        for (self.scratch.constraints.items) |constraint| if (!constraint.solved) return;
+        for (self.scratch.sources.items) |source| {
             if (source.value != 0 or source.binding == 0 or source.root == 0) continue;
             const module = &self.session.units[source.owner];
             const binding = module.binding(source.binding);
@@ -3938,7 +3983,7 @@ const ClosureRegion = struct {
             if (!try self.potentialArrow(source.owner, binding.ty)) continue;
             const actual = try self.project(source.root);
             if (!try self.firstOrderArrow(actual)) continue;
-            if (self.session.principal_reads) |reads| reads.invalidate();
+            if (self.session.principal_reads) |reads| try reads.callPublish(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding }, actual);
             if (self.session.receipt_tape) |tape| try tape.call_publications.append(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding, .evidence = actual, .present = true });
             const entry = try self.session.validated_calls.getOrPut(self.session.allocator, .{ .target = .{ .unit = source.owner, .binding = source.binding }, .evidence = actual });
             if (!entry.found_existing) self.session.proofs.proof_published += 1;
@@ -4000,10 +4045,10 @@ const ClosureRegion = struct {
         };
     }
     fn importType(self: *ClosureRegion, scope: u32, ty: types.Id, depth: usize) RegionError!types.Id {
-        if (depth >= self.session.options.max_depth or self.imported.count() >= self.session.options.max_values) return error.TypeLimit;
+        if (depth >= self.session.options.max_depth or self.scratch.imported.count() >= self.session.options.max_values) return error.TypeLimit;
         const key: Import = .{ .scope = scope, .ty = ty };
-        if (self.imported.get(key)) |existing| return existing;
-        const source = &self.session.units[self.sources.items[scope].owner].types;
+        if (self.scratch.imported.get(key)) |existing| return existing;
+        const source = &self.session.units[self.scratch.sources.items[scope].owner].types;
         const node = source.node(ty);
         const result = switch (node.tag) {
             .absent => return error.UnresolvedType,
@@ -4039,15 +4084,15 @@ const ClosureRegion = struct {
                 break :blk if (node.tag == .nominal) try self.solver.nominal(.{ .unit = node.a, .decl = node.b }, values) else try self.solver.product(values);
             },
         };
-        try self.imported.put(self.session.allocator, key, result);
-        if (node.tag == .variable) try self.variables.append(self.session.allocator, .{ .source = key, .region = result });
+        try self.scratch.imported.put(self.session.allocator, key, result);
+        if (node.tag == .variable) try self.scratch.variables.append(self.session.allocator, .{ .source = key, .region = result });
         return result;
     }
     fn importLabel(self: *ClosureRegion, scope: u32, label: types.Effects.Label, depth: usize) RegionError!types.Effects.Label {
         if (depth >= self.session.options.max_depth) return error.TypeLimit;
         const key: LabelImport = .{ .scope = scope, .label = label };
-        if (self.imported_labels.get(key)) |known| return known;
-        const source = &self.session.units[self.sources.items[scope].owner].types;
+        if (self.scratch.imported_labels.get(key)) |known| return known;
+        const source = &self.session.units[self.scratch.sources.items[scope].owner].types;
         if (label == 0 or label >= source.operations.len) return error.UnresolvedType;
         var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
@@ -4057,15 +4102,15 @@ const ClosureRegion = struct {
         defer allocator.free(arguments);
         for (original, arguments) |argument, *imported| imported.* = try self.importType(scope, argument, depth + 1);
         const result = try self.solver.internOperation(source.operation(label).identity, arguments);
-        try self.imported_labels.put(self.session.allocator, key, result);
+        try self.scratch.imported_labels.put(self.session.allocator, key, result);
         return result;
     }
     fn importRow(self: *ClosureRegion, scope: u32, row: types.Effects.Id, depth: usize) RegionError!types.Effects.Id {
         if (row == 0) return 0;
         if (depth >= self.session.options.max_depth) return error.TypeLimit;
         const key: RowImport = .{ .scope = scope, .row = row };
-        if (self.imported_rows.get(key)) |known| return known;
-        const source = &self.session.units[self.sources.items[scope].owner].types;
+        if (self.scratch.imported_rows.get(key)) |known| return known;
+        const source = &self.session.units[self.scratch.sources.items[scope].owner].types;
         if (row >= source.effects.rows.len) return error.UnresolvedType;
         const original = source.row(row);
         var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
@@ -4082,31 +4127,54 @@ const ClosureRegion = struct {
                 break :blk self.solver.effects.node(fresh).tail;
             },
             .parameter => |parameter| blk: {
-                const parameter_key: RowParameter = .{ .owner = self.sources.items[scope].owner, .parameter = parameter };
-                const fresh = self.row_parameters.get(parameter_key) orelse fresh: {
-                    if (self.row_parameters.count() >= std.math.maxInt(u32)) return error.TypeLimit;
-                    const created: u32 = @intCast(self.row_parameters.count());
-                    try self.row_parameters.put(self.session.allocator, parameter_key, created);
+                const parameter_key: RowParameter = .{ .owner = self.scratch.sources.items[scope].owner, .parameter = parameter };
+                const fresh = self.scratch.row_parameters.get(parameter_key) orelse fresh: {
+                    if (self.scratch.row_parameters.count() >= std.math.maxInt(u32)) return error.TypeLimit;
+                    const created: u32 = @intCast(self.scratch.row_parameters.count());
+                    try self.scratch.row_parameters.put(self.session.allocator, parameter_key, created);
                     break :fresh created;
                 };
                 break :blk .{ .parameter = fresh };
             },
         };
         const result = self.solver.effects.row(labels, tail) catch |err| return types.effectError(err);
-        try self.imported_rows.put(self.session.allocator, key, result);
+        try self.scratch.imported_rows.put(self.session.allocator, key, result);
         return result;
     }
     fn importRowVariable(self: *ClosureRegion, scope: u32, variable: u32) RegionError!types.Effects.Id {
-        const owner = self.sources.items[scope].owner;
+        const owner = self.scratch.sources.items[scope].owner;
         if (variable >= self.session.units[owner].types.effects.variable_count) return error.UnresolvedType;
         const key: RowVariable = .{ .scope = scope, .variable = variable };
-        if (self.row_variables.get(key)) |known| return known;
+        if (self.scratch.row_variables.get(key)) |known| return known;
         const fresh = try self.solver.freshEffects();
-        try self.row_variables.put(self.session.allocator, key, fresh);
+        try self.scratch.row_variables.put(self.session.allocator, key, fresh);
         return fresh;
     }
     fn importEvidence(self: *ClosureRegion, actual: type_evidence.Id, depth: usize) RegionError!types.Id {
         if (depth >= self.session.options.max_depth) return error.TypeLimit;
+        if (actual == 0) return error.UnresolvedType;
+        if (actual <= types.never) return actual;
+        self.session.evidence_import_requests += 1;
+        self.prepareEvidenceImports();
+        const memo = &self.scratch.evidence_import_cache;
+        const key = if (self.session.reuse_evidence_imports) memo.key(actual, depth) else null;
+        if (key) |id| if (memo.answers.get(id)) |known| {
+            self.session.evidence_import_reused += 1;
+            return known;
+        };
+        const result = try self.importEvidenceGraph(actual, depth);
+        // Construction may synchronize the solver's physical effect clock.
+        self.prepareEvidenceImports();
+        if (key) |id| if (memo.key(actual, depth) != null) try memo.answers.put(self.session.allocator, id, result);
+        return result;
+    }
+    fn prepareEvidenceImports(self: *ClosureRegion) void {
+        if (self.scratch.evidence_import_cache.activate(&self.session.evidence, &self.solver, self.solver.closed_generation, self.solver.effects.physical_epoch, self.session.options.max_depth)) {
+            self.scratch.evidence_rows.clearRetainingCapacity();
+            self.scratch.evidence_labels.clearRetainingCapacity();
+        }
+    }
+    fn importEvidenceGraph(self: *ClosureRegion, actual: type_evidence.Id, depth: usize) RegionError!types.Id {
         const node = self.session.evidence.node(actual);
         return switch (node.tag) {
             .absent => error.UnresolvedType,
@@ -4146,7 +4214,8 @@ const ClosureRegion = struct {
     }
     fn importEvidenceLabel(self: *ClosureRegion, label: u32, depth: usize) RegionError!types.Effects.Label {
         if (depth >= self.session.options.max_depth) return error.TypeLimit;
-        if (self.evidence_labels.get(label)) |known| return known;
+        self.prepareEvidenceImports();
+        if (self.scratch.evidence_labels.get(label)) |known| return known;
         const source = self.session.evidence.view().effects;
         const operation = source.operation(label);
         var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
@@ -4157,13 +4226,14 @@ const ClosureRegion = struct {
         defer allocator.free(arguments);
         for (original, arguments) |argument, *imported| imported.* = try self.importEvidence(argument, depth + 1);
         const result = try self.solver.internOperation(operation.identity, arguments);
-        try self.evidence_labels.put(self.session.allocator, label, result);
+        try self.scratch.evidence_labels.put(self.session.allocator, label, result);
         return result;
     }
     fn importEvidenceRow(self: *ClosureRegion, row: u32, depth: usize) RegionError!types.Effects.Id {
         if (row == 0) return 0;
         if (depth >= self.session.options.max_depth) return error.TypeLimit;
-        if (self.evidence_rows.get(row)) |known| return known;
+        self.prepareEvidenceImports();
+        if (self.scratch.evidence_rows.get(row)) |known| return known;
         const source = self.session.evidence.view().effects;
         var scratch_buffer: [128]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.session.allocator);
@@ -4173,31 +4243,31 @@ const ClosureRegion = struct {
         defer allocator.free(labels);
         for (source_labels, labels) |label, *imported| imported.* = try self.importEvidenceLabel(label, depth + 1);
         const result = self.solver.effects.row(labels, .closed) catch |err| return types.effectError(err);
-        try self.evidence_rows.put(self.session.allocator, row, result);
+        try self.scratch.evidence_rows.put(self.session.allocator, row, result);
         return result;
     }
     fn project(self: *ClosureRegion, ty: types.Id) RegionError!type_evidence.Id {
         const resolved = try self.solver.resolve(ty, 0);
-        return self.session.evidence.projectOwned(&self.solver, resolved, &self.projection_cache) catch |err| switch (err) {
+        return self.session.evidence.projectOwned(&self.solver, resolved, &self.scratch.projection_cache) catch |err| switch (err) {
             error.UnresolvedType => 0,
             else => return err,
         };
     }
     fn addValue(self: *ClosureRegion, value_: ValueId, depth: usize) RegionError!u32 {
-        if (depth >= self.session.options.max_depth or self.sources.items.len >= self.session.options.max_values or self.sources.items.len >= std.math.maxInt(u32)) return error.TypeLimit;
+        if (depth >= self.session.options.max_depth or self.scratch.sources.items.len >= self.session.options.max_values or self.scratch.sources.items.len >= std.math.maxInt(u32)) return error.TypeLimit;
         const kind = self.session.valueInfo(value_).kind;
         if (kind != .closure and kind != .suspension) return self.addAggregate(value_, depth);
         const metadata = self.session.closureInfo(value_);
         const owner = self.session.findUnit(metadata.unit, null) orelse return error.UnresolvedType;
         const module = &self.session.units[owner];
-        const scope: u32 = @intCast(self.sources.items.len);
-        try self.sources.append(self.session.allocator, .{ .value = value_, .owner = owner });
+        const scope: u32 = @intCast(self.scratch.sources.items.len);
+        try self.scratch.sources.append(self.session.allocator, .{ .value = value_, .owner = owner });
         var body: core.Id = 0;
         const root = switch (metadata.origin) {
             .anonymous => blk: {
                 const template = module.closures[metadata.identity];
                 body = template.body;
-                self.sources.items[scope].closed_rows = template.closed_rows;
+                self.scratch.sources.items[scope].closed_rows = template.closed_rows;
                 if (template.function_type != 0) {
                     const function = try self.importType(scope, template.function_type, 0);
                     if (kind != .suspension) break :blk function;
@@ -4211,7 +4281,7 @@ const ClosureRegion = struct {
             .named => blk: {
                 const definition = module.body(metadata.identity) orelse return error.UnresolvedType;
                 body = definition.root;
-                self.sources.items[scope].closed_rows = definition.closed_rows;
+                self.scratch.sources.items[scope].closed_rows = definition.closed_rows;
                 var full = module.binding(metadata.identity).ty;
                 for (0..metadata.applied) |_| {
                     const n = module.types.node(full);
@@ -4238,8 +4308,8 @@ const ClosureRegion = struct {
                 break :blk signature;
             },
         };
-        self.sources.items[scope].root = root;
-        self.sources.items[scope].body = body;
+        self.scratch.sources.items[scope].root = root;
+        self.scratch.sources.items[scope].body = body;
         for (self.session.type_mappings.items[metadata.mappings.start..][0..metadata.mappings.len]) |mapping| try self.solver.unify(try self.importType(scope, mapping.variable, 0), try self.importEvidence(mapping.evidence, 0));
         try self.seedRows(scope, self.session.row_mappings.items[metadata.row_mappings.start..][0..metadata.row_mappings.len]);
         const existing = self.session.valueEvidence(value_);
@@ -4260,10 +4330,10 @@ const ClosureRegion = struct {
             const formal = try self.importType(scope, formal_source, 0);
             if (self.session.valueInfo(capture).kind != .scalar) {
                 const child = try self.addValue(capture, depth + 1);
-                const actual = try self.solver.resolve(self.sources.items[child].root, 0);
+                const actual = try self.solver.resolve(self.scratch.sources.items[child].root, 0);
                 // Admit the capture's ambient view while retaining its implementation row.
                 try self.solver.unify(formal, try self.solver.openCovariant(actual));
-                try self.edges.append(self.session.allocator, .{ .parent = scope, .child = child, .slot = @intCast(index), .formal = formal });
+                try self.scratch.edges.append(self.session.allocator, .{ .parent = scope, .child = child, .slot = @intCast(index), .formal = formal });
             } else {
                 const actual = self.session.valueEvidence(capture);
                 if (actual == 0) return error.UnresolvedType;
@@ -4271,11 +4341,11 @@ const ClosureRegion = struct {
             }
         }
         if (metadata.origin == .named) {
-            self.sources.items[scope].binding = metadata.identity;
+            self.scratch.sources.items[scope].binding = metadata.identity;
             try self.importScheme(scope, module.binding(metadata.identity).scheme, body);
         } else if (metadata.origin == .anonymous) {
             const qualifier = module.closures[metadata.identity].qualifier;
-            self.sources.items[scope].binding = qualifier;
+            self.scratch.sources.items[scope].binding = qualifier;
             if (qualifier != 0) try self.importScheme(scope, module.binding(qualifier).scheme, body);
         }
         if (body != 0) try self.collect(scope, body);
@@ -4297,17 +4367,17 @@ const ClosureRegion = struct {
             }
             if (constructor_index == null) return error.UnresolvedType;
         }
-        const scope: u32 = @intCast(self.sources.items.len);
-        try self.sources.append(self.session.allocator, .{ .owner = owner, .value = value_ });
+        const scope: u32 = @intCast(self.scratch.sources.items.len);
+        try self.scratch.sources.append(self.session.allocator, .{ .owner = owner, .value = value_ });
         const captures = try self.session.allocator.dupe(ValueId, self.session.valueChildren(value_));
         defer self.session.allocator.free(captures);
         var children: std.ArrayList(types.Id) = .empty;
         defer children.deinit(self.session.allocator);
         for (captures, 0..) |capture, index| {
             const child = try self.addValue(capture, depth + 1);
-            const formal = self.sources.items[child].root;
+            const formal = self.scratch.sources.items[child].root;
             try children.append(self.session.allocator, formal);
-            try self.edges.append(self.session.allocator, .{ .parent = scope, .child = child, .slot = @intCast(index), .formal = formal });
+            try self.scratch.edges.append(self.session.allocator, .{ .parent = scope, .child = child, .slot = @intCast(index), .formal = formal });
         }
         const root = switch (info.kind) {
             .scalar, .type_constructor, .resolver, .provider, .state_provider => try self.importEvidence(self.session.valueEvidence(value_), 0),
@@ -4342,13 +4412,13 @@ const ClosureRegion = struct {
             .effect_set, .effect_descriptor, .computation, .request_decision => try self.importEvidence(self.session.valueEvidence(value_), 0),
             .closure, .suspension => return error.UnresolvedType,
         };
-        self.sources.items[scope].root = root;
+        self.scratch.sources.items[scope].root = root;
         const existing = self.session.valueEvidence(value_);
         if (existing != 0) try self.solver.unify(root, try self.importEvidence(existing, 0));
         return scope;
     }
     fn collectCall(self: *ClosureRegion, caller: u32, reference: core.BindingRef, callee_type: types.Id, arguments: []const core.Id) RegionError!void {
-        const target_ = try self.session.external(try self.session.target(self.sources.items[caller].owner, reference));
+        const target_ = try self.session.external(try self.session.target(self.scratch.sources.items[caller].owner, reference));
         const module = &self.session.units[target_.unit];
         const binding = module.binding(target_.binding);
         const definition = module.body(target_.binding);
@@ -4357,7 +4427,7 @@ const ClosureRegion = struct {
             if (definition == null or (definition.?.runtime and !definition.?.is_function)) tape.unknown = true;
         };
         if (self.session.principal_reads) |reads| if (binding.kind == .global and (definition == null or (definition.?.runtime and !definition.?.is_function))) {
-            reads.invalidate();
+            reads.invalidate(.runtime_source);
         };
         const lexical_caller: u32 = if (definition == null) caller + 1 else 0;
         const body_root = if (definition) |body| body.root else binding.initializer;
@@ -4377,25 +4447,25 @@ const ClosureRegion = struct {
                 const present = self.session.validated_calls.contains(.{ .target = target_, .evidence = known });
                 if (self.session.receipt_tape) |tape| try tape.call_reads.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding, .evidence = known, .present = present });
                 if (present) {
-                    if (self.session.principal_reads) |reads| reads.invalidate();
+                    if (self.session.principal_reads) |reads| reads.invalidate(.call_read);
                     self.session.proofs.proof_reused += 1;
                     return;
                 }
             }
-            if (self.call_instances.get(.{ .owner = target_.unit, .binding = target_.binding, .evidence = known, .caller = lexical_caller })) |prior| {
-                _ = try self.admitSignature(instantiated, self.sources.items[prior].root);
+            if (self.scratch.call_instances.get(.{ .owner = target_.unit, .binding = target_.binding, .evidence = known, .caller = lexical_caller })) |prior| {
+                _ = try self.admitSignature(instantiated, self.scratch.sources.items[prior].root);
                 return;
             }
         }
         const scope = try self.typeScope(target_.unit);
-        self.sources.items[scope].body = body_root;
-        self.sources.items[scope].binding = target_.binding;
-        self.sources.items[scope].closed_rows = if (definition) |body| body.closed_rows else if (module.node(body_root).tag == .closure) module.closure(body_root).closed_rows else binding.scheme.closed_rows;
-        self.sources.items[scope].root = try self.importType(scope, source_type, 0);
+        self.scratch.sources.items[scope].body = body_root;
+        self.scratch.sources.items[scope].binding = target_.binding;
+        self.scratch.sources.items[scope].closed_rows = if (definition) |body| body.closed_rows else if (module.node(body_root).tag == .closure) module.closure(body_root).closed_rows else binding.scheme.closed_rows;
+        self.scratch.sources.items[scope].root = try self.importType(scope, source_type, 0);
         try self.importScheme(scope, binding.scheme, body_root);
         if (self.source_interface) {
-            var formal = self.sources.items[scope].root;
-            const caller_module = &self.session.units[self.sources.items[caller].owner];
+            var formal = self.scratch.sources.items[scope].root;
+            const caller_module = &self.session.units[self.scratch.sources.items[caller].owner];
             for (arguments) |argument| {
                 const arrow = self.solver.node(try self.solver.resolve(formal, 0));
                 if (arrow.tag != .function) break;
@@ -4403,7 +4473,7 @@ const ClosureRegion = struct {
                 // Bottom remains ordinary control flow in the solver. Witness
                 // selection owns this exact applied argument separately.
                 if (self.solver.node(try self.solver.resolve(actual, 0)).tag == .never)
-                    try self.witness_inputs.put(self.session.allocator, arrow.a, actual);
+                    try self.scratch.witness_inputs.put(self.session.allocator, arrow.a, actual);
                 formal = arrow.b;
             }
         }
@@ -4413,51 +4483,51 @@ const ClosureRegion = struct {
             }
             try self.shareLexical(scope, caller, binding.scheme);
         }
-        _ = try self.admitSignature(instantiated, self.sources.items[scope].root);
-        const actual = try self.project(self.sources.items[scope].root);
+        _ = try self.admitSignature(instantiated, self.scratch.sources.items[scope].root);
+        const actual = try self.project(self.scratch.sources.items[scope].root);
         if (actual != 0) {
             const key: CallKey = .{ .owner = target_.unit, .binding = target_.binding, .evidence = actual, .caller = lexical_caller };
-            if (self.call_instances.get(key)) |prior| {
-                _ = try self.admitSignature(instantiated, self.sources.items[prior].root);
+            if (self.scratch.call_instances.get(key)) |prior| {
+                _ = try self.admitSignature(instantiated, self.scratch.sources.items[prior].root);
                 return;
             }
-            try self.call_instances.put(self.session.allocator, key, scope);
+            try self.scratch.call_instances.put(self.session.allocator, key, scope);
             try self.collect(scope, body_root);
         } else {
-            if (self.unresolved_calls.get(target_)) |active| {
+            if (self.scratch.unresolved_calls.get(target_)) |active| {
                 // Recursive uses share the active monomorphic inference root.
                 // Closed instances keep their separate evidence-keyed cache.
-                _ = try self.admitSignature(instantiated, self.sources.items[active].root);
+                _ = try self.admitSignature(instantiated, self.scratch.sources.items[active].root);
                 return;
             }
-            try self.unresolved_calls.put(self.session.allocator, target_, scope);
-            defer _ = self.unresolved_calls.remove(target_);
+            try self.scratch.unresolved_calls.put(self.session.allocator, target_, scope);
+            defer _ = self.scratch.unresolved_calls.remove(target_);
             try self.collect(scope, body_root);
         }
         if (definition == null) try self.shareLexical(scope, caller, binding.scheme);
     }
     fn shareLexical(self: *ClosureRegion, scope: u32, caller: u32, scheme: types.Scheme) RegionError!void {
-        const module = &self.session.units[self.sources.items[scope].owner];
+        const module = &self.session.units[self.scratch.sources.items[scope].owner];
         // Existing records never change; imports only append. Fix the initial
         // length and reload each record by value after any intervening growth.
-        const variable_count = self.variables.items.len;
+        const variable_count = self.scratch.variables.items.len;
         for (0..variable_count) |index| {
-            const variable = self.variables.items[index];
+            const variable = self.scratch.variables.items[index];
             if (variable.source.scope != scope or std.mem.findScalar(types.Id, module.types.list(scheme.variables), variable.source.ty) != null) continue;
             try self.solver.unify(variable.region, try self.importType(caller, variable.source.ty, 0));
         }
         var rows: std.ArrayList(RowVariable) = .empty;
         defer rows.deinit(self.session.allocator);
-        var iterator = self.row_variables.iterator();
+        var iterator = self.scratch.row_variables.iterator();
         while (iterator.next()) |entry| {
             const key = entry.key_ptr.*;
-            if (key.scope != scope or std.mem.findScalar(types.Id, module.types.list(scheme.row_variables), key.variable) != null or std.mem.findScalar(types.Id, module.types.list(self.sources.items[scope].closed_rows), key.variable) != null) continue;
+            if (key.scope != scope or std.mem.findScalar(types.Id, module.types.list(scheme.row_variables), key.variable) != null or std.mem.findScalar(types.Id, module.types.list(self.scratch.sources.items[scope].closed_rows), key.variable) != null) continue;
             try rows.append(self.session.allocator, key);
         }
-        for (rows.items) |row| try self.solver.unifyEffects(self.row_variables.get(row).?, try self.importRowVariable(caller, row.variable));
+        for (rows.items) |row| try self.solver.unifyEffects(self.scratch.row_variables.get(row).?, try self.importRowVariable(caller, row.variable));
     }
     fn alignClosure(self: *ClosureRegion, scope: u32, id: core.Id) RegionError!void {
-        const module = &self.session.units[self.sources.items[scope].owner];
+        const module = &self.session.units[self.scratch.sources.items[scope].owner];
         const closure = module.closure(id);
         const actual = try self.importType(scope, module.typeOf(id), 0);
         const envelope = if (closure.function_type != 0) try self.importType(scope, closure.function_type, 0) else actual;
@@ -4466,19 +4536,19 @@ const ClosureRegion = struct {
         const shape = try self.solver.functionWithEffects(try self.importType(scope, closure.parameter.ty, 0), try self.importType(scope, module.typeOf(closure.body), 0), signature.c);
         try self.solver.unify(actual, envelope);
         try self.solver.unify(actual, shape);
-        if (self.source_interface) try self.source_functions.append(self.session.allocator, actual);
+        if (self.source_interface) try self.scratch.source_functions.append(self.session.allocator, actual);
     }
     fn operationConstraint(self: *ClosureRegion, scope: u32, id: core.Id, operation: core.OperationValue) RegionError!void {
-        const owner = self.sources.items[scope].owner;
+        const owner = self.scratch.sources.items[scope].owner;
         const module = &self.session.units[owner];
         var arguments: std.ArrayList(types.Id) = .empty;
         defer arguments.deinit(self.session.allocator);
         for (module.types.list(operation.arguments)) |argument| try arguments.append(self.session.allocator, try self.importType(scope, argument, 0));
         const signature = try self.importType(scope, operation.signature, 0);
         if (operation.witness != 0) {
-            try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(operation.witness), 0), .right = try self.importType(scope, operation.witness_result, 0), .result = 0, .kind = .type_head });
+            try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(operation.witness), 0), .right = try self.importType(scope, operation.witness_result, 0), .result = 0, .kind = .type_head });
         }
-        try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = signature, .right = try self.solver.product(arguments.items), .result = 0, .signature = signature, .identity = .{ .unit = if (operation.identity.unit == 0) self.session.unitId(owner) else operation.identity.unit, .decl = operation.identity.decl }, .kind = .effect_operation });
+        try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = signature, .right = try self.solver.product(arguments.items), .result = 0, .signature = signature, .identity = .{ .unit = if (operation.identity.unit == 0) self.session.unitId(owner) else operation.identity.unit, .decl = operation.identity.decl }, .kind = .effect_operation });
     }
     /// An invocation can retain a generic result while its source row already
     /// proves the operation arguments. Recover that proof only from a complete
@@ -4514,8 +4584,15 @@ const ClosureRegion = struct {
         try self.solver.unify(constraint.right, try self.solver.product(arguments));
         return true;
     }
+    fn definitionIndex(self: *ClosureRegion) *std.AutoHashMapUnmanaged(DefinitionKey, core.BindingId) {
+        return if (self.session.reuse_callable_definitions) &self.session.callable_definitions else &self.scratch.definitions;
+    }
     fn callableDefinitions(self: *ClosureRegion, owner: usize) RegionError!void {
-        if (self.definition_units.contains(owner)) return;
+        // This index reads immutable Core, never the current inference scope.
+        // Its lifetime is the Session's source owner, not a solver region.
+        const definitions = self.definitionIndex();
+        const owners = if (self.session.reuse_callable_definitions) &self.session.callable_definition_units else &self.scratch.definition_units;
+        if (owners.contains(owner)) return;
         const module = &self.session.units[owner];
         var work: std.ArrayList(core.Id) = .empty;
         defer work.deinit(self.session.allocator);
@@ -4525,7 +4602,7 @@ const ClosureRegion = struct {
             while (work.pop()) |id| {
                 const node = module.node(id);
                 switch (node.tag) {
-                    .reference, .closure => try self.definitions.put(self.session.allocator, .{ .owner = owner, .node = id }, @intCast(index)),
+                    .reference, .closure => try definitions.put(self.session.allocator, .{ .owner = owner, .node = id }, @intCast(index)),
                     .return_ => try work.append(self.session.allocator, node.a),
                     .if_value, .if_stmt => try work.appendSlice(self.session.allocator, &.{ node.b, node.c }),
                     .match => for (module.matchArms(id)) |arm| {
@@ -4539,11 +4616,11 @@ const ClosureRegion = struct {
                 }
             }
         }
-        try self.definition_units.put(self.session.allocator, owner, {});
+        try owners.put(self.session.allocator, owner, {});
     }
     fn collectStartupPatterns(self: *ClosureRegion, scope: u32, roots: []const core.PatternId) RegionError!void {
         if (!self.retain_selected) return;
-        const module = &self.session.units[self.sources.items[scope].owner];
+        const module = &self.session.units[self.scratch.sources.items[scope].owner];
         var work: std.ArrayList(core.PatternId) = .empty;
         defer work.deinit(self.session.allocator);
         var seen: std.AutoHashMapUnmanaged(core.PatternId, void) = .empty;
@@ -4572,13 +4649,13 @@ const ClosureRegion = struct {
         if (self.collect_depth >= self.session.options.max_depth) return error.TypeLimit;
         self.collect_depth += 1;
         defer self.collect_depth -= 1;
-        const module = &self.session.units[self.sources.items[scope].owner];
+        const module = &self.session.units[self.scratch.sources.items[scope].owner];
         if (self.session.receipt_tape) |tape| {
-            const source = self.sources.items[scope];
+            const source = self.scratch.sources.items[scope];
             if (source.binding != 0 and module.binding(source.binding).kind == .global) try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
         }
-        try self.callableDefinitions(self.sources.items[scope].owner);
-        const recipe = if (self.session.options.reuse_body_recipes) try self.session.body_recipes.get(self.session.allocator, self.session.units, .{ .owner = self.sources.items[scope].owner, .body = body, .callables = self.include_callables }, self.session.options.max_values) else null;
+        try self.callableDefinitions(self.scratch.sources.items[scope].owner);
+        const recipe = if (self.session.options.reuse_body_recipes) try self.session.body_recipes.get(self.session.allocator, self.session.units, .{ .owner = self.scratch.sources.items[scope].owner, .body = body, .callables = self.include_callables }, self.session.options.max_values) else null;
         var work: body_recipe.Walk = .{ .recipe = recipe };
         defer work.deinit(self.session.allocator);
         try work.append(self.session.allocator, body);
@@ -4592,19 +4669,19 @@ const ClosureRegion = struct {
             }
             if (n.tag == .reference) {
                 const reference = module.reference(id);
-                if (reference.unit == 0 or reference.unit == self.session.unitId(self.sources.items[scope].owner)) {
+                if (reference.unit == 0 or reference.unit == self.session.unitId(self.scratch.sources.items[scope].owner)) {
                     const binding = module.binding(reference.binding);
-                    if (binding.kind == .local) try self.data_aliases.append(self.session.allocator, .{ .instance = try self.importType(scope, n.ty, 0), .principal = try self.importType(scope, binding.ty, 0) });
+                    if (binding.kind == .local) try self.scratch.data_aliases.append(self.session.allocator, .{ .instance = try self.importType(scope, n.ty, 0), .principal = try self.importType(scope, binding.ty, 0) });
                 }
             }
             if (self.include_callables and !self.source_interface and n.tag == .reference) {
-                const resolved = try self.session.external(try self.session.target(self.sources.items[scope].owner, module.reference(id)));
+                const resolved = try self.session.external(try self.session.target(self.scratch.sources.items[scope].owner, module.reference(id)));
                 const producer = &self.session.units[resolved.unit];
                 const binding = producer.binding(resolved.binding);
                 const definition = producer.body(resolved.binding);
                 const cached = self.session.slot(resolved);
                 if (self.session.principal_reads) |reads| if (binding.kind == .global) {
-                    if (definition == null or (definition.?.runtime and !definition.?.is_function)) reads.invalidate() else {
+                    if (definition == null or (definition.?.runtime and !definition.?.is_function)) reads.invalidate(.runtime_source) else {
                         const actual_read = if (!definition.?.runtime and cached.state == .complete and self.session.valueInfo(cached.value).kind == .scalar) self.session.valueEvidence(cached.value) else 0;
                         try reads.scalar(self.session.allocator, .{ .unit = self.session.unitId(resolved.unit), .binding = resolved.binding }, actual_read);
                     }
@@ -4623,8 +4700,8 @@ const ClosureRegion = struct {
                 }
             }
             if (self.include_callables and n.tag == .reference and module.types.node(n.ty).tag == .function) {
-                const definition = self.definitions.get(.{ .owner = self.sources.items[scope].owner, .node = id });
-                if (definition == null or definition.? == self.sources.items[scope].binding) {
+                const definition = self.definitionIndex().get(.{ .owner = self.scratch.sources.items[scope].owner, .node = id });
+                if (definition == null or definition.? == self.scratch.sources.items[scope].binding) {
                     const previous = self.defer_members;
                     self.defer_members = true;
                     defer self.defer_members = previous;
@@ -4634,7 +4711,7 @@ const ClosureRegion = struct {
             const source_signature = module.dispatchSignature(id);
             const dispatch_signature = if (source_signature == 0) 0 else try self.importType(scope, source_signature, 0);
             if (n.tag == .handle) if (module.handleEffects(id)) |handler| {
-                try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, handler.first, 0), .right = if (handler.second == 0) 0 else try self.importType(scope, handler.second, 0), .result = try self.solver.functionWithEffects(types.unit, types.unit, try self.importRow(scope, handler.residual, 0)), .signature = try self.solver.functionWithEffects(types.unit, types.unit, try self.importRow(scope, handler.extended, 0)), .kind = .effect_handler });
+                try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, handler.first, 0), .right = if (handler.second == 0) 0 else try self.importType(scope, handler.second, 0), .result = try self.solver.functionWithEffects(types.unit, types.unit, try self.importRow(scope, handler.residual, 0)), .signature = try self.solver.functionWithEffects(types.unit, types.unit, try self.importRow(scope, handler.extended, 0)), .kind = .effect_handler });
             };
             if (self.include_callables and n.tag == .call) try self.collectCall(scope, module.call(id).target, module.call(id).callee_type, module.children(id));
             if (self.include_callables and n.tag == .apply) {
@@ -4645,7 +4722,7 @@ const ClosureRegion = struct {
                 }
                 if (callee.tag == .reference) {
                     const reference = module.reference(n.a);
-                    const target_ = try self.session.external(try self.session.target(self.sources.items[scope].owner, reference));
+                    const target_ = try self.session.external(try self.session.target(self.scratch.sources.items[scope].owner, reference));
                     const binding = self.session.units[target_.unit].binding(target_.binding);
                     if (binding.kind == .global or binding.initializer != 0) try self.collectCall(scope, reference, callee.ty, &.{n.b}) else if (self.retain_selected) {
                         self.startup_coverage_complete = false;
@@ -4654,11 +4731,11 @@ const ClosureRegion = struct {
                     self.startup_coverage_complete = false;
                 }
             }
-            if (n.tag == .record_merge) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .kind = .record_merge });
-            if (self.source_interface and n.tag == .type_same) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = types.boolean, .kind = .type_compare });
-            if (n.tag == .associated or (n.tag == .scalar and n.c != 0 and n.b != 0)) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .deferred_member = self.defer_members, .op = Session.operator(n.op), .member = if (n.tag == .associated) n.c else 0 });
-            if (n.tag == .project) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .projection = n.b, .kind = .field, .deferred_member = self.defer_members });
-            if (n.tag == .result_associated) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .member = n.b, .kind = .result_dispatch, .deferred_member = self.defer_members });
+            if (n.tag == .record_merge) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .kind = .record_merge });
+            if (self.source_interface and n.tag == .type_same) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = types.boolean, .kind = .type_compare });
+            if (n.tag == .associated or (n.tag == .scalar and n.c != 0 and n.b != 0)) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .deferred_member = self.defer_members, .op = Session.operator(n.op), .member = if (n.tag == .associated) n.c else 0 });
+            if (n.tag == .project) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .projection = n.b, .kind = .field, .deferred_member = self.defer_members });
+            if (n.tag == .result_associated) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .result = try self.importType(scope, n.ty, 0), .signature = dispatch_signature, .member = n.b, .kind = .result_dispatch, .deferred_member = self.defer_members });
             switch (n.tag) {
                 .scalar, .associated, .logical, .record_merge, .type_same, .apply, .effect_provider, .handle => try work.appendSlice(self.session.allocator, &.{ n.a, n.b }),
                 .if_value, .if_stmt, .state_provider => try work.appendSlice(self.session.allocator, &.{ n.a, n.b, n.c }),
@@ -4671,7 +4748,7 @@ const ClosureRegion = struct {
                         // is specialized, just as the source checker does.
                         const collection = try self.solver.fresh();
                         try self.solver.unify(try self.importType(scope, module.typeOf(args[0]), 0), try self.solver.sequence(.cursor, collection));
-                        try self.constraints.append(self.session.allocator, .{
+                        try self.scratch.constraints.append(self.session.allocator, .{
                             .kind = .collection,
                             .scope = scope,
                             .node = id,
@@ -4679,7 +4756,7 @@ const ClosureRegion = struct {
                             .result = if (operation == .cursor_value) try self.importType(scope, n.ty, 0) else try self.solver.fresh(),
                         });
                     }
-                    if (module.arrayOperation(id) == .get and module.types.node(module.typeOf(args[0])).tag == .variable) try self.constraints.append(self.session.allocator, .{
+                    if (module.arrayOperation(id) == .get and module.types.node(module.typeOf(args[0])).tag == .variable) try self.scratch.constraints.append(self.session.allocator, .{
                         .kind = .collection,
                         .scope = scope,
                         .node = id,
@@ -4710,7 +4787,7 @@ const ClosureRegion = struct {
                 .loop => {
                     const iteration = module.loopInfo(id);
                     try self.collectStartupPatterns(scope, &.{iteration.pattern});
-                    if (iteration.kind == .array and iteration.pattern != 0 and module.types.node(module.typeOf(iteration.first)).tag == .variable) try self.constraints.append(self.session.allocator, .{
+                    if (iteration.kind == .array and iteration.pattern != 0 and module.types.node(module.typeOf(iteration.first)).tag == .variable) try self.scratch.constraints.append(self.session.allocator, .{
                         .kind = .collection,
                         .scope = scope,
                         .node = id,
@@ -4755,9 +4832,9 @@ const ClosureRegion = struct {
                             suffix = arrow.b;
                         }
                         try self.solver.unify(suffix, try self.importType(scope, module.typeOf(id), 0));
-                        try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(metadata.resolver), 0), .right = signature, .result = try self.importType(scope, module.typeOf(id), 0), .kind = .resolver });
+                        try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(metadata.resolver), 0), .right = signature, .result = try self.importType(scope, module.typeOf(id), 0), .kind = .resolver });
                     }
-                    if (metadata.operation != .monad) try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(metadata.resolver), 0), .result = try self.importType(scope, module.typeOf(id), 0), .kind = .resolver_shape });
+                    if (metadata.operation != .monad) try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(metadata.resolver), 0), .result = try self.importType(scope, module.typeOf(id), 0), .kind = .resolver_shape });
                 },
                 .update => {
                     const update = module.updateInfo(id);
@@ -4777,14 +4854,14 @@ const ClosureRegion = struct {
                             assigned = try self.importType(scope, selector.source_type, 0);
                         } else {
                             const result = if (reverse == 0) try self.importType(scope, n.ty, 0) else try self.solver.fresh();
-                            try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, selector.source_type, 0), .right = assigned, .result = result, .signature = try self.solver.function(types.unit, types.unit), .member = module.projection(selector.projection).field, .kind = .update, .deferred_member = self.defer_members });
+                            try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, selector.source_type, 0), .right = assigned, .result = result, .signature = try self.solver.function(types.unit, types.unit), .member = module.projection(selector.projection).field, .kind = .update, .deferred_member = self.defer_members });
                             assigned = result;
                         }
                     }
                     if (selectors.len != 0) for (selectors) |selector| {
                         if (selector.kind == .index) {
                             try work.append(self.session.allocator, selector.index);
-                            if (module.types.node(selector.source_type).tag == .variable) try self.constraints.append(self.session.allocator, .{
+                            if (module.types.node(selector.source_type).tag == .variable) try self.scratch.constraints.append(self.session.allocator, .{
                                 .kind = .collection,
                                 .scope = scope,
                                 .node = id,
@@ -4793,17 +4870,17 @@ const ClosureRegion = struct {
                             });
                             continue;
                         }
-                        try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, selector.source_type, 0), .result = try self.importType(scope, selector.result_type, 0), .projection = selector.projection, .kind = .field, .writable = true, .deferred_member = self.defer_members });
+                        try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, selector.source_type, 0), .result = try self.importType(scope, selector.result_type, 0), .projection = selector.projection, .kind = .field, .writable = true, .deferred_member = self.defer_members });
                     } else for (module.updatePath(id)) |projection_index| {
                         const projection = module.projection(projection_index);
-                        try self.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, projection.source_type, 0), .result = try self.importType(scope, projection.result_type, 0), .projection = projection_index, .kind = .field, .writable = true, .deferred_member = self.defer_members });
+                        try self.scratch.constraints.append(self.session.allocator, .{ .scope = scope, .node = id, .left = try self.importType(scope, projection.source_type, 0), .result = try self.importType(scope, projection.result_type, 0), .projection = projection_index, .kind = .field, .writable = true, .deferred_member = self.defer_members });
                     };
                 },
                 .operation_value => try self.operationConstraint(scope, id, module.operationValue(id)),
                 .closure => if (self.include_callables) {
-                    const qualifier = self.definitions.get(.{ .owner = self.sources.items[scope].owner, .node = id }) orelse module.closure(id).qualifier;
-                    if (qualifier != 0 and self.sources.items[scope].binding != qualifier) {
-                        if (self.retain_selected and !try self.session.startupSelectorFree(self.sources.items[scope].owner, module.closure(id).body)) self.startup_coverage_complete = false;
+                    const qualifier = self.definitionIndex().get(.{ .owner = self.scratch.sources.items[scope].owner, .node = id }) orelse module.closure(id).qualifier;
+                    if (qualifier != 0 and self.scratch.sources.items[scope].binding != qualifier) {
+                        if (self.retain_selected and !try self.session.startupSelectorFree(self.scratch.sources.items[scope].owner, module.closure(id).body)) self.startup_coverage_complete = false;
                         continue;
                     }
                     try self.alignClosure(scope, id);
@@ -4826,7 +4903,7 @@ const ClosureRegion = struct {
                     for (module.requestArms(id)) |arm| try work.append(self.session.allocator, arm.callback);
                 },
                 .suspend_ => {
-                    if (self.retain_selected and !try self.session.startupSelectorFree(self.sources.items[scope].owner, module.closures[n.a].body)) self.startup_coverage_complete = false;
+                    if (self.retain_selected and !try self.session.startupSelectorFree(self.scratch.sources.items[scope].owner, module.closures[n.a].body)) self.startup_coverage_complete = false;
                     if (self.complete_demand_bodies) {
                         const closure = module.closures[n.a];
                         const actual = try self.importType(scope, n.ty, 0);
@@ -4834,12 +4911,12 @@ const ClosureRegion = struct {
                         if (demanded.tag != .demand) return error.TypeMismatch;
                         try self.solver.unify(demanded.a, try self.importType(scope, module.typeOf(closure.body), 0));
                         if (closure.function_type != 0) try self.solver.unify(try self.importType(scope, closure.function_type, 0), try self.solver.functionWithEffects(types.unit, demanded.a, demanded.c));
-                        if (closure.qualifier != 0 and closure.qualifier != self.sources.items[scope].binding) try self.importScheme(scope, module.binding(closure.qualifier).scheme, closure.body);
+                        if (closure.qualifier != 0 and closure.qualifier != self.scratch.sources.items[scope].binding) try self.importScheme(scope, module.binding(closure.qualifier).scheme, closure.body);
                         try self.collect(scope, closure.body);
                         // Only a completed exact source body can participate in
                         // retained row inference. No value/memo is created.
-                        if (self.completed_demands.items.len >= self.session.options.max_values) return error.TypeLimit;
-                        try self.completed_demands.append(self.session.allocator, .{ .scope = scope, .node = id, .body = closure.body, .root = actual });
+                        if (self.scratch.completed_demands.items.len >= self.session.options.max_values) return error.TypeLimit;
+                        try self.scratch.completed_demands.append(self.session.allocator, .{ .scope = scope, .node = id, .body = closure.body, .root = actual });
                     }
                 },
                 .constant, .reference, .constructor_function, .primitive_function, .panic, .type_constructor => {},
@@ -4857,7 +4934,7 @@ const ClosureRegion = struct {
         var changed = false;
         while (true) {
             const before = self.solver.cursor();
-            for (self.data_aliases.items) |*alias| {
+            for (self.scratch.data_aliases.items) |*alias| {
                 if (alias.solved) continue;
                 alias.solved = try self.transferDataFacts(alias.principal, alias.instance, 0);
             }
@@ -4941,7 +5018,7 @@ const ClosureRegion = struct {
         var head = input;
         var depth: usize = 0;
         while (depth < self.session.options.max_depth) : (depth += 1) {
-            head = self.witness_inputs.get(head) orelse head;
+            head = self.scratch.witness_inputs.get(head) orelse head;
             head = try self.solver.resolve(head, 0);
             const node = self.solver.node(head);
             if (node.tag != .function) return head;
@@ -4956,15 +5033,15 @@ const ClosureRegion = struct {
             var required: usize = 0;
             var progress = try self.solveDataAliases();
             var index: usize = 0;
-            while (index < self.constraints.items.len) : (index += 1) {
-                const constraint = self.constraints.items[index];
+            while (index < self.scratch.constraints.items.len) : (index += 1) {
+                const constraint = self.scratch.constraints.items[index];
                 if (constraint.solved) continue;
                 remaining += 1;
                 if (!constraint.deferred_member) required += 1;
                 if (constraint.kind == .record_merge) {
                     if (try self.solver.mergeRecords(constraint.left, constraint.right)) |merged| {
                         try self.solver.unify(merged, constraint.result);
-                        self.constraints.items[index].solved = true;
+                        self.scratch.constraints.items[index].solved = true;
                         progress = true;
                     }
                     continue;
@@ -4974,33 +5051,33 @@ const ClosureRegion = struct {
                     if (owner_type.tag == .variable) continue;
                     if (owner_type.tag != .array and owner_type.tag != .list) return error.TypeMismatch;
                     try self.solver.unify(owner_type.a, constraint.result);
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
                 if (constraint.kind == .type_rep or constraint.kind == .effect_rep) {
                     const represented = if (constraint.kind == .type_rep) constraint.left else constraint.signature;
                     if (try self.project(represented) == 0) continue;
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
                 if (constraint.kind == .invocation) {
                     const selected = self.invocation(constraint) catch |err| return self.sourceSelectionFailure(constraint, err);
                     if (!selected) continue;
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
                 if (constraint.kind == .physical_field or constraint.kind == .receiver) {
                     if (!try self.solveFieldConstraint(constraint)) continue;
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
                 if (constraint.kind == .update) {
                     if (!try self.updateConstraint(constraint)) continue;
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
@@ -5029,7 +5106,7 @@ const ClosureRegion = struct {
                     try labels.appendSlice(self.session.allocator, self.solver.rowLabels(residual));
                     const row = self.solver.effects.rowAt(labels.items, self.solver.row(residual).tail, self.solver.row(residual).cursor) catch |err| return types.effectError(err);
                     try self.solver.unifyEffects(extended.c, row);
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
@@ -5042,7 +5119,7 @@ const ClosureRegion = struct {
                         return self.session.fail(target.unit, .{ .start = point, .end = point }, .invalid_annotation);
                     }
                     if (try self.project(left) == 0 or try self.project(right) == 0) continue;
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
@@ -5058,7 +5135,7 @@ const ClosureRegion = struct {
                     }
                     if (self.solver.node(try self.solver.resolve(head, 0)).tag == .variable) continue;
                     try self.solver.unify(head, constraint.right);
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
@@ -5078,13 +5155,13 @@ const ClosureRegion = struct {
                     const selected = try self.solver.functionWithEffects(signature.a, signature.b, row);
                     try self.solver.unify(constraint.left, selected);
                     if (constraint.signature != 0) try self.solver.unify(constraint.signature, selected);
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
                 if (constraint.kind == .field) {
                     if (!try self.solveFieldConstraint(constraint)) continue;
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
@@ -5095,7 +5172,7 @@ const ClosureRegion = struct {
                     if (resolver.tag != .resolver) return error.TypeMismatch;
                     const token = self.session.evidence.node(resolver.a);
                     if (token.tag != .type_constructor) return error.TypeMismatch;
-                    const source = self.sources.items[constraint.scope];
+                    const source = self.scratch.sources.items[constraint.scope];
                     const metadata = self.session.units[source.owner].resolverInfo(constraint.node);
                     const target_ = try self.session.resolverTarget(source.owner, constraint.node, metadata, (@as(u64, token.a) << 32) | token.b);
                     const body = self.session.units[target_.unit].body(target_.binding) orelse return error.UnresolvedType;
@@ -5103,7 +5180,7 @@ const ClosureRegion = struct {
                     try self.solver.unify(constraint.right, try self.importType(scope, body.scheme.root, 0));
                     try self.collect(scope, body.root);
                     try self.selectedTarget(target_);
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
@@ -5116,7 +5193,7 @@ const ClosureRegion = struct {
                     if (token.tag != .type_constructor) return error.TypeMismatch;
                     const result = self.solver.node(try self.solver.resolve(constraint.result, 0));
                     if (result.tag == .variable) {
-                        const owner = self.sources.items[constraint.scope].owner;
+                        const owner = self.scratch.sources.items[constraint.scope].owner;
                         const module = &self.session.units[owner];
                         const family = (@as(u64, token.a) << 32) | token.b;
                         const nominal = for (module.nominals) |nominal| {
@@ -5127,13 +5204,13 @@ const ClosureRegion = struct {
                         for (0..nominal.parameters.len) |_| try arguments.append(self.session.allocator, try self.solver.fresh());
                         try self.solver.unify(constraint.result, try self.solver.nominal(.{ .unit = token.a, .decl = token.b }, arguments.items));
                     } else if (result.tag != .nominal or result.a != token.a or result.b != token.b) return error.TypeMismatch;
-                    self.constraints.items[index].solved = true;
+                    self.scratch.constraints.items[index].solved = true;
                     progress = true;
                     continue;
                 }
                 const selected = if (constraint.kind == .result_dispatch) try self.resultConstraint(constraint) else try self.binaryConstraint(constraint, fallback);
                 if (!selected) continue;
-                self.constraints.items[index].solved = true;
+                self.scratch.constraints.items[index].solved = true;
                 progress = true;
             }
             if (remaining == 0) {
@@ -5149,7 +5226,7 @@ const ClosureRegion = struct {
             } else if (allow_remaining or required == 0) {
                 return;
             } else {
-                for (self.constraints.items) |constraint| if (!constraint.solved and constraint.explicit)
+                for (self.scratch.constraints.items) |constraint| if (!constraint.solved and constraint.explicit)
                     return self.failConstraint(constraint, .ambiguous_qualified);
                 return error.UnresolvedType;
             }
@@ -5170,16 +5247,16 @@ const ClosureRegion = struct {
         };
     }
     fn binaryCandidate(self: *ClosureRegion, constraint: Constraint, identity: types.NominalIdentity) RegionError!bool {
-        const source = self.sources.items[constraint.scope];
+        const source = self.scratch.sources.items[constraint.scope];
         const reference = (try self.session.associatedTarget(self.session.unitId(source.owner), identity, constraint.member, constraint.op)) orelse return false;
         const target_ = try self.session.target(null, reference);
         const key: CandidateKey = .{ .caller = constraint.scope, .node = constraint.node, .target = target_ };
-        const scope = self.candidate_instances.get(key) orelse scope: {
+        const scope = self.scratch.candidate_instances.get(key) orelse scope: {
             const candidate = try self.callableScope(target_);
-            try self.candidate_instances.put(self.session.allocator, key, candidate);
+            try self.scratch.candidate_instances.put(self.session.allocator, key, candidate);
             break :scope candidate;
         };
-        const signature = self.sources.items[scope].root;
+        const signature = self.scratch.sources.items[scope].root;
         const first = self.solver.node(signature);
         if (first.tag != .function) return false;
         const second = self.solver.node(first.b);
@@ -5227,11 +5304,11 @@ const ClosureRegion = struct {
     }
     fn resultConstraint(self: *ClosureRegion, constraint: Constraint) RegionError!bool {
         const identity = try self.identityOf(constraint.result) orelse return false;
-        const source = self.sources.items[constraint.scope];
+        const source = self.scratch.sources.items[constraint.scope];
         const reference = (try self.session.associatedTarget(self.session.unitId(source.owner), identity, constraint.member, .none)) orelse return self.session.failNode(source.owner, constraint.node, .missing_associated);
         const target_ = try self.session.target(null, reference);
         const scope = try self.callableScope(target_);
-        const signature = self.sources.items[scope].root;
+        const signature = self.scratch.sources.items[scope].root;
         const arrow = self.solver.node(signature);
         if (arrow.tag != .function) return error.TypeMismatch;
         try self.solver.unify(constraint.left, arrow.a);
@@ -5244,17 +5321,17 @@ const ClosureRegion = struct {
         // This path runs only after a candidate has been admitted. Record even
         // when its body instance was already collected in this region.
         try self.selectedTarget(target_);
-        const root = self.sources.items[scope].root;
+        const root = self.scratch.sources.items[scope].root;
         const actual = try self.project(root);
         if (actual != 0) {
             const key: CallKey = .{ .owner = target_.unit, .binding = target_.binding, .evidence = actual };
-            if (self.call_instances.get(key)) |prior| {
-                try self.solver.unify(root, self.sources.items[prior].root);
+            if (self.scratch.call_instances.get(key)) |prior| {
+                try self.solver.unify(root, self.scratch.sources.items[prior].root);
                 return;
             }
-            try self.call_instances.put(self.session.allocator, key, scope);
+            try self.scratch.call_instances.put(self.session.allocator, key, scope);
         }
-        try self.collect(scope, self.sources.items[scope].body);
+        try self.collect(scope, self.scratch.sources.items[scope].body);
     }
     const MemberMismatch = struct {
         region: *ClosureRegion,
@@ -5264,7 +5341,7 @@ const ClosureRegion = struct {
             const self = observation.region;
             if (self.session.diagnostic != null) return;
             if (observation.constraint.kind != .field) return;
-            const source = self.sources.items[observation.constraint.scope];
+            const source = self.scratch.sources.items[observation.constraint.scope];
             const module = &self.session.units[source.owner];
             const point = module.projection(observation.constraint.projection).diagnostic_point;
             if (point == 0) return;
@@ -5296,37 +5373,37 @@ const ClosureRegion = struct {
         return admitted;
     }
     fn typeScope(self: *ClosureRegion, owner: usize) RegionError!u32 {
-        if (self.sources.items.len >= self.session.options.max_values or self.sources.items.len >= std.math.maxInt(u32)) return error.TypeLimit;
-        const scope: u32 = @intCast(self.sources.items.len);
-        try self.sources.append(self.session.allocator, .{ .value = 0, .owner = owner });
+        if (self.scratch.sources.items.len >= self.session.options.max_values or self.scratch.sources.items.len >= std.math.maxInt(u32)) return error.TypeLimit;
+        const scope: u32 = @intCast(self.scratch.sources.items.len);
+        try self.scratch.sources.append(self.session.allocator, .{ .value = 0, .owner = owner });
         return scope;
     }
     fn callableScope(self: *ClosureRegion, target_: Target) RegionError!u32 {
         const module = &self.session.units[target_.unit];
         const body = module.body(target_.binding) orelse return error.UnresolvedType;
         const scope = try self.typeScope(target_.unit);
-        self.sources.items[scope].body = body.root;
-        self.sources.items[scope].closed_rows = body.closed_rows;
-        self.sources.items[scope].root = try self.importType(scope, module.binding(target_.binding).ty, 0);
-        self.sources.items[scope].binding = target_.binding;
+        self.scratch.sources.items[scope].body = body.root;
+        self.scratch.sources.items[scope].closed_rows = body.closed_rows;
+        self.scratch.sources.items[scope].root = try self.importType(scope, module.binding(target_.binding).ty, 0);
+        self.scratch.sources.items[scope].binding = target_.binding;
         try self.importScheme(scope, body.scheme, body.root);
         return scope;
     }
     fn arrayMember(self: *ClosureRegion, target_: Target, receiver: ValueId, expected: type_evidence.Id) RegionError!ValueId {
         const actual = try self.addValue(receiver, 0);
         const scope = try self.callableScope(target_);
-        const root = self.sources.items[scope].root;
+        const root = self.scratch.sources.items[scope].root;
         const arrow = self.solver.node(root);
         if (arrow.tag != .function) return error.TypeMismatch;
-        try self.solver.unify(arrow.a, self.sources.items[actual].root);
+        try self.solver.unify(arrow.a, self.scratch.sources.items[actual].root);
         if (expected != 0) try self.solver.unify(try self.solver.openCovariant(arrow.b), try self.importEvidence(expected, 0));
-        try self.collect(scope, self.sources.items[scope].body);
+        try self.collect(scope, self.scratch.sources.items[scope].body);
         self.solve() catch |err| {
             if (err == error.UnresolvedType) {
                 // This selected use needs the destination of @type.result.
                 // Keep an unresolved element independent from that missing
                 // destination, and report the first outstanding requirement.
-                for (self.constraints.items) |constraint| {
+                for (self.scratch.constraints.items) |constraint| {
                     if (constraint.solved or constraint.deferred_member) continue;
                     if (constraint.kind == .result_dispatch and try self.identityOf(constraint.result) == null)
                         return self.failConstraint(constraint, .ambiguous_associated);
@@ -5339,15 +5416,15 @@ const ClosureRegion = struct {
         defer proof.deinit(self.session.allocator);
         const function = try self.session.richValue(.{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
         var header = self.session.closureInfo(function);
-        header.mappings = try self.session.captureMappings(target_.unit, self.sources.items[scope].body, proof.types);
-        header.row_mappings = try self.session.captureRowMappings(target_.unit, self.sources.items[scope].body, proof.rows);
+        header.mappings = try self.session.captureMappings(target_.unit, self.scratch.sources.items[scope].body, proof.types);
+        header.row_mappings = try self.session.captureRowMappings(target_.unit, self.scratch.sources.items[scope].body, proof.rows);
         const captures = try self.session.allocator.dupe(ValueId, self.session.valueChildren(function));
         defer self.session.allocator.free(captures);
-        const selected = try self.session.makeClosure(target_.unit, self.sources.items[scope].body, header, captures);
-        return self.session.typedView(target_.unit, self.sources.items[scope].body, selected, try self.project(root));
+        const selected = try self.session.makeClosure(target_.unit, self.scratch.sources.items[scope].body, header, captures);
+        return self.session.typedView(target_.unit, self.scratch.sources.items[scope].body, selected, try self.project(root));
     }
     fn fieldType(self: *ClosureRegion, constraint: Constraint) RegionError!?types.Id {
-        const source = self.sources.items[constraint.scope];
+        const source = self.scratch.sources.items[constraint.scope];
         const module = &self.session.units[source.owner];
         const explicit = constraint.kind == .physical_field or constraint.kind == .receiver;
         const projection = if (explicit) core.Projection{ .field = constraint.member, .nominal = .{ .unit = 0, .decl = 0 }, .source_type = 0, .result_type = 0, .variants = .{} } else module.projection(constraint.projection);
@@ -5442,7 +5519,7 @@ const ClosureRegion = struct {
         if (constraint.kind == .physical_field) return self.missingPhysicalField(constraint, owner);
         const target_ = method_target orelse return self.failConstraint(constraint, .missing_member);
         const scope = try self.callableScope(target_);
-        const signature = self.sources.items[scope].root;
+        const signature = self.scratch.sources.items[scope].root;
         const arrow = self.solver.node(signature);
         if (arrow.tag != .function) return error.TypeMismatch;
         try self.solver.unify(arrow.a, receiver);
@@ -5504,7 +5581,7 @@ const ClosureRegion = struct {
         invocation_.source_selection = self.deferredSourceSelection(constraint);
         invocation_.left = signature;
         invocation_.right = if (binary) 1 else 0;
-        try self.constraints.append(self.session.allocator, invocation_);
+        try self.scratch.constraints.append(self.session.allocator, invocation_);
     }
     fn invocation(self: *ClosureRegion, constraint: Constraint) RegionError!bool {
         const carrier = self.solver.node(try self.solver.resolve(constraint.signature, 0));
@@ -5571,7 +5648,7 @@ const ClosureRegion = struct {
             const updated = try self.updatedRecord(constraint.left, constraint.right, constraint.member, null) orelse return self.failConstraint(constraint, .missing_field);
             try self.solver.unify(constraint.result, updated);
         } else if (owner.tag == .nominal) {
-            const source = self.sources.items[constraint.scope];
+            const source = self.scratch.sources.items[constraint.scope];
             const module = &self.session.units[source.owner];
             var constructors: usize = 0;
             for (module.constructors) |constructor| {
@@ -5594,13 +5671,13 @@ const ClosureRegion = struct {
         return true;
     }
     fn freeze(self: *ClosureRegion, scope: u32) RegionError!ValueId {
-        if (self.frozen.get(scope)) |existing| return existing;
-        const source = self.sources.items[scope];
+        if (self.scratch.frozen.get(scope)) |existing| return existing;
+        const source = self.scratch.sources.items[scope];
         const actual = try self.project(source.root);
         if (actual == 0) return error.UnresolvedType;
         const captures = try self.session.allocator.dupe(ValueId, self.session.valueChildren(source.value));
         defer self.session.allocator.free(captures);
-        for (self.edges.items) |edge| if (edge.parent == scope) {
+        for (self.scratch.edges.items) |edge| if (edge.parent == scope) {
             captures[edge.slot] = try self.freeze(edge.child);
         };
         const value_kind = self.session.valueInfo(source.value).kind;
@@ -5610,7 +5687,7 @@ const ClosureRegion = struct {
             const result = try self.session.makeAggregate(source.owner, source.body, info.kind, info.nominal, info.bits, captures);
             self.session.value_records.items[result] = self.session.value_records.items[source.value];
             const typed = try self.session.typedView(source.owner, source.body, result, actual);
-            try self.frozen.put(self.session.allocator, scope, typed);
+            try self.scratch.frozen.put(self.session.allocator, scope, typed);
             return typed;
         }
         var metadata = self.session.closureInfo(source.value);
@@ -5624,11 +5701,11 @@ const ClosureRegion = struct {
             self.session.values.items[header].nominal = self.session.valueInfo(source.value).nominal;
         }
         const result = try self.session.typedView(source.owner, source.body, header, actual);
-        try self.frozen.put(self.session.allocator, scope, result);
+        try self.scratch.frozen.put(self.session.allocator, scope, result);
         return result;
     }
     fn allConstraintsSolved(self: *const ClosureRegion) bool {
-        for (self.constraints.items) |constraint| if (!constraint.solved) return false;
+        for (self.scratch.constraints.items) |constraint| if (!constraint.solved) return false;
         return true;
     }
     fn closeRetainedFunctionRows(self: *ClosureRegion, root: types.Id, parameters: usize) RegionError!bool {
@@ -5652,8 +5729,8 @@ const ClosureRegion = struct {
         var changed = true;
         while (changed) {
             changed = false;
-            for (self.completed_demands.items) |demand| {
-                const module = &self.session.units[self.sources.items[demand.scope].owner];
+            for (self.scratch.completed_demands.items) |demand| {
+                const module = &self.session.units[self.scratch.sources.items[demand.scope].owner];
                 const node = module.node(demand.node);
                 if (node.tag != .suspend_ or module.closures[node.a].body != demand.body) return error.UnresolvedType;
                 const arrow = self.solver.node(try self.solver.resolve(demand.root, 0));
@@ -5664,7 +5741,7 @@ const ClosureRegion = struct {
                 try self.solver.unifyEffects(row, closed);
                 changed = true;
             }
-            for (self.sources.items) |source| {
+            for (self.scratch.sources.items) |source| {
                 if (source.value == 0) continue;
                 const kind = self.session.valueInfo(source.value).kind;
                 if (kind != .closure and kind != .suspension) continue;
@@ -5703,19 +5780,19 @@ const ClosureRegion = struct {
         return true;
     }
     fn genericEntryInterface(self: *ClosureRegion, scope: u32) RegionError!bool {
-        const arrow = self.solver.node(try self.solver.resolve(self.sources.items[scope].root, 0));
+        const arrow = self.solver.node(try self.solver.resolve(self.scratch.sources.items[scope].root, 0));
         if (arrow.tag != .function) return false;
         if (try self.project(arrow.a) != 0 and try self.project(arrow.b) != 0) return false;
         // Incomplete captured sources remain body proof failures, including
         // captures whose representation was erased by an unrelated use.
-        for (self.sources.items, 0..) |source, index| {
+        for (self.scratch.sources.items, 0..) |source, index| {
             if (index == scope or source.value == 0) continue;
             if (try self.project(source.root) == 0) return false;
         }
         const root = try self.solver.product(&.{ arrow.a, arrow.b });
         const header = try self.solver.freeVariables(root);
         defer self.session.allocator.free(header);
-        for (self.constraints.items) |constraint| {
+        for (self.scratch.constraints.items) |constraint| {
             if (constraint.solved) continue;
             if (constraint.scope != scope or constraint.explicit or constraint.deferred_member) return false;
             switch (constraint.kind) {
@@ -5755,11 +5832,11 @@ const ClosureRegion = struct {
     fn specialize(self: *ClosureRegion, value_: ValueId, expected: type_evidence.Id) RegionError!ValueId {
         self.include_callables = true;
         const scope = try self.addValue(value_, 0);
-        const actual = try self.solver.resolve(self.sources.items[scope].root, 0);
+        const actual = try self.solver.resolve(self.scratch.sources.items[scope].root, 0);
         try self.solver.unify(try self.solver.openCovariant(actual), try self.importEvidence(expected, 0));
         try self.solve();
         try self.closeRetainedRows();
-        const selected = try self.session.typedView(self.sources.items[scope].owner, self.sources.items[scope].body, try self.freeze(scope), expected);
+        const selected = try self.session.typedView(self.scratch.sources.items[scope].owner, self.scratch.sources.items[scope].body, try self.freeze(scope), expected);
         try self.publishValidatedCalls();
         return selected;
     }
@@ -5819,7 +5896,7 @@ fn lexicalSnapshotScenario(backing: Allocator, eligible: usize) !void {
     const caller = try region.typeScope(0);
     const callee = try region.typeScope(0);
     const unrelated = try region.typeScope(0);
-    region.sources.items[callee].closed_rows = certified_rows;
+    region.scratch.sources.items[callee].closed_rows = certified_rows;
     for (originals.items) |original| {
         _ = try region.importType(unrelated, original, 0);
         _ = try region.importType(callee, original, 0);
@@ -5827,10 +5904,10 @@ fn lexicalSnapshotScenario(backing: Allocator, eligible: usize) !void {
     // Force the first new caller import to grow this buffer. No borrowed slice
     // or record pointer may survive that import; newly appended records must
     // not join the initial lexical snapshot.
-    const exact = try allocator.dupe(ClosureRegion.Variable, region.variables.items);
-    region.variables.deinit(allocator);
-    region.variables = .fromOwnedSlice(exact);
-    const initial = region.variables.items.len;
+    const exact = try allocator.dupe(ClosureRegion.Variable, region.scratch.variables.items);
+    region.scratch.variables.deinit(allocator);
+    region.scratch.variables = .fromOwnedSlice(exact);
+    const initial = region.scratch.variables.items.len;
     if (eligible == 0) {
         // Unrelated and quantified records impose no allocation requirement on
         // an empty lexical transfer, even with a nonempty inference table.
@@ -5840,7 +5917,7 @@ fn lexicalSnapshotScenario(backing: Allocator, eligible: usize) !void {
     }
     for (source_rows) |row| _ = try region.importRowVariable(callee, source.effects.node(row).tail.variable);
     try region.shareLexical(callee, caller, .{ .variables = quantified, .row_variables = quantified_rows });
-    try std.testing.expectEqual(initial + eligible, region.variables.items.len);
+    try std.testing.expectEqual(initial + eligible, region.scratch.variables.items.len);
     for (originals.items[0..eligible]) |original| {
         const actual = try region.importType(caller, original, 0);
         try region.solver.unify(actual, types.u32_type);
@@ -5895,10 +5972,10 @@ fn bodyRecipeLower(source: []const u8) !core.Module {
     return module;
 }
 fn expectRecipeSolverEqual(reference: *const ClosureRegion, replay: *const ClosureRegion) !void {
-    try std.testing.expectEqualDeep(reference.sources.items, replay.sources.items);
-    try std.testing.expectEqualDeep(reference.variables.items, replay.variables.items);
-    try std.testing.expectEqualDeep(reference.constraints.items, replay.constraints.items);
-    try std.testing.expectEqualDeep(reference.data_aliases.items, replay.data_aliases.items);
+    try std.testing.expectEqualDeep(reference.scratch.sources.items, replay.scratch.sources.items);
+    try std.testing.expectEqualDeep(reference.scratch.variables.items, replay.scratch.variables.items);
+    try std.testing.expectEqualDeep(reference.scratch.constraints.items, replay.scratch.constraints.items);
+    try std.testing.expectEqualDeep(reference.scratch.data_aliases.items, replay.scratch.data_aliases.items);
     try std.testing.expectEqualDeep(reference.solver.nodes.items, replay.solver.nodes.items);
     try std.testing.expectEqualDeep(reference.solver.extra.items, replay.solver.extra.items);
     try std.testing.expectEqualDeep(reference.solver.variables.items, replay.solver.variables.items);
@@ -5909,8 +5986,8 @@ fn expectRecipeSolverEqual(reference: *const ClosureRegion, replay: *const Closu
     try std.testing.expectEqualDeep(reference.solver.effects.variables.items, replay.solver.effects.variables.items);
     try std.testing.expectEqualDeep(reference.solver.effects.versions.items, replay.solver.effects.versions.items);
     try std.testing.expectEqual(reference.solver.cursor(), replay.solver.cursor());
-    try std.testing.expectEqual(reference.unresolved_calls.count(), replay.unresolved_calls.count());
-    try std.testing.expectEqual(reference.call_instances.count(), replay.call_instances.count());
+    try std.testing.expectEqual(reference.scratch.unresolved_calls.count(), replay.scratch.unresolved_calls.count());
+    try std.testing.expectEqual(reference.scratch.call_instances.count(), replay.scratch.call_instances.count());
     try std.testing.expectEqualDeep(reference.session.evidence.nodes.items, replay.session.evidence.nodes.items);
     try std.testing.expectEqualDeep(reference.session.evidence.extra.items, replay.session.evidence.extra.items);
     try std.testing.expectEqualDeep(reference.session.evidence.effects.rows.items, replay.session.evidence.effects.rows.items);
@@ -5921,6 +5998,8 @@ fn bodyRecipeHistoryScenario(allocator: Allocator, module: *const core.Module, w
     var reference_session = try Session.init(allocator, &.{module.*});
     defer reference_session.deinit();
     reference_session.options.reuse_body_recipes = false;
+    reference_session.reuse_callable_definitions = false;
+    reference_session.reuse_region_scratch = false;
     reference_session.options.reuse_validated_calls = false;
     var replay_session = try Session.init(allocator, &.{module.*});
     defer replay_session.deinit();
@@ -5985,8 +6064,8 @@ fn bodyRecipeHistoryScenario(allocator: Allocator, module: *const core.Module, w
             try region.solver.unify(variable, types.f32_type);
             _ = try region.solver.internOperation(types.builtin_state_write, &.{types.f32_type});
         }
-        for (reference.sources.items, 0..) |source, index| if (source.root != 0) {
-            try std.testing.expectEqual(try reference.project(source.root), try replay.project(replay.sources.items[index].root));
+        for (reference.scratch.sources.items, 0..) |source, index| if (source.root != 0) {
+            try std.testing.expectEqual(try reference.project(source.root), try replay.project(replay.scratch.sources.items[index].root));
         };
         try expectRecipeSolverEqual(&reference, &replay);
     };
@@ -6056,6 +6135,8 @@ fn bodyRecipeQuotaScenario(allocator: Allocator, module: *const core.Module, roo
     var reference_session = try Session.init(allocator, &.{module.*});
     defer reference_session.deinit();
     reference_session.options.reuse_body_recipes = false;
+    reference_session.reuse_callable_definitions = false;
+    reference_session.reuse_region_scratch = false;
     var replay_session = try Session.init(allocator, &.{module.*});
     defer replay_session.deinit();
     // Populate a complete recipe where admission permits it. A later smaller
@@ -6299,7 +6380,7 @@ fn solverCapacityExportsScenario(backing: Allocator) !void {
     var region_alive = true;
     defer if (region_alive) region.deinit();
     const root = try region.solver.array(types.u32_type);
-    try region.variables.append(allocator, .{ .source = .{ .scope = 0, .ty = 19 }, .region = root });
+    try region.scratch.variables.append(allocator, .{ .source = .{ .scope = 0, .ty = 19 }, .region = root });
     var solved = try region.exportSolved(0);
     var solved_alive = true;
     defer if (solved_alive) solved.deinit(allocator);
@@ -6310,8 +6391,9 @@ fn solverCapacityExportsScenario(backing: Allocator) !void {
     var next = try ClosureRegion.init(&session);
     var next_alive = true;
     defer if (next_alive) next.deinit();
-    try std.testing.expectEqual(@as(u32, 0), next.imported.count());
-    try std.testing.expectEqual(@as(usize, 0), next.variables.items.len);
+    try std.testing.expectEqual(@as(u32, 0), next.scratch.imported.count());
+    try std.testing.expectEqual(@as(usize, 0), next.scratch.variables.items.len);
+    try std.testing.expectEqual(@as(usize, 1), session.region_scratch_pool.stats.reused);
     const replacement = try next.solver.array(types.f32_type);
     try std.testing.expectEqual(root, replacement);
     const newer_evidence = try next.project(replacement);
@@ -6341,17 +6423,17 @@ test "solver capacity regions keep fresh maps and active solvers across nested r
     defer if (outer_alive) outer.deinit();
     const root = try outer.solver.fresh();
     try outer.solver.appendVersion(root, types.u32_type);
-    try outer.imported.put(allocator, .{ .scope = 7, .ty = 13 }, root);
+    try outer.scratch.imported.put(allocator, .{ .scope = 7, .ty = 13 }, root);
     var inner = try ClosureRegion.init(&session);
     var inner_alive = true;
     defer if (inner_alive) inner.deinit();
     try std.testing.expect(inner.solver.nodes.items.ptr != outer.solver.nodes.items.ptr);
-    try std.testing.expectEqual(@as(u32, 0), inner.imported.count());
+    try std.testing.expectEqual(@as(u32, 0), inner.scratch.imported.count());
     const inner_nodes = inner.solver.nodes.items.ptr;
     inner.deinit();
     inner_alive = false;
     try std.testing.expectEqual(types.u32_type, try outer.solver.resolve(root, 0));
-    try std.testing.expectEqual(root, outer.imported.get(.{ .scope = 7, .ty = 13 }).?);
+    try std.testing.expectEqual(root, outer.scratch.imported.get(.{ .scope = 7, .ty = 13 }).?);
     outer.deinit();
     outer_alive = false;
     try std.testing.expect(session.solver_capacity_pool.slot.?.solver.nodes.items.ptr == inner_nodes);
@@ -6385,4 +6467,138 @@ test "solver capacity Session allocator swaps preserve the original durable slot
     defer next.deinit();
     try std.testing.expect(next.solver.nodes.items.ptr == retained_nodes);
     try std.testing.expect(next.solver.allocator.ptr == allocator.ptr and next.solver.allocator.vtable == allocator.vtable);
+}
+
+test "inference scratch retains bounded capacity and discards oversized regions" {
+    const a = std.testing.allocator;
+    var session = try Session.init(a, &.{});
+    defer session.deinit();
+    var first = try ClosureRegion.init(&session);
+    try first.scratch.variables.append(a, .{ .source = .{ .scope = 0, .ty = 17 }, .region = types.u32_type });
+    first.deinit();
+    try std.testing.expect(session.region_scratch_pool.slot != null);
+    try std.testing.expect(session.region_scratch_pool.stats.retained_bytes <= @import("scratch_pool.zig").limit);
+    var oversized = try ClosureRegion.init(&session);
+    try std.testing.expectEqual(@as(usize, 0), oversized.scratch.variables.items.len);
+    try oversized.scratch.variables.ensureTotalCapacity(a, @import("scratch_pool.zig").limit / @sizeOf(ClosureRegion.Variable) + 1);
+    oversized.deinit();
+    try std.testing.expect(session.region_scratch_pool.slot == null);
+    var next = try ClosureRegion.init(&session);
+    defer next.deinit();
+    try std.testing.expectEqual(@as(usize, 0), next.scratch.variables.items.len);
+    try std.testing.expectEqual(@as(u32, 0), next.scratch.imported.count());
+}
+
+fn evidenceImportSharingScenario(allocator: Allocator) !void {
+    var session = try Session.init(allocator, &.{});
+    defer session.deinit();
+    const e = &session.evidence;
+    const nominal = try e.intern(.nominal, 1, 7, &.{types.u32_type});
+    const list = try e.intern(.list, nominal, 0, &.{});
+    const operation = try e.effects.internOperation(.{ .unit = 1, .decl = 9 }, &.{list});
+    const row = try e.effects.internRow(&.{operation});
+    const provider = try e.internWithEffects(.provider, nominal, 0, row, &.{});
+    const state = try e.internStateProvider(nominal, nominal, list);
+    const record = try e.intern(.record, 0, 0, &.{ 11, provider, 13, state });
+    const arrow = try e.internWithEffects(.function, record, list, row, &.{});
+    const root = try e.intern(.product, 0, 0, &.{ arrow, arrow, list, record });
+    var shared = try ClosureRegion.init(&session);
+    defer shared.deinit();
+    const imported = try shared.importEvidence(root, 0);
+    const count = shared.solver.nodes.items.len;
+    const cursor = shared.solver.cursor();
+    for (0..16) |_| try std.testing.expectEqual(imported, try shared.importEvidence(root, 0));
+    try std.testing.expectEqual(count, shared.solver.nodes.items.len);
+    try std.testing.expectEqual(cursor, shared.solver.cursor());
+    try std.testing.expectEqual(root, try shared.project(imported));
+    try std.testing.expect(session.evidence_import_reused >= 16);
+    session.reuse_evidence_imports = false;
+    var reference = try ClosureRegion.init(&session);
+    defer reference.deinit();
+    const copied = try reference.importEvidence(root, 0);
+    try std.testing.expectEqual(root, try reference.project(copied));
+    try std.testing.expect(reference.solver.nodes.items.len > count);
+    // Closed graphs may be shared across independent variable histories, but
+    // those histories remain distinct and retain cursor-relative resolution.
+    const first = try shared.solver.fresh();
+    const before = shared.solver.cursor();
+    try shared.solver.unify(first, imported);
+    const after = shared.solver.cursor();
+    try std.testing.expectEqual(imported, try shared.solver.resolve(first, before));
+    try std.testing.expectEqual(types.Tag.variable, shared.solver.node(try shared.solver.resolve(first, after)).tag);
+    const second = try shared.solver.fresh();
+    try shared.solver.unify(second, types.f32_type);
+    try std.testing.expectEqual(root, try shared.project(imported));
+}
+
+test "closed evidence imports share graphs and preserve semantic effects and chronology under allocation failures" {
+    try evidenceImportSharingScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, evidenceImportSharingScenario, .{});
+}
+
+test "closed evidence imports preserve request depth limits and recover after failure" {
+    var session = try Session.init(std.testing.allocator, &.{});
+    defer session.deinit();
+    const array = try session.evidence.intern(.array, types.u32_type, 0, &.{});
+    const root = try session.evidence.intern(.list, array, 0, &.{});
+    var region = try ClosureRegion.init(&session);
+    defer region.deinit();
+    session.options.max_depth = 3;
+    const known = try region.importEvidence(root, 0);
+    try std.testing.expectEqual(known, try region.importEvidence(root, 0));
+    try std.testing.expectError(error.TypeLimit, region.importEvidence(root, 1));
+    session.options.max_depth = 2;
+    try std.testing.expectError(error.TypeLimit, region.importEvidence(root, 0));
+    session.options.max_depth = 3;
+    try std.testing.expectEqual(root, try region.project(try region.importEvidence(root, 0)));
+}
+
+test "closed evidence imports revoke recycled IDs physical mutations and saturated clocks" {
+    var session = try Session.init(std.testing.allocator, &.{});
+    defer session.deinit();
+    const root = try session.evidence.intern(.product, 0, 0, &.{ types.u32_type, types.boolean });
+    var region = try ClosureRegion.init(&session);
+    defer region.deinit();
+    const mark = region.solver.mark();
+    const old = try region.importEvidence(root, 0);
+    region.solver.rollback(mark);
+    try std.testing.expectEqual(old, try region.solver.array(types.f32_type));
+    const current = try region.importEvidence(root, 0);
+    try std.testing.expect(current != old);
+    try std.testing.expectEqual(root, try region.project(current));
+    const node = region.solver.node(current);
+    region.solver.replaceListItem(.{ .start = node.a, .len = node.b }, 0, types.f32_type);
+    const corrected = try region.importEvidence(root, 0);
+    try std.testing.expect(corrected != current);
+    try std.testing.expectEqual(root, try region.project(corrected));
+    region.solver.closed_generation = std.math.maxInt(u16);
+    const saturated = try region.importEvidence(root, 0);
+    try std.testing.expect(saturated != try region.importEvidence(root, 0));
+    region.solver.effects.physical_epoch = std.math.maxInt(u64);
+    const exhausted = try region.importEvidence(root, 0);
+    try std.testing.expect(exhausted != try region.importEvidence(root, 0));
+}
+
+test "closed evidence imports revoke effect rows on rollback and clear scratch between regions" {
+    var session = try Session.init(std.testing.allocator, &.{});
+    defer session.deinit();
+    const op = try session.evidence.effects.internOperation(.{ .unit = 1, .decl = 5 }, &.{types.u32_type});
+    const row = try session.evidence.effects.internRow(&.{op});
+    const root = try session.evidence.internWithEffects(.function, types.u32_type, types.u32_type, row, &.{});
+    {
+        var region = try ClosureRegion.init(&session);
+        defer region.deinit();
+        const before = region.solver.mark();
+        _ = try region.importEvidence(root, 0);
+        region.solver.rollback(before);
+        _ = try region.solver.internOperation(.{ .unit = 2, .decl = 1 }, &.{types.f32_type});
+        _ = try region.solver.effects.row(&.{1}, .closed);
+        try std.testing.expectEqual(root, try region.project(try region.importEvidence(root, 0)));
+    }
+    var next = try ClosureRegion.init(&session);
+    defer next.deinit();
+    try std.testing.expectEqual(@as(u32, 0), next.scratch.evidence_import_cache.answers.count());
+    try std.testing.expect(next.scratch.evidence_import_cache.source == null);
+    _ = try next.solver.array(types.boolean);
+    try std.testing.expectEqual(root, try next.project(try next.importEvidence(root, 0)));
 }

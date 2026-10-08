@@ -9,6 +9,31 @@ pub fn checkAllAllocationFailures(backing: std.mem.Allocator, comptime test_fn: 
     try std.testing.checkAllAllocationFailures(adapter.allocator(), test_fn, extra_args);
 }
 
+/// Concurrent jobs can distribute scratch allocations differently on each run.
+/// Sweep every index observed in successful schedules, without requiring an
+/// unreached allocation to exist in every subsequent schedule. Reached faults
+/// must propagate, and all paths must balance their complete allocation traffic.
+pub fn checkObservedConcurrentFailures(backing: std.mem.Allocator, comptime test_fn: anytype, extra_args: anytype) !void {
+    var adapter: Deterministic = .{ .backing = backing };
+    var observed: usize = 0;
+    for (0..4) |_| {
+        var probe = std.testing.FailingAllocator.init(adapter.allocator(), .{});
+        try @call(.auto, test_fn, .{probe.allocator()} ++ extra_args);
+        try std.testing.expectEqual(probe.allocated_bytes, probe.freed_bytes);
+        observed = @max(observed, probe.alloc_index);
+    }
+    for (0..observed) |index| {
+        var probe = std.testing.FailingAllocator.init(adapter.allocator(), .{ .fail_index = index });
+        if (@call(.auto, test_fn, .{probe.allocator()} ++ extra_args)) |_| {
+            try std.testing.expect(!probe.has_induced_failure);
+        } else |err| switch (err) {
+            error.OutOfMemory => try std.testing.expect(probe.has_induced_failure),
+            else => return err,
+        }
+        try std.testing.expectEqual(probe.allocated_bytes, probe.freed_bytes);
+    }
+}
+
 const Deterministic = struct {
     backing: std.mem.Allocator,
     fn allocator(self: *Deterministic) std.mem.Allocator {

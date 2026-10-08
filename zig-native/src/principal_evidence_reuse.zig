@@ -14,11 +14,16 @@ const Allocator = std.mem.Allocator;
 pub const GraphMode = enum { eager, lazy, primitive };
 
 pub const Stats = struct {
+    persisted_requests: usize = 0,
+    persisted_hits: usize = 0,
+    persisted_call_proofs: usize = 0,
+    persisted_declines: usize = 0,
     projected_empty_hits: usize = 0,
     projected_empty_declines: usize = 0,
     input_image_checks: usize = 0,
     dependency_validations: usize = 0,
     graph_importers_initialized: usize = 0,
+    graph_importers_prepared: usize = 0,
     empty_hits: usize = 0,
     primitive_hits: usize = 0,
     primitive_fallbacks: usize = 0,
@@ -34,6 +39,7 @@ pub const Stats = struct {
     options_declined: usize = 0,
     captured: usize = 0,
     fresh_regions: usize = 0,
+    call_publications_replayed: usize = 0,
 };
 pub const State = struct {
     allocator: Allocator,
@@ -46,6 +52,7 @@ pub const State = struct {
     reuse_projected_inputs: bool = false,
     input_image_equal: ?bool = null,
     last_inputs: ?*const @import("principal_inputs.zig").Key = null,
+    imported_inputs: ?@import("principal_inputs.zig").Key = null,
     stats: Stats = .{},
 
     /// Old Core and Pools stay immutable/alive through this candidate. Only
@@ -63,18 +70,21 @@ pub const State = struct {
         result.reuse_projected_inputs = execution.reuse_projected_principals;
         return result;
     }
-    /// Build with the original graph validation. No importer owner is published
-    /// until every allocation and structural stability update has succeeded.
+    /// Reuse this query's already validated namespace and catalog. No importer
+    /// owner is published until every allocation and stability update succeeds.
     fn ensureGraphs(self: *State) Allocator.Error!bool {
         if (self.graphs) |*graphs| return graphs.enabled;
-        var graphs = try importer.Importer.init(self.allocator, &self.old.metadata.pools.?, self.gate.units, self.names, self.gate.units.len);
-        if (!self.gate.enabled or !graphs.enabled) {
+        if (!self.gate.enabled) return false;
+        const prepared = try importer.Importer.initCheckedQuery(self.allocator, &self.old.metadata.pools.?, self.gate.units, &self.gate);
+        var graphs = prepared orelse try importer.Importer.init(self.allocator, &self.old.metadata.pools.?, self.gate.units, self.names, self.gate.units.len);
+        if (!graphs.enabled) {
             graphs.deinit();
             return false;
         }
         for (graphs.stable, self.gate.structural_units) |*stable, structural| stable.* = structural;
         self.graphs = graphs;
         self.stats.graph_importers_initialized += 1;
+        self.stats.graph_importers_prepared += @intFromBool(prepared != null);
         return true;
     }
     const PrimitiveResult = union(enum) { fallback, declined, solved: core_eval.SolvedEvidence };
@@ -125,6 +135,7 @@ pub const State = struct {
         return node.tag == .u32 and node.a == 0 and node.b == 0 and node.c == 0;
     }
     pub fn deinit(self: *State) void {
+        if (self.imported_inputs) |*inputs| inputs.deinit(self.allocator);
         if (self.graphs) |*graphs| graphs.deinit();
         self.gate.deinit();
         self.* = undefined;
@@ -141,8 +152,29 @@ pub const State = struct {
         self.input_image_equal = true;
         return true;
     }
+    /// Retained evidence IDs belong to the old Snapshot. Re-intern every
+    /// publication before publishing any of them or retaining the new key.
+    fn currentInputs(self: *State, generator: anytype, inputs: *const @import("principal_inputs.zig").Key) Allocator.Error!?*const @import("principal_inputs.zig").Key {
+        if (inputs.call_publications.len == 0) return inputs;
+        if (!self.inputImageEqual() or !try self.ensureGraphs()) return null;
+        // This importer is private to principal type/row translation. The
+        // complete input projection proved every source type, nominal, effect
+        // and local ID equal, even when a nested literal changed. It grants no
+        // executable or value import; those use separate importers and gates.
+        @memset(self.graphs.?.stable, true);
+        var translated = try inputs.clone(self.allocator);
+        var owned = true;
+        defer if (owned) translated.deinit(self.allocator);
+        for (translated.call_publications) |*call|
+            call.evidence = (try self.graphs.?.importPrincipalCall(generator, call.target, call.evidence)) orelse return null;
+        self.imported_inputs = translated;
+        owned = false;
+        return &self.imported_inputs.?;
+    }
     pub fn lookup(self: *State, generator: anytype, target: core.BindingRef, options: core_eval.Options) Allocator.Error!?core_eval.SolvedEvidence {
         self.last_inputs = null;
+        if (self.imported_inputs) |*inputs| inputs.deinit(self.allocator);
+        self.imported_inputs = null;
         self.stats.requests += 1;
         if (target.unit > self.old.cached_units) self.stats.fresh_unit_requests += 1;
         const exact = self.gate.admitsPrincipal(target);
@@ -165,7 +197,13 @@ pub const State = struct {
                     return null;
                 }
                 if (empty) if (proof.inputs) |*inputs| if (inputs.matches(&generator.evaluator) and self.inputImageEqual()) {
-                    self.last_inputs = inputs;
+                    const current_inputs = (try self.currentInputs(generator, inputs)) orelse {
+                        self.stats.projected_empty_declines += 1;
+                        return null;
+                    };
+                    try current_inputs.publish(&generator.evaluator);
+                    self.last_inputs = current_inputs;
+                    self.stats.call_publications_replayed += current_inputs.call_publications.len;
                     self.stats.projected_empty_hits += 1;
                     self.stats.hits += 1;
                     self.stats.empty_hits += 1;
@@ -200,7 +238,18 @@ pub const State = struct {
                     return null;
                 };
             };
-            if (proof.inputs) |*inputs| self.last_inputs = inputs;
+            // An exact-source result can still be reused without its projected
+            // key. Carry that key forward only when its dynamic reads match,
+            // and replay the memo publications the skipped region would make.
+            errdefer {
+                var owned = solved;
+                owned.deinit(self.allocator);
+            }
+            if (proof.inputs) |*inputs| if (inputs.matches(&generator.evaluator)) if (try self.currentInputs(generator, inputs)) |current_inputs| {
+                try current_inputs.publish(&generator.evaluator);
+                self.last_inputs = current_inputs;
+                self.stats.call_publications_replayed += current_inputs.call_publications.len;
+            };
             if (empty) self.stats.empty_hits += 1;
             self.stats.hits += 1;
             if (target.unit > self.old.cached_units) self.stats.fresh_unit_hits += 1;

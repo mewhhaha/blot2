@@ -61,10 +61,53 @@ are instrumentation, not source-language fuel semantics.
 
 Constant records keep unused generic fields in the evaluator until a concrete
 use selects them. Calls and partial applications can retain those fields while
-capturing dynamic arguments once. Code jobs containing such static captures
-currently rebuild after edits because their request keys do not describe the
-captured values; other semantic and code reuse remains available. Complete
-emission journals still reconstruct the exact output.
+capturing dynamic arguments once. Anonymous closure keys include every static
+capture. Retained admission matches the complete value, callable and evidence
+graph, including aliases, against current values. Unknown correspondence
+declines reuse. Captured generic values do not authorize a principal scheme
+receipt. Named partial static helpers still depend on their enclosing job's
+validated static roots rather than an independent capture key.
+
+Successful retained revisions also own optimizer inputs and optional transformed
+function bodies. Exact source instructions, signatures, direct callee bodies and
+completed ownership summaries authorize reuse. A transitive change to a callee's
+escape behavior invalidates callers even when their instructions are unchanged.
+Summary preparation uses deterministic function order before either fresh
+optimization or reuse. Numeric function IDs currently remain part of the key;
+index movement conservatively loses reuse. Final Wasm assembly still runs.
+
+Principal query receipts also preserve compiler memo effects. An admitted
+literal-only edit can reuse an empty inference result while replaying exact
+nominal-cache writes and owner-translated closed call proofs. Absence and negative
+nominal reads are dependencies, as are completed scalar types. This path still
+requires an empty initial call-proof table and the complete source input
+projection; it does not yet provide general per-body incremental inference.
+Actual constant evaluation and executable validity remain independent.
+
+`backend_checkpoint.zig` serializes empty-result principal receipts and optimized
+body candidates for an explicitly requested restart cache. The portable graph
+owns its arrays and strings, with no native pointers, allocator capacities or
+evaluated source values. A complete source image (including literal bits) and
+observed semantic inputs gate principal-proof import. Optimized bodies use the
+ordinary exact input/callee/lifetime matcher. The client exports only committed
+revisions; cache I/O belongs to its caller. This is separate from `.blotdep`
+frontend bundles and from the more permissive in-memory literal projection.
+
+Two bounded experiments establish the remaining backend boundaries.
+`resolved_scalar_ssa.zig` creates owned scalar value definitions, explicit
+operands, types and trap facts after ordinary specialization. Its emitter reads
+no Core, solver, evaluator or layout store. The private policy defaults off;
+calls, overloaded operators, control-flow joins and heap ownership still use the
+existing path. It is not the full SSA migration.
+
+`scalar_live_patch.zig` owns closed scalar machine images. Direct and recursive
+calls go through stable table slots; original exported trampolines retain their
+function identities. Deltas contain changed functions and import the existing
+table, with no initialization segments. The experimental host validates the
+base identity, instantiates first, then publishes all replacements synchronously
+with rollback. This is possible because admitted code has no host calls,
+suspension, globals, memory or captured references. Public scalar ABI changes
+decline; gdev's stateful heap/effect program is outside this experiment.
 
 ## Ownership and memory
 
@@ -80,12 +123,22 @@ detach one path and leaf. Branch copies freeze their children so both versions
 remain independently editable. Ownership tokens are descriptor addresses plus
 one, never tracing pointers to obsolete descriptors. Static data is immutable,
 unused slots stay zero, and descriptors cache the current traversal leaf.
-Immutable cursors also own an independent leaf cache, so interleaved forks do
-not repeatedly evict one another. Source-body facts have one compilation owner;
+Word-element cursors also own an independent leaf cache, so interleaved forks
+do not repeatedly evict one another. Source-body facts have one compilation owner;
 bounded scalar collections can use locals and private rectangular append
 regions can allocate their exact result. These optimizations consume typed
-structure, not prelude names. The dense scalar-row fixture is experimental and
-does not change Array/List layouts used by programs.
+structure, not prelude names. The separate dense scalar-row fixture supports a
+broader recursive layout experiment. Production collections now pack flat
+tuples and records of up to 16 checked scalar fields. All construction, access,
+copying, cursor and constant paths use the same checked row stride. Extracted
+rows own their storage; ordinary scalar replacement can eliminate temporary
+boxes. List trees store spans of words; typed operations translate logical row
+counts and positions. Rows may cross leaves, and List/Array conversions copy
+spans directly. Scalar field projections can read packed data without a box.
+Packed cursors and direct loops reuse leaf spans; boundary-crossing fields use
+checked word lookups. A bounded direct-call expansion pass exposes ordinary
+allocation producers to scalar replacement. Generic iterator step/cursor
+allocation remains a separate limit.
 
 ## Limits and measurement
 
@@ -100,3 +153,6 @@ publication in public edit measurements. Report requested allocator bytes
 separately from process RSS. Keep deterministic output and executed guest checks
 alongside latency measurements. The gdev targets are approximately 500 ms cold
 and below 100 ms incremental, without a hard real-time guarantee.
+The project API's `profileBackend: true` adds nested phase timings and the eight
+slowest inference regions to `stats.backendTiming`. Detailed clocks are disabled
+by default so profiling does not tax ordinary hot paths.

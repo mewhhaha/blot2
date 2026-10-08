@@ -522,7 +522,14 @@ fn emitConversion(c: Code, r: Runtime, arena: wasm.Arena, to_list: bool) Error!v
     const span = try c.temp();
     try c.set(count, .{ .load, source, if (to_list) heap.offset(heap.Array, "length") else d.length });
     if (to_list) {
-        try c.set(result, .{ .call, r.new, count, @as(Local, .{ .id = 1 }) });
+        // Zero denotes reference words; positive values are the checked number
+        // of scalar words per logical Array element. The tree stores words.
+        const width: Local = .{ .id = 1 };
+        try c.when(.{ .i32_gt_u, width, 1 });
+        try c.trap(.{ .i32_gt_u, count, .{ .i32_div_u, limit, width } });
+        try c.set(count, .{ .i32_mul, count, width });
+        try c.end();
+        try c.set(result, .{ .call, r.new, count, .{ .i32_ne, width, 0 } });
     } else {
         try c.set(result, .{ .call, arena.allocate, .{ .cell, 4, count, 0 } });
         try c.store(.{ .i32_sub, result, @sizeOf(heap.ArenaHeader) - heap.offset(heap.ArenaHeader, "flags") }, 0, .{ .load, source, d.scalar_elements });
@@ -686,9 +693,15 @@ fn staticTree(module: *wasm.Module, leaves: []const u32) Error!StaticNode {
     return .{ .address = address, .height = height, .count = left.count + right.count };
 }
 pub fn staticDescriptor(module: *wasm.Module, length: u32, leaves: []const u32) Error!u32 {
+    return staticDescriptorKind(module, length, leaves, false);
+}
+pub fn staticScalarDescriptor(module: *wasm.Module, length: u32, leaves: []const u32) Error!u32 {
+    return staticDescriptorKind(module, length, leaves, true);
+}
+fn staticDescriptorKind(module: *wasm.Module, length: u32, leaves: []const u32, scalar_elements: bool) Error!u32 {
     const root = try staticTree(module, leaves);
     std.debug.assert(root.count == length);
-    const address = try module.dataObject(heap.ListDescriptor{ .length = length, .root = root.address, .cached_leaf = 0, .cached_base = 0, .scalar_elements = 0, .immutable = 1 });
+    const address = try module.dataObject(heap.ListDescriptor{ .length = length, .root = root.address, .cached_leaf = 0, .cached_base = 0, .scalar_elements = if (scalar_elements) 2 else 0, .immutable = 1 });
     if (root.address != 0) try module.dataReference(address + d.root, .{ .role = .static_address, .value = root.address });
     return address;
 }

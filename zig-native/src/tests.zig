@@ -1,4 +1,8 @@
 test {
+    _ = @import("wasm_inline.zig");
+    _ = @import("optimized_archive_tests.zig");
+    _ = @import("runtime_parallel_tests.zig");
+    _ = @import("machine_code_sharing_tests.zig");
     _ = @import("packed_layout.zig");
     _ = @import("collection_optimization_tests.zig");
     _ = @import("structural_record_tests.zig");
@@ -264,6 +268,10 @@ comptime {
 
 test {
     _ = @import("artifact_import_tests.zig");
+    _ = @import("optimized_bodies_tests.zig");
+    _ = @import("principal_archive_tests.zig");
+    _ = @import("resolved_scalar_ssa_tests.zig");
+    _ = @import("scalar_live_patch_tests.zig");
     _ = @import("artifact_operation_admission_tests.zig");
     _ = @import("buffered_stamp_tests.zig");
     _ = @import("check_nominal_tests.zig");

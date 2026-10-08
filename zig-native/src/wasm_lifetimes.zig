@@ -78,7 +78,7 @@ pub const Plan = struct {
     }
 };
 pub const Output = ir.Body;
-const Parameter = struct { escapes: bool = true, bytes: u32 = 0 };
+pub const Parameter = struct { escapes: bool = true, bytes: u32 = 0 };
 const Summary = struct {
     parameters: []Parameter,
     invalidates: bool = true,
@@ -95,6 +95,7 @@ pub const Summaries = struct {
     functions: []Summary,
     parameters: []Parameter,
     depth: u32 = 0,
+    prepared: bool = false,
 
     pub fn init(a: A, module: *const w.Module) !Summaries {
         const functions = try a.alloc(Summary, module.functions.items.len);
@@ -114,8 +115,19 @@ pub const Summaries = struct {
         self.a.free(self.parameters);
         self.a.free(self.functions);
     }
+    /// Finish conservative call facts in deterministic function order before
+    /// any cached optimization is consulted. Cache hits must not change which
+    /// recursive/depth-limited summary is observed by later functions.
+    pub fn prepare(self: *Summaries) A.Error!void {
+        if (self.prepared) return;
+        if (self.module.arena != null) for (0..self.functions.len) |id| {
+            _ = try self.get(@intCast(id));
+        };
+        self.prepared = true;
+    }
     fn get(self: *Summaries, id: u32) A.Error!Summary {
         const summary = &self.functions[id];
+        if (self.prepared) return summary.*;
         if (summary.state != .unseen or self.depth == 128) return summary.*;
         if (self.module.arena) |arena| {
             if (id == arena.recycle or id == arena.reset or id == arena.collect or id == arena.mark or arena.isAllocation(id)) {

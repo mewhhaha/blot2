@@ -67,4 +67,13 @@ pub fn build(b: *std.Build) void {
     const packed_file = generate_packed.addOutputFileArg("packed-layout-fixture.wasm");
     const install_packed = b.addInstallFile(packed_file, "packed-layout-fixture.wasm");
     b.step("packed-layout-fixture", "Generate the experimental dense scalar row fixture").dependOn(&install_packed.step);
+    const patch_fixture = b.addExecutable(.{ .name = "scalar-patch-fixture", .root_module = b.createModule(.{
+        .root_source_file = b.path("src/scalar_patch_fixture.zig"),
+        .target = target,
+        .optimize = optimize,
+    }), .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
+    const generate_patch = b.addRunArtifact(patch_fixture);
+    const patch_file = generate_patch.addOutputFileArg("scalar-patch-fixture.json");
+    const install_patch = b.addInstallFile(patch_file, "scalar-patch-fixture.json");
+    b.step("scalar-patch-fixture", "Generate the experimental scalar live-patching laws").dependOn(&install_patch.step);
 }

@@ -199,6 +199,8 @@ pub const Session = struct {
     // Bound lazily, after init's returned Session has reached its final address.
     epoch: ?*Epoch = null,
     policy: Policy = Policy.reference,
+    profile_backend: bool = false,
+    checkpoint: ?@import("backend_checkpoint.zig").Checkpoint = null,
 
     /// Enable qualified project reuse before any revision or retained owner.
     /// Preserve independent choices, such as exact unchanged-output reuse.
@@ -235,9 +237,17 @@ pub const Session = struct {
             epoch.owner = null;
         }
         if (self.current) |*current| current.deinit(self.allocator);
+        if (self.checkpoint) |*checkpoint| checkpoint.deinit();
         self.releaseSeed();
         if (self.epoch) |epoch| epoch.release();
         self.* = undefined;
+    }
+    /// Exports only the committed revision. Encoding never modifies it, and
+    /// callers own the returned bytes independently of this Session.
+    pub fn checkpointBytes(self: *const Session, compiler: [32]u8) ![]u8 {
+        if (self.epoch) |epoch| if (epoch.preparing or epoch.active != null) return error.RevisionBusy;
+        const current = &(self.current orelse return error.NoSuccessfulRevision);
+        return @import("backend_checkpoint.zig").encode(self.allocator, compiler, &current.artifacts);
     }
     fn releaseSeed(self: *Session) void {
         if (self.seed_snapshot) |owner| owner.deinit() else dependency_format.deinit(self.allocator, &self.seed);
@@ -509,6 +519,9 @@ pub const Session = struct {
                 var emission_policy = self.policy;
                 emission_policy.principal_reuse = self.policy.principal_reuse and (prior_compatible or self.policy.capture_fresh_principals);
                 var result = try prepared.emitWithOptions(a, .{
+                    .io = io,
+                    .profile_backend = self.profile_backend,
+                    .checkpoint = if (self.checkpoint) |*checkpoint| checkpoint else null,
                     .policy = emission_policy,
                     .retain_artifacts = true,
                     .previous = if (code_compatible and self.current != null) &self.current.?.artifacts else null,

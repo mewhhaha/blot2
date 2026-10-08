@@ -1,15 +1,84 @@
 # Zig compiler status
 
+The production packed-row transfer is implemented and tested. Lists and Arrays
+store flat scalar tuples/records inline, with preserved snapshots, field order,
+floating-point bits and logical lengths. Packed cursors and direct loops reuse
+leaf spans. A bounded general inlining pass exposes allocation producers to
+scalar replacement; it has no prelude-name rules.
+
+On 100,000-row fixtures, generation/folding uses about **6.4× less CPU** and
+List/Array conversion about **4× less**. Retained List storage falls **61%** and
+Array storage **43%**. Performance is mixed: read-only List folds use about
+**1.9× as much CPU**, cursors **1.5×**, and the comprehension fixture uses one
+extra Wasm page. Broader fusion/SIMD and generic iterator allocation remain open.
+
+Paired frozen-gdev results are **1,466 → 1,606 ms cold**, **389 → 399 ms first
+edit**, and **353 → 370 ms revert**. Cold CPU increases about 2.4%; this batch
+does not establish a compiler-speed improvement. Fresh/retained output parity
+and Wasm validation pass. The 500 ms cold / 100 ms edit targets remain unmet.
+
+The full native suite and **546 guest/client tests** pass. Zig-analyzer reports
+120 existing warnings and no errors across 280 files. The
+[packed-row report](../std/PERFORMANCE.md#production-packed-scalar-rows) contains
+the raw sample locations, limitations and exact binary pin. These changes are
+not installed locally.
+
+## Previous compiler-performance checkpoint
+
+The current [compiler-performance program](../PLAN.md) is in progress. Its
+qualified default path retains optimized bodies, keys anonymous static closures
+by captured values, shares bounded inference scratch and closed evidence imports,
+and replays projected principal queries across scalar literal edits. Prepared
+graph importers avoid repeatedly validating already admitted principal queries.
+These are general compiler optimizations, with bounded reuse admission.
+
+The final five alternating pairs on the frozen 394 KB gdev workload show
+median first edit **984 → 378 ms**, subsequent edit **982 → 376 ms**, and fresh
+CLI compilation **1,354 → 1,294 ms**. Requested allocation bytes fall **503 → 433
+MB**; cold peak RSS is about 74 MiB and retained peak RSS about 158 MiB. Peak
+tracked live storage is unchanged. Earlier quieter runs measured 773/184/171 ms
+for the candidate; absolute times cannot be compared across batches. Both
+latency targets remain unmet. Every Wasm hash matches the original compiler.
+The native suite and **539 guest/client tests** pass; the
+[final measurement report](../std/PERFORMANCE.md#compiler-performance-program-final-default-path-check)
+records boundaries, raw samples and the exact binary. That measurement preceded
+the later packed-row checkpoint; neither candidate was installed locally.
+
+Opt-in development tiers, exact private machine-body sharing and coarse parallel
+optimizer jobs pass 1,077 native and 537 guest/client tests. Sharing reduces
+gdev Wasm size by 7.8%; four workers reduce the measured cold assembly phase
+from about 30 ms to 18 ms, without an established total compilation speedup.
+All three remain opt-in. Explicit portable backend checkpoints now restore
+empty-result principal-query proofs and optimized bodies after process death.
+The full gdev restore produces identical Wasm and reuses 1,438 call proofs and
+1,536 optimized bodies. The checkpoint release gate passes with 538 guest/client
+tests. Five paired restarts use about 30% less child CPU work; heavily contended
+wall-clock samples are not a target-latency result. Evaluated values and arbitrary
+specializations are not persisted.
+
+Resolved scalar SSA now has a default-off native prototype. It emits without
+source/solver owners but admits only two gdev bodies; no useful compilation
+speedup is established. A stateless scalar live-patch prototype redirects
+unchanged and recursive callers while preserving exported function objects,
+with stale/corrupt patch rejection and transactional table publication. It is
+an internal experiment and cannot patch gdev's heap/effect state. The final
+release build, native suite and 539 guest/client tests pass. Lint reports 120
+existing warnings and no errors across 279 files. General body-level checking,
+complete ownership-aware SSA, arbitrary specialization persistence and stateful
+live patches remain open.
+
+## Previous list transfer qualification
+
 The [list transfer batch](../std/PERFORMANCE.md#list-transfer-batch) is qualified
 and installed locally. Independent cursor leaf positions, small scalar
 collection elimination, exact-size rectangular builders and reusable function
 facts use general compiler proofs. The focused runtime probes improve by about
 2.7×, 85× and 96× respectively; these are not whole-application speedups.
 
-Packed scalar rows remain an isolated layout/emission prototype. Its 100,000-row
-fixture is about 4.3× faster and uses 44% less heap, with raw F32 bits preserved.
-It is not enabled in the production List/Array representation. Lists retain
-their existing AVL backing.
+At that checkpoint, packed scalar rows were an isolated layout/emission
+prototype. Its 100,000-row fixture was about 4.3× faster and used 44% less heap,
+with raw F32 bits preserved. It had not changed production List/Array storage.
+Lists retain their existing AVL backing.
 
 The native suite and **534 guest/client tests** pass. Zig-analyzer checks 258
 files with 122 existing warnings and no errors. The standalone compiler builds

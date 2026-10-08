@@ -2,8 +2,18 @@
 //! cache validity; source, evidence, executable and value checks remain distinct.
 //! Tests may override individual fields to compare the reference implementation.
 pub const Policy = struct {
+    codegen_tier: @import("compilation_tier.zig").Tier = .optimized,
+    share_machine_code: bool = false,
+    codegen_workers: u8 = 1,
+    /// Experimental resolved SSA for closed straight-line scalar bodies.
+    resolve_scalar_bodies: bool = false,
     /// Same-binary execution policies; none grants semantic cache admission.
     reuse_solver_capacity: bool = true,
+    reuse_region_scratch: bool = true,
+    reuse_callable_definitions: bool = true,
+    reuse_evidence_imports: bool = true,
+    /// Successful root conversions within an immutable emitter mapping region.
+    memoize_layout_roots: bool = true,
     reuse_refinements: bool = false,
     /// Retain the principal prepasses already executed by a fresh backend.
     capture_fresh_principals: bool = false,
@@ -29,6 +39,7 @@ pub const Policy = struct {
     /// Catalog, declaration and dynamic-read checks remain authoritative.
     reuse_rebuilt_queries: bool = false,
     reuse_rebuilt_code: bool = false,
+    reuse_optimized_bodies: bool = false,
     prepare_checked_query_importer: bool = false,
     reuse_equivalent_validation: bool = false,
     transport_source_templates: bool = false,
@@ -61,6 +72,7 @@ pub const Policy = struct {
         .reuse_dependency_validation = true,
         .reuse_rebuilt_queries = true,
         .reuse_rebuilt_code = true,
+        .reuse_optimized_bodies = true,
         .prepare_checked_query_importer = true,
         .reuse_equivalent_validation = true,
     };

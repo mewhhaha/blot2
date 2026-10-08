@@ -139,6 +139,9 @@ fn importScenario(allocator: Allocator, old: *const artifacts.Pools, input: Inpu
     try std.testing.expectEqual(evidence.Tag.demand, demand.tag);
     const function = store.node(demand.a);
     try std.testing.expectEqual(evidence.Tag.function, function.tag);
+    const call_target: core.BindingRef = .{ .unit = 1, .binding = fixture.units[0].bodies[1].binding };
+    const old_arrow = old.evaluator.evidence.view().node(input.demand).a;
+    try std.testing.expectEqual(@as(?u32, demand.a), try graphs.importPrincipalCall(&generator, call_target, old_arrow));
     try std.testing.expectEqualSlices(u32, &.{ fixture.field, 3 }, store.children(function.a));
     const children = store.children(function.b);
     try std.testing.expectEqual(@as(u32, 1), store.node(children[1]).a);
@@ -207,6 +210,10 @@ test "principal import declines duplicate foreign-owner malformed and nested Sta
         try std.testing.expect((try graphs.importPrincipalEvidence(&generator, 1, &.{.{ .variable = fixture.variable, .evidence = value }}, &.{})) == null);
     try std.testing.expect((try graphs.importPrincipalEvidence(&generator, 1, &.{}, &.{.{ .variable = 0, .evidence = input.state_row }})) == null);
     try std.testing.expect((try graphs.importPrincipalEvidence(&generator, 1, &.{.{ .variable = fixture.variable, .evidence = input.nested_state }}, &.{})) == null);
+    const call_target: core.BindingRef = .{ .unit = 1, .binding = fixture.units[0].bodies[1].binding };
+    try std.testing.expect((try graphs.importPrincipalCall(&generator, call_target, input.nested_state)) == null);
+    try std.testing.expect((try graphs.importPrincipalCall(&generator, call_target, 3)) == null);
+    try std.testing.expect((try graphs.importPrincipalCall(&generator, .{ .unit = 1, .binding = 0 }, input.demand)) == null);
     try std.testing.expectEqual(nodes, generator.evaluator.evidence.nodes.items.len);
     try std.testing.expectEqual(rows, generator.evaluator.evidence.effects.rows.items.len);
 }

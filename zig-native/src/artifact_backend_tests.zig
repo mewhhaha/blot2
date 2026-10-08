@@ -63,7 +63,7 @@ test "Gate A backend reconstructs solved captures providers State Demand Foreign
         var module = try lower(source);
         defer module.deinit(a);
         const before = metadata.stamp(module);
-        var reference = try backend.compileWithOptions(a, &.{module}, 1, .{});
+        var reference = try backend.compileWithOptions(a, &.{module}, 1, .{ .policy = .{ .memoize_layout_roots = false, .reuse_region_scratch = false, .reuse_callable_definitions = false } });
         defer reference.deinit(a);
         var reconstructed = try backend.compileWithOptions(a, &.{module}, 1, .{ .artifact_replay = true });
         defer reconstructed.deinit(a);
@@ -77,6 +77,29 @@ test "Gate A backend reconstructs solved captures providers State Demand Foreign
         try std.testing.expectEqual(@as(usize, 1), summary.pinned_modules);
         try std.testing.expectEqualSlices(u8, &before, &metadata.stamp(module));
     }
+}
+
+test "artifact replay preserves codegen tiers and physical sharing without merging semantic jobs" {
+    var module = try lower(
+        \\const left = fn (value: U32) => @u32.add value 7
+        \\const right = fn (value: U32) => @u32.add value 7
+        \\entry const answer = fn (value: U32) => @u32.add (left value) (right value)
+    );
+    defer module.deinit(a);
+    const Tier = @import("compilation_tier.zig").Tier;
+    for ([_]Tier{ .optimized, .development }) |tier| for ([_]bool{ false, true }) |shared| {
+        const policy: @import("execution_policy.zig").Policy = .{ .codegen_tier = tier, .share_machine_code = shared, .codegen_workers = 4 };
+        var fresh = try backend.compileWithOptions(a, &.{module}, 1, .{ .io = std.testing.io, .policy = policy });
+        defer fresh.deinit(a);
+        var replayed = try backend.compileWithOptions(a, &.{module}, 1, .{ .io = std.testing.io, .policy = policy, .artifact_replay = true });
+        defer replayed.deinit(a);
+        try std.testing.expect(fresh.diagnostic == null and replayed.diagnostic == null);
+        try std.testing.expectEqualSlices(u8, fresh.bytes, replayed.bytes);
+        try std.testing.expectEqual(fresh.constant_steps, replayed.constant_steps);
+        try std.testing.expectEqual(fresh.code_instances, replayed.code_instances);
+        try std.testing.expectEqual(tier, replayed.runtime_optimization.tier);
+        try std.testing.expectEqual(replayed.emitted_functions + replayed.runtime_optimization.shared, replayed.artifacts.?.functions);
+    };
 }
 
 fn allocationScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {

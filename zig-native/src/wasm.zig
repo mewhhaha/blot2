@@ -33,6 +33,19 @@ pub const Arena = struct {
         return function == self.allocate or function == self.allocate_scalar;
     }
 };
+pub const AssemblyOptions = struct {
+    io: ?std.Io = null,
+    workers: u8 = 1,
+    tier: @import("compilation_tier.zig").Tier = .optimized,
+    share_machine_code: bool = false,
+    /// Experimental scalar patch linker. Imported tables are never initialized
+    /// by an element segment; the host publishes replacements after validation.
+    import_function_table: ?u32 = null,
+    export_function_table: bool = false,
+    previous: ?*const @import("optimized_bodies.zig").Capture = null,
+    current: ?*@import("optimized_bodies.zig").Capture = null,
+    stats: ?*@import("optimized_bodies.zig").Stats = null,
+};
 /// Handles are indexes into an externref table, never encoded host pointers.
 /// Callers retain a cursor mark and release only handles owned by that scope.
 pub const HostReferences = struct { retain: u32, release: u32, cursor: u32 };
@@ -372,6 +385,14 @@ pub const Module = struct {
         try self.exports.append(self.allocator, .{ .name = owned, .index = id, .parameter = .unit, .result = self.globals.items[id].scalar, .global = true });
     }
     pub fn assemble(self: *const Module) ![]u8 {
+        return self.assembleWithOptions(.{});
+    }
+    pub fn assembleWithOptions(self: *const Module, options: AssemblyOptions) ![]u8 {
+        if (options.import_function_table != null and self.host_references != null) return error.InvalidFunctionReference;
+        if (options.stats) |stats| stats.tier = options.tier;
+        if (options.current) |current| current.tier = options.tier;
+        var code = try @import("machine_code_sharing.zig").Index.init(self.allocator, self, options.share_machine_code);
+        defer code.deinit();
         var output = Bytes.init(self.allocator);
         defer output.deinit();
         try output.raw(&.{ 0, 97, 115, 109, 1, 0, 0, 0 });
@@ -390,26 +411,36 @@ pub const Module = struct {
         payload.clear();
         if (self.functions.items.len > std.math.maxInt(u32) - self.imports.items.len) return error.ModuleTooLarge;
         const import_count: u32 = @intCast(self.imports.items.len);
-        if (import_count != 0) {
-            try payload.uleb(import_count);
+        if (import_count != 0 or options.import_function_table != null) {
+            try payload.uleb(import_count + @as(u32, @intFromBool(options.import_function_table != null)));
             for (self.imports.items) |item| {
                 try payload.name(item.module);
                 try payload.name(item.name);
                 try payload.byte(0);
                 try payload.uleb(item.signature);
             }
+            if (options.import_function_table) |minimum| {
+                try payload.name("blot:patch");
+                try payload.name("table");
+                try payload.byte(1); // table import, not a function index
+                try payload.byte(0x70);
+                try payload.byte(0);
+                try payload.uleb(minimum);
+            }
             try output.section(2, payload.items());
             payload.clear();
         }
-        try payload.uleb(@intCast(self.functions.items.len));
-        for (self.functions.items) |function| try payload.uleb(function.signature);
+        try payload.uleb(@intCast(code.unique));
+        for (self.functions.items, 0..) |function, id| if (code.emits(id)) {
+            try payload.uleb(function.signature);
+        };
         if (self.functions.items.len != 0) try output.section(3, payload.items());
         payload.clear();
-        if (self.indirect or self.host_references != null) {
+        if (options.import_function_table == null and (self.indirect or self.host_references != null or options.export_function_table)) {
             try payload.uleb(if (self.host_references != null) 2 else 1);
             try payload.byte(0x70); // funcref
             try payload.byte(0); // minimum only
-            try payload.uleb(if (self.indirect) @intCast(self.functions.items.len) else 0);
+            try payload.uleb(if (self.indirect or options.export_function_table) @intCast(self.functions.items.len) else 0);
             if (self.host_references != null) {
                 try payload.byte(0x6f); // externref, separate from callable handles
                 try payload.byte(0); // minimum only
@@ -438,11 +469,12 @@ pub const Module = struct {
             try output.section(6, payload.items());
             payload.clear();
         }
-        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 3 else 0)));
+        try payload.uleb(@intCast(self.exports.items.len + @as(usize, if (self.public_arena) 3 else 0) + @intFromBool(options.export_function_table)));
         for (self.exports.items) |item| {
             try payload.name(item.name);
             try payload.byte(if (item.global) 3 else 0);
-            try payload.uleb(if (item.global) item.index else item.index + import_count);
+            if (!item.global and item.index >= self.functions.items.len) return error.InvalidFunctionReference;
+            try payload.uleb(if (item.global) item.index else code.function(item.index) + import_count);
         }
         if (self.public_arena) {
             try payload.name("blot:memory");
@@ -450,38 +482,65 @@ pub const Module = struct {
             try payload.uleb(0);
             try payload.name("blot:allocate");
             try payload.byte(0);
-            try payload.uleb(self.arena.?.allocate + import_count);
+            try payload.uleb(code.function(self.arena.?.allocate) + import_count);
             try payload.name("blot:reset");
             try payload.byte(0);
-            try payload.uleb(self.arena.?.reset + import_count);
+            try payload.uleb(code.function(self.arena.?.reset) + import_count);
+        }
+        if (options.export_function_table) {
+            try payload.name("blot:patch:table");
+            try payload.byte(1);
+            try payload.uleb(0);
         }
         try output.section(7, payload.items());
         payload.clear();
         if (self.start) |start| {
             if (start >= self.functions.items.len or self.functions.items[start].parameters.len != 0 or self.functions.items[start].result != .none) return error.InvalidFunctionReference;
-            try payload.uleb(start + import_count);
+            try payload.uleb(code.function(start) + import_count);
             try output.section(8, payload.items());
             payload.clear();
         }
-        if (self.indirect) {
+        if (self.indirect and options.import_function_table == null) {
             try payload.uleb(1);
             try payload.byte(0); // active segment at table zero
             try payload.raw(&.{ 0x41, 0, 0x0b });
             try payload.uleb(@intCast(self.functions.items.len));
-            for (0..self.functions.items.len) |id| try payload.uleb(@as(u32, @intCast(id)) + import_count);
+            for (0..self.functions.items.len) |id| try payload.uleb(code.function(@intCast(id)) + import_count);
             try output.section(9, payload.items());
             payload.clear();
         }
         if (self.functions.items.len != 0) {
-            try payload.uleb(@intCast(self.functions.items.len));
+            try payload.uleb(@intCast(code.unique));
             var body = Bytes.init(self.allocator);
             defer body.deinit();
             var passes = try @import("runtime_pipeline.zig").Session.init(self.allocator, self);
             defer passes.deinit();
-            for (self.functions.items) |function| {
+            passes.tier = options.tier;
+            if (options.current) |current| try current.recordInputs(self, &passes.summaries);
+            var matcher: ?@import("optimized_bodies.zig").Matcher = if (options.previous != null and options.current != null) try .init(self.allocator, options.previous.?, options.current.?) else null;
+            defer if (matcher) |*matches| matches.deinit();
+            var parallel = try @import("runtime_parallel.zig").Batch.run(self.allocator, options.io, &passes, code, if (matcher) |*matches| matches else null, options.workers);
+            defer if (parallel) |*batch| batch.deinit();
+            if (options.stats) |stats| if (parallel) |batch| {
+                stats.workers = batch.workers;
+                stats.parallel_jobs = batch.jobs;
+            };
+            for (self.functions.items, 0..) |function, id| {
+                if (options.stats) |stats| stats.functions += 1;
+                if (!code.emits(id)) {
+                    if (options.stats) |stats| stats.shared += 1;
+                    continue;
+                }
                 body.clear();
-                var optimized = try passes.optimize(&function);
-                defer if (optimized) |*owned| owned.deinit(self.allocator);
+                const reused = if (matcher) |*matches| matches.matches(id) else false;
+                var optimized = if (reused) options.previous.?.output(id) else if (parallel) |*batch| batch.take(id) else try passes.optimize(&function);
+                defer if (!reused) {
+                    if (optimized) |*owned| owned.deinit(self.allocator);
+                };
+                if (options.current) |current| try current.recordOutput(id, optimized);
+                if (options.stats) |stats| {
+                    if (reused) stats.reused += 1 else stats.optimized += 1;
+                }
                 const locals = if (optimized) |owned| owned.locals.items else function.locals.items;
                 const instructions = if (optimized) |owned| owned.instructions.items else function.instructions.items;
                 try body.uleb(@intCast(locals.len));
@@ -489,13 +548,23 @@ pub const Module = struct {
                     try body.byte(1);
                     try body.byte(@backingInt(local));
                 }
-                for (instructions) |instruction| try encodeInstruction(&body, instruction, self.functions.items.len, self.globals.items.len, self.signatures.items.len, import_count);
+                for (instructions) |instruction| {
+                    var encoded = instruction;
+                    if (encoded.op == .call) {
+                        if (encoded.operand >= self.functions.items.len) return error.InvalidFunctionReference;
+                        encoded.operand = code.function(encoded.operand);
+                    }
+                    try encodeInstruction(&body, encoded, code.unique, self.globals.items.len, self.signatures.items.len, import_count);
+                }
                 try body.byte(0x0b);
                 try payload.uleb(@intCast(body.items().len));
                 try payload.raw(body.items());
             }
             try output.section(10, payload.items());
             payload.clear();
+            if (options.stats) |stats| if (options.current) |current| {
+                stats.retained_bytes = current.bytes();
+            };
         }
         if (self.arena != null and self.data.items.len != 0) {
             try payload.uleb(1); // one active data segment at memory zero

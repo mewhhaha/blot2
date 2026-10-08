@@ -114,6 +114,7 @@ const Generator = struct {
     layouts: layout.Store,
     row_keys: substitutions.Store,
     template_keys: substitutions.Store,
+    static_keys: substitutions.Store,
     template_catalog: std.ArrayList(artifacts.CapturedTemplate) = .empty,
     template_instances: std.AutoHashMapUnmanaged(artifacts.CapturedTemplate, u32) = .empty,
     runtime_operations: runtime_operations.Store,
@@ -126,7 +127,7 @@ const Generator = struct {
         // Mirror the backend's startup source-creation mode. Receipt option
         // equality remains exact; this test consumer is the same kind of owner.
         evaluator.options.retain_source_suspensions = true;
-        return .{ .allocator = allocator, .evaluator = evaluator, .layouts = try layout.Store.init(allocator), .row_keys = substitutions.Store.init(allocator), .template_keys = substitutions.Store.init(allocator), .runtime_operations = runtime_operations.Store.initProject(allocator, fixture.names.view()) };
+        return .{ .allocator = allocator, .evaluator = evaluator, .layouts = try layout.Store.init(allocator), .row_keys = substitutions.Store.init(allocator), .template_keys = substitutions.Store.init(allocator), .static_keys = substitutions.Store.init(allocator), .runtime_operations = runtime_operations.Store.initProject(allocator, fixture.names.view()) };
     }
     fn deinit(self: *Generator) void {
         self.template_instances.deinit(self.allocator);
@@ -134,6 +135,7 @@ const Generator = struct {
         self.runtime_operations.deinit();
         self.row_keys.deinit();
         self.template_keys.deinit();
+        self.static_keys.deinit();
         self.layouts.deinit();
         self.evaluator.deinit();
     }

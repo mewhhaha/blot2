@@ -14,6 +14,10 @@ pub const Cache = struct {
         self.answers.deinit(allocator);
         self.* = undefined;
     }
+    pub fn clearRetainingCapacity(self: *Cache) void {
+        self.answers.clearRetainingCapacity();
+        self.* = .{ .answers = self.answers };
+    }
     pub fn activate(self: *Cache, source: *const anyopaque, target: *const anyopaque, generation: u16, physical: u64) bool {
         if (self.source != source or self.target != target or self.generation != generation or self.physical != physical) {
             self.answers.clearRetainingCapacity();

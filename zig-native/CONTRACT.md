@@ -30,6 +30,23 @@ are immutable. Scratch state is released before final output publication.
 Historical solver semantics use dense version records and explicit cursors;
 ordinary union-find is not an assumed substitute for the reference behavior.
 
+Inference regions may return their flat scratch buffers to one session-owned
+pool capped at 512 KiB. Return clears every vector length, map entry and
+projection owner; no inference answer or source borrow remains accessible.
+Nested active regions own separate buffers. A temporary allocator wrapper cannot
+take or populate the durable allocator's slot. Oversized scratch is freed.
+Callable-definition indexes read immutable Core and belong to the whole Session.
+An emitter may memoize successful layout roots only while its source owner,
+type mappings and row mappings remain immutable. Recursive conversions retain
+their ordinary depth checks.
+
+Within one inference region, copies of the same closed semantic evidence may
+share solver nodes. Keys include request depth; changing the depth limit revokes
+the cache. Closed evidence contains no solver variables, so substitutions do not
+invalidate it. Rollback, physical list edits, owner changes and saturated
+physical clocks do invalidate it. Type sharing never merges independently
+scoped variables. Pooled scratch clears these answers and their owners.
+
 Constant collection values publish immutable child spans. Session-owned growth
 buffers may write outside every published span and extend only the latest span
 in that buffer. Branching from an earlier version copies its visible children.
@@ -91,10 +108,85 @@ word types do not prove pointer roles. `runtime_pipeline` owns at most the input
 and next transformed body, releasing the input after a successful replacement;
 failure must not mutate the retained function or fragment.
 
+Optimized body captures own their inputs and outputs. Reuse requires exact local
+instructions and types, called bodies, call signatures, arena roles and completed
+callee lifetime facts. Compute summaries in deterministic order before selecting
+cached bodies; cache hits must not change recursive summary observation order.
+Failed assembly discards its candidate capture and preserves the previous one.
+
+Compilation tiers belong to the session and to optimized captures. Development
+mode may omit scalar replacement and automatic vectorization, but never checking,
+evaluation or required cleanup. Cross-tier optimized bodies cannot be reused.
+Optional machine-code sharing compares complete instruction/type sequences;
+hashes only select candidates. Source/evidence identities, logical fragments and
+indirect table slots remain separate. Public functions retain distinct Wasm
+identities. A previously folded body must run optimization if an edit separates
+it again; absence of an optimized result is not proof that no pass was needed.
+
+Concurrent optimization borrows only immutable functions and fully prepared
+lifetime summaries. Each worker owns a bounded reusable scratch arena and clones
+surviving output into the synchronized parent allocator. Every job joins before
+output publication, failure cleanup or owner destruction. Small workloads stay
+serial. Scheduling cannot change emitted bytes or cache validity.
+
+The experimental optimizer archive stores owned portable values, never native
+pointers or allocator capacities. Compiler identity, bounded decoding and a
+checksum protect the format; they do not authorize semantic reuse. Every loaded
+body still requires the ordinary exact matcher against fresh machine inputs and
+completed callee lifetime facts. Automatic disk-cache loading is not enabled.
+
+An explicit backend checkpoint also owns empty-result principal-query proofs
+and their closed call evidence. It contains no Core pointers, native capacities
+or evaluated values. Exact ordered Core/catalog and symbol/producer images
+(including literal bits) precede dynamic input validation. Re-intern imported
+closed evidence into the current session, validate all targets and reserve all
+publication capacity before publishing any memo or call proof. Providers,
+generative identities and unbounded graphs decline. Source-image equality alone
+does not authorize a query whose observed inputs differ. Every lookup clears
+the preceding lookup's borrowed input key, including an in-memory hit.
+
+Only a committed successful revision can export a checkpoint. Export never
+advances its revision; failed edits preserve the last successful export. Loading
+is optional, bounded and compiler-versioned; unsupported or corrupt candidates
+fall back to fresh work, while allocation failures propagate. Source and runtime
+evaluation still run. The host explicitly owns cache file persistence.
+
+Experimental resolved scalar SSA crosses its ownership boundary only after
+ordinary specialization. Every operand refers to an earlier typed value; all
+admitted values are scalar, and instruction order and raw immediates are exact.
+Admission has bounded depth/work and emits nothing on an unsupported form.
+Emission reads only the owned IR. OOM propagates rather than silently falling
+back. Heap/control-flow ownership and overloaded selection are not admitted.
+
+Experimental scalar live-patch images admit no globals, memory, host imports,
+startup, closures or effects. Public semantic scalar ABI and internal machine
+signatures/slot order must match. All internal calls route through stable slots;
+exported trampolines stay in the original instance. A delta imports the table
+without element initialization and carries exact base/next identities. The host
+checks and instantiates the whole delta before synchronous slot publication,
+rejects stale bases, and rolls back publication failure. Closed synchronous
+calls cannot overlap that publication. These rules do not establish safety for
+heap graphs, captured values, running/suspended effects or gdev's live state.
+
 Checked scalar element layouts select pointer-free array allocation and list
 leaves. The descriptor carries this fact through cloning, structural operations
 and conversion. Reference-valued elements keep tracing; machine i32 alone is
 never evidence that a word is scalar. Runtime list branches remain pointerful.
+
+Collection elements that are flat products or structural records with 1–16 checked
+scalar fields use consecutive payload words. Source lengths count rows; indexing,
+overflow checks, copies and edits use the checked row stride. Constants and
+runtime constructors share canonical field order. Extraction creates an owning
+row allocation; no interior pointer escapes. Scalar replacement may eliminate
+that box under its ordinary proof. Raw word copies preserve floating-point bits.
+List descriptors and tree ranges count storage words; typed emission converts
+logical counts and positions. A row may cross leaves. Intermediate word edits
+stay private until the entire row is published; only the first edit consumes a
+possibly shared input. Conversion copies spans and adjusts the private Array
+header back to a logical row count. Direct scalar projections retain evaluation
+and bounds checks without allocating an extracted row.
+Nested, nominal, reference-bearing, erased and wider rows keep the one-word
+element representation. Numeric host arrays retain their existing ABI.
 
 State plus memoized demands can construct real cycles: a demand may read a
 closure from State and cache a result that reaches that same demand. Clearing
@@ -118,16 +210,31 @@ Small aggregate scalar replacement requires full initialization before aliasing
 and fixed field offsets. Every lexical version and loop carry owns separate
 scalar locals. ABI values, captured/escaped values and GC roots remain boxed.
 The pass transforms an assembly copy, preserving retained symbolic fragments.
+Direct loop patterns containing only bindings, wildcards and products need no
+failure blocks; their local definitions dominate the loop body. Patterns with
+runtime tests retain the failure path. Generic iterator lowering still creates
+step/cursor values, and these are not universally eliminated.
+Before scalar replacement, small straight-line direct callees containing one
+bounded allocation can be expanded at the call site. Admission excludes other
+calls, control flow, global/host operations and reads of uninitialized locals.
+Arguments evaluate once, and traps stay at the original call position. Expansion
+is bounded to 96 callee instructions, 64 locals/parameters and approximately
+4,096 caller instructions. Optimized-body reuse checks the full callee body;
+the development tier skips this optional pass.
 Ordinary source inlining has a four-node budget, expanded to 64 for aggregate
 results inside loops or known callback arguments. Nesting is limited to six
 levels and expansion stops past 4,096 emitted instructions. These are structural
 cost limits, independent of declaration names and source modules.
 
-Immutable cursors own a leaf base and its logical start, separate from the
+Word-element cursors own a leaf base and its logical start, separate from the
 collection's lookup cache. Forks only consult that shared cache on a leaf
 crossing. The four-word cursor stays in the previous 32-byte allocation class.
 Serialized cursors start without a cached leaf. Every stored pointer remains an
 allocation base and published cursors are initialized once, never mutated.
+Packed-row cursors keep logical positions with a private leaf cache whose base
+counts words. Direct loops also retain the leaf span. Fields inside that span
+load directly; a field crossing its boundary uses the checked tree lookup.
+Serialized cursors start uncached. No interior pointer is retained.
 
 `function_facts` memoizes bounded source-body facts within one Generator owner.
 Unknown dispatch/calls remain unknown, and inlined bodies retain the ordinary
@@ -144,8 +251,8 @@ effects. The intermediate list must never escape or be observed. Admitted
 regions allocate their final List or Array directly; count overflow uses the
 ordinary path with its original failure order. Reference storage is cleared
 before element evaluation. Ragged/filtered/effectful regions remain ordinary
-builders. The packed scalar-row experiment is a separate fixture and does not
-change the production collection ABI.
+builders. Production packed collections use the flat-row rule above; the recursive
+packed scalar-row planner remains a separate fixture.
 
 Executable fragment validity records each inlined source body and every static
 value root. Exact source/catalog dependencies and complete
@@ -156,6 +263,25 @@ revision and its owners. Within one compile, code and principal/query admission
 share immutable semantic validation arrays through independently released leases.
 Source owners, current Core, allocator and admission options must match; executable
 body/value checks remain separate.
+
+Static closure keys retain binding-to-value roots. Admission compares the whole
+captured graph and records only proven old-to-current value correspondences;
+it never clones an unvalidated value to make a key match. Dynamic capture slots
+still require known layouts. Static generic slots may remain erased because
+their complete evaluator graph supplies the code identity, not a reusable
+principal scheme. Capture environments evaluate and store dynamic arguments
+once in source order.
+
+A projected principal query may retain an empty type/row result across primitive
+literal edits only when its complete source input projection and recorded scalar
+type reads match. It must begin without validated-call proofs and perform no
+value evaluation, nested specialization or unrecorded runtime read. Nominal memo
+inputs retain absence, true and false separately; internal writes preserve the
+final value. Closed call publications are translated into the current evidence
+owner, with source-defined nominal/effect identities checked. Reserve all memo
+capacity before publication. The projected query certifies no runtime or staged
+value: ordinary evaluation still runs and reports errors. Executable admission
+uses its own source and captured-value checks.
 
 ## Frontend interface
 

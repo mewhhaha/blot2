@@ -33,6 +33,13 @@ pub const Stats = struct {
     analyzed: usize = 0,
     small_collections: usize = 0,
     exact_builders: usize = 0,
+    layout_requests: usize = 0,
+    layout_reused: usize = 0,
+    region_requests: usize = 0,
+    evidence_import_requests: usize = 0,
+    evidence_import_reused: usize = 0,
+    region_reused: usize = 0,
+    region_retained_bytes: usize = 0,
 };
 pub const Store = struct {
     entries: std.AutoHashMapUnmanaged(core.BindingRef, Facts) = .empty,

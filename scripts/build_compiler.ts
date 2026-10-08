@@ -18,6 +18,7 @@ const result = await new Deno.Command("zig", {
     "compiler-identity",
     "arena-fixture",
     "list-runtime-fixture",
+    "scalar-patch-fixture",
     "-Doptimize=fast",
   ],
   stdout: "inherit",

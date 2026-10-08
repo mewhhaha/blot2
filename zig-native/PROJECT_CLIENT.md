@@ -40,6 +40,65 @@ file created by `blot dependencies`. A mismatched bundle is rejected.
 `expectedCompilerIdentity` can pin a 64-character lowercase compiler
 fingerprint.
 
+`codegenTier: "development"` skips optional scalar replacement and automatic
+vectorization. Type/effect checking, constant evaluation, explicit cleanup and
+lifetime analysis still run. The default is `"optimized"`. A project session
+keeps its selected tier; start a separate session to compare outputs. Optimized
+body captures are valid only for the tier that produced them. This option does
+not change the optimization mode used to build the native compiler itself.
+
+`shareMachineCode: true` enables the internal body-sharing prototype. Identical
+resolved functions share one Wasm body while their source/evidence identities
+and indirect table slots remain distinct. Exported functions keep distinct
+identities. The default is `false`. On the frozen gdev workload this removes 272
+duplicate bodies and reduces Wasm size by 7.8%; no total compile-time improvement
+has been established. The
+`runtimeOptimization.shared` counter counts removed duplicate bodies. Artifact
+statistics describe the logical functions retained for replay.
+
+`codegenWorkers` requests 1–16 concurrent optimizer workers (default 1). Jobs
+read immutable function bodies and completed lifetime summaries; each worker
+owns its scratch arena. Small builds and edits with fewer than four uncached
+bodies or 4,096 instructions stay serial. `runtimeOptimization.workers` and
+`parallel_jobs` report the actual work scheduled. Output is byte-identical to
+serial assembly. This prototype parallelizes runtime optimization, not semantic
+checking or evaluation. Four workers reduced the measured cold assembly phase
+from about 30 ms to 18 ms on gdev, but total latency was too noisy to establish
+a speedup. It remains opt-in.
+
+`exportCheckpoint()` returns portable backend cache bytes from the last
+successful revision. It queues after earlier builds without advancing the
+revision. Pass those bytes as `checkpoint` when opening another compiler:
+
+```ts
+const checkpoint = await compiler.exportCheckpoint();
+await Deno.writeFile("build/project.blotcache", checkpoint);
+const restarted = await createCompiler({
+  entry: "/project/main.blot",
+  checkpoint: await Deno.readFile("build/project.blotcache"),
+});
+```
+
+The caller owns persistence; the compiler does not read or write cache files
+automatically. Startup copies the provided bytes. A checkpoint contains admitted
+principal-query proofs and optimized function bodies, not evaluated source
+values or arbitrary specializations. Compiler identity, complete source/catalog
+and symbol identities, observed semantic inputs, compilation tier and optimizer
+dependencies govern reuse. Changed or unsupported inputs compile afresh. Stale
+or corrupt cache bytes also fall back to fresh compilation. The encoded input
+must be nonempty and fit the transport frame limit (less than 63 MiB).
+Principal proofs currently require the same canonical producer paths. Moving a
+project or extracting an embedded standard library to a different directory can
+therefore lose semantic reuse even when contents match; exact optimizer-body
+reuse is checked separately.
+
+Exporting before a successful build rejects with `NoSuccessfulRevision`; the
+session remains usable. A failed edit preserves the previous checkpoint.
+`close()` drains exports as well as builds, and `dispose()` interrupts them.
+Saving a checkpoint has its own cost and should be measured separately from
+restoring it. This is an optional restart cache, not a substitute for a retained
+compiler session during editing.
+
 Concurrent builds queue in order. A successful build returns
 `{ success: true,
 revision, bytes, stats }`; a failure returns diagnostics and

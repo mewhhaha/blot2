@@ -1,5 +1,75 @@
 # Compiler direction
 
+The current list-like transfer order is: preserve one typed frontend and shared
+language laws; packed scalar rows and broader general fusion/SIMD; then ragged
+builders, rolling reductions and composable source summaries. Query rewrites,
+runtime caches and workers remain separate measured follow-ups. Their remaining
+scalar/generic frontend convergence is specific to list-like; Blot keeps its
+existing typed path, separate List/Array types and explicit lazy iterators.
+Do not copy eager producer rewrites across effectful iterator pulls.
+
+The first production storage step packs flat scalar List and Array rows. It covers
+literals, static values, fill/generate, exact builders, indexing, updates,
+structural copies, cursors and List/Array conversion. Reference-bearing/nested
+rows retain their previous representation. The full native suite and 546
+guest/client tests pass, including allocation failure and fresh/retained laws.
+The [qualification report](std/PERFORMANCE.md#production-packed-scalar-rows)
+records every runtime and compiler measurement. Direct scalar field
+reads avoid extracted boxes. Packed cursors and direct loops reuse leaf spans;
+bounded allocation-producing callees expose their temporary rows to scalar
+replacement. Broader row fusion and SIMD remain the next representation work.
+The measured generation and conversion fixtures use 6.4× and 4.0× less CPU,
+respectively, but read-only List folds use 1.9× as much CPU. Packed retained
+List storage falls 61%. Closing the traversal regression remains open. This
+batch does not improve compiler latency: paired gdev cold compilation is
+1,466 → 1,606 ms and first edit 389 → 399 ms. Both targets remain unmet.
+
+The compiler-performance program approved after `586e0ae` covers ten hills:
+
+1. Reuse fully optimized function bodies with exact optimizer dependencies.
+2. Include captured values in executable identities and reuse admission.
+3. Recheck individual changed bodies instead of whole modules where valid.
+4. Produce resolved ownership-aware SSA before runtime emission.
+5. Reduce allocation traffic using reusable scratch and immutable sharing.
+6. Persist admitted specializations and optimized dependency fragments.
+7. Share generic machine code where representation and evidence permit it.
+8. Offer a fast development tier with full semantics and required cleanup.
+9. Schedule immutable independent jobs concurrently with deterministic output.
+10. Produce patches for ABI-compatible running Wasm programs.
+
+This program is in progress. Begin with optimized body retention and complete
+dependency laws; retain the frozen compiler and gdev workload in
+`build/compiler-hills/before`. Every stage requires fresh/retained parity,
+failure recovery, allocation ownership and end-to-end measurements. Prototype
+SSA, shared generic code, tiers, concurrency and patches before changing their
+production defaults. No optimization may recognize prelude declaration names.
+
+Current progress: optimized-body retention (1) and scratch/closed-evidence sharing
+(5) are qualified. Capture keys (2) cover anonymous static closures; projected
+principal-query replay (3) covers structurally identical scalar-literal edits,
+not general body-level checking. Exact private machine-body sharing (7), the
+development tier (8) and coarse optimizer jobs (9) are qualified opt-in
+prototypes. Sharing reduces gdev Wasm size by 7.8%; total compile-time gains from
+these options remain unproven. Portable backend checkpoints (6) now restore
+empty-result principal-query proofs and optimized bodies across processes. Their
+full gate and restart measurements pass, with about 30% less child CPU work on
+gdev restarts under a contended host. They do not persist arbitrary
+specializations or evaluated values. Resolved scalar SSA (4) is a private,
+default-off prototype with exact-output and ownership laws; its gdev coverage is
+too narrow to establish a useful speedup. Live scalar Wasm patches (10) have an
+executed native/host prototype, including stable exported identities, recursive
+call redirection and atomic publication. It rejects heap/effect state and has no
+project-client API yet. That preceding checkpoint passed the release build,
+native suite and 539 guest/client tests, with 120 existing lint warnings and
+no errors across 279 files.
+
+The program is not complete: general body-level checking, full resolved
+ownership-aware SSA, arbitrary specialization persistence and stateful live
+patching remain open. The final paired default-path run measures 1,354 → 1,294 ms
+cold, 984 → 378 ms first edit and 982 → 376 ms subsequent edit. Earlier quieter
+runs measured 773/184/171 ms for the candidate; do not compare absolute latency
+across batches. Both targets remain unmet.
+
 The architecture cleanup approved after checkpoint `42cb11f` covers all seven
 review findings. Preserve source behavior, fresh/retained parity and the existing
 cycle laws throughout this migration:
@@ -48,11 +118,12 @@ The follow-up review adopts `splice` and ordered `splice_many` as ordinary
 source functions over structural slices/concatenation. Its paged spine, tiny
 owners and generation caches are still prototypes, not their default layout.
 
-The next transfer batch implements independent immutable cursor caches, bounded
+The previous transfer batch implemented independent immutable cursor caches, bounded
 scalar temporary collections across helpers, rectangular exact-size builders,
-and compile-owned function facts. Packed scalar rows have a separate measured
-fixture; production ABI integration, ragged count passes, rolling reductions,
-summary trees, host span borrows and adaptive runtime workers remain future work.
+and compile-owned function facts. Packed scalar rows began as a separate measured
+fixture; their production integration is the current batch above. Ragged count
+passes, rolling reductions, summary trees, host span borrows and adaptive runtime
+workers remain future work.
 
 The list/iterator program approved on 2026-10-07 follows checkpoint `5f09303`:
 

@@ -16,10 +16,10 @@ pub const Observation = struct {
     complete: bool = true,
     pub fn observe(self: *Observation, region: anytype) void {
         self.regions += 1;
-        self.scopes += region.sources.items.len;
+        self.scopes += region.scratch.sources.items.len;
         self.nodes += region.solver.nodes.items.len;
         self.complete = self.complete and !region.source_interface and !region.retain_selected and !region.complete_demand_bodies;
-        for (region.constraints.items) |constraint| self.complete = self.complete and constraint.solved;
+        for (region.scratch.constraints.items) |constraint| self.complete = self.complete and constraint.solved;
     }
 };
 pub const Record = struct {

@@ -344,6 +344,7 @@ const Generator = struct {
     representation_bridge: ?bridge.Store = null,
     row_keys: substitutions.Store,
     template_keys: substitutions.Store,
+    static_keys: substitutions.Store,
     template_catalog: std.ArrayList(artifacts.CapturedTemplate) = .empty,
     runtime_operations: runtime_operations.Store,
     instances: std.AutoHashMapUnmanaged(artifacts.Key, u32) = .empty,
@@ -375,7 +376,7 @@ const Generator = struct {
             evaluator.deinit();
             return err;
         };
-        var result: Generator = .{ .units = fixture.units, .evaluator = evaluator, .layouts = layouts, .row_keys = substitutions.Store.init(a), .template_keys = substitutions.Store.init(a), .runtime_operations = runtime_operations.Store.initProject(a, fixture.names.view()) };
+        var result: Generator = .{ .units = fixture.units, .evaluator = evaluator, .layouts = layouts, .row_keys = substitutions.Store.init(a), .template_keys = substitutions.Store.init(a), .static_keys = substitutions.Store.init(a), .runtime_operations = runtime_operations.Store.initProject(a, fixture.names.view()) };
         errdefer result.deinit();
         result.physical = try result.layouts.intern(.record, 0, 0, &.{ fixture.right, types.f32_type, fixture.left, types.u32_type });
         const semantic_label = try result.evaluator.evidence.effects.internOperation(.{ .unit = 1, .decl = 23 }, &.{types.f32_type});
@@ -438,6 +439,7 @@ const Generator = struct {
         self.layouts.deinit();
         self.row_keys.deinit();
         self.template_keys.deinit();
+        self.static_keys.deinit();
         self.template_catalog.deinit(a);
         self.runtime_operations.deinit();
         self.instances.deinit(a);

@@ -1,5 +1,343 @@
 # Standard library API and performance audit
 
+## Production packed scalar rows
+
+The 2026-10-08 transfer makes flat tuples and structural records of 1–16 checked
+scalar fields consecutive payload words in both Lists and Arrays. Construction,
+constants, updates, structural copies, cursors and conversions share this rule.
+Source lengths still count rows; List tree ranges count words. Extracted values
+own their storage, and nested/reference-bearing/nominal/erased/wide rows keep
+boxed storage. Distinct List/Array APIs are preserved.
+
+Direct field reads and ordinary scalar replacement remove temporary boxes.
+Plain loop bindings no longer hide definitions inside unnecessary failure
+blocks. A general bounded inlining pass exposes straight-line allocation
+producers to scalar replacement, with complete callee dependencies for reuse.
+Packed cursors and direct loops keep leaf spans; crossing rows use checked word
+lookups. None of these optimizations recognize prelude names.
+
+The comparison is against the preceding compiler-performance checkpoint in
+`build/compiler-hills/final/`, not the original compiler at `586e0ae`.
+`scripts/bench_packed_rows.ts` compiles eight ordinary programs with both
+compilers and runs ten warmups plus 25 alternating runtime pairs. All results
+are checked. Guest calls return scalars; `memoryBytes()` reports linear-memory
+page high-water, not exact live heap bytes. Host contention affected wall time,
+so this table reports median process CPU during each call; raw wall samples are
+also retained. No builds, tests or lint from this task ran during benchmarks.
+
+| 100,000-row fixture | CPU before → after | Wasm page high-water before → after |
+| --- | ---: | ---: |
+| Retained Array fold | 0.137 → 0.148 ms | 3.625 → 2.062 MiB |
+| Retained List fold | 0.218 → 0.420 ms | 3.562 → 1.375 MiB |
+| Retained List cursor | 0.428 → 0.653 ms | 3.562 → 1.375 MiB |
+| Generate + generic fold | 16.622 → 2.604 ms | 5.000 → 2.875 MiB |
+| Comprehension + generic fold | 23.768 → 20.896 ms | 6.750 → 6.812 MiB |
+| Generate + indexed fold | 0.772 → 0.267 ms | 3.625 → 2.062 MiB |
+| Array/List round trip + fold | 18.356 → 4.622 ms | 6.250 → 4.000 MiB |
+| Reference-row fallback | 1.640 → 1.671 ms | 6.688 → 6.688 MiB |
+
+Generation/folding uses about 6.4× less CPU, indexed construction about 2.9× less,
+and the conversion fixture about 4.0× less. Retained packed List storage falls
+61%, and packed Array storage 43%. These are fixture results, not whole-program
+speedups. Read-only List folds use about 1.9× as much CPU and cursors 1.5×;
+retained Array reads are also slightly slower. The comprehension fixture uses
+one additional Wasm page. Closing those traversal costs and eliminating generic
+iterator step/cursor allocations remain open. This is not a universal runtime
+performance improvement.
+
+Five alternating fresh-process pairs and five retained sessions per compiler
+use the same 53-file, 394,294-byte frozen gdev snapshot. Retained edits change
+`robots.blot`'s floor extent, then revert and repeat a no-op. Session population
+is measured separately and excludes opening the session. Fresh wall time
+includes the Python process monitor, compiler launch, output writing and
+teardown; retained time includes the client round trip and byte delivery.
+Wasm validation and hashing follow the measured interval. Filesystem caches and
+other host activity are uncontrolled.
+
+| Compiler measurement | Previous checkpoint | Packed-row candidate |
+| --- | ---: | ---: |
+| Fresh CLI wall median | 1,466.04 ms | 1,605.73 ms |
+| Fresh native CPU median | 1,192.85 ms | 1,220.94 ms |
+| Retained population | 1,800.74 ms | 1,770.88 ms |
+| First edit | 388.51 ms | 398.75 ms |
+| Subsequent edit/revert | 353.27 ms | 370.38 ms |
+| No-op | 6.44 ms | 6.46 ms |
+| Fresh peak RSS median | 76,308 KiB | 75,752 KiB |
+| Retained peak RSS median | 162,216 KiB | 161,372 KiB |
+| Fresh requested allocation bytes | 433,294,622 | 433,590,389 |
+
+There is no compiler-latency win: cold CPU increases about 2.4%, cold wall about
+9.5%, and measured edits also slow slightly. Peak requested live bytes remain
+58,404,972, and tracked live bytes after teardown remain zero. The 500 ms cold /
+100 ms edit targets are unmet. Each compiler's retained outputs exactly match
+its own fresh results, including the edited source; all Wasm validates. Output
+changes from 629,240 to 629,339 bytes because representation/emission changes.
+
+`deno task test:compiler` passes the native suite and **546 guest/client tests**.
+Focused laws cover source evaluation/trap order, raw F32 bits, snapshots, leaf
+crossings, escaped values under collection, allocation failures, changed layout
+and callback dependencies, failed revisions and fresh/retained parity.
+Zig-analyzer checks 280 files with 120 existing warnings and no errors. Formatting,
+TypeScript checks and `git diff --check` pass.
+
+Raw runtime samples are in
+`build/compiler-hills/qualified-packed-rows/runtime-qualified/report.json`;
+gdev samples and summary are in `qualified-packed-rows/gdev/`, driven by
+`build/compiler-hills/paired-packed-rows.ts`. The successful full gate is
+`build/compiler-hills/packed-rows-qualified-gate-2.log`. Binary, compiler identity
+and qualification manifest are frozen in `build/compiler-hills/packed-rows-final/`.
+The binary SHA-256 is
+`453a09fc9a73f24785e059ba90685974468e241044eecd6c7270e689b623de38`.
+These changes are not installed locally. The manifest records their state at
+measurement time, before the source checkpoint commit.
+
+The next work is reducing packed traversal overhead and broader typed row
+fusion/SIMD, followed by ragged builders, rolling reductions and composable
+summaries. Query rewrites, caches and worker facilities remain separate measured
+follow-ups.
+
+## Compiler performance program: final default-path check
+
+The final combined default path was compared with the frozen compiler at
+`586e0ae` using five alternating pairs on the same 53-file, 394,294-byte gdev
+snapshot. No builds, tests or lint jobs from this task ran during measurement;
+other host activity remained uncontrolled. The original/candidate comparison
+within this run is valid; absolute times should not be compared across batches.
+
+| Median | Original | Final candidate |
+| --- | ---: | ---: |
+| Fresh CLI wall, including monitor launch | 1,353.99 ms | 1,294.01 ms |
+| Fresh native process wall | 1,324.94 ms | 1,264.80 ms |
+| Retained population | 1,909.19 ms | 1,797.57 ms |
+| First edit | 983.77 ms | 377.54 ms |
+| Subsequent edit/revert | 982.47 ms | 375.60 ms |
+| No-op | 6.33 ms | 7.75 ms |
+| Fresh peak RSS | 75,536 KiB | 75,388 KiB |
+| Retained peak RSS | 159,660 KiB | 161,508 KiB |
+| Fresh requested allocation bytes | 503,461,351 | 433,294,622 |
+| Fresh allocation calls | 1,584,139 | 1,457,381 |
+
+First and subsequent edits improve about 62%; cold compilation improves about
+4%. Allocation traffic falls 14%, while peak tracked live bytes stay at
+58,404,972. Peak RSS is essentially unchanged. Every Wasm hash matches the
+original, including the changed-source result. The 500 ms cold / 100 ms edit
+targets remain unmet. Opt-in tiers, sharing, workers, restart checkpoints and
+the private SSA prototype are excluded from this default-path comparison.
+
+The release build, native suite and 539 guest/client tests pass. Lint reports
+120 existing warnings and no errors across 279 files. Raw samples and summary
+are in `build/compiler-hills/qualified-final/`; the driver is `paired-final.ts`.
+The exact binary and qualification manifest are frozen at
+`build/compiler-hills/final/`. At measurement time it was not installed or committed.
+
+## Compiler performance program: first batch
+
+The first batch after `586e0ae` retains fully optimized runtime bodies with exact
+source/callee/lifetime dependencies, includes captured static values in anonymous
+closure identities, memoizes immutable layout roots, shares bounded inference
+scratch, and indexes callable definitions once per compilation. Projected
+principal receipts replay closed call proofs across primitive literal edits
+when the complete structural input and observed semantic inputs match. Ordinary
+evaluation still executes changed values and preserves traps. This is a bounded
+principal-query optimization, not general body-level incremental checking.
+
+Five alternating pairs compare the frozen original binary against the candidate
+on the frozen 53-file, 394,294-byte gdev workload. Retained sessions include
+initial cache population, `robots.blot` literal 60.0 → 61.0, revert, and no-op.
+No build, test or linter ran concurrently with these measurements.
+
+| Median | Original | Candidate |
+| --- | ---: | ---: |
+| Fresh CLI wall | 902.16 ms | 902.11 ms |
+| Fresh native CPU | 871.76 ms | 864.07 ms |
+| Retained population | 992.71 ms | 974.75 ms |
+| First edit | 562.36 ms | 241.04 ms |
+| Subsequent edit/revert | 543.48 ms | 230.37 ms |
+| No-op | 2.85 ms | 2.56 ms |
+| Fresh peak RSS | 75,944 KiB | 76,708 KiB |
+| Retained peak RSS | 160,708 KiB | 161,988 KiB |
+| Fresh requested allocation bytes | 503,461,351 | 437,771,206 |
+| Fresh allocation calls | 1,584,139 | 1,476,830 |
+
+Fresh wall time includes launching the Python process monitor, the native
+compiler, output writing and teardown. Filesystem caches are uncontrolled;
+“fresh” means a new compiler process, not a guaranteed cold disk cache. Retained
+time includes the public client round trip and byte delivery, excluding the
+additional output hash. The first edit is about 57% faster. Cold latency does not
+improve measurably, and both the 500 ms cold / 100 ms edit targets remain unmet.
+Allocation traffic falls 13%; peak tracked live bytes remain 58,404,972, so the
+allocation reduction must not be described as a 13% reduction in peak memory.
+
+Every original/candidate output hash matches: population/revert/no-op produce
+629,240 bytes with SHA-256
+`5cc558f49e8121632b9b78a5099fbe6d85b63fcaa15d1acfb4eebe1791476cf7`;
+the edited result is
+`d37615ab9a2246821abe1eba9a895f41fef4cf3aec7d67de3d1999bdef60b2b5`.
+The full compiler gate passes, including 536 guest/client tests. Allocation
+failure laws cover retained publication and scratch ownership; executed tests
+cover static capture distinctions, changed staged values, errors and recovery.
+
+Local raw artifacts are under `build/compiler-hills/qualified-stage2/`:
+`samples.jsonl` and `summary.json`; the harness is
+`build/compiler-hills/paired.ts`, and the gate log is
+`build/compiler-hills/gate-stage2.log`. The original binary and identity are in
+`build/compiler-hills/before/`; the qualified candidate is frozen at
+`build/compiler-hills/principal-reuse/blotc`. Detailed profiling is opt-in through
+`profileBackend`; its timings are not mixed into the paired measurements.
+
+## Compiler performance program: closed evidence and query imports
+
+The next qualified checkpoint prepares a checked principal graph importer once
+per valid owner and shares repeated closed evidence imports within an inference
+region. Sharing includes depth and owner/physical-clock validity; it never
+merges open solver variables. Rollback, physical mutations, a changed depth
+limit and pooled-owner reuse revoke cached answers. Ordinary chronological
+substitution semantics remain unchanged.
+
+Five new alternating pairs use the same frozen workload, original compiler,
+monitor and edit sequence as the first batch. These are within-run comparisons;
+absolute timings from the earlier run are not a valid estimate of the marginal
+gain from these additions.
+
+| Median | Original | Candidate |
+| --- | ---: | ---: |
+| Fresh CLI wall, including monitor launch | 807.49 ms | 773.14 ms |
+| Fresh native process wall | 788.91 ms | 754.60 ms |
+| Retained population | 906.60 ms | 884.92 ms |
+| First edit | 508.21 ms | 183.69 ms |
+| Subsequent edit/revert | 500.07 ms | 170.58 ms |
+| No-op | 2.62 ms | 2.67 ms |
+| Fresh peak RSS | 75,800 KiB | 75,900 KiB |
+| Retained peak RSS | 160,348 KiB | 161,388 KiB |
+| Fresh requested allocation bytes | 503,461,351 | 433,294,622 |
+| Fresh allocation calls | 1,584,139 | 1,457,381 |
+
+Cold compilation improves about 4%; first and subsequent edits improve about
+64% and 66%. Allocation traffic falls 14%, while peak tracked live bytes remain
+58,404,972. Both latency targets remain unmet. All output hashes remain identical
+to those listed above. Native tests, allocation-failure laws and 536 guest/client
+tests pass; zig-analyzer reports 120 warnings and no errors across 263 files.
+
+An independent opt-in profile attributes about 567 ms of cold backend work to
+inference and only 16 ms to assembly/optimization. The largest principal region
+visits 13,863 scopes and creates 295,105 solver nodes. The profiled first edit
+replays 1,438 closed call proofs, spends about 59 ms in remaining inference and
+6 ms in assembly. These profiles locate work; their instrumented times are not
+mixed into the paired distributions.
+
+Raw samples and summary are in `build/compiler-hills/qualified-stage3/`;
+the driver is `build/compiler-hills/paired-stage3.ts`. The candidate binary and
+identity are frozen in `build/compiler-hills/closed-imports/`. Native, guest,
+release and linter logs have the `closed-import` prefix. This report qualifies
+the default path, before the later opt-in tier/sharing/parallel prototypes.
+
+## Compiler performance program: tiers, body sharing and workers
+
+The opt-in development tier, exact private machine-body sharing and coarse
+optimizer workers pass 1,077 native and 537 guest/client tests. Sharing preserves
+logical function/table identities, public function identities, captured values,
+traps and fresh/retained parity. Development still performs checking, evaluation
+and lifetime cleanup. Worker failures join every job and release its storage;
+allocation-failure tests account for schedule-dependent arena growth.
+
+Five rotating/reversed runs compare each option on the frozen gdev workload.
+Other applications contended for this machine; no compiler build, test or linter
+from this task ran concurrently. Total population medians ranged from 1.58 to
+1.80 seconds, with similar process CPU totals. This run does **not** establish an
+end-to-end compilation speedup or a default-path regression.
+
+| Option | Cold assembly median | Physical Wasm bodies | Wasm bytes |
+| --- | ---: | ---: | ---: |
+| Optimized, serial | 30.3 ms | 1,536 | 629,240 |
+| Development, serial | 17.4 ms | 1,536 | 605,222 |
+| Exact private body sharing | 30.2 ms | 1,264 | 580,188 |
+| Two optimizer workers | 24.8 ms | 1,536 | 629,240 |
+| Four optimizer workers | 17.7 ms | 1,536 | 629,240 |
+
+Sharing removes 272 duplicate bodies and reduces output size by 7.8%. Parallel
+output is byte-identical to serial output; all variants match their respective
+fresh rebuilds after edits. Two changed bodies on a retained edit fall below
+the parallel threshold. Serial optimized compilation without sharing remains
+the default: semantic inference dominates this workload.
+
+Raw samples and summaries are in `build/compiler-hills/qualified-stage4/`,
+with driver `options-stage4.ts` and frozen binary/identity in
+`build/compiler-hills/optimization-options/`. Final native and guest logs are
+`native-stage4-final.log` and `guest-stage4-corrected.log`. The linter reports
+120 warnings and no errors across 271 files.
+
+## Compiler performance program: portable backend checkpoints
+
+The explicit `exportCheckpoint()` / `checkpoint` API retains empty-result
+principal-query proofs and optimized bodies across compiler process death. It
+checks the complete Core/catalog and symbol image, observed semantic inputs,
+compiler identity and optimizer dependencies before reuse. Source validation
+and compile-time evaluation still execute. Failed edits preserve the last
+successful checkpoint; stale and corrupt candidates fall back to fresh work.
+The full compiler gate passes, including 538 guest/client tests.
+
+The frozen gdev checkpoint is 3,217,806 bytes. It restores 1,438 closed call proofs
+and all 1,536 optimized bodies. Every initial/edit/revert/no-op output matches the
+fresh compiler byte-for-byte. Five alternating pairs include checkpoint file
+reading, process spawn, open/decode, source checking, compilation and response.
+Filesystem caches are warm; Deno launch and process close are excluded.
+
+This machine was heavily contended during the run. Fresh-process wall medians
+were 2,987 ms without a checkpoint and 2,482 ms with it, with fresh samples ranging
+from 2,569 to 5,485 ms. These absolute numbers cannot be compared with the quieter
+773 ms CLI measurements above or used as a target-latency result. Median child
+CPU work fell from about 1.44 s to 1.01 s (100 Hz process counters), approximately
+30%. CPU totals for subsequent edits were essentially unchanged. Cold peak RSS
+was about 107 versus 109 MiB; retained peak RSS was about 154 versus 160 MiB.
+
+Cache creation is visible: the one recorded population took 1,474 ms, and export
+plus writing the checkpoint took another 47 ms. Median restart/open time rose
+from 3 ms to 170 ms including reading, transfer and decoding. Restoring a
+checkpoint saves semantic work after that cost; it does not replace retaining a
+live compiler during editing.
+
+Raw samples and summary are in `build/compiler-hills/qualified-checkpoint/`,
+with driver `checkpoint-bench.ts`. The qualified binary and identity are frozen
+in `build/compiler-hills/backend-checkpoints/`. The gate log is
+`checkpoint-gate.log`. Lint checked 274 files with no errors; its additional
+owning-optional warning was confirmed as a false positive at the existing
+`AlreadyOpen` guard and is documented locally in the following change.
+
+## Compiler performance program: resolved IR and live-patch experiments
+
+The resolved scalar SSA experiment owns value definitions, explicit operands,
+types and trap facts after ordinary specialization. Emission works after checked
+source/solver owners are destroyed. Native allocation-failure laws and exact
+Wasm comparisons cover arithmetic, raw floating constants, traps and fallback.
+It admits only two bodies (six value definitions) in gdev. Five alternating
+same-process fresh-session runs measure medians of 1,420 ms on the existing path
+and 1,397 ms with the prototype. This narrow coverage does not establish a useful
+whole-compiler speedup; the policy remains off. Full heap/control-flow SSA needs
+a substantially broader semantic lowering boundary. Samples and the standalone
+driver are `build/compiler-hills/ssa-bench.log` and `ssa-bench.zig`.
+
+The live-patch experiment replaces only changed functions in closed stateless
+scalar Wasm modules. Stable table slots redirect unchanged callers and recursive
+calls, while exported trampolines retain their function identities. Native tests
+cover owned snapshots, failed allocations and incompatible ABI/state rejection.
+The executed-Wasm fixture covers one changed helper, stale/corrupt input,
+publication ordering, revert, signed zero and division traps. No table mutation
+runs during patch instantiation. The host validates first and publishes all
+slots synchronously, with rollback on failure.
+
+This is an internal native/host experiment, not a project-client patch API.
+Globals, heap references, host imports, captured functions and suspended effects
+decline. It cannot patch gdev yet. Reproduce its execution laws with the
+`scalar-patch-fixture` build step and `scalar_live_patch.test.ts`; focused logs
+are `scalar-patch-native.log` and `scalar-patch-execution.log`.
+
+The final release build, native suite and 539 guest/client tests pass, with 120
+existing linter warnings and no errors across 279 files. A combined task was
+externally terminated during the native stage (exit 143, no test failure); its
+release build completed, and the unchanged native and guest stages passed when
+run separately. Final logs are `prototypes-native-final.log`,
+`prototypes-guest-final.log` and `prototypes-final-analyzer.log`.
+
 ## List transfer batch
 
 The first transfer batch from `../list-like` is implemented through general
@@ -37,8 +375,9 @@ constructing and reducing 100,000 escaping three-word U32/F32/F32 rows takes
 0.672 → 0.158 ms. Heap storage falls 3,724,288 → 2,097,152 bytes, about 44%.
 Checks compare every field's raw bits, including F32 signed zero and NaN payloads.
 The planner supports nested tuples/structural records; the measured fixture is
-flat. Reference-bearing and nominal layouts are rejected. Production List and
-Array values do not yet use packed rows, and Lists retain the existing AVL tree.
+flat. Reference-bearing and nominal layouts are rejected. At that checkpoint,
+production List and Array values did not use packed rows. Lists retain the
+existing AVL tree.
 
 The same frozen gdev workload contains 394,294 source bytes across 53 files.
 Five alternating fresh-process pairs with warm filesystem caches and three

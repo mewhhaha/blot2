@@ -70,6 +70,29 @@ test "Chunk list runtime publication releases every allocation failure" {
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, runtimeFailures, .{});
 }
 
+fn packedEmissionFailures(a: std.mem.Allocator, units: []const core.Module) !void {
+    var result = try @import("core_backend.zig").compileWithOptions(a, units, 1, .{ .retain_artifacts = true });
+    defer result.deinit(a);
+    try std.testing.expect(result.diagnostic == null);
+    try std.testing.expect(result.bytes.len > 8);
+}
+test "packed array constants and runtime copies release every emission allocation failure" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\const saved = [(3, 7)]
+        \\entry const run = fn (value: U32) => do:
+        \\  let rows = @array.fill 2 (value, value)
+        \\  let copied = @array.from_list (@list.concat (@list.from_array rows) saved)
+        \\  let row = @array.get copied 2
+        \\  let (left, right) = row
+        \\  return @u32.add left right
+    );
+    defer module.deinit(a);
+    const units = [_]core.Module{module};
+    try packedEmissionFailures(a, &units);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, packedEmissionFailures, .{&units});
+}
+
 test "collection ownership rejects an old value observed after an update and on either branch" {
     const a = std.testing.allocator;
     var module = try lower(a,

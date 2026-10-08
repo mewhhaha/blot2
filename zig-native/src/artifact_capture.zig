@@ -11,6 +11,7 @@ pub const Capture = struct {
     metadata: metadata.Context,
     emission: emitter.Recorder,
     cached_units: usize = 0,
+    optimized: ?@import("optimized_bodies.zig").Capture = null,
 
     /// Selection is globally guarded before any retained lookup. This first
     /// admission rejects fresh associated implementations and structural
@@ -69,6 +70,7 @@ pub const Capture = struct {
     }
 
     pub fn deinit(self: *Capture) void {
+        if (self.optimized) |*optimized| optimized.deinit();
         self.emission.deinit();
         self.metadata.deinit();
         self.* = undefined;

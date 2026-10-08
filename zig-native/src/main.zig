@@ -33,7 +33,9 @@ pub const compiler_defaults = .{ .artifact_replay = compiler_identity.artifact_r
 
 const Command = enum { lex, parse, check, build, dependencies, parse_project, check_project, build_project };
 const Stats = struct {
+    backend_timing: @import("backend_timing.zig").Stats = .{},
     optimization: @import("function_facts.zig").Stats = .{},
+    runtime_optimization: @import("optimized_bodies.zig").Stats = .{},
     source_bytes: usize = 0,
     tokens: usize = 0,
     syntax_nodes: usize = 0,
@@ -196,6 +198,8 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         // reporting the diagnostic and leaving compilation.
         stats.code_instances = compiled.code_instances;
         stats.optimization = compiled.optimization;
+        stats.runtime_optimization = compiled.runtime_optimization;
+        stats.backend_timing = compiled.timing;
         stats.callable_wrappers = compiled.callable_wrappers;
         stats.emitted_functions = compiled.emitted_functions;
         stats.constant_steps = compiled.constant_steps;
@@ -241,6 +245,8 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var body_lowerings: usize = 0;
     var code_instances: usize = 0;
     var optimization: @import("function_facts.zig").Stats = .{};
+    var runtime_optimization: @import("optimized_bodies.zig").Stats = .{};
+    var backend_timing: @import("backend_timing.zig").Stats = .{};
     var callable_wrappers: usize = 0;
     var emitted_functions: usize = 0;
     var wasm_bytes: usize = 0;
@@ -350,7 +356,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         }
         teardown_us += elapsed(release_start, io);
         const emit_start = now(io);
-        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit });
+        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit });
         defer {
             const result_release_start = now(io);
             compiled.deinit(allocator);
@@ -358,6 +364,8 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         }
         code_instances = compiled.code_instances;
         optimization = compiled.optimization;
+        runtime_optimization = compiled.runtime_optimization;
+        backend_timing = compiled.timing;
         callable_wrappers = compiled.callable_wrappers;
         emitted_functions = compiled.emitted_functions;
         constant_steps = compiled.constant_steps;
@@ -398,6 +406,8 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .body_lowerings = body_lowerings,
         .code_instances = code_instances,
         .optimization = optimization,
+        .runtime_optimization = runtime_optimization,
+        .backend_timing = backend_timing,
         .callable_wrappers = callable_wrappers,
         .emitted_functions = emitted_functions,
         .constant_steps = constant_steps,

@@ -371,11 +371,19 @@ to a function expecting the other is a type error. `List.from_array values` and
 `Array.from_list values` explicitly copy between representations.
 
 The Zig runtime backs lists with balanced trees of dense leaves. Small leaves
-grow with demand, up to 248 elements. Exclusive end edits reuse storage; shared
+grow with demand, up to 248 words. Exclusive end edits reuse storage; shared
 edits copy one leaf and its tree path, preserving earlier versions. Traversal
-caches the current leaf; direct list loops traverse a whole leaf before
+caches the current leaf; word-element loops traverse a whole leaf before
 resolving the next one. Arrays stay contiguous with constant-time indexing;
 array append/prepend copies the contents.
+
+Lists and arrays of small, flat scalar tuples or records store the fields
+consecutively, without a separate heap object for each row. Reads still produce ordinary
+immutable values: keeping a row, capturing it or editing the array preserves
+the earlier value. Nested and reference-bearing rows retain their existing
+boxed storage. Lengths and slices count logical elements, including when a
+packed row crosses a list leaf boundary. List/Array conversion copies spans
+of words without constructing a separate object for each row.
 
 Both types have ordinary prelude members `values.length` and `values.is_empty`.
 Only arrays support `values[index]`, `values[index] := replacement`, `get`, and

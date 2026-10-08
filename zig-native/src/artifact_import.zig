@@ -53,6 +53,9 @@ pub const Importer = struct {
     template_keys: std.AutoHashMapUnmanaged(SubstitutionKey, u32) = .empty,
     row_keys: std.AutoHashMapUnmanaged(SubstitutionKey, u32) = .empty,
     captures: std.AutoHashMapUnmanaged(u32, u32) = .empty,
+    /// Correspondence proved by complete static value/evidence/capture graphs.
+    /// These IDs belong to this Importer's old and current evaluator owners.
+    value_anchors: std.AutoHashMapUnmanaged(u32, u32) = .empty,
     operation_labels: ?[]u32 = null,
     operation_scopes: ?[]OperationScope = null,
 
@@ -159,6 +162,7 @@ pub const Importer = struct {
         self.template_keys.deinit(self.allocator);
         self.row_keys.deinit(self.allocator);
         self.captures.deinit(self.allocator);
+        self.value_anchors.deinit(self.allocator);
         if (self.operation_labels) |labels| self.allocator.free(labels);
         if (self.operation_scopes) |scopes| self.allocator.free(scopes);
         if (self.names) |*names| names.deinit(self.allocator);
@@ -255,7 +259,7 @@ pub const Importer = struct {
     }
 
     pub fn importRequest(self: *Importer, generator: anytype, old_request: artifacts.Request) Allocator.Error!?artifacts.Request {
-        return self.request(generator, old_request) catch |err| switch (err) {
+        return self.request(generator, old_request, true) catch |err| switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             error.Declined => null,
         };
@@ -263,10 +267,68 @@ pub const Importer = struct {
     /// Exact current-owner equality after structural import. Hashes and IDs from
     /// different owners never authorize a match, and operation tables are read-only.
     pub fn matches(self: *Importer, generator: anytype, old_request: artifacts.Request, current: artifacts.Request) Allocator.Error!bool {
+        if (old_request == .closure and current == .closure and (old_request.closure.static_values != 0 or current.closure.static_values != 0)) {
+            var actual = current;
+            actual.closure.static_values = 0;
+            const imported = self.request(generator, old_request, false) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+            if (!std.meta.eql(imported, actual)) return false;
+            return self.matchStaticKey(generator, old_request.closure.static_values, current.closure.static_values);
+        }
         const imported = (try self.importRequest(generator, old_request)) orelse return false;
         return std.meta.eql(imported, current);
     }
-    fn request(self: *Importer, g: anytype, old_request: artifacts.Request) Error!artifacts.Request {
+    fn staticEntries(self: *const Importer, id: u32) Error![]const substitutions.Entry {
+        if (id == 0) return &.{};
+        if (id > self.old.static_values.spans.len) return error.Declined;
+        const span = self.old.static_values.spans[id - 1];
+        const entries = try bounded(substitutions.Entry, self.old.static_values.entries, span.start, span.len);
+        for (entries, 0..) |entry, index| {
+            if (entry.variable == 0 or entry.value >= self.old.evaluator.values.len) return error.Declined;
+            if (index != 0 and entry.variable <= entries[index - 1].variable) return error.Declined;
+        }
+        return entries;
+    }
+    /// Merge only a correspondence already proved by source_value_template.
+    /// Conflicting alias relationships decline rather than overwrite a proof.
+    pub fn recordValueAnchors(self: *Importer, anchors: []const u32) Allocator.Error!bool {
+        if (anchors.len != self.old.evaluator.values.len) return false;
+        for (anchors, 0..) |current, old| if (current != 0) {
+            if (self.value_anchors.get(@intCast(old))) |known| if (known != current) return false;
+        };
+        for (anchors, 0..) |current, old| if (current != 0) try self.value_anchors.put(self.allocator, @intCast(old), current);
+        return true;
+    }
+    fn matchStaticKey(self: *Importer, g: anytype, old_id: u32, current_id: u32) Allocator.Error!bool {
+        const before = self.staticEntries(old_id) catch return false;
+        const after = g.static_keys.get(current_id);
+        if (before.len != after.len or before.len == 0) return false;
+        const gate = if (self.code_gate) |*owned| &owned.semantic else return false;
+        const roots = try self.allocator.alloc(u32, before.len);
+        defer self.allocator.free(roots);
+        for (before, after, roots) |old, current, *root| {
+            if (old.variable != current.variable) return false;
+            root.* = old.value;
+        }
+        const inspection = try @import("source_value_template.zig").Plan.inspectRootsWithRows(self.allocator, self.old, gate, roots, .source_declared);
+        var plan = inspection.plan orelse return false;
+        defer plan.deinit(self.allocator);
+        const anchors = try self.allocator.alloc(u32, self.old.evaluator.values.len);
+        defer self.allocator.free(anchors);
+        @memset(anchors, 0);
+        for (before, after) |old, current| {
+            if (!(plan.matchInto(g, self, old.value, current.value, anchors) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false)) return false;
+        }
+        return self.recordValueAnchors(anchors);
+    }
+    fn staticKey(self: *Importer, g: anytype, id: u32) Error!u32 {
+        if (id == 0) return 0;
+        const source = try self.staticEntries(id);
+        const entries = try self.allocator.alloc(substitutions.Entry, source.len);
+        defer self.allocator.free(entries);
+        for (source, entries) |old, *current| current.* = .{ .variable = old.variable, .value = if (old.value == 0) 0 else self.value_anchors.get(old.value) orelse return error.Declined };
+        return g.static_keys.intern(entries) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else error.Declined;
+    }
+    fn request(self: *Importer, g: anytype, old_request: artifacts.Request, import_static: bool) Error!artifacts.Request {
         try self.bind(g);
         return switch (old_request) {
             .named => |old_key| blk: {
@@ -297,11 +359,28 @@ pub const Importer = struct {
                 key.ty = try self.shape(g, key.ty, 0);
                 key.captures = try self.shape(g, key.captures, 0);
                 if (g.layouts.node(key.ty).tag != .function or g.layouts.node(key.captures).tag != .product) return error.Declined;
-                if (!knownLayout(&g.layouts, key.ty, 0) or !knownLayout(&g.layouts, key.captures, 0)) return error.Declined;
+                if (!knownLayout(&g.layouts, key.ty, 0)) return error.Declined;
+                if (old_key.static_values == 0) {
+                    if (!knownLayout(&g.layouts, key.captures, 0)) return error.Declined;
+                } else {
+                    const module = self.old.modules[old_key.unit - 1].module;
+                    const capture_span = module.closures[old_key.catalog].captures;
+                    const bindings = module.extra[capture_span.start..][0..capture_span.len];
+                    const layouts = g.layouts.children(key.captures);
+                    if (bindings.len != layouts.len) return error.Declined;
+                    const statics = try self.staticEntries(old_key.static_values);
+                    for (bindings, layouts) |binding, actual| {
+                        const is_static = for (statics) |item| {
+                            if (item.variable == binding) break true;
+                        } else false;
+                        if (!is_static and !knownLayout(&g.layouts, actual, 0)) return error.Declined;
+                    }
+                }
                 key.templates = try self.templateKey(g, old_key.unit, key.templates, 0);
                 key.evidence = try self.mappingEvidence(g, old_key.unit, key.evidence, 0);
                 key.rows = try self.rowKey(g, old_key.unit, key.rows, 0);
                 key.parameter_template = if (key.parameter_template == 0) 0 else try self.capture(g, key.parameter_template, 0);
+                key.static_values = if (import_static) try self.staticKey(g, old_key.static_values) else 0;
                 break :blk .{ .closure = key };
             },
             .callable => |old_key| .{ .callable = .{ .target = try self.target(old_key.target), .ty = try self.closedShape(g, old_key.ty), .applied = old_key.applied } },
@@ -430,6 +509,23 @@ pub const Importer = struct {
     /// validated-call certificates are published by this operation.
     pub fn importPrincipalEvidence(self: *Importer, generator: anytype, old_owner: u32, type_maps: []const evidence.Mapping, row_maps: []const evidence.RowMapping) Allocator.Error!?core_eval.SolvedEvidence {
         return self.principalEvidence(generator, old_owner, type_maps, row_maps) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else null;
+    }
+    /// A retained principal query may also have published a closed call proof.
+    /// Its caller must validate the query's full source image and dynamic inputs.
+    /// This operation translates the evidence; it publishes no certificate.
+    pub fn importPrincipalCall(self: *Importer, generator: anytype, reference: core.BindingRef, actual: u32) Allocator.Error!?u32 {
+        return self.principalCall(generator, reference, actual) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else null;
+    }
+    fn principalCall(self: *Importer, generator: anytype, reference: core.BindingRef, actual: u32) Error!u32 {
+        try self.bind(generator);
+        const previous = try self.oldModule(reference.unit);
+        const current = &self.units[(try self.unit(reference.unit, true)) - 1];
+        if (reference.binding == 0 or reference.binding >= previous.bindings.len or reference.binding >= current.bindings.len) return error.Declined;
+        if (previous.binding(reference.binding).kind != .global or current.binding(reference.binding).kind != .global or previous.body(reference.binding) == null or current.body(reference.binding) == null) return error.Declined;
+        var remaining: usize = 1_000_000;
+        try self.principalType(actual, 0, &remaining);
+        if (self.old.evaluator.evidence.view().node(actual).tag != .function) return error.Declined;
+        return self.semanticType(generator, actual, 0);
     }
     fn principalEvidence(self: *Importer, g: anytype, owner: u32, type_maps: []const evidence.Mapping, row_maps: []const evidence.RowMapping) Error!core_eval.SolvedEvidence {
         try self.bind(g);

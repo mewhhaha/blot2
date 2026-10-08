@@ -45,6 +45,7 @@ pub const ResolvedBody = struct {
     }
 };
 pub const Service = struct {
+    timing: ?*@import("backend_timing.zig").Work = null,
     allocator: Allocator,
     units: []const core.Module,
     evaluator: *core_eval.Session,
@@ -116,6 +117,8 @@ pub const Service = struct {
         return self.refineMappingsCaptures(unit_id, root, expected, mappings, rows, span, &.{});
     }
     pub fn refineMappingsCaptures(self: *Service, unit_id: u32, root: EvidenceRoot, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span, captures: []const core_eval.RetainedCapture) Error!void {
+        const timing = if (self.timing) |work| work.enter(.specialization) else null;
+        defer if (timing) |scope| scope.deinit();
         self.refinement_stats.requests += 1;
         var seeds: std.ArrayList(type_evidence.Mapping) = .empty;
         defer seeds.deinit(self.allocator);

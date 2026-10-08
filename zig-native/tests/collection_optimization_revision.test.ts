@@ -29,6 +29,7 @@ entry const answer = fn seed => consume (pair seed)
 entry const product = fn values => build values
 `;
   const retained = await createZigProjectCompiler(options);
+  let successes = 0;
   try {
     for (
       const source of [
@@ -46,6 +47,19 @@ entry const product = fn values => build values
         continue;
       }
       ok(built.success, JSON.stringify(built));
+      const optimizer = built.stats.runtimeOptimization as {
+        functions: number;
+        reused: number;
+        optimized: number;
+      };
+      ok(optimizer.functions > 0);
+      if (successes++ === 1) {
+        ok(optimizer.reused > 0, JSON.stringify(optimizer));
+      }
+      deepStrictEqual(
+        optimizer.functions,
+        optimizer.reused + optimizer.optimized,
+      );
       const fresh = await createZigProjectCompiler(options);
       try {
         const expected = await fresh.build({ sources });

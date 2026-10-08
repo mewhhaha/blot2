@@ -14,7 +14,7 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 
 const Request = struct {
-    kind: enum { open, build, close },
+    kind: enum { open, build, close, checkpoint },
     id: u32,
     epoch: ?[]const u8 = null,
     revision: ?u64 = null,
@@ -23,6 +23,11 @@ const Request = struct {
     stdRoot: ?[]const u8 = null,
     imports: []const project.Alias = &.{},
     dependencies: ?[]const u8 = null,
+    profileBackend: bool = false,
+    codegenTier: @import("compilation_tier.zig").Tier = .optimized,
+    shareMachineCode: bool = false,
+    codegenWorkers: u8 = 1,
+    checkpoint: bool = false,
     sources: []const SourceRange = &.{},
 };
 const SourceRange = struct { path: []const u8, start: u32, length: u32, deleted: bool = false };
@@ -63,6 +68,7 @@ fn validPath(path: []const u8) bool {
     return path.len != 0 and std.Io.Dir.path.isAbsolute(path) and std.mem.findScalar(u8, path, 0) == null;
 }
 fn validateOpen(request: Request) !project.Options {
+    if (request.codegenWorkers == 0 or request.codegenWorkers > 16) return error.InvalidOpen;
     if (request.entry == null or !validPath(request.entry.?) or request.epoch != null or request.revision != null) return error.InvalidOpen;
     for ([_]?[]const u8{ request.prelude, request.stdRoot, request.dependencies }) |path| if (path) |p| {
         if (!validPath(p)) return error.InvalidOpen;
@@ -80,7 +86,7 @@ const OpenProject = struct {
     options_owner: inputs.Snapshot,
     session: retained.Session,
 
-    fn init(a: Allocator, io: Io, request: Request, compiler: [32]u8) !OpenProject {
+    fn init(a: Allocator, io: Io, request: Request, compiler: [32]u8, checkpoint_bytes: []const u8) !OpenProject {
         const raw = try validateOpen(request);
         const entry = try a.dupe(u8, request.entry.?);
         errdefer a.free(entry);
@@ -99,7 +105,16 @@ const OpenProject = struct {
             const seed = try dep_loader.load(a, io, bytes, compiler, dep_cli.settings(actual), actual, &stats);
             break :blk retained.Session.init(a, seed, options.options);
         } else try retained.Session.initEmpty(a, options.options);
+        errdefer session.deinit();
         session.enableProjectBuildReuse();
+        session.profile_backend = request.profileBackend;
+        session.policy.codegen_tier = request.codegenTier;
+        session.policy.share_machine_code = request.shareMachineCode;
+        if (checkpoint_bytes.len != 0) session.checkpoint = @import("backend_checkpoint.zig").decode(a, compiler, checkpoint_bytes) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => null, // Optional candidates never replace source validation.
+        };
+        session.policy.codegen_workers = request.codegenWorkers;
         // Private pilot executable only; ordinary Session defaults stay off.
         session.policy.reuse_unchanged_output = true;
         return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session };
@@ -179,6 +194,9 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
                     .frontend = result.result.stats,
                     .backend = result.result.compiled.reuse,
                     .optimization = result.result.compiled.optimization,
+                    .runtimeOptimization = result.result.compiled.runtime_optimization,
+                    .backendTiming = result.result.compiled.timing,
+                    .principals = result.result.compiled.principal,
                     .sourceBytes = result.source_bytes,
                     .freshModules = result.fresh_modules,
                     .cachedModules = result.cached_modules,
@@ -209,7 +227,7 @@ pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compile
         .protocol = "blot-zig-project",
         .version = 1,
         .compilerIdentity = &identity,
-        .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays" },
+        .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "backend-checkpoints" },
         .maxFrameBytes = frames.max_frame_bytes,
     }, &.{});
     var opened: ?OpenProject = null;
@@ -225,15 +243,29 @@ pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compile
         last_id = request.id;
         switch (request.kind) {
             .open => {
-                if (request.sources.len != 0 or frame.payload().len != 0) return error.InvalidOpen;
+                if (request.sources.len != 0 or request.checkpoint != (frame.payload().len != 0)) return error.InvalidOpen;
                 if (opened != null) return error.AlreadyOpen;
-                opened = try OpenProject.init(a, io, request, compiler);
+                // AlreadyOpen above proves the optional owns no previous session.
+                // zig-analyzer: disable-next-line overwritten-owning-value
+                opened = try OpenProject.init(a, io, request, compiler, frame.payload());
                 try reply(a, writer, .{ .kind = "open", .id = request.id, .epoch = epoch, .revision = 0 }, &.{});
             },
-            .build, .close => {
+            .build, .close, .checkpoint => {
                 const owner = if (opened) |*value| value else return error.NotOpen;
-                if (request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null) return error.InvalidRequest;
+                if (request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.codegenTier != .optimized or request.shareMachineCode or request.codegenWorkers != 1 or request.checkpoint) return error.InvalidRequest;
                 if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.session.revisions) return error.RevisionMismatch;
+                if (request.kind == .checkpoint) {
+                    if (request.sources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
+                    const bytes = owner.session.checkpointBytes(compiler) catch |err| {
+                        try reply(a, writer, .{ .kind = "checkpoint", .id = request.id, .epoch = epoch, .revision = owner.session.revisions, .success = false, .code = @errorName(err) }, &.{});
+                        continue;
+                    };
+                    defer a.free(bytes);
+                    if (bytes.len > frames.max_frame_bytes - 1024) {
+                        try reply(a, writer, .{ .kind = "checkpoint", .id = request.id, .epoch = epoch, .revision = owner.session.revisions, .success = false, .code = "checkpoint_limit" }, &.{});
+                    } else try reply(a, writer, .{ .kind = "checkpoint", .id = request.id, .epoch = epoch, .revision = owner.session.revisions, .success = true }, bytes);
+                    continue;
+                }
                 if (request.kind == .close) {
                     if (request.sources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
                     try reply(a, writer, .{ .kind = "close", .id = request.id, .epoch = epoch, .revision = owner.session.revisions }, &.{});

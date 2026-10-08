@@ -673,6 +673,10 @@ export async function withAssetImports(
     get compilerIdentity() {
       return compiler.compilerIdentity;
     },
+    exportCheckpoint() {
+      if (closed) return Promise.reject(new Error("Asset compiler is closed"));
+      return enqueue(() => compiler.exportCheckpoint());
+    },
     build(options = {}) {
       // Capture caller buffers before queueing, matching the native client.
       try {

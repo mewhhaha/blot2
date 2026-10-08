@@ -71,6 +71,7 @@ const Generator = struct {
     layouts: layout.Store,
     row_keys: substitutions.Store,
     template_keys: substitutions.Store,
+    static_keys: substitutions.Store,
     template_catalog: std.ArrayList(artifacts.CapturedTemplate) = .empty,
     template_instances: std.AutoHashMapUnmanaged(artifacts.CapturedTemplate, u32) = .empty,
     runtime_operations: operations.Store,
@@ -79,13 +80,14 @@ const Generator = struct {
     fn init(allocator: Allocator, fixture: *const Fixture) !Generator {
         var evaluator = try eval.Session.init(allocator, fixture.units);
         errdefer evaluator.deinit();
-        return .{ .evaluator = evaluator, .layouts = try layout.Store.init(allocator), .row_keys = substitutions.Store.init(allocator), .template_keys = substitutions.Store.init(allocator), .runtime_operations = operations.Store.initProject(allocator, fixture.names.view()), .allocator = allocator };
+        return .{ .evaluator = evaluator, .layouts = try layout.Store.init(allocator), .row_keys = substitutions.Store.init(allocator), .template_keys = substitutions.Store.init(allocator), .static_keys = substitutions.Store.init(allocator), .runtime_operations = operations.Store.initProject(allocator, fixture.names.view()), .allocator = allocator };
     }
     fn deinit(self: *Generator) void {
         self.template_catalog.deinit(self.allocator);
         self.template_instances.deinit(self.allocator);
         self.runtime_operations.deinit();
         self.template_keys.deinit();
+        self.static_keys.deinit();
         self.row_keys.deinit();
         self.layouts.deinit();
         self.evaluator.deinit();

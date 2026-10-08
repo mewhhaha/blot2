@@ -12,7 +12,7 @@ const Allocator = std.mem.Allocator;
 const absent = std.math.maxInt(u32);
 const Error = Allocator.Error || error{ InvalidFunctionReference, InvalidGlobalReference, ModuleTooLarge, Declined };
 const Address = struct { original: u32, actual: u32, len: u32, owner: u32 };
-pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0 };
+pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, resolved_scalar_bodies: usize = 0, resolved_scalar_values: usize = 0 };
 pub const State = struct {
     allocator: Allocator,
     old: *const capture.Capture,
@@ -222,11 +222,12 @@ pub const State = struct {
         @memset(anchors, 0);
         const same = plan.matchInto(g, &self.importer, read.value, current, anchors) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
         if (!same) return false;
+        if (!try self.importer.recordValueAnchors(anchors)) return false;
         try self.static_matches.put(self.allocator, read, current);
         return true;
     }
     fn staticHelper(self: *const State, function: emitter.FunctionArtifact, owner: u32) bool {
-        return function.role == .static_closure and owner != 0 and function.resource_owner == owner and !self.blocked[owner - 1] and self.old.metadata.jobs.items[owner - 1].static_reads.items.len != 0;
+        return function.role == .static_closure and owner != 0 and function.resource_owner == owner and !self.blocked[owner - 1] and self.old.metadata.jobs.items[owner - 1].hasStaticValues();
     }
     fn admit(self: *State, g: anytype, id: u32) Allocator.Error!bool {
         const first = self.starts[id - 1];
