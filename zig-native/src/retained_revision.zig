@@ -74,7 +74,6 @@ pub const FallbackStats = struct {
     recheck_body_elaborations: usize = 0,
     reused_check_body_elaborations: usize = 0,
     frozen_modules: usize = 0,
-    freeze_body_lowerings: usize = 0,
     reused_core_bodies: usize = 0,
     reused_entry_bodies: usize = 0,
     entry_cutoff: @import("entry_frontend_cutoff.zig").Stats = .{},
@@ -198,20 +197,9 @@ pub const Session = struct {
     last: Stats = .{},
     // Bound lazily, after init's returned Session has reached its final address.
     epoch: ?*Epoch = null,
-    policy: Policy = Policy.reference,
+    policy: Policy = .{},
     profile_backend: bool = false,
     checkpoint: ?@import("backend_checkpoint.zig").Checkpoint = null,
-
-    /// Enable qualified project reuse before any revision or retained owner.
-    /// Preserve independent choices, such as exact unchanged-output reuse.
-    pub fn enableProjectBuildReuse(self: *Session) void {
-        std.debug.assert(self.epoch == null and self.current == null and self.revisions == 0);
-        inline for (@typeInfo(Policy).@"struct".field_names) |field| {
-            if (comptime @field(Policy.project, field) != @field(Policy.reference, field)) {
-                @field(self.policy, field) = @field(Policy.project, field);
-            }
-        }
-    }
 
     /// Moves an already wire/semantic/compiler-admitted seed and pins its exact
     /// source/check/backend settings. Compiler identity cannot change within
@@ -254,7 +242,7 @@ pub const Session = struct {
         self.seed_snapshot = null;
     }
     fn ensureSharedSeed(self: *Session) !void {
-        if (!self.policy.share_dependency_storage or self.seed_snapshot != null) return;
+        if (self.seed_snapshot != null) return;
         // A decoded seed must establish complete validation before its result
         // can be retained. The cost belongs to this initial preparation.
         try closure.validate(self.allocator, &self.seed);
@@ -312,7 +300,6 @@ pub const Session = struct {
         return true;
     }
     fn entryOffer(self: *const Session) ?partial.EntryPrevious {
-        if (!self.policy.reuse_entry_interface_cutoff or !self.policy.reuse_prepared_entry) return null;
         const previous = if (self.current) |*value| value else return null;
         const prepared = &previous.prepared;
         if (prepared.units.len == 0 or prepared.entry != prepared.units.len or prepared.units.len != self.seed.modules.len + 1 or prepared.cached != self.seed.modules.len or prepared.paths.len != prepared.units.len) return null;
@@ -321,7 +308,7 @@ pub const Session = struct {
         for (self.seed.modules, prepared.units[0..self.seed.modules.len]) |module, ir| {
             if (!std.meta.eql(module.core, ir)) return null;
         }
-        return .{ .prepared = prepared, .source = previous.snapshot.capturedSource(prepared.paths[prepared.entry - 1]) orelse return null, .reuse_modules = self.policy.reuse_module_interface_cutoff };
+        return .{ .prepared = prepared, .source = previous.snapshot.capturedSource(prepared.paths[prepared.entry - 1]) orelse return null, .reuse_modules = true };
     }
     fn mixedFrontend(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats, reuse: []const bool) !?partial.Preparation {
         const a = self.allocator;
@@ -338,10 +325,10 @@ pub const Session = struct {
             var fresh_alive = true;
             defer if (fresh_alive) fresh.deinit(a);
             if (fresh == .rejected) return null;
-            const saved: retained_dependency.Seed = if (self.policy.share_dependency_storage) shared: {
-                const owner = try closure.freezeSharedFromMixed(a, &source, &checked.?, &fresh.ready, self.seed_snapshot.?, self.policy.reuse_dependency_validation, &work.dependency_storage);
+            const saved: retained_dependency.Seed = shared: {
+                const owner = try closure.freezeSharedFromMixed(a, &source, &checked.?, &fresh.ready, self.seed_snapshot.?, &work.dependency_storage);
                 break :shared .{ .value = owner.value, .snapshot = owner };
-            } else .{ .value = try closure.freezeFromMixedCheckedCore(a, &source, &checked.?, &fresh.ready) };
+            };
             work.validated_modules = source.order.items.len - checked.?.entry_cutoff.reused - checked.?.module_cutoff.reused;
             work.entry_cutoff = checked.?.entry_cutoff;
             work.module_cutoff = checked.?.module_cutoff;
@@ -352,10 +339,8 @@ pub const Session = struct {
             work.reused_check_body_elaborations = checked.?.body_elaborations;
             work.frozen_modules = saved.value.modules.len;
             for (saved.value.modules) |module| work.reused_core_bodies += module.core.body_lowerings;
-            if (self.policy.reuse_prepared_entry) {
-                kept = fresh.ready;
-                fresh_alive = false;
-            }
+            kept = fresh.ready;
+            fresh_alive = false;
             break :snapshot_block saved;
         };
         // The new seed owns or retains every immutable module independently.
@@ -387,7 +372,7 @@ pub const Session = struct {
     }
     fn fallback(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, snapshot: *inputs.Snapshot, candidate_seed: *?retained_dependency.Seed, counts: *FallbackStats) !partial.Preparation {
         const a = self.allocator;
-        if (self.policy.reuse_module_frontends and std.mem.eql(u8, &self.seed_settings, &settings(snapshot.options))) {
+        if (std.mem.eql(u8, &self.seed_settings, &settings(snapshot.options))) {
             if (try snapshot.reusableModules(io, &self.seed)) |reuse| {
                 defer a.free(reuse);
                 const mixed = self.mixedFrontend(io, entry_path, output_identity, snapshot, candidate_seed, counts, reuse) catch |err| blk: {
@@ -405,11 +390,7 @@ pub const Session = struct {
         var kept_check: ?checker.CheckedProject = null;
         defer if (kept_check) |*checked| checked.deinit(a);
         const empty: dependency.FrozenDependency = .{ .symbols = &.{}, .modules = &.{} };
-        var fresh = if (self.policy.reuse_fallback_check)
-            try partial.prepareProjectKeepingCheck(a, &source, entry_path, output_identity, &empty, &kept_check)
-        else
-            try partial.prepareProject(a, &source, entry_path, output_identity, &empty);
-        const reuse_core = self.policy.reuse_fallback_check and self.policy.reuse_fallback_core;
+        var fresh = try partial.prepareProjectKeepingCheck(a, &source, entry_path, output_identity, &empty, &kept_check);
         var fresh_alive = false;
         defer if (fresh_alive) fresh.deinit(a);
         switch (fresh) {
@@ -419,32 +400,25 @@ pub const Session = struct {
                 counts.syntax_nodes = prepared.stats.syntax_nodes;
                 counts.body_elaborations = prepared.stats.body_elaborations;
                 counts.body_lowerings = prepared.stats.body_lowerings;
-                if (reuse_core) fresh_alive = true else prepared.deinit(a);
+                fresh_alive = true;
             },
         }
         if (kept_check == null) {
             kept_check = try checker.checkProject(a, &source);
             counts.recheck_body_elaborations = kept_check.?.body_elaborations;
         } else counts.reused_check_body_elaborations = kept_check.?.body_elaborations;
-        const frozen = if (reuse_core)
-            try closure.freezeFromCheckedCore(a, &source, &kept_check.?, &fresh.ready)
-        else
-            try closure.freeze(a, &source, &kept_check.?);
+        const frozen = try closure.freezeFromCheckedCore(a, &source, &kept_check.?, &fresh.ready);
         if (fresh_alive) {
             fresh.deinit(a);
             fresh_alive = false;
         }
         candidate_seed.* = .{ .value = frozen };
-        if (self.policy.share_dependency_storage) {
-            const owner = try retained_dependency.Snapshot.adopt(a, frozen);
-            owner.validated = true;
-            candidate_seed.*.?.snapshot = owner;
-            counts.dependency_storage = .{ .fresh_modules = frozen.modules.len, .core_checked = frozen.modules.len, .interface_checked = frozen.modules.len };
-        }
+        const owner = try retained_dependency.Snapshot.adopt(a, frozen);
+        owner.validated = true;
+        candidate_seed.*.?.snapshot = owner;
+        counts.dependency_storage = .{ .fresh_modules = frozen.modules.len, .core_checked = frozen.modules.len, .interface_checked = frozen.modules.len };
         counts.frozen_modules = frozen.modules.len;
-        for (frozen.modules) |module| {
-            if (reuse_core) counts.reused_core_bodies += module.core.body_lowerings else counts.freeze_body_lowerings += module.core.body_lowerings;
-        }
+        for (frozen.modules) |module| counts.reused_core_bodies += module.core.body_lowerings;
         return partial.prepareReadOnly(a, io, entry_path, output_identity, snapshot.options, &candidate_seed.*.?.value, snapshot.provider());
     }
     pub fn prepareRevision(self: *Session, io: std.Io, entry_path: []const u8, output_identity: ?[]const u8, options: project.Options) !Preparation {
@@ -466,7 +440,7 @@ pub const Session = struct {
         defer if (candidate_seed) |*seed| seed.deinit(a);
         const settings_key = settings(snapshot.options);
         const admitted = std.mem.eql(u8, &self.seed_settings, &settings_key) and try snapshot.admits(io, &self.seed);
-        if (admitted and self.policy.reuse_unchanged_output) if (self.current) |*current| if (current.output) |output| {
+        if (admitted) if (self.current) |*current| if (current.output) |output| {
             if (output.matches(entry_path, output_identity, self.policy) and try snapshot.entryEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1], &current.snapshot) and try snapshot.equalsPrevious(io, &current.snapshot)) {
                 var emission = try output.emission(a);
                 errdefer emission.deinit(a);
@@ -514,19 +488,16 @@ pub const Session = struct {
                 // checks exact per-body dependencies, catalogs and static value
                 // graphs even when a dependency seed had to be rebuilt.
                 const prior_compatible = !rebuilt;
-                const code_compatible = prior_compatible or (self.policy.reuse_rebuilt_code and std.mem.eql(u8, &self.seed_settings, &settings_key));
-                const queries_compatible = prior_compatible or (self.policy.reuse_rebuilt_queries and std.mem.eql(u8, &self.seed_settings, &settings(snapshot.options)));
-                var emission_policy = self.policy;
-                emission_policy.principal_reuse = self.policy.principal_reuse and (prior_compatible or self.policy.capture_fresh_principals);
+                const compatible = prior_compatible or std.mem.eql(u8, &self.seed_settings, &settings_key);
                 var result = try prepared.emitWithOptions(a, .{
                     .io = io,
                     .profile_backend = self.profile_backend,
                     .checkpoint = if (self.checkpoint) |*checkpoint| checkpoint else null,
-                    .policy = emission_policy,
+                    .policy = self.policy,
                     .retain_artifacts = true,
-                    .previous = if (code_compatible and self.current != null) &self.current.?.artifacts else null,
-                    .query_previous = if (queries_compatible and self.current != null) &self.current.?.artifacts else null,
-                    .principal_previous = if (rebuilt and self.policy.reuse_projected_principals and self.current != null) &self.current.?.artifacts else null,
+                    .previous = if (compatible and self.current != null) &self.current.?.artifacts else null,
+                    .query_previous = if (compatible and self.current != null) &self.current.?.artifacts else null,
+                    .principal_previous = if (rebuilt and self.current != null) &self.current.?.artifacts else null,
                     .cached_units = prepared.cached,
                 });
                 errdefer result.deinit(a);
@@ -537,8 +508,8 @@ pub const Session = struct {
                 var artifacts = result.result.compiled.capture orelse return error.MissingOwnedArtifacts;
                 result.result.compiled.capture = null;
                 errdefer artifacts.deinit();
-                var cached_output: ?CachedOutput = if (self.policy.reuse_unchanged_output) try CachedOutput.init(a, entry_path, output_identity, &result, prepared.units.len, self.policy) else null;
-                errdefer if (cached_output) |*output| output.deinit(a);
+                var cached_output = try CachedOutput.init(a, entry_path, output_identity, &result, prepared.units.len, self.policy);
+                errdefer cached_output.deinit(a);
                 const candidate = try a.create(Candidate);
                 candidate.* = .{
                     .allocator = a,

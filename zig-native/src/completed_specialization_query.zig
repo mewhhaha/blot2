@@ -52,21 +52,14 @@ pub const State = struct {
     independent_calls: std.ArrayList(independent.Record) = .empty,
     /// PRIVATE execution policy, outside semantic Session.Options. The old
     /// Capture/receipts and current Core/Gate are immutable until deinit.
-    optimize_admission: bool = false,
     recover_call_proofs: bool = true,
     io: ?std.Io = null,
     semantic_workers: u8 = 1,
-    source_effect_rows: bool = false,
     revalidate_plain_facts: bool = true,
-    reuse_graph_scratch: bool = false,
-    prepare_checked_importer: bool = false,
     graph_scratch: graph.QueryScratch,
-    frozen_source_effect_rows: ?bool = null,
-    frozen_prepare_checked_importer: ?bool = null,
     buckets: std.AutoHashMapUnmanaged(SourceKey, std.ArrayList(usize)) = .empty,
     plans: ?[]CachedPlan = null,
     semantic: ?importer.Importer = null,
-    anchors: std.ArrayList(u32) = .empty,
     state_owner: ?usize = null,
     generator_owner: ?usize = null,
     session_owner: ?usize = null,
@@ -82,7 +75,6 @@ pub const State = struct {
             for (plans) |*cached| if (cached.plan) |*plan| plan.deinit(self.allocator);
             self.allocator.free(plans);
         }
-        self.anchors.deinit(self.allocator);
         var buckets = self.buckets.valueIterator();
         while (buckets.next()) |bucket| bucket.deinit(self.allocator);
         self.buckets.deinit(self.allocator);
@@ -117,7 +109,7 @@ pub const State = struct {
     pub fn pairedImporter(self: *State) Allocator.Error!*importer.Importer {
         if (self.semantic == null) {
             const pools = &self.old.metadata.pools.?;
-            const prepared = if (self.prepare_checked_importer) try importer.Importer.initCheckedQuery(self.allocator, pools, self.gate.units, &self.gate) else null;
+            const prepared = try importer.Importer.initCheckedQuery(self.allocator, pools, self.gate.units, &self.gate);
             const maps = prepared orelse try importer.Importer.init(self.allocator, pools, self.gate.units, pools.identity.?.view(), self.gate.units.len);
             for (maps.stable, self.gate.structural_units) |*stable, exact| stable.* = exact;
             self.semantic = maps;
@@ -137,7 +129,7 @@ pub const State = struct {
         defer roots.deinit(self.allocator);
         try roots.appendSlice(self.allocator, &.{ record.selected, record.input });
         for (record.views) |view| try roots.appendSlice(self.allocator, &.{ view.value, view.selected });
-        const inspection = try graph.Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, &self.gate, roots.items, if (self.source_effect_rows) .source_declared else .empty_only);
+        const inspection = try graph.Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, &self.gate, roots.items, .source_declared);
         self.stats.plan_inspections += 1;
         cached.plan = inspection.plan;
         cached.checked = true;
@@ -160,7 +152,6 @@ pub const State = struct {
             if (prior.variable != fresh.variable) return false;
             // Rich row IDs belong to separate semantic owners; matchInto
             // compares imported operation identities and arguments afterward.
-            if (!self.source_effect_rows and prior.evidence != fresh.evidence) return false;
         }
         return true;
     }
@@ -172,9 +163,6 @@ pub const State = struct {
     }
     pub fn lookup(self: *State, g: anytype, input: u32, expected: u32) Allocator.Error!?u32 {
         defer self.stats.graph_scratch = self.graph_scratch.stats;
-        // Cached admission plans retain one immutable domain policy.
-        if (self.frozen_source_effect_rows) |policy| if (policy != self.source_effect_rows) return null;
-        if (self.frozen_prepare_checked_importer) |policy| if (policy != self.prepare_checked_importer) return null;
         self.stats.lookups += 1;
         if (!self.gate.enabled or g.evaluator.units.ptr != self.gate.units.ptr or g.evaluator.units.len != self.gate.units.len or self.allocator.ptr != g.evaluator.allocator.ptr or self.allocator.vtable != g.evaluator.allocator.vtable) return null;
         if (input >= g.evaluator.values.items.len or g.evaluator.valueInfo(input).kind != .closure or expected == 0 or expected >= g.evaluator.evidence.nodes.items.len or g.evaluator.evidence.node(expected).tag != .function) return null;
@@ -186,23 +174,16 @@ pub const State = struct {
             self.reject(.resource);
             return null;
         }
-        var indices: ?[]const usize = null;
-        if (self.optimize_admission) {
-            if (self.state_owner) |owner| if (owner != @intFromPtr(self)) return null;
-            if (self.generator_owner) |owner| if (owner != @intFromPtr(g)) return null;
-            if (self.session_owner) |owner| if (owner != @intFromPtr(&g.evaluator)) return null;
-            self.frozen_source_effect_rows = self.source_effect_rows;
-            self.frozen_prepare_checked_importer = self.prepare_checked_importer;
-            self.state_owner = @intFromPtr(self);
-            self.generator_owner = @intFromPtr(g);
-            self.session_owner = @intFromPtr(&g.evaluator);
-            try self.index();
-            const bucket = self.buckets.get(sourceKey(current)) orelse return null;
-            indices = bucket.items;
-        }
+        if (self.state_owner) |owner| if (owner != @intFromPtr(self)) return null;
+        if (self.generator_owner) |owner| if (owner != @intFromPtr(g)) return null;
+        if (self.session_owner) |owner| if (owner != @intFromPtr(&g.evaluator)) return null;
+        self.state_owner = @intFromPtr(self);
+        self.generator_owner = @intFromPtr(g);
+        self.session_owner = @intFromPtr(&g.evaluator);
+        try self.index();
         const records = self.old.metadata.specialization_receipts.items;
-        for (0..if (indices) |positions| positions.len else records.len) |ordinal| {
-            const position = if (indices) |positions| positions[ordinal] else ordinal;
+        const bucket = self.buckets.get(sourceKey(current)) orelse return null;
+        for (bucket.items) |position| {
             const record = &records[position];
             self.stats.enumerated_records += 1;
             if (record.input >= pools.evaluator.values.len or pools.evaluator.values[record.input].kind != .closure) continue;
@@ -221,19 +202,12 @@ pub const State = struct {
                 self.reject(.source);
                 continue;
             }
-            if (self.optimize_admission and !self.rootMatches(g, record.input, input)) {
+            if (!self.rootMatches(g, record.input, input)) {
                 self.stats.root_preflight_declined += 1;
                 self.reject(.input);
                 continue;
             }
-            var owned_maps: ?importer.Importer = null;
-            defer if (owned_maps) |*maps| maps.deinit();
-            const maps = if (self.optimize_admission) try self.pairedImporter() else fresh: {
-                owned_maps = try importer.Importer.init(self.allocator, pools, self.gate.units, pools.identity.?.view(), self.gate.units.len);
-                self.stats.owner_importers += 1;
-                self.stats.fresh_importers += 1;
-                break :fresh &owned_maps.?;
-            };
+            const maps = try self.pairedImporter();
             if (!maps.enabled) {
                 self.reject(.source);
                 continue;
@@ -243,42 +217,18 @@ pub const State = struct {
                 self.reject(.expected);
                 continue;
             }
-            var owned_plan: ?graph.Plan = null;
-            defer if (owned_plan) |*plan| plan.deinit(self.allocator);
-            const plan = if (self.optimize_admission) (try self.cachedPlan(position)) orelse {
+            const plan = (try self.cachedPlan(position)) orelse {
                 self.reject(.domain);
                 continue;
-            } else fresh: {
-                var roots: std.ArrayList(u32) = .empty;
-                defer roots.deinit(self.allocator);
-                try roots.appendSlice(self.allocator, &.{ record.selected, record.input });
-                for (record.views) |view| try roots.appendSlice(self.allocator, &.{ view.value, view.selected });
-                const inspection = try graph.Plan.inspectRootsWithRows(self.allocator, pools, &self.gate, roots.items, if (self.source_effect_rows) .source_declared else .empty_only);
-                self.stats.plan_inspections += 1;
-                owned_plan = inspection.plan orelse {
-                    self.reject(.domain);
-                    continue;
-                };
-                break :fresh &owned_plan.?;
             };
-            var owned_anchors: ?[]u32 = null;
-            defer if (owned_anchors) |values| self.allocator.free(values);
-            const anchors = if (self.reuse_graph_scratch and self.optimize_admission) self.graph_scratch.begin(plan, g) catch |err| switch (err) {
+            const anchors = self.graph_scratch.begin(plan, g) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.Declined => {
                     self.reject(.source);
                     continue;
                 },
-            } else if (self.optimize_admission) scratch: {
-                try self.anchors.resize(self.allocator, pools.evaluator.values.len);
-                break :scratch self.anchors.items;
-            } else scratch: {
-                owned_anchors = try self.allocator.alloc(u32, pools.evaluator.values.len);
-                break :scratch owned_anchors.?;
             };
-            const scratch_enabled = self.reuse_graph_scratch and self.optimize_admission;
-            if (!scratch_enabled) @memset(anchors, 0);
-            const input_match = if (scratch_enabled) plan.matchIntoWithScratch(g, maps, record.input, input, anchors, &self.graph_scratch) else plan.matchInto(g, maps, record.input, input, anchors);
+            const input_match = plan.matchIntoWithScratch(g, maps, record.input, input, anchors, &self.graph_scratch);
             if (!(input_match catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.Declined => false,
@@ -354,7 +304,7 @@ pub const State = struct {
                         valid = false;
                         break;
                     };
-                    const view_match = if (scratch_enabled) plan.matchIntoWithScratch(g, maps, view.selected, selected, anchors, &self.graph_scratch) else plan.matchInto(g, maps, view.selected, selected, anchors);
+                    const view_match = plan.matchIntoWithScratch(g, maps, view.selected, selected, anchors, &self.graph_scratch);
                     if (!(view_match catch |err| switch (err) {
                         error.OutOfMemory => return error.OutOfMemory,
                         error.Declined => false,
@@ -425,7 +375,8 @@ pub const State = struct {
             }
             try g.evaluator.typed_views.ensureUnusedCapacity(self.allocator, @intCast(record.views.len));
             try g.evaluator.validated_calls.ensureUnusedCapacity(self.allocator, @intCast(record.call_publications.len + proofs.items.len));
-            try self.independent_calls.ensureUnusedCapacity(self.allocator, proofs.items.len);
+            const collect_proofs = self.semantic_workers > 1;
+            if (collect_proofs) try self.independent_calls.ensureUnusedCapacity(self.allocator, proofs.items.len);
             try g.evaluator.plain_nominals.ensureUnusedCapacity(self.allocator, @intCast(plain.count()));
             try g.evaluator.specialized_closures.ensureUnusedCapacity(self.allocator, 1);
             var next = try record.clone(self.allocator);
@@ -447,7 +398,7 @@ pub const State = struct {
             const before_children = g.evaluator.children.items.len;
             const before = g.evaluator.values.items.len;
             const storage: graph.Plan.QueryStorage = .{ .values_before = record.values_before, .values_added = record.values_added, .children_added = record.children_added };
-            const imported = if (scratch_enabled) plan.materializeReceiptWithScratch(g, maps, anchors, storage, &self.graph_scratch) else if (self.optimize_admission) plan.materializeReceiptMappedWithImporter(g, maps, anchors, storage) else plan.materializeReceiptMapped(g, anchors, storage);
+            const imported = plan.materializeReceiptWithScratch(g, maps, anchors, storage, &self.graph_scratch);
             const mapped = imported catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.Declined => {
@@ -455,13 +406,15 @@ pub const State = struct {
                     continue;
                 },
             };
-            defer if (!scratch_enabled) self.allocator.free(mapped);
             for (record.views, view_evidence) |view, actual| if (!view.existed) g.evaluator.typed_views.putAssumeCapacity(.{ .value = mapped[view.value], .evidence = actual }, mapped[view.selected]);
             for (proofs.items) |proof| {
                 const key: eval.CallProofKey = .{ .target = .{ .unit = proof.target.unit - 1, .binding = proof.target.binding }, .evidence = proof.evidence };
                 if (!g.evaluator.validated_calls.contains(key)) g.evaluator.proofs.proof_published += 1;
                 g.evaluator.validated_calls.putAssumeCapacity(key, {});
-                self.independent_calls.appendAssumeCapacity(proof);
+                if (collect_proofs) self.independent_calls.appendAssumeCapacity(proof) else {
+                    var owned = proof;
+                    owned.deinit(self.allocator);
+                }
             }
             proofs.clearRetainingCapacity();
             for (record.call_publications, calls) |call, actual| {

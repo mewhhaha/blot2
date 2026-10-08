@@ -43,7 +43,7 @@ decline. Optimized-body relocation separately checks the complete direct-call
 graph, signatures, globals, imports and lifetime summaries; it rewrites an owned
 output copy and preserves retained input bytes.
 
-Inference partitions, resolved scalar SSA and semantic workers remain opt-in.
+Inference partitions and semantic workers remain opt-in.
 The partition experiment accepts 963 of 968 attempted gdev boundaries, reducing
 the largest diagnostic region from 13,863 to 10,335 scopes. Its fresh-session
 pairs improve by roughly 11–14%, but retained-edit samples show no clear win.
@@ -430,31 +430,10 @@ owning-optional warning was confirmed as a false positive at the existing
 
 ## Compiler performance program: resolved IR and live-patch experiments
 
-The resolved scalar SSA experiment owns value definitions, explicit operands,
-types and trap facts after ordinary specialization. Emission works after checked
-source/solver owners are destroyed. Native allocation-failure laws and exact
-Wasm comparisons cover arithmetic, raw floating constants, traps and fallback.
-It admits only two bodies (six value definitions) in gdev. Five alternating
-same-process fresh-session runs measure medians of 1,420 ms on the existing path
-and 1,397 ms with the prototype. This narrow coverage does not establish a useful
-whole-compiler speedup; the policy remains off. Full heap/control-flow SSA needs
-a substantially broader semantic lowering boundary. Samples and the standalone
-driver are `build/compiler-hills/ssa-bench.log` and `ssa-bench.zig`.
-
-The live-patch experiment replaces only changed functions in closed stateless
-scalar Wasm modules. Stable table slots redirect unchanged callers and recursive
-calls, while exported trampolines retain their function identities. Native tests
-cover owned snapshots, failed allocations and incompatible ABI/state rejection.
-The executed-Wasm fixture covers one changed helper, stale/corrupt input,
-publication ordering, revert, signed zero and division traps. No table mutation
-runs during patch instantiation. The host validates first and publishes all
-slots synchronously, with rollback on failure.
-
-This is an internal native/host experiment, not a project-client patch API.
-Globals, heap references, host imports, captured functions and suspended effects
-decline. It cannot patch gdev yet. Reproduce its execution laws with the
-`scalar-patch-fixture` build step and `scalar_live_patch.test.ts`; focused logs
-are `scalar-patch-native.log` and `scalar-patch-execution.log`.
+The resolved scalar SSA and scalar live-patch experiments were deleted. SSA
+admitted two gdev bodies (medians 1,420 ms existing path vs 1,397 ms with the
+prototype), which established no whole-compiler win; live patching never reached
+the production path and could not patch gdev's heap/effect state.
 
 The final release build, native suite and 539 guest/client tests pass, with 120
 existing linter warnings and no errors across 279 files. A combined task was

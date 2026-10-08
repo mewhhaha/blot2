@@ -83,7 +83,7 @@ const Pinned = struct {
 };
 
 fn certify(allocator: std.mem.Allocator, old: *artifacts.Pools, current: *Fixture, pins: []const artifacts.ModulePin) !void {
-    var gate = try Gate.initWithExecution(allocator, old, current.units, current.names.view(), .{ .reuse_equivalent_validation = true });
+    var gate = try Gate.init(allocator, old, current.units, current.names.view());
     defer gate.deinit();
     try std.testing.expect(gate.enabled and gate.dependencies_validated);
     var certificate = (try gate.freezeValidation(allocator, pins)).?;
@@ -98,14 +98,14 @@ test "published dependency validation certificates retain exact graphs context a
     var pinned = try Pinned.init(a, &before);
     defer pinned.deinit(a);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, certify, .{ &pinned.pools, &before, pinned.pools.modules });
-    var initial = try Gate.initWithExecution(a, &pinned.pools, before.units, before.names.view(), .{ .reuse_equivalent_validation = true });
+    var initial = try Gate.init(a, &pinned.pools, before.units, before.names.view());
     defer initial.deinit();
     try std.testing.expect(initial.enabled);
     pinned.pools.dependency_certificate = (try initial.freezeValidation(a, pinned.pools.modules)).?;
     var current = try Fixture.init(a, &.{ independent, consumer });
     defer current.deinit(a);
     current.units[0].nodes[root(&current.units[0], "schema")].a = 8;
-    var admitted_ = try Gate.initWithExecution(a, &pinned.pools, current.units, current.names.view(), .{ .reuse_equivalent_validation = true });
+    var admitted_ = try Gate.init(a, &pinned.pools, current.units, current.names.view());
     defer admitted_.deinit();
     try std.testing.expect(admitted_.enabled);
     try std.testing.expectEqual(@as(usize, 0), admitted_.dependency_validations);
@@ -115,7 +115,7 @@ test "published dependency validation certificates retain exact graphs context a
     // Changing a validator input revokes the certificate even if all pins
     // match. Restore it and it can still be used after this discarded attempt.
     pinned.pools.dependency_certificate.?.context.symbol_count = 0;
-    var uncached = try Gate.initWithExecution(a, &pinned.pools, current.units, current.names.view(), .{ .reuse_equivalent_validation = true });
+    var uncached = try Gate.init(a, &pinned.pools, current.units, current.names.view());
     defer uncached.deinit();
     try std.testing.expect(uncached.enabled);
     try std.testing.expectEqual(@as(usize, 2), uncached.dependency_validations);
@@ -128,7 +128,7 @@ test "published dependency validation certificates retain exact graphs context a
     before.units[0].nodes[node].ty = std.math.maxInt(u32);
     pinned.pools.modules[0].stamp = artifacts.stamp(before.units[0]);
     current.units[0].nodes[node] = before.units[0].nodes[node];
-    var corrupt = try Gate.initWithExecution(a, &pinned.pools, current.units, current.names.view(), .{ .reuse_equivalent_validation = true });
+    var corrupt = try Gate.init(a, &pinned.pools, current.units, current.names.view());
     defer corrupt.deinit();
     try std.testing.expect(!corrupt.enabled and !corrupt.dependencies_validated);
     try std.testing.expect((try corrupt.freezeValidation(a, pinned.pools.modules)) == null);
@@ -180,7 +180,7 @@ fn mutateFunction(fixture: *Fixture) !void {
     fixture.units[0].nodes[node.b].a = 8;
 }
 fn unaffectedModules(allocator: std.mem.Allocator, old: *artifacts.Pools, current: *Fixture) !void {
-    var gate = try Gate.initWithExecution(allocator, old, current.units, current.names.view(), .{ .reuse_unaffected_modules = true, .reuse_equivalent_validation = true });
+    var gate = try Gate.init(allocator, old, current.units, current.names.view());
     defer gate.deinit();
     try std.testing.expect(gate.enabled);
     try std.testing.expect(!gate.structural_units[0] and gate.structural_units[1]);
@@ -237,7 +237,7 @@ test "unaffected module queries still validate current cross unit edges and reje
         if (variant == 0) after.units[0].types.nodes[T.u32_type].tag = .f32;
         if (variant == 1) after.units[1].calls[0].target.binding = std.math.maxInt(u32);
         if (variant == 2) pinned.pools.modules[0].stamp[0] ^= 1;
-        var gate = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_unaffected_modules = true, .reuse_equivalent_validation = true });
+        var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
         defer gate.deinit();
         try std.testing.expect(!gate.enabled);
     }
@@ -670,7 +670,7 @@ test "semantic catalog identity survives body edits without granting executable 
     defer pinned.deinit(a);
     var other = try Pinned.init(a, &before);
     defer other.deinit(a);
-    var gate = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_unaffected_modules = true });
+    var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer gate.deinit();
     try std.testing.expect(gate.admitsCatalog(&pinned.pools, 1));
     try std.testing.expect(!gate.admitsCatalog(&other.pools, 1));
@@ -703,7 +703,7 @@ test "semantic catalog admission rejects payload constructor and effect argument
     for (cases) |source| {
         var after = try Fixture.init(a, &.{source});
         defer after.deinit(a);
-        var gate = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_unaffected_modules = true });
+        var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
         defer gate.deinit();
         try std.testing.expect(!gate.admitsCatalog(&pinned.pools, 1));
         try std.testing.expect(try query_importer.initCheckedQuery(a, &pinned.pools, after.units, &gate) == null);
@@ -815,7 +815,7 @@ fn equivalentGate(allocator: std.mem.Allocator, old: *artifacts.Pools, current: 
     const before_current = artifacts.stamp(current.units);
     var ordinary = try Gate.init(allocator, old, current.units, current.names.view());
     defer ordinary.deinit();
-    var reused = try Gate.initWithExecution(allocator, old, current.units, current.names.view(), .{ .reuse_equivalent_validation = true });
+    var reused = try Gate.init(allocator, old, current.units, current.names.view());
     defer reused.deinit();
     try std.testing.expectEqual(ordinary.enabled, reused.enabled);
     try std.testing.expectEqualSlices(bool, ordinary.structural_units, reused.structural_units);
@@ -860,7 +860,7 @@ test "equivalent validation admits only opaque isolated scalar payload changes" 
         var pinned = try Pinned.init(a, &before);
         defer pinned.deinit(a);
         try equivalentGate(a, &pinned.pools, &after);
-        var checked = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_equivalent_validation = true });
+        var checked = try Gate.init(a, &pinned.pools, after.units, after.names.view());
         defer checked.deinit();
         try std.testing.expect(checked.enabled);
         try std.testing.expect(!checked.admits(target(&after.units[0], if (index == 0) "flag" else "fraction")));
@@ -878,7 +878,7 @@ test "equivalent validation rejects malformed equal dependency recipes after rep
     var pinned = try Pinned.init(a, &before);
     defer pinned.deinit(a);
     try equivalentGate(a, &pinned.pools, &after);
-    var checked = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_equivalent_validation = true });
+    var checked = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer checked.deinit();
     try std.testing.expect(!checked.enabled);
     try std.testing.expectEqual(@as(usize, 1), checked.dependency_validations);
@@ -894,14 +894,14 @@ test "equivalent validation rechecks old pins and current nonpayload structure e
     before.units[0].nodes[root(&before.units[0], "schema")].a = 99;
     try equivalentGate(a, &pinned.pools, &after);
     {
-        var rejected = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_equivalent_validation = true });
+        var rejected = try Gate.init(a, &pinned.pools, after.units, after.names.view());
         defer rejected.deinit();
         try std.testing.expect(!rejected.enabled and rejected.dependency_validations == 0);
     }
     pinned.pools.modules[0].stamp = artifacts.stamp(before.units[0]);
     after.units[0].nodes[root(&after.units[0], "schema")].op = .add;
     try equivalentGate(a, &pinned.pools, &after);
-    var rejected = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_equivalent_validation = true });
+    var rejected = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer rejected.deinit();
     try std.testing.expect(!rejected.enabled and rejected.dependency_validations == 0);
 }
@@ -927,7 +927,7 @@ test "equivalent validation rejects bounds-valid equal cycles without accepting 
     var pinned = try Pinned.init(a, &before);
     defer pinned.deinit(a);
     try equivalentGate(a, &pinned.pools, &after);
-    var rejected = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_equivalent_validation = true });
+    var rejected = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer rejected.deinit();
     try std.testing.expect(!rejected.enabled and rejected.dependency_validations == 1);
 }
@@ -952,13 +952,13 @@ test "equivalent validation retains mandatory erased source dependency checks" {
     var pinned = try Pinned.init(a, &before);
     defer pinned.deinit(a);
     try equivalentGate(a, &pinned.pools, &after);
-    var rejected = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_equivalent_validation = true });
+    var rejected = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer rejected.deinit();
     try std.testing.expect(!rejected.enabled and rejected.dependency_validations == 1);
 }
 
 fn projectedPrincipals(allocator: std.mem.Allocator, old: *artifacts.Pools, current: *Fixture) !void {
-    var gate = try Gate.initWithExecution(allocator, old, current.units, current.names.view(), .{ .reuse_unaffected_modules = true, .reuse_declaration_principals = true, .reuse_equivalent_validation = true });
+    var gate = try Gate.init(allocator, old, current.units, current.names.view());
     defer gate.deinit();
     try std.testing.expect(gate.enabled);
     try std.testing.expectEqual(@as(usize, 3), gate.dependency_validations);
@@ -1042,14 +1042,10 @@ test "equivalent validation reuses unchanged local graphs only under equal forei
     try mutateFunction(&after);
     var pinned = try Pinned.init(a, &before);
     defer pinned.deinit(a);
-    var reference = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_unaffected_modules = true, .reuse_declaration_principals = true });
-    defer reference.deinit();
-    var optimized = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_unaffected_modules = true, .reuse_declaration_principals = true, .reuse_equivalent_validation = true });
+    var optimized = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer optimized.deinit();
-    try std.testing.expect(reference.enabled and optimized.enabled);
-    try std.testing.expectEqual(@as(usize, 4), reference.dependency_validations);
+    try std.testing.expect(optimized.enabled);
     try std.testing.expectEqual(@as(usize, 3), optimized.dependency_validations);
-    try std.testing.expectEqualSlices(bool, reference.dirty, optimized.dirty);
     // A valid, unused lexical binding changes the foreign bounds projection.
     // Even an unchanged consumer must then receive ordinary current validation.
     const bindings = after.units[0].bindings;
@@ -1063,12 +1059,12 @@ test "equivalent validation reuses unchanged local graphs only under equal forei
     expanded[bindings.len].target = .{ .unit = 1, .binding = @intCast(bindings.len) };
     after.units[0].bindings = expanded;
     defer after.units[0].bindings = bindings;
-    var extended = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_unaffected_modules = true, .reuse_declaration_principals = true, .reuse_equivalent_validation = true });
+    var extended = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer extended.deinit();
     try std.testing.expect(extended.enabled);
     try std.testing.expectEqual(@as(usize, 4), extended.dependency_validations);
     after.units[0].bindings = bindings[0..1];
-    var shortened = try Gate.initWithExecution(a, &pinned.pools, after.units, after.names.view(), .{ .reuse_unaffected_modules = true, .reuse_declaration_principals = true, .reuse_equivalent_validation = true });
+    var shortened = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer shortened.deinit();
     try std.testing.expect(!shortened.enabled);
 }

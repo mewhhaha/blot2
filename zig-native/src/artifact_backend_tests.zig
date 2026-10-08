@@ -58,31 +58,23 @@ const collection_source =
     \\  return array
 ;
 
-test "local refinement and closed source sharing preserve exact Wasm staging and effects" {
-    for ([_]bool{ false, true }) |retained| {
-        var hits: usize = 0;
-        for ([_][]const u8{ partition_source, provider_source, collection_source, @embedFile("request-fixtures/template-wrapped-reuse.blot"), @embedFile("request-fixtures/f32-foreign-nested.blot") }) |source| {
-            var module = try lower(source);
-            defer module.deinit(a);
-            var reference = try backend.compileWithOptions(a, &.{module}, 1, .{
-                .retain_artifacts = retained,
-                .policy = .{ .reuse_refinements = true, .reuse_local_refinements = false, .reuse_closed_source_types = false },
-            });
-            defer reference.deinit(a);
-            var shared = try backend.compileWithOptions(a, &.{module}, 1, .{
-                .retain_artifacts = retained,
-                .policy = .{ .reuse_refinements = true },
-            });
-            defer shared.deinit(a);
-            try std.testing.expect(reference.diagnostic == null and shared.diagnostic == null);
-            try std.testing.expectEqualSlices(u8, reference.bytes, shared.bytes);
-            try std.testing.expectEqual(reference.constant_steps, shared.constant_steps);
-            try std.testing.expectEqual(reference.code_instances, shared.code_instances);
-            try std.testing.expectEqual(retained, shared.capture != null);
-            hits += shared.refinements.local_hits;
-        }
-        try std.testing.expect(hits > 0);
+test "local refinement and closed source sharing preserve exact Wasm staging and effects across fresh and retained builds" {
+    var hits: usize = 0;
+    for ([_][]const u8{ partition_source, provider_source, collection_source, @embedFile("request-fixtures/template-wrapped-reuse.blot"), @embedFile("request-fixtures/f32-foreign-nested.blot") }) |source| {
+        var module = try lower(source);
+        defer module.deinit(a);
+        var fresh = try backend.compileWithOptions(a, &.{module}, 1, .{});
+        defer fresh.deinit(a);
+        var retained = try backend.compileWithOptions(a, &.{module}, 1, .{ .retain_artifacts = true });
+        defer retained.deinit(a);
+        try std.testing.expect(fresh.diagnostic == null and retained.diagnostic == null);
+        try std.testing.expectEqualSlices(u8, fresh.bytes, retained.bytes);
+        try std.testing.expectEqual(fresh.constant_steps, retained.constant_steps);
+        try std.testing.expectEqual(fresh.code_instances, retained.code_instances);
+        try std.testing.expect(fresh.capture == null and retained.capture != null);
+        hits += fresh.refinements.local_hits + retained.refinements.local_hits;
     }
+    try std.testing.expect(hits > 0);
 }
 
 const partition_source =
@@ -123,7 +115,7 @@ test "Gate A backend reconstructs solved captures providers State Demand Foreign
         var module = try lower(source);
         defer module.deinit(a);
         const before = metadata.stamp(module);
-        var reference = try backend.compileWithOptions(a, &.{module}, 1, .{ .policy = .{ .memoize_layout_roots = false, .reuse_region_scratch = false, .reuse_callable_definitions = false } });
+        var reference = try backend.compileWithOptions(a, &.{module}, 1, .{});
         defer reference.deinit(a);
         var reconstructed = try backend.compileWithOptions(a, &.{module}, 1, .{ .artifact_replay = true });
         defer reconstructed.deinit(a);

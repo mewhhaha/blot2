@@ -57,7 +57,6 @@ pub const Result = struct {
     module_stamps: struct { computed: usize = 0, reused: usize = 0, comparisons: usize = 0, copied: usize = 0 } = .{},
     refinements: @import("refinement_receipt.zig").Stats = .{},
     completed_queries: completed_specialization_query.Stats = .{},
-    source_templates: source_value_template.TransportStats = .{},
     artifacts: ?ArtifactSummary = null,
     capture: ?artifact_capture.Capture = null,
     reuse: artifact_fragment.Stats = .{},
@@ -97,8 +96,6 @@ const EvidenceRoot = refinement_receipt.Root;
 const RuntimeSlot = struct { global: u32, initializer: u32, active: bool = true };
 const Generator = struct {
     work_timing: @import("backend_timing.zig").Work = .{},
-    memoize_layout_roots: bool = true,
-    resolve_scalar_bodies: bool = false,
     allocator: Allocator,
     units: []const core.Module,
     artifacts: ?*code_artifacts.Context = null,
@@ -106,15 +103,10 @@ const Generator = struct {
     principal_state: ?*principal_evidence_reuse.State = null,
     persisted_principals: ?*@import("principal_archive.zig").Reader = null,
     principal_stats: principal_evidence_reuse.Stats = .{},
-    source_templates: ?source_value_template.Context = null,
-    source_template_stats: source_value_template.TransportStats = .{},
     query_state: ?*completed_specialization_query.State = null,
-    reuse_refinements: bool = false,
     refinement_owner: ?*code_artifacts.Context = null,
-    reuse_body_proof_cutoff: bool = false,
     refinement_stats: refinement_receipt.Stats = .{},
     refinement_memo: refinement_receipt.Memo = .{},
-    reuse_local_refinements: bool = true,
     work: artifact_fragment.Stats = .{},
     module: wasm.Module,
     instances: std.AutoHashMapUnmanaged(Key, u32) = .empty,
@@ -960,11 +952,11 @@ const Generator = struct {
         return key;
     }
     fn specializer(self: *Generator) Allocator.Error!specialization.Service {
-        return .{ .timing = &self.work_timing, .allocator = self.allocator, .units = self.units, .evaluator = &self.evaluator, .layouts = &self.layouts, .bridge = try self.representationBridge(), .refinement_stats = &self.refinement_stats, .refinement_regions = &self.work.refinement_regions, .cache = if (self.reuse_refinements) .{ .context = self, .lookup = lookupRefinement, .record = recordRefinement } else null };
+        return .{ .timing = &self.work_timing, .allocator = self.allocator, .units = self.units, .evaluator = &self.evaluator, .layouts = &self.layouts, .bridge = try self.representationBridge(), .refinement_stats = &self.refinement_stats, .refinement_regions = &self.work.refinement_regions, .cache = .{ .context = self, .lookup = lookupRefinement, .record = recordRefinement } };
     }
     fn lookupRefinement(context: *anyopaque, root: EvidenceRoot, shape: @import("code_expectation.zig").View, expected: u32, seeds: []const type_evidence.Mapping, rows: []const type_evidence.RowMapping) Allocator.Error!?core_eval.SolvedEvidence {
         const self: *Generator = @ptrCast(@alignCast(context));
-        if (self.reuse_local_refinements) if (try self.refinement_memo.lookup(self, root, expected, seeds, rows)) |result| return result;
+        if (try self.refinement_memo.lookup(self, root, expected, seeds, rows)) |result| return result;
         return refinement_receipt.lookup(self, root, shape, expected, seeds, rows);
     }
     fn recordRefinement(context: *anyopaque, record: specialization.Record) Allocator.Error!void {
@@ -1089,33 +1081,20 @@ const Generator = struct {
         var service = try self.specializer();
         var resolved = service.named(key) catch |err| return self.specializationFailure(service, err);
         defer resolved.deinit(self.allocator);
-        // Complete ordinary semantic specialization before crossing the owned
-        // resolved-IR boundary. Unsupported source forms keep their full path.
-        var scalar_body = if (self.resolve_scalar_bodies and !key.template_result and key.templates == 0)
-            try @import("resolved_scalar_ssa.zig").resolve(self.allocator, source, source.bodyParameters(body), @backingInt(resolved.root))
-        else
-            null;
-        defer if (scalar_body) |*owned| owned.deinit(self.allocator);
-        if (scalar_body) |*owned| {
-            try owned.emit(&self.module, function_id);
-            self.work.resolved_scalar_bodies += 1;
-            self.work.resolved_scalar_values += owned.nodes.items.len;
+        var emitter: Emitter = .{ .generator = self, .unit_id = unit_id, .function_id = function_id, .provider_local = key.count, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items, .factory_template = key.template_result };
+        defer emitter.deinit();
+        for (source.bodyParameters(body), 0..) |parameter, index| if (parameter.binding != 0) {
+            if (self.capturedTemplate(key.templates, parameter.binding)) |template| {
+                try emitter.templates.put(self.allocator, parameter.binding, .{ .unit = template.unit, .node = template.node, .environment = if (template.has_environment) @intCast(index) else null, .captures = template.captures, .templates = template.templates, .computation = template.computation, .evidence = template.evidence, .rows = template.rows });
+            } else try emitter.locals.put(self.allocator, parameter.binding, @intCast(index));
+        };
+        if (key.template_result) {
+            try emitter.templateExpression(@backingInt(resolved.root), 0);
+            const template = emitter.result_template orelse return self.fail(unit_id, body.root, .unresolved_type);
+            try self.template_results.put(self.allocator, key, template);
         } else {
-            var emitter: Emitter = .{ .generator = self, .unit_id = unit_id, .function_id = function_id, .provider_local = key.count, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items, .factory_template = key.template_result };
-            defer emitter.deinit();
-            for (source.bodyParameters(body), 0..) |parameter, index| if (parameter.binding != 0) {
-                if (self.capturedTemplate(key.templates, parameter.binding)) |template| {
-                    try emitter.templates.put(self.allocator, parameter.binding, .{ .unit = template.unit, .node = template.node, .environment = if (template.has_environment) @intCast(index) else null, .captures = template.captures, .templates = template.templates, .computation = template.computation, .evidence = template.evidence, .rows = template.rows });
-                } else try emitter.locals.put(self.allocator, parameter.binding, @intCast(index));
-            };
-            if (key.template_result) {
-                try emitter.templateExpression(@backingInt(resolved.root), 0);
-                const template = emitter.result_template orelse return self.fail(unit_id, body.root, .unresolved_type);
-                try self.template_results.put(self.allocator, key, template);
-            } else {
-                try emitter.expression(@backingInt(resolved.root), 0);
-                if (source.types.node(source.typeOf(body.root)).tag == .never) try emitter.emit(.unreachable_, 0);
-            }
+            try emitter.expression(@backingInt(resolved.root), 0);
+            if (source.types.node(source.typeOf(body.root)).tag == .never) try emitter.emit(.unreachable_, 0);
         }
         if (scope) |*actor| try actor.solved(resolved.mappings.items, resolved.rows.items, self.template_keys.get(key.templates));
         // addFunction copied parameters into an owned signature; only its ID escapes.
@@ -1819,7 +1798,7 @@ pub const CompileOptions = struct {
     io: ?std.Io = null,
     /// Detailed hot-region clocks are opt-in; broad phase timing stays cheap.
     profile_backend: bool = false,
-    policy: @import("execution_policy.zig").Policy = .reference,
+    policy: @import("execution_policy.zig").Policy = .{},
     observe_startup: bool = false,
     identity: ?runtime_identity.View = null,
     evidence_noise: bool = false,
@@ -1858,9 +1837,9 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     const recording = options.artifact_replay or options.retain_artifacts or options.previous != null or options.query_previous != null;
     const principal_previous = options.principal_previous orelse options.previous;
     const query_previous = options.query_previous orelse options.previous;
-    var module_stamps: code_artifacts.ModuleStamps = .{ .allocator = allocator, .current = units, .previous = if (query_previous) |old| if (old.metadata.pools) |*pools| pools else null else null, .compare_contents = options.policy.stamp_reuse == .exact };
+    var module_stamps: code_artifacts.ModuleStamps = .{ .allocator = allocator, .current = units, .previous = if (query_previous) |old| if (old.metadata.pools) |*pools| pools else null else null, .compare_contents = true };
     defer module_stamps.deinit();
-    const stamps: ?*code_artifacts.ModuleStamps = if (options.policy.stamp_reuse != .none and module_stamps.previous != null) &module_stamps else null;
+    const stamps: ?*code_artifacts.ModuleStamps = if (module_stamps.previous != null) &module_stamps else null;
     var journal = artifact_emitter.Recorder.init(allocator);
     var journal_alive = true;
     defer if (journal_alive) journal.deinit();
@@ -1876,92 +1855,64 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     generator.evaluator.timing = if (options.profile_backend) &generator.work_timing else null;
     // The replay gate destroys all mutable compiler state before materialization.
     if (recording) generator.artifacts = &metadata;
-    if (recording or options.policy.reuse_local_refinements) generator.refinement_owner = &metadata;
+    generator.refinement_owner = &metadata;
     var generator_alive = true;
     defer if (generator_alive) generator.deinit();
-    generator.memoize_layout_roots = options.policy.memoize_layout_roots;
-    generator.resolve_scalar_bodies = options.policy.resolve_scalar_bodies;
-    generator.evaluator.reuse_solver_capacity = options.policy.reuse_solver_capacity;
-    generator.evaluator.reuse_region_scratch = options.policy.reuse_region_scratch;
-    generator.evaluator.reuse_callable_definitions = options.policy.reuse_callable_definitions;
-    generator.evaluator.reuse_evidence_imports = options.policy.reuse_evidence_imports;
-    generator.evaluator.reuse_closed_source_types = options.policy.reuse_closed_source_types;
     generator.evaluator.split_closed_calls = options.policy.split_closed_calls;
-    generator.evaluator.retain_principal_inputs = options.policy.reuse_projected_principals;
-    generator.reuse_refinements = (options.policy.reuse_refinements and recording) or options.policy.reuse_local_refinements;
-    generator.reuse_local_refinements = options.policy.reuse_local_refinements;
-    generator.reuse_body_proof_cutoff = options.policy.reuse_body_proof_cutoff;
     generator.evaluator.diagnostic_context = .{ .identity = options.identity, .entry = entry, .prelude = options.diagnostic_prelude_unit, .source_mode = options.diagnostic_source_mode };
     generator.startup_facts.enabled = options.observe_startup;
     if (options.identity) |names| generator.runtime_operations = runtime_operations.Store.initProject(allocator, names);
     if (recording) generator.runtime_operations.artifacts = &journal;
     var retained: ?artifact_fragment.State = null;
     defer if (retained) |*state| state.deinit();
-    if (options.policy.reuse_code_fragments) if (options.previous) |previous| {
+    if (options.previous) |previous| {
         if (previous.emission.sealed and previous.metadata.pools != null) {
             retained = try artifact_fragment.State.initWithStamps(allocator, previous, units, options.identity, options.cached_units, stamps);
             generator.retained = &retained.?;
         }
-    };
+    }
     var principal_state: ?principal_evidence_reuse.State = null;
     defer if (principal_state) |*state| state.deinit();
     var persisted_principals: ?@import("principal_archive.zig").Reader = if (options.checkpoint) |checkpoint| .{ .allocator = allocator, .archive = &checkpoint.principal, .units = units, .names = options.identity } else null;
     defer if (persisted_principals) |*reader| reader.deinit();
-    if (options.policy.principal_reuse and (options.retain_artifacts or options.previous != null or options.checkpoint != null)) {
+    if (options.retain_artifacts or options.previous != null or options.checkpoint != null) {
         if (persisted_principals) |*reader| generator.persisted_principals = reader;
         if (principal_previous) |previous| if (previous.emission.sealed and previous.metadata.pools != null) {
             // Executable admission already checked this semantic source pair.
             // Clone only under identical admission options and owner pairing;
             // code still needs its separate exact body/value checks. Repeating
             // the whole dependency validation here would tax every small edit.
-            if (options.policy.share_query_gate and options.policy.principal_graph_mode != .eager and options.policy.reuse_declaration_principals and options.policy.reuse_unaffected_modules and options.policy.reuse_equivalent_validation) if (retained) |*state| if (state.importer.code_gate) |*checked| {
+            if (retained) |*state| if (state.importer.code_gate) |*checked| {
                 if (shared_query_gate.share(allocator, &previous.metadata.pools.?, units, &checked.semantic)) |admission| {
-                    principal_state = .{ .allocator = allocator, .old = previous, .gate = admission, .names = options.identity, .graph_mode = options.policy.principal_graph_mode, .reuse_projected_inputs = options.policy.reuse_projected_principals };
+                    principal_state = .{ .allocator = allocator, .old = previous, .gate = admission, .names = options.identity };
                 }
             };
-            if (principal_state == null) principal_state = try principal_evidence_reuse.State.initWithExecution(allocator, previous, units, options.identity, options.policy.principal_graph_mode, .{ .reuse_projected_principals = options.policy.reuse_projected_principals, .reuse_declaration_principals = options.policy.reuse_declaration_principals, .reuse_unaffected_modules = options.policy.reuse_unaffected_modules, .reuse_equivalent_validation = options.policy.reuse_equivalent_validation, .stamps = stamps });
+            if (principal_state == null) principal_state = try principal_evidence_reuse.State.init(allocator, previous, units, options.identity, stamps);
             generator.principal_state = &principal_state.?;
         };
         // Bind callbacks only after the Generator reaches its stable stack address.
         generator.evaluator.principal_provider = .{ .context = &generator, .lookup = Generator.principalLookup, .record = Generator.principalRecord };
     }
-    var template_gate: ?@import("principal_reuse_gate.zig").Gate = null;
-    defer if (template_gate) |*gate| gate.deinit();
-    if (options.policy.transport_source_templates) if (options.previous) |previous| if (previous.metadata.pools) |*pools| {
-        if (principal_state) |*state| {
-            generator.source_templates = .{ .pools = pools, .gate = &state.gate };
-        } else {
-            template_gate = try @import("principal_reuse_gate.zig").Gate.initWithExecution(allocator, pools, units, options.identity, .{ .reuse_declaration_principals = options.policy.reuse_declaration_principals, .reuse_unaffected_modules = options.policy.reuse_unaffected_modules, .stamps = stamps });
-            generator.source_templates = .{ .pools = pools, .gate = &template_gate.? };
-        }
-    };
     var query_state: ?completed_specialization_query.State = null;
     defer if (query_state) |*state| state.deinit();
-    generator.evaluator.retain_specialization_receipts = options.policy.reuse_completed_specializations and recording;
-    if (options.policy.reuse_completed_specializations) if (query_previous) |previous| if (previous.metadata.pools != null) {
+    generator.evaluator.retain_specialization_receipts = recording;
+    if (query_previous) |previous| if (previous.metadata.pools != null) {
         // Both States are prepared here from this compile's same immutable
         // source pair and identity. A new namespace is never admitted by a
-        // lease. Eager principal import can locally disable its Gate, so that
-        // mode retains the fresh query admission path.
-        if (options.policy.share_query_gate and options.policy.principal_graph_mode != .eager) if (principal_state) |*principal| {
+        // lease.
+        if (principal_state) |*principal| {
             if (shared_query_gate.share(allocator, &previous.metadata.pools.?, units, &principal.gate)) |gate| {
                 query_state = .{ .allocator = allocator, .old = previous, .graph_scratch = .{ .allocator = allocator }, .gate = gate };
                 query_state.?.stats.shared_gates = 1;
                 query_state.?.stats.shared_gate_bytes = shared_query_gate.validationBytes(&query_state.?.gate);
             }
-        };
+        }
         if (query_state == null) {
-            query_state = .{ .allocator = allocator, .old = previous, .graph_scratch = .{ .allocator = allocator }, .gate = try @import("principal_reuse_gate.zig").Gate.initWithExecution(allocator, &previous.metadata.pools.?, units, options.identity, .{ .reuse_declaration_principals = options.policy.reuse_declaration_principals, .reuse_unaffected_modules = options.policy.reuse_unaffected_modules, .stamps = stamps }) };
+            query_state = .{ .allocator = allocator, .old = previous, .graph_scratch = .{ .allocator = allocator }, .gate = try @import("principal_reuse_gate.zig").Gate.initWithStamps(allocator, &previous.metadata.pools.?, units, options.identity, stamps) };
             query_state.?.stats.gate_fresh = 1;
         }
-        query_state.?.optimize_admission = options.policy.optimize_completed_query_admission;
         query_state.?.io = options.io;
         query_state.?.semantic_workers = options.policy.semantic_workers;
-        query_state.?.source_effect_rows = options.policy.reuse_source_effect_queries;
-        query_state.?.reuse_graph_scratch = options.policy.reuse_query_graph_scratch;
-        // The prepared importer consumes only this compile epoch's checked
-        // Gate. Eager mode keeps its fresh preparation path.
-        query_state.?.prepare_checked_importer = options.policy.prepare_checked_query_importer and options.policy.principal_graph_mode != .eager;
         generator.query_state = &query_state.?;
         generator.evaluator.specialization_provider = .{ .context = &generator, .lookup = Generator.completedQueryLookup };
     };
@@ -1989,12 +1940,12 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         error.ModuleTooLarge => return error.ModuleTooLarge,
     };
     timing.initialize_us = clock.lap();
-    var optimized: ?@import("optimized_bodies.zig").Capture = if (options.retain_artifacts and options.policy.reuse_optimized_bodies) .{ .allocator = allocator } else null;
+    var optimized: ?@import("optimized_bodies.zig").Capture = if (options.retain_artifacts) .{ .allocator = allocator } else null;
     defer if (optimized) |*owned| owned.deinit();
     var runtime_optimization: @import("optimized_bodies.zig").Stats = .{};
     const retained_optimized = if (options.previous) |previous| if (previous.optimized) |*owned| owned else null else null;
     const checkpoint_optimized = if (options.checkpoint) |checkpoint| if (checkpoint.optimizer) |*owned| owned else null else null;
-    const optimized_previous = if (options.policy.reuse_optimized_bodies) retained_optimized orelse checkpoint_optimized else null;
+    const optimized_previous = retained_optimized orelse checkpoint_optimized;
     var result: Result = .{ .bytes = try generator.module.assembleWithOptions(.{ .io = options.io, .workers = options.policy.codegen_workers, .tier = options.policy.codegen_tier, .share_machine_code = options.policy.share_machine_code, .previous = optimized_previous, .current = if (optimized) |*owned| owned else null, .stats = &runtime_optimization }), .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps };
     result.emitted_functions -= runtime_optimization.shared;
     result.runtime_optimization = runtime_optimization;
@@ -2016,7 +1967,6 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     errdefer result.deinit(allocator);
     if (options.observe_startup) result.startup_observation = try generator.startup_facts.capture(allocator, &generator.module);
     result.principal = generator.principalStats();
-    result.source_templates = generator.source_template_stats;
     if (query_state) |state| result.completed_queries = state.stats;
     result.completed_queries.recorded = generator.evaluator.specialization_receipts.items.len;
     for (generator.evaluator.specialization_receipts.items) |record| if (record.complete) {
@@ -2034,10 +1984,11 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     if (recording) {
         try metadata.specialization_receipts.ensureUnusedCapacity(allocator, generator.evaluator.specialization_receipts.items.len);
         for (generator.evaluator.specialization_receipts.items) |record| metadata.specialization_receipts.appendAssumeCapacity(try record.clone(allocator));
-        if (query_state) |*state| {
+        // Records exist only for parallel semantic inference.
+        if (query_state) |*state| if (options.policy.semantic_workers > 1) {
             try metadata.independent_calls.ensureUnusedCapacity(allocator, state.independent_calls.items.len);
             for (state.independent_calls.items) |record| metadata.independent_calls.appendAssumeCapacity(try record.clone(allocator));
-        }
+        };
         try metadata.capturePoolsWithStamps(&generator, options.identity, stamps);
         // Publish validation only with this candidate's owned artifact pools.
         // A failed edit leaves the previous certificate and source pins intact.
@@ -2480,7 +2431,6 @@ fn generate(g: *Generator, entry: u32, unit_order: []const u32) Error!void {
             };
         };
         if (exports == 0) return g.decline(entry, .{ .start = 0, .end = 0 }, .no_entry);
-        if (g.source_templates) |context| g.source_template_stats = try source_value_template.replaceCompleted(g, context, entry);
     }
     {
         const timing = g.work_timing.enter(.startup);
@@ -2565,7 +2515,7 @@ const Emitter = struct {
         const g = self.generator;
         g.facts.stats.layout_requests += 1;
         const slot = &self.layout_cache[ty % self.layout_cache.len];
-        if (g.memoize_layout_roots and slot.ty == ty and slot.value != 0) {
+        if (slot.ty == ty and slot.value != 0) {
             g.facts.stats.layout_reused += 1;
             return slot.value;
         }

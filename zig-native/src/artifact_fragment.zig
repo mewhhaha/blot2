@@ -15,7 +15,7 @@ const HostReferences = wasm.HostReferences;
 const absent = std.math.maxInt(u32);
 const Error = Allocator.Error || error{ InvalidFunctionReference, InvalidGlobalReference, ModuleTooLarge, Declined };
 const Address = struct { original: u32, actual: u32, len: u32, owner: u32 };
-pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, resolved_scalar_bodies: usize = 0, resolved_scalar_values: usize = 0, reused_scalar_constants: usize = 0 };
+pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, reused_scalar_constants: usize = 0 };
 pub const State = struct {
     allocator: Allocator,
     old: *const capture.Capture,

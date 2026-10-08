@@ -49,10 +49,6 @@ fn equal(actual: *const partial.Result, expected: *const partial.Result) !void {
     try std.testing.expectEqual(expected.result.compiled.constant_steps, actual.result.compiled.constant_steps);
 }
 fn initialize(session: *retained.Session, fixture: *Fixture) !void {
-    session.enableProjectBuildReuse();
-    session.policy.reuse_entry_interface_cutoff = true;
-    // Keep the original entry-only policy laws independent of module cutoffs.
-    session.policy.reuse_module_interface_cutoff = false;
     var first = try session.revise(io, fixture.path, null, .{});
     defer first.deinit(a);
     try std.testing.expect(first.result.diagnostic == null and first.result.compiled.diagnostic == null);

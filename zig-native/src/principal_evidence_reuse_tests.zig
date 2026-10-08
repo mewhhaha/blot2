@@ -256,7 +256,7 @@ test "principal cache candidate allocation failures preserve old capture and a l
     const old = &initial.capture.?;
     const retained_proofs = artifacts.stamp(old.metadata.principal_proofs.items);
     const retained_emission = artifacts.stamp(old.emission.instructions);
-    var fresh = try after.emit(a, .{ .policy = .{ .principal_reuse = false } });
+    var fresh = try after.emit(a, .{ .policy = .{} });
     defer fresh.deinit(a);
     try allocationReuse(a, &after, old, &fresh);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, allocationReuse, .{ &after, old, &fresh });
@@ -285,7 +285,7 @@ test "principal cache failed backend candidate leaves prior captured proofs reus
     const retained_core = artifacts.stamp(before.units);
     const retained_proofs = artifacts.stamp(old.metadata.principal_proofs.items);
     const retained_emission = artifacts.stamp(old.emission.instructions);
-    var fresh_failure = try failed.emit(a, .{ .policy = .{ .principal_reuse = false } });
+    var fresh_failure = try failed.emit(a, .{ .policy = .{} });
     defer fresh_failure.deinit(a);
     var candidate = try failed.emit(a, .{ .previous = old, .retain_artifacts = true });
     defer candidate.deinit(a);
@@ -388,7 +388,7 @@ test "lazy empty principal proof needs no graph importer or lookup allocations a
     const allocator = failures.allocator();
     var generator = try LazyGenerator.init(allocator, &after);
     defer generator.deinit();
-    var state = try principal_reuse.State.init(allocator, old, after.units, after.names.view(), .lazy);
+    var state = try principal_reuse.State.init(allocator, old, after.units, after.names.view(), null);
     defer state.deinit();
     try std.testing.expect(state.graphs == null and state.gate.admits(target));
     failures.fail_index = failures.alloc_index;
@@ -401,16 +401,11 @@ test "lazy empty principal proof needs no graph importer or lookup allocations a
     failures.fail_index = std.math.maxInt(usize);
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
-    var lazy = try after.emit(a, .{ .previous = old, .retain_artifacts = true, .policy = .{ .principal_graph_mode = .lazy } });
+    var lazy = try after.emit(a, .{ .previous = old, .retain_artifacts = true });
     defer lazy.deinit(a);
-    var eager = try after.emit(a, .{ .previous = old, .retain_artifacts = true, .policy = .{ .principal_graph_mode = .eager } });
-    defer eager.deinit(a);
     try equalEmission(&fresh, &lazy);
-    try equalEmission(&eager, &lazy);
     try std.testing.expectEqual(@as(usize, 0), lazy.principal.graph_importers_initialized);
-    try std.testing.expectEqual(@as(usize, 1), eager.principal.graph_importers_initialized);
     try std.testing.expectEqual(lazy.principal.hits, lazy.principal.empty_hits);
-    try std.testing.expectEqual(eager.principal.hits, lazy.principal.hits);
     try std.testing.expect(savedProof(&lazy.capture.?, target) != null);
 }
 
@@ -424,7 +419,7 @@ test "lazy principal graph construction follows target and exact options admissi
     const proof = savedProof(&initial.capture.?, target) orelse return error.TestExpectedPrincipalCapture;
     var generator = try LazyGenerator.init(a, &fixture);
     defer generator.deinit();
-    var state = try principal_reuse.State.init(a, &initial.capture.?, fixture.units, fixture.names.view(), .lazy);
+    var state = try principal_reuse.State.init(a, &initial.capture.?, fixture.units, fixture.names.view(), null);
     defer state.deinit();
     var options = proof.options;
     options.max_steps += 1;
@@ -439,7 +434,7 @@ test "lazy principal graph construction follows target and exact options admissi
     var foreign = try Fixture.init(positive_source);
     defer foreign.deinit();
     foreign.names.bytes[foreign.names.owners[0].start + 1] = 'x';
-    var rejected = try principal_reuse.State.init(a, &initial.capture.?, foreign.units, foreign.names.view(), .lazy);
+    var rejected = try principal_reuse.State.init(a, &initial.capture.?, foreign.units, foreign.names.view(), null);
     defer rejected.deinit();
     try std.testing.expect(!rejected.gate.enabled);
     try std.testing.expect((try rejected.lookup(&generator, target, proof.options)) == null);
@@ -453,7 +448,7 @@ fn lazyNonemptyScenario(allocator: std.mem.Allocator, old: *const capture.Captur
     defer generator.deinit();
     // Shift current-session IDs before import; raw IDs are not a certificate.
     const noise = try generator.evaluator.evidence.intern(.array, 4, 0, &.{});
-    var state = try principal_reuse.State.init(allocator, old, after.units, after.names.view(), .lazy);
+    var state = try principal_reuse.State.init(allocator, old, after.units, after.names.view(), null);
     defer state.deinit();
     try std.testing.expect(state.graphs == null);
     const values = generator.evaluator.values.items.len;
@@ -490,12 +485,9 @@ test "lazy nonempty row principal imports keep fresh output and release every fa
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, lazyNonemptyScenario, .{ &initial.capture.?, &after, target, proof.options });
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
-    var lazy = try after.emit(a, .{ .previous = &initial.capture.?, .policy = .{ .principal_graph_mode = .lazy } });
+    var lazy = try after.emit(a, .{ .previous = &initial.capture.? });
     defer lazy.deinit(a);
-    var eager = try after.emit(a, .{ .previous = &initial.capture.?, .policy = .{ .principal_graph_mode = .eager } });
-    defer eager.deinit(a);
     try equalEmission(&fresh, &lazy);
-    try equalEmission(&eager, &lazy);
     try std.testing.expectEqual(@as(usize, 1), lazy.principal.graph_importers_initialized);
 }
 
@@ -516,7 +508,7 @@ test "lazy principal importer construction OOM leaves no published graph and ret
     const allocator = failures.allocator();
     var generator = try LazyGenerator.init(allocator, &after);
     defer generator.deinit();
-    var state = try principal_reuse.State.init(allocator, old, after.units, after.names.view(), .lazy);
+    var state = try principal_reuse.State.init(allocator, old, after.units, after.names.view(), null);
     defer state.deinit();
     failures.fail_index = failures.alloc_index;
     try std.testing.expectError(error.OutOfMemory, state.lookup(&generator, target, proof.options));
@@ -528,7 +520,7 @@ test "lazy principal importer construction OOM leaves no published graph and ret
     defer solved.deinit(allocator);
     try std.testing.expect(state.graphs != null and state.stats.hits == 1);
     try std.testing.expectEqualSlices(u8, &old_proofs, &artifacts.stamp(old.metadata.principal_proofs.items));
-    var reverted = try before.emit(a, .{ .previous = old, .policy = .{ .principal_graph_mode = .lazy } });
+    var reverted = try before.emit(a, .{ .previous = old });
     defer reverted.deinit(a);
     try equalEmission(&initial, &reverted);
     try std.testing.expect(reverted.principal.hits > 0);
@@ -585,7 +577,7 @@ test "lazy nonempty principal graphs remap owned type and effect IDs without car
     const noise_label = try generator.evaluator.evidence.effects.internOperation(.{ .unit = 1, .decl = operation }, &.{4});
     _ = try generator.evaluator.evidence.effects.internRow(&.{noise_label});
     const values = generator.evaluator.values.items.len;
-    var state = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), .lazy);
+    var state = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), null);
     defer state.deinit();
     var solved = (try state.lookup(&generator, target, proof.options)) orelse return error.TestExpectedPrincipalHit;
     defer solved.deinit(a);
@@ -624,7 +616,7 @@ fn primitiveScenario(allocator: std.mem.Allocator, old: *const capture.Capture, 
     var generator = try LazyGenerator.init(allocator, after);
     defer generator.deinit();
     _ = try generator.evaluator.evidence.intern(.array, 4, 0, &.{});
-    var state = try principal_reuse.State.init(allocator, old, after.units, after.names.view(), .primitive);
+    var state = try principal_reuse.State.init(allocator, old, after.units, after.names.view(), null);
     defer state.deinit();
     const prior_values = generator.evaluator.values.items.len;
     var solved = (try state.lookup(&generator, target, options)) orelse return error.TestExpectedPrincipalHit;
@@ -656,19 +648,15 @@ test "primitive principal copies actual U32 facts without importer with exact fr
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, primitiveScenario, .{ old, &after, target, proof.options });
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
-    var primitive = try after.emit(a, .{ .previous = old, .retain_artifacts = true, .policy = .{ .principal_graph_mode = .primitive } });
+    var primitive = try after.emit(a, .{ .previous = old, .retain_artifacts = true });
     defer primitive.deinit(a);
-    var lazy = try after.emit(a, .{ .previous = old, .policy = .{ .principal_graph_mode = .lazy } });
-    defer lazy.deinit(a);
     try equalEmission(&fresh, &primitive);
-    try equalEmission(&lazy, &primitive);
     try std.testing.expectEqual(@as(usize, 1), primitive.principal.primitive_hits);
     try std.testing.expectEqual(@as(usize, 0), primitive.principal.graph_importers_initialized);
-    try std.testing.expectEqual(@as(usize, 1), lazy.principal.graph_importers_initialized);
     const current = savedProof(&primitive.capture.?, target) orelse return error.TestExpectedPrincipalCapture;
     try std.testing.expectEqualDeep(proof.types, current.types);
     try std.testing.expect(@intFromPtr(proof.types.ptr) != @intFromPtr(current.types.ptr));
-    var reverted = try before.emit(a, .{ .previous = &primitive.capture.?, .policy = .{ .principal_graph_mode = .primitive } });
+    var reverted = try before.emit(a, .{ .previous = &primitive.capture.? });
     defer reverted.deinit(a);
     try equalEmission(&initial, &reverted);
 }
@@ -696,7 +684,7 @@ test "primitive empty facts preserve options owner namespace and dirty source re
     const proof = savedProof(old, target) orelse return error.TestExpectedPrincipalCapture;
     var generator = try LazyGenerator.init(a, &after);
     defer generator.deinit();
-    var state = try principal_reuse.State.init(a, old, after.units, after.names.view(), .primitive);
+    var state = try principal_reuse.State.init(a, old, after.units, after.names.view(), null);
     defer state.deinit();
     var changed = proof.options;
     changed.max_steps += 1;
@@ -714,7 +702,7 @@ test "primitive empty facts preserve options owner namespace and dirty source re
     var foreign = try Fixture.init(positive_source);
     defer foreign.deinit();
     foreign.names.bytes[foreign.names.owners[0].start + 1] = 'x';
-    var other = try principal_reuse.State.init(a, old, foreign.units, foreign.names.view(), .primitive);
+    var other = try principal_reuse.State.init(a, old, foreign.units, foreign.names.view(), null);
     defer other.deinit();
     try std.testing.expect((try other.lookup(&generator, target, proof.options)) == null);
     try std.testing.expect(other.graphs == null and !other.gate.enabled);
@@ -738,7 +726,7 @@ test "primitive fact import declines zero nonvariable out of bounds and duplicat
     for (bad_keys) |key| {
         var maps = [_]semantic.Mapping{.{ .variable = key, .evidence = 3 }};
         proof.types = &maps;
-        var state = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), .primitive);
+        var state = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), null);
         defer state.deinit();
         try std.testing.expect((try state.lookup(&generator, target, proof.options)) == null);
         try std.testing.expect(state.graphs == null);
@@ -747,7 +735,7 @@ test "primitive fact import declines zero nonvariable out of bounds and duplicat
     }
     var duplicate = [_]semantic.Mapping{ .{ .variable = variable, .evidence = 3 }, .{ .variable = variable, .evidence = 3 } };
     proof.types = &duplicate;
-    var state = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), .primitive);
+    var state = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), null);
     defer state.deinit();
     try std.testing.expect((try state.lookup(&generator, target, proof.options)) == null);
     try std.testing.expect(state.graphs == null);
@@ -771,7 +759,7 @@ test "primitive facts never attach source keys to a different current Core owner
     proof.types = &maps;
     var generator = try LazyGenerator.init(a, &other);
     defer generator.deinit();
-    var state = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), .primitive);
+    var state = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), null);
     defer state.deinit();
     try std.testing.expect(state.gate.admits(target));
     try std.testing.expect((try state.lookup(&generator, target, proof.options)) == null);
@@ -797,7 +785,7 @@ test "primitive malformed old U32 declines and current prefix mismatch uses the 
     const original_u32 = old.metadata.pools.?.evaluator.evidence.nodes[3];
     old.metadata.pools.?.evaluator.evidence.nodes[3].a = 1;
     defer old.metadata.pools.?.evaluator.evidence.nodes[3] = original_u32;
-    var malformed = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), .primitive);
+    var malformed = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), null);
     defer malformed.deinit();
     try std.testing.expect((try malformed.lookup(&generator, target, proof.options)) == null);
     try std.testing.expectEqual(@as(usize, 1), malformed.stats.primitive_fallbacks);
@@ -809,7 +797,7 @@ test "primitive malformed old U32 declines and current prefix mismatch uses the 
     const original_boolean = generator.evaluator.evidence.nodes.items[2];
     generator.evaluator.evidence.nodes.items[2].a = 1;
     defer generator.evaluator.evidence.nodes.items[2] = original_boolean;
-    var fallback = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), .primitive);
+    var fallback = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), null);
     defer fallback.deinit();
     var solved = (try fallback.lookup(&generator, target, proof.options)) orelse return error.TestExpectedPrincipalHit;
     defer solved.deinit(a);
@@ -835,7 +823,7 @@ test "primitive non U32 and generative provider facts retain original graph vali
     proof.types = &f32_maps;
     var generator = try LazyGenerator.init(a, &fixture);
     defer generator.deinit();
-    var state = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), .primitive);
+    var state = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), null);
     defer state.deinit();
     var solved = (try state.lookup(&generator, target, proof.options)) orelse return error.TestExpectedPrincipalHit;
     defer solved.deinit(a);
@@ -860,7 +848,7 @@ test "primitive non U32 and generative provider facts retain original graph vali
     for ([_]u32{ provider, state_provider }) |id| {
         var maps = [_]semantic.Mapping{.{ .variable = variable, .evidence = id }};
         proof.types = &maps;
-        var unsupported = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), .primitive);
+        var unsupported = try principal_reuse.State.init(a, old, fixture.units, fixture.names.view(), null);
         defer unsupported.deinit();
         try std.testing.expect((try unsupported.lookup(&generator, target, proof.options)) == null);
         try std.testing.expectEqual(@as(usize, 1), unsupported.stats.graph_importers_initialized);
@@ -881,7 +869,7 @@ test "primitive nonempty row facts fall back and retain exact fresh output" {
     try successful(&initial);
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
-    var primitive = try after.emit(a, .{ .previous = &initial.capture.?, .policy = .{ .principal_graph_mode = .primitive } });
+    var primitive = try after.emit(a, .{ .previous = &initial.capture.? });
     defer primitive.deinit(a);
     try equalEmission(&fresh, &primitive);
     try std.testing.expectEqual(@as(usize, 1), primitive.principal.graph_importers_initialized);
@@ -906,7 +894,7 @@ test "primitive mapping copy OOM publishes no importer or hit and retry then rev
     const allocator = failure.allocator();
     var generator = try LazyGenerator.init(allocator, &after);
     defer generator.deinit();
-    var state = try principal_reuse.State.init(allocator, old, after.units, after.names.view(), .primitive);
+    var state = try principal_reuse.State.init(allocator, old, after.units, after.names.view(), null);
     defer state.deinit();
     failure.fail_index = failure.alloc_index;
     try std.testing.expectError(error.OutOfMemory, state.lookup(&generator, target, proof.options));
@@ -919,7 +907,7 @@ test "primitive mapping copy OOM publishes no importer or hit and retry then rev
     try std.testing.expect(state.graphs == null);
     try std.testing.expectEqual(@as(usize, 1), state.stats.primitive_hits);
     try std.testing.expectEqualSlices(u8, &old_facts, &artifacts.stamp(old.metadata.principal_proofs.items));
-    var reverted = try before.emit(a, .{ .previous = old, .policy = .{ .principal_graph_mode = .primitive } });
+    var reverted = try before.emit(a, .{ .previous = old });
     defer reverted.deinit(a);
     try equalEmission(&initial, &reverted);
 }

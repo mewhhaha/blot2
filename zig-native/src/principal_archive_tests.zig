@@ -34,7 +34,7 @@ const Fixture = struct {
         return .{ .units = .{module}, .names = try identity.Metadata.capture(a, &pool, &.{.{ .unit = 1, .path = "/checkpoint/main.blot" }}, 1) };
     }
     fn emit(self: *const Fixture, allocator: std.mem.Allocator, cache: ?*const archive.Checkpoint) !backend.Result {
-        return backend.compileWithOptions(allocator, &self.units, 1, .{ .identity = self.names.view(), .policy = .project, .retain_artifacts = true, .checkpoint = cache });
+        return backend.compileWithOptions(allocator, &self.units, 1, .{ .identity = self.names.view(), .retain_artifacts = true, .checkpoint = cache });
     }
     fn deinit(self: *Fixture) void {
         self.units[0].deinit(a);

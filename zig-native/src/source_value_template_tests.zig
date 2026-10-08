@@ -679,27 +679,6 @@ test "source template unsolved graph exhaustive OOM leaves values and query publ
     defer gate.deinit();
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, oomImport, .{ &after, &initial.capture.?, &gate });
 }
-test "source template compiler experiment pays ordinary source fuel and preserves fresh output" {
-    var before = try Fixture.init(unsolved_source);
-    defer before.deinit();
-    var after = try Fixture.init(unsolved_source);
-    defer after.deinit();
-    editSchema(&after);
-    var initial = try before.emit(a, .{ .retain_artifacts = true });
-    defer initial.deinit(a);
-    try successful(&initial);
-    var ordinary = try after.emit(a, .{ .previous = &initial.capture.?, .retain_artifacts = true });
-    defer ordinary.deinit(a);
-    try successful(&ordinary);
-    var candidate = try after.emit(a, .{ .previous = &initial.capture.?, .retain_artifacts = true, .policy = .{ .transport_source_templates = true } });
-    defer candidate.deinit(a);
-    try successful(&candidate);
-    try std.testing.expectEqualSlices(u8, ordinary.bytes, candidate.bytes);
-    try std.testing.expectEqual(ordinary.constant_steps, candidate.constant_steps);
-    try std.testing.expectEqual(@as(usize, 1), candidate.source_templates.imported);
-    try std.testing.expectEqual(candidate.source_templates.logical_steps_before, candidate.source_templates.logical_steps_after);
-    try std.testing.expectEqual(@as(u32, 0), candidate.source_templates.roots[0].imported_evidence);
-}
 test "source template generic same-source callbacks retain distinct U32 and F32 scoped captures" {
     const source =
         \\type Bundle [first, second] is data = #Bundle { first: first, second: second }
@@ -876,7 +855,7 @@ fn anchorDir() !std.testing.TmpDir {
     return dir;
 }
 fn cutoffScenario(allocator: Allocator, after: *const Fixture, old: *const capture.Capture, expected: []const u8) !void {
-    var result = try after.emit(allocator, .{ .previous = old, .retain_artifacts = true, .policy = .project });
+    var result = try after.emit(allocator, .{ .previous = old, .retain_artifacts = true });
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expectEqualSlices(u8, expected, result.bytes);
@@ -897,9 +876,7 @@ test "refinement early cutoff consumes fresh call proofs across runtime body edi
     try dir.dir.writeFile(std.testing.io, .{ .sub_path = "values.blot", .data = "const adjust = fn (value: U32) => @u32.add value 1\n" });
     var before = try Fixture.project(&dir);
     defer before.deinit();
-    var policy = @import("execution_policy.zig").Policy.project;
-    policy.reuse_body_proof_cutoff = true;
-    var initial = try before.emit(a, .{ .retain_artifacts = true, .policy = policy });
+    var initial = try before.emit(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     for ([_][]const u8{
@@ -909,9 +886,9 @@ test "refinement early cutoff consumes fresh call proofs across runtime body edi
         try dir.dir.writeFile(std.testing.io, .{ .sub_path = "values.blot", .data = source });
         var after = try Fixture.project(&dir);
         defer after.deinit();
-        var fresh = try after.emit(a, .{ .policy = policy });
+        var fresh = try after.emit(a, .{});
         defer fresh.deinit(a);
-        var retained = try after.emit(a, .{ .previous = &initial.capture.?, .retain_artifacts = true, .policy = policy });
+        var retained = try after.emit(a, .{ .previous = &initial.capture.?, .retain_artifacts = true });
         defer retained.deinit(a);
         try successful(&fresh);
         try successful(&retained);
@@ -956,16 +933,6 @@ test "source template anchors complete dependency graphs and preserves bidirecti
     try std.testing.expectEqualSlices(u32, actual, capturedArrays(&g.evaluator, imported));
     try std.testing.expect(g.evaluator.values.items.len > old_count);
     try sameValue(&pools.evaluator, plan.root, &g.evaluator, imported);
-    // Fresh complete code emission retains exactly the original data layout.
-    var ordinary = try after.emit(a, .{ .previous = &initial.capture.?, .retain_artifacts = true });
-    defer ordinary.deinit(a);
-    try successful(&ordinary);
-    var candidate = try after.emit(a, .{ .previous = &initial.capture.?, .retain_artifacts = true, .policy = .{ .transport_source_templates = true } });
-    defer candidate.deinit(a);
-    try successful(&candidate);
-    try std.testing.expectEqualSlices(u8, ordinary.bytes, candidate.bytes);
-    try std.testing.expectEqual(ordinary.constant_steps, candidate.constant_steps);
-    try std.testing.expectEqual(@as(usize, 1), candidate.source_templates.imported);
 }
 test "source template declines conflicting global alias graphs before value or slot publication" {
     var dir = try anchorDir();
@@ -1093,7 +1060,7 @@ test "completed specialization query replays concrete captured callback without 
     ;
     var before = try Fixture.init(source);
     defer before.deinit();
-    var initial = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var initial = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     try std.testing.expect(initial.capture.?.metadata.specialization_receipts.items.len > 0);
@@ -1103,7 +1070,7 @@ test "completed specialization query replays concrete captured callback without 
     var fresh = try backend.compileWithIdentity(a, after.units, after.entry, after.names.view());
     defer fresh.deinit(a);
     try successful(&fresh);
-    var imported = try backend.compileWithOptions(a, after.units, after.entry, .{ .identity = after.names.view(), .retain_artifacts = true, .previous = &initial.capture.?, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var imported = try backend.compileWithOptions(a, after.units, after.entry, .{ .identity = after.names.view(), .retain_artifacts = true, .previous = &initial.capture.? });
     defer imported.deinit(a);
     try successful(&imported);
     std.debug.print("query fixture initial={d}, complete={d}, reused={d}, reasons={any}\n", .{ initial.completed_queries.recorded, initial.completed_queries.complete_records, imported.completed_queries.reused, imported.completed_queries.reasons });
@@ -1158,8 +1125,6 @@ fn independentQueryAttempt(fixture: *const Fixture, old: *const capture.Capture,
     if (incoming) try g.evaluator.validated_calls.put(a, key, {});
     var state = try queries.State.init(a, old, fixture.units, fixture.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
     state.recover_call_proofs = enabled;
     const values_before = g.evaluator.values.items.len;
     const calls_before = g.evaluator.validated_calls.count();
@@ -1195,7 +1160,7 @@ fn independentQueryAttempt(fixture: *const Fixture, old: *const capture.Capture,
 test "independent call proof uses exact scalar inputs and preserves negative reads and declined publication" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(independent_query_source);
@@ -1215,7 +1180,7 @@ test "independent call proof uses exact scalar inputs and preserves negative rea
 test "independent call proof rejects wrong scalar and distinct collection arrows without changing the current evaluator" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(independent_query_source);
@@ -1270,7 +1235,7 @@ fn parallelProofScenario(allocator: Allocator, fixture: *const Fixture, old: *co
 test "independent semantic workers retain deterministic unpublished judgments and join through allocation failures" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var current = try Fixture.init(independent_query_source);
@@ -1326,7 +1291,7 @@ test "independent call proof preserves List versus Array nominal identity and re
 test "independent call proof every failed allocation preserves query maps values slots and retry" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(independent_query_source);
@@ -1340,14 +1305,14 @@ test "independent call proof every failed allocation preserves query maps values
 test "independent call proof retained dependencies survive semantic owner remapping and reject changed producers" {
     var before = try Fixture.init(independent_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     try independentQueryRead(&old.capture.?, before.target("checked"), true);
     var after = try Fixture.init(independent_query_source);
     defer after.deinit();
     editSchema(&after);
-    var checked = try after.emit(a, .{ .retain_artifacts = true, .previous = &old.capture.?, .evidence_noise = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var checked = try after.emit(a, .{ .retain_artifacts = true, .previous = &old.capture.?, .evidence_noise = true });
     defer checked.deinit(a);
     try successful(&checked);
     try std.testing.expect(checked.completed_queries.independent_rechecked > 0);
@@ -1358,7 +1323,7 @@ test "independent call proof retained dependencies survive semantic owner remapp
     try std.testing.expectEqual(fresh.constant_steps, checked.constant_steps);
     var third = try Fixture.init(independent_query_source);
     defer third.deinit();
-    var reused = try third.emit(a, .{ .retain_artifacts = true, .previous = &checked.capture.?, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var reused = try third.emit(a, .{ .retain_artifacts = true, .previous = &checked.capture.? });
     defer reused.deinit(a);
     try successful(&reused);
     try std.testing.expect(reused.completed_queries.independent_reused > 0);
@@ -1368,7 +1333,7 @@ test "independent call proof retained dependencies survive semantic owner remapp
     try std.testing.expectEqual(third_fresh.constant_steps, reused.constant_steps);
     const body = third.units[0].body(third.target("factor").binding).?;
     third.units[0].nodes[body.root].a = 6;
-    var changed = try third.emit(a, .{ .retain_artifacts = true, .previous = &reused.capture.?, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true } });
+    var changed = try third.emit(a, .{ .retain_artifacts = true, .previous = &reused.capture.? });
     defer changed.deinit(a);
     try successful(&changed);
     try std.testing.expectEqual(@as(usize, 0), changed.completed_queries.independent_reused);
@@ -1409,8 +1374,6 @@ fn plainQueryAttempt(fixture: *const Fixture, old: *const capture.Capture, mode:
     const expected = try queryExpected(&g, old, old.metadata.specialization_receipts.items[0].expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, old, fixture.units, fixture.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
     state.revalidate_plain_facts = mode != .reference;
     const key = plainQueryKey(fixture, "PlainPayload");
     if (mode == .known_false) try g.evaluator.plain_nominals.put(a, key, false);
@@ -1432,7 +1395,7 @@ fn plainQueryAttempt(fixture: *const Fixture, old: *const capture.Capture, mode:
 test "plain catalog query recovery preserves negative reads conflicting facts and atomic declined publication" {
     var before = try Fixture.init(plain_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(plain_query_source);
@@ -1455,7 +1418,7 @@ test "plain catalog query recovery preserves negative reads conflicting facts an
 test "plain catalog query recovery cleans every allocation failure without publishing staged facts" {
     var before = try Fixture.init(plain_query_source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     try plainQueryFact(&old.capture.?, &.{.{ .key = plainQueryKey(&before, "PlainPayload"), .plain = true }});
@@ -1498,7 +1461,7 @@ test "semantic catalog imports nominal evidence while executable layout remains 
     defer after.deinit();
     editSchema(&after);
     const pools = &old.capture.?.metadata.pools.?;
-    var gate = try gate_api.Gate.initWithExecution(a, pools, after.units, after.names.view(), .{ .reuse_unaffected_modules = true });
+    var gate = try gate_api.Gate.init(a, pools, after.units, after.names.view());
     defer gate.deinit();
     try std.testing.expect(gate.enabled and !gate.structural_units[0]);
     var maps = (try @import("artifact_import.zig").Importer.initCheckedQuery(a, pools, after.units, &gate)).?;
@@ -1524,7 +1487,7 @@ test "semantic catalog imports nominal evidence while executable layout remains 
 test "source declared effect query preserves fresh bytes and fuel across edits and remapped owners" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_source_effect_queries = true, .reuse_query_graph_scratch = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source_row_query);
@@ -1533,10 +1496,10 @@ test "source declared effect query preserves fresh bytes and fuel across edits a
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
-    var pure = try after.emit(a, .{ .retain_artifacts = true, .previous = &old.capture.?, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var pure = try after.emit(a, .{ .retain_artifacts = true, .previous = &old.capture.? });
     defer pure.deinit(a);
     try successful(&pure);
-    var reused = try after.emit(a, .{ .evidence_noise = true, .retain_artifacts = true, .previous = &old.capture.?, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_source_effect_queries = true, .reuse_query_graph_scratch = true } });
+    var reused = try after.emit(a, .{ .evidence_noise = true, .retain_artifacts = true, .previous = &old.capture.? });
     defer reused.deinit(a);
     try successful(&reused);
     std.debug.print("source rows records={d} pure={d} reused={d} reasons={any}\n", .{ old.completed_queries.recorded, pure.completed_queries.reused, reused.completed_queries.reused, reused.completed_queries.reasons });
@@ -1548,7 +1511,7 @@ test "source declared effect query preserves fresh bytes and fuel across edits a
     var reverted_fresh = try third.emit(a, .{});
     defer reverted_fresh.deinit(a);
     try successful(&reverted_fresh);
-    var reverted = try third.emit(a, .{ .retain_artifacts = true, .previous = &reused.capture.?, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_source_effect_queries = true, .reuse_query_graph_scratch = true } });
+    var reverted = try third.emit(a, .{ .retain_artifacts = true, .previous = &reused.capture.? });
     defer reverted.deinit(a);
     try successful(&reverted);
     try std.testing.expect(reverted.completed_queries.reused > 0);
@@ -1564,8 +1527,6 @@ fn queryAllocationFailure(allocator: Allocator, fixture: *const Fixture, old: *c
     const expected = try queryExpected(&g, old, old.metadata.specialization_receipts.items[0].expected);
     var state = try @import("completed_specialization_query.zig").State.init(allocator, old, fixture.units, fixture.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
     const sizes = .{ g.evaluator.values.items.len, g.evaluator.children.items.len, g.evaluator.closures.items.len, g.evaluator.type_mappings.items.len, g.evaluator.row_mappings.items.len, g.evaluator.record_layouts.items.len, g.evaluator.field_names.items.len, g.evaluator.typed_views.count(), g.evaluator.specialized_closures.count(), g.evaluator.validated_calls.count(), g.evaluator.plain_nominals.count(), g.evaluator.specialization_receipts.items.len };
     const slots = artifacts.stamp(g.evaluator.slots);
     const selected = state.lookup(&g, input, expected) catch |err| {
@@ -1584,7 +1545,7 @@ fn queryAllocationFailure(allocator: Allocator, fixture: *const Fixture, old: *c
 test "completed specialization query every allocation failure preserves all publication maps and slots" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var initial = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     var after = try Fixture.init(query_source);
@@ -1595,7 +1556,7 @@ test "completed specialization query every allocation failure preserves all publ
 test "completed specialization query changed concrete captures and low quotas explicitly retain ordinary inference" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var initial = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     var after = try Fixture.init(query_source);
@@ -1608,8 +1569,6 @@ test "completed specialization query changed concrete captures and low quotas ex
     const expected = try queryExpected(&g, &initial.capture.?, initial.capture.?.metadata.specialization_receipts.items[0].expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, &initial.capture.?, after.units, after.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
     g.evaluator.options.max_values = 8;
     try std.testing.expect((try state.lookup(&g, input, expected)) == null);
     g.evaluator.options.max_values = 1_000_000;
@@ -1625,13 +1584,13 @@ test "completed specialization query changed concrete captures and low quotas ex
 test "completed specialization query repeated fresh owners carry remapped receipts without changing output or quotas" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var second = try Fixture.init(query_source);
     defer second.deinit();
     editSchema(&second);
-    var transported = try backend.compileWithOptions(a, second.units, second.entry, .{ .identity = second.names.view(), .retain_artifacts = true, .previous = &old.capture.?, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var transported = try backend.compileWithOptions(a, second.units, second.entry, .{ .identity = second.names.view(), .retain_artifacts = true, .previous = &old.capture.? });
     defer transported.deinit(a);
     try successful(&transported);
     try std.testing.expectEqual(@as(usize, 1), transported.completed_queries.reused);
@@ -1641,7 +1600,7 @@ test "completed specialization query repeated fresh owners carry remapped receip
     var fresh = try backend.compileWithIdentity(a, third.units, third.entry, third.names.view());
     defer fresh.deinit(a);
     try successful(&fresh);
-    var reverted = try backend.compileWithOptions(a, third.units, third.entry, .{ .identity = third.names.view(), .retain_artifacts = true, .previous = &transported.capture.?, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var reverted = try backend.compileWithOptions(a, third.units, third.entry, .{ .identity = third.names.view(), .retain_artifacts = true, .previous = &transported.capture.? });
     defer reverted.deinit(a);
     try successful(&reverted);
     try std.testing.expectEqual(@as(usize, 1), reverted.completed_queries.reused);
@@ -1655,7 +1614,7 @@ test "completed specialization query repeated fresh owners carry remapped receip
 test "completed specialization query exact current expected type and cache-state reads remain authoritative" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(query_source);
@@ -1668,8 +1627,6 @@ test "completed specialization query exact current expected type and cache-state
     const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_receipts.items[0].expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
     const wrong = try g.evaluator.evidence.intern(.function, 3, 4, &.{});
     try std.testing.expect((try state.lookup(&g, input, wrong)) == null);
     try std.testing.expectError(error.Declined, g.evaluator.specializeClosure(input, wrong));
@@ -1690,7 +1647,7 @@ test "completed specialization query exact current expected type and cache-state
 test "completed specialization query declines foreign allocator and same-pointer shorter owner before access" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(query_source);
@@ -1703,8 +1660,6 @@ test "completed specialization query declines foreign allocator and same-pointer
     const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_receipts.items[0].expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
     const before_values = g.evaluator.values.items.len;
     const before_children = g.evaluator.children.items.len;
     const owner = g.evaluator.units;
@@ -1728,7 +1683,7 @@ test "completed specialization query selected values and remapped receipt surviv
     var before = try Fixture.init(query_source);
     var before_live = true;
     defer if (before_live) before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     var old_live = true;
     defer if (old_live) old.deinit(a);
     try successful(&old);
@@ -1742,8 +1697,6 @@ test "completed specialization query selected values and remapped receipt surviv
     const input = try g.evaluator.richValue(after.target("callback"));
     const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_receipts.items[0].expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
     var state_live = true;
     defer if (state_live) state.deinit();
     const selected = (try state.lookup(&g, input, expected)).?;
@@ -1780,8 +1733,6 @@ fn pairedQueryFailure(allocator: Allocator, fixture: *const Fixture, old: *const
     const expected = try queryExpected(&g, old, old.metadata.specialization_receipts.items[0].expected);
     var state = try @import("completed_specialization_query.zig").State.init(allocator, old, fixture.units, fixture.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
     const left_selected = (try state.lookup(&g, left, expected)).?;
     const sizes = .{ g.evaluator.values.items.len, g.evaluator.children.items.len, g.evaluator.closures.items.len, g.evaluator.type_mappings.items.len, g.evaluator.row_mappings.items.len, g.evaluator.record_layouts.items.len, g.evaluator.field_names.items.len, g.evaluator.typed_views.count(), g.evaluator.specialized_closures.count(), g.evaluator.validated_calls.count(), g.evaluator.plain_nominals.count(), g.evaluator.specialization_receipts.items.len };
     const slots = artifacts.stamp(g.evaluator.slots);
@@ -1807,7 +1758,7 @@ fn pairedQueryFailure(allocator: Allocator, fixture: *const Fixture, old: *const
 test "completed specialization query ordered bucket and warmed plan distinguish same-source concrete captures under every allocation failure" {
     var before = try Fixture.init(paired_query_source);
     defer before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     try std.testing.expectEqual(@as(usize, 2), old.capture.?.metadata.specialization_receipts.items.len);
@@ -1821,7 +1772,7 @@ test "completed specialization query ordered bucket and warmed plan distinguish 
 test "completed specialization query importer cannot cross a live Generator Session owner" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_query_graph_scratch = true } });
+    var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(query_source);
@@ -1834,8 +1785,6 @@ test "completed specialization query importer cannot cross a live Generator Sess
     const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_receipts.items[0].expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
     try std.testing.expect((try state.lookup(&g, input, expected)) != null);
     var foreign = try Generator.init(&after);
     defer foreign.deinit();
@@ -1907,9 +1856,6 @@ fn sourceRowOom(allocator: Allocator, fixture: *const Fixture, old: *const captu
     const expected = try sourceRowExpected(&g, old, input, fixture.names.view());
     var state = try @import("completed_specialization_query.zig").State.init(allocator, old, fixture.units, fixture.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
-    state.source_effect_rows = true;
     const sizes = sourceRowPublicationSizes(&g);
     const slots = artifacts.stamp(g.evaluator.slots);
     const selected = state.lookup(&g, input, expected) catch |err| {
@@ -1930,7 +1876,7 @@ fn sourceRowOom(allocator: Allocator, fixture: *const Fixture, old: *const captu
 test "source declared effect query every allocation failure preserves publications slots and exact growth with current row noise" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_source_effect_queries = true, .reuse_query_graph_scratch = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source_row_query);
@@ -1943,7 +1889,7 @@ test "source declared effect query every allocation failure preserves publicatio
 test "source declared effect query frozen row policy declines changes and semantic operation arguments stay distinct" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_source_effect_queries = true, .reuse_query_graph_scratch = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source_row_query);
@@ -1957,9 +1903,6 @@ test "source declared effect query frozen row policy declines changes and semant
     const expected = try sourceRowExpected(&g, &old.capture.?, input, after.names.view());
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
-    state.source_effect_rows = true;
     const function = g.evaluator.evidence.node(expected);
     const effects = g.evaluator.evidence.effects.view();
     const label = effects.rowLabels(function.c)[0];
@@ -1973,18 +1916,8 @@ test "source declared effect query frozen row policy declines changes and semant
     try std.testing.expectEqual(initial_sizes, sourceRowPublicationSizes(&g));
     try std.testing.expect(state.stats.reasons[@backingInt(@import("completed_specialization_query.zig").Reason.expected)] > 0);
     try std.testing.expect((try state.lookup(&g, input, expected)) != null);
-    state.source_effect_rows = false;
     const sizes = sourceRowPublicationSizes(&g);
     try std.testing.expect((try state.lookup(&g, input, expected)) == null);
-    try std.testing.expectEqual(sizes, sourceRowPublicationSizes(&g));
-    var pure_state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
-    defer pure_state.deinit();
-    pure_state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
-    try std.testing.expect((try pure_state.lookup(&g, input, expected)) == null);
-    try std.testing.expect(pure_state.stats.reasons[@backingInt(@import("completed_specialization_query.zig").Reason.domain)] > 0);
-    pure_state.source_effect_rows = true;
-    try std.testing.expect((try pure_state.lookup(&g, input, expected)) == null);
     try std.testing.expectEqual(sizes, sourceRowPublicationSizes(&g));
 }
 
@@ -1992,7 +1925,7 @@ test "source declared effect query nonempty row and receipt survive destruction 
     var before = try Fixture.init(source_row_query);
     var before_live = true;
     defer if (before_live) before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_source_effect_queries = true, .reuse_query_graph_scratch = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     var old_live = true;
     defer if (old_live) old.deinit(a);
     try successful(&old);
@@ -2007,9 +1940,6 @@ test "source declared effect query nonempty row and receipt survive destruction 
     const input = try g.evaluator.richValue(after.target("callback"));
     const expected = try sourceRowExpected(&g, &old.capture.?, input, after.names.view());
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
-    state.source_effect_rows = true;
     var state_live = true;
     defer if (state_live) state.deinit();
     const selected = (try state.lookup(&g, input, expected)).?;
@@ -2054,7 +1984,7 @@ fn expectRowDomain(old: *const capture.Capture, gate: *const gate_api.Gate, root
 test "source declared effect graph rejects generated labels and provider State operation arguments" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_source_effect_queries = true, .reuse_query_graph_scratch = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source_row_query);
@@ -2106,7 +2036,7 @@ test "source declared effect query structurally remaps a nominal operation argum
     ;
     var before = try Fixture.init(source);
     defer before.deinit();
-    var old = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_source_effect_queries = true, .reuse_query_graph_scratch = true } });
+    var old = try before.emit(a, .{ .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
     var after = try Fixture.init(source);
@@ -2115,7 +2045,7 @@ test "source declared effect query structurally remaps a nominal operation argum
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
-    var reused = try after.emit(a, .{ .evidence_noise = true, .retain_artifacts = true, .previous = &old.capture.?, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_source_effect_queries = true, .reuse_query_graph_scratch = true } });
+    var reused = try after.emit(a, .{ .evidence_noise = true, .retain_artifacts = true, .previous = &old.capture.? });
     defer reused.deinit(a);
     try successful(&reused);
     try std.testing.expect(reused.completed_queries.reused > 0);
@@ -2153,9 +2083,6 @@ test "source declared effect query structurally remaps a nominal operation argum
     try std.testing.expect(argument >= old_view.nodes.len);
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
-    state.source_effect_rows = true;
     try std.testing.expect((try state.lookup(&g, input, expected)) != null);
 }
 
@@ -2362,14 +2289,14 @@ test "query graph scratch partial old child overlap declines without publication
     }
 }
 
-fn gatePilotOptions(old: *const capture.Capture, mode: @import("principal_evidence_reuse.zig").GraphMode, enabled: bool) backend.CompileOptions {
-    return .{ .retain_artifacts = true, .previous = old, .policy = .{ .optimize_completed_query_admission = true, .reuse_completed_specializations = true, .reuse_source_effect_queries = true, .reuse_query_graph_scratch = true, .share_query_gate = enabled, .principal_graph_mode = mode } };
+fn gatePilotOptions(old: *const capture.Capture) backend.CompileOptions {
+    return .{ .retain_artifacts = true, .previous = old };
 }
 
-test "shared query gate backend uses one clone in primitive lazy modes and fresh eager admission" {
+test "shared query gate backend uses one clone and matches fresh output" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var initial = try before.emit(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     var after = try Fixture.init(source_row_query);
@@ -2378,44 +2305,27 @@ test "shared query gate backend uses one clone in primitive lazy modes and fresh
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
-    for ([_]@import("principal_evidence_reuse.zig").GraphMode{ .primitive, .lazy, .eager }) |mode| {
-        var off = try after.emit(a, gatePilotOptions(&initial.capture.?, mode, false));
-        defer off.deinit(a);
-        var on = try after.emit(a, gatePilotOptions(&initial.capture.?, mode, true));
-        defer on.deinit(a);
-        try successful(&off);
-        try successful(&on);
-        try std.testing.expectEqualSlices(u8, fresh.bytes, on.bytes);
-        try std.testing.expectEqualSlices(u8, off.bytes, on.bytes);
-        try std.testing.expectEqual(fresh.constant_steps, on.constant_steps);
-        try std.testing.expectEqual(off.completed_queries.reused, on.completed_queries.reused);
-        try std.testing.expect(on.completed_queries.reused > 0);
-        try std.testing.expectEqual(@as(usize, 0), off.completed_queries.shared_gates);
-        try std.testing.expectEqual(@as(usize, 1), off.completed_queries.gate_fresh);
-        try std.testing.expectEqual(@as(usize, if (mode == .eager) 0 else 1), on.completed_queries.shared_gates);
-        try std.testing.expectEqual(@as(usize, if (mode == .eager) 1 else 0), on.completed_queries.gate_fresh);
-        if (mode != .eager) try std.testing.expect(on.completed_queries.shared_gate_bytes > 0);
-    }
-    var no_principal_options = gatePilotOptions(&initial.capture.?, .primitive, true);
-    no_principal_options.policy.principal_reuse = false;
-    var no_principal = try after.emit(a, no_principal_options);
-    defer no_principal.deinit(a);
-    try successful(&no_principal);
-    try std.testing.expectEqual(@as(usize, 0), no_principal.completed_queries.shared_gates);
-    try std.testing.expectEqual(@as(usize, 1), no_principal.completed_queries.gate_fresh);
-    try std.testing.expectEqualSlices(u8, fresh.bytes, no_principal.bytes);
+    var on = try after.emit(a, gatePilotOptions(&initial.capture.?));
+    defer on.deinit(a);
+    try successful(&on);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, on.bytes);
+    try std.testing.expectEqual(fresh.constant_steps, on.constant_steps);
+    try std.testing.expect(on.completed_queries.reused > 0);
+    try std.testing.expectEqual(@as(usize, 1), on.completed_queries.shared_gates);
+    try std.testing.expectEqual(@as(usize, 0), on.completed_queries.gate_fresh);
+    try std.testing.expect(on.completed_queries.shared_gate_bytes > 0);
 }
 
 test "shared query gate new compile freshly detects changed Core at the same owner address" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var initial = try before.emit(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     var after = try Fixture.init(query_source);
     defer after.deinit();
     editSchema(&after);
     {
-        var first = try after.emit(a, gatePilotOptions(&initial.capture.?, .primitive, true));
+        var first = try after.emit(a, gatePilotOptions(&initial.capture.?));
         defer first.deinit(a);
         try successful(&first);
         try std.testing.expect(first.completed_queries.reused > 0);
@@ -2430,7 +2340,7 @@ test "shared query gate new compile freshly detects changed Core at the same own
     try std.testing.expect(after.units.ptr == same_owner);
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
-    var changed = try after.emit(a, gatePilotOptions(&initial.capture.?, .primitive, true));
+    var changed = try after.emit(a, gatePilotOptions(&initial.capture.?));
     defer changed.deinit(a);
     try successful(&fresh);
     try successful(&changed);
@@ -2443,7 +2353,7 @@ test "shared query gate new compile freshly detects changed Core at the same own
 test "shared query gate keeps query Plans owned after principal teardown and declines changed live owners" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var initial = try before.emit(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     var after = try Fixture.init(query_source);
     defer after.deinit();
@@ -2454,12 +2364,10 @@ test "shared query gate keeps query Plans owned after principal teardown and dec
     g.evaluator.retain_specialization_receipts = true;
     const input = try g.evaluator.richValue(after.target("callback"));
     const expected = try queryExpected(&g, &initial.capture.?, initial.capture.?.metadata.specialization_receipts.items[0].expected);
-    var principal = try @import("principal_evidence_reuse.zig").State.init(a, &initial.capture.?, after.units, after.names.view(), .primitive);
+    var principal = try @import("principal_evidence_reuse.zig").State.init(a, &initial.capture.?, after.units, after.names.view(), null);
     const cloned = (@import("shared_query_gate.zig").share(a, &initial.capture.?.metadata.pools.?, after.units, &principal.gate)) orelse return error.ExpectedClone;
     var state: @import("completed_specialization_query.zig").State = .{ .allocator = a, .old = &initial.capture.?, .gate = cloned, .graph_scratch = .{ .allocator = a } };
     defer state.deinit();
-    state.optimize_admission = true;
-    state.reuse_graph_scratch = true;
     principal.deinit();
     const selected = (try state.lookup(&g, input, expected)) orelse return error.ExpectedHit;
     try std.testing.expectEqual(@as(usize, 1), state.stats.reused);
@@ -2475,7 +2383,7 @@ test "shared query gate keeps query Plans owned after principal teardown and dec
 }
 
 fn gateBackendFailure(allocator: Allocator, fixture: *const Fixture, old: *const capture.Capture, expected: []const u8, fuel: usize) !void {
-    var result = try fixture.emit(allocator, gatePilotOptions(old, .primitive, true));
+    var result = try fixture.emit(allocator, gatePilotOptions(old));
     defer result.deinit(allocator);
     try successful(&result);
     try std.testing.expectEqual(@as(usize, 1), result.completed_queries.shared_gates);
@@ -2488,7 +2396,7 @@ fn gateBackendFailure(allocator: Allocator, fixture: *const Fixture, old: *const
 test "shared query gate backend releases every allocation failure without changing previous artifacts" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var initial = try before.emit(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     var after = try Fixture.init(query_source);
     defer after.deinit();
@@ -2502,16 +2410,10 @@ test "shared query gate backend releases every allocation failure without changi
     try std.testing.expectEqualSlices(u8, &old_slots, &artifacts.stamp(initial.capture.?.metadata.pools.?.slots));
 }
 
-fn preparedQueryOptions(old: *const capture.Capture, mode: @import("principal_evidence_reuse.zig").GraphMode, enabled: bool) backend.CompileOptions {
-    var options = gatePilotOptions(old, mode, true);
-    options.policy.prepare_checked_query_importer = enabled;
-    return options;
-}
-
-test "checked query importer backend preserves rows and exact work with default off and eager fallback" {
+test "checked query importer backend preserves rows and exact work" {
     var before = try Fixture.init(source_row_query);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var initial = try before.emit(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
     var after = try Fixture.init(source_row_query);
@@ -2520,37 +2422,20 @@ test "checked query importer backend preserves rows and exact work with default 
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
     try successful(&fresh);
-    for ([_]@import("principal_evidence_reuse.zig").GraphMode{ .primitive, .lazy, .eager }) |mode| {
-        var off = try after.emit(a, preparedQueryOptions(&initial.capture.?, mode, false));
-        defer off.deinit(a);
-        var on = try after.emit(a, preparedQueryOptions(&initial.capture.?, mode, true));
-        defer on.deinit(a);
-        try successful(&off);
-        try successful(&on);
-        try std.testing.expectEqualSlices(u8, fresh.bytes, on.bytes);
-        try std.testing.expectEqualSlices(u8, off.bytes, on.bytes);
-        try std.testing.expectEqual(fresh.constant_steps, on.constant_steps);
-        try std.testing.expectEqual(off.completed_queries.reused, on.completed_queries.reused);
-        try std.testing.expect(on.completed_queries.reused > 0);
-        try std.testing.expectEqual(@as(usize, 0), off.completed_queries.prepared_importers);
-        try std.testing.expectEqual(@as(usize, 1), off.completed_queries.fresh_importers);
-        try std.testing.expectEqual(@as(usize, if (mode == .eager) 0 else 1), on.completed_queries.prepared_importers);
-        try std.testing.expectEqual(@as(usize, if (mode == .eager) 1 else 0), on.completed_queries.fresh_importers);
-    }
-    var standalone = preparedQueryOptions(&initial.capture.?, .primitive, true);
-    standalone.policy.principal_reuse = false;
-    var result = try after.emit(a, standalone);
-    defer result.deinit(a);
-    try successful(&result);
-    try std.testing.expectEqual(@as(usize, 1), result.completed_queries.prepared_importers);
-    try std.testing.expectEqual(@as(usize, 1), result.completed_queries.gate_fresh);
-    try std.testing.expectEqualSlices(u8, fresh.bytes, result.bytes);
+    var on = try after.emit(a, gatePilotOptions(&initial.capture.?));
+    defer on.deinit(a);
+    try successful(&on);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, on.bytes);
+    try std.testing.expectEqual(fresh.constant_steps, on.constant_steps);
+    try std.testing.expect(on.completed_queries.reused > 0);
+    try std.testing.expectEqual(@as(usize, 1), on.completed_queries.prepared_importers);
+    try std.testing.expectEqual(@as(usize, 0), on.completed_queries.fresh_importers);
 }
 
 test "checked query importer new compile detects body mutation and live State owners and options remain bound" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var initial = try before.emit(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     var after = try Fixture.init(query_source);
     defer after.deinit();
@@ -2564,9 +2449,6 @@ test "checked query importer new compile detects body mutation and live State ow
         const expected = try queryExpected(&g, &initial.capture.?, initial.capture.?.metadata.specialization_receipts.items[0].expected);
         var state = try @import("completed_specialization_query.zig").State.init(a, &initial.capture.?, after.units, after.names.view());
         defer state.deinit();
-        state.optimize_admission = true;
-        state.reuse_graph_scratch = true;
-        state.prepare_checked_importer = true;
         const selected = (try state.lookup(&g, input, expected)) orelse return error.ExpectedHit;
         try std.testing.expectEqual(@as(usize, 1), state.stats.prepared_importers);
         var moved = state; // Borrowed copy; original alone destroys owned state.
@@ -2576,9 +2458,7 @@ test "checked query importer new compile detects body mutation and live State ow
         const other_input = try another.evaluator.richValue(after.target("callback"));
         const other_expected = try queryExpected(&another, &initial.capture.?, initial.capture.?.metadata.specialization_receipts.items[0].expected);
         try std.testing.expect(try state.lookup(&another, other_input, other_expected) == null);
-        state.prepare_checked_importer = false;
         try std.testing.expect(try state.lookup(&g, input, expected) == null);
-        state.prepare_checked_importer = true;
         g.evaluator.options.max_steps = 1;
         try std.testing.expect(try state.lookup(&g, input, expected) == null);
         g.evaluator.options.max_steps = (eval.Options{}).max_steps;
@@ -2595,7 +2475,7 @@ test "checked query importer new compile detects body mutation and live State ow
     try std.testing.expect(after.units.ptr == same_owner);
     var fresh = try after.emit(a, .{});
     defer fresh.deinit(a);
-    var changed = try after.emit(a, preparedQueryOptions(&initial.capture.?, .primitive, true));
+    var changed = try after.emit(a, gatePilotOptions(&initial.capture.?));
     defer changed.deinit(a);
     try successful(&fresh);
     try successful(&changed);
@@ -2605,7 +2485,7 @@ test "checked query importer new compile detects body mutation and live State ow
 }
 
 fn preparedQueryBackendFailure(allocator: Allocator, fixture: *const Fixture, old: *const capture.Capture, expected: []const u8, work: usize) !void {
-    var result = try fixture.emit(allocator, preparedQueryOptions(old, .primitive, true));
+    var result = try fixture.emit(allocator, gatePilotOptions(old));
     defer result.deinit(allocator);
     try successful(&result);
     try std.testing.expectEqual(@as(usize, 1), result.completed_queries.prepared_importers);
@@ -2618,7 +2498,7 @@ fn preparedQueryBackendFailure(allocator: Allocator, fixture: *const Fixture, ol
 test "checked query importer backend keeps previous values slots and query memo publication atomic under every OOM" {
     var before = try Fixture.init(query_source);
     defer before.deinit();
-    var initial = try before.emit(a, .{ .retain_artifacts = true, .policy = .{ .reuse_completed_specializations = true } });
+    var initial = try before.emit(a, .{ .retain_artifacts = true });
     defer initial.deinit(a);
     var after = try Fixture.init(query_source);
     defer after.deinit();

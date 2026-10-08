@@ -110,16 +110,10 @@ tests. Five paired restarts use about 30% less child CPU work; heavily contended
 wall-clock samples are not a target-latency result. Evaluated values and arbitrary
 specializations are not persisted.
 
-Resolved scalar SSA now has a default-off native prototype. It emits without
-source/solver owners but admits only two gdev bodies; no useful compilation
-speedup is established. A stateless scalar live-patch prototype redirects
-unchanged and recursive callers while preserving exported function objects,
-with stale/corrupt patch rejection and transactional table publication. It is
-an internal experiment and cannot patch gdev's heap/effect state. The final
-release build, native suite and 539 guest/client tests pass. Lint reports 120
-existing warnings and no errors across 279 files. General body-level checking,
-complete ownership-aware SSA, arbitrary specialization persistence and stateful
-live patches remain open.
+The resolved scalar SSA and scalar live-patch prototypes were deleted: neither
+produced a measured compilation win or reached the production path. General
+body-level checking, complete ownership-aware SSA, arbitrary specialization
+persistence and stateful live patches remain open.
 
 ## Previous list transfer qualification
 

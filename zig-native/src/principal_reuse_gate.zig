@@ -22,9 +22,6 @@ pub const Gate = struct {
     /// Exact retained Snapshot owner paired with this private gate.
     source_pools: ?*const artifacts.Pools = null,
     enabled: bool = false,
-    /// Exact declaration graphs in changed modules may supply principal proofs.
-    /// Executable/value/receipt admission still requires structural_units.
-    declaration_principals: bool = false,
     dependency_validations: usize = 0,
     reused_dependency_validations: usize = 0,
     dependencies_validated: bool = false,
@@ -53,15 +50,14 @@ pub const Gate = struct {
     /// The caller retains immutable current Core through every admits call.
     /// Retained pins and identity remain immutable during initialization; the
     /// gate owns only its flags and does not retain the old artifact owner.
-    pub const Execution = struct { reuse_projected_principals: bool = false, reuse_declaration_principals: bool = false, reuse_unaffected_modules: bool = false, reuse_equivalent_validation: bool = false, stamps: ?*artifacts.ModuleStamps = null };
-
     pub fn init(allocator: Allocator, old: *const artifacts.Pools, units: []const core.Module, names: ?identity.View) Allocator.Error!Gate {
-        return initWithExecution(allocator, old, units, names, .{});
+        return initWithStamps(allocator, old, units, names, null);
     }
 
-    /// Changed-module admission keeps its semantic catalogs exact and marks
-    /// declarations dirty unless an exact principal projection is enabled.
-    pub fn initWithExecution(allocator: Allocator, old: *const artifacts.Pools, units: []const core.Module, names: ?identity.View, execution: Execution) Allocator.Error!Gate {
+    /// Changed-module admission keeps its semantic catalogs exact; exact
+    /// declaration projections may retain principal proofs in changed modules.
+    /// Executable/value/receipt admission still requires structural_units.
+    pub fn initWithStamps(allocator: Allocator, old: *const artifacts.Pools, units: []const core.Module, names: ?identity.View, stamps: ?*artifacts.ModuleStamps) Allocator.Error!Gate {
         const structural_units = try allocator.alloc(bool, units.len);
         errdefer allocator.free(structural_units);
         @memset(structural_units, false);
@@ -78,24 +74,23 @@ pub const Gate = struct {
         const storage = try allocator.create(Storage);
         errdefer allocator.destroy(storage);
         storage.* = .{};
-        var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .declaration_principals = execution.reuse_declaration_principals, .structural_units = structural_units, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
+        var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .structural_units = structural_units, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
 
         if (!old.project_identity or old.identity == null or names == null or old.modules.len != units.len or units.len == 0 or units.len >= std.math.maxInt(u32)) return result;
         // Check every retained pointer against its original pin before comparing
         // any current structure or using a retained dependency recipe.
-        for (old.modules) |pin| if (!std.mem.eql(u8, &pin.stamp, &try artifacts.moduleStamp(pin.module, execution.stamps))) return result;
+        for (old.modules) |pin| if (!std.mem.eql(u8, &pin.stamp, &try artifacts.moduleStamp(pin.module, stamps))) return result;
         const previous = old.identity.?.view();
         const current = names.?;
         if (!try namespaceEqual(allocator, old, units, previous, current)) return result;
 
         var all_structural = true;
         for (units, old.modules, 0..) |*module, pin, unit| {
-            const exact = if (execution.stamps) |stamps| try stamps.proveSame(pin.module, module) else false;
+            const exact = if (stamps) |checker| try checker.proveSame(pin.module, module) else false;
             structural_units[unit] = exact or moduleEqual(pin.module, module);
             all_structural = all_structural and structural_units[unit];
         }
         if (!all_structural) {
-            if (!execution.reuse_unaffected_modules) return result;
             for (units, old.modules, structural_units) |*module, pin, structural| {
                 if (!structural and !catalogEqual(pin.module, module)) return result;
             }
@@ -135,7 +130,7 @@ pub const Gate = struct {
             // therefore have equal validation results when foreign bounds
             // also agree. Every dirty/source/catalog check still runs, and
             // changed modules always receive their own full validation.
-            if (!execution.reuse_equivalent_validation or !structural or !equivalent_context) {
+            if (!structural or !equivalent_context) {
                 result.dependency_validations += 1;
                 if (!try validDependencies(allocator, module, current_units, current.symbols.len)) return result;
             }
@@ -165,14 +160,14 @@ pub const Gate = struct {
                 // Whole-module executable reuse stays disabled. An exact
                 // declaration projection may retain only its principal proof.
                 @memset(dirty[offsets[unit]..offsets[unit + 1]], true);
-                if (execution.reuse_declaration_principals) for (module.bindings[1..], 1..) |binding, id| {
+                for (module.bindings[1..], 1..) |binding, id| {
                     const same = switch (binding.kind) {
                         .global => try projection.definitionEqual(allocator, pin.module, &module, @intCast(id)),
                         .external => id < pin.module.bindings.len and std.meta.eql(pin.module.bindings[id], binding),
                         .local, .parameter => false,
                     };
                     dirty[offsets[unit] + id] = !same;
-                };
+                }
                 continue;
             }
             for (module.nodes, pin.module.nodes, 0..) |node, before, id| {
@@ -245,7 +240,6 @@ pub const Gate = struct {
     pub fn admitsPrincipal(self: *const Gate, target: core.BindingRef) bool {
         if (!self.enabled or target.unit == 0 or target.unit > self.units.len or target.binding == 0) return false;
         const unit = target.unit - 1;
-        if (!self.structural_units[unit] and !self.declaration_principals) return false;
         const module = self.units[unit];
         if (target.binding >= module.bindings.len) return false;
         const binding = module.bindings[target.binding];
@@ -267,7 +261,7 @@ pub const Gate = struct {
     pub fn admitsLocalSource(self: *const Gate, target: core.BindingRef) bool {
         if (!self.admitsCallIdentity(target)) return false;
         const unit = target.unit - 1;
-        return (self.structural_units[unit] or self.declaration_principals) and !self.local_dirty[self.offsets[unit] + target.binding];
+        return !self.local_dirty[self.offsets[unit] + target.binding];
     }
 
     /// Identity alone permits comparing a freshly established closed judgment.

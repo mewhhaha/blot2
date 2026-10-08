@@ -9,9 +9,9 @@ const capture = @import("artifact_capture.zig");
 const importer = @import("artifact_import.zig");
 const identity = @import("runtime_identity.zig");
 const gate = @import("principal_reuse_gate.zig");
+const code_artifacts = @import("code_artifacts.zig");
 const Allocator = std.mem.Allocator;
 
-pub const GraphMode = enum { eager, lazy, primitive };
 
 pub const Stats = struct {
     persisted_requests: usize = 0,
@@ -50,8 +50,6 @@ pub const State = struct {
     /// Borrowed current identity stays alive through this compile, like Core.
     names: ?identity.View,
     graphs: ?importer.Importer = null,
-    graph_mode: GraphMode,
-    reuse_projected_inputs: bool = false,
     input_image_equal: ?bool = null,
     last_inputs: ?*const @import("principal_inputs.zig").Key = null,
     imported_inputs: ?@import("principal_inputs.zig").Key = null,
@@ -60,16 +58,11 @@ pub const State = struct {
     /// Old Core and Pools stay immutable/alive through this candidate. Only
     /// this distinct importer's stability flags receive the checked namespace
     /// gate; retained code fragments keep their existing exact Core gate.
-    pub fn init(allocator: Allocator, old: *const capture.Capture, units: []const core.Module, names: ?identity.View, graph_mode: GraphMode) Allocator.Error!State {
-        return initWithExecution(allocator, old, units, names, graph_mode, .{});
-    }
-    pub fn initWithExecution(allocator: Allocator, old: *const capture.Capture, units: []const core.Module, names: ?identity.View, graph_mode: GraphMode, execution: gate.Gate.Execution) Allocator.Error!State {
-        var admission = try gate.Gate.initWithExecution(allocator, &old.metadata.pools.?, units, names, execution);
+    pub fn init(allocator: Allocator, old: *const capture.Capture, units: []const core.Module, names: ?identity.View, stamps: ?*code_artifacts.ModuleStamps) Allocator.Error!State {
+        var admission = try gate.Gate.initWithStamps(allocator, &old.metadata.pools.?, units, names, stamps);
         errdefer admission.deinit();
-        var result: State = .{ .allocator = allocator, .old = old, .gate = admission, .names = names, .graph_mode = graph_mode, .stats = .{ .dependency_validations = admission.dependency_validations, .reused_dependency_validations = admission.reused_dependency_validations } };
+        const result: State = .{ .allocator = allocator, .old = old, .gate = admission, .names = names, .stats = .{ .dependency_validations = admission.dependency_validations, .reused_dependency_validations = admission.reused_dependency_validations } };
         errdefer if (result.graphs) |*graphs| graphs.deinit();
-        if (graph_mode == .eager and !try result.ensureGraphs()) result.gate.enabled = false;
-        result.reuse_projected_inputs = execution.reuse_projected_principals;
         return result;
     }
     /// Reuse this query's already validated namespace and catalog. No importer
@@ -180,7 +173,7 @@ pub const State = struct {
         self.stats.requests += 1;
         if (target.unit > self.old.cached_units) self.stats.fresh_unit_requests += 1;
         const exact = self.gate.admitsPrincipal(target);
-        if (!exact and !(self.reuse_projected_inputs and self.gate.enabled)) {
+        if (!exact and !self.gate.enabled) {
             self.stats.changed_or_unsupported += 1;
             return null;
         }
@@ -216,10 +209,10 @@ pub const State = struct {
                 return null;
             }
             if (!empty) self.stats.nonempty_requests += 1;
-            const solved: core_eval.SolvedEvidence = if (empty and self.graph_mode != .eager)
+            const solved: core_eval.SolvedEvidence = if (empty)
                 .{ .types = &.{}, .rows = &.{} }
             else blk: {
-                if (self.graph_mode == .primitive) switch (try self.primitiveEvidence(generator, target.unit, proof.types, proof.rows)) {
+                switch (try self.primitiveEvidence(generator, target.unit, proof.types, proof.rows)) {
                     .solved => |facts| {
                         self.stats.primitive_hits += 1;
                         break :blk facts;
@@ -230,7 +223,7 @@ pub const State = struct {
                         return null;
                     },
                     .fallback => self.stats.primitive_fallbacks += 1,
-                };
+                }
                 if (!try self.ensureGraphs()) {
                     self.stats.evidence_declined += 1;
                     return null;

@@ -272,8 +272,6 @@ test {
     _ = @import("artifact_import_tests.zig");
     _ = @import("optimized_bodies_tests.zig");
     _ = @import("principal_archive_tests.zig");
-    _ = @import("resolved_scalar_ssa_tests.zig");
-    _ = @import("scalar_live_patch_tests.zig");
     _ = @import("artifact_operation_admission_tests.zig");
     _ = @import("buffered_stamp_tests.zig");
     _ = @import("check_nominal_tests.zig");

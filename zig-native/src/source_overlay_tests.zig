@@ -63,8 +63,6 @@ test "source overlays compile new virtual modules and retain exact edits deletio
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
-    session.policy.reuse_unchanged_output = true;
     var first = try session.prepareRevisionWithSources(io, fixture.entry, null, .{}, &fixture.sources(original));
     defer first.deinit();
     try success(first);
@@ -177,7 +175,6 @@ test "source overlays allocation failures leave the retained revision reusable" 
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
     var initial = try session.prepareRevisionWithSources(io, fixture.entry, null, .{}, &fixture.sources(original));
     defer initial.deinit();
     try success(initial);

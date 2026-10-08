@@ -41,9 +41,11 @@ Normal scope exits and source branches release only exited scopes; cancellation
 unwinds the entire function, including inlined scopes. Escaping payload values
 retain their independent ownership/collector policy.
 
-Execution choices are a single session-owned `execution_policy.Policy`, with
-named reference/project defaults and explicit differential-test overrides.
-Cached-output equality includes that policy. Stamping instrumentation belongs
+Execution choices are a single session-owned `execution_policy.Policy`: codegen
+tier, machine-code sharing, codegen/semantic worker counts and closed-call
+splitting. Compiler behavior is not policy; the CLI and the project server run
+the same implementation, and artifact retention follows the retained session
+(`retain_artifacts`/`previous`). Cached-output equality includes the policy. Stamping instrumentation belongs
 to the caller; there are no mutable global compiler switches. Identical semantic
 validation inputs share immutable arrays through independent leases within one
 compilation. Executable, value and evidence admission remain separate proofs.
@@ -92,22 +94,6 @@ observed semantic inputs gate principal-proof import. Optimized bodies use the
 ordinary exact input/callee/lifetime matcher. The client exports only committed
 revisions; cache I/O belongs to its caller. This is separate from `.blotdep`
 frontend bundles and from the more permissive in-memory literal projection.
-
-Two bounded experiments establish the remaining backend boundaries.
-`resolved_scalar_ssa.zig` creates owned scalar value definitions, explicit
-operands, types and trap facts after ordinary specialization. Its emitter reads
-no Core, solver, evaluator or layout store. The private policy defaults off;
-calls, overloaded operators, control-flow joins and heap ownership still use the
-existing path. It is not the full SSA migration.
-
-`scalar_live_patch.zig` owns closed scalar machine images. Direct and recursive
-calls go through stable table slots; original exported trampolines retain their
-function identities. Deltas contain changed functions and import the existing
-table, with no initialization segments. The experimental host validates the
-base identity, instantiates first, then publishes all replacements synchronously
-with rollback. This is possible because admitted code has no host calls,
-suspension, globals, memory or captured references. Public scalar ABI changes
-decline; gdev's stateful heap/effect program is outside this experiment.
 
 ## Ownership and memory
 

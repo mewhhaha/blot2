@@ -106,7 +106,6 @@ const OpenProject = struct {
             break :blk retained.Session.init(a, seed, options.options);
         } else try retained.Session.initEmpty(a, options.options);
         errdefer session.deinit();
-        session.enableProjectBuildReuse();
         session.profile_backend = request.profileBackend;
         session.policy.codegen_tier = request.codegenTier;
         session.policy.share_machine_code = request.shareMachineCode;
@@ -115,8 +114,6 @@ const OpenProject = struct {
             else => null, // Optional candidates never replace source validation.
         };
         session.policy.codegen_workers = request.codegenWorkers;
-        // Private pilot executable only; ordinary Session defaults stay off.
-        session.policy.reuse_unchanged_output = true;
         return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session };
     }
     fn deinit(self: *OpenProject) void {

@@ -50,7 +50,6 @@ fn equal(actual: *const partial.Result, expected: *const partial.Result) !void {
     try std.testing.expectEqual(expected.result.compiled.constant_steps, actual.result.compiled.constant_steps);
 }
 fn initialize(session: *retained.Session, fixture: *Fixture) !void {
-    session.enableProjectBuildReuse();
     var first = try session.revise(io, fixture.path, null, .{});
     defer first.deinit(a);
     try std.testing.expect(first.result.diagnostic == null and first.result.compiled.diagnostic == null);
@@ -154,7 +153,6 @@ test "shared dependency revisions bound storage across repeated errors and rever
     var session = try retained.Session.initEmpty(alloc, .{});
     var alive = true;
     defer if (alive) session.deinit();
-    session.enableProjectBuildReuse();
     var warmed: usize = 0;
     for (0..40) |iteration| {
         for ([_][]const u8{ original, "const value: U32 = 42\n" }, [_]*const partial.Result{ &expected_original, &expected_edited }) |text, expected| {
@@ -191,7 +189,6 @@ test "module interface cutoff preserves a transitive staged chain through discar
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     try initialize(&session, &fixture);
-    session.policy.share_dependency_storage = false;
     var original_result = try fresh(&fixture);
     defer original_result.deinit(a);
     const original_output = original_result.result.compiled.bytes;
@@ -318,72 +315,50 @@ test "module interface cutoff rejects fixity changes and failed producer checks 
     try equal(&recovered, &expected);
 }
 
-test "module interface cutoff policy invalidates exact output reuse and retains the conservative path" {
+test "module interface cutoff reuses an unaffected importer after an interface-neutral dependency edit" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.policy.reuse_unchanged_output = true;
     try initialize(&session, &fixture);
     var unchanged = try session.revise(io, fixture.path, null, .{});
     defer unchanged.deinit(a);
     try std.testing.expect(session.last.reused_output);
-    session.policy.reuse_module_interface_cutoff = false;
-    var disabled = try session.revise(io, fixture.path, null, .{});
-    defer disabled.deinit(a);
-    try std.testing.expect(!session.last.reused_output);
-    try std.testing.expectEqualSlices(u8, unchanged.result.compiled.bytes, disabled.result.compiled.bytes);
-    for ([_]bool{ false, true }) |enabled| {
-        session.policy.reuse_module_interface_cutoff = enabled;
-        try fixture.write("changed.blot", if (enabled) original else "const value: U32 = 42\n");
+    for ([_][]const u8{ "const value: U32 = 42\n", original }) |text| {
+        try fixture.write("changed.blot", text);
         var expected = try fresh(&fixture);
         defer expected.deinit(a);
         var actual = try session.revise(io, fixture.path, null, .{});
         defer actual.deinit(a);
         try equal(&actual, &expected);
-        try std.testing.expectEqual(@as(usize, if (enabled) 1 else 0), session.last.fallback.module_cutoff.reused);
     }
+    try std.testing.expectEqual(@as(usize, 1), session.last.fallback.module_cutoff.reused);
 }
 
-test "prepared entry Core removes the second frontend pass and keeps policy and publication independent" {
+test "prepared entry Core removes the second frontend pass and keeps publication independent" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.policy.reuse_unchanged_output = true;
     try initialize(&session, &fixture);
-    for ([_]bool{ false, true }) |reuse| {
-        session.policy.reuse_prepared_entry = reuse;
-        try fixture.write("changed.blot", edited);
-        var expected = try fresh(&fixture);
-        defer expected.deinit(a);
-        const before = artifacts.stamp(session.seed);
-        var candidate = try session.prepareRevision(io, fixture.path, null, .{});
-        defer candidate.deinit();
-        try std.testing.expect(candidate == .ready);
-        try equal(candidate.ready.result().?, &expected);
-        const stats = candidate.ready.stats;
-        try std.testing.expect(stats.rebuilt_seed and stats.fallback.reused_frontend_modules > 0);
-        if (reuse) {
-            try std.testing.expect(stats.fallback.reused_entry_bodies > 0);
-            try std.testing.expectEqual(@as(usize, 0), candidate.ready.result().?.result.stats.body_elaborations);
-            try std.testing.expectEqual(@as(usize, 0), candidate.ready.result().?.result.stats.body_lowerings);
-        } else {
-            try std.testing.expectEqual(@as(usize, 0), stats.fallback.reused_entry_bodies);
-            try std.testing.expect(candidate.ready.result().?.result.stats.body_elaborations > 0);
-        }
-        try std.testing.expect(session.discard(candidate.ready));
-        try std.testing.expectEqualSlices(u8, &before, &artifacts.stamp(session.seed));
-    }
+    try fixture.write("changed.blot", edited);
+    var expected = try fresh(&fixture);
+    defer expected.deinit(a);
+    const before = artifacts.stamp(session.seed);
+    var candidate = try session.prepareRevision(io, fixture.path, null, .{});
+    defer candidate.deinit();
+    try std.testing.expect(candidate == .ready);
+    try equal(candidate.ready.result().?, &expected);
+    const stats = candidate.ready.stats;
+    try std.testing.expect(stats.rebuilt_seed and stats.fallback.reused_frontend_modules > 0);
+    try std.testing.expect(stats.fallback.reused_entry_bodies > 0);
+    try std.testing.expectEqual(@as(usize, 0), candidate.ready.result().?.result.stats.body_elaborations);
+    try std.testing.expectEqual(@as(usize, 0), candidate.ready.result().?.result.stats.body_lowerings);
+    try std.testing.expect(session.discard(candidate.ready));
+    try std.testing.expectEqualSlices(u8, &before, &artifacts.stamp(session.seed));
     var committed = try session.revise(io, fixture.path, null, .{});
     defer committed.deinit(a);
     try std.testing.expect(session.last.fallback.reused_entry_bodies > 0);
-    session.policy.reuse_prepared_entry = false;
-    var changed_policy = try session.prepareRevision(io, fixture.path, null, .{});
-    defer changed_policy.deinit();
-    try std.testing.expect(changed_policy == .ready and !changed_policy.ready.stats.reused_output);
-    try std.testing.expectEqualSlices(u8, committed.result.compiled.bytes, changed_policy.ready.result().?.result.compiled.bytes);
-    try std.testing.expect(session.discard(changed_policy.ready));
 }
 
 test "prepared entry Core retains generic List Array nominal and effect code across producer and simultaneous entry edits" {
@@ -488,8 +463,6 @@ test "module frontend reuse rechecks a changed module and its readers and preser
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
     try initialize(&session, &fixture);
-    // Retain coverage of the original transitive invalidation policy.
-    session.policy.reuse_module_interface_cutoff = false;
     const seed_stamp = artifacts.stamp(session.seed);
     const code_stamp = artifacts.stamp(session.current.?.artifacts.metadata.principal_proofs.items);
     try fixture.write("changed.blot", edited);
@@ -619,37 +592,28 @@ test "module frontend loader rejects reuse across a dirty transitive dependency"
     try std.testing.expect(try snapshot.reusableModules(io, &session.seed) == null);
 }
 
-test "module frontend policy participates in exact output reuse and preserves independent sessions" {
+test "module frontend reuse is owned per session and unchanged output stays exact" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.policy.reuse_unchanged_output = true;
     try initialize(&session, &fixture);
     var unchanged = try session.revise(io, fixture.path, null, .{});
     defer unchanged.deinit(a);
     try std.testing.expect(session.last.reused_output);
-    session.policy.reuse_module_frontends = false;
-    var disabled = try session.revise(io, fixture.path, null, .{});
-    defer disabled.deinit(a);
-    try std.testing.expect(!session.last.reused_output);
-    try std.testing.expectEqualSlices(u8, unchanged.result.compiled.bytes, disabled.result.compiled.bytes);
     try std.testing.expectEqual(@as(usize, 0), unchanged.result.compiled.constant_steps);
-    try std.testing.expect(disabled.result.compiled.constant_steps > 0);
-    // A default session stays independent of the enabled project's policy.
+    // A second session never borrows the first session's retained frontend.
     var other = try retained.Session.initEmpty(a, .{});
     defer other.deinit();
-    try std.testing.expect(!other.policy.reuse_module_frontends);
     var other_first = try other.revise(io, fixture.path, null, .{});
     defer other_first.deinit(a);
     try fixture.write("changed.blot", edited);
-    session.policy.reuse_module_frontends = true;
     var enabled_edit = try session.revise(io, fixture.path, null, .{});
     defer enabled_edit.deinit(a);
     try expectReuse(session.last);
     var ordinary_edit = try other.revise(io, fixture.path, null, .{});
     defer ordinary_edit.deinit(a);
-    try std.testing.expectEqual(@as(usize, 0), other.last.fallback.reused_frontend_modules);
+    try expectReuse(other.last);
     try equal(&enabled_edit, &ordinary_edit);
 }
 
@@ -663,7 +627,6 @@ test "module frontend reuse treats changed prelude fixities as dependencies and 
     try fixture.write("right.blot", "const fixed: U32 = 2 + 3\n");
     var session = try retained.Session.initEmpty(a, options);
     defer session.deinit();
-    session.enableProjectBuildReuse();
     var first = try session.revise(io, fixture.path, null, options);
     defer first.deinit(a);
     try std.testing.expect(first.result.diagnostic == null and first.result.compiled.diagnostic == null);
@@ -768,7 +731,7 @@ test "shared dependency validation requires the immutable owner and preserves po
         previous.validated = validated;
         defer previous.validated = true;
         var stats: storage.Stats = .{};
-        const next = try closure.freezeSharedFromMixed(a, &mixed.source, &mixed.checked, &mixed.prepared, previous, true, &stats);
+        const next = try closure.freezeSharedFromMixed(a, &mixed.source, &mixed.checked, &mixed.prepared, previous, &stats);
         defer next.deinit();
         try std.testing.expectEqual(owned.modules.len, stats.shared_modules);
         try std.testing.expectEqual(@as(usize, if (validated) owned.modules.len else 0), stats.core_reused);
@@ -786,7 +749,7 @@ test "shared dependency validation requires the immutable owner and preserves po
     defer wrong_owner.deinit();
     wrong_owner.validated = true;
     var stats: storage.Stats = .{};
-    try std.testing.expectError(error.InvalidArtifact, closure.freezeSharedFromMixed(a, &mixed.source, &mixed.checked, &mixed.prepared, wrong_owner, true, &stats));
+    try std.testing.expectError(error.InvalidArtifact, closure.freezeSharedFromMixed(a, &mixed.source, &mixed.checked, &mixed.prepared, wrong_owner, &stats));
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, sharedStorageFailure, .{ expected, key });
 }
 

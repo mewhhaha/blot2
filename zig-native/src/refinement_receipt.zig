@@ -311,13 +311,12 @@ pub fn lookup(g: anytype, root: Root, shape: expectation.View, expected: u32, se
             .body => |body| body.unit,
             .closure => |closure| closure.unit,
         };
-        const cutoff = g.reuse_body_proof_cutoff;
-        if (root_unit == 0 or root_unit > gate.structural_units.len or !gate.structural_units[root_unit - 1] or (root == .body and !(if (cutoff) gate.admitsLocalSource(root.body) else gate.admits(root.body)))) {
+        if (root_unit == 0 or root_unit > gate.structural_units.len or !gate.structural_units[root_unit - 1] or (root == .body and !gate.admitsLocalSource(root.body))) {
             decline(g, .root);
             continue;
         }
         const transitive = gate.admitsReceipt(facts.*);
-        var valid = transitive or (cutoff and gate.admitsRefinement(facts.*));
+        var valid = transitive or gate.admitsRefinement(facts.*);
         if (!valid) {
             decline(g, .source);
             continue;

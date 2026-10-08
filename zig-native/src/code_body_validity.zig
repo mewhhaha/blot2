@@ -13,7 +13,7 @@ pub const Gate = struct {
     semantic: principal.Gate,
     exact: []bool,
     pub fn init(a: std.mem.Allocator, old: *const artifacts.Pools, units: []const core.Module, names: ?identity.View, stamps: ?*artifacts.ModuleStamps) !Gate {
-        var semantic = try principal.Gate.initWithExecution(a, old, units, names, .{ .reuse_declaration_principals = true, .reuse_unaffected_modules = true, .reuse_equivalent_validation = true, .stamps = stamps });
+        var semantic = try principal.Gate.initWithStamps(a, old, units, names, stamps);
         errdefer semantic.deinit();
         const exact = try a.alloc(bool, semantic.dirty.len);
         errdefer a.free(exact);

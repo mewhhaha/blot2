@@ -190,25 +190,6 @@ is optional, bounded and compiler-versioned; unsupported or corrupt candidates
 fall back to fresh work, while allocation failures propagate. Source and runtime
 evaluation still run. The host explicitly owns cache file persistence.
 
-Experimental resolved scalar SSA crosses its ownership boundary only after
-ordinary specialization. Every operand refers to an earlier typed value; all
-admitted values are scalar, and instruction order and raw immediates are exact.
-Structured branches retain their condition and matching join; phi operands run
-only in their selected arm, preserving traps and evaluation order.
-Admission has bounded depth/work and emits nothing on an unsupported form.
-Emission reads only the owned IR. OOM propagates rather than silently falling
-back. Heap ownership, loops, calls and overloaded selection are not admitted.
-
-Experimental scalar live-patch images admit no globals, memory, host imports,
-startup, closures or effects. Public semantic scalar ABI and internal machine
-signatures/slot order must match. All internal calls route through stable slots;
-exported trampolines stay in the original instance. A delta imports the table
-without element initialization and carries exact base/next identities. The host
-checks and instantiates the whole delta before synchronous slot publication,
-rejects stale bases, and rolls back publication failure. Closed synchronous
-calls cannot overlap that publication. These rules do not establish safety for
-heap graphs, captured values, running/suspended effects or gdev's live state.
-
 Checked scalar element layouts select pointer-free array allocation and list
 leaves. The descriptor carries this fact through cloning, structural operations
 and conversion. Reference-valued elements keep tracing; machine i32 alone is

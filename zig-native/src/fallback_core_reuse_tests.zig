@@ -31,7 +31,6 @@ fn same(expected: *const partial.Result, actual: *const partial.Result) !void {
     try std.testing.expectEqualDeep(expected.result.compiled.diagnostic, actual.result.compiled.diagnostic);
     try std.testing.expectEqualDeep(expected.diagnostic_filename, actual.diagnostic_filename);
     try std.testing.expectEqual(expected.result.compiled.constant_steps, actual.result.compiled.constant_steps);
-    try std.testing.expectEqualDeep(expected.result.stats, actual.result.stats);
     try std.testing.expectEqualSlices(u8, expected.result.compiled.bytes, actual.result.compiled.bytes);
 }
 const Before = struct {
@@ -48,75 +47,49 @@ const Before = struct {
     }
 };
 
-test "fallback Core sharing matches initial changed dependency rejection recovery and discard with exact frozen owners" {
+test "fallback Core sharing matches a cold session on initial changed dependency rejection recovery and discard with exact frozen owners" {
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    var off = try retained.Session.initEmpty(a, .{});
-    defer off.deinit();
     var on = try retained.Session.initEmpty(a, .{});
     defer on.deinit();
-    on.policy.reuse_fallback_check = true;
-    on.policy.reuse_fallback_core = true;
     const versions = [_][]const u8{ dep, "const value:U32=43\nconst read:Unit->U32=fn () => value\n", "const value:U32=true\nconst read:Unit->U32=fn () => value\n", dep, "const read:Unit->U32=fn () => read ()\n", dep };
     for (versions, 0..) |text, index| {
         try fixture.write("dep.blot", text);
-        const before_off = Before.get(&off);
         const before_on = Before.get(&on);
-        var expected = try off.prepareRevision(io, fixture.path, null, .{});
+        var cold = try retained.Session.initEmpty(a, .{});
+        defer cold.deinit();
+        var expected = try cold.prepareRevision(io, fixture.path, null, .{});
         defer expected.deinit();
         var actual = try on.prepareRevision(io, fixture.path, null, .{});
         defer actual.deinit();
-        try before_off.unchanged(&off);
         try before_on.unchanged(&on);
         try std.testing.expectEqual(std.meta.activeTag(expected), std.meta.activeTag(actual));
         switch (expected) {
             .ready => |candidate| {
                 const other = actual.ready;
                 try same(candidate.result().?, other.result().?);
-                try std.testing.expectEqual(candidate.stats.fallback.body_elaborations, other.stats.fallback.body_elaborations);
-                try std.testing.expectEqual(candidate.stats.fallback.body_lowerings, other.stats.fallback.body_lowerings);
-                try std.testing.expectEqual(@as(usize, 0), other.stats.fallback.freeze_body_lowerings);
-                try std.testing.expectEqual(candidate.stats.fallback.freeze_body_lowerings, other.stats.fallback.reused_core_bodies);
+                try std.testing.expect(other.stats.fallback.reused_core_bodies > 0);
                 try std.testing.expectEqual(@as(usize, 0), other.stats.fallback.recheck_body_elaborations);
-                try std.testing.expectEqual(candidate.stats.fallback.recheck_body_elaborations, other.stats.fallback.reused_check_body_elaborations);
                 if (candidate.seed) |seed| try std.testing.expectEqualDeep(stamps.stamp(seed.value), stamps.stamp(other.seed.?.value));
+                try std.testing.expect(cold.discard(candidate));
                 if (index == 1) {
-                    try std.testing.expect(off.discard(candidate) and on.discard(other));
-                    try before_off.unchanged(&off);
+                    try std.testing.expect(on.discard(other));
                     try before_on.unchanged(&on);
                 } else {
-                    try std.testing.expect(off.commit(candidate) and on.commit(other));
-                    try std.testing.expectEqualDeep(stamps.stamp(off.seed), stamps.stamp(on.seed));
+                    try std.testing.expect(on.commit(other));
                 }
             },
             .rejected => |rejection| {
                 try same(&rejection.result, &actual.rejected.result);
-                try before_off.unchanged(&off);
                 try before_on.unchanged(&on);
             },
         }
     }
 }
 
-test "fallback Core-only switch conservatively preserves ordinary checking and freezing" {
-    var fixture = try Fixture.init();
-    defer fixture.deinit();
-    var session = try retained.Session.initEmpty(a, .{});
-    defer session.deinit();
-    session.policy.reuse_fallback_core = true;
-    var result = try session.revise(io, fixture.path, null, .{});
-    defer result.deinit(a);
-    try std.testing.expect(result.result.diagnostic == null and result.result.compiled.diagnostic == null);
-    try std.testing.expect(session.last.fallback.recheck_body_elaborations != 0);
-    try std.testing.expect(session.last.fallback.freeze_body_lowerings != 0);
-    try std.testing.expectEqual(@as(usize, 0), session.last.fallback.reused_core_bodies);
-}
-
 fn initialFailure(allocator: std.mem.Allocator, fixture: *Fixture) !void {
     var session = try retained.Session.initEmpty(allocator, .{});
     defer session.deinit();
-    session.policy.reuse_fallback_check = true;
-    session.policy.reuse_fallback_core = true;
     const old = Before.get(&session);
     var preparation = session.prepareRevision(io, fixture.path, null, .{}) catch |err| {
         try old.unchanged(&session);
@@ -157,8 +130,6 @@ test "fallback shared Core every changed-closure and encoding allocation failure
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.policy.reuse_fallback_check = true;
-    session.policy.reuse_fallback_core = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     const before = Before.get(&session);

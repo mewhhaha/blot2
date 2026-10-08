@@ -223,7 +223,7 @@ fn checkChecked(source: *const project.Project, checked: *const project_check.Ch
 /// Retained entry-last preparation. The supplied snapshot exclusively controls
 /// the lifetime of its immutable module payloads. Sharing grants storage and
 /// structural validation reuse only; source/check admission already completed.
-pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *const partial.Prepared, previous: *const retained.Snapshot, reuse_validation: bool, stats: *retained.Stats) Error!*retained.Snapshot {
+pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *const partial.Prepared, previous: *const retained.Snapshot, stats: *retained.Stats) Error!*retained.Snapshot {
     try checkMixed(source, prepared);
     try checkChecked(source, checked);
     try require(previous.initialized == previous.modules.len and source.compiled_modules.ptr == previous.value.modules.ptr and source.compiled_modules.len == previous.value.modules.len);
@@ -252,7 +252,7 @@ pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Projec
             stats.fresh_modules += 1;
         }
     }
-    try validateMode(a, &result.value, result, if (reuse_validation) previous else null, stats);
+    try validateMode(a, &result.value, result, previous, stats);
     try validateSources(&result.value, source);
     result.validated = true;
     return result;

@@ -71,8 +71,6 @@ test "catalog queries survive rebuilt dependencies with exact fresh staging and 
     try fixture.write("dep.blot", catalog_producer);
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
-    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
@@ -106,21 +104,6 @@ test "catalog queries survive rebuilt dependencies with exact fresh staging and 
     var restored = try session.revise(io, fixture.path, null, .{});
     defer restored.deinit(a);
     try std.testing.expectEqualSlices(u8, initial.result.compiled.bytes, restored.result.compiled.bytes);
-    session.policy.reuse_rebuilt_queries = false;
-    // Code fragments also offer their pinned owner to query admission. Disable
-    // both reuse sources when checking the wholly fresh rebuilt-query lane.
-    session.policy.reuse_rebuilt_code = false;
-    const policy = try ready(&session, &fixture, .{});
-    defer policy.deinit();
-    try std.testing.expect(!policy.stats.reused_output);
-    try std.testing.expect(session.discard(policy));
-    try editedCatalog(&fixture, '8');
-    var disabled = try session.revise(io, fixture.path, null, .{});
-    defer disabled.deinit(a);
-    try std.testing.expectEqual(@as(usize, 0), disabled.result.compiled.completed_queries.reused);
-    var expected = try fresh(&fixture, .{});
-    defer expected.deinit(a);
-    try equal(&disabled, &expected);
 }
 
 fn catalogQueryFailure(allocator: std.mem.Allocator, session: *retained.Session, fixture: *Fixture, expected: *const partial.Result) !void {
@@ -161,11 +144,6 @@ test "catalog queries decline unrepresented imported effect operations and prese
     try fixture.write("effects.blot", "type Read a is effect = { get: Unit -> a }\n");
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
-    var pure = try retained.Session.initEmpty(a, .{});
-    defer pure.deinit();
-    pure.enableProjectBuildReuse();
-    pure.policy.reuse_source_effect_queries = false;
     for ([_]u8{ '7', '8', '7' }, 0..) |number, revision| {
         const text = try a.dupe(u8, producer);
         defer a.free(text);
@@ -175,10 +153,7 @@ test "catalog queries decline unrepresented imported effect operations and prese
         defer expected.deinit(a);
         var result = try session.revise(io, fixture.path, null, .{});
         defer result.deinit(a);
-        var baseline = try pure.revise(io, fixture.path, null, .{});
-        defer baseline.deinit(a);
         try equal(&result, &expected);
-        try equal(&baseline, &expected);
         if (revision != 0) {
             // This imported effect member is materialized in the consumer,
             // absent from its declaring module's nominal/operation tables.
@@ -198,7 +173,6 @@ test "catalog queries preserve seed and capture through every failed rebuilt can
     try fixture.write("dep.blot", catalog_producer);
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     try editedCatalog(&fixture, '8');
@@ -212,9 +186,6 @@ test "catalog queries preserve seed and capture through every failed rebuilt can
 fn initializeUnaffectedQuery(fixture: *Fixture, session: *retained.Session) !void {
     try fixture.write("dep.blot", unaffected_producer);
     try fixture.write("main.blot", unaffected_query_main);
-    session.enableProjectBuildReuse();
-    session.policy.reuse_unaffected_modules = true;
-    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(session.allocator);
     try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
@@ -317,7 +288,6 @@ test "unaffected query revisions keep List Array and nominal closure evidence di
     try fixture.write("dep.blot", producer);
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
     var hits: usize = 0;
     for ([_]u32{ 7, 8, 7 }) |number| {
         const source = try a.print("{s}\nentry const changed = fn (value: U32) => @u32.add value {d}\n", .{ consumer, number });
@@ -391,11 +361,6 @@ test "refinement receipt preserves generic collection record State and captured 
         defer fixture.deinit();
         var session = try retained.Session.initEmpty(a, .{});
         defer session.deinit();
-        session.enableProjectBuildReuse();
-        // Complete code reuse skips refinement entirely. Isolate the semantic
-        // receipt boundary while retaining its ordinary inputs and outputs.
-        session.policy.reuse_code_fragments = false;
-        session.policy.reuse_refinements = true;
         var hits: usize = 0;
         for ([_]u32{ 8, 9, 8, 9 }) |version| {
             const source = try a.print("{s}\nentry const schema: U32 = {d}\n", .{ body, version });
@@ -421,9 +386,6 @@ test "refinement receipt survives edits reverts rejected revisions and changed s
     try fixture.write("main.blot", refinement_source);
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
-    session.policy.reuse_code_fragments = false;
-    session.policy.reuse_refinements = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
@@ -484,9 +446,6 @@ test "refinement receipt every replay allocation failure leaves previous results
     try fixture.write("main.blot", refinement_source);
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
-    session.policy.reuse_code_fragments = false;
-    session.policy.reuse_refinements = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     const source = try a.dupe(u8, refinement_source);
@@ -521,7 +480,6 @@ test "List and Array prelude members retain code across real entry edits and cat
     const options: project.Options = .{ .prelude_path = fixture.prelude };
     var session = try retained.Session.initEmpty(a, options);
     defer session.deinit();
-    session.enableProjectBuildReuse();
     var initial = try session.revise(io, fixture.path, null, options);
     defer initial.deinit(a);
     try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
@@ -554,7 +512,6 @@ test "collection replay gate still rejects unknown builtin identities and local 
     const options: project.Options = .{ .prelude_path = fixture.prelude };
     var session = try retained.Session.initEmpty(a, options);
     defer session.deinit();
-    session.enableProjectBuildReuse();
     for (0..2) |_| {
         var result = try session.revise(io, fixture.path, null, options);
         defer result.deinit(a);
@@ -605,8 +562,6 @@ test "unchanged-output exact reads preserve current owners through discard commi
     var session = try retained.Session.initEmpty(a, .{});
     var session_alive = true;
     defer if (session_alive) session.deinit();
-    session.enableProjectBuildReuse();
-    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     const before = Stamp.read(&session);
@@ -644,8 +599,6 @@ test "unchanged-output entry and producer changes reject reuse and failed revisi
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
-    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     try fixture.write("main.blot", "entry const answer:U32=missing\n");
@@ -684,15 +637,14 @@ test "unchanged-output root identity policy and exact optional settings decline 
     defer fixture.deinit();
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
-    session.policy.principal_reuse = !session.policy.principal_reuse;
+    session.policy.share_machine_code = !session.policy.share_machine_code;
     const policy = try ready(&session, &fixture, .{});
     defer policy.deinit();
     try std.testing.expect(!policy.stats.reused_output);
     try std.testing.expect(session.discard(policy));
-    session.policy.principal_reuse = !session.policy.principal_reuse;
+    session.policy.share_machine_code = !session.policy.share_machine_code;
     var other_identity = try session.prepareRevision(io, fixture.path, "", .{});
     defer other_identity.deinit();
     try std.testing.expect(other_identity == .ready);
@@ -718,8 +670,6 @@ fn unchangedOutputAllocationLaw(allocator: std.mem.Allocator, fixture: *const Fi
     var session = try retained.Session.initEmpty(allocator, .{});
     var session_alive = true;
     defer if (session_alive) session.deinit();
-    session.enableProjectBuildReuse();
-    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(allocator);
     const before = Stamp.read(&session);
@@ -766,8 +716,6 @@ test "unchanged-output identical bytes with a retargeted import symlink require 
     try fixture.dir.dir.symLink(io, "a.blot", "dep.blot", .{});
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
-    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     const before = Stamp.read(&session);
@@ -801,7 +749,6 @@ test "unchanged-output owns its cached bytes independently of detached caller re
     try equal(&first, &second);
     var session = try retained.Session.initEmpty(a, .{});
     defer session.deinit();
-    session.policy.reuse_unchanged_output = true;
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(a);
     initial.result.compiled.bytes[0] ^= 255;
@@ -942,14 +889,12 @@ const project_query_edit =
 fn initializeProjectQuery(fixture: *Fixture, session: *retained.Session) !void {
     try fixture.write("dep.blot", "const marker:U32=1\n");
     try fixture.write("main.blot", project_query_source);
-    session.enableProjectBuildReuse();
     var initial = try session.revise(io, fixture.path, null, .{});
     defer initial.deinit(session.allocator);
     try std.testing.expect(initial.result.diagnostic == null and initial.result.compiled.diagnostic == null);
     try std.testing.expect(initial.result.compiled.completed_queries.complete_records > 0);
     try std.testing.expect(session.last.fallback.reused_core_bodies > 0);
     try std.testing.expectEqual(@as(usize, 0), session.last.fallback.recheck_body_elaborations);
-    try std.testing.expectEqual(@as(usize, 0), session.last.fallback.freeze_body_lowerings);
     try fixture.write("main.blot", project_query_edit);
 }
 fn expectProjectQuery(candidate: *const retained.Candidate, expected: *const partial.Result) !void {
@@ -1278,107 +1223,52 @@ test "revision candidate every preparation and caller-encoding allocation failur
     try std.testing.expectEqual(@as(usize, 2), session.revisions);
 }
 
-test "solver capacity policy stays private and changing it declines unchanged-output reuse" {
+test "fresh principal capture serves the first edit and the edit after a dependency rebuild" {
+    const main_source = unaffected_query_main ++ "\nentry const checked: U32 where { type_rep U32 } = marker\n";
+    const edit_source = unaffected_query_edit ++ "\nentry const checked: U32 where { type_rep U32 } = marker\n";
     var fixture = try Fixture.init();
     defer fixture.deinit();
-    var session = try retained.Session.initEmpty(a, .{});
-    defer session.deinit();
-    session.enableProjectBuildReuse();
-    try std.testing.expect(session.policy.reuse_solver_capacity);
-    session.policy.reuse_solver_capacity = false;
-    session.policy.reuse_unchanged_output = true;
-    var original_result = try session.revise(io, fixture.path, null, .{});
-    defer original_result.deinit(a);
-    var unchanged = try session.revise(io, fixture.path, null, .{});
-    defer unchanged.deinit(a);
-    try std.testing.expect(session.last.reused_output);
-    session.policy.reuse_solver_capacity = true;
-    var enabled = try session.revise(io, fixture.path, null, .{});
-    defer enabled.deinit(a);
-    try std.testing.expect(!session.last.reused_output);
-    try std.testing.expectEqualSlices(u8, original_result.result.compiled.bytes, enabled.result.compiled.bytes);
-    var enabled_unchanged = try session.revise(io, fixture.path, null, .{});
-    defer enabled_unchanged.deinit(a);
-    try std.testing.expect(session.last.reused_output);
-    session.policy.reuse_solver_capacity = false;
-    var disabled = try session.revise(io, fixture.path, null, .{});
-    defer disabled.deinit(a);
-    try std.testing.expect(!session.last.reused_output);
-    try std.testing.expectEqualSlices(u8, original_result.result.compiled.bytes, disabled.result.compiled.bytes);
-}
-
-test "fresh principal capture serves the first edit and the edit after a dependency rebuild" {
-    // Exercise the original capture policy and the separate projected-input
-    // policy; explicitly retain the original query policy after seed rebuilds.
-    for ([_]bool{ false, true }) |projected| {
-        const main_source = unaffected_query_main ++ "\nentry const checked: U32 where { type_rep U32 } = marker\n";
-        const edit_source = unaffected_query_edit ++ "\nentry const checked: U32 where { type_rep U32 } = marker\n";
-        var fixture = try Fixture.init();
-        defer fixture.deinit();
-        try fixture.write("dep.blot", unaffected_producer);
-        try fixture.write("main.blot", main_source);
-        var candidate = try retained.Session.initEmpty(a, .{});
-        defer candidate.deinit();
-        candidate.enableProjectBuildReuse();
-        candidate.policy.reuse_rebuilt_queries = false;
-        candidate.policy.reuse_rebuilt_code = false;
-        candidate.policy.reuse_projected_principals = projected;
-        var baseline = try retained.Session.initEmpty(a, .{});
-        defer baseline.deinit();
-        baseline.enableProjectBuildReuse();
-        baseline.policy.reuse_rebuilt_queries = false;
-        baseline.policy.reuse_rebuilt_code = false;
-        baseline.policy.reuse_projected_principals = projected;
-        baseline.policy.capture_fresh_principals = false;
-        for (0..4) |revision| {
-            if (revision == 1 or revision == 2) try fixture.write("main.blot", edit_source);
-            if (revision == 2) {
-                const producer = try a.dupe(u8, unaffected_producer);
-                defer a.free(producer);
-                producer[std.mem.find(u8, producer, "U32 = 1").? + "U32 = ".len] = '2';
-                try fixture.write("dep.blot", producer);
-            }
-            if (revision == 3) try fixture.write("main.blot", main_source);
-            var expected = try fresh(&fixture, .{});
-            defer expected.deinit(a);
-            var before = try baseline.revise(io, fixture.path, null, .{});
-            defer before.deinit(a);
-            var after = try candidate.revise(io, fixture.path, null, .{});
-            defer after.deinit(a);
-            try equal(&before, &expected);
-            try equal(&after, &expected);
-            const old = before.result.compiled.principal;
-            const current = after.result.compiled.principal;
-            if (revision == 0 or revision == 2) {
-                try std.testing.expect(candidate.last.rebuilt_seed);
-                try std.testing.expectEqual(@as(usize, 0), old.captured);
-                try std.testing.expect(current.captured > 0);
-                if (revision == 2 and projected) {
-                    try std.testing.expect(current.projected_empty_hits > 0);
-                } else try std.testing.expectEqual(@as(usize, 0), current.hits);
-                try std.testing.expectEqual(@as(usize, 0), after.result.compiled.completed_queries.reused);
-                try std.testing.expectEqual(@as(usize, 0), after.result.compiled.reuse.reused_named);
-            } else {
-                try std.testing.expect(!candidate.last.rebuilt_seed);
-                try std.testing.expect(current.hits > old.hits);
-                try std.testing.expect(current.fresh_regions < old.fresh_regions);
-            }
+    try fixture.write("dep.blot", unaffected_producer);
+    try fixture.write("main.blot", main_source);
+    var candidate = try retained.Session.initEmpty(a, .{});
+    defer candidate.deinit();
+    for (0..4) |revision| {
+        if (revision == 1 or revision == 2) try fixture.write("main.blot", edit_source);
+        if (revision == 2) {
+            const producer = try a.dupe(u8, unaffected_producer);
+            defer a.free(producer);
+            producer[std.mem.find(u8, producer, "U32 = 1").? + "U32 = ".len] = '2';
+            try fixture.write("dep.blot", producer);
         }
-        const last_good = Stamp.read(&candidate);
-        const proofs = metadata.stamp(candidate.current.?.artifacts.metadata.principal_proofs.items);
-        try fixture.write("main.blot", "entry const wrong: U32 = false\n");
-        var rejected = try candidate.prepareRevision(io, fixture.path, null, .{});
-        defer rejected.deinit();
-        try std.testing.expect(rejected == .rejected);
-        try last_good.unchanged(&candidate);
-        try std.testing.expectEqualSlices(u8, &proofs, &metadata.stamp(candidate.current.?.artifacts.metadata.principal_proofs.items));
+        if (revision == 3) try fixture.write("main.blot", main_source);
+        var expected = try fresh(&fixture, .{});
+        defer expected.deinit(a);
+        var after = try candidate.revise(io, fixture.path, null, .{});
+        defer after.deinit(a);
+        try equal(&after, &expected);
+        const current = after.result.compiled.principal;
+        if (revision == 0 or revision == 2) {
+            try std.testing.expect(candidate.last.rebuilt_seed);
+            try std.testing.expect(current.captured > 0);
+            if (revision == 2) try std.testing.expect(current.projected_empty_hits > 0);
+        } else {
+            try std.testing.expect(!candidate.last.rebuilt_seed);
+            try std.testing.expect(current.hits > 0);
+        }
     }
+    const last_good = Stamp.read(&candidate);
+    const proofs = metadata.stamp(candidate.current.?.artifacts.metadata.principal_proofs.items);
+    try fixture.write("main.blot", "entry const wrong: U32 = false\n");
+    var rejected = try candidate.prepareRevision(io, fixture.path, null, .{});
+    defer rejected.deinit();
+    try std.testing.expect(rejected == .rejected);
+    try last_good.unchanged(&candidate);
+    try std.testing.expectEqualSlices(u8, &proofs, &metadata.stamp(candidate.current.?.artifacts.metadata.principal_proofs.items));
 }
 
 fn freshPrincipalFailure(allocator: std.mem.Allocator, fixture: *Fixture, expected: *const partial.Result) !void {
     var session = try retained.Session.initEmpty(allocator, .{});
     defer session.deinit();
-    session.enableProjectBuildReuse();
     const old = Stamp.read(&session);
     const pending = try ready(&session, fixture, .{});
     defer pending.deinit();

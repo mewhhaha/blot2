@@ -202,12 +202,6 @@ const IndexedRegion = struct {
 
 pub const Session = struct {
     timing: ?*@import("backend_timing.zig").Work = null,
-    /// Private storage policy; no solver evidence or source owner is pooled.
-    reuse_solver_capacity: bool = true,
-    reuse_region_scratch: bool = true,
-    reuse_callable_definitions: bool = true,
-    reuse_evidence_imports: bool = true,
-    reuse_closed_source_types: bool = true,
     split_closed_calls: bool = false,
     split_active: std.AutoHashMapUnmanaged(Target, void) = .empty,
     split_attempts: usize = 0,
@@ -230,7 +224,6 @@ pub const Session = struct {
     refinement_observation: ?*@import("refinement_receipt.zig").Observation = null,
     principal_provider: ?PrincipalProvider = null,
     principal_regions: usize = 0,
-    retain_principal_inputs: bool = false,
     principal_reads: ?*principal_inputs.Recorder = null,
     owned_diagnostic_message: []u8 = &.{},
     /// Borrowed only during emission. Core owns the low-level API fallback;
@@ -1383,7 +1376,7 @@ pub const Session = struct {
         var reads: principal_inputs.Recorder = .{ .eligible = self.validated_calls.count() == 0, .max_reads = self.options.max_values };
         defer reads.deinit(self.allocator);
         const previous_reads = self.principal_reads;
-        const recording = self.retain_principal_inputs and self.principal_provider != null;
+        const recording = self.principal_provider != null;
         if (recording) self.principal_reads = &reads;
         defer self.principal_reads = previous_reads;
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
@@ -3380,8 +3373,6 @@ const ClosureRegion = struct {
         closed_source_cache: @import("closed_source_types.zig").Cache = .{},
         sources: std.ArrayList(Source) = .empty,
         imported: std.AutoHashMapUnmanaged(Import, types.Id) = .empty,
-        definitions: std.AutoHashMapUnmanaged(DefinitionKey, core.BindingId) = .empty,
-        definition_units: std.AutoHashMapUnmanaged(usize, void) = .empty,
         imported_rows: std.AutoHashMapUnmanaged(RowImport, types.Effects.Id) = .empty,
         imported_labels: std.AutoHashMapUnmanaged(LabelImport, types.Effects.Label) = .empty,
         row_variables: std.AutoHashMapUnmanaged(RowVariable, types.Effects.Id) = .empty,
@@ -3450,11 +3441,11 @@ const ClosureRegion = struct {
     fn init(session: *Session) types.Error!ClosureRegion {
         const timing = if (session.timing) |work| work.enter(.inference) else null;
         errdefer if (timing) |scope| scope.deinit();
-        var region: ClosureRegion = if (session.reuse_solver_capacity) blk: {
-            const lease = try session.solver_capacity_pool.take(session.allocator);
-            break :blk .{ .session = session, .timing = timing, .solver = lease.solver, .solver_initial = lease.initial, .scratch_allocator = session.allocator };
-        } else .{ .session = session, .timing = timing, .solver = try types.Store.initWithOptions(session.allocator, .{ .closed_graphs = true }), .scratch_allocator = session.allocator };
-        if (session.reuse_region_scratch) region.scratch = session.region_scratch_pool.take(session.allocator);
+        // Solver capacity and scratch storage are pooled; no solver evidence
+        // or source owner is.
+        const lease = try session.solver_capacity_pool.take(session.allocator);
+        var region: ClosureRegion = .{ .session = session, .timing = timing, .solver = lease.solver, .solver_initial = lease.initial, .scratch_allocator = session.allocator };
+        region.scratch = session.region_scratch_pool.take(session.allocator);
         region.occurs_base = region.solver.occurs_steps;
         return region;
     }
@@ -3482,7 +3473,7 @@ const ClosureRegion = struct {
             self.session.solver_capacity_pool.give(.{ .solver = self.solver, .initial = initial });
             self.solver = undefined;
         } else self.solver.deinit();
-        if (self.session.reuse_region_scratch) self.session.region_scratch_pool.give(self.scratch_allocator, self.scratch) else self.scratch.deinit(self.scratch_allocator);
+        self.session.region_scratch_pool.give(self.scratch_allocator, self.scratch);
         self.scratch = undefined;
     }
     fn failConstraint(self: *ClosureRegion, constraint: Constraint, code: Code) Error {
@@ -4048,7 +4039,7 @@ const ClosureRegion = struct {
         const owner = self.scratch.sources.items[scope].owner;
         const source = &self.session.units[owner].types;
         const node = source.node(ty);
-        const shared = self.session.reuse_closed_source_types and ty > types.never and
+        const shared = ty > types.never and
             try self.session.closed_source_types.closed(self.session.allocator, self.session.units, owner, ty, 0);
         const closed_key = @import("closed_source_types.zig").Cache.key(owner, ty, depth);
         if (shared) {
@@ -4169,7 +4160,7 @@ const ClosureRegion = struct {
         self.session.evidence_import_requests += 1;
         self.prepareEvidenceImports();
         const memo = &self.scratch.evidence_import_cache;
-        const key = if (self.session.reuse_evidence_imports) memo.key(actual, depth) else null;
+        const key = memo.key(actual, depth);
         if (key) |id| if (memo.answers.get(id)) |known| {
             self.session.evidence_import_reused += 1;
             return known;
@@ -4647,13 +4638,13 @@ const ClosureRegion = struct {
         return true;
     }
     fn definitionIndex(self: *ClosureRegion) *std.AutoHashMapUnmanaged(DefinitionKey, core.BindingId) {
-        return if (self.session.reuse_callable_definitions) &self.session.callable_definitions else &self.scratch.definitions;
+        return &self.session.callable_definitions;
     }
     fn callableDefinitions(self: *ClosureRegion, owner: usize) RegionError!void {
         // This index reads immutable Core, never the current inference scope.
         // Its lifetime is the Session's source owner, not a solver region.
         const definitions = self.definitionIndex();
-        const owners = if (self.session.reuse_callable_definitions) &self.session.callable_definition_units else &self.scratch.definition_units;
+        const owners = &self.session.callable_definition_units;
         if (owners.contains(owner)) return;
         const module = &self.session.units[owner];
         var work: std.ArrayList(core.Id) = .empty;
@@ -6062,8 +6053,6 @@ fn bodyRecipeHistoryScenario(allocator: Allocator, module: *const core.Module, w
     var reference_session = try Session.init(allocator, &.{module.*});
     defer reference_session.deinit();
     reference_session.options.reuse_body_recipes = false;
-    reference_session.reuse_callable_definitions = false;
-    reference_session.reuse_region_scratch = false;
     reference_session.options.reuse_validated_calls = false;
     var replay_session = try Session.init(allocator, &.{module.*});
     defer replay_session.deinit();
@@ -6199,8 +6188,6 @@ fn bodyRecipeQuotaScenario(allocator: Allocator, module: *const core.Module, roo
     var reference_session = try Session.init(allocator, &.{module.*});
     defer reference_session.deinit();
     reference_session.options.reuse_body_recipes = false;
-    reference_session.reuse_callable_definitions = false;
-    reference_session.reuse_region_scratch = false;
     var replay_session = try Session.init(allocator, &.{module.*});
     defer replay_session.deinit();
     // Populate a complete recipe where admission permits it. A later smaller
@@ -6439,7 +6426,6 @@ fn solverCapacityExportsScenario(backing: Allocator) !void {
     var session = try Session.init(allocator, &.{});
     var session_alive = true;
     defer if (session_alive) session.deinit();
-    session.reuse_solver_capacity = true;
     var region = try ClosureRegion.init(&session);
     var region_alive = true;
     defer if (region_alive) region.deinit();
@@ -6481,7 +6467,6 @@ test "solver capacity regions keep fresh maps and active solvers across nested r
     const allocator = std.testing.allocator;
     var session = try Session.init(allocator, &.{});
     defer session.deinit();
-    session.reuse_solver_capacity = true;
     var outer = try ClosureRegion.init(&session);
     var outer_alive = true;
     defer if (outer_alive) outer.deinit();
@@ -6507,7 +6492,6 @@ test "solver capacity Session allocator swaps preserve the original durable slot
     const allocator = std.testing.allocator;
     var session = try Session.init(allocator, &.{});
     defer session.deinit();
-    session.reuse_solver_capacity = true;
     var first = try ClosureRegion.init(&session);
     first.deinit();
     const retained_nodes = session.solver_capacity_pool.slot.?.solver.nodes.items.ptr;
@@ -6576,12 +6560,6 @@ fn evidenceImportSharingScenario(allocator: Allocator) !void {
     try std.testing.expectEqual(cursor, shared.solver.cursor());
     try std.testing.expectEqual(root, try shared.project(imported));
     try std.testing.expect(session.evidence_import_reused >= 16);
-    session.reuse_evidence_imports = false;
-    var reference = try ClosureRegion.init(&session);
-    defer reference.deinit();
-    const copied = try reference.importEvidence(root, 0);
-    try std.testing.expectEqual(root, try reference.project(copied));
-    try std.testing.expect(reference.solver.nodes.items.len > count);
     // Closed graphs may be shared across independent variable histories, but
     // those histories remain distinct and retain cursor-relative resolution.
     const first = try shared.solver.fresh();
