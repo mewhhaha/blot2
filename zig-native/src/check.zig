@@ -971,13 +971,15 @@ const Engine = struct {
             const callee = try self.importScheme(callee_interface.?, .{ .unit = target.unit, .binding = constraint.identity.decl }, 0, origin, depth + 1) orelse return null;
             try callees.append(self.allocator, callee);
         };
-        var copier: SchemeCopier = .{ .allocator = self.allocator, .source = interface.types, .destination = &self.types };
+        var copier_buffer: [4096]u8 align(@alignOf(usize)) = undefined;
+        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, self.allocator);
+        var copier: SchemeCopier = .{ .allocator = copier_scratch.allocator(), .source = interface.types, .destination = &self.types };
         defer copier.deinit();
         var variables: std.ArrayList(T.Id) = .empty;
         defer variables.deinit(self.allocator);
         for (copier.source.list(interface.scheme.variables)) |old| {
             const fresh = try self.types.fresh();
-            try copier.mapping.put(self.allocator, copier.source.head(old, 0), fresh);
+            try copier.mapping.put(copier.allocator, copier.source.head(old, 0), fresh);
             try variables.append(self.allocator, fresh);
         }
         const row_variables = try copier.quantifiedRows(interface.scheme.row_variables);
@@ -1395,13 +1397,15 @@ const Engine = struct {
     fn copyNominal(self: *Engine, producer: DeclarationCatalog, source_index: u32) T.Error!u32 {
         const source = producer.nominals[source_index];
         if (self.nominalIndex(source.identity)) |index| return index;
-        var copier: SchemeCopier = .{ .allocator = self.allocator, .source = producer.types, .destination = &self.types };
+        var copier_buffer: [4096]u8 align(@alignOf(usize)) = undefined;
+        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, self.allocator);
+        var copier: SchemeCopier = .{ .allocator = copier_scratch.allocator(), .source = producer.types, .destination = &self.types };
         defer copier.deinit();
         var variables: std.ArrayList(T.Id) = .empty;
         defer variables.deinit(self.allocator);
         for (producer.types.list(source.variables)) |old| {
             const fresh = try self.types.fresh();
-            try copier.mapping.put(self.allocator, producer.types.head(old, 0), fresh);
+            try copier.mapping.put(copier.allocator, producer.types.head(old, 0), fresh);
             try variables.append(self.allocator, fresh);
         }
         var parameters: std.ArrayList(T.Id) = .empty;
@@ -1429,13 +1433,15 @@ const Engine = struct {
     fn copyEffectFamily(self: *Engine, producer: DeclarationCatalog, source_index: u32) T.Error!u32 {
         const source = producer.effect_families[source_index];
         if (self.effect_family_identities.get(source.identity)) |known| return known;
-        var copier: SchemeCopier = .{ .allocator = self.allocator, .source = producer.types, .destination = &self.types };
+        var copier_buffer: [4096]u8 align(@alignOf(usize)) = undefined;
+        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, self.allocator);
+        var copier: SchemeCopier = .{ .allocator = copier_scratch.allocator(), .source = producer.types, .destination = &self.types };
         defer copier.deinit();
         var variables: std.ArrayList(T.Id) = .empty;
         defer variables.deinit(self.allocator);
         for (producer.types.list(source.variables)) |old| {
             const fresh = try self.types.fresh();
-            try copier.mapping.put(self.allocator, producer.types.head(old, 0), fresh);
+            try copier.mapping.put(copier.allocator, producer.types.head(old, 0), fresh);
             try variables.append(self.allocator, fresh);
         }
         var parameters: std.ArrayList(T.Id) = .empty;
@@ -1518,13 +1524,15 @@ const Engine = struct {
     fn copyContract(self: *Engine, producer: DeclarationCatalog, source_index: u32) T.Error!u32 {
         const source = producer.contracts[source_index];
         if (self.contract_identities.get(source.identity)) |known| return known;
-        var copier: SchemeCopier = .{ .allocator = self.allocator, .source = producer.types, .destination = &self.types };
+        var copier_buffer: [4096]u8 align(@alignOf(usize)) = undefined;
+        var copier_scratch: std.heap.BufferFirstAllocator = .init(&copier_buffer, self.allocator);
+        var copier: SchemeCopier = .{ .allocator = copier_scratch.allocator(), .source = producer.types, .destination = &self.types };
         defer copier.deinit();
         var variables: std.ArrayList(T.Id) = .empty;
         defer variables.deinit(self.allocator);
         for (producer.types.list(source.variables)) |old| {
             const fresh = try self.types.fresh();
-            try copier.mapping.put(self.allocator, producer.types.head(old, 0), fresh);
+            try copier.mapping.put(copier.allocator, producer.types.head(old, 0), fresh);
             try variables.append(self.allocator, fresh);
         }
         const rows = try copier.quantifiedRows(source.row_variables);

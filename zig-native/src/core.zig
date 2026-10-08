@@ -678,6 +678,9 @@ const Builder = struct {
         return id;
     }
     fn projectType(self: *Builder, source: T.Id, depth: usize) Error!T.Id {
+        var scratch_buffer: [256]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const allocator = scratch.allocator();
         if (source == 0) return 0;
         if (self.type_map[source] != 0) return self.type_map[source];
         if (depth >= 1024) return error.CoreLimit;
@@ -705,29 +708,29 @@ const Builder = struct {
             .function => .{ .tag = .function, .a = try self.projectType(original.a, depth + 1), .b = try self.projectType(original.b, depth + 1), .c = try self.projectRow(original.c, depth + 1) },
             .product => blk: {
                 var fields: std.ArrayList(T.Id) = .empty;
-                defer fields.deinit(self.allocator);
-                for (self.checked.types.list(.{ .start = original.a, .len = original.b })) |child| try fields.append(self.allocator, try self.projectType(child, depth + 1));
+                defer fields.deinit(allocator);
+                for (self.checked.types.list(.{ .start = original.a, .len = original.b })) |child| try fields.append(allocator, try self.projectType(child, depth + 1));
                 const span = try self.saveTypes(fields.items);
                 break :blk .{ .tag = .product, .a = span.start, .b = span.len };
             },
             .record => blk: {
                 var fields: std.ArrayList(T.Id) = .empty;
-                defer fields.deinit(self.allocator);
+                defer fields.deinit(allocator);
                 for (0..original.b) |index| {
                     const field = self.checked.types.recordField(original, index);
                     const saved = try self.saved_fields.getOrPut(self.allocator, field.name);
                     if (!saved.found_existing) try self.field_names.append(self.allocator, .{ .symbol = field.name, .spelling = try self.saveName(self.names.get(field.name)) });
-                    try fields.appendSlice(self.allocator, &.{ field.name, try self.projectType(field.ty, depth + 1) });
+                    try fields.appendSlice(allocator, &.{ field.name, try self.projectType(field.ty, depth + 1) });
                 }
                 const span = try self.saveTypes(fields.items);
                 break :blk .{ .tag = .record, .a = span.start, .b = original.b };
             },
             .nominal => blk: {
                 var arguments: std.ArrayList(T.Id) = .empty;
-                defer arguments.deinit(self.allocator);
+                defer arguments.deinit(allocator);
                 const source_arguments = self.checked.types.nominalArguments(original);
-                try arguments.append(self.allocator, @intCast(source_arguments.len));
-                for (source_arguments) |argument| try arguments.append(self.allocator, try self.projectType(argument, depth + 1));
+                try arguments.append(allocator, @intCast(source_arguments.len));
+                for (source_arguments) |argument| try arguments.append(allocator, try self.projectType(argument, depth + 1));
                 const span = try self.saveTypes(arguments.items);
                 break :blk .{ .tag = .nominal, .a = original.a, .b = original.b, .c = span.start };
             },
@@ -751,12 +754,15 @@ const Builder = struct {
         return id;
     }
     fn projectOperation(self: *Builder, label: T.Effects.Label, depth: usize) Error!T.Effects.Label {
+        var scratch_buffer: [256]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const allocator = scratch.allocator();
         if (depth >= 1024 or label == 0 or label >= self.effect_operation_map.len) return error.CoreLimit;
         if (self.effect_operation_map[label] != 0) return self.effect_operation_map[label];
         const source = self.checked.types.operations.items[label];
         var values: std.ArrayList(T.Id) = .empty;
-        defer values.deinit(self.allocator);
-        for (self.checked.types.list(source.arguments)) |argument| try values.append(self.allocator, try self.projectType(argument, depth + 1));
+        defer values.deinit(allocator);
+        for (self.checked.types.list(source.arguments)) |argument| try values.append(allocator, try self.projectType(argument, depth + 1));
         const arguments = try self.saveTypes(values.items);
         if (self.effect_operations.items.len == std.math.maxInt(u32)) return error.CoreLimit;
         const id: u32 = @intCast(self.effect_operations.items.len);
@@ -765,6 +771,9 @@ const Builder = struct {
         return id;
     }
     fn projectRow(self: *Builder, source: T.Effects.Id, depth: usize) Error!T.Effects.Id {
+        var scratch_buffer: [256]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const allocator = scratch.allocator();
         if (source == 0) return 0;
         if (depth >= 1024 or source >= self.effect_row_map.len) return error.CoreLimit;
         if (self.effect_row_map[source] != 0) return self.effect_row_map[source] - 1;
@@ -773,8 +782,8 @@ const Builder = struct {
         // identity, with no further substitutions or historical cursor.
         const original = self.checked.types.effects.node(source);
         var labels: std.ArrayList(T.Effects.Label) = .empty;
-        defer labels.deinit(self.allocator);
-        for (self.checked.types.effects.list(original.labels)) |label| try labels.append(self.allocator, try self.projectOperation(label, depth + 1));
+        defer labels.deinit(allocator);
+        for (self.checked.types.effects.list(original.labels)) |label| try labels.append(allocator, try self.projectOperation(label, depth + 1));
         const tail: T.Effects.Tail = switch (original.tail) {
             .closed => .closed,
             .variable => |variable| .{ .variable = try self.projectRowVariable(variable) },
@@ -786,7 +795,7 @@ const Builder = struct {
         }
         if (self.effect_rows.items.len == std.math.maxInt(u32) or labels.items.len > std.math.maxInt(u32) - self.effect_labels.items.len) return error.CoreLimit;
         const start: u32 = @intCast(self.effect_labels.items.len);
-        try self.effect_labels.appendSlice(self.allocator, labels.items);
+        try self.effect_labels.appendSlice(allocator, labels.items);
         const id: u32 = @intCast(self.effect_rows.items.len);
         try self.effect_rows.append(self.allocator, .{ .labels = .{ .start = start, .len = @intCast(labels.items.len) }, .tail = tail });
         self.effect_row_map[source] = id + 1;
@@ -799,17 +808,20 @@ const Builder = struct {
         return .{ .start = start, .len = @intCast(values.len) };
     }
     fn projectScheme(self: *Builder, scheme: T.Scheme) Error!T.Scheme {
+        var scratch_buffer: [256]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const allocator = scratch.allocator();
         const root = try self.projectType(scheme.root, 0);
         var variables: std.ArrayList(T.Id) = .empty;
-        defer variables.deinit(self.allocator);
-        for (self.checked.types.list(scheme.variables)) |id| try variables.append(self.allocator, try self.projectType(id, 0));
+        defer variables.deinit(allocator);
+        for (self.checked.types.list(scheme.variables)) |id| try variables.append(allocator, try self.projectType(id, 0));
         const span = try self.saveTypes(variables.items);
         var row_variables: std.ArrayList(T.Id) = .empty;
-        defer row_variables.deinit(self.allocator);
-        for (self.checked.types.list(scheme.row_variables)) |variable| try row_variables.append(self.allocator, try self.projectRowVariable(variable));
+        defer row_variables.deinit(allocator);
+        for (self.checked.types.list(scheme.row_variables)) |variable| try row_variables.append(allocator, try self.projectRowVariable(variable));
         const row_span = try self.saveTypes(row_variables.items);
         row_variables.clearRetainingCapacity();
-        for (self.checked.types.list(scheme.closed_rows)) |variable| try row_variables.append(self.allocator, try self.projectRowVariable(variable));
+        for (self.checked.types.list(scheme.closed_rows)) |variable| try row_variables.append(allocator, try self.projectRowVariable(variable));
         const closed_span = try self.saveTypes(row_variables.items);
         const start: u32 = @intCast(self.obligations.items.len);
         for (self.checked.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |value| try self.obligations.append(self.allocator, .{ .ty = try self.projectType(value.ty, 0), .kind = value.kind, .span = self.checked.diagnosticSpan(self.tree, value.source), .name = value.name, .result = try self.projectType(value.result, 0), .other = try self.projectType(value.other, 0), .signature = try self.projectType(value.signature, 0), .operator = value.operator, .identity = value.identity, .explicit = value.explicit, .qualification_span = value.qualification_span, .qualification_unit = value.qualification_unit, .diagnostic_name = if (value.explicit and value.name != 0) try self.saveName(self.names.get(value.name)) else .{} });

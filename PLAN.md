@@ -134,6 +134,15 @@ later edits. Wasm matched in every phase. Direct allocation comparison removed
 20,734 allocations and 2.7 MB; the global allocation target remains open.
 Results are in ignored `build/bench/row-projection-scratch`.
 
+Frozen-Core projection and imported scheme copying also use bounded temporary
+buffers; published arrays retain their original owners. The full 565-test
+guest/client gate and zero-finding analyzer pass. Against the preceding buffer
+change, gdev requested allocation falls from 437.6 to 397.0 MB and allocation
+count from 1.54 to 1.24 million. Five paired runs measured 919 / 925 ms fresh,
+1,030 / 1,030 ms population, 200 / 190 ms first edit and 180 / 170 ms later
+edits. Wasm matched throughout. Results are in ignored
+`build/bench/type-and-scheme-scratch`; no cold speedup is claimed.
+
 ### Hills 1 (backend) and 3: summaries instead of unfolding
 
 Root cause: `ClosureRegion.collectCall` (`core_eval.zig`, about line 4432)
