@@ -1,283 +1,360 @@
 # Compiler direction
 
-## Twenty-hill review program
+Blot uses the handwritten Zig 0.17 compiler in `zig-native/` and its retained
+project API. The gdev targets are about 500 ms cold compilation and under 100 ms
+incremental compilation, with language, effects, staging and guest behavior
+preserved. No optimization may recognize prelude declaration names. The previous
+version of this file, with every earlier program's measurements, is
+`git show be33230:PLAN.md`.
 
-Approved on 2026-10-08 after checkpoint `be33230`. The review measured the
-frozen gdev workload at about 0.85–1.0 s cold CPU, with inference about 720 ms.
-One principal region (`const sandbox = game …`) costs about 420 ms. A literal
-edit costs about 228 ms. Synthetic probes expose exponential and depth cliffs.
-Each milestone commits locally after `deno task test:compiler` passes.
+## Twenty-hill program
 
-Compile performance:
+Approved on 2026-10-08 after a review of checkpoint `be33230`. Paused the same
+day. This section records what landed, what waits on a branch, and how to finish
+the rest. Each milestone lands as a local commit on `main` after
+`deno task test:compiler` and `deno task lint:zig` pass. Nothing is pushed.
 
-1. Infer generic callees once; instantiate schemes instead of re-collecting
-   bodies per unresolved call. Diamond depth 16 under 20 ms, chains linear.
-2. Split the `sandbox` region with higher-order summaries; no gdev region over
-   50 ms.
-3. Remove the static call-depth cliff: a 255-deep direct-call chain fails with
-   `constant_fuel`. Depth limits apply only to executed compile-time code.
-4. Key specializations by body and complete evidence, not closure value IDs.
-5. Count, then fix, solver hot paths (occurs, epoch cache wipes, fixpoint scans).
-6. Literal edits re-evaluate affected constants only; body edits recheck one body.
-7. Region arenas: under 100 MB requested allocation for cold gdev.
-8. Default restart cache keyed by compiler identity.
-9. Deterministic parallel region inference once regions are small.
-10. Committed benchmark corpus, `blotc build --profile`, and counter budgets
-    that fail tests on exponential regressions.
+| Hill                                  | State                                       |
+| ------------------------------------- | ------------------------------------------- |
+| 1. Infer generic callees once         | Frontend half on a branch; backend open     |
+| 2. Split the `sandbox` region         | Open; depends on 1 and 3                    |
+| 3. Remove the call-depth cliff        | Open; same mechanism as 1's backend half    |
+| 4. Canonical specialization keys      | Open                                        |
+| 5. Solver hot paths                   | Open; counters landed                       |
+| 6. Cheap literal and body edits       | Open                                        |
+| 7. Region arenas                      | Open                                        |
+| 8. Default restart cache              | Open                                        |
+| 9. Parallel region inference          | Open; after 1–3                             |
+| 10. Benchmarks, profile, budgets      | Done (`ae14677`)                            |
+| 11. One production policy             | Done on a branch, gate unfinished           |
+| 12. One reuse/query model             | Open; after 11                              |
+| 13. Delete or promote prototypes      | Done on a branch, gate unfinished           |
+| 14. Split god structs and switches    | Open                                        |
+| 15. Source layout and test filter     | Test filter on the policy branch; rest open |
+| 16. Shared equality/hash, diagnostics | Done (`4dd0a0e`)                            |
+| 17. Zero analyzer warnings in CI      | Done (`4dd0a0e`); first GitHub run pending  |
+| 18. Reclaim disk                      | Done locally; `build/` 37 → 4.5 GB          |
+| 19. Docs state current numbers        | Open                                        |
+| 20. Remove stale leftovers            | Done except the `.blot` fixtures in `src`   |
 
-Maintenance:
+### Measuring
 
-11. One production policy for CLI and project server; at most five options.
-12. One query/dependency/early-cutoff model for the reuse layer.
-13. Delete or promote each prototype and default-off path.
-14. Split god structs and switch functions; no function over about 120 lines.
-15. Source subdirectories, fixtures outside `src`, and a native test filter.
-16. One structural equality/hash and one diagnostic table.
+- Frozen gdev workload: `build/bench/gdev-snapshot` (gitignored). gdev is a
+  private repository and blot2 is public, so never commit its sources. Verify
+  the snapshot against `scripts/bench/gdev-manifest.json`.
+- Paired comparison:
+  `deno task bench:compile -- --baseline OLD_BLOTC --candidate NEW_BLOTC`. It
+  reports child CPU (not wall time) for fresh processes and retained phases. It
+  fails on any Wasm difference.
+- Attribution: `blotc build ... --profile` prints phase timings and the slowest
+  inference regions. Every build prints deterministic `work_counters`.
+- Regression budgets: `zig-native/tests/compile_budget.test.ts` asserts counters
+  for the chain, generic chain, diamond and fan-out probes. Its two ignored
+  probes (`chain_mono` N=300 and diamond N=16) document the cliffs that hills 1
+  and 3 remove. Un-ignore them and tighten the `today` tables whenever a hill
+  lowers counters.
+- On this machine ananicy demotes `deno` and its children to SCHED_IDLE. Compare
+  CPU, never wall time, and use alternating pairs.
 
-Cleanup:
+Starting point (be33230, cold CLI on the gdev snapshot):
 
-17. Zero zig-analyzer warnings, enforced in CI, with CI caching.
-18. Reclaim build and cache disk; scripts write to `build/tmp/`.
-19. Docs state current numbers; history lives in git.
-20. Remove stale leftovers (stash, empty output dirs, zeroed profile records).
+- About 0.85–1.0 s CPU. Phases: check 137 ms, lower 31 ms, emit 672 ms.
+- Inference is about 720 ms of emit.
+- One principal region (`const sandbox = game …` in `src/main.blot`) has 13,863
+  scopes and takes about 420 ms.
+- Counters: 1,758 regions; 66,509 scopes; 5,673 closed and 10,897 unresolved
+  callee collections; 7,436 memo hits; 3,113 solver passes; 35,725 constraint
+  visits; 213,964 occurs steps; 555,661 type nodes; 426 MB requested in 1.4 M
+  allocations.
+- A literal edit (`floor_half_extent` 60.0 → 61.0 in `src/robots.blot`) takes
+  about 228 ms. It re-specializes 210 named functions and 72 closures, and every
+  edit reports `rebuilt_seed: true`.
 
-## Semantic compilation performance program
+### Next: land the two branches
 
-The next ten hills are approved after checkpoint `8b44ee6`. Preserve that
-compiler and the gdev source snapshot for paired fresh-process and retained-edit
-measurements. The qualified starting measurements are 1,606 ms cold and 399 ms
-first edit; quieter diagnostic timings are for attribution, not claimed gains.
+1. `hills/11-13-policy-prototypes`. This is hills 11 and 13. It is rebased onto
+   `ae14677` and ends with a one-line `wip test filter` commit for hill 15.
+   - It deletes `scalar_live_patch`, `resolved_scalar_ssa` and
+     `transport_source_templates`, plus the 40-odd reuse and project knobs and
+     their off paths.
+   - `Policy` keeps `codegen_tier`, `share_machine_code`, `codegen_workers`,
+     `semantic_workers` and `split_closed_calls`.
+   - The diff is −1,781/+370 lines over 39 files.
+   - The gate was still running when work stopped.
+   - **To finish:**
+     - Rebase onto `main` and run `deno task test:compiler` and
+       `deno task lint:zig`.
+     - Run `bench:compile` against `main`. Wasm must be byte-identical, cold CLI
+       CPU must not regress, and retained edits must not regress.
+     - Check how fresh/retained differential tests were rewritten. They now
+       compare sessions, not knobs.
+     - Keep the test-filter commit (it adds `-Dtest-filter` to `build.zig`) and
+       document it in AGENTS.md.
+     - Merge.
+2. `hills/1-frontend-scheme-sharing`. This is the frontend half of hill 1, built
+   on `5da0014`.
+   - Commit `8696d7e` makes callee schemes shareable by reference in
+     `check.zig`. It adds about 580 lines and `check_shared_scheme_tests.zig`.
+   - The WIP commit after it sets a temporary differential switch,
+     `pub var callee_sharing_threshold`, to 0 and fixes an addition overflow in
+     `shareScheme`.
+   - **To finish:**
+     - Rebase onto `main`. `check.zig` conflicts with the analyzer renames and
+       the `work_counters` additions.
+     - Run the differential comparison: threshold `maxInt(u32)` against 0 over
+       native tests, guest tests, guide examples and the gdev snapshot.
+       Diagnostics (code, span, order), Wasm bytes, `constant_steps` and
+       `code_instances` must all match.
+     - Then delete the mutable global. Sharing is unconditional whenever
+       `summary.shareable` holds, because ARCHITECTURE.md forbids mutable global
+       switches.
+     - Acceptance: diamond N=24 checks in under 20 ms, a generic chain's check
+       cost is linear, and budgets are tightened.
 
-1. Split oversized inference regions using independently valid body summaries.
-2. Deduplicate repeated semantic specialization by complete evidence.
-3. Share immutable semantic graphs while keeping solver variables region-local.
-4. Extend semantic early cutoff to general body edits with exact dependencies.
-5. Publish transactional revision deltas without rebuilding unchanged metadata.
-6. Retain evaluated constants and relocatable serialized data with exact inputs.
-7. Expand portable dependencies to eligible complete semantic artifacts.
-8. Complete the resolved backend IR boundary for calls, control flow and ownership.
-9. Remove incidental function indices from optimized-body reuse identities.
-10. Schedule independent semantic jobs with owned solver state deterministically.
+### Hills 1 (backend) and 3: summaries instead of unfolding
 
-Status: implementation in progress. The earlier bounded paths and experiments
-below remain the reference and fallback, not evidence that these new gates are
-complete. General language rules authorize reuse; declaration names never do.
-Preserve chronological solver semantics, staging, diagnostics, provider and
-generative identities, revision recovery, and executed-Wasm behavior. Measure
-each architectural step before extending its admission or production defaults.
+Root cause: `ClosureRegion.collectCall` (`core_eval.zig`, about line 4432)
+creates a scope for every global call. It freshens every callee type and, when
+the instantiated call type is not closed at collection time, calls
+`collect(scope, body_root)`. Collection precedes solving, so in principal
+analysis this is the common case. The only guard is `unresolved_calls`, which
+stops active recursion. The call DAG becomes a tree.
 
-The current implementation adds a Session-local completed-refinement index to
-both fresh CLI and retained builds, shares closed source types across lexical
-imports, retains dependency-validation certificates, imports nonempty portable
-principal results, relocates optimized direct calls, and allows exact completed
-scalar constants inside retained code fragments. Refinement receipts can now
-stop transitive invalidation at freshly checked closed-call judgments: changing
-a callee from addition to subtraction preserves eligible caller type answers
-while runtime code and staged values rebuild. Focused parity and allocation
-failure laws pass. The release build and 1,095 native tests pass; all 548
-guest/client tests pass across the full run and focused environmental retries.
-The [qualification report](std/PERFORMANCE.md#semantic-compilation-performance)
-records the final scope and pinned binary.
+The depth cliff is `collect`'s `collect_depth >= options.max_depth` (256). It
+raises `error.TypeLimit`, which is reported as `constant_fuel`. Even annotated
+callees are collected inside the caller's region: a 255-deep chain of
+`fn (x: U32) -> U32` functions fails, and so does an operator-free generic chain
+at 300.
 
-Three broader paths remain opt-in: independent first-order call partitions,
-resolved scalar SSA with structured branches/joins, and independent semantic
-workers. The partition experiment accepts 963 gdev boundaries and reduces the
-largest diagnostic region from 13,863 to 10,335 scopes, with identical Wasm and
-evaluation counts. Initial fresh-session pairs improve, but retained-edit
-samples show no clear win. It therefore does not change production defaults.
+1. **Depth-free closed-call partition.**
+   - In `partitionCall`/`closedCall` (about lines 4531–4580), replace the nested
+     `child.closedCall` with a Session-level queue of (target, expected
+     evidence) jobs drained iteratively by the top-level caller.
+   - Remove the 32-job `split_active` limit and the inherited `collect_depth`.
+   - Admit only callee schemes without obligations or free variables. The parent
+     accepts the call by signature and does not collect the body.
+   - Make this unconditional once parity holds, and delete `split_closed_calls`.
+   - The earlier opt-in prototype accepted 963 gdev boundaries, cut the largest
+     region from 13,863 to 10,335 scopes, and kept Wasm identical.
+2. **`call_summary` constraint for functional callees.**
+   - A callee is functional when its result and effect row are determined by its
+     parameter types. Decline for `result_dispatch`, open effect-row
+     dependencies, lexical closures that share outer variables (`shareLexical`,
+     `definition == null`), closure or callable evidence (use
+     `firstOrderArrow`), and SCC members.
+   - `collectCall` appends (target, argument types, result) instead of
+     collecting the body.
+   - `solveMode` (about line 5091) resolves it once the parameter prefix is
+     closed, using a Session memo
+     `call_summaries[(target, closed input
+     evidence)]`.
+   - On a miss, push a job onto an explicit heap stack. The job runs the callee
+     as its own closed region and publishes through `validated_calls`. Then
+     retry. There is no native recursion.
+   - Never use the order-sensitive `fallback` pass for summaries.
+   - A failed job, or an input that never closes, falls back to inline
+     collection, so the authoritative diagnostics stay unchanged.
+3. **Limit `max_depth` to executed code.** After 1 and 2, `max_depth` limits
+   only executed compile-time evaluation (`expressionInner`), not region
+   collection.
 
-These are bounded implementations, not completion of the entire redesign.
-Higher-order/SCC summaries, general body edit identities, full metadata deltas,
-retained aggregate evaluation/serialized data, arbitrary portable semantic jobs,
-resolved calls/loops/heap ownership, and a general adaptive semantic scheduler
-remain open. Five alternating pairs show median native CPU of 1,196 → 1,182 ms
-cold, 350 → 310 ms first edit and 330 → 290 ms revert. Cold CPU is nearly
-unchanged; edit CPU improves about 11–12%. Requested allocation traffic falls
-433.6 → 425.4 MB. Host contention makes the wall samples unsuitable for proving
-the target latency; the 500 ms cold / 100 ms edit goals remain unestablished.
-The historical measurements below describe their respective checkpoints.
+Laws:
 
-## Existing programs
+- Executed-Wasm parity on all tests and on gdev.
+- Diagnostic parity, including an ill-typed leaf at depth 300 and a missing
+  `add` deep in a summarized callee.
+- Fresh/retained parity.
+- `.blotdep` and checkpoint round trips.
+- Allocation-failure sweeps over the job queue.
 
-The current list-like transfer order is: preserve one typed frontend and shared
-language laws; packed scalar rows and broader general fusion/SIMD; then ragged
-builders, rolling reductions and composable source summaries. Query rewrites,
-runtime caches and workers remain separate measured follow-ups. Their remaining
-scalar/generic frontend convergence is specific to list-like; Blot keeps its
-existing typed path, separate List/Array types and explicit lazy iterators.
-Do not copy eager producer rewrites across effectful iterator pulls.
+Acceptance:
 
-The first production storage step packs flat scalar List and Array rows. It covers
-literals, static values, fill/generate, exact builders, indexing, updates,
-structural copies, cursors and List/Array conversion. Reference-bearing/nested
-rows retain their previous representation. The full native suite and 546
-guest/client tests pass, including allocation failure and fresh/retained laws.
-The [qualification report](std/PERFORMANCE.md#production-packed-scalar-rows)
-records every runtime and compiler measurement. Direct scalar field
-reads avoid extracted boxes. Packed cursors and direct loops reuse leaf spans;
-bounded allocation-producing callees expose their temporary rows to scalar
-replacement. Broader row fusion and SIMD remain the next representation work.
-The measured generation and conversion fixtures use 6.4× and 4.0× less CPU,
-respectively, but read-only List folds use 1.9× as much CPU. Packed retained
-List storage falls 61%. Closing the traversal regression remains open. This
-batch does not improve compiler latency: paired gdev cold compilation is
-1,466 → 1,606 ms and first edit 389 → 399 ms. Both targets remain unmet.
+- `chain_mono` at 300 and 1,000 compiles, and so does `gen300`.
+- Diamond N=16 emits in milliseconds.
+- On gdev, unresolved collections and the maximum region scopes fall.
 
-The compiler-performance program approved after `586e0ae` covers ten hills:
+### Hill 2: the `sandbox` region
 
-1. Reuse fully optimized function bodies with exact optimizer dependencies.
-2. Include captured values in executable identities and reuse admission.
-3. Recheck individual changed bodies instead of whole modules where valid.
-4. Produce resolved ownership-aware SSA before runtime emission.
-5. Reduce allocation traffic using reusable scratch and immutable sharing.
-6. Persist admitted specializations and optimized dependency fragments.
-7. Share generic machine code where representation and evidence permit it.
-8. Offer a fast development tier with full semantics and required cleanup.
-9. Schedule immutable independent jobs concurrently with deterministic output.
-10. Produce patches for ABI-compatible running Wasm programs.
+`principalEvidence` (about line 1374) uses `include_callables` to pull the
+transitive callee graph into one region. After hill 1's backend work, profile
+gdev with `--profile`. The remaining scopes come from higher-order combinators
+(plugins, ECS queries, iterators).
 
-This program is in progress. Begin with optimized body retention and complete
-dependency laws; retain the frozen compiler and gdev workload in
-`build/compiler-hills/before`. Every stage requires fresh/retained parity,
-failure recovery, allocation ownership and end-to-end measurements. Prototype
-SSA, shared generic code, tiers, concurrency and patches before changing their
-production defaults. No optimization may recognize prelude declaration names.
+- Extend summaries to function-typed parameters. A summary stays parametric in
+  the obligations of its argument functions.
+- Extend summaries to lexical closures by treating captured variables as extra
+  public variables.
+- Give each SCC one joint region.
 
-Current progress: optimized-body retention (1) and scratch/closed-evidence sharing
-(5) are qualified. Capture keys (2) cover anonymous static closures; projected
-principal-query replay (3) covers structurally identical scalar-literal edits,
-not general body-level checking. Exact private machine-body sharing (7), the
-development tier (8) and coarse optimizer jobs (9) are qualified opt-in
-prototypes. Sharing reduces gdev Wasm size by 7.8%; total compile-time gains from
-these options remain unproven. Portable backend checkpoints (6) now restore
-empty-result principal-query proofs and optimized bodies across processes. Their
-full gate and restart measurements pass, with about 30% less child CPU work on
-gdev restarts under a contended host. They do not persist arbitrary
-specializations or evaluated values. Resolved scalar SSA (4) is a private,
-default-off prototype with exact-output and ownership laws; its gdev coverage is
-too narrow to establish a useful speedup. Live scalar Wasm patches (10) have an
-executed native/host prototype, including stable exported identities, recursive
-call redirection and atomic publication. It rejects heap/effect state and has no
-project-client API yet. That preceding checkpoint passed the release build,
-native suite and 539 guest/client tests, with 120 existing lint warnings and
-no errors across 279 files.
+Acceptance: no gdev region takes more than 50 ms.
 
-The program is not complete: general body-level checking, full resolved
-ownership-aware SSA, arbitrary specialization persistence and stateful live
-patching remain open. The final paired default-path run measures 1,354 → 1,294 ms
-cold, 984 → 378 ms first edit and 982 → 376 ms subsequent edit. Earlier quieter
-runs measured 773/184/171 ms for the candidate; do not compare absolute latency
-across batches. Both targets remain unmet.
+### Hill 4: canonical specialization keys
 
-The architecture cleanup approved after checkpoint `42cb11f` covers all seven
-review findings. Preserve source behavior, fresh/retained parity and the existing
-cycle laws throughout this migration:
+The same `packages/ecs.blot` body (binding 234, body 80) is inferred in four
+regions. `specialized_closures` is keyed by `ViewKey{value, evidence}`, where
+`value` is a closure value ID that includes its captures. The refinement memo
+and refinement receipts in `core_backend.zig` are keyed per seed.
 
-1. A typed runtime IR shared by allocation, vectorization and lifetime passes.
-2. Explicit cleanup paths for normal return, break, cancellation and demand reset.
-3. A specialization boundary that hands resolved bodies to runtime emission.
-4. Defined production reuse policies, isolated differential controls and shared
-   revision validation inputs with distinct semantic/executable proofs.
-5. Shared heap layout definitions for construction, access and serialization.
-6. Compilation/session-owned options and instrumentation; no mutable global knobs.
-7. Distinct numeric handle domains and named accessors at compiler boundaries.
+- Key both by (body, complete evidence including capture evidence).
+- Prove that the capture values cannot change the inferred result before
+  sharing.
 
-These boundaries are now implemented: the compact typed stack IR and pipeline,
-private-scope cleanup ledger, semantic specialization service, shared policy and
-validation leases, centralized fixed heap schemas, caller-owned instrumentation,
-and distinct conversion/runtime handles. The full compiler gate and paired
-measurements against the committed compiler pass; the
-[qualification report](std/PERFORMANCE.md#compiler-architecture-cleanup)
-records bounded private-handler memory and unchanged compilation cost.
-The stack IR is not SSA; dynamic source
-selection still queries semantics, and legacy dense Core storage still uses raw
-words internally. These changes do not remove tracing or solve dynamic cycles.
+Acceptance: `--profile` shows no duplicate (body, evidence) regions.
 
-The approved next program replaces tracing with explicit ownership: full control
-flow lifetimes, temporary elimination/regions, RC for shared storage, suspended
-effect ownership and cancellation, then removal of tracing after qualification.
-The implemented lifetime pass follows proven temporaries across branches, loop
-exits, borrowed direct calls and fresh-result ownership transfers. It also
-releases closed allocation groups with shared children and cycles when every
-reference and exit is proven, and records pointer-free collection element
-layouts. Private handler scopes now clean up explicitly. Shared RC, ownership
-of escaping and suspended effect values, and collector removal remain open; do not
-describe this partial proof as universal ownership or a GC-free runtime.
-The cycle audit has an executed counterexample: State can return a closure that
-reaches the demand caching that closure. Preserve this legal behavior and its
-bounded-memory regression when adding RC; cyclic ownership cannot be omitted.
+### Hill 5: solver hot paths
 
-The latest `../list-like/LIST.md` review covers its uncommitted packet/span design.
-Adopted here: allocation-free empty values and unchanged structural operations,
-and identical-bit edit avoidance with safe snapshots. Preserve Blot's distinct
-List/Array types, no public list indexing, logarithmic tree edits and detached
-small slices. Larger span buffers, sparse compaction and host span borrows need
-workload and lifetime evidence before changing those contracts.
-The follow-up review adopts `splice` and ordered `splice_many` as ordinary
-source functions over structural slices/concatenation. Its paged spine, tiny
-owners and generation caches are still prototypes, not their default layout.
+Measure first with `solver_passes`, `solver_constraint_visits` and
+`occurs_steps`.
 
-The previous transfer batch implemented independent immutable cursor caches, bounded
-scalar temporary collections across helpers, rectangular exact-size builders,
-and compile-owned function facts. Packed scalar rows began as a separate measured
-fixture; their production integration is the current batch above. Ragged count
-passes, rolling reductions, summary trees, host span borrows and adaptive runtime
-workers remain future work.
+- `types.zig` `occurs` walks resolved types without a visited set.
+- Each `mutation_epoch` bump wipes the whole resolve cache
+  (`epoch_resolution_cache.zig`). Rollback also drops `closed_generation`.
+- `solveMode` rescans every constraint until nothing changes. `solveDataAliases`
+  rescans aliases.
 
-The list/iterator program approved on 2026-10-07 follows checkpoint `5f09303`:
+Fixes: a visited bitmap or a cached "variable-free" flag for `occurs`, per-type
+resolve caches that survive unrelated writes, and a worklist of constraints
+indexed by the variables they watch. Chronological substitution semantics must
+hold, so keep diagnostic parity tests next to each change.
 
-1. Ordinary `iter`/`next` dispatch in `for` and comprehensions, preserving effects,
-   monadic control flow, evaluation order and early exit.
-2. Immutable snapshot cursors with efficient leaf traversal and independent positions.
-3. Source adapters: zip/zip_strict, enumerate, windows, take/take_while, map/filter,
-   folds and explicit list/array collection.
-4. Structural concatenation, slices and splits; no public list indexing.
-5. Bulk leaf copying, conversion and construction.
-6. Measured growth, metadata and sparse-result storage improvements.
-7. Automatic numeric SIMD and explicit SIMD primitives, preserving scalar semantics.
-8. General elimination of local iterator state and step allocations.
+### Hill 6: cheap edits
 
-These eight areas are implemented and qualified in the
-[iterator follow-up](std/PERFORMANCE.md#iterator-and-structural-list-follow-up).
-Allocation elimination and automatic SIMD have bounded admission rules; generic
-iterator pipelines can still allocate. Runtime reclamation uses a tracing arena
-collector alongside ownership analysis. The larger gdev snapshot remains above
-the 500 ms fresh-process and 100 ms retained-edit targets.
+Use the retained profile with `deno task bench:compile` to find which
+invalidation forces `rebuilt_seed` on a literal edit.
 
-Preserve distinct List/Array types and ordinary source implementations; compiler
-optimizations must not recognize adapter or prelude declaration names. Check
-both const evaluation and executed Wasm, retained dependency validity, and
-cold/edit compiler cost.
+- Literal-only edits re-evaluate the affected constants and re-emit only data
+  segments, functions whose instructions changed, and their callers'
+  relocations.
+- Body edits recheck one body behind an exact interface cutoff. Its callers
+  rebuild only when the summary or scheme changes. This builds on refinement
+  receipts and early cutoff.
 
-The approved type-system and ergonomics program, including typed external
-assets, is tracked in [language evolution](zig-native/LANGUAGE_EVOLUTION.md).
+Targets: a literal edit under 30 ms, and a body edit under 100 ms on gdev.
 
-Blot uses the handwritten Zig 0.17 compiler and its asynchronous
-retained-project API. The targets for gdev are about 500 ms cold compilation and
-under 100 ms incremental compilation, with language, effects, staging and guest
-behavior preserved. Exact Bend API shapes and evaluation step counts are retired
-by the owner's decision on 2026-10-05.
+### Hill 7: region arenas
 
-The current work and measurements are in
-[zig-native/STATUS.md](zig-native/STATUS.md). Continue improving invalidation
-precision, scratch ownership and artifact reuse only where measurements show a
-benefit. Dependency bundles and retained modules must account for compiler
-settings, nominal identities, provider/evidence selection and executed
-compile-time code.
+Cold gdev requests 426 MB in 1.4 M allocations for 394 KB of source. Give each
+ClosureRegion's solver, scratch and constraint lists one arena that is reset
+when the region ends. Publish results by copying them out, following CONTRACT.md
+ownership rules. Use the same arenas for checker pending lists and the scheme
+copier. Target: under 100 MB requested, with allocation-failure laws intact.
 
-Use language fixtures, negative diagnostics, allocation-failure tests, executed
-Wasm and fresh-versus-retained output comparisons as correctness gates. Keep
-cold process timing, dependency population, first edit, subsequent edit, no-op
-and failed-edit recovery separate. Parallelize only after measuring a useful
-independent workload and including coordination costs.
+### Hill 8: default restart cache
 
-The [demand evaluation design](zig-native/DEMANDS.md) specifies the `@demand`
-spelling, predictable elimination of deferred arguments, and the effect,
-lifetime, and incremental dependency rules needed for source-defined `&&` and
-`||` to compile to ordinary branches. The compiler now eliminates cells for
-bounded expression combinators, including repeated local demands. More complex
-and escaping uses retain runtime cells; `@force` remains an alias.
+Backend checkpoints (`backend_checkpoint.zig`) already reduce gdev restart CPU
+by about 30%, but only when the client supplies them. The project server and the
+CLI should read and write a cache by default under the platform cache directory,
+keyed by compiler identity and the entry. Write it atomically, and on corruption
+or an identity mismatch, ignore and replace it. Measure restart CPU with
+`bench:compile`.
 
-The [standard library audit](std/PERFORMANCE.md) covers collection construction,
-callback effects, demand lowering, math and vector allocation, with paired
-runtime measurements and a fresh gdev compilation baseline.
+### Hill 9: parallel region inference
+
+After hills 1–3, regions are independent closed jobs. Run them on
+`semantic_workers` threads with solver state owned by each job. Publish results
+in a deterministic order. Gate record collection in `independent_call_proof.zig`
+on more than one worker. Enable by default only if paired CPU and wall time win
+on an idle machine. Thread counts measured as no help while one region
+dominated.
+
+### Hill 12: one reuse/query model
+
+Today's caching code spans 19 files, about 6.3k lines plus 7.3k of tests:
+dependency certificates and closure, revision inputs, retained candidates, the
+principal gate and evidence reuse, and refinement and specialization receipts.
+Each has its own key, equality, hash and "did the inputs change" check.
+
+Replace them with one query table: a key, recorded dependencies (from
+`declaration_dependencies` and `dependency_closure`), a value fingerprint, and
+an early-cutoff predicate. Archives become that table's serialization through
+`dependency_format`. Migrate one mechanism at a time behind fresh/retained
+parity, starting with refinement receipts.
+
+### Hill 14: split god structs and switches
+
+- **Structs:**
+  - `core_eval.Session` has 75 fields; split into a value store, closure
+    regions, specialization caches and retained-reuse state.
+  - `core.Builder` has 73 fields.
+  - `core_backend.Generator` has 53 fields; split into serialization, planning,
+    array/layout and statement emission.
+  - `core.Module` has 46 fields.
+- **Functions:** split these per node kind:
+  - `checkInternalExecution`, 383 lines
+  - `expressionInner`, 335
+  - `collect`, 279
+  - `compileWithOptions`, 262
+  - `serialize`, 251
+- **Files:** split along the seams:
+  - `check.zig` into schemes, expressions and statements, rows and fields, and
+    validation
+  - `core.zig` into module and builder
+- **Target:** no function over about 120 lines.
+
+Do this after hills 1–5, which edit the same functions.
+
+### Hill 15: source layout and test filter
+
+`zig-native/src` holds 285 `.zig` files flat, 139 of them tests, plus 32 fixture
+directories and 18 `.blot` files.
+
+- Move sources into `parse/`, `check/`, `eval/`, `backend/`, `reuse/` and
+  `runtime/`, with tests next to their areas.
+- Fixtures move to `zig-native/fixtures/`. `@embedFile` cannot leave a module's
+  root, so either root the test module at `zig-native/` or expose the fixtures
+  as a separate module in `build.zig`.
+- Land `-Dtest-filter` from the policy branch.
+
+Do this last, because it touches every import.
+
+### Hill 17 follow-up
+
+The first GitHub Actions run of the new workflow needs checking. It clones and
+builds zig-analyzer at `756bfd5` with caching. An uncached analyzer backend
+build took about 16 minutes on this loaded machine.
+
+### Hill 19: docs
+
+- Rewrite `zig-native/STATUS.md` as current state plus one table of current
+  numbers.
+- Cut `std/PERFORMANCE.md` (1,321 lines of dated journal) down to the current
+  standard-library guidance.
+- Leave the history in git.
+- Update `zig-native/ARCHITECTURE.md` for policy, summaries and arenas as the
+  hills land.
+
+### Hill 20 remainder
+
+The `.blot` fixtures at the top of `zig-native/src`, for example
+`checker-positive_*` and `monad_*`, move with hill 15. `build/` still holds
+about 4 GB of older qualification, profile and audit directories that were not
+on the approved deletion list. Review them with the owner.
+
+## Earlier programs still open
+
+These items from the programs before 2026-10-08 are not covered above.
+
+- **Semantic compilation program:**
+  - Transactional revision deltas without rebuilding unchanged metadata. This
+    overlaps hill 6.
+  - Portable dependencies for complete semantic artifacts.
+  - A resolved backend IR for calls, control flow and ownership.
+  - Optimized-body reuse identities without incidental function indices.
+- **Runtime ownership program:**
+  - Shared RC, ownership of escaping and suspended effect values, and removal of
+    the tracing collector after qualification.
+  - Preserve the executed counterexample: State can return a closure that
+    reaches the demand caching it.
+- **Collections:**
+  - Read-only List folds still use 1.9× the CPU of the pre-packed layout.
+  - Broader row fusion and SIMD, ragged builders, rolling reductions and summary
+    trees remain open.
+  - Generic iterator step and cursor allocation remain open.
+  - Keep List and Array as distinct types, with no public list indexing.
+- **Language evolution:** see `zig-native/LANGUAGE_EVOLUTION.md` and the
+  [demand evaluation design](zig-native/DEMANDS.md).
+
+Gates for all of these: language fixtures, negative diagnostics, allocation
+failure tests, executed Wasm, and fresh-versus-retained output comparisons.
+Measure cold compiles, dependency population, first edit, subsequent edit, no-op
+and failed-edit recovery separately.
