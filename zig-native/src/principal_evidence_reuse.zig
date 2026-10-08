@@ -62,7 +62,6 @@ pub const State = struct {
         var admission = try gate.Gate.initWithStamps(allocator, &old.metadata.pools.?, units, names, stamps);
         errdefer admission.deinit();
         const result: State = .{ .allocator = allocator, .old = old, .gate = admission, .names = names, .stats = .{ .dependency_validations = admission.dependency_validations, .reused_dependency_validations = admission.reused_dependency_validations } };
-        errdefer if (result.graphs) |*graphs| graphs.deinit();
         return result;
     }
     /// Reuse this query's already validated namespace and catalog. No importer
