@@ -217,59 +217,63 @@ pub const Store = struct {
         try self.appendVersion(variable, resolved);
     }
     fn extractInner(self: *Store, root: Id, label: Label) Error!Extraction {
-        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
-        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
-        const scratch_allocator = scratch.allocator();
-        const value = self.node(root);
-        const labels = self.list(value.labels);
-        for (labels, 0..) |candidate, index| if (candidate == label) {
-            // Removing an edge preserves one immutable owned span. Keep a
-            // fresh header: extraction resets its cursor just like row().
-            if (index == 0 or index + 1 == labels.len) {
-                const remaining: List = .{ .start = value.labels.start + @as(u32, if (index == 0) 1 else 0), .len = value.labels.len - 1 };
-                if (remaining.len == 0 and value.tail == .closed) return .{ .remaining = 0 };
-                return .{ .remaining = try self.add(.{ .labels = remaining, .tail = value.tail }) };
-            }
-            var remaining: std.ArrayList(Label) = .empty;
-            defer remaining.deinit(scratch_allocator);
-            try remaining.appendSlice(scratch_allocator, labels[0..index]);
-            try remaining.appendSlice(scratch_allocator, labels[index + 1 ..]);
-            return .{ .remaining = try self.row(remaining.items, value.tail) };
-        };
-        if (value.tail != .variable) return error.EffectMismatch;
-        const tail = try self.fresh();
-        const replacement_id = try self.row(&.{label}, self.node(tail).tail);
-        try self.appendVersion(value.tail.variable, replacement_id);
-        // The existing prefix stays in place; only its tail was expanded.
-        return .{ .remaining = try self.add(.{ .labels = value.labels, .tail = self.node(tail).tail, .cursor = value.cursor }), .expanded = value.tail.variable };
+        const view = try self.extractView(self.node(root), label);
+        const remaining = view.saved orelse if (view.remaining.labels.len == 0 and view.remaining.tail == .closed) 0 else try self.add(view.remaining);
+        return .{ .remaining = remaining, .expanded = view.expanded };
     }
     pub fn extract(self: *Store, root: Id, label: Label) Error!Extraction {
         const point = self.mark();
         errdefer self.rollback(point);
         return self.extractInner(try self.resolve(root, 0), label);
     }
+    // Unification walks immutable spans without publishing a row header for
+    // every removed label. Cursors and substitutions remain chronological.
+    const ExtractionView = struct { remaining: Row, expanded: ?u32 = null, saved: ?Id = null };
+    fn resolveView(self: *Store, value: Row) Error!Row {
+        if (value.tail != .variable or self.replacement(value.tail.variable, value.cursor) == null) return value;
+        return self.node(try self.resolve(try self.add(value), 0));
+    }
+    fn extractView(self: *Store, value: Row, label: Label) Error!ExtractionView {
+        const labels = self.list(value.labels);
+        for (labels, 0..) |candidate, index| if (candidate == label) {
+            if (index == 0 or index + 1 == labels.len) {
+                return .{ .remaining = .{ .labels = .{ .start = value.labels.start + @as(u32, if (index == 0) 1 else 0), .len = value.labels.len - 1 }, .tail = value.tail } };
+            }
+            var buffer: [512]u8 align(@alignOf(usize)) = undefined;
+            var scratch: std.heap.BufferFirstAllocator = .init(&buffer, self.allocator);
+            const allocator = scratch.allocator();
+            var remaining: std.ArrayList(Label) = .empty;
+            defer remaining.deinit(allocator);
+            try remaining.appendSlice(allocator, labels[0..index]);
+            try remaining.appendSlice(allocator, labels[index + 1 ..]);
+            const saved = try self.row(remaining.items, value.tail);
+            return .{ .remaining = self.node(saved), .saved = saved };
+        };
+        if (value.tail != .variable) return error.EffectMismatch;
+        const tail = try self.fresh();
+        const replacement_id = try self.row(&.{label}, self.node(tail).tail);
+        try self.appendVersion(value.tail.variable, replacement_id);
+        return .{ .remaining = .{ .labels = value.labels, .tail = self.node(tail).tail, .cursor = value.cursor }, .expanded = value.tail.variable };
+    }
     pub fn unify(self: *Store, left: Id, right: Id) Error!void {
         const point = self.mark();
         errdefer self.rollback(point);
-        var a = try self.resolve(left, 0);
-        var b = try self.resolve(right, 0);
+        var a = self.node(try self.resolve(left, 0));
+        var b = self.node(try self.resolve(right, 0));
         var work: usize = 0;
         while (true) {
             if (work == 65536) return error.EffectLimit;
             work += 1;
-            const an = self.node(a);
-            const bn = self.node(b);
-            if (an.labels.len == 0 and bn.labels.len == 0 and std.meta.eql(an.tail, bn.tail)) return;
-            if (an.labels.len == 0 and an.tail == .variable) return self.bind(an.tail.variable, b);
-            if (bn.labels.len == 0 and bn.tail == .variable) return self.bind(bn.tail.variable, a);
-            if (an.labels.len == 0) return error.EffectMismatch;
-            const selected = try self.extractInner(b, self.list(an.labels)[0]);
+            if (a.labels.len == 0 and b.labels.len == 0 and std.meta.eql(a.tail, b.tail)) return;
+            if (a.labels.len == 0 and a.tail == .variable) return self.bind(a.tail.variable, try self.add(b));
+            if (b.labels.len == 0 and b.tail == .variable) return self.bind(b.tail.variable, try self.add(a));
+            if (a.labels.len == 0) return error.EffectMismatch;
+            const selected = try self.extractView(b, self.list(a.labels)[0]);
             if (selected.expanded) |variable| {
-                if (an.tail == .variable and an.tail.variable == variable) return error.InfiniteEffect;
+                if (a.tail == .variable and a.tail.variable == variable) return error.InfiniteEffect;
             }
-            const remainder = try self.add(.{ .labels = .{ .start = an.labels.start + 1, .len = an.labels.len - 1 }, .tail = an.tail, .cursor = an.cursor });
-            a = try self.resolve(remainder, 0);
-            b = try self.resolve(selected.remaining, 0);
+            a = try self.resolveView(.{ .labels = .{ .start = a.labels.start + 1, .len = a.labels.len - 1 }, .tail = a.tail, .cursor = a.cursor });
+            b = try self.resolveView(selected.remaining);
         }
     }
     /// Substitution for scheme instantiation replaces only the named tail.

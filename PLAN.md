@@ -14,28 +14,28 @@ earlier backlog included. This section records completed milestones and the
 remaining work. Each milestone lands as a local commit on `main` after
 `deno task test:compiler` and `deno task lint:zig` pass. Nothing is pushed.
 
-| Hill                                  | State                                            |
-| ------------------------------------- | ------------------------------------------------ |
-| 1. Infer generic callees once         | Done for first-order callees                     |
-| 2. Split the `sandbox` region         | Open; depends on 1 and 3                         |
-| 3. Remove the call-depth cliff        | Done; executed depth is separate                 |
-| 4. Canonical specialization keys      | Open                                             |
-| 5. Solver hot paths                   | Occurs DAG visitation done; caches/worklist open |
-| 6. Cheap literal and body edits       | Open                                             |
-| 7. Region arenas                      | Arenas on main; allocation target open           |
-| 8. Default restart cache              | Done on main                                     |
-| 9. Parallel region inference          | Open; after 1–3                                  |
-| 10. Benchmarks, profile, budgets      | Done (`ae14677`)                                 |
-| 11. One production policy             | Done on main                                     |
-| 12. One reuse/query model             | Open; after 11                                   |
-| 13. Delete or promote prototypes      | Done on main                                     |
-| 14. Split god structs and switches    | Open                                             |
-| 15. Source layout and test filter     | Test filter on main; layout open                 |
-| 16. Shared equality/hash, diagnostics | Done (`4dd0a0e`)                                 |
-| 17. Zero analyzer warnings in CI      | Done (`4dd0a0e`); first GitHub run pending       |
-| 18. Reclaim disk                      | Done locally; `build/` 37 → 4.5 GB               |
-| 19. Docs state current numbers        | Done on main; update as remaining hills land     |
-| 20. Remove stale leftovers            | Done except the `.blot` fixtures in `src`        |
+| Hill                                  | State                                               |
+| ------------------------------------- | --------------------------------------------------- |
+| 1. Infer generic callees once         | Done for first-order callees                        |
+| 2. Split the `sandbox` region         | Open; depends on 1 and 3                            |
+| 3. Remove the call-depth cliff        | Done; executed depth is separate                    |
+| 4. Canonical specialization keys      | Open                                                |
+| 5. Solver hot paths                   | Occurs DAG and row views done; caches/worklist open |
+| 6. Cheap literal and body edits       | Open                                                |
+| 7. Region arenas                      | Arenas on main; allocation target open              |
+| 8. Default restart cache              | Done on main                                        |
+| 9. Parallel region inference          | Open; after 1–3                                     |
+| 10. Benchmarks, profile, budgets      | Done (`ae14677`)                                    |
+| 11. One production policy             | Done on main                                        |
+| 12. One reuse/query model             | Open; after 11                                      |
+| 13. Delete or promote prototypes      | Done on main                                        |
+| 14. Split god structs and switches    | Open                                                |
+| 15. Source layout and test filter     | Test filter on main; layout open                    |
+| 16. Shared equality/hash, diagnostics | Done (`4dd0a0e`)                                    |
+| 17. Zero analyzer warnings in CI      | Done (`4dd0a0e`); first GitHub run pending          |
+| 18. Reclaim disk                      | Done locally; `build/` 37 → 4.5 GB                  |
+| 19. Docs state current numbers        | Done on main; update as remaining hills land        |
+| 20. Remove stale leftovers            | Done except the `.blot` fixtures in `src`           |
 
 ### Measuring
 
@@ -160,6 +160,22 @@ later edits. Wasm matched in every phase. Requested allocation falls from 397.0
 to 344.0 MB, while peak requested memory rises from 59.2 to 88.6 MB. The
 under-100-MB cumulative allocation target remains open. Results are in ignored
 `build/bench/region-pooled-arenas`.
+
+Effect unification now walks immutable row views instead of publishing a header
+for every consumed label. It preserves operation multiplicity, extraction cursor
+resets, substitution order, rollback and the existing work limit. Native laws
+compare 1,024 generated histories with the materialized rules, exercise wide-row
+allocation failures, and check limit boundaries. The full compiler gate passes
+with 565 guest/client tests and zero analyzer findings. Differential
+qualification compared 692 compiler invocations with no diagnostic, constant,
+code-instance or Wasm differences.
+
+Seven paired gdev runs measured 809 / 818 ms fresh CPU, 910 / 920 ms population,
+170 / 170 ms first edit and 160 / 150 ms later edits. Requested allocation falls
+from 344.0 to 335.9 MB and peak requested memory from 88.6 to 79.7 MB. Cold CPU
+increased about 1%; this is an allocation reduction, not a cold-speed claim.
+Wasm matched in all phases. Results are in ignored
+`build/bench/effect-row-views`.
 
 ### Hills 1 (backend) and 3: summaries instead of unfolding
 

@@ -165,6 +165,7 @@ test {
 
 test {
     _ = @import("effect_span_tests.zig");
+    _ = @import("effect_unification_tests.zig");
     _ = @import("parser_use_tests.zig");
 }
 

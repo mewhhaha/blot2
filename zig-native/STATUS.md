@@ -22,21 +22,21 @@ because a checkpoint file exists.
 
 ## Current measurements
 
-These are the latest qualified arena measurements on the frozen, private
-394,294-byte gdev workload, from five alternating pairs. CPU is child user plus
+These are the latest qualified effect-row measurements on the frozen, private
+394,294-byte gdev workload, from seven alternating pairs. CPU is child user plus
 system time; filesystem caches and machine load are uncontrolled. Fresh
 compilation has persistence disabled. Retained population is measured separately
 from edits. Earlier batches and different workloads are not comparable timings.
 
 | Measurement                          |                           Current value |
 | ------------------------------------ | --------------------------------------: |
-| Fresh CLI CPU                        |                                  847 ms |
-| Retained population CPU              |                                  960 ms |
-| First retained literal edit CPU      |                                  180 ms |
-| Subsequent edit/revert CPU           |                                  170 ms |
+| Fresh CLI CPU                        |                                  818 ms |
+| Retained population CPU              |                                  920 ms |
+| First retained literal edit CPU      |                                  170 ms |
+| Subsequent edit/revert CPU           |                                  150 ms |
 | No-op CPU                            | Below the process-accounting resolution |
-| Fresh requested allocation           |                                344.0 MB |
-| Peak requested live memory           |                                 88.6 MB |
+| Fresh requested allocation           |                                335.9 MB |
+| Peak requested live memory           |                                 79.7 MB |
 | Live requested memory after teardown |                                       0 |
 | Inference regions                    |                                   2,597 |
 | Largest region, scopes               |                                   7,369 |
@@ -45,9 +45,9 @@ from edits. Earlier batches and different workloads are not comparable timings.
 | Wasm bytes                           |                                 629,339 |
 
 Wasm matched between compilers and between fresh and retained phases. Against
-the preceding scratch-buffer implementation, requested allocation fell 13%, peak
-live memory rose from 59.2 MB, and cold CPU was essentially unchanged. Raw
-samples and binary hashes are in ignored `build/bench/region-pooled-arenas`.
+the preceding arena implementation, requested allocation fell from 344.0 MB and
+peak live memory from 88.6 MB; cold CPU increased about 1% in the paired run.
+Raw samples and binary hashes are in ignored `build/bench/effect-row-views`.
 Requested allocation is cumulative allocator traffic, not process RSS or guest
 memory. The 500 ms cold, under-100 ms retained-edit and under-100 MB cumulative
 allocation targets remain open; the stricter literal-edit target is 30 ms.

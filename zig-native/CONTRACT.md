@@ -345,6 +345,12 @@ capacity before publication. The projected query certifies no runtime or staged
 value: ordinary evaluation still runs and reports errors. Executable admission
 uses its own source and captured-value checks.
 
+Effect unification walks immutable label-span views. A left remainder keeps its
+chronological cursor; extracting a right label resets that cursor just as
+ordinary extraction does. Repeated operations, ordered substitutions, rollback
+and the work limit retain their original behavior. Publishing fewer temporary
+row headers must not collapse distinct historical variable views.
+
 ## Frontend interface
 
 `token.zig`: `Tag`, `Token { tag, start: u32, end: u32 }`. `lexer.zig`:
