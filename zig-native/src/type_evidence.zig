@@ -303,16 +303,19 @@ pub const Store = struct {
                 if (!found) return error.UnresolvedType;
             },
         }
+        var scratch_buffer: [256]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const allocator = scratch.allocator();
         var labels: std.ArrayList(Effects.Label) = .empty;
-        defer labels.deinit(self.allocator);
+        defer labels.deinit(allocator);
         var arguments: std.ArrayList(Id) = .empty;
-        defer arguments.deinit(self.allocator);
+        defer arguments.deinit(allocator);
         for (source.rowLabels(row)) |label| {
             arguments.clearRetainingCapacity();
-            for (source.operationArguments(label)) |argument| try arguments.append(self.allocator, try self.projectDepth(source, argument, mappings, rows, depth + 1, budget, retained, memo, height));
-            try labels.append(self.allocator, try self.effects.internOperation(source.operation(label).identity, arguments.items));
+            for (source.operationArguments(label)) |argument| try arguments.append(allocator, try self.projectDepth(source, argument, mappings, rows, depth + 1, budget, retained, memo, height));
+            try labels.append(allocator, try self.effects.internOperation(source.operation(label).identity, arguments.items));
         }
-        try labels.appendSlice(self.allocator, self.effects.view().rowLabels(suffix));
+        try labels.appendSlice(allocator, self.effects.view().rowLabels(suffix));
         return self.effects.internRow(labels.items);
     }
     /// Matching only appends variable substitutions; a failed candidate restores

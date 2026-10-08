@@ -126,6 +126,14 @@ recording completed call proofs and keeping lexical reuse within one region. The
 cold regression still disqualifies it. A stable closed-resolution-cache
 experiment also regressed CPU and allocation; neither experiment is production.
 
+Effect-row projection now keeps short-lived labels and arguments in a 256-byte
+stack buffer, with heap fallback. The full gate passes with 565 guest/client
+tests and zero analyzer findings. Five paired gdev runs measured 908 / 906 ms
+fresh CPU, 1,030 / 1,020 ms population and unchanged 190 / 170 ms first and
+later edits. Wasm matched in every phase. Direct allocation comparison removed
+20,734 allocations and 2.7 MB; the global allocation target remains open.
+Results are in ignored `build/bench/row-projection-scratch`.
+
 ### Hills 1 (backend) and 3: summaries instead of unfolding
 
 Root cause: `ClosureRegion.collectCall` (`core_eval.zig`, about line 4432)
