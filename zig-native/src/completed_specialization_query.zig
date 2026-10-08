@@ -170,7 +170,7 @@ pub const State = struct {
         const pools = &self.old.metadata.pools.?;
         const ordinary = eval.Options{};
         // Exact low-quota/error/depth behavior stays on the ordinary collector.
-        if (g.evaluator.options.max_values != ordinary.max_values or g.evaluator.options.max_children != ordinary.max_children or g.evaluator.options.max_depth != ordinary.max_depth or g.evaluator.options.max_steps != ordinary.max_steps) {
+        if (g.evaluator.options.max_values != ordinary.max_values or g.evaluator.options.max_children != ordinary.max_children or g.evaluator.options.max_depth != ordinary.max_depth or g.evaluator.options.max_type_depth != ordinary.max_type_depth or g.evaluator.options.max_steps != ordinary.max_steps) {
             self.reject(.resource);
             return null;
         }
@@ -335,7 +335,7 @@ pub const State = struct {
                 if (fact.read) {
                     var present = plain.get(fact.key) orelse g.evaluator.plain_nominals.get(fact.key);
                     if (self.revalidate_plain_facts and present == null and fact.present and fact.plain and
-                        @import("plain_catalog.zig").prove(self.gate.units, unit, @truncate(fact.key), g.evaluator.options.max_depth))
+                        @import("plain_catalog.zig").prove(self.gate.units, unit, @truncate(fact.key), g.evaluator.options.max_type_depth))
                     {
                         // This immutable source fact is safe to rederive. Stage
                         // it locally; publish only after the whole query commits.

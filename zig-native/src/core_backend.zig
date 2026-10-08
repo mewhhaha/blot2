@@ -1081,8 +1081,12 @@ const Generator = struct {
         var service = try self.specializer();
         var resolved = service.named(key) catch |err| return self.specializationFailure(service, err);
         defer resolved.deinit(self.allocator);
-        var emitter: Emitter = .{ .generator = self, .unit_id = unit_id, .function_id = function_id, .provider_local = key.count, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items, .factory_template = key.template_result };
-        defer emitter.deinit();
+        const emitter = try self.allocator.create(Emitter);
+        emitter.* = .{ .generator = self, .unit_id = unit_id, .function_id = function_id, .provider_local = key.count, .mappings = resolved.mappings.items, .row_mappings = resolved.rows.items, .factory_template = key.template_result };
+        defer {
+            emitter.deinit();
+            self.allocator.destroy(emitter);
+        }
         for (source.bodyParameters(body), 0..) |parameter, index| if (parameter.binding != 0) {
             if (self.capturedTemplate(key.templates, parameter.binding)) |template| {
                 try emitter.templates.put(self.allocator, parameter.binding, .{ .unit = template.unit, .node = template.node, .environment = if (template.has_environment) @intCast(index) else null, .captures = template.captures, .templates = template.templates, .computation = template.computation, .evidence = template.evidence, .rows = template.rows });
@@ -1858,7 +1862,6 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     generator.refinement_owner = &metadata;
     var generator_alive = true;
     defer if (generator_alive) generator.deinit();
-    generator.evaluator.split_closed_calls = options.policy.split_closed_calls;
     generator.evaluator.diagnostic_context = .{ .identity = options.identity, .entry = entry, .prelude = options.diagnostic_prelude_unit, .source_mode = options.diagnostic_source_mode };
     generator.startup_facts.enabled = options.observe_startup;
     if (options.identity) |names| generator.runtime_operations = runtime_operations.Store.initProject(allocator, names);
@@ -2668,50 +2671,66 @@ const Emitter = struct {
     fn inlineNamedValues(self: *Emitter, key: Key, arguments: []const core.Id, captured: ?[]const u32, depth: usize) Error!bool {
         return self.inlineNamedValuesMode(key, arguments, captured, depth, null);
     }
-    fn inlineNamedValuesMode(self: *Emitter, key: Key, arguments: []const core.Id, captured: ?[]const u32, depth: usize, small_result: ?*SmallCollection) Error!bool {
+    // Preparation owns the large mapping/initialization frame. It returns
+    // before recursively emitting an inlined body, so deep call graphs retain
+    // only the small emission continuation on the native stack.
+    fn prepareNamedInline(self: *Emitter, key: Key, arguments: []const core.Id, captured: ?[]const u32, small_result: ?*SmallCollection, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), borrowed_collections: *u16) Error!?*Emitter {
         const g = self.generator;
-        if (self.inline_depth >= 6 or g.module.functions.items[self.function_id].instructions.items.len > 4096 or (if (captured) |values| values.len != key.count else arguments.len < key.count) or key.templates != 0 or key.template_result) return false;
+        if (self.inline_depth >= 6 or g.module.functions.items[self.function_id].instructions.items.len > 4096 or (if (captured) |values| values.len != key.count else arguments.len < key.count) or key.templates != 0 or key.template_result) return null;
         const source = g.unit(key.target.unit);
-        const body = source.body(key.target.binding) orelse return false;
+        const body = source.body(key.target.binding) orelse return null;
         const facts = try g.facts.get(g.allocator, g.units, key.target);
+        borrowed_collections.* = facts.borrowed_collections;
         const in_loop = self.inline_loop or self.loop_targets.items.len != 0;
         var expose_data = small_result != null or (in_loop and self.inlineDataType(key.result));
         if (captured == null) for (key.parameters[0..key.count], arguments[0..key.count], 0..) |ty, argument, i| {
             expose_data = expose_data or (g.layouts.node(ty).tag == .function and self.isCallableTemplate(argument));
             if (i < 16 and facts.borrowed_collections & (@as(u16, 1) << @intCast(i)) != 0 and self.smallCollectionCandidate(argument)) expose_data = true;
         };
-        if (!body.is_function or body.parameters.len != key.count or (facts.inline_cost orelse return false) > (if (expose_data) @as(u16, 64) else 4) or self.hasErasedType(key.result, 0)) return false;
-        for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0) or g.layouts.node(ty).tag == .demand) return false;
-        var mappings: std.ArrayList(Mapping) = .empty;
-        var rows: std.ArrayList(RowMapping) = .empty;
-        defer mappings.deinit(g.allocator);
-        defer rows.deinit(g.allocator);
+        if (!body.is_function or body.parameters.len != key.count or (facts.inline_cost orelse return null) > (if (expose_data) @as(u16, 64) else 4) or self.hasErasedType(key.result, 0)) return null;
+        for (key.parameters[0..key.count]) |ty| if (self.hasErasedType(ty, 0) or g.layouts.node(ty).tag == .demand) return null;
         var source_type = source.binding(key.target.binding).ty;
         for (key.parameters[0..key.count], 0..) |ty, i| {
             const arrow = source.types.node(source_type);
-            try g.mapTypeDepth(key.target.unit, &mappings, &rows, arrow.a, ty, body.span, 0);
-            try g.mapRow(key.target.unit, &mappings, &rows, arrow.c, key.effects[i], body.span, true);
+            try g.mapTypeDepth(key.target.unit, mappings, rows, arrow.a, ty, body.span, 0);
+            try g.mapRow(key.target.unit, mappings, rows, arrow.c, key.effects[i], body.span, true);
             source_type = arrow.b;
         }
-        try g.mapTypeDepth(key.target.unit, &mappings, &rows, source_type, key.result, body.span, 0);
+        try g.mapTypeDepth(key.target.unit, mappings, rows, source_type, key.result, body.span, 0);
         var full = key.result;
         var reverse: usize = key.count;
         while (reverse != 0) {
             reverse -= 1;
             full = try g.internLayoutWithEffects(.function, key.parameters[reverse], full, key.effects[reverse], &.{});
         }
-        try g.refineMappings(key.target.unit, .{ .body = key.target }, full, &mappings, &rows, body.span);
+        try g.refineMappings(key.target.unit, .{ .body = key.target }, full, mappings, rows, body.span);
         if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target);
-        var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = in_loop };
+        const emitter = try g.allocator.create(Emitter);
+        emitter.* = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels, .inline_depth = self.inline_depth + 1, .inline_loop = in_loop };
         if (small_result) |result| emitter.small_result = .{ .root = body.root, .value = result };
-        defer emitter.deinit();
+        return emitter;
+    }
+    fn inlineNamedValuesMode(self: *Emitter, key: Key, arguments: []const core.Id, captured: ?[]const u32, depth: usize, small_result: ?*SmallCollection) Error!bool {
+        const g = self.generator;
+        var mappings: std.ArrayList(Mapping) = .empty;
+        var rows: std.ArrayList(RowMapping) = .empty;
+        defer mappings.deinit(g.allocator);
+        defer rows.deinit(g.allocator);
+        var borrowed_collections: u16 = 0;
+        const emitter = try self.prepareNamedInline(key, arguments, captured, small_result, &mappings, &rows, &borrowed_collections) orelse return false;
+        const source = g.unit(key.target.unit);
+        const body = source.body(key.target.binding).?;
+        defer {
+            emitter.deinit();
+            g.allocator.destroy(emitter);
+        }
         for (source.bodyParameters(body), 0..) |parameter, i| {
             if (captured) |values| {
                 if (parameter.binding != 0) try emitter.locals.put(g.allocator, parameter.binding, values[i]);
                 continue;
             }
             const argument = arguments[i];
-            if (i < 16 and facts.borrowed_collections & (@as(u16, 1) << @intCast(i)) != 0) if (try self.captureSmallCollection(argument, depth)) |values| {
+            if (i < 16 and borrowed_collections & (@as(u16, 1) << @intCast(i)) != 0) if (try self.captureSmallCollection(argument, depth)) |values| {
                 if (parameter.binding != 0) try emitter.small_values.put(g.allocator, parameter.binding, values);
                 continue;
             };
@@ -5538,6 +5557,143 @@ const Emitter = struct {
             ty = arrow.b;
         }
     }
+    fn emitReference(self: *Emitter, id: core.Id) Error!void {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const n = unit_.node(id);
+        const reference = unit_.reference(id);
+        if (reference.unit == 0 or reference.unit == self.unit_id) {
+            if (self.computation_values.contains(reference.binding)) {
+                const expected = try self.codeLayout(n.ty, unit_.span(id));
+                try self.checkComputationABI(reference.binding, expected, id);
+            }
+            if (self.static_values.get(reference.binding)) |static_value| {
+                const ty = try self.codeLayout(n.ty, unit_.span(id));
+                if (g.evaluator.valueScalar(static_value)) |value| try self.emit(if (value.scalar == .f32) .f32_const else .i32_const, value.bits) else try self.referenceConstant(try g.serialize(static_value, ty, 0), .static_address);
+                return;
+            }
+            if (self.templates.get(reference.binding)) |template| {
+                try self.templateValue(template, try self.codeLayout(n.ty, unit_.span(id)));
+                return;
+            }
+            if (self.locals.get(reference.binding)) |local| {
+                try self.emit(.local_get, local);
+                return;
+            }
+        }
+        const normalized = try g.normalize(self.unit_id, reference);
+        if (g.unit(normalized.unit).body(normalized.binding)) |body| {
+            if (body.runtime and !body.is_function) {
+                try self.emit(.global_get, try g.runtimeGlobal(normalized));
+                return;
+            }
+        }
+        if (unit_.types.node(n.ty).tag == .function) {
+            const target = try g.normalize(self.unit_id, reference);
+            const ty = try self.codeLayout(n.ty, unit_.span(id));
+            if (g.unit(target.unit).body(target.binding).?.is_function) {
+                try self.descriptor(try g.callable(.{ .target = target, .ty = ty }), null);
+            } else {
+                const value = try g.constant(target, ty);
+                try g.emitValue(self.function_id, value);
+            }
+            return;
+        }
+        const value = try g.constant(try g.normalize(self.unit_id, reference), try self.codeLayout(n.ty, unit_.span(id)));
+        try g.emitValue(self.function_id, value);
+    }
+    fn emitNamedCall(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const call = unit_.call(id);
+        const key = try g.signature(call.target, call.callee_type, self.unit_id, self.mappings, self.row_mappings, unit_.span(id), false);
+        if (key.count > call.arguments.len) return g.fail(self.unit_id, id, .unsupported);
+        if (try self.inlineCollectionEdit(id, key, depth)) return;
+        if (try self.inlineDemandCall(key, call.arguments, depth)) return;
+        if (try self.inlineStaticCall(key, call.arguments, depth)) return;
+        if (try self.inlineNamedCall(key, call.arguments, depth)) return;
+        const function_id = try g.function(key);
+        for (call.arguments[0..key.count]) |argument| try self.expression(argument, depth + 1);
+        try self.providerHead();
+        try self.emit(.call, function_id);
+        var ty = key.result;
+        for (call.arguments[key.count..]) |argument| {
+            const fn_type = g.layouts.node(ty);
+            if (fn_type.tag != .function) return g.fail(self.unit_id, id, .unresolved_type);
+            const callee = try self.temporary(.i32);
+            try self.emit(.local_set, callee);
+            const value = try self.capture(argument, depth);
+            const signature = try g.module.internType(&.{ .i32, g.layouts.machine(fn_type.a), .i32 }, g.layouts.machine(fn_type.b));
+            try self.emit(.local_get, callee);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
+            try self.emit(.local_get, value);
+            try self.providerHead();
+            try self.emit(.local_get, callee);
+            try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
+            try self.emit(.call_indirect, signature);
+            ty = fn_type.b;
+        }
+    }
+    fn emitTypeComparison(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const n = unit_.node(id);
+        const left_type = try self.codeLayout(unit_.typeOf(n.a), unit_.span(n.a));
+        const right_type = try self.codeLayout(unit_.typeOf(n.b), unit_.span(n.b));
+        var left = left_type;
+        var right = right_type;
+        while (g.layouts.node(left).tag == .function) left = g.layouts.node(left).b;
+        while (g.layouts.node(right).tag == .function) right = g.layouts.node(right).b;
+        const left_evidence = g.toEvidence(left) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .unresolved_type);
+        const right_evidence = g.toEvidence(right) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .unresolved_type);
+        try self.expression(n.a, depth + 1);
+        try self.emit(.drop, 0);
+        try self.expression(n.b, depth + 1);
+        try self.emit(.drop, 0);
+        try self.emit(.i32_const, @intFromBool(left_evidence == right_evidence));
+    }
+    fn emitResultAssociated(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const n = unit_.node(id);
+        const expected = try self.codeLayout(n.ty, unit_.span(id));
+        const target = try self.memberTarget(id, n.b, expected) orelse return g.fail(self.unit_id, id, .missing_associated);
+        const input = try self.codeLayout(unit_.typeOf(n.a), unit_.span(id));
+        const full = try g.internLayout(.function, input, expected, &.{});
+        const wrapper = try g.callable(.{ .target = target, .ty = try self.dispatchCallableLayout(id, full) });
+        const argument = try self.capture(n.a, depth);
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_get, argument);
+        try self.providerHead();
+        try self.emit(.call, wrapper);
+    }
+    fn emitLogical(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const n = unit_.node(id);
+        if (n.op != .and_ and n.op != .or_) return g.fail(self.unit_id, id, .unsupported);
+        try self.expression(n.a, depth + 1);
+        try self.emit(.if_, @backingInt(wasm.ValueType.i32));
+        self.labels += 1;
+        if (n.op == .and_) try self.expression(n.b, depth + 1) else try self.emit(.i32_const, 1);
+        try self.emit(.else_, 0);
+        if (n.op == .and_) try self.emit(.i32_const, 0) else try self.expression(n.b, depth + 1);
+        self.labels -= 1;
+        try self.emit(.end, 0);
+    }
+    fn emitBlock(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        if (!self.exact_probe) if (exact_builder.analyze(unit_, id)) |plan| return self.exactBuilder(id, plan, depth);
+        try self.emit(.block, @backingInt((try self.scalar(id)).machine()));
+        try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .cleanup = self.cleanups.mark() });
+        self.labels += 1;
+        const terminated = try self.suite(id, depth + 1);
+        if (terminated) try self.emit(.unreachable_, 0) else try self.emit(if (try self.scalar(id) == .f32) .f32_const else .i32_const, 0);
+        self.labels -= 1;
+        _ = self.return_targets.pop();
+        try self.emit(.end, 0);
+    }
     fn expression(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const previous_root = self.analysis_root;
         if (previous_root == 0) self.analysis_root = id;
@@ -5563,18 +5719,7 @@ const Emitter = struct {
             },
             .type_constructor => try self.emit(.i32_const, 0),
             .resolver_op => try self.resolverOperation(id, depth),
-            .result_associated => {
-                const expected = try self.codeLayout(n.ty, unit_.span(id));
-                const target = try self.memberTarget(id, n.b, expected) orelse return g.fail(self.unit_id, id, .missing_associated);
-                const input = try self.codeLayout(unit_.typeOf(n.a), unit_.span(id));
-                const full = try g.internLayout(.function, input, expected, &.{});
-                const wrapper = try g.callable(.{ .target = target, .ty = try self.dispatchCallableLayout(id, full) });
-                const argument = try self.capture(n.a, depth);
-                try self.emit(.i32_const, 0);
-                try self.emit(.local_get, argument);
-                try self.providerHead();
-                try self.emit(.call, wrapper);
-            },
+            .result_associated => try self.emitResultAssociated(id, depth),
             .product, .record => try self.aggregate(id, depth),
             .record_merge => try self.recordMerge(id, depth),
             .construct => try self.construct(id, depth),
@@ -5594,106 +5739,12 @@ const Emitter = struct {
                 try self.descriptor(try g.primitiveFunction(.{ .unit = self.unit_id, .catalog = n.a, .ty = ty }), null);
             },
             .panic => try self.emit(.unreachable_, 0),
-            .type_same => {
-                const left_type = try self.codeLayout(unit_.typeOf(n.a), unit_.span(n.a));
-                const right_type = try self.codeLayout(unit_.typeOf(n.b), unit_.span(n.b));
-                var left = left_type;
-                var right = right_type;
-                while (g.layouts.node(left).tag == .function) left = g.layouts.node(left).b;
-                while (g.layouts.node(right).tag == .function) right = g.layouts.node(right).b;
-                const left_evidence = g.toEvidence(left) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .unresolved_type);
-                const right_evidence = g.toEvidence(right) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .unresolved_type);
-                try self.expression(n.a, depth + 1);
-                try self.emit(.drop, 0);
-                try self.expression(n.b, depth + 1);
-                try self.emit(.drop, 0);
-                try self.emit(.i32_const, @intFromBool(left_evidence == right_evidence));
-            },
+            .type_same => try self.emitTypeComparison(id, depth),
             .constant => try self.emit(if (try self.scalar(id) == .f32) .f32_const else .i32_const, n.a),
-            .reference => {
-                const reference = unit_.reference(id);
-                if (reference.unit == 0 or reference.unit == self.unit_id) {
-                    if (self.computation_values.contains(reference.binding)) {
-                        const expected = try self.codeLayout(n.ty, unit_.span(id));
-                        try self.checkComputationABI(reference.binding, expected, id);
-                    }
-                    if (self.static_values.get(reference.binding)) |static_value| {
-                        const ty = try self.codeLayout(n.ty, unit_.span(id));
-                        if (g.evaluator.valueScalar(static_value)) |value| try self.emit(if (value.scalar == .f32) .f32_const else .i32_const, value.bits) else try self.referenceConstant(try g.serialize(static_value, ty, 0), .static_address);
-                        return;
-                    }
-                    if (self.templates.get(reference.binding)) |template| {
-                        try self.templateValue(template, try self.codeLayout(n.ty, unit_.span(id)));
-                        return;
-                    }
-                    if (self.locals.get(reference.binding)) |local| {
-                        try self.emit(.local_get, local);
-                        return;
-                    }
-                }
-                const normalized = try g.normalize(self.unit_id, reference);
-                if (g.unit(normalized.unit).body(normalized.binding)) |body| {
-                    if (body.runtime and !body.is_function) {
-                        try self.emit(.global_get, try g.runtimeGlobal(normalized));
-                        return;
-                    }
-                }
-                if (unit_.types.node(n.ty).tag == .function) {
-                    const target = try g.normalize(self.unit_id, reference);
-                    const ty = try self.codeLayout(n.ty, unit_.span(id));
-                    if (g.unit(target.unit).body(target.binding).?.is_function) {
-                        try self.descriptor(try g.callable(.{ .target = target, .ty = ty }), null);
-                    } else {
-                        const value = try g.constant(target, ty);
-                        try g.emitValue(self.function_id, value);
-                    }
-                    return;
-                }
-                const value = try g.constant(try g.normalize(self.unit_id, reference), try self.codeLayout(n.ty, unit_.span(id)));
-                try g.emitValue(self.function_id, value);
-            },
+            .reference => try self.emitReference(id),
             .scalar, .associated => try self.dispatchScalar(id, depth),
-            .logical => {
-                if (n.op != .and_ and n.op != .or_) return g.fail(self.unit_id, id, .unsupported);
-                try self.expression(n.a, depth + 1);
-                try self.emit(.if_, @backingInt(wasm.ValueType.i32));
-                self.labels += 1;
-                if (n.op == .and_) try self.expression(n.b, depth + 1) else try self.emit(.i32_const, 1);
-                try self.emit(.else_, 0);
-                if (n.op == .and_) try self.emit(.i32_const, 0) else try self.expression(n.b, depth + 1);
-                self.labels -= 1;
-                try self.emit(.end, 0);
-            },
-            .call => {
-                const call = unit_.call(id);
-                const key = try g.signature(call.target, call.callee_type, self.unit_id, self.mappings, self.row_mappings, unit_.span(id), false);
-                if (key.count > call.arguments.len) return g.fail(self.unit_id, id, .unsupported);
-                if (try self.inlineCollectionEdit(id, key, depth)) return;
-                if (try self.inlineDemandCall(key, call.arguments, depth)) return;
-                if (try self.inlineStaticCall(key, call.arguments, depth)) return;
-                if (try self.inlineNamedCall(key, call.arguments, depth)) return;
-                const function_id = try g.function(key);
-                for (call.arguments[0..key.count]) |argument| try self.expression(argument, depth + 1);
-                try self.providerHead();
-                try self.emit(.call, function_id);
-                var ty = key.result;
-                for (call.arguments[key.count..]) |argument| {
-                    const fn_type = g.layouts.node(ty);
-                    if (fn_type.tag != .function) return g.fail(self.unit_id, id, .unresolved_type);
-                    const callee = try self.temporary(.i32);
-                    try self.emit(.local_set, callee);
-                    const value = try self.capture(argument, depth);
-                    const signature = try g.module.internType(&.{ .i32, g.layouts.machine(fn_type.a), .i32 }, g.layouts.machine(fn_type.b));
-                    try self.emit(.local_get, callee);
-                    try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
-                    try self.emit(.local_get, value);
-                    try self.providerHead();
-                    try self.emit(.local_get, callee);
-                    try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
-                    try self.emit(.call_indirect, signature);
-                    ty = fn_type.b;
-                }
-            },
+            .logical => try self.emitLogical(id, depth),
+            .call => try self.emitNamedCall(id, depth),
             .if_value => {
                 try self.expression(n.a, depth + 1);
                 try self.emit(.if_, @backingInt((try self.scalar(id)).machine()));
@@ -5707,17 +5758,7 @@ const Emitter = struct {
             .match => {
                 _ = try self.matchExpression(id, depth + 1);
             },
-            .block => {
-                if (!self.exact_probe) if (exact_builder.analyze(unit_, id)) |plan| return self.exactBuilder(id, plan, depth);
-                try self.emit(.block, @backingInt((try self.scalar(id)).machine()));
-                try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .cleanup = self.cleanups.mark() });
-                self.labels += 1;
-                const terminated = try self.suite(id, depth + 1);
-                if (terminated) try self.emit(.unreachable_, 0) else try self.emit(if (try self.scalar(id) == .f32) .f32_const else .i32_const, 0);
-                self.labels -= 1;
-                _ = self.return_targets.pop();
-                try self.emit(.end, 0);
-            },
+            .block => try self.emitBlock(id, depth),
             else => return g.fail(self.unit_id, id, .unsupported),
         }
     }

@@ -7,7 +7,4 @@ pub const Policy = struct {
     share_machine_code: bool = false,
     codegen_workers: u8 = 1,
     semantic_workers: u8 = 1,
-    /// Independently solve closed first-order call boundaries. Qualification
-    /// remains opt-in while region/work-limit behavior is being measured.
-    split_closed_calls: bool = false,
 };

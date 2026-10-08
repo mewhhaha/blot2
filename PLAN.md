@@ -9,28 +9,28 @@ version of this file, with every earlier program's measurements, is
 
 ## Twenty-hill program
 
-Approved on 2026-10-08 after a review of checkpoint `be33230`. Paused the same
-day. This section records what landed, what waits on a branch, and how to finish
-the rest. Each milestone lands as a local commit on `main` after
+Approved on 2026-10-08 after a review of checkpoint `be33230`. Resumed with
+the earlier backlog included. This section records completed milestones and
+the remaining work. Each milestone lands as a local commit on `main` after
 `deno task test:compiler` and `deno task lint:zig` pass. Nothing is pushed.
 
 | Hill                                  | State                                       |
 | ------------------------------------- | ------------------------------------------- |
-| 1. Infer generic callees once         | Frontend half on a branch; backend open     |
+| 1. Infer generic callees once         | Done for first-order callees     |
 | 2. Split the `sandbox` region         | Open; depends on 1 and 3                    |
-| 3. Remove the call-depth cliff        | Open; same mechanism as 1's backend half    |
+| 3. Remove the call-depth cliff        | Done; executed depth is separate    |
 | 4. Canonical specialization keys      | Open                                        |
-| 5. Solver hot paths                   | Open; counters landed                       |
+| 5. Solver hot paths                   | Occurs DAG visitation done; caches/worklist open                       |
 | 6. Cheap literal and body edits       | Open                                        |
 | 7. Region arenas                      | Open                                        |
 | 8. Default restart cache              | Open                                        |
 | 9. Parallel region inference          | Open; after 1–3                             |
 | 10. Benchmarks, profile, budgets      | Done (`ae14677`)                            |
-| 11. One production policy             | Done on a branch, gate unfinished           |
+| 11. One production policy             | Done on main           |
 | 12. One reuse/query model             | Open; after 11                              |
-| 13. Delete or promote prototypes      | Done on a branch, gate unfinished           |
+| 13. Delete or promote prototypes      | Done on main           |
 | 14. Split god structs and switches    | Open                                        |
-| 15. Source layout and test filter     | Test filter on the policy branch; rest open |
+| 15. Source layout and test filter     | Test filter on main; layout open |
 | 16. Shared equality/hash, diagnostics | Done (`4dd0a0e`)                            |
 | 17. Zero analyzer warnings in CI      | Done (`4dd0a0e`); first GitHub run pending  |
 | 18. Reclaim disk                      | Done locally; `build/` 37 → 4.5 GB          |
@@ -43,16 +43,16 @@ the rest. Each milestone lands as a local commit on `main` after
   private repository and blot2 is public, so never commit its sources. Verify
   the snapshot against `scripts/bench/gdev-manifest.json`.
 - Paired comparison:
-  `deno task bench:compile -- --baseline OLD_BLOTC --candidate NEW_BLOTC`. It
+  `deno task bench:compile --baseline OLD_BLOTC --candidate NEW_BLOTC`. It
   reports child CPU (not wall time) for fresh processes and retained phases. It
   fails on any Wasm difference.
 - Attribution: `blotc build ... --profile` prints phase timings and the slowest
   inference regions. Every build prints deterministic `work_counters`.
 - Regression budgets: `zig-native/tests/compile_budget.test.ts` asserts counters
-  for the chain, generic chain, diamond and fan-out probes. Its two ignored
-  probes (`chain_mono` N=300 and diamond N=16) document the cliffs that hills 1
-  and 3 remove. Un-ignore them and tighten the `today` tables whenever a hill
-  lowers counters.
+  for the chain, generic chain, diamond and fan-out probes. Deep probes now include annotated chains at 300 and 1,000, a generic
+  chain at 300 and diamond N=16. Executed laws also cover these shapes, deep
+  diagnostics, dependencies, checkpoints and retained recovery. Tighten the
+  `today` tables whenever a hill lowers counters.
 - On this machine ananicy demotes `deno` and its children to SCHED_IDLE. Compare
   CPU, never wall time, and use alternating pairs.
 
@@ -70,46 +70,33 @@ Starting point (be33230, cold CLI on the gdev snapshot):
   about 228 ms. It re-specializes 210 named functions and 72 closures, and every
   edit reports `rebuilt_seed: true`.
 
-### Next: land the two branches
+### Completed qualification
 
-1. `hills/11-13-policy-prototypes`. This is hills 11 and 13. It is rebased onto
-   `ae14677` and ends with a one-line `wip test filter` commit for hill 15.
-   - It deletes `scalar_live_patch`, `resolved_scalar_ssa` and
-     `transport_source_templates`, plus the 40-odd reuse and project knobs and
-     their off paths.
-   - `Policy` keeps `codegen_tier`, `share_machine_code`, `codegen_workers`,
-     `semantic_workers` and `split_closed_calls`.
-   - The diff is −1,781/+370 lines over 39 files.
-   - The gate was still running when work stopped.
-   - **To finish:**
-     - Rebase onto `main` and run `deno task test:compiler` and
-       `deno task lint:zig`.
-     - Run `bench:compile` against `main`. Wasm must be byte-identical, cold CLI
-       CPU must not regress, and retained edits must not regress.
-     - Check how fresh/retained differential tests were rewritten. They now
-       compare sessions, not knobs.
-     - Keep the test-filter commit (it adds `-Dtest-filter` to `build.zig`) and
-       document it in AGENTS.md.
-     - Merge.
-2. `hills/1-frontend-scheme-sharing`. This is the frontend half of hill 1, built
-   on `5da0014`.
-   - Commit `8696d7e` makes callee schemes shareable by reference in
-     `check.zig`. It adds about 580 lines and `check_shared_scheme_tests.zig`.
-   - The WIP commit after it sets a temporary differential switch,
-     `pub var callee_sharing_threshold`, to 0 and fixes an addition overflow in
-     `shareScheme`.
-   - **To finish:**
-     - Rebase onto `main`. `check.zig` conflicts with the analyzer renames and
-       the `work_counters` additions.
-     - Run the differential comparison: threshold `maxInt(u32)` against 0 over
-       native tests, guest tests, guide examples and the gdev snapshot.
-       Diagnostics (code, span, order), Wasm bytes, `constant_steps` and
-       `code_instances` must all match.
-     - Then delete the mutable global. Sharing is unconditional whenever
-       `summary.shareable` holds, because ARCHITECTURE.md forbids mutable global
-       switches.
-     - Acceptance: diamond N=24 checks in under 20 ms, a generic chain's check
-       cost is linear, and budgets are tightened.
+The production-policy cleanup and unconditional frontend callee sharing are on
+main. Both passed the full native/guest gate and zero-finding analyzer gate.
+The test filter now imports the complete suite at comptime, so a filter actually
+runs matching tests instead of silently running none. Frontend differential
+qualification included 672 compiler invocations and 30 guide snippets; diagnostics,
+Wasm, constant steps and code-instance counts matched. Diamond N=24 checked in
+2.3 ms. The mutable sharing threshold and closed-call policy switch are removed.
+
+Backend summaries use a session-owned iterative queue, preserve argument witness
+sites and deferred checking on fallback, and isolate source-interface jobs.
+The full gate passed with 562 guest/client tests and zero analyzer findings.
+Two successive complete guest differential runs passed all 510 existing guest
+and client tests. Deep-chain execution, ordered diagnostic parity, dependency
+and checkpoint round trips, fresh/retained edits, recovery and allocation-failure
+laws pass. Debug and release both compile the 1,000-link annotated chain.
+
+Seven alternating gdev pairs after this change measured 748 / 759 ms fresh CPU,
+840 / 850 ms dependency population, 170 / 160 ms first edit and 150 / 150 ms
+subsequent edit (baseline / candidate). Wasm was identical in every phase.
+The 1.5% cold increase is recorded rather than claimed as a speedup; the global
+500 ms target remains open. Maximum region scopes fell from 13,863 to 7,369,
+unresolved collections to 7,356 and occurs visits to 52,251. Requested allocation
+is still about 403 MB. The remaining higher-order region and solver hot paths
+are the next performance work. Raw measurements stay in ignored
+`build/bench/backend-summaries-final`.
 
 ### Hills 1 (backend) and 3: summaries instead of unfolding
 

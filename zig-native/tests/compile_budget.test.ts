@@ -97,7 +97,9 @@ function assertWithinBudget(
     const budget = Math.ceil(measured * headroom);
     const value = observed[name as keyof Budgeted];
     if (!(value <= budget)) {
-      failures.push(`${name}: ${value} exceeds budget ${budget} (was ${measured})`);
+      failures.push(
+        `${name}: ${value} exceeds budget ${budget} (was ${measured})`,
+      );
     }
   }
   assert.equal(
@@ -116,58 +118,56 @@ Deno.test("budget: chain_mono N=128 stays linear", async () => {
     "chain_mono N=128",
     await measure(chainMono(128)),
     {
-      type_nodes: 11102,
-      allocated_bytes: 5687109,
-      inference_regions: 133,
-      region_scopes: 910,
-      max_region_scopes: 388,
-      call_collections_closed: 259,
-      call_collections_unresolved: 258,
-      solver_passes: 137,
-      solver_constraint_visits: 260,
-      occurs_steps: 780,
+      type_nodes: 10461,
+      allocated_bytes: 6784193,
+      inference_regions: 393,
+      region_scopes: 396,
+      max_region_scopes: 2,
+      call_collections_closed: 0,
+      call_collections_unresolved: 0,
+      solver_passes: 1175,
+      solver_constraint_visits: 1550,
+      occurs_steps: 9,
     },
   );
 });
 
-// Generic links stay unresolved, so every use re-collects the callee body and
-// the chain is quadratic today (compare unresolved collections with N^2/2).
-Deno.test("budget: chain_generic N=64 holds today's quadratic cost", async () => {
+// Generic bodies are inferred once for each closed input signature.
+Deno.test("budget: chain_generic N=64 stays linear", async () => {
   assertWithinBudget(
     "chain_generic N=64",
     await measure(chainGeneric(64)),
     {
-      type_nodes: 23429,
-      allocated_bytes: 9149403,
-      inference_regions: 69,
-      region_scopes: 6828,
-      max_region_scopes: 196,
-      call_collections_closed: 1,
-      call_collections_unresolved: 4483,
-      solver_passes: 2344,
-      solver_constraint_visits: 52195,
-      occurs_steps: 13583,
+      type_nodes: 9382,
+      allocated_bytes: 5670642,
+      inference_regions: 201,
+      region_scopes: 204,
+      max_region_scopes: 2,
+      call_collections_closed: 0,
+      call_collections_unresolved: 0,
+      solver_passes: 725,
+      solver_constraint_visits: 844,
+      occurs_steps: 591,
     },
   );
 });
 
-// Two uses per link re-collect the callee body per path: exponential today.
-// N=8 is the largest size that stays cheap; see the ignored N=16 probe below.
-Deno.test("budget: diamond N=8 holds today's cost", async () => {
+// Shared callee summaries bound the work by bodies, regardless of path count.
+Deno.test("budget: diamond N=8 stays linear", async () => {
   assertWithinBudget(
     "diamond N=8",
     await measure(diamond(8)),
     {
-      type_nodes: 76681,
-      allocated_bytes: 12107968,
-      inference_regions: 13,
-      region_scopes: 4084,
-      max_region_scopes: 1024,
-      call_collections_closed: 1,
-      call_collections_unresolved: 3047,
-      solver_passes: 1036,
-      solver_constraint_visits: 109738,
-      occurs_steps: 8151,
+      type_nodes: 6479,
+      allocated_bytes: 3357343,
+      inference_regions: 33,
+      region_scopes: 36,
+      max_region_scopes: 2,
+      call_collections_closed: 0,
+      call_collections_unresolved: 0,
+      solver_passes: 109,
+      solver_constraint_visits: 116,
+      occurs_steps: 87,
     },
   );
 });
@@ -179,55 +179,38 @@ Deno.test("budget: fanout N=128 stays linear", async () => {
     "fanout N=128",
     await measure(fanout(128)),
     {
-      type_nodes: 21095,
-      allocated_bytes: 8672641,
-      inference_regions: 264,
-      region_scopes: 793,
-      max_region_scopes: 265,
-      call_collections_closed: 517,
-      call_collections_unresolved: 2,
-      solver_passes: 269,
-      solver_constraint_visits: 10,
-      occurs_steps: 1566,
+      type_nodes: 18554,
+      allocated_bytes: 10786346,
+      inference_regions: 782,
+      region_scopes: 791,
+      max_region_scopes: 2,
+      call_collections_closed: 0,
+      call_collections_unresolved: 0,
+      solver_passes: 1312,
+      solver_constraint_visits: 3095,
+      occurs_steps: 1563,
     },
   );
 });
 
-// KNOWN FAILING TODAY. These document cliffs that upcoming hills must remove;
-// un-ignore each one when the hill that fixes it lands.
-
-// ClosureRegion.collect recurses once per chained call, so a monomorphic chain
-// of 300 links exceeds options.max_depth (256) and the build is rejected with
-// `constant_fuel`. Summary-based instantiation should compile it in linear work.
-Deno.test({
-  name: "cliff: chain_mono N=300 compiles",
-  ignore: true,
-  fn: async () => {
-    const actual = await measure(chainMono(300));
+// Deep calls and shared DAGs cannot consume the execution depth budget.
+for (
+  const program of [
+    chainMono(300),
+    chainMono(1000),
+    chainGeneric(300),
+    diamond(16),
+  ]
+) {
+  Deno.test(`budget: ${program.name} N=${program.size} compiles with bounded regions`, async () => {
+    const actual = await measure(program);
     assert(
       actual.success,
-      `chain_mono N=300 rejected with ${actual.diagnostic?.code}`,
+      `${program.name} rejected: ${actual.diagnostic?.code}`,
     );
-    assert(actual.counters.inference_regions <= 400, "regions must stay linear");
-  },
-});
-
-// Each level collects its generic callee twice, so work doubles per level
-// (diamond N=10 already performs ~12k unresolved collections and ~1.7M
-// constraint visits). With one summary per callee the cost is linear in N.
-Deno.test({
-  name: "cliff: diamond N=16 stays linear",
-  ignore: true,
-  fn: async () => {
-    const actual = await measure(diamond(16));
-    assert(actual.success, `diamond N=16 rejected: ${actual.diagnostic?.code}`);
-    assert(
-      actual.counters.call_collections_unresolved <= 16 * 16,
-      `diamond N=16 collected ${actual.counters.call_collections_unresolved} bodies`,
-    );
-    assert(
-      actual.counters.solver_constraint_visits <= 16 * 1024,
-      `diamond N=16 visited ${actual.counters.solver_constraint_visits} constraints`,
-    );
-  },
-});
+    assert(actual.counters.region_scopes <= program.size * 4 + 20);
+    assert(actual.counters.max_region_scopes <= 4);
+    assert.equal(actual.counters.call_collections_unresolved, 0);
+    assert(actual.counters.solver_constraint_visits <= program.size * 16 + 32);
+  });
+}

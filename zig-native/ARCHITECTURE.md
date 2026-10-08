@@ -42,13 +42,23 @@ unwinds the entire function, including inlined scopes. Escaping payload values
 retain their independent ownership/collector policy.
 
 Execution choices are a single session-owned `execution_policy.Policy`: codegen
-tier, machine-code sharing, codegen/semantic worker counts and closed-call
-splitting. Compiler behavior is not policy; the CLI and the project server run
+tier, machine-code sharing and codegen/semantic worker counts. Compiler behavior
+is not policy; the CLI and the project server run
 the same implementation, and artifact retention follows the retained session
 (`retain_artifacts`/`previous`). Cached-output equality includes the policy. Stamping instrumentation belongs
 to the caller; there are no mutable global compiler switches. Identical semantic
 validation inputs share immutable arrays through independent leases within one
 compilation. Executable, value and evidence admission remain separate proofs.
+
+Frontend schemes reference shareable callee schemes instead of copying their
+transitive obligations. Backend first-order calls become summary constraints:
+once their input types close, a session queue checks each target/input pair in
+an independent region. The explicit job stack avoids native recursive inference
+along deep call chains and reuses shared subgraphs. Interface preflight has its
+own summary mode so witness validation keeps its source order. Failed jobs
+replay ordinary collection for authoritative diagnostics. Recursive targets,
+lexical captures and higher-order calls still require a shared inference region.
+Occurs checks visit each resolved node once even when the type is a shared DAG.
 
 Representation conversions distinguish layout, evidence, their respective effect
 rows and code-expectation handles. Runtime cleanup distinguishes function/local
@@ -128,10 +138,11 @@ allocation remains a separate limit.
 
 ## Limits and measurement
 
-The native evaluator defaults to 1,000,000 operations, nesting depth 256,
+The native evaluator defaults to 1,000,000 operations, executed nesting depth 256,
 1,000,000 values and 4,194,304 child slots per evaluation session. It diagnoses
 exhaustion; these limits do not count retired Bend evaluation steps. Separate
-backend and Wasm memory constraints are enforced at their boundaries.
+structural type-depth, backend and Wasm memory constraints are enforced at their
+boundaries. Source call-chain length does not consume the execution depth budget.
 
 Measure fresh processes, dependency population, first edits, subsequent edits,
 no-ops and failed-edit recovery independently. Include transport and output

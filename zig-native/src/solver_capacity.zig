@@ -95,13 +95,13 @@ fn vector(total: *usize, list: anytype) bool {
 }
 
 /// Conservative requested-backing-storage bound, not semantic solver fuel.
-/// All nine dense arrays, both epoch entry buffers, and the one unmanaged map
+/// All ten dense arrays, both epoch entry buffers, and the one unmanaged map
 /// are covered. Pin Zig0.17's hashmap allocator layout: Header(values,keys,u32
 /// capacity), one metadata byte/slot, u64 keys, u32 values, alignment padding.
 pub fn storageBound(store: *const types.Store) ?usize {
     comptime {
-        // Fifteenth field is the scalar occurs_steps work counter: no storage.
-        if (@typeInfo(types.Store).@"struct".field_names.len != 15 or
+        // Occurs visitation owns one dense buffer and a scalar generation.
+        if (@typeInfo(types.Store).@"struct".field_names.len != 17 or
             @typeInfo(types.Effects.Store).@"struct".field_names.len != 10 or
             @typeInfo(epochs.Cache).@"struct".field_names.len != 6)
             @compileError("Reaudit every owned solver buffer before changing pool accounting");
@@ -109,7 +109,7 @@ pub fn storageBound(store: *const types.Store) ?usize {
             @compileError("Reaudit hashmap header key/value storage before changing solver views");
     }
     var bytes: usize = 0;
-    inline for (.{ store.nodes, store.extra, store.variables, store.versions, store.operations, store.effects.rows, store.effects.labels, store.effects.variables, store.effects.versions }) |list| {
+    inline for (.{ store.nodes, store.extra, store.variables, store.versions, store.operations, store.occurs_seen, store.effects.rows, store.effects.labels, store.effects.variables, store.effects.versions }) |list| {
         if (!vector(&bytes, list)) return null;
     }
     if (!add(&bytes, store.resolved.entries.len, @sizeOf(epochs.Cache.Entry)) or

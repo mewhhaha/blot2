@@ -69,6 +69,8 @@ pub const Store = struct {
     /// Deterministic work counter: type nodes visited by occurs checks. It is
     /// never rolled back or consulted by solving, so pooled stores accumulate.
     occurs_steps: u64 = 0,
+    occurs_seen: std.ArrayList(u32) = .empty,
+    occurs_generation: u32 = 0,
     use_resolution_cache: bool = true,
     resolved: epoch_cache.Cache = .{},
     allocator: std.mem.Allocator,
@@ -102,6 +104,7 @@ pub const Store = struct {
         self.versions.deinit(self.allocator);
         self.variable_views.deinit(self.allocator);
         self.resolved.deinit(self.allocator);
+        self.occurs_seen.deinit(self.allocator);
         self.effects.deinit();
         self.operations.deinit(self.allocator);
         self.* = undefined;
@@ -495,17 +498,35 @@ pub const Store = struct {
         }
     }
     fn occurs(self: *Store, variable: u32, root: Id) Error!bool {
+        const resolved_root = try self.resolve(root, 0);
+        if (self.closedHeight(resolved_root) != 0 or resolved_root <= never) {
+            self.occurs_steps += 1;
+            return false;
+        }
+        const prior_length = self.occurs_seen.items.len;
+        if (prior_length < self.nodes.items.len) {
+            try self.occurs_seen.resize(self.allocator, self.nodes.items.len);
+            @memset(self.occurs_seen.items[prior_length..], 0);
+        }
+        self.occurs_generation +%= 1;
+        if (self.occurs_generation == 0) {
+            @memset(self.occurs_seen.items, 0);
+            self.occurs_generation = 1;
+        }
         var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
         var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
         const scratch_allocator = scratch.allocator();
         var pending: std.ArrayList(Id) = .empty;
         defer pending.deinit(scratch_allocator);
-        try pending.append(scratch_allocator, try self.resolve(root, 0));
+        try pending.append(scratch_allocator, resolved_root);
         var budget: usize = 1_000_000;
         while (pending.pop()) |id| {
+            if (self.occurs_seen.items[id] == self.occurs_generation) continue;
+            self.occurs_seen.items[id] = self.occurs_generation;
             if (budget == 0) return error.TypeLimit;
             budget -= 1;
             self.occurs_steps += 1;
+            if (self.closedHeight(id) != 0) continue;
             const value = self.node(id);
             switch (value.tag) {
                 .variable => if (value.a == variable) return true,
@@ -1139,6 +1160,30 @@ test "occurs steps count visited nodes and survive rollback" {
     try std.testing.expect(counted >= 2);
     store.rollback(point);
     try std.testing.expectEqual(counted, store.occurs_steps);
+}
+fn sharedOccursLaw(allocator: std.mem.Allocator) !void {
+    var store = try Store.init(allocator);
+    defer store.deinit();
+    const leaf = try store.fresh();
+    const other = try store.fresh();
+    var root = leaf;
+    for (0..12) |_| root = try store.product(&.{ root, root });
+    const before = store.occurs_steps;
+    try std.testing.expect(!try store.occurs(store.node(other).a, root));
+    try std.testing.expect(store.occurs_steps - before <= 13);
+    const point = store.mark();
+    try std.testing.expectError(error.InfiniteType, store.unify(leaf, root));
+    try std.testing.expectEqual(point, store.mark());
+    try store.unify(other, root);
+    store.rollback(point);
+    // A reused ID and a wrapped visitation clock must not hide a cycle.
+    store.occurs_generation = std.math.maxInt(u32);
+    try std.testing.expectError(error.InfiniteType, store.unify(leaf, root));
+    try std.testing.expect(!try store.occurs(store.node(other).a, root));
+}
+test "occurs visits shared graphs once and preserves cycles through rollback and allocation failures" {
+    try sharedOccursLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, sharedOccursLaw, .{});
 }
 test "indexed scalar histories equal sequential replacement oracle at every cursor" {
     var random = std.Random.DefaultPrng.init(0x12345678);

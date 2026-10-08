@@ -145,7 +145,7 @@ test "entry phase type witnesses and physical collection limits remain authorita
     for (0..2) |mode| for (0..12) |limit| {
         var session = try eval.Session.init(a, &units);
         defer session.deinit();
-        if (mode == 0) session.options.max_values = limit else session.options.max_depth = limit;
+        if (mode == 0) session.options.max_values = limit else session.options.max_type_depth = limit;
         const interface = session.sourceInterface(try target(&module, "selected")) catch |err| {
             try std.testing.expectEqual(error.Declined, err);
             try std.testing.expectEqual(eval.Code.constant_fuel, session.diagnostic.?.code);
@@ -186,4 +186,17 @@ test "entry phase source identity and forward declaration order determine discar
         try std.testing.expectEqualStrings(control.message, result.diagnostic.?.message());
         try std.testing.expectEqual(@as(usize, 0), result.constant_steps);
     }
+}
+
+test "source interface inference does not consume the executed expression depth budget" {
+    var module = try lower("const leaf = fn value => @u32.add value 1\nconst middle = fn value => leaf value\nentry const answer = fn (value: U32) => middle value\n");
+    defer module.deinit(a);
+    var session = try eval.Session.init(a, &.{module});
+    defer session.deinit();
+    session.options.max_depth = 0;
+    session.options.max_steps = 0;
+    const interface = try session.sourceInterface(try target(&module, "answer"));
+    try std.testing.expect(interface.selected);
+    try std.testing.expect(session.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
 }

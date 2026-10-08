@@ -69,11 +69,19 @@ The ordered namespaces, semantic catalogs, expected shape, seeds, scalar reads,
 plain-data facts and publication dependencies must still agree. This cutoff
 grants no executable or compile-time-value reuse; those dependencies rebuild.
 
-The closed-call partition experiment gives each child its own chronological
-solver. Only exact, fully solved first-order arrows may replace parent source
-collection. Recursive components, higher-order boundaries and unresolved work
-keep ordinary collection. Failed speculative checks publish no diagnostic; the
-ordinary path remains responsible for the error.
+Call summaries give each closed first-order job its own chronological solver.
+The session drains an explicit job stack keyed by source target, complete input
+evidence and interface-checking mode. A caller imports only a fully solved
+arrow; result-directed obligations, lexical captures and higher-order boundaries
+keep ordinary collection. Active recursive targets share their inline region.
+Failed speculative jobs publish no diagnostic; fallback preserves the caller's
+argument witness sites and deferred-member context. An independently completed
+callee proof may survive an enclosing caller's failed qualification.
+
+Summary jobs own their solver and scratch until completion or session teardown.
+Evidence copied into the session may outlive a job; solver IDs and source
+borrows may not. The execution depth budget applies only to executed expressions
+and patterns. Structural type-depth and storage limits remain separate.
 
 Constant collection values publish immutable child spans. Session-owned growth
 buffers may write outside every published span and extend only the latest span

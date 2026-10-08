@@ -85,7 +85,7 @@ const partition_source =
     \\entry const answer = fn (value: U32) => @u32.add (twice value) (recurse value)
 ;
 fn partitionScenario(allocator: std.mem.Allocator, module: *const core.Module, expected: []const u8) !void {
-    var result = try backend.compileWithOptions(allocator, &.{module.*}, 1, .{ .retain_artifacts = true, .policy = .{ .split_closed_calls = true } });
+    var result = try backend.compileWithOptions(allocator, &.{module.*}, 1, .{ .retain_artifacts = true });
     defer result.deinit(allocator);
     try std.testing.expect(result.diagnostic == null);
     try std.testing.expect(result.optimization.split_accepted > 0);
@@ -97,7 +97,7 @@ test "closed call partitions preserve recursive components staged evaluation eff
         defer module.deinit(a);
         var reference = try backend.compileWithOptions(a, &.{module}, 1, .{ .retain_artifacts = true });
         defer reference.deinit(a);
-        var split = try backend.compileWithOptions(a, &.{module}, 1, .{ .retain_artifacts = true, .policy = .{ .split_closed_calls = true } });
+        var split = try backend.compileWithOptions(a, &.{module}, 1, .{ .retain_artifacts = true });
         defer split.deinit(a);
         try std.testing.expectEqualDeep(reference.diagnostic, split.diagnostic);
         try std.testing.expectEqualSlices(u8, reference.bytes, split.bytes);

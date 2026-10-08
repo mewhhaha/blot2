@@ -164,8 +164,14 @@ fn constantProofs(allocator: std.mem.Allocator, module: *const core.Module, acce
             else => return err,
         }
         try std.testing.expectEqual(evaluator.Code.ambiguous_qualified, session.diagnostic.?.code);
-        try std.testing.expectEqual(@as(usize, 0), session.proofs.proof_published);
-        try std.testing.expectEqual(@as(usize, 0), session.proofs.proof_reused);
+        // Independent closed callees may complete before the enclosing
+        // qualification fails. No judgment for that failed body can escape.
+        var proofs = session.validated_calls.keyIterator();
+        while (proofs.next()) |proof| try std.testing.expect(proof.target.binding != seed.binding);
+        const before = session.proofs.proof_reused;
+        session.diagnostic = null;
+        try prove(&session, module, "second", allocator);
+        try std.testing.expect(session.proofs.proof_reused > before);
     }
 }
 test "constant prepasses publish complete proofs and leave unresolved obligations unpublished" {
