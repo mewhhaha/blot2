@@ -29,7 +29,7 @@ pub fn build(b: *std.Build) void {
     module.addOptions("compiler_identity", identity);
     const exe = b.addExecutable(.{ .name = "blotc", .root_module = module, .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
     b.installArtifact(exe);
-    const tests = b.addTest(.{ .root_module = b.createModule(.{
+    const tests = b.addTest(.{ .filters = b.option([]const []const u8, "test-filter", "filter") orelse &.{}, .root_module = b.createModule(.{
         .root_source_file = b.path("src/production_suite.zig"),
         .target = target,
         .optimize = optimize,
