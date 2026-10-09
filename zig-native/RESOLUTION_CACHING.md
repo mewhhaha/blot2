@@ -112,12 +112,21 @@ analyzer checks 288 files with zero findings. Its release SHA-256 is
 under `build/bench/composite-cache-owner-transition/`. Seven no-cache pairs
 measure 959/971 ms fresh CPU, 1,110/1,110 ms population, 260/260 ms first edit
 and 220/220 ms subsequent edit. Wasm and work counters match. The remaining cold
-overhead is not justified by these results; restart and full-gate checks are
-still running.
+overhead is not justified by these results. Seven restart pairs measure
+1,045/1,044 ms cold population and 638/659 ms process restart, with 1,110/1,100
+ms retained population, 260/250 ms first edit and 220/220 ms subsequent edit.
+Its full native suite and all 595 guest/client tests pass. This candidate is not
+accepted: the repeated cold/restart costs outweigh the small allocation
+reduction in these measurements.
 
 A separate warmup candidate records a bounded root-use hint on the first changed
 query and builds a frontier only after a second epoch miss. This hint can admit
 unhelpful roots but can never validate an answer: the complete key and
 dependency certificate still decide reuse. It aims to avoid allocating and
-scanning certificates for one-use roots. Its tests and measurements are pending.
-Task 009 remains open until its complete correctness and cost gates pass.
+scanning certificates for one-use roots. Twenty focused native checks pass,
+including discovery checks, and the analyzer reports zero findings in 288 files.
+Release SHA-256
+`671e30f9e1172c0d15b4dcced06c083304af47cecf20689f167ffeb2063d4a1e` is pinned in
+`build/bench/composite-cache-warmup/`. Broader qualification and measurements
+remain pending. Task 009 remains open until its complete correctness and cost
+gates pass.

@@ -66,26 +66,31 @@ development and the scenarios below.
 - The fix is committed as `8a40c1a`. The later composite candidate removes a
   release-only visit-counter cost and fixes its empty-owner analyzer warning;
   288 files then have zero findings. Seven no-cache pairs still measure 959/971
-  ms baseline/candidate fresh CPU, with equal population and edit medians. A
-  bounded warmup admission experiment is now being checked; no composite
-  implementation is accepted by those measurements.
+  ms baseline/candidate fresh CPU, with equal population and edit medians.
+  Restart CPU measures 638/659 ms across seven pairs. Its full native suite and
+  all 595 guest/client tests pass; the cost still does not justify landing it. A
+  bounded warmup admission experiment passes twenty focused native checks and
+  the analyzer; its broader qualification and measurements remain pending. No
+  composite implementation is accepted by those measurements.
 - Validation: the isolated fourth candidate passes 55 native resolution and
   ownership laws and 14 executed-Wasm laws. Generated histories, physical edits,
   rollback, future views, saturation and allocation failures are covered. The
   differential comparison passes 305 cases (610 invocations) with identical
-  diagnostics and Wasm. Full compiler and analyzer gates remain pending.
+  diagnostics and Wasm. The full compiler gate passes the native suite and 595
+  guest/client tests. The analyzer found an empty-owner overwrite, corrected in
+  the later candidate.
 - Comparison: seven alternating pairs measured 944/957 ms fresh CPU, 1,100/1,100
   ms dependency population, 250/260 ms first edit and 230/210 ms subsequent
   edit, baseline/candidate. Fresh requested allocation fell from 321,026,930 to
   320,341,190 bytes. A separate seven-pair restart batch measured 1,042/1,049 ms
   cold population and 640/673 ms process restart. These are loaded-host
   observations, without a compiler-speed claim. Same-compiler and cross-compiler
-  Wasm comparisons passed. A fifth candidate removes the test visit counter from
-  release execution; its cost measurements remain pending.
+  Wasm comparisons passed. The later release-counter and ownership correction
+  has the cold/restart costs recorded above.
 - Remaining limitations: the candidate admits bounded frontiers only in solver
   stores using closed-graph certificates. Ordinary resolution handles larger
   frontiers. No production composite-cache change has landed. The discovered
-  future-alias correctness correction is being qualified separately.
+  future-alias correctness correction is qualified separately in `8a40c1a`.
 - Durable record: [resolution caching](../zig-native/RESOLUTION_CACHING.md)
   records the contract, counterexample, rejected candidates, pins and results.
 - Isolated work: `/tmp/blot-composite-cache-prototype/` tests bounded
