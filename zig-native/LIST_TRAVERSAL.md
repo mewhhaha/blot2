@@ -502,6 +502,44 @@ timings therefore do not qualify larger packed-row leaves. Dynamic construction,
 persistent-update memory, and any representation-policy changes remain
 unresolved; this static-data probe is not accepted for production.
 
+A subsequent crossing-copy probe replaces fixed-size scalar leaf copies with
+explicit vector loads/stores and scalar tails. Its pin is
+`7bd99ac661233d76c6fe1883b643b43c22316d81ebd27ec041c2d3c808cab6ee`, in
+`build/bench/inline-crossing-copy/`. Sixteen focused execution laws pass,
+including snapshots, nested traversals, effects, bounds failure and recovery.
+The complete F32 record/tuple benchmark preserves all expected values, but
+record widths 9–16 measure 1.020–1.048 times boxed CPU and tuple widths 9–16
+measure 1.028–1.057. These loaded-host development measurements do not close the
+regression. This probe remains unlanded; its partial execution checks are not a
+substitute for full compiler, native ownership or analyzer qualification.
+
+Two straight-line floating-loop unroll probes also fail to close the remaining
+record regression. The first admits named calls and checks four-row bounds at
+each group; its pin is
+`5ca1441c2b25fb015f14b332d1d902049f62fc26fc0bb3df10e12d3bdf301550`, in
+`build/bench/row-unroll-calls/`. The second computes group counts once per leaf;
+its pin is `c4e21298f67e4de475f66bc7e8c828ea6e72b2df72ed5eb0d6378feaec0e2783`,
+in `build/bench/row-unroll-groups/`. Both preserve the sequence of scalar
+additions and pass ten row/snapshot/revision execution laws. The latter passes
+the analyzer with zero findings across 288 files. Record width 15 still measures
+1.079 and 1.055 times boxed CPU, respectively. Both remain unlanded; a failed
+record gate does not warrant claiming broader tuple or compiler qualification.
+An earlier syntax-only matcher excluded the benchmark's named addition calls and
+produced unchanged Wasm; its measurements are not evidence for unrolling.
+
+A later probe actually aligns runtime-created packed List leaves, using the
+largest whole-row capacity no greater than the ordinary 248 words. It adds
+internal constructor/leaf roles and their fragment relocation handling; it does
+not enlarge allocation buckets. Its pin is
+`0dada83da4f7ccb707f8e9f77e20a6502d3695f9e893505e0167afc211115483`, in
+`build/bench/runtime-row-alignment/`. Ten row/snapshot/revision execution laws
+pass and the analyzer reports zero findings in 288 files. Unlike the earlier
+static-only probe, its changed construction is exercised by the runtime `let`
+benchmark. Wider F32 record folds approach boxed CPU, but widths 15 and 16 still
+measure 1.013 and 1.019 times boxed. It remains unlanded. Tuple performance,
+general persistent-update cost and full compiler/native ownership qualification
+are not established for this probe; the record gate is still open.
+
 ### U32 production qualification, 9 October 2026
 
 The integer-only pass and bounded callee-admission change are qualified together

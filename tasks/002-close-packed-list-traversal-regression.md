@@ -161,3 +161,6 @@ development and the scenarios below.
   affect the runtime-created benchmark List. The production-tree full gate
   passes the native suite and all 598 guest/client tests, with zero analyzer
   findings across 288 Zig files. These results do not complete the task.
+- A fixed-size crossing-copy experiment passes sixteen execution laws but still
+  measures wider F32 folds about 2–6% above boxed CPU. It remains unlanded; the
+  pin and complete measurements are recorded in the durable traversal record.

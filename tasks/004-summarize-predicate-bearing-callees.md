@@ -146,3 +146,11 @@ development and the scenarios below.
   implement the remaining principal/residual graph requirements. The
   production-tree full gate passes the native suite and all 598 guest/client
   tests, with zero analyzer findings across 288 Zig files.
+- A result-directed experiment keys complete expected signatures and preserves
+  ordinary fallback for open results/effects. Its native ownership laws,
+  eighteen execution laws, analyzer and 305 corpus comparisons pass. However,
+  depth-128 result chains allocate about 29% more, and seven gdev pairs measure
+  fresh CPU increasing from 938 to 1,080 ms. It remains unlanded. The
+  [durable summary record](../zig-native/CALL_SUMMARIES.md#result-directed-expected-input-experiment-9-october-2026)
+  preserves the pin, proof boundaries and measurements; a complete expected key
+  alone does not solve the repeated principal-graph work.

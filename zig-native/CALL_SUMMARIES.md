@@ -436,3 +436,41 @@ are `build/bench/row-and-admission-main-compiler-gate.log` and
 `build/bench/row-and-admission-main-analyzer.log`. Three additional integration
 pairs preserve all fresh/retained/restart byte comparisons. The independent
 seven-pair admission measurements above remain the better isolated cost record.
+
+## Result-directed expected-input experiment, 9 October 2026
+
+An isolated candidate admits first-order result-directed predicates only when
+the entire expected call signature projects to closed evidence. That signature
+joins the argument evidence and checking mode in the job key; an open result or
+effect row retains ordinary caller-side checking. Transitive admission records
+whether a descendant needs this complete expectation. Job construction imports
+the keyed signature into its own solver before collecting the body. This is a
+closed call judgment, not principal information.
+
+The release pin is
+`af8afe6f77f5406008d9597707a2e489ee59facb9b3afced150c1fe767174d0e`, in
+`build/bench/result-call-summaries/`. Focused native laws prove that U32 and F32
+expectations receive distinct complete jobs and repeated identical uses share
+one job. Immutable-input and exhaustive allocation-failure checks pass, as do
+the existing contextual-result laws. The analyzer reports zero findings in 287
+files. Eighteen execution laws pass, including imports, dependency bundles,
+checkpoints, repeated failed edits, recovery and changed bodies. All 305 corpus
+comparisons preserve semantics, ordered diagnostics and Wasm.
+
+Seven depth-128 synthetic pairs expose a cost that prevents acceptance. The U32
+result chain grows from 5,029,133 to 6,468,129 requested bytes and from 8.406 to
+9.034 ms CPU; the F32 chain grows from 5,029,136 to 6,468,132 bytes and from
+7.712 to 8.539 ms. The U32 chain's largest region shrinks from 133 to 3 scopes,
+but total regions rise from 134 to 394 and solver passes from 138 to 919. The
+total scope count remains 401. More independent jobs do not remove the repeated
+work.
+
+Seven gdev pairs measure 938/1,080 ms fresh CPU and 1,110/1,240 ms retained
+population, baseline/candidate. First edits measure 250/240 ms and subsequent
+edits 230/230 ms. The restart batch measures 1,067/1,191 ms cold population,
+644/644 ms restart, 1,100/1,230 ms retained population, 250/260 ms first edit
+and 230/230 ms subsequent edit. All byte comparisons pass. These loaded-host
+results reinforce the rejection: the fresh/population increase is material. The
+candidate remains unlanded, and no full compiler gate or completion claim is
+made for it. Its source patch, execution test and raw samples remain in the
+qualification directory for work on the principal graph representation.
