@@ -369,3 +369,59 @@ the rejected probes do not prove that bounds checks alone cause the remaining
 gap. The graphs and input-only probe are preserved beneath
 `build/bench/list-sequential-qualified/` and
 `build/bench/list-balanced-input-probe/` respectively.
+
+### Contiguous wrapping-sum candidate, 9 October 2026
+
+A later serialized-leaf alignment probe still measured record fold ratios of
+1.025 and 1.010 at widths 14 and 15. It did not close the regression and remains
+unlanded in `build/bench/list-aligned-leaf/`.
+
+The current independent candidate keeps the original List layout. It recognizes
+a straight-line wrapping U32 sum over 8–16 distinct, adjacent four-byte fields
+of one base address. Every discarded temporary has exactly one definition and
+one use in the entire function. It combines exact four-word loads, adds their
+integer lanes and extracts four final lanes, retaining scalar tail fields. It
+never widens the accessed byte range or reassociates floating-point addition.
+The match is structural and names no source function or collection operation.
+
+The pass runs after ownership lowering. That ordering preserves scalar pointer
+provenance while lifetimes are decided; inserted cleanup calls prevent a match
+across a release. Calls, control flow, noncontiguous fields, repeated fields,
+observed temporaries and other operators also prevent the transformation. Moving
+it ahead of ownership lowering would erase information needed by the lifetime
+analysis and is not the intended implementation.
+
+The development candidate is SHA-256
+`5515c093f2d516f581de778d045175412b90255aed2f90274208a280d13a135c`, pinned in
+`build/bench/list-row-reduce-after-lifetimes/`. All 16 U32 record widths and 15
+U32 tuple widths beat the preserved boxed fold baseline in that batch. Record
+widths 14/15/16 measured 0.578/0.641/0.518 times boxed CPU; tuple widths
+13/14/15/16 measured 0.940/0.923/0.964/0.913. Explicit cursors remain slower.
+These loaded-host development measurements are not the final release gate.
+
+Three native laws pass, including exhaustive allocation failures, exact byte
+coverage for every admitted width and conservative rejection cases. The native
+filter reports 18 passing tests including discovery checks. Thirteen existing
+row, snapshot, cursor and effect execution laws pass. Two new execution laws
+cover U32 overflow, scalar tails, empty input, bounds-failure recovery and
+order-sensitive F32 sums. A 305-case corpus comparison (610 invocations, 244
+successful cases) has no semantic, diagnostic or Wasm differences. Its ordinary
+fixtures do not establish performance for the new wide-row kernel.
+
+The traversal harness also accepts an optional final `u32` or `f32` argument.
+F32 workloads convert each row index to binary32 and compare against a scalar,
+source-ordered `Math.fround` reference. This preserves the original default U32
+workloads and exposes floating-point behavior rather than inferring it from
+integer timings.
+
+The F32 record and tuple batch passed its value checks but exposed a remaining
+regression: wider record folds measured roughly 1.03–1.06 times boxed CPU, and
+wider tuple folds roughly 1.03–1.06. Reports are in `f32-record/` and
+`f32-tuple/` beneath `build/bench/list-row-reduce-after-lifetimes/`. A separate
+probe groups loads while retaining the original scalar F32 addition order; its
+qualification is still pending.
+
+Release qualification, full combined compiler checks and compiler-cost
+measurements remain pending. The source is isolated in
+`/tmp/blot-row-reduction-only-prototype/`; this record does not mark task 002 or
+the broader SIMD task complete.

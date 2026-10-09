@@ -140,3 +140,14 @@ development and the scenarios below.
   design/prototype success nor a partial-width improvement completes this task.
 - Durable record: [LIST_TRAVERSAL.md](../zig-native/LIST_TRAVERSAL.md) records
   the ownership boundary, experiments and remaining qualification gates.
+- Current independent candidate: exact contiguous U32 sums use vector lanes
+  after ownership lowering and retain scalar tails. It preserves the original
+  List layout. All 31 U32 row shapes beat the boxed fold baseline in its
+  development batch; record widths 14/15/16 measure 0.578/0.641/0.518 times
+  boxed CPU. Eighteen focused native checks, fifteen execution laws and the
+  305-case corpus comparison pass. The optional F32 traversal workloads pass
+  their source-ordered value checks but expose roughly 3–6% regressions at wider
+  record and tuple widths. A separate load-grouping probe preserves scalar F32
+  addition order and is not yet qualified. The release, full compiler,
+  compiler-cost and F32 performance gates remain open; these results do not
+  complete the task.

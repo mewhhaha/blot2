@@ -1,12 +1,12 @@
 // deno run --allow-read --allow-write --allow-run scripts/bench_list_traversal.ts \
-//   BASELINE CURRENT STD OUTPUT [record|tuple] [REPEAT]
+//   BASELINE CURRENT STD OUTPUT [record|tuple] [REPEAT] [u32|f32]
 import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 import { cpuUsage } from "node:process";
 import { fileURLToPath } from "node:url";
 import { instantiateGuest } from "../compiler/guest.ts";
 
-assert(Deno.args.length >= 4 && Deno.args.length <= 6);
+assert(Deno.args.length >= 4 && Deno.args.length <= 7);
 const [baseline, candidate, std, output] = Deno.args.slice(0, 4).map((p) =>
   resolve(p)
 );
@@ -14,6 +14,8 @@ const shape = Deno.args[4] ?? "record";
 assert(shape === "record" || shape === "tuple");
 const repeat = Number(Deno.args[5] ?? 16);
 assert(Number.isSafeInteger(repeat) && repeat > 0 && repeat <= 4096);
+const scalar = Deno.args[6] ?? "u32";
+assert(scalar === "u32" || scalar === "f32");
 await Deno.mkdir(output, { recursive: true });
 const hash = async (path: string | URL) =>
   [
@@ -52,7 +54,10 @@ const median = (values: number[]) =>
 for (let width = shape === "tuple" ? 2 : 1; width <= 16; width++) {
   const fields = Array.from(
     { length: width },
-    (_, i) => shape === "tuple" ? `i + ${i}` : `f${i}: i + ${i}`,
+    (_, i) => {
+      const value = scalar === "f32" ? `@u32.to_f32 (i + ${i})` : `i + ${i}`;
+      return shape === "tuple" ? value : `f${i}: ${value}`;
+    },
   ).join(", ");
   const value = shape === "tuple" ? `(${fields})` : `{${fields}}`;
   const binder = shape === "tuple"
@@ -67,13 +72,13 @@ for (let width = shape === "tuple" ? 2 : 1; width <= 16; width++) {
     path,
     `let rows = @list.generate ${count} (fn i => ${value})
 entry const fold = fn repeat => do:
-  let total = 0
+  let total = ${scalar === "f32" ? "0.0" : "0"}
   for pass in 0..repeat:
     for ${binder} in rows:
       total := self + ${sum}
   return total
 entry const cursor = fn repeat => do:
-  let total = 0
+  let total = ${scalar === "f32" ? "0.0" : "0"}
   for pass in 0..repeat:
     let cursor = rows.iter
     for i in 0..${count}:
@@ -132,6 +137,18 @@ entry const memory_probe = fn (seed: U32) => #[seed]
         metrics,
       });
     }
+    let expected = (repeat * (width * count * (count - 1) / 2 +
+      count * width * (width - 1) / 2)) >>> 0;
+    if (scalar === "f32") {
+      expected = 0;
+      for (let pass = 0; pass < repeat; pass++) {
+        for (let index = 0; index < count; index++) {
+          for (let field = 0; field < width; field++) {
+            expected = Math.fround(expected + (index + field));
+          }
+        }
+      }
+    }
     for (const operation of ["fold", "cursor"]) {
       const samples = variants.map(() => ({
         process_cpu_ms: [] as number[],
@@ -144,11 +161,7 @@ entry const memory_probe = fn (seed: U32) => #[seed]
           const result = guests[index].call(operation, repeat);
           const elapsed = performance.now() - started;
           const used = cpuUsage(before);
-          assert.equal(
-            result,
-            (repeat * (width * count * (count - 1) / 2 +
-              count * width * (width - 1) / 2)) >>> 0,
-          );
+          assert.equal(result, expected);
           if (round >= 0) {
             samples[index].process_cpu_ms.push(
               (used.user + used.system) / 1000 / repeat,
@@ -190,7 +203,10 @@ await Deno.writeTextFile(
   `${output}/report.json`,
   JSON.stringify(
     {
-      note: `${shape} rows, widths ${shape === "tuple" ? 2 : 1}–16, ` +
+      note:
+        `${scalar.toUpperCase()} ${shape} rows, widths ${
+          shape === "tuple" ? 2 : 1
+        }–16, ` +
         "immutable retained Lists, full fold and explicit cursor. " +
         `20 warmups, 31 alternating paired samples, each ${repeat} traversals. ` +
         "Per-traversal process CPU includes V8/host overhead. " +
