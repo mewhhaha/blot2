@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — task 001 is qualified; no completion is claimed.
 - **Dependencies:** [001](001-qualify-list-span-prototype.md)
 - **Originating requirements:** PLAN: Earlier programs still open / Collections.
   Sources: [PLAN.md](../PLAN.md).
@@ -25,7 +25,7 @@ cursor regression against the preserved pre-packed boxed baseline.
 
 ## Implementation checklist
 
-- [ ] Locate and pin the older boxed compiler and matching library/workload from
+- [x] Locate and pin the older boxed compiler and matching library/workload from
       the preserved packed-row qualification evidence; retain a separate
       current-main comparison.
 - [ ] Profile fold and cursor costs, then remove repeated leaf lookup, bounds
@@ -66,11 +66,26 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: pending. Dependency 001 was merged as `c6654ec`.
+- Validation: the initial span baseline has task 001's full compiler gate.
+  Experimental field-copy and span-advance changes remain outside production in
+  `/tmp/blot-list-field-prototype/`; they are not a completed fix.
+- Comparison: `scripts/bench_list_traversal.ts` measures all widths 1–16 with
+  retained Lists, fold and cursor cases, 20 warmups and 31 alternating samples
+  of 16 traversals. It pins compiler, library and workload hashes, checks
+  values/Wasm validity, and separates compiler allocation from guest memory. The
+  older boxed compiler is pinned at SHA-256
+  `150c2b032b43490434ba99c0bd91911de4bc8723fa3d4e4cf803d0f8fb88c413`. Its
+  prelude/list/array/vector sources match the current library at the recorded
+  starting revision. Initial samples in `build/bench/list-widths-boxed-span/`
+  confirm that task 001 alone does not close the regression.
+- Investigation: scalar replacement copies more fields than each temporary
+  accessor needs; a field-demand prototype reduces Wasm size but does not close
+  runtime costs. Crossing rows also repeat leaf lookup. Experimental
+  measurements and focused tests are in `build/bench/list-field-qualified/`. A
+  missing direct test import for `wasm_sroa.zig` was discovered and corrected in
+  the prototype so its focused ownership tests actually run.
+- Remaining limitations: the fold and cursor gates are still open. Prototype
+  successes do not establish the all-width acceptance criteria.
+- Durable record: final implementation and qualification evidence are pending;
+  extend [LIST_TRAVERSAL.md](../zig-native/LIST_TRAVERSAL.md) before completion.
