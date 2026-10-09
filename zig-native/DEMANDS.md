@@ -1,6 +1,6 @@
 # Predictable demand evaluation
 
-Design and implementation status, 2026-10-06. Make ordinary demand parameters
+Design and implementation status, 2026-10-09. Make ordinary demand parameters
 compile to control flow and local values when their uses are known. Keep a
 deferred value at runtime only where the compiler cannot eliminate its storage.
 The first acceptance case is source-defined `&&` and `||` producing the same
@@ -12,16 +12,19 @@ mode. **Both spellings are implemented as aliases.** The first optimization is
 also implemented: known, fully applied expression bodies consisting of parameter
 reads, scalar intrinsics, `if`, constructor matches, aggregate expressions,
 constants and demands use branches and locals. Pattern locals and guards retain
-lexical scope. Analysis admits at most 96 expression/pattern nodes. It does not inspect operator names.
-Multiple reads use a local memo reset on each invocation, including inside
-loops. Other bodies use the existing cell.
+lexical scope. Analysis admits at most 96 expression/pattern nodes, including
+the bodies of fully applied local forwarding calls. It does not inspect operator
+names. Multiple reads, including forwarded reads, use a local memo reset on each
+invocation. Recursive and indirect calls, escaping demands and demands revisited
+inside a callee loop retain the shared runtime cell.
 
 Inlining records the consumed declaration in the caller's code artifact.
 Retained code checks its exact Core projection and transitive semantic reads,
 and carries that dependency forward across reuse. Unrelated body edits may
 retain the caller; changes to consumed bodies rebuild it. Namespace, catalog,
-and source-ID changes remain conservative. Demand forwarding, escaping demands,
-and demands revisited inside a callee loop still use ordinary runtime cells.
+and source-ID changes remain conservative. Forwarding preflights every nested
+call's concrete signature before emitting arguments, so a declined inner call
+cannot try to materialize an outer demand whose cell was eliminated.
 
 ## Language contract
 
@@ -141,21 +144,28 @@ demand created outside the loop.
 
 ### Completion and cancellation
 
-The successful-result contract is established. Behavior after an aborted or
-failed demand needs an explicit compatibility decision before optimizing those
-paths. The evaluator currently distinguishes pending, evaluating, and cached
-states, resets to pending on an evaluator error, and rejects recursive forcing.
-Wasm sets an evaluating marker before the indirect call; a trap or
-request-handler exit does not follow the normal cache-publication path. These
-mechanisms do not establish a single general retry policy.
+Only normal completion publishes a shared result. A request handler's `yield`
+resumes the same evaluation. Its `return` or `break` cancels an unfinished
+demand: every active force unwound by that cancellation becomes pending again,
+including nested forces. A later force starts the expression again under the
+current providers. Effects already performed remain observable and may run again
+on a retry; cancellation is not a transaction.
 
-Add characterization cases for reentrant demand, guest traps, request `yield`,
-handler `return`/`break`, and invoking a captured computation again. Decide
-whether an aborted demand becomes retryable or terminal and how partial effects
-are treated. Never cache a placeholder result from a cancelled computation.
-Until the contract and evaluator/runtime parity are established, keep the
-affected demand paths on the existing representation. The initial branch
-optimization must exclude cases whose nonlocal exits are unproved.
+A Wasm trap or host exception cannot run the language's cancellation cleanup.
+The interrupted demand remains terminal, and later forces fail without
+evaluating it again. This applies to persistent demands that survive a guest
+call. Other entry calls remain usable. Recursive forcing fails rather than
+returning an unfinished result. The native evaluator resets its pending state
+when a failed compile-time evaluation unwinds; a failed compilation publishes no
+successful value or revision.
+
+Executed sync and JSPI laws cover handler `return` and `break`, nested pending
+demands, retry under a later handler, normal completion after `yield`, repeated
+captured-computation invocation, host exceptions, division traps and recursive
+forcing through State. The constant evaluator also rejects the recursive case.
+No path may cache a placeholder returned during cancellation. Local memo
+elimination must preserve these boundaries; escaping demands retain their shared
+runtime cells.
 
 This proposal does not introduce concurrent forcing or cross-thread sharing.
 Those would need their own state and synchronization contract.

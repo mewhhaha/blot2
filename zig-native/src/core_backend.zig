@@ -2639,6 +2639,37 @@ const Emitter = struct {
         machine: wasm.ValueType,
     };
 
+    // Every forwarded call must keep its demand arguments as local expressions.
+    // Check their concrete signatures before emitting any outer arguments, so a
+    // later fallback cannot try to materialize an elided outer demand cell.
+    fn demandCallShapes(self: *Emitter, unit_id: u32, plan: *const @import("demand_inline.zig").Plan, mappings: []const Mapping, rows: []const RowMapping, depth: usize) Error!bool {
+        if (depth >= 96) return false;
+        const g = self.generator;
+        const source = g.unit(unit_id);
+        for (plan.calls[0..plan.call_count]) |id| {
+            const call = source.call(id);
+            const key = try g.signature(call.target, call.callee_type, unit_id, mappings, rows, source.span(id), false);
+            const target = g.unit(key.target.unit);
+            const body = target.body(key.target.binding) orelse return false;
+            if (key.count != call.arguments.len or key.count != body.parameters.len) return false;
+            const child = @import("demand_inline.zig").Plan.init(target, body) orelse return false;
+            for (call.arguments, 0..) |argument, i| {
+                if (self.hasErasedType(key.parameters[i], 0)) return false;
+                if (g.layouts.node(key.parameters[i]).tag == .demand and source.node(argument).tag != .suspend_) return false;
+            }
+            var next_mappings: std.ArrayList(Mapping) = .empty;
+            var next_rows: std.ArrayList(RowMapping) = .empty;
+            defer next_mappings.deinit(g.allocator);
+            defer next_rows.deinit(g.allocator);
+            for (target.bodyParameters(body), 0..) |parameter, i| {
+                try g.mapTypeDepth(key.target.unit, &next_mappings, &next_rows, parameter.ty, key.parameters[i], body.span, 0);
+            }
+            try g.mapTypeDepth(key.target.unit, &next_mappings, &next_rows, target.typeOf(body.root), key.result, body.span, 0);
+            if (!try self.demandCallShapes(key.target.unit, &child, next_mappings.items, next_rows.items, depth + 1)) return false;
+        }
+        return true;
+    }
+
     fn inlineDemandCall(self: *Emitter, key: Key, arguments: []const core.Id, depth: usize) Error!bool {
         const g = self.generator;
         const source = g.unit(key.target.unit);
@@ -2650,7 +2681,6 @@ const Emitter = struct {
             if (self.hasErasedType(key.parameters[i], 0)) return false;
             if (g.layouts.node(key.parameters[i]).tag == .demand and caller.node(argument).tag != .suspend_) return false;
         }
-        if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target);
         var mappings: std.ArrayList(Mapping) = .empty;
         var rows: std.ArrayList(RowMapping) = .empty;
         defer mappings.deinit(g.allocator);
@@ -2659,6 +2689,8 @@ const Emitter = struct {
             try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
         }
         try g.mapTypeDepth(key.target.unit, &mappings, &rows, source.typeOf(body.root), key.result, body.span, 0);
+        if (!try self.demandCallShapes(key.target.unit, &plan, mappings.items, rows.items, 0)) return false;
+        if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target);
         var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels };
         defer emitter.deinit();
         var demands: [max_parameters]InlineDemand = undefined;

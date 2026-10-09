@@ -1067,13 +1067,22 @@ providers active at the first force. An unused demand needs no provider. To
 forward an existing demand to another lazy parameter, pass `@demand value`. Unit
 callbacks remain available for work that should run on every call.
 
+A request handler's `return` or `break` cancels an unfinished demand and makes
+it pending again. Its next demand starts the expression again under the then
+active providers. Effects already performed are not rolled back. A handler's
+`yield` resumes evaluation; only normal completion publishes the shared result.
+Recursive forcing fails. If a Wasm trap or host exception interrupts a demand,
+that demand remains terminal: later attempts fail without running its expression
+again. Other entry calls remain usable.
+
 Known, fully applied small expression functions composed of parameter reads,
 primitive scalar operations, conditionals and demands can use branches and local
 values without a heap cell. This includes the prelude's `&&` and `||`, aliases,
-and equivalent user functions. Repeated reads cache the result in a local at the
-first demand; a new call starts a new cache. Escaping demands and more complex
-bodies retain the shared runtime cell. Evaluation order, capture versions and
-first-demand providers are the same in both cases.
+equivalent user functions and acyclic forwarding through other small functions
+in the same module. Repeated reads, including forwarded reads, share one result
+at the first demand; a new call starts a new cache. Escaping demands and more
+complex bodies retain the shared runtime cell. Evaluation order, capture
+versions and first-demand providers are the same in both cases.
 
 ## Pattern alternatives and layout
 

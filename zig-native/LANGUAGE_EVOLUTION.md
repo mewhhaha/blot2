@@ -82,7 +82,7 @@ dependency files.
 
 ## Verification
 
-The current native suite, 577 guest/client tests and zero-finding analyzer gate
+The current native suite, 589 guest/client tests and zero-finding analyzer gate
 pass. Typed-path laws cover type-changing composition, identity, aliases,
 captured callbacks, twelve-level composition, large accessors, early returns,
 effect sequencing, incompatible source types, effectful accessor rejection,

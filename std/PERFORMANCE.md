@@ -46,13 +46,14 @@ failure. `unwrap_or` remains eager. `@demand` requests one deferred result and
 shares its successful completion; `@force` remains an alias. An ordinary
 callback runs on each invocation. Skipped demands must not run effects or traps.
 See [the demand design](../zig-native/DEMANDS.md) for forwarding, escaping
-values, provider scope and unresolved cancellation behavior.
+values, provider scope, cancellation and failed completion.
 
 Known callbacks can use direct calls and bounded inlining. Unknown callbacks
 retain the general path. Known demand combinators containing admitted branches,
-constructor matches and guards can use local memo state instead of a heap cell.
-Admission is bounded to 96 expression/pattern nodes and preserves lexical
-binding identities, evaluation order and once-only demand behavior.
+constructor matches, guards and acyclic local forwarding calls can use local
+memo state instead of a heap cell. Admission is bounded to 96 expression/pattern
+nodes across the forwarding chain and preserves lexical binding identities,
+evaluation order and once-only demand behavior.
 
 ## Optimization boundaries
 

@@ -250,6 +250,24 @@ is claimed. Results are in ignored
 `build/bench/variable-certificates-qualified`. Composite resolution caches and
 the variable-indexed constraint worklist remain open.
 
+Local demand forwarding now admits fully applied, acyclic calls inside the same
+96-node proof budget. Concrete nested signatures are checked before emitting
+arguments. Repeated forces share invocation-local results; skipped arguments
+remain unevaluated. Indirect, recursive, escaping and callee-loop cases retain
+the shared-cell path. The completion contract now specifies provider
+cancellation/retry, recursive-force rejection and terminal persistent cells
+after guest traps or host exceptions. Native immutable-Core/allocation-failure
+laws and sync/JSPI, checkpoint, dependency and failed-revision tests pass. The
+full gate passes with 589 guest/client tests and zero analyzer findings; a
+751-invocation existing-program comparison finds no differences.
+
+Seven paired gdev runs measured 644 / 647 ms fresh CPU, unchanged 740 ms
+population, 160 / 150 ms first edit and unchanged 140 ms subsequent edit.
+Allocation, deterministic work counters and Wasm are unchanged. No compilation
+speedup is claimed. Results are in ignored
+`build/bench/demand-forwarding-qualified`. Broader demand escape and loop
+elimination remain open.
+
 ### Hills 1 (backend) and 3: summaries instead of unfolding
 
 Root cause: `ClosureRegion.collectCall` (`core_eval.zig`, about line 4432)

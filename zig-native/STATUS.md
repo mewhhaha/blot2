@@ -2,7 +2,7 @@
 
 Blot's production compiler is handwritten Zig 0.17. Deno hosts the public
 compiler API, formatter and Wasm guest API. The current compiler passes the
-native suite, all 577 guest/client tests and the zero-finding Zig analyzer gate.
+native suite, all 589 guest/client tests and the zero-finding Zig analyzer gate.
 Language behavior remains defined by [the guide](../compiler/guide.md), with
 ownership rules in [CONTRACT.md](CONTRACT.md).
 
@@ -21,6 +21,12 @@ accessors retain unused polymorphic fields. Bounded inlining and private
 functions preserve callback effect labels without treating a partial layout as a
 closed semantic proof.
 
+Known local demand-forwarding chains can use control flow and local memo state
+within a shared 96-node proof budget. Indirect, recursive and escaping demands
+retain runtime cells. Provider cancellation permits a later force to retry;
+recursive force fails, and traps or host exceptions leave persistent demand
+cells terminal. Sync and JSPI execution share this contract.
+
 Region solvers and checker scratch use independent resettable arenas, retaining
 at most 64 MiB per pool. Published results keep durable owners. Automatic CLI
 and project-server restart caches contain validated checkpoint candidates;
@@ -30,7 +36,7 @@ because a checkpoint file exists.
 
 ## Current measurements
 
-These are the latest qualified variable-cache measurements on the frozen,
+These are the latest qualified demand-forwarding measurements on the frozen,
 private 394,294-byte gdev workload, from seven alternating pairs. CPU is child
 user plus system time; filesystem caches and machine load are uncontrolled.
 Fresh compilation has persistence disabled. Retained population is measured
@@ -39,7 +45,7 @@ comparable timings.
 
 | Measurement                          |                           Current value |
 | ------------------------------------ | --------------------------------------: |
-| Fresh CLI CPU                        |                                  652 ms |
+| Fresh CLI CPU                        |                                  647 ms |
 | Retained population CPU              |                                  740 ms |
 | First retained literal edit CPU      |                                  150 ms |
 | Subsequent edit/revert CPU           |                                  140 ms |
@@ -54,14 +60,14 @@ comparable timings.
 | Wasm bytes                           |                                 629,339 |
 
 Wasm matched between compilers and between fresh and retained phases. Against
-the preceding typed-path compiler, fresh CPU was 643 / 652 ms and population 750
-/ 740 ms; first and subsequent edits were unchanged at 150 and 140 ms. Work
-counters stayed unchanged. Variable-resolution certificates reduce requested
-allocation by about 1 MB; no compile-speed gain is claimed. Raw samples and
-binary hashes are in ignored `build/bench/variable-certificates-qualified`.
-Requested allocation is cumulative allocator traffic, not process RSS or guest
-memory. The 500 ms cold, under-100 ms retained-edit and under-100 MB cumulative
-allocation targets remain open; the stricter literal-edit target is 30 ms.
+the preceding variable-cache compiler, fresh CPU was 644 / 647 ms, population
+was unchanged at 740 ms, first edit was 160 / 150 ms and subsequent edit was
+unchanged at 140 ms. Allocation and work counters are unchanged. No
+compile-speed gain is claimed. Raw samples and binary hashes are in ignored
+`build/bench/demand-forwarding-qualified`. Requested allocation is cumulative
+allocator traffic, not process RSS or guest memory. The 500 ms cold, under-100
+ms retained-edit and under-100 MB cumulative allocation targets remain open; the
+stricter literal-edit target is 30 ms.
 
 ## Building and verification
 
