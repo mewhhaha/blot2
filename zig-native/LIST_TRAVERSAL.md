@@ -421,7 +421,30 @@ wider tuple folds roughly 1.03–1.06. Reports are in `f32-record/` and
 probe groups loads while retaining the original scalar F32 addition order; its
 qualification is still pending.
 
-Release qualification, full combined compiler checks and compiler-cost
-measurements remain pending. The source is isolated in
-`/tmp/blot-row-reduction-only-prototype/`; this record does not mark task 002 or
-the broader SIMD task complete.
+The U32 candidate's release is SHA-256
+`2546adaf4041999a8f7ef5221ec92cb4b5e9998123059d7a44eae680974d1aad`, pinned in
+`build/bench/list-row-reduce-release/`. Its fifteen focused execution laws pass.
+Seven no-cache compiler pairs measure 948/963 ms fresh CPU, 1,120/1,120 ms
+population, 250/240 ms first edit and 220/230 ms subsequent edit,
+baseline/candidate. Seven restart pairs measure 1,035/1,032 ms cold population,
+635/641 ms process restart, 1,090/1,090 ms retained population, 250/240 ms first
+edit and 220/220 ms subsequent edit. No-op CPU is below 10-ms accounting
+resolution. All Wasm comparisons pass, including cross-compiler comparisons; the
+intentional-change permission was not needed by this workload. These loaded-host
+measurements establish no compiler speedup.
+
+The order-preserving F32 load probe is SHA-256
+`386f9e2cf66349e521b4bcba3bb58e1e620c8dac469a4bc15642a98f1b292059`, in
+`build/bench/list-float-loads/`. Nineteen focused native checks and the analyzer
+pass. Execution checks cover all widths of Arrays and Lists, alternate field
+orders, cancellation, subnormals, empty inputs, leaf crossings and failure
+recovery. The first execution invocation lacked the private checkout's `build/`
+directory; only the corrected and expanded execution logs are passing evidence.
+
+Its generated record loops contain the grouped loads; tuple loop bytes are
+unchanged. The F32 batch still measures roughly 1.02–1.06 times boxed CPU at
+many wider widths. This additional transformation is not accepted for landing.
+The widths with crossing rows motivate a separate whole-row static leaf probe;
+that probe remains unqualified. The source is isolated in
+`/tmp/blot-row-reduction-only-prototype/`; none of these partial results
+complete task 002 or the broader SIMD task.
