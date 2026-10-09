@@ -331,3 +331,41 @@ The outer runner records these values in the manifest; the restricted Deno
 process could not read `/proc/loadavg` and explicitly records `null`. Process
 CPU and paired order reduce scheduling noise but do not establish idle-machine
 timing or a speedup for near-equal cases.
+
+### Rejected follow-on experiments
+
+The following probes used separate source copies and were not merged. Their five
+focused row-view and effect execution tests passed; none establishes the full
+compiler or all-width qualification gate.
+
+- Replacing exact short copies with overlapping power-of-two prefix/suffix
+  copies made widths 12–16 1.3–4.5% slower than the committed implementation.
+  Source, binary and samples are preserved in
+  `build/bench/list-crossing-prototype/`.
+- Copying a crossing row's first fragment directly before walking later leaves
+  produced median ratios of 0.987, 0.980, 0.962, 1.014 and 1.002 at widths
+  12–16. Paired distributions overlapped substantially. This does not resolve
+  the wide-row gate; the probe remains isolated in
+  `build/bench/list-crossing-first-fragment-prototype/`.
+- Grouping adjacent fields into 128-bit loads and extracting scalar lanes made
+  widths 12–16 9.4–37.6% slower. The result is rejected; records are in
+  `build/bench/list-vector-loads-built-prototype/`. An earlier run started after
+  a failed build and is explicitly invalidated in
+  `build/bench/list-vector-loads-prototype/`; it is not evidence for this
+  change.
+- An input-only probe balanced the U32 sum without changing the compiler. Ratios
+  of 0.975–1.028 against the original expression showed no consistent
+  improvement. Its changed input is not the task's acceptance workload.
+
+- Computing field addresses explicitly and using zero load offsets produced
+  ratios of 0.991, 1.032, 0.993, 0.991 and 0.996 at widths 12–16. This also
+  fails to establish a reliable improvement. The source and samples remain in
+  `build/bench/list-zero-offset-loads-prototype/`.
+
+V8's generated graphs for the committed compiler show one bounds check per
+scalar field in the wide fold and a 4,828-byte optimized body, versus 1,560
+bytes for the boxed compiler. These observations motivate further investigation;
+the rejected probes do not prove that bounds checks alone cause the remaining
+gap. The graphs and input-only probe are preserved beneath
+`build/bench/list-sequential-qualified/` and
+`build/bench/list-balanced-input-probe/` respectively.
