@@ -56,8 +56,14 @@ Commit `d736d45` completes task [009] with bounded, cost-gated composite
 resolution certificates. The production native suite and 598 guest/client tests
 pass, with zero findings across 289 Zig files. Its paired measurements and
 remaining performance limits are recorded in
-[resolution caching](../zig-native/RESOLUTION_CACHING.md). Task [010] is being
-qualified independently.
+[resolution caching](../zig-native/RESOLUTION_CACHING.md).
+
+Commit `352b3ff` completes task [010]: inference regions with more than eight
+constraints or data aliases use variable-indexed worklists. The native suite and
+598 guest/client tests pass, with zero findings across 290 Zig files. Gdev
+constraint visits fall from 35,215 to 29,679 without a CPU change outside
+accounting noise; [indexed inference work](../zig-native/INDEXED_SOLVER.md)
+records the evidence and remaining limits.
 
 ## Completed foundations to preserve
 
@@ -285,7 +291,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [007] — Infer recursive components jointly              | Pending     | [006]                                  |
 | [008] — Canonicalize specialization keys                | Pending     | [007]                                  |
 | [009] — Cache composite type resolutions                | Complete    | None                                   |
-| [010] — Schedule constraints by variable                | In progress | [009]                                  |
+| [010] — Schedule constraints by variable                | Complete    | [009]                                  |
 | [011] — Reduce semantic allocation traffic              | Pending     | [007], [008], [010]                    |
 | [012] — Schedule independent semantic jobs              | Pending     | [007], [008], [010]                    |
 | [013] — Qualify parallel inference                      | Pending     | [011], [012]                           |
