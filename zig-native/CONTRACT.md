@@ -361,16 +361,24 @@ allocation bases. The balanced tree's word bound fits within 64 stack entries,
 and a checked overflow traps instead of writing past the private storage.
 
 Scalar-only row views use transient Wasm address locals while that collection
-root remains live. They never enter source values, captures or heap fields. Rows
-crossing leaves are copied in raw word spans to one lazily allocated scalar
-buffer per loop activation. Copy sizes are selected from the checked row width;
-projection offsets come from the canonical flat layout. The buffer is reused
-only after the previous view's last possible use. The inner row loop is bounded
-by the current leaf; the outer loop handles crossings and the final logical
-length, recovering the logical row index only at a leaf boundary. Empty loops
-allocate neither buffer. Normal exits, breaks, returns and cancellation release
-private traversal storage exactly once; optional cleanup skips unallocated
-storage. Serialized cursors start uncached and retain allocation-base fields.
+root remains live. They never enter source values, captures or heap fields. A
+nonempty loop activation over multi-word rows allocates one scalar buffer of two
+rows before its first iteration, so no allocation call sits on the per-leaf
+path. Rows crossing leaves are copied in raw words into its second half. When
+two leaves hold the row, two copies of one row width each end at their
+fragment's end: the later leaf's block lands first, then the earlier leaf's
+block overwrites the row's leading words and spills only into the first half.
+Their discarded leading bytes may come from headers or neighboring objects, but
+never from below the 256 reserved bytes or past a fragment's end. A row spanning
+more leaves copies exact fragments with sizes selected from the checked row
+width. Projection offsets come from the canonical flat layout. The buffer is
+reused only after the previous view's last possible use. The inner row loop is
+bounded by the current leaf; the outer loop handles crossings and the final
+logical length, recovering the logical row index only at a leaf boundary. Empty
+loops allocate neither buffer. Normal exits, breaks, returns and cancellation
+release private traversal storage exactly once; optional cleanup skips
+unallocated storage. Serialized cursors start uncached and retain
+allocation-base fields.
 
 After lifetime lowering has consumed pointer provenance, a straight-line U32 sum
 may combine exact adjacent four-byte fields using vector loads and wrapping lane

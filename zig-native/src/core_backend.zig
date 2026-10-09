@@ -4499,13 +4499,70 @@ const Emitter = struct {
         try self.copyScalarSpan(destination, source, count, middle + 1, last);
         try self.emit(.end, 0);
     }
+    /// The caller proves base < span[2] < base + words and passes a buffer of
+    /// 2 * words words. The row is assembled at its second half; the first half
+    /// is slack. Returns with span at the leaf holding the row's last word.
     fn copyCrossingListRow(self: *Emitter, source: u32, base: u32, words: u32, span: [3]u32, scratch: u32, walk: ?list_traversal.Walk) Error!void {
+        const bytes = words * 4;
         const position = try self.temporary(.i32);
+        const head_bytes = try self.temporary(.i32);
+        const head_end = try self.temporary(.i32);
+        try self.emit(.local_get, span[2]);
+        try self.emit(.local_set, position);
+        try self.emit(.local_get, position);
+        try self.emit(.local_get, base);
+        try self.emit(.i32_sub, 0);
+        try self.emit(.i32_const, 4);
+        try self.emit(.i32_mul, 0);
+        try self.emit(.local_set, head_bytes);
+        try self.listSpanAddress(position, span);
+        try self.emit(.local_set, head_end);
+        try self.resolveListSpan(source, position, span, walk);
+        try self.listRowFits(base, words, span[2]);
+        try self.emit(.if_, 0);
+        // Two leaves hold the row. Two constant-size copies replace a
+        // size-dependent branch per fragment. Each block ends at its fragment's
+        // end, so neither reads past a leaf. Earlier bytes come from preceding
+        // headers or objects. Payloads lie above the 256 reserved bytes and a
+        // row has at most 64, so no address wraps. The tail block lands first;
+        // the head block overwrites its leading words and spills only into the
+        // slack half.
+        try self.emit(.local_get, scratch);
+        try self.emit(.i32_const, bytes);
+        try self.emit(.i32_add, 0);
+        try self.listSpanAddress(position, span);
+        try self.emit(.local_get, head_bytes);
+        try self.emit(.i32_sub, 0);
+        try self.emit(.i32_const, bytes);
+        try self.emit(.memory_copy, 0);
+        try self.emit(.local_get, scratch);
+        try self.emit(.local_get, head_bytes);
+        try self.emit(.i32_add, 0);
+        try self.emit(.local_get, head_end);
+        try self.emit(.i32_const, bytes);
+        try self.emit(.i32_sub, 0);
+        try self.emit(.i32_const, bytes);
+        try self.emit(.memory_copy, 0);
+        try self.emit(.else_, 0);
+        // A short later leaf: copy each fragment exactly.
+        const row = try self.temporary(.i32);
         const copied = try self.temporary(.i32);
         const count = try self.temporary(.i32);
+        const fragment = try self.temporary(.i32);
+        try self.emit(.local_get, scratch);
+        try self.emit(.i32_const, bytes);
+        try self.emit(.i32_add, 0);
+        try self.emit(.local_set, row);
+        try self.emit(.local_get, position);
         try self.emit(.local_get, base);
-        try self.emit(.local_set, position);
-        try self.emit(.i32_const, 0);
+        try self.emit(.i32_sub, 0);
+        try self.emit(.local_set, count);
+        try self.emit(.local_get, head_end);
+        try self.emit(.local_get, head_bytes);
+        try self.emit(.i32_sub, 0);
+        try self.emit(.local_set, fragment);
+        try self.copyScalarSpan(row, fragment, count, 1, words);
+        try self.emit(.local_get, count);
         try self.emit(.local_set, copied);
         try self.emit(.block, 0);
         try self.emit(.loop, 0);
@@ -4535,16 +4592,15 @@ const Emitter = struct {
         try self.emit(.local_set, count);
         try self.emit(.end, 0);
         const destination = try self.temporary(.i32);
-        const span_source = try self.temporary(.i32);
-        try self.emit(.local_get, scratch);
+        try self.emit(.local_get, row);
         try self.emit(.local_get, copied);
         try self.emit(.i32_const, 4);
         try self.emit(.i32_mul, 0);
         try self.emit(.i32_add, 0);
         try self.emit(.local_set, destination);
         try self.listSpanAddress(position, span);
-        try self.emit(.local_set, span_source);
-        try self.copyScalarSpan(destination, span_source, count, 1, words);
+        try self.emit(.local_set, fragment);
+        try self.copyScalarSpan(destination, fragment, count, 1, words);
         try self.emit(.local_get, position);
         try self.emit(.local_get, count);
         try self.emit(.i32_add, 0);
@@ -4554,6 +4610,7 @@ const Emitter = struct {
         try self.emit(.i32_add, 0);
         try self.emit(.local_set, copied);
         try self.emit(.br, 0);
+        try self.emit(.end, 0);
         try self.emit(.end, 0);
         try self.emit(.end, 0);
     }
@@ -4583,19 +4640,10 @@ const Emitter = struct {
         try self.emit(.if_, 0);
         try self.listLeafView(base, span, view);
         try self.emit(.else_, 0);
-        // A crossing row uses one private scalar buffer per dynamic loop
-        // activation, allocated lazily and released on every exit.
-        try self.emit(.local_get, view.scratch);
-        try self.emit(.i32_eqz, 0);
-        try self.emit(.if_, 0);
-        const scratch = try self.allocateStorage(words * 4, true);
-        try self.emit(.local_get, scratch);
-        try self.emit(.local_set, view.scratch);
-        try self.emit(.end, 0);
         try self.copyCrossingListRow(source, base, words, span, view.scratch, walk);
         try self.emit(.local_get, view.scratch);
         try self.emit(.local_set, view.owner);
-        try self.emit(.i32_const, 0);
+        try self.emit(.i32_const, words * 4);
         try self.emit(.local_set, view.offset);
         try self.emit(.end, 0);
         try self.emit(.local_get, view.owner);
@@ -6422,7 +6470,7 @@ const Emitter = struct {
         try self.cleanups.append(self.generator.allocator, .{ .release_if_nonzero = @fromBackingInt(@intCast(walk.storage)) });
         return walk;
     }
-    fn loopRowView(self: *Emitter, id: core.Id, span: ?[3]u32) Error!?RowView {
+    fn loopRowView(self: *Emitter, id: core.Id, span: ?[3]u32, end: u32) Error!?RowView {
         if (span == null) return null;
         const g = self.generator;
         const source = g.unit(self.unit_id);
@@ -6445,6 +6493,18 @@ const Emitter = struct {
         const view: RowView = .{ .binding = if (pattern.tag == .bind) pattern.a else 0, .row = g.layouts.node(collection).a, .owner = try self.temporary(.i32), .offset = try self.temporary(.i32), .address = try self.temporary(.i32), .next_address = try self.temporary(.i32), .limit_address = try self.temporary(.i32), .scratch = try self.temporary(.i32) };
         try self.emit(.i32_const, 0);
         try self.emit(.local_set, view.scratch);
+        if (words > 1) {
+            // A crossing row uses one private scalar buffer per nonempty loop
+            // activation, released on every exit. Allocating it before the
+            // loop keeps calls off the per-leaf path, so engines need not
+            // spill loop-carried values around a rarely taken allocation.
+            try self.emit(.local_get, end);
+            try self.emit(.if_, 0);
+            const scratch = try self.allocateStorage(words * 8, true);
+            try self.emit(.local_get, scratch);
+            try self.emit(.local_set, view.scratch);
+            try self.emit(.end, 0);
+        }
         try self.emit(.i32_const, 0);
         try self.emit(.local_set, view.limit_address);
         try self.emit(.i32_const, 1);
@@ -6509,7 +6569,7 @@ const Emitter = struct {
             }
         }
         const list_walk = try self.loopListWalk(array_local, end, list_span != null);
-        const row_view = try self.loopRowView(id, list_span);
+        const row_view = try self.loopRowView(id, list_span, end);
         // A floor belongs to this activation. Earlier allocations are pinned
         // and traced. Collect after allocation traffic proportional to the
         // arena, so a small cursor does not repeatedly trace a large snapshot.

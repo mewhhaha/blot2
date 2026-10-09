@@ -164,3 +164,10 @@ development and the scenarios below.
 - A fixed-size crossing-copy experiment passes sixteen execution laws but still
   measures wider F32 folds about 2–6% above boxed CPU. It remains unlanded; the
   pin and complete measurements are recorded in the durable traversal record.
+- Hoisted buffer and two-block crossing rows: the crossing buffer is allocated
+  before the loop, removing a per-leaf accumulator spill, and two-leaf rows use
+  two constant-size copies. Maximum F32 fold medians against boxed fall from
+  1.046/1.055 to 1.012/1.017 (records/tuples) in interleaved batches; widths
+  14–16 retain 0.6–1.7%, so the all-width gate is still open. Full gate (599
+  guest/client tests), pinned analyzer and corpus comparison pass; details are
+  in [LIST_TRAVERSAL.md](../zig-native/LIST_TRAVERSAL.md).

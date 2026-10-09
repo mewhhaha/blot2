@@ -51,3 +51,43 @@ entry const width_${width} = fn count => do:
     }
   });
 });
+
+// Concatenated slices leave short leaves inside the List, and bounded
+// coalescing can split one row across more than two leaves.
+Deno.test("packed List rows assembled from many short leaves match flat values at every width", async () => {
+  const functions = Array.from({ length: 16 }, (_, offset) => {
+    const width = offset + 1;
+    const row = Array.from(
+      { length: width },
+      (_, field) => `f${field}: i + ${field}`,
+    ).join(", ");
+    const sum = Array.from({ length: width }, (_, field) => `row.f${field}`)
+      .join(" + ");
+    return `
+entry const width_${width} = fn count => do:
+  let values = @list.generate count (fn i => {${row}})
+  let mixed = @list.slice values 0 0
+  for a in 0..6:
+    for b in 0..8:
+      mixed := @list.concat self (@list.slice values (a * 47 + b * 5) (1 + a + b * 2))
+  let result = 0
+  for row in mixed:
+    result := self + ${sum}
+  return result
+`;
+  });
+  await compileAndRun(functions.join("\n"), (guest) => {
+    for (let width = 1; width <= 16; width++) {
+      let expected = 0;
+      for (let a = 0; a < 6; a++) {
+        for (let b = 0; b < 8; b++) {
+          const start = a * 47 + b * 5;
+          for (let i = start; i < start + 1 + a + b * 2; i++) {
+            expected += width * i + width * (width - 1) / 2;
+          }
+        }
+      }
+      equal(guest.call(`width_${width}`, 400), expected >>> 0);
+    }
+  });
+});

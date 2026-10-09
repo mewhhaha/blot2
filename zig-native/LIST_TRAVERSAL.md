@@ -189,13 +189,16 @@ returned. All other rows keep their owning representation.
 
 Admitted rows use a private view into a leaf. The view never becomes a source
 value. A row crossing a leaf boundary is copied, without numeric conversion,
-into a lazily allocated scalar buffer of at most 64 bytes. This buffer is reused
-only after the previous row's last possible use. An inner loop handles rows
-known to fit in the current leaf; the outer loop performs boundary work and
-recovers the next logical row index. The leaf bound also proves the inner loop
-cannot pass the List's final row. Direct field loads use checked constant
-offsets. A bounded decision tree selects constant copy sizes for crossing
-fragments, allowing the host to inline these small copies.
+into a scalar buffer of two rows (at most 128 bytes), allocated before a
+nonempty traversal of multi-word rows. This buffer is reused only after the
+previous row's last possible use. An inner loop handles rows known to fit in the
+current leaf; the outer loop performs boundary work and recovers the next
+logical row index. The leaf bound also proves the inner loop cannot pass the
+List's final row. Direct field loads use checked constant offsets. A row held by
+two leaves is assembled with two constant-size copies of one row width, each
+ending at its fragment's end; a row spanning more leaves copies exact fragments
+through a bounded decision tree of constant sizes. The host inlines all of these
+small copies.
 
 Both private allocations are scoped to one dynamic traversal. Empty traversals
 allocate neither. Normal exits, breaks, returns and cancellation release only
@@ -566,3 +569,28 @@ subsequent edit. The restart batch measures 1,025/1,026 ms cold population,
 and 220/220 ms subsequent edit. No-op samples are at the 10-ms accounting limit.
 All byte comparisons pass without a cross-compiler exception. These are
 integration checks, not evidence of a general compiler speedup.
+
+### Hoisted buffer and two-block crossing rows, 9 October 2026
+
+TurboFan traces of the width-16 F32 fold found two costs absent from boxed rows.
+The lazy crossing-buffer allocation was a non-deferred call inside the outer
+loop, so the F32 accumulator was spilled and reloaded at every leaf boundary.
+The fragment loop's size-dependent decision tree also lengthened each crossing
+row. Widths dividing 248 (no crossings) were already at boxed parity.
+
+The buffer is now allocated before a nonempty multi-word traversal, and a row
+held by two leaves is assembled with two constant-size copies (see the ownership
+contract). Release
+`3c53194ed05088584145d316369a623158b218cf751a57c26daea98065939fd1` is pinned in
+`build/bench/list-two-block-crossing/`. Five interleaved repeats against the
+boxed compiler, at host load 20–35, give maximum per-width F32 fold medians of
+1.012 for records and 1.017 for tuples, against 1.046 and 1.055 for the
+preceding production compiler in the same batches. Widths 3–13 are at or below
+1.006; widths 14–16 retain 0.6–1.7%. U32 folds, cursors, the packed-row harness
+and the thirteen general workloads are unchanged; their Wasm is identical where
+no row view is involved. The 305-case corpus has identical semantics, with one
+intended Wasm difference whose entries execute identically. The full native
+suite, 599 guest/client tests and the pinned analyzer (zero findings) pass. A
+new execution law folds rows from many concatenated slices at every width. Rows
+spanning three leaves did not arise in any tested construction, so the exact
+fallback copy remains unexercised by execution tests.
