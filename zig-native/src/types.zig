@@ -22,6 +22,10 @@ pub const Node = struct {
     closed_generation: u16 = 0,
     a: u32 = 0,
     b: u32 = 0,
+    // For a solver-owned variable with lower bound zero, c may contain a
+    // resolution certified by closed_generation. Open answers also check the
+    // remaining variable's last write. Publication rebuilds source variables
+    // without this certificate; variable semantics still read only a and b.
     c: u32 = 0,
 };
 comptime {
@@ -382,6 +386,15 @@ pub const Store = struct {
             self.synchronizeClosedGraphs();
             // A certified raw graph has no cursor-dependent children or tails.
             if (self.closedHeight(root) != 0) return root;
+            const raw = self.node(root);
+            if (self.use_resolution_cache and at == 0 and raw.tag == .variable and raw.b == 0 and raw.c != 0 and raw.closed_generation == self.closed_generation and self.closed_generation != std.math.maxInt(u16) and self.effects.physical_epoch != std.math.maxInt(u64)) {
+                const remaining = self.node(raw.c);
+                if (self.closedHeight(raw.c) != 0) return raw.c;
+                if (remaining.tag == .variable) {
+                    const last = self.variables.items[remaining.a].last;
+                    if (last == none or self.versions.items[last].position < remaining.b) return raw.c;
+                }
+            }
         }
         // Historical windows retain the original chronological traversal.
         if (!self.use_resolution_cache or at != 0 or root <= never) return self.resolveDepth(root, at, 0);
@@ -390,6 +403,14 @@ pub const Store = struct {
         if (!self.resolved.activate(mutation, effects)) return self.resolveDepth(root, at, 0);
         if (self.resolved.get(root)) |result| return result;
         const result = try self.resolveDepth(root, at, 0);
+        if (self.use_closed_graphs and self.closed_generation != std.math.maxInt(u16) and self.effects.physical_epoch != std.math.maxInt(u64) and (self.closedHeight(result) != 0 or self.node(result).tag == .variable) and self.node(root).tag == .variable and self.node(root).b == 0) {
+            // Closed answers survive appended writes. An open answer watches
+            // only its remaining chronological variable. Physical edits,
+            // rollback and saturated certificates revoke either proof.
+            self.nodes.items[root].c = result;
+            self.nodes.items[root].closed_generation = self.closed_generation;
+            return result;
+        }
         // An unchanged query must not acquire fresh retained storage.
         if (result == root and root >= self.resolved.high_water) return result;
         try self.resolved.put(self.allocator, root, result);
@@ -1804,4 +1825,70 @@ test "type substitution preserves historical views and independent row replaceme
     const effectful_function = store.node(store.list(.{ .start = store.node(effectful).a, .len = 2 })[0]);
     try std.testing.expectEqual(@as(Effects.Id, 0), pure_function.c);
     try std.testing.expectEqualSlices(Effects.Label, &.{foreign_operation}, store.rowLabels(effectful_function.c));
+}
+
+fn closedVariableCertificateLaw(allocator: std.mem.Allocator) !void {
+    var cached = try Store.initWithOptions(allocator, .{ .closed_graphs = true });
+    defer cached.deinit();
+    var oracle = try Store.initWithOptions(allocator, .{ .resolution_cache = false });
+    defer oracle.deinit();
+    var roots: [2][8]Id = undefined;
+    for ([_]*Store{ &cached, &oracle }, &roots) |store, *variables| for (variables) |*variable| {
+        variable.* = try store.fresh();
+    };
+    const marks = [_]Mark{ cached.mark(), oracle.mark() };
+    var proof = try @import("type_evidence.zig").Store.init(allocator);
+    defer proof.deinit();
+    for (0..16) |step| {
+        for ([_]*Store{ &cached, &oracle }, roots) |store, variables| {
+            const selected: Id = if (step % 3 == 0) variables[(step + 1) % variables.len] else if (step % 3 == 1) u32_type else f32_type;
+            try store.appendVersion(variables[step % variables.len], selected);
+        }
+        for (0..cached.cursor() + 1) |at| for (roots[0], roots[1]) |left, right| {
+            const l = try cached.resolve(left, @intCast(at));
+            const r = try oracle.resolve(right, @intCast(at));
+            const expected = proof.project(&oracle, r, &.{}) catch |err| switch (err) {
+                error.UnresolvedType => 0,
+                else => return err,
+            };
+            const actual = proof.project(&cached, l, &.{}) catch |err| switch (err) {
+                error.UnresolvedType => 0,
+                else => return err,
+            };
+            try std.testing.expectEqual(expected, actual);
+            if (expected == 0) {
+                try std.testing.expectEqual(oracle.node(r).a, cached.node(l).a);
+                try std.testing.expectEqual(oracle.node(r).b, cached.node(l).b);
+            }
+        };
+    }
+    for ([_]*Store{ &cached, &oracle }, marks) |store, mark_| store.rollback(mark_);
+    for ([_]*Store{ &cached, &oracle }, roots) |store, variables| {
+        try store.appendVersion(variables[0], f32_type);
+        try std.testing.expectEqual(f32_type, try store.resolve(variables[0], 0));
+        try std.testing.expectEqual(variables[1], try store.resolve(variables[1], 0));
+        const record = try store.record(&.{.{ .name = 10, .ty = u32_type }});
+        try store.appendVersion(variables[1], record);
+        _ = try store.resolve(variables[1], 0);
+        const shape = store.node(record);
+        store.replaceListItem(.{ .start = shape.a, .len = shape.b * 2 }, 1, f32_type);
+        const resolved = store.node(try store.resolve(variables[1], 0));
+        try std.testing.expectEqual(f32_type, store.recordField(resolved, 0).ty);
+    }
+    const point = cached.effects.mark();
+    const row = try cached.effects.row(&.{foreign_operation}, .closed);
+    const callback = try cached.functionWithEffects(unit, u32_type, row);
+    try cached.appendVersion(roots[0][2], callback);
+    try std.testing.expectEqual(row, cached.node(try cached.resolve(roots[0][2], 0)).c);
+    cached.effects.rollback(point);
+    const replacement_row = try cached.effects.row(&.{ foreign_operation, foreign_operation }, .closed);
+    try std.testing.expectEqual(row, replacement_row);
+    const changed = cached.node(try cached.resolve(roots[0][2], 0));
+    try std.testing.expectEqualSlices(Effects.Label, &.{ foreign_operation, foreign_operation }, cached.rowLabels(changed.c));
+    cached.closed_generation = std.math.maxInt(u16);
+    try std.testing.expectEqual(f32_type, try cached.resolve(roots[0][0], 0));
+}
+test "closed variable certificates preserve chronological cursors physical edits rollback and allocation failure" {
+    try closedVariableCertificateLaw(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, closedVariableCertificateLaw, .{});
 }

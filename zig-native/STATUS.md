@@ -30,21 +30,22 @@ because a checkpoint file exists.
 
 ## Current measurements
 
-These are the latest qualified typed-path measurements on the frozen, private
-394,294-byte gdev workload, from seven alternating pairs. CPU is child user plus
-system time; filesystem caches and machine load are uncontrolled. Fresh
-compilation has persistence disabled. Retained population is measured separately
-from edits. Earlier batches and different workloads are not comparable timings.
+These are the latest qualified variable-cache measurements on the frozen,
+private 394,294-byte gdev workload, from seven alternating pairs. CPU is child
+user plus system time; filesystem caches and machine load are uncontrolled.
+Fresh compilation has persistence disabled. Retained population is measured
+separately from edits. Earlier batches and different workloads are not
+comparable timings.
 
 | Measurement                          |                           Current value |
 | ------------------------------------ | --------------------------------------: |
-| Fresh CLI CPU                        |                                  637 ms |
-| Retained population CPU              |                                  730 ms |
+| Fresh CLI CPU                        |                                  652 ms |
+| Retained population CPU              |                                  740 ms |
 | First retained literal edit CPU      |                                  150 ms |
 | Subsequent edit/revert CPU           |                                  140 ms |
 | No-op CPU                            | Below the process-accounting resolution |
-| Fresh requested allocation           |                                322.2 MB |
-| Peak requested live memory           |                                 79.1 MB |
+| Fresh requested allocation           |                                321.2 MB |
+| Peak requested live memory           |                                 78.9 MB |
 | Live requested memory after teardown |                                       0 |
 | Inference regions                    |                                   2,036 |
 | Largest region, scopes               |                                   8,041 |
@@ -53,14 +54,14 @@ from edits. Earlier batches and different workloads are not comparable timings.
 | Wasm bytes                           |                                 629,339 |
 
 Wasm matched between compilers and between fresh and retained phases. Against
-the preceding parametric-scheme compiler, fresh CPU was 636 / 637 ms; population
-and first edit were unchanged at 730 and 150 ms, and subsequent edits were 130 /
-140 ms. Work counters and requested allocation stayed unchanged. This language
-feature is not a compile-speed improvement. Raw samples and binary hashes are in
-ignored `build/bench/typed-paths-qualified`. Requested allocation is cumulative
-allocator traffic, not process RSS or guest memory. The 500 ms cold, under-100
-ms retained-edit and under-100 MB cumulative allocation targets remain open; the
-stricter literal-edit target is 30 ms.
+the preceding typed-path compiler, fresh CPU was 643 / 652 ms and population 750
+/ 740 ms; first and subsequent edits were unchanged at 150 and 140 ms. Work
+counters stayed unchanged. Variable-resolution certificates reduce requested
+allocation by about 1 MB; no compile-speed gain is claimed. Raw samples and
+binary hashes are in ignored `build/bench/variable-certificates-qualified`.
+Requested allocation is cumulative allocator traffic, not process RSS or guest
+memory. The 500 ms cold, under-100 ms retained-edit and under-100 MB cumulative
+allocation targets remain open; the stricter literal-edit target is 30 ms.
 
 ## Building and verification
 

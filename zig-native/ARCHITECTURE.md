@@ -82,6 +82,14 @@ General higher-order calls, lexical captures and recursive components still
 require shared inference regions. Occurs checks visit each resolved node once
 even when the type is a shared DAG.
 
+Current variable resolution can reuse a node-local certificate across unrelated
+substitutions. Closed results remain stable; open aliases watch the remaining
+chronological variable. Physical type/effect edits and rollback invalidate the
+certificate generation, and historical cursor queries retain their original
+traversal. Published source variables carry no solver certificate. Composite
+resolution and constraint scheduling still use their existing epoch-based cache
+and solver passes.
+
 Representation conversions distinguish layout, evidence, their respective effect
 rows and code-expectation handles. Runtime cleanup distinguishes function/local
 handles, and resolved bodies distinguish source expressions. Store-bound

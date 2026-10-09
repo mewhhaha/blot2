@@ -45,6 +45,14 @@ are immutable. Scratch state is released before final output publication.
 Historical solver semantics use dense version records and explicit cursors;
 ordinary union-find is not an assumed substitute for the reference behavior.
 
+Solver-owned variables may retain a certified resolution in their unused node
+field. A closed answer survives unrelated appended substitutions. An open answer
+also checks the remaining variable's latest write against its chronological
+lower bound. Only current queries of principal variable nodes use this path;
+historical views keep ordinary traversal. Rollback, physical type/effect edits
+and saturated certificate clocks revoke these answers. The certificate is
+nonsemantic metadata and is stripped when variables leave the solver owner.
+
 Inference regions lease arenas that own their solver, constraints and scratch.
 Small buffers use bump storage; larger buffers are recycled within size classes.
 Large remapping preserves live neighboring buffers and every allocation header.
