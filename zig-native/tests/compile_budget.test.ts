@@ -119,7 +119,7 @@ Deno.test("budget: chain_mono N=128 stays linear", async () => {
     await measure(chainMono(128)),
     {
       type_nodes: 10461,
-      allocated_bytes: 6354769,
+      allocated_bytes: 6350930,
       inference_regions: 264,
       region_scopes: 396,
       max_region_scopes: 2,
@@ -186,8 +186,8 @@ Deno.test("budget: fanout N=128 stays linear", async () => {
       max_region_scopes: 2,
       call_collections_closed: 0,
       call_collections_unresolved: 0,
-      solver_passes: 1312,
-      solver_constraint_visits: 3095,
+      solver_passes: 1311,
+      solver_constraint_visits: 2582,
       occurs_steps: 1563,
     },
   );

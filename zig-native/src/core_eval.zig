@@ -3516,6 +3516,16 @@ const ClosureRegion = struct {
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
     const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary };
     const Constraint = struct { target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, solved: bool = false };
+    const Worklists = struct {
+        constraints: @import("solver_worklist.zig").Queue = .{},
+        aliases: @import("solver_worklist.zig").Queue = .{},
+        observed_revision: u64 = 0,
+        fn deinit(self: *Worklists, allocator: Allocator) void {
+            self.constraints.deinit(allocator);
+            self.aliases.deinit(allocator);
+            self.* = undefined;
+        }
+    };
     const Scratch = struct {
         projection_cache: @import("projection_cache.zig").Cache = .{},
         evidence_import_cache: @import("evidence_import_cache.zig").Cache = .{},
@@ -3531,6 +3541,7 @@ const ClosureRegion = struct {
         variables: std.ArrayList(Variable) = .empty,
         edges: std.ArrayList(Edge) = .empty,
         constraints: std.ArrayList(Constraint) = .empty,
+        worklists: ?*Worklists = null,
         selected_targets: std.ArrayList(core.BindingRef) = .empty,
         summary_arguments: std.ArrayList(core.Id) = .empty,
         data_aliases: std.ArrayList(DataAlias) = .empty,
@@ -3543,10 +3554,18 @@ const ClosureRegion = struct {
         witness_inputs: std.AutoHashMapUnmanaged(types.Id, types.Id) = .empty,
 
         pub fn deinit(self: *Scratch, allocator: Allocator) void {
-            inline for (@typeInfo(Scratch).@"struct".field_names) |field| @field(self, field).deinit(allocator);
+            if (self.worklists) |work| {
+                work.deinit(allocator);
+                allocator.destroy(work);
+            }
+            inline for (@typeInfo(Scratch).@"struct".field_names) |field| {
+                if (comptime !std.mem.eql(u8, field, "worklists")) @field(self, field).deinit(allocator);
+            }
             self.* = undefined;
         }
     };
+    reference_scan: bool = false,
+    work_revision: u64 = 0,
     profile_principal: bool = false,
     profile_rejected: u16 = 0,
     profile_input_calls: usize = 0,
@@ -5043,6 +5062,7 @@ const ClosureRegion = struct {
         }
     }
     fn collect(self: *ClosureRegion, scope: u32, body: core.Id) RegionError!void {
+        self.work_revision +|= 1;
         const module = &self.session.units[self.scratch.sources.items[scope].owner];
         if (self.session.receipt_tape) |tape| {
             const source = self.scratch.sources.items[scope];
@@ -5324,7 +5344,7 @@ const ClosureRegion = struct {
     /// Local uses retain their producer's selected data facts. Callable
     /// components keep their own instances and rows; unresolved producer
     /// variables never acquire facts from a use.
-    fn solveDataAliases(self: *ClosureRegion) RegionError!bool {
+    fn solveDataAliasesReference(self: *ClosureRegion) RegionError!bool {
         var changed = false;
         while (true) {
             const before = self.solver.cursor();
@@ -5423,14 +5443,285 @@ const ClosureRegion = struct {
     fn solveMode(self: *ClosureRegion, allow_remaining: bool) RegionError!void {
         while (!try self.solveStep(allow_remaining)) try self.session.call_summaries.drain(self.session);
     }
+    fn synchronizeWork(self: *ClosureRegion) RegionError!void {
+        const a = self.scratch_allocator;
+        const work = &self.scratch.worklists.?.constraints;
+        while (work.entries.items.len < self.scratch.constraints.items.len) {
+            const item = self.scratch.constraints.items[work.entries.items.len];
+            try work.add(a, !item.deferred_member);
+            if (item.solved) work.complete(work.entries.items.len - 1);
+        }
+        const aliases = &self.scratch.worklists.?.aliases;
+        while (aliases.entries.items.len < self.scratch.data_aliases.items.len) {
+            const item = self.scratch.data_aliases.items[aliases.entries.items.len];
+            try aliases.add(a, true);
+            if (item.solved) aliases.complete(aliases.entries.items.len - 1);
+        }
+        work.observe(&self.solver);
+        aliases.observe(&self.solver);
+        if (self.scratch.worklists.?.observed_revision != self.work_revision or self.work_revision == std.math.maxInt(u64)) {
+            work.wakeAll();
+            aliases.wakeAll();
+            self.scratch.worklists.?.observed_revision = self.work_revision;
+        }
+    }
+    fn solveDataAliases(self: *ClosureRegion) RegionError!bool {
+        var changed = false;
+        const work = &self.scratch.worklists.?.aliases;
+        while (true) {
+            const before = self.solver.cursor();
+            var next: usize = 0;
+            while (work.take(next)) |index| {
+                const alias = self.scratch.data_aliases.items[index];
+                const solved = try self.transferDataFacts(alias.principal, alias.instance, 0);
+                self.scratch.data_aliases.items[index].solved = solved;
+                try self.synchronizeWork();
+                if (solved) work.complete(index) else try work.watch(self.scratch_allocator, &self.solver, index, &.{ alias.principal, alias.instance }, false, false);
+                next = index + 1;
+            }
+            if (self.solver.cursor() == before) return changed;
+            changed = true;
+        }
+    }
+    fn needsIndexedWork(self: *const ClosureRegion) bool {
+        return self.scratch.constraints.items.len > 8 or self.scratch.data_aliases.items.len > 8;
+    }
     fn solveStep(self: *ClosureRegion, allow_remaining: bool) RegionError!bool {
+        if (@import("builtin").is_test and self.reference_scan) return self.solveStepReference(allow_remaining);
+        if (self.scratch.worklists == null) {
+            if (!self.needsIndexedWork()) return self.solveStepReference(allow_remaining);
+            const work = try self.scratch_allocator.create(Worklists);
+            work.* = .{};
+            self.scratch.worklists = work;
+        }
+        var fallback = false;
+        const work = &self.scratch.worklists.?.constraints;
+        try self.synchronizeWork();
+        // A summary job can be resumed directly by the session's stack driver,
+        // without going through solveMode after its children finish.
+        work.wakeExternal();
+        while (true) {
+            self.session.counters.solver_passes += 1;
+            var progress = try self.solveDataAliases();
+            const remaining = work.remaining;
+            var next: usize = 0;
+            while (work.take(next)) |index| {
+                self.session.counters.solver_constraint_visits += 1;
+                const state = try self.attemptConstraint(index, fallback);
+                try self.synchronizeWork();
+                if (state == .solved) {
+                    work.complete(index);
+                    progress = true;
+                } else {
+                    const item = self.scratch.constraints.items[index];
+                    try work.watch(self.scratch_allocator, &self.solver, index, &.{ item.left, if (item.kind == .call_summary or item.kind == .invocation) 0 else item.right, item.result, item.signature }, item.kind == .call_summary, item.kind == .type_compare or item.kind == .effect_operation);
+                    work.setWaiting(index, state == .waiting);
+                }
+                next = index + 1;
+            }
+            if (remaining == 0) {
+                _ = try self.closeCertificates();
+                return true;
+            }
+            if (progress or try self.closeCertificates()) {
+                fallback = false;
+                try self.synchronizeWork();
+            } else if (work.waiting != 0) {
+                return false;
+            } else if (try self.expandOpenSummaries()) {
+                // Expansion marks the old summary constraints solved directly.
+                for (self.scratch.constraints.items, 0..) |item, index| if (item.solved and index < work.entries.items.len) work.complete(index);
+                try self.synchronizeWork();
+                fallback = false;
+            } else if (!fallback) {
+                fallback = true;
+                work.wakeAll();
+            } else if (allow_remaining or work.required == 0) {
+                return true;
+            } else {
+                for (self.scratch.constraints.items) |constraint| if (!constraint.solved and constraint.explicit)
+                    return self.failConstraint(constraint, .ambiguous_qualified);
+                return error.UnresolvedType;
+            }
+        }
+    }
+    fn attemptConstraint(self: *ClosureRegion, index: usize, fallback: bool) RegionError!SummaryProgress {
+        const constraint = self.scratch.constraints.items[index];
+        if (constraint.kind == .call_summary) return self.solveSummary(index);
+        if (constraint.kind == .record_merge) {
+            if (try self.solver.mergeRecords(constraint.left, constraint.right)) |merged| {
+                try self.solver.unify(merged, constraint.result);
+                self.scratch.constraints.items[index].solved = true;
+                return .solved;
+            }
+            return .open;
+        }
+        if (constraint.kind == .collection) {
+            const owner_type = self.solver.node(try self.solver.resolve(constraint.left, 0));
+            if (owner_type.tag == .variable) return .open;
+            if (owner_type.tag != .array and owner_type.tag != .list) return error.TypeMismatch;
+            try self.solver.unify(owner_type.a, constraint.result);
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .type_rep or constraint.kind == .effect_rep) {
+            const represented = if (constraint.kind == .type_rep) constraint.left else constraint.signature;
+            if (try self.project(represented) == 0) return .open;
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .invocation) {
+            const selected = self.invocation(constraint) catch |err| return self.sourceSelectionFailure(constraint, err);
+            if (!selected) return .open;
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .physical_field or constraint.kind == .receiver) {
+            if (!try self.solveFieldConstraint(constraint)) return .open;
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .update) {
+            if (!try self.updateConstraint(constraint)) return .open;
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .effect_handler) {
+            var labels: std.ArrayList(types.Effects.Label) = .empty;
+            defer labels.deinit(self.session.allocator);
+            var closed = true;
+            for ([_]types.Id{ constraint.left, constraint.right }) |token_type| {
+                if (token_type == 0) continue;
+                const token = try self.solver.resolve(token_type, 0);
+                if (!try self.solver.equalClosed(token, token)) {
+                    closed = false;
+                    break;
+                }
+                const nominal = self.solver.node(token);
+                if (nominal.tag != .nominal) return error.TypeMismatch;
+                const arguments = try self.session.allocator.dupe(types.Id, self.solver.nominalArguments(nominal));
+                defer self.session.allocator.free(arguments);
+                try labels.append(self.session.allocator, try self.solver.internOperation(.{ .unit = nominal.a, .decl = nominal.b }, arguments));
+            }
+            if (!closed) return .open;
+            const remainder = self.solver.node(try self.solver.resolve(constraint.result, 0));
+            const extended = self.solver.node(try self.solver.resolve(constraint.signature, 0));
+            if (remainder.tag != .function or extended.tag != .function) return error.TypeMismatch;
+            const residual = try self.solver.resolveEffects(remainder.c, 0);
+            try labels.appendSlice(self.session.allocator, self.solver.rowLabels(residual));
+            const row = self.solver.effects.rowAt(labels.items, self.solver.row(residual).tail, self.solver.row(residual).cursor) catch |err| return types.effectError(err);
+            try self.solver.unifyEffects(extended.c, row);
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .type_compare) {
+            const left = try self.sourceWitnessHead(constraint.left);
+            const right = try self.sourceWitnessHead(constraint.right);
+            if (self.solver.node(left).tag == .never or self.solver.node(right).tag == .never) {
+                const target = self.source_entry.?;
+                const point = self.session.units[target.unit].sourceNamePoint(target.binding);
+                return self.session.fail(target.unit, .{ .start = point, .end = point }, .invalid_annotation);
+            }
+            if (try self.project(left) == 0 or try self.project(right) == 0) return .open;
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .type_head) {
+            var head = constraint.left;
+            var depth: usize = 0;
+            while (true) {
+                if (depth >= 1024) return error.TypeLimit;
+                const node = self.solver.node(try self.solver.resolve(head, 0));
+                if (node.tag != .function) break;
+                head = node.b;
+                depth += 1;
+            }
+            if (self.solver.node(try self.solver.resolve(head, 0)).tag == .variable) return .open;
+            try self.solver.unify(head, constraint.right);
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .effect_operation) {
+            var argument_pack = try self.solver.resolve(constraint.right, 0);
+            if (!try self.solver.equalClosed(argument_pack, argument_pack)) {
+                if (!try self.recoverOperationArguments(constraint)) return .open;
+                argument_pack = try self.solver.resolve(constraint.right, 0);
+            }
+            const signature = self.solver.node(try self.solver.resolve(constraint.left, 0));
+            if (signature.tag == .variable) return .open;
+            if (signature.tag != .function) return error.TypeMismatch;
+            const arguments = self.solver.list(.{ .start = self.solver.node(argument_pack).a, .len = self.solver.node(argument_pack).b });
+            const label = try self.solver.internOperation(constraint.identity, arguments);
+            const residual = if (constraint.explicit) 0 else try self.solver.freshEffects();
+            const row = self.solver.effects.row(&.{label}, self.solver.row(residual).tail) catch |err| return types.effectError(err);
+            const selected = try self.solver.functionWithEffects(signature.a, signature.b, row);
+            try self.solver.unify(constraint.left, selected);
+            if (constraint.signature != 0) try self.solver.unify(constraint.signature, selected);
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .field) {
+            if (!try self.solveFieldConstraint(constraint)) return .open;
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .resolver) {
+            const actual = try self.project(constraint.left);
+            if (actual == 0) return .open;
+            const resolver = self.session.evidence.node(actual);
+            if (resolver.tag != .resolver) return error.TypeMismatch;
+            const token = self.session.evidence.node(resolver.a);
+            if (token.tag != .type_constructor) return error.TypeMismatch;
+            const source = self.scratch.sources.items[constraint.scope];
+            const metadata = self.session.units[source.owner].resolverInfo(constraint.node);
+            const target_ = try self.session.resolverTarget(source.owner, constraint.node, metadata, (@as(u64, token.a) << 32) | token.b);
+            const body = self.session.units[target_.unit].body(target_.binding) orelse return error.UnresolvedType;
+            const scope = try self.typeScope(target_.unit);
+            try self.solver.unify(constraint.right, try self.importType(scope, body.scheme.root, 0));
+            try self.collect(scope, body.root);
+            try self.selectedTarget(target_);
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        if (constraint.kind == .resolver_shape) {
+            const actual = try self.project(constraint.left);
+            if (actual == 0) return .open;
+            const provider = self.session.evidence.node(actual);
+            if (provider.tag != .resolver) return error.TypeMismatch;
+            const token = self.session.evidence.node(provider.a);
+            if (token.tag != .type_constructor) return error.TypeMismatch;
+            const result = self.solver.node(try self.solver.resolve(constraint.result, 0));
+            if (result.tag == .variable) {
+                const owner = self.scratch.sources.items[constraint.scope].owner;
+                const module = &self.session.units[owner];
+                const family = (@as(u64, token.a) << 32) | token.b;
+                const nominal = for (module.nominals) |nominal| {
+                    if (self.session.nominalIdentity(owner, nominal.identity.unit, nominal.identity.decl) == family) break nominal;
+                } else return error.UnresolvedType;
+                var arguments: std.ArrayList(types.Id) = .empty;
+                defer arguments.deinit(self.session.allocator);
+                for (0..nominal.parameters.len) |_| try arguments.append(self.session.allocator, try self.solver.fresh());
+                try self.solver.unify(constraint.result, try self.solver.nominal(.{ .unit = token.a, .decl = token.b }, arguments.items));
+            } else if (result.tag != .nominal or result.a != token.a or result.b != token.b) return error.TypeMismatch;
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
+        const selected = if (constraint.kind == .result_dispatch) try self.resultConstraint(constraint) else try self.binaryConstraint(constraint, fallback);
+        if (!selected) return .open;
+        self.scratch.constraints.items[index].solved = true;
+        return .solved;
+    }
+    fn solveStepReference(self: *ClosureRegion, allow_remaining: bool) RegionError!bool {
         var fallback = false;
         while (true) {
+            // A small region can grow while selecting or expanding a body.
+            // Switch before another whole pass once its bounded fast path ends.
+            if (!(@import("builtin").is_test and self.reference_scan) and self.needsIndexedWork()) return self.solveStep(allow_remaining);
             self.session.counters.solver_passes += 1;
             var remaining: usize = 0;
             var required: usize = 0;
             var waiting = false;
-            var progress = try self.solveDataAliases();
+            var progress = try self.solveDataAliasesReference();
             var index: usize = 0;
             while (index < self.scratch.constraints.items.len) : (index += 1) {
                 const constraint = self.scratch.constraints.items[index];
@@ -5438,188 +5729,11 @@ const ClosureRegion = struct {
                 remaining += 1;
                 self.session.counters.solver_constraint_visits += 1;
                 if (!constraint.deferred_member) required += 1;
-                if (constraint.kind == .call_summary) {
-                    switch (try self.solveSummary(index)) {
-                        .solved => progress = true,
-                        .waiting => waiting = true,
-                        .open => {},
-                    }
-                    continue;
+                switch (try self.attemptConstraint(index, fallback)) {
+                    .solved => progress = true,
+                    .waiting => waiting = true,
+                    .open => {},
                 }
-                if (constraint.kind == .record_merge) {
-                    if (try self.solver.mergeRecords(constraint.left, constraint.right)) |merged| {
-                        try self.solver.unify(merged, constraint.result);
-                        self.scratch.constraints.items[index].solved = true;
-                        progress = true;
-                    }
-                    continue;
-                }
-                if (constraint.kind == .collection) {
-                    const owner_type = self.solver.node(try self.solver.resolve(constraint.left, 0));
-                    if (owner_type.tag == .variable) continue;
-                    if (owner_type.tag != .array and owner_type.tag != .list) return error.TypeMismatch;
-                    try self.solver.unify(owner_type.a, constraint.result);
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .type_rep or constraint.kind == .effect_rep) {
-                    const represented = if (constraint.kind == .type_rep) constraint.left else constraint.signature;
-                    if (try self.project(represented) == 0) continue;
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .invocation) {
-                    const selected = self.invocation(constraint) catch |err| return self.sourceSelectionFailure(constraint, err);
-                    if (!selected) continue;
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .physical_field or constraint.kind == .receiver) {
-                    if (!try self.solveFieldConstraint(constraint)) continue;
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .update) {
-                    if (!try self.updateConstraint(constraint)) continue;
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .effect_handler) {
-                    var labels: std.ArrayList(types.Effects.Label) = .empty;
-                    defer labels.deinit(self.session.allocator);
-                    var closed = true;
-                    for ([_]types.Id{ constraint.left, constraint.right }) |token_type| {
-                        if (token_type == 0) continue;
-                        const token = try self.solver.resolve(token_type, 0);
-                        if (!try self.solver.equalClosed(token, token)) {
-                            closed = false;
-                            break;
-                        }
-                        const nominal = self.solver.node(token);
-                        if (nominal.tag != .nominal) return error.TypeMismatch;
-                        const arguments = try self.session.allocator.dupe(types.Id, self.solver.nominalArguments(nominal));
-                        defer self.session.allocator.free(arguments);
-                        try labels.append(self.session.allocator, try self.solver.internOperation(.{ .unit = nominal.a, .decl = nominal.b }, arguments));
-                    }
-                    if (!closed) continue;
-                    const remainder = self.solver.node(try self.solver.resolve(constraint.result, 0));
-                    const extended = self.solver.node(try self.solver.resolve(constraint.signature, 0));
-                    if (remainder.tag != .function or extended.tag != .function) return error.TypeMismatch;
-                    const residual = try self.solver.resolveEffects(remainder.c, 0);
-                    try labels.appendSlice(self.session.allocator, self.solver.rowLabels(residual));
-                    const row = self.solver.effects.rowAt(labels.items, self.solver.row(residual).tail, self.solver.row(residual).cursor) catch |err| return types.effectError(err);
-                    try self.solver.unifyEffects(extended.c, row);
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .type_compare) {
-                    const left = try self.sourceWitnessHead(constraint.left);
-                    const right = try self.sourceWitnessHead(constraint.right);
-                    if (self.solver.node(left).tag == .never or self.solver.node(right).tag == .never) {
-                        const target = self.source_entry.?;
-                        const point = self.session.units[target.unit].sourceNamePoint(target.binding);
-                        return self.session.fail(target.unit, .{ .start = point, .end = point }, .invalid_annotation);
-                    }
-                    if (try self.project(left) == 0 or try self.project(right) == 0) continue;
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .type_head) {
-                    var head = constraint.left;
-                    var depth: usize = 0;
-                    while (true) {
-                        if (depth >= 1024) return error.TypeLimit;
-                        const node = self.solver.node(try self.solver.resolve(head, 0));
-                        if (node.tag != .function) break;
-                        head = node.b;
-                        depth += 1;
-                    }
-                    if (self.solver.node(try self.solver.resolve(head, 0)).tag == .variable) continue;
-                    try self.solver.unify(head, constraint.right);
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .effect_operation) {
-                    var argument_pack = try self.solver.resolve(constraint.right, 0);
-                    if (!try self.solver.equalClosed(argument_pack, argument_pack)) {
-                        if (!try self.recoverOperationArguments(constraint)) continue;
-                        argument_pack = try self.solver.resolve(constraint.right, 0);
-                    }
-                    const signature = self.solver.node(try self.solver.resolve(constraint.left, 0));
-                    if (signature.tag == .variable) continue;
-                    if (signature.tag != .function) return error.TypeMismatch;
-                    const arguments = self.solver.list(.{ .start = self.solver.node(argument_pack).a, .len = self.solver.node(argument_pack).b });
-                    const label = try self.solver.internOperation(constraint.identity, arguments);
-                    const residual = if (constraint.explicit) 0 else try self.solver.freshEffects();
-                    const row = self.solver.effects.row(&.{label}, self.solver.row(residual).tail) catch |err| return types.effectError(err);
-                    const selected = try self.solver.functionWithEffects(signature.a, signature.b, row);
-                    try self.solver.unify(constraint.left, selected);
-                    if (constraint.signature != 0) try self.solver.unify(constraint.signature, selected);
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .field) {
-                    if (!try self.solveFieldConstraint(constraint)) continue;
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .resolver) {
-                    const actual = try self.project(constraint.left);
-                    if (actual == 0) continue;
-                    const resolver = self.session.evidence.node(actual);
-                    if (resolver.tag != .resolver) return error.TypeMismatch;
-                    const token = self.session.evidence.node(resolver.a);
-                    if (token.tag != .type_constructor) return error.TypeMismatch;
-                    const source = self.scratch.sources.items[constraint.scope];
-                    const metadata = self.session.units[source.owner].resolverInfo(constraint.node);
-                    const target_ = try self.session.resolverTarget(source.owner, constraint.node, metadata, (@as(u64, token.a) << 32) | token.b);
-                    const body = self.session.units[target_.unit].body(target_.binding) orelse return error.UnresolvedType;
-                    const scope = try self.typeScope(target_.unit);
-                    try self.solver.unify(constraint.right, try self.importType(scope, body.scheme.root, 0));
-                    try self.collect(scope, body.root);
-                    try self.selectedTarget(target_);
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .resolver_shape) {
-                    const actual = try self.project(constraint.left);
-                    if (actual == 0) continue;
-                    const provider = self.session.evidence.node(actual);
-                    if (provider.tag != .resolver) return error.TypeMismatch;
-                    const token = self.session.evidence.node(provider.a);
-                    if (token.tag != .type_constructor) return error.TypeMismatch;
-                    const result = self.solver.node(try self.solver.resolve(constraint.result, 0));
-                    if (result.tag == .variable) {
-                        const owner = self.scratch.sources.items[constraint.scope].owner;
-                        const module = &self.session.units[owner];
-                        const family = (@as(u64, token.a) << 32) | token.b;
-                        const nominal = for (module.nominals) |nominal| {
-                            if (self.session.nominalIdentity(owner, nominal.identity.unit, nominal.identity.decl) == family) break nominal;
-                        } else return error.UnresolvedType;
-                        var arguments: std.ArrayList(types.Id) = .empty;
-                        defer arguments.deinit(self.session.allocator);
-                        for (0..nominal.parameters.len) |_| try arguments.append(self.session.allocator, try self.solver.fresh());
-                        try self.solver.unify(constraint.result, try self.solver.nominal(.{ .unit = token.a, .decl = token.b }, arguments.items));
-                    } else if (result.tag != .nominal or result.a != token.a or result.b != token.b) return error.TypeMismatch;
-                    self.scratch.constraints.items[index].solved = true;
-                    progress = true;
-                    continue;
-                }
-                const selected = if (constraint.kind == .result_dispatch) try self.resultConstraint(constraint) else try self.binaryConstraint(constraint, fallback);
-                if (!selected) continue;
-                self.scratch.constraints.items[index].solved = true;
-                progress = true;
             }
             if (remaining == 0) {
                 _ = try self.closeCertificates();
@@ -6363,6 +6477,71 @@ fn lexicalSnapshotScenario(backing: Allocator, eligible: usize) !void {
 test "lexical sharing snapshots initial numeric records across growth and preserves quantified type and row independence" {
     for ([_]usize{ 0, 1, 80 }) |eligible| try lexicalSnapshotScenario(std.testing.allocator, eligible);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, lexicalSnapshotScenario, .{@as(usize, 1)});
+}
+
+fn indexedChainScenario(allocator: Allocator, indexed: bool, aliases: bool, count: usize) !u64 {
+    var session = try Session.init(allocator, &.{});
+    defer session.deinit();
+    var region = try ClosureRegion.init(&session);
+    defer region.deinit();
+    region.reference_scan = !indexed;
+    const variables = try allocator.alloc(types.Id, count + 1);
+    defer allocator.free(variables);
+    for (variables) |*variable| variable.* = try region.solver.fresh();
+    var seed: types.Id = types.u32_type;
+    if (!aliases) for (0..count) |_| {
+        seed = try region.solver.array(seed);
+    };
+    try region.solver.unify(variables[0], seed);
+    for (0..count) |offset| {
+        const i = count - offset - 1;
+        if (aliases) {
+            try region.scratch.data_aliases.append(region.scratch_allocator, .{ .principal = variables[i], .instance = variables[i + 1] });
+        } else {
+            try region.scratch.constraints.append(region.scratch_allocator, .{ .kind = .collection, .scope = 0, .node = 0, .left = variables[i], .result = variables[i + 1] });
+        }
+    }
+    try region.solve();
+    try std.testing.expectEqual(types.u32_type, try region.solver.resolve(variables[count], 0));
+    for (region.scratch.constraints.items) |constraint| try std.testing.expect(constraint.solved);
+    for (region.scratch.data_aliases.items) |alias| try std.testing.expect(alias.solved);
+    return session.counters.solver_constraint_visits;
+}
+fn indexedChainAllocationScenario(allocator: Allocator) !void {
+    _ = try indexedChainScenario(allocator, true, false, 4);
+    _ = try indexedChainScenario(allocator, true, false, 12);
+    _ = try indexedChainScenario(allocator, true, true, 12);
+}
+test "indexed solver preserves reverse constraint and data alias chains with bounded visits and allocation recovery" {
+    const a = std.testing.allocator;
+    const ordinary = try indexedChainScenario(a, false, false, 64);
+    const indexed = try indexedChainScenario(a, true, false, 64);
+    try std.testing.expectEqual(@as(u64, 2080), ordinary);
+    try std.testing.expectEqual(@as(u64, 127), indexed);
+    _ = try indexedChainScenario(a, false, true, 64);
+    _ = try indexedChainScenario(a, true, true, 64);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, indexedChainAllocationScenario, .{});
+}
+
+test "indexed solver switches a small completed region to watched work after new aliases arrive" {
+    var session = try Session.init(std.testing.allocator, &.{});
+    defer session.deinit();
+    var region = try ClosureRegion.init(&session);
+    defer region.deinit();
+    var variables: [13]types.Id = undefined;
+    for (&variables) |*variable| variable.* = try region.solver.fresh();
+    try region.solver.unify(variables[0], types.u32_type);
+    for (0..2) |index| try region.scratch.data_aliases.append(region.scratch_allocator, .{ .principal = variables[index], .instance = variables[index + 1] });
+    try region.solve();
+    try std.testing.expect(region.scratch.worklists == null);
+    try std.testing.expectEqual(types.u32_type, try region.solver.resolve(variables[2], 0));
+    for (0..10) |offset| {
+        const index = 11 - offset;
+        try region.scratch.data_aliases.append(region.scratch_allocator, .{ .principal = variables[index], .instance = variables[index + 1] });
+    }
+    try region.solve();
+    try std.testing.expect(region.scratch.worklists != null);
+    try std.testing.expectEqual(types.u32_type, try region.solver.resolve(variables[12], 0));
 }
 
 fn bodyRecipeLower(source: []const u8) !core.Module {

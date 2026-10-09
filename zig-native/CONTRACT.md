@@ -82,6 +82,19 @@ An emitter may memoize successful layout roots only while its source owner, type
 mappings and row mappings remain immutable. Recursive conversions retain their
 ordinary depth checks.
 
+Constraint and data-alias scheduling metadata belongs to the inference region.
+Regions with at most eight items of each kind use bounded scans; larger regions
+own one lazily allocated pair of variable-indexed worklists. A growing region
+switches before another whole pass. Reverse watches and ready bits retain
+numeric IDs, never pointers into growing solver tables. Writes wake work in
+source order; earlier items wait for the next pass, and aliases settle before
+constraints. Rollback, physical edits and saturated generations revoke narrow
+watches. Source collection and completed summary jobs explicitly wake their
+dependent work. Larger or unsupported dependency frontiers retain conservative
+write watches. Every queue buffer and owner is released with its region,
+including partially allocated state. See
+[indexed inference work](INDEXED_SOLVER.md).
+
 Within one inference region, copies of the same closed semantic evidence may
 share solver nodes. Keys include request depth; changing the depth limit revokes
 the cache. Closed evidence contains no solver variables, so substitutions do not

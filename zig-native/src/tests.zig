@@ -1,4 +1,5 @@
 comptime {
+    _ = @import("solver_worklist.zig");
     _ = @import("region_arena.zig");
     _ = @import("restart_cache.zig");
     _ = @import("structural.zig");
