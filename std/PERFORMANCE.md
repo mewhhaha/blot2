@@ -28,10 +28,14 @@ wider rows retain the boxed representation. Extracted values own their storage;
 packing never licenses changing a surviving snapshot or reordering F32 work.
 
 Packing reduces retained storage and construction/conversion work on qualified
-fixtures. It is not a universal traversal speedup: the existing read-only List
-fold fixture uses about 1.9 times the CPU of the preceding boxed layout, and its
-cursor fixture about 1.5 times. That regression remains open. Measure the actual
-traversal and element shape before selecting a representation.
+fixtures. Historical qualification found roughly 1.9 times the CPU for a
+read-only List fold and 1.5 times for its cursor versus the preceding boxed
+layout. The qualified direct-loop span check reduces that three-field fold's CPU
+by about 24% against the packed baseline, with unchanged memory. It does not
+complete the all-width boxed-baseline regression or change cursor emission. See
+[List traversal qualification](../zig-native/LIST_TRAVERSAL.md) for the proof,
+measurements and remaining limits. Measure the actual traversal and element
+shape before selecting a representation.
 
 ## Effects, callbacks and demands
 

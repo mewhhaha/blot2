@@ -113,3 +113,25 @@ test "collection ownership rejects an old value observed after an update and on 
         if (op == .append or op == .prepend) try std.testing.expect(!proof.admits(@intCast(index)));
     };
 }
+
+test "packed List span emission preserves immutable Core under allocation failure" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\entry const run = fn (count: U32) => do:
+        \\  let values = @list.generate count (fn (i: U32) => (i, i, i))
+        \\  let total = 0
+        \\  for pass in 0..2:
+        \\    for (x, y, z) in values:
+        \\      for (first, _, _) in values:
+        \\        total := @u32.add total first
+        \\        break
+        \\      total := @u32.add total (@u32.add x (@u32.add y z))
+        \\  return total
+    );
+    defer module.deinit(a);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    const units = [_]core.Module{module};
+    try packedEmissionFailures(a, &units);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, packedEmissionFailures, .{&units});
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}

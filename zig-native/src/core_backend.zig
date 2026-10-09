@@ -3472,7 +3472,7 @@ const Emitter = struct {
         return .{ .owner = owner, .container = container, .offset = offset, .size = size, .wrapped = wrapped };
     }
     fn loadLocation(self: *Emitter, place: Location, scalar_: Scalar) Error!void {
-        if (place.list_index) |index| if (place.row_words != 0) return self.readListRow(place.owner, index, place.row_words, null);
+        if (place.list_index) |index| if (place.row_words != 0) return self.readListRow(place.owner, index, place.row_words, null, null);
         try self.emit(.local_get, place.container);
         try self.emit(.local_get, place.offset);
         try self.emit(.i32_add, 0);
@@ -4185,7 +4185,7 @@ const Emitter = struct {
                     if (input_list and row_words != 0) {
                         try self.listRowBounds(source, index, row_words);
                         if (op == .cursor_value) {
-                            try self.readListRow(source, index, row_words, try self.cursorCache(locals[0]));
+                            try self.readListRow(source, index, row_words, try self.cursorCache(locals[0]), null);
                         } else {
                             const next = try self.temporary(.i32);
                             try self.emit(.local_get, index);
@@ -4248,7 +4248,7 @@ const Emitter = struct {
             .get => {
                 if (input_list and row_words != 0) {
                     try self.listRowBounds(locals[0], locals[1], row_words);
-                    return self.readListRow(locals[0], locals[1], row_words, null);
+                    return self.readListRow(locals[0], locals[1], row_words, null, null);
                 }
                 try self.arrayBounds(locals[0], locals[1]);
                 if (input_list) {
@@ -4362,7 +4362,7 @@ const Emitter = struct {
         }
         try self.emit(.call, (try self.generator.module.ensureLists()).address);
     }
-    fn readListRow(self: *Emitter, source: u32, index: u32, words: u32, cache: ?[2]u32) Error!void {
+    fn readListRow(self: *Emitter, source: u32, index: u32, words: u32, cache: ?[2]u32, span_end: ?u32) Error!void {
         const base = try self.multiplyLocal(index, words);
         var fields: [16]u32 = undefined;
         for (fields[0..words]) |*field| field.* = try self.temporary(.i32);
@@ -4372,22 +4372,33 @@ const Emitter = struct {
             try self.emit(.local_get, cached[1]);
             try self.emit(.i32_sub, 0);
             try self.emit(.local_set, relative);
-            try self.emit(.local_get, cached[0]);
-            try self.emit(.if_, @backingInt(wasm.ValueType.i32));
-            try self.emit(.local_get, relative);
-            try self.emit(.local_get, cached[0]);
-            try self.emit(.i32_load, heap.offset(heap.ListNode, "length"));
-            try self.emit(.i32_le_u, 0);
-            try self.emit(.local_get, cached[0]);
-            try self.emit(.i32_load, heap.offset(heap.ListNode, "length"));
-            try self.emit(.local_get, relative);
-            try self.emit(.i32_sub, 0);
-            try self.emit(.i32_const, words);
-            try self.emit(.i32_ge_u, 0);
-            try self.emit(.i32_and, 0);
-            try self.emit(.else_, 0);
-            try self.emit(.i32_const, 0);
-            try self.emit(.end, 0);
+            if (span_end) |end| {
+                // A direct loop has resolved the nonempty immutable leaf and
+                // proved base >= its start. List storage is bounded well below
+                // u32 overflow, so only the row's end needs checking here.
+                try self.emit(.local_get, base);
+                try self.emit(.i32_const, words);
+                try self.emit(.i32_add, 0);
+                try self.emit(.local_get, end);
+                try self.emit(.i32_le_u, 0);
+            } else {
+                try self.emit(.local_get, cached[0]);
+                try self.emit(.if_, @backingInt(wasm.ValueType.i32));
+                try self.emit(.local_get, relative);
+                try self.emit(.local_get, cached[0]);
+                try self.emit(.i32_load, heap.offset(heap.ListNode, "length"));
+                try self.emit(.i32_le_u, 0);
+                try self.emit(.local_get, cached[0]);
+                try self.emit(.i32_load, heap.offset(heap.ListNode, "length"));
+                try self.emit(.local_get, relative);
+                try self.emit(.i32_sub, 0);
+                try self.emit(.i32_const, words);
+                try self.emit(.i32_ge_u, 0);
+                try self.emit(.i32_and, 0);
+                try self.emit(.else_, 0);
+                try self.emit(.i32_const, 0);
+                try self.emit(.end, 0);
+            }
             try self.emit(.if_, 0);
             const address = try self.temporary(.i32);
             try self.arrayAddress(cached[0], relative, 4);
@@ -6238,7 +6249,7 @@ const Emitter = struct {
                     try self.emit(.local_set, span[2]);
                     try self.emit(.end, 0);
                     if (words != 0) {
-                        try self.readListRow(array_local, counter, words, .{ span[0], span[1] });
+                        try self.readListRow(array_local, counter, words, .{ span[0], span[1] }, span[2]);
                     } else {
                         try self.emit(.local_get, span[0]);
                         try self.emit(.i32_const, @import("list_runtime.zig").header);

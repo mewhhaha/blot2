@@ -2,7 +2,7 @@
 
 Blot's production compiler is handwritten Zig 0.17. Deno hosts the public
 compiler API, formatter and Wasm guest API. The current compiler passes the
-native suite, all 589 guest/client tests and the zero-finding Zig analyzer gate.
+native suite, all 590 guest/client tests and the zero-finding Zig analyzer gate.
 Language behavior remains defined by [the guide](../compiler/guide.md), with
 ownership rules in [CONTRACT.md](CONTRACT.md).
 
@@ -33,6 +33,11 @@ and project-server restart caches contain validated checkpoint candidates;
 missing, unavailable, incompatible and corrupt caches fall back to compilation.
 Explicit checkpoints remain supported. No evaluated values are trusted merely
 because a checkpoint file exists.
+
+The qualified [List span change](LIST_TRAVERSAL.md) removes redundant leaf
+validation from direct packed-row loops. Its three-field fold fixture uses about
+24% less CPU against the preceding packed compiler, with unchanged guest memory.
+Full traversal and cursor regression closure remain open.
 
 ## Current measurements
 
