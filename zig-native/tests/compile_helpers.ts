@@ -32,13 +32,13 @@ export function equal(actual: unknown, expected: unknown): void {
   if (!Object.is(actual, expected)) throw new Error(`Expected ${String(expected)}, received ${String(actual)}`);
 }
 
-export async function compileExpectedFailure(source: string, code: string, message?: string, options: { prelude?: string } = {}): Promise<void> {
+export async function compileExpectedFailure(source: string, code: string, message?: string, options: { prelude?: string; stdRoot?: string } = {}): Promise<void> {
   const dir = await Deno.makeTempDir({ dir: new URL("../../build", import.meta.url).pathname, prefix: "zig-native-failure-" });
   try {
     const input = `${dir}/program.blot`;
     const output = `${dir}/program.wasm`;
     await Deno.writeTextFile(input, source);
-    const execution = await new Deno.Command(compiler, { args: ["build", input, output, "--prelude", options.prelude ?? new URL("../../std/prelude.blot", import.meta.url).pathname], stdout: "piped", stderr: "piped" }).output();
+    const execution = await new Deno.Command(compiler, { args: ["build", input, output, "--prelude", options.prelude ?? new URL("../../std/prelude.blot", import.meta.url).pathname, ...(options.stdRoot ? ["--std-root", options.stdRoot] : [])], stdout: "piped", stderr: "piped" }).output();
     const text = new TextDecoder().decode(execution.stdout);
     if (execution.success) throw new Error("Expected compilation to fail");
     const records = text.trim().split("\n").map(line => JSON.parse(line));

@@ -170,6 +170,84 @@ pub const Store = struct {
     pub fn fromTypeWithRows(self: *Store, module: *const core.Module, ty: types.Id, mappings: []const Mapping, rows: []const RowMapping, partial: bool) Error!Id {
         return self.fromTypeDepth(module, ty, mappings, rows, 0, partial);
     }
+    /// Copy physical shapes out of one solved live region. Open semantic rows
+    /// remain unknown, and unresolved types remain erased. No solver IDs or
+    /// mutable substitution histories are retained in the representation store.
+    pub fn fromSolver(self: *Store, source: *types.Store, ty: types.Id) Error!Id {
+        var budget: usize = 1_000_000;
+        return self.fromSolverDepth(source, ty, 0, &budget);
+    }
+    fn fromSolverDepth(self: *Store, source: *types.Store, ty: types.Id, depth: usize, budget: *usize) Error!Id {
+        if (depth >= 1024 or budget.* == 0) return error.LayoutLimit;
+        budget.* -= 1;
+        const root = source.resolve(ty, 0) catch |err| return solverError(err);
+        const n = source.node(root);
+        switch (n.tag) {
+            .unit, .boolean, .u32, .f32, .never => return root,
+            .variable => return erased,
+            .absent => return error.UnresolvedType,
+            .type_constructor => return self.intern(.type_constructor, n.a, n.b, &.{}),
+            .array, .list, .cursor, .resolver => return self.intern(switch (n.tag) {
+                .array => .array,
+                .list => .list,
+                .cursor => .cursor,
+                else => .resolver,
+            }, try self.fromSolverDepth(source, n.a, depth + 1, budget), 0, &.{}),
+            .function, .demand, .provider => return self.internWithEffects(switch (n.tag) {
+                .function => .function,
+                .demand => .demand,
+                else => .provider,
+            }, try self.fromSolverDepth(source, n.a, depth + 1, budget), if (n.tag == .function) try self.fromSolverDepth(source, n.b, depth + 1, budget) else 0, try self.fromSolverRow(source, n.c, depth + 1, budget), &.{}),
+            .state_provider => return self.internStateProvider(try self.fromSolverDepth(source, n.a, depth + 1, budget), try self.fromSolverDepth(source, n.b, depth + 1, budget), try self.fromSolverDepth(source, n.c, depth + 1, budget)),
+            .product, .record, .nominal => {
+                var scratch_buffer: [256]u8 align(@alignOf(usize)) = undefined;
+                var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+                const allocator = scratch.allocator();
+                var values: std.ArrayList(u32) = .empty;
+                defer values.deinit(allocator);
+                if (n.tag == .record) {
+                    for (0..n.b) |i| {
+                        const field = source.recordField(n, i);
+                        try values.append(allocator, field.name);
+                        try values.append(allocator, try self.fromSolverDepth(source, field.ty, depth + 1, budget));
+                    }
+                    return self.internRecord(values.items);
+                }
+                const children_ = try allocator.dupe(types.Id, if (n.tag == .nominal) source.nominalArguments(n) else source.list(.{ .start = n.a, .len = n.b }));
+                defer allocator.free(children_);
+                for (children_) |child| try values.append(allocator, try self.fromSolverDepth(source, child, depth + 1, budget));
+                return self.intern(if (n.tag == .product) .product else .nominal, if (n.tag == .nominal) n.a else 0, if (n.tag == .nominal) n.b else 0, values.items);
+            },
+        }
+    }
+    fn fromSolverRow(self: *Store, source: *types.Store, row: types.Effects.Id, depth: usize, budget: *usize) Error!u32 {
+        if (depth >= 1024 or budget.* == 0) return error.LayoutLimit;
+        budget.* -= 1;
+        const root = source.resolveEffects(row, 0) catch |err| return solverError(err);
+        if (source.row(root).tail != .closed) return unknown_row;
+        var labels: std.ArrayList(u32) = .empty;
+        defer labels.deinit(self.allocator);
+        var arguments: std.ArrayList(u32) = .empty;
+        defer arguments.deinit(self.allocator);
+        const source_labels = try self.allocator.dupe(types.Effects.Label, source.rowLabels(root));
+        defer self.allocator.free(source_labels);
+        for (source_labels) |label| {
+            arguments.clearRetainingCapacity();
+            const source_arguments = try self.allocator.dupe(types.Id, source.operationArguments(label));
+            defer self.allocator.free(source_arguments);
+            const identity = source.operation(label).identity;
+            for (source_arguments) |argument| try arguments.append(self.allocator, try self.fromSolverDepth(source, argument, depth + 1, budget));
+            try labels.append(self.allocator, self.effects.internOperation(identity, arguments.items) catch |err| return effectError(err));
+        }
+        return self.effects.internRow(labels.items) catch |err| return effectError(err);
+    }
+    fn solverError(err: types.Error) Error {
+        return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.TypeMismatch => error.TypeMismatch,
+            else => error.LayoutLimit,
+        };
+    }
     pub fn rowFromType(self: *Store, module: *const core.Module, row: types.Effects.Id, mappings: []const Mapping, rows: []const RowMapping, partial: bool) Error!evidence.Effects.Id {
         return self.fromTypeRow(module, row, mappings, rows, 0, partial);
     }
@@ -502,4 +580,58 @@ fn effectLayoutScenario(allocator: Allocator) !void {
 test "layout cache identity and semantic conversion preserve exact closed effect rows" {
     try effectLayoutScenario(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, effectLayoutScenario, .{});
+}
+
+fn solverLayoutScenario(allocator: Allocator) !void {
+    var source = try types.Store.init(allocator);
+    var source_alive = true;
+    defer if (source_alive) source.deinit();
+    var layouts = try Store.init(allocator);
+    defer layouts.deinit();
+    var semantic = try evidence.Store.init(allocator);
+    defer semantic.deinit();
+    const result = try source.fresh();
+    const tail = try source.freshEffects();
+    const phantom = try source.nominal(.{ .unit = 3, .decl = 9 }, &.{types.f32_type});
+    const operation = try source.internOperation(.{ .unit = 2, .decl = 8 }, &.{phantom});
+    const open = source.effects.row(&.{ operation, operation }, source.row(tail).tail) catch |err| return types.effectError(err);
+    const callback = try source.functionWithEffects(types.u32_type, result, open);
+    const shape = try source.record(&.{ .{ .name = 99, .ty = callback }, .{ .name = 7, .ty = try source.array(result) } });
+    const point = source.mark();
+    const initial = try layouts.fromSolver(&source, shape);
+    const initial_callback = layouts.children(initial)[3];
+    try std.testing.expectEqual(erased, layouts.node(initial_callback).b);
+    try std.testing.expectEqual(unknown_row, layouts.node(initial_callback).c);
+    try std.testing.expectError(error.UnresolvedType, layouts.toEvidence(&semantic, initial));
+
+    try source.unify(result, types.f32_type);
+    try source.unifyEffects(tail, 0);
+    const closed = try layouts.fromSolver(&source, shape);
+    const closed_callback = layouts.children(closed)[3];
+    try std.testing.expectEqual(types.f32_type, layouts.node(closed_callback).b);
+    const labels = layouts.effects.view().rowLabels(layouts.node(closed_callback).c);
+    try std.testing.expectEqual(@as(usize, 2), labels.len);
+    try std.testing.expectEqual(labels[0], labels[1]);
+    try std.testing.expectEqual(types.NominalIdentity{ .unit = 2, .decl = 8 }, layouts.effects.view().operation(labels[0]).identity);
+    const argument = layouts.effects.view().operationArguments(labels[0])[0];
+    try std.testing.expectEqualSlices(u32, &.{types.f32_type}, layouts.children(argument));
+    const closed_evidence = try layouts.toEvidence(&semantic, closed);
+
+    source.rollback(point);
+    try std.testing.expectEqual(initial, try layouts.fromSolver(&source, shape));
+    try source.unify(result, types.u32_type);
+    try source.unifyEffects(tail, 0);
+    const different = try layouts.fromSolver(&source, shape);
+    try std.testing.expect(closed != different);
+    source.deinit();
+    source_alive = false;
+    // The region can disappear and recycle every numeric solver ID; copied
+    // shapes remain owned, and open effects never become a pure certificate.
+    try std.testing.expectEqual(closed_evidence, try layouts.toEvidence(&semantic, closed));
+    try std.testing.expectError(error.UnresolvedType, layouts.toEvidence(&semantic, initial));
+    try std.testing.expectEqual(types.u32_type, layouts.node(layouts.children(different)[3]).b);
+}
+test "solved representation projection owns partial shapes without certifying open effects" {
+    try solverLayoutScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, solverLayoutScenario, .{});
 }

@@ -317,6 +317,33 @@ and each index are evaluated once, left to right, before the replacement; `self`
 is the old value at the selected leaf. Existing aliases keep the old root. As
 with plain `:=`, the replacement must be pure; use `use` first for effects.
 
+`std/path` packages pure getters and setters as
+`Path source target focus replacement`. `make read write` constructs a path,
+`get path source` reads its focus, and `set path replacement source` returns the
+target. `modify path transform source` applies the transform once to the old
+focus; the transform may perform effects. Each ordinary argument evaluates once,
+left to right. Paths construct successors, so existing aliases and untouched
+fields, including callbacks, keep their values.
+
+`compose outer inner` selects the inner focus within the outer focus. Setters
+rebuild from the inner target outward, allowing the replacement and enclosing
+record types to change. `identity` selects the whole value. These are ordinary
+source functions; custom getters and setters must be pure, and the type checker
+checks their common source type and every composition boundary.
+
+```blot
+import * as path from "std/path"
+const position = path.make (fn source => source.position)
+  (fn replacement => fn source => @record.merge source { position: replacement })
+const x = path.make (fn source => source.x)
+  (fn replacement => fn source => @record.merge source { x: replacement })
+const position_x = path.compose position x
+entry const answer = fn () => do:
+  let original = { position: { x: 40, y: 7 }, health: 2 }
+  let changed = path.set position_x 2.5 original
+  return @f32.add (path.get position_x changed) (@u32.to_f32 original.health)
+```
+
 Generic functions depending on dispatch monomorphize at their uses before const
 evaluation and Wasm emission, including closures and recursion. No runtime
 member lookup. Dispatch whose operand types (for members and fields: the

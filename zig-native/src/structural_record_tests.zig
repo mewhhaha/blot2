@@ -7,6 +7,7 @@ const core = @import("core.zig");
 const eval = @import("core_eval.zig");
 const backend = @import("core_backend.zig");
 const layout = @import("layout.zig");
+const types = @import("types.zig");
 
 const source =
     \\type Point = { x: U32, y: F32 }
@@ -101,4 +102,68 @@ test "constant record merge interns shapes across repeated updates" {
     try std.testing.expectEqual(@as(u32, 42), value.bits);
     // Empty shape, the input/result shape, and the replacement shape.
     try std.testing.expectEqual(@as(usize, 3), session.record_layouts.items.len);
+}
+
+const path_source =
+    \\const position = make (fn value => value.position)
+    \\  (fn replacement => fn value => @record.merge value { position: replacement })
+    \\const x = make (fn value => value.x)
+    \\  (fn replacement => fn value => @record.merge value { x: replacement })
+    \\const position_x = compose position x
+    \\const original = { position: { x: 40, y: 7 }, kept: 2, callback: fn value => @u32.add value 40 }
+    \\const changed = set position_x 2.5 original
+    \\entry const answer = @u32.add original.position.x changed.kept
+    \\entry const runtime = fn (value: U32) => get identity value
+    \\entry const composed = fn (value: U32) => do:
+    \\  let initial = { position: { x: value, y: 7 }, kept: 2, callback: fn argument => @u32.add argument value }
+    \\  let changed = set position_x 2.5 initial
+    \\  return get position_x changed
+    \\entry const effects = fn (send: U32 -> U32 ! {Foreign}) => do:
+    \\  let initial = { position: { x: 40, y: 7 }, callback: fn value => send value }
+    \\  let changed = set position_x 2.5 initial
+    \\  let focus = get position_x changed
+    \\  return @f32.add focus (@u32.to_f32 (changed.callback 2))
+    \\entry const callback = fn () => changed.callback 2
+    \\const inner = make (fn source => source.inner)
+    \\  (fn replacement => fn source => @record.merge source { inner: replacement })
+    \\const deep_x = compose inner (compose inner (compose inner (compose inner x)))
+    \\entry const deep = fn (value: U32) => do:
+    \\  let callback = fn argument => @u32.add argument value
+    \\  let initial = { inner: { inner: { inner: { inner: { x: value, callback }, callback }, callback }, callback }, callback }
+    \\  let changed = set deep_x 2.5 initial
+    \\  return get deep_x changed
+    \\entry const deep_effects = fn (send: U32 -> U32 ! {Foreign}) => do:
+    \\  let callback = fn argument => send argument
+    \\  let initial = { inner: { inner: { inner: { inner: { x: 40, callback }, callback }, callback }, callback }, callback }
+    \\  let changed = set deep_x 2.5 initial
+    \\  return @f32.add (get deep_x changed) (@u32.to_f32 (changed.callback 2))
+    \\entry const deep_closed = fn (value: U32) => get deep_x { inner: { inner: { inner: { inner: { x: value, callback: #False }, callback: #False }, callback: #False }, callback: #False }, callback: #False }
+;
+
+fn pathFrontend(allocator: std.mem.Allocator, input: []const u8) !void {
+    var module = try lowerInput(allocator, input);
+    defer module.deinit(allocator);
+}
+
+test "typed paths keep unobserved generic accessors staged through allocation failure" {
+    const allocator = std.testing.allocator;
+    const io = std.testing.io;
+    const library = std.Io.Dir.cwd().readFileAlloc(io, "std/path.blot", allocator, .limited(65536)) catch |err| switch (err) {
+        error.FileNotFound => try std.Io.Dir.cwd().readFileAlloc(io, "../std/path.blot", allocator, .limited(65536)),
+        else => return err,
+    };
+    defer allocator.free(library);
+    const input = try allocator.print("{s}\n{s}", .{ library, path_source });
+    defer allocator.free(input);
+    var module = try lowerInput(allocator, input);
+    defer module.deinit(allocator);
+    const saved = try allocator.dupe(types.Node, module.types.nodes);
+    defer allocator.free(saved);
+    try evaluate(allocator, &module);
+    try emit(allocator, &module);
+    const failures = @import("allocation_failures.zig");
+    try failures.checkAllAllocationFailures(allocator, pathFrontend, .{input});
+    try failures.checkAllAllocationFailures(allocator, evaluate, .{&module});
+    try failures.checkAllAllocationFailures(allocator, emit, .{&module});
+    try std.testing.expectEqualDeep(saved, module.types.nodes);
 }

@@ -54,6 +54,7 @@ pub const Service = struct {
     refinement_stats: *refinement_receipt.Stats,
     refinement_regions: *usize,
     cache: ?Cache = null,
+    code_projection: ?core_eval.CodeProjection = null,
     failure: ?Failure = null,
 
     fn unit(self: *const Service, id: u32) *const core.Module {
@@ -140,7 +141,7 @@ pub const Service = struct {
         const bridge = self.bridge;
         const result_handle = bridge.toCodeExpectation(@fromBackingInt(@intCast(expected))) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
         const result = @backingInt(result_handle);
-        const enabled = self.cache != null and captures.len == 0 and self.evaluator.receipt_tape == null;
+        const enabled = self.cache != null and captures.len == 0 and self.code_projection == null and self.evaluator.receipt_tape == null;
         const cached = if (enabled) try self.cache.?.lookup(self.cache.?.context, root, bridge.partialView(), result, seeds.items, row_seeds.items) else null;
         var solved = cached orelse fresh: {
             self.refinement_regions.* += 1;
@@ -162,7 +163,7 @@ pub const Service = struct {
             const before_steps = self.evaluator.steps;
             var output = switch (root) {
                 .body => |target| self.evaluator.bodyEvidencePartialFull(target, bridge.partialView(), result, seeds.items, row_seeds.items),
-                .closure => |closure_| self.evaluator.closureEvidencePartialCaptures(closure_.unit, closure_.catalog, bridge.partialView(), result, seeds.items, row_seeds.items, captures),
+                .closure => |closure_| self.evaluator.closureEvidencePartialCapturesCode(closure_.unit, closure_.catalog, bridge.partialView(), result, seeds.items, row_seeds.items, captures, self.code_projection),
             } catch |err| switch (err) {
                 error.RequestUnwind => return self.evaluationFailure(),
                 error.Declined => return self.evaluationFailure(),

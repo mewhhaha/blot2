@@ -88,6 +88,25 @@ const ConstructorKey = code_artifacts.ConstructorKey;
 const PrimitiveKey = code_artifacts.PrimitiveKey;
 const OperationKey = code_artifacts.OperationKey;
 const SerializedKey = struct { value: core_eval.ValueId, ty: layout.Id, suspension: bool = false };
+const StaticCodeProjection = struct {
+    generator: *Generator,
+    mappings: *std.ArrayList(Mapping),
+    fn mapping(context: *anyopaque, solver: *types.Store, variable: types.Id, root: types.Id) (types.Error || error{UnresolvedType})!void {
+        const self: *@This() = @ptrCast(@alignCast(context));
+        for (self.mappings.items) |entry| if (entry.variable == variable and entry.layout != layout.erased) return;
+        const concrete = self.generator.layouts.fromSolver(solver, root) catch |err| return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.TypeMismatch => error.TypeMismatch,
+            error.UnresolvedType => error.UnresolvedType,
+            error.LayoutLimit => error.TypeLimit,
+        };
+        for (self.mappings.items) |*entry| if (entry.variable == variable) {
+            entry.layout = concrete;
+            return;
+        };
+        try self.mappings.append(self.generator.allocator, .{ .variable = variable, .layout = concrete });
+    }
+};
 const specialization = @import("specialization.zig");
 const refinement_receipt = @import("refinement_receipt.zig");
 const EvidenceRoot = refinement_receipt.Root;
@@ -746,6 +765,10 @@ const Generator = struct {
                 const captures = source.extra[closure_.captures.start..][0..closure_.captures.len];
                 if (captures.len != child_count) return self.fail(metadata.unit, closure_.body, .constant_expression);
                 for (captures, 0..) |binding, index| try child_types.append(self.allocator, try self.captureLayout(metadata.unit, binding, self.evaluator.valueChildren(id)[index], &mappings, &rows));
+                for (child_types.items) |capture_type| {
+                    var budget: usize = 1_000_000;
+                    if (!self.retainedLayoutConcrete(capture_type, false, 0, &budget)) return self.serializeStagedClosure(id, ty);
+                }
                 // Contextual effect widening preserves the retained implementation's row.
                 const implementation_type = if (closure_.function_type == 0) ty else try self.codeLayoutWithRows(metadata.unit, closure_.function_type, mappings.items, rows.items, source.span(closure_.body));
                 function_id = try self.closureFunction(.{ .unit = metadata.unit, .catalog = metadata.identity, .ty = implementation_type, .captures = try self.internLayout(.product, 0, 0, child_types.items), .evidence = try self.mappingEvidence(mappings.items), .rows = try self.rowMappingEvidence(rows.items) });
@@ -770,6 +793,70 @@ const Generator = struct {
         const address = try self.closureData(function_id, environment);
         try self.serialized.put(self.allocator, .{ .value = id, .ty = ty }, address);
         return address;
+    }
+    /// A closed selected interface can capture generic helpers whose unused
+    /// interfaces remain open. Keep the exact live graph while proving and
+    /// emitting this invocation, rather than serializing those open helpers.
+    fn serializeStagedClosure(self: *Generator, value: core_eval.ValueId, ty: layout.Id) Error!u32 {
+        const header = self.evaluator.closureInfo(value);
+        const source = self.unit(header.unit);
+        const metadata = source.closures[header.identity];
+        const bindings = source.extra[metadata.captures.start..][0..metadata.captures.len];
+        const captured = try self.allocator.dupe(core_eval.ValueId, self.evaluator.valueChildren(value));
+        defer self.allocator.free(captured);
+        if (bindings.len != captured.len) return self.fail(header.unit, metadata.body, .unsupported);
+        var mappings: std.ArrayList(Mapping) = .empty;
+        defer mappings.deinit(self.allocator);
+        var rows: std.ArrayList(RowMapping) = .empty;
+        defer rows.deinit(self.allocator);
+        for (self.evaluator.type_mappings.items[header.mappings.start..][0..header.mappings.len]) |mapping| {
+            const concrete = self.fromEvidence(mapping.evidence) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.fail(header.unit, metadata.body, .unresolved_type);
+            try self.mapType(header.unit, &mappings, mapping.variable, concrete, source.span(metadata.body));
+        }
+        try self.loadSemanticRows(self.evaluator.row_mappings.items[header.row_mappings.start..][0..header.row_mappings.len], &rows);
+        const arrow = self.layouts.node(ty);
+        if (metadata.function_type != 0) {
+            try self.mapCapturedFunction(header.unit, metadata.function_type, ty, &mappings, &rows, source.span(metadata.body));
+        } else {
+            try self.mapType(header.unit, &mappings, metadata.parameter.ty, arrow.a, metadata.parameter.span);
+            try self.mapType(header.unit, &mappings, source.typeOf(metadata.body), arrow.b, source.span(metadata.body));
+        }
+        const hints = try self.allocator.alloc(core_eval.RetainedCapture, captured.len);
+        defer self.allocator.free(hints);
+        for (bindings, captured, hints) |binding, actual, *hint| hint.* = .{ .binding = binding, .unit = header.unit, .node = 0, .value = actual };
+        try self.refineAccessorMappings(header.unit, header.identity, ty, &mappings, &rows, source.span(metadata.body), hints);
+        const function_id = try self.capturedClosureFunction(header, ty, captured, mappings.items, rows.items);
+        const address = try self.closureData(function_id, 0);
+        try self.serialized.put(self.allocator, .{ .value = value, .ty = ty }, address);
+        return address;
+    }
+    /// Private helpers consume exact live captures. Their enclosing artifact
+    /// must rebuild; neither a closed semantic receipt nor a portable code key
+    /// can represent the partial capture graph.
+    fn capturedClosureFunction(self: *Generator, header: core_eval.ClosureValue, ty: layout.Id, captured: []const core_eval.ValueId, mappings: []const Mapping, rows: []const RowMapping) Error!u32 {
+        const source = self.unit(header.unit);
+        const metadata = source.closures[header.identity];
+        const bindings = source.extra[metadata.captures.start..][0..metadata.captures.len];
+        if (self.instance_depth >= 256) return self.fail(header.unit, metadata.body, .complexity);
+        self.instance_depth += 1;
+        defer self.instance_depth -= 1;
+        if (self.artifacts) |artifacts| artifacts.requireFreshCode();
+        const arrow = self.layouts.node(ty);
+        const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b));
+        try self.static_closures.append(self.allocator, function_id);
+        self.work.fresh_closures += 1;
+        try self.startup_facts.request(self.allocator, function_id, .anonymous, header.unit, header.identity, false);
+        const caller = self.startup_facts.active;
+        self.startup_facts.active = function_id;
+        defer self.startup_facts.active = caller;
+        var emitter: Emitter = .{ .generator = self, .unit_id = header.unit, .function_id = function_id, .provider_local = 2, .mappings = mappings, .row_mappings = rows };
+        defer emitter.deinit();
+        if (metadata.parameter.binding != 0) try emitter.locals.put(self.allocator, metadata.parameter.binding, 1);
+        for (bindings, captured) |binding, actual| try emitter.static_values.put(self.allocator, binding, actual);
+        try emitter.expression(metadata.body, 0);
+        if (source.types.node(source.typeOf(metadata.body)).tag == .never) try emitter.emit(.unreachable_, 0);
+        self.startup_facts.complete(function_id);
+        return function_id;
     }
     fn serializeNamedClosure(self: *Generator, id: core_eval.ValueId, ty: layout.Id, depth: usize) Error!u32 {
         const metadata = self.evaluator.closureInfo(id);
@@ -991,6 +1078,22 @@ const Generator = struct {
     fn refineMappingsCaptures(self: *Generator, unit_id: u32, root: EvidenceRoot, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span, captures: []const core_eval.RetainedCapture) Error!void {
         var service = try self.specializer();
         service.refineMappingsCaptures(unit_id, root, expected, mappings, rows, span, captures) catch |err| return self.specializationFailure(service, err);
+    }
+    fn refineAccessorMappings(self: *Generator, unit_id: u32, catalog: u32, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span, captures: []const core_eval.RetainedCapture) Error!void {
+        var projection: StaticCodeProjection = .{ .generator = self, .mappings = mappings };
+        var service = try self.specializer();
+        service.code_projection = .{ .context = &projection, .mapping = StaticCodeProjection.mapping };
+        service.refineMappingsCaptures(unit_id, .{ .closure = .{ .unit = unit_id, .catalog = catalog } }, expected, mappings, rows, span, captures) catch |err| return self.specializationFailure(service, err);
+    }
+    fn mapCapturedFunction(self: *Generator, unit_id: u32, function_type: types.Id, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span) Error!void {
+        const source = self.unit(unit_id).types.node(function_type);
+        const actual = self.layouts.node(expected);
+        if (source.tag != .function or actual.tag != .function) return self.decline(unit_id, span, .unresolved_type);
+        try self.mapTypeDepth(unit_id, mappings, rows, source.a, actual.a, span, 0);
+        try self.mapTypeDepth(unit_id, mappings, rows, source.b, actual.b, span, 0);
+        // A pure implementation can run under its caller's larger ambient
+        // effect row. Parameter and result rows keep exact checking above.
+        try self.mapRow(unit_id, mappings, rows, source.c, actual.c, span, true);
     }
     fn findRetained(self: *Generator, retained: *artifact_fragment.State, request: code_artifacts.Request) Allocator.Error!?u32 {
         const timing = self.work_timing.enter(.lookup);
@@ -5333,6 +5436,102 @@ const Emitter = struct {
         try self.emit(.end, 0);
         try self.emit(.local_get, cached);
     }
+    // A selected getter may accept data containing an unobserved callback row.
+    // Its ABI is concrete even though that nested row has no closed semantic
+    // header. Keep the actual closure/captures in this Session and prove its
+    // body against the selected code shape instead of materializing that row.
+    // Inlining limits select emission strategy, never source admission.
+    fn staticApply(self: *Emitter, id: core.Id, depth: usize) Error!bool {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const node = source.node(id);
+        if (self.static_values.count() == 0) return false;
+        const value = try self.staticReference(node.a) orelse return false;
+        if (g.evaluator.valueInfo(value).kind != .closure) return false;
+        const header = g.evaluator.closureInfo(value);
+        if (header.origin != .anonymous) return false;
+        const ty = try self.codeLayout(source.typeOf(node.a), source.span(id));
+        const arrow = g.layouts.node(ty);
+        if (arrow.tag != .function or arrow.c == layout.unknown_row) return false;
+        if (g.toEvidence(ty)) |_| return false else |err| switch (err) {
+            error.UnresolvedType => {},
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return false,
+        }
+        if (self.hasErasedType(ty, 0)) return false;
+        const producer = g.unit(header.unit);
+        const metadata = producer.closures[header.identity];
+        const bindings = producer.extra[metadata.captures.start..][0..metadata.captures.len];
+        const captured = try g.allocator.dupe(core_eval.ValueId, g.evaluator.valueChildren(value));
+        defer g.allocator.free(captured);
+        if (bindings.len != captured.len) return g.fail(header.unit, metadata.body, .unsupported);
+        if (g.artifacts) |artifacts| artifacts.requireFreshCode();
+        var mappings: std.ArrayList(Mapping) = .empty;
+        defer mappings.deinit(g.allocator);
+        var rows: std.ArrayList(RowMapping) = .empty;
+        defer rows.deinit(g.allocator);
+        for (g.evaluator.type_mappings.items[header.mappings.start..][0..header.mappings.len]) |mapping| {
+            const concrete = g.fromEvidence(mapping.evidence) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(header.unit, metadata.body, .unresolved_type);
+            try g.mapType(header.unit, &mappings, mapping.variable, concrete, producer.span(metadata.body));
+        }
+        try g.loadSemanticRows(g.evaluator.row_mappings.items[header.row_mappings.start..][0..header.row_mappings.len], &rows);
+        if (metadata.function_type != 0) {
+            try g.mapCapturedFunction(header.unit, metadata.function_type, ty, &mappings, &rows, producer.span(metadata.body));
+        } else {
+            try g.mapType(header.unit, &mappings, metadata.parameter.ty, arrow.a, metadata.parameter.span);
+            try g.mapType(header.unit, &mappings, producer.typeOf(metadata.body), arrow.b, producer.span(metadata.body));
+        }
+        const hints_len = std.math.add(usize, captured.len, @intFromBool(metadata.parameter.binding != 0)) catch return g.fail(header.unit, metadata.body, .complexity);
+        const hints = try g.allocator.alloc(core_eval.RetainedCapture, hints_len);
+        defer g.allocator.free(hints);
+        for (bindings, captured, hints[0..captured.len]) |binding, actual, *hint| {
+            hint.* = .{ .binding = binding, .unit = header.unit, .node = 0, .value = actual };
+        }
+        var argument_rows: std.ArrayList(type_evidence.RowMapping) = .empty;
+        defer argument_rows.deinit(g.allocator);
+        for (self.row_mappings) |mapping| {
+            if (mapping.row == layout.unknown_row) continue;
+            const evidence = g.rowToEvidence(mapping.row) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .unresolved_type);
+            try argument_rows.append(g.allocator, .{ .variable = mapping.variable, .evidence = evidence });
+        }
+        if (metadata.parameter.binding != 0) hints[captured.len] = .{
+            .binding = metadata.parameter.binding,
+            .unit = self.unit_id,
+            .node = node.b,
+            .mappings = try g.mappingEvidence(self.mappings),
+            .rows = argument_rows.items,
+            .signature_only = true,
+        };
+        // The caller's frozen argument signature retains known effect labels
+        // beside its open tails. These live hints disable semantic receipts.
+        try g.refineAccessorMappings(header.unit, header.identity, ty, &mappings, &rows, producer.span(metadata.body), hints);
+        const argument = try self.capture(node.b, depth);
+        const inline_body = self.inline_depth < 6 and g.module.functions.items[self.function_id].instructions.items.len <= 4096 and @import("inline_body.zig").cost(producer, metadata.body) != null;
+        if (!inline_body) {
+            const function_id = try g.capturedClosureFunction(header, ty, captured, mappings.items, rows.items);
+            try self.emit(.i32_const, 0);
+            try self.emit(.local_get, argument);
+            try self.providerHead();
+            try self.emit(.call, function_id);
+            return true;
+        }
+        var emitter: Emitter = .{
+            .generator = g,
+            .unit_id = header.unit,
+            .function_id = self.function_id,
+            .provider_local = self.provider_local,
+            .mappings = mappings.items,
+            .row_mappings = rows.items,
+            .cleanups = .{ .parent = &self.cleanups },
+            .labels = self.labels,
+            .inline_depth = self.inline_depth + 1,
+        };
+        defer emitter.deinit();
+        if (metadata.parameter.binding != 0) try emitter.locals.put(g.allocator, metadata.parameter.binding, argument);
+        for (bindings, captured) |binding, actual| try emitter.static_values.put(g.allocator, binding, actual);
+        try emitter.expression(metadata.body, depth + 1);
+        return true;
+    }
     fn apply(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
@@ -5342,6 +5541,7 @@ const Emitter = struct {
             try self.emit(.unreachable_, 0);
             return;
         }
+        if (try self.staticApply(id, depth)) return;
         if (try self.partialStaticCall(id, depth)) return;
         if (@import("known_call.zig").resolve(g.units, self.unit_id, id)) |known| {
             if (known.signature != 0) {
@@ -6560,7 +6760,9 @@ const Emitter = struct {
         const n = source.node(id);
         // Concrete values use ordinary runtime loads. This path retains only
         // a constant whose polymorphic children cannot yet have one layout.
-        if (g.layouts.fromType(source, source.typeOf(n.b), self.mappings)) |_| return false else |err| if (err == error.OutOfMemory) return error.OutOfMemory;
+        if (g.layouts.fromType(source, source.typeOf(n.b), self.mappings)) |ty| {
+            if (!self.hasErasedType(ty, 0)) return false;
+        } else |err| if (err == error.OutOfMemory) return error.OutOfMemory;
         const value = try self.staticReference(n.b) orelse return false;
         var bindings: std.ArrayList(StaticBinding) = .empty;
         defer bindings.deinit(g.allocator);

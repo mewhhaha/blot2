@@ -25,6 +25,16 @@ keep the existing stable artifact-owner identity and validity checks. Dynamic
 member selection, closure captures and staging still request semantic work as
 needed; this boundary does not assume every expression was monomorphized early.
 
+Constant aggregates can retain unobserved polymorphic accessors while selected
+fields lower with their own concrete use types. For an anonymous callable whose
+argument contains an open callback row, source emission proves the body against
+the selected code shape and the caller's frozen argument signature. Solved
+partial physical shapes retain unknown rows without becoming semantic evidence.
+Exact live captures stay within that Session; these hints disable semantic
+receipts and executable-fragment reuse. Bounded inlining selects small bodies;
+private functions handle larger bodies and deeper composition. Runtime argument
+order, ambient effect widening and cleanup retain ordinary call semantics.
+
 A completed closure specialization also proves its frozen closure and demand
 captures at their exact evidence. The evaluator publishes those fixed points
 together, after reserving all cache entries, so later requests do not recheck or

@@ -24,6 +24,21 @@ AST IDs, type IDs and instruction IDs are 32-bit indexes into contiguous owned
 tables. Lists are spans in side arrays. There are no per-character nodes,
 semantic linked lists or persistent tree maps in hot mutable state.
 
+A staged callable may accept data containing unobserved open callback rows.
+Selected source emission retains that callable and its exact Session-owned
+captures without materializing a closed semantic header. It rechecks the body
+against the selected concrete type positions and imports the caller's frozen
+argument signature, preserving known effect labels beside open tails. A pure
+implementation can run under a larger caller ambient; parameter and result rows
+retain their exact checks. These live hints disable semantic receipts and
+executable fragment reuse. They never enter a dependency archive or certify
+erased type positions. A synchronous projection copies partial physical shapes
+out of the solved region without retaining solver IDs; open rows stay unknown.
+Small bodies inline with inherited cleanups, and larger or deeply composed
+bodies use private functions. Runtime arguments evaluate once in their original
+order. Private functions have ordinary invocation-local cleanup and provider
+scopes.
+
 Individual compilations use owned arrays and explicit deinitialization, not an
 unbounded arena of obsolete inference versions. Published syntax/typed bodies
 are immutable. Scratch state is released before final output publication.

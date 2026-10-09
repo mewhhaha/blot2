@@ -213,6 +213,26 @@ Inference regions fall from 2,440 to 2,036 and constraint visits from 48,860 to
 higher-order partitioning target remains open. Wasm matched in every phase.
 Results are in ignored `build/bench/parametric-leaves-final`.
 
+The older extensible-record direction now includes `std/path`: pure
+getter/setter bundles, identity and composition, type-changing writes and
+effectful modification. A selected accessor can retain unobserved callback rows
+through source emission with exact live capture and argument-signature proofs;
+these hints cannot enter semantic receipts or reusable code fragments. Small
+bodies inline; private functions preserve larger bodies and deep compositions.
+Partial physical projections copy solved shapes without certifying open rows.
+Native allocation-failure/immutability laws and sync/JSPI, dependency,
+checkpoint and failed-edit recovery tests pass, including twelve-level paths,
+large accessors, early returns and effectful untouched callbacks. The full gate
+passes with 577 guest/client tests and zero analyzer findings. A 725-invocation
+existing-program comparison preserves diagnostics, constant steps, code-instance
+counts and Wasm.
+
+Seven paired gdev runs measured 636 / 637 ms fresh CPU, unchanged 730 ms
+population and unchanged 150 ms first edit. Subsequent edit CPU was 130 / 140
+ms. Requested allocation and deterministic work counters are unchanged, and Wasm
+matches in every phase. No performance gain is claimed. Results are in ignored
+`build/bench/typed-paths-qualified`. Other language directions remain open.
+
 ### Hills 1 (backend) and 3: summaries instead of unfolding
 
 Root cause: `ClosureRegion.collectCall` (`core_eval.zig`, about line 4432)

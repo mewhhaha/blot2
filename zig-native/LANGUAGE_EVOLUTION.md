@@ -17,9 +17,11 @@ generic/imported type aliases retained in dependency interfaces. Named contracts
 compose parameterized predicate bundles, including imported and qualified
 contracts, with separately instantiated evidence and latent rows. Record
 literals, exact record aliases, field-preserving type-changing updates, and
-generic `@record.merge` now share stable layouts. Their contracts survive
-imports and serialized dependencies. Completion gates below remain open unless
-explicitly documented as current behavior in the language guide.
+generic `@record.merge` now share stable layouts. `std/path` provides pure
+getter/setter paths, whole-value identity, composition, type-changing writes and
+effectful modification. Their contracts survive imports and serialized
+dependencies. Completion gates below remain open unless explicitly documented as
+current behavior in the language guide.
 
 | Direction                   | First executable boundary                                                                            | Completion gate                                                                         |
 | --------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -28,7 +30,7 @@ explicitly documented as current behavior in the language guide.
 | 3. Generic contracts        | Implemented: named, parameterized bundles of existing predicates with imports and dependency bundles | Associated type members, implementation declarations, richer evidence diagnostics       |
 | 4. Generic scoped effects   | Symbolic operation arguments in written rows                                                         | Distinct same-typed instances, handler subtraction, escaping-capability rejection       |
 | 5. Usage/lifetime contracts | Inferred usage/capture facts with checked boundaries                                                 | Unique/shared, borrowed, once/many, resource cleanup, sound separate compilation        |
-| 6. Extensible records       | Structural rows and field-preserving updates                                                         | Composable typed paths, stable layout, sharing and evaluation-order laws                |
+| 6. Extensible records       | Implemented: structural rows, stable layouts, type-changing updates and `std/path` composition       | Passed: aliases, captured callbacks, effect ordering, dependencies and checkpoints      |
 | 7. Polymorphic packages     | Annotated higher-rank inputs and existential packages                                                | Skolem-escape rejection, evidence passing, specialization, heterogeneous packages       |
 | 8. Typed staging            | Typed asset module construction at a host boundary                                                   | Typed Blot code values, descriptors, hygienic generation, exact staged dependencies     |
 | 9. Erased proofs            | Explicit witnesses for bounded numeric/index facts                                                   | Branch facts, bounds-check elimination, erased evidence, bounded checking costs         |
@@ -78,29 +80,19 @@ remain importable. Named contracts publish only parameter patterns and ordinary
 predicate templates; their source AST and inference scratch do not escape into
 dependency files.
 
-## Verification checkpoint — 2026-10-06
+## Verification
 
-`deno task test:compiler` passes: the native suite and 501 guest/client tests.
-The editor grammar/highlight checks and formatter checks pass. The analyzer
-reports no errors and 122 warnings: 121 pre-existing findings and one ownership
-warning for nested binding names in `Snapshot.clone`. Those names are released
-by `Snapshot.deinit`; exhaustive allocation-failure checks cover cloning and
-cleanup. The startup-stall fixture uses the normal two-second allowance so its
-PID is recorded before intentionally withholding the protocol greeting.
+The current native suite, 577 guest/client tests and zero-finding analyzer gate
+pass. Typed-path laws cover type-changing composition, identity, aliases,
+captured callbacks, twelve-level composition, large accessors, early returns,
+effect sequencing, incompatible source types, effectful accessor rejection,
+dependency bundles, checkpoints and failed-edit recovery. Native
+allocation-failure sweeps also check frozen-Core immutability. A separate
+725-invocation comparison preserves existing diagnostics, constant steps,
+code-instance counts and Wasm bytes.
 
-The final seven alternating paired `gdev` runs pin all 43 source files and both
-executables. Fresh native CLI median: 791.0 ms in the comparison snapshot, 793.8
-ms with these changes; CPU: 743.8 / 744.4 ms; peak RSS: 63,768 / 63,764 KiB.
-First retained comment edit: 231.2 / 237.0 ms; revert: 191.9 / 201.6 ms; no-op:
-2.1 / 2.1 ms. These are warm-filesystem measurements, with fresh processes
-separate from populated sessions. The 500 ms cold / under-100 ms edit gates
-remain open.
-
-The comparison executable already contains the early asset/alias/hole work; it
-is not the original repository HEAD. Canonical field layout changes final Wasm
-bytes, so each variant checks its own exact fresh/edit/revert/no-op parity;
-execution laws establish behavior. Raw samples, compiler hashes and source
-hashes are in the local ignored
-`build/language-foundations/gdev-records-timings.json`. An earlier run under
-changing machine load is retained separately as
-`gdev-records-timings-loaded.json`; its wall-time medians are not a speed claim.
+Seven alternating gdev pairs preserve Wasm and deterministic work counters.
+Fresh CPU is 636 / 637 ms before/after the path change; population and first
+edit are unchanged, while subsequent edits measure 130 / 140 ms. The cold and
+retained-edit targets remain open. See [STATUS.md](STATUS.md) for current
+measurements and remaining compiler work.

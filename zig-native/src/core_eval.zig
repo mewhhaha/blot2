@@ -184,6 +184,12 @@ const unit_value: Value = .{ .scalar = .unit, .bits = 0 };
 /// selected instance still collects and solves its complete body separately.
 pub const RetainedValue = struct { binding: core.BindingId, evidence: type_evidence.Id };
 pub const RetainedCapture = struct {
+    /// A live value owned by this exact Session. Such hints are used only by
+    /// uncached code refinement and never enter a portable record.
+    value: ValueId = 0,
+    /// Import an immutable expression signature without evaluating its body.
+    /// This retains source effect labels omitted from a partial code shape.
+    signature_only: bool = false,
     binding: core.BindingId,
     unit: u32,
     node: core.Id,
@@ -192,6 +198,13 @@ pub const RetainedCapture = struct {
     values: []const RetainedValue = &.{},
     captures: []const RetainedCapture = &.{},
     computation: bool = false,
+};
+/// A synchronous representation consumer for an uncached, fully solved region.
+/// The solver is borrowed only during this call; its nodes are not evidence and
+/// cannot escape the region or enter a semantic receipt.
+pub const CodeProjection = struct {
+    context: *anyopaque,
+    mapping: *const fn (*anyopaque, *types.Store, types.Id, types.Id) (types.Error || error{UnresolvedType})!void,
 };
 pub const ProofStats = struct { proof_published: usize = 0, proof_reused: usize = 0 };
 pub const DiagnosticContext = struct { identity: ?runtime_identity.View = null, entry: u32 = 0, prelude: u32 = 0, source_mode: bool = false };
@@ -958,13 +971,16 @@ pub const Session = struct {
         return region.closureEvidenceFull(owner, closure, .{ .code = .{ .view = expectations, .id = expected } }, seeds, row_seeds) catch |err| return self.evidenceFailure(owner, module.span(closure.body), err);
     }
     pub fn closureEvidencePartialCaptures(self: *Session, unit: u32, catalog: u32, expectations: code_expectation.View, expected: code_expectation.Id, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, captures: []const RetainedCapture) Error!SolvedEvidence {
+        return self.closureEvidencePartialCapturesCode(unit, catalog, expectations, expected, seeds, row_seeds, captures, null);
+    }
+    pub fn closureEvidencePartialCapturesCode(self: *Session, unit: u32, catalog: u32, expectations: code_expectation.View, expected: code_expectation.Id, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, captures: []const RetainedCapture, projection: ?CodeProjection) Error!SolvedEvidence {
         const owner = self.findUnit(unit, null) orelse return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
         const module = &self.units[owner];
         if (catalog >= module.closures.len) return self.fail(owner, .{ .start = 0, .end = 0 }, .unsupported);
         const closure_ = module.closures[catalog];
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
         defer region.deinit();
-        return region.closureEvidenceCaptures(owner, closure_, .{ .code = .{ .view = expectations, .id = expected } }, seeds, row_seeds, captures) catch |err| return self.evidenceFailure(owner, module.span(closure_.body), err);
+        return region.closureEvidenceCaptures(owner, closure_, .{ .code = .{ .view = expectations, .id = expected } }, seeds, row_seeds, captures, projection) catch |err| return self.evidenceFailure(owner, module.span(closure_.body), err);
     }
     pub fn closureEvidenceFull(self: *Session, unit: u32, catalog: u32, expected: type_evidence.Id, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping) Error!SolvedEvidence {
         const owner = self.findUnit(unit, null) orelse return self.fail(self.units.len, .{ .start = 0, .end = 0 }, .unsupported);
@@ -3880,9 +3896,14 @@ const ClosureRegion = struct {
         return solved.types;
     }
     fn closureEvidenceFull(self: *ClosureRegion, owner: usize, closure: core.ClosureInfo, expected: Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping) RegionError!SolvedEvidence {
-        return self.closureEvidenceCaptures(owner, closure, expected, seeds, row_seeds, &.{});
+        return self.closureEvidenceCaptures(owner, closure, expected, seeds, row_seeds, &.{}, null);
     }
     fn importRetainedCapture(self: *ClosureRegion, capture: RetainedCapture, depth: usize) RegionError!types.Id {
+        if (capture.value != 0) {
+            if (capture.value >= self.session.values.items.len) return error.UnresolvedType;
+            const scope = try self.addValue(capture.value, depth + 1);
+            return self.scratch.sources.items[scope].root;
+        }
         // A captured generic helper is not an invocation. Keep its source
         // signature and lexical semantic inputs; its concrete call uses the
         // ordinary per-use proof. No unselected source body is certified here.
@@ -3904,6 +3925,7 @@ const ClosureRegion = struct {
             }
         }
         try self.seedRows(scope, capture.rows);
+        if (capture.signature_only) return self.scratch.sources.items[scope].root;
         const capture_list = if (node.tag == .closure or node.tag == .suspend_) module.closures[node.a].captures else core.List{};
         const captured = module.extra[capture_list.start..][0..capture_list.len];
         for (capture.values) |value| {
@@ -3929,7 +3951,7 @@ const ClosureRegion = struct {
         const actual = self.scratch.sources.items[scope].root;
         return if (capture.computation) try self.solver.nominal(.{ .unit = std.math.maxInt(u32), .decl = 5 }, &.{actual}) else actual;
     }
-    fn closureEvidenceCaptures(self: *ClosureRegion, owner: usize, closure: core.ClosureInfo, expected: Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, captures: []const RetainedCapture) RegionError!SolvedEvidence {
+    fn closureEvidenceCaptures(self: *ClosureRegion, owner: usize, closure: core.ClosureInfo, expected: Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, captures: []const RetainedCapture, projection: ?CodeProjection) RegionError!SolvedEvidence {
         self.include_callables = true;
         const scope = try self.typeScope(owner);
         const module = &self.session.units[owner];
@@ -3950,6 +3972,10 @@ const ClosureRegion = struct {
         try self.collect(scope, closure.body);
         try self.solve();
         try self.publishValidatedCalls();
+        if (projection) |consumer| for (self.scratch.variables.items) |variable| {
+            if (variable.source.scope != scope or try self.project(variable.region) != 0) continue;
+            try consumer.mapping(consumer.context, &self.solver, variable.source.ty, variable.region);
+        };
         return self.exportSolved(scope);
     }
     // This first retention path only admits interfaces containing plain data.
