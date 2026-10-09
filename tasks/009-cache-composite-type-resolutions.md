@@ -59,15 +59,27 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Validation: the isolated fourth candidate passes 55 native resolution and
+  ownership laws and 14 executed-Wasm laws. Generated histories, physical edits,
+  rollback, future views, saturation and allocation failures are covered. The
+  differential comparison passes 305 cases (610 invocations) with identical
+  diagnostics and Wasm. Full compiler and analyzer gates remain pending.
+- Comparison: seven alternating pairs measured 944/957 ms fresh CPU, 1,100/1,100
+  ms dependency population, 250/260 ms first edit and 230/210 ms subsequent
+  edit, baseline/candidate. Fresh requested allocation fell from 321,026,930 to
+  320,341,190 bytes. A separate seven-pair restart batch measured 1,042/1,049 ms
+  cold population and 640/673 ms process restart. These are loaded-host
+  observations, without a compiler-speed claim. Same-compiler and cross-compiler
+  Wasm comparisons passed. A fifth candidate removes the test visit counter from
+  release execution; its cost measurements remain pending.
+- Remaining limitations: the candidate admits bounded frontiers only in solver
+  stores using closed-graph certificates. Ordinary resolution handles larger
+  frontiers. No production composite-cache change has landed. The discovered
+  future-alias correctness correction is being qualified separately.
+- Durable record: [resolution caching](../zig-native/RESOLUTION_CACHING.md)
+  records the contract, counterexample, rejected candidates, pins and results.
 - Isolated work: `/tmp/blot-composite-cache-prototype/` tests bounded
   certificates that retain unresolved type/effect frontiers and revoke future
   variable views when the shared clock advances. It starts from current main,
-  not the previously rejected closed-cache implementation. No performance or
-  correctness result is claimed before qualification completes.
+  not the previously rejected closed-cache implementation. The complete task
+  remains open until the remaining correctness and cost gates pass.

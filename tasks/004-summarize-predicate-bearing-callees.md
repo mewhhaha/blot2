@@ -108,6 +108,20 @@ development and the scenarios below.
   witness diagnostics, bounded graph admission, ownership/allocation failures,
   repeated diamonds, separate compilation and paired CPU/allocation evidence. A
   wider admission rule alone does not complete this task.
+- Follow-on written-scheme candidate: import the checked explicit residual
+  predicates with fresh scope variables, preserving source argument witnesses
+  and delaying closed proof publication until obligations are solved. The
+  source-interface associated chain at depth 128 drops from 260 to 4 scopes and
+  the field chain from 130 to 2, without multiplying successful jobs. The
+  isolated candidate passes 305 corpus comparisons (610 invocations), all with
+  identical diagnostics and Wasm, eighteen diagnostic-boundary comparisons,
+  seventeen execution laws, and a native immutable-input/allocation-failure law.
+  The execution laws include independently instantiated U32/F32 witnesses,
+  imports, dependency bundles, checkpoints, edits, failure and recovery. Release
+  SHA-256: `d46f5bda8ea02630366467ac8028d34b304361bab1c033c0269589db8d021775`.
+  Release cost measurements and the full compiler/analyzer gates remain pending;
+  implicit requirements and general principal graphs still require
+  implementation.
 - Durable specification and rejected experiment qualification:
   [CALL_SUMMARIES.md](../zig-native/CALL_SUMMARIES.md). A production
   implementation remains to be qualified.

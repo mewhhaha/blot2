@@ -1,0 +1,103 @@
+# Chronological resolution caching
+
+Type resolution follows ordered type and effect substitutions, including views
+into a future part of that history. It is not ordinary union-find. The reference
+path is `types.Store.resolveDepth`; a cache must preserve the same canonical
+views and failures at each requested cursor.
+
+## Existing certificates and the future-alias correction
+
+The current-epoch cache is invalidated by type or effect mutation. Solver-owned
+principal variables additionally retain node-local certificates. A closed answer
+survives unrelated appended substitutions. An open answer watches the remaining
+variable's chronological lower bound. Rollback, physical graph edits and
+saturated clocks revoke those certificates. The metadata never leaves its solver
+owner.
+
+An unwritten future alias needs an additional check. Create a variable's view at
+cursor 10, assign a second variable to that view, and resolve the second
+variable. The result initially has cursor 10. Nine unrelated writes then bring
+the shared clock to 10. Ordinary traversal now returns the unwritten variable's
+principal view, with cursor zero. Retaining the cursor-10 certificate would
+disagree with the reference path even though the variable itself has no writes.
+
+The pending correction accepts an unwritten remaining variable only while its
+view is already principal or is still beyond the shared clock. The native
+regression compares cached and uncached stores through that transition. This
+corrects the existing variable cache; it does not implement composite caching.
+Its source analyzer passes with zero findings; the full compiler gate is still
+running.
+
+## Bounded composite candidate
+
+The isolated candidate in `/tmp/blot-composite-cache-prototype/` is not yet a
+production implementation. It adds a solver-local table with 16 direct-mapped
+slots keyed by root and chronological cursor. A complete entry owns its result
+ID and at most eight unresolved type/effect dependencies. No pointers into
+growable storage are retained.
+
+Certificates describe the normalized result's unresolved frontier. Monotone
+appends cannot rewrite the already consumed prefix. The latest write of each
+remaining variable must still match. Unwritten future type views additionally
+watch the shared clock. Physical type generation, physical effect generation,
+rollback and saturated counters invalidate or decline the cache. The ordinary
+resolver remains the fallback for unsupported or oversized proofs.
+
+Discovery visits at most 256 nodes with a 128-entry traversal stack. The table
+allocates once, only after a query has changed its root; an unchanged first
+query acquires no retained storage. Publication uses a complete local record.
+Existing same-epoch hits are checked first. The fourth candidate enables this
+table only in solver stores that already request closed-graph certificates and
+also admits variable roots whose normalized result is composite.
+
+## Qualification record, 9 October 2026
+
+The initial admission experiment failed the existing no-allocation law for an
+unchanged aggregate query and was rejected. A corrected frontier candidate
+passed the focused native laws but increased fresh compiler CPU in a three-pair
+screen. Moving the ordinary epoch-cache hit before frontier validation still
+increased fresh CPU from 887 to 952 ms in the next screen. Neither version was
+landed. The latter release has SHA-256
+`decd3f0436a7dbd4c99cca4ead671e94b0b011df1f74ec0d4fdd8152c4d38953`; its complete
+retained records are under `build/bench/composite-cache-epoch-first/`.
+
+One copied scratch runner initially reused the preceding experiment's output
+directory. Its generated artifacts were moved to that corrected directory with
+the original command paths recorded in the manifest. The overwritten earlier
+screen is not a qualified raw-data record. Its remaining patch and the explicit
+record of that limitation are under `build/bench/composite-cache-frontier/`.
+
+The fourth candidate passed all 55 native resolution/ownership laws and 14
+executed-Wasm laws. These include generated chronological histories, physical
+edits, rollback and recycled IDs, future views, cache saturation, allocation
+failure, callbacks/effects, dependencies, checkpoints and failed revisions. The
+fingerprint oracle traverses List and cursor children as well as the other
+composite shapes.
+
+Its release SHA-256 is
+`2cf284a468cbfc51ef9625d73ecaa7cd448622518f18d58b6d36d98748999d5f`. The baseline
+contains only the future-alias correction and has SHA-256
+`2a709b4ca9d93fad58057531f7913ce159e6129aeb59596aff6e5534c6c9c258`. The initial
+three-pair gdev screen measured 972/981 ms fresh CPU, 1,120/1,140 ms dependency
+population, 260/260 ms first edit and 250/240 ms subsequent edit,
+baseline/candidate. Requested fresh allocation fell from 321,026,930 to
+320,341,190 bytes and type nodes from 547,540 to 542,591. Work counters and Wasm
+were identical. Host load was 39.5–41.2 on 16 CPUs; these are screening results,
+not an idle-machine performance claim.
+
+Seven alternating pairs measured 944/957 ms fresh CPU, 1,100/1,100 ms
+population, 250/260 ms first edit and 230/210 ms subsequent edit. A separate
+seven-pair restart batch measured 1,042/1,049 ms cold population, 640/673 ms
+process restart, 1,110/1,120 ms retained population, 250/260 ms first edit and
+230/230 ms subsequent edit. No-op CPU was below the retained counter's 10-ms
+resolution. Neither comparison establishes a compiler speedup. All Wasm
+comparisons passed.
+
+The corpus comparison also passed: 305 cases, 610 invocations, 244 successful
+cases, and no diagnostic, semantic or Wasm differences. Pins, source patches,
+commands and raw samples are retained under
+`build/bench/composite-cache-variable-frontier/`. The full compiler and analyzer
+gates remain pending. A fifth candidate removes the test visit counter from
+release execution while retaining it in native test builds; its measurements are
+pending. Task 009 remains open until its complete correctness and cost gates
+pass.
