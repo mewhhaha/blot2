@@ -51,10 +51,21 @@ also checks the remaining variable's latest write against its chronological
 lower bound. An unwritten future alias must be resolved again when the shared
 type/effect clock reaches that alias's cursor, so its canonical principal view
 matches ordinary traversal. Only current queries of principal variable nodes use
-this path; historical views keep ordinary traversal. Rollback, physical
-type/effect edits and saturated certificate clocks revoke these answers. The
-certificate is nonsemantic metadata and is stripped when variables leave the
-solver owner.
+this path; historical variable views do not use that node-local certificate.
+Rollback, physical type/effect edits and saturated certificate clocks revoke
+these answers. The certificate is nonsemantic metadata and is stripped when
+variables leave the solver owner.
+
+Composite resolution certificates belong to the same solver, in a separate
+bounded table keyed by root and chronological cursor. They retain owned numeric
+IDs and a complete unresolved type/effect frontier, never pointers into scratch
+storage. A hit checks the remaining variables, future-view clock and physical
+generations. Rollback and saturated generations revoke reuse before recycled IDs
+can be read. Recording a certificate requires a complete local record and
+successful table allocation; failure cannot publish a partial answer. The
+default cost policy retains only normalizations creating at least four nodes.
+Larger frontiers and cheaper queries keep ordinary resolution. See
+[resolution caching](RESOLUTION_CACHING.md) for the bounds and qualification.
 
 Inference regions lease arenas that own their solver, constraints and scratch.
 Small buffers use bump storage; larger buffers are recycled within size classes.

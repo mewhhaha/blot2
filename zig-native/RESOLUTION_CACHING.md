@@ -30,16 +30,15 @@ files, zero findings) pass. The release is pinned at
 `build/bench/future-alias-qualified/blotc`, SHA-256
 `2a709b4ca9d93fad58057531f7913ce159e6129aeb59596aff6e5534c6c9c258`. The logs are
 `build/bench/future-alias-compiler-gate.log` and
-`build/bench/future-alias-analyzer.log`. Composite caching remains separate
-work.
+`build/bench/future-alias-analyzer.log`. Composite caching remained separate
+work at that milestone.
 
-## Bounded composite candidate
+## Bounded composite cache
 
-The isolated candidate in `/tmp/blot-composite-cache-prototype/` is not yet a
-production implementation. It adds a solver-local table with 16 direct-mapped
-slots keyed by root and chronological cursor. A complete entry owns its result
-ID and at most eight unresolved type/effect dependencies. No pointers into
-growable storage are retained.
+The production cache adds a solver-local table with 16 direct-mapped slots keyed
+by root and chronological cursor. A complete entry owns its result ID and at
+most eight unresolved type/effect dependencies. No pointers into growable
+storage are retained.
 
 Certificates describe the normalized result's unresolved frontier. Monotone
 appends cannot rewrite the already consumed prefix. The latest write of each
@@ -48,12 +47,14 @@ watch the shared clock. Physical type generation, physical effect generation,
 rollback and saturated counters invalidate or decline the cache. The ordinary
 resolver remains the fallback for unsupported or oversized proofs.
 
-Discovery visits at most 256 nodes with a 128-entry traversal stack. The table
-allocates once, only after a query has changed its root; an unchanged first
-query acquires no retained storage. Publication uses a complete local record.
-Existing same-epoch hits are checked first. The fourth candidate enables this
-table only in solver stores that already request closed-graph certificates and
-also admits variable roots whose normalized result is composite.
+Discovery visits at most 256 nodes with a 128-entry traversal stack. The default
+cost policy records only normalizations creating at least four type nodes. The
+table allocates once; an unchanged first query acquires no retained storage.
+Publication uses a complete local record. Existing same-epoch hits are checked
+first. The table is enabled only in solver stores that request closed-graph
+certificates and also admits variable roots whose normalized result is
+composite. Historical queries keep their exact root/cursor key. The experiments
+below explain why cheaper normalizations do not acquire certificates.
 
 ## Qualification record, 9 October 2026
 
@@ -147,8 +148,8 @@ exist. Focused native checks and the analyzer pass. This probe's release pin is
 population, 631/648 ms process restart, 1,100/1,090 ms retained population,
 240/250 ms first edit and 220/210 ms subsequent edit. Byte comparisons pass. The
 cold/restart measurements still do not justify this candidate, which remains
-unlanded. Task 009 remains open until its complete correctness and cost gates
-pass; a correct certificate alone is insufficient evidence of a useful cache.
+unlanded. It did not complete task 009; a correct certificate alone is
+insufficient evidence of a useful cache.
 
 An instrumented development build explains part of the cost. Across 2,089 solver
 stores in one gdev build, it observes 640,199 cache misses and 6,730 hits. Of
@@ -158,5 +159,55 @@ is `d2b4277342e93a87796bc4d4e43e02a7b623ef2a12f478a197df9c868b759de3`, in
 work, not valid timing measurements. A follow-on cost policy records only
 normalizations creating at least four nodes and removes the warmup hint table.
 Twenty-one focused native checks pass, including the default-policy admission
-case and low-threshold certificate/ownership cases. Its release measurements and
-full qualification remain pending.
+case and low-threshold certificate/ownership cases. The analyzer reports zero
+findings in 288 files. Its release pin is
+`f2294ddde4887413ae544850be235a05c5796362fbdc43f05b07475845d17a1a`, in
+`build/bench/composite-cache-cost-gated/`.
+
+Seven no-cache pairs measure 943/955 ms fresh CPU, 1,110/1,110 ms population,
+240/250 ms first edit and 230/230 ms subsequent edit, baseline/candidate. A
+separate seven-pair restart batch measures 1,046/1,035 ms cold population,
+650/653 ms restart, 1,110/1,100 ms retained population, 240/250 ms first edit
+and 220/220 ms subsequent edit. Requested fresh allocation changes from
+321,026,930 to 320,975,430 bytes. Same-compiler and cross-compiler bytes match.
+These loaded-host measurements show mixed cold costs and no general compiler
+speedup; they do not establish the final performance targets.
+
+A separate Store benchmark resolves a 32-layer array after each of 10,000
+unrelated writes. Every result checks all layers and the U32 element, with an
+equal checksum in both configurations. Seven alternating pairs measure median
+CPU of 9.251 ms with composite caching disabled and 1.089 ms enabled; type nodes
+fall from 320,040 to 72. The benchmark sources, executable hashes and samples
+are under `microbench/` in the same qualification directory. This demonstrates
+the benefit for repeated expensive resolutions, rather than a whole-compiler
+gain. The 305-case differential comparison passes with no semantic, diagnostic
+or Wasm differences, as do fourteen focused execution laws. Its full native
+suite and all 595 guest/client tests also pass.
+
+## Production qualification, 9 October 2026
+
+The cost-gated implementation is accepted. Production release
+`0e78ed2c1e6343c41fb92cc1565fc0f11ffa007a74ca869826cf67307ddcb78d` is pinned in
+`build/bench/composite-cache-main/`. Zig 0.17.0, the full native suite and all
+598 guest/client tests pass. The analyzer reports zero findings across 289 Zig
+files. The focused resolution filter passes 41 checks, including discovery. Logs
+are `build/bench/composite-cache-main-compiler-gate.log`,
+`build/bench/composite-cache-main-native.log` and
+`build/bench/composite-cache-main-analyzer.log`. The recorded source hashes,
+executable and compiler identity match the production tree.
+
+Three alternating integration pairs against the preceding row/admission release
+`1a0be8c0a216346299f7701484287f58675a337fce872272bafeec22a9e9c8a0` measure
+954/957 ms fresh CPU, 1,110/1,120 ms population, 250/250 ms first edit and
+230/220 ms subsequent edit. The restart batch measures 1,030/1,024 ms cold
+population, 637/639 ms restart, 1,100/1,090 ms retained population, 250/260 ms
+first edit and 220/230 ms subsequent edit. No-op samples are at the 10-ms
+accounting limit. Every fresh/retained/restart and cross-compiler byte
+comparison passes.
+
+Requested fresh allocation falls from 321,139,550 to 321,088,050 bytes; type
+nodes fall from 547,540 to 546,936. These loaded-host measurements show small,
+mixed timing changes. Acceptance rests on the complete validity/ownership laws,
+the measured benefit for repeated expensive resolution and the bounded cost
+policy. This is not a general compiler-speed claim. The final cold, edit,
+region-size and cumulative-allocation targets remain open.

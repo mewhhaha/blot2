@@ -29,7 +29,7 @@ fn fingerprint(store: *const T.Store, root: T.Id, hash: *std.hash.Wyhash, depth:
             if (row.tail == .variable) hash.update(std.mem.asBytes(&row.tail.variable));
             if (row.tail == .parameter) hash.update(std.mem.asBytes(&row.tail.parameter));
         },
-        .array, .resolver => try fingerprint(store, n.a, hash, depth + 1),
+        .array, .list, .cursor, .resolver => try fingerprint(store, n.a, hash, depth + 1),
         .state_provider => {
             try fingerprint(store, n.a, hash, depth + 1);
             try fingerprint(store, n.b, hash, depth + 1);
@@ -234,6 +234,89 @@ test "sparse complete caches preserve history and physical publication across re
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, sparseHistory, .{});
 }
 
+fn compositeScenario(allocator: std.mem.Allocator) !void {
+    var cached = try T.Store.initWithOptions(allocator, .{ .closed_graphs = true, .composite_min_growth = 0 });
+    defer cached.deinit();
+    var plain = try T.Store.initWithOptions(allocator, .{ .resolution_cache = false });
+    defer plain.deinit();
+    const stores = [_]*T.Store{ &cached, &plain };
+    var roots: [2]T.Id = undefined;
+    var variables: [2][3]T.Id = undefined;
+    var rows: [2]E.Id = undefined;
+    for (stores, 0..) |store, side| {
+        for (&variables[side]) |*variable| variable.* = try store.fresh();
+        rows[side] = try store.freshEffects();
+        const function = try store.functionWithEffects(variables[side][0], variables[side][1], rows[side]);
+        roots[side] = try store.product(&.{ function, try store.sequence(.list, variables[side][0]), try store.sequence(.cursor, variables[side][1]) });
+        try store.appendVersion(variables[side][0], T.u32_type);
+    }
+    try std.testing.expectEqual(try observe(&plain, roots[1], 0), try observe(&cached, roots[0], 0));
+    // An unrelated write expires the ordinary epoch cache but leaves the
+    // normalized frontier valid for reuse.
+    for (stores, 0..) |store, side| try store.appendVersion(variables[side][2], T.boolean);
+    try std.testing.expectEqual(try observe(&plain, roots[1], 0), try observe(&cached, roots[0], 0));
+    try std.testing.expect(cached.composites.get(roots[0], 0) != null);
+    for (stores, 0..) |store, side| try store.appendVersion(variables[side][2], T.boolean);
+    const nodes = cached.nodes.items.len;
+    const visits = cached.resolution_steps;
+    const retained = cached.composites.get(roots[0], 0).?.result;
+    try std.testing.expectEqual(retained, try cached.resolve(roots[0], 0));
+    try std.testing.expectEqual(nodes, cached.nodes.items.len);
+    try std.testing.expectEqual(visits, cached.resolution_steps);
+    try std.testing.expectEqual(try observe(&plain, roots[1], 0), try observe(&cached, roots[0], 0));
+    const marks = [_]T.Mark{ cached.mark(), plain.mark() };
+    for (stores, 0..) |store, side| {
+        try store.appendVersion(variables[side][0], variables[side][1]);
+        try store.appendVersion(variables[side][1], T.u32_type);
+        const variable = store.row(rows[side]).tail.variable;
+        try store.effects.appendVersion(variable, try store.effects.row(&.{1}, .closed));
+    }
+    for (0..cached.cursor() + 3) |at| {
+        try std.testing.expectEqual(try observe(&plain, roots[1], @intCast(at)), try observe(&cached, roots[0], @intCast(at)));
+    }
+    for (stores, marks, 0..) |store, mark, side| {
+        store.rollback(mark);
+        try store.appendVersion(variables[side][0], T.f32_type);
+        const variable = store.row(rows[side]).tail.variable;
+        try store.effects.appendVersion(variable, try store.effects.row(&.{2}, .closed));
+    }
+    try std.testing.expectEqual(try observe(&plain, roots[1], 0), try observe(&cached, roots[0], 0));
+    // Bounded capacity is independent of the number of roots and windows.
+    for (0..40) |i| {
+        for (stores, 0..) |store, side| {
+            const root = try store.array(variables[side][1]);
+            try std.testing.expect(try store.resolve(root, @intCast(i)) != 0);
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 16), cached.composites.entries.len);
+}
+test "composite resolution certificates preserve open frontiers aliases histories and bounded ownership" {
+    try compositeScenario(a);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, compositeScenario, .{});
+}
+
+test "composite resolution certificates revoke future views when unrelated writes advance the clock" {
+    var store = try T.Store.initWithOptions(a, .{ .closed_graphs = true, .composite_min_growth = 0 });
+    defer store.deinit();
+    const variable = try store.fresh();
+    const future = try store.resolve(variable, 4);
+    const other = try store.fresh();
+    const root = try store.function(future, other);
+    try store.appendVersion(other, T.boolean);
+    const first = store.node(try store.resolve(root, 0));
+    try std.testing.expectEqual(@as(T.Cursor, 4), store.node(first.a).b);
+    const unrelated = try store.fresh();
+    try store.appendVersion(unrelated, T.boolean);
+    _ = try store.resolve(root, 0);
+    try std.testing.expect(store.composites.get(root, 0) != null);
+    for (0..2) |_| try store.appendVersion(unrelated, T.boolean);
+    const advanced = store.node(try store.resolve(root, 0));
+    try std.testing.expectEqual(@as(T.Cursor, 0), store.node(advanced.a).b);
+    // Writes below the original lower bound still change canonical views.
+    try store.appendVersion(variable, T.u32_type);
+    try std.testing.expectEqual(T.u32_type, store.node(try store.resolve(root, 0)).a);
+}
+
 test "variable resolution certificates refresh future aliases when unrelated writes reach their cursor" {
     var cached = try T.Store.initWithOptions(a, .{ .closed_graphs = true });
     defer cached.deinit();
@@ -248,4 +331,23 @@ test "variable resolution certificates refresh future aliases when unrelated wri
         for (0..9) |_| try store.appendVersion(unrelated, T.boolean);
         try std.testing.expectEqual(@as(T.Cursor, 0), store.node(try store.resolve(alias, 0)).b);
     }
+}
+
+test "composite cache cost gate retains expensive graphs and skips cheap roots" {
+    var store = try T.Store.initWithOptions(a, .{ .closed_graphs = true });
+    defer store.deinit();
+    const variable = try store.fresh();
+    const unrelated = try store.fresh();
+    const cheap = try store.array(variable);
+    var root = variable;
+    for (0..8) |_| root = try store.array(root);
+    try store.appendVersion(variable, T.u32_type);
+    _ = try store.resolve(cheap, 0);
+    try std.testing.expectEqual(@as(usize, 0), store.composites.entries.len);
+    const resolved = try store.resolve(root, 0);
+    try std.testing.expect(store.composites.get(root, 0) != null);
+    try store.appendVersion(unrelated, T.boolean);
+    const visits = store.resolution_steps;
+    try std.testing.expectEqual(resolved, try store.resolve(root, 0));
+    try std.testing.expectEqual(visits, store.resolution_steps);
 }

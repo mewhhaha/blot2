@@ -4,6 +4,7 @@
 const std = @import("std");
 const resolution_cache = @import("resolution_cache.zig");
 const epoch_cache = @import("epoch_resolution_cache.zig");
+const composite_cache = @import("composite_resolution_cache.zig");
 pub const Effects = @import("effects.zig");
 pub const Id = u32;
 pub const Cursor = u32;
@@ -73,10 +74,15 @@ pub const Store = struct {
     /// Deterministic work counter: type nodes visited by occurs checks. It is
     /// never rolled back or consulted by solving, so pooled stores accumulate.
     occurs_steps: u64 = 0,
+    /// Test-only normalizer visits, independent of cache admission and rollback.
+    resolution_steps: u64 = 0,
     occurs_seen: std.ArrayList(u32) = .empty,
     occurs_generation: u32 = 0,
     use_resolution_cache: bool = true,
     resolved: epoch_cache.Cache = .{},
+    use_composite_cache: bool = true,
+    composite_min_growth: usize = 4,
+    composites: composite_cache.Cache = .{},
     allocator: std.mem.Allocator,
     nodes: std.ArrayList(Node) = .empty,
     extra: std.ArrayList(Id) = .empty,
@@ -89,13 +95,15 @@ pub const Store = struct {
     operations: std.ArrayList(Operation) = .empty,
 
     /// Owned per-store policy; uncached instances preserve the same chronology.
-    pub const Options = struct { resolution_cache: bool = true, closed_graphs: bool = false };
+    pub const Options = struct { resolution_cache: bool = true, closed_graphs: bool = false, composite_cache: bool = true, composite_min_growth: usize = 4 };
 
     pub fn init(allocator: std.mem.Allocator) Error!Store {
         return initWithOptions(allocator, .{});
     }
     pub fn initWithOptions(allocator: std.mem.Allocator, options: Options) Error!Store {
         var self: Store = .{ .allocator = allocator, .use_closed_graphs = options.closed_graphs, .use_resolution_cache = options.resolution_cache, .effects = Effects.Store.initWithOptions(allocator, .{ .resolution_cache = options.resolution_cache }) catch |err| return effectError(err) };
+        self.use_composite_cache = options.composite_cache and options.closed_graphs;
+        self.composite_min_growth = options.composite_min_growth;
         errdefer self.deinit();
         try self.nodes.appendSlice(allocator, &.{ .{ .tag = .absent }, .{ .tag = .unit }, .{ .tag = .boolean }, .{ .tag = .u32 }, .{ .tag = .f32 }, .{ .tag = .never } });
         try self.operations.appendSlice(allocator, &.{ .{ .identity = .{ .unit = 0, .decl = 0 } }, .{ .identity = .{ .unit = 0, .decl = 1 } } });
@@ -108,6 +116,7 @@ pub const Store = struct {
         self.versions.deinit(self.allocator);
         self.variable_views.deinit(self.allocator);
         self.resolved.deinit(self.allocator);
+        self.composites.deinit(self.allocator);
         self.occurs_seen.deinit(self.allocator);
         self.effects.deinit();
         self.operations.deinit(self.allocator);
@@ -381,6 +390,82 @@ pub const Store = struct {
         const value = self.node(id);
         return if (value.tag == .variable) self.variable_views.get((@as(u64, value.a) << 32) | position) orelse id else id;
     }
+    fn compositeWindow(self: *Store, root: Id, at: Cursor) Error!Id {
+        const enabled = self.use_composite_cache and
+            resolution_cache.stamp(self.mutation_epoch) != null and resolution_cache.stamp(self.effects.mutation_epoch) != null;
+        if (enabled and self.composites.entries.len != 0 and self.composites.activate(self.closed_generation, self.effects.physical_epoch)) if (self.composites.get(root, at)) |certificate| {
+            if (self.validResolution(certificate)) return certificate.result;
+        };
+        const before_nodes = self.nodes.items.len;
+        const result = try self.resolveDepth(root, at, 0);
+        // An unchanged query cannot acquire fresh retained storage. Existing
+        // slots may retain its frontier without any additional allocation.
+        if (enabled and (result != root or self.composites.entries.len != 0) and self.nodes.items.len - before_nodes >= self.composite_min_growth and self.composites.activate(self.closed_generation, self.effects.physical_epoch)) {
+            if (self.resolutionDependencies(result)) |certificate| try self.composites.put(self.allocator, root, at, certificate);
+        }
+        return result;
+    }
+    fn validResolution(self: *const Store, certificate: *const composite_cache.Record) bool {
+        if (certificate.future_clock) |clock| if (clock != self.cursor()) return false;
+        for (certificate.dependencies[0..certificate.count]) |dependency| {
+            const last = if (dependency.effect) self.effects.variables.items[dependency.variable].last else self.variables.items[dependency.variable].last;
+            if (last != dependency.last) return false;
+        }
+        return true;
+    }
+    fn resolutionDependencies(self: *const Store, result: Id) ?composite_cache.Record {
+        var certificate: composite_cache.Record = .{ .result = result };
+        var pending: [128]Id = undefined;
+        pending[0] = result;
+        var count: usize = 1;
+        var budget: usize = 256;
+        while (count != 0) {
+            count -= 1;
+            const id = pending[count];
+            if (self.closedHeight(id) != 0 or id <= never) continue;
+            if (budget == 0) return null;
+            budget -= 1;
+            const n = self.node(id);
+            if (n.tag == .variable) {
+                const variable = self.variables.items[n.a];
+                if (!certificate.add(.{ .variable = n.a, .last = variable.last })) return null;
+                if (variable.first == none and n.b > self.cursor()) certificate.future_clock = self.cursor();
+                continue;
+            }
+            if (n.tag == .function or n.tag == .demand or n.tag == .provider) {
+                const row_ = self.row(n.c);
+                if (row_.tail == .variable and !certificate.add(.{ .variable = row_.tail.variable, .last = self.effects.variables.items[row_.tail.variable].last, .effect = true })) return null;
+            }
+            var children: [3]Id = undefined;
+            const tail: []const Id = switch (n.tag) {
+                .function => blk: {
+                    children = .{ n.a, n.b, 0 };
+                    break :blk children[0..2];
+                },
+                .array, .list, .cursor, .resolver, .demand, .provider => blk: {
+                    children[0] = n.a;
+                    break :blk children[0..1];
+                },
+                .state_provider => blk: {
+                    children = .{ n.a, n.b, n.c };
+                    break :blk &children;
+                },
+                .product => self.list(.{ .start = n.a, .len = n.b }),
+                .nominal => self.nominalArguments(n),
+                .record => blk: {
+                    if (n.b > pending.len - count) return null;
+                    for (0..n.b) |i| pending[count + i] = self.recordField(n, i).ty;
+                    count += n.b;
+                    break :blk &.{};
+                },
+                else => &.{},
+            };
+            if (tail.len > pending.len - count) return null;
+            @memcpy(pending[count..][0..tail.len], tail);
+            count += tail.len;
+        }
+        return certificate;
+    }
     pub fn resolve(self: *Store, root: Id, at: Cursor) Error!Id {
         if (self.use_closed_graphs) {
             self.synchronizeClosedGraphs();
@@ -393,19 +478,32 @@ pub const Store = struct {
                 if (remaining.tag == .variable) {
                     const last = self.variables.items[remaining.a].last;
                     if (last == none) {
-                        // Reaching an unwritten future view makes variableView
-                        // choose its principal ID, even after unrelated writes.
+                        // Once the clock reaches an unwritten future view,
+                        // variableView canonicalizes it to the principal ID.
                         if (remaining.b == 0 or remaining.b > self.cursor()) return raw.c;
                     } else if (self.versions.items[last].position < remaining.b) return raw.c;
                 }
             }
         }
-        // Historical windows retain the original chronological traversal.
-        if (!self.use_resolution_cache or at != 0 or root <= never) return self.resolveDepth(root, at, 0);
+        if (!self.use_resolution_cache or root <= never) return self.resolveDepth(root, at, 0);
+        if (at != 0) return self.compositeWindow(root, at);
         const mutation = resolution_cache.stamp(self.mutation_epoch) orelse return self.resolveDepth(root, at, 0);
         const effects = resolution_cache.stamp(self.effects.mutation_epoch) orelse return self.resolveDepth(root, at, 0);
         if (!self.resolved.activate(mutation, effects)) return self.resolveDepth(root, at, 0);
         if (self.resolved.get(root)) |result| return result;
+        // Current-epoch hits are already complete and cheaper than validating
+        // a frontier. Consult cross-epoch certificates only on an epoch miss.
+        // An empty table cannot answer a query. Defer physical certificate
+        // checks until lookup or a costly normalization can use them.
+        const composite = self.use_composite_cache;
+        if (composite and self.composites.entries.len != 0 and self.composites.activate(self.closed_generation, self.effects.physical_epoch)) if (self.composites.get(root, at)) |certificate| {
+            if (self.validResolution(certificate)) {
+                const result = certificate.result;
+                if (result != root or root < self.resolved.high_water) try self.resolved.put(self.allocator, root, result);
+                return result;
+            }
+        };
+        const before_nodes = self.nodes.items.len;
         const result = try self.resolveDepth(root, at, 0);
         if (self.use_closed_graphs and self.closed_generation != std.math.maxInt(u16) and self.effects.physical_epoch != std.math.maxInt(u64) and (self.closedHeight(result) != 0 or self.node(result).tag == .variable) and self.node(root).tag == .variable and self.node(root).b == 0) {
             // Closed answers survive appended writes. An open answer watches
@@ -418,9 +516,11 @@ pub const Store = struct {
         // An unchanged query must not acquire fresh retained storage.
         if (result == root and root >= self.resolved.high_water) return result;
         try self.resolved.put(self.allocator, root, result);
+        if (composite and self.nodes.items.len - before_nodes >= self.composite_min_growth and self.composites.activate(self.closed_generation, self.effects.physical_epoch)) if (self.resolutionDependencies(result)) |certificate| try self.composites.put(self.allocator, root, at, certificate);
         return result;
     }
     fn resolveDepth(self: *Store, root: Id, at: Cursor, depth: usize) Error!Id {
+        if (@import("builtin").is_test) self.resolution_steps += 1;
         if (depth >= 1024) return error.TypeLimit;
         const height = self.closedHeight(root);
         if (height != 0) {
