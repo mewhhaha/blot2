@@ -73,8 +73,10 @@ development and the scenarios below.
   the analyzer. Seven pairs measure 943/935 ms cold CPU but 630/652 ms process
   restart, with matching Wasm and lower allocation. That repeated restart cost
   keeps it unaccepted. A later lazy-activation probe passes focused native
-  checks and the analyzer; its measurements remain pending. No composite
-  implementation is accepted by those measurements.
+  checks and the analyzer. Its seven no-cache pairs measure 947/946 ms cold CPU,
+  while restart pairs measure 631/648 ms restart CPU and 983/1,026 ms cold
+  population. Byte comparisons pass, but these costs also leave the candidate
+  unaccepted. No composite implementation is accepted by those measurements.
 - Validation: the isolated fourth candidate passes 55 native resolution and
   ownership laws and 14 executed-Wasm laws. Generated histories, physical edits,
   rollback, future views, saturation and allocation failures are covered. The

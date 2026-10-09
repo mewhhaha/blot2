@@ -141,6 +141,22 @@ certificate is actually recorded. An empty table needs no validity check on
 every miss; the complete certificate still controls every hit once records
 exist. Focused native checks and the analyzer pass. This probe's release pin is
 `e0fbd4b40ef139fda3f322432155d6a9c158f9fd3bd69bee48db36f4fa6110d2`, in
-`build/bench/composite-cache-lazy-activation/`. Its paired measurements remain
-pending. Task 009 remains open until its complete correctness and cost gates
-pass.
+`build/bench/composite-cache-lazy-activation/`. Seven no-cache pairs measure
+947/946 ms fresh CPU, 1,090/1,080 ms population, 240/250 ms first edit and
+220/230 ms subsequent edit. Seven restart pairs measure 983/1,026 ms cold
+population, 631/648 ms process restart, 1,100/1,090 ms retained population,
+240/250 ms first edit and 220/210 ms subsequent edit. Byte comparisons pass. The
+cold/restart measurements still do not justify this candidate, which remains
+unlanded. Task 009 remains open until its complete correctness and cost gates
+pass; a correct certificate alone is insufficient evidence of a useful cache.
+
+An instrumented development build explains part of the cost. Across 2,089 solver
+stores in one gdev build, it observes 640,199 cache misses and 6,730 hits. Of
+those hits, 6,381 avoid creating at most two type nodes. The instrumentation pin
+is `d2b4277342e93a87796bc4d4e43e02a7b623ef2a12f478a197df9c868b759de3`, in
+`build/bench/composite-cache-profile-saved/`; these counts are evidence about
+work, not valid timing measurements. A follow-on cost policy records only
+normalizations creating at least four nodes and removes the warmup hint table.
+Twenty-one focused native checks pass, including the default-policy admission
+case and low-threshold certificate/ownership cases. Its release measurements and
+full qualification remain pending.
