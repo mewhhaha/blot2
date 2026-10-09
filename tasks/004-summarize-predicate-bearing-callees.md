@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — design dependency 003 is complete; no implementation
-  completion is claimed.
+- **Status:** In progress — isolated admission and graph probes; no
+  implementation completion is claimed.
 - **Dependencies:** [003](003-specify-general-call-summaries.md)
 - **Originating requirements:** PLAN: Hill 1 / generic callee sharing. Sources:
   [PLAN.md](../PLAN.md).
@@ -66,11 +66,38 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: pending. No task 004 compiler change has landed.
+- Baseline: with the qualified task 001 compiler (SHA-256
+  `034d660ce38691df9a18c895ab228c4d0a76d618aa1969117d16604e06ee2833`), an
+  explicit associated-predicate chain grows from 36 scopes at 16 wrappers to 260
+  scopes at 128 wrappers. At 128 wrappers an explicit field chain uses 130
+  scopes. Reproduction sources and results are in
+  `build/bench/call-summary-explicit-baseline/`.
+- Isolated investigation:
+  `/tmp/blot-list-field-prototype/zig-native/src/core_eval.zig` currently
+  contains a task 004 probe, separate from the main working tree's task 002
+  candidate. It admits explicit dispatch, field and update obligations through
+  the existing fresh-variable job path and classifies shared callee graphs once,
+  propagating rejected descendants to their ancestors. The original file is
+  preserved at `/tmp/core_eval_before_explicit_summary.zig`.
+- Prototype results: twelve associated/field/missing-evidence cases at depths 0,
+  16, 64 and 128 preserve outcomes and ordered diagnostics. At depth 128, the
+  associated case's largest region drops from 260 to 2 scopes and the field
+  case's from 130 to 1. The existing five call-summary execution tests pass,
+  including deep chains, callbacks/effects, diagnostic fallback, dependencies,
+  checkpoints and failed-edit recovery. Eleven qualified-row, explicit-evidence
+  and named-contract execution laws also pass, including separate compilation
+  and retained recovery. Results are in
+  `build/bench/call-summary-graph-prototype/` and
+  `build/bench/call-summary-explicit-baseline/graph-call-summary-tests.log`.
+- Cost requiring investigation: in the associated case, total regions rise from
+  135 to 393 and solver passes from 535 to 2,083. Smaller regions alone do not
+  establish a faster or lower-allocation compiler. No performance or completion
+  claim is made for this probe.
+- Remaining implementation and validation: complete principal/residual graph
+  coverage, unsupported explicit and result-directed cases, authoritative
+  witness diagnostics, bounded graph admission, ownership/allocation failures,
+  repeated diamonds, separate compilation and paired CPU/allocation evidence. A
+  wider admission rule alone does not complete this task.
+- Durable specification: [CALL_SUMMARIES.md](../zig-native/CALL_SUMMARIES.md).
+  Durable implementation qualification has not yet been written.

@@ -66,7 +66,9 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: pending. Dependency 001 was merged as `c6654ec`.
+- Commit: `bcff12b` records the tested intermediate implementation; the
+  all-width performance acceptance criterion remains open. Dependency 001 was
+  merged as `c6654ec`.
 - Candidate: the final release is pinned at
   `build/bench/list-sequential-qualified/blotc`, SHA-256
   `742c3e91faf3dd682d33873d8d02da13eefa0f252c62da570c3fb3b0bc068053`. Its source

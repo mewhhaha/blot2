@@ -234,6 +234,9 @@ storage is reusable; it does not claim that tracing limit is resolved.
 
 ### Sequential implementation qualification
 
+The intermediate implementation is committed as `bcff12b`. Its behavior and
+ownership gates pass; the all-width performance gate remains open.
+
 The production candidate is pinned at
 `build/bench/list-sequential-qualified/blotc`, SHA-256
 `742c3e91faf3dd682d33873d8d02da13eefa0f252c62da570c3fb3b0bc068053`. Its compiler

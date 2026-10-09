@@ -265,7 +265,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [001] — Qualify list span prototype                     | Complete    | None                                   |
 | [002] — Close packed list traversal regression          | In progress | [001]                                  |
 | [003] — Specify general call summaries                  | Complete    | None                                   |
-| [004] — Summarize predicate bearing callees             | Ready       | [003]                                  |
+| [004] — Summarize predicate bearing callees             | In progress | [003]                                  |
 | [005] — Summarize higher order callees                  | Pending     | [004]                                  |
 | [006] — Summarize lexical closures                      | Pending     | [005]                                  |
 | [007] — Infer recursive components jointly              | Pending     | [006]                                  |
