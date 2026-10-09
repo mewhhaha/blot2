@@ -4,6 +4,7 @@ comptime {
     _ = @import("structural.zig");
     _ = @import("diagnostic_code.zig");
     _ = @import("wasm_inline.zig");
+    _ = @import("wasm_sroa.zig");
     _ = @import("optimized_archive_tests.zig");
     _ = @import("runtime_parallel_tests.zig");
     _ = @import("machine_code_sharing_tests.zig");
@@ -254,8 +255,7 @@ comptime {
     _ = @import("alias_project_tests.zig");
 }
 
-comptime {
-}
+comptime {}
 
 test {
     _ = @import("plain_catalog_tests.zig");

@@ -254,8 +254,11 @@ never evidence that a word is scalar. Runtime list branches remain pointerful.
 Collection elements that are flat products or structural records with 1–16
 checked scalar fields use consecutive payload words. Source lengths count rows;
 indexing, overflow checks, copies and edits use the checked row stride.
-Constants and runtime constructors share canonical field order. Extraction
-creates an owning row allocation; no interior pointer escapes. Scalar
+Constants and runtime constructors share canonical field order. Observable
+extraction creates an owning row allocation; no interior pointer escapes. Direct
+List loops may borrow a row only when every use selects a checked scalar field,
+or a flat tuple pattern binds scalar values. Aliases, captures, returned rows,
+implicit row carries and unknown forms retain owned extraction. Scalar
 replacement may eliminate that box under its ordinary proof. Raw word copies
 preserve floating-point bits. List descriptors and tree ranges count storage
 words; typed emission converts logical counts and positions. A row may cross
@@ -287,6 +290,9 @@ each step allocates only a small cursor.
 Small aggregate scalar replacement requires full initialization before aliasing
 and fixed field offsets. Every lexical version and loop carry owns separate
 scalar locals. ABI values, captured/escaped values and GC roots remain boxed.
+Each snapshot stores only its demanded fields. Demand propagates backwards
+through every alias/carry edge to a fixed point; all source field values are
+read before destination writes. Dropped fields still evaluate their operands.
 The pass transforms an assembly copy, preserving retained symbolic fragments.
 Direct loop patterns containing only bindings, wildcards and products need no
 failure blocks; their local definitions dominate the loop body. Patterns with
@@ -310,9 +316,27 @@ crossing. The four-word cursor stays in the previous 32-byte allocation class.
 Serialized cursors start without a cached leaf. Every stored pointer remains an
 allocation base and published cursors are initialized once, never mutated.
 Packed-row cursors keep logical positions with a private leaf cache whose base
-counts words. Direct loops also retain the leaf span. Fields inside that span
-load directly; a field crossing its boundary uses the checked tree lookup.
-Serialized cursors start uncached. No interior pointer is retained.
+counts words. Direct loops retain their own leaf span and a bounded stack of
+pending right subtrees. The private stack roots the original collection and is
+cleared before use; its references are allocation bases. Each tree edge is
+visited at most once, independently of descriptor-cache changes. Each request
+consumes the immediately next leaf: direct loops read every word in order,
+including fragments of crossing rows. Stack-position locals may contain private
+interior addresses; the stored collection and subtree references remain
+allocation bases. The balanced tree's word bound fits within 64 stack entries,
+and a checked overflow traps instead of writing past the private storage.
+
+Scalar-only row views use transient Wasm address locals while that collection
+root remains live. They never enter source values, captures or heap fields. Rows
+crossing leaves are copied in raw word spans to one lazily allocated scalar
+buffer per loop activation. Copy sizes are selected from the checked row width;
+projection offsets come from the canonical flat layout. The buffer is reused
+only after the previous view's last possible use. The inner row loop is bounded
+by the current leaf; the outer loop handles crossings and the final logical
+length, recovering the logical row index only at a leaf boundary. Empty loops
+allocate neither buffer. Normal exits, breaks, returns and cancellation release
+private traversal storage exactly once; optional cleanup skips unallocated
+storage. Serialized cursors start uncached and retain allocation-base fields.
 
 `function_facts` memoizes bounded source-body facts within one Generator owner.
 Unknown dispatch/calls remain unknown, and inlined bodies retain the ordinary

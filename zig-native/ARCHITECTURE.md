@@ -176,15 +176,18 @@ can allocate their exact result. These optimizations consume typed structure,
 not prelude names. The separate dense scalar-row fixture supports a broader
 recursive layout experiment. Production collections now pack flat tuples and
 records of up to 16 checked scalar fields. All construction, access, copying,
-cursor and constant paths use the same checked row stride. Extracted rows own
-their storage; ordinary scalar replacement can eliminate temporary boxes. List
-trees store spans of words; typed operations translate logical row counts and
-positions. Rows may cross leaves, and List/Array conversions copy spans
-directly. Scalar field projections can read packed data without a box. Packed
-cursors and direct loops reuse leaf spans; boundary-crossing fields use checked
-word lookups. A bounded direct-call expansion pass exposes ordinary allocation
-producers to scalar replacement. Generic iterator step/cursor allocation remains
-a separate limit.
+cursor and constant paths use the same checked row stride. Observable extracted
+rows own their storage; ordinary scalar replacement can eliminate temporary
+boxes and transfer only fields demanded by each snapshot. List trees store spans
+of words; typed operations translate logical row counts and positions. Rows may
+cross leaves, and List/Array conversions copy spans directly. Scalar field
+projections can read packed data without a box. Packed cursors retain checked
+leaf caches. Direct loops walk pending subtrees with a bounded private stack
+that roots the original collection. Scalar-only row uses and flat tuple bindings
+can read private leaf views; crossing rows use a scoped scalar buffer. Escaping
+rows keep owned extraction. A bounded direct-call expansion pass exposes
+ordinary allocation producers to scalar replacement. Generic iterator
+step/cursor allocation remains a separate limit.
 
 ## Limits and measurement
 

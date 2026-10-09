@@ -8,7 +8,7 @@ const ir = @import("runtime_ir.zig");
 const A = std.mem.Allocator;
 const none = std.math.maxInt(u32);
 const Value = struct { id: u32 = 0, offset: u32 = 0, constant: ?u32 = null };
-const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0 };
+const Node = struct { parent: u32, bad: bool = false, size: u32 = 0, allocation: bool = false, first_copy: u32 = none, last_store: u32 = 0, store_mask: u32 = 0, scope: usize = 0, fields: u32 = 0, used_fields: u16 = 0 };
 const Event = struct { input: Value = .{}, destination: u32 = 0, field: u32 = 0, allocation: u32 = 0, fresh: bool = false };
 const Control = struct { height: usize, result: u32, unreachable_: bool = false, identity: usize = 0 };
 pub const Output = ir.Body;
@@ -250,6 +250,46 @@ const Analysis = struct {
         const n = self.nodes.items[self.root(id)];
         return !n.bad and n.size != 0;
     }
+    fn demandedFields(self: *Analysis) !void {
+        // Copies are snapshots, but only fields subsequently read need slots.
+        // Propagate demand backwards through copies, including loop carries
+        // and both branch arms. One field can enter a node only once.
+        const Edge = struct { source: u32, next: u32 };
+        const heads = try self.a.alloc(u32, self.nodes.items.len);
+        defer self.a.free(heads);
+        @memset(heads, none);
+        var edges: std.ArrayList(Edge) = .empty;
+        defer edges.deinit(self.a);
+        var pending: std.ArrayList(u32) = .empty;
+        defer pending.deinit(self.a);
+        for (self.events) |event| {
+            if (event.destination != 0 and !event.fresh and self.selected(event.destination)) {
+                const index: u32 = @intCast(edges.items.len);
+                try edges.append(self.a, .{ .source = event.input.id, .next = heads[event.destination] });
+                heads[event.destination] = index;
+            }
+        }
+        for (self.nodes.items, 0..) |node, id| if (node.used_fields != 0) try pending.append(self.a, @intCast(id));
+        while (pending.pop()) |destination| {
+            const needed = self.nodes.items[destination].used_fields;
+            var index = heads[destination];
+            while (index != none) {
+                const edge = edges.items[index];
+                const source = &self.nodes.items[edge.source];
+                if ((source.used_fields | needed) != source.used_fields) {
+                    source.used_fields |= needed;
+                    try pending.append(self.a, edge.source);
+                }
+                index = edge.next;
+            }
+        }
+    }
+    fn fieldLocal(self: *const Analysis, id: u32, field: u32) u32 {
+        const node = self.nodes.items[id];
+        const lower = (@as(u32, 1) << @intCast(field)) - 1;
+        std.debug.assert(node.used_fields & (@as(u16, 1) << @intCast(field)) != 0);
+        return node.fields + @popCount(@as(u32, node.used_fields) & lower);
+    }
 };
 fn emit(out: *Output, a: A, op: w.Op, operand: u32) !void {
     try out.instructions.append(a, .{ .op = op, .operand = operand });
@@ -258,11 +298,12 @@ fn copyFields(out: *Output, analysis: *Analysis, event: Event) !void {
     const a = analysis.a;
     const count = analysis.nodes.items[analysis.root(event.destination)].size / 4;
     // All sources precede all stores: a loop/branch may permute aliases.
-    for (0..count) |i| try emit(out, a, .local_get, analysis.nodes.items[event.input.id].fields + @as(u32, @intCast(i)));
+    const mask = analysis.nodes.items[event.destination].used_fields;
+    for (0..count) |i| if (mask & (@as(u16, 1) << @intCast(i)) != 0) try emit(out, a, .local_get, analysis.fieldLocal(event.input.id, @intCast(i)));
     var i = count;
     while (i != 0) {
         i -= 1;
-        try emit(out, a, .local_set, analysis.nodes.items[event.destination].fields + i);
+        if (mask & (@as(u16, 1) << @intCast(i)) != 0) try emit(out, a, .local_set, analysis.fieldLocal(event.destination, i));
     }
 }
 fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []const w.ValueType, instructions: []const w.Instruction) !?Output {
@@ -302,12 +343,16 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         break;
     };
     if (!any) return null;
+    for (instructions, events) |inst, event| if ((inst.op == .i32_load or inst.op == .f32_load) and analysis.selected(event.input.id)) {
+        analysis.nodes.items[event.input.id].used_fields |= @as(u16, 1) << @intCast(event.field / 4);
+    };
+    try analysis.demandedFields();
     var out: Output = .{};
     errdefer out.deinit(a);
     try out.locals.appendSlice(a, locals);
     for (0..analysis.nodes.items.len) |id| {
         if (!analysis.selected(@intCast(id))) continue;
-        const count = analysis.nodes.items[analysis.root(@intCast(id))].size / 4;
+        const count = @popCount(analysis.nodes.items[id].used_fields);
         analysis.nodes.items[id].fields = @intCast(function.parameters.len + out.locals.items.len);
         try out.locals.appendNTimes(a, .i32, count);
     }
@@ -320,11 +365,13 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
         if (event.destination != 0 and !event.fresh and analysis.selected(event.destination)) try copyFields(&out, &analysis, event);
         if ((inst.op == .i32_load or inst.op == .f32_load) and analysis.selected(event.input.id)) {
             try emit(&out, a, .drop, 0);
-            try emit(&out, a, .local_get, analysis.nodes.items[event.input.id].fields + event.field / 4);
+            try emit(&out, a, .local_get, analysis.fieldLocal(event.input.id, event.field / 4));
             if (inst.op == .f32_load) try emit(&out, a, .f32_reinterpret_i32, 0);
         } else if ((inst.op == .i32_store or inst.op == .f32_store) and analysis.selected(event.input.id)) {
-            if (inst.op == .f32_store) try emit(&out, a, .i32_reinterpret_f32, 0);
-            try emit(&out, a, .local_set, analysis.nodes.items[event.input.id].fields + event.field / 4);
+            if (analysis.nodes.items[event.input.id].used_fields & (@as(u16, 1) << @intCast(event.field / 4)) != 0) {
+                if (inst.op == .f32_store) try emit(&out, a, .i32_reinterpret_f32, 0);
+                try emit(&out, a, .local_set, analysis.fieldLocal(event.input.id, event.field / 4));
+            } else try emit(&out, a, .drop, 0);
             try emit(&out, a, .drop, 0);
         } else try out.instructions.append(a, inst);
     }
@@ -373,6 +420,39 @@ fn scalarReplacementOwnership(a: A) !void {
 test "scalar replacement owns scratch and output through every failed allocation" {
     try scalarReplacementOwnership(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scalarReplacementOwnership, .{});
+}
+
+fn selectiveFieldCopies(a: A) !void {
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const f = try module.addFunction(&.{.i32}, .i32);
+    const row = try module.addLocal(f, .i32);
+    const first = try module.addLocal(f, .i32);
+    const last = try module.addLocal(f, .i32);
+    try module.emitSlice(f, &.{ .{ .op = .i32_const, .operand = 64 }, .{ .op = .call, .operand = arena.allocate_scalar }, .{ .op = .local_set, .operand = row } });
+    for (0..16) |field| try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = row }, .{ .op = .local_get, .operand = 0 }, .{ .op = .i32_store, .operand = @intCast(field * 4) } });
+    try module.emitSlice(f, &.{
+        .{ .op = .local_get, .operand = row },   .{ .op = .local_set, .operand = first },
+        .{ .op = .local_get, .operand = row },   .{ .op = .local_set, .operand = last },
+        .{ .op = .local_get, .operand = first }, .{ .op = .i32_load, .operand = 0 },
+        .{ .op = .local_get, .operand = last },  .{ .op = .i32_load, .operand = 60 },
+        .{ .op = .i32_add },
+    });
+    const before = try a.dupe(w.Instruction, module.functions.items[f].instructions.items);
+    defer a.free(before);
+    var out = (try run(a, &module, &module.functions.items[f])).?;
+    defer out.deinit(a);
+    // Two fields for the original and one for each snapshot, not sixteen
+    // slots and sixteen transfers at every single-field accessor.
+    try std.testing.expectEqual(@as(usize, 7), out.locals.items.len);
+    for (out.instructions.items) |inst| try std.testing.expect(inst.op != .call);
+    try std.testing.expectEqualSlices(w.Instruction, before, module.functions.items[f].instructions.items);
+}
+
+test "scalar replacement copies only fields demanded by each snapshot" {
+    try selectiveFieldCopies(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, selectiveFieldCopies, .{});
 }
 
 test "scalar replacement declines incomplete initialization and stores after an alias escapes" {

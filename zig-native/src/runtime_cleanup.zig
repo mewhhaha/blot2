@@ -10,7 +10,7 @@ const heap = @import("runtime_layout.zig");
 const A = std.mem.Allocator;
 
 pub const Mark = enum(usize) { _ };
-pub const Action = union(enum) { release: ir.LocalId, reset_demand: ir.LocalId };
+pub const Action = union(enum) { release: ir.LocalId, release_if_nonzero: ir.LocalId, reset_demand: ir.LocalId };
 pub const Stack = struct {
     parent: ?*const Stack = null,
     actions: std.ArrayList(Action) = .empty,
@@ -46,6 +46,13 @@ fn emit(action: Action, module: *wasm.Module, function: ir.FunctionId) A.Error!v
         .release => |local| {
             try module.emit(id, .{ .op = .local_get, .operand = @backingInt(local) });
             try module.emit(id, .{ .op = .call, .operand = module.arena.?.recycle });
+        },
+        .release_if_nonzero => |local| {
+            try module.emit(id, .{ .op = .local_get, .operand = @backingInt(local) });
+            try module.emit(id, .{ .op = .if_ });
+            try module.emit(id, .{ .op = .local_get, .operand = @backingInt(local) });
+            try module.emit(id, .{ .op = .call, .operand = module.arena.?.recycle });
+            try module.emit(id, .{ .op = .end });
         },
         .reset_demand => |local| {
             try module.emit(id, .{ .op = .local_get, .operand = @backingInt(local) });

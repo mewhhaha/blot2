@@ -81,6 +81,8 @@ entry const cursor = fn repeat => do:
       total := self + ${sum}
       cursor := @cursor.advance self
   return total
+// An aggregate entry exposes the arena to the host memory measurement.
+entry const memory_probe = fn (seed: U32) => #[seed]
 `,
   );
   pins[path] = await hash(path);
@@ -115,6 +117,10 @@ entry const cursor = fn repeat => do:
       const metrics = JSON.parse(log.trim().split("\n").at(-1)!);
       assert.equal(metrics.memory.live_bytes, 0);
       guests.push(await instantiateGuest(bytes));
+      assert(
+        guests.at(-1)!.memoryBytes() > 0,
+        "Guest arena must be measurable",
+      );
       rows.push({
         kind: "compile",
         shape,

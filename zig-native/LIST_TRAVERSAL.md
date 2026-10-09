@@ -155,3 +155,176 @@ unchanged. Closing the regression requires paired measurements against the
 preserved boxed compiler over every supported row width, with boundary,
 snapshot, nested-loop and cursor coverage. Neither this result nor the older
 1.9× fold / 1.5× cursor measurements prove that broader gate has passed.
+
+## Sequential leaves and private row views
+
+This follow-on implementation is under qualification. Task 002 remains open
+until its full release, ownership, differential and all-width performance checks
+pass. The pre-change production binary is preserved at
+`build/bench/list-field-qualified/pre-walk-blotc`, SHA-256
+`034d660ce38691df9a18c895ab228c4d0a76d618aa1969117d16604e06ee2833`.
+
+The initial all-width comparison confirmed that the span check alone left a
+substantial gap. Two independent costs mattered: copying every field through
+temporary row aliases, and restarting a tree lookup at each packed leaf. Wider
+rows visit more leaves for the same number of logical elements. A diagnostic
+large-leaf experiment supported that diagnosis; it was discarded. Production
+keeps the existing 248-word leaf limit and persistent-edit layout.
+
+`list_traversal.zig` emits a private traversal with at most 64 pending right
+subtrees. A separate word roots the original List for the entire traversal. The
+storage is cleared before initialization and owns only allocation-base
+references. Advancing pops a pending subtree and descends its left edge, saving
+right children. Each request advances to the immediately next leaf because the
+caller consumes every intervening field. Stack-position locals advance by word
+addresses, while stored references remain allocation bases. Each tree edge is
+visited once. Nested traversals have independent progress and do not consult or
+overwrite each other's state.
+
+`row_projection_uses.zig` admits a whole-row binding only when every use is a
+direct projection of a checked scalar field. Its bounded walk rejects aliases,
+whole-row captures, implicit carries and unsupported forms. Flat tuple patterns
+can bind their scalar fields directly, including values later captured or
+returned. All other rows keep their owning representation.
+
+Admitted rows use a private view into a leaf. The view never becomes a source
+value. A row crossing a leaf boundary is copied, without numeric conversion,
+into a lazily allocated scalar buffer of at most 64 bytes. This buffer is reused
+only after the previous row's last possible use. An inner loop handles rows
+known to fit in the current leaf; the outer loop performs boundary work and
+recovers the next logical row index. The leaf bound also proves the inner loop
+cannot pass the List's final row. Direct field loads use checked constant
+offsets. A bounded decision tree selects constant copy sizes for crossing
+fragments, allowing the host to inline these small copies.
+
+Both private allocations are scoped to one dynamic traversal. Empty traversals
+allocate neither. Normal exits, breaks, returns and cancellation release only
+allocated storage. The original collection root remains live until those
+releases. No interior address enters a collection, closure, demand, cursor or
+host value.
+
+Scalar replacement separately computes the fields demanded by each snapshot,
+propagating demand backwards through copy edges to a fixed point. This reduces
+unused scalar slots and transfers without merging lexical versions. Copy sources
+are read before destination writes; unused store operands still execute in
+order. A new native law checks selective copies, immutable inputs and every
+allocation-failure point. `wasm_sroa.zig` is now explicitly imported by the test
+root, so focused filters execute its laws rather than only suite-discovery
+tests.
+
+Prototype results, which precede the final explicit collection root, are in
+`build/bench/list-field-qualified/`. They validate the direction but do not
+qualify the final binary. Five added executed-Wasm laws cover all row widths,
+tuple bindings, old-row snapshots, raw floating-point bits, live fields across
+nested collection, synchronous/JSPI resumption, request cancellation through
+break/return, host exceptions and subsequent recovery. Existing packed-row,
+iterator, revision and effect laws remain required. Release measurements must
+include both modes of `scripts/bench_list_traversal.ts`, the original packed-row
+benchmark, compiler allocation/retained edits, and runtime memory.
+
+The cursor path still uses its existing immutable cursor and cached lookup. Its
+remaining cost is a separate required gate in task 047; direct-loop results do
+not establish cursor performance. The tracing baseline also has a pre-existing
+nested-loop retention limit: with 90 outer rows, increasing each inner loop from
+8 to 200 discarded 8,192-word arrays grew committed memory from 43,515,904 to
+942,211,072 bytes in both the baseline and prototype. Task 035 must cover this
+case while preserving live outer values. The new regression law uses a fixed
+repeated workload to check that row views remain live and private traversal
+storage is reusable; it does not claim that tracing limit is resolved.
+
+### Sequential implementation qualification
+
+The production candidate is pinned at
+`build/bench/list-sequential-qualified/blotc`, SHA-256
+`742c3e91faf3dd682d33873d8d02da13eefa0f252c62da570c3fb3b0bc068053`. Its compiler
+identity is `335693d2f998b635913318c2b72e5092b4a7a3b3ce52b1989ba93e461ff684cd`.
+The directory's `manifest.json` records the source and harness hashes, both
+baselines and measurement commands. Later memory instrumentation has its own
+entry; it does not replace the historical scalar-only harness hash.
+
+Zig 0.17.0's full native suite and all 595 guest/client tests passed. The
+analyzer checked 287 Zig files with zero findings. The 305-case differential
+made 610 invocations with identical success, ordered diagnostics, semantic
+counters and teardown ownership. All 488 successful Wasm files validate. Fifty
+intentional Wasm changes reflect the traversal and scalar-replacement lowering;
+both guide modules return 45, 26 and 5 for the previously qualified calls. Gate
+logs are `build/bench/list-leaf-qualified/compiler-gate-final.log` and
+`analyzer-final.log`; older interrupted logs are not passing evidence.
+
+Seven alternating gdev pairs retain strict same-compiler fresh, retained and
+restart byte equality. Intentional cross-compiler changes use the separately
+qualified `--allow-wasm-diff` option. The following are process CPU medians,
+with ordinary fresh compilation measured without a persistent cache.
+
+| Measurement                           | Task 001 CPU, ms | Sequential CPU, ms |
+| ------------------------------------- | ---------------: | -----------------: |
+| Fresh, persistence disabled           |              981 |                973 |
+| Retained population                   |            1,110 |              1,110 |
+| First retained literal edit           |              260 |                250 |
+| Subsequent edit/revert                |              230 |                230 |
+| No-op                                 |         Below 10 |           Below 10 |
+| Cold cache population, separate batch |            1,064 |              1,054 |
+| Process restart, separate batch       |              647 |                659 |
+
+Fresh requested allocation changes from 321,239,456 to 321,026,930 bytes; peak
+requested live memory changes from 78,947,905 to 78,908,053 bytes. Semantic work
+counters remain 2,036 regions, 40,387 scopes, 8,041 scopes in the largest
+region, 35,215 constraint visits and 42,410 occurs visits. The small allocation
+decrease does not establish the final compiler-allocation target. Host load was
+108→104 on 16 CPUs during the no-cache batch and 104→133 during the restart
+batch; these absolute timings do not replace the qualified starting baseline.
+
+The original packed-row harness measured the retained List fold at 0.291→0.106
+ms CPU against task 001, with unchanged committed memory of 1,441,792 bytes. The
+cursor measured 0.613→0.630 ms. All 13 general runtime workloads retained their
+previous committed memory. The explicit cursor still uses persistent progress,
+cached lookup and owned row extraction. It does not inherit a direct loop's
+private sequential traversal; the cursor cost remains required work.
+
+### All-width boxed comparison
+
+`scripts/bench_list_traversal.ts` uses 16,384 retained rows, 20 warmups and 31
+alternating paired samples, with 128 traversals per sample. An otherwise unused
+aggregate entry exposes the arena to the guest API; both variants use the same
+entry and reset behavior. The harness rejects an unavailable arena. Earlier
+scalar-only reports remain in `boxed-record/` and `boxed-tuple/`, but their zero
+memory fields are unavailable measurements. Corrected reports are in
+`boxed-record-memory/` and `boxed-tuple-memory/`.
+
+CPU entries below are candidate/boxed ratios of process-CPU medians. Memory
+entries are committed KiB after folds and match between the two row shapes. They
+include constants and runtime storage, rather than only the traversal buffer.
+Cursor runs can commit another 64 KiB at widths 9 and 10.
+
+| Width | Record fold | Tuple fold | Record cursor | Tuple cursor | Boxed KiB | Packed KiB |
+| ----- | ----------: | ---------: | ------------: | -----------: | --------: | ---------: |
+| 1     |       0.275 |          — |         1.167 |            — |       704 |        192 |
+| 2     |       0.368 |      0.348 |         1.369 |        1.378 |       704 |        256 |
+| 3     |       0.474 |      0.432 |         1.664 |        1.442 |       704 |        320 |
+| 4     |       0.504 |      0.483 |         1.434 |        1.326 |       704 |        384 |
+| 5     |       0.615 |      0.658 |         1.670 |        1.369 |     1,216 |        448 |
+| 6     |       0.796 |      0.689 |         1.880 |        1.426 |     1,216 |        512 |
+| 7     |       0.852 |      0.758 |         1.820 |        1.663 |     1,216 |        576 |
+| 8     |       0.797 |      0.734 |         1.653 |        1.363 |     1,216 |        640 |
+| 9     |       0.908 |      0.854 |         2.074 |        1.636 |     1,216 |        704 |
+| 10    |       0.935 |      0.829 |         2.053 |        1.748 |     1,216 |        768 |
+| 11    |       0.935 |      0.866 |         1.994 |        1.716 |     1,216 |        896 |
+| 12    |       0.970 |      0.854 |         1.996 |        1.562 |     1,216 |        960 |
+| 13    |       0.989 |      0.989 |         1.984 |        1.640 |     2,240 |      1,024 |
+| 14    |       1.021 |      0.907 |         2.076 |        1.723 |     2,240 |      1,088 |
+| 15    |       1.016 |      0.950 |         2.135 |        1.765 |     2,240 |      1,152 |
+| 16    |       1.044 |      0.917 |         1.935 |        1.554 |     2,240 |      1,216 |
+
+The record fold remains above the boxed baseline at widths 14–16. The tuple fold
+medians improve at every width, but the width-13 margin is small. This does not
+close the all-width fold requirement. Every cursor remains slower and is tracked
+by task 047. No storage fallback was introduced to hide a regression.
+Correctness, ownership and the large improvement in the original packed fold
+justify preserving this intermediate implementation; they do not justify marking
+task 002 complete.
+
+Host load was 127.08→121.74 for records and 121.74→86.40 for tuples on 16 CPUs.
+The outer runner records these values in the manifest; the restricted Deno
+process could not read `/proc/loadavg` and explicitly records `null`. Process
+CPU and paired order reduce scheduling noise but do not establish idle-machine
+timing or a speedup for near-equal cases.

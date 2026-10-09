@@ -135,3 +135,25 @@ test "packed List span emission preserves immutable Core under allocation failur
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, packedEmissionFailures, .{&units});
     try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
 }
+
+test "packed List borrowed row emission preserves immutable Core under allocation failure" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\entry const run = fn (count: U32) => do:
+        \\  let values = @list.generate count (fn (i: U32) => {a: i, b: i, c: i})
+        \\  let total = 0
+        \\  for pass in 0..2:
+        \\    for row in values:
+        \\      for first in values:
+        \\        total := @u32.add total first.a
+        \\        break
+        \\      total := @u32.add total (@u32.add row.a row.c)
+        \\  return total
+    );
+    defer module.deinit(a);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    const units = [_]core.Module{module};
+    try packedEmissionFailures(a, &units);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, packedEmissionFailures, .{&units});
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}

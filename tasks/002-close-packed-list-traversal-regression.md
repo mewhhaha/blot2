@@ -28,13 +28,13 @@ cursor regression against the preserved pre-packed boxed baseline.
 - [x] Locate and pin the older boxed compiler and matching library/workload from
       the preserved packed-row qualification evidence; retain a separate
       current-main comparison.
-- [ ] Profile fold and cursor costs, then remove repeated leaf lookup, bounds
+- [x] Profile fold and cursor costs, then remove repeated leaf lookup, bounds
       work or row materialization only where typed layout and control-flow
       proofs permit it.
-- [ ] Cover all supported scalar row widths 1–16, cross-leaf rows, nested loops,
+- [x] Cover all supported scalar row widths 1–16, cross-leaf rows, nested loops,
       forks and snapshots. Keep List distinct from Array and expose no public
       List indexing.
-- [ ] Retain boxed paths for nested, nominal, reference-bearing, erased and
+- [x] Retain boxed paths for nested, nominal, reference-bearing, erased and
       wider rows. Record the cursor diagnosis and any remaining cursor work
       explicitly.
 
@@ -58,51 +58,83 @@ development and the scenarios below.
 
 - [ ] Paired evidence demonstrates the read-only fold regression is closed over
       the supported shapes; a partial-width improvement is not full completion.
-- [ ] The related cursor regression is measured and explained. Any unresolved
+- [x] The related cursor regression is measured and explained. Any unresolved
       required behavior or performance work has a bounded follow-up before final
       qualification.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
 - Commit: pending. Dependency 001 was merged as `c6654ec`.
-- Validation: the initial span baseline has task 001's full compiler gate. The
-  next candidate has been ported from `/tmp/blot-list-field-prototype/` to the
-  working tree. Its final release and full compiler gate are running; prototype
-  results are not completion evidence for that final binary.
-- Comparison: `scripts/bench_list_traversal.ts` measures all widths 1–16 with
-  retained Lists, fold and cursor cases, 20 warmups and 31 alternating samples
-  of 16 traversals by default, with an explicit repeat override for longer
-  measurements. Record widths 1–16 and tuple widths 2–16 are separate modes. It
-  pins compiler, library and workload hashes, checks values/Wasm validity, and
-  separates compiler allocation from guest memory. The older boxed compiler is
-  pinned at SHA-256
-  `150c2b032b43490434ba99c0bd91911de4bc8723fa3d4e4cf803d0f8fb88c413`. Its
-  prelude/list/array/vector sources match the current library at the recorded
-  starting revision. Initial samples in `build/bench/list-widths-boxed-span/`
-  confirm that task 001 alone does not close the regression.
-- Investigation: scalar replacement copies more fields than each temporary
-  accessor needs, and packed traversal restarts tree lookup at many more leaf
-  boundaries. The candidate adds a rooted private tree walk, scalar-only row
-  views, a loop bounded by each leaf, and selective field copies. Crossing rows
-  keep a private scalar buffer; escaping rows remain owned. Experimental
-  measurements and focused tests are in `build/bench/list-field-qualified/`. A
+- Candidate: the final release is pinned at
+  `build/bench/list-sequential-qualified/blotc`, SHA-256
+  `742c3e91faf3dd682d33873d8d02da13eefa0f252c62da570c3fb3b0bc068053`. Its source
+  and binary hashes are in that directory's `manifest.json`.
+- Validation so far: Zig 0.17.0; zero analyzer findings across 287 Zig files;
+  305 differential cases (610 invocations), with identical semantic counters,
+  diagnostics and teardown ownership; all 488 successful Wasm outputs validate.
+  Fifty intentional Wasm differences reflect scalar replacement and traversal
+  lowering. `deno task test:compiler` passed the native suite and all 595
+  guest/client tests. Logs are `build/bench/list-leaf-qualified/`'s
+  `compiler-gate-final.log` and `analyzer-final.log`; interrupted earlier logs
+  are not passing evidence.
+- Implementation: a rooted private tree walk advances through leaves without
+  repeated root lookup. Checked scalar-only row uses and flat tuple bindings
+  borrow scoped views; crossing rows use a private scalar buffer. The leaf loop
+  avoids per-row boundary and index work, projections use checked field offsets,
+  and short crossing copies have constant sizes. Escaping rows remain owned.
+  Scalar replacement transfers only the fields demanded by each snapshot. The
   missing direct test import for `wasm_sroa.zig` was corrected so its focused
-  ownership tests actually run. Three new execution laws cover old-row
-  snapshots, tuple bindings, F32 bits, and nested collection. The prototype
-  passes them, but some wider-row samples still regress slightly; final paired
-  measurements are required.
-- Benchmark safety: `bench:compile --allow-wasm-diff` now permits only
+  ownership tests actually run.
+- New execution laws cover old-row snapshots, all record/tuple widths, F32 bits,
+  persistent edits during traversal, nested collection, synchronous/JSPI
+  suspension, return/break cancellation and recovery after host failure. The
+  final release passed these checks in the full compiler gate.
+- Comparison: `scripts/bench_list_traversal.ts` measures record widths 1–16 and
+  tuple widths 2–16 with 20 warmups, 31 alternating samples and an explicit
+  repeat count. It pins compiler, library, script and workload hashes, checks
+  values/Wasm validity and separates compiler allocation from guest memory. The
+  preserved boxed compiler is SHA-256
+  `150c2b032b43490434ba99c0bd91911de4bc8723fa3d4e4cf803d0f8fb88c413`; its
+  prelude/list/array/vector sources match the recorded library. Task 001's
+  packed comparison remains separately pinned as `pre-walk-blotc`, SHA-256
+  `034d660ce38691df9a18c895ab228c4d0a76d618aa1969117d16604e06ee2833`. Earlier
+  width measurements improved substantially but still missed the boxed fold
+  baseline at some wide rows. The corrected aggregate-probe reports measured
+  record folds at widths 14/15/16 at 1.021×/1.016×/1.044× boxed CPU. All tuple
+  fold medians improved, with a small margin at width 13. All 31 row shapes use
+  less committed memory than boxed rows; memory counts and every width's CPU
+  ratios are in the durable record. Earlier scalar-only reports remain intact,
+  but their zero memory fields mean an unavailable arena. Corrected results are
+  in `boxed-record-memory/` and `boxed-tuple-memory/` under the candidate's
+  qualification directory. High host load prevents treating these measurements
+  as an idle-machine qualification.
+- Compiler comparison: seven alternating no-cache pairs measured 981→973 ms
+  fresh CPU, 1,110→1,110 ms retained population, 260→250 ms first edit and
+  230→230 ms subsequent edit. No-op CPU was below the 10-ms accounting
+  resolution. Requested fresh allocation was 321,239,456→321,026,930 bytes;
+  semantic work counters were unchanged. A separate restart-cache batch measured
+  1,064→1,054 ms cold population and 647→659 ms process restart. All
+  within-compiler fresh/retained/restart byte checks passed. These loaded host
+  results do not replace the qualified starting baseline or meet the final
+  compiler targets.
+- Runtime comparison: the original packed-row harness measured retained List
+  fold CPU at 0.291→0.106 ms against task 001, with unchanged 1,441,792-byte
+  committed memory. Its cursor measured 0.613→0.630 ms. All 13 general runtime
+  workloads retained the same committed memory. The explicit cursor still
+  allocates persistent progress and extracts rows through its cached lookup; it
+  does not use the direct loop's private walk or row views. Task 047 owns the
+  bounded optimization and all-width cursor gate.
+- Benchmark safety: `bench:compile --allow-wasm-diff` permits only
   cross-compiler differences. Nondeterministic, retained and restart failures
   remain fatal. A deliberately nondeterministic wrapper failed the gate with
   this flag; a stable wrapper adding the same harmless custom section passed.
   Raw evidence is in
   `build/bench/list-leaf-qualified/harness-{negative,positive}`.
-- Remaining limitations: the fold and cursor gates are still open. Prototype
-  successes do not establish the all-width acceptance criteria.
-- Durable record: the candidate's ownership boundary and open gates are recorded
-  in [LIST_TRAVERSAL.md](../zig-native/LIST_TRAVERSAL.md). Task 047 now
-  explicitly owns the remaining all-width cursor performance gate; task 035
-  includes the pre-existing nested-loop retention counterexample. Final
-  qualification is still pending.
+- Remaining limitations: the all-width fold performance gate is open. Task 047
+  owns the measured cursor follow-up; direct-loop improvement does not close it.
+  Task 035 owns the pre-existing nested-loop retention counterexample. Neither
+  design/prototype success nor a partial-width improvement completes this task.
+- Durable record: [LIST_TRAVERSAL.md](../zig-native/LIST_TRAVERSAL.md) records
+  the ownership boundary, experiments and remaining qualification gates.

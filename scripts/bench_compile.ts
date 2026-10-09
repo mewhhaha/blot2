@@ -6,11 +6,11 @@
 // child CPU time (user + system), never wall time, because wall samples on a
 // shared host mostly measure contention. Both binaries must emit the same Wasm
 // for every workload and phase, and a retained session must match a fresh
-// build, or the run fails after writing its results. Linux only (uses bash
+// build, or the run fails after writing its results.
 // Intentional cross-compiler differences require --allow-wasm-diff; output
 // stability and each compiler's retained/restart parity always remain gates.
-// `times` and /proc). Run with --allow-all: Deno gates /proc behind it, and the
-// harness already executes arbitrary compilers.
+// Linux only (uses bash `times` and /proc). Run with --allow-all: Deno gates /proc
+// behind it, and the harness already executes arbitrary compilers.
 //
 // Workloads: the frozen gdev snapshot under build/bench/gdev-snapshot (private
 // source, never committed; verified against scripts/bench/gdev-manifest.json)

@@ -2,7 +2,7 @@
 
 Blot's production compiler is handwritten Zig 0.17. Deno hosts the public
 compiler API, formatter and Wasm guest API. The current compiler passes the
-native suite, all 590 guest/client tests and the zero-finding Zig analyzer gate.
+native suite, all 595 guest/client tests and the zero-finding Zig analyzer gate.
 Language behavior remains defined by [the guide](../compiler/guide.md), with
 ownership rules in [CONTRACT.md](CONTRACT.md).
 
