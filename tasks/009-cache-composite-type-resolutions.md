@@ -63,6 +63,12 @@ development and the scenarios below.
   suite and 595 guest/client tests, with zero analyzer findings across 287
   files. The pinned release and logs are in the
   [durable cache record](../zig-native/RESOLUTION_CACHING.md).
+- The fix is committed as `8a40c1a`. The later composite candidate removes a
+  release-only visit-counter cost and fixes its empty-owner analyzer warning;
+  288 files then have zero findings. Seven no-cache pairs still measure 959/971
+  ms baseline/candidate fresh CPU, with equal population and edit medians. A
+  bounded warmup admission experiment is now being checked; no composite
+  implementation is accepted by those measurements.
 - Validation: the isolated fourth candidate passes 55 native resolution and
   ownership laws and 14 executed-Wasm laws. Generated histories, physical edits,
   rollback, future views, saturation and allocation failures are covered. The

@@ -101,8 +101,23 @@ comparisons passed.
 The corpus comparison also passed: 305 cases, 610 invocations, 244 successful
 cases, and no diagnostic, semantic or Wasm differences. Pins, source patches,
 commands and raw samples are retained under
-`build/bench/composite-cache-variable-frontier/`. The full compiler and analyzer
-gates remain pending. A fifth candidate removes the test visit counter from
-release execution while retaining it in native test builds; its measurements are
-pending. Task 009 remains open until its complete correctness and cost gates
-pass.
+`build/bench/composite-cache-variable-frontier/`. Its full native suite and all
+595 guest/client tests pass. The analyzer found one overwritten-owner warning
+when installing the initially empty entry buffer; this version was not landed.
+
+The next candidate removes the visit-counter increment from release execution
+and explicitly releases the old empty owner before installing the buffer. The
+analyzer checks 288 files with zero findings. Its release SHA-256 is
+`a069fcabcc9199bce1dcdd87be84cea119fd4a0da437ed34cc7c6433161f3d6e`, preserved
+under `build/bench/composite-cache-owner-transition/`. Seven no-cache pairs
+measure 959/971 ms fresh CPU, 1,110/1,110 ms population, 260/260 ms first edit
+and 220/220 ms subsequent edit. Wasm and work counters match. The remaining cold
+overhead is not justified by these results; restart and full-gate checks are
+still running.
+
+A separate warmup candidate records a bounded root-use hint on the first changed
+query and builds a frontier only after a second epoch miss. This hint can admit
+unhelpful roots but can never validate an answer: the complete key and
+dependency certificate still decide reuse. It aims to avoid allocating and
+scanning certificates for one-use roots. Its tests and measurements are pending.
+Task 009 remains open until its complete correctness and cost gates pass.
