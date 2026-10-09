@@ -70,8 +70,11 @@ development and the scenarios below.
   Restart CPU measures 638/659 ms across seven pairs. Its full native suite and
   all 595 guest/client tests pass; the cost still does not justify landing it. A
   bounded warmup admission experiment passes twenty focused native checks and
-  the analyzer; its broader qualification and measurements remain pending. No
-  composite implementation is accepted by those measurements.
+  the analyzer. Seven pairs measure 943/935 ms cold CPU but 630/652 ms process
+  restart, with matching Wasm and lower allocation. That repeated restart cost
+  keeps it unaccepted. A later lazy-activation probe passes focused native
+  checks and the analyzer; its measurements remain pending. No composite
+  implementation is accepted by those measurements.
 - Validation: the isolated fourth candidate passes 55 native resolution and
   ownership laws and 14 executed-Wasm laws. Generated histories, physical edits,
   rollback, future views, saturation and allocation failures are covered. The

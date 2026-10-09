@@ -127,6 +127,20 @@ scanning certificates for one-use roots. Twenty focused native checks pass,
 including discovery checks, and the analyzer reports zero findings in 288 files.
 Release SHA-256
 `671e30f9e1172c0d15b4dcced06c083304af47cecf20689f167ffeb2063d4a1e` is pinned in
-`build/bench/composite-cache-warmup/`. Broader qualification and measurements
-remain pending. Task 009 remains open until its complete correctness and cost
-gates pass.
+`build/bench/composite-cache-warmup/`. Seven no-cache pairs measure 943/935 ms
+fresh CPU, 1,100/1,090 ms population, 250/250 ms first edit and 220/220 ms
+subsequent edit. Seven restart pairs measure 1,027/1,040 ms cold population,
+630/652 ms process restart, 1,100/1,080 ms retained population, 250/250 ms first
+edit and 220/230 ms subsequent edit. Same-compiler and cross-compiler Wasm
+comparisons pass. Requested fresh allocation falls from 321,026,930 to
+320,517,978 bytes. These loaded-host observations still show a repeated restart
+cost; the warmup candidate is not accepted for production.
+
+A subsequent isolated probe defers physical-owner activation until the first
+certificate is actually recorded. An empty table needs no validity check on
+every miss; the complete certificate still controls every hit once records
+exist. Focused native checks and the analyzer pass. This probe's release pin is
+`e0fbd4b40ef139fda3f322432155d6a9c158f9fd3bd69bee48db36f4fa6110d2`, in
+`build/bench/composite-cache-lazy-activation/`. Its paired measurements remain
+pending. Task 009 remains open until its complete correctness and cost gates
+pass.
