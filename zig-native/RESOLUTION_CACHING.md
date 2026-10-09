@@ -186,12 +186,12 @@ suite and all 595 guest/client tests also pass.
 
 ## Production qualification, 9 October 2026
 
-The cost-gated implementation is accepted. Production release
-`0e78ed2c1e6343c41fb92cc1565fc0f11ffa007a74ca869826cf67307ddcb78d` is pinned in
-`build/bench/composite-cache-main/`. Zig 0.17.0, the full native suite and all
-598 guest/client tests pass. The analyzer reports zero findings across 289 Zig
-files. The focused resolution filter passes 41 checks, including discovery. Logs
-are `build/bench/composite-cache-main-compiler-gate.log`,
+The cost-gated implementation is accepted in commit `d736d45`. Production
+release `0e78ed2c1e6343c41fb92cc1565fc0f11ffa007a74ca869826cf67307ddcb78d` is
+pinned in `build/bench/composite-cache-main/`. Zig 0.17.0, the full native suite
+and all 598 guest/client tests pass. The analyzer reports zero findings across
+289 Zig files. The focused resolution filter passes 41 checks, including
+discovery. Logs are `build/bench/composite-cache-main-compiler-gate.log`,
 `build/bench/composite-cache-main-native.log` and
 `build/bench/composite-cache-main-analyzer.log`. The recorded source hashes,
 executable and compiler identity match the production tree.

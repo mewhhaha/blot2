@@ -52,6 +52,13 @@ progress: the float fold regression and general principal/residual summaries are
 still open. Their task files and durable records contain the separate pinned
 measurements; they do not replace the starting baseline above.
 
+Commit `d736d45` completes task [009] with bounded, cost-gated composite
+resolution certificates. The production native suite and 598 guest/client tests
+pass, with zero findings across 289 Zig files. Its paired measurements and
+remaining performance limits are recorded in
+[resolution caching](../zig-native/RESOLUTION_CACHING.md). Task [010] is being
+qualified independently.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -277,8 +284,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [006] — Summarize lexical closures                      | Pending     | [005]                                  |
 | [007] — Infer recursive components jointly              | Pending     | [006]                                  |
 | [008] — Canonicalize specialization keys                | Pending     | [007]                                  |
-| [009] — Cache composite type resolutions                | In progress | None                                   |
-| [010] — Schedule constraints by variable                | Pending     | [009]                                  |
+| [009] — Cache composite type resolutions                | Complete    | None                                   |
+| [010] — Schedule constraints by variable                | In progress | [009]                                  |
 | [011] — Reduce semantic allocation traffic              | Pending     | [007], [008], [010]                    |
 | [012] — Schedule independent semantic jobs              | Pending     | [007], [008], [010]                    |
 | [013] — Qualify parallel inference                      | Pending     | [011], [012]                           |

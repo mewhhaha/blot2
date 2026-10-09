@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — an isolated indexed scheduler is being qualified;
+  production integration and completion remain pending.
 - **Dependencies:** [009](009-cache-composite-type-resolutions.md)
 - **Originating requirements:** PLAN: Hill 5 / indexed solver worklist. Sources:
   [PLAN.md](../PLAN.md).
@@ -58,10 +59,17 @@ development and the scenarios below.
 ## Completion evidence
 
 - Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Validation: the isolated candidate passes 35 focused inference/queue checks,
+  reverse-chain and allocation-failure laws, 305 differential cases, 39 focused
+  execution laws and all 598 guest/client tests. The analyzer reports zero
+  findings across 290 files. Full native qualification remains in progress.
+- Comparison: three initial paired samples preserve Wasm and reduce constraint
+  visits from 35,215 to 29,641. Seven-pair fresh/retained and restart
+  qualification remains in progress; the durable record contains the pins and
+  initial measurements.
+- Remaining limitations: production still uses the scan scheduler. Bounded
+  frontier discovery retains conservative broad watches for oversized or
+  indirect dependencies. Completion requires all remaining correctness and cost
+  gates and production integration.
+- Durable record: [indexed inference work](../zig-native/INDEXED_SOLVER.md)
+  records the queue contract, initial correctness evidence and remaining gates.
