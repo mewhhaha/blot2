@@ -94,10 +94,20 @@ development and the scenarios below.
   135 to 393 and solver passes from 535 to 2,083. Smaller regions alone do not
   establish a faster or lower-allocation compiler. No performance or completion
   claim is made for this probe.
+- Release qualification: sixteen existing execution laws, eighteen ordered
+  diagnostic-boundary cases and twelve synthetic cases across seven alternating
+  pairs passed. At depth 128, associated-chain CPU rose from 10.242 to 11.716 ms
+  and requested allocation from 5,406,388 to 8,803,028 bytes; field-chain CPU
+  rose from 9.171 to 9.775 ms and allocation from 5,135,019 to 8,555,007 bytes.
+  Gdev counters and Wasm were unchanged. The admission expansion was rejected
+  for landing; complete commands, pins and comparisons are recorded in the
+  [durable experiment record](../zig-native/CALL_SUMMARIES.md#predicate-admission-experiment-9-october-2026)
+  and `build/bench/call-summary-graph-release/`.
 - Remaining implementation and validation: complete principal/residual graph
   coverage, unsupported explicit and result-directed cases, authoritative
   witness diagnostics, bounded graph admission, ownership/allocation failures,
   repeated diamonds, separate compilation and paired CPU/allocation evidence. A
   wider admission rule alone does not complete this task.
-- Durable specification: [CALL_SUMMARIES.md](../zig-native/CALL_SUMMARIES.md).
-  Durable implementation qualification has not yet been written.
+- Durable specification and rejected experiment qualification:
+  [CALL_SUMMARIES.md](../zig-native/CALL_SUMMARIES.md). A production
+  implementation remains to be qualified.

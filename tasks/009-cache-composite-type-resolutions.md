@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** In progress — an isolated dependency-certificate prototype is
+  being tested; no production change or completion is claimed.
 - **Dependencies:** None.
 - **Originating requirements:** PLAN: Hill 5 / solver hot paths. Sources:
   [PLAN.md](../PLAN.md).
@@ -65,3 +66,8 @@ development and the scenarios below.
 - Remaining limitations: not yet assessed; list unresolved scope explicitly.
 - Durable record: pending; link specifications/qualification outside `tasks/`
   before cleanup.
+- Isolated work: `/tmp/blot-composite-cache-prototype/` tests bounded
+  certificates that retain unresolved type/effect frontiers and revoke future
+  variable views when the shared clock advances. It starts from current main,
+  not the previously rejected closed-cache implementation. No performance or
+  correctness result is claimed before qualification completes.

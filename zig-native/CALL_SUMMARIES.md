@@ -271,3 +271,62 @@ transitions. Profile largest-region time separately from total compiler CPU and
 allocation. The under-50-ms largest-region and no-duplicate-key targets remain
 implementation qualification gates; a design or a narrower admitted subset does
 not satisfy them.
+
+## Predicate-admission experiment, 9 October 2026
+
+The isolated admission-graph experiment is not production. It allows explicit
+dispatch, field and update obligations through the existing first-order job
+queue. It classifies reachable callee requirements once and propagates declined
+requirements through reverse edges, rather than repeating a transitive walk for
+each target. Signature shape admission remains separate from that graph cache.
+This does not implement the principal graph, result-directed inputs, general
+predicate coverage or the transition budget specified above.
+
+The baseline release is the sequential List traversal compiler at commit
+`bcff12b47611020d4effd9a5eb8d0b97c1835c55`, SHA-256
+`742c3e91faf3dd682d33873d8d02da13eefa0f252c62da570c3fb3b0bc068053`. The
+experiment's release SHA-256 is
+`39d34414fea6cf173cc9538ffd92f8609267208f1107e220f27c620118b8e79e`. Its patch is
+preserved in `build/bench/call-summary-graph-prototype/source.patch`; release
+inputs, commands, samples and results are in
+`build/bench/call-summary-graph-release/`. Private workload sources remain
+uncommitted.
+
+Sixteen existing execution tests passed, covering deep chains, callbacks,
+effects, qualified rows/evidence, contracts, dependencies, checkpoints and
+retained failure recovery. Eighteen diagnostic-boundary cases at depths 0, 16
+and 128 preserved the exact ordered diagnostics for missing fields, incompatible
+results, competing failures and annotation witnesses. Deferred unused failures
+remain accepted as in the baseline. Twelve synthetic cases at depths 0, 16, 64
+and 128 preserved outcomes, diagnostics and Wasm bytes across seven alternating
+pairs; every compiler teardown reported zero live bytes.
+
+The successful deep chains show why smaller regions alone are insufficient:
+
+| Chain, depth 128                 | Largest region, scopes | CPU, ms | Requested allocation, bytes | Solver visits |
+| -------------------------------- | ---------------------: | ------: | --------------------------: | ------------: |
+| Associated predicate, baseline   |                    260 |  10.242 |                   5,406,388 |         1,569 |
+| Associated predicate, experiment |                      2 |  11.716 |                   8,803,028 |         2,859 |
+| Field predicate, baseline        |                    130 |   9.171 |                   5,135,019 |           393 |
+| Field predicate, experiment      |                      1 |   9.775 |                   8,555,007 |         1,425 |
+
+The failing associated chain improved from 7.471 to 5.876 ms and from 4,599,745
+to 4,136,869 requested bytes. That improvement does not offset the successful
+chains' increased allocation and solver work or establish complete admission.
+
+Seven alternating gdev pairs without restart caching measured 791/790 ms fresh
+CPU, 900/910 ms dependency population, 200/200 ms first edit and 180/180 ms
+subsequent edit, baseline/experiment respectively. Fresh requested allocation
+was 321,026,930/321,060,278 bytes. In a separate restart-cache batch the medians
+were 853/846 ms cold population, 495/480 ms restart, 890/910 ms dependency
+population, 190/200 ms first edit and 180/180 ms subsequent edit. No-op CPU was
+below the retained process counter's 10 ms resolution. All same-compiler and
+cross-compiler Wasm comparisons passed without an exception flag; gdev work
+counters were unchanged. Host load fell from about 25.5 to 15.5 on 16 CPUs, so
+these are paired loaded-host observations, not idle-machine qualification.
+
+Decision: do not land this admission expansion. Keep the graph and diagnostic
+cases as evidence for the next implementation. It must represent residual
+requirements and share principal work without multiplying successful job
+allocation, and still supply bounded scheduling, authoritative fallback and
+allocation-failure coverage. Task 004 remains open.

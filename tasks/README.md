@@ -270,7 +270,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [006] — Summarize lexical closures                      | Pending     | [005]                                  |
 | [007] — Infer recursive components jointly              | Pending     | [006]                                  |
 | [008] — Canonicalize specialization keys                | Pending     | [007]                                  |
-| [009] — Cache composite type resolutions                | Ready       | None                                   |
+| [009] — Cache composite type resolutions                | In progress | None                                   |
 | [010] — Schedule constraints by variable                | Pending     | [009]                                  |
 | [011] — Reduce semantic allocation traffic              | Pending     | [007], [008], [010]                    |
 | [012] — Schedule independent semantic jobs              | Pending     | [007], [008], [010]                    |
