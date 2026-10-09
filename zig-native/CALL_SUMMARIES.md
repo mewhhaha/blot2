@@ -559,3 +559,104 @@ compiler CPU speedup. The initial guard placement is preserved separately under
 `initial-candidate/` and `initial-results/`; the final guard avoids its emission
 lookup. General principal/residual graphs, unsupported explicit/result-directed
 requirements, higher-order inputs and component handling remain open.
+
+## Owned inferred principal graphs, 9 October 2026
+
+The next milestone describes each admitted global first-order body once in an
+immutable Session-owned graph. It retains the interface, type and row binders,
+ordered body constraints, aliases, function relationships and global callee
+edges. Each edge keeps its original argument expressions and deferred-member
+context. Import creates fresh caller-local binders, preserves sharing inside
+that import and replays the original action order. Source Core/type/obligation
+tables remain immutable. No live solver address or caller-selected proof enters
+the graph owner.
+
+Description collects one body without expanding its callees. It publishes only
+after every owned array and cache allocation succeeds. Graph nodes and edges,
+including diagnostic spelling storage, count against the Session's configured
+value/child limits. Allocation failure remains an error. Descriptions with
+chronological writes, rigid row parameters, lexical/value-dependent forms or
+unsupported first-order shapes decline to ordinary collection. Small quota
+inquiries, selected captures/emission, complete demand checking and independent
+closed-input jobs retain their original paths.
+
+An optional principal/source-interface inquiry can export an unresolved callee
+edge when its complete interface has only unknown data binders and unselected
+rows. An iterative scan checks every distinct reachable body and edge, preserving
+diamonds rather than copying their transitive paths. Explicit requirements,
+concrete bounds, structured endpoints and recursion decline this shortcut. The
+edge remains unsolved; it cannot publish a complete validated-call judgment or a
+dependency-complete refinement receipt. A later concrete caller input, result or
+row uses the ordinary solver and witness path. The closed-input job key is
+unchanged. General result-directed callee admission and unsupported explicit
+requirements remain task 004 work; this milestone does not complete that task.
+
+The baseline is the qualified `f7be6e7` release, SHA-256
+`d431170c3bfa2c3dd38b5c61eff375a6e326b3a530e14896b9a8e0873869f439`.
+The candidate is SHA-256
+`ae2458cb3e31cd42f2f9c91a40909ff43786474aff2a28f33d9b009e0688bbaa`, with
+compiler-identity file SHA-256
+`dc5b861ddb9628c6f32bc402d4dc5d22943c91635262c135aa954f8ddfcfa225`.
+Both use Zig 0.17.0. The four-file source patch is SHA-256
+`22686519b212babe27347a6f68e13b61b646e944f54350e2ab7f6e0b50fa708b`.
+Pins, generated sources, scripts and raw results are in
+`build/bench/cloud-principal-graphs/`; the final pin is `candidate-guarded/`.
+Earlier candidate directories preserve investigations and are not this release.
+
+Qualification commands and results:
+
+- `deno task test:compiler`: full native suite and all 601 guest/client tests
+  pass; `compiler-gate-factory.log` records the final run.
+- `deno task lint:zig`: 291 Zig files, zero findings, using the CI-pinned
+  analyzer; `analyzer-guarded.log` records the run.
+- `python3 build/bench/cloud-principal-graphs/compare-guarded.py`: all 393
+  public cases match ordered JSON diagnostics and successful Wasm bytes, with
+  276 successful cases. Compilation memory records return to zero live bytes.
+- Native laws check independent U32/F32 imports, repeated queries, immutable
+  source tables and exhaustive allocation failures through description, graph
+  copying, traversal and publication. Open diamonds at depths 8, 16 and 64
+  have work bounded by distinct bodies/edges and perform no evaluation.
+- The new executed-Wasm law uses a staged factory, a repeated diamond and a
+  result-selected constructor through an import. Fresh and retained builds
+  agree after body edits, a failed edit and correction. Existing dependency,
+  checkpoint, callback/effect and diagnostic laws also pass the full gate.
+
+The factory workload returns a generic helper from a `do` constant, triggering
+the optional principal inquiry before independent U32/F32 use. Its leaf calls
+ordinary associated `add`; each wrapper calls its predecessor twice. Fifteen
+alternating fresh-process pairs disable persistence, verify exact Wasm equality
+and zero live bytes, and measure child user plus system CPU with `getrusage`.
+The command is
+`python3 build/bench/cloud-principal-graphs/measure-guarded-factory-three.py`.
+Host load is approximately 0.89 on five reported CPUs. Requested allocation and
+work counters are identical across repetitions of each binary.
+
+| Diamond depth | Median CPU ms, baseline/candidate | Requested allocation bytes, baseline/candidate | Total scopes, baseline/candidate | Largest region scopes, baseline/candidate | Constraint visits, baseline/candidate |
+| ------------: | --------------------------------: | ---------------------------------------------: | -------------------------------: | ----------------------------------------: | ------------------------------------: |
+| 4             |                     4.486 / 4.338 |                          3,602,120 / 3,474,384 |                          82 / 56 |                                    32 / 3 |                             191 / 130 |
+| 8             |                     7.219 / 4.689 |                          5,420,870 / 4,158,718 |                         586 / 84 |                                   512 / 3 |                           1,255 / 234 |
+| 12            |                   198.730 / 5.371 |                         19,420,315 / 4,783,635 |                      8,290 / 112 |                                 8,192 / 3 |                          16,719 / 338 |
+
+Description regions are included: at depth 12 total regions rise from 87 to
+100 while unresolved body collections fall from 8,195 to 4. This is a measured
+improvement for the staged factory inquiry. Ordinary typed workloads need not
+invoke that inquiry and do not acquire the same reduction. The extended
+depth-16 fresh batch was stopped after one pair because baseline checking was
+slow; its raw files are preserved separately and excluded from these medians.
+
+Seven official synthetic pairs compare fresh, retained population, first edit,
+edit/revert, no-op and restart phases:
+`deno task bench:compile --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-guarded/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/guarded-synthetic`.
+All byte comparisons pass. Ordinary monomorphic/generic chains, diamond 8 and
+fan-out 128 retain their deterministic work counters. CPU is mixed; retained
+samples frequently fall below the 10-ms accounting resolution. The frozen
+private gdev snapshot remains unavailable, so these public results establish no
+general compiler or gdev speedup.
+
+The same seven-pair harness, extended with the factory source and its ordinary
+leaf edit, also passes all fresh/retained/restart comparisons:
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-factory.ts --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-guarded/blotc --runs 7 --workload factory_diamond_12 --restart-cache --out build/bench/cloud-principal-graphs/guarded-factory-retained`.
+Fresh CPU is 205/7 ms; retained population, first edit and subsequent edit are
+200/<10, 210/<10 and 190/<10 ms. Restart is 7/7 ms and no-op is below 10 ms for
+both. The retained factory improvement is above the accounting resolution;
+the candidate's sub-10-ms samples do not provide a more precise latency.

@@ -12,6 +12,89 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 
+Deno.test("inferred graph edges preserve result witnesses through diamonds, imports and failed edits", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const library = `${directory}/library.blot`;
+  const source = (double: boolean, invalid: boolean) => {
+    const lines = [
+      `const f_0 = fn value => ${
+        invalid
+          ? "value + #True"
+          : double
+          ? '@type.call "add" value value'
+          : "value"
+      }`,
+    ];
+    for (let i = 1; i <= 4; i++) {
+      lines.push(`const f_${i} = fn value => f_${i - 1} (f_${i - 1} value)`);
+    }
+    return lines.join("\n") + `
+const first = fn value => value.first
+type Box a is data = #Box a
+const factory = do:
+  return f_4
+const Box.from = fn value => #Box (factory value)
+`;
+  };
+  const options = { executable, entry, prelude };
+  try {
+    await Deno.writeTextFile(library, source(true, false));
+    await Deno.writeTextFile(
+      entry,
+      `
+import * as library from "./library"
+const from = fn value => @type.result "from" value
+entry const integer = fn (value: U32) => do:
+  let #library.Box result: library.Box U32 = from (library.first ({first: value}))
+  return result
+entry const floating = fn (value: F32) => do:
+  let #library.Box result: library.Box F32 = from (library.first ({first: value}))
+  return result
+`,
+    );
+    const retained = await createZigProjectCompiler(options);
+    try {
+      for (
+        const [double, invalid] of [
+          [true, false],
+          [false, false],
+          [true, true],
+          [true, false],
+        ]
+      ) {
+        const sources = { [library]: source(double, invalid) };
+        const current = await retained.build({ sources });
+        const fresh = await createZigProjectCompiler(options);
+        try {
+          const reference = await fresh.build({ sources });
+          assert.equal(current.success, !invalid, JSON.stringify(current));
+          assert.equal(current.success, reference.success);
+          if (current.success && reference.success) {
+            assert.deepEqual(current.bytes, reference.bytes);
+            const guest = await instantiateGuest(current.bytes);
+            try {
+              const factor = double ? 65536 : 1;
+              assert.equal(guest.call("integer", 37), 37 * factor);
+              assert.equal(guest.call("floating", 1.5), 1.5 * factor);
+            } finally {
+              guest.dispose();
+            }
+          } else if (!current.success && !reference.success) {
+            assert.deepEqual(current.diagnostics, reference.diagnostics);
+          }
+        } finally {
+          await fresh.dispose();
+        }
+      }
+    } finally {
+      await retained.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("summary jobs preserve executed deep chains and shared diamonds", async () => {
   for (
     const [program, increment] of [

@@ -149,6 +149,17 @@ region. Failed speculative jobs publish no diagnostic; fallback preserves the
 caller's argument witness sites and deferred-member context. An independently
 completed callee proof may survive an enclosing caller's failed qualification.
 
+Admitted inferred first-order bodies also have bounded immutable principal
+graphs owned by that source Session. Ordered constraints and callee edges retain
+their original argument/result witnesses. Import freshens type and row binders
+without copying transitive diamond paths. Optional principal inquiries may
+export a checked all-unknown residual edge, but it remains unsolved and cannot
+certify a complete call or refinement receipt. Concrete or structured endpoints,
+explicit bounds and unsupported forms retain ordinary checking. Description and
+cache publication finish every ownership allocation before installing a visible
+graph; out-of-memory never becomes a cached semantic decline. General admission
+and the later callback/capture/component boundaries remain implementation work.
+
 Summary jobs own their solver and scratch until completion or session teardown.
 Evidence copied into the session may outlive a job; solver IDs and source
 borrows may not. The execution depth budget applies only to executed expressions

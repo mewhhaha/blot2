@@ -56,6 +56,100 @@ fn qualifiedSchemeScenario(allocator: std.mem.Allocator, module: *const core.Mod
     try std.testing.expectEqual(@as(usize, 0), session.steps);
 }
 
+fn principalGraphScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    var summarized = try evaluator.Session.init(allocator, &.{module.*});
+    defer summarized.deinit();
+    for ([_][]const u8{ "integer", "floating", "field" }) |name| {
+        const expected = try ordinary.sourceInterface(target(module, name));
+        const actual = try summarized.sourceInterface(target(module, name));
+        try std.testing.expect(expected.evidence != 0 and actual.evidence != 0);
+        const expected_arrow = ordinary.evidence.node(expected.evidence);
+        const actual_arrow = summarized.evidence.node(actual.evidence);
+        try std.testing.expectEqual(type_evidence.Tag.function, actual_arrow.tag);
+        try std.testing.expectEqual(expected_arrow.a, actual_arrow.a);
+        try std.testing.expectEqual(expected_arrow.b, actual_arrow.b);
+        try std.testing.expectEqual(expected_arrow.c, actual_arrow.c);
+    }
+    const expected_generic = try ordinary.sourceInterface(target(module, "generic"));
+    const actual_generic = try summarized.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqual(expected_generic.evidence, actual_generic.evidence);
+    try std.testing.expectEqual(expected_generic.generic, actual_generic.generic);
+    try std.testing.expectEqual(expected_generic.selected, actual_generic.selected);
+    try std.testing.expect(actual_generic.pending <= expected_generic.pending);
+    try std.testing.expect(actual_generic.pending != 0);
+    try std.testing.expect(summarized.principal_graph_builds != 0);
+    try std.testing.expect(summarized.principal_graph_imports != 0);
+    try std.testing.expect(summarized.principal_graph_deferred != 0);
+    try std.testing.expect(summarized.counters.region_scopes < ordinary.counters.region_scopes);
+    const builds = summarized.principal_graph_builds;
+    _ = try summarized.sourceInterface(target(module, "integer"));
+    try std.testing.expectEqual(builds, summarized.principal_graph_builds);
+    try std.testing.expectEqual(@as(usize, 0), summarized.steps);
+    try std.testing.expect(summarized.diagnostic == null);
+}
+
+test "owned principal graphs preserve independent inferred uses and publish atomically" {
+    var text: std.ArrayList(u8) = .empty;
+    defer text.deinit(a);
+    try text.appendSlice(a,
+        \\const f_0 = fn value => @type.call "add" value value
+        \\const first = fn value => value.first
+        \\
+    );
+    for (1..5) |i| try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+    try text.appendSlice(a,
+        \\entry const integer = fn (value: U32) => f_4 value
+        \\entry const floating = fn (value: F32) => f_4 value
+        \\entry const field = fn (value: F32) => first ({first: value})
+        \\entry const generic = fn value => f_4 value
+        \\
+    );
+    var module = try lowerPreludeProducer(text.items, &.{.add});
+    defer module.deinit(a);
+    const nodes = try a.dupe(core.Node, module.nodes);
+    defer a.free(nodes);
+    const type_nodes = try a.dupe(types.Node, module.types.nodes);
+    defer a.free(type_nodes);
+    const obligations = try a.dupe(core.Obligation, module.obligations);
+    defer a.free(obligations);
+    try principalGraphScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, principalGraphScenario, .{&module});
+    try std.testing.expectEqualDeep(nodes, module.nodes);
+    try std.testing.expectEqualDeep(type_nodes, module.types.nodes);
+    try std.testing.expectEqualDeep(obligations, module.obligations);
+}
+
+test "open principal diamond inquiry grows with distinct bodies and edges" {
+    for ([_]usize{ 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "const f_0 = fn value => @type.call \"add\" value value\n");
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const generic = fn value => f_{d} value\n", .{depth});
+        var module = try lowerPreludeProducer(text.items, &.{.add});
+        defer module.deinit(a);
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        const result = try session.sourceInterface(target(&module, "generic"));
+        try std.testing.expectEqual(@as(type_evidence.Id, 0), result.evidence);
+        try std.testing.expect(result.pending != 0);
+        try std.testing.expect(session.counters.region_scopes <= depth * 2 + 20);
+        try std.testing.expect(session.principal_graph_builds <= depth * 2 + 4);
+        try std.testing.expect(session.principal_graph_nodes <= depth * 64 + 128);
+        try std.testing.expect(session.principal_graph_deferred != 0);
+        const builds = session.principal_graph_builds;
+        const scopes = session.counters.region_scopes;
+        const again = try session.sourceInterface(target(&module, "generic"));
+        try std.testing.expectEqualDeep(result, again);
+        try std.testing.expectEqual(builds, session.principal_graph_builds);
+        try std.testing.expectEqual(scopes + 1, session.counters.region_scopes);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    }
+}
+
 test "written predicate schemes share fresh requirements without expanding source chains or mutating inputs" {
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(a);
