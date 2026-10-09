@@ -45,6 +45,13 @@ uncontrolled. Against the previous variable-cache compiler, fresh CPU was
 speedup was claimed. Raw samples and binary hashes are in ignored
 `build/bench/demand-forwarding-qualified`.
 
+The later compiler milestone `90bd532` qualifies U32 row reductions and bounded
+callee admission with the full native suite, 598 guest/client tests and zero
+analyzer findings across 288 Zig files. Tasks [002] and [004] remain in
+progress: the float fold regression and general principal/residual summaries are
+still open. Their task files and durable records contain the separate pinned
+measurements; they do not replace the starting baseline above.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical

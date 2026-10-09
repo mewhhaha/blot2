@@ -69,6 +69,8 @@ development and the scenarios below.
 
 - Commit: `fd8cd3f` lands the qualified checked written-predicate milestone; it
   does not complete task 004.
+- Commit: `90bd532` adds bounded transitive admission, qualified with the U32
+  row reductions. General principal/residual summaries remain unfinished.
 - Baseline: with the qualified task 001 compiler (SHA-256
   `034d660ce38691df9a18c895ab228c4d0a76d618aa1969117d16604e06ee2833`), an
   explicit associated-predicate chain grows from 36 scopes at 16 wrappers to 260
