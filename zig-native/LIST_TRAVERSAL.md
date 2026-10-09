@@ -594,3 +594,83 @@ suite, 599 guest/client tests and the pinned analyzer (zero findings) pass. A
 new execution law folds rows from many concatenated slices at every width. Rows
 spanning three leaves did not arise in any tested construction, so the exact
 fallback copy remains unexercised by execution tests.
+
+### Word positions at leaf boundaries, 9 October 2026
+
+The cloud checkout contains Git history but none of the earlier ignored
+qualification artifacts. The production source is
+`65dccda29d56d4eaf6d23ff81ca05f1720824d23`. A boxed compiler was rebuilt from
+`586e0ae5a6443cf8c3d50f470a453a99ed044046`, the parent of the packed-row commit
+`8b44ee6`. Its prelude, List, Array and vector sources match current main. This
+new binary is a separate comparison; it does not recover the historically pinned
+executable or its original measurement batch. The frozen private gdev snapshot
+is also absent, so its gate is unmeasured.
+
+A probe keeps the direct row-view loop's counter and outer bound in storage
+words. It removes the word-to-row division at a leaf boundary and the following
+row-to-word multiplication. Source lengths and cursors still count logical rows;
+crossing copies, snapshots, cleanup and the inner loop are unchanged. The probe
+is **unlanded**: the production source and active release/development builds
+were restored after the measurements.
+
+| Input                    | SHA-256                                                            |
+| ------------------------ | ------------------------------------------------------------------ |
+| Rebuilt unchanged main   | `745347b7752831e4bae78397f5e3731ab8e16d0d227314ee2afd8d399c1baf82` |
+| Rebuilt boxed compiler   | `271a79825708cec2b5b486fcd7203f6dcd0bf6e9506398b9f73d03fb63695392` |
+| Release probe            | `ec765e93041461d66c301b0038da736fe41a0404af1faf9d422d9509423b421f` |
+| Probe patch from main    | `e5f654d89ebadf177dec12601f151282a328ce319cceb8cb0dbb4ec0a29af164` |
+| Probe `core_backend.zig` | `013a9d17f12ec6f9b34170b3d276df9a8526907a2c973fb469f632e8321d5a97` |
+
+The machine uses Zig 0.17.0 and Deno 2.9.6 (V8 15.0.245.2-rusty). Three
+interleaved release batches per shape use `scripts/bench_list_traversal.ts`, 16
+traversals per sample, 20 warmups and 31 alternating pairs. The release
+measurements ran after the compiler gate finished; reported load was below one.
+Every result passes the source-ordered scalar reference and Wasm validity
+checks. Compiler, library, harness and workload hashes are pinned in each
+report.
+
+These are medians of the three per-batch candidate/main CPU ratios, not
+confidence intervals:
+
+| Width | F32 record fold | F32 tuple fold |
+| ----: | --------------: | -------------: |
+|    12 |           0.984 |          1.002 |
+|    13 |           1.002 |          0.990 |
+|    14 |           0.999 |          1.003 |
+|    15 |           1.006 |          0.998 |
+|    16 |           1.001 |          0.992 |
+
+The first development batch suggested a 2–3% width-15 improvement; repeated
+release measurements do not confirm it. Development and release probes emit
+identical Wasm for all 31 F32 row shapes. Some integer widths improve, but tuple
+width five produces per-batch ratios of 1.018, 1.096 and 1.124; record width
+eleven has a median ratio of 1.032. This is not a reason to admit the change.
+Against the rebuilt boxed compiler, the maximum per-width median F32 fold ratio
+is still 1.012 for records and 1.024 for tuples. The all-width criterion remains
+open.
+
+Compared with unchanged main, all 31 shapes preserve committed guest memory and
+semantic work counters. Requested compiler allocation falls by 107–2,577 bytes
+across the measured workloads; that is separate from guest memory or CPU and
+does not establish the overall allocation target.
+
+The probe passes 24 focused row, snapshot, revision, effect and iterator
+execution tests, the complete native suite and all 599 guest/client tests. The
+analyzer at CI revision `756bfd5c3e94b2197b08ce79ce1e7b5d110c0508` reports zero
+findings across 290 production files. An initial full gate had one setup
+failure: Deno could not download its standalone runtime from `dl.deno.land`.
+Caching the matching official GitHub release with its published SHA-256 verified
+fixes that test, and a subsequent full `deno task test:compiler` passes.
+
+Seven alternating compiler pairs over `chain_mono_128`, `chain_generic_64`,
+`diamond_8` and `fanout_128` preserve cross-compiler Wasm equality and each
+compiler's fresh/retained parity, including edits and reverts. Fresh CPU medians
+are 8/8, 7/6, 4/4 and 15/16 ms (main/probe); retained differences are within
+10-ms process-accounting resolution. These public synthetic checks establish no
+compiler speedup and do not replace the missing gdev measurements.
+
+Raw reports, the patch, source and binaries remain in `build/bench/cloud-list/`;
+`summary.json` records the pins and aggregate ratios. The probe is in
+`word-position-release/`, the full passing gate is
+`word-position-compiler-gate-retry.log`, and analyzer output is
+`word-position-analyzer.log`. Tasks 002 and 047 retain their existing gates.

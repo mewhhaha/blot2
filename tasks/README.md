@@ -65,6 +65,15 @@ constraint visits fall from 35,215 to 29,679 without a CPU change outside
 accounting noise; [indexed inference work](../zig-native/INDEXED_SOLVER.md)
 records the evidence and remaining limits.
 
+The cloud follow-up for [002] tested loop counters in storage words against
+unchanged `65dccda` and a separately rebuilt pre-packed compiler. The probe
+passes the native suite, 599 guest/client tests and the pinned analyzer, but
+repeated release measurements do not establish an F32 improvement and expose an
+integer tuple regression. It remains unlanded; task [002] remains in progress.
+[The traversal record](../zig-native/LIST_TRAVERSAL.md#word-positions-at-leaf-boundaries-9-october-2026)
+pins the experiment and distinguishes unavailable historical/private evidence
+from the new public-workload measurements.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical

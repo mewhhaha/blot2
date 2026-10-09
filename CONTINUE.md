@@ -14,8 +14,21 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   14–16 and at or below 1.006 elsewhere; the all-width gate stays open.
 - Task 004 (general principal/residual call summaries) is in progress; see its
   task file for rejected experiments.
+- Cloud follow-up: a loop counter in storage words passed the native suite, 599
+  guest/client tests and the pinned analyzer, but repeated release batches did
+  not establish an F32 improvement and regressed a U32 tuple shape. It is
+  unlanded; the production compiler remains at `65dccda`. See
+  [the measurement record](zig-native/LIST_TRAVERSAL.md#word-positions-at-leaf-boundaries-9-october-2026).
 
 ## Next steps for task 002
+
+The cloud checkout lacks the original ignored benchmark artifacts and frozen
+private gdev snapshot. `build/bench/cloud-list/` contains a rebuilt pre-packed
+compiler, the unchanged production baseline, the rejected probe and raw results.
+The rebuilt boxed binary is a separate comparison, not the original pinned
+executable. Restore the historical artifacts and verify the gdev snapshot
+against `scripts/bench/gdev-manifest.json` before final qualification. The
+all-width fold gate remains open.
 
 1. Run the gdev compile comparison for the latest commit, allowing the intended
    Wasm difference:
@@ -25,7 +38,8 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
    boxed compiler `build/compiler-hills/final/blotc`). If widths 14–16 stay
    above 1.0, investigate the remaining per-crossing cost (tree walk and the two
    64-byte copies feeding 4-byte loads).
-3. Analysis tools from this session live in `build/bench/f32-fold-analysis/`:
+3. Analysis tools from the original machine lived in
+   `build/bench/f32-fold-analysis/` and are absent from this cloud checkout:
    `multi.ts` (hand-edited Wasm comparisons), `dump_seq.py` (TurboFan
    register-allocated sequences; trace with
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
@@ -39,5 +53,13 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   flags guarded `defer if (alive)` patterns (10 false positives). The CI pin
   `756bfd5` reports zero findings; run with
   `ZIG_ANALYZER=/tmp/blot-qualified-analyzer-756bfd5/zig-out/bin/zig-analyzer`.
+  Those paths refer to the original machine. In the cloud checkout, use
+  `ZIG_ANALYZER=/workspace/tooling/zig-analyzer/zig-out/bin/zig-analyzer`; its
+  source is at the CI pin and it reports zero findings across 290 Zig files.
+- The cloud Deno 2.9.6 standalone runtime is cached from the official GitHub
+  release with its published SHA-256 verified. The initial full gate failed only
+  on the blocked `dl.deno.land` download; after caching, the complete
+  `deno task test:compiler` command passed. Keep the cache setup in the saved
+  environment installation instructions.
 - Corpus differential and budget scripts:
   `build/bench/indexed-solver-lazy-release/tools/`.

@@ -171,3 +171,16 @@ development and the scenarios below.
   14–16 retain 0.6–1.7%, so the all-width gate is still open. Full gate (599
   guest/client tests), pinned analyzer and corpus comparison pass; details are
   in [LIST_TRAVERSAL.md](../zig-native/LIST_TRAVERSAL.md).
+- Cloud follow-up, 9 October 2026: a storage-word loop counter removes the
+  division/multiplication between leaf boundaries. The release probe passes the
+  native suite, all 599 guest/client tests, 24 focused execution tests and zero
+  analyzer findings across 290 files. Three alternating release batches per
+  shape do not establish a consistent F32 improvement over unchanged main; the
+  U32 tuple-width-five median ratio is 1.096. The probe is unlanded and the
+  production source is restored. The boxed source was rebuilt from Git as a
+  separate comparison; the historical pinned executable and private gdev
+  snapshot are unavailable in this checkout. Seven paired runs over the four
+  public compiler workloads preserve fresh/retained Wasm parity, but do not
+  replace the missing gdev gate. Raw evidence is in `build/bench/cloud-list/`;
+  identities, measurements and the rejection are preserved in
+  [the durable record](../zig-native/LIST_TRAVERSAL.md#word-positions-at-leaf-boundaries-9-october-2026).
