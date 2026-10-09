@@ -203,13 +203,31 @@ Deno.test("written predicate summaries preserve independent witnesses through im
         (double ? '@type.call "add" value value' : "value"),
       128,
     ) +
-    'const first: a -> b where { field "first" a b } = fn value => value.first\n';
+    'const first: a -> b where { field "first" a b } = fn value => value.first\n' +
+    `type Box a is data = #Box a
+const Box.read: Box a -> b where { field "first" a b } = fn box => case box of
+  #Box value => first value
+const Box.twice: Box a -> Box a where { associated "add" a a a } = fn box => case box of
+  #Box value => #Box (f_128 value)
+const Box.add: Box a -> Box a -> Box a where { associated "add" a a a } = fn left => fn right => case left, right of
+  #Box value, #Box other => #Box (f_128 value)
+const Box.from: a -> Box a where { associated "add" a a a } = fn value => #Box (f_128 value)
+`;
   const program = (invalid: boolean) =>
-    'import { f_128, first } from "./library"\n' +
-    `entry const integer = fn (value: U32) => f_128 (first ${
+    'import * as library from "./library"\n' +
+    'const add = fn left => fn right => @type.call "add" left right\n' +
+    'const from = fn value => @type.result "from" value\n' +
+    `entry const integer = fn (value: U32) => case (#library.Box ((#library.Box (${
       invalid ? "#True" : "{first: value}"
-    })\n` +
-    "entry const floating = fn (value: F32) => f_128 (first {first: value})\n";
+    })).read)).twice of\n  #library.Box result => result\n` +
+    `entry const floating = fn (value: F32) => case (#library.Box ((#library.Box ({first: value})).read)).twice of
+  #library.Box result => result
+entry const associated = fn (value: U32) => case add (#library.Box value) (#library.Box value) of
+  #library.Box result => result
+entry const constructed = fn (value: F32) => do:
+  let #library.Box result: library.Box F32 = from value
+  return result
+`;
   const options = { executable, entry, prelude };
   try {
     await Deno.writeTextFile(library, source(true));
@@ -263,6 +281,8 @@ Deno.test("written predicate summaries preserve independent witnesses through im
                 (0xffff_ffff * factor) >>> 0,
               );
               assert.equal(guest.call("floating", 1.25), 1.25 * factor);
+              assert.equal(guest.call("associated", 21), 21 * factor);
+              assert.equal(guest.call("constructed", 1.25), 1.25 * factor);
             } finally {
               guest.dispose();
             }

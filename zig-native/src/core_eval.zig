@@ -5857,6 +5857,16 @@ const ClosureRegion = struct {
             }
             try self.scratch.call_instances.put(self.scratch_allocator, key, scope);
         }
+        // callableScope already imported this instance's written requirements.
+        // Emission and complete demand checking still collect the actual body.
+        if (!self.retain_selected and !self.complete_demand_bodies) {
+            const module = &self.session.units[target_.unit];
+            const binding = module.binding(target_.binding);
+            if (binding.kind == .global and binding.scheme.obligations.len != 0 and try self.checkedSchemeReusable(target_)) {
+                if (self.session.receipt_tape) |tape| try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
+                return;
+            }
+        }
         try self.collect(scope, self.scratch.sources.items[scope].body);
     }
     const MemberMismatch = struct {

@@ -96,6 +96,80 @@ fn summaryAdmissionScenario(allocator: std.mem.Allocator, module: *const core.Mo
     try std.testing.expectEqual(visits, session.summary_eligibility_visits);
 }
 
+fn dispatchedSchemeScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    for ([_]struct { name: []const u8, scalar: types.Id }{
+        .{ .name = "integer", .scalar = types.u32_type },
+        .{ .name = "floating", .scalar = types.f32_type },
+        .{ .name = "associated", .scalar = types.u32_type },
+        .{ .name = "constructed", .scalar = types.f32_type },
+    }) |entry| {
+        const selected = try session.sourceInterface(target(module, entry.name));
+        try std.testing.expect(selected.evidence != 0);
+        const arrow = session.evidence.node(selected.evidence);
+        try std.testing.expectEqual(type_evidence.Tag.function, arrow.tag);
+        try std.testing.expectEqual(entry.scalar, arrow.a);
+        try std.testing.expectEqual(entry.scalar, arrow.b);
+    }
+    // The written residuals, not the wrappers inside each implementation,
+    // supply the source interface. Every use still has its own fresh scope.
+    try std.testing.expect(session.counters.max_region_scopes <= 6);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    try std.testing.expect(session.diagnostic == null);
+}
+
+test "dispatched written schemes preserve fresh argument and result predicates without body expansion" {
+    var text: std.ArrayList(u8) = .empty;
+    defer text.deinit(a);
+    try text.appendSlice(a,
+        \\type Integer is data = #Integer U32
+        \\type Float is data = #Float F32
+        \\const Integer.add = fn left => fn right => case left, right of
+        \\  #Integer x, #Integer y => #Integer (@u32.add x y)
+        \\const Float.add = fn left => fn right => case left, right of
+        \\  #Float x, #Float y => #Float (@f32.add x y)
+        \\const f_0: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
+        \\
+    );
+    for (1..9) |i| try text.print(a, "const f_{d} = fn value => f_{d} value\n", .{ i, i - 1 });
+    try text.appendSlice(a,
+        \\type Box a is data = #Box a
+        \\const Box.twice: Box a -> Box a where { associated "add" a a a } = fn box => case box of
+        \\  #Box value => do:
+        \\    let first = f_8 value
+        \\    return #Box (f_8 first)
+        \\const Box.add: Box a -> Box a -> Box a where { associated "add" a a a } = fn left => fn right => case left, right of
+        \\  #Box x, #Box y => #Box (f_8 x)
+        \\const Box.from: a -> Box a where { associated "add" a a a } = fn value => #Box (f_8 value)
+        \\const add = fn left => fn right => @type.call "add" left right
+        \\const from = fn value => @type.result "from" value
+        \\entry const integer = fn (value: U32) => case (#Box (#Integer value)).twice of
+        \\  #Box (#Integer result) => result
+        \\entry const floating = fn (value: F32) => case (#Box (#Float value)).twice of
+        \\  #Box (#Float result) => result
+        \\entry const associated = fn (value: U32) => case add (#Box (#Integer value)) (#Box (#Integer value)) of
+        \\  #Box (#Integer result) => result
+        \\entry const constructed = fn (value: F32) => do:
+        \\  let #Box (#Float result): Box Float = from (#Float value)
+        \\  return result
+        \\
+    );
+    var module = try lower(text.items);
+    defer module.deinit(a);
+    const nodes = try a.dupe(core.Node, module.nodes);
+    defer a.free(nodes);
+    const graph = try a.dupe(types.Node, module.types.nodes);
+    defer a.free(graph);
+    const obligations = try a.dupe(core.Obligation, module.obligations);
+    defer a.free(obligations);
+    try dispatchedSchemeScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, dispatchedSchemeScenario, .{&module});
+    try std.testing.expectEqualDeep(nodes, module.nodes);
+    try std.testing.expectEqualDeep(graph, module.types.nodes);
+    try std.testing.expectEqualDeep(obligations, module.obligations);
+}
+
 test "summary admission visits a shared callee graph once and publishes atomically" {
     var text: std.ArrayList(u8) = .empty;
     defer text.deinit(a);

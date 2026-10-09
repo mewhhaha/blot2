@@ -47,3 +47,33 @@ Deno.test("qualified clauses still enforce exact actual implementation rows", as
     });
   }
 });
+
+Deno.test("dispatched written schemes retain implementation effects and unsatisfied residuals", async () => {
+  await compileAndRun(
+    `effect Read: Unit -> U32
+type Box is data = #Box U32
+const Box.twice: Box -> (Unit -> Box ! {Read}) where { associated "add" U32 U32 U32 ! {} } = fn box => fn () => do:
+  let #Box value = box
+  use offset <- Read ()
+  return #Box (@u32.add (@type.call "add" value value) offset)
+entry const answer = fn (value: U32) => do (@effect.provider Read (fn () => 1)):
+  use box <- (#Box value).twice ()
+  let #Box result = box
+  return result
+`,
+    (guest) => {
+      for (const value of [0, 21, 0xffff_ffff]) {
+        equal(guest.call("answer", value), (value * 2 + 1) >>> 0);
+      }
+    },
+  );
+  await compileExpectedFailure(
+    `type Box a is data = #Box a
+const Box.twice: Box a -> Box a where { associated "add" a a a } = fn box => box
+entry const answer = fn () => do:
+  let #Box value = (#Box #True).twice
+  return 42
+`,
+    "missing_associated",
+  );
+});
