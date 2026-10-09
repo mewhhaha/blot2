@@ -72,6 +72,14 @@ constraint visits fall from 35,215 to 29,679 without a CPU change outside
 accounting noise; [indexed inference work](../zig-native/INDEXED_SOLVER.md)
 records the evidence and remaining limits.
 
+Commit `099e700` adds owned inferred principal graphs and iterative export of
+all-unknown residual edges. The native suite, 601 guest/client tests and 393
+public diagnostic/Wasm comparisons pass, with zero analyzer findings across 291
+files. Staged diamond factories show bounded work and measured CPU/allocation
+reductions; ordinary typed workloads retain their counters. General admission
+and result-directed callee edges remain open, so task [004] stays in progress.
+See [owned inferred graphs](../zig-native/CALL_SUMMARIES.md#owned-inferred-principal-graphs-9-october-2026).
+
 The cloud follow-up for [002] tested loop counters in storage words against
 unchanged `65dccda` and a separately rebuilt pre-packed compiler. The probe
 passes the native suite, 599 guest/client tests and the pinned analyzer, but

@@ -13,11 +13,12 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   constant-size copies. F32 folds are now within 0.6–1.7% of boxed at widths
   14–16 and at or below 1.006 elsewhere; the all-width gate stays open.
 - Task 004 (general principal/residual call summaries) is in progress. Commit
-  `f7be6e7` reuses checked written predicates for associated/member
-  implementations and result-selected constructors in type-only checking. The
-  native suite, 600 guest/client tests and zero-findings analyzer pass. General
-  inferred graphs remain unfinished; see
-  [the qualification record](zig-native/CALL_SUMMARIES.md#dispatched-written-predicate-schemes-9-october-2026).
+  `099e700` adds owned inferred first-order graphs and bounded export of
+  all-unknown residual callee edges. Staged diamond factories share distinct
+  bodies instead of unfolding paths. The native suite, 601 guest/client tests,
+  393 public comparisons and zero-findings analyzer pass. General admission,
+  including result-directed callee edges, remains unfinished; see
+  [the qualification record](zig-native/CALL_SUMMARIES.md#owned-inferred-principal-graphs-9-october-2026).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -52,14 +53,20 @@ fold gate remains open.
 
 ## Next steps for task 004
 
-Implement the principal/residual graph representation from
-[CALL_SUMMARIES.md](zig-native/CALL_SUMMARIES.md). The written-scheme milestones
-preserve caller-side variables, predicates and rows, but do not share general
-inferred graphs. Preserve ordinary diagnostic fallback and complete publication;
-widening job admission alone was already rejected for extra allocation.
-`build/bench/cloud-selected-schemes/` contains the current public comparisons,
-paired measurements and pinned baseline/candidate binaries. CPU observations are
-mixed; no general compiler speedup or private gdev qualification is claimed.
+Extend the owned graph representation in
+[CALL_SUMMARIES.md](zig-native/CALL_SUMMARIES.md). Current open-edge admission
+still uses the old complete-input eligibility rule, so a result-directed callee
+can unfold even when its interface is entirely unknown. Export that relationship
+in the caller's optional principal region without submitting it to an input-only
+job. Concrete expectations, original argument/result witnesses and complete
+publication must retain ordinary checking. Finish unsupported explicit coverage
+and ordered failure/recovery qualification before closing task 004.
+`build/bench/cloud-principal-graphs/` contains the final `candidate-guarded/`
+pin, 393-case comparison, fifteen paired factory measurements and seven-pair
+fresh/retained/restart comparisons. Factory depth 12 drops from 198.730 to
+5.371 ms CPU and 19,420,315 to 4,783,635 requested bytes. Ordinary typed
+workloads keep their counters; no general compiler or private gdev speedup is
+claimed. Preserve the earlier selected-scheme pins as separate baselines.
 
 ## Notes
 
@@ -71,7 +78,7 @@ mixed; no general compiler speedup or private gdev qualification is claimed.
   `ZIG_ANALYZER=/tmp/blot-qualified-analyzer-756bfd5/zig-out/bin/zig-analyzer`.
   Those paths refer to the original machine. In the cloud checkout, use
   `ZIG_ANALYZER=/workspace/tooling/zig-analyzer/zig-out/bin/zig-analyzer`; its
-  source is at the CI pin and it reports zero findings across 290 Zig files.
+  source is at the CI pin and it reports zero findings across 291 Zig files.
 - The cloud Deno 2.9.6 standalone runtime is cached from the official GitHub
   release with its published SHA-256 verified. The initial full gate failed only
   on the blocked `dl.deno.land` download; after caching, the complete

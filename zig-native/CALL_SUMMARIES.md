@@ -562,7 +562,7 @@ requirements, higher-order inputs and component handling remain open.
 
 ## Owned inferred principal graphs, 9 October 2026
 
-The next milestone describes each admitted global first-order body once in an
+Commit `099e700` describes each admitted global first-order body once in an
 immutable Session-owned graph. It retains the interface, type and row binders,
 ordered body constraints, aliases, function relationships and global callee
 edges. Each edge keeps its original argument expressions and deferred-member
