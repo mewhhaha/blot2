@@ -21,12 +21,17 @@ the shared clock to 10. Ordinary traversal now returns the unwritten variable's
 principal view, with cursor zero. Retaining the cursor-10 certificate would
 disagree with the reference path even though the variable itself has no writes.
 
-The pending correction accepts an unwritten remaining variable only while its
-view is already principal or is still beyond the shared clock. The native
-regression compares cached and uncached stores through that transition. This
-corrects the existing variable cache; it does not implement composite caching.
-Its source analyzer passes with zero findings; the full compiler gate is still
-running.
+The correction accepts an unwritten remaining variable only while its view is
+already principal or is still beyond the shared clock. The native regression
+compares cached and uncached stores through that transition. This corrects the
+existing variable cache; it does not implement composite caching. Zig 0.17.0,
+the full native suite, all 595 guest/client tests and the source analyzer (287
+files, zero findings) pass. The release is pinned at
+`build/bench/future-alias-qualified/blotc`, SHA-256
+`2a709b4ca9d93fad58057531f7913ce159e6129aeb59596aff6e5534c6c9c258`. The logs are
+`build/bench/future-alias-compiler-gate.log` and
+`build/bench/future-alias-analyzer.log`. Composite caching remains separate
+work.
 
 ## Bounded composite candidate
 

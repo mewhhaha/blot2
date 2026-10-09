@@ -392,7 +392,11 @@ pub const Store = struct {
                 if (self.closedHeight(raw.c) != 0) return raw.c;
                 if (remaining.tag == .variable) {
                     const last = self.variables.items[remaining.a].last;
-                    if (last == none or self.versions.items[last].position < remaining.b) return raw.c;
+                    if (last == none) {
+                        // Reaching an unwritten future view makes variableView
+                        // choose its principal ID, even after unrelated writes.
+                        if (remaining.b == 0 or remaining.b > self.cursor()) return raw.c;
+                    } else if (self.versions.items[last].position < remaining.b) return raw.c;
                 }
             }
         }

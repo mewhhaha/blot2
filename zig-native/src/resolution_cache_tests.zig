@@ -233,3 +233,19 @@ test "sparse complete caches preserve history and physical publication across re
     try sparseHistory(a);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, sparseHistory, .{});
 }
+
+test "variable resolution certificates refresh future aliases when unrelated writes reach their cursor" {
+    var cached = try T.Store.initWithOptions(a, .{ .closed_graphs = true });
+    defer cached.deinit();
+    var plain = try T.Store.initWithOptions(a, .{ .resolution_cache = false });
+    defer plain.deinit();
+    for ([_]*T.Store{ &cached, &plain }) |store| {
+        const future = try store.resolve(try store.fresh(), 10);
+        const alias = try store.fresh();
+        try store.appendVersion(alias, future);
+        try std.testing.expectEqual(@as(T.Cursor, 10), store.node(try store.resolve(alias, 0)).b);
+        const unrelated = try store.fresh();
+        for (0..9) |_| try store.appendVersion(unrelated, T.boolean);
+        try std.testing.expectEqual(@as(T.Cursor, 0), store.node(try store.resolve(alias, 0)).b);
+    }
+}

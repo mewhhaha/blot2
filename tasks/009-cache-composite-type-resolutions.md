@@ -58,7 +58,11 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
+- Commit: the future-alias correctness fix is qualified independently; the
+  composite cache remains unlanded. Its full compiler gate passes the native
+  suite and 595 guest/client tests, with zero analyzer findings across 287
+  files. The pinned release and logs are in the
+  [durable cache record](../zig-native/RESOLUTION_CACHING.md).
 - Validation: the isolated fourth candidate passes 55 native resolution and
   ownership laws and 14 executed-Wasm laws. Generated histories, physical edits,
   rollback, future views, saturation and allocation failures are covered. The
