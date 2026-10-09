@@ -82,6 +82,12 @@ General higher-order calls, lexical captures and recursive components still
 require shared inference regions. Occurs checks visit each resolved node once
 even when the type is a shared DAG.
 
+[General call summaries](CALL_SUMMARIES.md) specifies the next boundary:
+separate principal graphs and completed call judgments, explicit residual and
+callback obligations, capture inputs, recursive components, canonical keys and
+transactional publication. It is a design contract; the general implementation
+and qualification remain open.
+
 Current variable resolution can reuse a node-local certificate across unrelated
 substitutions. Closed results remain stable; open aliases watch the remaining
 chronological variable. Physical type/effect edits and rollback invalidate the

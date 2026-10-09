@@ -116,6 +116,12 @@ Evidence copied into the session may outlive a job; solver IDs and source
 borrows may not. The execution depth budget applies only to executed expressions
 and patterns. Structural type-depth and storage limits remain separate.
 
+The extension contract is [General call summaries](CALL_SUMMARIES.md). It keeps
+principal summaries separate from caller-selected judgments, requires explicit
+capture and residual-obligation inputs, and defines component-atomic publication
+and authoritative diagnostic fallback. These extended summary forms remain
+implementation work.
+
 Constant collection values publish immutable child spans. Session-owned growth
 buffers may write outside every published span and extend only the latest span
 in that buffer. Branching from an earlier version copies its visible children.
