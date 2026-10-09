@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — design dependency 003 is complete; no implementation
+  completion is claimed.
 - **Dependencies:** [003](003-specify-general-call-summaries.md)
 - **Originating requirements:** PLAN: Hill 1 / generic callee sharing. Sources:
   [PLAN.md](../PLAN.md).
@@ -15,6 +16,11 @@ Share checked predicate-bearing callee summaries without unfolding the
 transitive call graph at each use.
 
 ## Starting point
+
+Use the
+[approved summary interface](../zig-native/CALL_SUMMARIES.md#admission-and-caller-interface)
+and its
+[acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
 
 [check_shared_scheme_tests.zig](../zig-native/src/check_shared_scheme_tests.zig)
 covers frontend scheme sharing; [core_eval.zig](../zig-native/src/core_eval.zig)

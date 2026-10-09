@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete — design committed as `3de4bbb`.
 - **Dependencies:** None.
 - **Originating requirements:** PLAN: Hills 1–3 / summaries and the sandbox
   region. Sources: [PLAN.md](../PLAN.md).
@@ -24,16 +24,16 @@ publication rules.
 
 ## Implementation checklist
 
-- [ ] Specify summary inputs/results for residual predicates, function-parameter
+- [x] Specify summary inputs/results for residual predicates, function-parameter
       obligations, lexical captures and latent effect rows, keeping principal
       schemes separate from caller-selected evidence.
-- [ ] Define admission, closed and unresolved states, recursive-component
+- [x] Define admission, closed and unresolved states, recursive-component
       membership, bounded iteration, versioning, ownership and atomic
       publication. Include independently completed jobs surviving caller
       failure.
-- [ ] Specify fallback to ordinary checking and source-ordered authoritative
+- [x] Specify fallback to ordinary checking and source-ordered authoritative
       diagnostics, including argument witness sites and deferred obligations.
-- [ ] Save the design under `zig-native/` and link it from the
+- [x] Save the design under `zig-native/` and link it from the
       architecture/contract. Give tasks 004–008 explicit interfaces and
       acceptance examples; implementation remains separate.
 
@@ -53,20 +53,29 @@ change.
 
 ## Acceptance criteria
 
-- [ ] Durable documentation settles the summary representation, semantics,
+- [x] Durable documentation settles the summary representation, semantics,
       diagnostic order, ownership and fallback API.
-- [ ] Every later summary task has positive, negative and recovery examples; the
+- [x] Every later summary task has positive, negative and recovery examples; the
       design does not claim those features are implemented.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `3de4bbb` — Specify general call summaries and recursive inference
+  boundaries.
+- Validation: `deno fmt --config /dev/null --check` passed for the
+  specification, architecture and ownership contract. Local documentation links
+  resolve. Reviewed every interface and acceptance group against
+  `core_eval.zig`, the current shared-scheme tests and the language guide.
+- Comparison: not applicable to this documentation-only design. Compiler
+  behavior and benchmarks are unchanged; no redundant compiler test run was
+  required.
+- Remaining limitations: tasks [004](004-summarize-predicate-bearing-callees.md)
+  through [008](008-canonicalize-specialization-keys.md) still implement and
+  qualify these contracts. Portable summary records await the later query and
+  artifact work; the design explicitly retains source fallback.
+- Durable record: [CALL_SUMMARIES.md](../zig-native/CALL_SUMMARIES.md), linked
+  from [ARCHITECTURE.md](../zig-native/ARCHITECTURE.md) and
+  [CONTRACT.md](../zig-native/CONTRACT.md). It includes positive, negative and
+  recovery cases for each later summary task.

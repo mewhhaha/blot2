@@ -16,6 +16,11 @@ duplicate regions only when the full proof permits sharing.
 
 ## Starting point
 
+Use the
+[approved summary interface](../zig-native/CALL_SUMMARIES.md#lexical-captures-and-canonical-inputs)
+and its
+[acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
+
 `specialized_closures` and frozen capture proofs in
 [core_eval.zig](../zig-native/src/core_eval.zig) still retain value-specific
 keys. [specialization.zig](../zig-native/src/specialization.zig),

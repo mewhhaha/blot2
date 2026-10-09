@@ -260,93 +260,93 @@ also adds `zig-native/tests/list_span_execution.test.ts`.
 
 Dependency numbers below link to their task files. All tasks are initially open.
 
-| Task                                                    | Status  | Dependencies                           |
-| ------------------------------------------------------- | ------- | -------------------------------------- |
-| [001] — Qualify list span prototype                     | Ready   | None                                   |
-| [002] — Close packed list traversal regression          | Pending | [001]                                  |
-| [003] — Specify general call summaries                  | Ready   | None                                   |
-| [004] — Summarize predicate bearing callees             | Pending | [003]                                  |
-| [005] — Summarize higher order callees                  | Pending | [004]                                  |
-| [006] — Summarize lexical closures                      | Pending | [005]                                  |
-| [007] — Infer recursive components jointly              | Pending | [006]                                  |
-| [008] — Canonicalize specialization keys                | Pending | [007]                                  |
-| [009] — Cache composite type resolutions                | Ready   | None                                   |
-| [010] — Schedule constraints by variable                | Pending | [009]                                  |
-| [011] — Reduce semantic allocation traffic              | Pending | [007], [008], [010]                    |
-| [012] — Schedule independent semantic jobs              | Pending | [007], [008], [010]                    |
-| [013] — Qualify parallel inference                      | Pending | [011], [012]                           |
-| [014] — Specify unified query table                     | Pending | [008]                                  |
-| [015] — Migrate refinement queries                      | Pending | [014]                                  |
-| [016] — Migrate specialization and principal queries    | Pending | [015]                                  |
-| [017] — Unify source and revision validation            | Pending | [016]                                  |
-| [018] — Migrate executable reuse queries                | Pending | [017]                                  |
-| [019] — Serialize the query table                       | Pending | [018]                                  |
-| [020] — Persist complete semantic artifacts             | Pending | [019]                                  |
-| [021] — Publish transactional revision deltas           | Pending | [017], [020]                           |
-| [022] — Retain constants and relocatable data           | Pending | [020], [021]                           |
-| [023] — Narrow literal edit invalidation                | Pending | [022]                                  |
-| [024] — Apply general body interface cutoff             | Pending | [023]                                  |
-| [025] — Resolve calls before emission                   | Pending | [008], [020]                           |
-| [026] — Resolve structured control flow                 | Pending | [025]                                  |
-| [027] — Represent ownership in resolved ir              | Pending | [026]                                  |
-| [028] — Make emission consume resolved bodies           | Pending | [027]                                  |
-| [029] — Remove function indices from reuse keys         | Pending | [018], [028]                           |
-| [030] — Specify shared and cyclic ownership             | Pending | [027]                                  |
-| [031] — Implement shared reference counting             | Pending | [030]                                  |
-| [032] — Own escaping values and persistent roots        | Pending | [031]                                  |
-| [033] — Own suspended effects and cancellation          | Pending | [032]                                  |
-| [034] — Reclaim cyclic ownership                        | Pending | [033]                                  |
-| [035] — Remove the tracing runtime                      | Pending | [034]                                  |
-| [036] — Summarize demand control flow                   | Pending | [007], [014]                           |
-| [037] — Lower loop aware local memos                    | Pending | [036]                                  |
-| [038] — Eliminate demands through known callbacks       | Pending | [037], [032]                           |
-| [039] — Guarantee and explain demand lowering           | Pending | [038], [033]                           |
-| [040] — Fuse packed row producers and consumers         | Pending | [002], [027]                           |
-| [041] — Broaden numeric simd                            | Pending | [040]                                  |
-| [042] — Specify ragged builders                         | Pending | [011], [027]                           |
-| [043] — Implement ragged builders                       | Pending | [042]                                  |
-| [044] — Specify rolling and summary operations          | Pending | [040]                                  |
-| [045] — Implement rolling reductions                    | Pending | [044]                                  |
-| [046] — Implement composable summary trees              | Pending | [045]                                  |
-| [047] — Eliminate generic iterator state                | Pending | [040], [027]                           |
-| [048] — Explain dispatch and evidence                   | Pending | [004], [005]                           |
-| [049] — Specify editor completion                       | Pending | [048]                                  |
-| [050] — Implement editor completion                     | Pending | [049]                                  |
-| [051] — Specify module abstraction                      | Pending | [020]                                  |
-| [052] — Implement opaque types and privacy              | Pending | [051]                                  |
-| [053] — Qualify module cutoffs and wrapper erasure      | Pending | [052], [024]                           |
-| [054] — Specify associated types and implementations    | Pending | [052]                                  |
-| [055] — Implement associated type members               | Pending | [054]                                  |
-| [056] — Implement declarations and evidence diagnostics | Pending | [055]                                  |
-| [057] — Specify scoped effect identities                | Pending | [052]                                  |
-| [058] — Implement effect instances and subtraction      | Pending | [057]                                  |
-| [059] — Reject escaping capabilities                    | Pending | [058]                                  |
-| [060] — Specify usage and lifetime contracts            | Pending | [059], [030]                           |
-| [061] — Check usage and call multiplicity               | Pending | [060]                                  |
-| [062] — Implement resource cleanup contracts            | Pending | [061], [033], [020]                    |
-| [063] — Specify polymorphic packages                    | Pending | [056], [059]                           |
-| [064] — Check higher rank types and skolems             | Pending | [063]                                  |
-| [065] — Implement existential packages                  | Pending | [064], [020]                           |
-| [066] — Specify typed staging                           | Pending | [053], [065]                           |
-| [067] — Implement typed code and descriptors            | Pending | [066]                                  |
-| [068] — Implement hygienic generation and reuse         | Pending | [067], [024]                           |
-| [069] — Specify bounded erased proofs                   | Pending | [056]                                  |
-| [070] — Implement numeric and index witnesses           | Pending | [069]                                  |
-| [071] — Eliminate checks from proved branch facts       | Pending | [070], [026]                           |
-| [072] — Specify structured concurrency                  | Pending | [059], [062]                           |
-| [073] — Implement scoped tasks and cancellation         | Pending | [072], [035]                           |
-| [074] — Implement disjoint access and host execution    | Pending | [073], [071]                           |
-| [075] — Split evaluator state and dispatch              | Pending | All [001]–[074]                        |
-| [076] — Split core module and builder                   | Pending | [075]                                  |
-| [077] — Split checker responsibilities                  | Pending | [076]                                  |
-| [078] — Split backend state and emission                | Pending | [077]                                  |
-| [079] — Relocate fixtures through a test module         | Pending | [078]                                  |
-| [080] — Organize the source tree                        | Pending | [079]                                  |
-| [081] — Finalize durable documentation                  | Pending | [080]                                  |
-| [082] — Qualify the remote analyzer workflow            | Pending | [081]                                  |
-| [083] — Review and clean old build artifacts            | Pending | [081]                                  |
-| [084] — Qualify the complete program                    | Pending | [082], [083]                           |
-| [999] — Remove tasks and plan                           | Pending | All [001]–[084], plus every added task |
+| Task                                                    | Status      | Dependencies                           |
+| ------------------------------------------------------- | ----------- | -------------------------------------- |
+| [001] — Qualify list span prototype                     | In progress | None                                   |
+| [002] — Close packed list traversal regression          | Pending     | [001]                                  |
+| [003] — Specify general call summaries                  | Complete    | None                                   |
+| [004] — Summarize predicate bearing callees             | Ready       | [003]                                  |
+| [005] — Summarize higher order callees                  | Pending     | [004]                                  |
+| [006] — Summarize lexical closures                      | Pending     | [005]                                  |
+| [007] — Infer recursive components jointly              | Pending     | [006]                                  |
+| [008] — Canonicalize specialization keys                | Pending     | [007]                                  |
+| [009] — Cache composite type resolutions                | Ready       | None                                   |
+| [010] — Schedule constraints by variable                | Pending     | [009]                                  |
+| [011] — Reduce semantic allocation traffic              | Pending     | [007], [008], [010]                    |
+| [012] — Schedule independent semantic jobs              | Pending     | [007], [008], [010]                    |
+| [013] — Qualify parallel inference                      | Pending     | [011], [012]                           |
+| [014] — Specify unified query table                     | Pending     | [008]                                  |
+| [015] — Migrate refinement queries                      | Pending     | [014]                                  |
+| [016] — Migrate specialization and principal queries    | Pending     | [015]                                  |
+| [017] — Unify source and revision validation            | Pending     | [016]                                  |
+| [018] — Migrate executable reuse queries                | Pending     | [017]                                  |
+| [019] — Serialize the query table                       | Pending     | [018]                                  |
+| [020] — Persist complete semantic artifacts             | Pending     | [019]                                  |
+| [021] — Publish transactional revision deltas           | Pending     | [017], [020]                           |
+| [022] — Retain constants and relocatable data           | Pending     | [020], [021]                           |
+| [023] — Narrow literal edit invalidation                | Pending     | [022]                                  |
+| [024] — Apply general body interface cutoff             | Pending     | [023]                                  |
+| [025] — Resolve calls before emission                   | Pending     | [008], [020]                           |
+| [026] — Resolve structured control flow                 | Pending     | [025]                                  |
+| [027] — Represent ownership in resolved ir              | Pending     | [026]                                  |
+| [028] — Make emission consume resolved bodies           | Pending     | [027]                                  |
+| [029] — Remove function indices from reuse keys         | Pending     | [018], [028]                           |
+| [030] — Specify shared and cyclic ownership             | Pending     | [027]                                  |
+| [031] — Implement shared reference counting             | Pending     | [030]                                  |
+| [032] — Own escaping values and persistent roots        | Pending     | [031]                                  |
+| [033] — Own suspended effects and cancellation          | Pending     | [032]                                  |
+| [034] — Reclaim cyclic ownership                        | Pending     | [033]                                  |
+| [035] — Remove the tracing runtime                      | Pending     | [034]                                  |
+| [036] — Summarize demand control flow                   | Pending     | [007], [014]                           |
+| [037] — Lower loop aware local memos                    | Pending     | [036]                                  |
+| [038] — Eliminate demands through known callbacks       | Pending     | [037], [032]                           |
+| [039] — Guarantee and explain demand lowering           | Pending     | [038], [033]                           |
+| [040] — Fuse packed row producers and consumers         | Pending     | [002], [027]                           |
+| [041] — Broaden numeric simd                            | Pending     | [040]                                  |
+| [042] — Specify ragged builders                         | Pending     | [011], [027]                           |
+| [043] — Implement ragged builders                       | Pending     | [042]                                  |
+| [044] — Specify rolling and summary operations          | Pending     | [040]                                  |
+| [045] — Implement rolling reductions                    | Pending     | [044]                                  |
+| [046] — Implement composable summary trees              | Pending     | [045]                                  |
+| [047] — Eliminate generic iterator state                | Pending     | [040], [027]                           |
+| [048] — Explain dispatch and evidence                   | Pending     | [004], [005]                           |
+| [049] — Specify editor completion                       | Pending     | [048]                                  |
+| [050] — Implement editor completion                     | Pending     | [049]                                  |
+| [051] — Specify module abstraction                      | Pending     | [020]                                  |
+| [052] — Implement opaque types and privacy              | Pending     | [051]                                  |
+| [053] — Qualify module cutoffs and wrapper erasure      | Pending     | [052], [024]                           |
+| [054] — Specify associated types and implementations    | Pending     | [052]                                  |
+| [055] — Implement associated type members               | Pending     | [054]                                  |
+| [056] — Implement declarations and evidence diagnostics | Pending     | [055]                                  |
+| [057] — Specify scoped effect identities                | Pending     | [052]                                  |
+| [058] — Implement effect instances and subtraction      | Pending     | [057]                                  |
+| [059] — Reject escaping capabilities                    | Pending     | [058]                                  |
+| [060] — Specify usage and lifetime contracts            | Pending     | [059], [030]                           |
+| [061] — Check usage and call multiplicity               | Pending     | [060]                                  |
+| [062] — Implement resource cleanup contracts            | Pending     | [061], [033], [020]                    |
+| [063] — Specify polymorphic packages                    | Pending     | [056], [059]                           |
+| [064] — Check higher rank types and skolems             | Pending     | [063]                                  |
+| [065] — Implement existential packages                  | Pending     | [064], [020]                           |
+| [066] — Specify typed staging                           | Pending     | [053], [065]                           |
+| [067] — Implement typed code and descriptors            | Pending     | [066]                                  |
+| [068] — Implement hygienic generation and reuse         | Pending     | [067], [024]                           |
+| [069] — Specify bounded erased proofs                   | Pending     | [056]                                  |
+| [070] — Implement numeric and index witnesses           | Pending     | [069]                                  |
+| [071] — Eliminate checks from proved branch facts       | Pending     | [070], [026]                           |
+| [072] — Specify structured concurrency                  | Pending     | [059], [062]                           |
+| [073] — Implement scoped tasks and cancellation         | Pending     | [072], [035]                           |
+| [074] — Implement disjoint access and host execution    | Pending     | [073], [071]                           |
+| [075] — Split evaluator state and dispatch              | Pending     | All [001]–[074]                        |
+| [076] — Split core module and builder                   | Pending     | [075]                                  |
+| [077] — Split checker responsibilities                  | Pending     | [076]                                  |
+| [078] — Split backend state and emission                | Pending     | [077]                                  |
+| [079] — Relocate fixtures through a test module         | Pending     | [078]                                  |
+| [080] — Organize the source tree                        | Pending     | [079]                                  |
+| [081] — Finalize durable documentation                  | Pending     | [080]                                  |
+| [082] — Qualify the remote analyzer workflow            | Pending     | [081]                                  |
+| [083] — Review and clean old build artifacts            | Pending     | [081]                                  |
+| [084] — Qualify the complete program                    | Pending     | [082], [083]                           |
+| [999] — Remove tasks and plan                           | Pending     | All [001]–[084], plus every added task |
 
 ## Coverage matrix
 

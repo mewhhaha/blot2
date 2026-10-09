@@ -16,6 +16,11 @@ higher-order calls into independent inference regions.
 
 ## Starting point
 
+Use the
+[approved summary interface](../zig-native/CALL_SUMMARIES.md#higher-order-obligations-and-effects)
+and its
+[acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
+
 Predicate-free callbacks already use checked schemes. `ClosureRegion` and
 `principalEvidence` in [core_eval.zig](../zig-native/src/core_eval.zig) still
 combine general higher-order graphs;

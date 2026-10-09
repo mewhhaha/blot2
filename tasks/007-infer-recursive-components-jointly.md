@@ -16,6 +16,11 @@ scheduling.
 
 ## Starting point
 
+Use the
+[approved summary interface](../zig-native/CALL_SUMMARIES.md#recursive-components-and-bounded-scheduling)
+and its
+[acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
+
 Active recursive targets currently fall back into their inline region in
 [core_eval.zig](../zig-native/src/core_eval.zig). Its call-summary queue already
 removes native recursion for admitted acyclic jobs;

@@ -16,6 +16,11 @@ distinction between principal facts and selected evidence.
 
 ## Starting point
 
+Use the
+[approved summary interface](../zig-native/CALL_SUMMARIES.md#lexical-captures-and-canonical-inputs)
+and its
+[acceptance cases](../zig-native/CALL_SUMMARIES.md#acceptance-examples-for-the-implementation-sequence).
+
 [core_eval.zig](../zig-native/src/core_eval.zig) tracks closure values and
 frozen capture proofs;
 [completed_specialization_query.zig](../zig-native/src/completed_specialization_query.zig)
