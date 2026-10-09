@@ -42,6 +42,11 @@ development and the scenarios below.
   tracing absent.
 - Stress long-running collections, escaping closures, repeated guest calls,
   canceled requests and discarded cycles.
+- Include nested collecting loops whose successive activation floors retain
+  earlier dead temporaries. Task 002 found identical baseline/candidate growth
+  from 43,515,904 to 942,211,072 committed bytes when a 90-row outer traversal
+  increased each inner loop from 8 to 200 discarded 8,192-word arrays. Preserve
+  live outer rows while bounding dead storage within one guest invocation.
 - Compare runtime CPU, allocation, peak/live memory and compiler overhead with
   the pinned tracing baseline.
 

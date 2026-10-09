@@ -1,14 +1,21 @@
 // deno run --allow-read --allow-write --allow-run scripts/bench_list_traversal.ts \
-//   BASELINE CURRENT STD OUTPUT
+//   BASELINE CURRENT STD OUTPUT [record|tuple] [REPEAT]
 import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 import { cpuUsage } from "node:process";
+import { fileURLToPath } from "node:url";
 import { instantiateGuest } from "../compiler/guest.ts";
 
-assert.equal(Deno.args.length, 4, "Expected BASELINE CURRENT STD OUTPUT");
-const [baseline, candidate, std, output] = Deno.args.map((p) => resolve(p));
+assert(Deno.args.length >= 4 && Deno.args.length <= 6);
+const [baseline, candidate, std, output] = Deno.args.slice(0, 4).map((p) =>
+  resolve(p)
+);
+const shape = Deno.args[4] ?? "record";
+assert(shape === "record" || shape === "tuple");
+const repeat = Number(Deno.args[5] ?? 16);
+assert(Number.isSafeInteger(repeat) && repeat > 0 && repeat <= 4096);
 await Deno.mkdir(output, { recursive: true });
-const hash = async (path: string) =>
+const hash = async (path: string | URL) =>
   [
     ...new Uint8Array(
       await crypto.subtle.digest("SHA-256", await Deno.readFile(path)),
@@ -16,6 +23,8 @@ const hash = async (path: string) =>
   ]
     .map((x) => x.toString(16).padStart(2, "0")).join("");
 const pins: Record<string, string> = {};
+const scriptPath = fileURLToPath(import.meta.url);
+pins[scriptPath] = await hash(scriptPath);
 for (const path of [baseline, candidate]) pins[path] = await hash(path);
 for await (const entry of Deno.readDir(std)) {
   if (entry.isFile && entry.name.endsWith(".blot")) {
@@ -29,22 +38,38 @@ const variants = [
 ];
 const rows: Record<string, unknown>[] = [];
 const count = 16384;
-const repeat = 16;
+const readLoad = async () => {
+  try {
+    return Number((await Deno.readTextFile("/proc/loadavg")).split(" ")[0]);
+  } catch {
+    return null;
+  }
+};
+const loadStart = await readLoad();
 const median = (values: number[]) =>
   [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
-for (let width = 1; width <= 16; width++) {
-  const fields = Array.from({ length: width }, (_, i) => `f${i}: i + ${i}`)
-    .join(", ");
-  const sum = Array.from({ length: width }, (_, i) => `row.f${i}`).join(" + ");
+for (let width = shape === "tuple" ? 2 : 1; width <= 16; width++) {
+  const fields = Array.from(
+    { length: width },
+    (_, i) => shape === "tuple" ? `i + ${i}` : `f${i}: i + ${i}`,
+  ).join(", ");
+  const value = shape === "tuple" ? `(${fields})` : `{${fields}}`;
+  const binder = shape === "tuple"
+    ? `(${Array.from({ length: width }, (_, i) => `f${i}`).join(", ")})`
+    : "row";
+  const sum = Array.from(
+    { length: width },
+    (_, i) => shape === "tuple" ? `f${i}` : `row.f${i}`,
+  ).join(" + ");
   const path = `${output}/width-${width}.blot`;
   await Deno.writeTextFile(
     path,
-    `let rows = @list.generate ${count} (fn i => {${fields}})
+    `let rows = @list.generate ${count} (fn i => ${value})
 entry const fold = fn repeat => do:
   let total = 0
   for pass in 0..repeat:
-    for row in rows:
+    for ${binder} in rows:
       total := self + ${sum}
   return total
 entry const cursor = fn repeat => do:
@@ -52,7 +77,7 @@ entry const cursor = fn repeat => do:
   for pass in 0..repeat:
     let cursor = rows.iter
     for i in 0..${count}:
-      let row = @cursor.value cursor
+      let ${binder} = @cursor.value cursor
       total := self + ${sum}
       cursor := @cursor.advance self
   return total
@@ -92,6 +117,7 @@ entry const cursor = fn repeat => do:
       guests.push(await instantiateGuest(bytes));
       rows.push({
         kind: "compile",
+        shape,
         width,
         variant: variant.name,
         wall_ms,
@@ -128,6 +154,7 @@ entry const cursor = fn repeat => do:
       for (let index = 0; index < variants.length; index++) {
         rows.push({
           kind: "runtime",
+          shape,
           operation,
           width,
           count,
@@ -157,15 +184,21 @@ await Deno.writeTextFile(
   `${output}/report.json`,
   JSON.stringify(
     {
-      note:
-        "Widths 1–16, immutable retained Lists, full fold and explicit cursor. " +
-        "20 warmups, 31 alternating paired samples, each 16 traversals. " +
+      note: `${shape} rows, widths ${shape === "tuple" ? 2 : 1}–16, ` +
+        "immutable retained Lists, full fold and explicit cursor. " +
+        `20 warmups, 31 alternating paired samples, each ${repeat} traversals. ` +
         "Per-traversal process CPU includes V8/host overhead. " +
         "Guest memory is committed pages; compiler allocation is separate.",
       pins,
       count,
       repeat,
       versions: Deno.version,
+      host: {
+        os: Deno.build.os,
+        arch: Deno.build.arch,
+        load_start: loadStart,
+        load_end: await readLoad(),
+      },
       rows,
     },
     null,

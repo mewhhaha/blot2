@@ -7,6 +7,8 @@
 // shared host mostly measure contention. Both binaries must emit the same Wasm
 // for every workload and phase, and a retained session must match a fresh
 // build, or the run fails after writing its results. Linux only (uses bash
+// Intentional cross-compiler differences require --allow-wasm-diff; output
+// stability and each compiler's retained/restart parity always remain gates.
 // `times` and /proc). Run with --allow-all: Deno gates /proc behind it, and the
 // harness already executes arbitrary compilers.
 //
@@ -562,6 +564,7 @@ async function main(): Promise<number> {
   // Wasm parity: baseline = candidate; fresh = retained; edit phases agree
   // with a fresh build of the edited tree; restoring the source restores bytes.
   const problems: string[] = [];
+  const crossCompilerProblems = new Set<string>();
   const wasm: Record<string, Record<string, Hash>> = {};
   for (const workload of workloads) {
     const digests: Record<string, Hash> = {};
@@ -585,9 +588,16 @@ async function main(): Promise<number> {
       const built = await freshBuild(variant, edited, output);
       digests[`fresh_edited/${variant.name}`] = built.wasm_sha256;
     }
-    const compare = (left: string, right: string, why: string) => {
+    const compare = (
+      left: string,
+      right: string,
+      why: string,
+      crossCompiler = false,
+    ) => {
       if (digests[left] && digests[right] && digests[left] !== digests[right]) {
-        problems.push(`${workload.name}: ${why} (${left} vs ${right})`);
+        const problem = `${workload.name}: ${why} (${left} vs ${right})`;
+        problems.push(problem);
+        if (crossCompiler) crossCompilerProblems.add(problem);
       }
     };
     for (const variant of variants.map((v) => v.name)) {
@@ -632,6 +642,7 @@ async function main(): Promise<number> {
         `${key}/baseline`,
         `${key}/candidate`,
         "baseline and candidate emitted different Wasm",
+        true,
       );
     }
     wasm[workload.name] = digests;
@@ -735,6 +746,11 @@ async function main(): Promise<number> {
   }
 
   const loadEnd = loadAverage();
+  // Intentional backend changes may differ between binaries. They must never
+  // excuse nondeterministic output or a broken retained/restart comparison.
+  const unexpectedProblems = args["allow-wasm-diff"]
+    ? problems.filter((problem) => !crossCompilerProblems.has(problem))
+    : problems;
   await Deno.writeTextFile(
     `${out}/results.json`,
     JSON.stringify(
@@ -756,6 +772,7 @@ async function main(): Promise<number> {
         counters,
         wasm,
         problems,
+        unexpected_problems: unexpectedProblems,
       },
       null,
       2,
@@ -769,10 +786,12 @@ async function main(): Promise<number> {
   if (problems.length) {
     console.log(
       `\nWasm verification ${
-        args["allow-wasm-diff"] ? "differences (allowed)" : "FAILED"
+        unexpectedProblems.length
+          ? "FAILED"
+          : "cross-compiler differences (allowed)"
       }:\n  ${problems.join("\n  ")}`,
     );
-    return args["allow-wasm-diff"] ? 0 : 1;
+    return unexpectedProblems.length ? 1 : 0;
   }
   console.log(
     `Wasm verified identical: baseline = candidate${

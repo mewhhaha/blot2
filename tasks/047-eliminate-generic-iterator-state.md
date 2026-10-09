@@ -33,6 +33,9 @@ pins pull semantics.
       order and early exit.
 - [ ] Retain ordinary heap state for escaping/unknown uses and preserve
       effectful iter/next behavior.
+- [ ] Close the packed List cursor regression measured in task 002. Bound
+      sequential leaf traversal and row extraction without mutating published
+      cursors or sharing progress between forks.
 
 ## Validation
 
@@ -48,6 +51,9 @@ development and the scenarios below.
   effect traces with fallback.
 - Use `scripts/bench_iterators.ts` to measure step/cursor allocation, runtime
   and compiler overhead separately.
+- Run both record and tuple modes of `scripts/bench_list_traversal.ts` against
+  the pinned boxed compiler and the task 002 release, over every supported row
+  width. Preserve cursor snapshots, cross-leaf rows and reference fallbacks.
 
 ## Acceptance criteria
 
@@ -55,6 +61,8 @@ development and the scenarios below.
       allocations.
 - [ ] Pull order, early termination, snapshots and escaping fallback remain
       correct.
+- [ ] The packed cursor cost is closed over the supported widths; the direct
+      loop improvement from task 002 does not count as cursor qualification.
 - [ ] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
