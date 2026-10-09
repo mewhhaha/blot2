@@ -474,3 +474,88 @@ results reinforce the rejection: the fresh/population increase is material. The
 candidate remains unlanded, and no full compiler gate or completion claim is
 made for it. Its source patch, execution test and raw samples remain in the
 qualification directory for work on the principal graph representation.
+
+## Dispatched written-predicate schemes, 9 October 2026
+
+Commit `f7be6e7` extends the written-predicate milestone. Type-only selection
+now uses the existing checked written-scheme import for associated
+implementations, member implementations and constructors selected by result
+type. `callableScope` has already imported the implementation's root and
+residual predicates into a fresh scope. `collectSelected` can retain that
+instance without collecting its body again when the existing first-order global
+admission rule accepts it. Each residual must still solve before proof
+publication. The receiver/result relationships, invocation rows and
+qualification origins stay in the caller's solver. The source receipt records
+the selected implementation so body edits invalidate it.
+
+The early guard keeps selected capture/emission and complete demand-body
+checking on their original body collection path, without an additional scheme
+lookup. Predicate-free implementations, unsupported residuals and higher-order
+shapes also keep their existing paths. No new principal facts, independent jobs
+or result-directed cache key are created. This extends the qualified written
+milestone; it does not implement general inferred/residual graphs or finish task
+004.
+
+The baseline is source revision `65dccda`, release SHA-256
+`745347b7752831e4bae78397f5e3731ab8e16d0d227314ee2afd8d399c1baf82`. The final
+candidate is SHA-256
+`d431170c3bfa2c3dd38b5c61eff375a6e326b3a530e14896b9a8e0873869f439`. Both use Zig
+0.17.0. Binaries, identities, source patch, generated public workloads,
+comparisons and raw measurements are preserved in
+`build/bench/cloud-selected-schemes/`.
+
+Qualification includes the full `deno task test:compiler` command (native suite
+and 600 guest/client tests), and `deno task lint:zig` (zero findings across 290
+Zig files). The native law checks separate U32/F32 argument and result
+instantiations, bounded source regions, immutable Core/type/obligation tables
+and exhaustive allocation failures. Its focused test binary executes the law as
+well as the fifteen discovery tests. The import law covers dispatched physical
+fields, members, associated calls and result-selected constructors through
+dependency bundles, checkpoints, body edits, failed edits and recovery. A
+curried member law executes its implementation's handled operation and rejects
+an unsatisfied extra residual.
+
+The differential command `python3 build/bench/cloud-selected-schemes/compare.py`
+compares 367 public cases (734 compiler invocations), including tracked sources
+in both prelude modes and generated dispatch/diagnostic cases. All ordered JSON
+diagnostics and successful Wasm bytes match; 250 cases succeed. The remaining
+cases include missing associated/field/receiver evidence, incompatible results,
+open representation predicates, unused qualifications and ordered failures.
+Every emitted compilation memory record reports zero live bytes; two intentional
+type-limit cases emit only matching diagnostics.
+
+Seven alternating fresh-process pairs cover 24 generated
+associated/member/result cases at depths 0, 16, 64 and 128, including 8/32
+repeated body calls. All preserve Wasm. Requested allocation falls by 304–36,888
+bytes; each case has two fewer total scopes and four fewer constraint visits,
+with unchanged region and solver-pass counts. The command is
+`python3 build/bench/cloud-selected-schemes/measure.py`; the initial load is
+about 0.18. A separate 31-pair run (`measure_main.py`) gives these depth-128
+medians and the same deterministic allocation/scope counts:
+
+| Case                  | Child CPU ms, baseline/candidate | Requested allocation bytes, baseline/candidate | Largest region scopes, baseline/candidate |
+| --------------------- | -------------------------------: | ---------------------------------------------: | ----------------------------------------: |
+| Associated, depth 128 |                    4.833 / 4.796 |                          2,338,914 / 2,306,130 |                                     5 / 4 |
+| Member, depth 128     |                    4.529 / 4.879 |                          2,281,312 / 2,263,416 |                                     7 / 5 |
+| Result, depth 128     |                    4.656 / 4.574 |                          2,272,425 / 2,254,529 |                                     7 / 5 |
+
+CPU is mixed: the member example is slower despite its reduced work and
+allocation. The separate 31-pair fan-out probe measures 16.028/16.322 ms child
+CPU, with a median paired ratio of 1.009. These observations are not a general
+speedup claim.
+
+Seven
+`deno task bench:compile --baseline build/bench/cloud-selected-schemes/baseline/blotc --candidate build/bench/cloud-selected-schemes/candidate/blotc --runs 7 --workload synthetic --out build/bench/cloud-selected-schemes/synthetic`
+pairs preserve fresh/retained Wasm equality across population, first edit,
+subsequent edit/revert and no-op phases. Fresh CPU medians are 8/8, 7/7, 5/4 and
+15/15 ms for monomorphic chain 128, generic chain 64, diamond 8 and fan-out 128.
+Retained timings often fall below the 10-ms process-accounting resolution. Load
+rises from about 0.2 to 0.4. This establishes execution/recovery parity, not a
+retained CPU improvement.
+
+The frozen private gdev snapshot is unavailable in this cloud checkout. These
+public comparisons do not replace gdev qualification or establish a general
+compiler CPU speedup. The initial guard placement is preserved separately under
+`initial-candidate/` and `initial-results/`; the final guard avoids its emission
+lookup. General principal/residual graphs, unsupported explicit/result-directed
+requirements, higher-order inputs and component handling remain open.

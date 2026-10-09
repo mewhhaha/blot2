@@ -132,18 +132,22 @@ already proves its quantified inputs, including callbacks and effect rows;
 ordinary call checking may import that scheme without collecting its body.
 Checked written predicates on first-order global schemes are likewise imported
 with fresh scope variables and the original argument witnesses. They must solve
-before a closed judgment is published. Transitive job admission classifies each
-reachable scheme once per immutable Session and reserves capacity before
-publishing the complete classification. Source shape and active-recursion checks
-remain local to the requesting job; a cached graph classification does not
-override them. Computed values still require capture proofs, and
-source-interface checking, selected captures and complete demand-body checking
-retain ordinary collection. Other result-directed obligations, lexical captures
-and higher-order boundaries keep ordinary collection. Active recursive targets
-share their inline region. Failed speculative jobs publish no diagnostic;
-fallback preserves the caller's argument witness sites and deferred-member
-context. An independently completed callee proof may survive an enclosing
-caller's failed qualification.
+before a closed judgment is published. Type-only associated/member selection and
+result-selected construction may use that same checked scheme: the fresh scope
+already owns the imported predicates and selected signature. The source receipt
+records the implementation; selected capture/emission and complete demand
+checking still collect its body. No caller-selected fact becomes a principal
+proof. Transitive job admission classifies each reachable scheme once per
+immutable Session and reserves capacity before publishing the complete
+classification. Source shape and active-recursion checks remain local to the
+requesting job; a cached graph classification does not override them. Computed
+values still require capture proofs, and predicate-free source-interface
+checking, selected captures and complete demand-body checking retain ordinary
+collection. Other result-directed obligations, lexical captures and higher-order
+boundaries keep ordinary collection. Active recursive targets share their inline
+region. Failed speculative jobs publish no diagnostic; fallback preserves the
+caller's argument witness sites and deferred-member context. An independently
+completed callee proof may survive an enclosing caller's failed qualification.
 
 Summary jobs own their solver and scratch until completion or session teardown.
 Evidence copied into the session may outlive a job; solver IDs and source

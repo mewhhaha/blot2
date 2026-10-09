@@ -71,6 +71,17 @@ development and the scenarios below.
   does not complete task 004.
 - Commit: `90bd532` adds bounded transitive admission, qualified with the U32
   row reductions. General principal/residual summaries remain unfinished.
+- Commit: `f7be6e7` extends checked written-scheme reuse to associated/member
+  implementations and result-selected constructors during type-only selection.
+  Native fresh-instance, immutable-input and allocation-failure laws pass, as do
+  imports, dispatched fields, effects, bundles, checkpoints and failed-edit
+  recovery. The full native suite and 600 guest/client tests pass, with zero
+  analyzer findings across 290 files. All 367 public differential cases preserve
+  ordered diagnostics and Wasm. Paired measurements reduce scopes, constraint
+  visits and allocation without increasing region counts; CPU is mixed and the
+  private gdev snapshot is unavailable. This is a bounded milestone; the general
+  graph acceptance criteria remain open. Pins, commands and measurements are in
+  [the durable record](../zig-native/CALL_SUMMARIES.md#dispatched-written-predicate-schemes-9-october-2026).
 - Baseline: with the qualified task 001 compiler (SHA-256
   `034d660ce38691df9a18c895ab228c4d0a76d618aa1969117d16604e06ee2833`), an
   explicit associated-predicate chain grows from 36 scopes at 16 wrappers to 260

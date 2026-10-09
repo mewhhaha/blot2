@@ -52,6 +52,13 @@ progress: the float fold regression and general principal/residual summaries are
 still open. Their task files and durable records contain the separate pinned
 measurements; they do not replace the starting baseline above.
 
+Commit `f7be6e7` extends the written-predicate milestone to type-only
+associated, member and result-selected implementation checking. Its native suite
+and 600 guest/client tests pass, with zero findings across 290 Zig files. Public
+comparisons preserve diagnostics and Wasm; scope and allocation reductions do
+not establish a general CPU speedup. Task [004] remains in progress. See
+[dispatched written schemes](../zig-native/CALL_SUMMARIES.md#dispatched-written-predicate-schemes-9-october-2026).
+
 Commit `d736d45` completes task [009] with bounded, cost-gated composite
 resolution certificates. The production native suite and 598 guest/client tests
 pass, with zero findings across 289 Zig files. Its paired measurements and
