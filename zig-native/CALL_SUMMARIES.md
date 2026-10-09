@@ -330,3 +330,62 @@ cases as evidence for the next implementation. It must represent residual
 requirements and share principal work without multiplying successful job
 allocation, and still supply bounded scheduling, authoritative fallback and
 allocation-failure coverage. Task 004 remains open.
+
+## Written-predicate scheme milestone, 9 October 2026
+
+The follow-on candidate imports the already checked, written requirements of a
+declared first-order global function into a fresh region scope. It retains the
+ordinary source argument witness mapping and solves those predicates before
+publishing a closed judgment. It does not recollect the declared body for every
+use. Predicate-free admission is unchanged; inferred predicates, selected-mode
+capture retention, complete demand-body checking and higher-order shapes keep
+their existing paths. This is a bounded part of task 004, not its completion.
+
+The isolated release has SHA-256
+`d46f5bda8ea02630366467ac8028d34b304361bab1c033c0269589db8d021775`. Its native
+suite and all 596 guest/client tests pass, as does the analyzer across 287 files
+with zero findings. The new native law checks immutable Core and exhaustive
+allocation failures while requiring bounded source-interface region size. The
+new execution law checks independent U32/F32 instantiations through imports,
+dependency bundles, checkpoints, body edits, rejected edits and recovery.
+Seventeen focused execution laws, eighteen diagnostic-boundary cases and 305
+corpus cases (610 invocations) also pass without diagnostic or Wasm differences.
+
+Seven alternating synthetic pairs measured these depth-128 cases:
+
+| Chain                | CPU, baseline/candidate ms | Requested allocation, baseline/candidate bytes |
+| -------------------- | -------------------------: | ---------------------------------------------: |
+| Associated predicate |             10.153 / 9.384 |                          5,406,379 / 4,740,399 |
+| Field predicate      |              8.443 / 8.411 |                          5,135,010 / 4,619,098 |
+| Missing evidence     |              7.213 / 6.274 |                          4,599,736 / 4,136,616 |
+
+The associated chain's largest source-interface region falls from 260 to 4
+scopes, and the field chain's from 130 to 2. Successful job counts do not
+multiply. A separate seven-pair, 98-request retained probe covers population,
+failed edits, repeated failure, recovery, valid body edits, restoration and
+no-op requests. Diagnostics and Wasm remain stable; guest results are checked.
+Most small retained phases are below or near the 10 ms CPU accounting
+resolution, so this probe establishes recovery, not a gdev speedup.
+
+The first full-gate attempt in the isolated checkout stopped at guest type
+checking because that checkout lacked unchanged host modules and parser assets.
+After restoring those files from the repository, the exact full command passed.
+Only `build/bench/explicit-scheme-release/compiler-gate-restored.log` is passing
+full-gate evidence for that isolated release. Raw samples, diagnostics, source
+patches and recovery records are in that directory.
+
+The production-tree candidate, including the future-alias fix, is SHA-256
+`4484ea5b46e30cd6c6b8b66fc8855098893a99c74a1a4d3cd4bf4019cadecf3b`. Seven
+alternating gdev pairs measure 942/953 ms cold CPU, 1,090/1,100 ms population,
+250/250 ms first edit and 220/220 ms subsequent edit. A separate restart batch
+measures 1,027/1,026 ms cold population, 645/649 ms process restart, 1,090/1,090
+ms retained population, 240/240 ms first edit and 220/220 ms subsequent edit.
+No-op CPU remains below the 10 ms accounting resolution. All byte comparisons
+pass; these loaded-host measurements establish no gdev speedup. Raw results are
+under `build/bench/written-predicate-main/`. Its combined full compiler gate
+passes the native suite and all 596 guest/client tests; the production analyzer
+checks 287 Zig files with zero findings. The logs are
+`build/bench/written-predicate-main-compiler-gate.log` and
+`build/bench/written-predicate-main-analyzer.log`. The written-predicate
+milestone is qualified for production. General principal/residual graph
+summaries remain unfinished.

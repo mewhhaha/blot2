@@ -4604,15 +4604,28 @@ const ClosureRegion = struct {
                 return;
             }
         }
-        // A source function with no residual predicates is already proved for
-        // all of its quantified inputs, including function arguments and rows.
-        // Computed function values still require their actual capture proof.
-        if (!self.source_interface and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and binding.scheme.obligations.len == 0) {
+        // Source checking proves a declared body under its written requirements.
+        // Import those requirements with fresh variables; do not recollect the
+        // body or publish a closed call proof before its predicates are solved.
+        if ((!self.source_interface or binding.scheme.obligations.len != 0) and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and try self.checkedSchemeReusable(target_)) {
             const scope = try self.typeScope(target_.unit);
             self.scratch.sources.items[scope].body = body_root;
             self.scratch.sources.items[scope].binding = target_.binding;
             self.scratch.sources.items[scope].closed_rows = definition.?.closed_rows;
             self.scratch.sources.items[scope].root = try self.importType(scope, source_type, 0);
+            try self.importScheme(scope, binding.scheme, body_root);
+            if (self.source_interface) {
+                var formal = self.scratch.sources.items[scope].root;
+                const caller_module = &self.session.units[self.scratch.sources.items[caller].owner];
+                for (arguments) |argument| {
+                    const arrow = self.solver.node(try self.solver.resolve(formal, 0));
+                    if (arrow.tag != .function) break;
+                    const actual = try self.importType(caller, caller_module.typeOf(argument), 0);
+                    if (self.solver.node(try self.solver.resolve(actual, 0)).tag == .never)
+                        try self.scratch.witness_inputs.put(self.scratch_allocator, arrow.a, actual);
+                    formal = arrow.b;
+                }
+            }
             _ = try self.admitSignature(instantiated, self.scratch.sources.items[scope].root);
             if (self.session.receipt_tape) |tape| try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
             const actual = try self.project(self.scratch.sources.items[scope].root);
@@ -4620,7 +4633,7 @@ const ClosureRegion = struct {
                 try self.scratch.call_instances.put(self.scratch_allocator, .{ .owner = target_.unit, .binding = target_.binding, .evidence = actual, .caller = 0 }, scope);
                 // This checked scheme has no outstanding body obligations. Its
                 // closed proof is independent of later failures in the caller.
-                if (self.session.options.reuse_validated_calls) try self.publishValidatedSource(self.scratch.sources.items[scope]);
+                if (binding.scheme.obligations.len == 0 and self.session.options.reuse_validated_calls) try self.publishValidatedSource(self.scratch.sources.items[scope]);
             }
             return;
         }
@@ -4632,6 +4645,26 @@ const ClosureRegion = struct {
             return;
         }
         try self.collectInlineCall(caller, target_, callee_type, arguments);
+    }
+    fn checkedSchemeReusable(self: *ClosureRegion, target_: Target) RegionError!bool {
+        const module = &self.session.units[target_.unit];
+        const body = module.body(target_.binding) orelse return false;
+        const scheme = module.binding(target_.binding).scheme;
+        if (scheme.obligations.len == 0) return true;
+        for (module.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |requirement| {
+            if (!requirement.explicit) return false;
+            switch (requirement.kind) {
+                .dispatch, .field, .receiver, .update, .record_merge, .effect_operation, .type_rep, .effect_rep => {},
+                else => return false,
+            }
+        }
+        var arrow_type = body.scheme.root;
+        for (0..body.parameters.len) |_| {
+            const arrow = module.types.node(arrow_type);
+            if (arrow.tag != .function or !try self.potentialData(target_.unit, arrow.a, 0)) return false;
+            arrow_type = arrow.b;
+        }
+        return self.potentialData(target_.unit, arrow_type, 0);
     }
     fn collectInlineCall(self: *ClosureRegion, caller: u32, target_: Target, callee_type: types.Id, arguments: []const core.Id) RegionError!void {
         const module = &self.session.units[target_.unit];

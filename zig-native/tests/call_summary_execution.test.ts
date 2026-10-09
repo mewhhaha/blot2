@@ -191,3 +191,92 @@ Deno.test("summary jobs survive dependencies checkpoints edits and failed revisi
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("written predicate summaries preserve independent witnesses through imports and recovery", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const library = `${directory}/library.blot`;
+  const bundle = `${directory}/library.blotdep`;
+  const source = (double: boolean) =>
+    chain(
+      'const f_0: a -> a where { associated "add" a a a } = fn value => ' +
+        (double ? '@type.call "add" value value' : "value"),
+      128,
+    ) +
+    'const first: a -> b where { field "first" a b } = fn value => value.first\n';
+  const program = (invalid: boolean) =>
+    'import { f_128, first } from "./library"\n' +
+    `entry const integer = fn (value: U32) => f_128 (first ${
+      invalid ? "#True" : "{first: value}"
+    })\n` +
+    "entry const floating = fn (value: F32) => f_128 (first {first: value})\n";
+  const options = { executable, entry, prelude };
+  try {
+    await Deno.writeTextFile(library, source(true));
+    await Deno.writeTextFile(entry, program(false));
+    const packed = await new Deno.Command(executable, {
+      args: ["dependencies", entry, bundle, "--prelude", prelude],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assert(packed.success, new TextDecoder().decode(packed.stdout));
+    const producer = await createZigProjectCompiler(options);
+    let checkpoint: Uint8Array<ArrayBuffer>;
+    let initial: Uint8Array<ArrayBuffer>;
+    try {
+      const first = await producer.build();
+      assert(first.success, JSON.stringify(first));
+      initial = first.bytes;
+      checkpoint = await producer.exportCheckpoint();
+    } finally {
+      await producer.dispose();
+    }
+    const retained = await createZigProjectCompiler({
+      ...options,
+      dependencies: bundle,
+      checkpoint,
+    });
+    try {
+      const restored = await retained.build();
+      assert(restored.success, JSON.stringify(restored));
+      assert.deepEqual(restored.bytes, initial);
+      for (
+        const [double, invalid] of [[false, false], [true, true], [true, false]]
+      ) {
+        const sources = {
+          [library]: source(double),
+          [entry]: program(invalid),
+        };
+        const current = await retained.build({ sources });
+        const fresh = await createZigProjectCompiler(options);
+        try {
+          const reference = await fresh.build({ sources });
+          assert.equal(current.success, !invalid, JSON.stringify(current));
+          assert.equal(current.success, reference.success);
+          if (current.success && reference.success) {
+            assert.deepEqual(current.bytes, reference.bytes);
+            const guest = await instantiateGuest(current.bytes);
+            try {
+              const factor = double ? 2 : 1;
+              assert.equal(
+                guest.call("integer", 0xffff_ffff),
+                (0xffff_ffff * factor) >>> 0,
+              );
+              assert.equal(guest.call("floating", 1.25), 1.25 * factor);
+            } finally {
+              guest.dispose();
+            }
+          } else if (!current.success && !reference.success) {
+            assert.deepEqual(current.diagnostics, reference.diagnostics);
+          }
+        } finally {
+          await fresh.dispose();
+        }
+      }
+    } finally {
+      await retained.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

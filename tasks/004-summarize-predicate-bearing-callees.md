@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — isolated admission and graph probes; no
-  implementation completion is claimed.
+- **Status:** In progress — the written-predicate milestone is qualified;
+  general summaries remain unfinished.
 - **Dependencies:** [003](003-specify-general-call-summaries.md)
 - **Originating requirements:** PLAN: Hill 1 / generic callee sharing. Sources:
   [PLAN.md](../PLAN.md).
@@ -24,9 +24,10 @@ and its
 
 [check_shared_scheme_tests.zig](../zig-native/src/check_shared_scheme_tests.zig)
 covers frontend scheme sharing; [core_eval.zig](../zig-native/src/core_eval.zig)
-admits declared global schemes only when residual predicates are absent.
-`collectCall`, the summary queue and `validated_calls` are the integration
-points for task 003.
+now admits checked written predicates on first-order global schemes alongside
+the original predicate-free path. Inferred predicates and general graphs still
+need wider admission and proof sharing. `collectCall`, the summary queue and
+`validated_calls` are the integration points for task 003.
 
 ## Implementation checklist
 
@@ -66,7 +67,8 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: pending. No task 004 compiler change has landed.
+- Commit: the checked written-predicate milestone is qualified for a local
+  milestone commit; it does not complete task 004.
 - Baseline: with the qualified task 001 compiler (SHA-256
   `034d660ce38691df9a18c895ab228c4d0a76d618aa1969117d16604e06ee2833`), an
   explicit associated-predicate chain grows from 36 scopes at 16 wrappers to 260
@@ -119,9 +121,16 @@ development and the scenarios below.
   The execution laws include independently instantiated U32/F32 witnesses,
   imports, dependency bundles, checkpoints, edits, failure and recovery. Release
   SHA-256: `d46f5bda8ea02630366467ac8028d34b304361bab1c033c0269589db8d021775`.
-  Release cost measurements and the full compiler/analyzer gates remain pending;
-  implicit requirements and general principal graphs still require
-  implementation.
-- Durable specification and rejected experiment qualification:
-  [CALL_SUMMARIES.md](../zig-native/CALL_SUMMARIES.md). A production
-  implementation remains to be qualified.
+  Its full native suite and all 596 guest/client tests pass, with zero findings
+  across 287 Zig files. Seven synthetic pairs reduce depth-128 associated
+  allocation from 5,406,379 to 4,740,399 bytes and field allocation from
+  5,135,010 to 4,619,098 bytes. A 98-request retained probe passes failed-edit,
+  repeated failure, recovery, body-edit, restore and no-op comparisons. The
+  combined production-tree gate passes the native suite and all 596 guest/client
+  tests, with zero findings across 287 Zig files. Seven final compiler pairs
+  preserve Wasm equality and measure 942/953 ms cold CPU, 250/250 ms first edit
+  and 220/220 ms subsequent edit; they establish no gdev speedup. Restart
+  comparisons also pass. Implicit requirements and general principal graphs
+  still require implementation.
+- Durable specification, bounded milestone and rejected experiment
+  qualification: [CALL_SUMMARIES.md](../zig-native/CALL_SUMMARIES.md).

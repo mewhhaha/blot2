@@ -47,6 +47,43 @@ fn lowerWithOptions(source: []const u8, options: checker.ModuleOptions) !core.Mo
     return module;
 }
 
+fn qualifiedSchemeScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const selected = try session.sourceInterface(target(module, "run"));
+    try std.testing.expect(selected.evidence != 0);
+    try std.testing.expect(session.counters.max_region_scopes <= 8);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
+test "written predicate schemes share fresh requirements without expanding source chains or mutating inputs" {
+    var text: std.ArrayList(u8) = .empty;
+    defer text.deinit(a);
+    try text.appendSlice(a,
+        \\type N is data = #N U32
+        \\const N.add = fn left => fn right => case left, right of
+        \\  #N a, #N b => #N (@u32.add a b)
+        \\const f_0: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
+        \\
+    );
+    for (1..17) |i| try text.print(a, "const f_{d} = fn value => f_{d} value\n", .{ i, i - 1 });
+    try text.appendSlice(a,
+        \\entry const run = fn (value: U32) => case f_16 (#N value) of
+        \\  #N result => result
+        \\
+    );
+    var module = try lower(text.items);
+    defer module.deinit(a);
+    const nodes = try a.dupe(core.Node, module.nodes);
+    defer a.free(nodes);
+    const extra = try a.dupe(u32, module.extra);
+    defer a.free(extra);
+    try qualifiedSchemeScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, qualifiedSchemeScenario, .{&module});
+    try std.testing.expectEqualDeep(nodes, module.nodes);
+    try std.testing.expectEqualSlices(u32, extra, module.extra);
+}
+
 const contextual_result_prelude =
     \\infixl 60 (+) = add
     \\const add = fn left => fn right => @type.call "add" left right
