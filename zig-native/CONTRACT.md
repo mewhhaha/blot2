@@ -106,13 +106,20 @@ evidence and interface-checking mode. A caller imports only a fully solved
 arrow. A declared global source function with no residual scheme predicates
 already proves its quantified inputs, including callbacks and effect rows;
 ordinary call checking may import that scheme without collecting its body.
-Computed values still require capture proofs, and source-interface checking,
-selected captures and complete demand-body checking retain ordinary collection.
-Other result-directed obligations, lexical captures and higher-order boundaries
-keep ordinary collection. Active recursive targets share their inline region.
-Failed speculative jobs publish no diagnostic; fallback preserves the caller's
-argument witness sites and deferred-member context. An independently completed
-callee proof may survive an enclosing caller's failed qualification.
+Checked written predicates on first-order global schemes are likewise imported
+with fresh scope variables and the original argument witnesses. They must solve
+before a closed judgment is published. Transitive job admission classifies each
+reachable scheme once per immutable Session and reserves capacity before
+publishing the complete classification. Source shape and active-recursion checks
+remain local to the requesting job; a cached graph classification does not
+override them. Computed values still require capture proofs, and
+source-interface checking, selected captures and complete demand-body checking
+retain ordinary collection. Other result-directed obligations, lexical captures
+and higher-order boundaries keep ordinary collection. Active recursive targets
+share their inline region. Failed speculative jobs publish no diagnostic;
+fallback preserves the caller's argument witness sites and deferred-member
+context. An independently completed callee proof may survive an enclosing
+caller's failed qualification.
 
 Summary jobs own their solver and scratch until completion or session teardown.
 Evidence copied into the session may outlive a job; solver IDs and source
@@ -340,6 +347,13 @@ length, recovering the logical row index only at a leaf boundary. Empty loops
 allocate neither buffer. Normal exits, breaks, returns and cancellation release
 private traversal storage exactly once; optional cleanup skips unallocated
 storage. Serialized cursors start uncached and retain allocation-base fields.
+
+After lifetime lowering has consumed pointer provenance, a straight-line U32 sum
+may combine exact adjacent four-byte fields using vector loads and wrapping lane
+addition. Every removed temporary has one definition and one read. The
+transformation accesses exactly the original bytes, retains scalar tails, and
+cannot cross cleanup calls or control edges. Floating-point addition retains its
+original order. This pass must not move ahead of lifetime analysis.
 
 `function_facts` memoizes bounded source-body facts within one Generator owner.
 Unknown dispatch/calls remain unknown, and inlined bodies retain the ordinary

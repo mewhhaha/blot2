@@ -389,3 +389,50 @@ checks 287 Zig files with zero findings. The logs are
 `build/bench/written-predicate-main-analyzer.log`. The written-predicate
 milestone is qualified for production. General principal/residual graph
 summaries remain unfinished.
+
+## Bounded callee admission, 9 October 2026
+
+The next change retains the existing admitted obligation kinds. It separates the
+requested function's first-order shape check from the transitive scheme check,
+visits each reachable callee once, and propagates rejection from a child to its
+ancestors. A rejected child does not reject an unrelated valid sibling. Node and
+edge counts are bounded by the configured value limit, capped at the 32-bit
+index range. Reaching the bound declines without publishing a partial
+classification. Complete classifications reserve all cache capacity before
+publication. The cache belongs to the immutable source Session, and job-local
+recursion and active-job checks still run before consulting it.
+
+The isolated release is SHA-256
+`1fdac33389d5186e23a526168d2923f7aa776a9ef18e81fec7617726c9daf289`, in
+`build/bench/call-admission/`. Its focused native law counts at most 34 visits
+for a 32-wrapper associated-member chain, performs no new visits for the same
+completed query, and passes exhaustive allocation failures. The counter does not
+increment in production. Seventeen execution laws and 305 corpus cases (610
+invocations, 244 successful cases) preserve results, ordered diagnostics and
+Wasm. The isolated analyzer reports zero findings across 287 files.
+
+Seven alternating synthetic pairs compare against the written-predicate
+milestone. At depth 128, associated-chain CPU falls from 9.220 to 8.308 ms and
+requested allocation from 7,292,829 to 6,755,861 bytes. Field-chain CPU falls
+from 9.886 to 9.375 ms and allocation from 7,272,429 to 6,744,317 bytes. Missing
+evidence retains its authoritative diagnostics; CPU measures 31.090/30.447 ms
+and allocation 27,633,323/27,096,355 bytes. Smaller CPU cases are mixed.
+
+Seven gdev no-cache pairs measure 966/972 ms fresh CPU, 1,130/1,140 ms
+population, 250/250 ms first edit and 240/230 ms subsequent edit. A separate
+seven-pair restart batch measures 1,039/1,035 ms cold population, 639/652 ms
+process restart, 1,080/1,110 ms retained population, 250/250 ms first edit and
+230/230 ms subsequent edit. No-op CPU is below the 10-ms accounting resolution.
+All Wasm comparisons pass. These loaded-host measurements establish no general
+compiler speedup. The bounded graph scan does not implement principal/residual
+graphs, result-directed inputs, lexical captures or higher-order summaries; task
+004 and its successor tasks remain open.
+
+The combined production release, including the U32 row-fold pass, is SHA-256
+`1a0be8c0a216346299f7701484287f58675a337fce872272bafeec22a9e9c8a0`, pinned in
+`build/bench/row-and-admission-main/`. Its full native suite and all 598
+guest/client tests pass. The analyzer checks 288 files with zero findings; logs
+are `build/bench/row-and-admission-main-compiler-gate.log` and
+`build/bench/row-and-admission-main-analyzer.log`. Three additional integration
+pairs preserve all fresh/retained/restart byte comparisons. The independent
+seven-pair admission measurements above remain the better isolated cost record.

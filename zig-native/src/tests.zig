@@ -5,6 +5,7 @@ comptime {
     _ = @import("diagnostic_code.zig");
     _ = @import("wasm_inline.zig");
     _ = @import("wasm_sroa.zig");
+    _ = @import("wasm_row_reduce.zig");
     _ = @import("optimized_archive_tests.zig");
     _ = @import("runtime_parallel_tests.zig");
     _ = @import("machine_code_sharing_tests.zig");

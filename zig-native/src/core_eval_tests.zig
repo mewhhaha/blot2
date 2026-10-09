@@ -84,6 +84,40 @@ test "written predicate schemes share fresh requirements without expanding sourc
     try std.testing.expectEqualSlices(u32, extra, module.extra);
 }
 
+fn summaryAdmissionScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const first = try session.sourceInterface(target(module, "run"));
+    try std.testing.expect(first.evidence != 0);
+    const visits = session.summary_eligibility_visits;
+    try std.testing.expect(visits != 0 and visits <= 34);
+    const second = try session.sourceInterface(target(module, "run"));
+    try std.testing.expect(second.evidence != 0);
+    try std.testing.expectEqual(visits, session.summary_eligibility_visits);
+}
+
+test "summary admission visits a shared callee graph once and publishes atomically" {
+    var text: std.ArrayList(u8) = .empty;
+    defer text.deinit(a);
+    try text.appendSlice(a,
+        \\type N is data = #N U32
+        \\const N.add = fn left => fn right => case left, right of
+        \\  #N a, #N b => #N (@u32.add a b)
+        \\const f_0 = fn value => @type.call "add" value value
+        \\
+    );
+    for (1..33) |i| try text.print(a, "const f_{d} = fn value => f_{d} value\n", .{ i, i - 1 });
+    try text.appendSlice(a,
+        \\entry const run = fn (value: U32) => case f_32 (#N value) of
+        \\  #N result => result
+        \\
+    );
+    var module = try lower(text.items);
+    defer module.deinit(a);
+    try summaryAdmissionScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, summaryAdmissionScenario, .{&module});
+}
+
 const contextual_result_prelude =
     \\infixl 60 (+) = add
     \\const add = fn left => fn right => @type.call "add" left right

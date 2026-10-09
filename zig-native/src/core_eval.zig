@@ -338,6 +338,7 @@ pub const Session = struct {
     split_attempts: usize = 0,
     split_accepted: usize = 0,
     split_declined: usize = 0,
+    summary_eligibility_visits: usize = 0,
     counters: @import("work_counters.zig").Counters = .{},
     closed_source_types: @import("closed_source_types.zig").Facts = .{},
     closed_source_imports: usize = 0,
@@ -4734,12 +4735,11 @@ const ClosureRegion = struct {
         if (self.scratch.unresolved_calls.contains(target_)) return false;
         if (self.session.call_summaries.draining and !self.summary_job) return false;
         if (self.session.call_summaries.active.contains(target_)) return false;
+        if (!try self.summaryShapeEligible(target_)) return false;
         if (self.session.call_summaries.eligibility.get(target_)) |known| return known;
-        const eligible = try self.checkSummaryEligibility(target_);
-        try self.session.call_summaries.eligibility.put(self.session.allocator, target_, eligible);
-        return eligible;
+        return self.checkSummaryEligibility(target_);
     }
-    fn checkSummaryEligibility(self: *ClosureRegion, target_: Target) RegionError!bool {
+    fn summaryShapeEligible(self: *ClosureRegion, target_: Target) RegionError!bool {
         const module = &self.session.units[target_.unit];
         const body = module.body(target_.binding) orelse return false;
         if (!body.is_function or body.parameters.len == 0) return false;
@@ -4749,27 +4749,76 @@ const ClosureRegion = struct {
             if (arrow.tag != .function or !try self.potentialData(target_.unit, arrow.a, 0)) return false;
             arrow_type = arrow.b;
         }
-        if (!try self.potentialData(target_.unit, arrow_type, 0)) return false;
-        var pending: std.ArrayList(Target) = .empty;
-        defer pending.deinit(self.session.allocator);
-        var seen: std.AutoHashMapUnmanaged(Target, void) = .empty;
-        defer seen.deinit(self.session.allocator);
-        try pending.append(self.session.allocator, target_);
-        while (pending.pop()) |target| {
-            if (seen.contains(target)) continue;
-            try seen.put(self.session.allocator, target, {});
+        return self.potentialData(target_.unit, arrow_type, 0);
+    }
+    fn checkSummaryEligibility(self: *ClosureRegion, target_: Target) RegionError!bool {
+        const Candidate = struct { target: Target, bad: bool = false, parents: u32 = std.math.maxInt(u32) };
+        const Parent = struct { index: u32, next: u32 };
+        const a = self.session.allocator;
+        const limit = @min(self.session.options.max_values, std.math.maxInt(u32));
+        if (limit == 0) return false;
+        var nodes: std.ArrayList(Candidate) = .empty;
+        defer nodes.deinit(a);
+        var indices: std.AutoHashMapUnmanaged(Target, u32) = .empty;
+        defer indices.deinit(a);
+        var edges: std.ArrayList(Parent) = .empty;
+        defer edges.deinit(a);
+        var pending: std.ArrayList(u32) = .empty;
+        defer pending.deinit(a);
+        try nodes.append(a, .{ .target = target_ });
+        try indices.put(a, target_, 0);
+        var index: usize = 0;
+        while (index < nodes.items.len) : (index += 1) {
+            if (@import("builtin").is_test) self.session.summary_eligibility_visits += 1;
+            const target = nodes.items[index].target;
             const unit = &self.session.units[target.unit];
             const scheme = unit.binding(target.binding).scheme;
             for (unit.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |requirement| {
-                if (requirement.explicit) return false;
+                if (requirement.explicit) {
+                    nodes.items[index].bad = true;
+                    continue;
+                }
                 switch (requirement.kind) {
                     .dispatch, .field, .writable_field, .collection, .record_merge, .update => {},
-                    .callee_use => try pending.append(self.session.allocator, try self.session.external(.{ .unit = target.unit, .binding = requirement.identity.decl })),
-                    else => return false,
+                    .callee_use => {
+                        const child = try self.session.external(.{ .unit = target.unit, .binding = requirement.identity.decl });
+                        if (self.session.call_summaries.eligibility.get(child)) |eligible| {
+                            if (!eligible) nodes.items[index].bad = true;
+                            continue;
+                        }
+                        const entry = try indices.getOrPut(a, child);
+                        if (!entry.found_existing) {
+                            if (nodes.items.len >= limit) return false;
+                            entry.value_ptr.* = @intCast(nodes.items.len);
+                            try nodes.append(a, .{ .target = child });
+                        }
+                        const child_index = entry.value_ptr.*;
+                        if (edges.items.len >= limit) return false;
+                        const edge_index: u32 = @intCast(edges.items.len);
+                        try edges.append(a, .{ .index = @intCast(index), .next = nodes.items[child_index].parents });
+                        nodes.items[child_index].parents = edge_index;
+                    },
+                    else => nodes.items[index].bad = true,
                 }
             }
         }
-        return true;
+        for (nodes.items, 0..) |candidate, i| if (candidate.bad) try pending.append(a, @intCast(i));
+        while (pending.pop()) |child| {
+            var edge = nodes.items[child].parents;
+            while (edge != std.math.maxInt(u32)) {
+                const parent = edges.items[edge];
+                if (!nodes.items[parent.index].bad) {
+                    nodes.items[parent.index].bad = true;
+                    try pending.append(a, parent.index);
+                }
+                edge = parent.next;
+            }
+        }
+        // Every reachable component is now classified. A bad descendant only
+        // declines its ancestors, never an unrelated valid sibling.
+        try self.session.call_summaries.eligibility.ensureUnusedCapacity(a, @intCast(nodes.items.len));
+        for (nodes.items) |candidate| self.session.call_summaries.eligibility.putAssumeCapacity(candidate.target, !candidate.bad);
+        return !nodes.items[0].bad;
     }
     fn summaryInputs(self: *ClosureRegion, constraint: Constraint) RegionError!type_evidence.Id {
         const body = self.session.units[constraint.target.unit].body(constraint.target.binding).?;

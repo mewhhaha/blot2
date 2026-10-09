@@ -145,9 +145,16 @@ development and the scenarios below.
   List layout. All 31 U32 row shapes beat the boxed fold baseline in its
   development batch; record widths 14/15/16 measure 0.578/0.641/0.518 times
   boxed CPU. Eighteen focused native checks, fifteen execution laws and the
-  305-case corpus comparison pass. The optional F32 traversal workloads pass
-  their source-ordered value checks but expose roughly 3–6% regressions at wider
-  record and tuple widths. A separate load-grouping probe preserves scalar F32
-  addition order and is not yet qualified. The release, full compiler,
-  compiler-cost and F32 performance gates remain open; these results do not
-  complete the task.
+  305-case corpus comparison pass. The release also passes fifteen focused
+  execution laws and paired fresh/retained/restart comparisons. The combined
+  production-tree release, SHA-256
+  `1a0be8c0a216346299f7701484287f58675a337fce872272bafeec22a9e9c8a0`, keeps
+  every U32 fold median below boxed in the all-width batch. Record widths
+  14/15/16 measure 0.567/0.629/0.493 times boxed CPU, while tuple width 15 has a
+  small margin at 0.996. The F32 workloads preserve source-ordered values but
+  retain roughly 3–6% regressions at wider widths. Float load grouping and a
+  reduced traversal guard do not close that gap. Larger global leaves increase
+  shared append memory and remain rejected; static-only larger leaves do not
+  affect the runtime-created benchmark List. The production-tree full gate
+  passes the native suite and all 598 guest/client tests, with zero analyzer
+  findings across 288 Zig files. These results do not complete the task.

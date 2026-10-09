@@ -417,9 +417,7 @@ integer timings.
 The F32 record and tuple batch passed its value checks but exposed a remaining
 regression: wider record folds measured roughly 1.03–1.06 times boxed CPU, and
 wider tuple folds roughly 1.03–1.06. Reports are in `f32-record/` and
-`f32-tuple/` beneath `build/bench/list-row-reduce-after-lifetimes/`. A separate
-probe groups loads while retaining the original scalar F32 addition order; its
-qualification is still pending.
+`f32-tuple/` beneath `build/bench/list-row-reduce-after-lifetimes/`.
 
 The U32 candidate's release is SHA-256
 `2546adaf4041999a8f7ef5221ec92cb4b5e9998123059d7a44eae680974d1aad`, pinned in
@@ -444,7 +442,89 @@ directory; only the corrected and expanded execution logs are passing evidence.
 Its generated record loops contain the grouped loads; tuple loop bytes are
 unchanged. The F32 batch still measures roughly 1.02–1.06 times boxed CPU at
 many wider widths. This additional transformation is not accepted for landing.
-The widths with crossing rows motivate a separate whole-row static leaf probe;
-that probe remains unqualified. The source is isolated in
+The independent U32 source is isolated in
 `/tmp/blot-row-reduction-only-prototype/`; none of these partial results
 complete task 002 or the broader SIMD task.
+
+### Leaf-capacity experiments, 9 October 2026
+
+Aligning serialized leaves to whole rows, while retaining the ordinary capacity,
+does not close the F32 regression. Its pin is
+`84250bbb3ef6043cf67bb4b9627097586a36c57d7734b1e9ff7d9e50c29428c9`, in
+`build/bench/list-row-aligned-reduction/`. Fifteen execution laws pass, but
+wider F32 folds still measure about 1.02–1.05 times boxed CPU. The initial
+execution command lacked executable permission on the pinned binary; only
+`execution-executable.log` records the corrected successful run.
+
+Two further probes increase the global leaf capacity from 248 words to 1,016 and
+4,088 words. The 1,016-word pin is
+`3ed09e518b36256dbf362a1ed6d1772f3d7362f32a3c01963d2a7383c5262a38`, in
+`build/bench/list-large-leaf/`. Its fifteen execution laws pass, but wider F32
+fold ratios still straddle one, at roughly 0.995–1.009. The 4,088-word pin is
+`f0963215134fc0ba00311b6930e9bdc20e018bd974ce45ca897da0f4283d7795`, in
+`build/bench/list-16k-leaf/`. Every record median improves against boxed rows;
+the tuple-width-eight median instead regresses to 1.133 times boxed CPU.
+
+The larger capacity also has a material persistent-update cost. A separate
+31-pair screen over all thirteen general runtime workloads preserves results,
+but the shared-append workload grows from 983,040 to 3,080,192 bytes of
+committed guest memory against the sequential compiler. These are loaded-host
+development screens, not complete runtime or ownership qualification. The
+capacity change is rejected for production. Increasing a global storage unit to
+improve a read-only fold would require its own convincing update and memory
+evidence. The ordinary leaf capacity and representation remain unchanged. Raw
+pins, commands, timestamps, load readings and samples remain in the directories
+above.
+
+A smaller traversal experiment checks the internally constructed tree's root
+height once and removes the capacity check at each descent. Its pin is
+`9f3c0fbe9a273534126fd64ac355e50a963af0023fbae9118e0bda4f520d3c1b`, in
+`build/bench/list-height-walk/`. Sixteen execution laws pass. All F32 fold value
+checks pass, but wider record and tuple medians still reach about 1.03–1.05
+times boxed CPU. This does not establish a performance reason to change the
+existing per-push guard, so the experiment remains unlanded. The initial
+execution invocation used incorrect test filenames, and the first identity
+command ran outside `zig-native/`; only their corrected logs record successful
+commands.
+
+A separate static-data probe gives packed rows 248 complete rows per leaf while
+leaving scalar and dynamically constructed Lists at the ordinary capacity. Its
+first partial-slice test fails because the existing leaf cut assumes `chunk_new`
+returns a leaf; a larger count instead returns a tree. Splitting the cut before
+copying fixes that counterexample in the isolated probe. The corrected pin is
+`83f952ab5fec438c4c821dbabcc437e408cdf38f038480c65254d3c3313c9f16`, in
+`build/bench/static-row-capacity-corrected/`, with seventeen execution laws
+passing. The earlier pin and failing test are retained separately.
+
+The ordinary traversal benchmark creates its retained List with runtime `let`,
+so that probe does not exercise its new static-data policy there. Its float fold
+timings therefore do not qualify larger packed-row leaves. Dynamic construction,
+persistent-update memory, and any representation-policy changes remain
+unresolved; this static-data probe is not accepted for production.
+
+### U32 production qualification, 9 October 2026
+
+The integer-only pass and bounded callee-admission change are qualified together
+in release `1a0be8c0a216346299f7701484287f58675a337fce872272bafeec22a9e9c8a0`,
+pinned in `build/bench/row-and-admission-main/`. The full native suite and all
+598 guest/client tests pass, with zero findings across 288 Zig files. The
+corrected native row-reduction filter passes 18 tests including discovery; the
+earlier misspelled filter selected only discovery tests and is not evidence for
+the new laws. Full-gate logs are
+`build/bench/row-and-admission-main-compiler-gate.log` and
+`build/bench/row-and-admission-main-analyzer.log`.
+
+All 31 U32 fold medians improve against the boxed compiler in the production
+batch. Record widths 14/15/16 measure 0.567/0.629/0.493 times boxed CPU. Tuple
+widths 13/14/15/16 measure 0.927/0.934/0.996/0.940, with a narrow margin at 15.
+Wider F32 records and tuples still reach roughly 1.03–1.06 times boxed CPU.
+These loaded-host results keep the broader float and final performance gates
+open.
+
+Three integration pairs against the written-predicate milestone measure 935/931
+ms fresh CPU, 1,090/1,100 ms population, 240/240 ms first edit and 220/220 ms
+subsequent edit. The restart batch measures 1,025/1,026 ms cold population,
+640/623 ms restart, 1,080/1,070 ms retained population, 230/240 ms first edit
+and 220/220 ms subsequent edit. No-op samples are at the 10-ms accounting limit.
+All byte comparisons pass without a cross-compiler exception. These are
+integration checks, not evidence of a general compiler speedup.

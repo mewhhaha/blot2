@@ -134,3 +134,13 @@ development and the scenarios below.
   still require implementation.
 - Durable specification, bounded milestone and rejected experiment
   qualification: [CALL_SUMMARIES.md](../zig-native/CALL_SUMMARIES.md).
+- The next admission milestone keeps the existing supported obligations and
+  classifies each reachable callee once, with bounded nodes/edges and atomic
+  publication. Its isolated release passes the allocation-failure/visit-bound
+  law, seventeen execution laws and all 305 corpus comparisons. At depth 128,
+  associated allocation falls from 7,292,829 to 6,755,861 bytes and field
+  allocation from 7,272,429 to 6,744,317 bytes. Gdev CPU results are mixed; no
+  general speedup is claimed. This classifies admission efficiently but does not
+  implement the remaining principal/residual graph requirements. The
+  production-tree full gate passes the native suite and all 598 guest/client
+  tests, with zero analyzer findings across 288 Zig files.
