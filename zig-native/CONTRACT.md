@@ -701,3 +701,10 @@ allocation-free and the published revision is unchanged. Captured slices are
 immutable; a lease names one allocation, never a revision. Code that replaces a
 pool slice must release its lease, never free it. See
 [revision deltas](REVISION_DELTAS.md).
+
+A retained fragment may replay an aggregate constant child when the current
+value is already evaluated and its complete graph matches the old one; the child
+is re-serialized in the current owner through the ordinary constant path, and
+only the caller's exact root-address operands are relocated. Demand cells and
+other generative or operational values rebuild their callers. See
+[retained constants](RETAINED_CONSTANTS.md).

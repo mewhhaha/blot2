@@ -247,6 +247,14 @@ const Generator = struct {
         std.debug.assert(request == .constant);
         _ = try self.constant(request.constant.target, request.constant.ty);
     }
+    /// Re-serializes an admitted aggregate constant in the current owner and
+    /// returns its root address.
+    pub fn replayConstant(self: *Generator, request: code_artifacts.Request) Error!u32 {
+        std.debug.assert(request == .constant);
+        const value = try self.constant(request.constant.target, request.constant.ty);
+        if (value.scalar != .pointer) return error.InvalidFunctionReference;
+        return value.bits;
+    }
     pub fn publishRetained(self: *Generator, request: code_artifacts.Request, function_id: u32) Error!void {
         switch (request) {
             .named => |key| try self.instances.put(self.allocator, key, function_id),
@@ -2113,6 +2121,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         result.reuse.candidates = state.stats.candidates;
         result.reuse.declined = state.stats.declined;
         result.reuse.reused_scalar_constants = state.stats.reused_scalar_constants;
+        result.reuse.reused_aggregate_constants = state.stats.reused_aggregate_constants;
     }
     if (recording) {
         for (generator.evaluator.specialization_receipts.items) |record| {

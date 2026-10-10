@@ -59,6 +59,10 @@ pub fn main(init: std.process.Init) !void {
                             .metadata_copied_bytes = 0,
                             .metadata_shared_fields = 0,
                             .metadata_copied_fields = 0,
+                            .reused_named = 0,
+                            .reused_closures = 0,
+                            .reused_scalar_constants = 0,
+                            .reused_aggregate_constants = 0,
                         }, .{}, &writer.interface);
                         try writer.interface.writeByte('\n');
                         continue;
@@ -69,6 +73,7 @@ pub fn main(init: std.process.Init) !void {
                 var digest: [32]u8 = undefined;
                 std.crypto.hash.sha2.Sha256.hash(compiled.bytes, &digest, .{});
                 const counters = compiled.counters;
+                const reuse = compiled.reuse;
                 const reused = candidate.stats.reused_output;
                 if (!session.commit(candidate)) return error.CommitFailed;
                 candidate.deinit();
@@ -88,6 +93,10 @@ pub fn main(init: std.process.Init) !void {
                     .metadata_copied_bytes = if (@hasField(@TypeOf(counters), "metadata_copied_bytes")) counters.metadata_copied_bytes else 0,
                     .metadata_shared_fields = if (@hasField(@TypeOf(counters), "metadata_shared_fields")) counters.metadata_shared_fields else 0,
                     .metadata_copied_fields = if (@hasField(@TypeOf(counters), "metadata_copied_fields")) counters.metadata_copied_fields else 0,
+                    .reused_named = reuse.reused_named,
+                    .reused_closures = reuse.reused_closures,
+                    .reused_scalar_constants = reuse.reused_scalar_constants,
+                    .reused_aggregate_constants = if (@hasField(@TypeOf(reuse), "reused_aggregate_constants")) reuse.reused_aggregate_constants else 0,
                 }, .{}, &writer.interface);
                 try writer.interface.writeByte('\n');
             }

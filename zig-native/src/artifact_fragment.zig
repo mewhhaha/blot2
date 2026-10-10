@@ -15,7 +15,10 @@ const HostReferences = wasm.HostReferences;
 const absent = std.math.maxInt(u32);
 const Error = Allocator.Error || error{ InvalidFunctionReference, InvalidGlobalReference, ModuleTooLarge, Declined };
 const Address = struct { original: u32, actual: u32, len: u32, owner: u32 };
-pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, reused_scalar_constants: usize = 0 };
+pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, reused_scalar_constants: usize = 0, reused_aggregate_constants: usize = 0 };
+/// An admitted aggregate constant child: the current request and the old
+/// serialized root address that the retained caller's operands name.
+const AggregateConstant = struct { request: artifacts.Request, root: u32 };
 pub const State = struct {
     allocator: Allocator,
     old: *const capture.Capture,
@@ -34,6 +37,11 @@ pub const State = struct {
     enabled: bool,
     stats: Stats = .{},
     static_matches: std.AutoHashMapUnmanaged(artifacts.StaticRead, u32) = .empty,
+    /// Old non-suspension serialized roots by value and layout.
+    serialized_roots: std.AutoHashMapUnmanaged(u64, u32) = .empty,
+    aggregate_constants: std.AutoHashMapUnmanaged(u32, AggregateConstant) = .empty,
+    /// Old aggregate root address to its current serialization, exact only.
+    constant_addresses: std.ArrayList(Address) = .empty,
 
     pub fn init(a: Allocator, old: *const capture.Capture, units: []const core.Module, names: ?identity.View, cached: usize) Allocator.Error!State {
         return initWithStamps(a, old, units, names, cached, null);
@@ -65,9 +73,12 @@ pub const State = struct {
             .leave => |item| ends[item.job - 1] = event.sequence,
             else => {},
         };
+        var roots: std.AutoHashMapUnmanaged(u64, u32) = .empty;
+        errdefer roots.deinit(a);
+        for (old.metadata.pools.?.serialized) |entry| if (!entry.suspension) try roots.put(a, rootKey(entry.value, entry.ty), entry.address);
         for (old.metadata.jobs.items, 1..) |job, id| {
             var fresh = !job.reusable or switch (job.request) {
-                .constant => !scalarConstant(old, job),
+                .constant => !scalarConstant(old, job) and aggregateRoot(old, &roots, job) == null,
                 .runtime_global => true,
                 else => false,
             };
@@ -103,7 +114,7 @@ pub const State = struct {
         errdefer a.free(signatures);
         const imports = try slots(a, import_count);
         errdefer a.free(imports);
-        return .{ .allocator = a, .old = old, .importer = graphs, .starts = starts, .ends = ends, .blocked = blocked, .functions = functions, .signatures = signatures, .imports = imports, .globals = try slots(a, global_count), .arena = arena, .lists = lists, .host = host, .enabled = selection_stable };
+        return .{ .allocator = a, .old = old, .importer = graphs, .starts = starts, .ends = ends, .blocked = blocked, .functions = functions, .signatures = signatures, .imports = imports, .globals = try slots(a, global_count), .arena = arena, .lists = lists, .host = host, .enabled = selection_stable, .serialized_roots = roots };
     }
     pub fn deinit(self: *State) void {
         self.importer.deinit();
@@ -116,6 +127,58 @@ pub const State = struct {
         self.allocator.free(self.globals);
         self.addresses.deinit(self.allocator);
         self.static_matches.deinit(self.allocator);
+        self.serialized_roots.deinit(self.allocator);
+        self.aggregate_constants.deinit(self.allocator);
+        self.constant_addresses.deinit(self.allocator);
+    }
+    fn rootKey(value: u32, ty: u32) u64 {
+        return (@as(u64, value) << 32) | ty;
+    }
+    /// A completed non-scalar, non-suspension constant whose old serialized
+    /// root address is known. Demand cells keep their creation identity and
+    /// always rebuild.
+    fn aggregateRoot(old: *const capture.Capture, roots: *const std.AutoHashMapUnmanaged(u64, u32), job: artifacts.Job) ?u32 {
+        if (job.request != .constant or job.state != .complete or job.value == null) return null;
+        const result = job.value.?;
+        const values = old.metadata.pools.?.evaluator.values;
+        if (result.value >= values.len) return null;
+        switch (values[result.value].kind) {
+            .scalar, .suspension, .computation, .request_decision, .type_constructor, .resolver, .provider, .state_provider => return null,
+            else => {},
+        }
+        return roots.get(rootKey(result.value, result.layout));
+    }
+    /// Observe an already completed aggregate, never demand evaluation during
+    /// admission. Its complete value graph, including alias topology and
+    /// nominal identities, must match the old constant before the retained
+    /// caller may keep operands naming its serialized root.
+    fn aggregateConstantRequest(self: *State, g: anytype, id: u32) Allocator.Error!?AggregateConstant {
+        if (self.aggregate_constants.get(id)) |known| return known;
+        const job = self.old.metadata.jobs.items[id - 1];
+        const root = aggregateRoot(self.old, &self.serialized_roots, job) orelse return null;
+        const request = job.request.constant;
+        if (!self.importer.admitsBody(request.target) or request.target.unit == 0 or request.target.unit > self.importer.unit_map.len) return null;
+        const unit = self.importer.unit_map[request.target.unit - 1];
+        if (unit == 0 or unit > g.evaluator.units.len or request.target.binding >= g.evaluator.units[unit - 1].bindings.len) return null;
+        const body = g.evaluator.units[unit - 1].body(request.target.binding) orelse return null;
+        if (body.runtime) return null;
+        const slot = g.evaluator.slots[g.evaluator.binding_offsets[unit - 1] + request.target.binding];
+        if (slot.state != .complete) return null;
+        const gate = if (self.importer.code_gate) |*owned| &owned.semantic else return null;
+        if (!gate.enabled) return null;
+        const inspection = try @import("source_value_template.zig").Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, gate, &.{job.value.?.value}, .source_declared);
+        var plan = inspection.plan orelse return null;
+        defer plan.deinit(self.allocator);
+        const anchors = try self.allocator.alloc(u32, self.old.metadata.pools.?.evaluator.values.len);
+        defer self.allocator.free(anchors);
+        @memset(anchors, 0);
+        const same = plan.matchInto(g, &self.importer, job.value.?.value, slot.value, anchors) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else null;
+        if (!same) return null;
+        if (!try self.importer.recordValueAnchors(anchors)) return null;
+        const ty = (try self.importer.importLayout(g, request.ty)) orelse return null;
+        const admitted: AggregateConstant = .{ .request = .{ .constant = .{ .target = .{ .unit = unit, .binding = request.target.binding }, .ty = ty } }, .root = root };
+        try self.aggregate_constants.put(self.allocator, id, admitted);
+        return admitted;
     }
     fn slots(a: Allocator, count: usize) Allocator.Error![]u32 {
         const result = try a.alloc(u32, count);
@@ -222,10 +285,12 @@ pub const State = struct {
         }
         return address == 0;
     }
-    fn admitOperand(self: *State, g: anytype, operand: emitter.Operand, owner: u32) Allocator.Error!bool {
+    fn admitOperand(self: *State, g: anytype, operand: emitter.Operand, owner: u32, roots: []const u32) Allocator.Error!bool {
         return switch (operand.role) {
             .literal, .signature, .import_, .host_table => true,
-            .static_address => self.localAddress(operand.value, owner),
+            // A retained caller may also name the exact serialized root of an
+            // admitted aggregate constant child; interior addresses decline.
+            .static_address => self.localAddress(operand.value, owner) or std.mem.findScalar(u32, roots, operand.value) != null,
             .global => self.knownGlobal(operand.value, g.request_owner),
             .operation => try self.importer.admitOperation(g, operand.value),
             .function, .table_function => blk: {
@@ -276,6 +341,12 @@ pub const State = struct {
         const first = self.starts[id - 1];
         const last = self.ends[id - 1];
         if (first == std.math.maxInt(u64) or last <= first) return false;
+        var roots: std.ArrayList(u32) = .empty;
+        defer roots.deinit(self.allocator);
+        // Admitted aggregate children are re-serialized fresh, so their own
+        // subtree of jobs and records is never replayed or admitted here.
+        var skipped: std.ArrayList(u32) = .empty;
+        defer skipped.deinit(self.allocator);
         var m = self.metaAt(first);
         while (m < self.old.metadata.events.items.len) : (m += 1) {
             const event = self.old.metadata.events.items[m];
@@ -284,6 +355,13 @@ pub const State = struct {
                 .enter => |child| {
                     const child_job = self.old.metadata.jobs.items[child - 1];
                     for (child_job.static_reads.items) |read| if (!try self.matchStatic(g, read)) return false;
+                    if (child_job.request == .constant and !scalarConstant(self.old, child_job)) {
+                        const admitted = (try self.aggregateConstantRequest(g, child)) orelse return false;
+                        try roots.append(self.allocator, admitted.root);
+                        try skipped.append(self.allocator, child);
+                        m = self.metaAt(self.ends[child - 1] + 1) - 1;
+                        continue;
+                    }
                     const request = if (child_job.request == .constant) try self.scalarConstantRequest(g, child_job) else try self.importer.importRequest(g, child_job.request);
                     if (request == null) return false;
                 },
@@ -294,10 +372,14 @@ pub const State = struct {
         while (e < self.old.emission.records.items.len) : (e += 1) {
             const record = self.old.emission.records.items[e];
             if (record.sequence > last) break;
+            const inside = for (skipped.items) |child| {
+                if (record.sequence >= self.starts[child - 1] and record.sequence <= self.ends[child - 1]) break true;
+            } else false;
+            if (inside) continue;
             switch (record.event) {
                 .function => |item| if (self.old.emission.functions[item.id].role == .static_closure and !self.staticHelper(self.old.emission.functions[item.id], record.owner)) return false,
-                .instruction => |item| if (!try self.admitOperand(g, item.operand, record.owner)) return false,
-                .data_word => |item| if (!self.localAddress(item.address, record.owner) or !try self.admitOperand(g, item.operand, record.owner)) return false,
+                .instruction => |item| if (!try self.admitOperand(g, item.operand, record.owner, roots.items)) return false,
+                .data_word => |item| if (!self.localAddress(item.address, record.owner) or !try self.admitOperand(g, item.operand, record.owner, roots.items)) return false,
                 .global => |item| if (!self.knownGlobal(item.id, g.request_owner)) return false,
                 .global_bits => |item| if (!self.knownGlobal(item.id, g.request_owner)) return false,
                 .data => |item| if (item.bytes.len % 4 != 0) return false,
@@ -358,6 +440,7 @@ pub const State = struct {
     }
     fn resolveAddress(self: *const State, original: u32) Error!u32 {
         if (original < 256 and self.arena != null) return original;
+        for (self.constant_addresses.items) |item| if (original == item.original) return item.actual;
         for (self.addresses.items) |item| if (original >= item.original and original < item.original + item.len) return item.actual + original - item.original;
         return error.InvalidFunctionReference;
     }
@@ -428,7 +511,15 @@ pub const State = struct {
                 switch (event) {
                     .enter => |child| if (child != id) {
                         const old_child = &self.old.metadata.jobs.items[child - 1];
-                        if (old_child.request == .constant) {
+                        if (old_child.request == .constant and !scalarConstant(self.old, old_child.*)) {
+                            // Serialize the current, graph-equal value in the
+                            // current owner exactly as fresh compilation does,
+                            // then relocate the caller's root operand.
+                            const admitted = self.aggregate_constants.get(child) orelse return error.InvalidFunctionReference;
+                            const actual = try g.replayConstant(admitted.request);
+                            try self.constant_addresses.append(self.allocator, .{ .original = admitted.root, .actual = actual, .len = 1, .owner = child });
+                            self.stats.reused_aggregate_constants += 1;
+                        } else if (old_child.request == .constant) {
                             const actual_request = (try self.scalarConstantRequest(g, old_child.*)) orelse return error.InvalidFunctionReference;
                             try g.replayScalarConstant(actual_request);
                             self.stats.reused_scalar_constants += 1;
