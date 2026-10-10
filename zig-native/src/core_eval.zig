@@ -554,6 +554,7 @@ pub const Session = struct {
     timing: ?*@import("backend_timing.zig").Work = null,
     call_summaries: CallSummaries = .{},
     lexical_inputs: lexical_capture_inputs.Cache = .{},
+    canonical_specializations: @import("canonical_specialization.zig").Cache = .{},
     split_attempts: usize = 0,
     split_accepted: usize = 0,
     split_declined: usize = 0,
@@ -704,6 +705,7 @@ pub const Session = struct {
     pub fn deinit(self: *Session) void {
         self.call_summaries.deinit(self);
         self.lexical_inputs.deinit(self.allocator);
+        self.canonical_specializations.deinit(self.allocator);
         self.region_arena_pool.deinit();
         self.callable_definitions.deinit(self.allocator);
         self.callable_definition_units.deinit(self.allocator);
@@ -846,6 +848,18 @@ pub const Session = struct {
         // Specialization requires nonzero evidence, leaving this key for inference.
         const key: ViewKey = .{ .value = value_, .evidence = 0, .entry_interface = entry_interface };
         if (self.specialized_closures.get(key)) |existing| return existing;
+        const mode: @import("canonical_specialization.zig").Mode = if (entry_interface) .entry else .inferred;
+        var canonical = try self.canonical_specializations.key(self, value_);
+        defer if (canonical) |*input| input.deinit(self.allocator);
+        if (canonical) |*input| if (try self.canonical_specializations.lookup(self, input, 0, mode)) |selected| return selected;
+        const values_before = self.values.items.len;
+        const children_before = self.children.items.len;
+        const steps_before = self.steps;
+        var tape: receipt.Tape = .{};
+        defer tape.deinit(self.allocator);
+        const previous_tape = self.receipt_tape;
+        if (canonical != null) self.receipt_tape = &tape;
+        defer self.receipt_tape = previous_tape;
         try self.specialized_closures.ensureUnusedCapacity(self.allocator, 1);
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
         defer region.deinit();
@@ -853,7 +867,36 @@ pub const Session = struct {
             region.inferEntry(value_) catch |err| return self.evidenceFailure(owner, span, err)
         else
             region.infer(value_) catch |err| return self.evidenceFailure(owner, span, err);
-        if (inferred) |selected| try self.cacheSpecialization(key, selected);
+        if (inferred) |selected| {
+            try self.cacheSpecialization(key, selected);
+            if (canonical) |input| {
+                var record = try tape.finish(self.allocator, .{
+                    .input = value_,
+                    .expected = 0,
+                    .selected = selected,
+                    .options = self.options,
+                    .depth = self.depth,
+                    .values_before = values_before,
+                    .children_before = children_before,
+                    .values_added = self.values.items.len - values_before,
+                    .children_added = self.children.items.len - children_before,
+                    .steps = self.steps - steps_before,
+                    .collected = tape.collected,
+                    .source_scopes = region.scratch.sources.items.len,
+                    .solver_nodes = region.solver.nodes.items.len,
+                    .complete = region.allConstraintsSolved() and self.steps == steps_before and !region.source_interface and !region.retain_selected,
+                    .sources = &.{},
+                    .scalar_reads = &.{},
+                    .call_reads = &.{},
+                    .call_publications = &.{},
+                    .views = &.{},
+                    .plain_facts = &.{},
+                });
+                defer record.deinit(self.allocator);
+                canonical = null;
+                try self.canonical_specializations.remember(self, input, record, mode);
+            }
+        }
         return inferred;
     }
     pub fn specializeSuspension(self: *Session, value_: ValueId, expected: type_evidence.Id) Error!ValueId {
@@ -876,6 +919,9 @@ pub const Session = struct {
         if (self.receipt_tape) |tape| tape.nested = true;
         if (self.specialized_closures.get(key)) |existing| return existing;
         if (self.receipt_tape == null) if (self.specialization_provider) |provider| if (try provider.lookup(provider.context, self, value_, expected)) |selected| return selected;
+        var canonical = try self.canonical_specializations.key(self, value_);
+        defer if (canonical) |*input| input.deinit(self.allocator);
+        if (canonical) |*input| if (try self.canonical_specializations.lookup(self, input, expected, .selected)) |selected| return selected;
         try self.specialized_closures.ensureUnusedCapacity(self.allocator, 1);
         const values_before = self.values.items.len;
         const children_before = self.children.items.len;
@@ -883,10 +929,10 @@ pub const Session = struct {
         var tape: receipt.Tape = .{};
         defer tape.deinit(self.allocator);
         const previous_tape = self.receipt_tape;
-        const recording = self.retain_specialization_receipts and previous_tape == null;
+        const recording = (self.retain_specialization_receipts or canonical != null) and previous_tape == null;
         if (recording) self.receipt_tape = &tape;
         defer self.receipt_tape = previous_tape;
-        if (recording) try self.specialization_receipts.ensureUnusedCapacity(self.allocator, 1);
+        if (recording and self.retain_specialization_receipts) try self.specialization_receipts.ensureUnusedCapacity(self.allocator, 1);
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
         defer region.deinit();
         const specialized = region.specialize(value_, expected) catch |err| switch (err) {
@@ -925,8 +971,14 @@ pub const Session = struct {
         });
         try self.cacheCompletedSpecialization(key, specialized, &region);
         if (record) |owned| {
-            self.specialization_receipts.appendAssumeCapacity(owned);
-            record = null;
+            if (canonical) |input| {
+                canonical = null;
+                try self.canonical_specializations.remember(self, input, owned, .selected);
+            }
+            if (self.retain_specialization_receipts) {
+                self.specialization_receipts.appendAssumeCapacity(owned);
+                record = null;
+            }
         }
         return specialized;
     }

@@ -44,10 +44,13 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   the final immutable pin. Five formerly limited deep cases now compile; some
   controls add overhead and diamond32 CPU rises 10.872→19.634 ms. See
   [the component qualification](zig-native/CALL_SUMMARIES.md#joint-recursive-inference-10-october-2026).
-- Task 008 (canonical specialization keys) is in progress. Reuse complete
-  semantic proofs while rebuilding outputs against each request's current
-  captures; preserve the existing value-specific output memo and independent
-  retained/portable validation boundaries.
+- Task 008 (canonical specialization keys) is complete. Complete Session-owned
+  proofs reconstruct results against current captures with atomic replay. The
+  full native suite, 617 guest/client tests, 617 strict comparisons and
+  zero-findings analyzer pass. Initial/edited execution and
+  fresh/retained/restart measurements qualify the immutable pin. Scalar/Box
+  repeated-capture regions fall; incomplete interfaces remain conservative. See
+  [the canonical qualification](zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -80,34 +83,33 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 008
+## Next steps for task 011
 
 Implement and qualify
-[canonical specialization keys](tasks/008-canonicalize-specialization-keys.md).
-Keep `build/bench/cloud-principal-graphs/candidate-components/` immutable as the
-baseline, with source commit `4f898b0`; the lexical and earlier component pins
-remain unchanged. Task 007's record retains exact binary/identity/source hashes,
-608 comparison cases, initial and edited guest checks, 65 fresh workloads and 64
-retained/restart workloads. Its source probe now terminates with the expected
-generic-entry rejection; the baseline frontend and lowering already finished,
-and the earlier attribution to frontend retry was incorrect.
+[semantic allocation reduction](tasks/011-reduce-semantic-allocation-traffic.md).
+Keep `build/bench/cloud-principal-graphs/candidate-canonical/` immutable as the
+baseline. Its compiler SHA-256 is
+`73aafd1e53b68516178f6acb359cfc689239d009b20263472301c97654e0847a`, identity
+`dc7184bf61fd9a6b587ea14302c0cdd1a42eef6eaf4cc7837f7d6034151113f8`, and six-file
+source manifest
+`d38d5a3fbbfb4fba050cad191c072fb071bf84d3d0a4a6a8d1d11a1e59ebc558`. Older
+lexical/component pins remain unchanged. Canonical results cover 617 strict
+comparison cases, 77 fresh workloads and 73 retained/restart workloads.
 
-`specialized_closures` uses actual value/evidence/mode keys for evaluated
-output. A canonical cache must instead retain complete body/evidence/capture
-proof, then rebuild a fresh result with current captures and alias
-relationships. Use `specialization_receipt.zig`,
-`completed_specialization_query.zig` and `source_value_template.zig` as the
-validation/publication boundary; do not copy an entire session snapshot for each
-specialization. Preserve all source, scalar, call, view and plain-fact
-observations, options, nominal/provider/demand IDs, resource limits and
-principal-versus-selected modes. Unknown/incomplete inputs remain conservative.
-Rooted graph plans must own bounded keys, preserve exact equality after hash
-selection and publish no partial result on OOM. Native and executed-Wasm laws
-must cover equivalent duplicates, unequal captures/effects, forced collisions,
-current-capture reconstruction, retained/checkpoint edits and failure recovery.
-The next investigation notes are in ignored
-`build/bench/cloud-principal-graphs/task008-design-notes.md`; they are not an
-implemented or qualified design.
+Attribute logical solver/scratch allocation separately from backing allocator
+requests, graph cloning, evidence imports and durable publication before
+changing owners. `ClosureRegion.freeze` currently duplicates a capture vector
+with the Session allocator and then copies it again into Session children.
+Remove the redundant buffer while retaining exact aliases, demand identity,
+mapping ownership and OOM recovery. Child freezing can reallocate Session
+arrays: do not retain a borrowed child slice across it or across `makeAggregate`
+capacity growth. Region arenas are stable heap owners; allocator instrumentation
+must not point at a returned-by-value region. Keep region-local binders
+independent and share only immutable graphs with valid owners. Measure fresh,
+population, edit/revert, no-op and restart separately. Under-100-MB private
+workload qualification remains open until task 084 and cannot be inferred from
+public synthetic workloads. Tasks 012 and 014 are also ready after 008; follow
+their written scopes.
 
 ## Notes
 
@@ -119,7 +121,7 @@ implemented or qualified design.
   `ZIG_ANALYZER=/tmp/blot-qualified-analyzer-756bfd5/zig-out/bin/zig-analyzer`.
   Those paths refer to the original machine. In the cloud checkout, use
   `ZIG_ANALYZER=/workspace/tooling/zig-analyzer/zig-out/bin/zig-analyzer`; its
-  source is at the CI pin and it reports zero findings across 294 Zig files.
+  source is at the CI pin and it reports zero findings across 295 Zig files.
 - The cloud Deno 2.9.6 standalone runtime is cached from the official GitHub
   release with its published SHA-256 verified. The initial full gate failed only
   on the blocked `dl.deno.land` download; after caching, the complete

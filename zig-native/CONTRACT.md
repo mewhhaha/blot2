@@ -602,3 +602,13 @@ lookup.
 The CLI, native checks and executed-Wasm tests are the production gates.
 Validate all declarations, including unused ones. Keep effects, staging, guest
 ABI and fresh-versus-retained output checks intact during performance changes.
+
+The Session-local canonical specialization cache owns its exact capture keys,
+complete observation receipts and created value/child deltas. It never owns a
+whole Session snapshot and never stores solver nodes. Its immutable evidence,
+closure mapping and record-layout handles refer only to the same live Session. A
+hit reconstructs fresh output values around the current capture handles after
+revalidating reads. All publication capacity is reserved first; the final graph
+and proof-map commit allocates nothing. Mutable creation state and unsupported
+observations decline. Local canonical plans are not portable artifacts; existing
+portable receipt import must prove source pairing and remap all owner handles.

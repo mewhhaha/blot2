@@ -177,6 +177,10 @@ fn lowerPreludeProducer(source: []const u8, operations: []const test_prelude.Ope
 }
 
 fn lowerWithOptions(source: []const u8, options: checker.ModuleOptions) !core.Module {
+    return lowerWithUnit(source, options, 1);
+}
+
+fn lowerWithUnit(source: []const u8, options: checker.ModuleOptions, unit: u32) !core.Module {
     var tokens = try lexer.lex(a, source);
     defer tokens.deinit(a);
     try std.testing.expectEqual(@as(usize, 0), tokens.diagnostics.items.len);
@@ -185,7 +189,7 @@ fn lowerWithOptions(source: []const u8, options: checker.ModuleOptions) !core.Mo
     var syntax = try parser.parse(a, source, tokens.tokens.items, &pool);
     defer syntax.deinit(a);
     try std.testing.expectEqual(@as(usize, 0), syntax.diagnostics.items.len);
-    var checked = try checker.checkModuleWithOptions(a, &syntax, &pool, &.{}, &.{}, 1, options);
+    var checked = try checker.checkModuleWithOptions(a, &syntax, &pool, &.{}, &.{}, unit, options);
     defer checked.deinit(a);
     for (checked.diagnostics) |diagnostic| std.debug.print("check:{d}: {s}\n", .{ diagnostic.span.start, diagnostic.message() });
     try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
@@ -4892,6 +4896,8 @@ fn lexicalScalarScenario(allocator: std.mem.Allocator, module: *const core.Modul
     var ordinary = try evaluator.Session.init(allocator, &.{module.*});
     defer ordinary.deinit();
     ordinary.options.reuse_lexical_summaries = false;
+    // Isolate lexical job reuse; canonical proof reuse has its own region laws.
+    summarized.canonical_specializations.enabled = false;
     var keys: lexical_inputs.Cache = .{};
     defer keys.deinit(allocator);
     const selected: lexical_inputs.Interfaces = .empty;
@@ -5045,6 +5051,9 @@ fn lexicalDemandScenario(allocator: std.mem.Allocator, module: *const core.Modul
         captures[index] = session.valueChildren(ready)[0];
         try std.testing.expectEqual(evaluator.ValueKind.suspension, session.valueInfo(captures[index]).kind);
         try std.testing.expect(session.suspensionCached(captures[index]) == null);
+        const examined = session.canonical_specializations.examined_words;
+        try std.testing.expectEqual(@as(?lexical_inputs.Inputs, null), try session.canonical_specializations.key(&session, ready));
+        try std.testing.expect(session.canonical_specializations.examined_words > examined);
         identifiers[index] = try keys.intern(allocator, &session, ready, &selected) orelse return error.ExpectedCompleteCaptureInputs;
     }
     try std.testing.expect(identifiers[0] != identifiers[1]);
@@ -5207,4 +5216,222 @@ test "lexical summary allocation failures abandon partial jobs and retry in the 
     defer module.deinit(a);
     const allocations = try lexicalRetryScenario(&module, null);
     for (0..allocations) |offset| _ = try lexicalRetryScenario(&module, offset);
+}
+
+fn canonicalScalarScenario(allocator: std.mem.Allocator, module: *const core.Module, collision: bool) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    session.canonical_specializations.force_collision = collision;
+    session.options.trace_runtime_dependencies = true;
+    session.options.retain_source_suspensions = true;
+    const expected = try session.evidence.intern(.function, types.u32_type, types.u32_type, &.{});
+    const first = try session.richValue(target(module, "first"));
+    _ = try session.specializeClosure(first, expected);
+    const again = try session.richValue(target(module, "again"));
+    const capture = session.valueChildren(again)[0];
+    try std.testing.expect(capture != session.valueChildren(first)[0]);
+    const regions = session.counters.inference_regions;
+    const steps = session.steps;
+    const selected = try session.specializeClosure(again, expected);
+    try std.testing.expectEqual(regions, session.counters.inference_regions);
+    try std.testing.expectEqual(steps, session.steps);
+    try std.testing.expectEqual(capture, session.valueChildren(selected)[0]);
+    try std.testing.expectEqual(@as(usize, 1), session.canonical_specializations.reused);
+    const other = try session.richValue(target(module, "other"));
+    const before_other = session.counters.inference_regions;
+    const different = try session.specializeClosure(other, expected);
+    try std.testing.expect(session.counters.inference_regions > before_other);
+    try std.testing.expectEqual(@as(u32, 2), session.valueInfo(session.valueChildren(different)[0]).bits);
+    try std.testing.expectEqual(@as(usize, 1), session.canonical_specializations.reused);
+    try std.testing.expectEqual(@as(u32, 83), (try session.value(target(module, "answer"))).bits);
+}
+
+test "canonical selected proofs use current captures and exact equality under forced collisions" {
+    var module = try lower(
+        \\const make: U32 -> (U32 -> U32 ! {}) = fn captured => fn value => @u32.add captured value
+        \\entry const first = make 1
+        \\entry const again = make 1
+        \\entry const other = make 2
+        \\entry const answer = @u32.add (first 40) (other 40)
+    );
+    defer module.deinit(a);
+    try canonicalScalarScenario(a, &module, false);
+    try canonicalScalarScenario(a, &module, true);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, canonicalScalarScenario, .{ &module, true });
+}
+
+test "canonical inference proofs distinguish selected and entry modes with current capture graphs" {
+    var module = try lower(
+        \\const make: U32 -> (U32 -> U32 ! {}) = fn captured => fn value => @u32.add captured value
+        \\entry const first = make 1
+        \\entry const again = make 1
+    );
+    defer module.deinit(a);
+    for ([_]bool{ false, true }) |entry_mode| {
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        const first = try session.richValue(target(&module, "first"));
+        _ = if (entry_mode) (try session.inferEntryClosure(first)).? else try session.inferClosure(first);
+        const again = try session.richValue(target(&module, "again"));
+        const before = session.counters.inference_regions;
+        const selected = if (entry_mode) (try session.inferEntryClosure(again)).? else try session.inferClosure(again);
+        try std.testing.expectEqual(before, session.counters.inference_regions);
+        try std.testing.expectEqual(session.valueChildren(again)[0], session.valueChildren(selected)[0]);
+        try std.testing.expectEqual(@as(usize, 1), session.canonical_specializations.reused);
+        const expected = try session.evidence.intern(.function, types.u32_type, types.u32_type, &.{});
+        const selected_before = session.counters.inference_regions;
+        _ = try session.specializeClosure(again, expected);
+        try std.testing.expect(session.counters.inference_regions > selected_before);
+    }
+}
+
+fn canonicalHitRetry(module: *const core.Module, offset: ?usize) !usize {
+    var failing = std.testing.FailingAllocator.init(a, .{});
+    var allocations: usize = 0;
+    {
+        var session = try evaluator.Session.init(failing.allocator(), &.{module.*});
+        defer session.deinit();
+        session.retain_specialization_receipts = true;
+        const expected = try session.evidence.intern(.function, types.u32_type, types.u32_type, &.{});
+        const first = try session.richValue(target(module, "first"));
+        const again = try session.richValue(target(module, "again"));
+        _ = try session.specializeClosure(first, expected);
+        const sizes = .{ session.values.items.len, session.children.items.len, session.closures.items.len, session.type_mappings.items.len, session.row_mappings.items.len, session.demands.items.len, session.typed_views.count(), session.specialized_closures.count(), session.validated_calls.count(), session.plain_nominals.count(), session.specialization_receipts.items.len };
+        const regions = session.counters.inference_regions;
+        const start = failing.alloc_index;
+        if (offset) |index| failing.fail_index = start + index;
+        const selected = session.specializeClosure(again, expected) catch |err| retry: {
+            try std.testing.expectEqual(error.OutOfMemory, err);
+            try std.testing.expect(failing.has_induced_failure);
+            try std.testing.expectEqual(sizes, .{ session.values.items.len, session.children.items.len, session.closures.items.len, session.type_mappings.items.len, session.row_mappings.items.len, session.demands.items.len, session.typed_views.count(), session.specialized_closures.count(), session.validated_calls.count(), session.plain_nominals.count(), session.specialization_receipts.items.len });
+            try std.testing.expectEqual(regions, session.counters.inference_regions);
+            try std.testing.expectEqual(@as(usize, 0), session.canonical_specializations.reused);
+            failing.fail_index = std.math.maxInt(usize);
+            break :retry try session.specializeClosure(again, expected);
+        };
+        allocations = failing.alloc_index - start;
+        try std.testing.expectEqual(regions, session.counters.inference_regions);
+        try std.testing.expectEqual(session.valueChildren(again)[0], session.valueChildren(selected)[0]);
+        try std.testing.expectEqual(@as(usize, 1), session.canonical_specializations.reused);
+        try std.testing.expectEqual(@as(usize, 2), session.specialization_receipts.items.len);
+        try std.testing.expectEqual(again, session.specialization_receipts.items[1].input);
+    }
+    try std.testing.expectEqual(failing.allocated_bytes, failing.freed_bytes);
+    return allocations;
+}
+
+test "canonical proof hit publishes atomically and retries every allocation failure in the same session" {
+    var module = try lower(
+        \\const make: U32 -> (U32 -> U32 ! {}) = fn captured => fn value => @u32.add captured value
+        \\entry const first = make 1
+        \\entry const again = make 1
+    );
+    defer module.deinit(a);
+    const allocations = try canonicalHitRetry(&module, null);
+    for (0..allocations) |offset| _ = try canonicalHitRetry(&module, offset);
+}
+
+test "canonical capture keys preserve aggregate aliases nominal identities and settings" {
+    var module = try lower(
+        \\type Box is data = #Box { value: U32 }
+        \\type Other is data = #Other { value: U32 }
+        \\const make = fn left => fn right => fn () => @u32.add left.value right.value
+        \\const box = #Box { value: 20 }
+        \\entry const shared = make box box
+        \\entry const shared_again = make box box
+        \\entry const separate = make (#Box { value: 20 }) (#Box { value: 20 })
+        \\entry const separate_again = make (#Box { value: 20 }) (#Box { value: 20 })
+        \\entry const nominal = make (#Other { value: 20 }) (#Other { value: 20 })
+    );
+    defer module.deinit(a);
+    var session = try evaluator.Session.init(a, &.{module});
+    defer session.deinit();
+    session.canonical_specializations.force_collision = true;
+    const expected = try session.evidence.intern(.function, types.unit, types.u32_type, &.{});
+    for ([_][]const u8{ "shared", "shared_again", "separate", "separate_again", "nominal" }, 0..) |name, index| {
+        const raw = try session.richValue(target(&module, name));
+        const before = session.counters.inference_regions;
+        const selected = try session.specializeClosure(raw, expected);
+        if (index == 1 or index == 3) try std.testing.expectEqual(before, session.counters.inference_regions) else try std.testing.expect(session.counters.inference_regions > before);
+        const current = session.valueChildren(raw);
+        const frozen = session.valueChildren(selected);
+        for (current, frozen) |original, refined| {
+            try std.testing.expectEqual(session.valueInfo(original).nominal, session.valueInfo(refined).nominal);
+            try canonicalCurrentPayload(&session, original, refined);
+        }
+        try std.testing.expectEqual(index < 2, current[0] == current[1]);
+        try std.testing.expectEqual(index < 2, frozen[0] == frozen[1]);
+    }
+    const raw = try session.richValue(target(&module, "shared_again"));
+    session.options.max_steps -= 1;
+    try std.testing.expectEqual(@as(?lexical_inputs.Inputs, null), try session.canonical_specializations.key(&session, raw));
+}
+
+fn canonicalCurrentPayload(session: *evaluator.Session, original: u32, refined: u32) !void {
+    const left = session.valueInfo(original);
+    const right = session.valueInfo(refined);
+    try std.testing.expectEqual(left.kind, right.kind);
+    try std.testing.expectEqual(left.bits, right.bits);
+    try std.testing.expectEqual(left.nominal, right.nominal);
+    if (left.kind == .scalar) try std.testing.expectEqual(original, refined);
+    const before = session.valueChildren(original);
+    const after = session.valueChildren(refined);
+    try std.testing.expectEqual(before.len, after.len);
+    for (before, after) |old, current| try canonicalCurrentPayload(session, old, current);
+}
+
+test "canonical proofs preserve selected effect evidence and mismatch diagnostics" {
+    var module = try lower(
+        \\effect Read: Unit -> U32
+        \\const make = fn (captured: U32) => fn () => do:
+        \\  use value <- Read ()
+        \\  return @u32.add captured value
+        \\entry const first = make 1
+        \\entry const again = make 1
+    );
+    defer module.deinit(a);
+    for ([_]bool{ false, true }) |sharing| {
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        session.canonical_specializations.enabled = sharing;
+        session.canonical_specializations.force_collision = true;
+        const first = try session.richValue(target(&module, "first"));
+        const expected = session.valueEvidence(try session.inferClosure(first));
+        _ = try session.specializeClosure(first, expected);
+        const again = try session.richValue(target(&module, "again"));
+        const selected = try session.specializeClosure(again, expected);
+        try std.testing.expectEqual(expected, session.valueEvidence(selected));
+        const pure = try session.evidence.intern(.function, types.unit, types.u32_type, &.{});
+        try std.testing.expect(expected != pure);
+        try expectCaptureMismatch(&session, again, pure);
+    }
+}
+
+test "canonical call observations resolve explicit nonsequential source unit identities" {
+    var module = try lowerWithUnit(
+        \\entry const callee: U32 -> U32 = fn value => @u32.add value 0
+        \\const make: U32 -> (U32 -> U32 ! {}) = fn captured => fn value => callee (@u32.add captured value)
+        \\entry const first = make 1
+        \\entry const again = make 1
+        \\entry const third = make 1
+    , .{}, 17);
+    defer module.deinit(a);
+    var session = try evaluator.Session.init(a, &.{module});
+    defer session.deinit();
+    const expected = try session.evidence.intern(.function, types.u32_type, types.u32_type, &.{});
+    const callee = try session.richValue(target(&module, "callee"));
+    _ = try session.specializeClosure(callee, expected);
+    for ([_][]const u8{ "first", "again", "third" }) |name| {
+        _ = try session.specializeClosure(try session.richValue(target(&module, name)), expected);
+    }
+    try std.testing.expect(session.canonical_specializations.reused != 0);
+    var observed = false;
+    var buckets = session.canonical_specializations.buckets.valueIterator();
+    while (buckets.next()) |bucket| for (bucket.items) |entry| {
+        for (entry.proof.call_reads) |read| {
+            try std.testing.expectEqual(@as(u32, 17), read.unit);
+            observed = true;
+        }
+    };
+    try std.testing.expect(observed);
 }

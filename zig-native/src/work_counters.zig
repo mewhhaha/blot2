@@ -5,6 +5,10 @@
 pub const Counters = struct {
     /// Inference regions opened (ClosureRegion lifetimes, including split children).
     inference_regions: u64 = 0,
+    /// Session-local canonical requests and complete proofs reconstructed around
+    /// the current captures without opening a new inference region.
+    canonical_specialization_queries: u64 = 0,
+    canonical_specialization_hits: u64 = 0,
     /// Sum and maximum of type scopes held by one region at release.
     region_scopes: u64 = 0,
     max_region_scopes: u64 = 0,

@@ -25,11 +25,14 @@ pub const Inputs = struct {
     rows: []evidence.RowMapping,
     slots: []Slot,
     words: []u64,
+    /// Corresponding live handles in canonical traversal order; never key bytes.
+    values: []u32,
     pub fn deinit(self: *Inputs, allocator: Allocator) void {
         allocator.free(self.mappings);
         allocator.free(self.rows);
         allocator.free(self.slots);
         allocator.free(self.words);
+        allocator.free(self.values);
         self.* = undefined;
     }
 };
@@ -56,7 +59,7 @@ pub const Cache = struct {
         if (self.examined_words >= session.options.max_children) return null;
         var examined: usize = 0;
         defer self.examined_words += examined;
-        var input = try buildWithBudget(allocator, session, value, selected, session.options.max_children - self.examined_words, &examined) orelse return null;
+        var input = try buildWithBudget(allocator, session, value, selected, session.options.max_children - self.examined_words, &examined, false) orelse return null;
         errdefer input.deinit(allocator);
         const bytes = std.mem.sliceAsBytes(input.words);
         if (self.keys.get(bytes)) |existing| {
@@ -90,16 +93,26 @@ pub fn build(allocator: Allocator, session: anytype, value: u32) Allocator.Error
 }
 pub fn buildWithInterfaces(allocator: Allocator, session: anytype, value: u32, selected: *const Interfaces) Allocator.Error!?Inputs {
     var examined: usize = 0;
-    return buildWithBudget(allocator, session, value, selected, session.options.max_children, &examined);
+    return buildWithBudget(allocator, session, value, selected, session.options.max_children, &examined, false);
 }
-fn buildWithBudget(allocator: Allocator, session: anytype, value: u32, selected: *const Interfaces, limit: usize, examined: *usize) Allocator.Error!?Inputs {
-    return buildChecked(allocator, session, value, selected, limit, examined) catch |err| switch (err) {
+/// Exact session-local specialization input, including an empty environment.
+pub fn buildCanonical(allocator: Allocator, session: anytype, value: u32) Allocator.Error!?Inputs {
+    const selected: Interfaces = .empty;
+    var examined: usize = 0;
+    return buildWithBudget(allocator, session, value, &selected, session.options.max_children, &examined, true);
+}
+pub fn buildCanonicalBudget(allocator: Allocator, session: anytype, value: u32, limit: usize, examined: *usize) Allocator.Error!?Inputs {
+    const selected: Interfaces = .empty;
+    return buildWithBudget(allocator, session, value, &selected, limit, examined, true);
+}
+fn buildWithBudget(allocator: Allocator, session: anytype, value: u32, selected: *const Interfaces, limit: usize, examined: *usize, allow_empty: bool) Allocator.Error!?Inputs {
+    return buildChecked(allocator, session, value, selected, limit, examined, allow_empty) catch |err| switch (err) {
         error.Declined => null,
         error.OutOfMemory => error.OutOfMemory,
     };
 }
 
-fn buildChecked(allocator: Allocator, session: anytype, value: u32, selected: *const Interfaces, limit: usize, examined: *usize) Error!Inputs {
+fn buildChecked(allocator: Allocator, session: anytype, value: u32, selected: *const Interfaces, limit: usize, examined: *usize, allow_empty: bool) Error!Inputs {
     const view = session.snapshot();
     if (value == 0 or value >= view.values.len or view.values[value].kind != .closure) return error.Declined;
     const root = session.closureInfo(value);
@@ -111,7 +124,7 @@ fn buildChecked(allocator: Allocator, session: anytype, value: u32, selected: *c
     };
     const module = &session.units[owner orelse return error.Declined];
     const children = session.valueChildren(value);
-    if (children.len == 0 or children.len > session.options.max_children) return error.Declined;
+    if ((!allow_empty and children.len == 0) or children.len > session.options.max_children) return error.Declined;
     if (children.len > limit / 4) return error.Declined;
     const anonymous = root.origin == .anonymous;
     if (anonymous and root.identity >= module.closures.len) return error.Declined;
@@ -125,6 +138,9 @@ fn buildChecked(allocator: Allocator, session: anytype, value: u32, selected: *c
     errdefer allocator.free(mappings);
     const rows = try allocator.dupe(evidence.RowMapping, view.row_mappings[root.row_mappings.start..][0..root.row_mappings.len]);
     errdefer allocator.free(rows);
+    var values: std.ArrayList(u32) = .empty;
+    errdefer values.deinit(allocator);
+    try values.append(allocator, value);
     var words: std.ArrayList(u64) = .empty;
     errdefer words.deinit(allocator);
     try append(allocator, &words, &.{ 1, root.unit, root.identity, @intFromBool(anonymous), root.applied, root.ty, view.value_evidence[value], children.len }, limit, examined);
@@ -161,6 +177,7 @@ fn buildChecked(allocator: Allocator, session: anytype, value: u32, selected: *c
                 if (current.depth >= session.options.max_type_depth or seen.count() >= session.options.max_values or seen.count() >= std.math.maxInt(u32)) return error.Declined;
                 if (current.value >= view.values.len or current.value >= view.value_evidence.len or interface(view, selected, current.value) == 0) return error.Declined;
                 const ordinal: u32 = @intCast(seen.count());
+                try values.append(allocator, current.value);
                 try seen.put(allocator, current.value, .{ .ordinal = ordinal, .active = true });
                 const info = view.values[current.value];
                 if (info.start > view.children.len or info.len > view.children.len - info.start) return error.Declined;
@@ -208,5 +225,7 @@ fn buildChecked(allocator: Allocator, session: anytype, value: u32, selected: *c
         }
         slots[index] = .{ .binding = binding, .interface = interface(view, selected, child), .alias = seen.get(child).?.ordinal };
     }
-    return .{ .unit = root.unit, .identity = root.identity, .anonymous = anonymous, .applied = root.applied, .source_type = root.ty, .existing = view.value_evidence[value], .parameters = if (anonymous) 1 else definition.?.parameters.len - root.applied, .mappings = mappings, .rows = rows, .slots = slots, .words = try words.toOwnedSlice(allocator) };
+    const owned_words = try words.toOwnedSlice(allocator);
+    errdefer allocator.free(owned_words);
+    return .{ .unit = root.unit, .identity = root.identity, .anonymous = anonymous, .applied = root.applied, .source_type = root.ty, .existing = view.value_evidence[value], .parameters = if (anonymous) 1 else definition.?.parameters.len - root.applied, .mappings = mappings, .rows = rows, .slots = slots, .words = owned_words, .values = try values.toOwnedSlice(allocator) };
 }

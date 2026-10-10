@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — attribution and redundant publication-copy reduction
+  follow the qualified canonical specialization baseline.
 - **Dependencies:** [007](007-infer-recursive-components-jointly.md),
   [008](008-canonicalize-specialization-keys.md),
   [010](010-schedule-constraints-by-variable.md)

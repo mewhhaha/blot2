@@ -1396,3 +1396,152 @@ specialization keys remain task 008; duplicate scoped checks, component overhead
 and allocation traffic remain optimization work. The frozen private gdev
 workload and original task 002 boxed binary remain unavailable; these public
 results make no private-workload performance claim.
+
+## Session-local canonical specialization (10 October 2026)
+
+`canonical_specialization.zig` separates a complete semantic judgment from the
+actual `specialized_closures` memo. That memo still uses the current ValueId;
+canonical equality never returns an earlier closure with its earlier captures.
+Selected specialization, ordinary concrete inference and concrete entry
+inference have distinct modes. Principal source schemes and generic entry
+rejections do not become completed selected proofs.
+
+The canonical input owns exact word sequences and a separate traversal of live
+handles. Words include source unit/body/origin/applied parameters, immutable
+source type identity, interned complete evidence, every semantic option, ordered
+source capture slots, type/row mappings, exact scalar bits, nominal identity,
+storage field names, nested callable code/mappings and canonical graph aliases.
+Within one live Session, evidence interning supplies canonical semantic
+type/effect identities; source type IDs belong to immutable Core, never to a
+region solver. Hashes only choose buckets. Full word equality, expected
+evidence, mode, execution depth and observation validation decide whether a
+request may reuse a proof.
+
+Admission requires the existing complete receipt tape: all constraints solved,
+no body execution, no nested or unknown observation. Captures must have complete
+interfaces. Mutable demands, providers and other unsupported identity-bearing
+inputs or outputs decline this plan. Ordinary resource limits are required;
+backend runtime tracing and retained-source settings are supported and remain
+exact key inputs. Queries inside another inquiry or observation tape use
+ordinary collection. Input construction charges attempted work even when it
+declines, and one Session bounds examined and retained key/plan words by
+`max_children`.
+
+A retained plan owns the input graph description, complete receipt, exact
+created value/child delta, record-layout references and proved identity memo
+publications. It owns no Session snapshot and indexes only reachable captures
+and the request's created values. Regular closure metadata, solved mapping
+spans, evidence and record layouts are immutable append-only entries in this
+exact Session; replay may share those entries. Each created output ValueId is
+fresh. Suspension creation and memo identity are unsupported by this local plan.
+No local plan or borrowed Session handle crosses a revision, dependency
+artifact, checkpoint or process boundary.
+
+Replay pairs old input graph ordinals with the current handles, preserving the
+alias partition. Created edges are rewritten through this pairing; typed headers
+sharing an input child span use the corresponding current span. External
+immutable spans containing changed anchored handles decline rather than
+retaining an older capture. Record layouts and solved metadata keep their
+Session owner. Scalar reads, validated-call presence, existing typed views and
+ordered plain-nominal reads and writes are revalidated. Recorded external unit
+IDs are resolved to current internal unit indices, including nonsequential IDs.
+
+All graph, map and optional transported-receipt capacities are reserved before
+publication. The final append and proof-map commit allocate nothing. An
+allocation failure on a hit changes capacity only: graph lengths, facts and
+memos are unchanged, and the same live Session can retry. Replay restores the
+actual specialization key, selected fixed points and proved frozen child
+identity entries. Selected hits can emit a remapped complete receipt for the
+existing portable importer; ordinary and entry inference do not add a new
+portable receipt mode. Existing portable source pairing, evidence import, graph
+matching and quota gates remain authoritative.
+
+Always-on `canonical_specialization_queries` and `canonical_specialization_hits`
+counters accompany `inference_regions`. Native laws cover equal freshly
+allocated captures, changed scalar bits, forced hash collisions, distinct
+inference modes, shared/separate aggregate aliases, nominal identity, changed
+settings/effects, nonsequential unit IDs, generative-demand decline and every
+cache-hit allocation failure with same-Session retry. Executed Wasm laws cover
+aggregates, nested callbacks and retained edit/failure/recovery. Current
+refinement observations always install an observation tape, so those queries
+decline canonical reuse. Task 008 is qualified for this admitted complete
+domain; incomplete interfaces and unsupported mutable identities still collect
+ordinary regions.
+
+### Canonical qualification and remaining limits
+
+Zig **0.17.0**; `deno task test:compiler` passes the full LLVM native suite and
+**617 guest/client tests** (`canonical-full-gate-v2.log`). The focused
+canonical/lexical batch passes **79 native laws**; `deno task lint:zig` reports
+**zero findings across 295 Zig files** (`canonical-analyzer-v3.log`). The first
+full guest batch exposed a TypeScript union-narrowing error in the new execution
+test; the corrected second full batch passes. Compiler sources and binary did
+not change between those two full batches.
+
+Immutable pins under `build/bench/cloud-principal-graphs/`:
+
+| Pin                                                  | Compiler SHA-256                                                   | Compiler identity SHA-256                                          | Source-input manifest SHA-256                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `candidate-components/` (task 007, source `4f898b0`) | `b513f76268ee76b0d5b32ef4a2e028c782534120260ea83504271fe410af92cf` | `08b67e99d5c9e96b3138d0385dd5767d0f3e62f40a71b9c7dd34f53d2d6abed5` | `0a19ca3317b7c6b16501934e07a07a1fa1dd69d44f2f81a986652ace93beb3a0` |
+| `candidate-canonical/` (task 008)                    | `73aafd1e53b68516178f6acb359cfc689239d009b20263472301c97654e0847a` | `dc7184bf61fd9a6b587ea14302c0cdd1a42eef6eaf4cc7837f7d6034151113f8` | `d38d5a3fbbfb4fba050cad191c072fb071bf84d3d0a4a6a8d1d11a1e59ebc558` |
+
+Source-input manifest hashes use sorted compact JSON of path-to-SHA-256 maps;
+the candidate covers the five changed compiler/native-test files and its new
+executed-Wasm test. The earlier `candidate-canonical-v1/` has the same compiler
+but an older test-source manifest and is not the final qualified pin.
+
+`compare-canonical.py` checks **617 public cases / 1,234 invocations** with both
+prelude modes. Diagnostics and Wasm are identical with no acceptance exceptions;
+**854 successful outputs** and all **1,234 teardown memory records** are
+checked, each with zero live requested bytes. Initial outputs execute in **52
+guests / 3,148 calls**. Independently rebuilt edited outputs match the retained
+batch's recorded hashes and execute in **84 guests / 10,212 calls**. Folded
+scalar reads are validated separately and are not counted as calls. Existing
+portable receipt, checkpoint, corruption and failed-edit recovery laws remain in
+the full gate.
+
+`measure-canonical.py` measures **77 workloads / 15 alternating pairs / 2,310
+fresh invocations**, with persistence disabled and child user+system CPU
+measured at microsecond resolution. CPU and backing requested-byte medians below
+are baseline→candidate; ranges retain all 15 samples. Work and bytes are
+deterministic, Wasm is identical and teardown live bytes are zero.
+
+| Complete-capture workload | CPU median µs (ranges baseline / candidate) | Requested bytes     | Regions | Canonical hits / queries |
+| ------------------------- | ------------------------------------------- | ------------------- | ------- | ------------------------ |
+| Scalar, 8                 | 936→923                                     | 236,625→228,885     | 29→21   | 7 / 8                    |
+| Scalar, 32                | 1,408→1,345                                 | 593,130→578,854     | 77→45   | 31 / 32                  |
+| Scalar, 128               | 3,176→2,814 (2,979–3,722 / 2,552–3,234)     | 1,971,038→1,928,282 | 269→141 | 127 / 128                |
+| Box, 8                    | 1,078→1,051                                 | 303,380→292,740     | 27→19   | 7 / 8                    |
+| Box, 32                   | 1,769→1,566                                 | 778,054→749,266     | 75→43   | 31 / 32                  |
+| Box, 128                  | 4,408→3,825 (3,926–7,127 / 3,379–4,738)     | 2,764,374→2,660,662 | 267→139 | 127 / 128                |
+
+The median of all workload CPU ratios is **0.987**; this establishes a small
+broader change, rather than a general large speedup. The new nested-callback
+control has an incomplete captured interface and conservatively records zero
+hits: at width 128 its CPU is 5,052→4,992 µs, requested bytes
+2,792,397→2,875,885 and regions remain 275. At width 8 its CPU rises 1,286→1,326
+µs. The older callback-capture width-8 control remains 37,064→36,933 µs, with a
+largest recorded candidate region of 34,731 µs. Diamond32 remains costly
+(19,986→19,460 µs). Host load at batch start/end was 0.187/0.591 on four CPUs;
+shared-host caches and load are uncontrolled.
+
+Seven alternating pairs of `bench-compile-canonical.ts` cover **73 workloads /
+6,132 phase samples**, separating fresh, isolated cache population/restart,
+retained population, first edit, subsequent edit/revert and no-op. Command:
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-canonical.ts --baseline build/bench/cloud-principal-graphs/candidate-components/blotc --candidate build/bench/cloud-principal-graphs/candidate-canonical/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/canonical-retained`.
+Every fresh/restart/retained hash matches its fresh initial or edited source;
+cross-compiler hashes are identical and `unexpected_problems` is empty.
+Scalar128 fresh/restart CPU medians are 9→8 / 8→8 ms; Box128 is 10→9 ms in both
+phases. Diamond32 fresh/restart is 24→24 / 24→23 ms. Retained CPU has roughly 10
+ms accounting resolution; zero medians do not imply zero work or establish an
+edit speedup. Host load at batch start/end was 0.077/0.707.
+
+Raw evidence is `canonical-comparisons/report.json` and `execution.json`,
+`canonical-measurement/report.json`, `canonical-retained/results.json`,
+`samples.jsonl` and `execution.json`, plus the named gate/analyzer/execution
+logs. These durable tables preserve qualification if ignored artifacts are
+cleaned up. No private gdev result, universal 50-ms region bound or under-100-MB
+allocation qualification is claimed: the frozen private workload remains
+unavailable. Allocation attribution and remaining redundant copies continue in
+task 011; canonical local proofs remain Session-owned and do not replace
+portable query validation or the unified table planned in task 014.

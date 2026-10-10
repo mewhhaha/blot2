@@ -142,6 +142,16 @@ cases now compile. Some controls add overhead, and diamond32 CPU rises
 [The component qualification](../zig-native/CALL_SUMMARIES.md#joint-recursive-inference-10-october-2026)
 retains exact identities, commands, distributions and remaining limitations.
 
+Task [008] completes canonical specialization for admitted complete inputs. The
+full native suite, 617 guest/client tests, 617 strict public comparisons and
+zero-findings analyzer across 295 Zig files pass. Initial and edited outputs
+execute; 77 fresh and 73 retained/restart workloads qualify the immutable pin.
+Repeated scalar/Box captures reuse proofs while rebuilding current handles;
+incomplete inputs remain conservative. Overall median CPU ratio is 0.987. Task
+[011] is next; [012] and [014] are also dependency-ready.
+[The canonical qualification](../zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026)
+records exact pins, measurements and remaining limits.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -366,10 +376,10 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [005] — Summarize higher order callees                  | Complete    | [004]                                  |
 | [006] — Summarize lexical closures                      | Complete    | [005]                                  |
 | [007] — Infer recursive components jointly              | Complete    | [006]                                  |
-| [008] — Canonicalize specialization keys                | In progress | [007]                                  |
+| [008] — Canonicalize specialization keys                | Complete    | [007]                                  |
 | [009] — Cache composite type resolutions                | Complete    | None                                   |
 | [010] — Schedule constraints by variable                | Complete    | [009]                                  |
-| [011] — Reduce semantic allocation traffic              | Pending     | [007], [008], [010]                    |
+| [011] — Reduce semantic allocation traffic              | In progress | [007], [008], [010]                    |
 | [012] — Schedule independent semantic jobs              | Pending     | [007], [008], [010]                    |
 | [013] — Qualify parallel inference                      | Pending     | [011], [012]                           |
 | [014] — Specify unified query table                     | Pending     | [008]                                  |

@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — designing complete session-owned canonical proofs
-  and reconstruction against current captures; no completion is claimed.
+- **Status:** Complete — session-owned complete canonical proofs rebuild outputs
+  against current captures; public fresh/retained/restart qualification passes.
 - **Dependencies:** [007](007-infer-recursive-components-jointly.md)
 - **Originating requirements:** PLAN: Hill 4 / canonical specialization keys.
   Sources: [PLAN.md](../PLAN.md).
@@ -31,11 +31,11 @@ provide the current selected-evidence boundaries.
 
 ## Implementation checklist
 
-- [ ] Define canonical keys for the body, type/effect evidence, captures and
+- [x] Define canonical keys for the body, type/effect evidence, captures and
       every value-dependent input identified by summary analysis.
-- [ ] Preserve generative/nominal/provider identities, alias graphs, settings
+- [x] Preserve generative/nominal/provider identities, alias graphs, settings
       and principal-versus-selected modes; use exact equality after hash lookup.
-- [ ] Unify only proved equivalent requests, preserve region-local variables,
+- [x] Unify only proved equivalent requests, preserve region-local variables,
       and keep unknown value dependencies conservative.
 
 ## Validation
@@ -55,20 +55,32 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] No duplicate inference regions remain for the same complete canonical
+- [x] No duplicate inference regions remain for the same complete canonical
       body/evidence key.
-- [ ] Any input capable of changing semantics distinguishes keys or declines
+- [x] Any input capable of changing semantics distinguishes keys or declines
       sharing; evidence proves this across retained and portable paths.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: qualified local milestone; revision is recorded after the compiler
+  commit.
+- Validation: Zig 0.17.0; full LLVM native suite and 617 guest/client tests
+  pass; 79 focused native laws pass; 295 Zig files have zero analyzer findings.
+  Strict comparison covers 617 cases / 1,234 invocations with identical
+  diagnostics and Wasm; all teardown records have zero live requested bytes.
+  Initial output executes in 52 guests / 3,148 calls and edited output in 84
+  guests / 10,212 calls, matching retained hashes.
+- Comparison: immutable task-007 baseline and `candidate-canonical/` hashes, 77
+  fresh workloads / 15 alternating pairs and 73 retained/restart workloads /
+  seven pairs are recorded in the durable qualification. Scalar/Box width-128
+  regions fall 269→141 / 267→139, with 127 hits each; median CPU falls
+  3,176→2,814 / 4,408→3,825 µs. Overall median CPU ratio is 0.987.
+- Remaining limitations: incomplete interfaces and unsupported mutable
+  demand/provider inputs decline sharing; nested-callback controls can add
+  allocation overhead. Retained CPU quantization prevents edit speedup claims.
+  Private gdev remains unavailable; task 011 owns allocation follow-up and task
+  084 retains the application allocation/performance targets.
+- Durable record:
+  [session-local canonical specialization](../zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026).
