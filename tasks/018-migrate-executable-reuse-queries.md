@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — implementation and qualification are next.
 - **Dependencies:** [017](017-unify-source-and-revision-validation.md)
 - **Originating requirements:** PLAN: Hill 12 / executable queries. Sources:
   [PLAN.md](../PLAN.md).

@@ -970,7 +970,8 @@
         "fresh_measurement": "source-validation-measurement/report.json",
         "retained_measurement": "source-validation-memory/report.json",
         "proof_measurement": "source-validation-proof-memory/report.json"
-      }
+      },
+      "source_revision": "089efb0b9b29504513bc0808fb20992b09c53f89"
     }
   },
   "drivers": {
