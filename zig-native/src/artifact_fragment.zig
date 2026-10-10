@@ -167,23 +167,36 @@ pub const State = struct {
         return left;
     }
     pub fn find(self: *State, g: anytype, request: artifacts.Request) Allocator.Error!?u32 {
-        if (!self.enabled) return null;
-        for (self.old.metadata.pools.?.functions) |function| {
+        if (!self.enabled or !self.old.executable_queries_complete) return null;
+        var candidates = self.old.executable_queries.candidates(@import("executable_query.zig").fragmentFingerprint(request), .oldest_first);
+        while (candidates.next()) |position| {
+            const record = self.old.executable_queries.records.items[position];
             const same_origin = switch (request) {
-                .named => |key| switch (function.request) {
+                .named => |key| switch (record.key.request) {
                     .named => |old| old.target.binding == key.target.binding and self.sameUnit(old.target.unit, key.target.unit),
                     else => false,
                 },
-                .closure => |key| switch (function.request) {
+                .closure => |key| switch (record.key.request) {
                     .closure => |old| old.catalog == key.catalog and self.sameUnit(old.unit, key.unit),
                     else => false,
                 },
                 else => false,
             };
             if (!same_origin) continue;
-            const job = self.old.emission.functions[function.function].owner;
+            const job = record.value.job;
             if (job == 0 or self.blocked[job - 1]) continue;
-            if (!try self.importer.matches(g, function.request, request)) continue;
+            if (!try self.importer.matches(g, record.key.request, request)) continue;
+            var dependencies_match = true;
+            for (record.dependencies.inline_bodies) |target| if (!self.importer.admitsBody(target)) {
+                dependencies_match = false;
+                break;
+            };
+            if (!dependencies_match) continue;
+            for (record.dependencies.static_reads) |read| if (!try self.matchStatic(g, read)) {
+                dependencies_match = false;
+                break;
+            };
+            if (!dependencies_match) continue;
             self.stats.candidates += 1;
             if (try self.admit(g, job)) return job;
             self.stats.declined += 1;

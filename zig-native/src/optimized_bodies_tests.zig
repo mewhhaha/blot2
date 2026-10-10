@@ -20,6 +20,8 @@ test "optimized bodies survive unrelated edits and keep immutable owned results"
     const before = try assemble(a, &module, null, &old, &stats);
     defer a.free(before);
     try std.testing.expectEqual(@as(usize, 2), stats.optimized);
+    try std.testing.expect(old.queries_complete);
+    try std.testing.expectEqual(@as(usize, 2), old.queries.records.items.len);
     module.functions.items[second].instructions.items[1].operand = 2;
     var current: retained.Capture = .{ .allocator = a };
     defer current.deinit();
@@ -39,6 +41,80 @@ test "optimized bodies survive unrelated edits and keep immutable owned results"
     defer a.free(original);
     try std.testing.expectEqualSlices(u8, before, original);
     try std.testing.expectEqual(@as(usize, 2), stats.reused);
+}
+
+test "executable optimizer queries decline unsealed and saturated results without changing fresh bytes" {
+    const a = std.testing.allocator;
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    const id = try module.addFunction(&.{.i32}, .i32);
+    try module.emit(id, .{ .op = .local_get });
+    const fresh = try module.assemble();
+    defer a.free(fresh);
+    for (0..3) |limit| {
+        var old: retained.Capture = .{ .allocator = a };
+        defer old.deinit();
+        switch (limit) {
+            0 => old.queries.limits.records = 0,
+            1 => old.queries.limits.owned_bytes = 0,
+            2 => old.queries.limits.retained_capacity = 0,
+            else => unreachable,
+        }
+        const before = try module.assembleWithOptions(.{ .current = &old });
+        defer a.free(before);
+        try std.testing.expectEqualSlices(u8, fresh, before);
+        try std.testing.expect(!old.queries_complete);
+        try std.testing.expectEqual(@as(usize, 0), old.queries.records.items.len);
+        var current: retained.Capture = .{ .allocator = a };
+        defer current.deinit();
+        var stats: retained.Stats = .{};
+        const next = try module.assembleWithOptions(.{ .previous = &old, .current = &current, .stats = &stats });
+        defer a.free(next);
+        try std.testing.expectEqualSlices(u8, fresh, next);
+        try std.testing.expectEqual(@as(usize, 0), stats.reused);
+        try std.testing.expectEqual(@as(usize, 1), stats.optimized);
+        // Entries are mandatory optimizer input owners; a caller must not
+        // mistake these complete-looking bytes for published query records.
+        old.queries_complete = false;
+        var matcher = try retained.Matcher.init(a, &old, &current);
+        defer matcher.deinit();
+        try std.testing.expect(!matcher.matches(id));
+    }
+}
+
+test "executable optimizer queries preserve source ordering and omit skipped physical aliases" {
+    const a = std.testing.allocator;
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    for (0..3) |_| {
+        const id = try module.addFunction(&.{.i32}, .i32);
+        try module.emit(id, .{ .op = .local_get });
+    }
+    var old: retained.Capture = .{ .allocator = a };
+    defer old.deinit();
+    const bytes = try module.assembleWithOptions(.{ .current = &old, .share_machine_code = true });
+    defer a.free(bytes);
+    try std.testing.expect(old.queries_complete);
+    try std.testing.expectEqual(@as(usize, 1), old.queries.records.items.len);
+    try std.testing.expectEqual(@as(u32, 0), old.queries.records.items[0].key.source);
+    try std.testing.expect(old.queries.records.items[0].value.ready);
+    try std.testing.expect(!old.entries.items[1].output_ready and !old.entries.items[2].output_ready);
+    var current: retained.Capture = .{ .allocator = a };
+    defer current.deinit();
+    const next = try module.assembleWithOptions(.{ .previous = &old, .current = &current, .share_machine_code = false });
+    defer a.free(next);
+    const fresh = try module.assembleWithOptions(.{ .share_machine_code = false });
+    defer a.free(fresh);
+    try std.testing.expectEqualSlices(u8, fresh, next);
+    try std.testing.expectEqual(@as(usize, 3), current.queries.records.items.len);
+    const fingerprint = current.queries.records.items[0].key.local_fingerprint;
+    var newest = current.queries.candidates(fingerprint, .newest_first);
+    var oldest = current.queries.candidates(fingerprint, .oldest_first);
+    for (0..3) |ordinal| {
+        try std.testing.expectEqual(@as(u32, @intCast(2 - ordinal)), current.queries.records.items[newest.next().?].value.function);
+        try std.testing.expectEqual(@as(u32, @intCast(ordinal)), current.queries.records.items[oldest.next().?].value.function);
+    }
+    try std.testing.expect(newest.next() == null and oldest.next() == null);
 }
 
 test "unchanged callers invalidate when transitive ownership facts change" {

@@ -562,6 +562,7 @@ pub const Module = struct {
             }
             try output.section(10, payload.items());
             payload.clear();
+            if (options.current) |current| try current.sealQueries();
             if (options.stats) |stats| if (options.current) |current| {
                 stats.retained_bytes = current.bytes();
             };

@@ -13,6 +13,45 @@ pub const Capture = struct {
     emission: emitter.Recorder,
     cached_units: usize = 0,
     optimized: ?@import("optimized_bodies.zig").Capture = null,
+    executable_queries: @import("executable_query.zig").FragmentTable = .{},
+    executable_queries_complete: bool = false,
+
+    /// Called only after owned pools, sealed emission and complete job/function
+    /// pairing have passed validation. Graph ordinals remain under this lease.
+    pub fn sealExecutableQueries(self: *Capture) std.mem.Allocator.Error!void {
+        const query = @import("executable_query.zig");
+        const a = self.metadata.allocator;
+        std.debug.assert(self.executable_queries.records.items.len == 0 and !self.executable_queries_complete);
+        const pools = &(self.metadata.pools orelse return);
+        for (pools.functions) |function| {
+            if (function.request != .named and function.request != .closure) continue;
+            const owner = self.emission.functions[function.function].owner;
+            const job = self.metadata.jobs.items[owner - 1];
+            std.debug.assert(job.state == .complete and job.function.? == function.function);
+            if (!job.reusable) continue;
+            const bytes_needed = query.dependencyBytes(core.BindingRef, job.inline_bodies.items.len, metadata.StaticRead, job.static_reads.items.len) orelse {
+                self.executable_queries.saturated +|= 1;
+                return;
+            };
+            if (self.executable_queries.records.items.len >= self.executable_queries.limits.records or bytes_needed > self.executable_queries.limits.owned_bytes -| self.executable_queries.owned_bytes) {
+                self.executable_queries.saturated +|= 1;
+                return;
+            }
+            var builder = query.FragmentTable.begin(a, .{ .request = function.request });
+            defer builder.abort();
+            const bodies = try a.dupe(core.BindingRef, job.inline_bodies.items);
+            var transferred = false;
+            defer if (!transferred) a.free(bodies);
+            builder.read(.{ .inline_bodies = bodies, .static_reads = try a.dupe(metadata.StaticRead, job.static_reads.items), .replay_job = owner, .reusable = job.reusable });
+            transferred = true;
+            builder.stage(.{ .function = function.function, .job = owner });
+            var candidate = builder.complete().?;
+            defer candidate.abort();
+            const prepared = try self.executable_queries.prepare(a, &candidate) orelse return;
+            _ = self.executable_queries.publish(prepared, &candidate);
+        }
+        self.executable_queries_complete = true;
+    }
 
     /// Selection is globally guarded before any retained lookup. This first
     /// admission rejects fresh associated implementations and structural
@@ -71,6 +110,7 @@ pub const Capture = struct {
     }
 
     pub fn deinit(self: *Capture) void {
+        self.executable_queries.deinit(self.metadata.allocator);
         if (self.optimized) |*optimized| optimized.deinit();
         self.emission.deinit();
         self.metadata.deinit();

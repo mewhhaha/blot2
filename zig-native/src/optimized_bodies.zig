@@ -5,6 +5,7 @@ const std = @import("std");
 const ir = @import("runtime_ir.zig");
 const wasm = @import("wasm.zig");
 const lifetimes = @import("wasm_lifetimes.zig");
+const executable = @import("executable_query.zig");
 const A = std.mem.Allocator;
 
 pub const Stats = struct {
@@ -41,8 +42,11 @@ pub const Capture = struct {
     imports: std.ArrayList(u32) = .empty,
     globals: std.ArrayList(ir.ValueType) = .empty,
     arena: ?wasm.Arena = null,
+    queries: executable.OptimizerTable = .{},
+    queries_complete: bool = false,
 
     pub fn deinit(self: *Capture) void {
+        self.queries.deinit(self.allocator);
         for (self.entries.items) |*entry| entry.deinit(self.allocator);
         for (self.signatures.items) |signature| self.allocator.free(signature.parameters);
         self.entries.deinit(self.allocator);
@@ -83,6 +87,59 @@ pub const Capture = struct {
     pub fn output(self: *const Capture, id: usize) ?ir.Body {
         return self.entries.items[id].output;
     }
+    /// Records are sealed in ascending source order, including physical gaps.
+    /// This exact ordinal lookup preserves the same-position fast path without
+    /// granting reuse to unpublished, skipped or saturated inquiries.
+    fn queryAt(self: *const Capture, id: usize) ?*const executable.OptimizerTable.Record {
+        if (!self.queries_complete or self.queries.limits.lookup_work == 0) return null;
+        var first: usize = 0;
+        var end = self.queries.records.items.len;
+        while (first < end) {
+            const middle = first + (end - first) / 2;
+            const record = &self.queries.records.items[middle];
+            if (record.key.source < id) first = middle + 1 else if (record.key.source > id) end = middle else return record;
+        }
+        return null;
+    }
+    /// Seal in source ordinal order after successful assembly, never in worker
+    /// completion order. Skipped physical aliases remain inputs, not results.
+    /// A saturated optional index declines relocation for the entire owner.
+    pub fn sealQueries(self: *Capture) A.Error!void {
+        std.debug.assert(self.queries.records.items.len == 0 and !self.queries_complete);
+        for (self.entries.items, 0..) |entry, id| {
+            if (!entry.output_ready) continue;
+            var call_count: usize = 0;
+            for (entry.source.instructions.items) |inst| if (inst.op == .call) {
+                call_count += 1;
+            };
+            const bytes_needed = executable.dependencyBytes(u32, call_count, lifetimes.Parameter, entry.parameters.len) orelse {
+                self.queries.saturated +|= 1;
+                return;
+            };
+            if (self.queries.records.items.len >= self.queries.limits.records or bytes_needed > self.queries.limits.owned_bytes -| self.queries.owned_bytes) {
+                self.queries.saturated +|= 1;
+                return;
+            }
+            var builder = executable.OptimizerTable.begin(self.allocator, .{ .source = @intCast(id), .local_fingerprint = @import("runtime_body_relocation.zig").hash(entry.source), .tier = self.tier, .arena = self.arena });
+            defer builder.abort();
+            const callees = try self.allocator.alloc(u32, call_count);
+            var transferred = false;
+            defer if (!transferred) self.allocator.free(callees);
+            var cursor: usize = 0;
+            for (entry.source.instructions.items) |inst| if (inst.op == .call) {
+                callees[cursor] = inst.operand;
+                cursor += 1;
+            };
+            builder.read(.{ .callees = callees, .parameters = try self.allocator.dupe(lifetimes.Parameter, entry.parameters), .invalidates = entry.invalidates, .owned_result_bytes = entry.owned_result_bytes, .context_complete = true });
+            transferred = true;
+            builder.stage(.{ .function = @intCast(id), .ready = true });
+            var candidate = builder.complete().?;
+            defer candidate.abort();
+            const prepared = try self.queries.prepare(self.allocator, &candidate) orelse return;
+            _ = self.queries.publish(prepared, &candidate);
+        }
+        self.queries_complete = true;
+    }
     pub fn bytes(self: *const Capture) usize {
         var count = self.entries.items.len * @sizeOf(Entry) + self.signatures.items.len * @sizeOf(ir.Signature) + self.imports.items.len * 4 + self.globals.items.len;
         for (self.entries.items) |entry| {
@@ -90,7 +147,7 @@ pub const Capture = struct {
             if (entry.output) |body| count += body.locals.items.len + body.instructions.items.len * @sizeOf(ir.Instruction);
         }
         for (self.signatures.items) |signature| count += signature.parameters.len;
-        return count;
+        return count + self.queries.owned_bytes + self.queries.capacity_bytes;
     }
 };
 
@@ -134,6 +191,9 @@ pub const Matcher = struct {
     }
     fn matchesPosition(self: *const Matcher, id: usize) bool {
         if (!self.arena_same or !self.same[id] or !self.old.entries.items[id].output_ready) return false;
+        const record = self.old.queryAt(id) orelse return false;
+        if (record.key.tier != self.current.tier or !std.meta.eql(record.key.arena, self.current.arena)) return false;
+        if (!self.summarySame(record.dependencies, self.current.entries.items[id])) return false;
         for (self.current.entries.items[id].source.instructions.items) |inst| switch (inst.op) {
             .call => {
                 // Vectorization reads the callee body. Lifetime analysis reads
@@ -152,6 +212,11 @@ pub const Matcher = struct {
             .global_get, .global_set => if (inst.operand >= self.old.globals.items.len or inst.operand >= self.current.globals.items.len or self.old.globals.items[inst.operand] != self.current.globals.items[inst.operand]) return false,
             else => {},
         };
+        return true;
+    }
+    fn summarySame(_: *const Matcher, before: executable.OptimizerDependencies, after: Entry) bool {
+        if (before.invalidates != after.invalidates or before.owned_result_bytes != after.owned_result_bytes or before.parameters.len != after.parameters.len) return false;
+        for (before.parameters, after.parameters) |left, right| if (!std.meta.eql(left, right)) return false;
         return true;
     }
     pub fn matches(self: *const Matcher, id: usize) bool {
@@ -193,27 +258,18 @@ pub const Matcher = struct {
             if (self.matchesPosition(id)) prior.* = id else missing = true;
         }
         if (!missing) return;
-        var buckets: std.AutoHashMapUnmanaged(u64, usize) = .empty;
-        defer buckets.deinit(self.allocator);
-        const next = try self.allocator.alloc(?usize, self.old.entries.items.len);
-        defer self.allocator.free(next);
-        for (self.old.entries.items, 0..) |entry, id| {
-            next[id] = null;
-            if (!entry.output_ready) continue;
-            const bucket = try buckets.getOrPut(self.allocator, relocation.hash(entry.source));
-            next[id] = if (bucket.found_existing) bucket.value_ptr.* else null;
-            bucket.value_ptr.* = id;
-        }
+        if (!self.old.queries_complete) return;
         var walk: relocation.Walk = .{};
         defer walk.deinit(self.allocator);
         for (self.current.entries.items, self.prior_ids, 0..) |entry, *prior, id| {
             if (prior.* != null) continue;
-            var candidate = buckets.get(relocation.hash(entry.source));
-            var budget: usize = 64;
-            while (candidate) |before| {
-                if (budget == 0) break;
-                budget -= 1;
-                candidate = next[before];
+            var candidates = self.old.queries.candidates(relocation.hash(entry.source), .newest_first);
+            candidates.remaining = @min(candidates.remaining, 64);
+            while (candidates.next()) |position| {
+                const record = self.old.queries.records.items[position];
+                if (record.key.tier != self.current.tier or !std.meta.eql(record.key.arena, self.current.arena)) continue;
+                if (!self.summarySame(record.dependencies, entry)) continue;
+                const before = record.value.function;
                 if (!try self.graphSame(&walk, before, id)) continue;
                 if (self.old.output(before)) |body| {
                     var relocated = try cloneBody(self.allocator, body);

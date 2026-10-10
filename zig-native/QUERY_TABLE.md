@@ -8,9 +8,11 @@ transaction and position-index primitives for refinement; see
 principal and local source-template owners; see
 [its qualification](SPECIALIZATION_PRINCIPAL_QUERIES.md). Task 017 migrates
 singleton source/revision validation records; see
-[its qualification](SOURCE_VALIDATION.md). Executable adapters and portable
-query serialization remain tasks 018–020. Existing claim-specific validation
-gates remain production proof boundaries throughout migration.
+[its qualification](SOURCE_VALIDATION.md). Task 018 implements capture-owned
+fragment and optimizer adapters; see
+[their qualification](EXECUTABLE_QUERIES.md). Portable query serialization
+remains tasks 019–020. Existing claim-specific validation gates remain
+production proof boundaries throughout migration.
 
 ## Claims and owners
 
@@ -194,20 +196,21 @@ a later candidate. Cancellation and OOM are never durable semantic outcomes.
 | Session value slots, demands and plain-nominal state                                                                          | Session operational state; no portable evaluated-value migration is authorized by interface validation                                                                   |
 | Solver occurs/resolution caches, chronological substitutions and indexed constraint worklists                                 | active region internals; no query-table result contains their IDs or substitutes for their laws                                                                          |
 
-Tasks 015–017 implement the common owned record/index/transaction primitives
-with refinement, selected/principal results, local source templates and
-singleton source-validation records. Mandatory revision input owners and the
-optional checked-Core certificate retain separate lifetimes; their singleton
-records need no bucket index. Each following migration retains the old path as a
-comparison oracle until native, executed-Wasm, retained edits, OOM and portable
-parity pass, then removes its superseded index. Dual recording is bounded and
-does not change production diagnostic order. Task 015/016 qualify lookup work
-and retained storage during migration. Task 019 serializes supported complete
-records in dependency and checkpoint paths. Task 020 extends the represented
-semantic graphs for process-boundary persistence, with explicit
-supported/declined domains, reconstructed owners and fresh/retained/
-dependency/restart parity. Keep each claim-specific gate until its replacement
-has the same proof, rather than removing gates because storage is unified.
+Tasks 015–018 implement the common owned record/index/transaction primitives
+with refinement, selected/principal results, local source templates, singleton
+source-validation records and capture-owned executable inquiries. Mandatory
+revision input owners and the optional checked-Core certificate retain separate
+lifetimes; their singleton records need no bucket index. Each following
+migration retains the old path as a comparison oracle until native,
+executed-Wasm, retained edits, OOM and portable parity pass, then removes its
+superseded index. Dual recording is bounded and does not change production
+diagnostic order. Task 015/016 qualify lookup work and retained storage during
+migration. Task 019 serializes supported complete records in dependency and
+checkpoint paths. Task 020 extends the represented semantic graphs for
+process-boundary persistence, with explicit supported/declined domains,
+reconstructed owners and fresh/retained/ dependency/restart parity. Keep each
+claim-specific gate until its replacement has the same proof, rather than
+removing gates because storage is unified.
 
 ## Portable representation and compatibility
 

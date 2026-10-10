@@ -80,6 +80,7 @@ pub fn decode(a: A, compiler: format.Digest, bytes: []const u8) format.Error!bod
     snapshot.imports = &.{};
     result.globals = .fromOwnedSlice(snapshot.globals);
     snapshot.globals = &.{};
+    try result.sealQueries();
     return result;
 }
 fn validTypes(values: []const ir.ValueType) bool {

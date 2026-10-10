@@ -665,3 +665,13 @@ copying source bytes. Checked Core certificates own exact namespace/graph and
 foreign-bound images and grant only validation reuse. Singleton source owners
 retain their separate lifetimes and ordinary admission gates; optional oversized
 certificates rerun validation. See [the qualification](SOURCE_VALIDATION.md).
+
+Executable fragment and optimizer queries own complete read sets and result
+ordinals within an immutable capture lease. Their shared table is sealed in
+source order only after complete job/output ownership is established. Fragment
+lookup preserves oldest-first order and its exact source, selected evidence,
+capture, static-value and chronological replay gates. Optimizer lookup preserves
+newest-first relocation order, exact instruction/signature/context comparisons
+and completed transitive lifetime checks. Unsealed or saturated tables decline,
+including the same-position optimizer path. Semantic interface stability never
+certifies executable consumers. See [the qualification](EXECUTABLE_QUERIES.md).

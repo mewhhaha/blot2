@@ -225,6 +225,7 @@ fn journalCapture(fixture: *const Fixture, reference: Reference, id: u32) !captu
     result.metadata.pools.?.functions = try a.dupe(artifacts.Function, &.{.{ .request = .{ .named = fixture.key() }, .function = 0 }});
     result.emission.seal();
     try result.emission.freezeFunctions(result.metadata.function_jobs.items);
+    try result.sealExecutableQueries();
     return result;
 }
 test "operation admission validates exact entry catalogs in inline references and unused demands" {
@@ -248,6 +249,45 @@ test "operation admission validates exact entry catalogs in inline references an
         try std.testing.expectEqual(@as(?u32, 1), hit);
         try std.testing.expectEqual(before, tableStamp(&current));
     };
+}
+
+test "executable fragment queries decline unsealed and saturated captures while preserving the live request owner" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    var producer = try Generator.init(a, &fixture);
+    defer producer.deinit();
+    const inputs = try buildInputs(&producer, &fixture);
+    for (0..3) |limit| {
+        var old = try journalCapture(&fixture, .instruction, inputs.stable);
+        defer old.deinit();
+        try std.testing.expect(old.executable_queries_complete);
+        try std.testing.expectEqual(@as(usize, 1), old.executable_queries.records.items.len);
+        var current = try Generator.init(a, &fixture);
+        defer current.deinit();
+        const before = tableStamp(&current);
+        var state = try fragment.State.init(a, &old, fixture.units, fixture.names.view(), 1);
+        defer state.deinit();
+        try std.testing.expectEqual(@as(?u32, 1), try state.find(&current, .{ .named = fixture.key() }));
+        old.executable_queries_complete = false;
+        try std.testing.expect(try state.find(&current, .{ .named = fixture.key() }) == null);
+        old.executable_queries.deinit(a);
+        old.executable_queries = .{};
+        switch (limit) {
+            0 => old.executable_queries.limits.records = 0,
+            1 => old.executable_queries.limits.retained_capacity = 0,
+            2 => {
+                // A prefix can be complete locally while the whole optional
+                // table is incomplete. No such partial index authorizes reuse.
+                try old.sealExecutableQueries();
+                old.executable_queries_complete = false;
+            },
+            else => unreachable,
+        }
+        if (limit != 2) try old.sealExecutableQueries();
+        try std.testing.expect(!old.executable_queries_complete);
+        try std.testing.expect(try state.find(&current, .{ .named = fixture.key() }) == null);
+        try std.testing.expectEqual(before, tableStamp(&current));
+    }
 }
 
 fn allocationScenario(allocator: Allocator, fixture: *const Fixture, old: *const artifacts.Pools, inputs: Inputs) !void {

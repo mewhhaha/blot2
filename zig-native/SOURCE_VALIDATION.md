@@ -2,8 +2,8 @@
 
 Task 017 moves successful revision input owners and frozen-Core validation
 certificates onto `semantic_query_table.OwnedRecord(.source_validation)`. The
-implementation is qualified on 10 October 2026; the local milestone revision
-will be recorded after commit.
+implementation is qualified on 10 October 2026 at local milestone
+`089efb0b9b29504513bc0808fb20992b09c53f89`.
 
 There are two typed claims with separate owners. A revision input record owns
 exact settings and source/import observations; a Core validation record owns

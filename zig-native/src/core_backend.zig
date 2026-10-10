@@ -66,6 +66,8 @@ pub const Result = struct {
         canonical: @import("semantic_query_table.zig").Storage = .{},
         source_description: @import("semantic_query_table.zig").Storage = .{},
         open_residual: @import("semantic_query_table.zig").Storage = .{},
+        executable_fragment: @import("semantic_query_table.zig").Storage = .{},
+        executable_optimizer: @import("semantic_query_table.zig").Storage = .{},
     } = .{},
     artifacts: ?ArtifactSummary = null,
     capture: ?artifact_capture.Capture = null,
@@ -2183,6 +2185,9 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         optimized = null;
         metadata_alive = false;
         journal_alive = false;
+        try result.capture.?.sealExecutableQueries();
+        result.query_tables.executable_fragment = result.capture.?.executable_queries.storage();
+        if (result.capture.?.optimized) |*owner| result.query_tables.executable_optimizer = owner.queries.storage();
     }
     result.module_stamps = .{ .computed = module_stamps.computed, .reused = module_stamps.reused, .comparisons = module_stamps.comparisons, .copied = module_stamps.copied };
     timing.capture_us = clock.lap();
