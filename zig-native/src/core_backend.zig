@@ -71,6 +71,7 @@ pub const Result = struct {
     capture: ?artifact_capture.Capture = null,
     reuse: artifact_fragment.Stats = .{},
     principal: principal_evidence_reuse.Stats = .{},
+    source_validation: @import("dependency_certificate.zig").Stats = .{},
     bytes: []u8 = &.{},
     diagnostic: ?Diagnostic = null,
     code_instances: usize = 0,
@@ -2062,6 +2063,11 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     const checkpoint_optimized = if (options.checkpoint) |checkpoint| if (checkpoint.optimizer) |*owned| owned else null else null;
     const optimized_previous = retained_optimized orelse checkpoint_optimized;
     var result: Result = .{ .bytes = try generator.module.assembleWithOptions(.{ .io = options.io, .workers = options.policy.codegen_workers, .tier = options.policy.codegen_tier, .share_machine_code = options.policy.share_machine_code, .previous = optimized_previous, .current = if (optimized) |*owned| owned else null, .stats = &runtime_optimization }), .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps };
+    // A retained Gate lease zeros its work counters. Sum original gates once,
+    // keeping validation work separate from principal-query hits/misses.
+    if (retained) |*state| if (state.importer.code_gate) |*checked| result.source_validation.observe(&checked.semantic);
+    if (principal_state) |*state| result.source_validation.observe(&state.gate);
+    if (query_state) |*state| result.source_validation.observe(&state.gate);
     result.emitted_functions -= runtime_optimization.shared;
     result.runtime_optimization = runtime_optimization;
     timing.assemble_us = clock.lap();
@@ -2120,6 +2126,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         } else if (retained) |*state| if (state.importer.code_gate) |*checked| {
             metadata.pools.?.dependency_certificate = try checked.semantic.freezeValidation(allocator, metadata.pools.?.modules);
         };
+        if (metadata.pools.?.dependency_certificate) |*certificate| result.source_validation.retained = certificate.storage();
         journal.seal();
         try journal.freezeFunctions(metadata.function_jobs.items);
         // These helpers capture values absent from ClosureKey. Full journal

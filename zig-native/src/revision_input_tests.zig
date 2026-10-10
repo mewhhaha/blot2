@@ -335,6 +335,73 @@ test "revision input invalid resolution is owned and repeated without premature 
     try std.testing.expectEqual(@as(usize, 1), snapshot.counts.resolutions);
 }
 
+fn freezeInputs(allocator: std.mem.Allocator, path: []const u8) !void {
+    var snapshot = try inputs.Snapshot.init(allocator, .{});
+    var alive = true;
+    defer if (alive) snapshot.deinit();
+    const canonical = try snapshot.canonical(io, path);
+    const bytes = try snapshot.read(io, canonical);
+    const files = snapshot.files.items.ptr;
+    const source = bytes.ptr;
+    const counts = snapshot.counts;
+    var frozen = snapshot.freeze();
+    alive = false;
+    defer frozen.deinit();
+    try std.testing.expect(frozen.record.dependencies.files.items.ptr == files);
+    try std.testing.expect(frozen.capturedSource(canonical).?.ptr == source);
+    try std.testing.expectEqualDeep(counts, frozen.view().counts);
+    var next = try inputs.Snapshot.init(allocator, .{});
+    defer next.deinit();
+    try std.testing.expect(try next.equalsPrevious(io, frozen.view()));
+    try std.testing.expect(try next.entryEqualsPrevious(io, path, canonical, frozen.view()));
+}
+test "source validation frozen revision record moves each source owner once and survives every acquisition allocation failure" {
+    var dir = std.testing.tmpDir(.{});
+    defer dir.cleanup();
+    try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "entry const answer:U32=42\n" });
+    const path = try dir.dir.realPathFileAlloc(io, "main.blot", a);
+    defer a.free(path);
+    try freezeInputs(a, path);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, freezeInputs, .{path});
+}
+
+test "source validation frozen inputs recheck exact bytes ordered settings and failed import observations" {
+    var dir = std.testing.tmpDir(.{});
+    defer dir.cleanup();
+    const text = "entry const answer:U32=42\n";
+    try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = text });
+    const path = try dir.dir.realPathFileAlloc(io, "main.blot", a);
+    defer a.free(path);
+    const aliases = [_]project.Alias{ .{ .prefix = "one/", .root = "/one" }, .{ .prefix = "two/", .root = "/two" } };
+    var snapshot = try inputs.Snapshot.init(a, .{ .aliases = &aliases });
+    const canonical = try snapshot.canonical(io, path);
+    _ = try snapshot.read(io, canonical);
+    var frozen = snapshot.freeze();
+    defer frozen.deinit();
+    var same = try inputs.Snapshot.init(a, .{ .aliases = &aliases });
+    defer same.deinit();
+    try std.testing.expect(try same.equalsPrevious(io, frozen.view()));
+    const reversed = [_]project.Alias{ aliases[1], aliases[0] };
+    var reordered = try inputs.Snapshot.init(a, .{ .aliases = &reversed });
+    defer reordered.deinit();
+    try std.testing.expect(!try reordered.equalsPrevious(io, frozen.view()));
+    try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = "entry const answer:U32=43\n" });
+    var changed = try inputs.Snapshot.init(a, .{ .aliases = &aliases });
+    defer changed.deinit();
+    try std.testing.expect(!try changed.equalsPrevious(io, frozen.view()));
+    try std.testing.expectEqualStrings(text, frozen.capturedSource(canonical).?);
+    try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = text });
+    var failed = try inputs.Snapshot.init(a, .{});
+    _ = try failed.read(io, canonical);
+    try std.testing.expectError(error.InvalidPath, failed.resolve(path, "unknown/dep"));
+    var auxiliary = failed.freeze();
+    defer auxiliary.deinit();
+    var retry = try inputs.Snapshot.init(a, .{});
+    defer retry.deinit();
+    try std.testing.expect(!try retry.equalsPrevious(io, auxiliary.view()));
+    try std.testing.expectEqual(@as(usize, 1), auxiliary.record.dependencies.imports.items.len);
+}
+
 fn allocationCandidate(allocator: std.mem.Allocator, fixture: *Fixture) !void {
     try fixture.write(original);
     var session = try fixture.session(allocator);

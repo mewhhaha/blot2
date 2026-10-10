@@ -88,7 +88,56 @@ fn certify(allocator: std.mem.Allocator, old: *artifacts.Pools, current: *Fixtur
     try std.testing.expect(gate.enabled and gate.dependencies_validated);
     var certificate = (try gate.freezeValidation(allocator, pins)).?;
     defer certificate.deinit(allocator);
-    try std.testing.expectEqual(pins.len, certificate.modules.len);
+    try std.testing.expectEqual(pins.len, certificate.record.dependencies.modules.len);
+}
+
+test "source validation certificates reject exact graph namespace producer order and foreign bound mutations despite unchanged stamps" {
+    var before = try Fixture.init(a, &.{ independent, "entry const safe = fn (value:U32) => value\n" });
+    defer before.deinit(a);
+    var pinned = try Pinned.init(a, &before);
+    defer pinned.deinit(a);
+    var gate = try Gate.init(a, &pinned.pools, before.units, before.names.view());
+    defer gate.deinit();
+    var certificate = (try gate.freezeValidation(a, pinned.pools.modules)).?;
+    defer certificate.deinit(a);
+    const units = [_]*const core.Module{ &before.units[0], &before.units[1] };
+    const context: @import("frozen_core_validation.zig").Context = .{ .units = &units, .symbol_count = before.names.symbols.len };
+    try std.testing.expect(certificate.matches(context, before.names.view()));
+    try std.testing.expect(certificate.admits(0, pinned.pools.modules[0]));
+    try std.testing.expect(!certificate.admits(0, pinned.pools.modules[1]));
+    try std.testing.expect(!certificate.admits(2, pinned.pools.modules[0]));
+    var changed_bounds = context;
+    changed_bounds.symbol_count = context.symbol_count.? + 1;
+    try std.testing.expect(!certificate.matches(changed_bounds, before.names.view()));
+    changed_bounds = context;
+    changed_bounds.source_length = 1;
+    try std.testing.expect(!certificate.matches(changed_bounds, before.names.view()));
+    const binding_owner = before.units[1].bindings;
+    before.units[1].bindings = binding_owner[0 .. binding_owner.len - 1];
+    try std.testing.expect(!certificate.matches(context, before.names.view()));
+    before.units[1].bindings = binding_owner;
+    const spelling = before.names.bytes[0];
+    before.names.bytes[0] ^= 1;
+    try std.testing.expect(!certificate.matches(context, before.names.view()));
+    before.names.bytes[0] = spelling;
+    std.mem.swap(@TypeOf(before.names.symbols[0]), &before.names.symbols[1], &before.names.symbols[2]);
+    try std.testing.expect(!certificate.matches(context, before.names.view()));
+    std.mem.swap(@TypeOf(before.names.symbols[0]), &before.names.symbols[1], &before.names.symbols[2]);
+    var renamed = pinned.pools.modules[0];
+    renamed.canonical_path = @constCast("/forged/producer.blot");
+    try std.testing.expect(!certificate.admits(0, renamed));
+    const node = root(&before.units[0], "schema");
+    const payload = before.units[0].nodes[node].a;
+    before.units[0].nodes[node].a ^= 1;
+    // Deliberately leave the public fingerprint unchanged. Exact stored bytes
+    // still detect mutation of the previously validated immutable graph.
+    try std.testing.expect(!certificate.admits(0, pinned.pools.modules[0]));
+    before.units[0].nodes[node].a = payload;
+    try std.testing.expect(certificate.admits(0, pinned.pools.modules[0]));
+    try std.testing.expect(certificate.matches(context, before.names.view()));
+    const Certificate = @import("dependency_certificate.zig").Certificate;
+    try std.testing.expect((try Certificate.captureWithBudget(a, context, pinned.pools.modules, before.names.view(), 0)) == null);
+    try std.testing.expect((try Certificate.captureWithBudget(a, context, pinned.pools.modules, before.names.view(), 1024)) == null);
 }
 
 test "published dependency validation certificates retain exact graphs context and failure ownership" {
@@ -114,12 +163,12 @@ test "published dependency validation certificates retain exact graphs context a
 
     // Changing a validator input revokes the certificate even if all pins
     // match. Restore it and it can still be used after this discarded attempt.
-    pinned.pools.dependency_certificate.?.context.symbol_count = 0;
+    pinned.pools.dependency_certificate.?.record.key.symbol_count = 0;
     var uncached = try Gate.init(a, &pinned.pools, current.units, current.names.view());
     defer uncached.deinit();
     try std.testing.expect(uncached.enabled);
     try std.testing.expectEqual(@as(usize, 2), uncached.dependency_validations);
-    pinned.pools.dependency_certificate.?.context.symbol_count = before.names.view().symbols.len;
+    pinned.pools.dependency_certificate.?.record.key.symbol_count = before.names.view().symbols.len;
 
     // A changed retained graph cannot be hidden by replacing its public pin.
     // The certificate owns the digest of the graph actually validated.

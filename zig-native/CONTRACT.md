@@ -659,3 +659,9 @@ evidence. Their common index preserves wire order, and its lazy construction
 releases every partial record on OOM before retry. The version-2 archive
 projection is unchanged. See
 [the migration and qualification](SPECIALIZATION_PRINCIPAL_QUERIES.md).
+
+Successful revision inputs move into a typed source-validation record without
+copying source bytes. Checked Core certificates own exact namespace/graph and
+foreign-bound images and grant only validation reuse. Singleton source owners
+retain their separate lifetimes and ordinary admission gates; optional oversized
+certificates rerun validation. See [the qualification](SOURCE_VALIDATION.md).

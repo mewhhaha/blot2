@@ -5,6 +5,7 @@ const std = @import("std");
 const project = @import("project.zig");
 const D = @import("frozen_dependency.zig");
 const closure = @import("dependency_closure.zig");
+const queries = @import("semantic_query_table.zig");
 const Allocator = std.mem.Allocator;
 pub const overlays = @import("source_overlays.zig");
 comptime {
@@ -43,6 +44,82 @@ const Resolution = struct {
 };
 pub const Counts = struct { canonical_reads: usize = 0, source_reads: usize = 0, resolutions: usize = 0 };
 
+/// Successful source acquisition has a different owner from the mutable
+/// provider. These records describe inputs only; no semantic or emitted result
+/// can be obtained from their validation claim.
+const Settings = struct {
+    options: project.Options,
+    pub fn deinit(self: *Settings, a: Allocator) void {
+        freeOptions(a, self.options);
+    }
+};
+const Observations = struct {
+    paths: std.ArrayList(Entry),
+    files: std.ArrayList(Entry),
+    imports: std.ArrayList(Resolution),
+    pub fn deinit(self: *Observations, a: Allocator) void {
+        for (self.paths.items) |entry| entry.deinit(a);
+        self.paths.deinit(a);
+        for (self.files.items) |entry| entry.deinit(a);
+        self.files.deinit(a);
+        for (self.imports.items) |entry| entry.deinit(a);
+        self.imports.deinit(a);
+    }
+};
+const Acquired = struct {
+    counts: Counts,
+    pub fn deinit(_: *Acquired, _: Allocator) void {}
+};
+pub const Record = queries.OwnedRecord(.source_validation, Settings, Observations, Acquired);
+
+/// A single revision owns exactly one input record, so it needs no bucket or
+/// optional cache capacity. Freezing moves the original buffers without copying
+/// bytes or allocating. Auxiliary failed observations remain explicit and make
+/// unchanged-input admission decline, just as they do on the mutable provider.
+pub const Frozen = struct {
+    allocator: Allocator,
+    record: Record,
+    sources: ?overlays.Set,
+
+    pub fn deinit(self: *Frozen) void {
+        self.record.deinit(self.allocator);
+        if (self.sources) |*sources| sources.deinit();
+        self.* = undefined;
+    }
+    pub fn view(self: *const Frozen) View {
+        return .{ .options = self.record.key.options, .paths = self.record.dependencies.paths.items, .files = self.record.dependencies.files.items, .imports = self.record.dependencies.imports.items, .counts = self.record.value.counts };
+    }
+    pub fn capturedSource(self: *const Frozen, canonical_path: []const u8) ?[]const u8 {
+        return self.view().capturedSource(canonical_path);
+    }
+};
+
+/// Borrowed exact input projection shared by acquisition and frozen records.
+/// It deliberately exposes no mutable provider or filesystem operations.
+pub const View = struct {
+    options: project.Options,
+    paths: []const Entry,
+    files: []const Entry,
+    imports: []const Resolution,
+    counts: Counts,
+    pub fn capturedSource(self: View, canonical_path: []const u8) ?[]const u8 {
+        return switch (Snapshot.get(self.files, canonical_path) orelse return null) {
+            .bytes => |bytes| bytes,
+            .failure => null,
+        };
+    }
+};
+
+fn freeOptions(a: Allocator, options: project.Options) void {
+    if (options.prelude_path) |path| a.free(path);
+    if (options.std_root) |root| a.free(root);
+    for (options.aliases) |alias| {
+        a.free(alias.prefix);
+        a.free(alias.root);
+    }
+    a.free(options.aliases);
+}
+
 pub const Snapshot = struct {
     allocator: Allocator,
     options: project.Options,
@@ -51,6 +128,17 @@ pub const Snapshot = struct {
     imports: std.ArrayList(Resolution) = .empty,
     counts: Counts = .{},
     sources: ?overlays.Set = null,
+
+    pub fn view(self: *const Snapshot) View {
+        return .{ .options = self.options, .paths = self.paths.items, .files = self.files.items, .imports = self.imports.items, .counts = self.counts };
+    }
+    /// Call only after successful compilation. The provider is invalid after
+    /// this ownership transfer; rejected attempts retain their Snapshot.
+    pub fn freeze(self: *Snapshot) Frozen {
+        const frozen: Frozen = .{ .allocator = self.allocator, .record = .{ .key = .{ .options = self.options }, .dependencies = .{ .paths = self.paths, .files = self.files, .imports = self.imports }, .value = .{ .counts = self.counts } }, .sources = self.sources };
+        self.* = undefined;
+        return frozen;
+    }
 
     /// The complete overlay set is copied before any admission or compilation.
     /// Published revisions never borrow the request or caller's source buffers.
@@ -91,13 +179,7 @@ pub const Snapshot = struct {
     pub fn deinit(self: *Snapshot) void {
         const a = self.allocator;
         if (self.sources) |*sources| sources.deinit();
-        if (self.options.prelude_path) |path| a.free(path);
-        if (self.options.std_root) |root| a.free(root);
-        for (self.options.aliases) |alias| {
-            a.free(alias.prefix);
-            a.free(alias.root);
-        }
-        a.free(self.options.aliases);
+        freeOptions(a, self.options);
         for (self.paths.items) |entry| entry.deinit(a);
         self.paths.deinit(a);
         for (self.files.items) |entry| entry.deinit(a);
@@ -216,13 +298,13 @@ pub const Snapshot = struct {
             .failure => null,
         };
     }
-    pub fn entryEqualsPrevious(self: *Snapshot, io: std.Io, requested: []const u8, old_canonical: []const u8, previous: *const Snapshot) Allocator.Error!bool {
+    pub fn entryEqualsPrevious(self: *Snapshot, io: std.Io, requested: []const u8, old_canonical: []const u8, previous: View) Allocator.Error!bool {
         const actual_path = self.canonical(io, requested) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             return false;
         };
         if (!std.mem.eql(u8, actual_path, old_canonical)) return false;
-        const expected = switch (get(previous.files.items, old_canonical) orelse return false) {
+        const expected = switch (get(previous.files, old_canonical) orelse return false) {
             .bytes => |bytes| bytes,
             .failure => return false,
         };
@@ -236,15 +318,15 @@ pub const Snapshot = struct {
     /// Validate all facts consumed by a successful revision against current
     /// reads. Exact source bytes and resolution outcomes are required. Unknown
     /// or failed old observations decline; this is not timestamp admission.
-    pub fn equalsPrevious(self: *Snapshot, io: std.Io, previous: *const Snapshot) Allocator.Error!bool {
+    pub fn equalsPrevious(self: *Snapshot, io: std.Io, previous: View) Allocator.Error!bool {
         const left = self.options;
         const right = previous.options;
         if (left.input_mode != right.input_mode or left.max_source_bytes != right.max_source_bytes or left.max_total_source_bytes != right.max_total_source_bytes or left.max_files != right.max_files or !optionalTextEqual(left.prelude_path, right.prelude_path) or !optionalTextEqual(left.std_root, right.std_root) or left.aliases.len != right.aliases.len) return false;
         for (left.aliases, right.aliases) |actual, old| {
             if (!std.mem.eql(u8, actual.prefix, old.prefix) or !std.mem.eql(u8, actual.root, old.root)) return false;
         }
-        if (previous.files.items.len == 0) return false;
-        for (previous.paths.items) |entry| {
+        if (previous.files.len == 0) return false;
+        for (previous.paths) |entry| {
             const expected = switch (entry.result) {
                 .bytes => |bytes| bytes,
                 .failure => return false,
@@ -255,7 +337,7 @@ pub const Snapshot = struct {
             };
             if (!std.mem.eql(u8, expected, actual)) return false;
         }
-        for (previous.files.items) |entry| {
+        for (previous.files) |entry| {
             const expected = switch (entry.result) {
                 .bytes => |bytes| bytes,
                 .failure => return false,
@@ -266,7 +348,7 @@ pub const Snapshot = struct {
             };
             if (!std.mem.eql(u8, expected, actual)) return false;
         }
-        for (previous.imports.items) |entry| {
+        for (previous.imports) |entry| {
             const expected = switch (entry.result) {
                 .bytes => |bytes| bytes,
                 .failure => return false,

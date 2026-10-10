@@ -26,6 +26,7 @@ pub const Gate = struct {
     reused_dependency_validations: usize = 0,
     dependencies_validated: bool = false,
     validation_symbols: usize = 0,
+    validation_names: ?identity.View = null,
     /// Exact ordered namespace/structure equality, allowing only the narrowly
     /// permitted scalar value bits. This alone does not establish proof validity.
     structural_units: []const bool,
@@ -120,9 +121,9 @@ pub const Gate = struct {
             .{ .units = current_units, .symbol_count = current.symbols.len },
         );
         const old_context: validation.Context = .{ .units = old_units, .symbol_count = previous.symbols.len };
-        const certified_context = if (old.dependency_certificate) |*certificate| certificate.matches(old_context) else false;
+        const certified_context = if (old.dependency_certificate) |*certificate| certificate.matches(old_context, previous) else false;
         for (units, old.modules, structural_units, 0..) |*module, pin, structural, unit| {
-            if (certified_context and old.dependency_certificate.?.admits(unit, pin.stamp)) {
+            if (certified_context and old.dependency_certificate.?.admits(unit, pin)) {
                 // Every pin was checked against its current immutable bytes
                 // above; the certificate also owns its original stamp.
                 result.reused_dependency_validations += 1;
@@ -144,6 +145,7 @@ pub const Gate = struct {
         }
         result.dependencies_validated = true;
         result.validation_symbols = current.symbols.len;
+        result.validation_names = current;
         // All source declarations must have complete bodies. Imported aliases
         // must resolve to such a declaration, never a lexical or absent target.
         for (units, 0..) |module, unit| for (module.bindings[1..], 1..) |binding, id| switch (binding.kind) {
@@ -322,7 +324,7 @@ pub const Gate = struct {
             if (pin.module != module) return null;
             unit.* = module;
         }
-        return try @import("dependency_certificate.zig").Certificate.capture(a, .{ .units = units, .symbol_count = self.validation_symbols }, pins);
+        return try @import("dependency_certificate.zig").Certificate.capture(a, .{ .units = units, .symbol_count = self.validation_symbols }, pins, self.validation_names orelse return null);
     }
 
     fn targetDirty(self: *const Gate, owner: usize, target: core.BindingRef) bool {

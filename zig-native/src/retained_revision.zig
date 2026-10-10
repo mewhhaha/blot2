@@ -55,7 +55,7 @@ const CachedOutput = struct {
 const Current = struct {
     prepared: partial.Prepared,
     artifacts: capture.Capture,
-    snapshot: inputs.Snapshot,
+    snapshot: inputs.Frozen,
     output: ?CachedOutput = null,
     fn deinit(self: *Current, a: Allocator) void {
         // Artifact producer pins are invalid once Prepared's fresh Core dies.
@@ -441,7 +441,7 @@ pub const Session = struct {
         const settings_key = settings(snapshot.options);
         const admitted = std.mem.eql(u8, &self.seed_settings, &settings_key) and try snapshot.admits(io, &self.seed);
         if (admitted) if (self.current) |*current| if (current.output) |output| {
-            if (output.matches(entry_path, output_identity, self.policy) and try snapshot.entryEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1], &current.snapshot) and try snapshot.equalsPrevious(io, &current.snapshot)) {
+            if (output.matches(entry_path, output_identity, self.policy) and try snapshot.entryEqualsPrevious(io, entry_path, current.prepared.paths[current.prepared.entry - 1], current.snapshot.view()) and try snapshot.equalsPrevious(io, current.snapshot.view())) {
                 var emission = try output.emission(a);
                 errdefer emission.deinit(a);
                 const candidate = try a.create(Candidate);
@@ -511,14 +511,15 @@ pub const Session = struct {
                 var cached_output = try CachedOutput.init(a, entry_path, output_identity, &result, prepared.units.len, self.policy);
                 errdefer cached_output.deinit(a);
                 const candidate = try a.create(Candidate);
+                const input_counts = snapshot.counts;
                 candidate.* = .{
                     .allocator = a,
                     .epoch = epoch,
                     .token = epoch.token + 1,
                     .base_revision = self.revisions,
                     .settings_key = settings_key,
-                    .stats = .{ .rebuilt_seed = rebuilt, .inputs = snapshot.counts, .fallback = fallback_counts },
-                    .pending = .{ .prepared = prepared.*, .artifacts = artifacts, .snapshot = snapshot, .output = cached_output },
+                    .stats = .{ .rebuilt_seed = rebuilt, .inputs = input_counts, .fallback = fallback_counts },
+                    .pending = .{ .prepared = prepared.*, .artifacts = artifacts, .snapshot = snapshot.freeze(), .output = cached_output },
                     .seed = candidate_seed,
                     .emission = result,
                 };

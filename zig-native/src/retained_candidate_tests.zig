@@ -569,7 +569,7 @@ test "unchanged-output exact reads preserve current owners through discard commi
     defer initial.deinit(a);
     const before = Stamp.read(&session);
     const core_owner = session.current.?.prepared.units.ptr;
-    const source_owner = session.current.?.snapshot.files.items.ptr;
+    const source_owner = session.current.?.snapshot.record.dependencies.files.items.ptr;
     const output_owner = session.current.?.output.?.bytes.ptr;
     const candidate = try unchangedOutput(&session, &fixture, .{});
     defer candidate.deinit();
@@ -585,7 +585,7 @@ test "unchanged-output exact reads preserve current owners through discard commi
     try std.testing.expectEqual(@as(usize, 2), session.revisions);
     try std.testing.expect(session.last.reused_output);
     try std.testing.expect(session.current.?.prepared.units.ptr == core_owner);
-    try std.testing.expect(session.current.?.snapshot.files.items.ptr == source_owner);
+    try std.testing.expect(session.current.?.snapshot.record.dependencies.files.items.ptr == source_owner);
     try std.testing.expect(session.current.?.output.?.bytes.ptr == output_owner);
     const late = try unchangedOutput(&session, &fixture, .{});
     defer late.deinit();
@@ -838,19 +838,20 @@ const Stamp = struct {
             .failure => |err| metadata.stamp(.{ false, @intFromError(err) }),
         };
     }
-    fn snapshotStamp(snapshot: anytype) [32]u8 {
+    fn snapshotStamp(frozen: anytype) [32]u8 {
+        const snapshot = frozen.view();
         var hash = std.crypto.hash.Blake3.init(.{});
         hash.update(&metadata.stamp(snapshot.options));
         hash.update(&metadata.stamp(snapshot.counts));
-        for (snapshot.paths.items) |entry| {
+        for (snapshot.paths) |entry| {
             hash.update(&metadata.stamp(entry.key));
             hash.update(&outcomeStamp(entry.result));
         }
-        for (snapshot.files.items) |entry| {
+        for (snapshot.files) |entry| {
             hash.update(&metadata.stamp(entry.key));
             hash.update(&outcomeStamp(entry.result));
         }
-        for (snapshot.imports.items) |entry| {
+        for (snapshot.imports) |entry| {
             hash.update(&metadata.stamp(entry.source));
             hash.update(&metadata.stamp(entry.request));
             hash.update(&outcomeStamp(entry.result));
