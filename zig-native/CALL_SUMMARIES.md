@@ -1470,8 +1470,9 @@ ordinary regions.
 
 ### Canonical qualification and remaining limits
 
-Zig **0.17.0**; `deno task test:compiler` passes the full LLVM native suite and
-**617 guest/client tests** (`canonical-full-gate-v2.log`). The focused
+Local compiler milestone `daf9d704ee7048cd2d3d3536c4615842d8eb08b2` (not
+pushed). Zig **0.17.0**; `deno task test:compiler` passes the full LLVM native
+suite and **617 guest/client tests** (`canonical-full-gate-v2.log`). The focused
 canonical/lexical batch passes **79 native laws**; `deno task lint:zig` reports
 **zero findings across 295 Zig files** (`canonical-analyzer-v3.log`). The first
 full guest batch exposed a TypeScript union-narrowing error in the new execution

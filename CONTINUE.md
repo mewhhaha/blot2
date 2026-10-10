@@ -44,10 +44,10 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   the final immutable pin. Five formerly limited deep cases now compile; some
   controls add overhead and diamond32 CPU rises 10.872→19.634 ms. See
   [the component qualification](zig-native/CALL_SUMMARIES.md#joint-recursive-inference-10-october-2026).
-- Task 008 (canonical specialization keys) is complete. Complete Session-owned
-  proofs reconstruct results against current captures with atomic replay. The
-  full native suite, 617 guest/client tests, 617 strict comparisons and
-  zero-findings analyzer pass. Initial/edited execution and
+- Task 008 (canonical specialization keys) is complete at `daf9d70`. Complete
+  Session-owned proofs reconstruct results against current captures with atomic
+  replay. The full native suite, 617 guest/client tests, 617 strict comparisons
+  and zero-findings analyzer pass. Initial/edited execution and
   fresh/retained/restart measurements qualify the immutable pin. Scalar/Box
   repeated-capture regions fall; incomplete interfaces remain conservative. See
   [the canonical qualification](zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026).

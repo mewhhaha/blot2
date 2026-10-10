@@ -64,8 +64,8 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: qualified local milestone; revision is recorded after the compiler
-  commit.
+- Commit: `daf9d704ee7048cd2d3d3536c4615842d8eb08b2` (local milestone; not
+  pushed).
 - Validation: Zig 0.17.0; full LLVM native suite and 617 guest/client tests
   pass; 79 focused native laws pass; 295 Zig files have zero analyzer findings.
   Strict comparison covers 617 cases / 1,234 invocations with identical
