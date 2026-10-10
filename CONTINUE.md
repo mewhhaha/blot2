@@ -51,6 +51,19 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   fresh/retained/restart measurements qualify the immutable pin. Scalar/Box
   repeated-capture regions fall; incomplete interfaces remain conservative. See
   [the canonical qualification](zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026).
+- Task 011 (semantic allocation traffic) is complete in the current local
+  milestone. Stable owner meters and single-copy capture publication pass the
+  full native suite, 618 guest/client tests, 620 strict comparisons and the
+  zero-findings analyzer. Fresh/retained/restart qualification removes measured
+  wide-capture allocation with neutral overall CPU; repeated public revisions
+  plateau and teardown to zero. Small controls can add traffic. See
+  [the allocation qualification](zig-native/SEMANTIC_ALLOCATION.md).
+- Task 014 (typed query design) is complete at `8219cf3`, with final review
+  corrections at `beeae7f`. The shared table and migrations remain tasks
+  015–020. [The durable design](zig-native/QUERY_TABLE.md) keeps open principal
+  templates, completed semantic proofs, source validation, executable behavior
+  and evaluated values distinct, with exact dependency equality and atomic
+  publication.
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -83,33 +96,33 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 011
+## Next steps for task 012
 
-Implement and qualify
-[semantic allocation reduction](tasks/011-reduce-semantic-allocation-traffic.md).
-Keep `build/bench/cloud-principal-graphs/candidate-canonical/` immutable as the
+Implement
+[general private semantic jobs](tasks/012-schedule-independent-semantic-jobs.md).
+Keep `build/bench/cloud-principal-graphs/candidate-allocation/` immutable as the
 baseline. Its compiler SHA-256 is
-`73aafd1e53b68516178f6acb359cfc689239d009b20263472301c97654e0847a`, identity
-`dc7184bf61fd9a6b587ea14302c0cdd1a42eef6eaf4cc7837f7d6034151113f8`, and six-file
-source manifest
-`d38d5a3fbbfb4fba050cad191c072fb071bf84d3d0a4a6a8d1d11a1e59ebc558`. Older
-lexical/component pins remain unchanged. Canonical results cover 617 strict
-comparison cases, 77 fresh workloads and 73 retained/restart workloads.
+`571c1ccab004a8659553a20b10d5eb2e4b1ad9e680999a59156bc7b66af92c36`, identity
+`3be94f26e4252ad0a710459aaa87ac25628bdba41ad034781cc13e56a808185d`, and
+seven-file source manifest
+`ba3728c7d06708969c7a8ed1a015a908c045ee127331daa3b2449f1d33f5bef7`. Older pins
+remain unchanged. Task 011 qualifies 80 fresh workloads and 76 retained/restart
+workloads, plus direct requested-memory evidence on four repeated public graphs.
+The private application gate remains task 084.
 
-Attribute logical solver/scratch allocation separately from backing allocator
-requests, graph cloning, evidence imports and durable publication before
-changing owners. `ClosureRegion.freeze` currently duplicates a capture vector
-with the Session allocator and then copies it again into Session children.
-Remove the redundant buffer while retaining exact aliases, demand identity,
-mapping ownership and OOM recovery. Child freezing can reallocate Session
-arrays: do not retain a borrowed child slice across it or across `makeAggregate`
-capacity growth. Region arenas are stable heap owners; allocator instrumentation
-must not point at a returned-by-value region. Keep region-local binders
-independent and share only immutable graphs with valid owners. Measure fresh,
-population, edit/revert, no-op and restart separately. Under-100-MB private
-workload qualification remains open until task 084 and cannot be inferred from
-public synthetic workloads. Tasks 012 and 014 are also ready after 008; follow
-their written scopes.
+Generalize the existing closed-call proof batch to actual independent semantic
+components with immutable input snapshots, private solver/scratch/import maps
+and diagnostics. The coordinator owns SCC discovery, exact complete keys and
+atomic deterministic publication. Exported-source-interface fan-out alone does
+not complete the task. Newly discovered shared edges need conservative serial
+fallback or component restart before publication. Preserve completed independent
+proofs across other worker failures, stop dispatch on cancellation and join
+started jobs before any borrowed source or allocator is released. Worker-local
+semantic IDs require explicit remapping before parent publication. Test mixed
+results, one-versus-many equivalence, recursive components, cancellation and
+allocation failure. Default parallel enablement belongs to task 013 and needs
+both CPU and wall-time improvement. Task 014's design is complete; task 015 is
+also dependency-ready after the lower-numbered in-progress work.
 
 ## Notes
 

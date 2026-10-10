@@ -825,7 +825,7 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
     }
     var layouts = try Layouts.capture(allocator, &generator.layouts);
     errdefer layouts.deinit(allocator);
-    var evaluator = try generator.evaluator.copySnapshot(allocator);
+    var evaluator = try generator.evaluator.copySnapshotMeasured(allocator);
     errdefer evaluator.deinit(allocator);
     var rows = try Substitutions.capture(allocator, &generator.row_keys);
     errdefer rows.deinit(allocator);

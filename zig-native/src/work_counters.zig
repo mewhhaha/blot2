@@ -9,6 +9,28 @@ pub const Counters = struct {
     /// the current captures without opening a new inference region.
     canonical_specialization_queries: u64 = 0,
     canonical_specialization_hits: u64 = 0,
+    /// Logical successful client growth inside region arenas; these overlap
+    /// backing `memory` totals and must never be added to them.
+    solver_requested_bytes: u64 = 0,
+    solver_allocations: u64 = 0,
+    scratch_requested_bytes: u64 = 0,
+    scratch_allocations: u64 = 0,
+    max_solver_live_bytes: u64 = 0,
+    max_scratch_live_bytes: u64 = 0,
+    /// Subsets of the logical totals, counted only by the outer import.
+    evidence_import_solver_bytes: u64 = 0,
+    evidence_import_scratch_bytes: u64 = 0,
+    /// Exact allocations for owned evaluator snapshot cloning, including its
+    /// evidence snapshot; borrowed snapshots incur none of this traffic.
+    snapshot_copy_bytes: u64 = 0,
+    snapshot_copy_allocations: u64 = 0,
+    /// Durable principal copier buffers (the destination type Store is separate).
+    principal_copy_buffer_bytes: u64 = 0,
+    principal_copy_buffer_allocations: u64 = 0,
+    /// Capture preparation and durable child publication, distinct owners.
+    frozen_capture_temporary_bytes: u64 = 0,
+    frozen_capture_published_bytes: u64 = 0,
+    frozen_edge_scratch_bytes: u64 = 0,
     /// Sum and maximum of type scopes held by one region at release.
     region_scopes: u64 = 0,
     max_region_scopes: u64 = 0,

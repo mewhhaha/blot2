@@ -612,3 +612,14 @@ revalidating reads. All publication capacity is reserved first; the final graph
 and proof-map commit allocates nothing. Mutable creation state and unsupported
 observations decline. Local canonical plans are not portable artifacts; existing
 portable receipt import must prove source pairing and remap all owner handles.
+
+Region allocation meters belong to the heap-stable leased Arena. Solver and
+scratch adapters never point into a returned-by-value region and reset only on a
+new exclusive lease. Logical client requests overlap backing block requests and
+are reported separately. Capture collection retains handles, reacquiring child
+storage after recursive growth. Frozen publication prepares scratch-owned edge
+replacements, reserves all durable arrays, then reacquires/copies the original
+span once; no scratch type ID or temporary allocator pointer enters the result.
+Owned snapshot metering preserves the read-only copy API and returns slices
+freed by its original backing allocator. See
+[semantic allocation ownership](SEMANTIC_ALLOCATION.md).

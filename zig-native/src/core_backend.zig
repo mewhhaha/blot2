@@ -2097,6 +2097,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
             for (state.independent_calls.items) |record| metadata.independent_calls.appendAssumeCapacity(try record.clone(allocator));
         };
         try metadata.capturePoolsWithStamps(&generator, options.identity, stamps);
+        result.counters = generator.evaluator.counters;
         // Publish validation only with this candidate's owned artifact pools.
         // A failed edit leaves the previous certificate and source pins intact.
         if (principal_state) |*state| {

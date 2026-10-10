@@ -5435,3 +5435,59 @@ test "canonical call observations resolve explicit nonsequential source unit ide
     };
     try std.testing.expect(observed);
 }
+
+fn frozenPublicationScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var copied: evaluator.Snapshot = undefined;
+    var selected: evaluator.ValueId = undefined;
+    {
+        var session = try evaluator.Session.init(allocator, &.{module.*});
+        defer session.deinit();
+        session.canonical_specializations.enabled = false;
+        const raw = try session.richValue(target(module, "first"));
+        const info = session.valueInfo(raw);
+        const captures = try allocator.dupe(evaluator.ValueId, session.valueChildren(raw));
+        defer allocator.free(captures);
+        selected = (session.inferEntryClosure(raw) catch |err| {
+            // Child preparation may have completed before a parent reservation
+            // failed. Existing source headers and spans remain immutable.
+            try std.testing.expectEqualDeep(info, session.valueInfo(raw));
+            try std.testing.expectEqualSlices(evaluator.ValueId, captures, session.valueChildren(raw));
+            return err;
+        }) orelse return error.ExpectedConcreteInterface;
+        try std.testing.expectEqualDeep(info, session.valueInfo(raw));
+        try std.testing.expectEqualSlices(evaluator.ValueId, captures, session.valueChildren(raw));
+        try std.testing.expectEqualSlices(evaluator.ValueId, captures, session.valueChildren(selected));
+        try std.testing.expectEqual(@as(u64, 0), session.counters.frozen_capture_temporary_bytes);
+        try std.testing.expectEqual(@as(u64, 32), session.counters.frozen_capture_published_bytes);
+        try std.testing.expect(session.counters.solver_requested_bytes != 0);
+        try std.testing.expect(session.counters.scratch_requested_bytes != 0);
+        copied = try session.copySnapshotMeasured(allocator);
+        try std.testing.expect(session.counters.snapshot_copy_bytes != 0);
+    }
+    defer copied.deinit(allocator);
+    const info = copied.values[selected];
+    try std.testing.expectEqual(@as(u32, 8), info.len);
+    for (copied.children[info.start..][0..info.len], 1..) |capture, expected| {
+        try std.testing.expectEqual(@as(u32, @intCast(expected)), copied.values[capture].bits);
+    }
+}
+
+test "frozen publication preserves wide source captures and owned snapshots at every allocation failure" {
+    var module = try lower(
+        \\const make: U32 -> (U32 -> U32 ! {}) = fn seed => do:
+        \\  let c0 = seed
+        \\  let c1 = @u32.add seed 1
+        \\  let c2 = @u32.add seed 2
+        \\  let c3 = @u32.add seed 3
+        \\  let c4 = @u32.add seed 4
+        \\  let c5 = @u32.add seed 5
+        \\  let c6 = @u32.add seed 6
+        \\  let c7 = @u32.add seed 7
+        \\  return fn value => @u32.add value (@u32.add c0 (@u32.add c1 (@u32.add c2 (@u32.add c3 (@u32.add c4 (@u32.add c5 (@u32.add c6 c7)))))))
+        \\entry const first = make 1
+        \\entry const answer = first 6
+    );
+    defer module.deinit(a);
+    try frozenPublicationScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, frozenPublicationScenario, .{&module});
+}

@@ -43,6 +43,21 @@ pub const Arena = struct {
     capacity: usize = 0,
     large: ?*Large = null,
     available: [bin_count]?*Large = @splat(null),
+    // The Arena is heap-stable and exclusively leased. These adapters measure
+    // logical client requests, not the backing block totals or retained capacity.
+    solver_meter: @import("memory.zig").TrackedAllocator = undefined,
+    scratch_meter: @import("memory.zig").TrackedAllocator = undefined,
+
+    fn beginLease(self: *Arena) void {
+        self.solver_meter = .{ .backing = self.allocator() };
+        self.scratch_meter = .{ .backing = self.allocator() };
+    }
+    pub fn solverAllocator(self: *Arena) A {
+        return self.solver_meter.allocator();
+    }
+    pub fn scratchAllocator(self: *Arena) A {
+        return self.scratch_meter.allocator();
+    }
 
     pub fn allocator(self: *Arena) A {
         return .{ .ptr = self, .vtable = &.{ .alloc = alloc, .resize = resize, .remap = remap, .free = free } };
@@ -209,10 +224,12 @@ pub const Pool = struct {
             self.slot = null;
             self.stats.reused += 1;
             self.stats.retained_bytes = 0;
+            arena.beginLease();
             return arena;
         };
         const arena = try a.create(Arena);
         arena.* = .{ .backing = a };
+        arena.beginLease();
         return arena;
     }
     pub fn give(self: *Pool, arena: *Arena) void {
@@ -324,4 +341,38 @@ test "region arenas preserve live buffers during large remapping shrinking recyc
 test "region arenas preserve aligned live allocations and reset without allocating" {
     try ownershipScenario(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ownershipScenario, .{});
+}
+
+test "region client meters keep nested solver scratch owners separate and reset on lease reuse" {
+    const a = std.testing.allocator;
+    var pool = Pool.init(a);
+    defer pool.deinit();
+    const outer = try pool.take(a);
+    var outer_live = true;
+    defer if (outer_live) pool.give(outer);
+    const solver = outer.solverAllocator();
+    const scratch = outer.scratchAllocator();
+    const pinned = try solver.alloc(u8, 37);
+    @memset(pinned, 19);
+    var growth = try scratch.alloc(u8, 70000);
+    growth = try scratch.realloc(growth, 180000);
+    const inner = try pool.take(a);
+    const nested = try inner.solverAllocator().alloc(u8, 53);
+    try std.testing.expectEqual(@as(usize, 53), inner.solver_meter.counts.allocated_bytes);
+    try std.testing.expectEqual(@as(usize, 37), outer.solver_meter.counts.allocated_bytes);
+    try std.testing.expect(outer.scratch_meter.counts.allocated_bytes >= 180000);
+    try std.testing.expectEqual(@as(usize, 0), inner.scratch_meter.counts.allocated_bytes);
+    inner.solverAllocator().free(nested);
+    pool.give(inner);
+    for (pinned) |byte| try std.testing.expectEqual(@as(u8, 19), byte);
+    solver.free(pinned);
+    scratch.free(growth);
+    try std.testing.expectEqual(@as(usize, 0), outer.solver_meter.counts.live_bytes);
+    try std.testing.expectEqual(@as(usize, 0), outer.scratch_meter.counts.live_bytes);
+    pool.give(outer);
+    outer_live = false;
+    const next = try pool.take(a);
+    defer pool.give(next);
+    try std.testing.expectEqual(@as(usize, 0), next.solver_meter.counts.allocated_bytes);
+    try std.testing.expectEqual(@as(usize, 0), next.scratch_meter.counts.allocated_bytes);
 }

@@ -148,7 +148,7 @@ zero-findings analyzer across 295 Zig files pass. Initial and edited outputs
 execute; 77 fresh and 73 retained/restart workloads qualify the immutable pin.
 Repeated scalar/Box captures reuse proofs while rebuilding current handles;
 incomplete inputs remain conservative. Overall median CPU ratio is 0.987. Task
-[011] is next; [012] and [014] are also dependency-ready.
+[012] is next; [014] is complete and [015] is also dependency-ready.
 [The canonical qualification](../zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026)
 records exact pins, measurements and remaining limits.
 
@@ -385,8 +385,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [008] — Canonicalize specialization keys                | Complete    | [007]                                  |
 | [009] — Cache composite type resolutions                | Complete    | None                                   |
 | [010] — Schedule constraints by variable                | Complete    | [009]                                  |
-| [011] — Reduce semantic allocation traffic              | In progress | [007], [008], [010]                    |
-| [012] — Schedule independent semantic jobs              | Pending     | [007], [008], [010]                    |
+| [011] — Reduce semantic allocation traffic              | Complete    | [007], [008], [010]                    |
+| [012] — Schedule independent semantic jobs              | In progress | [007], [008], [010]                    |
 | [013] — Qualify parallel inference                      | Pending     | [011], [012]                           |
 | [014] — Specify unified query table                     | Complete    | [008]                                  |
 | [015] — Migrate refinement queries                      | Pending     | [014]                                  |

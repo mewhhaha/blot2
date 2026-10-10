@@ -20,6 +20,7 @@ const Allocator = std.mem.Allocator;
 const collection_growth = @import("eval_collection_growth.zig");
 pub const Value = scalar_ops.Value;
 pub const ValueId = u32;
+const FrozenCapture = struct { slot: u32, value: ValueId };
 /// Source interface inquiry owns no values and performs no constant demand.
 pub const SourceInterface = struct { evidence: type_evidence.Id = 0, generic: bool = false, pending: usize = 0, selected: bool = true };
 pub const StartupDependencies = struct {
@@ -1337,6 +1338,16 @@ pub const Session = struct {
     pub fn snapshot(self: *const Session) View {
         return .{ .values = self.values.items, .children = self.children.items, .closures = self.closures.items, .value_evidence = self.value_evidence.items, .type_mappings = self.type_mappings.items, .row_mappings = self.row_mappings.items, .evidence = self.evidence.view(), .value_records = self.value_records.items, .record_layouts = self.record_layouts.items, .field_names = self.field_names.items, .demands = self.demands.items };
     }
+    pub fn copySnapshotMeasured(self: *Session, backing: Allocator) Allocator.Error!Snapshot {
+        // Only slices escape this adapter. Their durable caller frees with the
+        // same backing allocator; no allocator pointer enters the snapshot.
+        var meter: @import("memory.zig").TrackedAllocator = .{ .backing = backing };
+        defer {
+            self.counters.snapshot_copy_bytes += meter.counts.allocated_bytes;
+            self.counters.snapshot_copy_allocations += meter.counts.allocations;
+        }
+        return self.copySnapshot(meter.allocator());
+    }
     pub fn copySnapshot(self: *const Session, allocator: Allocator) Allocator.Error!Snapshot {
         const values = try allocator.dupe(ValueInfo, self.values.items);
         errdefer allocator.free(values);
@@ -1402,6 +1413,34 @@ pub const Session = struct {
         self.values.appendAssumeCapacity(.{ .kind = kind, .nominal = nominal, .bits = tag, .start = start, .len = @intCast(children_.len) });
         self.value_evidence.appendAssumeCapacity(0);
         self.value_records.appendAssumeCapacity(0);
+        return id;
+    }
+    fn copyFrozenAggregate(self: *Session, owner: usize, source: core.Id, original: ValueId, replacements: []const FrozenCapture, metadata: ?ClosureValue) Error!ValueId {
+        const info = self.valueInfo(original);
+        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or info.len > self.options.max_children -| self.children.items.len or info.len > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
+        if (metadata != null and self.closures.items.len >= std.math.maxInt(u32)) return self.failNode(owner, source, .constant_fuel);
+        try self.values.ensureUnusedCapacity(self.allocator, 1);
+        try self.value_evidence.ensureUnusedCapacity(self.allocator, 1);
+        try self.value_records.ensureUnusedCapacity(self.allocator, 1);
+        try self.children.ensureUnusedCapacity(self.allocator, info.len);
+        if (metadata != null) {
+            try self.closures.ensureUnusedCapacity(self.allocator, 1);
+            try self.demands.ensureUnusedCapacity(self.allocator, 1);
+        }
+        const id: ValueId = @intCast(self.values.items.len);
+        const start: u32 = @intCast(self.children.items.len);
+        // The original span ends before this destination. Reacquire it only
+        // after all capacity growth; prepared children are stable handles.
+        self.children.appendSliceAssumeCapacity(self.valueChildren(original));
+        for (replacements) |replacement| self.children.items[start + replacement.slot] = replacement.value;
+        self.values.appendAssumeCapacity(.{ .kind = if (metadata != null) .closure else info.kind, .nominal = if (metadata != null) 0 else info.nominal, .bits = if (metadata != null) @intCast(self.closures.items.len) else info.bits, .start = start, .len = info.len });
+        self.value_evidence.appendAssumeCapacity(0);
+        self.value_records.appendAssumeCapacity(0);
+        if (metadata) |closure_| {
+            self.closures.appendAssumeCapacity(closure_);
+            self.demands.appendAssumeCapacity(.{});
+        }
+        self.counters.frozen_capture_published_bytes += info.len * @sizeOf(ValueId);
         return id;
     }
     fn copyAggregate(self: *Session, owner: usize, source: core.Id, original: ValueId, field: u32, replacement: ValueId) Error!ValueId {
@@ -3988,6 +4027,7 @@ const ClosureRegion = struct {
     code_expectation_remaining: usize = 0,
     /// Pooled solvers keep their occurs counter; this region owns the delta.
     occurs_base: u64 = 0,
+    importing_evidence: bool = false,
 
     fn init(session: *Session) types.Error!ClosureRegion {
         return initWithSolverAllocator(session, null);
@@ -3997,8 +4037,8 @@ const ClosureRegion = struct {
         errdefer if (timing) |scope| scope.deinit();
         const arena = try session.region_arena_pool.take(session.allocator);
         errdefer session.region_arena_pool.give(arena);
-        const allocator = arena.allocator();
-        var region: ClosureRegion = .{ .session = session, .timing = timing, .solver = try types.Store.initWithOptions(solver_allocator orelse allocator, .{ .closed_graphs = true }), .scratch_allocator = allocator, .arena = arena };
+        const allocator = arena.scratchAllocator();
+        var region: ClosureRegion = .{ .session = session, .timing = timing, .solver = try types.Store.initWithOptions(solver_allocator orelse arena.solverAllocator(), .{ .closed_graphs = true }), .scratch_allocator = allocator, .arena = arena };
         region.scratch.projection_cache.allocator = allocator;
         region.occurs_base = region.solver.occurs_steps;
         if (session.inquiry_regions == 0) {
@@ -4033,6 +4073,12 @@ const ClosureRegion = struct {
         self.collector.deinit(self.session.allocator);
         self.solver.deinit();
         self.scratch.deinit(self.scratch_allocator);
+        counters.solver_requested_bytes += self.arena.solver_meter.counts.allocated_bytes;
+        counters.solver_allocations += self.arena.solver_meter.counts.allocations;
+        counters.scratch_requested_bytes += self.arena.scratch_meter.counts.allocated_bytes;
+        counters.scratch_allocations += self.arena.scratch_meter.counts.allocations;
+        counters.max_solver_live_bytes = @max(counters.max_solver_live_bytes, self.arena.solver_meter.counts.peak_bytes);
+        counters.max_scratch_live_bytes = @max(counters.max_scratch_live_bytes, self.arena.scratch_meter.counts.peak_bytes);
         self.session.region_arena_pool.give(self.arena);
         self.scratch = undefined;
     }
@@ -4811,6 +4857,17 @@ const ClosureRegion = struct {
         return fresh;
     }
     fn importEvidence(self: *ClosureRegion, actual: type_evidence.Id, depth: usize) RegionError!types.Id {
+        const nested = self.importing_evidence;
+        const solver_before = self.arena.solver_meter.counts.allocated_bytes;
+        const scratch_before = self.arena.scratch_meter.counts.allocated_bytes;
+        self.importing_evidence = true;
+        defer {
+            self.importing_evidence = nested;
+            if (!nested) {
+                self.session.counters.evidence_import_solver_bytes += self.arena.solver_meter.counts.allocated_bytes - solver_before;
+                self.session.counters.evidence_import_scratch_bytes += self.arena.scratch_meter.counts.allocated_bytes - scratch_before;
+            }
+        }
         if (depth >= self.session.options.max_type_depth) return error.TypeLimit;
         if (actual == 0) return error.UnresolvedType;
         if (actual <= types.never) return actual;
@@ -4977,10 +5034,10 @@ const ClosureRegion = struct {
         try self.seedRows(scope, self.session.row_mappings.items[metadata.row_mappings.start..][0..metadata.row_mappings.len]);
         const existing = self.session.valueEvidence(value_);
         if (existing != 0) try self.solver.unify(root, try self.importEvidence(existing, 0));
-        const captures = try self.session.allocator.dupe(ValueId, self.session.valueChildren(value_));
-        defer self.session.allocator.free(captures);
-        self.unkeyed_capture_inputs = self.unkeyed_capture_inputs or captures.len != 0;
-        for (captures, 0..) |capture, index| {
+        const capture_count = self.session.valueInfo(value_).len;
+        self.unkeyed_capture_inputs = self.unkeyed_capture_inputs or capture_count != 0;
+        for (0..capture_count) |index| {
+            const capture = self.session.valueChildren(value_)[index];
             const formal_source = switch (metadata.origin) {
                 .anonymous => module.binding(module.extra[module.closures[metadata.identity].captures.start + index]).ty,
                 .named => module.bodyParameters(module.body(metadata.identity).?)[index].ty,
@@ -5059,14 +5116,14 @@ const ClosureRegion = struct {
         }
         const scope: u32 = @intCast(self.scratch.sources.items.len);
         try self.scratch.sources.append(self.scratch_allocator, .{ .owner = owner, .value = value_ });
-        const captures = try self.session.allocator.dupe(ValueId, self.session.valueChildren(value_));
-        defer self.session.allocator.free(captures);
+        const capture_count = self.session.valueInfo(value_).len;
         var children: std.ArrayList(types.Id) = .empty;
-        defer children.deinit(self.session.allocator);
-        for (captures, 0..) |capture, index| {
+        defer children.deinit(self.scratch_allocator);
+        for (0..capture_count) |index| {
+            const capture = self.session.valueChildren(value_)[index];
             const child = try self.addValue(capture, depth + 1);
             const formal = self.scratch.sources.items[child].root;
-            try children.append(self.session.allocator, formal);
+            try children.append(self.scratch_allocator, formal);
             try self.scratch.edges.append(self.scratch_allocator, .{ .parent = scope, .child = child, .slot = @intCast(index), .formal = formal });
         }
         const root = switch (info.kind) {
@@ -6475,15 +6532,21 @@ const ClosureRegion = struct {
         }
         for (region.scratch.constraints.items) |constraint| if (constraint.scope != scope) return null;
         for (region.solver.effects.rows.items) |row| if (row.tail == .parameter) return null;
+        var copy_meter: @import("memory.zig").TrackedAllocator = .{ .backing = a };
+        defer {
+            self.session.counters.principal_copy_buffer_bytes += copy_meter.counts.allocated_bytes;
+            self.session.counters.principal_copy_buffer_allocations += copy_meter.counts.allocations;
+        }
+        const buffers = copy_meter.allocator();
         const graph = try a.create(PrincipalGraph);
         errdefer a.destroy(graph);
         graph.* = .{ .key = key, .types = try types.Store.init(a) };
         errdefer graph.deinit(a);
         graph.untracked_reads = dependencies.unknown or dependencies.nested or dependencies.call_reads.items.len != 0 or dependencies.views.items.len != 0;
         for (region.scratch.sources.items) |source| graph.untracked_reads = graph.untracked_reads or source.owner != key.target.unit;
-        graph.dependencies = try a.dupe(core.BindingRef, dependencies.sources.items);
-        graph.plain_reads = try a.dupe(receipt.PlainFact, dependencies.plain_facts.items);
-        var copy: principal_type_graph.NormalizedCopy = .{ .allocator = a, .source = &region.solver, .destination = &graph.types, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
+        graph.dependencies = try buffers.dupe(core.BindingRef, dependencies.sources.items);
+        graph.plain_reads = try buffers.dupe(receipt.PlainFact, dependencies.plain_facts.items);
+        var copy: principal_type_graph.NormalizedCopy = .{ .allocator = buffers, .source = &region.solver, .destination = &graph.types, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
         defer copy.deinit();
         graph.root = try copy.ty(try region.solver.resolve(region.scratch.sources.items[scope].root, 0), 0);
         var import_count: usize = 0;
@@ -6491,7 +6554,7 @@ const ClosureRegion = struct {
         while (imported_keys.next()) |entry| if (entry.scope == scope) {
             import_count += 1;
         };
-        graph.imports = try a.alloc(PrincipalGraph.TypeImport, import_count);
+        graph.imports = try buffers.alloc(PrincipalGraph.TypeImport, import_count);
         var imports = region.scratch.imported.iterator();
         var index: usize = 0;
         while (imports.next()) |entry| {
@@ -6504,7 +6567,7 @@ const ClosureRegion = struct {
         while (row_keys.next()) |entry| if (entry.scope == scope) {
             row_count += 1;
         };
-        graph.rows = try a.alloc(PrincipalGraph.RowImport, row_count);
+        graph.rows = try buffers.alloc(PrincipalGraph.RowImport, row_count);
         var rows = region.scratch.row_variables.iterator();
         index = 0;
         while (rows.next()) |entry| {
@@ -6514,28 +6577,28 @@ const ClosureRegion = struct {
         }
         const residuals = region.scratch.constraints.items[body_constraints..];
         const requirements = region.scratch.constraints.items[0..body_constraints];
-        graph.requirements = try a.dupe(Constraint, requirements);
+        graph.requirements = try buffers.dupe(Constraint, requirements);
         for (graph.requirements) |*constraint| constraint.diagnostic_name = &.{};
         for (graph.requirements, requirements) |*constraint, original| {
-            constraint.diagnostic_name = try a.dupe(u8, original.diagnostic_name);
+            constraint.diagnostic_name = try buffers.dupe(u8, original.diagnostic_name);
             try region.freezePrincipalConstraint(&copy, constraint);
         }
-        graph.constraints = try a.dupe(Constraint, residuals);
+        graph.constraints = try buffers.dupe(Constraint, residuals);
         for (graph.constraints) |*constraint| constraint.diagnostic_name = &.{};
         for (graph.constraints, residuals) |*constraint, original| {
-            constraint.diagnostic_name = try a.dupe(u8, original.diagnostic_name);
+            constraint.diagnostic_name = try buffers.dupe(u8, original.diagnostic_name);
             try region.freezePrincipalConstraint(&copy, constraint);
         }
-        graph.aliases = try a.dupe(DataAlias, region.scratch.data_aliases.items);
+        graph.aliases = try buffers.dupe(DataAlias, region.scratch.data_aliases.items);
         for (graph.aliases) |*alias| {
             alias.instance = try copy.ty(try region.solver.resolve(alias.instance, 0), 0);
             alias.principal = try copy.ty(try region.solver.resolve(alias.principal, 0), 0);
         }
-        graph.functions = try a.dupe(types.Id, region.scratch.source_functions.items);
+        graph.functions = try buffers.dupe(types.Id, region.scratch.source_functions.items);
         for (graph.functions) |*function| function.* = try copy.ty(try region.solver.resolve(function.*, 0), 0);
-        graph.arguments = try a.dupe(core.Id, region.scratch.summary_arguments.items);
-        graph.references = try a.dupe(Target, region.scratch.principal_references.items);
-        graph.actions = try a.dupe(PrincipalGraph.Action, region.scratch.principal_actions.items[body_actions..]);
+        graph.arguments = try buffers.dupe(core.Id, region.scratch.summary_arguments.items);
+        graph.references = try buffers.dupe(Target, region.scratch.principal_references.items);
+        graph.actions = try buffers.dupe(PrincipalGraph.Action, region.scratch.principal_actions.items[body_actions..]);
         for (graph.actions) |*action| if (action.* == .constraint) {
             action.constraint -= @intCast(body_constraints);
         };
@@ -8342,16 +8405,23 @@ const ClosureRegion = struct {
         const source = self.scratch.sources.items[scope];
         const actual = try self.project(source.root);
         if (actual == 0) return error.UnresolvedType;
-        const captures = try self.session.allocator.dupe(ValueId, self.session.valueChildren(source.value));
-        defer self.session.allocator.free(captures);
+        var edge_count: usize = 0;
         for (self.scratch.edges.items) |edge| if (edge.parent == scope) {
-            captures[edge.slot] = try self.freeze(edge.child);
+            edge_count += 1;
+        };
+        const replacements = try self.scratch_allocator.alloc(FrozenCapture, edge_count);
+        defer self.scratch_allocator.free(replacements);
+        self.session.counters.frozen_edge_scratch_bytes += replacements.len * @sizeOf(FrozenCapture);
+        var index: usize = 0;
+        for (self.scratch.edges.items) |edge| if (edge.parent == scope) {
+            replacements[index] = .{ .slot = edge.slot, .value = try self.freeze(edge.child) };
+            index += 1;
         };
         const value_kind = self.session.valueInfo(source.value).kind;
         if (value_kind != .closure and value_kind != .suspension) {
             const info = self.session.valueInfo(source.value);
             if (info.kind == .scalar) return self.session.typedView(source.owner, source.body, source.value, actual);
-            const result = try self.session.makeAggregate(source.owner, source.body, info.kind, info.nominal, info.bits, captures);
+            const result = try self.session.copyFrozenAggregate(source.owner, source.body, source.value, replacements, null);
             self.session.value_records.items[result] = self.session.value_records.items[source.value];
             const typed = try self.session.typedView(source.owner, source.body, result, actual);
             try self.scratch.frozen.put(self.scratch_allocator, scope, typed);
@@ -8362,7 +8432,7 @@ const ClosureRegion = struct {
         defer solved.deinit(self.session.allocator);
         metadata.mappings = try self.session.captureMappings(source.owner, source.body, solved.types);
         metadata.row_mappings = try self.session.captureRowMappings(source.owner, source.body, solved.rows);
-        const header = try self.session.makeClosure(source.owner, source.body, metadata, captures);
+        const header = try self.session.copyFrozenAggregate(source.owner, source.body, source.value, replacements, metadata);
         if (value_kind == .suspension) {
             self.session.values.items[header].kind = .suspension;
             self.session.values.items[header].nominal = self.session.valueInfo(source.value).nominal;
