@@ -122,6 +122,24 @@ test "a generic chain appends obligations linearly" {
     try std.testing.expect(second < 8192);
 }
 
+test "inferred operation wrappers retain their written callee latent rows" {
+    var fixture = try Fixture.init(
+        \\type Signal a is effect = { get: Unit -> a }
+        \\const operation_0: a -> a ! {| e} where { operation Signal.get a } = fn token => Signal.get a ()
+        \\const operation_1 = fn token => do:
+        \\  use result <- operation_0 token
+        \\  return result
+    );
+    defer fixture.deinit();
+    try fixture.valid();
+    for ([_][]const u8{ "operation_0", "operation_1" }) |name| {
+        const binding = fixture.binding(name).?;
+        const arrow = fixture.checked.types.node(binding.scheme.root);
+        try std.testing.expectEqual(@import("types.zig").Effects.Tail.variable, std.meta.activeTag(fixture.checked.types.row(arrow.c).tail));
+        try std.testing.expect(binding.summary.has_explicit);
+    }
+}
+
 test "left operand dispatch wins through a shared callee" {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);
@@ -139,6 +157,42 @@ test "left operand dispatch wins through a shared callee" {
     defer f.deinit();
     try f.valid();
     try std.testing.expect(f.checked.counters.shared_uses > 0);
+}
+
+test "shared written predicates keep computed operands monomorphic and unrelated parameters fresh" {
+    var f = try Fixture.init(
+        \\const keep: a -> b -> b where { associated "add" a a a } = fn value => fn other => do:
+        \\  let ignored = @type.call "add" value value
+        \\  return other
+        \\entry const answer = fn () => do:
+        \\  let selected = case #True of
+        \\    #True => keep
+        \\    #False => keep
+        \\  let integer = selected 21 7
+        \\  return @f32.add (@u32.to_f32 integer) (selected 21 1.5)
+    );
+    defer f.deinit();
+    try f.valid();
+    const keep = f.binding("keep").?;
+    try std.testing.expect(keep.summary.has_explicit and keep.summary.shareable);
+    const flags = f.checked.types.list(keep.summary.requirement_variables);
+    try std.testing.expectEqual(@as(usize, 2), flags.len);
+    const public = f.checked.types.list(keep.summary.public_variables);
+    const arrow = f.checked.types.node(keep.scheme.root);
+    const other = f.checked.types.node(arrow.b);
+    try std.testing.expectEqual(@as(u32, 1), flags[std.mem.findScalar(u32, public, arrow.a).?]);
+    try std.testing.expectEqual(@as(u32, 0), flags[std.mem.findScalar(u32, public, other.a).?]);
+}
+
+test "shared written requirements retain the local computation reference origin" {
+    var f = try Fixture.init(@embedFile("retained-state-fixtures/unmet-qualifier.blot"));
+    defer f.deinit();
+    try f.valid();
+    const answer = f.binding("answer").?;
+    try std.testing.expectEqual(@as(u32, 1), answer.scheme.obligations.len);
+    const requirement = f.checked.obligations[answer.scheme.obligations.start];
+    try std.testing.expectEqual(@import("types.zig").ObligationKind.callee_use, requirement.kind);
+    try std.testing.expectEqualDeep(ast.Span{ .start = 594, .end = 605 }, f.tree.span(requirement.source));
 }
 
 test "a conflicting operand reports the same outcome through a shared callee" {
@@ -164,7 +218,7 @@ test "a conflicting operand reports the same outcome through a shared callee" {
     try std.testing.expect(f.checked.counters.shared_uses > 0);
 }
 
-test "return type polymorphism keeps flat instantiation" {
+test "return type polymorphism preserves independent expected results through shared uses" {
     var source: std.ArrayList(u8) = .empty;
     defer source.deinit(a);
     try source.appendSlice(a, header);
@@ -181,14 +235,39 @@ test "return type polymorphism keeps flat instantiation" {
         \\entry const integer = fn () => do:
         \\  let #Box value:Box U32 = wide 21
         \\  return value
+        \\entry const floating = fn () => do:
+        \\  let #Box value:Box F32 = wide 1.5
+        \\  return value
         \\
     );
     var f = try Fixture.init(source.items);
     defer f.deinit();
     try f.valid();
-    // Ordinary arithmetic inside the body can still share its producer.
-    try std.testing.expect(!f.binding("from").?.summary.shareable);
-    try std.testing.expect(!f.binding("wide").?.summary.shareable);
+    try std.testing.expect(f.binding("from").?.summary.shareable);
+    try std.testing.expect(f.binding("wide").?.summary.shareable);
+    try std.testing.expect(f.checked.counters.shared_uses > 0);
+    for ([_][]const u8{ "integer", "floating" }) |name| {
+        const entry = f.binding(name).?;
+        for (f.checked.obligations[entry.scheme.obligations.start..][0..entry.scheme.obligations.len]) |predicate|
+            try std.testing.expect(predicate.kind != .callee_use);
+    }
+}
+
+test "result directed principal diamonds keep frontend work bounded by distinct bodies" {
+    for ([_]usize{ 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "const f_0 = fn value => @type.result \"from\" value\n");
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const generic = fn value => f_{d} value\n", .{depth});
+        var f = try Fixture.init(text.items);
+        defer f.deinit();
+        try f.valid();
+        try std.testing.expect(f.binding("f_0").?.summary.shareable);
+        try std.testing.expect(f.checked.counters.obligations_appended < depth * 16 + 64);
+        try std.testing.expect(f.checked.counters.pending_peak < depth * 16 + 64);
+        try std.testing.expect(f.binding("generic").?.scheme.obligations.len <= 2);
+    }
 }
 
 test "mutually recursive generic functions keep flat obligations" {

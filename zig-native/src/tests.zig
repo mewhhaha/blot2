@@ -37,6 +37,7 @@ comptime {
     _ = @import("parser.zig");
     _ = @import("parser_tests.zig");
     _ = @import("types.zig");
+    _ = @import("principal_type_graph.zig");
     _ = @import("nominal_argument_borrow_tests.zig");
     _ = @import("solver_scratch_tests.zig");
     _ = @import("check.zig");

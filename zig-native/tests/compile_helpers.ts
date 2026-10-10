@@ -32,7 +32,7 @@ export function equal(actual: unknown, expected: unknown): void {
   if (!Object.is(actual, expected)) throw new Error(`Expected ${String(expected)}, received ${String(actual)}`);
 }
 
-export async function compileExpectedFailure(source: string, code: string, message?: string, options: { prelude?: string; stdRoot?: string } = {}): Promise<void> {
+export async function compileExpectedFailure(source: string, code: string, message?: string, options: { prelude?: string; stdRoot?: string; span?: readonly [number, number] } = {}): Promise<void> {
   const dir = await Deno.makeTempDir({ dir: new URL("../../build", import.meta.url).pathname, prefix: "zig-native-failure-" });
   try {
     const input = `${dir}/program.blot`;
@@ -45,6 +45,10 @@ export async function compileExpectedFailure(source: string, code: string, messa
     const diagnostic = records.find(record => record.kind === "diagnostic");
     const metrics = records.find(record => record.kind === "compilation");
     equal(diagnostic?.code, code);
+    if (options.span !== undefined) {
+      equal(diagnostic?.start, options.span[0]);
+      equal(diagnostic?.end, options.span[1]);
+    }
     if (message !== undefined) equal(diagnostic.message, message);
     equal(metrics?.success, false);
     equal(metrics?.memory.live_bytes, 0);

@@ -720,7 +720,7 @@ entry const answer = fn () => do:
   )
   return @f32.add (@u32.to_f32 value32) valuef
 entry const folded = answer ()
-`, "missing_associated", undefined, { prelude: "none" });
+`, "missing_associated", undefined, { prelude: "none", span: [594, 605] });
 });
 
 Deno.test("retained State selected proof rejects invoked-missing-member", async () => {

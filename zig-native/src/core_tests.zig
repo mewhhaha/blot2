@@ -256,6 +256,37 @@ const Fixture = struct {
     }
 };
 
+fn sharedHeaderPublication(allocator: std.mem.Allocator, fixture: *const Fixture) !void {
+    var module = try fixture.lower(allocator);
+    defer module.deinit(allocator);
+    for (0..4) |i| {
+        const binding = module.binding(fixture.binding(i));
+        try std.testing.expect(binding.has_explicit);
+        const dependencies = module.declaration_dependencies[binding.body_id];
+        var found = false;
+        for (module.dependency_members[dependencies.members.start..][0..dependencies.members.len]) |member| {
+            if (member.name != 0 and std.mem.eql(u8, fixture.pool.get(member.name), "add")) found = true;
+        }
+        try std.testing.expect(found);
+    }
+    const factory = module.body(fixture.binding(2)).?;
+    try std.testing.expect(!factory.is_function);
+    try std.testing.expectEqual(types.ObligationKind.callee_use, module.obligations[factory.scheme.obligations.start].kind);
+}
+
+test "shared written headers retain factory requirements and declaration candidates after publication" {
+    var fixture = try Fixture.init(
+        \\const twice: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
+        \\const alias = fn value => twice value
+        \\const factory: U32 -> U32 = do:
+        \\  return alias
+        \\entry const answer = fn (value: U32) => factory value
+    );
+    defer fixture.deinit();
+    try sharedHeaderPublication(a, &fixture);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, sharedHeaderPublication, .{&fixture});
+}
+
 test "one typed body retains principal numeric identity across U32 and F32 uses" {
     const source =
         \\infixl 60 (+) = _fixity_add

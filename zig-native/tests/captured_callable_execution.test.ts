@@ -121,7 +121,7 @@ Deno.test("retained callable captured-original JSPI", async () => {
 });
 
 Deno.test("retained callable rejects bound-cache-missing", async () => {
-  await compileExpectedFailure("data First = #First { value: U32 }\ndata Second = #Second { value: U32 }\nconst First.plus = fn box => fn delta => @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = fn box => do:\n  let bound = box.plus\n  return bound 1\nentry const answer = fn () => @u32.add (invoke (#First { value: 40 })) (invoke (#Second { value: 40 }))\nentry const folded = answer ()\n", "missing_member", undefined, { prelude: "none" });
+  await compileExpectedFailure("data First = #First { value: U32 }\ndata Second = #Second { value: U32 }\nconst First.plus = fn box => fn delta => @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = fn box => do:\n  let bound = box.plus\n  return bound 1\nentry const answer = fn () => @u32.add (invoke (#First { value: 40 })) (invoke (#Second { value: 40 }))\nentry const folded = answer ()\n", "missing_member", undefined, { prelude: "none", span: [335, 341] });
 });
 
 Deno.test("retained callable rejects captured-wrong-row", async () => {

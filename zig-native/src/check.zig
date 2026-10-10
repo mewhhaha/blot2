@@ -116,6 +116,13 @@ pub const SchemeSummary = struct {
     public_rows: T.List = .{},
     /// One flag per public variable: it occurs in a parameter type.
     public_inputs: T.List = .{},
+    public_outputs: T.List = .{},
+    only_result_selected: bool = false,
+    /// Predicate-connected public slots retain the computed-value restriction
+    /// even when the predicates themselves are behind shared references.
+    requirement_variables: T.List = .{},
+    requirement_rows: T.List = .{},
+    has_explicit: bool = false,
     /// Only schemes made of position-independent obligations are shared.
     shareable: bool = false,
 };
@@ -3951,6 +3958,9 @@ const Engine = struct {
             }
         }
     }
+    fn explicitRequirement(self: *const Engine, value: T.Obligation) bool {
+        return value.explicit or (value.kind == .callee_use and self.bindings.items[value.identity.decl].summary.has_explicit);
+    }
     fn scheme(self: *Engine, root: T.Id, excluded: []const T.Id, group: []const BindingId, capture_concrete: bool, certificate_owner: BindingId, qualification_scope: ast.Id) T.Error!T.Scheme {
         try self.solveFields();
         if (capture_concrete) try self.expandInformedUses(group, false);
@@ -3968,7 +3978,7 @@ const Engine = struct {
         }
         for (self.pending.items, 0..) |pending, index| {
             if (pending.solved or pending.covered or pending.local_scheme or !inList(group, pending.owner) or (pending.declared and pending.scope != qualification_scope)) continue;
-            if (!capture_concrete and pending.value.explicit and index < self.local_requirements_start) continue;
+            if (!capture_concrete and self.explicitRequirement(pending.value) and index < self.local_requirements_start) continue;
             var qualified = false;
             for (self.qualifications.items) |boundary| if (boundary.scope == qualification_scope) {
                 qualified = true;
@@ -3977,7 +3987,14 @@ const Engine = struct {
             if (qualified and !pending.declared and pending.scope == qualification_scope and sourceRequirement(pending.value.kind)) continue;
             var predicate_free: std.ArrayList(T.Id) = .empty;
             defer predicate_free.deinit(self.allocator);
-            for ([_]T.Id{ pending.value.ty, pending.value.other, pending.value.result, pending.value.signature }) |part| {
+            var parts: std.ArrayList(T.Id) = .empty;
+            defer parts.deinit(self.allocator);
+            if (!capture_concrete and pending.value.kind == .callee_use and self.bindings.items[pending.value.identity.decl].summary.has_explicit) {
+                try self.requirementParts(pending.value, &parts);
+            } else {
+                for ([_]T.Id{ pending.value.ty, pending.value.other, pending.value.result, pending.value.signature }) |part| if (part != 0) try parts.append(self.allocator, part);
+            }
+            for (parts.items) |part| {
                 if (part == 0) continue;
                 const vars = try self.types.freeVariables(part);
                 defer self.allocator.free(vars);
@@ -3985,7 +4002,7 @@ const Engine = struct {
             }
             var predicate_rows: std.ArrayList(u32) = .empty;
             defer predicate_rows.deinit(self.allocator);
-            for ([_]T.Id{ pending.value.ty, pending.value.other, pending.value.result, pending.value.signature }) |part| {
+            for (parts.items) |part| {
                 if (part == 0) continue;
                 const rows = try self.types.freeRowVariables(part);
                 defer self.allocator.free(rows);
@@ -4063,7 +4080,7 @@ const Engine = struct {
             progress = false;
             for (candidates.items) |*candidate| {
                 const pending = self.pending.items[candidate.index];
-                var retained = candidate.retained or pending.method_member or pending.value.explicit or (capture_concrete and (pending.value.kind == .dispatch or pending.value.kind == .result_dispatch or pending.value.kind == .monad_factory or pending.value.kind == .resolver_dispatch or pending.value.kind == .resolver_shape or pending.value.kind == .effect_operation or pending.value.kind == .effect_handler or pending.value.kind == .type_head or pending.value.kind == .callee_use) and !pending.suspended);
+                var retained = candidate.retained or pending.method_member or self.explicitRequirement(pending.value) or (capture_concrete and (pending.value.kind == .dispatch or pending.value.kind == .result_dispatch or pending.value.kind == .monad_factory or pending.value.kind == .resolver_dispatch or pending.value.kind == .resolver_shape or pending.value.kind == .effect_operation or pending.value.kind == .effect_handler or pending.value.kind == .type_head or pending.value.kind == .callee_use) and !pending.suspended);
                 if (!retained) for (candidate.variables) |variable| if (inList(variables.items, variable)) {
                     retained = true;
                     break;
@@ -4111,13 +4128,13 @@ const Engine = struct {
             const pending = self.pending.items[candidate.index];
             try self.obligations.append(self.allocator, .{ .ty = try self.types.resolve(pending.value.ty, 0), .kind = pending.value.kind, .source = pending.value.source, .name = pending.value.name, .result = if (pending.value.result == 0) 0 else try self.types.resolve(pending.value.result, 0), .other = if (pending.value.other == 0) 0 else try self.types.resolve(pending.value.other, 0), .signature = if (pending.value.signature == 0) 0 else try self.types.resolve(pending.value.signature, 0), .operator = pending.value.operator, .identity = pending.value.identity, .explicit = pending.value.explicit, .qualification_span = pending.value.qualification_span, .qualification_unit = pending.value.qualification_unit });
             self.pending.items[candidate.index].suspended = true;
-            if (!capture_concrete and pending.value.explicit) self.pending.items[candidate.index].local_scheme = true;
+            if (!capture_concrete and self.explicitRequirement(pending.value)) self.pending.items[candidate.index].local_scheme = true;
         }
         return .{ .root = closed.root, .variables = span, .row_variables = try self.types.saveList(row_variables.items), .closed_rows = closed.closed_rows, .obligations = .{ .start = start, .len = @intCast(self.obligations.items.len - start) } };
     }
     fn sharedKind(kind: T.ObligationKind) bool {
         return switch (kind) {
-            .dispatch, .field, .writable_field, .collection, .record_merge, .update, .callee_use => true,
+            .dispatch, .result_dispatch, .field, .writable_field, .receiver, .collection, .record_merge, .update, .effect_operation, .type_rep, .effect_rep, .callee_use => true,
             else => false,
         };
     }
@@ -4125,15 +4142,21 @@ const Engine = struct {
     /// outcome is a function of closed types qualify; everything else keeps
     /// the flat instantiation.
     fn summarize(self: *Engine, principal: T.Scheme) T.Error!SchemeSummary {
-        var summary: SchemeSummary = .{ .shareable = principal.root != 0 and principal.obligations.len != 0 };
+        var summary: SchemeSummary = .{ .shareable = principal.root != 0 and principal.obligations.len != 0, .only_result_selected = principal.obligations.len != 0 };
         var flat: u64 = 0;
         for (self.obligations.items[principal.obligations.start..][0..principal.obligations.len]) |constraint| {
-            if (!sharedKind(constraint.kind) or constraint.explicit or constraint.qualification_span != null) summary.shareable = false;
+            if (!sharedKind(constraint.kind)) summary.shareable = false;
+            summary.has_explicit = summary.has_explicit or constraint.explicit;
             if (constraint.kind == .callee_use) {
                 const callee = self.bindings.items[constraint.identity.decl].summary;
                 if (!callee.shareable) summary.shareable = false;
+                summary.has_explicit = summary.has_explicit or callee.has_explicit;
+                summary.only_result_selected = summary.only_result_selected and callee.only_result_selected;
                 flat += callee.flat_size;
-            } else flat += 1;
+            } else {
+                summary.only_result_selected = summary.only_result_selected and constraint.kind == .result_dispatch;
+                flat += 1;
+            }
         }
         summary.flat_size = @intCast(@min(flat, 1 << 30));
         if (principal.root == 0) return summary;
@@ -4164,6 +4187,31 @@ const Engine = struct {
         defer self.allocator.free(flags);
         for (public.items, flags) |variable, *flag| flag.* = @intFromBool(inList(parameter_free.items, variable));
         summary.public_inputs = try self.types.saveList(flags);
+        const result_free = try self.types.freeVariables(cursor);
+        defer self.allocator.free(result_free);
+        for (public.items, flags) |variable, *flag| flag.* = @intFromBool(inList(result_free, variable));
+        summary.public_outputs = try self.types.saveList(flags);
+        var requirements: std.ArrayList(T.Id) = .empty;
+        defer requirements.deinit(self.allocator);
+        for (self.obligations.items[principal.obligations.start..][0..principal.obligations.len]) |constraint| try self.requirementParts(constraint, &requirements);
+        var requirement_variables: std.ArrayList(T.Id) = .empty;
+        defer requirement_variables.deinit(self.allocator);
+        var requirement_rows: std.ArrayList(u32) = .empty;
+        defer requirement_rows.deinit(self.allocator);
+        for (requirements.items) |part| {
+            const variables = try self.types.freeVariables(part);
+            defer self.allocator.free(variables);
+            try requirement_variables.appendSlice(self.allocator, variables);
+            const rows = try self.types.freeRowVariables(part);
+            defer self.allocator.free(rows);
+            try requirement_rows.appendSlice(self.allocator, rows);
+        }
+        for (public.items, flags) |variable, *flag| flag.* = @intFromBool(inList(requirement_variables.items, variable));
+        summary.requirement_variables = try self.types.saveList(flags);
+        const row_flags = try self.allocator.alloc(u32, public_rows.items.len);
+        defer self.allocator.free(row_flags);
+        for (public_rows.items, row_flags) |row, *flag| flag.* = @intFromBool(inList(requirement_rows.items, row));
+        summary.requirement_rows = try self.types.saveList(row_flags);
         summary.public_variables = try self.types.saveList(public.items);
         summary.public_rows = try self.types.saveList(public_rows.items);
         return summary;
@@ -5294,15 +5342,18 @@ const Engine = struct {
     }
     fn blockComputedRequirements(self: *Engine, start: usize, qualified: bool) T.Error!void {
         var explicit = false;
-        for (self.pending.items[start..]) |pending| if (pending.owner == self.current and pending.scope == self.qualification_scope and !pending.solved and !pending.covered and pending.value.explicit) {
+        for (self.pending.items[start..]) |pending| if (pending.owner == self.current and pending.scope == self.qualification_scope and !pending.solved and !pending.covered and self.explicitRequirement(pending.value)) {
             explicit = true;
             break;
         };
         if (!explicit) return;
+        var parts: std.ArrayList(T.Id) = .empty;
+        defer parts.deinit(self.allocator);
         for (self.pending.items[start..]) |pending| {
-            if (pending.owner != self.current or pending.scope != self.qualification_scope or pending.solved or pending.covered or !sourceRequirement(pending.value.kind) or (qualified and !pending.declared)) continue;
-            for ([_]T.Id{ pending.value.ty, pending.value.other, pending.value.result, pending.value.signature }) |part| {
-                if (part == 0) continue;
+            if (pending.owner != self.current or pending.scope != self.qualification_scope or pending.solved or pending.covered or (qualified and !pending.declared)) continue;
+            parts.clearRetainingCapacity();
+            try self.requirementParts(pending.value, &parts);
+            for (parts.items) |part| {
                 const values = try self.types.freeVariables(part);
                 defer self.allocator.free(values);
                 for (values) |variable| if (!inList(self.computed_variables.items, variable)) try self.computed_variables.append(self.allocator, variable);
@@ -5310,6 +5361,17 @@ const Engine = struct {
                 defer self.allocator.free(rows);
                 for (rows) |row| if (!inList(self.computed_rows.items, row)) try self.computed_rows.append(self.allocator, row);
             }
+        }
+    }
+    fn requirementParts(self: *Engine, requirement: T.Obligation, output: *std.ArrayList(T.Id)) T.Error!void {
+        if (requirement.kind == .callee_use) {
+            const summary = self.bindings.items[requirement.identity.decl].summary;
+            const product = self.types.node(try self.types.resolve(requirement.ty, 0));
+            const instance = self.types.list(.{ .start = product.a, .len = product.b });
+            for (instance[0..summary.public_variables.len], self.types.list(summary.requirement_variables)) |part, flag| if (flag != 0) try output.append(self.allocator, part);
+            for (instance[summary.public_variables.len..], self.types.list(summary.requirement_rows)) |part, flag| if (flag != 0) try output.append(self.allocator, part);
+        } else if (sourceRequirement(requirement.kind)) {
+            for ([_]T.Id{ requirement.ty, requirement.other, requirement.result, requirement.signature }) |part| if (part != 0) try output.append(self.allocator, part);
         }
     }
     fn addResolverOp(self: *Engine, value: ResolverOp, explicit: bool) T.Error!u32 {
@@ -6517,7 +6579,33 @@ const Engine = struct {
                 }
             }
         }
-        if (!input_partial and input_open) return false;
+        if (callee.summary.only_result_selected) {
+            var result_ready = true;
+            for (self.types.list(callee.summary.public_outputs), instance[0..type_count]) |output, actual| if (output != 0 and !try self.types.equalClosed(actual, actual)) {
+                result_ready = false;
+                break;
+            };
+            // Only a fixed destination can infer an input for this class of
+            // schemes. Keep unknown destinations as graph edges even when an
+            // argument has already supplied a concrete type.
+            if (!result_ready) return false;
+            // With every public type and operation row already fixed, this
+            // use has no frontend inference result to export. Preserve its
+            // residual edge for mandatory Core checking instead of unfolding
+            // the same closed diamond at the expansion-depth boundary.
+            if (plain and open.items.len == 0) return false;
+        } else if (!input_partial and input_open) return false;
+        // Written requirements stay at their original reference until Core
+        // checks them. With every public data type already closed there is no
+        // frontend result inference to obtain by unfolding their graph.
+        if (callee.summary.has_explicit and plain and !input_partial) {
+            var data_closed = true;
+            for (open.items) |position| if (position < type_count) {
+                data_closed = false;
+                break;
+            };
+            if (data_closed) return false;
+        }
         self.counters.use_expansions += 1;
         if (input_partial or !plain or self.expansion_depth >= 64) {
             self.pending.items[index].solved = true;
@@ -6725,7 +6813,20 @@ const Engine = struct {
                 const item = self.pending.items[i];
                 if (item.solved or item.suspended or item.value.kind != .callee_use or !inList(group, item.owner)) continue;
                 const product = self.types.node(try self.types.resolve(item.value.ty, 0));
-                const type_count = self.bindings.items[item.value.identity.decl].summary.public_variables.len;
+                const summary = self.bindings.items[item.value.identity.decl].summary;
+                const type_count = summary.public_variables.len;
+                if (!recursive and summary.only_result_selected) {
+                    if (try self.resolveUse(i)) changed = true;
+                    continue;
+                }
+                if (!recursive and summary.has_explicit) {
+                    var closed = true;
+                    for (self.types.list(.{ .start = product.a, .len = product.b })[0..type_count]) |part| if (!try self.types.equalClosed(part, part)) {
+                        closed = false;
+                        break;
+                    };
+                    if (closed) continue;
+                }
                 var informed = recursive;
                 for (self.types.list(.{ .start = product.a, .len = product.b })[0..type_count]) |part| if (self.types.node(part).tag != .variable) {
                     informed = true;

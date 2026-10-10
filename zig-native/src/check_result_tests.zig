@@ -56,8 +56,21 @@ test "result directed schemes retain input and expected output across aliases an
             try std.testing.expectEqual(@as(u32, 2), binding.scheme.variables.len);
             try std.testing.expectEqual(@as(u32, 1), binding.scheme.obligations.len);
             const predicate = f.checked.obligations[binding.scheme.obligations.start];
-            try std.testing.expectEqual(T.ObligationKind.result_dispatch, predicate.kind);
-            try std.testing.expectEqualStrings("from", f.pool.get(predicate.name));
+            if (std.mem.eql(u8, name, "from")) {
+                try std.testing.expectEqual(T.ObligationKind.result_dispatch, predicate.kind);
+                try std.testing.expectEqualStrings("from", f.pool.get(predicate.name));
+            } else {
+                try std.testing.expectEqual(T.ObligationKind.callee_use, predicate.kind);
+                const original = f.checked.bindings[predicate.identity.decl];
+                try std.testing.expectEqualStrings("from", f.pool.get(original.name));
+                const requirement = f.checked.obligations[original.scheme.obligations.start];
+                try std.testing.expectEqual(T.ObligationKind.result_dispatch, requirement.kind);
+                const product = f.checked.types.node(predicate.ty);
+                const arguments = f.checked.types.list(.{ .start = product.a, .len = product.b });
+                const arrow = f.checked.types.node(binding.scheme.root);
+                try std.testing.expect(std.mem.findScalar(T.Id, arguments, arrow.a) != null);
+                try std.testing.expect(std.mem.findScalar(T.Id, arguments, arrow.b) != null);
+            }
         }
         if (std.mem.eql(u8, name, "integer") or std.mem.eql(u8, name, "floating")) {
             try std.testing.expectEqual(if (std.mem.eql(u8, name, "integer")) T.u32_type else T.f32_type, f.checked.types.node(binding.scheme.root).b);

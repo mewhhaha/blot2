@@ -126,39 +126,49 @@ grants no executable or compile-time-value reuse; those dependencies rebuild.
 
 Call summaries give each closed first-order job its own chronological solver.
 The session drains an explicit job stack keyed by source target, complete input
-evidence and interface-checking mode. A caller imports only a fully solved
-arrow. A declared global source function with no residual scheme predicates
-already proves its quantified inputs, including callbacks and effect rows;
-ordinary call checking may import that scheme without collecting its body.
-Checked written predicates on first-order global schemes are likewise imported
-with fresh scope variables and the original argument witnesses. They must solve
-before a closed judgment is published. Type-only associated/member selection and
-result-selected construction may use that same checked scheme: the fresh scope
-already owns the imported predicates and selected signature. The source receipt
-records the implementation; selected capture/emission and complete demand
-checking still collect its body. No caller-selected fact becomes a principal
-proof. Transitive job admission classifies each reachable scheme once per
-immutable Session and reserves capacity before publishing the complete
-classification. Source shape and active-recursion checks remain local to the
-requesting job; a cached graph classification does not override them. Computed
-values still require capture proofs, and predicate-free source-interface
-checking, selected captures and complete demand-body checking retain ordinary
-collection. Other result-directed obligations, lexical captures and higher-order
-boundaries keep ordinary collection. Active recursive targets share their inline
-region. Failed speculative jobs publish no diagnostic; fallback preserves the
-caller's argument witness sites and deferred-member context. An independently
-completed callee proof may survive an enclosing caller's failed qualification.
+evidence and interface-checking mode. Result-directed first-order jobs also key
+the complete expected result or complete arrow when those are consumed. They use
+fresh source binders; open caller variables never enter an independent job. A
+caller imports only a fully solved arrow. A declared global source function with
+no residual scheme predicates already proves its quantified inputs, including
+callbacks and effect rows; ordinary call checking may import that scheme without
+collecting its body. Checked written predicates on first-order global schemes
+are likewise imported with fresh scope variables and the original argument
+witnesses. They must solve before a closed judgment is published. Type-only
+associated/member selection and result-selected construction may use that same
+checked scheme: the fresh scope already owns the imported predicates and
+selected signature. The source receipt records the implementation; selected
+capture/emission and complete demand checking still collect its body. No
+caller-selected fact becomes a principal proof. Transitive job admission
+classifies each reachable scheme once per immutable Session and reserves
+capacity before publishing the complete classification. Source shape and
+active-recursion checks remain local to the requesting job; a cached graph
+classification does not override them. Computed values still require capture
+proofs, and predicate-free source-interface checking, selected captures and
+complete demand-body checking retain ordinary collection. Unsupported
+result-directed obligations, lexical captures and higher-order boundaries keep
+ordinary collection. Active recursive targets share their inline region. Failed
+speculative jobs publish no diagnostic; fallback preserves the caller's argument
+witness sites and deferred-member context. An independently completed callee
+proof may survive an enclosing caller's failed qualification.
 
 Admitted inferred first-order bodies also have bounded immutable principal
 graphs owned by that source Session. Ordered constraints and callee edges retain
 their original argument/result witnesses. Import freshens type and row binders
 without copying transitive diamond paths. Optional principal inquiries may
-export a checked all-unknown residual edge, but it remains unsolved and cannot
-certify a complete call or refinement receipt. Concrete or structured endpoints,
-explicit bounds and unsupported forms retain ordinary checking. Description and
-cache publication finish every ownership allocation before installing a visible
-graph; out-of-memory never becomes a cached semantic decline. General admission
-and the later callback/capture/component boundaries remain implementation work.
+export checked residual edges with source-owned first-order physical structure,
+nominal identities, alias relationships and operation rows. They remain unsolved
+and cannot certify a complete call or refinement receipt. Matching preserves
+exact live alias classes; a fixed effect row cannot match an open caller tail.
+Written header requirements are traversed in source order and remain mandatory
+even when a body edge is deferred. Region-local header reuse schedules required
+work; it is not a completed proof. Optional inquiries that use residual export
+retry ordinary checking on semantic failure, preserving original witness
+diagnostics. Type-head, type-comparison, handler and unsupported shapes still
+have admission limits. Description and cache publication finish every ownership
+allocation before installing a visible graph; out-of-memory never becomes a
+cached semantic decline. General admission and the later
+callback/capture/component boundaries remain implementation work.
 
 Summary jobs own their solver and scratch until completion or session teardown.
 Evidence copied into the session may outlive a job; solver IDs and source

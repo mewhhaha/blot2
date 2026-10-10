@@ -4,7 +4,7 @@ Work follows [tasks/README.md](tasks/README.md): pick the lowest-numbered ready
 or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
 `deno task lint:zig` before each compiler commit.
 
-## State on 9 October 2026
+## State on 10 October 2026
 
 - Task 010 (variable-indexed solver worklists) is complete: `352b3ff`, closed in
   `6a4271c`.
@@ -19,6 +19,13 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   393 public comparisons and zero-findings analyzer pass. General admission,
   including result-directed callee edges, remains unfinished; see
   [the qualification record](zig-native/CALL_SUMMARIES.md#owned-inferred-principal-graphs-9-october-2026).
+- The structured/result-directed milestone admits source-owned physical and
+  nominal residual relationships, preserves seeded operation rows, and keys
+  complete result expectations. The full native suite, 603 guest/client tests,
+  450 public comparisons and zero-findings analyzer pass. Task 004 stays open:
+  representation headers still repeat work, and general type-head, comparison
+  and handler admission is unfinished. See
+  [the new qualification record](zig-native/CALL_SUMMARIES.md#structured-and-result-directed-graphs-10-october-2026).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -55,18 +62,26 @@ fold gate remains open.
 
 Extend the owned graph representation in
 [CALL_SUMMARIES.md](zig-native/CALL_SUMMARIES.md). Current open-edge admission
-still uses the old complete-input eligibility rule, so a result-directed callee
-can unfold even when its interface is entirely unknown. Export that relationship
-in the caller's optional principal region without submitting it to an input-only
-job. Concrete expectations, original argument/result witnesses and complete
-publication must retain ordinary checking. Finish unsupported explicit coverage
-and ordered failure/recovery qualification before closing task 004.
-`build/bench/cloud-principal-graphs/` contains the final `candidate-guarded/`
-pin, 393-case comparison, fifteen paired factory measurements and seven-pair
-fresh/retained/restart comparisons. Factory depth 12 drops from 198.730 to
-5.371 ms CPU and 19,420,315 to 4,783,635 requested bytes. Ordinary typed
-workloads keep their counters; no general compiler or private gdev speedup is
-claimed. Preserve the earlier selected-scheme pins as separate baselines.
+now retains source-owned physical structure and result-directed callee
+relationships. Complete result/arrow inputs receive independent fresh jobs;
+unknown destinations and witness-dependent failures retain ordinary checking.
+Next, replace allocation-based open header keys with exact region-local keys
+over only the public slots consumed by mandatory requirements. Equivalent live
+inputs currently get different wrapper product IDs, and the depth-12
+representation diamond still needs 24,616 constraint visits. Preserve private
+binder independence, effect identities/cursors, original witness order and
+rollback revocation. Then finish general type-head, type-comparison and handler
+coverage before closing task 004. `build/bench/cloud-principal-graphs/` contains
+the final `candidate-guarded/` pin, 393-case comparison, fifteen paired factory
+measurements and seven-pair fresh/retained/restart comparisons. Factory depth 12
+drops from 198.730 to 5.371 ms CPU and 19,420,315 to 4,783,635 requested bytes.
+Ordinary typed workloads keep their counters; no general compiler or private
+gdev speedup is claimed. Preserve the earlier selected-scheme pins as separate
+baselines. The latest pin is `candidate-structured-result-v2/`; its depth-12
+result diamond drops from 489.525 to 6.156 ms CPU and from 120,471,388 to
+5,327,642 requested bytes. Small operation wrappers instead cost about 11% more.
+Keep the rejected v1 pin and its failure logs separate from the passing v2
+qualification.
 
 ## Notes
 

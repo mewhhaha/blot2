@@ -78,7 +78,18 @@ public diagnostic/Wasm comparisons pass, with zero analyzer findings across 291
 files. Staged diamond factories show bounded work and measured CPU/allocation
 reductions; ordinary typed workloads retain their counters. General admission
 and result-directed callee edges remain open, so task [004] stays in progress.
-See [owned inferred graphs](../zig-native/CALL_SUMMARIES.md#owned-inferred-principal-graphs-9-october-2026).
+See
+[owned inferred graphs](../zig-native/CALL_SUMMARIES.md#owned-inferred-principal-graphs-9-october-2026).
+
+The 10 October structured/result-directed milestone passes the full native
+suite, 603 guest/client tests, 450 public comparisons and the analyzer with zero
+findings in 291 files. Deep result diamonds have bounded measured work and
+substantial CPU/allocation reductions. Small operation wrappers cost about 11%
+more, representation headers still repeat work, and general type-head,
+comparison and handler admission remains unfinished. Task [004] stays in
+progress;
+[the qualification record](../zig-native/CALL_SUMMARIES.md#structured-and-result-directed-graphs-10-october-2026)
+preserves these limits.
 
 The cloud follow-up for [002] tested loop counters in storage words against
 unchanged `65dccda` and a separately rebuilt pre-packed compiler. The probe

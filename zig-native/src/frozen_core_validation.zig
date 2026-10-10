@@ -183,6 +183,17 @@ const Bounds = struct {
         try self.listRows(value.closed_rows);
         try range(self.m.obligations.len, value.obligations.start, value.obligations.len);
     }
+    fn publicSlots(self: Bounds, public: T.List, quantified: T.List, rows: bool) BoundsError!void {
+        if (rows) try self.listRows(public) else try self.listTypes(public);
+        const quantifiers = self.m.types.list(quantified);
+        var next: usize = 0;
+        for (self.m.types.list(public)) |slot| {
+            if (!rows) try require(self.m.types.node(slot).tag == .variable);
+            while (next < quantifiers.len and quantifiers[next] != slot) : (next += 1) {}
+            try require(next < quantifiers.len);
+            next += 1;
+        }
+    }
     fn parameter(self: Bounds, value: core.Parameter) BoundsError!void {
         try self.binding(value.binding, true);
         if (value.binding != 0) try require(self.m.bindings[value.binding].kind == .parameter);
@@ -277,6 +288,17 @@ const Bounds = struct {
             try enumValue(check.Kind, value.kind);
             try self.ty(value.ty);
             try self.scheme(value.scheme);
+            try self.publicSlots(value.public_variables, value.scheme.variables, false);
+            try self.publicSlots(value.public_rows, value.scheme.row_variables, true);
+            var has_explicit = false;
+            for (self.m.obligations[value.scheme.obligations.start..][0..value.scheme.obligations.len]) |requirement| {
+                has_explicit = has_explicit or requirement.explicit;
+                if (requirement.kind == .callee_use) {
+                    try self.binding(requirement.identity.decl, false);
+                    has_explicit = has_explicit or self.m.bindings[requirement.identity.decl].has_explicit;
+                }
+            }
+            try require(value.has_explicit == has_explicit);
             try self.span(value.span);
             try self.node(value.initializer, true);
             try self.bindingRef(value.target, id == 0 or value.kind == .local);
@@ -323,6 +345,25 @@ const Bounds = struct {
             try self.ty(value.signature);
             try self.symbol(value.name, true);
             try self.identity(value.identity, true);
+            if (value.kind == .callee_use) {
+                // Shared scheme references belong to this module's checked
+                // binding table; external bindings carry their own target.
+                try require(value.identity.unit == 0 or value.identity.unit == self.m.unit);
+                try self.binding(value.identity.decl, false);
+                const callee = self.m.bindings[value.identity.decl];
+                try range(self.m.types.extra.len, callee.public_variables.start, callee.public_variables.len);
+                try range(self.m.types.extra.len, callee.public_rows.start, callee.public_rows.len);
+                const product = self.m.types.node(value.ty);
+                try require(product.tag == .product);
+                try require(product.b == try sum(callee.public_variables.len, callee.public_rows.len));
+                try range(self.m.types.extra.len, product.a, product.b);
+                const parts = self.m.types.extra[product.a..][0..product.b];
+                for (parts[callee.public_variables.len..]) |part| {
+                    try self.ty(part);
+                    const carrier = self.m.types.node(part);
+                    try require(carrier.tag == .function and carrier.a == T.unit and carrier.b == T.unit);
+                }
+            }
             try self.span(value.span);
             if (value.qualification_span) |s| {
                 try require(s.start <= s.end);
@@ -705,7 +746,7 @@ pub fn validateBounds(module: *const core.Module, context: Context) BoundsError!
     try b.nodes();
 }
 
-const Kind = enum { type_, row, operation, node, pattern, closure, match_, arm, pattern_row, update, update_step, loop, request_loop, request_arm, resolver, operation_value };
+const Kind = enum { type_, row, operation, node, pattern, closure, match_, arm, pattern_row, update, update_step, loop, request_loop, request_arm, resolver, operation_value, scheme, obligation };
 const kind_count = @typeInfo(Kind).@"enum".field_names.len;
 pub const Frame = struct { vertex: usize, edge: usize = 0 };
 pub const Scratch = struct { colors: []u8, path: []Frame };
@@ -739,7 +780,11 @@ fn listRoles(m: *const core.Module, type_roles: []u8, core_roles: []u8) BoundsEr
         else => {},
     };
     for (m.types.operations) |o| try mark(type_roles, o.arguments.start, o.arguments.len, .type_);
-    for (m.bindings) |b| try markScheme(type_roles, b.scheme);
+    for (m.bindings) |b| {
+        try markScheme(type_roles, b.scheme);
+        try mark(type_roles, b.public_variables.start, b.public_variables.len, .type_);
+        try mark(type_roles, b.public_rows.start, b.public_rows.len, .row_variable);
+    }
     for (m.bodies) |b| {
         try markScheme(type_roles, b.scheme);
         try mark(type_roles, b.closed_rows.start, b.closed_rows.len, .row_variable);
@@ -779,7 +824,7 @@ const Graph = struct {
     starts: [kind_count + 1]usize,
     fn init(m: *const core.Module) BoundsError!Graph {
         var result: Graph = .{ .m = m, .starts = @splat(0) };
-        const counts = [_]usize{ m.types.nodes.len, m.types.effects.rows.len, m.types.operations.len, m.nodes.len, m.patterns.len, m.closures.len, m.matches.len, m.match_arms.len, m.pattern_rows.len, m.updates.len, m.update_steps.len, m.loops.len, m.request_loops.len, m.request_arms.len, m.resolver_ops.len, m.operation_values.len };
+        const counts = [_]usize{ m.types.nodes.len, m.types.effects.rows.len, m.types.operations.len, m.nodes.len, m.patterns.len, m.closures.len, m.matches.len, m.match_arms.len, m.pattern_rows.len, m.updates.len, m.update_steps.len, m.loops.len, m.request_loops.len, m.request_arms.len, m.resolver_ops.len, m.operation_values.len, m.bindings.len, m.obligations.len };
         for (counts, 0..) |size_, i| result.starts[i + 1] = try sum(result.starts[i], size_);
         return result;
     }
@@ -938,6 +983,14 @@ const Graph = struct {
                 return if (slot - 1 < v.arguments.len) self.vertex(.node, m.extra[v.arguments.start + slot - 1]) else null;
             },
             .operation_value => return if (slot == 0) self.vertex(.node, m.operation_values[id].witness) else null,
+            .scheme => {
+                const list = m.bindings[id].scheme.obligations;
+                return if (slot < list.len) self.vertex(.obligation, list.start + slot) else null;
+            },
+            .obligation => {
+                const value = m.obligations[id];
+                return if (slot == 0 and value.kind == .callee_use) self.vertex(.scheme, value.identity.decl) else null;
+            },
         }
     }
 };

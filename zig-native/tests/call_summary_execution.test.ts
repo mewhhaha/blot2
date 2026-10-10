@@ -12,6 +12,252 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 
+Deno.test("structured residual graphs preserve imported array record nominal and operation instances through saved state and recovery", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const library = `${directory}/library.blot`;
+  const bundle = `${directory}/library.blotdep`;
+  const source = (invalid: boolean, repeatedOperation = false) => {
+    const member = invalid ? "missing" : "first";
+    const lines = [
+      "type Box a is data = #Box a",
+      "type Signal a is effect = { get: Unit -> a }",
+      `const array_0 = fn value => #[value.${member}]`,
+      `const record_0 = fn value => {result: value.${member}}`,
+      `const nominal_0 = fn value => #Box value.${member}`,
+      "const operation_0: a -> a ! {| e} where { operation Signal.get a } = fn token => Signal.get a ()",
+    ];
+    for (let i = 1; i <= 8; i++) {
+      for (const shape of ["array", "record", "nominal"]) {
+        lines.push(
+          `const ${shape}_${i} = fn value => do:`,
+          `  let ignored = ${shape}_${i - 1} value`,
+          `  return ${shape}_${i - 1} value`,
+        );
+      }
+      lines.push(
+        `const operation_${i} = fn token => do:`,
+        `  use result <- operation_${i - 1} token`,
+        repeatedOperation
+          ? `  return operation_${i - 1} token`
+          : "  return result",
+      );
+    }
+    for (const shape of ["array", "record", "nominal", "operation"]) {
+      lines.push(`const ${shape}_factory = do:`, `  return ${shape}_8`);
+    }
+    return lines.join("\n") + "\n";
+  };
+  const options = { executable, entry, prelude };
+  try {
+    await Deno.writeTextFile(library, source(false));
+    await Deno.writeTextFile(
+      entry,
+      `import * as library from "./library"
+entry const integer = fn (value: U32) -> U32 => do:
+  let array = library.array_factory {first: value}
+  let record = library.record_factory {first: array[0]}
+  let #library.Box result = library.nominal_factory {first: record.result}
+  return result
+entry const floating = fn (value: F32) -> F32 => do:
+  let array = library.array_factory {first: value}
+  let record = library.record_factory {first: array[0]}
+  let #library.Box result = library.nominal_factory {first: record.result}
+  return result
+entry const requested = fn (value: U32) -> U32 => do (@effect.provider (library.Signal.get U32) (fn () => value)):
+  return library.operation_factory value
+entry const floating_requested = fn (value: F32) -> F32 => do (@effect.provider (library.Signal.get F32) (fn () => value)):
+  return library.operation_factory value
+`,
+    );
+    const packed = await new Deno.Command(executable, {
+      args: ["dependencies", entry, bundle, "--prelude", prelude],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assert(packed.success, new TextDecoder().decode(packed.stdout));
+    const producer = await createZigProjectCompiler(options);
+    let checkpoint: Uint8Array<ArrayBuffer>;
+    let expected: Uint8Array<ArrayBuffer>;
+    try {
+      const first = await producer.build();
+      assert(first.success, JSON.stringify(first));
+      expected = first.bytes;
+      checkpoint = await producer.exportCheckpoint();
+    } finally {
+      await producer.dispose();
+    }
+    const retained = await createZigProjectCompiler({
+      ...options,
+      dependencies: bundle,
+      checkpoint,
+    });
+    try {
+      const restored = await retained.build();
+      assert(restored.success, JSON.stringify(restored));
+      assert(restored.stats.cachedModules > 0);
+      assert.deepEqual(restored.bytes, expected);
+      for (
+        const [invalid, repeatedOperation] of [[false, false], [true, false], [
+          false,
+          true,
+        ], [false, false]]
+      ) {
+        const sources = { [library]: source(invalid, repeatedOperation) };
+        const current = await retained.build({ sources });
+        const fresh = await createZigProjectCompiler(options);
+        try {
+          const reference = await fresh.build({ sources });
+          assert.equal(
+            current.success,
+            !invalid,
+            JSON.stringify({
+              success: current.success,
+              diagnostics: "diagnostics" in current ? current.diagnostics : [],
+            }),
+          );
+          assert.equal(current.success, reference.success);
+          if (current.success && reference.success) {
+            assert.deepEqual(current.bytes, reference.bytes);
+            const guest = await instantiateGuest(current.bytes);
+            try {
+              for (const value of [0, 37, 0xffff_ffff]) {
+                assert.equal(guest.call("integer", value), value);
+                assert.equal(guest.call("requested", value), value);
+              }
+              for (const value of [0, 1.5, -2.25]) {
+                assert.equal(guest.call("floating", value), Math.fround(value));
+                assert.equal(
+                  guest.call("floating_requested", value),
+                  Math.fround(value),
+                );
+              }
+            } finally {
+              guest.dispose();
+            }
+          } else if (!current.success && !reference.success) {
+            assert.deepEqual(current.diagnostics, reference.diagnostics);
+          }
+        } finally {
+          await fresh.dispose();
+        }
+      }
+    } finally {
+      await retained.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("result principal graphs preserve deep nominal instances through imported factories and recovery", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const library = `${directory}/library.blot`;
+  const bundle = `${directory}/library.blotdep`;
+  const source = (double: boolean, invalid: boolean) => {
+    const lines = [
+      "type Box a is data = #Box a",
+      "const Box.from = fn (box: Box a) -> Box a => case box of",
+      `  #Box value => #Box (${
+        invalid
+          ? "value + #True"
+          : double
+          ? '@type.call "add" value value'
+          : "value"
+      })`,
+      'const f_0 = fn value => @type.result "from" value',
+    ];
+    for (let i = 1; i <= 8; i++) {
+      lines.push(`const f_${i} = fn value => f_${i - 1} (f_${i - 1} value)`);
+    }
+    lines.push("const factory = do:", "  return f_8");
+    return lines.join("\n") + "\n";
+  };
+  const options = { executable, entry, prelude };
+  try {
+    await Deno.writeTextFile(library, source(false, false));
+    await Deno.writeTextFile(
+      entry,
+      `import * as library from "./library"
+entry const integer = fn (value: U32) -> U32 => do:
+  let #library.Box result: library.Box U32 = library.factory (#library.Box value)
+  return result
+entry const floating = fn (value: F32) -> F32 => do:
+  let #library.Box result: library.Box F32 = library.factory (#library.Box value)
+  return result
+`,
+    );
+    const packed = await new Deno.Command(executable, {
+      args: ["dependencies", entry, bundle, "--prelude", prelude],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assert(packed.success, new TextDecoder().decode(packed.stdout));
+    const producer = await createZigProjectCompiler(options);
+    let checkpoint: Uint8Array<ArrayBuffer>;
+    let expected: Uint8Array<ArrayBuffer>;
+    try {
+      const first = await producer.build();
+      assert(first.success, JSON.stringify(first));
+      expected = first.bytes;
+      checkpoint = await producer.exportCheckpoint();
+    } finally {
+      await producer.dispose();
+    }
+    const retained = await createZigProjectCompiler({
+      ...options,
+      dependencies: bundle,
+      checkpoint,
+    });
+    try {
+      const restored = await retained.build();
+      assert(restored.success, JSON.stringify(restored));
+      assert(restored.stats.cachedModules > 0);
+      assert.deepEqual(restored.bytes, expected);
+      for (
+        const [double, invalid] of [
+          [false, false],
+          [true, false],
+          [true, true],
+          [false, false],
+        ]
+      ) {
+        const sources = { [library]: source(double, invalid) };
+        const current = await retained.build({ sources });
+        const fresh = await createZigProjectCompiler(options);
+        try {
+          const reference = await fresh.build({ sources });
+          assert.equal(current.success, !invalid, JSON.stringify(current));
+          assert.equal(current.success, reference.success);
+          if (current.success && reference.success) {
+            assert.deepEqual(current.bytes, reference.bytes);
+            const guest = await instantiateGuest(current.bytes);
+            try {
+              const factor = double ? 2 ** 256 : 1;
+              assert.equal(guest.call("integer", 37), (37 * factor) >>> 0);
+              assert.equal(
+                guest.call("floating", 1.5),
+                Math.fround(1.5 * factor),
+              );
+            } finally {
+              guest.dispose();
+            }
+          } else if (!current.success && !reference.success) {
+            assert.deepEqual(current.diagnostics, reference.diagnostics);
+          }
+        } finally {
+          await fresh.dispose();
+        }
+      }
+    } finally {
+      await retained.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("inferred graph edges preserve result witnesses through diamonds, imports and failed edits", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
@@ -295,6 +541,10 @@ const Box.twice: Box a -> Box a where { associated "add" a a a } = fn box => cas
 const Box.add: Box a -> Box a -> Box a where { associated "add" a a a } = fn left => fn right => case left, right of
   #Box value, #Box other => #Box (f_128 value)
 const Box.from: a -> Box a where { associated "add" a a a } = fn value => #Box (f_128 value)
+const integer_factory: U32 -> U32 = do:
+  return f_128
+const floating_factory: F32 -> F32 = do:
+  return f_128
 `;
   const program = (invalid: boolean) =>
     'import * as library from "./library"\n' +
@@ -310,6 +560,8 @@ entry const associated = fn (value: U32) => case add (#library.Box value) (#libr
 entry const constructed = fn (value: F32) => do:
   let #library.Box result: library.Box F32 = from value
   return result
+entry const integer_factory = fn (value: U32) => library.integer_factory value
+entry const floating_factory = fn (value: F32) => library.floating_factory value
 `;
   const options = { executable, entry, prelude };
   try {
@@ -366,6 +618,8 @@ entry const constructed = fn (value: F32) => do:
               assert.equal(guest.call("floating", 1.25), 1.25 * factor);
               assert.equal(guest.call("associated", 21), 21 * factor);
               assert.equal(guest.call("constructed", 1.25), 1.25 * factor);
+              assert.equal(guest.call("integer_factory", 21), 21 * factor);
+              assert.equal(guest.call("floating_factory", 1.25), 1.25 * factor);
             } finally {
               guest.dispose();
             }

@@ -85,6 +85,81 @@ test "every allocation failure releases validation workspace and retains immutab
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, verified, .{&m});
 }
 
+test "shared scheme public slots and row carriers reject malformed frozen metadata" {
+    var m = try lower(a,
+        \\const twice: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
+        \\const alias = twice
+        \\entry const generic = fn value => alias value
+    );
+    defer m.deinit(a);
+    try verified(a, &m);
+    var uses: usize = 0;
+    for (m.obligations) |*obligation| {
+        if (obligation.kind != .callee_use) continue;
+        uses += 1;
+        const saved = obligation.*;
+        const callee = &m.bindings[obligation.identity.decl];
+        const variables = callee.public_variables;
+        callee.public_variables.len = std.math.maxInt(u32);
+        try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&m, .{}));
+        callee.public_variables = variables;
+        const rows = callee.public_rows;
+        callee.public_rows.start = std.math.maxInt(u32);
+        try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&m, .{}));
+        callee.public_rows = rows;
+        obligation.identity.decl = std.math.maxInt(u32);
+        try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&m, .{}));
+        obligation.* = saved;
+        obligation.ty = T.u32_type;
+        try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&m, .{}));
+        obligation.* = saved;
+        const product = m.types.node(obligation.ty);
+        for (m.types.extra[product.a + variables.len ..][0..rows.len]) |carrier| {
+            const original = m.types.nodes[carrier];
+            m.types.nodes[carrier].a = T.boolean;
+            try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&m, .{}));
+            m.types.nodes[carrier] = original;
+        }
+    }
+    try std.testing.expect(uses != 0);
+    var explicit_bindings: usize = 0;
+    for (m.bindings) |*binding| {
+        if (!binding.has_explicit) continue;
+        explicit_bindings += 1;
+        binding.has_explicit = false;
+        try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&m, .{}));
+        binding.has_explicit = true;
+    }
+    try std.testing.expect(explicit_bindings != 0);
+    try verified(a, &m);
+}
+
+test "retained header cycles reject without rejecting ordinary recursive bodies" {
+    var m = try lower(a,
+        \\const twice: a -> a where { associated "add" a a a } = fn value => @type.call "add" value value
+        \\const alias = twice
+        \\entry const generic = fn value => alias value
+    );
+    defer m.deinit(a);
+    try verified(a, &m);
+    var cycles: usize = 0;
+    for (m.bindings, 0..) |binding, id| {
+        for (m.obligations[binding.scheme.obligations.start..][0..binding.scheme.obligations.len]) |*use| {
+            if (use.kind != .callee_use) continue;
+            const callee = m.binding(use.identity.decl);
+            if (binding.public_variables.len != callee.public_variables.len or binding.public_rows.len != callee.public_rows.len) continue;
+            const original = use.*;
+            use.identity.decl = @intCast(id);
+            try V.validateBounds(&m, .{});
+            try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
+            use.* = original;
+            cycles += 1;
+        }
+    }
+    try std.testing.expect(cycles != 0);
+    try verified(a, &m);
+}
+
 test "bounds reject overflow and every Core tag's interpreted reference before indexed reads" {
     var m = try lower(a, "entry const answer = fn () => do:\n  let values = #[40, 2]\n  return @u32.add (@array.get values 0) (@array.get values 1)\n");
     defer m.deinit(a);

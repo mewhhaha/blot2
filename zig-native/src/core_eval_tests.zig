@@ -123,10 +123,12 @@ test "owned principal graphs preserve independent inferred uses and publish atom
 }
 
 test "open principal diamond inquiry grows with distinct bodies and edges" {
-    for ([_]usize{ 8, 16, 64 }) |depth| {
+    for ([_][]const u8{ "@type.call \"add\" value value", "@type.result \"from\" value", "value.first" }) |leaf| for ([_]bool{ false, true }) |written| for ([_]usize{ 8, 16, 64 }) |depth| {
+        if (written and std.mem.startsWith(u8, leaf, "@type.result")) continue;
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(a);
-        try text.appendSlice(a, "const f_0 = fn value => @type.call \"add\" value value\n");
+        const clause = if (!written) "" else if (std.mem.startsWith(u8, leaf, "@type.call")) ": a -> a where { associated \"add\" a a a }" else ": a -> b where { field \"first\" a b }";
+        try text.print(a, "const f_0{s} = fn value => {s}\n", .{ clause, leaf });
         for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
         try text.print(a, "entry const generic = fn value => f_{d} value\n", .{depth});
         var module = try lowerPreludeProducer(text.items, &.{.add});
@@ -136,9 +138,11 @@ test "open principal diamond inquiry grows with distinct bodies and edges" {
         const result = try session.sourceInterface(target(&module, "generic"));
         try std.testing.expectEqual(@as(type_evidence.Id, 0), result.evidence);
         try std.testing.expect(result.pending != 0);
+        if (session.counters.region_scopes > depth * 2 + 20) std.debug.print("principal case {s}, written={}, depth={d}: scopes={d}, builds={d}, imports={d}, deferred={d}\n", .{ leaf, written, depth, session.counters.region_scopes, session.principal_graph_builds, session.principal_graph_imports, session.principal_graph_deferred });
         try std.testing.expect(session.counters.region_scopes <= depth * 2 + 20);
         try std.testing.expect(session.principal_graph_builds <= depth * 2 + 4);
         try std.testing.expect(session.principal_graph_nodes <= depth * 64 + 128);
+        if (session.principal_graph_deferred == 0) std.debug.print("no residual for {s}, written={}, depth={d}: scopes={d}, builds={d}, nodes={d}\n", .{ leaf, written, depth, session.counters.region_scopes, session.principal_graph_builds, session.principal_graph_nodes });
         try std.testing.expect(session.principal_graph_deferred != 0);
         const builds = session.principal_graph_builds;
         const scopes = session.counters.region_scopes;
@@ -147,6 +151,413 @@ test "open principal diamond inquiry grows with distinct bodies and edges" {
         try std.testing.expectEqual(builds, session.principal_graph_builds);
         try std.testing.expectEqual(scopes + 1, session.counters.region_scopes);
         try std.testing.expectEqual(@as(usize, 0), session.steps);
+    };
+}
+
+test "source owned array record and nominal skeletons keep open diamonds bounded" {
+    for ([_][]const u8{ "#[value.first]", "{result: value.first}", "#Box value.first" }) |leaf| {
+        for ([_]usize{ 8, 16, 64 }) |depth| {
+            var text: std.ArrayList(u8) = .empty;
+            defer text.deinit(a);
+            try text.appendSlice(a, "type Box a is data = #Box a\n");
+            try text.print(a, "const f_0 = fn value => {s}\n", .{leaf});
+            for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => do:\n  let ignored = f_{d} value\n  return f_{d} value\n", .{ i, i - 1, i - 1 });
+            try text.print(a, "entry const factory = do:\n  return f_{d}\n", .{depth});
+            var module = try lower(text.items);
+            defer module.deinit(a);
+            var session = try evaluator.Session.init(a, &.{module});
+            defer session.deinit();
+            const result = try session.sourceInterface(target(&module, "factory"));
+            if (session.counters.region_scopes > depth * 2 + 20) std.debug.print("structured {s}, depth={d}: scopes={d}, builds={d}, deferred={d}\n", .{ leaf, depth, session.counters.region_scopes, session.principal_graph_builds, session.principal_graph_deferred });
+            try std.testing.expect(result.evidence == 0 and result.pending != 0);
+            try std.testing.expect(session.counters.region_scopes <= depth * 2 + 20);
+            try std.testing.expect(session.principal_graph_builds <= depth * 2 + 4);
+            try std.testing.expect(session.principal_graph_deferred != 0);
+            try std.testing.expectEqual(@as(usize, 0), session.steps);
+        }
+    }
+}
+
+test "source owned structured residuals preserve independent concrete interfaces" {
+    for ([_]struct { leaf: []const u8, select: []const u8 }{
+        .{ .leaf = "#[value.first]", .select = "result[0]" },
+        .{ .leaf = "{result: value.first}", .select = "result.result" },
+        .{ .leaf = "#Box value.first", .select = "case result of\n    #Box value => value" },
+    }) |shape| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.print(a, "type Box a is data = #Box a\nconst f_0 = fn value => {s}\n", .{shape.leaf});
+        for (1..9) |i| try text.print(a, "const f_{d} = fn value => do:\n  let ignored = f_{d} value\n  return f_{d} value\n", .{ i, i - 1, i - 1 });
+        try text.appendSlice(a, "const factory = do:\n  return f_8\n");
+        for ([_]struct { []const u8, []const u8 }{ .{ "integer", "U32" }, .{ "floating", "F32" } }) |instance| try text.print(a, "entry const {s} = fn (value: {s}) -> {s} => do:\n  let result = factory {{first: value}}\n  return {s}\n", .{ instance[0], instance[1], instance[1], shape.select });
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        var ordinary = try evaluator.Session.init(a, &.{module});
+        defer ordinary.deinit();
+        ordinary.reuse_principal_graphs = false;
+        var summarized = try evaluator.Session.init(a, &.{module});
+        defer summarized.deinit();
+        for ([_][]const u8{ "integer", "floating" }) |name| {
+            const expected = try ordinary.sourceInterface(target(&module, name));
+            const actual = try summarized.sourceInterface(target(&module, name));
+            try std.testing.expect(actual.evidence != 0);
+            try std.testing.expectEqualDeep(ordinary.evidence.node(expected.evidence), summarized.evidence.node(actual.evidence));
+        }
+        try std.testing.expectEqual(@as(usize, 0), summarized.steps);
+    }
+}
+
+test "source owned operation identities retain open rows through shared diamonds" {
+    for ([_]bool{ false, true }) |written| for ([_]usize{ 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.print(a, "type Signal a is effect = {{ get: Unit -> a }}\nconst f_0{s} = fn (token: a) => Signal.get a ()\n", .{if (written) ": a -> a ! {| e} where { operation Signal.get a }" else ""});
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn token => do:\n  use ignored <- f_{d} token\n  return f_{d} token\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const factory = do:\n  return f_{d}\n", .{depth});
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        const result = try session.sourceInterface(target(&module, "factory"));
+        if (result.evidence != 0 or session.counters.region_scopes > depth * 2 + 32) std.debug.print("operation written={}, depth={d}: result={any}, scopes={d}, builds={d}, deferred={d}\n", .{ written, depth, result, session.counters.region_scopes, session.principal_graph_builds, session.principal_graph_deferred });
+        try std.testing.expectEqual(@as(type_evidence.Id, 0), result.evidence);
+        try std.testing.expect(result.pending != 0);
+        try std.testing.expect(session.counters.region_scopes <= depth * 2 + 32);
+        try std.testing.expect(session.principal_graph_deferred != 0);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    };
+}
+
+fn operationPrincipalScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    var summarized = try evaluator.Session.init(allocator, &.{module.*});
+    defer summarized.deinit();
+    for ([_][]const u8{ "integer", "floating" }) |name| {
+        const expected = try ordinary.sourceInterface(target(module, name));
+        const actual = try summarized.sourceInterface(target(module, name));
+        try std.testing.expect(actual.evidence != 0);
+        try std.testing.expectEqualDeep(ordinary.evidence.node(expected.evidence), summarized.evidence.node(actual.evidence));
+    }
+    for ([_]*evaluator.Session{ &ordinary, &summarized }) |session| {
+        const correct = try session.sourceInterface(target(module, "integer"));
+        var accepted = try session.bodyEvidenceFull(target(module, "convert"), correct.evidence, &.{}, &.{});
+        accepted.deinit(allocator);
+        const pure = try session.evidence.intern(.function, types.u32_type, types.u32_type, &.{});
+        try resultWitnessFailure(session, target(module, "convert"), pure);
+        try std.testing.expectEqual(evaluator.Code.effect_mismatch, session.diagnostic.?.code);
+    }
+    try std.testing.expectEqualDeep(ordinary.diagnostic, summarized.diagnostic);
+    ordinary.diagnostic = null;
+    summarized.diagnostic = null;
+    for ([_]*evaluator.Session{ &ordinary, &summarized }) |session| {
+        const correct = try session.sourceInterface(target(module, "integer"));
+        var recovered = try session.bodyEvidenceFull(target(module, "convert"), correct.evidence, &.{}, &.{});
+        recovered.deinit(allocator);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    }
+}
+
+test "operation residual graphs preserve family instances exact rows and recovery under allocation failure" {
+    var module = try lower(
+        \\type Signal a is effect = { get: Unit -> a }
+        \\const f_0 = fn (token: a) => Signal.get a ()
+        \\const f_1 = fn token => do:
+        \\  use ignored <- f_0 token
+        \\  return f_0 token
+        \\const f_2 = fn token => do:
+        \\  use ignored <- f_1 token
+        \\  return f_1 token
+        \\const f_3 = fn token => do:
+        \\  use ignored <- f_2 token
+        \\  return f_2 token
+        \\entry const convert = fn value => f_3 value
+        \\entry const integer = fn (value: U32) -> U32 => convert value
+        \\entry const floating = fn (value: F32) -> F32 => convert value
+    );
+    defer module.deinit(a);
+    try operationPrincipalScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, operationPrincipalScenario, .{&module});
+}
+
+fn writtenOperationProviderScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    for ([_]bool{ false, true }) |sharing| {
+        var session = try evaluator.Session.init(allocator, &.{module.*});
+        defer session.deinit();
+        session.reuse_principal_graphs = sharing;
+        const interface = try session.sourceInterface(target(module, "requested"));
+        try std.testing.expect(interface.evidence != 0);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+        try std.testing.expectEqual(@as(u32, 37), (try session.value(target(module, "answer"))).bits);
+    }
+}
+
+test "inferred wrappers discharge transitive written operation rows under a provider" {
+    var module = try lower(
+        \\type Signal a is effect = { get: Unit -> a }
+        \\const operation_0: a -> a ! {| e} where { operation Signal.get a } = fn token => Signal.get a ()
+        \\const operation_1 = fn token => operation_0 token
+        \\const operation_2 = fn token => operation_1 token
+        \\const factory = do:
+        \\  return operation_2
+        \\entry const requested = fn (value: U32) -> U32 => do (@effect.provider (Signal.get U32) (fn () => value)):
+        \\  return factory value
+        \\entry const answer = requested 37
+    );
+    defer module.deinit(a);
+    try writtenOperationProviderScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, writtenOperationProviderScenario, .{&module});
+}
+
+fn resultPrincipalScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    var summarized = try evaluator.Session.init(allocator, &.{module.*});
+    defer summarized.deinit();
+    const expected = try ordinary.sourceInterface(target(module, "generic"));
+    const actual = try summarized.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqual(expected.evidence, actual.evidence);
+    try std.testing.expectEqual(expected.generic, actual.generic);
+    try std.testing.expect(actual.pending != 0 and actual.pending <= expected.pending);
+    try std.testing.expect(summarized.principal_graph_deferred != 0);
+    try std.testing.expect(summarized.counters.region_scopes < ordinary.counters.region_scopes);
+    for ([_][]const u8{ "integer", "floating" }) |name| {
+        const baseline = try ordinary.sourceInterface(target(module, name));
+        const candidate = try summarized.sourceInterface(target(module, name));
+        try std.testing.expect(baseline.evidence != 0 and candidate.evidence != 0);
+        try std.testing.expectEqualDeep(ordinary.evidence.node(baseline.evidence), summarized.evidence.node(candidate.evidence));
+    }
+    for ([_][]const u8{ "argument_failure", "result_failure", "competing_failure" }) |name| {
+        const expected_type = try ordinary.evidence.intern(.function, types.u32_type, types.u32_type, &.{});
+        const actual_type = try summarized.evidence.intern(.function, types.u32_type, types.u32_type, &.{});
+        try resultWitnessFailure(&ordinary, target(module, name), expected_type);
+        try resultWitnessFailure(&summarized, target(module, name), actual_type);
+        try std.testing.expectEqualDeep(ordinary.diagnostic, summarized.diagnostic);
+        ordinary.diagnostic = null;
+        summarized.diagnostic = null;
+    }
+    const builds = summarized.principal_graph_builds;
+    _ = try summarized.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqual(builds, summarized.principal_graph_builds);
+    try std.testing.expectEqual(@as(usize, 0), summarized.steps);
+}
+
+fn resultWitnessFailure(session: *evaluator.Session, reference: core.BindingRef, expected: type_evidence.Id) !void {
+    var solved = session.bodyEvidenceFull(reference, expected, &.{}, &.{}) catch |err| {
+        if (err == error.Declined) return;
+        return err;
+    };
+    defer solved.deinit(session.allocator);
+    return error.TestExpectedError;
+}
+
+fn sharedHeaderWitnessScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    for ([_]bool{ false, true }) |reuse| {
+        var session = try evaluator.Session.init(allocator, &.{module.*});
+        defer session.deinit();
+        session.reuse_principal_graphs = reuse;
+        _ = session.sourceInterface(target(module, "answer")) catch |err| {
+            if (err != error.Declined) return err;
+            const diagnostic = session.diagnostic orelse return error.TestExpectedDiagnostic;
+            try std.testing.expectEqual(evaluator.Code.missing_member, diagnostic.code);
+            try std.testing.expectEqualDeep(core.Span{ .start = 335, .end = 341 }, diagnostic.span);
+            continue;
+        };
+        return error.TestExpectedError;
+    }
+}
+
+test "shared written headers preserve the first missing receiver witness under allocation failure" {
+    var module = try lower(@embedFile("captured-callable-fixtures/bound-cache-missing.blot"));
+    defer module.deinit(a);
+    try sharedHeaderWitnessScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, sharedHeaderWitnessScenario, .{&module});
+}
+
+test "result principal edges retain independent expected witnesses and ordinary failures under allocation pressure" {
+    var module = try lower(
+        \\type Box a is data = #Box a
+        \\const Box.from = fn value => #Box value
+        \\type Missing is data = #Missing U32
+        \\const absent = fn value => value.absent
+        \\const f_0 = fn value => @type.result "from" value
+        \\const f_1 = fn value => f_0 (f_0 value)
+        \\const f_2 = fn value => f_1 (f_1 value)
+        \\const f_3 = fn value => f_2 (f_2 value)
+        \\entry const generic = fn value => f_3 value
+        \\entry const integer = fn (value: U32) => do:
+        \\  let #Box result: Box U32 = f_0 value
+        \\  return result
+        \\entry const floating = fn (value: F32) => do:
+        \\  let #Box result: Box F32 = f_0 value
+        \\  return result
+        \\entry const argument_failure = fn value => do:
+        \\  let #Box result: Box U32 = f_0 (absent value)
+        \\  return result
+        \\entry const result_failure = fn (value: U32) -> U32 => do:
+        \\  let #Missing result: Missing = f_0 value
+        \\  return result
+        \\entry const competing_failure = fn value => do:
+        \\  let #Missing result: Missing = f_0 (absent value)
+        \\  return result
+    );
+    defer module.deinit(a);
+    const nodes = try a.dupe(core.Node, module.nodes);
+    defer a.free(nodes);
+    const frozen_types = try a.dupe(types.Node, module.types.nodes);
+    defer a.free(frozen_types);
+    try resultPrincipalScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, resultPrincipalScenario, .{&module});
+    try std.testing.expectEqualDeep(nodes, module.nodes);
+    try std.testing.expectEqualDeep(frozen_types, module.types.nodes);
+}
+
+test "closed result directed diamonds propagate destinations before expanding shared edges" {
+    for ([_]bool{ false, true }) |double| for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a,
+            \\type Box a is data = #Box a
+            \\
+        );
+        try text.appendSlice(a, if (double) "const Box.from = fn (box: Box a) -> Box a => case box of\n  #Box value => #Box (@type.call \"add\" value value)\n" else "const Box.from = fn (box: Box a) -> Box a => box\n");
+        try text.appendSlice(a, "const f_0 = fn value => @type.result \"from\" value\n");
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const integer = fn (value: U32) -> U32 => do:\n  let #Box result: Box U32 = f_{d} (#Box value)\n  return result\nentry const floating = fn (value: F32) -> F32 => do:\n  let #Box result: Box F32 = f_{d} (#Box value)\n  return result\n", .{ depth, depth });
+        var module = try lowerPreludeProducer(text.items, &.{.add});
+        defer module.deinit(a);
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        for ([_][]const u8{ "integer", "floating" }) |name| {
+            const result = try session.sourceInterface(target(&module, name));
+            if (result.evidence == 0 or session.counters.region_scopes > depth * 16 + 128) std.debug.print("result diamond depth={d}, {s}: {any}, scopes={d}, largest={d}, visits={d}, builds={d}\n", .{ depth, name, result, session.counters.region_scopes, session.counters.max_region_scopes, session.counters.solver_constraint_visits, session.principal_graph_builds });
+            try std.testing.expect(result.evidence != 0 and result.pending == 0);
+            try std.testing.expect(session.counters.region_scopes <= depth * 16 + 128);
+            const jobs = session.call_summaries.jobs.items.len;
+            const attempts = session.split_attempts;
+            const repeated = try session.sourceInterface(target(&module, name));
+            try std.testing.expectEqual(result.evidence, repeated.evidence);
+            try std.testing.expectEqual(jobs, session.call_summaries.jobs.items.len);
+            try std.testing.expectEqual(attempts, session.split_attempts);
+            try std.testing.expectEqual(jobs, session.call_summaries.keys.count());
+            if (depth <= 8) {
+                var ordinary = try evaluator.Session.init(a, &.{module});
+                defer ordinary.deinit();
+                ordinary.reuse_principal_graphs = false;
+                const baseline = try ordinary.sourceInterface(target(&module, name));
+                try std.testing.expectEqualDeep(ordinary.evidence.node(baseline.evidence), session.evidence.node(result.evidence));
+            }
+        }
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    };
+}
+
+test "source owned representation predicates retain open diamonds without closing private rows" {
+    for ([_][]const u8{
+        "const f_0: Box a -> Box a where { type_rep (Box a) } = fn value => value\n",
+        "const f_0: Unit -> Unit ! {| e} where { effect_rep ! {| e} } = fn () => ()\n",
+    }) |leaf| for ([_]usize{ 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "type Box a is data = #Box a\n");
+        try text.appendSlice(a, leaf);
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const factory = do:\n  return f_{d}\n", .{depth});
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        const interface = try session.sourceInterface(target(&module, "factory"));
+        try std.testing.expect(interface.evidence == 0 and interface.pending != 0);
+        try std.testing.expect(session.counters.region_scopes <= depth * 2 + 32);
+        try std.testing.expect(session.principal_graph_deferred != 0);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    };
+}
+
+test "result principal jobs defer Never witness diagnostics to their original source entry" {
+    var module = try lower(
+        \\type Box a is data = #Box a
+        \\const Box.from = fn value => #Box value
+        \\const convert = fn value => do:
+        \\  let same = @type.same (@panic "uncalled witness") value
+        \\  return @type.result "from" value
+        \\entry const run = fn (value: U32) -> U32 => do:
+        \\  let #Box result: Box U32 = convert value
+        \\  return result
+    );
+    defer module.deinit(a);
+    for ([_]bool{ false, true }) |sharing| {
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        session.reuse_principal_graphs = sharing;
+        _ = session.sourceInterface(target(&module, "run")) catch |err| {
+            try std.testing.expectEqual(error.Declined, err);
+            try std.testing.expectEqual(evaluator.Code.invalid_annotation, session.diagnostic.?.code);
+            const point = module.sourceNamePoint(target(&module, "run").binding);
+            try std.testing.expectEqual(core.Span{ .start = point, .end = point }, session.diagnostic.?.span);
+            try std.testing.expectEqual(@as(usize, 0), session.steps);
+            if (sharing) try std.testing.expect(session.split_declined != 0);
+            continue;
+        };
+        return error.TestUnexpectedResult;
+    }
+}
+
+fn resultPrincipalWitnessScenario(allocator: std.mem.Allocator, module: *const core.Module, effects: bool) !void {
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    var summarized = try evaluator.Session.init(allocator, &.{module.*});
+    defer summarized.deinit();
+    for ([_]*evaluator.Session{ &ordinary, &summarized }) |session| {
+        const complete = try session.evidence.project(&module.types, module.binding(target(module, "correct").binding).scheme.root, &.{});
+        var first = try session.bodyEvidenceFull(target(module, "convert"), complete, &.{}, &.{});
+        first.deinit(allocator);
+        const arrow = session.evidence.node(complete);
+        const incompatible = try session.evidence.intern(.function, if (effects) types.f32_type else types.u32_type, arrow.b, &.{});
+        try resultWitnessFailure(session, target(module, "convert"), incompatible);
+        try std.testing.expectEqual(if (effects) evaluator.Code.effect_mismatch else evaluator.Code.type_mismatch, session.diagnostic.?.code);
+    }
+    try std.testing.expectEqualDeep(ordinary.diagnostic, summarized.diagnostic);
+    try std.testing.expect(summarized.split_accepted != 0);
+    ordinary.diagnostic = null;
+    summarized.diagnostic = null;
+    for ([_]*evaluator.Session{ &ordinary, &summarized }) |session| {
+        const complete = try session.evidence.project(&module.types, module.binding(target(module, "correct").binding).scheme.root, &.{});
+        var corrected = try session.bodyEvidenceFull(target(module, "convert"), complete, &.{}, &.{});
+        corrected.deinit(allocator);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    }
+}
+
+test "result principal judgments keep per use input and effect failures authoritative and recover under allocation failure" {
+    for ([_]bool{ false, true }) |effects| {
+        const pure =
+            \\type Out is data = #Out U32
+            \\const Out.from = fn (value: F32) => #Out 42
+            \\const leaf = fn value => @type.result "from" value
+            \\entry const convert = fn value => leaf value
+            \\entry const correct = fn (value: F32) -> Out => convert value
+            \\entry const answer = 42
+        ;
+        const effectful =
+            \\type Out is data = #Out U32
+            \\type Tick is effect = Unit -> Unit
+            \\const Out.from = fn (value: F32) => do:
+            \\  use Tick ()
+            \\  return #Out 42
+            \\const leaf = fn value => @type.result "from" value
+            \\entry const convert = fn value => leaf value
+            \\entry const correct: F32 -> Out ! {Tick} = fn value => convert value
+            \\entry const answer = 42
+        ;
+        var module = try lower(if (effects) effectful else pure);
+        defer module.deinit(a);
+        try resultPrincipalWitnessScenario(a, &module, effects);
+        try @import("allocation_failures.zig").checkAllAllocationFailures(a, resultPrincipalWitnessScenario, .{ &module, effects });
     }
 }
 
@@ -176,6 +587,68 @@ test "written predicate schemes share fresh requirements without expanding sourc
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, qualifiedSchemeScenario, .{&module});
     try std.testing.expectEqualDeep(nodes, module.nodes);
     try std.testing.expectEqualSlices(u32, extra, module.extra);
+}
+
+test "closed written predicate diamonds share required work under complete public inputs" {
+    for ([_]usize{ 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "const f_0: a -> a where { associated \"add\" a a a } = fn value => @type.call \"add\" value value\n");
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const integer = fn (value: U32) -> U32 => f_{d} value\nentry const floating = fn (value: F32) -> F32 => f_{d} value\n", .{ depth, depth });
+        var module = try lowerPreludeProducer(text.items, &.{.add});
+        defer module.deinit(a);
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        for ([_]struct { []const u8, type_evidence.Id }{ .{ "integer", types.u32_type }, .{ "floating", types.f32_type } }) |instance| {
+            const result = try session.sourceInterface(target(&module, instance[0]));
+            if (result.evidence == 0 or result.pending != 0) std.debug.print("closed written {s}, depth={d}: result={any}, scopes={d}, visits={d}\n", .{ instance[0], depth, result, session.counters.region_scopes, session.counters.solver_constraint_visits });
+            try std.testing.expect(result.evidence != 0 and result.pending == 0);
+            const arrow = session.evidence.node(result.evidence);
+            try std.testing.expectEqual(instance[1], arrow.a);
+            try std.testing.expectEqual(instance[1], arrow.b);
+        }
+        try std.testing.expect(session.counters.max_region_scopes <= 8);
+        try std.testing.expect(session.counters.solver_constraint_visits <= depth * 20 + 128);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    }
+}
+
+fn constantHeaderScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    _ = session.sourceInterface(target(module, "factory")) catch |err| {
+        if (err != error.Declined) return err;
+        try std.testing.expectEqual(evaluator.Code.missing_associated, session.diagnostic.?.code);
+        if (module.bindings.len < 20) {
+            var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+            defer ordinary.deinit();
+            ordinary.reuse_principal_graphs = false;
+            _ = ordinary.sourceInterface(target(module, "factory")) catch |failed| {
+                if (failed != error.Declined) return failed;
+                try std.testing.expectEqualDeep(ordinary.diagnostic, session.diagnostic);
+            };
+            try std.testing.expect(ordinary.diagnostic != null);
+        }
+        try std.testing.expect(session.counters.solver_constraint_visits <= module.bindings.len * 12 + 128);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+        return;
+    };
+    return error.TestExpectedError;
+}
+
+test "closed mandatory headers remain bounded with unrelated generic public inputs" {
+    for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "const f_0: a -> a where { associated \"add\" Bool Bool Bool } = fn value => value\n");
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const factory = do:\n  return f_{d}\n", .{depth});
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        try constantHeaderScenario(a, &module);
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, constantHeaderScenario, .{&module});
+    }
 }
 
 fn summaryAdmissionScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {

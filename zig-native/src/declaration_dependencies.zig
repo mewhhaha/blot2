@@ -15,6 +15,7 @@ const Capture = struct {
     references: std.ArrayList(core.BindingRef) = .empty,
     locations: std.ArrayList(core.Id) = .empty,
     members: std.ArrayList(core.DependencyMember) = .empty,
+    schemes_seen: std.AutoHashMapUnmanaged(core.BindingId, void) = .empty,
     runtime_metadata: core.Id = 0,
     watched_binding: core.BindingId = 0,
     watched_used: bool = false,
@@ -23,6 +24,7 @@ const Capture = struct {
         self.references.deinit(self.allocator);
         self.locations.deinit(self.allocator);
         self.members.deinit(self.allocator);
+        self.schemes_seen.deinit(self.allocator);
     }
     fn node(self: *Capture, id: core.Id) Error!void {
         if (id != 0) try self.work.append(self.allocator, .{ .node = id });
@@ -54,7 +56,34 @@ const Capture = struct {
         if (name != 0 or op != .none) try self.members.append(self.allocator, .{ .name = name, .operator = op });
     }
     fn scheme(self: *Capture, value: T.Scheme) Error!void {
-        for (self.module.obligations[value.obligations.start..][0..value.obligations.len]) |obligation| {
+        if (value.obligations.len == 0) return;
+        const Frame = struct { scheme: T.Scheme, next: u32 = 0 };
+        var scratch_buffer: [512]u8 align(@alignOf(usize)) = undefined;
+        var scratch: std.heap.BufferFirstAllocator = .init(&scratch_buffer, self.allocator);
+        const allocator = scratch.allocator();
+        var pending: std.ArrayList(Frame) = .empty;
+        defer pending.deinit(allocator);
+        try pending.append(allocator, .{ .scheme = value });
+        var remaining: usize = scan_limit;
+        while (pending.items.len != 0) {
+            const last = pending.items.len - 1;
+            const frame = pending.items[last];
+            if (frame.next == frame.scheme.obligations.len) {
+                _ = pending.pop();
+                continue;
+            }
+            if (remaining == 0) return error.CoreLimit;
+            remaining -= 1;
+            pending.items[last].next += 1;
+            const obligation = self.module.obligations[frame.scheme.obligations.start + frame.next];
+            if (obligation.kind == .callee_use) {
+                if (obligation.identity.unit != 0 and obligation.identity.unit != self.module.unit) return error.CoreLimit;
+                const binding = obligation.identity.decl;
+                if (binding == 0 or binding >= self.module.bindings.len) return error.CoreLimit;
+                const entry = try self.schemes_seen.getOrPut(self.allocator, binding);
+                if (!entry.found_existing) try pending.append(allocator, .{ .scheme = self.module.binding(binding).scheme });
+                continue;
+            }
             if (!obligation.explicit) continue;
             switch (obligation.kind) {
                 .dispatch, .result_dispatch, .resolver_dispatch, .receiver, .field, .writable_field, .update => try self.member(obligation.name, obligation.operator),
@@ -65,6 +94,7 @@ const Capture = struct {
     fn scan(self: *Capture, body: core.Body) Error!core.DeclarationDependencies {
         const first_reference = self.references.items.len;
         const first_member = self.members.items.len;
+        self.schemes_seen.clearRetainingCapacity();
         self.runtime_metadata = 0;
         try self.scheme(body.scheme);
         try self.node(body.root);

@@ -2,8 +2,9 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — written predicates and bounded inferred graphs are
-  qualified; general admission remains unfinished.
+- **Status:** In progress — written predicates, structured residual graphs and
+  complete result-directed jobs are qualified; general admission and bounded
+  representation-header work remain unfinished.
 - **Dependencies:** [003](003-specify-general-call-summaries.md)
 - **Originating requirements:** PLAN: Hill 1 / generic callee sharing. Sources:
   [PLAN.md](../PLAN.md).
@@ -67,18 +68,31 @@ development and the scenarios below.
 
 ## Completion evidence
 
+- The 10 October structured/result-directed milestone adds source-owned
+  physical/nominal relationships, exact alias classes, seeded operation rows,
+  complete expected-result/arrow keys and ordinary diagnostic retry. The full
+  native suite and 603 guest/client tests pass, with zero analyzer findings in
+  291 Zig files. All 450 public differential cases preserve ordered diagnostics
+  and Wasm. Fifteen alternating pairs reduce the depth-12 result diamond from
+  489.525 to 6.156 ms CPU and 120,471,388 to 5,327,642 requested bytes. Small
+  operation wrappers cost about 11% more; representation headers still repeat
+  work. General type-head, comparison and handler coverage remains open. Exact
+  pins, commands and limitations are in
+  [the durable record](../zig-native/CALL_SUMMARIES.md#structured-and-result-directed-graphs-10-october-2026).
+
 - Commit: `099e700` adds immutable owned inferred first-order graphs, fresh
   type/row imports and iterative all-unknown residual-edge checking. Native
   independent-instance, immutable-source, depth-64 diamond and exhaustive
-  allocation-failure laws pass. The full native suite and 601 guest/client
-  tests pass; the analyzer reports zero findings across 291 files. All 393
-  public differential cases preserve ordered diagnostics and Wasm. Fifteen
-  paired staged factory runs at depth 12 reduce median CPU from 198.730 to
-  5.371 ms and requested allocation from 19,420,315 to 4,783,635 bytes.
-  Seven-pair fresh/retained/restart comparisons pass for both ordinary synthetic
-  workloads and the staged factory. General result-directed callee admission
-  and unsupported explicit requirements remain open. Exact pins, commands and
-  limitations are in [the durable record](../zig-native/CALL_SUMMARIES.md#owned-inferred-principal-graphs-9-october-2026).
+  allocation-failure laws pass. The full native suite and 601 guest/client tests
+  pass; the analyzer reports zero findings across 291 files. All 393 public
+  differential cases preserve ordered diagnostics and Wasm. Fifteen paired
+  staged factory runs at depth 12 reduce median CPU from 198.730 to 5.371 ms and
+  requested allocation from 19,420,315 to 4,783,635 bytes. Seven-pair
+  fresh/retained/restart comparisons pass for both ordinary synthetic workloads
+  and the staged factory. General result-directed callee admission and
+  unsupported explicit requirements remain open. Exact pins, commands and
+  limitations are in
+  [the durable record](../zig-native/CALL_SUMMARIES.md#owned-inferred-principal-graphs-9-october-2026).
 
 - Commit: `fd8cd3f` lands the qualified checked written-predicate milestone; it
   does not complete task 004.

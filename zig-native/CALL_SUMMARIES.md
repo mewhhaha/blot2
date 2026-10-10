@@ -582,24 +582,25 @@ closed-input jobs retain their original paths.
 
 An optional principal/source-interface inquiry can export an unresolved callee
 edge when its complete interface has only unknown data binders and unselected
-rows. An iterative scan checks every distinct reachable body and edge, preserving
-diamonds rather than copying their transitive paths. Explicit requirements,
-concrete bounds, structured endpoints and recursion decline this shortcut. The
-edge remains unsolved; it cannot publish a complete validated-call judgment or a
-dependency-complete refinement receipt. A later concrete caller input, result or
-row uses the ordinary solver and witness path. The closed-input job key is
-unchanged. General result-directed callee admission and unsupported explicit
-requirements remain task 004 work; this milestone does not complete that task.
+rows. An iterative scan checks every distinct reachable body and edge,
+preserving diamonds rather than copying their transitive paths. Explicit
+requirements, concrete bounds, structured endpoints and recursion decline this
+shortcut. The edge remains unsolved; it cannot publish a complete validated-call
+judgment or a dependency-complete refinement receipt. A later concrete caller
+input, result or row uses the ordinary solver and witness path. The closed-input
+job key is unchanged. General result-directed callee admission and unsupported
+explicit requirements remain task 004 work; this milestone does not complete
+that task.
 
 The baseline is the qualified `f7be6e7` release, SHA-256
-`d431170c3bfa2c3dd38b5c61eff375a6e326b3a530e14896b9a8e0873869f439`.
-The candidate is SHA-256
+`d431170c3bfa2c3dd38b5c61eff375a6e326b3a530e14896b9a8e0873869f439`. The
+candidate is SHA-256
 `ae2458cb3e31cd42f2f9c91a40909ff43786474aff2a28f33d9b009e0688bbaa`, with
 compiler-identity file SHA-256
-`dc5b861ddb9628c6f32bc402d4dc5d22943c91635262c135aa954f8ddfcfa225`.
-Both use Zig 0.17.0. The four-file source patch is SHA-256
-`22686519b212babe27347a6f68e13b61b646e944f54350e2ab7f6e0b50fa708b`.
-Pins, generated sources, scripts and raw results are in
+`dc5b861ddb9628c6f32bc402d4dc5d22943c91635262c135aa954f8ddfcfa225`. Both use Zig
+0.17.0. The four-file source patch is SHA-256
+`22686519b212babe27347a6f68e13b61b646e944f54350e2ab7f6e0b50fa708b`. Pins,
+generated sources, scripts and raw results are in
 `build/bench/cloud-principal-graphs/`; the final pin is `candidate-guarded/`.
 Earlier candidate directories preserve investigations and are not this release.
 
@@ -614,11 +615,11 @@ Qualification commands and results:
   276 successful cases. Compilation memory records return to zero live bytes.
 - Native laws check independent U32/F32 imports, repeated queries, immutable
   source tables and exhaustive allocation failures through description, graph
-  copying, traversal and publication. Open diamonds at depths 8, 16 and 64
-  have work bounded by distinct bodies/edges and perform no evaluation.
+  copying, traversal and publication. Open diamonds at depths 8, 16 and 64 have
+  work bounded by distinct bodies/edges and perform no evaluation.
 - The new executed-Wasm law uses a staged factory, a repeated diamond and a
-  result-selected constructor through an import. Fresh and retained builds
-  agree after body edits, a failed edit and correction. Existing dependency,
+  result-selected constructor through an import. Fresh and retained builds agree
+  after body edits, a failed edit and correction. Existing dependency,
   checkpoint, callback/effect and diagnostic laws also pass the full gate.
 
 The factory workload returns a generic helper from a `do` constant, triggering
@@ -633,16 +634,16 @@ work counters are identical across repetitions of each binary.
 
 | Diamond depth | Median CPU ms, baseline/candidate | Requested allocation bytes, baseline/candidate | Total scopes, baseline/candidate | Largest region scopes, baseline/candidate | Constraint visits, baseline/candidate |
 | ------------: | --------------------------------: | ---------------------------------------------: | -------------------------------: | ----------------------------------------: | ------------------------------------: |
-| 4             |                     4.486 / 4.338 |                          3,602,120 / 3,474,384 |                          82 / 56 |                                    32 / 3 |                             191 / 130 |
-| 8             |                     7.219 / 4.689 |                          5,420,870 / 4,158,718 |                         586 / 84 |                                   512 / 3 |                           1,255 / 234 |
-| 12            |                   198.730 / 5.371 |                         19,420,315 / 4,783,635 |                      8,290 / 112 |                                 8,192 / 3 |                          16,719 / 338 |
+|             4 |                     4.486 / 4.338 |                          3,602,120 / 3,474,384 |                          82 / 56 |                                    32 / 3 |                             191 / 130 |
+|             8 |                     7.219 / 4.689 |                          5,420,870 / 4,158,718 |                         586 / 84 |                                   512 / 3 |                           1,255 / 234 |
+|            12 |                   198.730 / 5.371 |                         19,420,315 / 4,783,635 |                      8,290 / 112 |                                 8,192 / 3 |                          16,719 / 338 |
 
-Description regions are included: at depth 12 total regions rise from 87 to
-100 while unresolved body collections fall from 8,195 to 4. This is a measured
+Description regions are included: at depth 12 total regions rise from 87 to 100
+while unresolved body collections fall from 8,195 to 4. This is a measured
 improvement for the staged factory inquiry. Ordinary typed workloads need not
-invoke that inquiry and do not acquire the same reduction. The extended
-depth-16 fresh batch was stopped after one pair because baseline checking was
-slow; its raw files are preserved separately and excluded from these medians.
+invoke that inquiry and do not acquire the same reduction. The extended depth-16
+fresh batch was stopped after one pair because baseline checking was slow; its
+raw files are preserved separately and excluded from these medians.
 
 Seven official synthetic pairs compare fresh, retained population, first edit,
 edit/revert, no-op and restart phases:
@@ -658,5 +659,105 @@ leaf edit, also passes all fresh/retained/restart comparisons:
 `deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-factory.ts --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-guarded/blotc --runs 7 --workload factory_diamond_12 --restart-cache --out build/bench/cloud-principal-graphs/guarded-factory-retained`.
 Fresh CPU is 205/7 ms; retained population, first edit and subsequent edit are
 200/<10, 210/<10 and 190/<10 ms. Restart is 7/7 ms and no-op is below 10 ms for
-both. The retained factory improvement is above the accounting resolution;
-the candidate's sub-10-ms samples do not provide a more precise latency.
+both. The retained factory improvement is above the accounting resolution; the
+candidate's sub-10-ms samples do not provide a more precise latency.
+
+## Structured and result-directed graphs, 10 October 2026
+
+This milestone retains source-owned first-order physical and nominal structure
+in open residual callee edges. Matching preserves exact live alias classes,
+field names, nominal identities and operation rows. A fixed source effect row
+cannot match a caller's open tail. Frozen graph copying preserves both source
+row prefixes and seeded caller labels, arguments, tails and chronological
+cursors. Public slot metadata survives dependency bundles and checkpoints;
+frozen validation checks its bounds and transitive explicit-requirement flags.
+
+Complete expected results or complete first-order arrows may now key independent
+result-directed jobs. Their binders belong to the job's source graph; caller
+variables never cross the solver boundary. All constraints must solve before
+publication. Failed speculative admission falls back to the original call and
+its witnesses. A speculative `Never` comparison has no source-entry witness and
+declines rather than manufacturing a diagnostic. Unknown result destinations
+keep ordinary associated-selection diagnostics. Fully fixed frontend result uses
+retain their residual edge instead of expanding a diamond at the old depth
+boundary. Binary implementation selection still requires complete operands.
+
+Written header leaves remain mandatory and ordered. Their iterative scheduler
+shares required work separately from principal graph proofs. Optional source and
+body inquiries that used residual export retry ordinary collection after a
+semantic failure, while out-of-memory propagates. No cached decline or partial
+proof replaces authoritative checking.
+
+The baseline is the qualified `f7be6e7` binary, SHA-256
+`d431170c3bfa2c3dd38b5c61eff375a6e326b3a530e14896b9a8e0873869f439`. The passing
+candidate is SHA-256
+`26bfb3dd5a3ea917c703e81d682117372ffc2ae4698df9e184900a3ccb06cacc`; its compiler
+identity file is SHA-256
+`0abb85722e25b5885e52a310c8b86eb46f55ce16175c0c4e8fe316afc5832e47`. The source
+patch against `78baef0`, excluding this documentation, is SHA-256
+`fa13b430104f2206ca9caaf1171178eef874f7b06954e75cb8c0fa78c1bda9b5`. Pins,
+scripts, generated workloads and raw output are preserved under
+`build/bench/cloud-principal-graphs/`; the candidate directory is
+`candidate-structured-result-v2/`. Both compilers use Zig 0.17.0. The earlier v1
+pin failed two guest laws and is preserved as an experiment, not a qualified
+release.
+
+Qualification commands and results:
+
+- `deno task test:compiler`: full native suite and all 603 guest/client tests
+  pass; `structured-v2-gate.log` records the final run.
+- `deno task lint:zig`: 291 Zig files, zero findings;
+  `structured-v2-analyzer.log` records the run with the CI-pinned analyzer.
+- `python3 build/bench/cloud-principal-graphs/compare-structured-v2.py`: all 450
+  public cases (900 invocations, 308 successes) preserve exact ordered JSON
+  diagnostics and successful Wasm bytes. Every compilation memory record returns
+  to zero live bytes and no restart cache is loaded.
+- Native laws cover structured imports, independent U32/F32 results, typed
+  result diamonds through depth 64, repeated identical queries, open written
+  representation diamonds, seeded operation rows, immutable source tables and
+  exhaustive allocation failures. Type-only inquiries perform no evaluation.
+- Executed-Wasm coverage includes array/record/nominal fields, written operation
+  rows, independently typed providers, repeated diamonds, dependency bundles,
+  checkpoints, cached imports, changed bodies, failed edits and recovery.
+
+Fifteen alternating fresh-process pairs use cache-disabled `build --profile`,
+compare exact Wasm and measure child user plus system CPU with `getrusage`:
+`python3 build/bench/cloud-principal-graphs/measure-structured-v2.py`. Load
+rises from about 0.07 to 0.22 on five reported CPUs. Requested allocation and
+work counters are deterministic across all repetitions.
+
+| Workload                   | Median CPU ms, baseline/candidate | Requested allocation bytes, baseline/candidate | Total scopes, baseline/candidate | Constraint visits, baseline/candidate |
+| -------------------------- | --------------------------------: | ---------------------------------------------: | -------------------------------: | ------------------------------------: |
+| Factory diamond 4          |                     4.413 / 4.309 |                          3,602,120 / 3,687,432 |                          82 / 68 |                             191 / 166 |
+| Factory diamond 8          |                     6.968 / 5.139 |                          5,420,870 / 4,570,022 |                        586 / 104 |                           1,255 / 310 |
+| Factory diamond 12         |                   206.295 / 5.848 |                         19,420,315 / 5,355,239 |                      8,290 / 140 |                          16,719 / 454 |
+| Result identity diamond 8  |                    25.329 / 5.264 |                          8,991,170 / 4,514,734 |                      6,122 / 120 |                           2,046 / 300 |
+| Result double diamond 8    |                    26.253 / 5.261 |                          9,457,698 / 4,577,004 |                      6,148 / 134 |                           2,070 / 312 |
+| Result double diamond 12   |                   489.525 / 6.156 |                        120,471,388 / 5,327,642 |                     98,308 / 182 |                          32,798 / 456 |
+| Representation diamond 8   |                     8.467 / 8.363 |                          5,993,070 / 5,186,674 |                          52 / 80 |                         6,396 / 1,568 |
+| Representation diamond 12  |                   59.961 / 50.819 |                        43,473,545 / 22,145,825 |                         68 / 108 |                      102,396 / 24,616 |
+| Operation wrappers 8       |                     4.599 / 5.124 |                          3,210,024 / 3,574,580 |                          62 / 91 |                               70 / 60 |
+| Structured field diamond 8 |                     7.081 / 4.763 |                          4,667,651 / 3,727,787 |                         544 / 51 |                           1,105 / 115 |
+
+The candidate's largest recorded inference region is 21.695 ms; no sampled
+region exceeds 50 ms. Profiles list only regions of at least 1 ms. Smaller
+factory cases can allocate more, and operation wrappers have an approximately
+11% CPU/allocation increase. The large diamond improvements do not establish a
+general compiler speedup. In particular, representation constraint visits still
+grow with transitive paths: open header keys use freshly allocated wrapper
+product IDs, preventing equivalent live inputs from sharing required work.
+
+Seven official synthetic pairs preserve fresh/retained/restart Wasm equality:
+`deno task bench:compile --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-structured-result-v2/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/structured-v2-synthetic`.
+The same harness extended with the factory also preserves all comparisons:
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-factory.ts --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-structured-result-v2/blotc --runs 7 --workload factory_diamond_12 --restart-cache --out build/bench/cloud-principal-graphs/structured-v2-factory-retained`.
+Retained timings use 10-ms process-accounting resolution; below-resolution
+samples are not precise latency measurements. Their raw records retain
+population, first edit, subsequent edit/revert, no-op and restart separately.
+
+Task 004 remains in progress. Next work is exact region-local header keys over
+requirement-consumed public slots and general type-head, comparison and handler
+coverage with ordinary diagnostic and ownership laws. Callback, lexical capture,
+recursive component and canonical cross-session inputs remain tasks 005–008. The
+historical boxed compiler and frozen private gdev workload are absent; these
+public results do not replace their qualification.

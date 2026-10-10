@@ -46,7 +46,7 @@ pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less,
 /// handle a=provider,b=inner expression,c=optional HandleEffects catalog index+1.
 pub const Node = struct { tag: Tag, op: Op = .none, ty: T.Id = 0, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
 pub const Parameter = struct { binding: BindingId, ty: T.Id, span: Span };
-pub const Binding = struct { initializer: Id = 0, kind: checked_types.Kind, ty: T.Id, scheme: T.Scheme, body_id: BodyId = 0, target: BindingRef, span: Span };
+pub const Binding = struct { initializer: Id = 0, kind: checked_types.Kind, ty: T.Id, scheme: T.Scheme, public_variables: T.List = .{}, public_rows: T.List = .{}, has_explicit: bool = false, body_id: BodyId = 0, target: BindingRef, span: Span };
 pub const RuntimeName = struct { binding: BindingId, point: u32 };
 /// Original declaration reads survive executable branch/value elimination.
 pub const DeclarationDependencies = struct { references: List = .{}, members: List = .{}, runtime_metadata: Id = 0 };
@@ -826,6 +826,12 @@ const Builder = struct {
         const start: u32 = @intCast(self.obligations.items.len);
         for (self.checked.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |value| try self.obligations.append(self.allocator, .{ .ty = try self.projectType(value.ty, 0), .kind = value.kind, .span = self.checked.diagnosticSpan(self.tree, value.source), .name = value.name, .result = try self.projectType(value.result, 0), .other = try self.projectType(value.other, 0), .signature = try self.projectType(value.signature, 0), .operator = value.operator, .identity = value.identity, .explicit = value.explicit, .qualification_span = value.qualification_span, .qualification_unit = value.qualification_unit, .diagnostic_name = if (value.explicit and value.name != 0) try self.saveName(self.names.get(value.name)) else .{} });
         return .{ .root = root, .variables = span, .row_variables = row_span, .closed_rows = closed_span, .obligations = .{ .start = start, .len = @intCast(self.obligations.items.len - start) } };
+    }
+    fn projectPublic(self: *Builder, public: T.List, rows: bool) Error!T.List {
+        var projected: std.ArrayList(T.Id) = .empty;
+        defer projected.deinit(self.allocator);
+        for (self.checked.types.list(public)) |id| try projected.append(self.allocator, if (rows) try self.projectRowVariable(id) else try self.projectType(id, 0));
+        return self.saveTypes(projected.items);
     }
     fn reserve(self: *Builder, source: ast.Id) Error!Id {
         if (self.nodes.items.len == std.math.maxInt(u32)) return error.CoreLimit;
@@ -2562,7 +2568,13 @@ const Builder = struct {
         self.merge_ranges.items[id] = .{ .start = start, .len = @intCast(self.merges.items.len - start) };
     }
     fn allBindings(self: *Builder) Error!void {
-        for (self.checked.bindings, 0..) |value, i| try self.bindings.append(self.allocator, .{ .kind = value.kind, .ty = try self.projectType(value.ty, 0), .scheme = try self.projectScheme(value.scheme), .target = if (i == 0) .{ .binding = 0 } else self.target(@intCast(i)), .span = self.tree.span(value.declaration) });
+        for (self.checked.bindings, 0..) |value, i| {
+            var has_explicit = value.summary.has_explicit;
+            for (self.checked.obligations[value.scheme.obligations.start..][0..value.scheme.obligations.len]) |requirement| {
+                has_explicit = has_explicit or requirement.explicit or (requirement.kind == .callee_use and self.checked.bindings[requirement.identity.decl].summary.has_explicit);
+            }
+            try self.bindings.append(self.allocator, .{ .kind = value.kind, .ty = try self.projectType(value.ty, 0), .scheme = try self.projectScheme(value.scheme), .public_variables = try self.projectPublic(value.summary.public_variables, false), .public_rows = try self.projectPublic(value.summary.public_rows, true), .has_explicit = has_explicit, .target = if (i == 0) .{ .binding = 0 } else self.target(@intCast(i)), .span = self.tree.span(value.declaration) });
+        }
     }
     fn projectedTypeList(self: *Builder, source: T.List) Error!T.List {
         var values: std.ArrayList(T.Id) = .empty;

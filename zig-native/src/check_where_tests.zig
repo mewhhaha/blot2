@@ -114,6 +114,7 @@ fn rejectionLaws(allocator: std.mem.Allocator) !void {
         try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
         var checked = try check.check(allocator, &tree, &pool);
         defer checked.deinit(allocator);
+        if (checked.diagnostics.len == 0) std.debug.print("expected {s} for:\n{s}", .{ @tagName(item.code), item.source });
         try std.testing.expect(checked.diagnostics.len != 0);
         try std.testing.expectEqual(item.code, checked.diagnostics[0].code);
         try std.testing.expectEqual(@as(u32, @intCast(std.mem.find(u8, item.source, item.marker).?)), checked.diagnostics[0].span.start);

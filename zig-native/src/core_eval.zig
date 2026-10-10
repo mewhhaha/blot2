@@ -217,9 +217,8 @@ const IndexedRegion = struct {
     plan: @import("eval_indexed_builder.zig").Plan,
 };
 
-/// An explicit stack of independently owned inference regions. Pending jobs
-/// contain only immutable source identities and closed semantic input values.
-/// Failed speculation is remembered, then replayed in the original caller.
+/// An immutable source-owned interface with residual body actions and shared
+/// callee edges. Each import freshens its binders in the receiving solver.
 const PrincipalGraph = struct {
     const Key = struct { target: Target, source_interface: bool, deferred_member: bool, options: Options };
     const TypeImport = struct { source: types.Id, graph: types.Id };
@@ -230,6 +229,7 @@ const PrincipalGraph = struct {
     root: types.Id = 0,
     imports: []TypeImport = &.{},
     rows: []RowImport = &.{},
+    requirements: []ClosureRegion.Constraint = &.{},
     constraints: []ClosureRegion.Constraint = &.{},
     aliases: []ClosureRegion.DataAlias = &.{},
     functions: []types.Id = &.{},
@@ -244,12 +244,15 @@ const PrincipalGraph = struct {
     fn edgeCount(self: *const PrincipalGraph) usize {
         var count = self.types.extra.items.len + self.types.effects.labels.items.len + self.actions.len + self.imports.len + self.rows.len + self.arguments.len + self.aliases.len * 2 + self.functions.len + self.references.len;
         for (self.constraints) |constraint| count +|= 5 +| constraint.diagnostic_name.len;
+        for (self.requirements) |constraint| count +|= 5 +| constraint.diagnostic_name.len;
         return count;
     }
 
     fn deinit(self: *PrincipalGraph, allocator: Allocator) void {
         for (self.constraints) |constraint| allocator.free(constraint.diagnostic_name);
+        for (self.requirements) |constraint| allocator.free(constraint.diagnostic_name);
         allocator.free(self.constraints);
+        allocator.free(self.requirements);
         allocator.free(self.imports);
         allocator.free(self.rows);
         allocator.free(self.aliases);
@@ -262,7 +265,7 @@ const PrincipalGraph = struct {
 };
 
 const CallSummaries = struct {
-    const Key = struct { target: Target, inputs: type_evidence.Id, source_interface: bool };
+    const Key = struct { target: Target, inputs: type_evidence.Id, source_interface: bool, expected_result: type_evidence.Id = 0, expected_signature: type_evidence.Id = 0, deferred_member: bool = false };
     const JobState = enum { queued, running, complete, declined };
     const Job = struct { key: Key, state: JobState = .queued, region: ?*ClosureRegion = null, result: type_evidence.Id = 0 };
     keys: std.AutoHashMapUnmanaged(Key, usize) = .empty,
@@ -270,8 +273,12 @@ const CallSummaries = struct {
     stack: std.ArrayList(usize) = .empty,
     active: std.AutoHashMapUnmanaged(Target, void) = .empty,
     eligibility: std.AutoHashMapUnmanaged(Target, bool) = .empty,
+    checked_requirements: std.AutoHashMapUnmanaged(Target, bool) = .empty,
+    public_requirements: std.AutoHashMapUnmanaged(Target, void) = .empty,
+    constant_requirements: std.AutoHashMapUnmanaged(Target, void) = .empty,
     principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, ?*PrincipalGraph) = .empty,
     open_principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, bool) = .empty,
+    result_principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, bool) = .empty,
     draining: bool = false,
 
     fn deinit(self: *CallSummaries, session: *Session) void {
@@ -284,6 +291,10 @@ const CallSummaries = struct {
         self.stack.deinit(session.allocator);
         self.active.deinit(session.allocator);
         self.eligibility.deinit(session.allocator);
+        self.checked_requirements.deinit(session.allocator);
+        self.public_requirements.deinit(session.allocator);
+        self.constant_requirements.deinit(session.allocator);
+        self.result_principals.deinit(session.allocator);
         var principals = self.principals.valueIterator();
         while (principals.next()) |entry| if (entry.*) |graph| {
             graph.deinit(session.allocator);
@@ -774,7 +785,23 @@ pub const Session = struct {
         const body = module.body(resolved.binding) orelse return self.fail(resolved.unit, module.binding(resolved.binding).span, .unsupported);
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
         defer region.deinit();
-        return region.sourceInterface(resolved, body) catch |err| return self.evidenceFailure(resolved.unit, body.span, err);
+        return region.sourceInterface(resolved, body) catch |err| {
+            if (err == error.OutOfMemory or !region.principal_only_used) return self.evidenceFailure(resolved.unit, body.span, err);
+            // A delayed edge can discover a failure after later caller work.
+            // Ordinary collection owns the diagnostic traversal and witnesses.
+            self.discardDiagnostic();
+            const sharing = self.reuse_principal_graphs;
+            self.reuse_principal_graphs = false;
+            defer self.reuse_principal_graphs = sharing;
+            var ordinary = ClosureRegion.init(self) catch return error.OutOfMemory;
+            defer ordinary.deinit();
+            return ordinary.sourceInterface(resolved, body) catch |failed| return self.evidenceFailure(resolved.unit, body.span, failed);
+        };
+    }
+    fn discardDiagnostic(self: *Session) void {
+        self.diagnostic = null;
+        self.allocator.free(self.owned_diagnostic_message);
+        self.owned_diagnostic_message = &.{};
     }
     /// Returns an owned mapping array in this body's frozen variable namespace.
     /// The region reads semantic core only: it evaluates no value or capture.
@@ -790,17 +817,16 @@ pub const Session = struct {
         const target_ = try self.external(try self.target(null, reference));
         const module = &self.units[target_.unit];
         const body = module.body(target_.binding) orelse return self.fail(target_.unit, module.binding(target_.binding).span, .unsupported);
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
-        defer region.deinit();
-        return region.bodyEvidence(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .code = .{ .view = expectations, .id = expected } }, seeds) catch |err| return self.evidenceFailure(target_.unit, module.span(body.root), err);
+        const solved = try self.solveEvidenceOwned(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .code = .{ .view = expectations, .id = expected } }, seeds, &.{});
+        self.allocator.free(solved.rows);
+        self.allocator.free(solved.selected);
+        return solved.types;
     }
     pub fn bodyEvidencePartialFull(self: *Session, reference: core.BindingRef, expectations: code_expectation.View, expected: code_expectation.Id, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping) Error!SolvedEvidence {
         const target_ = try self.external(try self.target(null, reference));
         const module = &self.units[target_.unit];
         const body = module.body(target_.binding) orelse return self.fail(target_.unit, module.binding(target_.binding).span, .unsupported);
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
-        defer region.deinit();
-        return region.bodyEvidenceFull(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .code = .{ .view = expectations, .id = expected } }, seeds, row_seeds) catch |err| return self.evidenceFailure(target_.unit, module.span(body.root), err);
+        return self.solveEvidenceOwned(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .code = .{ .view = expectations, .id = expected } }, seeds, row_seeds);
     }
     /// Copy only completed primitive inputs into a fresh, independently owned
     /// probe for these same immutable units. No rich semantic IDs are copied.
@@ -848,9 +874,7 @@ pub const Session = struct {
         const target_ = try self.external(try self.target(null, reference));
         const module = &self.units[target_.unit];
         const body = module.body(target_.binding) orelse return self.fail(target_.unit, module.binding(target_.binding).span, .unsupported);
-        var region = ClosureRegion.init(self) catch return error.OutOfMemory;
-        defer region.deinit();
-        return region.bodyEvidenceFull(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .semantic = expected }, seeds, row_seeds) catch |err| return self.evidenceFailure(target_.unit, module.span(body.root), err);
+        return self.solveEvidenceOwned(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .semantic = expected }, seeds, row_seeds);
     }
     /// Initializer-specific source dependencies, obtained without executing a
     /// value. Generic producers are instantiated in this region; two callers
@@ -1050,9 +1074,25 @@ pub const Session = struct {
         return region.closureEvidenceFull(owner, closure, .{ .semantic = expected }, seeds, row_seeds) catch |err| return self.evidenceFailure(owner, module.span(closure.body), err);
     }
     fn solveEvidence(self: *Session, owner: usize, body: core.Id, root: types.Id, closed_rows: types.List, scheme: types.Scheme, expected: type_evidence.Id, seeds: []const type_evidence.Mapping) Error![]type_evidence.Mapping {
+        const solved = try self.solveEvidenceOwned(owner, body, root, closed_rows, scheme, .{ .semantic = expected }, seeds, &.{});
+        self.allocator.free(solved.rows);
+        self.allocator.free(solved.selected);
+        return solved.types;
+    }
+    fn solveEvidenceOwned(self: *Session, owner: usize, body: core.Id, root: types.Id, closed_rows: types.List, scheme: types.Scheme, expected: ClosureRegion.Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping) Error!SolvedEvidence {
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
         defer region.deinit();
-        return region.bodyEvidence(owner, body, root, closed_rows, scheme, .{ .semantic = expected }, seeds) catch |err| return self.evidenceFailure(owner, self.units[owner].span(body), err);
+        return region.bodyEvidenceFull(owner, body, root, closed_rows, scheme, expected, seeds, row_seeds) catch |err| {
+            if (err == error.OutOfMemory or !region.principal_only_used) return self.evidenceFailure(owner, self.units[owner].span(body), err);
+            // Complete and partial code queries have the same witness-order
+            // boundary as source selection. A speculative graph failure never
+            // replaces the diagnostic from ordinary body collection.
+            self.discardDiagnostic();
+            const sharing = self.reuse_principal_graphs;
+            self.reuse_principal_graphs = false;
+            defer self.reuse_principal_graphs = sharing;
+            return self.solveEvidenceOwned(owner, body, root, closed_rows, scheme, expected, seeds, row_seeds);
+        };
     }
     fn evidenceFailure(self: *Session, owner: usize, span: core.Span, err: ClosureRegion.RegionError) Error {
         return switch (err) {
@@ -1590,11 +1630,24 @@ pub const Session = struct {
         defer region.profile_rejected = reads.rejected;
         region.profile_principal = true;
         region.profile_input_calls = self.validated_calls.count();
-        var solved = region.bodyEvidenceMode(resolved.unit, body.root, binding_type, body.closed_rows, body.scheme, .{ .semantic = 0 }, &.{}, &.{}, true) catch |err| switch (err) {
+        var solved = region.bodyEvidenceMode(resolved.unit, body.root, binding_type, body.closed_rows, body.scheme, .{ .semantic = 0 }, &.{}, &.{}, true) catch |err| ordinary: {
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+            if (region.principal_only_used) {
+                self.discardDiagnostic();
+                const sharing = self.reuse_principal_graphs;
+                self.reuse_principal_graphs = false;
+                defer self.reuse_principal_graphs = sharing;
+                var fallback = ClosureRegion.init(self) catch return error.OutOfMemory;
+                defer fallback.deinit();
+                break :ordinary fallback.bodyEvidenceMode(resolved.unit, body.root, binding_type, body.closed_rows, body.scheme, .{ .semantic = 0 }, &.{}, &.{}, true) catch |failed| switch (failed) {
+                    error.UnresolvedType => return null,
+                    else => return self.evidenceFailure(resolved.unit, body.span, failed),
+                };
+            }
             // Partial source results preserve unresolved facts; ordinary fresh
             // evaluation still owns value-dependent obligations and diagnostics.
-            error.UnresolvedType => return null,
-            else => return self.evidenceFailure(resolved.unit, body.span, err),
+            if (err == error.UnresolvedType) return null;
+            return self.evidenceFailure(resolved.unit, body.span, err);
         };
         errdefer solved.deinit(self.allocator);
         const key = if (recording) reads.key() else null;
@@ -2930,7 +2983,11 @@ pub const Session = struct {
         return self.applyValue(owner, id, typed, argument.value, frame.providers);
     }
     fn hasExplicitScheme(self: *const Session, owner: usize, scheme: types.Scheme) bool {
-        for (self.units[owner].obligations[scheme.obligations.start..][0..scheme.obligations.len]) |obligation| if (obligation.explicit) return true;
+        const module = &self.units[owner];
+        for (module.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |obligation| {
+            if (obligation.explicit) return true;
+            if (obligation.kind == .callee_use and (obligation.identity.unit == 0 or obligation.identity.unit == self.unitId(owner)) and module.binding(obligation.identity.decl).has_explicit) return true;
+        }
         return false;
     }
     fn validateScheme(self: *Session, owner: usize, source: core.Id, scheme: types.Scheme, frame: *Frame, allow_remaining: bool) Error!void {
@@ -3569,10 +3626,11 @@ const ClosureRegion = struct {
     const Edge = struct { parent: u32, child: u32, slot: u32, formal: types.Id };
     const DataAlias = struct { instance: types.Id, principal: types.Id, solved: bool = false };
     const CallKey = struct { owner: usize, binding: core.BindingId, evidence: type_evidence.Id, caller: u32 = 0 };
+    const SchemeInstance = struct { target: Target, public: type_evidence.Id, deferred_member: bool, open: types.Id = 0, constant: bool = false, physical: u64 = 0 };
     const DefinitionKey = struct { owner: usize, node: core.Id };
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
-    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary };
-    const Constraint = struct { target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, solved: bool = false };
+    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use };
+    const Constraint = struct { target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
     const Worklists = struct {
         constraints: @import("solver_worklist.zig").Queue = .{},
         aliases: @import("solver_worklist.zig").Queue = .{},
@@ -3611,6 +3669,9 @@ const ClosureRegion = struct {
         witness_inputs: std.AutoHashMapUnmanaged(types.Id, types.Id) = .empty,
         principal_references: std.ArrayList(Target) = .empty,
         principal_actions: std.ArrayList(PrincipalGraph.Action) = .empty,
+        /// Region-local scheduling shares a closed header's outstanding work.
+        /// Its predicates remain required; this is never a published proof.
+        scheme_instances: std.AutoHashMapUnmanaged(SchemeInstance, void) = .empty,
 
         pub fn deinit(self: *Scratch, allocator: Allocator) void {
             if (self.worklists) |work| {
@@ -3642,6 +3703,8 @@ const ClosureRegion = struct {
     include_callables: bool = false,
     source_interface: bool = false,
     building_principal: bool = false,
+    partial_principal: bool = false,
+    principal_only_used: bool = false,
     speculative_source_entry: bool = false,
     source_selection_failed: bool = false,
     complete_demand_bodies: bool = false,
@@ -3650,6 +3713,8 @@ const ClosureRegion = struct {
     // instance. Its enclosing proof still gathers mandatory effect equations.
     defer_members: bool = false,
     summary_job: bool = false,
+    result_summary_job: bool = false,
+    principal_result_job: bool = false,
     code_expectation_remaining: usize = 0,
     /// Pooled solvers keep their occurs counter; this region owns the delta.
     occurs_base: u64 = 0,
@@ -3708,6 +3773,15 @@ const ClosureRegion = struct {
     fn importScheme(self: *ClosureRegion, scope: u32, scheme: types.Scheme, source: core.Id) RegionError!void {
         const module = &self.session.units[self.scratch.sources.items[scope].owner];
         for (module.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |obligation| {
+            if (obligation.kind == .callee_use) {
+                const target_ = try self.schemeTarget(self.scratch.sources.items[scope].owner, obligation.identity);
+                if (self.session.units[target_.unit].binding(target_.binding).has_explicit) {
+                    const index = self.scratch.constraints.items.len;
+                    try self.appendConstraint(.{ .scope = scope, .node = source, .span = obligation.span, .kind = .scheme_use, .target = target_, .left = try self.importType(scope, obligation.ty, 0), .result = 0 });
+                    if (!self.building_principal) _ = try self.solveSchemeUse(index);
+                }
+                continue;
+            }
             if (!obligation.explicit) continue;
             const kind: ConstraintKind = switch (obligation.kind) {
                 .dispatch => .binary,
@@ -3832,6 +3906,7 @@ const ClosureRegion = struct {
     }
     fn sourceInterface(self: *ClosureRegion, target_: Target, body: *const core.Body) RegionError!SourceInterface {
         self.source_interface = true;
+        self.partial_principal = true;
         self.source_entry = target_;
         self.include_callables = true;
         const entry_module = &self.session.units[target_.unit];
@@ -3866,7 +3941,16 @@ const ClosureRegion = struct {
         for (self.scratch.constraints.items) |constraint| if (!constraint.solved) {
             pending += 1;
         };
-        if (pending != 0) return .{ .pending = pending, .generic = try self.genericEntryInterface(scope) };
+        if (pending != 0) {
+            const head = self.solver.node(try self.solver.resolve(self.scratch.sources.items[scope].root, 0));
+            const result_directed = for (self.scratch.constraints.items) |constraint| {
+                if (!constraint.solved and constraint.kind == .result_dispatch) break true;
+            } else false;
+            // An unselected destination retains ordinary result-dispatch
+            // diagnostics. Other unowned entry types must be rejected before
+            // evaluating an initializer merely to discover its representation.
+            return .{ .pending = pending, .generic = (head.tag == .variable and !result_directed) or try self.genericEntryInterface(scope) };
+        }
         for (self.scratch.sources.items) |source| {
             const module = &self.session.units[source.owner];
             if (source.binding == 0 or source.binding >= module.bindings.len) continue;
@@ -3957,6 +4041,7 @@ const ClosureRegion = struct {
     }
     fn bodyEvidenceMode(self: *ClosureRegion, owner: usize, body: core.Id, root: types.Id, closed_rows: types.List, scheme: types.Scheme, expected: Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, allow_remaining: bool) RegionError!SolvedEvidence {
         self.include_callables = true;
+        self.partial_principal = allow_remaining;
         const scope = try self.typeScope(owner);
         self.scratch.sources.items[scope].body = body;
         self.scratch.sources.items[scope].closed_rows = closed_rows;
@@ -4702,11 +4787,20 @@ const ClosureRegion = struct {
         // Import those requirements with fresh variables; do not recollect the
         // body or publish a closed call proof before its predicates are solved.
         if ((!self.source_interface or binding.scheme.obligations.len != 0) and !self.retain_selected and !self.complete_demand_bodies and definition != null and definition.?.is_function and binding.kind == .global and try self.checkedSchemeReusable(target_)) {
+            if (binding.scheme.obligations.len != 0 and self.partial_principal and try self.retainOpenPrincipal(.{ .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .deferred_member = self.defer_members })) {
+                const start = self.scratch.summary_arguments.items.len;
+                if (arguments.len > std.math.maxInt(u32) - start) return error.TypeLimit;
+                try self.scratch.summary_arguments.appendSlice(self.scratch_allocator, arguments);
+                try self.appendConstraint(.{ .kind = .call_summary, .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .right = callee_type, .arguments = .{ .start = @intCast(start), .len = @intCast(arguments.len) }, .deferred_member = self.defer_members, .principal_only = true });
+                self.principal_only_used = true;
+                return;
+            }
             const scope = try self.typeScope(target_.unit);
             self.scratch.sources.items[scope].body = body_root;
             self.scratch.sources.items[scope].binding = target_.binding;
             self.scratch.sources.items[scope].closed_rows = definition.?.closed_rows;
             self.scratch.sources.items[scope].root = try self.importType(scope, source_type, 0);
+            _ = try self.admitSignature(instantiated, self.scratch.sources.items[scope].root);
             try self.importScheme(scope, binding.scheme, body_root);
             if (self.source_interface) {
                 var formal = self.scratch.sources.items[scope].root;
@@ -4720,7 +4814,6 @@ const ClosureRegion = struct {
                     formal = arrow.b;
                 }
             }
-            _ = try self.admitSignature(instantiated, self.scratch.sources.items[scope].root);
             if (self.session.receipt_tape) |tape| try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(target_.unit), .binding = target_.binding });
             const actual = try self.project(self.scratch.sources.items[scope].root);
             if (actual != 0) {
@@ -4731,11 +4824,16 @@ const ClosureRegion = struct {
             }
             return;
         }
-        if (definition != null and binding.kind == .global and !self.retain_selected and try self.summaryEligible(target_)) {
+        if (definition != null and binding.kind == .global and !self.retain_selected) {
+            const independent = !self.principal_result_job and try self.summaryEligible(target_);
+            const residual = !independent and self.partial_principal and try self.retainOpenPrincipal(.{ .kind = .call_summary, .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .deferred_member = self.defer_members });
+            const result_directed = !independent and !residual and try self.resultPrincipalEligible(target_, self.defer_members);
+            if (!independent and !residual and !result_directed) return self.collectInlineCall(caller, target_, callee_type, arguments);
             const start = self.scratch.summary_arguments.items.len;
             if (arguments.len > std.math.maxInt(u32) - start) return error.TypeLimit;
             try self.scratch.summary_arguments.appendSlice(self.scratch_allocator, arguments);
-            try self.appendConstraint(.{ .kind = .call_summary, .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .right = callee_type, .arguments = .{ .start = @intCast(start), .len = @intCast(arguments.len) }, .deferred_member = self.defer_members });
+            try self.appendConstraint(.{ .kind = .call_summary, .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .right = callee_type, .arguments = .{ .start = @intCast(start), .len = @intCast(arguments.len) }, .deferred_member = self.defer_members, .principal_only = residual or result_directed });
+            self.principal_only_used = self.principal_only_used or residual or result_directed;
             return;
         }
         try self.collectInlineCall(caller, target_, callee_type, arguments);
@@ -4743,15 +4841,8 @@ const ClosureRegion = struct {
     fn checkedSchemeReusable(self: *ClosureRegion, target_: Target) RegionError!bool {
         const module = &self.session.units[target_.unit];
         const body = module.body(target_.binding) orelse return false;
-        const scheme = module.binding(target_.binding).scheme;
-        if (scheme.obligations.len == 0) return true;
-        for (module.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |requirement| {
-            if (!requirement.explicit) return false;
-            switch (requirement.kind) {
-                .dispatch, .field, .receiver, .update, .record_merge, .effect_operation, .type_rep, .effect_rep => {},
-                else => return false,
-            }
-        }
+        if (module.binding(target_.binding).scheme.obligations.len == 0) return true;
+        if (!try self.checkedRequirements(target_)) return false;
         var arrow_type = body.scheme.root;
         for (0..body.parameters.len) |_| {
             const arrow = module.types.node(arrow_type);
@@ -4759,6 +4850,335 @@ const ClosureRegion = struct {
             arrow_type = arrow.b;
         }
         return self.potentialData(target_.unit, arrow_type, 0);
+    }
+    fn schemeTarget(self: *ClosureRegion, owner: usize, identity: types.NominalIdentity) RegionError!Target {
+        return self.session.external(try self.session.target(owner, .{ .unit = identity.unit, .binding = identity.decl }));
+    }
+    fn checkedRequirements(self: *ClosureRegion, root: Target) RegionError!bool {
+        if (self.session.call_summaries.checked_requirements.get(root)) |known| return known;
+        const Visit = struct { target: Target, next: usize = 0 };
+        var stack: std.ArrayList(Visit) = .empty;
+        defer stack.deinit(self.scratch_allocator);
+        var visited: std.AutoHashMapUnmanaged(Target, bool) = .empty;
+        defer visited.deinit(self.scratch_allocator);
+        try stack.append(self.scratch_allocator, .{ .target = root });
+        try visited.put(self.scratch_allocator, root, false);
+        var edges: usize = 0;
+        while (stack.items.len != 0) {
+            const last = stack.items.len - 1;
+            const frame = stack.items[last];
+            const module = &self.session.units[frame.target.unit];
+            const scheme = module.binding(frame.target.binding).scheme;
+            if (frame.next == scheme.obligations.len) {
+                visited.getPtr(frame.target).?.* = true;
+                _ = stack.pop();
+                continue;
+            }
+            stack.items[last].next += 1;
+            edges += 1;
+            if (edges > self.session.options.max_children) return false;
+            const requirement = module.obligations[scheme.obligations.start + frame.next];
+            if (requirement.kind == .callee_use) {
+                const child = try self.schemeTarget(frame.target.unit, requirement.identity);
+                if (visited.get(child)) |done| {
+                    if (!done) return false;
+                    continue;
+                }
+                if (visited.count() >= self.session.options.max_values) return false;
+                try visited.put(self.scratch_allocator, child, false);
+                try stack.append(self.scratch_allocator, .{ .target = child });
+            } else {
+                if (!requirement.explicit) return false;
+                switch (requirement.kind) {
+                    .dispatch, .field, .receiver, .update, .record_merge, .effect_operation, .type_rep, .effect_rep => {},
+                    else => return false,
+                }
+            }
+        }
+        try self.session.call_summaries.checked_requirements.ensureUnusedCapacity(self.session.allocator, @intCast(visited.count()));
+        var targets = visited.keyIterator();
+        while (targets.next()) |target_| self.session.call_summaries.checked_requirements.putAssumeCapacity(target_.*, true);
+        return true;
+    }
+    const SchemeFrame = struct {
+        use: Constraint,
+        key: SchemeInstance,
+        copy: principal_type_graph.FrozenCopy,
+        next: u32 = 0,
+    };
+    const SchemeImport = union(enum) { solved, open, frame: SchemeFrame };
+    fn autonomousRowCarrier(self: *ClosureRegion, target_: Target, requirement: core.Obligation) bool {
+        if (requirement.kind != .dispatch and requirement.kind != .receiver and requirement.kind != .update) return false;
+        if (requirement.signature == 0) return false;
+        const module = &self.session.units[target_.unit];
+        const carrier = module.types.node(requirement.signature);
+        if (carrier.tag != .function or carrier.a != types.unit or carrier.b != types.unit) return false;
+        const row = module.types.row(carrier.c);
+        return row.labels.len == 0 and row.tail == .variable and std.mem.findScalar(u32, module.types.list(module.binding(target_.binding).public_rows), row.tail.variable) == null;
+    }
+    fn constantRequirements(self: *ClosureRegion, root: Target) RegionError!bool {
+        if (self.session.call_summaries.constant_requirements.contains(root)) return true;
+        if (self.session.call_summaries.constant_requirements.count() >= self.session.options.max_values) return false;
+        const Header = struct { target: Target, next: u32 = 0 };
+        var pending: std.ArrayList(Header) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        var visited: std.AutoHashMapUnmanaged(Target, bool) = .empty;
+        defer visited.deinit(self.scratch_allocator);
+        try visited.put(self.scratch_allocator, root, false);
+        try pending.append(self.scratch_allocator, .{ .target = root });
+        var edges: usize = 0;
+        while (pending.items.len != 0) {
+            const last = pending.items.len - 1;
+            const frame = pending.items[last];
+            const module = &self.session.units[frame.target.unit];
+            const scheme = module.binding(frame.target.binding).scheme;
+            if (frame.next == scheme.obligations.len) {
+                visited.getPtr(frame.target).?.* = true;
+                _ = pending.pop();
+                continue;
+            }
+            pending.items[last].next += 1;
+            edges += 1;
+            if (edges > self.session.options.max_children) return false;
+            const requirement = module.obligations[scheme.obligations.start + frame.next];
+            if (requirement.kind == .callee_use) {
+                const child = try self.schemeTarget(frame.target.unit, requirement.identity);
+                if (!self.session.units[child.unit].binding(child.binding).has_explicit or self.session.call_summaries.constant_requirements.contains(child)) continue;
+                if (visited.get(child)) |complete| {
+                    if (!complete) return false;
+                    continue;
+                }
+                if (visited.count() >= self.session.options.max_values) return false;
+                try visited.put(self.scratch_allocator, child, false);
+                try pending.append(self.scratch_allocator, .{ .target = child });
+            } else if (requirement.explicit) {
+                for ([_]types.Id{ requirement.ty, requirement.other, requirement.result, requirement.signature }) |operand| {
+                    if (operand != 0 and operand == requirement.signature and self.autonomousRowCarrier(frame.target, requirement)) continue;
+                    if (operand != 0 and !try self.session.closed_source_types.closed(self.session.allocator, self.session.units, frame.target.unit, operand, 0)) return false;
+                }
+            }
+        }
+        if (visited.count() > self.session.options.max_values -| self.session.call_summaries.constant_requirements.count()) return false;
+        try self.session.call_summaries.constant_requirements.ensureUnusedCapacity(self.session.allocator, @intCast(visited.count()));
+        var targets = visited.keyIterator();
+        while (targets.next()) |target_| self.session.call_summaries.constant_requirements.putAssumeCapacity(target_.*, {});
+        return true;
+    }
+    fn publicRequirementOperand(self: *ClosureRegion, target_: Target, root: types.Id) RegionError!bool {
+        const module = &self.session.units[target_.unit];
+        const binding = module.binding(target_.binding);
+        const Part = union(enum) { ty: types.Id, row: types.Effects.Id };
+        var pending: std.ArrayList(Part) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        var seen: std.AutoHashMapUnmanaged(u64, void) = .empty;
+        defer seen.deinit(self.scratch_allocator);
+        try pending.append(self.scratch_allocator, .{ .ty = root });
+        while (pending.pop()) |part| {
+            const key: u64 = switch (part) {
+                .ty => |id| id,
+                .row => |id| (@as(u64, 1) << 32) | id,
+            };
+            if (seen.contains(key)) continue;
+            if (seen.count() >= self.session.options.max_values) return false;
+            try seen.put(self.scratch_allocator, key, {});
+            switch (part) {
+                .row => |id| {
+                    const row = module.types.row(id);
+                    if (row.tail == .parameter) return false;
+                    if (row.tail == .variable and std.mem.findScalar(u32, module.types.list(binding.public_rows), row.tail.variable) == null) return false;
+                    for (module.types.rowLabels(id)) |label| for (module.types.operationArguments(label)) |argument| try pending.append(self.scratch_allocator, .{ .ty = argument });
+                },
+                .ty => |id| {
+                    const node = module.types.node(id);
+                    switch (node.tag) {
+                        .variable => if (std.mem.findScalar(types.Id, module.types.list(binding.public_variables), id) == null) return false,
+                        .absent => return false,
+                        .unit, .boolean, .u32, .f32, .never, .type_constructor => {},
+                        .array, .list, .cursor, .resolver => try pending.append(self.scratch_allocator, .{ .ty = node.a }),
+                        .function, .demand, .provider => {
+                            try pending.append(self.scratch_allocator, .{ .ty = node.a });
+                            if (node.tag == .function) try pending.append(self.scratch_allocator, .{ .ty = node.b });
+                            try pending.append(self.scratch_allocator, .{ .row = node.c });
+                        },
+                        .state_provider => for ([_]types.Id{ node.a, node.b, node.c }) |child| try pending.append(self.scratch_allocator, .{ .ty = child }),
+                        .product, .nominal => {
+                            const children = if (node.tag == .nominal) module.types.nominalArguments(node) else module.types.list(.{ .start = node.a, .len = node.b });
+                            for (children) |child| try pending.append(self.scratch_allocator, .{ .ty = child });
+                        },
+                        .record => for (0..node.b) |i| try pending.append(self.scratch_allocator, .{ .ty = module.types.recordField(node, i).ty }),
+                    }
+                },
+            }
+            if (pending.items.len > self.session.options.max_values) return false;
+        }
+        return true;
+    }
+    fn publicRequirements(self: *ClosureRegion, root: Target) RegionError!bool {
+        if (self.session.call_summaries.public_requirements.contains(root)) return true;
+        if (self.session.call_summaries.public_requirements.count() >= self.session.options.max_values) return false;
+        const Header = struct { target: Target, next: u32 = 0 };
+        var pending: std.ArrayList(Header) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        var visited: std.AutoHashMapUnmanaged(Target, bool) = .empty;
+        defer visited.deinit(self.scratch_allocator);
+        try visited.put(self.scratch_allocator, root, false);
+        try pending.append(self.scratch_allocator, .{ .target = root });
+        var edges: usize = 0;
+        while (pending.items.len != 0) {
+            const last = pending.items.len - 1;
+            const frame = pending.items[last];
+            const module = &self.session.units[frame.target.unit];
+            const scheme = module.binding(frame.target.binding).scheme;
+            if (frame.next == scheme.obligations.len) {
+                visited.getPtr(frame.target).?.* = true;
+                _ = pending.pop();
+                continue;
+            }
+            pending.items[last].next += 1;
+            edges += 1;
+            if (edges > self.session.options.max_children) return false;
+            const requirement = module.obligations[scheme.obligations.start + frame.next];
+            if (requirement.kind == .callee_use) {
+                const child = try self.schemeTarget(frame.target.unit, requirement.identity);
+                if (!self.session.units[child.unit].binding(child.binding).has_explicit) continue;
+                if (!try self.publicRequirementOperand(frame.target, requirement.ty)) return false;
+                if (self.session.call_summaries.public_requirements.contains(child)) continue;
+                if (visited.get(child)) |complete| {
+                    if (!complete) return false;
+                    continue;
+                }
+                if (visited.count() >= self.session.options.max_values) return false;
+                try visited.put(self.scratch_allocator, child, false);
+                try pending.append(self.scratch_allocator, .{ .target = child });
+            } else if (requirement.explicit) {
+                // Private binders require fresh independent work at each use.
+                // Public binders can share an outstanding requirement only
+                // inside the region holding their exact live instance.
+                for ([_]types.Id{ requirement.ty, requirement.other, requirement.result, requirement.signature }) |operand| {
+                    if (operand != 0 and operand == requirement.signature and self.autonomousRowCarrier(frame.target, requirement)) continue;
+                    if (operand != 0 and !try self.publicRequirementOperand(frame.target, operand)) return false;
+                }
+            }
+        }
+        if (visited.count() > self.session.options.max_values -| self.session.call_summaries.public_requirements.count()) return false;
+        try self.session.call_summaries.public_requirements.ensureUnusedCapacity(self.session.allocator, @intCast(visited.count()));
+        var targets = visited.keyIterator();
+        while (targets.next()) |target_| self.session.call_summaries.public_requirements.putAssumeCapacity(target_.*, {});
+        return true;
+    }
+    fn schemeImport(self: *ClosureRegion, use: Constraint) RegionError!SchemeImport {
+        const public = try self.project(use.left);
+        const constant = public == 0 and try self.constantRequirements(use.target);
+        const open = if (public == 0 and !constant and try self.publicRequirements(use.target)) try self.solver.resolve(use.left, 0) else 0;
+        const key: SchemeInstance = .{ .target = use.target, .public = public, .deferred_member = use.deferred_member, .open = open, .constant = constant, .physical = self.solver.effects.physical_epoch };
+        if ((public != 0 or open != 0 or constant) and self.scratch.scheme_instances.contains(key)) return .solved;
+        const module = &self.session.units[use.target.unit];
+        const binding = module.binding(use.target.binding);
+        const product = self.solver.node(try self.solver.resolve(use.left, 0));
+        if (product.tag != .product or product.b != binding.public_variables.len + binding.public_rows.len) return error.UnresolvedType;
+        const instance = try self.scratch_allocator.dupe(types.Id, self.solver.list(.{ .start = product.a, .len = product.b }));
+        defer self.scratch_allocator.free(instance);
+        var copy: principal_type_graph.FrozenCopy = .{ .allocator = self.scratch_allocator, .source = &module.types, .destination = &self.solver, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
+        errdefer copy.deinit();
+        for (module.types.list(binding.public_variables), instance[0..binding.public_variables.len]) |variable, actual| {
+            try copy.types.put(self.scratch_allocator, variable, actual);
+            try copy.variables.put(self.scratch_allocator, module.types.node(variable).a, actual);
+        }
+        for (module.types.list(binding.public_rows), instance[binding.public_variables.len..]) |variable, carrier| try copy.row_variables.put(self.scratch_allocator, variable, self.solver.node(carrier).c);
+        // An entirely unknown written graph remains a residual edge in the
+        // optional inquiry. Known endpoints still receive ordinary checking.
+        if (self.partial_principal and public == 0) {
+            var unknown = true;
+            for (instance[0..binding.public_variables.len]) |ty| unknown = unknown and self.solver.node(try self.solver.resolve(ty, 0)).tag == .variable;
+            for (instance[binding.public_variables.len..]) |ty| {
+                const carrier = self.solver.node(try self.solver.resolve(ty, 0));
+                const row = self.solver.row(try self.solver.resolveEffects(carrier.c, 0));
+                unknown = unknown and row.labels.len == 0 and row.tail != .parameter;
+            }
+            if (unknown and try self.retainOpenPrincipal(.{ .target = use.target, .scope = use.scope, .node = use.node, .left = try copy.ty(binding.scheme.root, 0), .result = 0, .deferred_member = use.deferred_member })) {
+                self.principal_only_used = true;
+                self.session.principal_graph_deferred += 1;
+                copy.deinit();
+                return .open;
+            }
+        }
+        return .{ .frame = .{ .use = use, .key = key, .copy = copy } };
+    }
+    fn solveSchemeUse(self: *ClosureRegion, index: usize) RegionError!SummaryProgress {
+        const first = try self.schemeImport(self.scratch.constraints.items[index]);
+        switch (first) {
+            .open => return .open,
+            .solved => {
+                self.scratch.constraints.items[index].solved = true;
+                return .solved;
+            },
+            .frame => {},
+        }
+        var pending: std.ArrayList(SchemeFrame) = .empty;
+        defer {
+            for (pending.items) |*frame| frame.copy.deinit();
+            pending.deinit(self.scratch_allocator);
+        }
+        pending.append(self.scratch_allocator, first.frame) catch |err| {
+            var failed = first.frame;
+            failed.copy.deinit();
+            return err;
+        };
+        // Header leaves retain their ordinary source order ahead of body
+        // constraints. A graph edge must not postpone an earlier witness until
+        // after a duplicate requirement collected from the callee's body.
+        var edges: usize = 0;
+        while (pending.items.len != 0) {
+            const last = pending.items.len - 1;
+            const use = pending.items[last].use;
+            const module = &self.session.units[use.target.unit];
+            const scheme = module.binding(use.target.binding).scheme;
+            if (pending.items[last].next == scheme.obligations.len) {
+                const key = pending.items[last].key;
+                if (key.public != 0 or key.open != 0 or key.constant) try self.scratch.scheme_instances.put(self.scratch_allocator, key, {});
+                var done = pending.pop().?;
+                done.copy.deinit();
+                continue;
+            }
+            edges += 1;
+            if (edges > self.session.options.max_children or pending.items.len > self.session.options.max_values) return error.TypeLimit;
+            const requirement = module.obligations[scheme.obligations.start + pending.items[last].next];
+            pending.items[last].next += 1;
+            if (requirement.kind == .callee_use) {
+                const target_ = try self.schemeTarget(use.target.unit, requirement.identity);
+                if (!self.session.units[target_.unit].binding(target_.binding).has_explicit) continue;
+                // Checked recursive components flatten their internal header
+                // uses. A cyclic retained header is malformed, not a proof.
+                for (pending.items) |active| if (std.meta.eql(active.use.target, target_)) return error.TypeLimit;
+                const child: Constraint = .{ .scope = use.scope, .node = use.node, .span = use.span, .kind = .scheme_use, .target = target_, .left = try pending.items[last].copy.ty(requirement.ty, 0), .result = 0, .deferred_member = use.deferred_member };
+                const imported = try self.schemeImport(child);
+                switch (imported) {
+                    .open => try self.appendConstraint(child),
+                    .solved => {},
+                    .frame => pending.append(self.scratch_allocator, imported.frame) catch |err| {
+                        var failed = imported.frame;
+                        failed.copy.deinit();
+                        return err;
+                    },
+                }
+            } else {
+                if (!requirement.explicit) continue;
+                const kind: ConstraintKind = switch (requirement.kind) {
+                    .dispatch => .binary,
+                    .field => .physical_field,
+                    .receiver => .receiver,
+                    .update => .update,
+                    .record_merge => .record_merge,
+                    .effect_operation => .effect_operation,
+                    .type_rep => .type_rep,
+                    .effect_rep => .effect_rep,
+                    else => return error.UnresolvedType,
+                };
+                try self.appendConstraint(.{ .scope = use.scope, .node = use.node, .span = use.span, .kind = kind, .explicit = true, .qualification_span = requirement.qualification_span, .qualification_unit = requirement.qualification_unit, .diagnostic_name = module.name(requirement.diagnostic_name), .left = try pending.items[last].copy.ty(requirement.ty, 0), .right = try pending.items[last].copy.ty(requirement.other, 0), .result = try pending.items[last].copy.ty(requirement.result, 0), .signature = try pending.items[last].copy.ty(requirement.signature, 0), .member = requirement.name, .op = requirement.operator, .identity = .{ .unit = if (requirement.identity.unit == 0) self.session.unitId(use.target.unit) else requirement.identity.unit, .decl = requirement.identity.decl }, .row_carrier = requirement.kind == .dispatch or requirement.kind == .receiver or requirement.kind == .update });
+            }
+        }
+        self.scratch.constraints.items[index].solved = true;
+        return .solved;
     }
     fn collectInlineCall(self: *ClosureRegion, caller: u32, target_: Target, callee_type: types.Id, arguments: []const core.Id) RegionError!void {
         const module = &self.session.units[target_.unit];
@@ -4932,9 +5352,55 @@ const ClosureRegion = struct {
     const SummaryProgress = enum { solved, waiting, open };
     fn solveSummary(self: *ClosureRegion, index: usize) RegionError!SummaryProgress {
         const constraint = self.scratch.constraints.items[index];
+        if (constraint.principal_only) {
+            if (self.partial_principal and try self.retainOpenPrincipal(constraint)) return .open;
+            if (try self.resultPrincipalEligible(constraint.target, constraint.deferred_member)) {
+                const body = self.session.units[constraint.target.unit].body(constraint.target.binding).?;
+                var result = constraint.left;
+                for (0..body.parameters.len) |_| {
+                    const arrow = self.solver.node(try self.solver.resolve(result, 0));
+                    if (arrow.tag != .function) return error.UnresolvedType;
+                    result = arrow.b;
+                }
+                // The destination chooses the implementation. Leave this
+                // edge in the caller until that destination has an owner;
+                // another edge may supply it without expanding a diamond.
+                if (self.solver.node(try self.solver.resolve(result, 0)).tag == .variable) return .open;
+                const expected = try self.project(result);
+                if (expected != 0) {
+                    const complete = try self.project(constraint.left);
+                    const signature = if (complete != 0 and try self.firstOrderArrow(complete)) complete else 0;
+                    const key: CallSummaries.Key = .{ .target = constraint.target, .inputs = 0, .source_interface = self.source_interface, .expected_result = if (signature == 0) expected else 0, .expected_signature = signature, .deferred_member = constraint.deferred_member };
+                    const job = try self.session.call_summaries.request(self.session, key);
+                    if (job) |entry| switch (entry.state) {
+                        .queued, .running => return .waiting,
+                        .complete => {
+                            const arrow = try self.importEvidence(entry.result, 0);
+                            const point = self.solver.mark();
+                            _ = self.admitSignature(constraint.left, arrow) catch |err| {
+                                self.solver.rollback(point);
+                                if (err == error.OutOfMemory) return err;
+                                self.scratch.constraints.items[index].solved = true;
+                                try self.expandSummary(constraint);
+                                return .solved;
+                            };
+                            self.scratch.constraints.items[index].solved = true;
+                            self.session.counters.call_memo_hits += 1;
+                            return .solved;
+                        },
+                        .declined => {},
+                    };
+                }
+            }
+            // Result-directed relationships are never submitted to the
+            // independent input-only job key, even after inputs become known.
+            self.scratch.constraints.items[index].solved = true;
+            try self.expandSummary(constraint);
+            return .solved;
+        }
         const inputs = try self.summaryInputs(constraint);
         if (inputs == 0) return .open;
-        const key: CallSummaries.Key = .{ .target = constraint.target, .inputs = inputs, .source_interface = self.source_interface };
+        const key: CallSummaries.Key = .{ .target = constraint.target, .inputs = inputs, .source_interface = self.source_interface, .deferred_member = constraint.deferred_member };
         const job = try self.session.call_summaries.request(self.session, key);
         if (job) |entry| switch (entry.state) {
             .queued, .running => return .waiting,
@@ -4983,10 +5449,37 @@ const ClosureRegion = struct {
     }
     fn beginSummary(self: *ClosureRegion, key: CallSummaries.Key) RegionError!void {
         self.summary_job = true;
+        self.result_summary_job = key.expected_result != 0 or key.expected_signature != 0;
+        self.principal_result_job = key.expected_result != 0;
         self.source_interface = key.source_interface;
+        self.defer_members = key.deferred_member;
         self.include_callables = true;
         const scope = try self.callableScope(key.target);
         var cursor = self.scratch.sources.items[scope].root;
+        if (key.expected_signature != 0) {
+            // Every domain, result and operation row belongs to the complete
+            // key. Normal operand selection is safe in this independent job;
+            // it never guesses a caller's still-open input or ambient row.
+            try self.solver.unify(cursor, try self.importEvidence(key.expected_signature, 0));
+            try self.scratch.unresolved_calls.put(self.scratch_allocator, key.target, scope);
+            try self.collect(scope, self.scratch.sources.items[scope].body);
+            return;
+        }
+        if (key.expected_result != 0) {
+            const body = self.session.units[key.target.unit].body(key.target.binding).?;
+            for (0..body.parameters.len) |_| {
+                const arrow = self.solver.node(try self.solver.resolve(cursor, 0));
+                if (arrow.tag != .function) return error.UnresolvedType;
+                cursor = arrow.b;
+            }
+            // Quantified inputs remain fresh in this solver. A destination can
+            // prove their types through the selected source constructor, but
+            // operand dispatch must never guess an unselected input.
+            try self.solver.unify(cursor, try self.importEvidence(key.expected_result, 0));
+            try self.scratch.unresolved_calls.put(self.scratch_allocator, key.target, scope);
+            try self.collect(scope, self.scratch.sources.items[scope].body);
+            return;
+        }
         // The input evidence is copied into this solver; no caller-owned
         // inference variable or result expectation enters the job.
         const inputs = try self.session.allocator.dupe(type_evidence.Id, self.session.evidence.children(key.inputs));
@@ -5205,6 +5698,12 @@ const ClosureRegion = struct {
             graph.rows[index] = .{ .source = entry.key_ptr.variable, .graph = entry.value_ptr.* };
         }
         const residuals = region.scratch.constraints.items[body_constraints..];
+        const requirements = region.scratch.constraints.items[0..body_constraints];
+        graph.requirements = try a.dupe(Constraint, requirements);
+        for (graph.requirements) |*constraint| constraint.diagnostic_name = &.{};
+        for (graph.requirements, requirements) |*constraint, original| {
+            constraint.diagnostic_name = try a.dupe(u8, original.diagnostic_name);
+        }
         graph.constraints = try a.dupe(Constraint, residuals);
         for (graph.constraints) |*constraint| constraint.diagnostic_name = &.{};
         for (graph.constraints, residuals) |*constraint, original| {
@@ -5283,12 +5782,66 @@ const ClosureRegion = struct {
         }
         return graph;
     }
+    fn resultPrincipalEligible(self: *ClosureRegion, target_: Target, deferred: bool) RegionError!bool {
+        if (!self.session.reuse_principal_graphs or (self.summary_job and !self.result_summary_job) or self.retain_selected or self.complete_demand_bodies or self.speculative_source_entry) return false;
+        if (self.session.options.max_values < 4096 or self.session.options.max_type_depth < 64) return false;
+        const root: PrincipalGraph.Key = .{ .target = target_, .source_interface = self.source_interface, .deferred_member = deferred, .options = self.session.options };
+        if (self.session.call_summaries.result_principals.get(root)) |known| return known;
+        if (self.session.call_summaries.result_principals.count() >= self.session.options.max_values) return false;
+        const ready = try self.checkResultPrincipal(root);
+        try self.session.call_summaries.result_principals.put(self.session.allocator, root, ready);
+        return ready;
+    }
+    fn checkResultPrincipal(self: *ClosureRegion, root: PrincipalGraph.Key) RegionError!bool {
+        const Visit = struct { key: PrincipalGraph.Key, graph: *PrincipalGraph, next: usize = 0 };
+        var pending: std.ArrayList(Visit) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        var visited: std.AutoHashMapUnmanaged(PrincipalGraph.Key, bool) = .empty;
+        defer visited.deinit(self.scratch_allocator);
+        if (!try self.summaryShapeEligible(root.target)) return false;
+        const first = try self.principalGraphForKey(root) orelse return false;
+        try pending.append(self.scratch_allocator, .{ .key = root, .graph = first });
+        try visited.put(self.scratch_allocator, root, false);
+        var result_directed = false;
+        var edges: usize = 0;
+        while (pending.items.len != 0) {
+            const last = pending.items.len - 1;
+            const frame = pending.items[last];
+            if (frame.next == frame.graph.requirements.len + frame.graph.constraints.len) {
+                visited.getPtr(frame.key).?.* = true;
+                _ = pending.pop();
+                continue;
+            }
+            pending.items[last].next += 1;
+            const constraint = if (frame.next < frame.graph.requirements.len) frame.graph.requirements[frame.next] else frame.graph.constraints[frame.next - frame.graph.requirements.len];
+            edges += 1;
+            if (edges > self.session.options.max_children) return false;
+            switch (constraint.kind) {
+                .result_dispatch, .effect_operation => result_directed = true,
+                .binary, .field, .physical_field, .receiver, .update, .collection, .record_merge, .type_head, .type_compare, .type_rep, .effect_rep, .effect_handler => {},
+                .call_summary, .scheme_use => {
+                    const child: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = root.source_interface, .deferred_member = constraint.deferred_member, .options = root.options };
+                    if (visited.get(child)) |done| {
+                        if (!done) return false;
+                        continue;
+                    }
+                    if (visited.count() >= self.session.options.max_values or !try self.summaryShapeEligible(child.target)) return false;
+                    const graph = try self.principalGraphForKey(child) orelse return false;
+                    try visited.put(self.scratch_allocator, child, false);
+                    try pending.append(self.scratch_allocator, .{ .key = child, .graph = graph });
+                },
+                else => return false,
+            }
+        }
+        return result_directed;
+    }
     fn retainOpenPrincipal(self: *ClosureRegion, constraint: Constraint) RegionError!bool {
         if (!self.session.reuse_principal_graphs or self.summary_job or self.retain_selected or self.complete_demand_bodies or self.speculative_source_entry) return false;
         if (self.session.options.max_values < 4096 or self.session.options.max_type_depth < 64) return false;
         const interface = try self.solver.resolve(constraint.left, 0);
-        if (!principal_type_graph.allUnknown(&self.solver, interface, self.session.options.max_type_depth)) return false;
         const key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = self.source_interface, .deferred_member = constraint.deferred_member, .options = self.session.options };
+        const graph = try self.principalGraphForKey(key) orelse return false;
+        if (!try principal_type_graph.matchesOpen(self.scratch_allocator, &graph.types, graph.root, &self.solver, interface, self.session.options.max_type_depth, self.session.options.max_values)) return false;
         if (!self.session.call_summaries.open_principals.contains(key) and self.session.call_summaries.open_principals.count() >= self.session.options.max_values) return false;
         const ready = self.session.call_summaries.open_principals.get(key) orelse ready: {
             const checked = try self.checkOpenPrincipal(key);
@@ -5310,63 +5863,109 @@ const ClosureRegion = struct {
         var visited: std.AutoHashMapUnmanaged(PrincipalGraph.Key, bool) = .empty;
         defer visited.deinit(a);
         const first = try self.principalGraphForKey(root) orelse return false;
-        if (!self.unknownPrincipalBody(first)) return false;
+        if (!try self.unknownPrincipalBody(first)) return false;
         try pending.append(a, .{ .key = root, .graph = first });
         try visited.put(a, root, false);
         var edges: usize = 0;
         while (pending.items.len != 0) {
             const last = pending.items.len - 1;
             const frame = pending.items[last];
-            if (frame.next == frame.graph.constraints.len) {
+            if (frame.next == frame.graph.requirements.len + frame.graph.constraints.len) {
                 visited.getPtr(frame.key).?.* = true;
                 _ = pending.pop();
                 continue;
             }
             pending.items[last].next += 1;
-            const constraint = frame.graph.constraints[frame.next];
+            const constraint = if (frame.next < frame.graph.requirements.len) frame.graph.requirements[frame.next] else frame.graph.constraints[frame.next - frame.graph.requirements.len];
             edges += 1;
             if (edges > self.session.options.max_children) return false;
-            if (constraint.kind != .call_summary) {
-                switch (constraint.kind) {
-                    .binary, .field, .result_dispatch => {},
-                    else => return false,
-                }
-                if (constraint.explicit) return false;
-                for ([_]types.Id{ constraint.left, constraint.right, constraint.result, constraint.signature }) |operand| {
-                    if (operand != 0 and !principal_type_graph.allUnknown(&frame.graph.types, operand, self.session.options.max_type_depth)) return false;
-                }
+            if (constraint.kind != .call_summary and constraint.kind != .scheme_use) {
+                if (!try self.unknownPrincipalConstraint(frame.graph, constraint)) return false;
                 continue;
             }
-            if (!principal_type_graph.allUnknown(&frame.graph.types, constraint.left, self.session.options.max_type_depth)) return false;
+            if (constraint.kind == .scheme_use) {
+                if (!try self.unknownPrincipalConstraint(frame.graph, constraint)) return false;
+            }
             const child: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = root.source_interface, .deferred_member = constraint.deferred_member, .options = root.options };
+            const graph = try self.principalGraphForKey(child) orelse return false;
+            if (constraint.kind == .call_summary and !try principal_type_graph.matchesOpen(a, &graph.types, graph.root, &frame.graph.types, constraint.left, self.session.options.max_type_depth, self.session.options.max_values)) return false;
             if (visited.get(child)) |done| {
                 if (!done) return false; // Joint recursive inference is separate.
                 continue;
             }
             if (visited.count() >= self.session.options.max_values) return false;
-            const graph = try self.principalGraphForKey(child) orelse return false;
-            if (!self.unknownPrincipalBody(graph)) return false;
+            if (!try self.unknownPrincipalBody(graph)) return false;
             try visited.put(a, child, false);
             try pending.append(a, .{ .key = child, .graph = graph });
         }
         return true;
     }
-    fn unknownPrincipalBody(self: *ClosureRegion, graph: *const PrincipalGraph) bool {
-        if (!principal_type_graph.allUnknown(&graph.types, graph.root, self.session.options.max_type_depth)) return false;
-        const module = &self.session.units[graph.key.target.unit];
-        const binding = module.binding(graph.key.target.binding);
-        const body = module.body(graph.key.target.binding).?;
-        for ([_]types.Scheme{ binding.scheme, body.scheme }) |scheme| {
-            for (module.obligations[scheme.obligations.start..][0..scheme.obligations.len]) |requirement| if (requirement.explicit) return false;
-        }
+    fn unknownPrincipalBody(self: *ClosureRegion, graph: *const PrincipalGraph) RegionError!bool {
+        if (!try principal_type_graph.matchesOpen(self.scratch_allocator, &graph.types, graph.root, &graph.types, graph.root, self.session.options.max_type_depth, self.session.options.max_values)) return false;
+        for (graph.requirements) |requirement| if (!try self.unknownPrincipalConstraint(graph, requirement)) return false;
         // An alias or declared bound can infer a concrete endpoint even when
         // the caller currently sees only variables. Keep those equations in
         // ordinary collection instead of deferring their consequences.
         for (graph.aliases) |alias| {
             if (alias.instance == alias.principal) continue;
-            if (!principal_type_graph.allUnknown(&graph.types, alias.instance, self.session.options.max_type_depth) or !principal_type_graph.allUnknown(&graph.types, alias.principal, self.session.options.max_type_depth)) return false;
+            if (!try principal_type_graph.matchesOpen(self.scratch_allocator, &graph.types, alias.principal, &graph.types, alias.instance, self.session.options.max_type_depth, self.session.options.max_values)) return false;
         }
-        for (graph.functions) |function| if (!principal_type_graph.allUnknown(&graph.types, function, self.session.options.max_type_depth)) return false;
+        for (graph.functions) |function| if (!try principal_type_graph.matchesOpen(self.scratch_allocator, &graph.types, function, &graph.types, function, self.session.options.max_type_depth, self.session.options.max_values)) return false;
+        return true;
+    }
+    fn unknownPrincipalConstraint(self: *ClosureRegion, graph: *const PrincipalGraph, constraint: Constraint) RegionError!bool {
+        if (constraint.kind == .scheme_use) {
+            const product = graph.types.node(constraint.left);
+            if (product.tag != .product) return false;
+            for (graph.types.list(.{ .start = product.a, .len = product.b })) |part| {
+                const node = graph.types.node(part);
+                if (node.tag == .variable) continue;
+                if (node.tag != .function or node.a != types.unit or node.b != types.unit) return false;
+                const row = graph.types.row(node.c);
+                if (row.labels.len != 0 or row.tail == .parameter) return false;
+            }
+            return true;
+        }
+        switch (constraint.kind) {
+            .binary, .field, .result_dispatch, .physical_field, .receiver, .update, .collection, .record_merge, .type_head, .type_rep, .effect_rep, .effect_operation => {},
+            else => return false,
+        }
+        // A known source constructor may shape the result, but a predicate's
+        // selection owner must remain unknown. Caller-selected structures are
+        // rejected separately by the source-to-caller skeleton match.
+        switch (constraint.kind) {
+            .binary => if (graph.types.node(constraint.left).tag != .variable or graph.types.node(constraint.right).tag != .variable) return false,
+            .field, .physical_field, .receiver, .update, .collection => if (graph.types.node(constraint.left).tag != .variable) return false,
+            .result_dispatch => if (graph.types.node(constraint.result).tag != .variable) return false,
+            .record_merge => if (graph.types.node(constraint.left).tag != .variable and graph.types.node(constraint.right).tag != .variable) return false,
+            .effect_operation => {
+                // The source fixes the operation family. Its residual action
+                // still adds the exact label and checks the caller's row.
+                if (constraint.identity.unit == 0) return false;
+                const signature = graph.types.node(constraint.left);
+                if (signature.tag != .function) return false;
+                const row = graph.types.row(signature.c);
+                if (row.tail == .parameter) return false;
+            },
+            else => {},
+        }
+        for ([_]types.Id{ constraint.left, constraint.right, constraint.result, constraint.signature }, 0..) |operand, index| {
+            // Receiver checking waits for its owner; the Unit argument is
+            // arity metadata, not a second operand dispatch candidate.
+            if (constraint.kind == .receiver and index == 1 and operand == types.unit) continue;
+            if (constraint.row_carrier and index == 3 and operand != 0) {
+                const carrier = graph.types.node(operand);
+                if (carrier.tag == .function and carrier.a == types.unit and carrier.b == types.unit) {
+                    const row = graph.types.row(carrier.c);
+                    if (row.labels.len == 0 and row.tail != .parameter) continue;
+                }
+            }
+            if (operand != 0) {
+                if (constraint.kind == .type_head) {
+                    if (!principal_type_graph.allUnknown(&graph.types, operand, self.session.options.max_type_depth)) return false;
+                } else if (!try principal_type_graph.matchesOpen(self.scratch_allocator, &graph.types, operand, &graph.types, operand, self.session.options.max_type_depth, self.session.options.max_values)) return false;
+            }
+        }
         return true;
     }
     fn importPrincipal(self: *ClosureRegion, scope: u32, graph: *PrincipalGraph) RegionError!void {
@@ -5925,6 +6524,12 @@ const ClosureRegion = struct {
     }
     fn attemptConstraint(self: *ClosureRegion, index: usize, fallback: bool) RegionError!SummaryProgress {
         const constraint = self.scratch.constraints.items[index];
+        // A destination-only principal job may infer inputs from a fixed
+        // result-selected declaration, but cannot choose between associated
+        // operand candidates on behalf of an unknown caller input or row.
+        if (self.principal_result_job and constraint.kind == .binary and
+            (try self.project(constraint.left) == 0 or try self.project(constraint.right) == 0)) return .open;
+        if (constraint.kind == .scheme_use) return self.solveSchemeUse(index);
         if (constraint.kind == .call_summary) return self.solveSummary(index);
         if (constraint.kind == .record_merge) {
             if (try self.solver.mergeRecords(constraint.left, constraint.right)) |merged| {
@@ -5996,7 +6601,9 @@ const ClosureRegion = struct {
             const left = try self.sourceWitnessHead(constraint.left);
             const right = try self.sourceWitnessHead(constraint.right);
             if (self.solver.node(left).tag == .never or self.solver.node(right).tag == .never) {
-                const target = self.source_entry.?;
+                // An independent job has no caller witness. Decline it so the
+                // caller's authoritative source traversal owns this error.
+                const target = self.source_entry orelse return error.UnresolvedType;
                 const point = self.session.units[target.unit].sourceNamePoint(target.binding);
                 return self.session.fail(target.unit, .{ .start = point, .end = point }, .invalid_annotation);
             }

@@ -1146,14 +1146,13 @@ const Generator = struct {
                 reverse -= 1;
                 full = try self.internLayoutWithEffects(.function, key.parameters[reverse], full, key.effects[reverse], &.{});
             }
-            for (source.obligations[body.scheme.obligations.start..][0..body.scheme.obligations.len]) |obligation| if (obligation.explicit) {
+            if (source.binding(key.target.binding).has_explicit) {
                 var mappings: std.ArrayList(Mapping) = .empty;
                 var rows: std.ArrayList(RowMapping) = .empty;
                 defer mappings.deinit(self.allocator);
                 defer rows.deinit(self.allocator);
                 try self.refineMappings(unit_id, .{ .body = key.target }, full, &mappings, &rows, body.span);
-                break;
-            };
+            }
             const global = if (body.runtime) try self.runtimeGlobal(key.target) else null;
             const constant_ = if (global == null) try self.constant(key.target, full) else null;
             const callee = try self.module.addLocal(function_id, .i32);
