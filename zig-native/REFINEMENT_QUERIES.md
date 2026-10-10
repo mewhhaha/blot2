@@ -186,9 +186,9 @@ bytes match the baseline; retained bytes plateau after the first round and all
 
 [The 154-row retained CSV](qualification/refinement-queries-retained.csv)
 contains complete CPU/wall/traffic/peak/live distributions and native refinement
-snapshots. Reused-output no-op phases carry the previous compilation's counters;
-those counters are snapshots, not new queries performed by the no-op. Per-phase
-CPU/allocation deltas still measure the no-op itself. The pin manifest contains
+snapshots. Reused-output no-op phases report zero compilation/query counters;
+they perform no new semantic queries. Per-phase CPU/allocation deltas measure
+the no-op itself. The pin manifest contains
 all entry/edit/dependency fixture hashes, both complete driver source maps,
 library hashes, scheduler settings and measurement-helper/report hashes.
 
