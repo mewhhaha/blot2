@@ -6,8 +6,8 @@ interfaces now have owned principal graphs and independent jobs under complete
 evidence. Live lexical closures now have owned capture inputs and independent
 jobs under complete evidence; their qualification is recorded below. Recursive
 components and portable canonical specialization keys remain implementation
-work. This document does not change language syntax
-or admit programs rejected by the language's existing inference rules.
+work. This document does not change language syntax or admit programs rejected
+by the language's existing inference rules.
 
 The existing boundary is in `core_eval.zig`: `CallSummaries`,
 `ClosureRegion.collectCall`, `summaryInputs`, `solveSummary`, `beginSummary`,
@@ -849,11 +849,13 @@ The same evidence directory preserves scripts, workload sources and raw records.
   preserve fresh diagnostics and executable results. Release deep-chain and
   diamond budget laws also pass.
 
-The direct source form `Seed.build -> parent.read -> Box.read -> parent` exposed
-a frontend lowering retry that did not finish during investigation, even with
-written arrows. It is not a passing recursive qualification. Task 007 must bound
-that work in addition to implementing joint recursive components. The probe is
-retained at
+The direct source form `Seed.build -> parent.read -> Box.read -> parent` did not
+finish during investigation, even with written arrows. Task 007's subsequent
+phase isolation establishes that the baseline frontend check and lowering both
+finish; the unbounded work is the ordinary Core source-interface inquiry. The
+earlier attribution to a frontend retry was incorrect. It is not a passing
+recursive qualification. Task 007 must bound that inquiry as well as independent
+late-edge frontend component publication. The probe is retained at
 `build/bench/cloud-principal-graphs/revealed-edge-recursive-frontend-probe.blot`.
 Debug self-backend deep-chain failures likewise remain separate from the passing
 release LLVM gate. Callback invocation, lexical capture, recursive components
@@ -1002,8 +1004,8 @@ Zig files, using Zig 0.17.0 and the qualified analyzer. The differential command
 `python3 build/bench/cloud-principal-graphs/compare-callbacks-v2.py` compares
 563 public cases, including 54 higher-order fixtures, in 1,126 fresh
 cache-disabled invocations. Ordered diagnostics and successful Wasm bytes match
-exactly; 380 cases (760 invocations) succeed. Every expected-valid callback fixture
-succeeds, including the predicate-bearing direct, curried, returned and
+exactly; 380 cases (760 invocations) succeed. Every expected-valid callback
+fixture succeeds, including the predicate-bearing direct, curried, returned and
 effectful forms. All 1,122 invocations with compilation metrics report zero live
 requested bytes after teardown and no loaded restart cache. The four remaining
 invocations are the paired existing `TypeLimit` fixtures, which emit no
@@ -1099,8 +1101,8 @@ preserving shared nodes across slots. It records exact scalar bits, data and
 nominal kinds, record names, child order, nested closure/suspension bodies and
 maps, provider creation identities and immutable operation descriptors, and
 pending demand creation/memo identities. Equal types with different values,
-bodies, providers, demands or alias graphs therefore cannot collide. Unit's
-zero value ID is valid. A cached/evaluating demand, cyclic value graph, unsupported
+bodies, providers, demands or alias graphs therefore cannot collide. Unit's zero
+value ID is valid. A cached/evaluating demand, cyclic value graph, unsupported
 value kind or incomplete interface declines optional admission. Complete checked
 owner projections may describe child interfaces; raw stored interfaces remain
 the fallback. Conflicting owner projections decline.
@@ -1129,12 +1131,12 @@ key. The feature can be disabled with `reuse_lexical_summaries` for reference
 qualification. Unknown and staged inputs remain general ordinary work, rather
 than becoming permanently ineligible source bodies.
 
-Two related ownership fixes accompany this boundary. Complete monomorphic
-value views reuse one scope within their scratch owner, preserving aliases;
-open generic interfaces still freshen per use. Entry-interface and full-body
+Two related ownership fixes accompany this boundary. Complete monomorphic value
+views reuse one scope within their scratch owner, preserving aliases; open
+generic interfaces still freshen per use. Entry-interface and full-body
 inference have distinct view keys, so an entry-interface result cannot certify
-full demand checking. Each mode retains its own result cache and both retain
-the same complete arrow and actual capture aliases.
+full demand checking. Each mode retains its own result cache and both retain the
+same complete arrow and actual capture aliases.
 
 An allocation failure abandons all queued/running summary regions, rebuilds the
 key map from finished jobs without allocation, and clears active stacks. The
@@ -1151,28 +1153,27 @@ results and stable capture aliases. Executed guest coverage changes captures and
 alias graphs through retained edits, rebinding snapshots, dependency bundles and
 checkpoint restoration; invalid capture/row/body edits recover to fresh output.
 
-The full Zig 0.17.0 gate passes the native suite and 610 guest/client tests;
-the analyzer reports zero findings across 292 Zig files. The code milestone is
+The full Zig 0.17.0 gate passes the native suite and 610 guest/client tests; the
+analyzer reports zero findings across 292 Zig files. The code milestone is
 `71c0f2a` on local `main`.
 
 Qualification compares immutable `candidate-callbacks-v2/` and
 `candidate-lexical/` under `build/bench/cloud-principal-graphs/`. The lexical
 binary SHA-256 is
-`de8823d9a68c729a58cfbe034965a9cc03f1cb2d31a2e2bf6415abc8f59457c3`, its
-compiler identity is
-`417ab3e3222b645c4c91bf9071b49b8565629b9256c6c47d2f6e7b6695a3f82a`, and its
-five-file source patch against `5236860` is
-`d5a40a506be736d2ce849fab356d951f29545682d5ff80fa01e2e881667b6613`.
-The manifest records exact source hashes. Binary and identity pins remain
-unchanged before and after every qualification stage.
+`de8823d9a68c729a58cfbe034965a9cc03f1cb2d31a2e2bf6415abc8f59457c3`, its compiler
+identity is `417ab3e3222b645c4c91bf9071b49b8565629b9256c6c47d2f6e7b6695a3f82a`,
+and its five-file source patch against `5236860` is
+`d5a40a506be736d2ce849fab356d951f29545682d5ff80fa01e2e881667b6613`. The manifest
+records exact source hashes. Binary and identity pins remain unchanged before
+and after every qualification stage.
 
 `python3 build/bench/cloud-principal-graphs/compare-lexical.py` passes 587
 public cases in 1,174 cache-disabled invocations, including 24 new lexical
 fixtures. All 21 expected-valid fixtures succeed; all three invalid fixtures
 reject. There are 401 successful cases (802 invocations). Ordered diagnostics
 match exactly. All 1,170 compilation metric records have zero live requested
-bytes and no loaded restart cache; four existing paired `TypeLimit` runs have
-no metrics. Successful Wasm matches except the three explicitly qualified
+bytes and no loaded restart cache; four existing paired `TypeLimit` runs have no
+metrics. Successful Wasm matches except the three explicitly qualified
 shared-aggregate fixtures at counts 8/32/128.
 
 Those exceptions preserve the actual shared capture. Previously freezing two
@@ -1185,20 +1186,20 @@ and candidate guests with 7,056 calls, checking every generated callable and
 folded result.
 
 `python3 build/bench/cloud-principal-graphs/measure-lexical.py` passes fifteen
-alternating release pairs across 53 workloads (1,590 invocations), using isolated
-child user+system CPU from `getrusage` with caches disabled. Allocation is
-cumulative requested bytes in decimal MB, not peak RSS.
+alternating release pairs across 53 workloads (1,590 invocations), using
+isolated child user+system CPU from `getrusage` with caches disabled. Allocation
+is cumulative requested bytes in decimal MB, not peak RSS.
 
-| Workload | Median CPU baseline / candidate (ms) | Allocation baseline / candidate (MB) | Maximum scopes baseline / candidate |
-| -------- | ----------------------------------: | -----------------------------------: | ----------------------------------: |
-| Captured callback, depth 8 | 35.459 / 34.633 | 8.402 / 8.402 | 1,025 / 1,025 |
-| Shared Box captures, 128 | 12.155 / 11.594 | 8.217 / 8.221 | 9 / 4 |
-| Separate Box captures, 128 | 12.188 / 11.751 | 8.604 / 8.912 | 9 / 7 |
-| Named scalar captures, 128 | 14.601 / 14.179 | 9.849 / 10.054 | 4 / 4 |
-| Anonymous scalar captures, 128 | 10.715 / 10.270 | 7.933 / 8.134 | 4 / 4 |
-| Nested callbacks, 128 | 16.390 / 16.253 | 11.013 / 11.431 | 5 / 5 |
-| Pending demands, 128 | 10.756 / 11.851 | 7.949 / 9.072 | 5 / 5 |
-| Local providers, 128 | 10.304 / 11.135 | 7.945 / 9.030 | 4 / 4 |
+| Workload                       | Median CPU baseline / candidate (ms) | Allocation baseline / candidate (MB) | Maximum scopes baseline / candidate |
+| ------------------------------ | -----------------------------------: | -----------------------------------: | ----------------------------------: |
+| Captured callback, depth 8     |                      35.459 / 34.633 |                        8.402 / 8.402 |                       1,025 / 1,025 |
+| Shared Box captures, 128       |                      12.155 / 11.594 |                        8.217 / 8.221 |                               9 / 4 |
+| Separate Box captures, 128     |                      12.188 / 11.751 |                        8.604 / 8.912 |                               9 / 7 |
+| Named scalar captures, 128     |                      14.601 / 14.179 |                       9.849 / 10.054 |                               4 / 4 |
+| Anonymous scalar captures, 128 |                      10.715 / 10.270 |                        7.933 / 8.134 |                               4 / 4 |
+| Nested callbacks, 128          |                      16.390 / 16.253 |                      11.013 / 11.431 |                               5 / 5 |
+| Pending demands, 128           |                      10.756 / 11.851 |                        7.949 / 9.072 |                               5 / 5 |
+| Local providers, 128           |                      10.304 / 11.135 |                        7.945 / 9.030 |                               4 / 4 |
 
 The depth-8 open captured control retains ordinary work and 512 constraint
 visits. Its largest recorded candidate region is 35.776 ms (baseline 32.456 ms).
@@ -1214,18 +1215,18 @@ Seven alternating pairs pass 52 ordinary/callback/lexical workloads through
 Every variant's fresh/restart/population/edit/no-op hashes agree with the
 appropriate fresh source. Capture edits change executable output; alias edits
 preserve equal values while changing sharing. The 27 expected cross-compiler
-differences are limited to the six shared/separate aggregate workloads and
-their phases; unexpected problems are empty. Independently rebuilt edited
-Wasm is checked against those recorded hashes and executes another 42 guests
-with 7,056 calls (`execute-lexical-retained.ts`).
+differences are limited to the six shared/separate aggregate workloads and their
+phases; unexpected problems are empty. Independently rebuilt edited Wasm is
+checked against those recorded hashes and executes another 42 guests with 7,056
+calls (`execute-lexical-retained.ts`).
 
 In that prelude-free synthetic batch, shared128 fresh/restart CPU is 15/15 ms
 for both compilers; fresh allocation falls from 10.65 to 9.99 MiB and restart
 from 10.95 to 10.29 MiB. Named128 fresh CPU is 16→17 ms, while
-demand/provider128 is 14→14 ms and nested128 is 19→19 ms. Allocation changes
-are approximately +2.1% for named128 and +0.1–0.2% for the latter controls.
-Fan-out is 18 ms fresh / 19 ms restart for both variants. Retained process CPU
-has 10 ms accounting resolution; zeros do not mean no execution.
+demand/provider128 is 14→14 ms and nested128 is 19→19 ms. Allocation changes are
+approximately +2.1% for named128 and +0.1–0.2% for the latter controls. Fan-out
+is 18 ms fresh / 19 ms restart for both variants. Retained process CPU has 10 ms
+accounting resolution; zeros do not mean no execution.
 
 Raw artifacts are `lexical-comparisons/report.json` and `execution.json`,
 `lexical-measurement/report.json`, and `lexical-retained/results.json`,
@@ -1235,3 +1236,163 @@ Task 006 is complete. Incomplete/staged/observed environments retain ordinary
 checking, and principal lexical graphs, joint components and portable canonical
 keys remain subsequent work. The private gdev snapshot and historical task 002
 artifacts remain unavailable.
+
+## Joint recursive inference (10 October 2026)
+
+Task 007's implementation uses `scope_components.zig` for exact directed body
+edges and region-local component identities. An edge joins only a known,
+admitted body. Unknown formal callbacks retain their callback obligations.
+Reverse ancestor discovery identifies a callable already on the caller's path;
+it does not scan every historic sibling instance. Open ordinary recursion shares
+its original monomorphic root. Closed instances join only when their complete
+interfaces agree. The newest matching root preserves ordinary inference order.
+
+Call-summary tickets own `queued`, `running`, `waiting`, `complete` and
+`declined` states. A late edge that merges components discards unfinished solver
+regions, keeps independently completed tickets and seeds every merged member in
+a fresh joint region. Internal edges replay against the new local scopes. After
+all obligations stabilize, every member's closed interface is staged before an
+allocation-free commit. Multi-member results remain private; they do not become
+global principal or validated-call facts. Abandonment removes pending keys and
+active owners without allocating, while preserving completed children.
+
+`Options.max_summary_transitions` defaults to one million per top-level inquiry.
+Complete call keys include all options. Discovery, merges, graph imports and
+summary scheduling spend this budget; exhaustion declines optional summaries and
+resumes ordinary bounded inference. Ordinary body collection also uses heap
+frames, retaining source recipe order, lexical exits and demand completion.
+Inference storage/type limits and executed `max_steps`/`max_depth` remain
+independent. Zero-step, depth-one laws demonstrate that inference does not
+execute a recursive body.
+
+The frontend separately keeps checked global bodies on its component stack until
+late method, associated and result-selected edges and qualification uses
+stabilize. Exact owner lowlinks can merge provisional groups. Global dependency
+discovery and scheduling use explicit heap worklists with lexical shadowing;
+syntax depth still bounds each body's syntax. Scheme predicates, suspensions and
+qualification diagnostics stage locally until the shared type/effect clock,
+pending obligations, uses and component membership all stop changing. Closed-row
+certificates describe actual monotonic solver writes and remain available across
+retries. Member schemes and owned predicates publish together.
+
+Queued selected methods retain ordinary field checks until their implementations
+are ready; the field solver yields to the scheduler. Active recursive methods
+retain ordinary receiver requirements. Associated dispatch waits for a pending
+preferred left candidate before considering a ready right candidate. Child
+diagnostics stage until the original reference, or insert at the original
+selected occurrence, preserving declaration/call diagnostic order. Allocation
+failure releases staged payloads, worklists and every saved global context.
+
+The qualified source milestone is recorded in the task closure. The immutable
+baseline is task 006's `candidate-lexical/`, sourced from `71c0f2a`; its binary
+SHA-256 is `de8823d9a68c729a58cfbe034965a9cc03f1cb2d31a2e2bf6415abc8f59457c3`
+and identity SHA-256 is
+`417ab3e3222b645c4c91bf9071b49b8565629b9256c6c47d2f6e7b6695a3f82a`. The final
+`candidate-components/` binary SHA-256 is
+`b513f76268ee76b0d5b32ef4a2e028c782534120260ea83504271fe410af92cf` and identity
+SHA-256 is `08b67e99d5c9e96b3138d0385dd5767d0f3e62f40a71b9c7dd34f53d2d6abed5`.
+The nine changed Zig/guest source files are individually hashed in its manifest;
+the SHA-256 of their sorted compact JSON hash map is
+`0a19ca3317b7c6b16501934e07a07a1fa1dd69d44f2f81a986652ace93beb3a0`. The build
+starts from `2254159` plus those source inputs. Earlier component pins v1–v4
+remain immutable investigation artifacts, without final qualification.
+
+After `zig version` reports 0.17.0, `deno task test:compiler` passes the full
+native suite and **615 guest/client tests** (`component-full-gate-v5.log`).
+`deno task lint:zig` with the CI-pinned analyzer reports **294 files, zero
+findings** (`component-analyzer-v5.log`). Native laws cover late component
+merges, direct/mutual/higher-order/polymorphic recursion, ordinary 1,001-body
+fallback at zero executed steps and depth one, summary budgets 0/1/8/64/one
+million, exact graph limits/generation wrap and allocation-failure recovery in
+the same session. Frontend laws cover written/generic 300/1,000 chains, local
+and pattern shadowing, suite scope restoration, preferred associated dispatch,
+final predicate ownership and declaration/call diagnostic order. The selected
+method cases include scalar and callable local bindings during the wait. The
+original entry-phase effect laws and invalid Never-witness diagnostics pass.
+Guest laws execute recursion, diamonds, selected methods, independent U32/F32
+instances, corrected invalid leaves and the deep forward chains.
+
+`compare-components.py` compares **608 cases / 1,216 invocations**, including
+all earlier public cases and 21 component inputs. All **413 baseline successes**
+retain exact Wasm; all ordered diagnostics agree except five qualified new
+acceptances: the 2,048-link alias fixture with both prelude choices, written and
+generic 1,000-link forward chains, and the 128-node recursive diamond. These
+were rejected by the baseline's inference limits and now compile without errors.
+There are 831 successful invocations and 1,212 memory records, all with zero
+live requested bytes at teardown; four early TypeLimit exits have no memory
+record. The exact source hashes and ordered diagnostics remain in
+`component-comparisons/report.json`. `execute-components.ts` executes the new
+component and alias output in **29 guests / 112 calls**. The original generic
+`Seed.build -> parent.read -> Box.read -> parent` probe times out at five
+seconds on the baseline, while the final compiler finishes in approximately 1.7
+ms with the expected `entry_type` rejection, without executing its recursive
+body (`component-original-probe.json`). The probe does not certify a generic
+Wasm entry or an executable infinite recursion.
+
+Fifteen alternating pairs in `measure-components.py` cover **65 common-success
+workloads / 1,950 fresh invocations** with persistence disabled. CPU is child
+user plus system time from `getrusage`; Wasm, allocation and work counters
+remain deterministic within each variant. On this four-CPU shared host,
+starting/ending one-minute load is 0.76/0.91. The median of workload CPU ratios
+is 1.052; this is overhead qualification, not a general speedup. Representative
+medians are:
+
+| Public workload           | Baseline CPU ms | Candidate CPU ms | Baseline allocation MiB | Candidate allocation MiB | Largest scope count before/after |
+| ------------------------- | --------------: | ---------------: | ----------------------: | -----------------------: | -------------------------------: |
+| Recursive diamond 32      |          10.872 |           19.634 |                    8.53 |                     8.09 |                         97 / 190 |
+| Direct ring 128           |           5.390 |            6.433 |                    3.60 |                     4.17 |                        129 / 255 |
+| Callback ring 128         |           7.852 |            8.389 |                    4.54 |                     5.24 |                        129 / 255 |
+| Generic forward chain 300 |           8.954 |            9.833 |                    5.74 |                     6.46 |                            2 / 2 |
+| Written forward chain 300 |           7.837 |            8.681 |                    5.26 |                     5.99 |                            2 / 2 |
+| Late selected method      |           1.076 |            1.119 |                    0.20 |                     0.21 |                            6 / 3 |
+| Named captures 128        |          13.908 |           14.384 |                    9.59 |                    10.29 |                            4 / 4 |
+| Provider captures 128     |          11.211 |           11.792 |                    8.61 |                     9.62 |                            4 / 4 |
+| Captured callback depth 8 |          35.073 |           34.959 |                    8.01 |                     8.29 |                    1,025 / 1,025 |
+
+Diamond32 CPU ranges are 9.783–12.550 ms baseline and 17.584–28.620 ms
+candidate. Its constraint visits rise 1,378→5,401, while allocations decrease;
+component rebuilding and private member checks remain measurable costs. Direct
+ring128 visits are 384→385 and callback128 visits 1,023→1,150. There are 408
+recorded candidate profile rows, with median 2.387 ms and maximum 35.563 ms;
+profile durations are wall time and only timed regions are recorded. The maximum
+occurs in the captured callback control, with 1,025 scopes. This public batch
+tracks the under-50-ms target but cannot establish it for gdev or all programs.
+
+The three newly admitted components receive **15 candidate-only runs each** in
+`measure-components-admissions.py`: diamond128 CPU median/range is 26.893 /
+25.196–30.301 ms, 12.59 MiB requested allocation and 766 maximum scopes;
+generic1000 is 36.758 / 34.135–38.927 ms, 20.73 MiB and two scopes; written1000
+is 32.606 / 30.624–35.649 ms, 18.76 MiB and two scopes. Their maximum recorded
+region durations are 15.930, 12.992 and 12.007 ms respectively. No baseline
+speed ratio applies to these rejected baseline cases.
+
+Seven alternating pairs of `bench-compile-components.ts` cover **64 synthetic
+workloads / 5,376 phase samples**, using isolated cache population and restart,
+retained population, edits, reverts and no-ops. Command:
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-components.ts --baseline build/bench/cloud-principal-graphs/candidate-lexical/blotc --candidate build/bench/cloud-principal-graphs/candidate-components/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/component-retained`.
+Every fresh/restart/retained hash matches its corresponding fresh initial or
+edited source, and cross-compiler hashes match exactly; `unexpected_problems` is
+empty. Independently rebuilt edited outputs match the recorded hashes and
+execute in **66 guests / 7,188 calls** (`execute-components-retained.ts`). Edits
+change ring base results, late selected methods, forward-chain leaves and the
+integer half of the polymorphic control, while preserving its F32 result.
+
+In that prelude-free retained batch, diamond32 fresh/restart CPU is 15→23 ms;
+retained population/edit/revert is 10→20 ms. Direct128 fresh is 10→12 ms and
+restart 10→11 ms; callback128 is 14→15 ms in both. Generic300 fresh/restart is
+13→15 ms and written300 12→13 ms. Named128 fresh/restart is 17→19 / 19→20 ms;
+demand128 fresh stays 15 ms and provider128 is 14→15 ms. Retained process CPU
+has 10 ms resolution, so zero medians do not mean zero work. Host load at this
+batch's start/end is 0.10/0.61. Shared-host caches/load remain uncontrolled.
+
+Raw evidence under `build/bench/cloud-principal-graphs/` is
+`component-comparisons/report.json` and `execution.json`,
+`component-measurement/report.json`,
+`component-admission-measurement/report.json`, and
+`component-retained/results.json`, `samples.jsonl` and `execution.json`, with
+gate, analyzer and execution logs. These durable measurements survive cleanup of
+those ignored artifacts. Task 007's implementation is qualified. Canonical
+specialization keys remain task 008; duplicate scoped checks, component overhead
+and allocation traffic remain optimization work. The frozen private gdev
+workload and original task 002 boxed binary remain unavailable; these public
+results make no private-workload performance claim.

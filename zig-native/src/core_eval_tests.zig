@@ -14,6 +14,155 @@ const type_evidence = @import("type_evidence.zig");
 const a = std.testing.allocator;
 const test_prelude = @import("test_prelude_producers.zig");
 
+const component_source =
+    \\const even: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else odd (@u32.sub value 1)
+    \\const odd: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else even (@u32.sub value 1)
+    \\entry const run: U32 -> U32 = fn value => even value
+;
+
+fn jointComponentScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    session.options.max_steps = 0;
+    session.options.max_depth = 1;
+    const result = try session.sourceInterface(target(module, "run"));
+    const arrow = session.evidence.node(result.evidence);
+    try std.testing.expectEqual(type_evidence.Tag.function, arrow.tag);
+    try std.testing.expectEqual(types.u32_type, arrow.a);
+    try std.testing.expectEqual(types.u32_type, arrow.b);
+    try std.testing.expectEqual(@as(u32, 0), arrow.c);
+    try std.testing.expect(session.component_restarts != 0);
+    try std.testing.expect(session.component_members_published >= 2);
+    try std.testing.expectEqual(@as(usize, 0), session.call_summaries.stack.items.len);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
+test "recursive summary tickets restart jointly and publish every member after all allocations" {
+    var module = try lower(component_source);
+    defer module.deinit(a);
+    try jointComponentScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, jointComponentScenario, .{&module});
+}
+
+test "recursive summary transition exhaustion falls back without spending execution fuel" {
+    var module = try lower(component_source);
+    defer module.deinit(a);
+    for ([_]usize{ 0, 1, 8, 64, 1_000_000 }) |limit| {
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        session.options.max_summary_transitions = limit;
+        session.options.max_steps = 0;
+        session.options.max_depth = 1;
+        const result = try session.sourceInterface(target(&module, "run"));
+        const arrow = session.evidence.node(result.evidence);
+        try std.testing.expectEqual(type_evidence.Tag.function, arrow.tag);
+        try std.testing.expectEqual(types.u32_type, arrow.a);
+        try std.testing.expectEqual(types.u32_type, arrow.b);
+        try std.testing.expectEqual(@as(u32, 0), arrow.c);
+        try std.testing.expect(session.summary_transitions <= limit);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+        try std.testing.expect(session.diagnostic == null);
+    }
+}
+
+test "recursive ordinary fallback collects a thousand bodies with explicit frames" {
+    var text: std.ArrayList(u8) = .empty;
+    defer text.deinit(a);
+    try text.appendSlice(a, "const f_0: U32 -> U32 = fn value => @u32.add value 0\n");
+    for (1..1001) |index| try text.print(a, "const f_{d}: U32 -> U32 = fn value => f_{d} value\n", .{ index, index - 1 });
+    try text.appendSlice(a, "entry const run: U32 -> U32 = fn value => f_1000 value\n");
+    var module = try lower(text.items);
+    defer module.deinit(a);
+    var session = try evaluator.Session.init(a, &.{module});
+    defer session.deinit();
+    session.reuse_principal_graphs = false;
+    session.options.reuse_validated_calls = false;
+    session.options.max_summary_transitions = 0;
+    session.options.max_steps = 0;
+    session.options.max_depth = 1;
+    session.options.max_type_depth = 8;
+    for (module.bodies[1..]) |body| try session.call_summaries.eligibility.put(a, .{ .unit = 0, .binding = body.binding }, false);
+    const result = try session.sourceInterface(target(&module, "run"));
+    const arrow = session.evidence.node(result.evidence);
+    try std.testing.expectEqual(types.u32_type, arrow.a);
+    try std.testing.expectEqual(types.u32_type, arrow.b);
+    try std.testing.expect(session.counters.max_region_scopes >= 1001);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
+fn componentRetry(module: *const core.Module, offset: ?usize) !usize {
+    var failing = std.testing.FailingAllocator.init(a, .{});
+    var session = try evaluator.Session.init(failing.allocator(), &.{module.*});
+    defer session.deinit();
+    const start = failing.alloc_index;
+    if (offset) |index| failing.fail_index = start + index;
+    const result = session.sourceInterface(target(module, "run")) catch |err| retry: {
+        try std.testing.expectEqual(error.OutOfMemory, err);
+        try std.testing.expect(failing.has_induced_failure);
+        try std.testing.expectEqual(@as(usize, 0), session.inquiry_regions);
+        try std.testing.expectEqual(@as(usize, 0), session.call_summaries.stack.items.len);
+        try std.testing.expectEqual(@as(u32, 0), session.call_summaries.active.count());
+        for (session.call_summaries.jobs.items) |job| {
+            try std.testing.expect(job.region == null);
+            try std.testing.expect(job.state == .complete or job.state == .declined);
+        }
+        failing.fail_index = std.math.maxInt(usize);
+        break :retry try session.sourceInterface(target(module, "run"));
+    };
+    const arrow = session.evidence.node(result.evidence);
+    try std.testing.expectEqual(types.u32_type, arrow.a);
+    try std.testing.expectEqual(types.u32_type, arrow.b);
+    try std.testing.expect(session.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    return failing.alloc_index - start;
+}
+
+test "recursive component allocation failures abandon pending members and retry in the same session" {
+    var module = try lower(component_source);
+    defer module.deinit(a);
+    const allocations = try componentRetry(&module, null);
+    for (0..allocations) |index| _ = try componentRetry(&module, index);
+}
+
+test "recursive selected frontend probe reaches bounded source inference" {
+    const source =
+        \\type Seed is data = #Seed
+        \\type Box a is data = #Box a
+        \\const Seed.build: a -> Seed -> Box a = fn value => fn seed => #Box value
+        \\const f_0 = fn value => @type.call "build" value #Seed
+        \\const parent: a -> a = fn value => (f_0 value).read
+        \\const Box.read: Box a -> a = fn box => case box of
+        \\  #Box value => parent value
+        \\entry const generic = fn value => parent value
+    ;
+    var module = try lower(source);
+    defer module.deinit(a);
+    var session = try evaluator.Session.init(a, &.{module});
+    defer session.deinit();
+    const result = try session.sourceInterface(target(&module, "generic"));
+    try std.testing.expect(result.generic or result.pending != 0 or result.evidence != 0);
+    try std.testing.expect(session.counters.max_region_scopes <= 32);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
+test "recursive discovery preserves invalid witnesses through unresolved acyclic diamonds" {
+    for ([_]usize{ 8, 12 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "const f_0 = fn left => fn right => @type.same (@panic \"uncalled witness\") right\n");
+        for (1..depth + 1) |index| try text.print(a, "const f_{d} = fn left => fn right => do:\n  let ignored = f_{d} left right\n  return f_{d} left right\n", .{ index, index - 1, index - 1 });
+        try text.print(a, "entry const integer = fn (value: U32) -> Bool => f_{d} value value\n", .{depth});
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        const reference = target(&module, "integer");
+        try std.testing.expectError(error.Declined, session.sourceInterface(reference));
+        try std.testing.expectEqual(evaluator.Code.invalid_annotation, session.diagnostic.?.code);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    }
+}
+
 fn lower(source: []const u8) !core.Module {
     return lowerWithOptions(source, .{});
 }

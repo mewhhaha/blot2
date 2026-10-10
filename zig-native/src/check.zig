@@ -9,6 +9,7 @@ const T = @import("types.zig");
 const P = @import("parameter_patterns.zig");
 const loop_targets = @import("loop_targets.zig");
 const source_operators = @import("source_operators.zig");
+const global_references = @import("global_references.zig");
 const Allocator = std.mem.Allocator;
 const F = @import("frozen_types.zig");
 const PI = @import("principal_interface.zig");
@@ -24,7 +25,7 @@ pub const ModuleOrigins = struct {
         return allocator.dupe(u8, "main");
     }
 };
-pub const ModuleOptions = struct { purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{} };
+pub const ModuleOptions = struct { purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: usize = 1_000_000 };
 /// Private differential control. This changes execution, never semantic module
 /// options or any retained-artifact key. Ordinary public entrypoints leave it off.
 pub const AliasGlobalStats = struct { attempts: usize = 0, admitted: usize = 0, declined: usize = 0, frames: usize = 0, peak_frames: usize = 0 };
@@ -48,6 +49,7 @@ pub const GlobalTrace = struct {
 };
 pub const PrivateExecution = struct {
     alias_globals: bool = false,
+    schedule_globals: bool = true,
     stats: ?*AliasGlobalStats = null,
     context: ?*anyopaque = null,
     observe: ?*const fn (?*anyopaque, GlobalTrace) void = null,
@@ -513,9 +515,11 @@ const CalleeOutcome = struct { types: []T.Id, rows: []T.Effects.Id };
 const unchanged_output = std.math.maxInt(u32);
 const State = enum { pending, active, complete };
 const Global = struct { state: State = .pending, index: u32 = 0, low: u32 = 0, on_stack: bool = false };
-const PendingObligation = struct { metadata: u32 = 0, value: T.Obligation, owner: BindingId, scope: ast.Id = 0, origin: u32 = 0, declared: bool = false, covered: bool = false, local_scheme: bool = false, direct: bool = false, method_member: bool = false, suspended: bool = false, solved: bool = false, expansion: u32 = 0 };
+const PendingObligation = struct { metadata: u32 = 0, value: T.Obligation, owner: BindingId, scope: ast.Id = 0, origin: u32 = 0, wait_target: BindingId = 0, declared: bool = false, covered: bool = false, local_scheme: bool = false, direct: bool = false, method_member: bool = false, suspended: bool = false, solved: bool = false, expansion: u32 = 0 };
 const Qualification = struct { scope: ast.Id, owner: BindingId, clauses: T.List, value: ast.Id, checked: bool = false };
 const QualificationUse = struct { scope: ast.Id, owner: BindingId, target: BindingId, source: ast.Id };
+const ForwardedRequirement = struct { use: usize, value: T.Obligation };
+const SelectedGlobal = struct { binding: BindingId, owner: BindingId, diagnostic_at: usize };
 const LoopFrame = struct { node: ast.Id, carries: []const Entry, iterations: []const BindingId, resolver_block: ast.Id = 0, exits: usize = 0 };
 const ResolverScope = struct { block: ast.Id = 0, resolver: BindingId = 0, owner_type: T.Id = 0, result: T.Id = 0, progress_depth: u32 = 0 };
 const RequestScope = struct { loop: ast.Id = 0, reply: T.Id = 0, target: T.Id = 0, completion: bool = false, return_scope: ast.Id = 0, arm: u32 = 0, state_bindings: T.List = .{}, invalid_outer_return: bool = false };
@@ -529,6 +533,12 @@ const Engine = struct {
     active_aliases: std.AutoHashMapUnmanaged(u32, void) = .empty,
     holes: std.ArrayList(struct { node: ast.Id, scope: T.List, owner: BindingId }) = .empty,
     execution: PrivateExecution = .{},
+    inference_limit: usize = 1_000_000,
+    inference_transitions: usize = 0,
+    /// Body checking may finish before late selected dependencies stabilize.
+    /// These members retain their recursive placeholders until publication.
+    finishing_group: []const BindingId = &.{},
+    dependency_owner: ?BindingId = null,
     computations: std.ArrayList(Computation) = .empty,
     request_loops: std.ArrayList(RequestLoop) = .empty,
     request_arms: std.ArrayList(RequestArm) = .empty,
@@ -581,6 +591,10 @@ const Engine = struct {
     local_requirements_start: usize = 0,
     qualifications: std.ArrayList(Qualification) = .empty,
     qualification_uses: std.ArrayList(QualificationUse) = .empty,
+    forwarded_requirements: std.AutoHashMapUnmanaged(ForwardedRequirement, void) = .empty,
+    staged_global_diagnostics: std.AutoHashMapUnmanaged(BindingId, []Diagnostic) = .empty,
+    selected_globals: std.ArrayList(SelectedGlobal) = .empty,
+    global_driver: bool = false,
     declared_obligations: std.ArrayList(T.Obligation) = .empty,
     predicate_origins: std.ArrayList(ast.Span) = .empty,
     computed_variables: std.ArrayList(T.Id) = .empty,
@@ -1175,10 +1189,11 @@ const Engine = struct {
             }
         }
     }
-    fn tryAssociated(self: *Engine, identity: Identity, member: symbols.Symbol, operator: T.Operator, left: T.Id, right: T.Id, source: ast.Id) T.Error!?struct { ty: T.Id, binding: BindingId } {
-        const index = (if (member == 0) self.associated_ops.get(.{ .identity = identity, .operator = operator }) else self.associated_members.get(.{ .identity = identity, .member = member })) orelse return null;
+    const AssociatedChoice = union(enum) { absent, waiting, selected: struct { ty: T.Id, binding: BindingId } };
+    fn tryAssociated(self: *Engine, identity: Identity, member: symbols.Symbol, operator: T.Operator, left: T.Id, right: T.Id, source: ast.Id) T.Error!AssociatedChoice {
+        const index = (if (member == 0) self.associated_ops.get(.{ .identity = identity, .operator = operator }) else self.associated_members.get(.{ .identity = identity, .member = member })) orelse return .absent;
         const binding = self.associated.items[index].binding;
-        try self.prepareGlobal(binding);
+        if (!try self.prepareSelectedGlobal(binding)) return .waiting;
         const point = self.types.mark();
         const pending = self.pending.items.len;
         self.mark_depth += 1;
@@ -1191,12 +1206,12 @@ const Engine = struct {
             error.TypeMismatch, error.InfiniteType, error.EffectMismatch, error.InfiniteEffect => {
                 self.types.rollback(point);
                 self.pending.shrinkRetainingCapacity(pending);
-                return null;
+                return .absent;
             },
             error.TypeLimit => return err,
         };
         self.dispatch_signatures[source] = expected;
-        return .{ .ty = result, .binding = binding };
+        return .{ .selected = .{ .ty = result, .binding = binding } };
     }
     fn dispatch(self: *Engine, left: T.Id, right: T.Id, member: symbols.Symbol, operator: T.Operator, source: ast.Id, direct: bool) T.Error!?T.Id {
         const a = try self.types.resolve(left, 0);
@@ -1204,9 +1219,13 @@ const Engine = struct {
         const an = self.types.node(a);
         const bn = self.types.node(b);
         if (an.tag == .variable or bn.tag == .variable) return null;
-        if (self.identityOf(a)) |identity| if (try self.tryAssociated(identity, member, operator, a, b, source)) |choice| {
-            if (direct) self.resolved[source] = choice.binding;
-            return choice.ty;
+        if (self.identityOf(a)) |identity| switch (try self.tryAssociated(identity, member, operator, a, b, source)) {
+            .absent => {},
+            .waiting => return null,
+            .selected => |choice| {
+                if (direct) self.resolved[source] = choice.binding;
+                return choice.ty;
+            },
         };
         const scalar_a = an.tag == .u32 or an.tag == .f32 or an.tag == .boolean;
         const scalar_b = bn.tag == .u32 or bn.tag == .f32 or bn.tag == .boolean;
@@ -1220,9 +1239,13 @@ const Engine = struct {
             }
             return if (comparison) T.boolean else a;
         }
-        if (self.identityOf(b)) |identity| if (try self.tryAssociated(identity, member, operator, a, b, source)) |choice| {
-            if (direct) self.resolved[source] = choice.binding;
-            return choice.ty;
+        if (self.identityOf(b)) |identity| switch (try self.tryAssociated(identity, member, operator, a, b, source)) {
+            .absent => {},
+            .waiting => return null,
+            .selected => |choice| {
+                if (direct) self.resolved[source] = choice.binding;
+                return choice.ty;
+            },
         };
         if (member != 0) return null;
         try self.diagnostic(.ambiguous_operator, source);
@@ -1233,7 +1256,7 @@ const Engine = struct {
         const identity = self.identityOf(destination) orelse return null;
         const index = self.associated_members.get(.{ .identity = identity, .member = member }) orelse return null;
         const binding = self.associated.items[index].binding;
-        try self.prepareGlobal(binding);
+        if (!try self.prepareSelectedGlobal(binding)) return null;
         const function = try self.instantiate(binding, source);
         // Destination lookup selects exactly one ordinary unary member. Unlike
         // binary dispatch, an incompatible selected signature has no fallback.
@@ -1259,7 +1282,7 @@ const Engine = struct {
         }
         const selected = self.associated_members.get(.{ .identity = .{ .unit = token.a, .decl = token.b }, .member = constraint.name }) orelse return false;
         const binding = self.associated.items[selected].binding;
-        try self.prepareGlobal(binding);
+        if (!try self.prepareSelectedGlobal(binding)) return false;
         // The protocol's selected ordinary method determines every input,
         // continuation and output type. No wrapper shape or fallback is implied.
         const function = try self.instantiate(binding, constraint.source);
@@ -2964,9 +2987,10 @@ const Engine = struct {
                         }
                     };
                 };
-                if (!active_member and !open_self_member) try self.prepareGlobal(binding);
+                var waiting_member = false;
+                if (!active_member and !open_self_member) waiting_member = !try self.prepareSelectedGlobal(binding);
                 const retained_self_member = !active_member and self.retainsSelfMember(binding, self.associated.items[index]);
-                if (active_member or open_self_member or retained_self_member) {
+                if (active_member or open_self_member or retained_self_member or waiting_member) {
                     result = try self.types.fresh();
                     const expected_function = try self.invocation(ty, result);
                     self.dispatch_signatures[source] = expected_function;
@@ -2979,13 +3003,18 @@ const Engine = struct {
                     // method requirement. The original request belongs to its
                     // qualification boundary, even during nested inference.
                     deferred.value.ty = ty;
-                    deferred.value.kind = .receiver;
+                    // A queued member has not been checked yet. Keep an
+                    // ordinary field obligation so its eventual signature is
+                    // checked against this occurrence's result. Only an active
+                    // recursive member retains a residual receiver requirement.
+                    deferred.value.kind = if (waiting_member) .field else .receiver;
                     deferred.value.name = name;
                     deferred.value.other = T.unit;
                     deferred.value.result = result;
                     deferred.value.signature = expected_function;
                     deferred.value.source = source;
-                    deferred.method_member = true;
+                    deferred.method_member = !waiting_member;
+                    deferred.wait_target = if (waiting_member) binding else 0;
                     if (deferred.origin == 0) deferred.origin = try self.projectionOrigin(source, name, true);
                     try self.pending.append(try self.pendingAllocator(), deferred);
                 } else {
@@ -3022,7 +3051,7 @@ const Engine = struct {
         // its public scheme. Its suspended body request still belongs to this
         // exact source declaration and must not be mistaken for solved evidence.
         for (self.pending.items) |pending| {
-            if (pending.owner != binding or pending.scope != declaration or !pending.method_member or !pending.suspended or pending.solved or pending.covered or pending.declared) continue;
+            if (pending.owner != binding or pending.scope != declaration or !pending.method_member or (!pending.suspended and !state.on_stack) or pending.solved or pending.covered or pending.declared) continue;
             const requirement = pending.value;
             if (requirement.explicit or requirement.kind != .receiver or requirement.name != member.member or self.types.node(self.types.head(requirement.other, 0)).tag != .unit) continue;
             const receiver = self.identityOf(requirement.ty) orelse continue;
@@ -3858,7 +3887,7 @@ const Engine = struct {
         if (boundary.checked) return;
         for (self.qualification_uses.items) |use| if (use.scope == boundary.scope) {
             const state = self.global_states.get(use.target).?;
-            if (state.on_stack) return;
+            if (state.on_stack and !inList(self.finishing_group, use.target)) return;
         };
         var i: usize = 0;
         while (i < self.pending.items.len) : (i += 1) {
@@ -3919,17 +3948,44 @@ const Engine = struct {
         }
         self.qualifications.items[index].checked = true;
     }
-    fn targetRequirements(self: *Engine, target: BindingId, limit: usize, visited: *std.ArrayList(BindingId), output: *std.ArrayList(T.Obligation), depth: usize) T.Error!void {
-        if (depth >= 1024) return error.TypeLimit;
-        if (inList(visited.items, target)) return;
-        try visited.append(self.allocator, target);
-        const scope = self.bindings.items[target].declaration;
-        for (self.qualifications.items) |boundary| if (boundary.scope == scope) {
-            try output.appendSlice(self.allocator, self.declared_obligations.items[boundary.clauses.start..][0..boundary.clauses.len]);
-            return;
-        };
-        for (self.pending.items[0..limit]) |pending| if (pending.scope == scope and !pending.solved and !pending.declared and !pending.covered and !pending.local_scheme) try output.append(self.allocator, pending.value);
-        for (self.qualification_uses.items) |use| if (use.scope == scope) try self.targetRequirements(use.target, limit, visited, output, depth + 1);
+    fn targetRequirements(self: *Engine, target: BindingId, limit: usize, visited: *std.ArrayList(BindingId), output: *std.ArrayList(T.Obligation)) T.Error!void {
+        var work: std.ArrayList(BindingId) = .empty;
+        defer work.deinit(self.allocator);
+        try work.append(self.allocator, target);
+        while (work.pop()) |current| {
+            try self.inferenceTransition();
+            if (inList(visited.items, current)) continue;
+            try visited.append(self.allocator, current);
+            const scope = self.bindings.items[current].declaration;
+            const qualified = for (self.qualifications.items) |boundary| {
+                if (boundary.scope == scope) {
+                    try output.appendSlice(self.allocator, self.declared_obligations.items[boundary.clauses.start..][0..boundary.clauses.len]);
+                    break true;
+                }
+            } else false;
+            if (qualified) continue;
+            for (self.pending.items[0..limit]) |pending| if (pending.scope == scope and !pending.solved and !pending.declared and !pending.covered and !pending.local_scheme) try output.append(self.allocator, pending.value);
+            var index = self.qualification_uses.items.len;
+            while (index != 0) {
+                index -= 1;
+                const use = self.qualification_uses.items[index];
+                if (use.scope == scope) try work.append(self.allocator, use.target);
+            }
+        }
+    }
+    fn prepareQualifications(self: *Engine, group: []const BindingId) T.Error!void {
+        var index: usize = 0;
+        while (index < self.pending.items.len) : (index += 1) {
+            const pending = self.pending.items[index];
+            if (pending.declared or pending.covered or pending.solved or pending.local_scheme or pending.value.kind != .callee_use) continue;
+            const qualified = for (self.qualifications.items) |boundary| {
+                if (boundary.scope == pending.scope and inList(group, boundary.owner)) break true;
+            } else false;
+            if (!qualified) continue;
+            try self.inferenceTransition();
+            self.pending.items[index].solved = true;
+            try self.expandUse(pending, pending.expansion);
+        }
     }
     fn expandQualificationUses(self: *Engine, group: []const BindingId) T.Error!void {
         var qualified = false;
@@ -3941,20 +3997,26 @@ const Engine = struct {
         const limit = self.pending.items.len;
         const saved_scope = self.qualification_scope;
         defer self.qualification_scope = saved_scope;
-        for (self.qualification_uses.items) |use| {
+        const use_count = self.qualification_uses.items.len;
+        for (0..use_count) |use_index| {
+            const use = self.qualification_uses.items[use_index];
             if (!inList(group, use.target)) continue;
             var visited: std.ArrayList(BindingId) = .empty;
             defer visited.deinit(self.allocator);
             var requirements: std.ArrayList(T.Obligation) = .empty;
             defer requirements.deinit(self.allocator);
-            try self.targetRequirements(use.target, limit, &visited, &requirements, 0);
+            try self.targetRequirements(use.target, limit, &visited, &requirements);
             self.qualification_scope = use.scope;
             for (requirements.items) |constraint| {
+                try self.inferenceTransition();
+                const forwarded: ForwardedRequirement = .{ .use = use_index, .value = constraint };
+                if (self.forwarded_requirements.contains(forwarded)) continue;
                 var value = constraint;
                 value.source = use.source;
                 // A forwarded implicit method projection is required at this
                 // reference occurrence, rather than at the member's body.
                 try self.appendPending(.{ .owner = use.owner, .origin = try self.memberUseOrigin(value, use.source), .suspended = value.explicit and value.kind != .record_merge, .value = value });
+                try self.forwarded_requirements.put(self.allocator, forwarded, {});
             }
         }
     }
@@ -3962,6 +4024,9 @@ const Engine = struct {
         return value.explicit or (value.kind == .callee_use and self.bindings.items[value.identity.decl].summary.has_explicit);
     }
     fn scheme(self: *Engine, root: T.Id, excluded: []const T.Id, group: []const BindingId, capture_concrete: bool, certificate_owner: BindingId, qualification_scope: ast.Id) T.Error!T.Scheme {
+        return self.schemeInto(root, excluded, group, capture_concrete, certificate_owner, qualification_scope, &self.obligations, null);
+    }
+    fn schemeInto(self: *Engine, root: T.Id, excluded: []const T.Id, group: []const BindingId, capture_concrete: bool, certificate_owner: BindingId, qualification_scope: ast.Id, output: *std.ArrayList(T.Obligation), suspensions: ?*std.ArrayList(usize)) T.Error!T.Scheme {
         try self.solveFields();
         if (capture_concrete) try self.expandInformedUses(group, false);
         const resolved = try self.types.resolve(root, 0);
@@ -4122,15 +4187,15 @@ const Engine = struct {
         };
         row_variables.shrinkRetainingCapacity(kept);
         const span = try self.types.saveList(variables.items);
-        const start: u32 = @intCast(self.obligations.items.len);
+        const start: u32 = @intCast(output.items.len);
         for (candidates.items) |candidate| {
             if (!candidate.retained) continue;
             const pending = self.pending.items[candidate.index];
-            try self.obligations.append(self.allocator, .{ .ty = try self.types.resolve(pending.value.ty, 0), .kind = pending.value.kind, .source = pending.value.source, .name = pending.value.name, .result = if (pending.value.result == 0) 0 else try self.types.resolve(pending.value.result, 0), .other = if (pending.value.other == 0) 0 else try self.types.resolve(pending.value.other, 0), .signature = if (pending.value.signature == 0) 0 else try self.types.resolve(pending.value.signature, 0), .operator = pending.value.operator, .identity = pending.value.identity, .explicit = pending.value.explicit, .qualification_span = pending.value.qualification_span, .qualification_unit = pending.value.qualification_unit });
-            self.pending.items[candidate.index].suspended = true;
+            try output.append(self.allocator, .{ .ty = try self.types.resolve(pending.value.ty, 0), .kind = pending.value.kind, .source = pending.value.source, .name = pending.value.name, .result = if (pending.value.result == 0) 0 else try self.types.resolve(pending.value.result, 0), .other = if (pending.value.other == 0) 0 else try self.types.resolve(pending.value.other, 0), .signature = if (pending.value.signature == 0) 0 else try self.types.resolve(pending.value.signature, 0), .operator = pending.value.operator, .identity = pending.value.identity, .explicit = pending.value.explicit, .qualification_span = pending.value.qualification_span, .qualification_unit = pending.value.qualification_unit });
+            if (suspensions) |staged| try staged.append(self.allocator, candidate.index) else self.pending.items[candidate.index].suspended = true;
             if (!capture_concrete and self.explicitRequirement(pending.value)) self.pending.items[candidate.index].local_scheme = true;
         }
-        return .{ .root = closed.root, .variables = span, .row_variables = try self.types.saveList(row_variables.items), .closed_rows = closed.closed_rows, .obligations = .{ .start = start, .len = @intCast(self.obligations.items.len - start) } };
+        return .{ .root = closed.root, .variables = span, .row_variables = try self.types.saveList(row_variables.items), .closed_rows = closed.closed_rows, .obligations = .{ .start = start, .len = @intCast(output.items.len - start) } };
     }
     fn sharedKind(kind: T.ObligationKind) bool {
         return switch (kind) {
@@ -4142,9 +4207,12 @@ const Engine = struct {
     /// outcome is a function of closed types qualify; everything else keeps
     /// the flat instantiation.
     fn summarize(self: *Engine, principal: T.Scheme) T.Error!SchemeSummary {
+        return self.summarizeFrom(principal, self.obligations.items);
+    }
+    fn summarizeFrom(self: *Engine, principal: T.Scheme, obligations: []const T.Obligation) T.Error!SchemeSummary {
         var summary: SchemeSummary = .{ .shareable = principal.root != 0 and principal.obligations.len != 0, .only_result_selected = principal.obligations.len != 0 };
         var flat: u64 = 0;
-        for (self.obligations.items[principal.obligations.start..][0..principal.obligations.len]) |constraint| {
+        for (obligations[principal.obligations.start..][0..principal.obligations.len]) |constraint| {
             if (!sharedKind(constraint.kind)) summary.shareable = false;
             summary.has_explicit = summary.has_explicit or constraint.explicit;
             if (constraint.kind == .callee_use) {
@@ -4193,7 +4261,7 @@ const Engine = struct {
         summary.public_outputs = try self.types.saveList(flags);
         var requirements: std.ArrayList(T.Id) = .empty;
         defer requirements.deinit(self.allocator);
-        for (self.obligations.items[principal.obligations.start..][0..principal.obligations.len]) |constraint| try self.requirementParts(constraint, &requirements);
+        for (obligations[principal.obligations.start..][0..principal.obligations.len]) |constraint| try self.requirementParts(constraint, &requirements);
         var requirement_variables: std.ArrayList(T.Id) = .empty;
         defer requirement_variables.deinit(self.allocator);
         var requirement_rows: std.ArrayList(u32) = .empty;
@@ -4422,6 +4490,7 @@ const Engine = struct {
         self.initializer_rejected = true;
     }
     const GlobalContext = struct {
+        depth: usize,
         current: BindingId,
         pending_start: usize,
         owner: ast.Id,
@@ -4442,6 +4511,7 @@ const Engine = struct {
         annotations_changed: bool = false,
         env_changed: bool = false,
         fn restore(self: *GlobalContext, engine: *Engine) void {
+            engine.depth = self.depth;
             if (self.env_changed) {
                 engine.env.clearRetainingCapacity();
                 engine.env.appendSliceAssumeCapacity(self.env.?);
@@ -4513,10 +4583,12 @@ const Engine = struct {
     // Both execution engines use this exact prefix, including every fallible
     // operation's original position. Frames only replace native call ownership.
     fn beginGlobal(self: *Engine, binding: BindingId) T.Error!GlobalFrame {
+        try self.inferenceTransition();
         self.counter += 1;
         try self.global_states.put(self.allocator, binding, .{ .state = .active, .index = self.counter, .low = self.counter, .on_stack = true });
         try self.active.append(self.allocator, binding);
         var context: GlobalContext = .{
+            .depth = self.depth,
             .current = self.current,
             .pending_start = self.pending_start,
             .owner = self.owner,
@@ -4531,6 +4603,7 @@ const Engine = struct {
             .inherited_rows = self.inherited_rows,
         };
         errdefer context.restore(self);
+        if (self.global_driver) self.depth = 0;
         self.pending_start = self.pending.items.len;
         self.ambient = try self.types.freshEffects();
         self.resolver_scope = .{};
@@ -4583,18 +4656,52 @@ const Engine = struct {
                 else => return err,
             };
         }
+        // Complete means the source body has been checked. on_stack remains
+        // true until every selected dependency and member scheme stabilizes.
+        self.global_states.getPtr(binding).?.state = .complete;
         const now = self.global_states.get(binding).?;
-        if (now.low == now.index) {
-            var group: std.ArrayList(BindingId) = .empty;
-            defer group.deinit(self.allocator);
-            while (self.active.pop()) |member| {
-                var state = self.global_states.get(member).?;
-                state.state = .complete;
-                state.on_stack = false;
-                try self.global_states.put(self.allocator, member, state);
-                try group.append(self.allocator, member);
-                if (member == binding) break;
+        if (now.low == now.index) try self.finishComponent(binding);
+        self.traceGlobal(.finished, binding);
+    }
+    fn inferenceTransition(self: *Engine) T.Error!void {
+        if (self.inference_transitions >= self.inference_limit) return error.TypeLimit;
+        self.inference_transitions += 1;
+    }
+    fn componentLow(self: *Engine, start: usize, binding: BindingId) u32 {
+        var low = self.global_states.get(binding).?.low;
+        for (self.active.items[start..]) |member| low = @min(low, self.global_states.get(member).?.low);
+        self.global_states.getPtr(binding).?.low = low;
+        return low;
+    }
+    fn resetQualifications(self: *Engine, group: []const BindingId) void {
+        for (self.qualifications.items) |*boundary| if (inList(group, boundary.owner)) {
+            boundary.checked = false;
+        };
+    }
+    fn pendingState(self: *const Engine) usize {
+        var count: usize = 0;
+        for (self.pending.items) |pending| if (!pending.solved and !pending.declared and !pending.covered and !pending.local_scheme) {
+            count += 1;
+        };
+        return count;
+    }
+    fn finishComponent(self: *Engine, binding: BindingId) T.Error!void {
+        var group: std.ArrayList(BindingId) = .empty;
+        defer group.deinit(self.allocator);
+        const saved_group = self.finishing_group;
+        defer self.finishing_group = saved_group;
+        const start = std.mem.findScalar(BindingId, self.active.items, binding).?;
+        while (true) {
+            try self.inferenceTransition();
+            const state = self.global_states.get(binding).?;
+            if (self.componentLow(start, binding) != state.index) return;
+            group.clearRetainingCapacity();
+            var cursor = self.active.items.len;
+            while (cursor > start) {
+                cursor -= 1;
+                try group.append(self.allocator, self.active.items[cursor]);
             }
+            self.finishing_group = group.items;
             var recursive = group.items.len > 1;
             for (self.qualification_uses.items) |use| if (inList(group.items, use.owner) and inList(group.items, use.target)) {
                 recursive = true;
@@ -4602,20 +4709,77 @@ const Engine = struct {
             };
             if (recursive) try self.expandInformedUses(group.items, true);
             try self.expandQualificationUses(group.items);
+            try self.prepareQualifications(group.items);
             try self.solveFields();
+            if (self.selected_globals.items.len != 0) return;
+            if (self.componentLow(start, binding) != state.index) return;
+            if (self.active.items.len != start + group.items.len) continue;
+            const before_pending = self.pending.items.len;
+            const schemes = try self.allocator.alloc(T.Scheme, group.items.len);
+            defer self.allocator.free(schemes);
+            const summaries = try self.allocator.alloc(SchemeSummary, group.items.len);
+            defer self.allocator.free(summaries);
+            var obligations: std.ArrayList(T.Obligation) = .empty;
+            defer obligations.deinit(self.allocator);
+            var suspensions: std.ArrayList(usize) = .empty;
+            defer suspensions.deinit(self.allocator);
+            for (group.items, 0..) |member, index| {
+                schemes[index] = try self.schemeInto(self.bindings.items[member].ty, &.{}, group.items, true, member, self.bindings.items[member].declaration, &obligations, &suspensions);
+                summaries[index] = try self.summarizeFrom(schemes[index], obligations.items);
+                if (recursive) summaries[index].shareable = false;
+            }
+            if (self.selected_globals.items.len != 0) return;
+            if (self.componentLow(start, binding) != state.index) return;
+            if (self.active.items.len != start + group.items.len or self.pending.items.len != before_pending) continue;
+            const staged_cursor = self.types.cursor();
+            const staged_pending = self.pendingState();
+            const staged_uses = self.qualification_uses.items.len;
+            // Clause matching can bind a receiver and reveal another body.
+            // Stage its diagnostics while that final solver work stabilizes.
+            const diagnostic_start = self.diagnostics.items.len;
             var qualification: usize = 0;
             while (qualification < self.qualifications.items.len) : (qualification += 1) if (inList(group.items, self.qualifications.items[qualification].owner)) try self.checkQualification(qualification);
-            for (group.items) |member| {
-                const principal = try self.scheme(self.bindings.items[member].ty, &.{}, group.items, true, member, self.bindings.items[member].declaration);
-                self.bindings.items[member].scheme = principal;
-                self.bindings.items[member].summary = try self.summarize(principal);
-                if (recursive) self.bindings.items[member].summary.shareable = false;
+            const diagnostics = try self.allocator.dupe(Diagnostic, self.diagnostics.items[diagnostic_start..]);
+            defer self.allocator.free(diagnostics);
+            self.diagnostics.shrinkRetainingCapacity(diagnostic_start);
+            var diagnostics_published = false;
+            defer if (!diagnostics_published) deinitDiagnosticPayloads(self.allocator, diagnostics);
+            try self.solveFields();
+            if (self.selected_globals.items.len != 0) {
+                self.resetQualifications(group.items);
+                return;
             }
+            if (self.componentLow(start, binding) != state.index) {
+                self.resetQualifications(group.items);
+                return;
+            }
+            if (self.active.items.len != start + group.items.len or self.pending.items.len != before_pending or self.types.cursor() != staged_cursor or self.pendingState() != staged_pending or self.qualification_uses.items.len != staged_uses) {
+                self.resetQualifications(group.items);
+                continue;
+            }
+            // Reserve both visible outputs before committing any member. Scheme
+            // retries own their predicates; independent completed output stays
+            // in place. Closed-row certificates record real monotonic solver
+            // writes and are deduplicated independently of tentative schemes.
+            try self.obligations.ensureUnusedCapacity(self.allocator, obligations.items.len);
+            try self.diagnostics.ensureUnusedCapacity(self.allocator, diagnostics.len);
+            const obligation_start: u32 = @intCast(self.obligations.items.len);
+            self.obligations.appendSliceAssumeCapacity(obligations.items);
+            for (suspensions.items) |pending| self.pending.items[pending].suspended = true;
+            for (schemes) |*principal| principal.obligations.start += obligation_start;
+            self.diagnostics.insertSliceAssumeCapacity(diagnostic_start, diagnostics);
+            diagnostics_published = true;
+            for (group.items, 0..) |member, index| {
+                self.bindings.items[member].scheme = schemes[index];
+                self.bindings.items[member].summary = summaries[index];
+                self.global_states.getPtr(member).?.on_stack = false;
+            }
+            self.active.shrinkRetainingCapacity(start);
+            return;
         }
-        self.traceGlobal(.finished, binding);
     }
     fn inferGlobal(self: *Engine, binding: BindingId) T.Error!void {
-        if (self.global_states.get(binding).?.state != .pending) return;
+        if (self.global_states.get(binding).?.state != .pending) return self.flushGlobalDiagnostics(binding);
         if (self.execution.alias_globals and self.aliasEntryContext()) {
             if (self.execution.stats) |stats| stats.attempts += 1;
             var plan = try self.aliasPlan(binding);
@@ -4626,11 +4790,162 @@ const Engine = struct {
             }
             if (self.execution.stats) |stats| stats.declined += 1;
         }
+        if (self.execution.schedule_globals and !self.global_driver) return self.inferScheduledGlobal(binding);
         var frame = try self.beginGlobal(binding);
         defer frame.context.restore(self);
         const declaration = self.tree.valueDecl(frame.id);
         const value = try self.taggedExpression(self.tree.list(declaration.attributes), declaration.body, 0);
         try self.finishGlobal(&frame, value);
+    }
+    fn discoveryShadowed(self: *const Engine, locals: []const symbols.Symbol, name: symbols.Symbol) bool {
+        if (std.mem.findScalar(symbols.Symbol, locals, name) != null) return true;
+        const text = self.pool.get(name);
+        if (std.mem.findScalar(u8, text, '.')) |dot| if (self.pool.lookup(text[0..dot])) |root| return std.mem.findScalar(symbols.Symbol, locals, root) != null;
+        return false;
+    }
+    fn discoveryReference(context: *anyopaque, kind: global_references.Kind, name: symbols.Symbol, member: symbols.Symbol, locals: []const symbols.Symbol) global_references.Error!?u32 {
+        const self: *Engine = @ptrCast(@alignCast(context));
+        var selected: ?BindingId = null;
+        switch (kind) {
+            .name => if (!self.discoveryShadowed(locals, name)) {
+                selected = try self.catalogBinding(name);
+                if (selected == null) {
+                    const text = self.pool.get(name);
+                    if (std.mem.findScalar(u8, text, '.')) |dot| {
+                        if (self.pool.lookup(text[0..dot])) |root| selected = self.globals.get(root);
+                    }
+                }
+            },
+            .qualified => if (!self.discoveryShadowed(locals, name)) {
+                selected = self.qualified.get(.{ .namespace = name, .member = member });
+            },
+            .operator => {
+                const text = self.pool.get(name);
+                const declared = self.overrides.get(name);
+                const named = if (declared) |override| override.named else text.len != 0 and (std.ascii.isAlphabetic(text[0]) or text[0] == '_');
+                const target = if (declared) |override| override.target else name;
+                if ((!named or !self.discoveryShadowed(locals, target)) and (declared != null or named)) {
+                    if (declared) |override| {
+                        if (override.external) |external| selected = self.external_targets.get(external) else selected = try self.catalogBinding(target);
+                    } else selected = try self.catalogBinding(target);
+                }
+            },
+        }
+        const binding = selected orelse return null;
+        if (self.bindings.items[binding].kind != .global) return null;
+        return binding;
+    }
+    fn flushGlobalDiagnostics(self: *Engine, binding: BindingId) Allocator.Error!void {
+        const diagnostics = self.staged_global_diagnostics.get(binding) orelse return;
+        try self.diagnostics.appendSlice(self.allocator, diagnostics);
+        _ = self.staged_global_diagnostics.remove(binding);
+        self.allocator.free(diagnostics);
+    }
+    const ScheduledGlobal = struct {
+        frame: GlobalFrame,
+        references: []global_references.Reference,
+        next: usize = 0,
+        value: ?T.Id = null,
+        finished: bool = false,
+        before: ?Global = null,
+        owner: BindingId = 0,
+        diagnostic_start: usize,
+        diagnostic_at: ?usize = null,
+    };
+    fn scheduledFrame(self: *Engine, binding: BindingId, before: ?Global, owner: BindingId, diagnostic_at: ?usize) T.Error!ScheduledGlobal {
+        const references = try global_references.discover(self.allocator, self.tree, self.bindings.items[binding].declaration, .{ .context = self, .self_name = self.self_name, .resolve = discoveryReference }, &self.inference_transitions, self.inference_limit);
+        errdefer self.allocator.free(references);
+        const diagnostic_start = self.diagnostics.items.len;
+        const frame = try self.beginGlobal(binding);
+        return .{ .frame = frame, .references = references, .before = before, .owner = owner, .diagnostic_start = diagnostic_start, .diagnostic_at = diagnostic_at };
+    }
+    fn inferScheduledGlobal(self: *Engine, initial: BindingId) T.Error!void {
+        std.debug.assert(!self.global_driver);
+        self.global_driver = true;
+        defer self.global_driver = false;
+        var frames: std.ArrayList(ScheduledGlobal) = .empty;
+        defer frames.deinit(self.allocator);
+        defer while (frames.pop()) |item| {
+            var unfinished = item;
+            self.allocator.free(unfinished.references);
+            unfinished.frame.context.restore(self);
+        };
+        try frames.ensureUnusedCapacity(self.allocator, 1);
+        frames.appendAssumeCapacity(try self.scheduledFrame(initial, null, 0, null));
+        while (frames.items.len != 0) {
+            try self.inferenceTransition();
+            const index = frames.items.len - 1;
+            if (frames.items[index].next < frames.items[index].references.len) {
+                const reference = frames.items[index].references[frames.items[index].next];
+                frames.items[index].next += 1;
+                const before = self.global_states.get(reference.binding).?;
+                const owner = frames.items[index].frame.binding;
+                if (before.state == .pending) {
+                    try frames.ensureUnusedCapacity(self.allocator, 1);
+                    frames.appendAssumeCapacity(try self.scheduledFrame(reference.binding, before, owner, null));
+                } else try self.finishPreparedGlobalOwner(reference.binding, before, owner);
+                continue;
+            }
+            if (frames.items[index].value == null) {
+                const declaration = self.tree.valueDecl(frames.items[index].frame.id);
+                frames.items[index].value = try self.taggedExpression(self.tree.list(declaration.attributes), declaration.body, 0);
+            }
+            if (self.selected_globals.items.len != 0) {
+                const selected = self.selected_globals.orderedRemove(0);
+                const before = self.global_states.get(selected.binding).?;
+                if (before.state == .pending) {
+                    try frames.ensureUnusedCapacity(self.allocator, 1);
+                    frames.appendAssumeCapacity(try self.scheduledFrame(selected.binding, before, selected.owner, selected.diagnostic_at));
+                } else try self.finishPreparedGlobalOwner(selected.binding, before, selected.owner);
+                continue;
+            }
+            if (!frames.items[index].finished) {
+                try self.finishGlobal(&frames.items[index].frame, frames.items[index].value.?);
+                frames.items[index].finished = true;
+                if (self.selected_globals.items.len != 0) continue;
+            } else {
+                const binding = frames.items[index].frame.binding;
+                const state = self.global_states.get(binding).?;
+                if (state.on_stack and state.low == state.index) try self.finishComponent(binding);
+                if (self.selected_globals.items.len != 0) continue;
+            }
+            var done = frames.pop().?;
+            defer self.allocator.free(done.references);
+            defer done.frame.context.restore(self);
+            if (done.before) |before| {
+                try self.finishPreparedGlobalOwner(done.frame.binding, before, done.owner);
+                const diagnostics = try self.allocator.dupe(Diagnostic, self.diagnostics.items[done.diagnostic_start..]);
+                self.diagnostics.shrinkRetainingCapacity(done.diagnostic_start);
+                var retained = false;
+                defer if (!retained) {
+                    deinitDiagnosticPayloads(self.allocator, diagnostics);
+                    self.allocator.free(diagnostics);
+                };
+                if (done.diagnostic_at) |position| {
+                    const at = @min(position, self.diagnostics.items.len);
+                    try self.diagnostics.insertSlice(self.allocator, at, diagnostics);
+                    for (self.selected_globals.items) |*pending| if (pending.diagnostic_at >= at) {
+                        pending.diagnostic_at += diagnostics.len;
+                    };
+                    self.allocator.free(diagnostics);
+                    retained = true;
+                } else {
+                    std.debug.assert(!self.staged_global_diagnostics.contains(done.frame.binding));
+                    try self.staged_global_diagnostics.put(self.allocator, done.frame.binding, diagnostics);
+                    retained = true;
+                }
+            }
+        }
+    }
+    fn prepareSelectedGlobal(self: *Engine, binding: BindingId) T.Error!bool {
+        if (self.bindings.items[binding].kind != .external and self.global_driver and self.global_states.get(binding).?.state == .pending) {
+            const owner = self.dependency_owner orelse self.current;
+            for (self.selected_globals.items) |pending| if (pending.binding == binding and pending.owner == owner) return false;
+            try self.selected_globals.append(self.allocator, .{ .binding = binding, .owner = owner, .diagnostic_at = self.diagnostics.items.len });
+            return false;
+        }
+        try self.prepareGlobal(binding);
+        return true;
     }
     const AliasStep = struct { binding: BindingId, body: ast.Id, target: BindingId = 0, next: usize = 0 };
     fn aliasEntryContext(self: *const Engine) bool {
@@ -4729,16 +5044,25 @@ const Engine = struct {
     }
     fn prepareGlobal(self: *Engine, binding: BindingId) T.Error!void {
         if (self.bindings.items[binding].kind == .external) return;
+        try self.inferenceTransition();
+        const owner = self.dependency_owner orelse self.current;
+        const saved_owner = self.dependency_owner;
+        self.dependency_owner = null;
+        defer self.dependency_owner = saved_owner;
         const before = self.global_states.get(binding).?;
         if (before.state == .pending) try self.inferGlobal(binding);
-        try self.finishPreparedGlobal(binding, before);
+        try self.flushGlobalDiagnostics(binding);
+        try self.finishPreparedGlobalOwner(binding, before, owner);
     }
     fn finishPreparedGlobal(self: *Engine, binding: BindingId, before: Global) T.Error!void {
+        return self.finishPreparedGlobalOwner(binding, before, self.current);
+    }
+    fn finishPreparedGlobalOwner(self: *Engine, binding: BindingId, before: Global, owner: BindingId) T.Error!void {
         const after = self.global_states.get(binding).?;
-        if (self.current != 0 and after.on_stack) {
-            var current = self.global_states.get(self.current).?;
+        if (owner != 0 and after.on_stack) {
+            var current = self.global_states.get(owner).?;
             current.low = @min(current.low, if (before.state == .pending) after.low else after.index);
-            try self.global_states.put(self.allocator, self.current, current);
+            self.global_states.getPtr(owner).?.* = current;
         }
     }
     fn globalReference(self: *Engine, binding: BindingId, id: ast.Id) T.Error!T.Id {
@@ -6377,8 +6701,23 @@ const Engine = struct {
             progress = false;
             var i: usize = start;
             while (i < self.pending.items.len) : (i += 1) {
+                // Yield to the heap driver before retrying a field whose
+                // selected body is queued. Its result remains an ordinary
+                // obligation until the dependency has an inferred signature.
+                if (self.selected_globals.items.len != 0) return;
                 const pending = self.pending.items[i];
                 if (pending.solved or pending.suspended) continue;
+                if (pending.wait_target != 0) {
+                    // A child's local scheme can invoke this solver while its
+                    // body is still active. Do not turn this caller's waited-on
+                    // field into that child's recursive receiver placeholder.
+                    if (self.global_states.get(pending.wait_target).?.state != .complete) continue;
+                    self.pending.items[i].wait_target = 0;
+                }
+                try self.inferenceTransition();
+                const saved_owner = self.dependency_owner;
+                self.dependency_owner = pending.owner;
+                defer self.dependency_owner = saved_owner;
                 const constraint = pending.value;
                 if (constraint.kind == .callee_use) {
                     if (try self.resolveUse(i)) progress = true;
@@ -7445,6 +7784,7 @@ fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *sy
     var engine: Engine = .{
         .scratch_pool = .init(allocator),
         .execution = execution,
+        .inference_limit = options.max_inference_transitions,
         .allocator = allocator,
         .tree = tree,
         .pool = pool,
@@ -7631,6 +7971,16 @@ fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *sy
     }
     defer engine.qualifications.deinit(allocator);
     defer engine.qualification_uses.deinit(allocator);
+    defer engine.forwarded_requirements.deinit(allocator);
+    defer engine.selected_globals.deinit(allocator);
+    defer {
+        var staged = engine.staged_global_diagnostics.valueIterator();
+        while (staged.next()) |diagnostics| {
+            deinitDiagnosticPayloads(allocator, diagnostics.*);
+            allocator.free(diagnostics.*);
+        }
+        engine.staged_global_diagnostics.deinit(allocator);
+    }
     defer engine.declared_obligations.deinit(allocator);
     defer engine.predicate_origins.deinit(allocator);
     defer engine.computed_variables.deinit(allocator);

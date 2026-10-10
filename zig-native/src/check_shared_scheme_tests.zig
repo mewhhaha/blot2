@@ -8,6 +8,225 @@ const ast = @import("ast.zig");
 const check = @import("check.zig");
 const a = std.testing.allocator;
 
+test "recursive frontend scheduling keeps forward chains independent of native and syntax depth" {
+    for ([_]usize{ 300, 1000 }) |depth| {
+        for ([_]bool{ false, true }) |annotated| {
+            var source: std.ArrayList(u8) = .empty;
+            defer source.deinit(a);
+            try source.appendSlice(a, "entry const run = fn value => f_0 value\n");
+            for (0..depth) |index| try source.print(a, "const f_{d}{s} = fn value => f_{d} value\n", .{ index, if (annotated) ": U32 -> U32" else "", index + 1 });
+            try source.print(a, "const f_{d}{s} = fn value => value\n", .{ depth, if (annotated) ": U32 -> U32" else "" });
+            var fixture = try Fixture.init(source.items);
+            defer fixture.deinit();
+            try fixture.valid();
+            try std.testing.expect(fixture.binding("run").?.scheme.root != 0);
+        }
+    }
+}
+
+test "recursive frontend dependency discovery preserves local and pattern shadowing" {
+    var fixture = try Fixture.init(
+        \\const global = fn value => value
+        \\const run = fn global => global 1
+        \\const local = fn value => do:
+        \\  let global = fn item => item
+        \\  return global value
+        \\const pattern = fn value => case value of
+        \\  (global, ignored) => global ignored
+        \\entry const result = local (run (fn value => pattern ((fn item => item), value)))
+    );
+    defer fixture.deinit();
+    try fixture.valid();
+}
+
+test "recursive frontend discovery restores names after a forever suite" {
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(a);
+    try source.appendSlice(a,
+        \\entry const run = fn value => do:
+        \\  for ever:
+        \\    let f_0 = fn item => item
+        \\    break
+        \\  return f_0 value
+        \\
+    );
+    for (0..1000) |index| try source.print(a, "const f_{d} = fn value => f_{d} value\n", .{ index, index + 1 });
+    try source.appendSlice(a, "const f_1000 = fn value => value\n");
+    var fixture = try Fixture.init(source.items);
+    defer fixture.deinit();
+    try fixture.valid();
+}
+
+const scheduled_diagnostic_source =
+    \\const parent: U32 -> U32 = fn value => do:
+    \\  let first: U32 = 1.5
+    \\  let second = broken value
+    \\  let last: U32 = 1.5
+    \\  return value
+    \\const broken: U32 -> F32 = fn value => value
+;
+
+fn scheduledFailureScenario(allocator: std.mem.Allocator) !void {
+    for ([_][]const u8{
+        scheduled_diagnostic_source,
+        late_recursive_source,
+    }, 0..) |source, index| {
+        var tokens = try lexer.lex(allocator, source);
+        defer tokens.deinit(allocator);
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(allocator);
+        var tree = try parser.parse(allocator, source, tokens.tokens.items, &pool);
+        defer tree.deinit(allocator);
+        var checked = try check.check(allocator, &tree, &pool);
+        defer checked.deinit(allocator);
+        if (index == 0) {
+            try std.testing.expect(checked.diagnostics.len >= 3);
+        } else try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    }
+}
+
+test "recursive frontend scheduled allocation failures release frames and staged diagnostics" {
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, scheduledFailureScenario, .{});
+}
+
+test "recursive frontend scheduled child diagnostics keep their original reference order" {
+    for ([_][]const u8{
+        scheduled_diagnostic_source,
+        \\type Box is data = #Box U32
+        \\const parent: U32 -> U32 = fn value => do:
+        \\  let first: U32 = 1.5
+        \\  let selected = (#Box 1).read
+        \\  let last: U32 = 1.5
+        \\  return value
+        \\const Box.read: Box -> U32 = fn box => do:
+        \\  let inner: U32 = 1.5
+        \\  return 42
+    }) |source| {
+        var tokens = try lexer.lex(a, source);
+        defer tokens.deinit(a);
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(a);
+        var tree = try parser.parse(a, source, tokens.tokens.items, &pool);
+        defer tree.deinit(a);
+        var ordinary = try check.checkPrivateExecution(a, &tree, &pool, .{ .schedule_globals = false });
+        defer ordinary.deinit(a);
+        var scheduled = try check.check(a, &tree, &pool);
+        defer scheduled.deinit(a);
+        try std.testing.expect(ordinary.diagnostics.len >= 3);
+        try std.testing.expectEqual(ordinary.diagnostics.len, scheduled.diagnostics.len);
+        for (ordinary.diagnostics, scheduled.diagnostics) |expected, actual| {
+            try std.testing.expectEqual(expected.code, actual.code);
+            try std.testing.expectEqualDeep(expected.span, actual.span);
+        }
+    }
+}
+
+test "recursive frontend waits for the preferred left dispatch before right fallback" {
+    var fixture = try Fixture.init(
+        \\type L is data = #L U32
+        \\type R is data = #R U32
+        \\type X is data = #X U32
+        \\const prime = @type.call "merge" (#X 1) (#R 2)
+        \\entry const answer: U32 = @type.call "merge" (#L 1) (#R 2)
+        \\const L.merge: L -> R -> U32 = fn left => fn right => 1
+        \\const R.merge: a -> R -> F32 = fn left => fn right => 1.0
+    );
+    defer fixture.deinit();
+    try fixture.valid();
+    const wanted = fixture.binding("L.merge").?;
+    const answer = fixture.binding("answer").?;
+    const selected = fixture.checked.resolved[fixture.tree.valueDecl(answer.declaration).body];
+    try std.testing.expect(selected != 0);
+    try std.testing.expectEqual(wanted.declaration, fixture.checked.bindings[selected].declaration);
+}
+
+test "recursive frontend retries publish only owned final scheme predicates" {
+    var fixture = try Fixture.init(
+        \\type Box is data = #Box U32
+        \\const choose: a -> Box where { associated "merge" Box Box Box } = fn value => @type.call "merge" value value
+        \\const Box.merge: Box -> Box -> Box = fn left => fn right => left
+        \\entry const answer: Box = choose (#Box 1)
+    );
+    defer fixture.deinit();
+    try fixture.valid();
+    try std.testing.expect(fixture.checked.obligations.len != 0);
+    for (fixture.checked.obligations, 0..) |_, index| {
+        var owned = false;
+        for (fixture.checked.bindings) |binding| if (index >= binding.scheme.obligations.start and index - binding.scheme.obligations.start < binding.scheme.obligations.len) {
+            owned = true;
+        };
+        try std.testing.expect(owned);
+    }
+}
+
+test "recursive frontend queued method preserves declaration and call diagnostics" {
+    const prefix =
+        \\type Seed is data = #Seed
+        \\type Box a is data = #Box a
+        \\const Seed.build: a -> Seed -> Box a = fn value => fn seed => #Box value
+        \\const wrap = fn value => @type.call "build" value #Seed
+        \\const parent: U32 -> U32 = fn value => if @u32.eq value 0 then 1.5 else (wrap value).read
+        \\const Box.read: Box U32 -> U32 = fn box => case box of
+    ;
+    const bodies = [_][]const u8{
+        "  #Box value => parent (@u32.sub value 1)\n",
+        "  #Box value => do:\n    let next = @u32.sub value 1\n    return parent next\n",
+        "  #Box value => do:\n    let next = fn arg => parent arg\n    return next (@u32.sub value 1)\n",
+    };
+    for (bodies) |body| {
+        const source = try std.mem.concat(a, u8, &.{ prefix, "\n", body, "entry const run: U32 -> U32 = fn value => parent value\n" });
+        defer a.free(source);
+        var tokens = try lexer.lex(a, source);
+        defer tokens.deinit(a);
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(a);
+        var tree = try parser.parse(a, source, tokens.tokens.items, &pool);
+        defer tree.deinit(a);
+        var ordinary = try check.checkPrivateExecution(a, &tree, &pool, .{ .schedule_globals = false });
+        defer ordinary.deinit(a);
+        var scheduled = try check.check(a, &tree, &pool);
+        defer scheduled.deinit(a);
+        try std.testing.expectEqual(@as(usize, 2), ordinary.diagnostics.len);
+        try std.testing.expectEqual(ordinary.diagnostics.len, scheduled.diagnostics.len);
+        for (ordinary.diagnostics, scheduled.diagnostics) |expected, actual| {
+            try std.testing.expectEqual(expected.code, actual.code);
+            try std.testing.expectEqualDeep(expected.span, actual.span);
+        }
+    }
+}
+
+const late_recursive_source =
+    \\type Seed is data = #Seed
+    \\type Box a is data = #Box a
+    \\const Seed.build: a -> Seed -> Box a = fn value => fn seed => #Box value
+    \\const f_0 = fn value => @type.call "build" value #Seed
+    \\const parent: a -> a = fn value => (f_0 value).read
+    \\const Box.read: Box a -> a = fn box => case box of
+    \\  #Box value => parent value
+    \\entry const generic = fn value => parent value
+;
+
+test "late selected recursive components keep their placeholder until all schemes publish" {
+    var fixture = try Fixture.init(late_recursive_source);
+    defer fixture.deinit();
+    try fixture.valid();
+    for ([_][]const u8{ "Seed.build", "f_0", "parent", "Box.read", "generic" }) |name| {
+        const binding = fixture.binding(name).?;
+        try std.testing.expect(binding.scheme.root != 0);
+        try std.testing.expectEqual(check.Kind.global, binding.kind);
+    }
+}
+
+test "frontend recursive component transition limit bounds unresolved selected work" {
+    var tokens = try lexer.lex(a, late_recursive_source);
+    defer tokens.deinit(a);
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(a);
+    var tree = try parser.parse(a, late_recursive_source, tokens.tokens.items, &pool);
+    defer tree.deinit(a);
+    try std.testing.expectError(error.TypeLimit, check.checkModuleWithOptions(a, &tree, &pool, &.{}, &.{}, 1, .{ .max_inference_transitions = 0 }));
+}
+
 const header =
     \\infixl 60 (+) = _fixity_add
     \\const _fixity_add = fn left => fn right => @type.call "add" left right

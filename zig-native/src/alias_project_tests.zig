@@ -131,7 +131,7 @@ test "project alias forwarding preserves every typed state history global trace 
 }
 
 const long_source = @embedFile("alias-project-fixtures/logical-long-2048.blot");
-test "project alias forwarding compiles the physical 2048 component only through enabled full project API" {
+test "project scheduling compiles the physical 2048 alias component with ordinary and private drivers" {
     var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text = long_source }}, false);
     defer fixture.deinit();
     for ([_]project.InputMode{ .source, .project }) |mode| {
@@ -139,8 +139,12 @@ test "project alias forwarding compiles the physical 2048 component only through
             var source = try project.load(a, io, fixture.path, fixture.options(mode));
             defer source.deinit(a);
             try std.testing.expectEqual(@as(usize, 0), source.diagnostics.items.len);
-            try std.testing.expectError(error.TypeLimit, checker.checkProject(a, &source));
-            try std.testing.expectError(error.TypeLimit, checker.checkProjectWithPrivateExecution(a, &source, .{}));
+            var ordinary = try checker.checkProject(a, &source);
+            defer ordinary.deinit(a);
+            try std.testing.expectEqual(@as(usize, 0), ordinary.diagnostics.len);
+            var scheduled = try checker.checkProjectWithPrivateExecution(a, &source, .{});
+            defer scheduled.deinit(a);
+            try std.testing.expectEqual(@as(usize, 0), scheduled.diagnostics.len);
             var stats: check.AliasGlobalStats = .{};
             var checked = try checker.checkProjectWithPrivateExecution(a, &source, .{ .alias_globals = true, .stats = &stats });
             defer checked.deinit(a);
@@ -203,7 +207,7 @@ test "project alias forwarding owns source free Core and releases every whole pr
     }
 }
 
-test "project alias forwarding keeps unsupported callable leading long source on ordinary TypeLimit" {
+test "project scheduling admits a callable before its long alias dependency" {
     const last_line = "entry const answer = fn () => cell0\n";
     try std.testing.expect(std.mem.endsWith(u8, long_source, last_line));
     const source = try std.mem.concat(a, u8, &.{ last_line, long_source[0 .. long_source.len - last_line.len] });
@@ -212,9 +216,13 @@ test "project alias forwarding keeps unsupported callable leading long source on
     defer fixture.deinit();
     var loaded = try project.load(a, io, fixture.path, fixture.options(.project));
     defer loaded.deinit(a);
-    try std.testing.expectError(error.TypeLimit, checker.checkProject(a, &loaded));
+    var ordinary = try checker.checkProject(a, &loaded);
+    defer ordinary.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), ordinary.diagnostics.len);
     var stats: check.AliasGlobalStats = .{};
-    try std.testing.expectError(error.TypeLimit, checker.checkProjectWithPrivateExecution(a, &loaded, .{ .alias_globals = true, .stats = &stats }));
+    var scheduled = try checker.checkProjectWithPrivateExecution(a, &loaded, .{ .alias_globals = true, .stats = &stats });
+    defer scheduled.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), scheduled.diagnostics.len);
     try std.testing.expectEqual(@as(usize, 0), stats.frames);
 }
 

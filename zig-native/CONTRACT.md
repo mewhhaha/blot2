@@ -219,8 +219,8 @@ ordinary checking. Entry-interface and full-body view caches have distinct keys.
 Complete monomorphic views preserve value aliases; generic views freshen.
 
 Allocation failure abandons pending summary jobs without allocation, rebuilds
-keys for independently finished jobs, and clears active state. It never caches an
-allocation failure or resumes a partially collected job. Joint recursive
+keys for independently finished jobs, and clears active state. It never caches
+an allocation failure or resumes a partially collected job. Joint recursive
 components and portable canonical keys remain tasks 007–008.
 
 Summary jobs own their solver and scratch until completion or session teardown.
@@ -567,6 +567,25 @@ recover semantic structure by reparsing source.
 occurs checks, rollback and cursor-relative resolution. Invalid inference is a
 diagnostic; unsupported features must explicitly decline. Frozen principal
 schemes belong to declarations, instantiated evidence belongs to uses.
+
+Recursive inference uses exact region-local body edges and heap scheduling.
+Adding a late selected edge may merge components; restart unfinished joint
+solver state before any member becomes visible. Publish a component's closed
+interfaces together, while independently completed dependencies keep their
+proofs. Open recursive instances share their monomorphic source root; closed
+polymorphic instances require equal complete interfaces. No component key owns
+or exports a solver variable. Summary scheduling has its own bounded transition
+budget; exhausting an optional summary declines it and resumes ordinary bounded
+inference without spending executed evaluation depth or fuel.
+
+Frontend global bodies stay on their component stack after body checking until
+selection, qualification and scheme predicates stabilize. Dependency discovery
+respects lexical shadowing and uses an explicit worklist. Scheme predicates and
+qualification diagnostics remain locally owned until every member can publish. A
+queued selected method keeps an ordinary field obligation and yields to its
+body's scheduler; an active recursive method retains its receiver requirement.
+Source diagnostics retain their occurrence order. Allocation failure releases
+all frames, staged predicates and diagnostic payloads.
 
 `check.zig`: `check(allocator, tree, symbols) !Checked`; Checked owns expression
 types, resolved local/global identities and diagnostics. Validate unused source

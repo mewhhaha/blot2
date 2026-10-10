@@ -74,6 +74,7 @@ comptime {
     _ = @import("loop_targets_tests.zig");
     _ = @import("core_eval.zig");
     _ = @import("core_eval_tests.zig");
+    _ = @import("scope_components.zig");
     _ = @import("core_operation_evidence_tests.zig");
     _ = @import("builtin_state_tests.zig");
     _ = @import("reflection_tests.zig");
