@@ -121,15 +121,26 @@ and canonical keys remain open.
 [The callback qualification](../zig-native/CALL_SUMMARIES.md#parametric-callback-obligations-10-october-2026)
 preserves exact pins, commands and remaining limits.
 
-Commit `71c0f2a` completes task [006]. Owned capture inputs retain exact
-values, aliases, interfaces, nested bodies and provider/demand identities.
-The native suite, 610 guest/client tests, 587 public comparisons and analyzer
-with zero findings pass. Initial/edited output each passes 42 guests with 7,056
-calls; fifteen pairs cover 53 fresh workloads and seven pairs cover 52
-retained/restart workloads. Shared Box captures save 12 static bytes per closure;
-some controls add overhead. Task [007] is in progress.
+Commit `71c0f2a` completes task [006]. Owned capture inputs retain exact values,
+aliases, interfaces, nested bodies and provider/demand identities. The native
+suite, 610 guest/client tests, 587 public comparisons and analyzer with zero
+findings pass. Initial/edited output each passes 42 guests with 7,056 calls;
+fifteen pairs cover 53 fresh workloads and seven pairs cover 52 retained/restart
+workloads. Shared Box captures save 12 static bytes per closure; some controls
+add overhead. Task [007] is in progress.
 [The lexical qualification](../zig-native/CALL_SUMMARIES.md#owned-lexical-inputs-10-october-2026)
 records exact pins, commands, alias exceptions and remaining limits.
+
+Commit `4f898b0` completes task [007]. Exact body edges and heap scheduling keep
+recursive inference bounded; late selected components publish every member
+together, preserving effects and diagnostic order. The full native suite, 615
+guest/client tests, 608 public comparisons and zero-findings analyzer pass.
+Initial/edited execution, fifteen-pair fresh measurements and seven-pair
+retained/restart batches qualify the immutable pin. Five formerly limited deep
+cases now compile. Some controls add overhead, and diamond32 CPU rises
+10.872→19.634 ms; no general speedup is claimed. Task [008] is in progress.
+[The component qualification](../zig-native/CALL_SUMMARIES.md#joint-recursive-inference-10-october-2026)
+retains exact identities, commands, distributions and remaining limitations.
 
 ## Completed foundations to preserve
 
@@ -354,8 +365,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [004] — Summarize predicate bearing callees             | Complete    | [003]                                  |
 | [005] — Summarize higher order callees                  | Complete    | [004]                                  |
 | [006] — Summarize lexical closures                      | Complete    | [005]                                  |
-| [007] — Infer recursive components jointly              | In progress | [006]                                  |
-| [008] — Canonicalize specialization keys                | Pending     | [007]                                  |
+| [007] — Infer recursive components jointly              | Complete    | [006]                                  |
+| [008] — Canonicalize specialization keys                | In progress | [007]                                  |
 | [009] — Cache composite type resolutions                | Complete    | None                                   |
 | [010] — Schedule constraints by variable                | Complete    | [009]                                  |
 | [011] — Reduce semantic allocation traffic              | Pending     | [007], [008], [010]                    |

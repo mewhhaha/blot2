@@ -27,20 +27,27 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   and seven-pair fresh/retained/restart batches qualify the immutable v2 pin.
   Deep predicate cases have bounded work; small controls add overhead. See
   [the durable callback qualification](zig-native/CALL_SUMMARIES.md#parametric-callback-obligations-10-october-2026).
-- Task 006 (owned lexical capture inputs) is complete at `71c0f2a`.
-  Complete ordered captures, actual aliases, values, nested bodies and
-  provider/demand identities key private jobs without global principal
-  publication. The full native suite, 610 guest/client tests, 587 public
-  comparisons and zero-findings analyzer pass. Initial/edited guest outputs,
-  fifteen-pair measurements and seven-pair retained/restart batches qualify the
-  immutable artifact. Shared Box output shrinks by 12 static bytes per closure;
-  small and demand/provider controls can add overhead. See
+- Task 006 (owned lexical capture inputs) is complete at `71c0f2a`. Complete
+  ordered captures, actual aliases, values, nested bodies and provider/demand
+  identities key private jobs without global principal publication. The full
+  native suite, 610 guest/client tests, 587 public comparisons and zero-findings
+  analyzer pass. Initial/edited guest outputs, fifteen-pair measurements and
+  seven-pair retained/restart batches qualify the immutable artifact. Shared Box
+  output shrinks by 12 static bytes per closure; small and demand/provider
+  controls can add overhead. See
   [the lexical qualification](zig-native/CALL_SUMMARIES.md#owned-lexical-inputs-10-october-2026).
-- Task 007 (joint recursive components) is in progress. The frontend currently
-  pops its Tarjan component before resolving late field/dispatch edges, so a
-  selected method can reach a complete-but-unpublished binding. Retain
-  provisional components through a bounded selection fixpoint and preserve
-  ordinary diagnostics, atomic member publication and independent children.
+- Task 007 (joint recursive components) is complete at `4f898b0`. Exact body
+  edges, component-atomic publication and heap scheduling bound both frontend
+  and ordinary Core inference. The full native suite, 615 guest/client tests,
+  608 public comparisons and zero-findings analyzer pass. Initial/edited guest
+  execution, fifteen-pair fresh and seven-pair retained/restart batches qualify
+  the final immutable pin. Five formerly limited deep cases now compile; some
+  controls add overhead and diamond32 CPU rises 10.872→19.634 ms. See
+  [the component qualification](zig-native/CALL_SUMMARIES.md#joint-recursive-inference-10-october-2026).
+- Task 008 (canonical specialization keys) is in progress. Reuse complete
+  semantic proofs while rebuilding outputs against each request's current
+  captures; preserve the existing value-specific output memo and independent
+  retained/portable validation boundaries.
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -73,25 +80,34 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 007
+## Next steps for task 008
 
-Implement and qualify joint recursive components from
-[CALL_SUMMARIES.md](zig-native/CALL_SUMMARIES.md#recursive-components-and-bounded-scheduling).
-Retain the direct source `Seed.build -> parent.read -> Box.read -> parent`
-probe at `build/bench/cloud-principal-graphs/revealed-edge-recursive-frontend-probe.blot`:
-it did not finish even with written arrows. `check.zig.finishGlobal` currently
-pops/marks the group complete before `solveFields`; selected field, dispatch and
-result-dispatch bodies then cannot update its lowlinks. The optional principal
-cycle law qualifies publication only, not ordinary recursive inference.
+Implement and qualify
+[canonical specialization keys](tasks/008-canonicalize-specialization-keys.md).
+Keep `build/bench/cloud-principal-graphs/candidate-components/` immutable as the
+baseline, with source commit `4f898b0`; the lexical and earlier component pins
+remain unchanged. Task 007's record retains exact binary/identity/source hashes,
+608 comparison cases, initial and edited guest checks, 65 fresh workloads and 64
+retained/restart workloads. Its source probe now terminates with the expected
+generic-entry rejection; the baseline frontend and lowering already finished,
+and the earlier attribution to frontend retry was incorrect.
 
-Keep task 006's immutable `candidate-lexical/` pin as the new baseline under
-`build/bench/cloud-principal-graphs/`, sourced from commit `71c0f2a`; earlier pins
-remain immutable. The lexical record includes exact source/binary/identity
-hashes, 587 comparisons, initial and edited executed guest checks, 53 fresh and
-52 retained/restart workloads. Add the one-million summary transition budget,
-iterative discovery/fallback scheduling, component-atomic publication, limit
-and allocation-failure recovery. Preserve annotated chains at 300/1,000,
-generic chains at 300 and existing direct/mutual/higher-order recursion laws.
+`specialized_closures` uses actual value/evidence/mode keys for evaluated
+output. A canonical cache must instead retain complete body/evidence/capture
+proof, then rebuild a fresh result with current captures and alias
+relationships. Use `specialization_receipt.zig`,
+`completed_specialization_query.zig` and `source_value_template.zig` as the
+validation/publication boundary; do not copy an entire session snapshot for each
+specialization. Preserve all source, scalar, call, view and plain-fact
+observations, options, nominal/provider/demand IDs, resource limits and
+principal-versus-selected modes. Unknown/incomplete inputs remain conservative.
+Rooted graph plans must own bounded keys, preserve exact equality after hash
+selection and publish no partial result on OOM. Native and executed-Wasm laws
+must cover equivalent duplicates, unequal captures/effects, forced collisions,
+current-capture reconstruction, retained/checkpoint edits and failure recovery.
+The next investigation notes are in ignored
+`build/bench/cloud-principal-graphs/task008-design-notes.md`; they are not an
+implemented or qualified design.
 
 ## Notes
 
@@ -103,7 +119,7 @@ generic chains at 300 and existing direct/mutual/higher-order recursion laws.
   `ZIG_ANALYZER=/tmp/blot-qualified-analyzer-756bfd5/zig-out/bin/zig-analyzer`.
   Those paths refer to the original machine. In the cloud checkout, use
   `ZIG_ANALYZER=/workspace/tooling/zig-analyzer/zig-out/bin/zig-analyzer`; its
-  source is at the CI pin and it reports zero findings across 292 Zig files.
+  source is at the CI pin and it reports zero findings across 294 Zig files.
 - The cloud Deno 2.9.6 standalone runtime is cached from the official GitHub
   release with its published SHA-256 verified. The initial full gate failed only
   on the blocked `dl.deno.land` download; after caching, the complete

@@ -1283,12 +1283,12 @@ diagnostics stage until the original reference, or insert at the original
 selected occurrence, preserving declaration/call diagnostic order. Allocation
 failure releases staged payloads, worklists and every saved global context.
 
-The qualified source milestone is recorded in the task closure. The immutable
-baseline is task 006's `candidate-lexical/`, sourced from `71c0f2a`; its binary
-SHA-256 is `de8823d9a68c729a58cfbe034965a9cc03f1cb2d31a2e2bf6415abc8f59457c3`
-and identity SHA-256 is
-`417ab3e3222b645c4c91bf9071b49b8565629b9256c6c47d2f6e7b6695a3f82a`. The final
-`candidate-components/` binary SHA-256 is
+The qualified source milestone is `4f898b0c0c9e7bd7025e84e2d0646ab7d6a7bb94`.
+The immutable baseline is task 006's `candidate-lexical/`, sourced from
+`71c0f2a`; its binary SHA-256 is
+`de8823d9a68c729a58cfbe034965a9cc03f1cb2d31a2e2bf6415abc8f59457c3` and identity
+SHA-256 is `417ab3e3222b645c4c91bf9071b49b8565629b9256c6c47d2f6e7b6695a3f82a`.
+The final `candidate-components/` binary SHA-256 is
 `b513f76268ee76b0d5b32ef4a2e028c782534120260ea83504271fe410af92cf` and identity
 SHA-256 is `08b67e99d5c9e96b3138d0385dd5767d0f3e62f40a71b9c7dd34f53d2d6abed5`.
 The nine changed Zig/guest source files are individually hashed in its manifest;

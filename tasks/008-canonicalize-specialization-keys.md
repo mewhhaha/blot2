@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — designing complete session-owned canonical proofs
+  and reconstruction against current captures; no completion is claimed.
 - **Dependencies:** [007](007-infer-recursive-components-jointly.md)
 - **Originating requirements:** PLAN: Hill 4 / canonical specialization keys.
   Sources: [PLAN.md](../PLAN.md).
