@@ -129,6 +129,10 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   the previous revision and copy only changed ones; unread body pins are gone.
   Steady edits request 1.4–6.1% less, peak 25–98 KB less, CPU geomean 0.967. See
   [the record](zig-native/REVISION_DELTAS.md).
+- Task 022 (retained aggregate constants) is complete at `62241e2`. Retained
+  fragments replay graph-equal aggregate constant children by re-serializing
+  them in the current owner and relocating the caller's root operands; output
+  stays identical to fresh. See [the record](zig-native/RETAINED_CONSTANTS.md).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -164,17 +168,18 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 022
+## Next steps for task 023
 
 Continue with
-[retained constants and relocatable data](tasks/022-retain-constants-and-relocatable-data.md).
-Scalar constant admission already exists; aggregate values and serialized data
-are rebuilt each revision. Pool fields are now leases
-([revision deltas](zig-native/REVISION_DELTAS.md)): code that replaces a pool
-slice must release its lease. Task-021 binaries and probes are in ignored
-`build/bench/revision-deltas/`; task-020's in `build/bench/semantic-artifacts/`.
-Tasks 036 and 048 are also ready. Tasks 002, 040–047 and 075 onward stay blocked
-on owner-local artifacts (task 002), and 084 on private gdev.
+[narrow literal edit invalidation](tasks/023-narrow-literal-edit-invalidation.md).
+Retained fragments now replay scalar and aggregate constant children
+([retained constants](zig-native/RETAINED_CONSTANTS.md)); pool fields are leases
+([revision deltas](zig-native/REVISION_DELTAS.md)). The retained probe
+`zig-native/qualification/revision_deltas_probe.zig` and its driver measure
+edit/revert/rejected/no-op phases against an earlier tree; task-022 binaries are
+in ignored `build/bench/aggregate-constants/`. Tasks 036 and 048 are also ready.
+Tasks 002, 040–047 and 075 onward stay blocked on owner-local artifacts (task
+002), and 084 on private gdev.
 
 ## Notes
 

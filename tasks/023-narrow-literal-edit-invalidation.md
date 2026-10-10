@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [022](022-retain-constants-and-relocatable-data.md)
 - **Originating requirements:** PLAN: Hill 6 / literal edits under 30 ms.
   Sources: [PLAN.md](../PLAN.md).

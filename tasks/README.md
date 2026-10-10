@@ -222,6 +222,15 @@ edits request 1.4–6.1% less, peak 25–98 KB less and retain 21–26 KB less, 
 geomean 0.967. Task [022] is ready. See
 [revision deltas](../zig-native/REVISION_DELTAS.md).
 
+Task [022] replays aggregate constant children in retained fragments at
+`62241e2`. Graph-equal current values are re-serialized in the current owner and
+only the caller's exact root operands are relocated, keeping output identical to
+fresh; demand cells and other generative values rebuild. The full LLVM native
+suite, 627 guest/client tests and zero-findings analyzer pass. A generated
+aggregate program replays four functions per edit; public examples are unchanged
+within noise. Task [023] is ready. See
+[retained constants](../zig-native/RETAINED_CONSTANTS.md).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -460,8 +469,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [019] — Serialize the query table                       | Complete    | [018]                                  |
 | [020] — Persist complete semantic artifacts             | Complete    | [019]                                  |
 | [021] — Publish transactional revision deltas           | Complete    | [017], [020]                           |
-| [022] — Retain constants and relocatable data           | Ready       | [020], [021]                           |
-| [023] — Narrow literal edit invalidation                | Pending     | [022]                                  |
+| [022] — Retain constants and relocatable data           | Complete    | [020], [021]                           |
+| [023] — Narrow literal edit invalidation                | Ready       | [022]                                  |
 | [024] — Apply general body interface cutoff             | Pending     | [023]                                  |
 | [025] — Resolve calls before emission                   | Pending     | [008], [020]                           |
 | [026] — Resolve structured control flow                 | Pending     | [025]                                  |

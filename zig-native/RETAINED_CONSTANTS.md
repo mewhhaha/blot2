@@ -4,7 +4,8 @@ Task 022 lets a retained function or closure fragment keep its code when it
 serializes an aggregate constant, not only a scalar one. Before, any constant
 child job whose value was not a scalar marked its fragment fresh, so every
 caller of an array, record, nominal or closure constant was rebuilt on every
-edit. Qualification is recorded below.
+edit. The compiler milestone is `62241e2f2d315b46c6b32a1785dfe1942ba44720`;
+qualification is recorded below.
 
 ## Admission
 
