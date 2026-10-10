@@ -1,8 +1,9 @@
 # Semantic allocation ownership
 
-Task 011 is qualified. These changes reduce redundant capture preparation
-without changing the immutable graph owners or claiming that the private
-application allocation target is met.
+Task 011 is qualified at source milestone `3a51bcd`
+(`3a51bcd3d611ac4e72f59e2b8eeb02a8c7d5c021`). These changes reduce redundant
+capture preparation without changing the immutable graph owners or claiming that
+the private application allocation target is met.
 
 ## Allocation categories before changing publication
 

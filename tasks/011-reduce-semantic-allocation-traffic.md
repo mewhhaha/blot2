@@ -62,8 +62,8 @@ development and the scenarios below.
 
 ## Completion evidence
 
-- Commit: the local milestone includes this record; its full source revision is
-  recorded in `candidate-allocation/manifest.json` and the durable record.
+- Commit: `3a51bcd`; the full source revision is recorded in
+  `candidate-allocation/manifest.json` and the durable record.
 - Validation: Zig 0.17.0; full LLVM native suite and 618 guest/client tests
   pass, with zero findings across 295 Zig files. New
   immutable-input/owned-snapshot laws sweep every allocation failure; nested

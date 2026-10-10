@@ -51,12 +51,12 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   fresh/retained/restart measurements qualify the immutable pin. Scalar/Box
   repeated-capture regions fall; incomplete interfaces remain conservative. See
   [the canonical qualification](zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026).
-- Task 011 (semantic allocation traffic) is complete in the current local
-  milestone. Stable owner meters and single-copy capture publication pass the
-  full native suite, 618 guest/client tests, 620 strict comparisons and the
-  zero-findings analyzer. Fresh/retained/restart qualification removes measured
-  wide-capture allocation with neutral overall CPU; repeated public revisions
-  plateau and teardown to zero. Small controls can add traffic. See
+- Task 011 (semantic allocation traffic) is complete at `3a51bcd`. Stable owner
+  meters and single-copy capture publication pass the full native suite, 618
+  guest/client tests, 620 strict comparisons and the zero-findings analyzer.
+  Fresh/retained/restart qualification removes measured wide-capture allocation
+  with neutral overall CPU; repeated public revisions plateau and teardown to
+  zero. Small controls can add traffic. See
   [the allocation qualification](zig-native/SEMANTIC_ALLOCATION.md).
 - Task 014 (typed query design) is complete at `8219cf3`, with final review
   corrections at `beeae7f`. The shared table and migrations remain tasks
