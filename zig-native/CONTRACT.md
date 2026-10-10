@@ -124,30 +124,30 @@ The ordered namespaces, semantic catalogs, expected shape, seeds, scalar reads,
 plain-data facts and publication dependencies must still agree. This cutoff
 grants no executable or compile-time-value reuse; those dependencies rebuild.
 
-Call summaries give each closed first-order job its own chronological solver.
-The session drains an explicit job stack keyed by source target, complete input
-evidence and interface-checking mode. Result-directed first-order jobs also key
-the complete expected result or complete arrow when those are consumed. They use
-fresh source binders; open caller variables never enter an independent job. A
-caller imports only a fully solved arrow. A declared global source function with
-no residual scheme predicates already proves its quantified inputs, including
-callbacks and effect rows; ordinary call checking may import that scheme without
-collecting its body. Checked written predicates on first-order global schemes
-are likewise imported with fresh scope variables and the original argument
-witnesses. They must solve before a closed judgment is published. Type-only
-associated/member selection and result-selected construction may use that same
-checked scheme: the fresh scope already owns the imported predicates and
-selected signature. The source receipt records the implementation; selected
-capture/emission and complete demand checking still collect its body. No
-caller-selected fact becomes a principal proof. Transitive job admission
-classifies each reachable scheme once per immutable Session and reserves
-capacity before publishing the complete classification. Source shape and
-active-recursion checks remain local to the requesting job; a cached graph
+Call summaries give each closed first-order or callback-interface job its own
+chronological solver. The session drains an explicit job stack keyed by source
+target, complete input evidence and interface-checking mode. Result-directed
+first-order jobs also key the complete expected result or complete arrow when
+those are consumed. They use fresh source binders; open caller variables never
+enter an independent job. A caller imports only a fully solved arrow. A declared
+global source function with no residual scheme predicates already proves its
+quantified inputs, including callbacks and effect rows; ordinary call checking
+may import that scheme without collecting its body. Checked written predicates
+on first-order global schemes are likewise imported with fresh scope variables
+and the original argument witnesses. They must solve before a closed judgment is
+published. Type-only associated/member selection and result-selected
+construction may use that same checked scheme: the fresh scope already owns the
+imported predicates and selected signature. The source receipt records the
+implementation; selected capture/emission and complete demand checking still
+collect its body. No caller-selected fact becomes a principal proof. Transitive
+job admission classifies each reachable scheme once per immutable Session and
+reserves capacity before publishing the complete classification. Source shape
+and active-recursion checks remain local to the requesting job; a cached graph
 classification does not override them. Computed values still require capture
 proofs, and predicate-free source-interface checking, selected captures and
 complete demand-body checking retain ordinary collection. Unsupported lexical
-captures and higher-order boundaries keep ordinary collection. Active recursive
-targets share their inline region. Failed speculative jobs publish no
+captures and incomplete callback boundaries keep ordinary collection. Active
+recursive targets share their inline region. Failed speculative jobs publish no
 diagnostic; fallback preserves the caller's argument witness sites and
 deferred-member context. An independently completed callee proof may survive an
 enclosing caller's failed qualification.
@@ -180,11 +180,30 @@ theorem, not a closed call judgment. Fixed source type heads, comparisons and
 closed operation/handler rows may be proved here; unknown owners and rows stay
 residual. Unsupported shapes decline without publishing a partial theorem.
 
+Higher-order principal graphs retain a dedicated callback-use action with the
+formal parameter slot, curried invocation stage, original argument/result
+witness and complete source callback signature. Source solving verifies its
+arrow and latent row equations but leaves the action unsolved: it is a
+parametric relationship, not a proof of any executable callback or capture. An
+imported graph freshens the same equations; a complete input-keyed job checks
+them in its private solver. Callback input purity and concrete operation rows
+remain exact, and returned or curried callbacks retain row aliases. First-order
+data predicates used by dispatch and physical representation keep their original
+domain. Separate bounded function-DAG checks admit summary interfaces, including
+callbacks receiving or returning callbacks.
+
+Source recipes classify the presence of lexical captures before optional graph
+admission. A region carrying live capture inputs or code capture hints retains
+ordinary checking for open higher-order graphs. A missing bounded recipe is also
+conservative. Complete callback interfaces can still key independent type jobs;
+the actual value owner checks its body, captures and provider observations. The
+recipe classification schedules work and certifies no capture result.
+
 Description and cache publication finish every ownership allocation before
 installing a visible graph; out-of-memory never becomes a cached semantic
-decline. Cycles currently decline optional principal publication. General
-callback, lexical-capture and joint-component boundaries remain implementation
-work in tasks 005–007.
+decline. Cycles currently decline optional principal publication.
+Lexical-capture and joint-component boundaries remain implementation work in
+tasks 006–007.
 
 Summary jobs own their solver and scratch until completion or session teardown.
 Evidence copied into the session may outlive a job; solver IDs and source

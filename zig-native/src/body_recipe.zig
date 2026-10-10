@@ -1,5 +1,5 @@
 //! Immutable visit orders over source Core. A recipe contains no inference
-//! types, selected members, captures, rows, or solved obligations. Each replay
+//! types, selected members, capture values, rows, or solved obligations. Each replay
 //! executes the original region actions in its current private source scope.
 const std = @import("std");
 const core = @import("core.zig");
@@ -9,6 +9,7 @@ const Allocator = std.mem.Allocator;
 pub const Key = struct { owner: usize, body: core.Id, callables: bool };
 pub const Recipe = struct {
     visits: std.ArrayList(core.Id) = .empty,
+    has_lexical_captures: bool = false,
     pub fn deinit(self: *Recipe, allocator: Allocator) void {
         self.visits.deinit(allocator);
     }
@@ -113,6 +114,8 @@ pub const Cache = struct {
             if (recipe.visits.items.len == limit) return error.PlanLimit;
             try seen.put(allocator, id, {});
             try recipe.visits.append(allocator, id);
+            const tag = module.node(id).tag;
+            if ((tag == .closure or tag == .suspend_) and module.closures[module.node(id).a].captures.len != 0) recipe.has_lexical_captures = true;
             // No later node can execute after this source error. Avoid reading
             // unreachable malformed descendants of intentionally invalid Core.
             if (module.node(id).tag == .invalid) break;

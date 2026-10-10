@@ -1,11 +1,11 @@
 # General call summaries
 
 This is the implementation specification for extending the current first-order
-summary queue. Predicate-bearing first-order functions now have owned principal
-graphs and independent jobs under complete evidence. General higher-order calls,
-lexical closures, recursive components and canonical specialization keys remain
-implementation work. This document does not change language syntax or admit
-programs rejected by the language's existing inference rules.
+summary queue. Predicate-bearing first-order functions and higher-order callback
+interfaces now have owned principal graphs and independent jobs under complete
+evidence. Lexical closures, recursive components and canonical specialization
+keys remain implementation work. This document does not change language syntax
+or admit programs rejected by the language's existing inference rules.
 
 The existing boundary is in `core_eval.zig`: `CallSummaries`,
 `ClosureRegion.collectCall`, `summaryInputs`, `solveSummary`, `beginSummary`,
@@ -912,7 +912,129 @@ and allocation from 5.80 to 6.67 MB. Cache loading, retained population, first
 edit, subsequent edit/revert, no-op and restart remain separate in the reports.
 No private gdev or general latency improvement is claimed.
 
-This closes task 004's bounded first-order principal/residual graph work.
-Callback, capture, recursive-component and canonical-key extensions remain tasks
-005–008; final program-wide performance and historical qualification are still
-open.
+This closes task 004's bounded first-order principal/residual graph work. The
+following record qualifies callback interfaces; capture, recursive-component and
+canonical-key extensions remain tasks 006–008. Final program-wide performance
+and historical qualification are still open.
+
+## Parametric callback obligations (10 October 2026)
+
+Higher-order source descriptions retain `callback_use` actions for formal
+function parameters. Each action owns the formal parameter ordinal, the curried
+application stage, its complete formal callback signature, and the original
+callee/argument/result type witnesses and Core origin. Applying a callback
+returned by a callback advances the stage in that same signature. Separate
+applications retain their own origins. Referencing a callback without invoking
+it supplies no implementation or executable proof.
+
+Source solving unifies the invocation arrow, argument and result, including the
+exact latent operation row. It marks a verified interface relationship while
+leaving the callback action unsolved in the published graph. Source
+qualification checks that the action still names the right formal slot and stage
+in the owned root, with exact type and row aliases. A source-complete graph is a
+conditional typing theorem; it does not certify any supplied callback's body or
+captures. An import freshens the graph and rechecks its equations. Complete
+higher-order jobs key every callback interface and data input, and publish only
+after their private solver finishes every required action.
+
+Dedicated bounded function-DAG predicates admit callbacks accepting or returning
+callbacks. First-order data/dispatch/physical-representation predicates retain
+their existing domain. The graph matcher allows nested function skeletons and
+preserves operation identities, arguments, multiplicity and aliases. Source
+ambient covariance applies to enclosing/returned arrows; a supplied callback's
+pure or fixed operation row remains exact. Unsupported function containers,
+rigid rows, unknown dynamic callees and incomplete lexical observations retain
+ordinary checking. This adds no higher-rank inference or staging capability.
+
+The initial policy also imported open callback graphs into runtime capture
+inquiries, adding equations at every transitive call without separating the
+capture proof. Its depth-8 capture control increased CPU from 33.448 to 79.639
+ms and the largest recorded region from 30.171 to 83.231 ms. That artifact,
+`candidate-callbacks/` (binary
+`2e9e4f4dd6705c6bf642b5e071ba2921570466e8a301913842bb71633b1025fb`), is retained
+as an unselected experiment. Full native/609 guest tests and 539 differential
+cases passed; those semantic results did not qualify its cost.
+
+The revised policy classifies inline lexical captures in the immutable source
+visit recipe before graph admission. Live environments and retained code-capture
+hints also mark that boundary. An unavailable bounded recipe conservatively
+declines open higher-order graph sharing. Complete callback interfaces still
+permit independent type jobs. Partially known captures keep ordinary body
+checking until task 006 supplies their owned input vector. The actual callback
+value always retains its own capture, provider and source-interface checks.
+
+Native laws cover direct, curried and returned callbacks at depths 4/8/16/64,
+two scalar instantiations, conditional unsolved graph actions, concrete
+operation rows, a wrong pure expected row and corrected reuse. A shared 24-level
+function DAG exercises type-depth/node/edge limits; function-valued arrays keep
+the data boundary. Exact row aliases, input purity and allocation-failure
+publication are separate laws. The capture fallback compares source evidence and
+transitive work with graph sharing disabled, checks frozen Core/types and sweeps
+allocation failures. The focused callback batch passed 53 tests; the added
+capture law and its imported support laws passed 16 tests.
+
+[The executed callback laws](tests/higher_order_summary_execution.test.ts) cover
+reducers, returned callbacks, runtime scalar captures, concrete handled effects,
+unused effectful callbacks, incompatible results and callback-body errors.
+Imported generic combinators survive dependency/checkpoint restoration;
+provider/callback edits and failed-edit correction match fresh bytes and ordered
+diagnostics. A nominal predicate-bearing combinator and callback execute their
+associated methods independently. Invalid explicit callback requirements remain
+source errors even when the value is passed to an unused callback parameter.
+
+Qualification pins are under `build/bench/cloud-principal-graphs/`. The task 004
+baseline remains `candidate-live-headers/`, binary
+`bbf1f1e032ef5cec102f7369c7740517f6e04b3151dc9f89df967543d786b724`. The revised
+`candidate-callbacks-v2/` binary is
+`3e1d56b638108fb1fc19e26d5516328ad320ed4395a4b1270fea20d49b4d4c4e`; compiler
+identity file SHA-256 is
+`10ddc630e765ce41e2c245171417d54a7272cd5e520b73ff0ea545c0c0631558`, and its
+five-file patch against `5492684` is
+`9114418ab75c5a0945922d36d1664797b3bc82d67dabe22ace6d5ee7c950298a`. Each
+manifest records exact source hashes. These binary and identity pins stay
+immutable through qualification.
+
+The revised pin passes `deno task test:compiler` with the full native suite and
+609 guest/client tests. `deno task lint:zig` reports zero findings across 291 Zig
+files, using Zig 0.17.0 and the qualified analyzer. The differential command
+`python3 build/bench/cloud-principal-graphs/compare-callbacks-v2.py` compares 563
+public cases, including 54 higher-order fixtures, in 1,126 fresh cache-disabled
+invocations. Ordered diagnostics and successful Wasm bytes match exactly; 380
+invocations succeed. Every expected-valid callback fixture succeeds, including
+the predicate-bearing direct, curried, returned and effectful forms. All 1,122
+invocations with compilation metrics report zero live requested bytes after
+teardown and no loaded restart cache. The four remaining invocations are the
+paired existing `TypeLimit` fixtures, which emit no compilation metrics.
+
+Fifteen alternating release pairs measure 32 public workloads in isolated fresh
+processes with caches disabled:
+`python3 build/bench/cloud-principal-graphs/measure-callbacks-v2.py`. Child CPU
+comes from `getrusage(RUSAGE_CHILDREN)` user plus system time. Every pair asserts
+exact Wasm equality; all 960 invocations succeed. Allocation below is cumulative
+requested memory in decimal MB, not peak RSS. Both binaries and their identity
+pins are verified before and after the batch.
+
+| Workload | Median CPU baseline / candidate (ms) | Allocation baseline / candidate (MB) | Maximum scopes baseline / candidate | Constraint visits baseline / candidate |
+| --- | ---: | ---: | ---: | ---: |
+| Predicate direct callback, depth 12 | 12,437.728 / 6.734 | 68.93 / 5.40 | 12,287 / 3 | 16,420 / 570 |
+| Predicate curried callback, depth 12 | 13,805.074 / 7.807 | 77.13 / 5.67 | 12,287 / 3 | 16,420 / 574 |
+| Predicate returned callback, depth 12 | 13,503.277 / 7.634 | 80.28 / 5.67 | 12,287 / 3 | 16,420 / 574 |
+| Predicate effectful callback, depth 12 | 8,903.948 / 6.150 | 51.48 / 4.74 | 12,287 / 4 | 12,310 / 327 |
+| Captured callback, depth 8 | 34.424 / 34.204 | 8.36 / 8.40 | 1,025 / 1,025 | 512 / 512 |
+| First-order factory control, depth 12 | 6.568 / 6.234 | 5.60 / 5.60 | 3 / 3 | 513 / 513 |
+| Mixed source control, depth 12 | 4.953 / 5.030 | 4.10 / 4.10 | 2 / 2 | 179 / 179 |
+
+Predicate-free direct/curried/returned/effectful/unused depth-12 controls were
+already cheap: their baseline CPU is 4.63–5.34 ms. Candidate CPU is 4.69–5.82
+ms, adding approximately 1–18%; allocation adds approximately 2–17%. Their
+maximum scopes fall from 15–28 to 4–5, but the interface/job overhead outweighs
+that saving on some small cases. Capture depths 4/6/8 retain ordinary work;
+their CPU is approximately flat and allocation changes by less than 1%.
+
+The candidate's largest **recorded** profile region is the depth-8 capture at
+33.266 ms (baseline 33.731 ms). Recorded predicate curried/returned depth-12
+regions are 1.067/1.676 ms. Several profiles, including the candidate predicate
+direct/effectful cases, record no region duration. They provide no duration or
+program-wide maximum claim. Captured regions still reach 1,025 scopes; this
+qualification does not replace task 006's explicit capture inputs or the final
+program-wide latency gate. No private gdev comparison is available.

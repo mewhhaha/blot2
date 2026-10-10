@@ -631,6 +631,177 @@ fn comparisonGraphScenario(allocator: std.mem.Allocator, module: *const core.Mod
     return error.TestExpectedError;
 }
 
+fn callbackGraphScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize, curried: bool) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const generic = try session.sourceInterface(target(module, "generic"));
+    if (generic.pending != 0) std.debug.print("callback source depth={d}: {any}\n", .{ depth, generic });
+    try std.testing.expect(generic.evidence == 0 and generic.pending == 0);
+    var callbacks: usize = 0;
+    var second_stages: usize = 0;
+    var graphs = session.call_summaries.normalized_principals.valueIterator();
+    while (graphs.next()) |entry| {
+        const graph = entry.*;
+        for (graph.constraints) |constraint| if (constraint.kind == .callback_use) {
+            try std.testing.expect(constraint.callback_interface and !constraint.solved);
+            try std.testing.expectEqual(@as(u32, 0), constraint.callback_slot);
+            callbacks += 1;
+            second_stages += @intFromBool(constraint.callback_stage == 1);
+        };
+        try std.testing.expectEqual(@as(usize, 0), graph.types.versions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), graph.types.effects.versions.items.len);
+    }
+    if (callbacks == 0) std.debug.print("no callback graphs depth={d}, raw={d}, normalized={d}, {any}\n", .{ depth, session.call_summaries.principals.count(), session.call_summaries.normalized_principals.count(), session.counters });
+    try std.testing.expect(callbacks != 0);
+    try std.testing.expectEqual(curried, second_stages != 0);
+    for ([_][]const u8{ "integer", "floating" }, [_]types.Id{ types.u32_type, types.f32_type }) |name, scalar| {
+        const selected = try session.sourceInterface(target(module, name));
+        try std.testing.expect(selected.evidence != 0 and selected.pending == 0);
+        try std.testing.expectEqual(scalar, session.evidence.node(selected.evidence).b);
+    }
+    if (session.counters.region_scopes > depth * 24 + 128 or session.counters.max_region_scopes > 8) std.debug.print("callback depth={d}: {any}, graphs={d}\n", .{ depth, session.counters, session.call_summaries.normalized_principals.count() });
+    try std.testing.expect(session.counters.region_scopes <= depth * 24 + 128);
+    try std.testing.expect(session.counters.max_region_scopes <= 8);
+    try std.testing.expect(session.counters.solver_constraint_visits <= depth * 512 + 512);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    if (depth != 4) return;
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    const reference = try ordinary.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqualDeep(reference, generic);
+    for ([_][]const u8{ "integer", "floating" }) |name| {
+        const expected = try ordinary.sourceInterface(target(module, name));
+        const actual = try session.sourceInterface(target(module, name));
+        try std.testing.expectEqualDeep(ordinary.evidence.node(expected.evidence), session.evidence.node(actual.evidence));
+    }
+}
+
+test "owned callback obligations bound higher order diamonds and preserve curried and returned callback stages" {
+    for ([_][]const u8{ "callback value", "callback value value", "callback () value" }, [_][]const u8{ "fn value => value", "fn value => fn ignored => value", "fn () => fn value => value" }, [_]bool{ false, true, true }) |invocation, producer, curried| {
+        for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+            var text: std.ArrayList(u8) = .empty;
+            defer text.deinit(a);
+            try text.print(a, "type Count is data = #Count U32\ntype Other is data = #Other U32\nconst identity = {s}\nconst f_0 = fn callback => fn value => do:\n  let compared = @type.same #Count #Other\n  use result <- {s}\n  return result\n", .{ producer, invocation });
+            for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn callback => fn value => do:\n  use first <- f_{d} callback value\n  return f_{d} callback first\n", .{ i, i - 1, i - 1 });
+            try text.print(a, "entry const generic = do:\n  return f_{d}\nentry const integer = fn (value: U32) => f_{d} identity value\nentry const floating = fn (value: F32) => f_{d} identity value\n", .{ depth, depth, depth });
+            var module = try lower(text.items);
+            defer module.deinit(a);
+            const nodes = try a.dupe(core.Node, module.nodes);
+            defer a.free(nodes);
+            const frozen = try a.dupe(types.Node, module.types.nodes);
+            defer a.free(frozen);
+            const obligations = try a.dupe(core.Obligation, module.obligations);
+            defer a.free(obligations);
+            try callbackGraphScenario(a, &module, depth, curried);
+            if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, callbackGraphScenario, .{ &module, depth, curried });
+            try std.testing.expectEqualDeep(nodes, module.nodes);
+            try std.testing.expectEqualDeep(frozen, module.types.nodes);
+            try std.testing.expectEqualDeep(obligations, module.obligations);
+        }
+    }
+}
+
+fn callbackRowScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    var summarized = try evaluator.Session.init(allocator, &.{module.*});
+    defer summarized.deinit();
+    var name_buffer: [32]u8 = undefined;
+    const name = try std.mem.print(&name_buffer, "f_{d}", .{depth});
+    for ([_]*evaluator.Session{ &ordinary, &summarized }) |session| {
+        const interface = try session.sourceInterface(target(module, "signature"));
+        try std.testing.expect(interface.evidence != 0);
+        const full = interface.evidence;
+        const outer = session.evidence.node(full);
+        const inner = session.evidence.node(outer.b);
+        const callback = session.evidence.node(outer.a);
+        try std.testing.expect(callback.c != 0 and inner.c == callback.c);
+        var valid = try session.bodyEvidenceFull(target(module, name), full, &.{}, &.{});
+        valid.deinit(allocator);
+        const pure_inner = try session.evidence.intern(.function, inner.a, inner.b, &.{});
+        const wrong = try session.evidence.internWithEffects(.function, outer.a, pure_inner, outer.c, &.{});
+        try std.testing.expectError(error.Declined, session.bodyEvidenceFull(target(module, name), wrong, &.{}, &.{}));
+        try std.testing.expectEqual(evaluator.Code.effect_mismatch, session.diagnostic.?.code);
+    }
+    try std.testing.expectEqualDeep(ordinary.diagnostic, summarized.diagnostic);
+    ordinary.diagnostic = null;
+    summarized.diagnostic = null;
+    for ([_]*evaluator.Session{ &ordinary, &summarized }) |session| {
+        const interface = try session.sourceInterface(target(module, "signature"));
+        try std.testing.expect(interface.evidence != 0);
+        const full = interface.evidence;
+        var corrected = try session.bodyEvidenceFull(target(module, name), full, &.{}, &.{});
+        corrected.deinit(allocator);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    }
+    try std.testing.expect(summarized.counters.max_region_scopes <= 8);
+}
+
+test "callback latent operation rows remain exact through independent jobs and failed expected rows recover under allocation failure" {
+    const depth: usize = 4;
+    var text: std.ArrayList(u8) = .empty;
+    defer text.deinit(a);
+    try text.appendSlice(a,
+        \\type Tick is effect = Unit -> U32
+        \\const f_0 = fn callback => fn value => do:
+        \\  use result <- callback value
+        \\  return result
+        \\entry const signature = fn (callback: U32 -> U32 ! {Tick}) => fn (value: U32) => do:
+        \\  use result <- callback value
+        \\  return result
+        \\
+    );
+    for (1..depth + 1) |i| try text.print(a, "entry const f_{d} = fn callback => fn value => do:\n  use first <- f_{d} callback value\n  use second <- f_{d} callback first\n  return second\n", .{ i, i - 1, i - 1 });
+    var module = try lower(text.items);
+    defer module.deinit(a);
+    const frozen = try a.dupe(types.Node, module.types.nodes);
+    defer a.free(frozen);
+    const rows = try a.dupe(types.Effects.Row, module.types.effects.rows);
+    defer a.free(rows);
+    try callbackRowScenario(a, &module, depth);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, callbackRowScenario, .{ &module, depth });
+    try std.testing.expectEqualDeep(frozen, module.types.nodes);
+    try std.testing.expectEqualDeep(rows, module.types.effects.rows);
+}
+
+fn callbackCaptureFallbackScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    var summarized = try evaluator.Session.init(allocator, &.{module.*});
+    defer summarized.deinit();
+    const reference = try ordinary.sourceInterface(target(module, "answer"));
+    const actual = try summarized.sourceInterface(target(module, "answer"));
+    try std.testing.expect(actual.evidence != 0 and actual.pending == 0);
+    try std.testing.expectEqualDeep(reference, actual);
+    try std.testing.expectEqualDeep(ordinary.evidence.node(reference.evidence), summarized.evidence.node(actual.evidence));
+    try std.testing.expect(summarized.counters.region_scopes <= ordinary.counters.region_scopes + depth * 8 + 32);
+    try std.testing.expect(summarized.counters.solver_constraint_visits <= ordinary.counters.solver_constraint_visits + depth * 8 + 32);
+    try std.testing.expectEqual(@as(usize, 0), summarized.steps);
+}
+
+test "higher order callback capture fallback preserves source checking without duplicate transitive work" {
+    for ([_]usize{ 4, 8 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "type Count is data = #Count U32\ntype Other is data = #Other U32\nconst f_0 = fn callback => fn value => do:\n  let compared = @type.same #Count #Other\n  use result <- callback value\n  return result\n");
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn callback => fn value => do:\n  use first <- f_{d} callback value\n  use second <- f_{d} callback first\n  return second\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "const factory = do:\n  return f_{d}\nentry const answer = fn (delta: U32) => factory (fn value => @u32.add value delta) 7\n", .{depth});
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        const nodes = try a.dupe(core.Node, module.nodes);
+        defer a.free(nodes);
+        const frozen = try a.dupe(types.Node, module.types.nodes);
+        defer a.free(frozen);
+        try callbackCaptureFallbackScenario(a, &module, depth);
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, callbackCaptureFallbackScenario, .{ &module, depth });
+        try std.testing.expectEqualDeep(nodes, module.nodes);
+        try std.testing.expectEqualDeep(frozen, module.types.nodes);
+    }
+}
+
 fn sourceProvenGraphScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
     var session = try evaluator.Session.init(allocator, &.{module.*});
     defer session.deinit();

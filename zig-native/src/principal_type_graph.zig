@@ -20,7 +20,7 @@ pub fn allUnknown(source: *const T.Store, root: T.Id, max_depth: usize) bool {
     return false;
 }
 
-/// Match an unselected caller against a source-owned first-order skeleton.
+/// Match an unselected caller against a source-owned data/callback skeleton.
 /// Constructors belong to the source; every quantified leaf must still be an
 /// unknown caller binder. Repeated source binders retain their alias class.
 /// This describes a residual relationship and proves no selected judgment.
@@ -35,7 +35,7 @@ pub fn sameOpen(allocator: std.mem.Allocator, source: *const T.Store, left: T.Id
 }
 
 fn matches(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id, caller: *const T.Store, actual: T.Id, max_depth: usize, max_nodes: usize, exact_binders: bool) std.mem.Allocator.Error!bool {
-    const Pair = struct { principal: T.Id, actual: T.Id, arrows: bool };
+    const Pair = struct { principal: T.Id, actual: T.Id, ambient: bool };
     const Item = struct { pair: Pair, depth: usize };
     const Row = struct { variable: ?u32, cursor: T.Cursor };
     var pending: std.ArrayList(Item) = .empty;
@@ -46,12 +46,12 @@ fn matches(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id
     defer variables.deinit(allocator);
     var rows: std.AutoHashMapUnmanaged(u32, Row) = .empty;
     defer rows.deinit(allocator);
-    try pending.append(allocator, .{ .pair = .{ .principal = principal, .actual = actual, .arrows = true }, .depth = 0 });
+    try pending.append(allocator, .{ .pair = .{ .principal = principal, .actual = actual, .ambient = true }, .depth = 0 });
     while (pending.pop()) |item| {
         if (item.depth >= max_depth) return false;
         const original = source.head(item.pair.principal, 0);
         const live = caller.head(item.pair.actual, 0);
-        const key: Pair = .{ .principal = original, .actual = live, .arrows = item.pair.arrows };
+        const key: Pair = .{ .principal = original, .actual = live, .ambient = item.pair.ambient };
         if (seen.contains(key)) continue;
         if (seen.count() >= max_nodes) return false;
         try seen.put(allocator, key, {});
@@ -70,7 +70,6 @@ fn matches(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id
         const depth = item.depth + 1;
         switch (from.tag) {
             .function => {
-                if (!item.pair.arrows) return false;
                 const before = source.row(from.c);
                 const after = caller.row(to.c);
                 if (before.labels.len > max_nodes) return false;
@@ -81,11 +80,12 @@ fn matches(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id
                     const arguments = source.operationArguments(left);
                     const actuals = caller.operationArguments(right);
                     if (arguments.len != actuals.len or arguments.len > max_nodes -| pending.items.len) return false;
-                    for (arguments, actuals) |a_, b_| try pending.append(allocator, .{ .pair = .{ .principal = a_, .actual = b_, .arrows = false }, .depth = depth });
+                    for (arguments, actuals) |a_, b_| try pending.append(allocator, .{ .pair = .{ .principal = a_, .actual = b_, .ambient = false }, .depth = depth });
                 }
                 // A pure source may have an unselected covariant ambient view.
+                // Supplied callbacks retain exact closed rows, including purity.
                 // This retains a residual edge, never a closed row judgment.
-                if (before.tail == .closed and before.labels.len != 0 and after.tail != .closed) return false;
+                if (before.tail == .closed and (before.labels.len != 0 or !item.pair.ambient) and after.tail != .closed) return false;
                 if (before.tail == .variable) {
                     const value: Row = .{ .variable = if (after.tail == .variable) after.tail.variable else null, .cursor = after.cursor };
                     const slot = try rows.getOrPut(allocator, before.tail.variable);
@@ -93,17 +93,17 @@ fn matches(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id
                         if (!std.meta.eql(slot.value_ptr.*, value)) return false;
                     } else slot.value_ptr.* = value;
                 }
-                try pending.append(allocator, .{ .pair = .{ .principal = from.a, .actual = to.a, .arrows = false }, .depth = depth });
-                try pending.append(allocator, .{ .pair = .{ .principal = from.b, .actual = to.b, .arrows = true }, .depth = depth });
+                try pending.append(allocator, .{ .pair = .{ .principal = from.a, .actual = to.a, .ambient = false }, .depth = depth });
+                try pending.append(allocator, .{ .pair = .{ .principal = from.b, .actual = to.b, .ambient = item.pair.ambient }, .depth = depth });
             },
-            .array, .list, .cursor => try pending.append(allocator, .{ .pair = .{ .principal = from.a, .actual = to.a, .arrows = false }, .depth = depth }),
+            .array, .list, .cursor => try pending.append(allocator, .{ .pair = .{ .principal = from.a, .actual = to.a, .ambient = false }, .depth = depth }),
             .product, .nominal => {
                 if (from.tag == .nominal and (from.a != to.a or from.b != to.b)) return false;
                 const left = if (from.tag == .nominal) source.nominalArguments(from) else source.list(.{ .start = from.a, .len = from.b });
                 const right = if (to.tag == .nominal) caller.nominalArguments(to) else caller.list(.{ .start = to.a, .len = to.b });
                 if (left.len != right.len) return false;
                 if (left.len > max_nodes -| pending.items.len) return false;
-                for (left, right) |a_, b_| try pending.append(allocator, .{ .pair = .{ .principal = a_, .actual = b_, .arrows = false }, .depth = depth });
+                for (left, right) |a_, b_| try pending.append(allocator, .{ .pair = .{ .principal = a_, .actual = b_, .ambient = false }, .depth = depth });
             },
             .record => {
                 if (from.b != to.b or from.b > max_nodes -| pending.items.len) return false;
@@ -111,7 +111,7 @@ fn matches(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id
                     const left = source.recordField(from, i);
                     const right = caller.recordField(to, i);
                     if (left.name != right.name) return false;
-                    try pending.append(allocator, .{ .pair = .{ .principal = left.ty, .actual = right.ty, .arrows = false }, .depth = depth });
+                    try pending.append(allocator, .{ .pair = .{ .principal = left.ty, .actual = right.ty, .ambient = false }, .depth = depth });
                 }
             },
             .unit, .boolean, .u32, .f32, .never => {},
@@ -119,6 +119,43 @@ fn matches(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id
         }
     }
     return true;
+}
+
+fn callbackSkeletonScenario(allocator: std.mem.Allocator) !void {
+    var source = try T.Store.init(allocator);
+    defer source.deinit();
+    const variable = try source.fresh();
+    const pure_callback = try source.function(variable, variable);
+    const pure = try source.function(pure_callback, pure_callback);
+    var caller = try T.Store.init(allocator);
+    defer caller.deinit();
+    var copy: Copy = .{ .allocator = allocator, .source = &source, .destination = &caller, .max_depth = 64, .max_nodes = 1024 };
+    defer copy.deinit();
+    const actual = try copy.ty(pure, 0);
+    try std.testing.expect(try matchesOpen(allocator, &source, pure, &caller, actual, 64, 1024));
+    const root = caller.node(actual);
+    const input = caller.node(root.a);
+    const open_callback = try caller.functionWithEffects(input.a, input.b, try caller.freshEffects());
+    const wrong_input = try caller.function(open_callback, root.b);
+    try std.testing.expect(!try matchesOpen(allocator, &source, pure, &caller, wrong_input, 64, 1024));
+    const row = try source.freshEffects();
+    const callback = try source.functionWithEffects(variable, variable, row);
+    const returned = try source.functionWithEffects(variable, callback, row);
+    const relationship = try source.function(callback, returned);
+    const instantiated = try copy.ty(relationship, 0);
+    try std.testing.expect(try matchesOpen(allocator, &source, relationship, &caller, instantiated, 64, 1024));
+    const outer = caller.node(instantiated);
+    const result = caller.node(outer.b);
+    const separated = try caller.functionWithEffects(result.a, result.b, try caller.freshEffects());
+    const wrong_alias = try caller.function(outer.a, separated);
+    try std.testing.expect(!try matchesOpen(allocator, &source, relationship, &caller, wrong_alias, 64, 1024));
+    try std.testing.expectEqual(@as(usize, 0), source.versions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), source.effects.versions.items.len);
+}
+
+test "callback skeleton imports retain pure input rows and curried returned row aliases under allocation failure" {
+    try callbackSkeletonScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, callbackSkeletonScenario, .{});
 }
 
 pub const Copy = Copier(*const T.Store, true);

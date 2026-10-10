@@ -407,7 +407,7 @@ const CallSummaries = struct {
         const body = region.session.units[source.owner].body(source.binding).?;
         _ = try region.closeRetainedFunctionRows(source.root, body.parameters.len);
         const result = try region.project(source.root);
-        if (result == 0 or !try region.firstOrderArrow(result)) return 0;
+        if (result == 0 or !try region.summaryValue(result, 0)) return 0;
         if (!region.source_interface) try region.publishValidatedCalls();
         return result;
     }
@@ -3658,8 +3658,8 @@ const ClosureRegion = struct {
     };
     const DefinitionKey = struct { owner: usize, node: core.Id };
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
-    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use };
-    const Constraint = struct { target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
+    const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use, callback_use };
+    const Constraint = struct { callback_slot: u32 = 0, callback_stage: u32 = 0, callback_interface: bool = false, target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
     const Worklists = struct {
         constraints: @import("solver_worklist.zig").Queue = .{},
         aliases: @import("solver_worklist.zig").Queue = .{},
@@ -3734,6 +3734,7 @@ const ClosureRegion = struct {
     source_interface: bool = false,
     building_principal: bool = false,
     partial_principal: bool = false,
+    unkeyed_capture_inputs: bool = false,
     principal_only_used: bool = false,
     speculative_source_entry: bool = false,
     source_selection_failed: bool = false,
@@ -4157,6 +4158,7 @@ const ClosureRegion = struct {
     }
     fn closureEvidenceCaptures(self: *ClosureRegion, owner: usize, closure: core.ClosureInfo, expected: Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, captures: []const RetainedCapture, projection: ?CodeProjection) RegionError!SolvedEvidence {
         self.include_callables = true;
+        self.unkeyed_capture_inputs = captures.len != 0 or closure.captures.len != 0;
         const scope = try self.typeScope(owner);
         const module = &self.session.units[owner];
         self.scratch.sources.items[scope].body = closure.body;
@@ -4270,6 +4272,62 @@ const ClosureRegion = struct {
             depth += 1;
         }
         return false;
+    }
+    /// Complete callback interfaces are semantic inputs; executable identity
+    /// and captures are checked by their value owner, never by this shape test.
+    fn summaryValue(self: *ClosureRegion, evidence: type_evidence.Id, depth: usize) RegionError!bool {
+        if (depth >= self.session.options.max_type_depth or evidence == 0) return false;
+        const node = self.session.evidence.node(evidence);
+        if (node.tag != .function) return self.firstOrderData(evidence, depth);
+        if (try self.firstOrderArrow(evidence)) return true;
+        const Item = struct { id: type_evidence.Id, depth: usize };
+        var pending: std.ArrayList(Item) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        var seen: std.AutoHashMapUnmanaged(type_evidence.Id, usize) = .empty;
+        defer seen.deinit(self.scratch_allocator);
+        try pending.append(self.scratch_allocator, .{ .id = evidence, .depth = depth });
+        var edges: usize = 0;
+        while (pending.pop()) |item| {
+            if (item.depth >= self.session.options.max_type_depth or item.id == 0) return false;
+            const value = self.session.evidence.node(item.id);
+            if (value.tag != .function) {
+                if (!try self.firstOrderData(item.id, item.depth)) return false;
+                continue;
+            }
+            if (seen.get(item.id)) |prior| if (prior >= item.depth) continue;
+            if (seen.count() >= self.session.options.max_values or 2 > self.session.options.max_children -| edges) return false;
+            try seen.put(self.scratch_allocator, item.id, item.depth);
+            try pending.appendSlice(self.scratch_allocator, &.{ .{ .id = value.a, .depth = item.depth + 1 }, .{ .id = value.b, .depth = item.depth + 1 } });
+            edges += 2;
+        }
+        return true;
+    }
+    fn potentialSummaryValue(self: *ClosureRegion, owner: usize, ty: types.Id, depth: usize) RegionError!bool {
+        if (depth >= self.session.options.max_type_depth or ty == 0) return false;
+        const module = &self.session.units[owner];
+        if (module.types.node(ty).tag != .function) return self.potentialData(owner, ty, depth);
+        const Item = struct { id: types.Id, depth: usize };
+        var pending: std.ArrayList(Item) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        var seen: std.AutoHashMapUnmanaged(types.Id, usize) = .empty;
+        defer seen.deinit(self.scratch_allocator);
+        try pending.append(self.scratch_allocator, .{ .id = ty, .depth = depth });
+        var edges: usize = 0;
+        while (pending.pop()) |item| {
+            if (item.depth >= self.session.options.max_type_depth or item.id == 0) return false;
+            const node = module.types.node(item.id);
+            if (node.tag != .function) {
+                if (!try self.potentialData(owner, item.id, item.depth)) return false;
+                continue;
+            }
+            if (module.types.row(node.c).tail == .parameter) return false;
+            if (seen.get(item.id)) |prior| if (prior >= item.depth) continue;
+            if (seen.count() >= self.session.options.max_values or 2 > self.session.options.max_children -| edges) return false;
+            try seen.put(self.scratch_allocator, item.id, item.depth);
+            try pending.appendSlice(self.scratch_allocator, &.{ .{ .id = node.a, .depth = item.depth + 1 }, .{ .id = node.b, .depth = item.depth + 1 } });
+            edges += 2;
+        }
+        return true;
     }
     // This quick source test can only exclude a proof. Variables still need
     // the complete semantic-evidence check below before admission.
@@ -4667,6 +4725,7 @@ const ClosureRegion = struct {
         if (existing != 0) try self.solver.unify(root, try self.importEvidence(existing, 0));
         const captures = try self.session.allocator.dupe(ValueId, self.session.valueChildren(value_));
         defer self.session.allocator.free(captures);
+        self.unkeyed_capture_inputs = self.unkeyed_capture_inputs or captures.len != 0;
         for (captures, 0..) |capture, index| {
             const formal_source = switch (metadata.origin) {
                 .anonymous => module.binding(module.extra[module.closures[metadata.identity].captures.start + index]).ty,
@@ -4774,6 +4833,18 @@ const ClosureRegion = struct {
         const binding = module.binding(target_.binding);
         const definition = module.body(target_.binding);
         if (self.building_principal) {
+            if (self.formalCallback(caller, reference)) |slot| {
+                // Merely referencing a formal callback does not select its
+                // implementation. Each actual application has its own action.
+                var arrow = try self.importType(caller, callee_type, 0);
+                for (arguments, 0..) |argument, stage| {
+                    const node = self.solver.node(try self.solver.resolve(arrow, 0));
+                    if (node.tag != .function) return error.UnresolvedType;
+                    try self.appendConstraint(.{ .kind = .callback_use, .scope = caller, .node = argument, .callback_slot = slot, .callback_stage = @intCast(stage), .left = arrow, .right = try self.importType(caller, self.session.units[self.scratch.sources.items[caller].owner].typeOf(argument), 0), .result = node.b, .signature = try self.callbackSignature(caller, slot) });
+                    arrow = node.b;
+                }
+                return;
+            }
             if (binding.kind != .global or !try self.summaryShapeEligible(target_)) return error.UnresolvedType;
             const start = self.scratch.summary_arguments.items.len;
             if (arguments.len > std.math.maxInt(u32) - start) return error.TypeLimit;
@@ -4861,7 +4932,7 @@ const ClosureRegion = struct {
             return;
         }
         if (definition != null and binding.kind == .global and !self.retain_selected) {
-            const independent = !self.principal_result_job and try self.summaryEligible(target_);
+            const independent = !self.principal_result_job and (!self.unkeyed_capture_inputs or try self.completeCallbackInputs(target_, instantiated)) and try self.summaryEligible(target_);
             const residual = !independent and self.partial_principal and try self.retainOpenPrincipal(.{ .kind = .call_summary, .target = target_, .scope = caller, .node = body_root, .left = instantiated, .result = instantiated, .deferred_member = self.defer_members });
             const result_directed = !independent and !residual and try self.resultPrincipalEligible(target_, self.defer_members);
             if (!independent and !residual and !result_directed) return self.collectInlineCall(caller, target_, callee_type, arguments);
@@ -5398,10 +5469,37 @@ const ClosureRegion = struct {
         var arrow_type = body.scheme.root;
         for (0..body.parameters.len) |_| {
             const arrow = module.types.node(arrow_type);
-            if (arrow.tag != .function or !try self.potentialData(target_.unit, arrow.a, 0)) return false;
+            if (arrow.tag != .function or !try self.potentialSummaryValue(target_.unit, arrow.a, 0)) return false;
             arrow_type = arrow.b;
         }
-        return self.potentialData(target_.unit, arrow_type, 0);
+        return self.potentialSummaryValue(target_.unit, arrow_type, 0);
+    }
+    fn higherOrderBody(self: *ClosureRegion, target_: Target) bool {
+        const module = &self.session.units[target_.unit];
+        const body = module.body(target_.binding) orelse return false;
+        var cursor = body.scheme.root;
+        for (0..body.parameters.len) |_| {
+            const arrow = module.types.node(cursor);
+            if (arrow.tag != .function) return false;
+            if (module.types.node(arrow.a).tag == .function) return true;
+            cursor = arrow.b;
+        }
+        return module.types.node(cursor).tag == .function;
+    }
+    fn completeCallbackInputs(self: *ClosureRegion, target_: Target, actual: types.Id) RegionError!bool {
+        const module = &self.session.units[target_.unit];
+        const body = module.body(target_.binding) orelse return false;
+        var source = body.scheme.root;
+        var cursor = actual;
+        for (0..body.parameters.len) |_| {
+            const arrow = module.types.node(source);
+            const supplied = self.solver.node(try self.solver.resolve(cursor, 0));
+            if (arrow.tag != .function or supplied.tag != .function) return false;
+            if (module.types.node(arrow.a).tag == .function and try self.project(supplied.a) == 0) return false;
+            source = arrow.b;
+            cursor = supplied.b;
+        }
+        return true;
     }
     fn checkSummaryEligibility(self: *ClosureRegion, target_: Target) RegionError!bool {
         const Candidate = struct { target: Target, bad: bool = false, parents: u32 = std.math.maxInt(u32) };
@@ -5481,7 +5579,7 @@ const ClosureRegion = struct {
             const arrow = self.solver.node(try self.solver.resolve(cursor, 0));
             if (arrow.tag != .function) return 0;
             const actual = try self.project(arrow.a);
-            if (actual == 0 or !try self.firstOrderData(actual, 0)) return 0;
+            if (actual == 0 or !try self.summaryValue(actual, 0)) return 0;
             if (self.source_interface and self.session.evidence.node(actual).tag == .never) return 0;
             try arguments.append(self.session.allocator, actual);
             cursor = arrow.b;
@@ -5663,6 +5761,63 @@ const ClosureRegion = struct {
             try rows.append(self.session.allocator, key);
         }
         for (rows.items) |row| try self.solver.unifyEffects(self.scratch.row_variables.get(row).?, try self.importRowVariable(caller, row.variable));
+    }
+    fn formalCallback(self: *ClosureRegion, scope: u32, reference: core.BindingRef) ?u32 {
+        const source = self.scratch.sources.items[scope];
+        if (reference.unit != 0 and reference.unit != self.session.unitId(source.owner)) return null;
+        const module = &self.session.units[source.owner];
+        const body = module.body(source.binding) orelse return null;
+        for (module.bodyParameters(body), 0..) |parameter, index| {
+            if (parameter.binding == reference.binding and module.types.node(parameter.ty).tag == .function) return @intCast(index);
+        }
+        return null;
+    }
+    fn callbackSignature(self: *ClosureRegion, scope: u32, slot: u32) RegionError!types.Id {
+        const source = self.scratch.sources.items[scope];
+        const module = &self.session.units[source.owner];
+        const body = module.body(source.binding) orelse return error.UnresolvedType;
+        const parameters = module.bodyParameters(body);
+        if (slot >= parameters.len) return error.UnresolvedType;
+        return self.importType(scope, parameters[slot].ty, 0);
+    }
+    const CallbackOrigin = struct { slot: u32, stage: u32 };
+    fn callbackOrigin(self: *ClosureRegion, scope: u32, callee: core.Id) ?CallbackOrigin {
+        const module = &self.session.units[self.scratch.sources.items[scope].owner];
+        var cursor = callee;
+        for (0..self.session.options.max_type_depth) |stage| {
+            const node = module.node(cursor);
+            if (node.tag == .reference) {
+                const slot = self.formalCallback(scope, module.reference(cursor)) orelse return null;
+                return .{ .slot = slot, .stage = @intCast(stage) };
+            }
+            if (node.tag != .apply) return null;
+            cursor = node.a;
+        }
+        return null;
+    }
+    fn sourceCallable(self: *ClosureRegion, scope: u32, callee: core.Id) bool {
+        const module = &self.session.units[self.scratch.sources.items[scope].owner];
+        var cursor = callee;
+        for (0..self.session.options.max_type_depth) |_| {
+            const node = module.node(cursor);
+            switch (node.tag) {
+                .apply => cursor = node.a,
+                .call, .associated, .project, .result_associated, .operation_value => return true,
+                .reference => {
+                    const reference = module.reference(cursor);
+                    if (reference.unit != 0 and reference.unit != self.session.unitId(self.scratch.sources.items[scope].owner)) return true;
+                    return module.binding(reference.binding).kind == .global;
+                },
+                .scalar => return node.c != 0 and node.b != 0,
+                else => return false,
+            }
+        }
+        return false;
+    }
+    fn callbackUse(self: *ClosureRegion, scope: u32, id: core.Id, origin: CallbackOrigin) RegionError!void {
+        const module = &self.session.units[self.scratch.sources.items[scope].owner];
+        const node = module.node(id);
+        try self.appendConstraint(.{ .kind = .callback_use, .scope = scope, .node = id, .callback_slot = origin.slot, .callback_stage = origin.stage, .left = try self.importType(scope, module.typeOf(node.a), 0), .right = try self.importType(scope, module.typeOf(node.b), 0), .result = try self.importType(scope, node.ty, 0), .signature = try self.callbackSignature(scope, origin.slot) });
     }
     fn alignClosure(self: *ClosureRegion, scope: u32, id: core.Id) RegionError!void {
         const module = &self.session.units[self.scratch.sources.items[scope].owner];
@@ -5919,7 +6074,7 @@ const ClosureRegion = struct {
                 // Operation selection retains the receiving region's ambient
                 // row. It remains a fresh residual obligation, even when its
                 // source-owned argument representation is already complete.
-                if (constraint.solved or constraint.kind == .call_summary or constraint.kind == .scheme_use or constraint.kind == .effect_operation) continue;
+                if (constraint.solved or constraint.callback_interface or constraint.kind == .call_summary or constraint.kind == .scheme_use or constraint.kind == .effect_operation) continue;
                 if (transitions >= self.session.options.max_children) return null;
                 transitions += 1;
                 attempted = true;
@@ -6028,6 +6183,7 @@ const ClosureRegion = struct {
         const target_: Target = .{ .unit = source.owner, .binding = source.binding };
         const definition = module.body(source.binding) orelse return null;
         if (definition.root != body or !try self.summaryShapeEligible(target_)) return null;
+        if (self.unkeyed_capture_inputs and self.higherOrderBody(target_)) return null;
         // Complete data inputs/results already share their input-keyed
         // judgments. An ambient row alone does not need a symbolic template.
         var arrow_type = source.root;
@@ -6075,6 +6231,7 @@ const ClosureRegion = struct {
     }
     fn resultPrincipalEligible(self: *ClosureRegion, target_: Target, deferred: bool) RegionError!bool {
         if (!self.session.reuse_principal_graphs or (self.summary_job and !self.result_summary_job) or self.retain_selected or self.complete_demand_bodies or self.speculative_source_entry) return false;
+        if (self.unkeyed_capture_inputs and self.higherOrderBody(target_)) return false;
         if (self.session.options.max_values < 4096 or self.session.options.max_type_depth < 64) return false;
         const root: PrincipalGraph.Key = .{ .target = target_, .source_interface = self.source_interface, .deferred_member = deferred, .options = self.session.options };
         if (self.session.call_summaries.result_principals.get(root)) |known| return known;
@@ -6128,6 +6285,7 @@ const ClosureRegion = struct {
     }
     fn retainOpenPrincipal(self: *ClosureRegion, constraint: Constraint) RegionError!bool {
         if (!self.session.reuse_principal_graphs or self.summary_job or self.retain_selected or self.complete_demand_bodies or self.speculative_source_entry) return false;
+        if (self.unkeyed_capture_inputs and self.higherOrderBody(constraint.target)) return false;
         if (self.session.options.max_values < 4096 or self.session.options.max_type_depth < 64) return false;
         const key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = self.source_interface, .deferred_member = constraint.deferred_member, .options = self.session.options };
         var graph = try self.principalGraphForKey(key) orelse return false;
@@ -6253,7 +6411,7 @@ const ClosureRegion = struct {
                         complete = complete and child_graph.source_complete;
                     } else {
                         if (!try self.unknownPrincipalConstraint(normalized, constraint)) return false;
-                        complete = complete and constraint.solved;
+                        complete = complete and (constraint.solved or constraint.callback_interface);
                     }
                 }
                 // A parametric source theorem is distinct from a closed call
@@ -6309,6 +6467,7 @@ const ClosureRegion = struct {
         return true;
     }
     fn unknownPrincipalConstraint(self: *ClosureRegion, graph: *const PrincipalGraph, constraint: Constraint) RegionError!bool {
+        if (constraint.kind == .callback_use) return self.principalCallback(graph, constraint);
         if (constraint.solved) return true;
         if (constraint.kind == .scheme_use) {
             const product = graph.types.node(constraint.left);
@@ -6379,6 +6538,31 @@ const ClosureRegion = struct {
             }
         }
         return true;
+    }
+    fn principalCallback(self: *ClosureRegion, graph: *const PrincipalGraph, constraint: Constraint) RegionError!bool {
+        if (!constraint.callback_interface or constraint.callback_slot >= self.session.options.max_type_depth or constraint.callback_stage >= self.session.options.max_type_depth) return false;
+        var cursor = graph.root;
+        for (0..constraint.callback_slot) |_| {
+            const arrow = graph.types.node(cursor);
+            if (arrow.tag != .function) return false;
+            cursor = arrow.b;
+        }
+        const owner = graph.types.node(cursor);
+        if (owner.tag != .function) return false;
+        const a = self.scratch_allocator;
+        const depth = self.session.options.max_type_depth;
+        const nodes = self.session.options.max_values;
+        if (!try principal_type_graph.sameOpen(a, &graph.types, owner.a, constraint.signature, depth, nodes)) return false;
+        cursor = constraint.signature;
+        for (0..constraint.callback_stage) |_| {
+            const arrow = graph.types.node(cursor);
+            if (arrow.tag != .function) return false;
+            cursor = arrow.b;
+        }
+        if (!try principal_type_graph.sameOpen(a, &graph.types, cursor, constraint.left, depth, nodes)) return false;
+        const arrow = graph.types.node(constraint.left);
+        if (arrow.tag != .function) return false;
+        return try principal_type_graph.sameOpen(a, &graph.types, arrow.a, constraint.right, depth, nodes) and try principal_type_graph.sameOpen(a, &graph.types, arrow.b, constraint.result, depth, nodes);
     }
     fn principalWitnessHead(self: *ClosureRegion, graph: *const PrincipalGraph, root: types.Id) RegionError!types.Id {
         var head = root;
@@ -6513,6 +6697,12 @@ const ClosureRegion = struct {
         self.session.principal_graph_imports += 1;
     }
     fn collect(self: *ClosureRegion, scope: u32, body: core.Id) RegionError!void {
+        const recipe = if (self.session.options.reuse_body_recipes) try self.session.body_recipes.get(self.session.allocator, self.session.units, .{ .owner = self.scratch.sources.items[scope].owner, .body = body, .callables = self.include_callables }, self.session.options.max_values) else null;
+        // This immutable syntax classification precedes graph admission, so a
+        // later-discovered inline capture cannot retroactively turn a source
+        // callback interface into a complete lexical input. No recipe means
+        // no proof of an empty lexical boundary; ordinary checking remains.
+        self.unkeyed_capture_inputs = self.unkeyed_capture_inputs or (if (recipe) |plan| plan.has_lexical_captures else self.include_callables);
         if (try self.principalGraph(scope, body)) |graph| return self.importPrincipal(scope, graph);
         self.work_revision +|= 1;
         const module = &self.session.units[self.scratch.sources.items[scope].owner];
@@ -6521,7 +6711,6 @@ const ClosureRegion = struct {
             if (source.binding != 0 and module.binding(source.binding).kind == .global) try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
         }
         try self.callableDefinitions(self.scratch.sources.items[scope].owner);
-        const recipe = if (self.session.options.reuse_body_recipes) try self.session.body_recipes.get(self.session.allocator, self.session.units, .{ .owner = self.scratch.sources.items[scope].owner, .body = body, .callables = self.include_callables }, self.session.options.max_values) else null;
         var work: body_recipe.Walk = .{ .recipe = recipe };
         defer work.deinit(self.session.allocator);
         try work.append(self.session.allocator, body);
@@ -6596,20 +6785,23 @@ const ClosureRegion = struct {
             if (self.include_callables and n.tag == .call) try self.collectCall(scope, module.call(id).target, module.call(id).callee_type, module.children(id));
             if (self.include_callables and n.tag == .apply) {
                 const callee = module.node(n.a);
+                const callback = if (self.building_principal) self.callbackOrigin(scope, n.a) else null;
+                if (callback) |origin| try self.callbackUse(scope, id, origin);
                 if (callee.tag == .closure) {
                     try self.alignClosure(scope, n.a);
                     try work.append(self.session.allocator, module.closure(n.a).body);
                 }
-                if (callee.tag == .reference) {
+                if (callback == null and callee.tag == .reference) {
                     const reference = module.reference(n.a);
                     const target_ = try self.session.external(try self.session.target(self.scratch.sources.items[scope].owner, reference));
                     const binding = self.session.units[target_.unit].binding(target_.binding);
                     if (binding.kind == .global or binding.initializer != 0) try self.collectCall(scope, reference, callee.ty, &.{n.b}) else if (self.retain_selected) {
                         self.startup_coverage_complete = false;
                     }
-                } else if (callee.tag != .closure and self.retain_selected) {
+                } else if (callback == null and callee.tag != .closure and self.retain_selected) {
                     self.startup_coverage_complete = false;
                 }
+                if (self.building_principal and callback == null and !self.sourceCallable(scope, n.a)) return error.UnresolvedType;
             }
             if (n.tag == .record_merge) try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = try self.importType(scope, n.ty, 0), .kind = .record_merge });
             if (self.source_interface and n.tag == .type_same) try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(n.a), 0), .right = try self.importType(scope, module.typeOf(n.b), 0), .result = types.boolean, .kind = .type_compare });
@@ -7013,6 +7205,29 @@ const ClosureRegion = struct {
     }
     fn attemptConstraint(self: *ClosureRegion, index: usize, fallback: bool) RegionError!SummaryProgress {
         const constraint = self.scratch.constraints.items[index];
+        if (constraint.kind == .callback_use) {
+            // Check the interface relationship, not the callback's executable
+            // identity. Its latent row is the exact row of this arrow and
+            // remains shared with the source's enclosing row equations.
+            if (constraint.callback_stage >= self.session.options.max_type_depth) return error.TypeLimit;
+            var signature = constraint.signature;
+            for (0..constraint.callback_stage) |_| {
+                const stage = self.solver.node(try self.solver.resolve(signature, 0));
+                if (stage.tag != .function) return error.TypeMismatch;
+                signature = stage.b;
+            }
+            try self.solver.unify(signature, constraint.left);
+            const arrow = self.solver.node(try self.solver.resolve(constraint.left, 0));
+            if (arrow.tag != .function) return error.TypeMismatch;
+            try self.solver.unify(arrow.a, constraint.right);
+            try self.solver.unify(arrow.b, constraint.result);
+            if (self.building_principal) {
+                self.scratch.constraints.items[index].callback_interface = true;
+                return .open;
+            }
+            self.scratch.constraints.items[index].solved = true;
+            return .solved;
+        }
         // A destination-only principal job may infer inputs from a fixed
         // result-selected declaration, but cannot choose between associated
         // operand candidates on behalf of an unknown caller input or row.
@@ -8904,4 +9119,32 @@ test "source head theorems require immutable fixed heads and retain mismatches c
     try sourceHeadScenario(allocator, &module);
     try @import("allocation_failures.zig").checkAllAllocationFailures(allocator, sourceHeadScenario, .{&module});
     try std.testing.expectEqualDeep(frozen, module.types.nodes);
+}
+
+fn callbackShapeDagScenario(allocator: Allocator) !void {
+    var session = try Session.init(allocator, &.{});
+    defer session.deinit();
+    var shape = try session.evidence.intern(.function, types.u32_type, types.u32_type, &.{});
+    for (0..24) |_| shape = try session.evidence.intern(.function, shape, shape, &.{});
+    var region = try ClosureRegion.initWithSolverAllocator(&session, allocator);
+    defer region.deinit();
+    try std.testing.expect(try region.summaryValue(shape, 0));
+    session.options.max_type_depth = 8;
+    try std.testing.expect(!try region.summaryValue(shape, 0));
+    session.options.max_type_depth = 256;
+    session.options.max_children = 1;
+    try std.testing.expect(!try region.summaryValue(shape, 0));
+    session.options.max_children = 4096;
+    session.options.max_values = 1;
+    try std.testing.expect(!try region.summaryValue(shape, 0));
+    session.options.max_values = 4096;
+    try std.testing.expect(try region.summaryValue(shape, 0));
+    const array = try session.evidence.intern(.array, shape, 0, &.{});
+    try std.testing.expect(!try region.summaryValue(array, 0));
+    try std.testing.expect(!try region.firstOrderData(shape, 0));
+}
+
+test "callback shape admission bounds shared function DAGs and preserves the first order data boundary under allocation failure" {
+    try callbackShapeDagScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, callbackShapeDagScenario, .{});
 }
