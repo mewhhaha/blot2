@@ -84,6 +84,14 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   edits, fifteen-pair fresh and seven-pair retained/restart qualification show
   bounded storage overhead and roughly neutral overall CPU. See
   [the refinement qualification](zig-native/REFINEMENT_QUERIES.md).
+- Task 016 (specialization and principal query owners) is complete at `913a59f`.
+  Selected, principal, canonical and local source-template tables preserve their
+  distinct proofs; the portable Reader keeps its v2 wire projection and uses a
+  transactional ordered index. Full LLVM native tests, 623 guest/client tests,
+  626 six-policy comparisons and the zero-findings analyzer pass.
+  Fresh/retained/checkpoint measurements qualify near-neutral overall CPU and
+  bounded storage, with recorded small-control overhead. See
+  [the durable qualification](zig-native/SPECIALIZATION_PRINCIPAL_QUERIES.md).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -116,29 +124,28 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 016
+## Next steps for task 017
 
 Migrate
-[specialization and principal queries](tasks/016-migrate-specialization-and-principal-queries.md)
-under [the typed query contract](zig-native/QUERY_TABLE.md). Preserve separate
-selected/inferred/entry specialization modes and principal empty/nonempty
-claims, complete capture aliases/values/evidence, source/import admission and
-ordered positive/negative plain and call-proof facts. Canonical specialization
-is Session-local; retained specialization and principal records have
-Context-owned snapshots. Current evaluator memo facts remain behind atomic typed
-replay. Keep first-valid priority and exact graph equality after fingerprint
-filtering.
+[source and revision validation](tasks/017-unify-source-and-revision-validation.md)
+under [the typed query contract](zig-native/QUERY_TABLE.md). Source admission is
+a separate claim from semantic, executable or evaluated-value reuse. Preserve
+exact options/bytes/import outcomes, ordered catalog/namespace/producer
+identities, foreign binding/symbol/source bounds, pinned source bytes and
+same-owner Gate leases. Keep mutable candidate input acquisition/errors distinct
+from a successfully frozen input/validation record; prepare all ownership before
+the allocation-free candidate commit.
 
-Keep prior qualified pins immutable under `build/bench/cloud-principal-graphs/`.
-Task 015's final baseline is `candidate-refinement-query-v2/`; its compiler hash
-is `cc8257fafaebaaa6c421b167220cb635db3062b8da3dd6e00064335801888526` and
-identity hash
-`6fe193c0a27c3445398769693281c87eb93c805311828df957b86731b3dab368`. The earlier
-`candidate-refinement-query/` has the same binaries and preserves its initial
-test-input map. Task 015's tracked distributions/pins retain the release and
-retained-driver baseline; see its durable qualification for bounds. Task 002 and
-the private application gate in task 084 stay open on absent owner-local
-artifacts.
+The final task-016 baseline is `candidate-specialization-principal/`, source
+revision `913a59f308fc58b6b3aad0197903149f16c780c4`, binary
+`1e6bbc8e4c951c0b2b9388f3edcc51730158a281e80a99bb4f79ef81cea580da`, identity
+`cc2684845fd95500767e26465b0f47edc11e4f76792eb36336484d321080bd04`, and 413-file
+source/test map
+`f89c5cd1b6b1433d58d5107ec0a20c310276aa1734fa73e22d4d5687bd6b7066`. Keep all
+preceding qualified pins immutable. Task 015's baseline remains
+`candidate-refinement-query-v2/`, with its initial identical-binary pin
+preserved at `candidate-refinement-query/`. Task 002 and the private application
+gate in 084 remain open on absent owner-local artifacts. No push is authorized.
 
 ## Notes
 
@@ -150,7 +157,7 @@ artifacts.
   `ZIG_ANALYZER=/tmp/blot-qualified-analyzer-756bfd5/zig-out/bin/zig-analyzer`.
   Those paths refer to the original machine. In the cloud checkout, use
   `ZIG_ANALYZER=/workspace/tooling/zig-analyzer/zig-out/bin/zig-analyzer`; its
-  source is at the CI pin and it reports zero findings across 298 Zig files.
+  source is at the CI pin and it reports zero findings across 300 Zig files.
 - The cloud Deno 2.9.6 standalone runtime is cached from the official GitHub
   release with its published SHA-256 verified. The initial full gate failed only
   on the blocked `dl.deno.land` download; after caching, the complete

@@ -1,8 +1,8 @@
 # Specialization and principal query migration
 
-Task 016 implements and qualifies the common tables described below. The local
-milestone revision will be filled in after committing the qualified sources. The
-common ownership/index primitives were qualified for refinement in
+Task 016 implements and qualifies the common tables described below at local
+revision `913a59f308fc58b6b3aad0197903149f16c780c4`. The common ownership/index
+primitives were qualified for refinement in
 [REFINEMENT_QUERIES.md](REFINEMENT_QUERIES.md).
 
 ## Claims and owners

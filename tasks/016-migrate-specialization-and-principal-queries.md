@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete — qualified at `913a59f`.
 - **Dependencies:** [015](015-migrate-refinement-queries.md)
 - **Originating requirements:** PLAN: Hill 12 / specialization and principal
   queries. Sources: [PLAN.md](../PLAN.md).
@@ -24,11 +24,11 @@ selected and principal answers under different checks.
 
 ## Implementation checklist
 
-- [ ] Translate keys and dependency records without merging caller-selected
+- [x] Translate keys and dependency records without merging caller-selected
       evidence with principal schemes.
-- [ ] Preserve complete capture graphs, scalar types, nominal-cache
+- [x] Preserve complete capture graphs, scalar types, nominal-cache
       absence/true/false observations and translated closed-call proofs.
-- [ ] Retain conservative treatment of live staged hints and static capture
+- [x] Retain conservative treatment of live staged hints and static capture
       jobs; remove old indexes only after all admission paths pass parity.
 
 ## Validation
@@ -48,20 +48,35 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Both selected and principal queries use the shared model while retaining
+- [x] Both selected and principal queries use the shared model while retaining
       their distinct proofs.
-- [ ] No stale answer survives a changed capture, identity or observed memo
+- [x] No stale answer survives a changed capture, identity or observed memo
       fact, and redundant indexes are gone.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `913a59f308fc58b6b3aad0197903149f16c780c4` (local compiler milestone).
+- Validation: Zig 0.17.0; full LLVM `deno task test:compiler` passes native laws
+  and 623 guest/client tests; `deno task lint:zig` reports zero findings across
+  300 files; package check and 248 focused production tests pass. Strict
+  626-case six-policy diagnostics/Wasm parity and
+  executed/retained/checkpoint/OOM laws pass, including additional
+  empty/nonempty principal probes.
+- Comparison: immutable task-015/016 binaries and 413 final source/test inputs
+  are pinned in the durable record. Fifteen-pair fresh measurements cover 86
+  workloads; seven-pair native/CLI retained/restart measurements cover 13. CPU
+  is near neutral overall; small principal records add bounded storage and some
+  small controls cost more. Full distributions, counters, table storage,
+  retained plateaus and zero teardown are recorded.
+- Remaining limitations: per-owner bounds do not claim an RSS/global allocation
+  reduction. Local open residual storage is law-qualified but has no positive
+  public retained-storage sample. Reader storage is omitted by the CLI; restart
+  hits and total allocations are measured. Query serialization/portable semantic
+  expansion remain tasks 019/020; historical boxed/private gdev gates remain
+  open under 002/084.
+- Durable record:
+  [specialization/principal query specification and
+  qualification](../zig-native/SPECIALIZATION_PRINCIPAL_QUERIES.md), including
+  tracked distribution CSVs, source/pin maps and the exact native probe.

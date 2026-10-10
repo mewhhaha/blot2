@@ -549,7 +549,7 @@
       },
       "build_command": "zig version; deno task test:compiler",
       "qualification": {
-        "state": "compiler, analyzer, strict six-policy parity and retained execution qualified; CPU/storage pending",
+        "state": "qualified specialization and principal adapters",
         "full_gate": "selected-query-full-gate-v3.log",
         "analyzer": "selected-query-analyzer-v5.log",
         "focused": "selected-query-focused-v18.log",
@@ -557,8 +557,13 @@
         "comparisons": "specialization-principal-comparisons/report.json",
         "retained": "specialization-principal-retained/report.json",
         "specific_retained": "specialization-principal-specific-retained/report.json",
-        "execution": "specialization-principal-comparisons/execution.json"
-      }
+        "execution": "specialization-principal-comparisons/execution.json",
+        "fresh": "specialization-principal-measurement/report.json",
+        "retained_memory": "specialization-principal-memory/report.json",
+        "proof_memory": "specialization-principal-proof-memory/report.json",
+        "proofs": "specialization-principal-proofs/report.json"
+      },
+      "source_revision": "913a59f308fc58b6b3aad0197903149f16c780c4"
     }
   },
   "drivers": {
@@ -1414,7 +1419,7 @@
     "measure-specialization-principal.py": "741a933efd73164201a46bcf2a7a411d41812fab256aec2a44f6bf871a72a7fe",
     "measure-specialization-principal-memory.py": "5ea7cb1cadd777b243f6ad901e7f05dd6c09a5a5490f2903c47cf89b1df051ab",
     "measure-specialization-principal-proof-memory.py": "62cf8a895cfb288f8e5ce81d911e925e339c4d01e2c72611a1cd6f5b21566aaf",
-    "export-specialization-principal.py": "23a2fd8daeedf43f205d699883b77390b44ca917a06fc4d9f732080af5808dfa"
+    "export-specialization-principal.py": "240a25413bd0b9b6e998a10091d4aea9a6d95471d777cd2f1472506129387671"
   },
   "reports": {
     "build/bench/cloud-principal-graphs/specialization-principal-measurement/report.json": "9a805e30281607684f582300c025075806083db0c29e551092926db90f13b480",
