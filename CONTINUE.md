@@ -106,6 +106,16 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   CPU is near neutral and allocation unchanged; retained tables add measured
   memory/allocation costs. Seventeen retained workloads plateau and tear down to
   zero. See [the qualification](zig-native/EXECUTABLE_QUERIES.md).
+- Task 019 (portable query serialization) is complete at `ea4a7f3`. Typed
+  versioned sections carry complete principal proofs and sealed optimizer
+  records; decoding validates every ordinal, evidence edge, body operand,
+  control frame and record/input correspondence before rebuilding native
+  indexes. Full LLVM native execution, 624 guest/client tests and zero analyzer
+  findings pass; six validator mutants are killed. Example checkpoints grow
+  9.6–19.6% and decode CPU rises 1.156× (below 0.25% of restart CPU). A first
+  design wrongly bounded builtin nominal units (`maxInt(u32)`) by the source
+  image; a public-example restart law now guards it. See
+  [the record](zig-native/PORTABLE_QUERIES.md).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -116,6 +126,9 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
 
 The owner confirmed the original benchmark artifacts were probably local and
 uncommitted. The cloud checkout lacks them and the frozen private gdev snapshot.
+The owner's machine (`~/src/blot2`) also has an empty `build/`. Its `../gdev`
+checkout does not match `scripts/bench/gdev-manifest.json` at any commit (at
+most 27 of 51 files), so task 002 stays blocked there as well.
 `build/bench/cloud-list/` contains a rebuilt pre-packed compiler, the unchanged
 production baseline, the rejected probe and raw results. The rebuilt boxed
 binary is a separate comparison, not the original pinned executable. Restore the
@@ -138,37 +151,28 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 019
+## Next steps for task 020
 
-The current session wraps after completing task 018. The owner authorized
-pushing the completed changes to `main`; later tasks remain pending. Continue
-with [portable query serialization](tasks/019-serialize-the-query-table.md)
-under [the typed query contract](zig-native/QUERY_TABLE.md).
+Continue with
+[complete semantic artifacts](tasks/020-persist-complete-semantic-artifacts.md)
+under [the typed query contract](zig-native/QUERY_TABLE.md) and
+[portable query records](zig-native/PORTABLE_QUERIES.md). Add each newly
+represented graph as its own typed section claim; keep declined kinds absent
+rather than partially encoded. Reconstruct owners, aliases, source and nominal
+identities on import (builtin identities use unit `maxInt(u32)`), and extend the
+public-example restart law and decode probe to every new kind.
 
-Version explicit query kinds, validity claims, portable keys and complete
-results. Rebuild native indexes from validated owned payloads; do not serialize
-native handles, pointers or allocator capacity. Preserve existing bounded,
-checksummed principal/optimizer envelopes, exact identity gates, OOM cleanup and
-fresh fallback on corrupt or incompatible checkpoints. Validate source/output
-call and resource ordinals before sealing decoded optimizer query records.
-Broader persisted semantic graphs remain task 020.
-
-The qualified task-018 candidate `candidate-executable-queries/` has source
-revision `a604cc1644d120430b0d853be9dcd9b8eab3e93f`, compiler hash
-`d6e06bd771805833dae1ea62657f188bc3c1fd3f05f39fe76a2186b85546e0a9`, identity
-`03de8c4a03bf1fa7de85fef284123ecb0b06a8254e10de2949f5a3a1f43291ef`, and a
-415-file compiler/guest input map
-`e480200caf99dd8c67096d2e29eceb64bafc54b49530f88a9e9e58c32baadea8`.
-
-The task-017 baseline is `candidate-source-validation/`, source revision
-`089efb0b9b29504513bc0808fb20992b09c53f89`, binary
-`5058f69f10640780061bb7a8cd093a9164dc789ff806ce1bc48b1ce0a9921356`, identity
-`23035481dc651f09728b2636b90d5eb1c8a78939b11896947cc396592f7c904c`, and 414-file
-source/test map
-`d2c208558cd097650d65e93710b73fa29cc2ded3496f98459588b1a7267159ae`. Preserve all
-qualified pins, including task 016's `candidate-specialization-principal/` and
-task 015's `candidate-refinement-query-v2/`. Task 002 and the private
-application gate in 084 remain open on absent owner-local artifacts.
+The task-019 candidate is pinned in
+[the qualification pins](zig-native/qualification/portable-queries-pins.json):
+compiler `69e8692e88c0e49fa63e25fe3d42100dcec085ee048bb900acb2d2c2ac36f0d5`,
+419-file input map
+`368c0ad70739d783feaaeea84ff331e3cf70985bccb8fb957a0c12bc68e8c9ce`, binaries in
+ignored `build/bench/serialize-queries/`. Its baseline was rebuilt locally from
+`e018d8d` (`8a758ae2…`); the cloud pins for tasks 015–018
+(`candidate-executable-queries/`, `candidate-source-validation/`,
+`candidate-specialization-principal/`, `candidate-refinement-query-v2/`) are not
+on this machine. Task 002 and the private application gate in 084 remain open on
+absent owner-local artifacts.
 
 ## Notes
 
@@ -180,7 +184,11 @@ application gate in 084 remain open on absent owner-local artifacts.
   `ZIG_ANALYZER=/tmp/blot-qualified-analyzer-756bfd5/zig-out/bin/zig-analyzer`.
   Those paths refer to the original machine. In the cloud checkout, use
   `ZIG_ANALYZER=/workspace/tooling/zig-analyzer/zig-out/bin/zig-analyzer`; its
-  source is at the CI pin and it reports zero findings across 302 Zig files.
+  source is at the CI pin and it reports zero findings across 302 Zig files. On
+  the owner's machine `../zig-analyzer` is absent: clone
+  `https://github.com/mewhhaha/zig-analyzer` at `756bfd5`, run
+  `zig build -Doptimize=fast && zig build backend`, and point `ZIG_ANALYZER` at
+  it. It reports zero findings across 303 Zig files at `ea4a7f3`.
 - The cloud Deno 2.9.6 standalone runtime is cached from the official GitHub
   release with its published SHA-256 verified. The initial full gate failed only
   on the blocked `dl.deno.land` download; after caching, the complete

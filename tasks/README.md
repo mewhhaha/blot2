@@ -189,6 +189,18 @@ query storage adds measured overhead. The
 pins, distributions, positive reuse, zero teardown and remaining scope. Task
 [019] remains pending for the next session.
 
+Task [019] completes portable query serialization at `ea4a7f3`. Typed, versioned
+sections carry complete principal proofs and sealed optimizer records. Decoding
+validates every ordinal, evidence edge, body operand, control frame and
+record/input correspondence before rebuilding native indexes; declined kinds
+recompute after restart. The full LLVM native suite, 624 guest/client tests and
+zero-findings analyzer pass, and six validator mutants are killed. 3,348
+alternating CLI builds preserve Wasm and reuse across fresh, population and
+restart. Example checkpoints grow 9.6–19.6% and in-process decode CPU rises
+1.156×, below 0.25% of restart CPU. Task [020] is ready. The
+[portable query record](../zig-native/PORTABLE_QUERIES.md) lists represented and
+declined kinds, measurements and remaining limits.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -424,8 +436,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [016] — Migrate specialization and principal queries    | Complete    | [015]                                  |
 | [017] — Unify source and revision validation            | Complete    | [016]                                  |
 | [018] — Migrate executable reuse queries                | Complete    | [017]                                  |
-| [019] — Serialize the query table                       | Pending     | [018]                                  |
-| [020] — Persist complete semantic artifacts             | Pending     | [019]                                  |
+| [019] — Serialize the query table                       | Complete    | [018]                                  |
+| [020] — Persist complete semantic artifacts             | Ready       | [019]                                  |
 | [021] — Publish transactional revision deltas           | Pending     | [017], [020]                           |
 | [022] — Retain constants and relocatable data           | Pending     | [020], [021]                           |
 | [023] — Narrow literal edit invalidation                | Pending     | [022]                                  |

@@ -5,7 +5,8 @@ graph: completed principal proofs and ready optimizer outputs. Both travel
 inside [backend checkpoints](src/backend_checkpoint.zig) through the bounded
 [dependency format](src/dependency_format.zig). This record follows
 [the typed query contract](QUERY_TABLE.md#portable-representation-and-compatibility).
-Qualification is recorded below.
+The compiler milestone is `ea4a7f3ef23ebf8506fe85eefa24f51ee65c3024`;
+qualification is recorded below.
 
 ## Typed sections
 

@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [019](019-serialize-the-query-table.md)
 - **Originating requirements:** PLAN: Earlier programs / portable complete
   semantic artifacts. Sources: [PLAN.md](../PLAN.md).
