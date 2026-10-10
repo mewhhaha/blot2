@@ -86,7 +86,13 @@ fn entryInferenceScenario(allocator: std.mem.Allocator, module: *const core.Modu
         const before = session.steps;
         const selected = (try session.inferEntryClosure(raw)) orelse return error.TestUnexpectedResult;
         try std.testing.expectEqual(before, session.steps);
-        try std.testing.expectEqual(selected, try session.inferClosure(raw));
+        // An entry interface is not the complete demand-body inquiry. Each
+        // mode caches its own result while retaining the same semantic arrow
+        // and actual capture aliases.
+        const complete = try session.inferClosure(raw);
+        try std.testing.expectEqual(session.valueEvidence(selected), session.valueEvidence(complete));
+        try std.testing.expectEqualSlices(evaluator.ValueId, session.valueChildren(selected), session.valueChildren(complete));
+        try std.testing.expectEqual(complete, try session.inferClosure(raw));
         try std.testing.expectEqual(selected, (try session.inferEntryClosure(raw)).?);
         const arrow = session.evidenceView().node(session.valueEvidence(selected));
         try std.testing.expectEqual(type_evidence.Tag.function, arrow.tag);

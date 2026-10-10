@@ -3,8 +3,10 @@
 This is the implementation specification for extending the current first-order
 summary queue. Predicate-bearing first-order functions and higher-order callback
 interfaces now have owned principal graphs and independent jobs under complete
-evidence. Lexical closures, recursive components and canonical specialization
-keys remain implementation work. This document does not change language syntax
+evidence. Live lexical closures now have owned capture inputs and independent
+jobs under complete evidence; their qualification is recorded below. Recursive
+components and portable canonical specialization keys remain implementation
+work. This document does not change language syntax
 or admit programs rejected by the language's existing inference rules.
 
 The existing boundary is in `core_eval.zig`: `CallSummaries`,
@@ -1080,3 +1082,76 @@ same ignored qualification directory. The durable conclusions above preserve the
 qualification when those local artifacts are unavailable. Task 005 is complete;
 lexical inputs, recursive components and portable canonical keys remain tasks
 006–008.
+
+## Owned lexical inputs (10 October 2026)
+
+`lexical_capture_inputs.zig` owns the environment of an admitted live closure.
+An anonymous closure records its ordered Core capture bindings; a partially
+applied named body records its applied parameter prefix and the remaining
+parameters. Both record the immutable source unit/body identity, origin, source
+type, stored root interface, type/row mappings and every evaluator option.
+Binding/body identities belong to this immutable session source, so they name a
+binding version within that owner. They are not portable revision keys.
+
+Each ordered slot contains its binding, complete interface and alias ordinal.
+The key walks the actual captured value graph in deterministic preorder,
+preserving shared nodes across slots. It records exact scalar bits, data and
+nominal kinds, record names, child order, nested closure/suspension bodies and
+maps, provider creation identities and immutable operation descriptors, and
+pending demand creation/memo identities. Equal types with different values,
+bodies, providers, demands or alias graphs therefore cannot collide. Unit's
+zero value ID is valid. A cached/evaluating demand, cyclic value graph, unsupported
+value kind or incomplete interface declines optional admission. Complete checked
+owner projections may describe child interfaces; raw stored interfaces remain
+the fallback. Conflicting owner projections decline.
+
+Keys contain exact owned words, slots and mappings. The hash map compares the
+entire byte sequence; hashes do not serve as equality proofs. No solver variable
+or mutable source borrow survives in a key. Depth, node and edge limits bound
+each graph walk. Per-session entry, retained-word, examined-word and interface
+visit limits also bound aggregate work, including unsuccessful admissions.
+Construction finishes every ownership allocation before publishing an entry.
+
+`CallSummaries.Key.lexical` selects those owned inputs. Its private region
+freshens the source arrow, seeds the stored mappings, unifies every capture
+binding with its keyed complete interface and checks the remaining body against
+the ordinary source obligations. Publication exports only a complete arrow to
+session-owned evidence. The requesting region imports it through ordinary
+signature admission and falls back to original body collection on a mismatch.
+The actual value owner still checks captured executable children; a callback
+interface or completed parent job never authorizes an unchecked implementation.
+
+Lexical jobs publish no capture-free global theorem, principal graph or global
+call receipt. Incomplete captures, open principal graphs, source-only checks,
+complete demand-body checks and active receipt/refinement observers retain
+ordinary collection. No evaluation is performed solely to complete a summary
+key. The feature can be disabled with `reuse_lexical_summaries` for reference
+qualification. Unknown and staged inputs remain general ordinary work, rather
+than becoming permanently ineligible source bodies.
+
+Two related ownership fixes accompany this boundary. Complete monomorphic
+value views reuse one scope within their scratch owner, preserving aliases;
+open generic interfaces still freshen per use. Entry-interface and full-body
+inference have distinct view keys, so an entry-interface result cannot certify
+full demand checking. Each mode retains its own result cache and both retain
+the same complete arrow and actual capture aliases.
+
+An allocation failure abandons all queued/running summary regions, rebuilds the
+key map from finished jobs without allocation, and clears active stacks. The
+outer solve boundary also handles failures after queuing a dependency but before
+draining it. Independently finished proofs survive; a partially started job is
+never resumed as a complete proof. Same-session allocation-failure retry laws
+exercise every query allocation and require fresh-equivalent recovery.
+
+Twelve focused native laws cover named/anonymous scalar captures, distinct
+values with equal interfaces, shared versus separate aggregates, nested
+callbacks, pending demands, provider identities, budget refusal, all-allocation
+failures and same-session retries. The entry-interface law checks separate mode
+results and stable capture aliases. Executed guest coverage changes captures and
+alias graphs through retained edits, rebinding snapshots, dependency bundles and
+checkpoint restoration; invalid capture/row/body edits recover to fresh output.
+
+The full Zig 0.17.0 gate passes the native suite and 610 guest/client tests;
+the analyzer reports zero findings across 292 Zig files. Fresh differential,
+executed guest and retained/restart qualification is in progress. Task 006
+completion and a general captured-workload speedup are not yet claimed.

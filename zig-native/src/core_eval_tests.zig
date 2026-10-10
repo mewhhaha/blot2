@@ -4734,3 +4734,328 @@ test "obligation-free higher-order schemes preserve captures independent instanc
     try parametricCallbackScenario(a, &module);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, parametricCallbackScenario, .{&module});
 }
+
+const lexical_inputs = @import("lexical_capture_inputs.zig");
+
+fn lexicalScalarScenario(allocator: std.mem.Allocator, module: *const core.Module, anonymous: bool) !void {
+    var summarized = try evaluator.Session.init(allocator, &.{module.*});
+    defer summarized.deinit();
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.options.reuse_lexical_summaries = false;
+    var keys: lexical_inputs.Cache = .{};
+    defer keys.deinit(allocator);
+    const selected: lexical_inputs.Interfaces = .empty;
+    var identifiers: [3]u32 = undefined;
+    for ([_][]const u8{ "first", "again", "other" }, 0..) |name, index| {
+        const value = try summarized.richValue(target(module, name));
+        const reference = try ordinary.richValue(target(module, name));
+        const before = summarized.steps;
+        const ready = try summarized.inferEntryClosure(value) orelse return error.ExpectedConcreteLexicalInterface;
+        const expected = try ordinary.inferClosure(reference);
+        try std.testing.expectEqual(before, summarized.steps);
+        const scopes = summarized.counters.region_scopes;
+        const complete = try summarized.inferClosure(value);
+        try std.testing.expect(summarized.counters.region_scopes > scopes);
+        try std.testing.expectEqual(summarized.valueEvidence(ready), summarized.valueEvidence(complete));
+        try std.testing.expectEqual(before, summarized.steps);
+        const actual_arrow = summarized.evidence.node(summarized.valueEvidence(ready));
+        const expected_arrow = ordinary.evidence.node(ordinary.valueEvidence(expected));
+        try std.testing.expectEqual(type_evidence.Tag.function, actual_arrow.tag);
+        try std.testing.expectEqual(types.u32_type, actual_arrow.a);
+        try std.testing.expectEqual(types.u32_type, actual_arrow.b);
+        try std.testing.expectEqual(expected_arrow.c, actual_arrow.c);
+        identifiers[index] = try keys.intern(allocator, &summarized, ready, &selected) orelse return error.ExpectedCompleteCaptureInputs;
+        try std.testing.expectEqual(anonymous, keys.inputs.items[identifiers[index] - 1].anonymous);
+        try std.testing.expectEqual(@as(usize, 1), keys.inputs.items[identifiers[index] - 1].slots.len);
+        try std.testing.expectEqual(@as(u32, if (index == 2) 2 else 1), summarized.valueInfo(summarized.valueChildren(ready)[0]).bits);
+    }
+    try std.testing.expectEqual(identifiers[0], identifiers[1]);
+    try std.testing.expect(identifiers[0] != identifiers[2]);
+    try std.testing.expect(keys.reused != 0);
+    try std.testing.expect(summarized.lexical_inputs.requests != 0);
+    try std.testing.expect(summarized.lexical_inputs.reused != 0);
+    var complete_jobs: usize = 0;
+    for (summarized.call_summaries.jobs.items) |job| if (job.key.lexical != 0 and job.state == .complete) {
+        complete_jobs += 1;
+    };
+    try std.testing.expect(complete_jobs != 0);
+    try std.testing.expectEqual(@as(usize, 0), ordinary.lexical_inputs.requests);
+    const values_before = summarized.values.items.len;
+    const key_count = keys.inputs.items.len;
+    const original_limit = summarized.options.max_type_depth;
+    summarized.options.max_type_depth = 0;
+    const first = try summarized.richValue(target(module, "first"));
+    try std.testing.expectEqual(@as(?u32, null), try keys.intern(allocator, &summarized, first, &selected));
+    summarized.options.max_type_depth = original_limit;
+    try std.testing.expectEqual(key_count, keys.inputs.items.len);
+    try std.testing.expectEqual(values_before, summarized.values.items.len);
+    var bounded: lexical_inputs.Cache = .{};
+    defer bounded.deinit(allocator);
+    const original_edges = summarized.options.max_children;
+    const ready = try summarized.inferClosure(first);
+    summarized.options.max_children = keys.inputs.items[identifiers[0] - 1].words.len;
+    _ = try bounded.intern(allocator, &summarized, ready, &selected) orelse return error.ExpectedCompleteCaptureInputs;
+    try std.testing.expectEqual(@as(?u32, null), try bounded.intern(allocator, &summarized, ready, &selected));
+    try std.testing.expect(bounded.retained_words <= summarized.options.max_children);
+    try std.testing.expect(bounded.examined_words <= summarized.options.max_children);
+    try std.testing.expectEqual(@as(usize, 1), bounded.inputs.items.len);
+    summarized.options.max_children = original_edges;
+    try std.testing.expectEqual(@as(u32, 83), (try summarized.value(target(module, "answer"))).bits);
+    try std.testing.expectEqual(@as(u32, 83), (try ordinary.value(target(module, "answer"))).bits);
+}
+
+test "lexical summaries own all scalar captures and keep different values separate through allocation failure" {
+    var module = try lower(
+        \\const make: U32 -> (U32 -> U32 ! {}) = fn captured => fn value => @u32.add captured value
+        \\entry const first = make 1
+        \\entry const again = make 1
+        \\entry const other = make 2
+        \\entry const answer = @u32.add (first 40) (other 40)
+    );
+    defer module.deinit(a);
+    const nodes = try a.dupe(core.Node, module.nodes);
+    defer a.free(nodes);
+    const bindings = try a.dupe(core.Binding, module.bindings);
+    defer a.free(bindings);
+    const type_nodes = try a.dupe(types.Node, module.types.nodes);
+    defer a.free(type_nodes);
+    try lexicalScalarScenario(a, &module, false);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lexicalScalarScenario, .{ &module, false });
+    try std.testing.expectEqualDeep(nodes, module.nodes);
+    try std.testing.expectEqualDeep(bindings, module.bindings);
+    try std.testing.expectEqualDeep(type_nodes, module.types.nodes);
+}
+
+test "anonymous lexical jobs preserve complete inference mode and repeated capture interfaces" {
+    var module = try lower(
+        \\const make = fn (captured: U32) => do:
+        \\  return fn (value: U32) => @u32.add captured value
+        \\entry const first = make 1
+        \\entry const again = make 1
+        \\entry const other = make 2
+        \\entry const answer = @u32.add (first 40) (other 40)
+    );
+    defer module.deinit(a);
+    try lexicalScalarScenario(a, &module, true);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lexicalScalarScenario, .{ &module, true });
+}
+
+fn lexicalAliasScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    var keys: lexical_inputs.Cache = .{};
+    defer keys.deinit(allocator);
+    const selected: lexical_inputs.Interfaces = .empty;
+    var identifiers: [2]u32 = undefined;
+    for ([_][]const u8{ "shared", "separate" }, 0..) |name, index| {
+        const value = try session.richValue(target(module, name));
+        const steps = session.steps;
+        const ready = try session.inferClosure(value);
+        try std.testing.expectEqual(steps, session.steps);
+        const children = session.valueChildren(ready);
+        try std.testing.expectEqual(@as(usize, 2), children.len);
+        try std.testing.expectEqual(index == 0, children[0] == children[1]);
+        identifiers[index] = try keys.intern(allocator, &session, ready, &selected) orelse return error.ExpectedCompleteCaptureInputs;
+        const slots = keys.inputs.items[identifiers[index] - 1].slots;
+        try std.testing.expectEqual(@as(usize, 2), slots.len);
+        try std.testing.expectEqual(index == 0, slots[0].alias == slots[1].alias);
+        try std.testing.expectEqual(slots[0].interface, slots[1].interface);
+    }
+    try std.testing.expect(identifiers[0] != identifiers[1]);
+    try std.testing.expectEqual(@as(u32, 80), (try session.value(target(module, "answer"))).bits);
+}
+
+test "lexical summary inputs preserve shared aggregate slots instead of merging equal separate captures" {
+    var module = try lower(
+        \\type Box is data = #Box { value: U32 }
+        \\const make = fn left => fn right => fn () => @u32.add left.value right.value
+        \\const box = #Box { value: 20 }
+        \\entry const shared = make box box
+        \\entry const separate = make (#Box { value: 20 }) (#Box { value: 20 })
+        \\entry const answer = @u32.add (shared ()) (separate ())
+    );
+    defer module.deinit(a);
+    try lexicalAliasScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lexicalAliasScenario, .{&module});
+}
+
+fn lexicalDemandScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    var keys: lexical_inputs.Cache = .{};
+    defer keys.deinit(allocator);
+    const selected: lexical_inputs.Interfaces = .empty;
+    var identifiers: [2]u32 = undefined;
+    var captures: [2]evaluator.ValueId = undefined;
+    for ([_][]const u8{ "first", "other" }, 0..) |name, index| {
+        const value = try session.richValue(target(module, name));
+        const steps = session.steps;
+        const ready = try session.inferClosure(value);
+        try std.testing.expectEqual(steps, session.steps);
+        captures[index] = session.valueChildren(ready)[0];
+        try std.testing.expectEqual(evaluator.ValueKind.suspension, session.valueInfo(captures[index]).kind);
+        try std.testing.expect(session.suspensionCached(captures[index]) == null);
+        identifiers[index] = try keys.intern(allocator, &session, ready, &selected) orelse return error.ExpectedCompleteCaptureInputs;
+    }
+    try std.testing.expect(identifiers[0] != identifiers[1]);
+    try std.testing.expect(captures[0] != captures[1]);
+    try std.testing.expectEqual(@as(u32, 42), (try session.value(target(module, "answer"))).bits);
+    try std.testing.expect(session.suspensionCached(captures[0]) != null);
+    const value = try session.inferClosure(try session.richValue(target(module, "first")));
+    try std.testing.expectEqual(@as(?u32, null), try keys.intern(allocator, &session, value, &selected));
+    try std.testing.expectEqual(@as(usize, 2), keys.inputs.items.len);
+}
+
+test "lexical keys distinguish pending demand creation and decline changed cached memo state" {
+    var module = try lower(
+        \\const make = fn ~(value: U32) => fn () => @force value
+        \\entry const first = make (@u32.add 40 2)
+        \\entry const other = make (@u32.add 40 2)
+        \\entry const answer = first ()
+    );
+    defer module.deinit(a);
+    try lexicalDemandScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lexicalDemandScenario, .{&module});
+}
+
+fn lexicalProviderScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    var keys: lexical_inputs.Cache = .{};
+    defer keys.deinit(allocator);
+    var selected: lexical_inputs.Interfaces = .empty;
+    defer selected.deinit(allocator);
+    var identifiers: [2]u32 = undefined;
+    for ([_][]const u8{ "first", "other" }, 0..) |name, index| {
+        const value = try session.richValue(target(module, name));
+        const provider = session.valueChildren(value)[0];
+        const implementation = session.valueChildren(provider)[0];
+        const steps = session.steps;
+        const ready = try session.inferClosure(implementation);
+        try std.testing.expectEqual(steps, session.steps);
+        try std.testing.expectEqual(evaluator.ValueKind.provider, session.valueInfo(provider).kind);
+        const implemented = session.valueEvidence(ready);
+        const signature = session.evidence.node(implemented);
+        const operation = session.evidence.node(@intCast(session.valueInfo(provider).nominal));
+        try std.testing.expectEqual(operation.a, signature.a);
+        try std.testing.expectEqual(operation.b, signature.b);
+        // This input-builder law supplies a complete checked producer
+        // interface. Untyped runtime providers keep ordinary checking.
+        var token: type_evidence.Id = 0;
+        for (module.nodes) |node| if (node.tag == .effect_provider) {
+            token = try session.evidence.project(&module.types, module.types.node(node.ty).a, &.{});
+            break;
+        };
+        try std.testing.expect(token != 0);
+        const provider_type = try session.evidence.internWithEffects(.provider, token, 0, signature.c, &.{});
+        try selected.put(allocator, provider, provider_type);
+        try selected.put(allocator, implementation, implemented);
+        identifiers[index] = try keys.intern(allocator, &session, value, &selected) orelse return error.ExpectedCompleteCaptureInputs;
+    }
+    // Even equal-shaped installations have separate creation identities. A
+    // result for one provider cannot certify another installation's capture.
+    try std.testing.expect(identifiers[0] != identifiers[1]);
+    try std.testing.expectEqual(@as(u32, 84), (try session.value(target(module, "answer"))).bits);
+}
+
+test "lexical summary inputs retain provider creation identity and complete implementation rows" {
+    var module = try lower(
+        \\effect Tick: Unit -> U32
+        \\const implementation: Unit -> U32 ! {} = fn () => 42
+        \\const make = fn (ignored: U32) => do:
+        \\  let provider = @effect.provider Tick implementation
+        \\  return fn () => do provider:
+        \\    use result <- Tick ()
+        \\    return result
+        \\entry const first = make 1
+        \\entry const other = make 2
+        \\entry const answer = @u32.add (first ()) (other ())
+    );
+    defer module.deinit(a);
+    try lexicalProviderScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lexicalProviderScenario, .{&module});
+}
+
+fn lexicalNestedScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    var keys: lexical_inputs.Cache = .{};
+    defer keys.deinit(allocator);
+    const selected: lexical_inputs.Interfaces = .empty;
+    var identifiers: [2]u32 = undefined;
+    for ([_][]const u8{ "first", "other" }, 0..) |name, index| {
+        const value = try session.richValue(target(module, name));
+        const steps = session.steps;
+        const ready = try session.inferClosure(value);
+        try std.testing.expectEqual(steps, session.steps);
+        const callback = session.valueChildren(ready)[0];
+        try std.testing.expectEqual(evaluator.ValueKind.closure, session.valueInfo(callback).kind);
+        try std.testing.expect(session.valueEvidence(callback) != 0);
+        try std.testing.expectEqual(@as(usize, 1), session.valueChildren(callback).len);
+        identifiers[index] = try keys.intern(allocator, &session, ready, &selected) orelse return error.ExpectedCompleteCaptureInputs;
+    }
+    try std.testing.expect(identifiers[0] != identifiers[1]);
+    try std.testing.expectEqual(@as(u32, 83), (try session.value(target(module, "answer"))).bits);
+}
+
+test "lexical summary inputs include nested callback captures without executing the callback" {
+    var module = try lower(
+        \\const plus: U32 -> (U32 -> U32 ! {}) = fn amount => fn value => @u32.add amount value
+        \\const make: (U32 -> U32 ! {}) -> (U32 -> U32 ! {}) = fn callback => fn value => callback value
+        \\entry const first = make (plus 1)
+        \\entry const other = make (plus 2)
+        \\entry const answer = @u32.add (first 40) (other 40)
+    );
+    defer module.deinit(a);
+    try lexicalNestedScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, lexicalNestedScenario, .{&module});
+}
+
+fn lexicalRetryScenario(module: *const core.Module, offset: ?usize) !usize {
+    var failing = std.testing.FailingAllocator.init(a, .{});
+    var allocations: usize = 0;
+    {
+        var session = try evaluator.Session.init(failing.allocator(), &.{module.*});
+        defer session.deinit();
+        const value = try session.richValue(target(module, "first"));
+        const steps = session.steps;
+        const start = failing.alloc_index;
+        if (offset) |index| failing.fail_index = start + index;
+        const ready = session.inferEntryClosure(value) catch |err| retry: {
+            try std.testing.expectEqual(error.OutOfMemory, err);
+            try std.testing.expect(failing.has_induced_failure);
+            try std.testing.expectEqual(@as(usize, 0), session.call_summaries.stack.items.len);
+            try std.testing.expectEqual(@as(u32, 0), session.call_summaries.active.count());
+            try std.testing.expectEqual(@as(u32, 0), session.call_summaries.active_lexical.count());
+            for (session.call_summaries.jobs.items) |job| {
+                try std.testing.expect(job.state == .complete or job.state == .declined);
+                try std.testing.expect(job.region == null);
+            }
+            failing.fail_index = std.math.maxInt(usize);
+            break :retry try session.inferEntryClosure(value);
+        };
+        allocations = failing.alloc_index - start;
+        const selected = ready orelse return error.ExpectedConcreteLexicalInterface;
+        const arrow = session.evidence.node(session.valueEvidence(selected));
+        try std.testing.expectEqual(type_evidence.Tag.function, arrow.tag);
+        try std.testing.expectEqual(types.u32_type, arrow.a);
+        try std.testing.expectEqual(types.u32_type, arrow.b);
+        try std.testing.expectEqual(@as(u32, 0), arrow.c);
+        try std.testing.expectEqual(steps, session.steps);
+        try std.testing.expectEqual(@as(u32, 42), (try session.value(target(module, "answer"))).bits);
+    }
+    try std.testing.expectEqual(failing.allocated_bytes, failing.freed_bytes);
+    return allocations;
+}
+
+test "lexical summary allocation failures abandon partial jobs and retry in the same session" {
+    var module = try lower(
+        \\const make: U32 -> (U32 -> U32 ! {}) = fn captured => fn value => @u32.add captured value
+        \\entry const first = make 1
+        \\entry const answer = first 41
+    );
+    defer module.deinit(a);
+    const allocations = try lexicalRetryScenario(&module, null);
+    for (0..allocations) |offset| _ = try lexicalRetryScenario(&module, offset);
+}

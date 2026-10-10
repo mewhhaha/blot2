@@ -13,6 +13,7 @@ const code_expectation = @import("code_expectation.zig");
 const provider_chain = @import("provider_chain.zig");
 const body_recipe = @import("body_recipe.zig");
 const principal_type_graph = @import("principal_type_graph.zig");
+const lexical_capture_inputs = @import("lexical_capture_inputs.zig");
 const runtime_identity = @import("runtime_identity.zig");
 const Allocator = std.mem.Allocator;
 const collection_growth = @import("eval_collection_growth.zig");
@@ -104,6 +105,7 @@ pub const Error = Allocator.Error || error{ Declined, RequestUnwind };
 pub const Options = struct {
     reuse_body_recipes: bool = true,
     reuse_validated_calls: bool = true,
+    reuse_lexical_summaries: bool = true,
     max_steps: usize = 1_000_000,
     /// Executed compile-time expressions and patterns only.
     max_depth: usize = 256,
@@ -155,7 +157,7 @@ const RequestHandler = struct { callback: ValueId, cell: u32, outer: provider_ch
 const Bound = struct { binding: core.BindingId, value: ValueId, previous: ?ValueId = null };
 const FieldKey = struct { family: u64, tag: u32, name: u32 };
 const FieldLocation = struct { field: u32, len: u32 };
-const ViewKey = struct { value: ValueId, evidence: type_evidence.Id };
+const ViewKey = struct { value: ValueId, evidence: type_evidence.Id, entry_interface: bool = false };
 // Offsets remain stable when field_names grows. The context is supplied for
 // every lookup, so no hash-table key borrows a reallocatable slice pointer.
 const RecordNames = struct {
@@ -271,7 +273,7 @@ const PrincipalGraph = struct {
 };
 
 const CallSummaries = struct {
-    const Key = struct { target: Target, inputs: type_evidence.Id, source_interface: bool, expected_result: type_evidence.Id = 0, expected_signature: type_evidence.Id = 0, deferred_member: bool = false };
+    const Key = struct { target: Target, inputs: type_evidence.Id, source_interface: bool, lexical: u32 = 0, expected_result: type_evidence.Id = 0, expected_signature: type_evidence.Id = 0, deferred_member: bool = false };
     const JobState = enum { queued, running, complete, declined };
     const Job = struct { key: Key, state: JobState = .queued, region: ?*ClosureRegion = null, result: type_evidence.Id = 0 };
     const HeaderParts = struct { mask: []bool, has_private: bool = false };
@@ -279,6 +281,7 @@ const CallSummaries = struct {
     jobs: std.ArrayList(Job) = .empty,
     stack: std.ArrayList(usize) = .empty,
     active: std.AutoHashMapUnmanaged(Target, void) = .empty,
+    active_lexical: std.AutoHashMapUnmanaged(u32, void) = .empty,
     eligibility: std.AutoHashMapUnmanaged(Target, bool) = .empty,
     checked_requirements: std.AutoHashMapUnmanaged(Target, bool) = .empty,
     // Exact source slots consumed by the mandatory header graph. These are
@@ -301,6 +304,7 @@ const CallSummaries = struct {
         self.jobs.deinit(session.allocator);
         self.stack.deinit(session.allocator);
         self.active.deinit(session.allocator);
+        self.active_lexical.deinit(session.allocator);
         self.eligibility.deinit(session.allocator);
         self.checked_requirements.deinit(session.allocator);
         var public_requirements = self.public_requirements.valueIterator();
@@ -323,7 +327,7 @@ const CallSummaries = struct {
         self.open_principals.deinit(session.allocator);
     }
     fn request(self: *CallSummaries, session: *Session, key: Key) ClosureRegion.RegionError!?Job {
-        if (self.active.contains(key.target)) return null;
+        if (if (key.lexical != 0) self.active_lexical.contains(key.lexical) else self.active.contains(key.target)) return null;
         if (self.keys.get(key)) |index| {
             const job = self.jobs.items[index];
             if (job.state == .queued) {
@@ -347,7 +351,11 @@ const CallSummaries = struct {
     }
     fn finish(self: *CallSummaries, session: *Session, index: usize, result: type_evidence.Id) void {
         const job = &self.jobs.items[index];
-        _ = self.active.remove(job.key.target);
+        if (job.key.lexical != 0) {
+            _ = self.active_lexical.remove(job.key.lexical);
+        } else {
+            _ = self.active.remove(job.key.target);
+        }
         if (job.region) |region| {
             region.deinit();
             session.allocator.destroy(region);
@@ -368,10 +376,34 @@ const CallSummaries = struct {
         session.diagnostic = null;
         self.finish(session, index, 0);
     }
+    fn abandonPending(self: *CallSummaries, session: *Session) void {
+        // A failed allocation is neither a semantic decline nor a partially
+        // initialized job that another inquiry may resume. Rebuild indices
+        // without allocating, retaining only finished independent judgments.
+        self.keys.clearRetainingCapacity();
+        var retained: usize = 0;
+        for (self.jobs.items) |job| {
+            if (job.state == .queued or job.state == .running) {
+                if (job.region) |region| {
+                    region.deinit();
+                    session.allocator.destroy(region);
+                }
+            } else {
+                self.jobs.items[retained] = job;
+                self.keys.putAssumeCapacity(job.key, retained);
+                retained += 1;
+            }
+        }
+        self.jobs.items.len = retained;
+        self.stack.clearRetainingCapacity();
+        self.active.clearRetainingCapacity();
+        self.active_lexical.clearRetainingCapacity();
+    }
     fn drain(self: *CallSummaries, session: *Session) ClosureRegion.RegionError!void {
         std.debug.assert(!self.draining);
         self.draining = true;
         defer self.draining = false;
+        errdefer self.abandonPending(session);
         while (self.stack.items.len != 0) {
             const index = self.stack.items[self.stack.items.len - 1];
             const job = self.jobs.items[index];
@@ -383,7 +415,7 @@ const CallSummaries = struct {
                 };
                 self.jobs.items[index].region = region;
                 self.jobs.items[index].state = .running;
-                try self.active.put(session.allocator, job.key.target, {});
+                if (job.key.lexical != 0) try self.active_lexical.put(session.allocator, job.key.lexical, {}) else try self.active.put(session.allocator, job.key.target, {});
                 region.beginSummary(job.key) catch |err| try self.decline(session, index, err);
                 continue;
             }
@@ -404,8 +436,8 @@ const CallSummaries = struct {
         if (!region.allConstraintsSolved()) return 0;
         try region.closeRetainedRows();
         const source = region.scratch.sources.items[0];
-        const body = region.session.units[source.owner].body(source.binding).?;
-        _ = try region.closeRetainedFunctionRows(source.root, body.parameters.len);
+        const parameters = if (region.lexical_summary_job != 0) region.session.lexical_inputs.inputs.items[region.lexical_summary_job - 1].parameters else region.session.units[source.owner].body(source.binding).?.parameters.len;
+        _ = try region.closeRetainedFunctionRows(source.root, parameters);
         const result = try region.project(source.root);
         if (result == 0 or !try region.summaryValue(result, 0)) return 0;
         if (!region.source_interface) try region.publishValidatedCalls();
@@ -416,6 +448,7 @@ const CallSummaries = struct {
 pub const Session = struct {
     timing: ?*@import("backend_timing.zig").Work = null,
     call_summaries: CallSummaries = .{},
+    lexical_inputs: lexical_capture_inputs.Cache = .{},
     split_attempts: usize = 0,
     split_accepted: usize = 0,
     split_declined: usize = 0,
@@ -549,6 +582,7 @@ pub const Session = struct {
     }
     pub fn deinit(self: *Session) void {
         self.call_summaries.deinit(self);
+        self.lexical_inputs.deinit(self.allocator);
         self.region_arena_pool.deinit();
         self.callable_definitions.deinit(self.allocator);
         self.callable_definition_units.deinit(self.allocator);
@@ -689,7 +723,7 @@ pub const Session = struct {
             .constructor, .primitive, .operation => core.Span{ .start = 0, .end = 0 },
         };
         // Specialization requires nonzero evidence, leaving this key for inference.
-        const key: ViewKey = .{ .value = value_, .evidence = 0 };
+        const key: ViewKey = .{ .value = value_, .evidence = 0, .entry_interface = entry_interface };
         if (self.specialized_closures.get(key)) |existing| return existing;
         try self.specialized_closures.ensureUnusedCapacity(self.allocator, 1);
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
@@ -3659,7 +3693,7 @@ const ClosureRegion = struct {
     const DefinitionKey = struct { owner: usize, node: core.Id };
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
     const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use, callback_use };
-    const Constraint = struct { callback_slot: u32 = 0, callback_stage: u32 = 0, callback_interface: bool = false, target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
+    const Constraint = struct { lexical_key: u32 = 0, callback_slot: u32 = 0, callback_stage: u32 = 0, callback_interface: bool = false, target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
     const Worklists = struct {
         constraints: @import("solver_worklist.zig").Queue = .{},
         aliases: @import("solver_worklist.zig").Queue = .{},
@@ -3690,6 +3724,7 @@ const ClosureRegion = struct {
         summary_arguments: std.ArrayList(core.Id) = .empty,
         data_aliases: std.ArrayList(DataAlias) = .empty,
         frozen: std.AutoHashMapUnmanaged(u32, ValueId) = .empty,
+        value_scopes: std.AutoHashMapUnmanaged(ValueId, u32) = .empty,
         call_instances: std.AutoHashMapUnmanaged(CallKey, u32) = .empty,
         candidate_instances: std.AutoHashMapUnmanaged(CandidateKey, u32) = .empty,
         unresolved_calls: std.AutoHashMapUnmanaged(Target, u32) = .empty,
@@ -3744,6 +3779,7 @@ const ClosureRegion = struct {
     // instance. Its enclosing proof still gathers mandatory effect equations.
     defer_members: bool = false,
     summary_job: bool = false,
+    lexical_summary_job: u32 = 0,
     result_summary_job: bool = false,
     principal_result_job: bool = false,
     code_expectation_remaining: usize = 0,
@@ -4367,10 +4403,14 @@ const ClosureRegion = struct {
         return false;
     }
     fn publishValidatedCalls(self: *ClosureRegion) RegionError!void {
+        // A lexical result is certified by its complete capture key. It cannot
+        // publish a capture-free proof for a source qualifier's global name.
+        if (self.lexical_summary_job != 0) return;
         if (!self.session.options.reuse_validated_calls or !self.allConstraintsSolved()) return;
         for (self.scratch.sources.items) |source| try self.publishValidatedSource(source);
     }
     fn publishValidatedSource(self: *ClosureRegion, source: Source) RegionError!void {
+        if (self.lexical_summary_job != 0) return;
         if (source.value != 0 or source.binding == 0 or source.root == 0) return;
         const module = &self.session.units[source.owner];
         const binding = module.binding(source.binding);
@@ -4664,6 +4704,9 @@ const ClosureRegion = struct {
     }
     fn addValue(self: *ClosureRegion, value_: ValueId, depth: usize) RegionError!u32 {
         if (depth >= self.session.options.max_type_depth or self.scratch.sources.items.len >= self.session.options.max_values or self.scratch.sources.items.len >= std.math.maxInt(u32)) return error.TypeLimit;
+        // Only a complete imported interface enters this map. Open callable
+        // values still instantiate independently at every use.
+        if (self.scratch.value_scopes.get(value_)) |prior| return prior;
         const kind = self.session.valueInfo(value_).kind;
         if (kind != .closure and kind != .suspension) return self.addAggregate(value_, depth);
         const metadata = self.session.closureInfo(value_);
@@ -4758,8 +4801,34 @@ const ClosureRegion = struct {
             self.scratch.sources.items[scope].binding = qualifier;
             if (qualifier != 0) try self.importScheme(scope, module.binding(qualifier).scheme, body);
         }
-        if (body != 0) try self.collect(scope, body);
+        if (try self.project(root) != 0) try self.scratch.value_scopes.put(self.scratch_allocator, value_, scope);
+        if (body != 0 and !try self.deferLexicalBody(scope, value_)) try self.collect(scope, body);
         return scope;
+    }
+    fn deferLexicalBody(self: *ClosureRegion, scope: u32, value: ValueId) RegionError!bool {
+        if (!self.session.options.reuse_lexical_summaries or self.building_principal or self.source_interface or self.retain_selected or self.complete_demand_bodies or self.session.valueInfo(value).kind != .closure) return false;
+        // Portable receipts require explicit replay of every observation.
+        // Their current ordinary path retains the complete source/capture proof.
+        if (self.session.receipt_tape != null or self.session.principal_reads != null or self.session.refinement_observation != null) return false;
+        if (self.session.lexical_inputs.examined_words >= self.session.options.max_children) return false;
+        var selected: lexical_capture_inputs.Interfaces = .empty;
+        defer selected.deinit(self.scratch_allocator);
+        for (self.scratch.sources.items) |capture| {
+            if (self.session.lexical_inputs.interface_visits >= self.session.options.max_children) return false;
+            self.session.lexical_inputs.interface_visits += 1;
+            if (capture.value == 0 or capture.root == 0) continue;
+            const actual = try self.project(capture.root);
+            if (actual == 0) continue;
+            if (selected.get(capture.value)) |prior| {
+                // One live polymorphic value can still have incompatible
+                // per-use views. It has no single complete capture interface.
+                if (prior != actual) return false;
+            } else try selected.put(self.scratch_allocator, capture.value, actual);
+        }
+        const lexical = try self.session.lexical_inputs.intern(self.session.allocator, self.session, value, &selected) orelse return false;
+        const source = self.scratch.sources.items[scope];
+        try self.appendConstraint(.{ .kind = .call_summary, .lexical_key = lexical, .target = .{ .unit = source.owner, .binding = 0 }, .scope = scope, .node = source.body, .left = source.root, .result = source.root, .deferred_member = self.defer_members });
+        return true;
     }
     fn addAggregate(self: *ClosureRegion, value_: ValueId, depth: usize) RegionError!u32 {
         const info = self.session.valueInfo(value_);
@@ -4825,6 +4894,7 @@ const ClosureRegion = struct {
         self.scratch.sources.items[scope].root = root;
         const existing = self.session.valueEvidence(value_);
         if (existing != 0) try self.solver.unify(root, try self.importEvidence(existing, 0));
+        if (try self.project(root) != 0) try self.scratch.value_scopes.put(self.scratch_allocator, value_, scope);
         return scope;
     }
     fn collectCall(self: *ClosureRegion, caller: u32, reference: core.BindingRef, callee_type: types.Id, arguments: []const core.Id) RegionError!void {
@@ -5571,11 +5641,11 @@ const ClosureRegion = struct {
         return !nodes.items[0].bad;
     }
     fn summaryInputs(self: *ClosureRegion, constraint: Constraint) RegionError!type_evidence.Id {
-        const body = self.session.units[constraint.target.unit].body(constraint.target.binding).?;
+        const parameters = if (constraint.lexical_key != 0) self.session.lexical_inputs.inputs.items[constraint.lexical_key - 1].parameters else self.session.units[constraint.target.unit].body(constraint.target.binding).?.parameters.len;
         var arguments: std.ArrayList(type_evidence.Id) = .empty;
         defer arguments.deinit(self.session.allocator);
         var cursor = constraint.left;
-        for (0..body.parameters.len) |_| {
+        for (0..parameters) |_| {
             const arrow = self.solver.node(try self.solver.resolve(cursor, 0));
             if (arrow.tag != .function) return 0;
             const actual = try self.project(arrow.a);
@@ -5637,12 +5707,28 @@ const ClosureRegion = struct {
         }
         const inputs = try self.summaryInputs(constraint);
         if (inputs == 0) return .open;
-        const key: CallSummaries.Key = .{ .target = constraint.target, .inputs = inputs, .source_interface = self.source_interface, .deferred_member = constraint.deferred_member };
+        const key: CallSummaries.Key = .{ .target = constraint.target, .inputs = inputs, .source_interface = self.source_interface, .lexical = constraint.lexical_key, .deferred_member = constraint.deferred_member };
         const job = try self.session.call_summaries.request(self.session, key);
         if (job) |entry| switch (entry.state) {
             .queued, .running => return .waiting,
             .complete => {
                 const target: core.BindingRef = .{ .unit = self.session.unitId(constraint.target.unit), .binding = constraint.target.binding };
+                if (constraint.lexical_key != 0) {
+                    const actual = try self.importEvidence(entry.result, 0);
+                    const point = self.solver.mark();
+                    _ = self.admitSignature(constraint.left, actual) catch |err| {
+                        self.solver.rollback(point);
+                        if (err == error.OutOfMemory) return err;
+                        // The caller's expected result/row never entered this
+                        // job. Its original body owns a rejected-use diagnostic.
+                        self.scratch.constraints.items[index].solved = true;
+                        try self.expandSummary(constraint);
+                        return .solved;
+                    };
+                    self.scratch.constraints.items[index].solved = true;
+                    self.session.counters.call_memo_hits += 1;
+                    return .solved;
+                }
                 if (!self.source_interface) if (self.session.receipt_tape) |tape| {
                     try tape.sources.append(self.session.allocator, target);
                     try tape.call_reads.append(self.session.allocator, .{ .unit = target.unit, .binding = target.binding, .evidence = entry.result, .present = true });
@@ -5663,6 +5749,7 @@ const ClosureRegion = struct {
         const saved = self.defer_members;
         self.defer_members = constraint.deferred_member;
         defer self.defer_members = saved;
+        if (constraint.lexical_key != 0) return self.collect(constraint.scope, constraint.node);
         if (constraint.source_selection) {
             const scope = try self.callableScope(constraint.target);
             _ = try self.admitSignature(constraint.left, self.scratch.sources.items[scope].root);
@@ -5680,7 +5767,7 @@ const ClosureRegion = struct {
         for (0..limit) |index| {
             const constraint = self.scratch.constraints.items[index];
             if (constraint.solved or constraint.kind != .call_summary) continue;
-            if (allow_remaining and try self.retainOpenPrincipal(constraint)) {
+            if (constraint.lexical_key == 0 and allow_remaining and try self.retainOpenPrincipal(constraint)) {
                 self.session.principal_graph_deferred += 1;
                 self.principal_only_used = true;
                 const key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = self.source_interface, .deferred_member = constraint.deferred_member, .options = self.session.options };
@@ -5703,7 +5790,7 @@ const ClosureRegion = struct {
         self.source_interface = key.source_interface;
         self.defer_members = key.deferred_member;
         self.include_callables = true;
-        const scope = try self.callableScope(key.target);
+        const scope = if (key.lexical != 0) try self.lexicalScope(key.lexical) else try self.callableScope(key.target);
         var cursor = self.scratch.sources.items[scope].root;
         if (key.expected_signature != 0) {
             // Every domain, result and operation row belongs to the complete
@@ -5739,8 +5826,50 @@ const ClosureRegion = struct {
             try self.solver.unify(arrow.a, try self.importEvidence(input, 0));
             cursor = arrow.b;
         }
-        try self.scratch.unresolved_calls.put(self.scratch_allocator, key.target, scope);
+        if (key.lexical == 0) try self.scratch.unresolved_calls.put(self.scratch_allocator, key.target, scope);
         try self.collect(scope, self.scratch.sources.items[scope].body);
+    }
+    fn lexicalScope(self: *ClosureRegion, lexical: u32) RegionError!u32 {
+        self.lexical_summary_job = lexical;
+        const input = self.session.lexical_inputs.inputs.items[lexical - 1];
+        const owner = self.session.findUnit(input.unit, null) orelse return error.UnresolvedType;
+        const module = &self.session.units[owner];
+        const scope = try self.typeScope(owner);
+        var source_type: types.Id = undefined;
+        var qualifier: core.BindingId = 0;
+        if (input.anonymous) {
+            const closure = module.closures[input.identity];
+            self.scratch.sources.items[scope].body = closure.body;
+            self.scratch.sources.items[scope].closed_rows = closure.closed_rows;
+            qualifier = closure.qualifier;
+            if (closure.function_type == 0) {
+                self.scratch.sources.items[scope].root = try self.solver.function(try self.importType(scope, closure.parameter.ty, 0), try self.importType(scope, module.typeOf(closure.body), 0));
+            } else self.scratch.sources.items[scope].root = try self.importType(scope, closure.function_type, 0);
+        } else {
+            const body = module.body(input.identity) orelse return error.UnresolvedType;
+            self.scratch.sources.items[scope].body = body.root;
+            self.scratch.sources.items[scope].closed_rows = body.closed_rows;
+            qualifier = input.identity;
+            source_type = module.binding(input.identity).ty;
+            for (0..input.applied) |_| {
+                const arrow = module.types.node(source_type);
+                if (arrow.tag != .function) return error.TypeMismatch;
+                source_type = arrow.b;
+            }
+            self.scratch.sources.items[scope].root = try self.importType(scope, source_type, 0);
+        }
+        // These arrays are owned by the Session key. Neither a live value
+        // handle nor a caller solver variable is imported into the private job.
+        try self.seed(scope, input.mappings);
+        try self.seedRows(scope, input.rows);
+        if (input.existing != 0) try self.solver.unify(self.scratch.sources.items[scope].root, try self.importEvidence(input.existing, 0));
+        for (input.slots, 0..) |capture, index| {
+            const formal = if (input.anonymous) module.binding(capture.binding).ty else module.bodyParameters(module.body(input.identity).?)[index].ty;
+            try self.solver.unify(try self.importType(scope, formal, 0), try self.importEvidence(capture.interface, 0));
+        }
+        if (qualifier != 0) try self.importScheme(scope, module.binding(qualifier).scheme, self.scratch.sources.items[scope].body);
+        self.scratch.sources.items[scope].binding = qualifier;
+        return scope;
     }
     fn shareLexical(self: *ClosureRegion, scope: u32, caller: u32, scheme: types.Scheme) RegionError!void {
         const module = &self.session.units[self.scratch.sources.items[scope].owner];
@@ -6172,6 +6301,9 @@ const ClosureRegion = struct {
         constraint.signature = try copy.ty(try self.solver.resolve(constraint.signature, 0), 0);
     }
     fn principalGraph(self: *ClosureRegion, scope: u32, body: core.Id) RegionError!?*PrincipalGraph {
+        // Captures are explicit selected inputs here, never an open principal
+        // qualifier whose complete global arrow can be freshened by a caller.
+        if (self.lexical_summary_job != 0) return null;
         if (self.building_principal or self.summary_job or !self.session.reuse_principal_graphs or !self.include_callables or self.retain_selected or self.complete_demand_bodies or self.speculative_source_entry) return null;
         // Quota-bound inquiries keep their original collector and its exact
         // prefix/limit diagnostics. Templates are an optional sharing policy.
@@ -7099,6 +7231,9 @@ const ClosureRegion = struct {
         return error.TypeLimit;
     }
     fn solveMode(self: *ClosureRegion, allow_remaining: bool) RegionError!void {
+        // The caller may fail after enqueueing a dependency but before the
+        // drain starts. Its query boundary also abandons pending tickets.
+        errdefer if (!self.session.call_summaries.draining) self.session.call_summaries.abandonPending(self.session);
         while (!try self.solveStep(allow_remaining)) try self.session.call_summaries.drain(self.session);
     }
     fn synchronizeWork(self: *ClosureRegion) RegionError!void {

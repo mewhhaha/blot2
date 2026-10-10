@@ -202,8 +202,26 @@ recipe classification schedules work and certifies no capture result.
 Description and cache publication finish every ownership allocation before
 installing a visible graph; out-of-memory never becomes a cached semantic
 decline. Cycles currently decline optional principal publication.
-Lexical-capture and joint-component boundaries remain implementation work in
-tasks 006–007.
+
+Live lexical summary inputs own ordered capture bindings, complete interfaces,
+alias ordinals, source/body identities, stored mappings and exact semantic graph
+words. Source identities belong to the immutable session version; portable
+revision keys remain separate work. Scalar bits, nested executable bodies,
+provider creation identities and pending demand identities participate in key
+equality. Unsupported, cyclic or incomplete graphs retain ordinary collection.
+Aggregate examined-word/interface-visit budgets include declined admissions.
+
+Each lexical job imports those inputs into a private solver and exports only a
+complete session-owned arrow. Its owner still checks executable captured values.
+It publishes no capture-free global principal proof or call receipt. Source
+interface, complete demand-body and receipt/refinement observer paths retain
+ordinary checking. Entry-interface and full-body view caches have distinct keys.
+Complete monomorphic views preserve value aliases; generic views freshen.
+
+Allocation failure abandons pending summary jobs without allocation, rebuilds
+keys for independently finished jobs, and clears active state. It never caches an
+allocation failure or resumes a partially collected job. Joint recursive
+components and portable canonical keys remain tasks 007–008.
 
 Summary jobs own their solver and scratch until completion or session teardown.
 Evidence copied into the session may outlive a job; solver IDs and source
@@ -213,7 +231,7 @@ and patterns. Structural type-depth and storage limits remain separate.
 The extension contract is [General call summaries](CALL_SUMMARIES.md). It keeps
 principal summaries separate from caller-selected judgments, requires explicit
 capture and residual-obligation inputs, and defines component-atomic publication
-and authoritative diagnostic fallback. These extended summary forms remain
+and authoritative diagnostic fallback. Component-atomic publication remains
 implementation work.
 
 Constant collection values publish immutable child spans. Session-owned growth
