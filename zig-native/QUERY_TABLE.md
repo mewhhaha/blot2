@@ -22,13 +22,13 @@ provenance. The table owns bucket vectors and record storage. Candidate builders
 own scratch and unpublished data. Published revisions hold leases on immutable
 records; their indexes and revision-specific validation states remain separate.
 
-| Query kind        | Complete key                                                                                                                                                            | Owned result and validity claim                                                                                                                               |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Refinement        | body or closure code identity; expected shape; complete ordered type/row seeds; mode; exact semantic options, depth and applicable resource limits                      | Solved type/row evidence and selected source targets, with complete refinement observations; a selected semantic judgment                                     |
-| Specialization    | task-008 canonical code/evidence/capture graph; expected evidence; selected/inferred/entry mode; exact options, depth and limits                                        | Rooted output reconstruction plan, immutable metadata/evidence graph and complete receipt; a selected closure judgment around the current inputs              |
-| Principal         | source declaration/code identity; explicit open-residual versus complete-proof submode; type/row binder structure; exact options; complete observed principal input set | Owned source-normalized open principal/residual graph or complete evidence result, distinguished by claim submode; empty and nonempty results remain distinct |
-| Source validation | canonical project settings/aliases; ordered producer identities, namespace/catalog image; source/import outcomes and foreign bounds                                     | Owned checked context image, dependency certificate and module/source pairing; source admission only                                                          |
-| Executable        | normalized function input/instructions; signatures, imports, globals, tier and representation policy; code/capture identities and transitive lifetime summaries         | Owned executable operation/optimization graph and relocation/lifetime metadata; executable behavior and machine representation                                |
+| Query kind        | Complete key                                                                                                                                                                                                            | Owned result and validity claim                                                                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Refinement        | body or closure code identity; expected shape; complete ordered type/row seeds; mode; exact semantic options, depth and applicable resource limits                                                                      | Solved type/row evidence and selected source targets, with complete refinement observations; a selected semantic judgment                                     |
+| Specialization    | task-008 canonical code/evidence/capture graph; expected evidence; selected/inferred/entry mode; exact options, depth and limits                                                                                        | Rooted output reconstruction plan, immutable metadata/evidence graph and complete receipt; a selected closure judgment around the current inputs              |
+| Principal         | source declaration/code identity; explicit open-residual versus complete-proof submode; type/row binder structure; exact options; complete observed principal input set                                                 | Owned source-normalized open principal/residual graph or complete evidence result, distinguished by claim submode; empty and nonempty results remain distinct |
+| Source validation | canonical project settings/aliases; ordered producer identities, namespace/catalog image; source/import outcomes and foreign bounds                                                                                     | Owned checked context image, dependency certificate and module/source pairing; source admission only                                                          |
+| Executable        | normalized function input/instructions; selected evidence and staging inputs; signatures, imports, globals, tier and representation policy; code/capture identities, optimizer inputs and transitive lifetime summaries | Owned executable operation/optimization graph and relocation/lifetime metadata; executable behavior and machine representation                                |
 
 Evaluated values are a separate operational claim. Session slots, chronological
 views, validated calls, demand memos and plain-nominal facts remain owned by the
@@ -97,15 +97,15 @@ result and publication equality, with deterministic source-order tie breaking.
 A dependency is a tagged owned observation with producer identity, claim kind,
 exact expected input/result representation and any chronology/owner bounds:
 
-| Dependency            | Recorded facts                                                                                                  |
-| --------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Source/body           | exact current declaration or body pairing, plus source diagnostics that must still run                          |
-| Interface             | complete canonical type/effect/principal graph; body identity is not implied                                    |
-| Capture/value         | rooted current graph, scalar bits, storage and alias/generative identity where supported                        |
-| Namespace/catalog     | ordered imports, resolution successes and failures, declaration/category identities and bounds                  |
-| Dynamic semantic fact | scalar slot evidence/state; call-proof presence; typed-view presence; plain-nominal absence/presence/value      |
-| Executable/lifetime   | exact instructions and called code identity; machine inputs and transitive allocation/escape/lifetime summaries |
-| Query result          | typed producer handle with an owned exact result image; revision number alone is not a validity proof           |
+| Dependency            | Recorded facts                                                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source/body           | exact current declaration or body pairing, plus source diagnostics that must still run                                                                                    |
+| Interface             | complete canonical type/effect/principal graph; body identity is not implied                                                                                              |
+| Capture/value         | rooted current graph, scalar bits, storage and alias/generative identity where supported                                                                                  |
+| Namespace/catalog     | ordered imports, resolution successes and failures, declaration/category identities and bounds                                                                            |
+| Dynamic semantic fact | scalar slot evidence/state; call-proof presence; typed-view presence; plain-nominal absence/presence/value                                                                |
+| Executable/lifetime   | exact instructions and called code identity; selected evidence, captures and staging; machine/policy/optimizer inputs and transitive allocation/escape/lifetime summaries |
+| Query result          | typed producer handle with an owned exact result image; revision number alone is not a validity proof                                                                     |
 
 Positive and negative observations are explicit. Absence of a plain-nominal fact
 is different from a present false fact. Replay validates reads and stages the
@@ -192,23 +192,28 @@ Task 015 implements the common owned record/index/transaction primitives with
 refinement first. Each following migration retains the old path as a comparison
 oracle until native, executed-Wasm, retained edits, OOM and portable parity
 pass, then removes its superseded index. Dual recording is bounded and does not
-change production diagnostic order. Task 020 qualifies aggregate lookup work,
-retained capacity, repeated revisions, failure recovery and
-fresh/retained/restart output. Keep each claim-specific gate until its
-replacement has the same proof, rather than removing gates because storage is
-unified.
+change production diagnostic order. Task 015/016 qualify lookup work and
+retained storage during migration. Task 019 serializes supported complete
+records in dependency and checkpoint paths. Task 020 extends the represented
+semantic graphs for process-boundary persistence, with explicit
+supported/declined domains, reconstructed owners and fresh/retained/
+dependency/restart parity. Keep each claim-specific gate until its replacement
+has the same proof, rather than removing gates because storage is unified.
 
 ## Portable representation and compatibility
 
 Portable records go through [dependency_format.zig](src/dependency_format.zig),
 inside the owned dependency/checkpoint envelope. The current format version is 1
 with reflected schema and bounded decoding; this document does not change it.
-Adding a query payload changes the schema. Use a deliberately versioned tagged
-payload and update the envelope version when wire interpretation changes;
-unknown versions/schema/kinds conservatively fall back to fresh compilation. No
-implicit reinterpretation of an older receipt as a stronger query claim is
-allowed. A transition reader may translate an old receipt only through its
-existing gate, then produce a fully owned current record.
+Task 019 round-trips every supported kind through dependency/principal and
+optimizer archive envelopes and backend checkpoints in separate processes,
+preserving each path's current error/fallback contract. Adding a query payload
+changes the schema. Use a deliberately versioned tagged payload and update the
+envelope version when wire interpretation changes; unknown versions/schema/kinds
+conservatively fall back to fresh compilation. No implicit reinterpretation of
+an older receipt as a stronger query claim is allowed. A transition reader may
+translate an old receipt only through its existing gate, then produce a fully
+owned current record.
 
 Encode stable producer/catalog identities, owned normalized source/evidence/code
 and capture graphs, ordered typed dependencies/publications, modes/options and
@@ -232,26 +237,30 @@ Corrupt caches never replace the last-good revision or authorize unsafe code.
 
 ## Acceptance walks
 
-| Change                                                                      | Required table behavior                                                                                                                                                                           |
-| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Literal 20→21 in a captured constant, same U32 interface                    | Source/value observation changes; selected key or validation misses. Rebuild around 21. An interface-only dependent may cut off after exact interface comparison; code/constant consumers cannot. |
-| Body `add x 1`→`add x 2`, unchanged U32→U32 type                            | Check the new body and its diagnostics. Principal-interface equality may stop only interface edges. Executable body edges invalidate; runtime calls must return the new value.                    |
-| Two equal fresh captures, then one scalar bit changes                       | Equal canonical graphs may hit and reconstruct current handles. Changed bits miss even under a forced fingerprint collision.                                                                      |
-| Shared Box pair→two equal separate Boxes, same type                         | Alias partition changes and selects a distinct key/decline. Nominal/provider/demand creation identities remain authoritative.                                                                     |
-| Namespace alias/import target changes or a formerly missing import resolves | Re-read the ordered resolution outcome and producer identity. Source certificate misses despite identical numeric IDs or superficial interface hashes.                                            |
-| Declaration/catalog reorders, signature superficially unchanged             | Validate bounds and stable source pairing, translate ordinals through the admitted importer, otherwise decline. Never resolve an external unit by blindly subtracting one.                        |
-| Plain fact absent→present false, or call proof presence changes             | Apply the typed observation rule. Exact absence reads reject. The specifically proved local monotone-call exception retains its required publications; no general absence exception exists.       |
-| One recursive member has an effect/type error                               | Publish no component member. Report the authoritative source-order error and leave the last-good revision usable.                                                                                 |
-| Edit fails, then source reverts                                             | Discard failed candidate data and uncommitted publications. Reuse the last-good owned records only after exact restored-input validation; execute the recovered output.                           |
-| Same fingerprints but unequal body/evidence/result                          | Full typed equality rejects or continues to the next candidate. No hash-only hit or early cutoff.                                                                                                 |
-| OOM after private child preparation, before parent commit                   | All candidate owners release safely; published graph lengths/facts/memos stay valid. Retry the same Session or next revision successfully.                                                        |
-| Restart with old schema, corrupted edge or exceeded bounds                  | Reject the cached candidate and compile fresh with ordinary diagnostics. No native handle or partial publication survives decoding.                                                               |
+| Change                                                                      | Required table behavior                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Literal 20→21 in a captured constant, same U32 interface                    | Source/value observation changes; selected key or validation misses. Rebuild around 21. An interface-only dependent may cut off after exact interface comparison; code/constant consumers cannot.                                                                                                                                                                                                                                                           |
+| Body `add x 1`→`add x 2`, unchanged U32→U32 type                            | Check the new body and its diagnostics. Principal-interface equality may stop only interface edges. Executable body edges invalidate; runtime calls must return the new value.                                                                                                                                                                                                                                                                              |
+| Two equal fresh captures, then one scalar bit changes                       | Equal canonical graphs may hit and reconstruct current handles. Changed bits miss even under a forced fingerprint collision.                                                                                                                                                                                                                                                                                                                                |
+| Shared Box pair→two equal separate Boxes, same type                         | Alias partition changes and selects a distinct key/decline. Nominal/provider/demand creation identities remain authoritative.                                                                                                                                                                                                                                                                                                                               |
+| Namespace alias/import target changes or a formerly missing import resolves | Re-read the ordered resolution outcome and producer identity. Source certificate misses despite identical numeric IDs or superficial interface hashes.                                                                                                                                                                                                                                                                                                      |
+| Declaration/catalog reorders, signature superficially unchanged             | Validate bounds and stable source pairing, translate ordinals through the admitted importer, otherwise decline. Never resolve an external unit by blindly subtracting one.                                                                                                                                                                                                                                                                                  |
+| Plain fact absent→present false, or call proof presence changes             | Apply the typed observation rule. Exact absence reads reject. The specifically proved local monotone-call exception retains its required publications; no general absence exception exists.                                                                                                                                                                                                                                                                 |
+| One recursive member has an effect/type error                               | Publish no component member. Report the authoritative source-order error and leave the last-good revision usable.                                                                                                                                                                                                                                                                                                                                           |
+| Edit fails, then source reverts                                             | Discard failed candidate data and uncommitted publications. Reuse the last-good owned records only after exact restored-input validation; execute the recovered output.                                                                                                                                                                                                                                                                                     |
+| Same fingerprints but unequal body/evidence/result                          | Full typed equality rejects or continues to the next candidate. No hash-only hit or early cutoff.                                                                                                                                                                                                                                                                                                                                                           |
+| OOM after private child preparation, before parent commit                   | All candidate owners release safely; published graph lengths/facts/memos stay valid. Retry the same Session or next revision successfully.                                                                                                                                                                                                                                                                                                                  |
+| Effectful closure/principal graph round trip                                | Normalize the exact producer-qualified operation identity, its type arguments and closed effect row; translate evidence and code into independent owners. An open residual effect tail stays an explicitly tagged principal template with freshly owned binders, never a completed invocation proof. Captured live providers, created demand state and unsupported mutable graph nodes decline unless task 020 implements their full identity/effect proof. |
+| Restart with old schema, corrupted edge or exceeded bounds                  | Reject the cached candidate and compile fresh with ordinary diagnostics. No native handle or partial publication survives decoding.                                                                                                                                                                                                                                                                                                                         |
 
 Review against [the language guide](../compiler/guide.md) and
 [CONTRACT.md](CONTRACT.md) preserves mandatory source checking, chronological
 ownership, alias/nominal identity, staging and demand creation. The
 implementation acceptance suite must deliberately exercise all these walks,
 first-match candidates, collision injection, deep/cyclic records, import OOM,
-cancellation and stable source-order diagnostics. Private gdev remains
-unavailable; this design makes no performance or implementation-completion claim
-for tasks 015–020.
+cancellation and stable source-order diagnostics. Represented initial portable
+domains are the complete kinds already admitted by the receipt/graph importer;
+new graph nodes remain declined until task 020 proves their independent
+ownership, aliases, source identities and effect dependencies. Private gdev
+remains unavailable; this design makes no performance or
+implementation-completion claim for tasks 015–020.

@@ -63,7 +63,8 @@ change.
 
 ## Completion evidence
 
-- Commit: local documentation milestone; final revision recorded after commit.
+- Commit: `8219cf3` (local design milestone), with reviewed task mapping and
+  compatibility corrections recorded in its qualification follow-up.
 - Validation: changed Markdown is formatted; local file/fragment links and
   task-015–020 migration destinations are checked. Read-only review covered
   current receipts, principal/source validation, artifact ownership and all
