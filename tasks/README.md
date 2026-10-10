@@ -231,6 +231,15 @@ aggregate program replays four functions per edit; public examples are unchanged
 within noise. Task [023] is ready. See
 [retained constants](../zig-native/RETAINED_CONSTANTS.md).
 
+Task [023] keeps retained reuse across literal edits in effectful modules at
+`fbe28c8`: the gate compares the operation-value catalog exactly instead of
+disabling itself program-wide, and dependency certificates share exactly proven
+unchanged images. The full LLVM native suite, 629 guest/client tests and
+zero-findings analyzer pass. Pure-module edits are 5–18% faster; effectful edits
+reuse unaffected code but at public-example size are CPU-neutral to 14% slower.
+The under-30-ms gdev target stays open for task 084. Task [024] is ready. See
+[literal edits](../zig-native/LITERAL_EDITS.md).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -470,8 +479,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [020] — Persist complete semantic artifacts             | Complete    | [019]                                  |
 | [021] — Publish transactional revision deltas           | Complete    | [017], [020]                           |
 | [022] — Retain constants and relocatable data           | Complete    | [020], [021]                           |
-| [023] — Narrow literal edit invalidation                | Ready       | [022]                                  |
-| [024] — Apply general body interface cutoff             | Pending     | [023]                                  |
+| [023] — Narrow literal edit invalidation                | Complete    | [022]                                  |
+| [024] — Apply general body interface cutoff             | Ready       | [023]                                  |
 | [025] — Resolve calls before emission                   | Pending     | [008], [020]                           |
 | [026] — Resolve structured control flow                 | Pending     | [025]                                  |
 | [027] — Represent ownership in resolved ir              | Pending     | [026]                                  |

@@ -7,7 +7,8 @@ operation, provider, state provider or runner therefore turned a literal edit
 inside a function body or aggregate into a disabled gate for the whole program:
 every retained function, closure, principal proof and selected query in every
 module was rebuilt. Top-level scalar edits were unaffected because they keep the
-module structural. The compiler milestone is recorded below.
+module structural. The compiler milestone is
+`fbe28c88a45b253289402fef4503dae6d3e42147`.
 
 ## Admission rule
 

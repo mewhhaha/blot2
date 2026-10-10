@@ -133,6 +133,11 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   fragments replay graph-equal aggregate constant children by re-serializing
   them in the current owner and relocating the caller's root operands; output
   stays identical to fresh. See [the record](zig-native/RETAINED_CONSTANTS.md).
+- Task 023 (literal edit invalidation) is complete at `fbe28c8`. Edited
+  effectful modules keep the reuse gate when their operation catalog is
+  unchanged, and certificates share unchanged module images. Effectful edits at
+  example size are CPU-neutral to 14% slower; the gdev target stays open. See
+  [the record](zig-native/LITERAL_EDITS.md).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -168,18 +173,19 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 023
+## Next steps for task 024
 
 Continue with
-[narrow literal edit invalidation](tasks/023-narrow-literal-edit-invalidation.md).
-Retained fragments now replay scalar and aggregate constant children
-([retained constants](zig-native/RETAINED_CONSTANTS.md)); pool fields are leases
-([revision deltas](zig-native/REVISION_DELTAS.md)). The retained probe
+[general body interface cutoff](tasks/024-apply-general-body-interface-cutoff.md).
+Invalidation is still per declaration:
+[literal edits](zig-native/LITERAL_EDITS.md) records why ecs consumers of
+`simulation` rebuild, and that verification plus fragment replay currently cost
+about what small functions cost to specialize. The retained probe
 `zig-native/qualification/revision_deltas_probe.zig` and its driver measure
-edit/revert/rejected/no-op phases against an earlier tree; task-022 binaries are
-in ignored `build/bench/aggregate-constants/`. Tasks 036 and 048 are also ready.
-Tasks 002, 040–047 and 075 onward stay blocked on owner-local artifacts (task
-002), and 084 on private gdev.
+edit/revert/rejected/no-op phases against an earlier tree; task-023 binaries are
+in ignored `build/bench/literal-edits/`. Tasks 036 and 048 are also ready. Tasks
+002, 040–047 and 075 onward stay blocked on owner-local artifacts (task 002),
+and 084 on private gdev.
 
 ## Notes
 
