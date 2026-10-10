@@ -3,6 +3,8 @@
 //! identity or semantic decision reads them, so a budget can assert on them
 //! without wall-time noise. A retained revision counts only the work it ran.
 pub const Counters = struct {
+    semantic_component_batches: u64 = 0,
+    semantic_component_jobs: u64 = 0,
     /// Inference regions opened (ClosureRegion lifetimes, including split children).
     inference_regions: u64 = 0,
     /// Session-local canonical requests and complete proofs reconstructed around
@@ -48,4 +50,11 @@ pub const Counters = struct {
     solver_constraint_visits: u64 = 0,
     /// Type nodes visited by occurs checks in region solvers.
     occurs_steps: u64 = 0,
+    pub fn merge(self: *Counters, other: Counters) void {
+        inline for (@typeInfo(Counters).@"struct".field_names) |name| {
+            if (comptime @import("std").mem.startsWith(u8, name, "max_")) {
+                @field(self, name) = @max(@field(self, name), @field(other, name));
+            } else @field(self, name) +|= @field(other, name);
+        }
+    }
 };

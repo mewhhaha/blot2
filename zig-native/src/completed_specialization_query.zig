@@ -50,6 +50,10 @@ pub const State = struct {
     gate: admission.Gate,
     stats: Stats = .{},
     independent_calls: std.ArrayList(independent.Record) = .empty,
+    /// Private certificates survive a failed executable query in this source
+    /// pair/Session. They are not executable facts or persisted automatically.
+    completed_worker_proofs: std.ArrayList(independent.Record) = .empty,
+    worker_proof_words: usize = 0,
     /// PRIVATE execution policy, outside semantic Session.Options. The old
     /// Capture/receipts and current Core/Gate are immutable until deinit.
     recover_call_proofs: bool = true,
@@ -67,6 +71,8 @@ pub const State = struct {
         return .{ .allocator = a, .old = old, .graph_scratch = .{ .allocator = a }, .gate = try admission.Gate.init(a, &old.metadata.pools.?, units, names) };
     }
     pub fn deinit(self: *State) void {
+        for (self.completed_worker_proofs.items) |*record| record.deinit(self.allocator);
+        self.completed_worker_proofs.deinit(self.allocator);
         for (self.independent_calls.items) |*record| record.deinit(self.allocator);
         self.independent_calls.deinit(self.allocator);
         self.graph_scratch.deinit();
@@ -275,7 +281,7 @@ pub const State = struct {
                     }
                 };
                 if (!present and read.present and self.recover_call_proofs) {
-                    const recovered = if (batch != null and batch.?.attempted(read_index)) batch.?.take(read_index, &self.stats) else try independent.acquire(self, g, read, actual);
+                    const recovered = if (batch != null and batch.?.attempted(read_index)) try batch.?.take(read_index, &self.stats) else try independent.acquire(self, g, read, actual);
                     if (recovered) |proof| {
                         var owned = proof;
                         errdefer owned.deinit(self.allocator);
@@ -473,7 +479,10 @@ pub const State = struct {
             try requests.append(self.allocator, .{ .index = read_index, .read = read, .actual = actual });
         }
         if (requests.items.len < 4 or source_bytes < 4096) return null;
-        const batch = try parallel.run(self.allocator, io, self, g, requests.items, self.semantic_workers);
+        if (requests.items.len > g.evaluator.options.max_values -| self.completed_worker_proofs.items.len) return null;
+        try self.completed_worker_proofs.ensureUnusedCapacity(self.allocator, requests.items.len);
+        var batch = try parallel.run(self.allocator, io, self, g, requests.items, self.semantic_workers);
+        batch.retainSuccesses(&self.completed_worker_proofs, &self.worker_proof_words, g.evaluator.options.max_children);
         self.stats.parallel_batches += 1;
         self.stats.parallel_jobs += requests.items.len;
         self.stats.parallel_workers = @max(self.stats.parallel_workers, batch.workers);

@@ -241,6 +241,9 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
 
 /// No diagnostic/metrics text is written to stdout in serve mode.
 pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compiler: [32]u8, cache_root: ?[]const u8) !void {
+    return runWithPolicy(a, io, reader, writer, compiler, cache_root, .{});
+}
+pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compiler: [32]u8, cache_root: ?[]const u8, policy: @import("execution_policy.zig").Policy) !void {
     const identity = std.fmt.bytesToHex(compiler, .lower);
     try reply(a, writer, .{
         .kind = "hello",
@@ -268,6 +271,8 @@ pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compile
                 // AlreadyOpen above proves the optional owns no previous session.
                 // zig-analyzer: disable-next-line overwritten-owning-value
                 opened = try OpenProject.init(a, io, request, compiler, frame.payload(), cache_root);
+                opened.?.session.policy.semantic_workers = policy.semantic_workers;
+                opened.?.session.policy.semantic_components = policy.semantic_components;
                 try reply(a, writer, .{ .kind = "open", .id = request.id, .epoch = epoch, .revision = 0 }, &.{});
             },
             .build, .close, .checkpoint => {

@@ -84,6 +84,12 @@ pub const Store = struct {
         errdefer allocator.free(rows);
         return .{ .operations = operations, .arguments = arguments, .rows = rows, .labels = try allocator.dupe(Label, self.labels.items) };
     }
+    pub fn clone(self: *const Store, allocator: Allocator) Allocator.Error!Store {
+        var result: Store = .{ .allocator = allocator };
+        errdefer result.deinit();
+        inline for (.{ "operations", "arguments", "rows", "labels", "operation_next", "row_next", "operation_buckets", "row_buckets" }) |field| @field(result, field) = try @field(self, field).clone(allocator);
+        return result;
+    }
     pub fn internOperation(self: *Store, identity: types.NominalIdentity, values: []const u32) Error!Label {
         var hash = std.hash.Wyhash.init(0);
         hash.update(std.mem.asBytes(&identity.unit));

@@ -67,6 +67,8 @@ export interface ZigProjectCompilerOptions {
   shareMachineCode?: boolean;
   /** Prototype: upper bound for coarse optimizer workers (1..16; default 1). */
   codegenWorkers?: number;
+  /** Opt-in private semantic components with 1..16 workers; default stays serial. */
+  semanticWorkers?: number;
   /** Optional backend checkpoint from exportCheckpoint; copied at startup. */
   checkpoint?: Uint8Array<ArrayBuffer>;
   /** Native restart cache root. Defaults to the platform cache directory when
@@ -237,9 +239,18 @@ class ProjectProcess implements ZigProjectCompiler {
   #nextId = 1;
   #exit: Deno.CommandStatus | undefined;
 
-  constructor(executable: string, cacheEnvironment: Record<string, string>) {
+  constructor(
+    executable: string,
+    cacheEnvironment: Record<string, string>,
+    semanticWorkers?: number,
+  ) {
     this.#child = new Deno.Command(executable, {
-      args: ["serve-project"],
+      args: [
+        "serve-project",
+        ...(semanticWorkers === undefined
+          ? []
+          : ["--semantic-workers", String(semanticWorkers)]),
+      ],
       clearEnv: true,
       env: cacheEnvironment,
       stdin: "piped",
@@ -760,6 +771,7 @@ export async function createZigProjectCompiler(
     "codegenTier",
     "shareMachineCode",
     "codegenWorkers",
+    "semanticWorkers",
     "checkpoint",
     "cacheDirectory",
     "startupTimeoutMs",
@@ -807,6 +819,13 @@ export async function createZigProjectCompiler(
       options.codegenWorkers > 16)
   ) {
     throw new RangeError("codegenWorkers must be an integer in 1..16");
+  }
+  if (
+    options.semanticWorkers !== undefined &&
+    (!Number.isInteger(options.semanticWorkers) ||
+      options.semanticWorkers < 1 || options.semanticWorkers > 16)
+  ) {
+    throw new RangeError("semanticWorkers must be an integer in 1..16");
   }
   const nullablePath = (value: unknown, name: string) =>
     value == null ? null : path(value, name);
@@ -876,7 +895,11 @@ export async function createZigProjectCompiler(
       if (value !== undefined) cacheEnvironment[variable] = value;
     }
   }
-  const process = new ProjectProcess(executable, cacheEnvironment);
+  const process = new ProjectProcess(
+    executable,
+    cacheEnvironment,
+    options.semanticWorkers,
+  );
   await process.initialize(open, timeout, identity, checkpoint);
   if (assets !== undefined) {
     try {

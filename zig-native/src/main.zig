@@ -11,6 +11,12 @@ const memory = @import("memory.zig");
 const project = @import("project.zig");
 const project_check = @import("project_check.zig");
 const Io = std.Io;
+const Policy = @import("execution_policy.zig").Policy;
+fn semanticPolicy(value: []const u8) ?Policy {
+    const workers = std.fmt.parseInt(u8, value, 10) catch return null;
+    if (workers == 0 or workers > 16) return null;
+    return .{ .semantic_workers = workers, .semantic_components = true };
+}
 const usage =
     \\Usage: blotc lex|parse|check SOURCE [SOURCE...]
     \\       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]
@@ -22,6 +28,7 @@ const usage =
     \\       blotc check|build also accepts explicit --prelude PATH|none (default: none).
     \\       Project options accept --input-mode project|source (default: project).
     \\       --profile (build, build-project) adds detailed backend clocks to the stats record.
+    \\       --semantic-workers 1..16 (build, build-project, serve-project) opts into private semantic jobs.
     \\
     \\Handwritten Zig source compiler. JSON-lines diagnostics and stage metrics
     \\are written to stdout. Parse coverage and executable coverage are distinct.
@@ -254,7 +261,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
     return ok;
 }
 
-fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile: bool, output_path: ?[]const u8, cache_root: ?[]const u8) !bool {
+fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile: bool, output_path: ?[]const u8, cache_root: ?[]const u8, policy: Policy) !bool {
     var tracked: memory.TrackedAllocator = .{ .backing = backing };
     const allocator = tracked.allocator();
     const start = now(io);
@@ -396,7 +403,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         var checkpoint = if (cache_file) |*file| file.load(io) else null;
         defer if (checkpoint) |*candidate| candidate.deinit();
         cache_loaded = checkpoint != null;
-        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .profile_backend = profile, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
+        var compiled = try backend.compileWithOptions(allocator, units, loaded.entry, .{ .io = io, .policy = policy, .profile_backend = profile, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
         defer {
             const result_release_start = now(io);
             compiled.deinit(allocator);
@@ -486,12 +493,16 @@ fn run(init: std.process.Init) !bool {
         return true;
     }
     if (std.mem.eql(u8, args[1], "serve-project")) {
-        if (args.len != 2) return error.InvalidServeArguments;
+        var policy: Policy = .{};
+        if (args.len != 2) {
+            if (args.len != 4 or !std.mem.eql(u8, args[2], "--semantic-workers")) return error.InvalidServeArguments;
+            policy = semanticPolicy(args[3]) orelse return error.InvalidServeArguments;
+        }
         var input_buffer: [4096]u8 = undefined;
         var output_buffer: [4096]u8 = undefined;
         var input = Io.File.stdin().readerStreaming(init.io, &input_buffer);
         var output = Io.File.stdout().writerStreaming(init.io, &output_buffer);
-        try @import("zig_project_server.zig").run(backing, init.io, &input.interface, &output.interface, compiler_identity.digest, cache_root);
+        try @import("zig_project_server.zig").runWithPolicy(backing, init.io, &input.interface, &output.interface, compiler_identity.digest, cache_root, policy);
         return true;
     }
     const command = (if (std.mem.eql(u8, args[1], "parse-project")) Command.parse_project else if (std.mem.eql(u8, args[1], "check-project")) Command.check_project else if (std.mem.eql(u8, args[1], "build-project")) Command.build_project else std.meta.stringToEnum(Command, args[1])) orelse {
@@ -521,6 +532,7 @@ fn run(init: std.process.Init) !bool {
         var options: project.Options = .{};
         var dependency_path: ?[]const u8 = null;
         var profile = false;
+        var policy: Policy = .{};
         var at = first_option;
         while (at < args.len) {
             // Every option takes one value except the --profile flag.
@@ -532,7 +544,10 @@ fn run(init: std.process.Init) !bool {
             }
             if (at + 1 >= args.len) return false;
             defer at += 2;
-            if (std.mem.eql(u8, args[at], "--std-root")) {
+            if (std.mem.eql(u8, args[at], "--semantic-workers")) {
+                if (command != .build and command != .build_project) return false;
+                policy = semanticPolicy(args[at + 1]) orelse return false;
+            } else if (std.mem.eql(u8, args[at], "--std-root")) {
                 options.std_root = args[at + 1];
             } else if (std.mem.eql(u8, args[at], "--alias")) {
                 const split = std.mem.findScalar(u8, args[at + 1], '=') orelse return false;
@@ -548,7 +563,7 @@ fn run(init: std.process.Init) !bool {
         }
         options.aliases = aliases.items;
         if (command == .dependencies or dependency_path != null) {
-            if (profile) return false;
+            if (profile or policy.semantic_components) return false;
             const success = try dependency_cli.process(init.io, backing, &output.interface, command == .dependencies, args[2], args[3], dependency_path, options, compiler_identity.digest);
             try output.interface.flush();
             return success;
@@ -562,7 +577,7 @@ fn run(init: std.process.Init) !bool {
         const inputs = if (selected == .build_project or project_command) args[2..3] else args[2..first_option];
         var success = true;
         for (inputs) |filename| {
-            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, if (selected == .build_project) args[3] else null, cache_root) catch |err| {
+            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, if (selected == .build_project) args[3] else null, cache_root, policy) catch |err| {
                 const stage = switch (selected) {
                     .parse_project => "parse-project",
                     .check_project => "check-project",

@@ -66,6 +66,17 @@ checking or evaluation. Four workers reduced the measured cold assembly phase
 from about 30 ms to 18 ms on gdev, but total latency was too noisy to establish
 a speedup. It remains opt-in.
 
+The direct native client accepts `semanticWorkers: 1..16` to opt into private
+semantic component jobs. Explicit `1` runs the same component path with one
+worker; omission keeps the existing serial inference path. Workers own their
+solver, scratch and evidence import state, join before publication, and preserve
+deterministic diagnostics and Wasm. `stats.workCounters.semantic_component_jobs`
+counts scheduled components. Small or unsupported jobs can stay serial. The
+native CLI exposes this setting as `--semantic-workers 1..16` on `build`,
+`build-project` and `serve-project`. See [SEMANTIC_JOBS.md](SEMANTIC_JOBS.md)
+for ownership, failure handling and qualification; no speedup or default change
+is claimed.
+
 The CLI and native project server automatically persist restart candidates under
 `$XDG_CACHE_HOME/blot` or `$HOME/.cache/blot` on Linux,
 `$HOME/Library/Caches/blot` on macOS, and `%LOCALAPPDATA%/Blot` on Windows.

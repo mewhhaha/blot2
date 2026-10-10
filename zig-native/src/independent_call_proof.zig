@@ -43,6 +43,23 @@ pub fn acquire(state: anytype, g: anytype, read: receipt.CallRead, actual: u32) 
     const a = state.allocator;
     const target: core.BindingRef = .{ .unit = read.unit, .binding = read.binding };
     if (!state.gate.admits(target)) return null;
+    if (comptime @hasField(@TypeOf(state.*), "completed_worker_proofs")) {
+        for (state.completed_worker_proofs.items) |record| {
+            if (!std.meta.eql(record.target, target) or record.evidence != actual or record.depth != g.evaluator.depth or !std.meta.eql(record.options, g.evaluator.options)) continue;
+            var valid = true;
+            for (record.sources) |source| if (!state.gate.admits(source)) {
+                valid = false;
+                break;
+            };
+            if (valid) for (record.scalar_reads) |input| if (!scalarMatches(g, input)) {
+                valid = false;
+                break;
+            };
+            if (!valid) continue;
+            state.stats.independent_reused += 1;
+            return try record.clone(a);
+        }
+    }
     for (state.old.metadata.independent_calls.items) |record| {
         if (!std.meta.eql(record.target, target) or record.evidence != read.evidence or record.depth != g.evaluator.depth or !std.meta.eql(record.options, g.evaluator.options)) continue;
         var valid = true;

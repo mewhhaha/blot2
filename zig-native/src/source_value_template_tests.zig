@@ -1213,10 +1213,12 @@ fn parallelProofScenario(allocator: Allocator, fixture: *const Fixture, old: *co
     const values = artifacts.stamp(g.evaluator.values.items);
     const steps = g.evaluator.steps;
     const calls = g.evaluator.validated_calls.count();
+    try state.completed_worker_proofs.ensureUnusedCapacity(allocator, requests.len);
     var batch = try parallel.run(allocator, std.testing.io, &state, &g, &requests, workers);
     defer batch.deinit();
+    batch.retainSuccesses(&state.completed_worker_proofs, &state.worker_proof_words, g.evaluator.options.max_children);
     for (requests, 0..) |request, index| {
-        var recovered = batch.take(index, &state.stats);
+        var recovered = try batch.take(index, &state.stats);
         defer if (recovered) |*record| record.deinit(allocator);
         try std.testing.expectEqual(index != 2, recovered != null);
         if (recovered) |record| {
@@ -1231,6 +1233,29 @@ fn parallelProofScenario(allocator: Allocator, fixture: *const Fixture, old: *co
     try std.testing.expect(g.evaluator.diagnostic == null);
     try std.testing.expectEqual(@as(usize, 3), state.stats.independent_rechecked);
     try std.testing.expectEqual(@as(usize, 1), state.stats.independent_declined);
+    try std.testing.expectEqual(@as(usize, 3), state.completed_worker_proofs.items.len);
+    // A sibling's later failure does not erase any owned complete certificate.
+    batch.slots[2].failed = true;
+    try std.testing.expectError(error.OutOfMemory, batch.take(2, &state.stats));
+    var reused = (try @import("independent_call_proof.zig").acquire(&state, &g, requests[0].read, requests[0].actual)).?;
+    defer reused.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 1), state.stats.independent_reused);
+    try std.testing.expectEqualDeep(fixture.target("checked"), reused.target);
+}
+
+test "private semantic artifact admission declines non positional Core source units" {
+    var before = try Fixture.init(independent_query_source);
+    defer before.deinit();
+    var old = try before.emit(a, .{ .retain_artifacts = true });
+    defer old.deinit(a);
+    try successful(&old);
+    var current = try Fixture.init(independent_query_source);
+    defer current.deinit();
+    current.units[0].unit = 4;
+    var gate = try @import("principal_reuse_gate.zig").Gate.init(a, &old.capture.?.metadata.pools.?, current.units, current.names.view());
+    defer gate.deinit();
+    try std.testing.expect(!gate.enabled);
+    try std.testing.expect(!gate.admits(.{ .unit = 4, .binding = current.target("checked").binding }));
 }
 
 test "independent semantic workers retain deterministic unpublished judgments and join through allocation failures" {

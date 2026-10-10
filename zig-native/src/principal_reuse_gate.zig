@@ -77,9 +77,16 @@ pub const Gate = struct {
         var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .structural_units = structural_units, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
 
         if (!old.project_identity or old.identity == null or names == null or old.modules.len != units.len or units.len == 0 or units.len >= std.math.maxInt(u32)) return result;
+        // Artifact/query records below use one-based catalog positions. The
+        // general evaluator also accepts explicit, non-dense Core unit IDs;
+        // decline this adapter until its entire reference protocol maps them.
+        for (units, 0..) |module, index| if (module.unit != 0 and module.unit != index + 1) return result;
         // Check every retained pointer against its original pin before comparing
         // any current structure or using a retained dependency recipe.
-        for (old.modules) |pin| if (!std.mem.eql(u8, &pin.stamp, &try artifacts.moduleStamp(pin.module, stamps))) return result;
+        for (old.modules, 0..) |pin, index| {
+            if (!std.mem.eql(u8, &pin.stamp, &try artifacts.moduleStamp(pin.module, stamps))) return result;
+            if (pin.module.unit != 0 and pin.module.unit != index + 1) return result;
+        }
         const previous = old.identity.?.view();
         const current = names.?;
         if (!try namespaceEqual(allocator, old, units, previous, current)) return result;

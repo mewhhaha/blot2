@@ -511,6 +511,18 @@ copy all importer maps into private storage. They never share Gate reference
 counts, solver state, evaluated values or diagnostic publication. Every worker
 joins before the caller validates and publishes results in original input order.
 
+The opt-in ready-component scheduler follows the same private-owner boundary.
+One recursive component is one job. Exact canonical Options, closed type/effect
+inputs and copied capture interfaces enter private Sessions; live value handles
+and caller variables do not. All workers join before the coordinator imports
+results into a staged evidence owner. Key validation and capacity reservation
+precede allocation-free publication of every completed member. Source reads
+touching active coordinator inference return to the serial SCC path. Completed
+independent jobs and current-query certificates survive sibling failure without
+granting executable or artifact admission. See
+[SEMANTIC_JOBS.md](SEMANTIC_JOBS.md) for bounds, cancellation, source-unit
+limits and qualification.
+
 Static closure keys retain binding-to-value roots. Admission compares the whole
 captured graph and records only proven old-to-current value correspondences; it
 never clones an unvalidated value to make a key match. Dynamic capture slots

@@ -35,6 +35,28 @@ pub const Inputs = struct {
         allocator.free(self.values);
         self.* = undefined;
     }
+    /// Private typing consumes the complete immutable key and its interfaces.
+    /// Live value handles are unnecessary and must not cross to another Session.
+    /// The copied words retain origin identity only. They contain source-owner
+    /// evidence ordinals and must never index a destination Session's Cache.
+    pub fn copyTyping(self: Inputs, allocator: Allocator, copy: *@import("semantic_evidence_import.zig").Importer) evidence.Error!Inputs {
+        var result = self;
+        result.mappings = &.{};
+        result.rows = &.{};
+        result.slots = &.{};
+        result.words = &.{};
+        result.values = &.{};
+        errdefer result.deinit(allocator);
+        result.mappings = try allocator.dupe(evidence.Mapping, self.mappings);
+        for (result.mappings) |*mapping| mapping.evidence = try copy.ty(mapping.evidence, 0);
+        result.rows = try allocator.dupe(evidence.RowMapping, self.rows);
+        for (result.rows) |*mapping| mapping.evidence = try copy.row(mapping.evidence, 0);
+        result.slots = try allocator.dupe(Slot, self.slots);
+        for (result.slots) |*slot| slot.interface = try copy.ty(slot.interface, 0);
+        result.words = try allocator.dupe(u64, self.words);
+        result.existing = try copy.ty(self.existing, 0);
+        return result;
+    }
 };
 
 pub const Cache = struct {

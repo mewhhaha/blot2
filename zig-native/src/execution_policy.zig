@@ -7,4 +7,6 @@ pub const Policy = struct {
     share_machine_code: bool = false,
     codegen_workers: u8 = 1,
     semantic_workers: u8 = 1,
+    /// Run the same private component path with one worker for qualification.
+    semantic_components: bool = false,
 };

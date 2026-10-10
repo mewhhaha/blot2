@@ -14,6 +14,37 @@ const type_evidence = @import("type_evidence.zig");
 const a = std.testing.allocator;
 const test_prelude = @import("test_prelude_producers.zig");
 
+fn componentBatchScenario(allocator: std.mem.Allocator, module: *const core.Module, workers: u8) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    session.semantic_io = std.testing.io;
+    session.semantic_component_workers = workers;
+    session.options.max_steps = 0;
+    const result = try session.sourceInterface(target(module, "run"));
+    const arrow = session.evidence.node(result.evidence);
+    try std.testing.expectEqual(type_evidence.Tag.function, arrow.tag);
+    try std.testing.expectEqual(types.u32_type, arrow.a);
+    try std.testing.expectEqual(types.u32_type, arrow.b);
+    try std.testing.expectEqual(@as(u32, 0), arrow.c);
+    try std.testing.expect(session.counters.semantic_component_jobs >= 4);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    try std.testing.expect(session.diagnostic == null);
+    try std.testing.expectEqual(@as(usize, 0), session.call_summaries.stack.items.len);
+}
+
+test "private semantic components infer independent body jobs with one and multiple workers" {
+    var module = try lower(
+        \\const a = fn value => @u32.add value 1
+        \\const b = fn value => @u32.add value 2
+        \\const c = fn value => @u32.add value 3
+        \\const d = fn value => @u32.add value 4
+        \\entry const run: U32 -> U32 = fn value => @u32.add (@u32.add (a value) (b value)) (@u32.add (c value) (d value))
+    );
+    defer module.deinit(a);
+    for ([_]u8{ 1, 2, 4 }) |workers| try componentBatchScenario(a, &module, workers);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, componentBatchScenario, .{ &module, @as(u8, 1) });
+}
+
 const component_source =
     \\const even: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else odd (@u32.sub value 1)
     \\const odd: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else even (@u32.sub value 1)

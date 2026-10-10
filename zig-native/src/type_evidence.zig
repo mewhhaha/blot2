@@ -82,6 +82,14 @@ pub const Store = struct {
         errdefer allocator.free(extra);
         return .{ .nodes = nodes, .extra = extra, .effects = try self.effects.copyOwned(allocator) };
     }
+    /// An independent mutable owner with exactly the same published IDs.
+    pub fn clone(self: *const Store, allocator: Allocator) Allocator.Error!Store {
+        var result: Store = .{ .allocator = allocator, .effects = .{ .allocator = allocator } };
+        errdefer result.deinit();
+        inline for (.{ "nodes", "extra", "next", "buckets" }) |field| @field(result, field) = try @field(self, field).clone(allocator);
+        result.effects = try self.effects.clone(allocator);
+        return result;
+    }
     /// Record fields are canonicalized by name: semantic equality is independent
     /// of payload slots, which remain in the separate core/layout catalogs.
     pub fn intern(self: *Store, tag: Tag, a: u32, b: u32, values: []const Id) Error!Id {

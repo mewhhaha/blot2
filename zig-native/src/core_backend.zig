@@ -2027,6 +2027,8 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         for (0..7) |index| _ = generator.evaluator.evidence.effects.internOperation(.{ .unit = std.math.maxInt(u32), .decl = @intCast(9000 + index) }, &.{types.f32_type}) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else error.ModuleTooLarge;
     }
     timing.prepare_us = clock.lap();
+    generator.evaluator.semantic_io = options.io;
+    generator.evaluator.semantic_component_workers = if (options.policy.semantic_components or options.policy.semantic_workers > 1) options.policy.semantic_workers else 0;
     generate(&generator, entry, options.unit_order) catch |err| switch (err) {
         error.Declined => {
             var diagnostic_ = generator.diagnostic;

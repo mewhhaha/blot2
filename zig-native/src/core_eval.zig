@@ -303,6 +303,316 @@ const CallSummaries = struct {
     result_principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, bool) = .empty,
     draining: bool = false,
 
+    const Member = struct { index: usize, key: Key };
+    const Edge = struct { from: u32, to: u32 };
+    const Component = struct {
+        members: []Member,
+        edges: []Edge,
+        budget: usize = 0,
+        fn deinit(self: *Component, a: Allocator) void {
+            a.free(self.members);
+            a.free(self.edges);
+        }
+        fn less(_: void, left: Component, right: Component) bool {
+            const l = left.members[0].key.target;
+            const r = right.members[0].key.target;
+            return if (l.unit != r.unit) l.unit < r.unit else if (l.binding != r.binding) l.binding < r.binding else left.members[0].index < right.members[0].index;
+        }
+    };
+    const ComponentResult = struct {
+        snapshot: ?type_evidence.Snapshot = null,
+        keys: []Key = &.{},
+        roots: []type_evidence.Id = &.{},
+        sources: []core.BindingRef = &.{},
+        recursive_members: usize = 0,
+        restarts: usize = 0,
+        transitions: usize = 0,
+        counters: @import("work_counters.zig").Counters = .{},
+        pub fn deinit(self: *ComponentResult, a: Allocator) void {
+            if (self.snapshot) |*snapshot_| snapshot_.deinit(a);
+            a.free(self.keys);
+            a.free(self.roots);
+            a.free(self.sources);
+        }
+        fn measured(session: *const Session) ComponentResult {
+            return .{ .transitions = session.summary_transitions, .counters = session.counters };
+        }
+    };
+    fn executeComponent(scratch: Allocator, output: Allocator, input: *const Session, component_: Component) Allocator.Error!?ComponentResult {
+        var private = try Session.init(scratch, input.units);
+        defer private.deinit();
+        private.options = input.options;
+        private.semantic_job_budget = component_.budget;
+        private.depth = input.depth;
+        private.seedScalarInputs(input) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else ComponentResult.measured(&private);
+        var dependencies: receipt.Tape = .{};
+        defer dependencies.deinit(scratch);
+        private.receipt_tape = &dependencies;
+        var imports: @import("semantic_evidence_import.zig").Importer = .{ .allocator = scratch, .source = input.evidence.view(), .destination = &private.evidence, .max_depth = input.options.max_type_depth };
+        defer imports.deinit();
+        var lexical_origins: std.ArrayList(u32) = .empty;
+        defer lexical_origins.deinit(scratch);
+        const requested_keys = try scratch.alloc(Key, component_.members.len);
+        defer scratch.free(requested_keys);
+        for (component_.members, requested_keys) |member_, *key| {
+            key.* = member_.key;
+            if (key.lexical != 0) {
+                const original = key.lexical;
+                if (std.mem.findScalar(u32, lexical_origins.items, original)) |index| {
+                    key.lexical = @intCast(index + 1);
+                } else {
+                    const original_input = input.lexical_inputs.inputs.items[original - 1];
+                    if (original_input.words.len > private.options.max_children -| private.lexical_inputs.retained_words) return ComponentResult.measured(&private);
+                    try lexical_origins.ensureUnusedCapacity(scratch, 1);
+                    try private.lexical_inputs.inputs.ensureUnusedCapacity(scratch, 1);
+                    const copied = original_input.copyTyping(scratch, &imports) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else ComponentResult.measured(&private);
+                    key.lexical = @intCast(lexical_origins.items.len + 1);
+                    lexical_origins.appendAssumeCapacity(original);
+                    private.lexical_inputs.inputs.appendAssumeCapacity(copied);
+                    // Opaque parent key words contain parent evidence/value
+                    // ordinals. Only the remapped typing fields are consumed
+                    // here; never index foreign words in the private cache.
+                    // A newly interned private input gets a fresh ordinal and
+                    // cannot escape the origin check below.
+                    private.lexical_inputs.retained_words += copied.words.len;
+                    private.lexical_inputs.examined_words += copied.words.len;
+                }
+            }
+            key.inputs = imports.ty(key.inputs, 0) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else ComponentResult.measured(&private);
+            key.expected_result = imports.ty(key.expected_result, 0) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else ComponentResult.measured(&private);
+            key.expected_signature = imports.ty(key.expected_signature, 0) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else ComponentResult.measured(&private);
+            _ = private.call_summaries.request(&private, key.*) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else ComponentResult.measured(&private);
+        }
+        for (component_.edges) |edge| _ = private.call_summaries.components.add(scratch, edge.from, edge.to, requested_keys.len, &private.summary_transitions, private.summaryLimit()) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else ComponentResult.measured(&private);
+        const before_values = private.values.items.len;
+        const before_children = private.children.items.len;
+        private.call_summaries.drain(&private) catch |err| {
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+            return .{ .transitions = private.summary_transitions, .counters = private.counters };
+        };
+        var result: ComponentResult = .{ .transitions = private.summary_transitions, .counters = private.counters };
+        errdefer result.deinit(output);
+        if (private.diagnostic != null or dependencies.unknown or dependencies.nested or private.steps != 0 or private.values.items.len != before_values or private.children.items.len != before_children) return result;
+        for (requested_keys) |key| {
+            const index = private.call_summaries.keys.get(key) orelse return result;
+            if (private.call_summaries.jobs.items[index].state != .complete) return result;
+        }
+        // Return every completed private member, including SCC members found
+        // during execution. No provisional or declined judgment crosses owners.
+        const Export = struct {
+            key: Key,
+            root: type_evidence.Id,
+            fn less(_: void, left: @This(), right: @This()) bool {
+                const l = left.key;
+                const r = right.key;
+                inline for (.{ "unit", "binding" }) |field| if (@field(l.target, field) != @field(r.target, field)) return @field(l.target, field) < @field(r.target, field);
+                inline for (.{ "lexical", "inputs", "expected_result", "expected_signature" }) |field| if (@field(l, field) != @field(r, field)) return @field(l, field) < @field(r, field);
+                if (l.source_interface != r.source_interface) return !l.source_interface;
+                return !l.deferred_member and r.deferred_member;
+            }
+        };
+        var exports: std.ArrayList(Export) = .empty;
+        defer exports.deinit(scratch);
+        for (private.call_summaries.jobs.items) |job| {
+            if (job.state != .complete) continue;
+            var key = job.key;
+            if (key.lexical != 0) {
+                if (key.lexical > lexical_origins.items.len) return result;
+                key.lexical = lexical_origins.items[key.lexical - 1];
+            }
+            try exports.append(scratch, .{ .key = key, .root = job.result });
+        }
+        std.mem.sortUnstable(Export, exports.items, {}, Export.less);
+        result.keys = try output.alloc(Key, exports.items.len);
+        result.roots = try output.alloc(type_evidence.Id, exports.items.len);
+        for (exports.items, result.keys, result.roots) |entry, *key, *root| {
+            key.* = entry.key;
+            root.* = entry.root;
+        }
+        result.recursive_members = private.component_members_published;
+        result.restarts = private.component_restarts;
+        result.snapshot = try private.evidence.copyOwned(output);
+        result.sources = try output.dupe(core.BindingRef, dependencies.sources.items);
+        return result;
+    }
+    fn parallelReady(self: *CallSummaries, session: *Session) ClosureRegion.RegionError!bool {
+        const io = session.semantic_io orelse return false;
+        if (session.semantic_component_workers == 0 or session.receipt_tape != null or session.principal_reads != null or session.refinement_observation != null or session.summary_exhausted) return false;
+        const a = session.allocator;
+        var ready: std.ArrayList(Component) = .empty;
+        defer {
+            for (ready.items) |*component_| component_.deinit(a);
+            ready.deinit(a);
+        }
+        for (self.jobs.items, 0..) |job, index| {
+            if (job.state != .queued or self.components.component(@intCast(index)) != index) continue;
+            var members: std.ArrayList(Member) = .empty;
+            defer members.deinit(a);
+            var eligible = true;
+            for (self.jobs.items, 0..) |member_, member_index| {
+                if (!self.member(index, member_index)) continue;
+                if ((member_.state != .queued and member_.state != .waiting) or member_.region != null or member_.key.lexical > session.lexical_inputs.inputs.items.len) {
+                    eligible = false;
+                    break;
+                }
+                // An active SCC has one monomorphic root per source owner.
+                // Distinct closed instances of that owner remain separate
+                // components; a merged ambiguous component stays serial.
+                for (members.items) |prior| {
+                    const same_owner = if (member_.key.lexical != 0 or prior.key.lexical != 0) member_.key.lexical != 0 and member_.key.lexical == prior.key.lexical else std.meta.eql(member_.key.target, prior.key.target);
+                    if (same_owner) eligible = false;
+                }
+                if (!eligible) break;
+                try members.append(a, .{ .index = member_index, .key = member_.key });
+            }
+            if (!eligible) continue;
+            var edges: std.ArrayList(Edge) = .empty;
+            defer edges.deinit(a);
+            for (self.components.edges.items) |edge| {
+                if (!self.member(index, edge.from)) continue;
+                if (!self.member(index, edge.to)) {
+                    if (self.jobs.items[edge.to].state != .complete and self.jobs.items[edge.to].state != .declined) eligible = false;
+                    continue;
+                }
+                var from: u32 = 0;
+                var to: u32 = 0;
+                for (members.items, 0..) |member_, local| {
+                    if (member_.index == edge.from) from = @intCast(local);
+                    if (member_.index == edge.to) to = @intCast(local);
+                }
+                try edges.append(a, .{ .from = from, .to = to });
+            }
+            if (!eligible) continue;
+            const owned_members = try members.toOwnedSlice(a);
+            errdefer a.free(owned_members);
+            const owned_edges = try edges.toOwnedSlice(a);
+            errdefer a.free(owned_edges);
+            try ready.append(a, .{ .members = owned_members, .edges = owned_edges });
+        }
+        if (ready.items.len < 2) return false;
+        std.mem.sortUnstable(Component, ready.items, {}, Component.less);
+        const budget = (session.summaryLimit() -| session.summary_transitions) / ready.items.len;
+        if (budget == 0) return false;
+        for (ready.items) |*component_| component_.budget = budget;
+        const jobs = @import("semantic_job_batch.zig");
+        var cancellation: jobs.Cancellation = .{};
+        var batch = try jobs.run(ComponentResult, a, io, ready.items, session.semantic_component_workers, &cancellation, @as(*const Session, session), executeComponent);
+        defer batch.deinit();
+        session.counters.semantic_component_batches += 1;
+        session.counters.semantic_component_jobs += ready.items.len;
+        var failed = false;
+        var progressed = false;
+        for (ready.items, batch.outcomes) |component_, outcome| switch (outcome) {
+            .out_of_memory => failed = true,
+            .complete => |result| {
+                session.counters.merge(result.counters);
+                if (!session.summaryCharge(result.transitions)) continue;
+                const snapshot_ = result.snapshot orelse continue;
+                var independent_sources = true;
+                for (result.sources) |source| {
+                    const owner = session.findUnit(source.unit, null) orelse {
+                        independent_sources = false;
+                        break;
+                    };
+                    if (self.active.contains(.{ .unit = owner, .binding = source.binding })) {
+                        independent_sources = false;
+                        break;
+                    }
+                }
+                if (!independent_sources) continue;
+                // Import into a complete private destination. A failed import
+                // cannot mutate parent evidence or publish a subset of an SCC.
+                var staged = session.evidence.clone(a) catch {
+                    failed = true;
+                    continue;
+                };
+                defer staged.deinit();
+                var imports: @import("semantic_evidence_import.zig").Importer = .{ .allocator = a, .source = snapshot_.view(), .destination = &staged, .max_depth = session.options.max_type_depth };
+                defer imports.deinit();
+                const Staged = struct { key: Key, index: ?usize, evidence: type_evidence.Id };
+                const prepared = a.alloc(Staged, result.roots.len) catch {
+                    failed = true;
+                    continue;
+                };
+                defer a.free(prepared);
+                var valid = true;
+                for (component_.members) |member_| {
+                    const job = self.jobs.items[member_.index];
+                    if (!std.meta.eql(job.key, member_.key) or job.region != null or job.state == .declined or job.state == .running) valid = false;
+                }
+                if (!valid) continue;
+                var added: usize = 0;
+                for (result.keys, result.roots, prepared) |key, root, *entry| {
+                    // Late discovery of a source currently being inferred by
+                    // the coordinator must restart through its serial SCC path.
+                    if ((if (key.lexical != 0) self.active_lexical.contains(key.lexical) else self.active.contains(key.target)) or !std.meta.eql(key.options, session.options)) {
+                        valid = false;
+                        break;
+                    }
+                    var mapped_key = key;
+                    mapped_key.inputs = imports.ty(key.inputs, 0) catch |err| {
+                        if (err == error.OutOfMemory) failed = true;
+                        valid = false;
+                        break;
+                    };
+                    mapped_key.expected_result = imports.ty(key.expected_result, 0) catch |err| {
+                        if (err == error.OutOfMemory) failed = true;
+                        valid = false;
+                        break;
+                    };
+                    mapped_key.expected_signature = imports.ty(key.expected_signature, 0) catch |err| {
+                        if (err == error.OutOfMemory) failed = true;
+                        valid = false;
+                        break;
+                    };
+                    const mapped = imports.ty(root, 0) catch |err| {
+                        if (err == error.OutOfMemory) failed = true;
+                        valid = false;
+                        break;
+                    };
+                    const existing = self.keys.get(mapped_key);
+                    if (existing) |index| {
+                        const job = self.jobs.items[index];
+                        if (job.region != null or job.state == .declined or (job.state == .complete and job.result != mapped)) {
+                            valid = false;
+                            break;
+                        }
+                    } else added += 1;
+                    entry.* = .{ .key = mapped_key, .index = existing, .evidence = mapped };
+                }
+                if (!valid or added > session.options.max_values -| self.jobs.items.len) continue;
+                self.keys.ensureUnusedCapacity(a, @intCast(added)) catch {
+                    failed = true;
+                    continue;
+                };
+                self.jobs.ensureUnusedCapacity(a, added) catch {
+                    failed = true;
+                    continue;
+                };
+                // Every member/key/effect mapping and index capacity is ready
+                // before the allocation-free publication of this whole package.
+                std.mem.swap(type_evidence.Store, &staged, &session.evidence);
+                for (prepared) |entry| {
+                    if (entry.index) |index| {
+                        if (self.jobs.items[index].state != .complete) self.finish(session, index, entry.evidence);
+                    } else {
+                        self.keys.putAssumeCapacity(entry.key, self.jobs.items.len);
+                        self.jobs.appendAssumeCapacity(.{ .key = entry.key, .state = .complete, .result = entry.evidence });
+                        session.split_attempts += 1;
+                        session.split_accepted += 1;
+                    }
+                }
+                session.component_restarts += result.restarts;
+                session.component_members_published += result.recursive_members;
+                progressed = true;
+            },
+            else => {},
+        };
+        if (failed) return error.OutOfMemory;
+        if (cancellation.cancelled()) return error.Declined;
+        return progressed;
+    }
+
     fn deinit(self: *CallSummaries, session: *Session) void {
         for (self.jobs.items) |job| if (job.region) |region| {
             region.deinit();
@@ -370,7 +680,7 @@ const CallSummaries = struct {
         const root = self.components.component(@intCast(from));
         if (root == self.components.component(@intCast(index)) and root < self.components.nodes.items.len and self.components.nodes.items[root].recursive) return false;
         const before = session.summary_transitions;
-        const merged = self.components.add(session.allocator, @intCast(from), @intCast(index), self.jobs.items.len, &session.summary_transitions, session.options.max_summary_transitions) catch |err| {
+        const merged = self.components.add(session.allocator, @intCast(from), @intCast(index), self.jobs.items.len, &session.summary_transitions, session.summaryLimit()) catch |err| {
             if (err == error.OutOfMemory) return err;
             session.summary_exhausted = true;
             return false;
@@ -438,6 +748,7 @@ const CallSummaries = struct {
         defer self.current = null;
         errdefer self.abandonPending(session);
         while (self.stack.items.len != 0) {
+            if (try self.parallelReady(session)) continue;
             const index = self.stack.items[self.stack.items.len - 1];
             self.current = index;
             if (!session.summaryCharge(1)) {
@@ -552,6 +863,11 @@ const CallSummaries = struct {
 };
 
 pub const Session = struct {
+    semantic_io: ?std.Io = null,
+    /// Zero keeps ordinary inference. An explicit policy enables joined jobs.
+    semantic_component_workers: u8 = 0,
+    /// Private operational bound; it does not alter a canonical Options key.
+    semantic_job_budget: ?usize = null,
     timing: ?*@import("backend_timing.zig").Work = null,
     call_summaries: CallSummaries = .{},
     lexical_inputs: lexical_capture_inputs.Cache = .{},
@@ -638,9 +954,13 @@ pub const Session = struct {
     demanded: usize = 0,
     depth: usize = 0,
 
+    fn summaryLimit(self: *const Session) usize {
+        return @min(self.options.max_summary_transitions, self.semantic_job_budget orelse self.options.max_summary_transitions);
+    }
+
     fn summaryCharge(self: *Session, count: usize) bool {
         if (self.summary_exhausted) return false;
-        if (count > self.options.max_summary_transitions -| self.summary_transitions) {
+        if (count > self.summaryLimit() -| self.summary_transitions) {
             self.summary_exhausted = true;
             return false;
         }
@@ -4041,7 +4361,7 @@ const ClosureRegion = struct {
         var region: ClosureRegion = .{ .session = session, .timing = timing, .solver = try types.Store.initWithOptions(solver_allocator orelse arena.solverAllocator(), .{ .closed_graphs = true }), .scratch_allocator = allocator, .arena = arena };
         region.scratch.projection_cache.allocator = allocator;
         region.occurs_base = region.solver.occurs_steps;
-        if (session.inquiry_regions == 0) {
+        if (session.inquiry_regions == 0 and session.semantic_job_budget == null) {
             session.summary_transitions = 0;
             session.summary_exhausted = false;
         }
@@ -8772,6 +9092,169 @@ fn bodyRecipeLower(source: []const u8) !core.Module {
     module.unit = 1;
     try std.testing.expectEqual(@as(usize, 0), module.diagnostics.len);
     return module;
+}
+fn semanticTestTarget(module: *const core.Module, name: []const u8) Target {
+    for (module.bodies) |body| if (std.mem.eql(u8, module.name(body.export_name), name)) return .{ .unit = 0, .binding = body.binding };
+    unreachable;
+}
+fn privateLexicalScenario(a: Allocator, module: *const core.Module, workers: u8) !void {
+    var session = try Session.init(a, &.{module.*});
+    defer session.deinit();
+    session.semantic_io = std.testing.io;
+    session.semantic_component_workers = workers;
+    const selected: lexical_capture_inputs.Interfaces = .empty;
+    const inputs = try session.evidence.intern(.product, 0, 0, &.{types.u32_type});
+    var requested: [2]CallSummaries.Key = undefined;
+    for ([_][]const u8{ "first", "other" }, &requested) |name, *key| {
+        const target_ = semanticTestTarget(module, name);
+        const value = try session.richValue(.{ .unit = 1, .binding = target_.binding });
+        const lexical = try session.lexical_inputs.intern(a, &session, value, &selected) orelse return error.ExpectedLexicalInput;
+        key.* = .{ .target = .{ .unit = 0, .binding = 0 }, .inputs = inputs, .source_interface = false, .lexical = lexical, .options = session.options };
+        _ = try session.call_summaries.request(&session, key.*);
+    }
+    const before_values = session.values.items.len;
+    const before_steps = session.steps;
+    try session.call_summaries.drain(&session);
+    try std.testing.expectEqual(@as(u64, 2), session.counters.semantic_component_jobs);
+    try std.testing.expectEqual(@as(usize, 2), session.lexical_inputs.inputs.items.len);
+    for (requested) |key| {
+        const job = session.call_summaries.jobs.items[session.call_summaries.keys.get(key).?];
+        try std.testing.expectEqual(CallSummaries.JobState.complete, job.state);
+        const arrow = session.evidence.node(job.result);
+        try std.testing.expectEqual(type_evidence.Tag.function, arrow.tag);
+        try std.testing.expectEqual(types.u32_type, arrow.a);
+        try std.testing.expectEqual(types.u32_type, arrow.b);
+    }
+    try std.testing.expectEqual(before_values, session.values.items.len);
+    try std.testing.expectEqual(before_steps, session.steps);
+}
+test "private semantic lexical components remap capture interfaces without exporting live handles through allocation failures" {
+    var module = try bodyRecipeLower(
+        \\const make: U32 -> (U32 -> U32 ! {}) = fn captured => fn value => @u32.add captured value
+        \\entry const first = make 1
+        \\entry const other = make 2
+    );
+    defer module.deinit(std.testing.allocator);
+    for ([_]u8{ 1, 4 }) |workers| try privateLexicalScenario(std.testing.allocator, &module, workers);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, privateLexicalScenario, .{ &module, @as(u8, 1) });
+}
+fn privateRecursiveScenario(a: Allocator, module: *const core.Module, workers: u8) !void {
+    var session = try Session.init(a, &.{module.*});
+    defer session.deinit();
+    session.semantic_io = std.testing.io;
+    session.semantic_component_workers = workers;
+    session.options.max_steps = 0;
+    const inputs = try session.evidence.intern(.product, 0, 0, &.{types.u32_type});
+    var requested: [3]CallSummaries.Key = undefined;
+    for ([_][]const u8{ "even", "odd", "independent" }, &requested) |name, *key| {
+        key.* = .{ .target = semanticTestTarget(module, name), .inputs = inputs, .source_interface = false, .options = session.options };
+        _ = try session.call_summaries.request(&session, key.*);
+    }
+    _ = try session.call_summaries.components.add(a, 0, 1, 3, &session.summary_transitions, session.summaryLimit());
+    _ = try session.call_summaries.components.add(a, 1, 0, 3, &session.summary_transitions, session.summaryLimit());
+    session.call_summaries.drain(&session) catch |err| {
+        // The SCC package publishes all requested members, or none, even if
+        // another successful package survives an allocation failure.
+        const first = session.call_summaries.keys.get(requested[0]);
+        const second = session.call_summaries.keys.get(requested[1]);
+        try std.testing.expectEqual(first != null, second != null);
+        if (first) |index| try std.testing.expectEqual(CallSummaries.JobState.complete, session.call_summaries.jobs.items[index].state);
+        return err;
+    };
+    try std.testing.expectEqual(@as(u64, 2), session.counters.semantic_component_jobs);
+    try std.testing.expect(session.component_members_published >= 2);
+    for (requested) |key| {
+        const job = session.call_summaries.jobs.items[session.call_summaries.keys.get(key).?];
+        try std.testing.expectEqual(CallSummaries.JobState.complete, job.state);
+        const arrow = session.evidence.node(job.result);
+        try std.testing.expectEqual(types.u32_type, arrow.a);
+        try std.testing.expectEqual(types.u32_type, arrow.b);
+    }
+}
+test "private semantic known recursive components publish every member atomically beside independent jobs" {
+    var module = try bodyRecipeLower(
+        \\entry const even: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else odd (@u32.sub value 1)
+        \\entry const odd: U32 -> U32 = fn value => if @u32.eq value 0 then 42 else even (@u32.sub value 1)
+        \\entry const independent = fn value => @u32.add value 1
+    );
+    defer module.deinit(std.testing.allocator);
+    for ([_]u8{ 1, 4 }) |workers| try privateRecursiveScenario(std.testing.allocator, &module, workers);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, privateRecursiveScenario, .{ &module, @as(u8, 1) });
+}
+test "private semantic declined jobs preserve successful siblings and late active dependencies return to serial inference" {
+    const a = std.testing.allocator;
+    var module = try bodyRecipeLower(
+        \\entry const leaf = fn value => @u32.add value 1
+        \\entry const caller: U32 -> U32 = fn value => leaf value
+        \\entry const independent: U32 -> U32 = fn value => @u32.add value 2
+    );
+    defer module.deinit(a);
+    for ([_]u8{ 1, 4 }) |workers| {
+        var session = try Session.init(a, &.{module});
+        defer session.deinit();
+        session.semantic_io = std.testing.io;
+        session.semantic_component_workers = workers;
+        session.options.max_steps = 0;
+        const inputs = try session.evidence.intern(.product, 0, 0, &.{types.u32_type});
+        var requested: [3]CallSummaries.Key = undefined;
+        for ([_][]const u8{ "leaf", "caller", "independent" }, &requested) |name, *key| {
+            key.* = .{ .target = semanticTestTarget(&module, name), .inputs = inputs, .source_interface = false, .options = session.options };
+            _ = try session.call_summaries.request(&session, key.*);
+        }
+        session.call_summaries.jobs.items[0].state = .running;
+        try session.call_summaries.active.put(a, requested[0].target, 0);
+        try std.testing.expect(try session.call_summaries.parallelReady(&session));
+        try std.testing.expectEqual(CallSummaries.JobState.queued, session.call_summaries.jobs.items[1].state);
+        try std.testing.expectEqual(CallSummaries.JobState.complete, session.call_summaries.jobs.items[2].state);
+        _ = session.call_summaries.active.remove(requested[0].target);
+        session.call_summaries.jobs.items[0].state = .queued;
+        try session.call_summaries.drain(&session);
+        for (requested) |key| try std.testing.expectEqual(CallSummaries.JobState.complete, session.call_summaries.jobs.items[session.call_summaries.keys.get(key).?].state);
+        var rejected = requested[0];
+        rejected.inputs = try session.evidence.intern(.product, 0, 0, &.{types.f32_type});
+        _ = try session.call_summaries.request(&session, rejected);
+        // A separate exact key prevents reusing the earlier completed sibling.
+        var good = requested[2];
+        good.source_interface = true;
+        _ = try session.call_summaries.request(&session, good);
+        try session.call_summaries.drain(&session);
+        try std.testing.expectEqual(CallSummaries.JobState.declined, session.call_summaries.jobs.items[session.call_summaries.keys.get(rejected).?].state);
+        try std.testing.expectEqual(CallSummaries.JobState.complete, session.call_summaries.jobs.items[session.call_summaries.keys.get(good).?].state);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+        try std.testing.expect(session.diagnostic == null);
+    }
+}
+test "private semantic recursive generic jobs keep distinct complete U32 and F32 inputs" {
+    const a = std.testing.allocator;
+    var module = try bodyRecipeLower(
+        \\entry const recursive = fn value => fn (count: U32) => if @u32.eq count 0 then value else recursive value (@u32.sub count 1)
+    );
+    defer module.deinit(a);
+    for ([_]u8{ 0, 1, 4 }) |workers| {
+        var session = try Session.init(a, &.{module});
+        defer session.deinit();
+        session.semantic_io = std.testing.io;
+        session.semantic_component_workers = workers;
+        session.options.max_steps = 0;
+        var requested: [2]CallSummaries.Key = undefined;
+        for ([_]types.Id{ types.u32_type, types.f32_type }, &requested) |input, *key| {
+            const inputs = try session.evidence.intern(.product, 0, 0, &.{ input, types.u32_type });
+            key.* = .{ .target = semanticTestTarget(&module, "recursive"), .inputs = inputs, .source_interface = false, .options = session.options };
+            _ = try session.call_summaries.request(&session, key.*);
+        }
+        try session.call_summaries.drain(&session);
+        for (requested, [_]types.Id{ types.u32_type, types.f32_type }) |key, input| {
+            const job = session.call_summaries.jobs.items[session.call_summaries.keys.get(key).?];
+            try std.testing.expectEqual(CallSummaries.JobState.complete, job.state);
+            const arrow = session.evidence.node(job.result);
+            try std.testing.expectEqual(input, arrow.a);
+            const inner = session.evidence.node(arrow.b);
+            try std.testing.expectEqual(types.u32_type, inner.a);
+            try std.testing.expectEqual(input, inner.b);
+        }
+        if (workers != 0) try std.testing.expectEqual(@as(u64, 2), session.counters.semantic_component_jobs);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    }
 }
 fn expectRecipeSolverEqual(reference: *const ClosureRegion, replay: *const ClosureRegion) !void {
     try std.testing.expectEqualDeep(reference.scratch.sources.items, replay.scratch.sources.items);
