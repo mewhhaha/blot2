@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete — durable typed query design and migration contract
+  reviewed against current ownership and validity paths.
 - **Dependencies:** [008](008-canonicalize-specialization-keys.md)
 - **Originating requirements:** PLAN: Hill 12 / one reuse-query model. Sources:
   [PLAN.md](../PLAN.md).
@@ -28,14 +29,14 @@ dependency information.
 
 ## Implementation checklist
 
-- [ ] Define typed keys and owned values for refinement, specialization,
+- [x] Define typed keys and owned values for refinement, specialization,
       principal, source-validation and executable queries, using complete
       canonical evidence.
-- [ ] Specify dependency recording, exact equality after fingerprints, early
+- [x] Specify dependency recording, exact equality after fingerprints, early
       cutoff, invalidation, failed candidates and concurrent publication.
-- [ ] Keep semantic interfaces, executable behavior and evaluated values as
+- [x] Keep semantic interfaces, executable behavior and evaluated values as
       distinct validity claims; unchanged types cannot certify unchanged bodies.
-- [ ] Document a staged migration and portable schema through
+- [x] Document a staged migration and portable schema through
       `dependency_format`, including versioning, corruption bounds and
       conservative fallback.
 
@@ -53,20 +54,26 @@ change.
 
 ## Acceptance criteria
 
-- [ ] A durable design specifies APIs, representations, diagnostics,
+- [x] A durable design specifies APIs, representations, diagnostics,
       compatibility and acceptance examples for tasks 015–020.
-- [ ] Each existing cache has a migration destination without weakening its
+- [x] Each existing cache has a migration destination without weakening its
       validity proof.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: local documentation milestone; final revision recorded after commit.
+- Validation: changed Markdown is formatted; local file/fragment links and
+  task-015–020 migration destinations are checked. Read-only review covered
+  current receipts, principal/source validation, artifact ownership and all
+  acceptance walks, including open-residual versus complete-proof submodes.
+- Comparison: performance measurement does not apply to this design-only task;
+  compiler code and executable fixtures are unchanged by task 014.
+- Remaining limitations: the shared table, migrations and portable records
+  remain unimplemented tasks 015–020. The design preserves conservative
+  unsupported domains and makes no new performance or complete-artifact coverage
+  claim.
+- Durable record: [typed reuse queries](../zig-native/QUERY_TABLE.md), including
+  APIs, owned representations, diagnostics, compatibility, migration mapping and
+  acceptance examples.

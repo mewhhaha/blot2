@@ -152,6 +152,12 @@ incomplete inputs remain conservative. Overall median CPU ratio is 0.987. Task
 [The canonical qualification](../zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026)
 records exact pins, measurements and remaining limits.
 
+Task [014] completes the documentation-only
+[typed query design](../zig-native/QUERY_TABLE.md): distinct validity claims,
+owned keys/results, exact dependency equality, transactional publication,
+cycles, portable compatibility and migration destinations for tasks [015]–[020].
+The common table and those migrations remain implementation work.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -382,7 +388,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [011] — Reduce semantic allocation traffic              | In progress | [007], [008], [010]                    |
 | [012] — Schedule independent semantic jobs              | Pending     | [007], [008], [010]                    |
 | [013] — Qualify parallel inference                      | Pending     | [011], [012]                           |
-| [014] — Specify unified query table                     | Pending     | [008]                                  |
+| [014] — Specify unified query table                     | Complete    | [008]                                  |
 | [015] — Migrate refinement queries                      | Pending     | [014]                                  |
 | [016] — Migrate specialization and principal queries    | Pending     | [015]                                  |
 | [017] — Unify source and revision validation            | Pending     | [016]                                  |
