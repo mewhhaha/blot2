@@ -236,13 +236,17 @@ const PrincipalGraph = struct {
     arguments: []core.Id = &.{},
     references: []Target = &.{},
     actions: []Action = &.{},
+    source_complete: bool = false,
+    dependencies: []core.BindingRef = &.{},
+    plain_reads: []receipt.PlainFact = &.{},
+    untracked_reads: bool = false,
 
     fn nodeCount(self: *const PrincipalGraph) usize {
         return self.types.nodes.items.len + self.types.effects.rows.items.len + self.types.operations.items.len;
     }
 
     fn edgeCount(self: *const PrincipalGraph) usize {
-        var count = self.types.extra.items.len + self.types.effects.labels.items.len + self.actions.len + self.imports.len + self.rows.len + self.arguments.len + self.aliases.len * 2 + self.functions.len + self.references.len;
+        var count = self.types.extra.items.len +| self.types.effects.labels.items.len +| self.actions.len +| self.imports.len +| self.rows.len +| self.arguments.len +| self.aliases.len *| 2 +| self.functions.len +| self.references.len +| self.dependencies.len +| self.plain_reads.len;
         for (self.constraints) |constraint| count +|= 5 +| constraint.diagnostic_name.len;
         for (self.requirements) |constraint| count +|= 5 +| constraint.diagnostic_name.len;
         return count;
@@ -260,6 +264,8 @@ const PrincipalGraph = struct {
         allocator.free(self.arguments);
         allocator.free(self.references);
         allocator.free(self.actions);
+        allocator.free(self.dependencies);
+        allocator.free(self.plain_reads);
         self.types.deinit();
     }
 };
@@ -268,15 +274,20 @@ const CallSummaries = struct {
     const Key = struct { target: Target, inputs: type_evidence.Id, source_interface: bool, expected_result: type_evidence.Id = 0, expected_signature: type_evidence.Id = 0, deferred_member: bool = false };
     const JobState = enum { queued, running, complete, declined };
     const Job = struct { key: Key, state: JobState = .queued, region: ?*ClosureRegion = null, result: type_evidence.Id = 0 };
+    const HeaderParts = struct { mask: []bool, has_private: bool = false };
     keys: std.AutoHashMapUnmanaged(Key, usize) = .empty,
     jobs: std.ArrayList(Job) = .empty,
     stack: std.ArrayList(usize) = .empty,
     active: std.AutoHashMapUnmanaged(Target, void) = .empty,
     eligibility: std.AutoHashMapUnmanaged(Target, bool) = .empty,
     checked_requirements: std.AutoHashMapUnmanaged(Target, bool) = .empty,
-    public_requirements: std.AutoHashMapUnmanaged(Target, void) = .empty,
+    // Exact source slots consumed by the mandatory header graph. These are
+    // immutable source facts, not a live instantiation or a completed proof.
+    public_requirements: std.AutoHashMapUnmanaged(Target, HeaderParts) = .empty,
+    public_requirement_slots: usize = 0,
     constant_requirements: std.AutoHashMapUnmanaged(Target, void) = .empty,
     principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, ?*PrincipalGraph) = .empty,
+    normalized_principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, *PrincipalGraph) = .empty,
     open_principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, bool) = .empty,
     result_principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, bool) = .empty,
     draining: bool = false,
@@ -292,6 +303,8 @@ const CallSummaries = struct {
         self.active.deinit(session.allocator);
         self.eligibility.deinit(session.allocator);
         self.checked_requirements.deinit(session.allocator);
+        var public_requirements = self.public_requirements.valueIterator();
+        while (public_requirements.next()) |parts| session.allocator.free(parts.mask);
         self.public_requirements.deinit(session.allocator);
         self.constant_requirements.deinit(session.allocator);
         self.result_principals.deinit(session.allocator);
@@ -301,6 +314,12 @@ const CallSummaries = struct {
             session.allocator.destroy(graph);
         };
         self.principals.deinit(session.allocator);
+        var normalized = self.normalized_principals.valueIterator();
+        while (normalized.next()) |graph| {
+            graph.*.deinit(session.allocator);
+            session.allocator.destroy(graph.*);
+        }
+        self.normalized_principals.deinit(session.allocator);
         self.open_principals.deinit(session.allocator);
     }
     fn request(self: *CallSummaries, session: *Session, key: Key) ClosureRegion.RegionError!?Job {
@@ -3626,7 +3645,17 @@ const ClosureRegion = struct {
     const Edge = struct { parent: u32, child: u32, slot: u32, formal: types.Id };
     const DataAlias = struct { instance: types.Id, principal: types.Id, solved: bool = false };
     const CallKey = struct { owner: usize, binding: core.BindingId, evidence: type_evidence.Id, caller: u32 = 0 };
-    const SchemeInstance = struct { target: Target, public: type_evidence.Id, deferred_member: bool, open: types.Id = 0, constant: bool = false, physical: u64 = 0 };
+    const SchemeInstance = struct { target: Target, public: type_evidence.Id, deferred_member: bool, open: u32 = 0, constant: bool = false, physical: u64 = 0, generation: u16 = 0 };
+    const SchemeInputs = struct {
+        keys: std.StringHashMapUnmanaged(u32) = .empty,
+        parts: usize = 0,
+
+        fn deinit(self: *SchemeInputs, allocator: Allocator) void {
+            var keys = self.keys.keyIterator();
+            while (keys.next()) |key| allocator.free(key.*);
+            self.keys.deinit(allocator);
+        }
+    };
     const DefinitionKey = struct { owner: usize, node: core.Id };
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
     const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use };
@@ -3669,9 +3698,10 @@ const ClosureRegion = struct {
         witness_inputs: std.AutoHashMapUnmanaged(types.Id, types.Id) = .empty,
         principal_references: std.ArrayList(Target) = .empty,
         principal_actions: std.ArrayList(PrincipalGraph.Action) = .empty,
-        /// Region-local scheduling shares a closed header's outstanding work.
+        /// Region-local scheduling shares a header's outstanding work.
         /// Its predicates remain required; this is never a published proof.
         scheme_instances: std.AutoHashMapUnmanaged(SchemeInstance, void) = .empty,
+        scheme_inputs: SchemeInputs = .{},
 
         pub fn deinit(self: *Scratch, allocator: Allocator) void {
             if (self.worklists) |work| {
@@ -3929,6 +3959,12 @@ const ClosureRegion = struct {
             self.session.owned_diagnostic_message = &.{};
             return .{ .selected = false };
         };
+        if (!body.is_function and try self.retainedComparison()) {
+            // The original nongeneric-entry traversal reports an unresolved
+            // witness at its source leaf. Keep that traversal authoritative.
+            self.principal_only_used = true;
+            return error.UnresolvedType;
+        }
         if (!body.is_function) for (self.scratch.constraints.items) |constraint| {
             if (constraint.solved or constraint.kind != .type_compare) continue;
             const owner = self.scratch.sources.items[constraint.scope].owner;
@@ -4964,7 +5000,7 @@ const ClosureRegion = struct {
         while (targets.next()) |target_| self.session.call_summaries.constant_requirements.putAssumeCapacity(target_.*, {});
         return true;
     }
-    fn publicRequirementOperand(self: *ClosureRegion, target_: Target, root: types.Id) RegionError!bool {
+    fn publicRequirementOperand(self: *ClosureRegion, target_: Target, root: types.Id, parts: *CallSummaries.HeaderParts) RegionError!bool {
         const module = &self.session.units[target_.unit];
         const binding = module.binding(target_.binding);
         const Part = union(enum) { ty: types.Id, row: types.Effects.Id };
@@ -4985,13 +5021,21 @@ const ClosureRegion = struct {
                 .row => |id| {
                     const row = module.types.row(id);
                     if (row.tail == .parameter) return false;
-                    if (row.tail == .variable and std.mem.findScalar(u32, module.types.list(binding.public_rows), row.tail.variable) == null) return false;
+                    if (row.tail == .variable) {
+                        if (std.mem.findScalar(u32, module.types.list(binding.public_rows), row.tail.variable)) |slot| {
+                            parts.mask[binding.public_variables.len + slot] = true;
+                        } else parts.has_private = true;
+                    }
                     for (module.types.rowLabels(id)) |label| for (module.types.operationArguments(label)) |argument| try pending.append(self.scratch_allocator, .{ .ty = argument });
                 },
                 .ty => |id| {
                     const node = module.types.node(id);
                     switch (node.tag) {
-                        .variable => if (std.mem.findScalar(types.Id, module.types.list(binding.public_variables), id) == null) return false,
+                        .variable => {
+                            if (std.mem.findScalar(types.Id, module.types.list(binding.public_variables), id)) |slot| {
+                                parts.mask[slot] = true;
+                            } else parts.has_private = true;
+                        },
                         .absent => return false,
                         .unit, .boolean, .u32, .f32, .never, .type_constructor => {},
                         .array, .list, .cursor, .resolver => try pending.append(self.scratch_allocator, .{ .ty = node.a }),
@@ -5013,15 +5057,32 @@ const ClosureRegion = struct {
         }
         return true;
     }
-    fn publicRequirements(self: *ClosureRegion, root: Target) RegionError!bool {
-        if (self.session.call_summaries.public_requirements.contains(root)) return true;
-        if (self.session.call_summaries.public_requirements.count() >= self.session.options.max_values) return false;
+    fn publicRequirements(self: *ClosureRegion, root: Target) RegionError!?CallSummaries.HeaderParts {
+        const store = &self.session.call_summaries;
+        if (store.public_requirements.get(root)) |known| return known;
+        if (store.public_requirements.count() >= self.session.options.max_values) return null;
         const Header = struct { target: Target, next: u32 = 0 };
+        const Parts = struct { header: CallSummaries.HeaderParts, complete: bool = false };
         var pending: std.ArrayList(Header) = .empty;
         defer pending.deinit(self.scratch_allocator);
-        var visited: std.AutoHashMapUnmanaged(Target, bool) = .empty;
-        defer visited.deinit(self.scratch_allocator);
-        try visited.put(self.scratch_allocator, root, false);
+        var visited: std.AutoHashMapUnmanaged(Target, Parts) = .empty;
+        var published = false;
+        defer {
+            if (!published) {
+                var parts = visited.valueIterator();
+                while (parts.next()) |part| self.session.allocator.free(part.header.mask);
+            }
+            visited.deinit(self.scratch_allocator);
+        }
+        const binding = self.session.units[root.unit].binding(root.binding);
+        var slots = std.math.add(usize, binding.public_variables.len, binding.public_rows.len) catch return null;
+        if (slots > self.session.options.max_children -| store.public_requirement_slots) return null;
+        const first = try self.session.allocator.alloc(bool, slots);
+        @memset(first, false);
+        visited.put(self.scratch_allocator, root, .{ .header = .{ .mask = first } }) catch |err| {
+            self.session.allocator.free(first);
+            return err;
+        };
         try pending.append(self.scratch_allocator, .{ .target = root });
         var edges: usize = 0;
         while (pending.items.len != 0) {
@@ -5030,48 +5091,126 @@ const ClosureRegion = struct {
             const module = &self.session.units[frame.target.unit];
             const scheme = module.binding(frame.target.binding).scheme;
             if (frame.next == scheme.obligations.len) {
-                visited.getPtr(frame.target).?.* = true;
+                visited.getPtr(frame.target).?.complete = true;
                 _ = pending.pop();
                 continue;
             }
-            pending.items[last].next += 1;
             edges += 1;
-            if (edges > self.session.options.max_children) return false;
+            if (edges > self.session.options.max_children) return null;
             const requirement = module.obligations[scheme.obligations.start + frame.next];
             if (requirement.kind == .callee_use) {
                 const child = try self.schemeTarget(frame.target.unit, requirement.identity);
-                if (!self.session.units[child.unit].binding(child.binding).has_explicit) continue;
-                if (!try self.publicRequirementOperand(frame.target, requirement.ty)) return false;
-                if (self.session.call_summaries.public_requirements.contains(child)) continue;
-                if (visited.get(child)) |complete| {
-                    if (!complete) return false;
+                const child_binding = self.session.units[child.unit].binding(child.binding);
+                if (!child_binding.has_explicit) {
+                    pending.items[last].next += 1;
                     continue;
                 }
-                if (visited.count() >= self.session.options.max_values) return false;
-                try visited.put(self.scratch_allocator, child, false);
-                try pending.append(self.scratch_allocator, .{ .target = child });
+                const child_parts: CallSummaries.HeaderParts = if (store.public_requirements.get(child)) |known| known else if (visited.get(child)) |known| blk: {
+                    if (!known.complete) return null;
+                    break :blk known.header;
+                } else {
+                    if (visited.count() >= self.session.options.max_values -| store.public_requirements.count()) return null;
+                    const count = std.math.add(usize, child_binding.public_variables.len, child_binding.public_rows.len) catch return null;
+                    if (count > self.session.options.max_children -| store.public_requirement_slots -| slots) return null;
+                    const mask = try self.session.allocator.alloc(bool, count);
+                    @memset(mask, false);
+                    visited.put(self.scratch_allocator, child, .{ .header = .{ .mask = mask } }) catch |err| {
+                        self.session.allocator.free(mask);
+                        return err;
+                    };
+                    slots += count;
+                    try pending.append(self.scratch_allocator, .{ .target = child });
+                    continue;
+                };
+                const product = module.types.node(requirement.ty);
+                if (product.tag != .product or product.b != child_parts.mask.len) return error.UnresolvedType;
+                const parts = &visited.getPtr(frame.target).?.header;
+                parts.has_private = parts.has_private or child_parts.has_private;
+                for (module.types.list(.{ .start = product.a, .len = product.b }), child_parts.mask) |operand, consumed| {
+                    if (consumed and !try self.publicRequirementOperand(frame.target, operand, parts)) return null;
+                }
             } else if (requirement.explicit) {
-                // Private binders require fresh independent work at each use.
-                // Public binders can share an outstanding requirement only
-                // inside the region holding their exact live instance.
+                // Open private binders keep fresh work. A closed public
+                // instantiation may share the header's required constraints,
+                // just as the original complete-public key does.
                 for ([_]types.Id{ requirement.ty, requirement.other, requirement.result, requirement.signature }) |operand| {
                     if (operand != 0 and operand == requirement.signature and self.autonomousRowCarrier(frame.target, requirement)) continue;
-                    if (operand != 0 and !try self.publicRequirementOperand(frame.target, operand)) return false;
+                    if (operand != 0 and !try self.publicRequirementOperand(frame.target, operand, &visited.getPtr(frame.target).?.header)) return null;
                 }
             }
+            pending.items[last].next += 1;
         }
-        if (visited.count() > self.session.options.max_values -| self.session.call_summaries.public_requirements.count()) return false;
-        try self.session.call_summaries.public_requirements.ensureUnusedCapacity(self.session.allocator, @intCast(visited.count()));
-        var targets = visited.keyIterator();
-        while (targets.next()) |target_| self.session.call_summaries.public_requirements.putAssumeCapacity(target_.*, {});
-        return true;
+        if (visited.count() > self.session.options.max_values -| store.public_requirements.count()) return null;
+        try store.public_requirements.ensureUnusedCapacity(self.session.allocator, @intCast(visited.count()));
+        var targets = visited.iterator();
+        while (targets.next()) |entry| store.public_requirements.putAssumeCapacity(entry.key_ptr.*, entry.value_ptr.header);
+        store.public_requirement_slots += slots;
+        published = true;
+        return store.public_requirements.get(root).?;
+    }
+    fn schemeInputs(self: *ClosureRegion, target_: Target, root: types.Id, header: CallSummaries.HeaderParts) RegionError!u32 {
+        const binding = self.session.units[target_.unit].binding(target_.binding);
+        const product = self.solver.node(try self.solver.resolve(root, 0));
+        if (product.tag != .product or product.b != header.mask.len) return error.UnresolvedType;
+        // Resolution may grow the solver's side arrays. Keep an owned copy of
+        // the slot handles, and use exact live IDs rather than alpha equality.
+        const instance = try self.scratch_allocator.dupe(types.Id, self.solver.list(.{ .start = product.a, .len = product.b }));
+        defer self.scratch_allocator.free(instance);
+        var parts: std.ArrayList(u32) = .empty;
+        defer parts.deinit(self.scratch_allocator);
+        for (instance, header.mask, 0..) |operand, consumed, slot| {
+            if (!consumed) continue;
+            const actual = try self.solver.resolve(operand, 0);
+            if (slot < binding.public_variables.len) {
+                const closed = try self.project(actual);
+                if (header.has_private and closed == 0) return 0;
+                try parts.appendSlice(self.scratch_allocator, &.{ if (closed == 0) 0 else 2, if (closed == 0) actual else closed });
+            } else {
+                const carrier = self.solver.node(actual);
+                if (carrier.tag != .function or carrier.a != types.unit or carrier.b != types.unit) return error.UnresolvedType;
+                const row = try self.solver.resolveEffects(carrier.c, 0);
+                const view = self.solver.row(row);
+                if (header.has_private and view.tail != .closed) return 0;
+                const closed = if (view.tail == .closed) self.session.evidence.projectEffects(&self.solver, row, &.{}, &.{}) catch |err| switch (err) {
+                    error.UnresolvedType => 0,
+                    else => return err,
+                } else 0;
+                if (header.has_private and closed == 0 and row != 0) return 0;
+                if (view.tail == .closed and (closed != 0 or row == 0)) {
+                    try parts.appendSlice(self.scratch_allocator, &.{ 3, closed });
+                    continue;
+                }
+                try parts.appendSlice(self.scratch_allocator, &.{ 1, view.cursor, @backingInt(std.meta.activeTag(view.tail)), switch (view.tail) {
+                    .closed => 0,
+                    .variable => |variable| variable,
+                    .parameter => |parameter| parameter,
+                }, view.labels.len });
+                try parts.appendSlice(self.scratch_allocator, self.solver.rowLabels(row));
+            }
+            if (parts.items.len > self.session.options.max_children) return 0;
+        }
+        const key = std.mem.sliceAsBytes(parts.items);
+        const inputs = &self.scratch.scheme_inputs;
+        if (inputs.keys.get(key)) |known| return known;
+        if (inputs.keys.count() >= self.session.options.max_values or inputs.keys.count() == std.math.maxInt(u32) or parts.items.len > self.session.options.max_children -| inputs.parts) return 0;
+        const owned = try self.scratch_allocator.dupe(u8, key);
+        errdefer self.scratch_allocator.free(owned);
+        try inputs.keys.ensureUnusedCapacity(self.scratch_allocator, 1);
+        const id: u32 = @intCast(inputs.keys.count() + 1);
+        inputs.keys.putAssumeCapacity(owned, id);
+        inputs.parts += parts.items.len;
+        return id;
     }
     fn schemeImport(self: *ClosureRegion, use: Constraint) RegionError!SchemeImport {
         const public = try self.project(use.left);
+        const cacheable = self.solver.closed_generation != std.math.maxInt(u16) and self.solver.effects.physical_epoch != std.math.maxInt(u64);
         const constant = public == 0 and try self.constantRequirements(use.target);
-        const open = if (public == 0 and !constant and try self.publicRequirements(use.target)) try self.solver.resolve(use.left, 0) else 0;
-        const key: SchemeInstance = .{ .target = use.target, .public = public, .deferred_member = use.deferred_member, .open = open, .constant = constant, .physical = self.solver.effects.physical_epoch };
-        if ((public != 0 or open != 0 or constant) and self.scratch.scheme_instances.contains(key)) return .solved;
+        const open = if (cacheable and public == 0 and !constant) blk: {
+            const mask = try self.publicRequirements(use.target) orelse break :blk 0;
+            break :blk try self.schemeInputs(use.target, use.left, mask);
+        } else 0;
+        const key: SchemeInstance = .{ .target = use.target, .public = if (cacheable) public else 0, .deferred_member = use.deferred_member, .open = open, .constant = cacheable and constant, .physical = self.solver.effects.physical_epoch, .generation = self.solver.closed_generation };
+        if ((key.public != 0 or key.open != 0 or key.constant) and self.scratch.scheme_instances.contains(key)) return .solved;
         const module = &self.session.units[use.target.unit];
         const binding = module.binding(use.target.binding);
         const product = self.solver.node(try self.solver.resolve(use.left, 0));
@@ -5087,7 +5226,7 @@ const ClosureRegion = struct {
         for (module.types.list(binding.public_rows), instance[binding.public_variables.len..]) |variable, carrier| try copy.row_variables.put(self.scratch_allocator, variable, self.solver.node(carrier).c);
         // An entirely unknown written graph remains a residual edge in the
         // optional inquiry. Known endpoints still receive ordinary checking.
-        if (self.partial_principal and public == 0) {
+        if (self.partial_principal and public == 0 and !constant) {
             var unknown = true;
             for (instance[0..binding.public_variables.len]) |ty| unknown = unknown and self.solver.node(try self.solver.resolve(ty, 0)).tag == .variable;
             for (instance[binding.public_variables.len..]) |ty| {
@@ -5292,7 +5431,7 @@ const ClosureRegion = struct {
                     continue;
                 }
                 switch (requirement.kind) {
-                    .dispatch, .field, .writable_field, .collection, .record_merge, .update => {},
+                    .dispatch, .field, .writable_field, .receiver, .collection, .record_merge, .update, .effect_operation, .effect_handler, .type_head, .type_rep, .effect_rep => {},
                     .callee_use => {
                         const child = try self.session.external(.{ .unit = target.unit, .binding = requirement.identity.decl });
                         if (self.session.call_summaries.eligibility.get(child)) |eligible| {
@@ -5426,6 +5565,12 @@ const ClosureRegion = struct {
         const saved = self.defer_members;
         self.defer_members = constraint.deferred_member;
         defer self.defer_members = saved;
+        if (constraint.source_selection) {
+            const scope = try self.callableScope(constraint.target);
+            _ = try self.admitSignature(constraint.left, self.scratch.sources.items[scope].root);
+            try self.collectSelected(scope, constraint.target);
+            return;
+        }
         // Argument IDs are consumed before collecting any nested call that
         // could grow this scratch list. They retain the original witness sites.
         const arguments = self.scratch.summary_arguments.items[constraint.arguments.start..][0..constraint.arguments.len];
@@ -5439,6 +5584,12 @@ const ClosureRegion = struct {
             if (constraint.solved or constraint.kind != .call_summary) continue;
             if (allow_remaining and try self.retainOpenPrincipal(constraint)) {
                 self.session.principal_graph_deferred += 1;
+                self.principal_only_used = true;
+                const key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = self.source_interface, .deferred_member = constraint.deferred_member, .options = self.session.options };
+                if ((try self.principalGraphForKey(key)).?.source_complete) {
+                    self.scratch.constraints.items[index].solved = true;
+                    changed = true;
+                }
                 continue;
             }
             self.scratch.constraints.items[index].solved = true;
@@ -5532,10 +5683,57 @@ const ClosureRegion = struct {
         defer arguments.deinit(self.session.allocator);
         for (module.types.list(operation.arguments)) |argument| try arguments.append(self.session.allocator, try self.importType(scope, argument, 0));
         const signature = try self.importType(scope, operation.signature, 0);
-        if (operation.witness != 0) {
+        if (operation.witness != 0 and !try self.sourceHeadProven(owner, module.typeOf(operation.witness), operation.witness_result)) {
             try self.appendConstraint(.{ .scope = scope, .node = id, .left = try self.importType(scope, module.typeOf(operation.witness), 0), .right = try self.importType(scope, operation.witness_result, 0), .result = 0, .kind = .type_head });
         }
-        try self.appendConstraint(.{ .scope = scope, .node = id, .left = signature, .right = try self.solver.product(arguments.items), .result = 0, .signature = signature, .identity = .{ .unit = if (operation.identity.unit == 0) self.session.unitId(owner) else operation.identity.unit, .decl = operation.identity.decl }, .kind = .effect_operation });
+        try self.appendConstraint(.{ .scope = scope, .node = id, .left = signature, .right = try self.solver.product(arguments.items), .result = 0, .signature = signature, .identity = .{ .unit = if (operation.identity.unit == 0) self.session.unitId(owner) else operation.identity.unit, .decl = operation.identity.decl }, .kind = .effect_operation, .solved = self.building_principal and try self.sourceOperationProven(owner, operation) });
+    }
+    fn sourceOperationProven(self: *ClosureRegion, owner: usize, operation: core.OperationValue) RegionError!bool {
+        // A source-seeded exact instance already owns its row prefix. This
+        // discharges only that redundant equation; every row import and handler
+        // equation remains in the template. Inferred instances stay residual.
+        const source = &self.session.units[owner].types;
+        const signature = source.node(operation.signature);
+        if (signature.tag != .function) return false;
+        const arguments = source.list(operation.arguments);
+        for (arguments) |argument| {
+            const complete = self.session.evidence.project(source, argument, &.{}) catch |err| switch (err) {
+                error.OutOfMemory => return err,
+                else => return false,
+            };
+            if (!try self.firstOrderData(complete, 0)) return false;
+        }
+        for (source.rowLabels(signature.c)) |label| {
+            if (std.meta.eql(source.operation(label).identity, operation.identity) and std.mem.eql(types.Id, source.operationArguments(label), arguments)) return true;
+        }
+        return false;
+    }
+    fn sourceHeadProven(self: *ClosureRegion, owner: usize, witness: types.Id, result: types.Id) RegionError!bool {
+        // Only immutable source facts may discharge this redundant equation.
+        // A caller-selected witness must still infer/check its result normally.
+        const source = &self.session.units[owner].types;
+        var head = witness;
+        for (0..self.session.options.max_type_depth) |_| {
+            const node = source.node(head);
+            if (node.tag != .function) break;
+            head = node.b;
+        } else return false;
+        // A fixed outer constructor stays the same under every fresh binder
+        // substitution. An unknown outer binder can later become an arrow,
+        // whose witness head differs from the binder itself.
+        if (head == result) switch (source.node(head).tag) {
+            .absent, .variable, .never => {},
+            else => return true,
+        };
+        const actual = self.session.evidence.project(source, head, &.{}) catch |err| switch (err) {
+            error.OutOfMemory => return err,
+            else => return false,
+        };
+        const expected = self.session.evidence.project(source, result, &.{}) catch |err| switch (err) {
+            error.OutOfMemory => return err,
+            else => return false,
+        };
+        return actual == expected and self.session.evidence.node(actual).tag != .never and try self.firstOrderData(actual, 0);
     }
     /// An invocation can retain a generic result while its source row already
     /// proves the operation arguments. Recover that proof only from a complete
@@ -5657,13 +5855,26 @@ const ClosureRegion = struct {
         const tape = self.session.receipt_tape;
         const reads = self.session.principal_reads;
         const observation = self.session.refinement_observation;
-        self.session.receipt_tape = null;
+        var dependencies: receipt.Tape = .{};
+        defer dependencies.deinit(a);
+        self.session.receipt_tape = &dependencies;
         self.session.principal_reads = null;
         self.session.refinement_observation = null;
         defer {
             self.session.receipt_tape = tape;
             self.session.principal_reads = reads;
             self.session.refinement_observation = observation;
+        }
+        // Collection and solving are speculative source inquiries. Neither may
+        // replace the diagnostic owned by the authoritative caller inquiry.
+        const diagnostic = self.session.diagnostic;
+        const message = self.session.owned_diagnostic_message;
+        self.session.diagnostic = null;
+        self.session.owned_diagnostic_message = &.{};
+        defer {
+            self.session.allocator.free(self.session.owned_diagnostic_message);
+            self.session.owned_diagnostic_message = message;
+            self.session.diagnostic = diagnostic;
         }
         var region = try ClosureRegion.initWithSolverAllocator(self.session, a);
         defer region.deinit();
@@ -5678,24 +5889,96 @@ const ClosureRegion = struct {
             error.OutOfMemory => return err,
             else => return null,
         };
-        if (region.scratch.sources.items.len != 1 or region.scratch.edges.items.len != 0) return null;
-        // A template is a frozen principal graph, never a solver history. Body
-        // equations needing chronological writes retain ordinary collection.
-        if (region.solver.versions.items.len != 0 or region.solver.effects.versions.items.len != 0) return null;
+        // This region contains only fresh immutable-source inputs. Source
+        // equations may refine its binders, but a template never owns their
+        // chronological solver history or emits speculative diagnostics.
+        var previous = region.solver.mark();
+        var transitions: usize = 0;
+        var fallback = false;
+        var imported_children: std.AutoHashMapUnmanaged(usize, void) = .empty;
+        defer imported_children.deinit(a);
+        while (true) {
+            var constraint_index: usize = 0;
+            var attempted = false;
+            while (constraint_index < region.scratch.constraints.items.len) : (constraint_index += 1) {
+                const constraint = region.scratch.constraints.items[constraint_index];
+                if (constraint.kind == .call_summary) {
+                    if (imported_children.contains(constraint_index)) continue;
+                    const child_key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = key.source_interface, .deferred_member = constraint.deferred_member, .options = key.options };
+                    const child = self.session.call_summaries.normalized_principals.get(child_key) orelse continue;
+                    var child_copy: principal_type_graph.Copy = .{ .allocator = a, .source = &child.types, .destination = &region.solver, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
+                    defer child_copy.deinit();
+                    _ = region.admitSignature(constraint.left, try child_copy.ty(child.root, 0)) catch |err| switch (err) {
+                        error.OutOfMemory => return err,
+                        else => return null,
+                    };
+                    try imported_children.put(a, constraint_index, {});
+                    self.session.counters.solver_constraint_visits += 1;
+                    continue;
+                }
+                // Operation selection retains the receiving region's ambient
+                // row. It remains a fresh residual obligation, even when its
+                // source-owned argument representation is already complete.
+                if (constraint.solved or constraint.kind == .call_summary or constraint.kind == .scheme_use or constraint.kind == .effect_operation) continue;
+                if (transitions >= self.session.options.max_children) return null;
+                transitions += 1;
+                attempted = true;
+                self.session.counters.solver_constraint_visits += 1;
+                _ = region.attemptConstraint(constraint_index, fallback) catch |err| switch (err) {
+                    error.OutOfMemory => return err,
+                    else => return null,
+                };
+            }
+            if (attempted) self.session.counters.solver_passes += 1;
+            const current = region.solver.mark();
+            if (current.versions == previous.versions and current.effects.versions == previous.effects.versions) {
+                if (fallback or !attempted) break;
+                fallback = true;
+            } else fallback = false;
+            previous = current;
+        }
+        if (region.scratch.edges.items.len != 0) return null;
+        for (region.scratch.sources.items, 0..) |source, index_| {
+            if (index_ != scope and (source.body != 0 or source.value != 0 or source.binding != 0)) return null;
+        }
+        for (region.scratch.constraints.items) |constraint| if (constraint.scope != scope) return null;
         for (region.solver.effects.rows.items) |row| if (row.tail == .parameter) return null;
         const graph = try a.create(PrincipalGraph);
         errdefer a.destroy(graph);
-        graph.* = .{ .key = key, .types = try types.Store.init(a), .root = region.scratch.sources.items[scope].root };
+        graph.* = .{ .key = key, .types = try types.Store.init(a) };
         errdefer graph.deinit(a);
-        graph.imports = try a.alloc(PrincipalGraph.TypeImport, region.scratch.imported.count());
+        graph.untracked_reads = dependencies.unknown or dependencies.nested or dependencies.call_reads.items.len != 0 or dependencies.views.items.len != 0;
+        for (region.scratch.sources.items) |source| graph.untracked_reads = graph.untracked_reads or source.owner != key.target.unit;
+        graph.dependencies = try a.dupe(core.BindingRef, dependencies.sources.items);
+        graph.plain_reads = try a.dupe(receipt.PlainFact, dependencies.plain_facts.items);
+        var copy: principal_type_graph.NormalizedCopy = .{ .allocator = a, .source = &region.solver, .destination = &graph.types, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
+        defer copy.deinit();
+        graph.root = try copy.ty(try region.solver.resolve(region.scratch.sources.items[scope].root, 0), 0);
+        var import_count: usize = 0;
+        var imported_keys = region.scratch.imported.keyIterator();
+        while (imported_keys.next()) |entry| if (entry.scope == scope) {
+            import_count += 1;
+        };
+        graph.imports = try a.alloc(PrincipalGraph.TypeImport, import_count);
         var imports = region.scratch.imported.iterator();
         var index: usize = 0;
-        while (imports.next()) |entry| : (index += 1) graph.imports[index] = .{ .source = entry.key_ptr.ty, .graph = entry.value_ptr.* };
-        graph.rows = try a.alloc(PrincipalGraph.RowImport, region.scratch.row_variables.count());
+        while (imports.next()) |entry| {
+            if (entry.key_ptr.scope != scope) continue;
+            graph.imports[index] = .{ .source = entry.key_ptr.ty, .graph = try copy.ty(try region.solver.resolve(entry.value_ptr.*, 0), 0) };
+            index += 1;
+        }
+        var row_count: usize = 0;
+        var row_keys = region.scratch.row_variables.keyIterator();
+        while (row_keys.next()) |entry| if (entry.scope == scope) {
+            row_count += 1;
+        };
+        graph.rows = try a.alloc(PrincipalGraph.RowImport, row_count);
         var rows = region.scratch.row_variables.iterator();
         index = 0;
-        while (rows.next()) |entry| : (index += 1) {
-            graph.rows[index] = .{ .source = entry.key_ptr.variable, .graph = entry.value_ptr.* };
+        while (rows.next()) |entry| {
+            if (entry.key_ptr.scope != scope) continue;
+            graph.rows[index] = .{ .source = entry.key_ptr.variable, .graph = try copy.row(try region.solver.resolveEffects(entry.value_ptr.*, 0), 0) };
+            index += 1;
         }
         const residuals = region.scratch.constraints.items[body_constraints..];
         const requirements = region.scratch.constraints.items[0..body_constraints];
@@ -5703,28 +5986,35 @@ const ClosureRegion = struct {
         for (graph.requirements) |*constraint| constraint.diagnostic_name = &.{};
         for (graph.requirements, requirements) |*constraint, original| {
             constraint.diagnostic_name = try a.dupe(u8, original.diagnostic_name);
+            try region.freezePrincipalConstraint(&copy, constraint);
         }
         graph.constraints = try a.dupe(Constraint, residuals);
         for (graph.constraints) |*constraint| constraint.diagnostic_name = &.{};
         for (graph.constraints, residuals) |*constraint, original| {
             constraint.diagnostic_name = try a.dupe(u8, original.diagnostic_name);
+            try region.freezePrincipalConstraint(&copy, constraint);
         }
         graph.aliases = try a.dupe(DataAlias, region.scratch.data_aliases.items);
+        for (graph.aliases) |*alias| {
+            alias.instance = try copy.ty(try region.solver.resolve(alias.instance, 0), 0);
+            alias.principal = try copy.ty(try region.solver.resolve(alias.principal, 0), 0);
+        }
         graph.functions = try a.dupe(types.Id, region.scratch.source_functions.items);
+        for (graph.functions) |*function| function.* = try copy.ty(try region.solver.resolve(function.*, 0), 0);
         graph.arguments = try a.dupe(core.Id, region.scratch.summary_arguments.items);
         graph.references = try a.dupe(Target, region.scratch.principal_references.items);
         graph.actions = try a.dupe(PrincipalGraph.Action, region.scratch.principal_actions.items[body_actions..]);
         for (graph.actions) |*action| if (action.* == .constraint) {
             action.constraint -= @intCast(body_constraints);
         };
-        // All allocations finish before transferring the durable graph owner.
-        // The region keeps only a fresh scratch solver for its normal teardown.
-        var replacement = try types.Store.initWithOptions(region.scratch_allocator, .{ .closed_graphs = true });
-        replacement.occurs_steps = region.solver.occurs_steps;
-        graph.types.deinit();
-        graph.types = region.solver;
-        region.solver = replacement;
         return graph;
+    }
+    fn freezePrincipalConstraint(self: *ClosureRegion, copy: *principal_type_graph.NormalizedCopy, constraint: *Constraint) RegionError!void {
+        constraint.left = try copy.ty(try self.solver.resolve(constraint.left, 0), 0);
+        // A callee edge's right operand remains an immutable Core type handle.
+        if (constraint.kind != .call_summary) constraint.right = try copy.ty(try self.solver.resolve(constraint.right, 0), 0);
+        constraint.result = try copy.ty(try self.solver.resolve(constraint.result, 0), 0);
+        constraint.signature = try copy.ty(try self.solver.resolve(constraint.signature, 0), 0);
     }
     fn principalGraph(self: *ClosureRegion, scope: u32, body: core.Id) RegionError!?*PrincipalGraph {
         if (self.building_principal or self.summary_job or !self.session.reuse_principal_graphs or !self.include_callables or self.retain_selected or self.complete_demand_bodies or self.speculative_source_entry) return null;
@@ -5753,6 +6043,7 @@ const ClosureRegion = struct {
         return self.principalGraphForKey(key);
     }
     fn principalGraphForKey(self: *ClosureRegion, key: PrincipalGraph.Key) RegionError!?*PrincipalGraph {
+        if (self.session.call_summaries.normalized_principals.get(key)) |graph| return graph;
         if (self.session.call_summaries.principals.get(key)) |graph| return graph;
         if (self.session.call_summaries.principals.count() >= self.session.options.max_values) return null;
         const graph = self.describePrincipal(key) catch |err| switch (err) {
@@ -5838,10 +6129,8 @@ const ClosureRegion = struct {
     fn retainOpenPrincipal(self: *ClosureRegion, constraint: Constraint) RegionError!bool {
         if (!self.session.reuse_principal_graphs or self.summary_job or self.retain_selected or self.complete_demand_bodies or self.speculative_source_entry) return false;
         if (self.session.options.max_values < 4096 or self.session.options.max_type_depth < 64) return false;
-        const interface = try self.solver.resolve(constraint.left, 0);
         const key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = self.source_interface, .deferred_member = constraint.deferred_member, .options = self.session.options };
-        const graph = try self.principalGraphForKey(key) orelse return false;
-        if (!try principal_type_graph.matchesOpen(self.scratch_allocator, &graph.types, graph.root, &self.solver, interface, self.session.options.max_type_depth, self.session.options.max_values)) return false;
+        var graph = try self.principalGraphForKey(key) orelse return false;
         if (!self.session.call_summaries.open_principals.contains(key) and self.session.call_summaries.open_principals.count() >= self.session.options.max_values) return false;
         const ready = self.session.call_summaries.open_principals.get(key) orelse ready: {
             const checked = try self.checkOpenPrincipal(key);
@@ -5849,13 +6138,65 @@ const ClosureRegion = struct {
             break :ready checked;
         };
         if (!ready) return false;
+        graph = (try self.principalGraphForKey(key)).?;
+        // Replay only equations inferred from immutable source. Caller
+        // selections never enter the template. Covariant rows retain the
+        // caller's ambient view; failed admission leaves the solver unchanged.
+        const point = self.solver.mark();
+        var accepted = false;
+        defer if (!accepted) self.solver.rollback(point);
+        var copy: principal_type_graph.Copy = .{ .allocator = self.scratch_allocator, .source = &graph.types, .destination = &self.solver, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
+        defer copy.deinit();
+        const interface = self.admitSignature(constraint.left, try copy.ty(graph.root, 0)) catch |err| switch (err) {
+            error.OutOfMemory => return err,
+            else => return false,
+        };
+        if (!try principal_type_graph.matchesOpen(self.scratch_allocator, &graph.types, graph.root, &self.solver, try self.solver.resolve(interface, 0), self.session.options.max_type_depth, self.session.options.max_values)) return false;
+        accepted = true;
         // This is an exported residual edge, never a completed call proof. A
         // partial prepass cannot retain a dependency-complete selected result.
-        if (self.session.principal_reads) |reads| reads.invalidate(.call_read);
-        if (self.session.receipt_tape) |tape| tape.unknown = true;
+        if (graph.source_complete) {
+            try self.principalDependencies(graph, true);
+        } else {
+            if (self.session.principal_reads) |reads| reads.invalidate(.call_read);
+            if (self.session.receipt_tape) |tape| tape.unknown = true;
+        }
         return true;
     }
+    fn principalDependencies(self: *ClosureRegion, first: *const PrincipalGraph, transitive: bool) RegionError!void {
+        if (self.session.principal_reads == null and self.session.receipt_tape == null) return;
+        var pending: std.ArrayList(*const PrincipalGraph) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        var seen: std.AutoHashMapUnmanaged(PrincipalGraph.Key, void) = .empty;
+        defer seen.deinit(self.scratch_allocator);
+        try pending.append(self.scratch_allocator, first);
+        var edges: usize = 0;
+        while (pending.pop()) |graph| {
+            if (seen.contains(graph.key)) continue;
+            if (seen.count() >= self.session.options.max_values) return error.TypeLimit;
+            try seen.put(self.scratch_allocator, graph.key, {});
+            if (graph.untracked_reads) {
+                if (self.session.principal_reads) |reads| reads.invalidate(.call_read);
+                if (self.session.receipt_tape) |tape| tape.unknown = true;
+            }
+            if (self.session.receipt_tape) |tape| try tape.sources.appendSlice(self.session.allocator, graph.dependencies);
+            for (graph.plain_reads) |fact| {
+                const actual = self.session.plain_nominals.get(fact.key);
+                if (self.session.principal_reads) |reads| try reads.plainRead(self.session.allocator, fact.key, actual);
+                if (self.session.receipt_tape) |tape| try tape.plain_facts.append(self.session.allocator, .{ .key = fact.key, .plain = actual orelse false, .present = actual != null });
+            }
+            if (!transitive) continue;
+            for ([_][]const Constraint{ graph.requirements, graph.constraints }) |constraints| for (constraints) |constraint| {
+                edges += 1;
+                if (edges > self.session.options.max_children) return error.TypeLimit;
+                if (constraint.kind != .call_summary and constraint.kind != .scheme_use) continue;
+                const key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = graph.key.source_interface, .deferred_member = constraint.deferred_member, .options = graph.key.options };
+                try pending.append(self.scratch_allocator, (try self.principalGraphForKey(key)).?);
+            };
+        }
+    }
     fn checkOpenPrincipal(self: *ClosureRegion, root: PrincipalGraph.Key) RegionError!bool {
+        if (self.session.call_summaries.normalized_principals.contains(root)) return true;
         const Visit = struct { key: PrincipalGraph.Key, graph: *PrincipalGraph, next: usize = 0 };
         const a = self.scratch_allocator;
         var pending: std.ArrayList(Visit) = .empty;
@@ -5871,6 +6212,61 @@ const ClosureRegion = struct {
             const last = pending.items.len - 1;
             const frame = pending.items[last];
             if (frame.next == frame.graph.requirements.len + frame.graph.constraints.len) {
+                const normalized = try self.describePrincipal(frame.key) orelse return false;
+                var published = false;
+                defer if (!published) {
+                    normalized.deinit(self.session.allocator);
+                    self.session.allocator.destroy(normalized);
+                };
+                if (!try self.unknownPrincipalBody(normalized)) return false;
+                // Source equations can expose a selected implementation that
+                // the original description could not name. Check those new
+                // edges before publishing, including a newly revealed cycle.
+                var waiting = false;
+                discover: for ([_][]const Constraint{ normalized.requirements, normalized.constraints }) |constraints| for (constraints) |constraint| {
+                    if (constraint.kind != .call_summary and constraint.kind != .scheme_use) continue;
+                    edges += 1;
+                    if (edges > self.session.options.max_children) return false;
+                    const child: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = root.source_interface, .deferred_member = constraint.deferred_member, .options = root.options };
+                    if (self.session.call_summaries.normalized_principals.contains(child)) continue;
+                    if (visited.get(child)) |done| {
+                        if (!done) return false;
+                        continue;
+                    }
+                    if (visited.count() >= self.session.options.max_values) return false;
+                    const child_graph = try self.principalGraphForKey(child) orelse return false;
+                    if (!try self.unknownPrincipalBody(child_graph)) return false;
+                    try visited.put(a, child, false);
+                    try pending.append(a, .{ .key = child, .graph = child_graph });
+                    waiting = true;
+                    break :discover;
+                };
+                if (waiting) continue;
+                var complete = true;
+                for (normalized.aliases) |alias| complete = complete and try principal_type_graph.sameOpen(a, &normalized.types, alias.instance, alias.principal, self.session.options.max_type_depth, self.session.options.max_values);
+                for (normalized.requirements) |requirement| complete = complete and requirement.solved;
+                for (normalized.constraints) |constraint| {
+                    if (constraint.kind == .call_summary or constraint.kind == .scheme_use) {
+                        const child: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = root.source_interface, .deferred_member = constraint.deferred_member, .options = root.options };
+                        const child_graph = (try self.principalGraphForKey(child)).?;
+                        if (constraint.kind == .call_summary and !try principal_type_graph.matchesOpen(a, &child_graph.types, child_graph.root, &normalized.types, constraint.left, self.session.options.max_type_depth, self.session.options.max_values)) return false;
+                        complete = complete and child_graph.source_complete;
+                    } else {
+                        if (!try self.unknownPrincipalConstraint(normalized, constraint)) return false;
+                        complete = complete and constraint.solved;
+                    }
+                }
+                // A parametric source theorem is distinct from a closed call
+                // judgment. Its unresolved binders remain fresh at each use.
+                normalized.source_complete = complete;
+                const nodes = normalized.nodeCount();
+                const graph_edges = normalized.edgeCount();
+                if (nodes > self.session.options.max_values -| self.session.principal_graph_nodes or graph_edges > self.session.options.max_children -| self.session.principal_graph_edges) return false;
+                try self.session.call_summaries.normalized_principals.put(self.session.allocator, frame.key, normalized);
+                published = true;
+                self.session.principal_graph_builds += 1;
+                self.session.principal_graph_nodes += nodes;
+                self.session.principal_graph_edges += graph_edges;
                 visited.getPtr(frame.key).?.* = true;
                 _ = pending.pop();
                 continue;
@@ -5880,7 +6276,6 @@ const ClosureRegion = struct {
             edges += 1;
             if (edges > self.session.options.max_children) return false;
             if (constraint.kind != .call_summary and constraint.kind != .scheme_use) {
-                if (!try self.unknownPrincipalConstraint(frame.graph, constraint)) return false;
                 continue;
             }
             if (constraint.kind == .scheme_use) {
@@ -5888,7 +6283,7 @@ const ClosureRegion = struct {
             }
             const child: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = root.source_interface, .deferred_member = constraint.deferred_member, .options = root.options };
             const graph = try self.principalGraphForKey(child) orelse return false;
-            if (constraint.kind == .call_summary and !try principal_type_graph.matchesOpen(a, &graph.types, graph.root, &frame.graph.types, constraint.left, self.session.options.max_type_depth, self.session.options.max_values)) return false;
+            if (self.session.call_summaries.normalized_principals.contains(child)) continue;
             if (visited.get(child)) |done| {
                 if (!done) return false; // Joint recursive inference is separate.
                 continue;
@@ -5914,6 +6309,7 @@ const ClosureRegion = struct {
         return true;
     }
     fn unknownPrincipalConstraint(self: *ClosureRegion, graph: *const PrincipalGraph, constraint: Constraint) RegionError!bool {
+        if (constraint.solved) return true;
         if (constraint.kind == .scheme_use) {
             const product = graph.types.node(constraint.left);
             if (product.tag != .product) return false;
@@ -5927,17 +6323,35 @@ const ClosureRegion = struct {
             return true;
         }
         switch (constraint.kind) {
-            .binary, .field, .result_dispatch, .physical_field, .receiver, .update, .collection, .record_merge, .type_head, .type_rep, .effect_rep, .effect_operation => {},
+            .binary, .field, .result_dispatch, .physical_field, .receiver, .update, .collection, .record_merge, .type_head, .type_compare, .type_rep, .effect_rep, .effect_operation => {},
             else => return false,
         }
         // A known source constructor may shape the result, but a predicate's
         // selection owner must remain unknown. Caller-selected structures are
         // rejected separately by the source-to-caller skeleton match.
         switch (constraint.kind) {
-            .binary => if (graph.types.node(constraint.left).tag != .variable or graph.types.node(constraint.right).tag != .variable) return false,
+            .binary => if (graph.types.node(constraint.left).tag != .variable and graph.types.node(constraint.right).tag != .variable) return false,
             .field, .physical_field, .receiver, .update, .collection => if (graph.types.node(constraint.left).tag != .variable) return false,
             .result_dispatch => if (graph.types.node(constraint.result).tag != .variable) return false,
             .record_merge => if (graph.types.node(constraint.left).tag != .variable and graph.types.node(constraint.right).tag != .variable) return false,
+            .type_head => if (graph.types.node(try self.principalWitnessHead(graph, constraint.left)).tag != .variable) return false,
+            .type_rep => if (!try self.unknownPrincipalData(graph, constraint.left)) return false,
+            .effect_rep => {
+                const carrier = graph.types.node(constraint.signature);
+                if (carrier.tag != .function) return false;
+                const row = graph.types.row(carrier.c);
+                var open = row.tail == .variable;
+                for (graph.types.rowLabels(carrier.c)) |label| for (graph.types.operationArguments(label)) |argument| {
+                    open = open or try self.unknownPrincipalData(graph, argument);
+                };
+                if (!open) return false;
+            },
+            .type_compare => {
+                const left = try self.principalWitnessHead(graph, constraint.left);
+                const right = try self.principalWitnessHead(graph, constraint.right);
+                if (graph.types.node(left).tag == .never or graph.types.node(right).tag == .never) return false;
+                if (!try self.unknownPrincipalData(graph, left) and !try self.unknownPrincipalData(graph, right)) return false;
+            },
             .effect_operation => {
                 // The source fixes the operation family. Its residual action
                 // still adds the exact label and checks the caller's row.
@@ -5961,12 +6375,75 @@ const ClosureRegion = struct {
                 }
             }
             if (operand != 0) {
-                if (constraint.kind == .type_head) {
-                    if (!principal_type_graph.allUnknown(&graph.types, operand, self.session.options.max_type_depth)) return false;
-                } else if (!try principal_type_graph.matchesOpen(self.scratch_allocator, &graph.types, operand, &graph.types, operand, self.session.options.max_type_depth, self.session.options.max_values)) return false;
+                if (!try principal_type_graph.matchesOpen(self.scratch_allocator, &graph.types, operand, &graph.types, operand, self.session.options.max_type_depth, self.session.options.max_values)) return false;
             }
         }
         return true;
+    }
+    fn principalWitnessHead(self: *ClosureRegion, graph: *const PrincipalGraph, root: types.Id) RegionError!types.Id {
+        var head = root;
+        for (0..self.session.options.max_type_depth) |_| {
+            const node = graph.types.node(head);
+            if (node.tag != .function) return head;
+            head = node.b;
+        }
+        return error.TypeLimit;
+    }
+    fn unknownPrincipalData(self: *ClosureRegion, graph: *const PrincipalGraph, root: types.Id) RegionError!bool {
+        var pending: std.ArrayList(types.Id) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        var seen: std.AutoHashMapUnmanaged(types.Id, void) = .empty;
+        defer seen.deinit(self.scratch_allocator);
+        try pending.append(self.scratch_allocator, root);
+        var edges: usize = 0;
+        while (pending.pop()) |id| {
+            if (seen.contains(id)) continue;
+            if (seen.count() >= self.session.options.max_values) return false;
+            try seen.put(self.scratch_allocator, id, {});
+            const node = graph.types.node(id);
+            switch (node.tag) {
+                .variable => return true,
+                .unit, .boolean, .u32, .f32, .never, .type_constructor => {},
+                .array, .list, .cursor => try pending.append(self.scratch_allocator, node.a),
+                .product, .nominal => {
+                    const children = if (node.tag == .nominal) graph.types.nominalArguments(node) else graph.types.list(.{ .start = node.a, .len = node.b });
+                    try pending.appendSlice(self.scratch_allocator, children);
+                    edges +|= children.len;
+                },
+                .record => for (0..node.b) |index| {
+                    try pending.append(self.scratch_allocator, graph.types.recordField(node, index).ty);
+                    edges +|= 1;
+                },
+                else => return false,
+            }
+            if (edges > self.session.options.max_children or pending.items.len > self.session.options.max_values) return false;
+        }
+        return false;
+    }
+    fn retainedComparison(self: *ClosureRegion) RegionError!bool {
+        var pending: std.ArrayList(PrincipalGraph.Key) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        var seen: std.AutoHashMapUnmanaged(PrincipalGraph.Key, void) = .empty;
+        defer seen.deinit(self.scratch_allocator);
+        for (self.scratch.constraints.items) |constraint| {
+            if (!constraint.solved and constraint.kind == .call_summary) try pending.append(self.scratch_allocator, .{ .target = constraint.target, .source_interface = self.source_interface, .deferred_member = constraint.deferred_member, .options = self.session.options });
+        }
+        var edges: usize = 0;
+        while (pending.pop()) |key| {
+            if (seen.contains(key)) continue;
+            if (seen.count() >= self.session.options.max_values) return error.TypeLimit;
+            try seen.put(self.scratch_allocator, key, {});
+            const graph = self.session.call_summaries.principals.get(key) orelse return true;
+            const source = graph orelse return true;
+            for ([_][]const Constraint{ source.requirements, source.constraints }) |constraints| for (constraints) |constraint| {
+                edges +|= 1;
+                if (edges > self.session.options.max_children) return error.TypeLimit;
+                if (!constraint.solved and constraint.kind == .type_compare) return true;
+                if (constraint.kind == .call_summary or constraint.kind == .scheme_use) try pending.append(self.scratch_allocator, .{ .target = constraint.target, .source_interface = key.source_interface, .deferred_member = constraint.deferred_member, .options = key.options });
+            };
+            if (pending.items.len > self.session.options.max_values) return error.TypeLimit;
+        }
+        return false;
     }
     fn importPrincipal(self: *ClosureRegion, scope: u32, graph: *PrincipalGraph) RegionError!void {
         std.debug.assert(graph.key.target.unit == self.scratch.sources.items[scope].owner and graph.key.target.binding == self.scratch.sources.items[scope].binding);
@@ -5975,17 +6452,22 @@ const ClosureRegion = struct {
         defer copy.deinit();
         for (graph.imports) |entry| {
             const original = try self.importType(scope, entry.source, 0);
-            try copy.types.put(self.scratch_allocator, entry.graph, original);
             const node = graph.types.node(entry.graph);
-            if (node.tag == .variable) try copy.variables.put(self.scratch_allocator, node.a, original);
+            if (node.tag == .variable) {
+                if (copy.variables.get(node.a)) |prior| try self.solver.unify(prior, original) else try copy.variables.put(self.scratch_allocator, node.a, original);
+            }
         }
         for (graph.rows) |entry| {
             const existing = try self.importRowVariable(scope, entry.source);
             const row = graph.types.row(entry.graph);
-            std.debug.assert(row.tail == .variable and row.labels.len == 0);
-            try copy.row_variables.put(self.scratch_allocator, row.tail.variable, existing);
-            try copy.rows.put(self.scratch_allocator, entry.graph, existing);
+            if (row.tail == .variable and row.labels.len == 0) {
+                if (copy.row_variables.get(row.tail.variable)) |prior| try self.solver.unifyEffects(prior, existing) else try copy.row_variables.put(self.scratch_allocator, row.tail.variable, existing);
+            }
         }
+        for (graph.imports) |entry| try self.solver.unify(try self.importType(scope, entry.source, 0), try copy.ty(entry.graph, 0));
+        for (graph.rows) |entry| try self.solver.unifyEffects(try self.importRowVariable(scope, entry.source), try copy.row(entry.graph, 0));
+        self.principal_only_used = true;
+        try self.principalDependencies(graph, false);
         const source = self.scratch.sources.items[scope];
         if (self.session.receipt_tape) |tape| try tape.sources.append(self.session.allocator, .{ .unit = self.session.unitId(source.owner), .binding = source.binding });
         for (graph.actions) |action| switch (action) {
@@ -6006,6 +6488,13 @@ const ClosureRegion = struct {
             .constraint => |index| {
                 const original = graph.constraints[index];
                 if (original.kind == .call_summary) {
+                    if (original.source_selection) {
+                        var constraint = original;
+                        constraint.scope = scope;
+                        constraint.left = try copy.ty(original.left, 0);
+                        try self.appendConstraint(constraint);
+                        continue;
+                    }
                     const deferred = self.defer_members;
                     self.defer_members = original.deferred_member;
                     defer self.defer_members = deferred;
@@ -6833,6 +7322,13 @@ const ClosureRegion = struct {
         // when its body instance was already collected in this region.
         try self.selectedTarget(target_);
         const root = self.scratch.sources.items[scope].root;
+        if (self.building_principal) {
+            if (!try self.summaryShapeEligible(target_)) return error.UnresolvedType;
+            try self.appendConstraint(.{ .kind = .call_summary, .scope = 0, .node = 0, .target = target_, .left = root, .result = 0, .source_selection = true, .deferred_member = self.defer_members });
+            self.scratch.sources.items[scope].body = 0;
+            self.scratch.sources.items[scope].binding = 0;
+            return;
+        }
         const actual = try self.project(root);
         if (actual != 0) {
             const key: CallKey = .{ .owner = target_.unit, .binding = target_.binding, .evidence = actual };
@@ -6907,7 +7403,7 @@ const ClosureRegion = struct {
         self.scratch.sources.items[scope].closed_rows = body.closed_rows;
         self.scratch.sources.items[scope].root = try self.importType(scope, module.binding(target_.binding).ty, 0);
         self.scratch.sources.items[scope].binding = target_.binding;
-        try self.importScheme(scope, body.scheme, body.root);
+        if (!self.building_principal or scope == 0) try self.importScheme(scope, body.scheme, body.root);
         return scope;
     }
     fn arrayMember(self: *ClosureRegion, target_: Target, receiver: ValueId, expected: type_evidence.Id) RegionError!ValueId {
@@ -8227,4 +8723,185 @@ test "closed evidence imports revoke effect rows on rollback and clear scratch b
     try std.testing.expect(next.scratch.evidence_import_cache.source == null);
     _ = try next.solver.array(types.boolean);
     try std.testing.expectEqual(root, try next.project(try next.importEvidence(root, 0)));
+}
+
+fn mandatoryHeaderKey(region: *ClosureRegion, use: ClosureRegion.Constraint) !ClosureRegion.SchemeInstance {
+    var imported = try region.schemeImport(use);
+    try std.testing.expect(imported == .frame);
+    defer imported.frame.copy.deinit();
+    return imported.frame.key;
+}
+
+fn mandatoryHeaderHistoryScenario(allocator: Allocator, module: *const core.Module) !void {
+    var session = try Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    var region = try ClosureRegion.init(&session);
+    defer region.deinit();
+    const target_: Target = for (module.bodies) |body| {
+        if (body.exported) break .{ .unit = 0, .binding = body.binding };
+    } else unreachable;
+    const binding = module.binding(target_.binding);
+    var slots: std.ArrayList(types.Id) = .empty;
+    defer slots.deinit(allocator);
+    const before = region.solver.mark();
+    for (0..binding.public_variables.len) |_| try slots.append(allocator, try region.solver.fresh());
+    for (0..binding.public_rows.len) |_| try slots.append(allocator, try region.solver.functionWithEffects(types.unit, types.unit, try region.solver.freshEffects()));
+    var use: ClosureRegion.Constraint = .{ .target = target_, .scope = 0, .node = 0, .left = try region.solver.product(slots.items), .result = 0 };
+    const first = try mandatoryHeaderKey(&region, use);
+    try std.testing.expect(first.open != 0);
+    try region.scratch.scheme_instances.put(region.scratch_allocator, first, {});
+    use.left = try region.solver.product(slots.items);
+    try std.testing.expect((try region.schemeImport(use)) == .solved);
+
+    // A second unknown type/row is a different input, even if its complete
+    // representation is still unavailable. Repeated aliases also differ from
+    // two independent unknowns.
+    if (binding.public_variables.len != 0) {
+        slots.items[slots.items.len - 1] = try region.solver.fresh();
+    } else slots.items[slots.items.len - 1] = try region.solver.functionWithEffects(types.unit, types.unit, try region.solver.freshEffects());
+    use.left = try region.solver.product(slots.items);
+    const separate = try mandatoryHeaderKey(&region, use);
+    try std.testing.expect(separate.open != first.open);
+    if (binding.public_variables.len == 2) {
+        slots.items[1] = slots.items[0];
+        use.left = try region.solver.product(slots.items);
+        const aliased = try mandatoryHeaderKey(&region, use);
+        try std.testing.expect(aliased.open != first.open and aliased.open != separate.open);
+    }
+
+    region.solver.rollback(before);
+    slots.clearRetainingCapacity();
+    for (0..binding.public_variables.len) |_| try slots.append(allocator, try region.solver.fresh());
+    for (0..binding.public_rows.len) |_| try slots.append(allocator, try region.solver.functionWithEffects(types.unit, types.unit, try region.solver.freshEffects()));
+    use.left = try region.solver.product(slots.items);
+    const recycled = try mandatoryHeaderKey(&region, use);
+    try std.testing.expectEqual(first.open, recycled.open);
+    try std.testing.expect(!std.meta.eql(first, recycled));
+    try region.scratch.scheme_instances.put(region.scratch_allocator, recycled, {});
+    try std.testing.expect((try region.schemeImport(use)) == .solved);
+
+    region.solver.closed_generation = std.math.maxInt(u16);
+    const saturated = try mandatoryHeaderKey(&region, use);
+    try std.testing.expect(saturated.public == 0 and saturated.open == 0 and !saturated.constant);
+    region.solver.effects.physical_epoch = std.math.maxInt(u64);
+    const exhausted = try mandatoryHeaderKey(&region, use);
+    try std.testing.expect(exhausted.public == 0 and exhausted.open == 0 and !exhausted.constant);
+}
+
+test "mandatory header inputs preserve unknown aliases rows rollback recycling saturation and ownership" {
+    const allocator = std.testing.allocator;
+    for ([_][]const u8{
+        "entry const required: a -> b -> Unit where { type_rep a, type_rep b } = fn left => fn right => ()\n",
+        "entry const required: Unit -> Unit ! {| e} where { effect_rep ! {| e} } = fn () => ()\n",
+    }) |source| {
+        var module = try bodyRecipeLower(source);
+        defer module.deinit(allocator);
+        try mandatoryHeaderHistoryScenario(allocator, &module);
+        try @import("allocation_failures.zig").checkAllAllocationFailures(allocator, mandatoryHeaderHistoryScenario, .{&module});
+    }
+}
+
+fn sourceHeadScenario(allocator: Allocator, module: *const core.Module) !void {
+    var session = try Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    var region = try ClosureRegion.init(&session);
+    defer region.deinit();
+    const scope = try region.typeScope(0);
+    var closed: usize = 0;
+    var open: usize = 0;
+    for (module.operation_values) |operation| {
+        if (operation.witness == 0) continue;
+        const witness = module.typeOf(operation.witness);
+        if (module.types.node(witness).tag == .variable) {
+            const selected = try region.importType(scope, witness, 0);
+            try region.solver.unify(selected, types.u32_type);
+            try std.testing.expect(!try region.sourceHeadProven(0, witness, types.u32_type));
+            open += 1;
+        } else {
+            try std.testing.expect(try region.sourceHeadProven(0, witness, operation.witness_result));
+            try std.testing.expect(!try region.sourceHeadProven(0, witness, types.f32_type));
+            closed += 1;
+        }
+    }
+    try std.testing.expectEqual(@as(usize, 2), closed);
+    try std.testing.expectEqual(@as(usize, 1), open);
+    try std.testing.expect(!try region.sourceHeadProven(0, types.never, types.never));
+    session.options.max_type_depth = 0;
+    try std.testing.expect(!try region.sourceHeadProven(0, types.u32_type, types.u32_type));
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
+fn revealedCycleScenario(allocator: Allocator, module: *const core.Module, parent: core.BindingId, read: core.BindingId) !void {
+    var session = try Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    var region = try ClosureRegion.init(&session);
+    defer region.deinit();
+    region.source_interface = true;
+    region.include_callables = true;
+    const key: PrincipalGraph.Key = .{ .target = .{ .unit = 0, .binding = parent }, .source_interface = true, .deferred_member = false, .options = session.options };
+    const original = (try region.principalGraphForKey(key)).?;
+    for (original.constraints) |constraint| if (constraint.kind == .call_summary or constraint.kind == .scheme_use) {
+        try std.testing.expect(constraint.target.binding != read);
+    };
+    for (0..2) |_| {
+        try std.testing.expect(!try region.checkOpenPrincipal(key));
+        var published = session.call_summaries.normalized_principals.keyIterator();
+        while (published.next()) |entry| {
+            try std.testing.expect(entry.target.binding != parent and entry.target.binding != read);
+        }
+        try std.testing.expect(session.diagnostic == null);
+    }
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
+test "newly revealed source selection cycles decline without publishing partial members under allocation failure" {
+    const allocator = std.testing.allocator;
+    var module = try bodyRecipeLower(
+        \\type Seed is data = #Seed
+        \\type Box a is data = #Box a
+        \\const Seed.build: a -> Seed -> Box a = fn value => fn seed => #Box value
+        \\const f_0 = fn value => @type.call "build" value #Seed
+        \\entry const parent: a -> a = fn value => (f_0 value).read
+        \\const Box.read: Box a -> a = fn box => case box of
+        \\  #Box value => value
+        \\entry const recursive_read: Box a -> a = fn box => case box of
+        \\  #Box value => parent value
+    );
+    defer module.deinit(allocator);
+    var parent: core.BindingId = 0;
+    var read: core.BindingId = 0;
+    for (module.bodies) |body| {
+        if (std.mem.eql(u8, module.name(body.export_name), "parent")) parent = body.binding;
+        if (std.mem.eql(u8, module.name(body.export_name), "recursive_read")) read = body.binding;
+    }
+    try std.testing.expect(parent != 0 and read != 0);
+    // Change an equally typed catalog target in the fixture before freezing it.
+    // Component inference and its ordinary fallback are qualified in task 007;
+    // this law isolates cycle-safe publication of the optional source graph.
+    module.associated[1].target.binding = read;
+    const frozen = try allocator.dupe(types.Node, module.types.nodes);
+    defer allocator.free(frozen);
+    const methods = try allocator.dupe(core.Associated, module.associated);
+    defer allocator.free(methods);
+    try revealedCycleScenario(allocator, &module, parent, read);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(allocator, revealedCycleScenario, .{ &module, parent, read });
+    try std.testing.expectEqualDeep(frozen, module.types.nodes);
+    try std.testing.expectEqualDeep(methods, module.associated);
+}
+
+test "source head theorems require immutable fixed heads and retain mismatches caller selections Never and limits" {
+    const allocator = std.testing.allocator;
+    var module = try bodyRecipeLower(
+        \\type Cell a is data = #Cell a
+        \\const closed = fn ignored => @state.get (#Cell 0)
+        \\const parametric = fn (witness: Cell a) -> Cell a => @state.get witness
+        \\const open = fn witness => @state.get witness
+        \\entry const answer = 42
+    );
+    defer module.deinit(allocator);
+    const frozen = try allocator.dupe(types.Node, module.types.nodes);
+    defer allocator.free(frozen);
+    try sourceHeadScenario(allocator, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(allocator, sourceHeadScenario, .{&module});
+    try std.testing.expectEqualDeep(frozen, module.types.nodes);
 }

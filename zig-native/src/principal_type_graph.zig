@@ -25,6 +25,16 @@ pub fn allUnknown(source: *const T.Store, root: T.Id, max_depth: usize) bool {
 /// unknown caller binder. Repeated source binders retain their alias class.
 /// This describes a residual relationship and proves no selected judgment.
 pub fn matchesOpen(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id, caller: *const T.Store, actual: T.Id, max_depth: usize, max_nodes: usize) std.mem.Allocator.Error!bool {
+    return matches(allocator, source, principal, caller, actual, max_depth, max_nodes, false);
+}
+
+/// Equality within one immutable owner retains exact binder identities.
+/// Separately allocated structural nodes may be equal; separate binders cannot.
+pub fn sameOpen(allocator: std.mem.Allocator, source: *const T.Store, left: T.Id, right: T.Id, max_depth: usize, max_nodes: usize) std.mem.Allocator.Error!bool {
+    return matches(allocator, source, left, source, right, max_depth, max_nodes, true);
+}
+
+fn matches(allocator: std.mem.Allocator, source: *const T.Store, principal: T.Id, caller: *const T.Store, actual: T.Id, max_depth: usize, max_nodes: usize, exact_binders: bool) std.mem.Allocator.Error!bool {
     const Pair = struct { principal: T.Id, actual: T.Id, arrows: bool };
     const Item = struct { pair: Pair, depth: usize };
     const Row = struct { variable: ?u32, cursor: T.Cursor };
@@ -49,6 +59,7 @@ pub fn matchesOpen(allocator: std.mem.Allocator, source: *const T.Store, princip
         const to = caller.node(live);
         if (from.tag == .variable) {
             if (to.tag != .variable) return false;
+            if (exact_binders and original != live) return false;
             const slot = try variables.getOrPut(allocator, from.a);
             if (slot.found_existing) {
                 if (slot.value_ptr.* != live) return false;
@@ -62,6 +73,8 @@ pub fn matchesOpen(allocator: std.mem.Allocator, source: *const T.Store, princip
                 if (!item.pair.arrows) return false;
                 const before = source.row(from.c);
                 const after = caller.row(to.c);
+                if (before.labels.len > max_nodes) return false;
+                if (exact_binders and (!std.meta.eql(before.tail, after.tail) or before.cursor != after.cursor)) return false;
                 if (before.labels.len != after.labels.len or before.tail == .parameter or after.tail == .parameter) return false;
                 for (source.rowLabels(from.c), caller.rowLabels(to.c)) |left, right| {
                     if (!std.meta.eql(source.operation(left).identity, caller.operation(right).identity)) return false;
@@ -108,8 +121,63 @@ pub fn matchesOpen(allocator: std.mem.Allocator, source: *const T.Store, princip
     return true;
 }
 
-pub const Copy = Copier(*const T.Store);
-pub const FrozenCopy = Copier(*const @import("core.zig").Types);
+pub const Copy = Copier(*const T.Store, true);
+pub const FrozenCopy = Copier(*const @import("core.zig").Types, true);
+/// A source-only solver may have inferred equations before publication. Every
+/// supplied root must be resolved first; the destination retains no history.
+pub const NormalizedCopy = Copier(*const T.Store, false);
+
+fn normalizedEqualityScenario(allocator: std.mem.Allocator) !void {
+    var source = try T.Store.init(allocator);
+    defer source.deinit();
+    const shared = try source.fresh();
+    const separate = try source.fresh();
+    const row = try source.freshEffects();
+    const distinct_row = try source.freshEffects();
+    const identity = try source.functionWithEffects(shared, shared, row);
+    const equalities = [_]bool{
+        try sameOpen(allocator, &source, identity, try source.functionWithEffects(shared, shared, row), 64, 1024),
+        try sameOpen(allocator, &source, identity, try source.functionWithEffects(separate, separate, row), 64, 1024),
+        try sameOpen(allocator, &source, identity, try source.functionWithEffects(shared, separate, row), 64, 1024),
+        try sameOpen(allocator, &source, identity, try source.functionWithEffects(shared, shared, distinct_row), 64, 1024),
+    };
+    try std.testing.expectEqualSlices(bool, &.{ true, false, false, false }, &equalities);
+    // Operation instances admit complete arguments only. The equation being
+    // normalized lives in the surrounding function graph and row tail.
+    const label = try source.internOperation(.{ .unit = 4, .decl = 8 }, &.{T.u32_type});
+    const concrete = source.effects.row(&.{label}, .closed) catch |err| return T.effectError(err);
+    try source.unify(shared, T.u32_type);
+    try source.unifyEffects(row, concrete);
+    const nested = try source.functionWithEffects(identity, identity, row);
+    const resolved = try source.resolve(nested, 0);
+    var frozen = try T.Store.init(allocator);
+    defer frozen.deinit();
+    var copy: NormalizedCopy = .{ .allocator = allocator, .source = &source, .destination = &frozen, .max_depth = 64, .max_nodes = 1024 };
+    defer copy.deinit();
+    const copied = try copy.ty(resolved, 0);
+    const root = frozen.node(copied);
+    const callback = frozen.node(root.a);
+    // Resolution may rebuild equivalent structural nodes separately. Exact
+    // binder equality and the copied graph must still preserve their relation.
+    try std.testing.expect(try sameOpen(allocator, &frozen, root.a, root.b, 64, 1024));
+    try std.testing.expectEqual(copied, try copy.ty(resolved, 0));
+    try std.testing.expectEqual(T.u32_type, callback.a);
+    try std.testing.expectEqual(T.u32_type, callback.b);
+    for ([_]T.Effects.Id{ root.c, callback.c }) |effect| {
+        const labels = frozen.rowLabels(effect);
+        try std.testing.expect(frozen.row(effect).tail == .closed);
+        try std.testing.expectEqual(@as(usize, 1), labels.len);
+        try std.testing.expectEqualDeep(T.NominalIdentity{ .unit = 4, .decl = 8 }, frozen.operation(labels[0]).identity);
+        try std.testing.expectEqualSlices(T.Id, &.{T.u32_type}, frozen.operationArguments(labels[0]));
+    }
+    try std.testing.expectEqual(@as(usize, 0), frozen.versions.items.len);
+    try std.testing.expectEqual(@as(usize, 0), frozen.effects.versions.items.len);
+}
+
+test "principal exact binder equality and normalized publication retain nested type and row equations under allocation failure" {
+    try normalizedEqualityScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, normalizedEqualityScenario, .{});
+}
 
 fn seededRowScenario(allocator: std.mem.Allocator) !void {
     var source = try T.Store.init(allocator);
@@ -215,7 +283,7 @@ test "open skeleton matching preserves source constructors aliases rows and owne
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, openSkeletonScenario, .{});
 }
 
-fn Copier(comptime Source: type) type {
+fn Copier(comptime Source: type, comptime frozen: bool) type {
     return struct {
         const Self = @This();
         allocator: std.mem.Allocator,
@@ -239,7 +307,7 @@ fn Copier(comptime Source: type) type {
         }
 
         pub fn ty(self: *Self, original: T.Id, depth: usize) T.Error!T.Id {
-            if (comptime Source == *const T.Store) std.debug.assert(self.source.versions.items.len == 0 and self.source.effects.versions.items.len == 0);
+            if (comptime Source == *const T.Store and frozen) std.debug.assert(self.source.versions.items.len == 0 and self.source.effects.versions.items.len == 0);
             if (original <= T.never) return original;
             if (depth >= self.max_depth or self.types.count() >= self.max_nodes) return error.TypeLimit;
             if (self.types.get(original)) |known| return known;

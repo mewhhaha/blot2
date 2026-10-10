@@ -1,8 +1,9 @@
 # General call summaries
 
 This is the implementation specification for extending the current first-order
-summary queue. Predicate-bearing functions, general higher-order calls, lexical
-closures, recursive components and canonical specialization keys remain
+summary queue. Predicate-bearing first-order functions now have owned principal
+graphs and independent jobs under complete evidence. General higher-order calls,
+lexical closures, recursive components and canonical specialization keys remain
 implementation work. This document does not change language syntax or admit
 programs rejected by the language's existing inference rules.
 
@@ -761,3 +762,157 @@ coverage with ordinary diagnostic and ownership laws. Callback, lexical capture,
 recursive component and canonical cross-session inputs remain tasks 005–008. The
 historical boxed compiler and frozen private gdev workload are absent; these
 public results do not replace their qualification.
+
+## Live headers and source-normalized graphs, 10 October 2026
+
+Mandatory written headers now share scheduling under exact region-local keys.
+The key visits only public slots consumed by the header; requirements consuming
+private binders demand the complete public interface. A complete slot records
+semantic evidence. An open slot records its live solver identity, substitution
+generation and effect chronology, including label arguments, tail aliases and
+cursors. Rollback, recycled variables and saturated history revoke reuse. A key
+certifies required scheduling, never successful predicate proof. Ordered header
+leaves and original witnesses remain mandatory.
+
+Principal description owns a raw graph separately from its normalized graph. A
+fresh source-only region solves source equations and imports already-qualified
+child source interfaces. It never evaluates a caller or treats a caller-selected
+method as a principal fact. Each resolved root is copied into a fresh immutable
+store; published type and effect stores contain no substitution history. The
+graph owns constraints, aliases, rows, functions, arguments, references, action
+order, diagnostic origins and source dependencies. Speculative description
+restores diagnostics and receipt state on all exits and releases any temporary
+diagnostic message. Out-of-memory propagates instead of becoming a cached
+semantic decline.
+
+Source normalization can prove fixed physical fields, record merge/update,
+nominal relationships, closed type heads, type comparisons and source-selected
+methods. In particular, an immutable source equation can infer a fixed operand
+constructor before an associated call is selected. A source operation is proven
+only when its exact immutable operation identity and complete arguments are
+already represented in the source signature's row; this check does not add or
+erase row labels. Closed handlers compose with those source interfaces. Unknown
+selection owners, open rows and unsupported shapes stay residual or decline.
+Neither a partially retained edge nor a complete parametric source theorem is a
+closed caller judgment or a refinement receipt.
+
+The iterative postorder scheduler re-describes a parent after checking its
+children. Source equations can reveal a new selected-method edge. It queues one
+new child, checks it, and retries the parent before publishing. This preserves
+shared sibling dependencies without mistaking an unprocessed sibling for a
+cycle. Encountering an active ancestor declines the optional theorem; no partial
+parent or cycle member is installed. Independently completed children can
+survive. Node, edge and transition limits bound all retries. Owned dependencies
+include the newly selected method and transitive source reads. The caller
+replays them when consuming the normalized graph. Foreign or untracked reads
+prevent reusable cross-revision certificates.
+
+Qualification uses Zig 0.17.0 and the selected-scheme baseline SHA-256
+`d431170c3bfa2c3dd38b5c61eff375a6e326b3a530e14896b9a8e0873869f439`. Candidate
+SHA-256 is `bbf1f1e032ef5cec102f7369c7740517f6e04b3151dc9f89df967543d786b724`,
+identity-file SHA-256
+`87301a2719d8ab67bdbf4eecb76e00bb9c2e6e53da1b226076cce89deb8a0fb8`. The six-file
+source patch against `ef8f4b9`, excluding documentation, is SHA-256
+`0849dd003b0f6d8859a4d3ebb81e13e378059d2440eaf1227bb29b8800c91259`. The
+immutable pin is `build/bench/cloud-principal-graphs/candidate-live-headers/`.
+The same evidence directory preserves scripts, workload sources and raw records.
+
+- `deno task test:compiler` passes the full native suite and all 607
+  guest/client tests; `live-header-full-gate-v7.log` records the final run. A
+  separate native build summary reports all three steps succeeded
+  (`live-header-native-v7.log`).
+- `deno task lint:zig` reports zero findings across 291 Zig files;
+  `live-header-analyzer-v7.log` uses the CI-pinned analyzer and workspace cache.
+- `python3 build/bench/cloud-principal-graphs/compare-live-headers.py` passes
+  509 cases / 1,018 invocations, including 350 successful cases. Exact ordered
+  diagnostics and successful Wasm bytes match. All 1,014 memory records report
+  zero live bytes; four invocations produce no memory record. Restart loading is
+  disabled. `live-header-comparisons/report.json` retains every sample.
+- Native laws cover source projection, merge/update, nominal fields/getters,
+  fixed-operand primitive selection, type comparison, seeded escaping rows,
+  closed handlers, private written-header witnesses, independent U32/F32 uses,
+  rollback revocation and diamonds through depth 64. Source inquiries perform no
+  evaluation and leave frozen Core unchanged. Allocation-failure sweeps cover
+  graph description, normalization, imports and publication.
+- A delayed-selection law confirms the raw parent lacks a getter edge and the
+  normalized parent owns the newly qualified getter edge. A separate kernel
+  fixture creates a type-compatible source-catalog cycle and requires repeated
+  optional checking to decline without publishing either cycle member, leaking
+  memory or changing the frozen input. This fixture qualifies publication; it
+  makes no claim about ordinary recursive inference.
+- Executed-Wasm laws cover imported structural/nominal/type-head/comparison
+  diamonds, delayed source-selected methods and handlers that actively invoke an
+  operation. Bundles, retained sessions, checkpoint restore, cached imports,
+  changed getters/comparisons, failed headers/rows/fields and corrected edits
+  preserve fresh diagnostics and executable results. Release deep-chain and
+  diamond budget laws also pass.
+
+The direct source form `Seed.build -> parent.read -> Box.read -> parent` exposed
+a frontend lowering retry that did not finish during investigation, even with
+written arrows. It is not a passing recursive qualification. Task 007 must bound
+that work in addition to implementing joint recursive components. The probe is
+retained at
+`build/bench/cloud-principal-graphs/revealed-edge-recursive-frontend-probe.blot`.
+Debug self-backend deep-chain failures likewise remain separate from the passing
+release LLVM gate. Callback invocation, lexical capture, recursive components
+and canonical cross-session keys remain tasks 005–008. The missing historical
+boxed compiler and frozen private gdev workload still prevent their final
+qualification; public results do not replace those artifacts.
+
+Fifteen alternating fresh-process pairs cover 23 workloads with persistence
+disabled and exact Wasm equality. CPU is child user plus system time measured by
+`getrusage`:
+`python3 build/bench/cloud-principal-graphs/measure-live-headers.py`. Load moves
+from approximately 0.02 to 0.96 on five reported CPUs. Allocation and counters
+are deterministic across repetitions. The raw report retains all CPU samples.
+
+| Workload                  | Median CPU ms, baseline/candidate | Requested bytes, baseline/candidate | Total scopes, baseline/candidate | Constraint visits, baseline/candidate |
+| ------------------------- | --------------------------------: | ----------------------------------: | -------------------------------: | ------------------------------------: |
+| Factory diamond 12        |                   201.064 / 6.115 |              19,420,315 / 5,601,419 |                      8,290 / 181 |                          16,719 / 513 |
+| Result double diamond 12  |                   476.870 / 6.085 |             120,471,388 / 5,487,506 |                     98,308 / 195 |                          32,798 / 486 |
+| Representation diamond 8  |                     7.954 / 5.975 |               5,993,070 / 4,336,311 |                         52 / 125 |                           6,396 / 123 |
+| Representation diamond 12 |                    60.262 / 6.868 |              43,473,545 / 4,847,090 |                         68 / 173 |                         102,396 / 163 |
+| Operation wrappers 8      |                     4.595 / 5.507 |               3,210,024 / 3,874,378 |                         62 / 137 |                               70 / 95 |
+| Open type head 12         |                  2408.407 / 6.441 |             192,788,721 / 5,334,905 |                     73,734 / 173 |                          81,932 / 437 |
+| Closed type head 12       |                  1426.425 / 5.591 |              64,117,575 / 4,352,205 |                     16,429 / 114 |                          16,396 / 236 |
+| Structured type head 12   |                  4353.041 / 6.676 |             104,987,771 / 5,352,551 |                     24,666 / 173 |                          28,696 / 421 |
+| Closed dispatch 12        |                     4.490 / 5.149 |               3,379,164 / 3,723,300 |                          48 / 78 |                              78 / 104 |
+| Active source handler 12  |                     4.446 / 4.835 |               3,672,490 / 4,013,358 |                         95 / 127 |                             163 / 191 |
+| Mixed source diamond 12   |                   663.442 / 4.939 |              26,230,049 / 4,100,725 |                     12,337 / 111 |                          16,502 / 179 |
+
+The candidate's largest reported region across these samples is 1.401 ms.
+Profiles report only regions of at least 1 ms; empty lists yield a zero field in
+the report, which is not a measured region duration or proof of a complete
+program maximum. The baseline's largest reported region is 1,929.438 ms.
+Representation visits now grow with distinct bodies instead of transitive paths.
+The closed source cases were already fast and pay description overhead:
+operation wrappers use about 20% more CPU and 21% more requested allocation,
+closed dispatch uses about 15% more CPU and 10% more allocation, and most simple
+structural/handler cases add about 9% allocation. The fixed-source update case
+costs about 5% more CPU, merge about 16%; getter CPU is flat. This task
+establishes bounded first-order sharing, not an across-the-board compiler
+speedup. Later allocation and scheduling tasks retain responsibility for that
+overhead.
+
+Seven official synthetic pairs preserve fresh, retained and restart Wasm
+equality:
+`deno task bench:compile --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-live-headers/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/live-header-synthetic`.
+Fresh median CPU for mono chain / generic chain / diamond / fan-out is 10/8/5/18
+ms in the baseline and 10/10/5/18 ms in the candidate. Restart medians are
+10/8/5/18 and 9/9/5/18 ms. Allocation adds approximately 1–5%. Retained phase
+timing has 10-ms process-accounting steps; zero and single-step differences do
+not establish precise edit latency or ratios.
+
+The same harness extended with the factory preserves all seven fresh, retained
+and restart pairs:
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-factory.ts --baseline build/bench/cloud-selected-schemes/candidate/blotc --candidate build/bench/cloud-principal-graphs/candidate-live-headers/blotc --runs 7 --workload factory_diamond_12 --restart-cache --out build/bench/cloud-principal-graphs/live-header-factory-retained`.
+Fresh CPU drops from 195 to 8 ms, allocation from 20.38 to 6.57 MB and peak
+requested memory from 15.63 to 1.14 MB. Restart CPU instead rises from 7 to 8 ms
+and allocation from 5.80 to 6.67 MB. Cache loading, retained population, first
+edit, subsequent edit/revert, no-op and restart remain separate in the reports.
+No private gdev or general latency improvement is claimed.
+
+This closes task 004's bounded first-order principal/residual graph work.
+Callback, capture, recursive-component and canonical-key extensions remain tasks
+005–008; final program-wide performance and historical qualification are still
+open.

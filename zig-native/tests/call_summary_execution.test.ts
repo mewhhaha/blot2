@@ -12,6 +12,419 @@ const executable = Deno.args[0] ??
   new URL("../zig-out/bin/blotc", import.meta.url);
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 
+Deno.test("source solved structural graphs preserve imported instances through checkpoints and failed edits", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const library = `${directory}/library.blot`;
+  const bundle = `${directory}/library.blotdep`;
+  const source = (
+    invalid: false | "field" | "header" | "row",
+    changed: boolean,
+  ) => {
+    const lines = [
+      "type Box a is data = #Box {left: a, keep: a}",
+      "type Seed is data = #Seed",
+      "const Seed.build: a -> Seed -> Box a = fn value => fn seed => #Box {left: value, keep: value}",
+      "type Tick is effect = Unit -> Unit",
+      "type Signal a is effect = { get: Unit -> a }",
+      "const read_seven: Unit -> U32 = fn () => @u32.add 0 7",
+      invalid === "row"
+        ? "const Box.read: Box a -> a ! {Tick} = fn box => do:\n  use Tick ()\n  return box.left"
+        : `const Box.read: Box a -> a${
+          invalid === "header" ? ' where { associated "missing" a a a }' : ""
+        } = fn box => box.${changed ? "keep" : "left"}`,
+      "type Count is data = #Count U32",
+      "type Other is data = #Other U32",
+      `const project_0 = fn value => {left: value, right: value}.${
+        invalid === "field" ? "missing" : "left"
+      }`,
+      "const merge_0 = fn value => (@record.merge {left: value} {right: value}).left",
+      "const update_0 = fn value => do:",
+      "  let record = {left: 0, keep: value}",
+      "  record.left := value",
+      "  return record.left",
+      "const nominal_0 = fn value => (#Box {left: value, keep: value}).left",
+      "const member_0 = fn value => (#Box {left: value, keep: value}).read",
+      'const revealed_seed = fn value => @type.call "build" value #Seed',
+      "const revealed_0 = fn value => (revealed_seed value).read",
+      'const known_0 = fn value => @type.call "add" value (@u32.add 0 1)',
+      "const handler_0: a -> a = fn value => do (@effect.provider (Signal.get U32) read_seven):\n  use ignored <- (Signal.get U32) ()\n  return value",
+      `const compare_0 = fn ignored => @type.same #Count #${
+        changed ? "Count" : "Other"
+      }`,
+    ];
+    for (
+      const kind of [
+        "project",
+        "merge",
+        "update",
+        "nominal",
+        "member",
+        "revealed",
+        "known",
+        "handler",
+        "compare",
+      ]
+    ) {
+      for (let i = 1; i <= 12; i++) {
+        lines.push(
+          `const ${kind}_${i} = fn value => do:`,
+          `  ${
+            (kind === "member" || kind === "revealed") && invalid === "row"
+              ? "use ignored <-"
+              : "let ignored ="
+          } ${kind}_${i - 1} value`,
+          `  return ${kind}_${i - 1} value`,
+        );
+      }
+      lines.push(`const ${kind}_factory = do:`, `  return ${kind}_12`);
+    }
+    return lines.join("\n") + "\n";
+  };
+  const program = ['import * as library from "./library"'];
+  for (
+    const kind of [
+      "project",
+      "merge",
+      "update",
+      "nominal",
+      "member",
+      "revealed",
+      "handler",
+    ]
+  ) {
+    for (const [name, type] of [["integer", "U32"], ["floating", "F32"]]) {
+      program.push(
+        `entry const ${kind}_${name}${
+          kind === "member" || kind === "revealed"
+            ? `: ${type} -> ${type} ! {}`
+            : ""
+        } = fn (value: ${type}) -> ${type} => library.${kind}_factory value`,
+      );
+    }
+  }
+  program.push(
+    "entry const compare = fn (value: U32) -> Bool => library.compare_factory value",
+    "entry const known = fn (value: U32) -> U32 => library.known_factory value",
+  );
+  const options = { executable, entry, prelude };
+  try {
+    await Deno.writeTextFile(library, source(false, false));
+    await Deno.writeTextFile(entry, program.join("\n") + "\n");
+    const packed = await new Deno.Command(executable, {
+      args: ["dependencies", entry, bundle, "--prelude", prelude],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assert(packed.success, new TextDecoder().decode(packed.stdout));
+    const producer = await createZigProjectCompiler(options);
+    let checkpoint: Uint8Array<ArrayBuffer>;
+    let expected: Uint8Array<ArrayBuffer>;
+    try {
+      const first = await producer.build();
+      assert(
+        first.success,
+        JSON.stringify({
+          success: first.success,
+          diagnostics: "diagnostics" in first ? first.diagnostics : [],
+        }),
+      );
+      expected = first.bytes;
+      checkpoint = await producer.exportCheckpoint();
+    } finally {
+      await producer.dispose();
+    }
+    const retained = await createZigProjectCompiler({
+      ...options,
+      dependencies: bundle,
+      checkpoint,
+    });
+    try {
+      const restored = await retained.build();
+      assert(
+        restored.success,
+        JSON.stringify({
+          success: restored.success,
+          diagnostics: "diagnostics" in restored ? restored.diagnostics : [],
+        }),
+      );
+      assert(restored.stats.cachedModules > 0);
+      assert.deepEqual(restored.bytes, expected);
+      for (
+        const [invalid, changed] of [
+          [false, true],
+          ["header", true],
+          [
+            "row",
+            true,
+          ],
+          ["field", true],
+          [
+            false,
+            false,
+          ],
+        ] as const
+      ) {
+        const sources = { [library]: source(invalid, changed) };
+        const current = await retained.build({ sources });
+        const fresh = await createZigProjectCompiler(options);
+        try {
+          const reference = await fresh.build({ sources });
+          assert.equal(
+            current.success,
+            !invalid,
+            JSON.stringify({
+              success: current.success,
+              diagnostics: "diagnostics" in current ? current.diagnostics : [],
+            }),
+          );
+          assert.equal(current.success, reference.success);
+          if (current.success && reference.success) {
+            assert.deepEqual(current.bytes, reference.bytes);
+            const guest = await instantiateGuest(current.bytes);
+            try {
+              for (
+                const kind of [
+                  "project",
+                  "merge",
+                  "update",
+                  "nominal",
+                  "member",
+                  "revealed",
+                  "handler",
+                ]
+              ) {
+                for (const value of [0, 37, 0xffff_ffff]) {
+                  assert.equal(guest.call(`${kind}_integer`, value), value);
+                }
+                for (const value of [0, 1.25, -2.5]) {
+                  assert.equal(
+                    guest.call(`${kind}_floating`, value),
+                    Math.fround(value),
+                  );
+                }
+              }
+              assert.equal(guest.call("compare", 42), changed);
+              for (const value of [0, 37, 0xffff_ffff]) {
+                assert.equal(guest.call("known", value), (value + 1) >>> 0);
+              }
+            } finally {
+              guest.dispose();
+            }
+          } else if (!current.success && !reference.success) {
+            assert.deepEqual(current.diagnostics, reference.diagnostics);
+          }
+        } finally {
+          await fresh.dispose();
+        }
+      }
+    } finally {
+      await retained.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("source closed State witness diamonds retain unrelated argument instances", async () => {
+  const lines = [
+    "type Cell a is data = #Cell a",
+    "const f_0 = fn ignored => @state.get (#Cell 0)",
+  ];
+  for (let i = 1; i <= 12; i++) {
+    lines.push(
+      `const f_${i} = fn witness => do:`,
+      `  use ignored <- f_${i - 1} witness`,
+      `  return f_${i - 1} witness`,
+    );
+  }
+  lines.push(
+    "const factory = do:",
+    "  return f_12",
+    "entry const integer = fn (value: U32) -> U32 => do:",
+    "  let (_, #Cell result) = @state.run (#Cell value) (fn () => factory value)",
+    "  return result",
+    "entry const floating = fn (value: F32) -> U32 => do:",
+    "  let (_, #Cell result) = @state.run (#Cell 42) (fn () => factory value)",
+    "  return result",
+  );
+  await compileAndRun(lines.join("\n") + "\n", (guest) => {
+    for (const value of [0, 37, 0xffff_ffff]) {
+      assert.equal(guest.call("integer", value), value);
+    }
+    for (const value of [0, 1.25, -2.5]) {
+      assert.equal(guest.call("floating", value), 42);
+    }
+  });
+});
+
+Deno.test("source parametric State witness heads preserve independent nominal arguments", async () => {
+  const lines = [
+    "type Cell a is data = #Cell a",
+    "const f_0 = fn (witness: Cell a) -> Cell a => @state.get witness",
+  ];
+  for (let i = 1; i <= 12; i++) {
+    lines.push(
+      `const f_${i} = fn witness => do:`,
+      `  use ignored <- f_${i - 1} witness`,
+      `  return f_${i - 1} witness`,
+    );
+  }
+  lines.push(
+    "const factory = do:",
+    "  return f_12",
+    "entry const integer = fn (value: U32) -> U32 => do:",
+    "  let (_, #Cell result) = @state.run (#Cell value) (fn () => factory (#Cell 0))",
+    "  return result",
+    "entry const floating = fn (value: F32) -> F32 => do:",
+    "  let (_, #Cell result) = @state.run (#Cell value) (fn () => factory (#Cell 0.0))",
+    "  return result",
+  );
+  await compileAndRun(lines.join("\n") + "\n", (guest) => {
+    for (const value of [0, 37, 0xffff_ffff]) {
+      assert.equal(guest.call("integer", value), value);
+    }
+    for (const value of [0, 1.25, -2.5]) {
+      assert.equal(guest.call("floating", value), Math.fround(value));
+    }
+  });
+});
+
+Deno.test("witness principal graphs preserve imported nominal state heads and comparisons through saved state and recovery", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const library = `${directory}/library.blot`;
+  const bundle = `${directory}/library.blotdep`;
+  const source = (invalid: "head" | "comparison" | false) => {
+    const lines = [
+      "type Cell a is data = #Cell a",
+      `const head_0 = fn (witness: w) -> Cell a => @state.get ${
+        invalid === "head" ? "0" : "witness"
+      }`,
+      `const same_0 = fn left => fn right => @type.same ${
+        invalid === "comparison" ? '(@panic "uncalled witness")' : "left"
+      } right`,
+    ];
+    for (let i = 1; i <= 12; i++) {
+      lines.push(
+        `const head_${i} = fn witness => do:`,
+        `  use ignored <- head_${i - 1} witness`,
+        `  return head_${i - 1} witness`,
+        `const same_${i} = fn left => fn right => do:`,
+        `  let ignored = same_${i - 1} left right`,
+        `  return same_${i - 1} left right`,
+      );
+    }
+    return lines.join("\n") + "\n";
+  };
+  const options = { executable, entry, prelude };
+  try {
+    await Deno.writeTextFile(library, source(false));
+    await Deno.writeTextFile(
+      entry,
+      `import * as library from "./library"
+entry const integer = fn (value: U32) -> U32 => do:
+  let (_, #library.Cell result) = @state.run (#library.Cell value) (fn () => library.head_12 (#library.Cell 0))
+  return result
+entry const floating = fn (value: F32) -> F32 => do:
+  let (_, #library.Cell result) = @state.run (#library.Cell value) (fn () => library.head_12 (#library.Cell 0.0))
+  return result
+entry const same_integer = fn (value: U32) -> Bool => library.same_12 value 1
+entry const same_floating = fn (value: F32) -> Bool => library.same_12 value 1.0
+entry const different = fn (value: U32) -> Bool => library.same_12 value 1.0
+entry const same_nominal = fn (value: U32) -> Bool => library.same_12 (#library.Cell value) (#library.Cell 1)
+entry const different_nominal = fn (value: U32) -> Bool => library.same_12 (#library.Cell value) (#library.Cell 1.0)
+`,
+    );
+    const packed = await new Deno.Command(executable, {
+      args: ["dependencies", entry, bundle, "--prelude", prelude],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assert(packed.success, new TextDecoder().decode(packed.stdout));
+    const producer = await createZigProjectCompiler(options);
+    let checkpoint: Uint8Array<ArrayBuffer>;
+    let expected: Uint8Array<ArrayBuffer>;
+    try {
+      const first = await producer.build();
+      assert(
+        first.success,
+        JSON.stringify({
+          success: first.success,
+          diagnostics: "diagnostics" in first ? first.diagnostics : [],
+        }),
+      );
+      expected = first.bytes;
+      checkpoint = await producer.exportCheckpoint();
+    } finally {
+      await producer.dispose();
+    }
+    const retained = await createZigProjectCompiler({
+      ...options,
+      dependencies: bundle,
+      checkpoint,
+    });
+    try {
+      const restored = await retained.build();
+      assert(
+        restored.success,
+        JSON.stringify({
+          success: restored.success,
+          diagnostics: "diagnostics" in restored ? restored.diagnostics : [],
+        }),
+      );
+      assert(restored.stats.cachedModules > 0);
+      assert.deepEqual(restored.bytes, expected);
+      for (
+        const invalid of [false, "head", false, "comparison", false] as const
+      ) {
+        const sources = { [library]: source(invalid) };
+        const current = await retained.build({ sources });
+        const fresh = await createZigProjectCompiler(options);
+        try {
+          const reference = await fresh.build({ sources });
+          assert.equal(
+            current.success,
+            !invalid,
+            JSON.stringify({
+              success: current.success,
+              diagnostics: "diagnostics" in current ? current.diagnostics : [],
+            }),
+          );
+          assert.equal(current.success, reference.success);
+          if (current.success && reference.success) {
+            assert.deepEqual(current.bytes, reference.bytes);
+            const guest = await instantiateGuest(current.bytes);
+            try {
+              for (const value of [0, 37, 0xffff_ffff]) {
+                assert.equal(guest.call("integer", value), value);
+                assert.equal(guest.call("same_integer", value), true);
+                assert.equal(guest.call("different", value), false);
+                assert.equal(guest.call("same_nominal", value), true);
+                assert.equal(guest.call("different_nominal", value), false);
+              }
+              for (const value of [0, 1.25, -2.5]) {
+                assert.equal(guest.call("floating", value), Math.fround(value));
+                assert.equal(guest.call("same_floating", value), true);
+              }
+            } finally {
+              guest.dispose();
+            }
+          } else if (!current.success && !reference.success) {
+            assert.deepEqual(current.diagnostics, reference.diagnostics);
+          }
+        } finally {
+          await fresh.dispose();
+        }
+      }
+    } finally {
+      await retained.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("structured residual graphs preserve imported array record nominal and operation instances through saved state and recovery", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
@@ -25,6 +438,7 @@ Deno.test("structured residual graphs preserve imported array record nominal and
       `const array_0 = fn value => #[value.${member}]`,
       `const record_0 = fn value => {result: value.${member}}`,
       `const nominal_0 = fn value => #Box value.${member}`,
+      "const representation_0: Box a -> Box a where { type_rep (Box a) } = fn value => value",
       "const operation_0: a -> a ! {| e} where { operation Signal.get a } = fn token => Signal.get a ()",
     ];
     for (let i = 1; i <= 8; i++) {
@@ -43,6 +457,17 @@ Deno.test("structured residual graphs preserve imported array record nominal and
           : "  return result",
       );
     }
+    for (let i = 1; i <= 12; i++) {
+      lines.push(
+        `const representation_${i} = fn value => representation_${
+          i - 1
+        } (representation_${i - 1} value)`,
+      );
+    }
+    lines.push(
+      "const representation_factory = do:",
+      "  return representation_12",
+    );
     for (const shape of ["array", "record", "nominal", "operation"]) {
       lines.push(`const ${shape}_factory = do:`, `  return ${shape}_8`);
     }
@@ -58,12 +483,14 @@ entry const integer = fn (value: U32) -> U32 => do:
   let array = library.array_factory {first: value}
   let record = library.record_factory {first: array[0]}
   let #library.Box result = library.nominal_factory {first: record.result}
-  return result
+  let #library.Box represented = library.representation_factory (#library.Box result)
+  return represented
 entry const floating = fn (value: F32) -> F32 => do:
   let array = library.array_factory {first: value}
   let record = library.record_factory {first: array[0]}
   let #library.Box result = library.nominal_factory {first: record.result}
-  return result
+  let #library.Box represented = library.representation_factory (#library.Box result)
+  return represented
 entry const requested = fn (value: U32) -> U32 => do (@effect.provider (library.Signal.get U32) (fn () => value)):
   return library.operation_factory value
 entry const floating_requested = fn (value: F32) -> F32 => do (@effect.provider (library.Signal.get F32) (fn () => value)):

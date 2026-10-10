@@ -4134,7 +4134,7 @@ const Engine = struct {
     }
     fn sharedKind(kind: T.ObligationKind) bool {
         return switch (kind) {
-            .dispatch, .result_dispatch, .field, .writable_field, .receiver, .collection, .record_merge, .update, .effect_operation, .type_rep, .effect_rep, .callee_use => true,
+            .dispatch, .result_dispatch, .field, .writable_field, .receiver, .collection, .record_merge, .update, .effect_operation, .type_head, .type_rep, .effect_rep, .callee_use => true,
             else => false,
         };
     }

@@ -72,6 +72,7 @@ comptime {
     _ = @import("core_demand_tests.zig");
     _ = @import("core_monad_tests.zig");
     _ = @import("loop_targets_tests.zig");
+    _ = @import("core_eval.zig");
     _ = @import("core_eval_tests.zig");
     _ = @import("core_operation_evidence_tests.zig");
     _ = @import("builtin_state_tests.zig");

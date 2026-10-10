@@ -219,10 +219,12 @@ test "source owned operation identities retain open rows through shared diamonds
         var session = try evaluator.Session.init(a, &.{module});
         defer session.deinit();
         const result = try session.sourceInterface(target(&module, "factory"));
-        if (result.evidence != 0 or session.counters.region_scopes > depth * 2 + 32) std.debug.print("operation written={}, depth={d}: result={any}, scopes={d}, builds={d}, deferred={d}\n", .{ written, depth, result, session.counters.region_scopes, session.principal_graph_builds, session.principal_graph_deferred });
+        if (result.evidence != 0 or session.counters.region_scopes > depth * 4 + 32) std.debug.print("operation written={}, depth={d}: result={any}, scopes={d}, builds={d}, deferred={d}\n", .{ written, depth, result, session.counters.region_scopes, session.principal_graph_builds, session.principal_graph_deferred });
         try std.testing.expectEqual(@as(type_evidence.Id, 0), result.evidence);
         try std.testing.expect(result.pending != 0);
-        try std.testing.expect(session.counters.region_scopes <= depth * 2 + 32);
+        // Source description and normalization each visit distinct bodies.
+        try std.testing.expect(session.counters.region_scopes <= depth * 4 + 32);
+        try std.testing.expect(session.counters.solver_constraint_visits <= depth * 256 + 256);
         try std.testing.expect(session.principal_graph_deferred != 0);
         try std.testing.expectEqual(@as(usize, 0), session.steps);
     };
@@ -471,9 +473,668 @@ test "source owned representation predicates retain open diamonds without closin
         defer session.deinit();
         const interface = try session.sourceInterface(target(&module, "factory"));
         try std.testing.expect(interface.evidence == 0 and interface.pending != 0);
-        try std.testing.expect(session.counters.region_scopes <= depth * 2 + 32);
+        if (session.counters.region_scopes > depth * 4 + 32 or session.principal_graph_deferred == 0) std.debug.print("representation {s}, depth={d}: {any}, deferred={d}\n", .{ leaf, depth, session.counters, session.principal_graph_deferred });
+        try std.testing.expect(session.counters.region_scopes <= depth * 4 + 32);
+        try std.testing.expect(session.counters.solver_constraint_visits <= depth * 256 + 256);
         try std.testing.expect(session.principal_graph_deferred != 0);
         try std.testing.expectEqual(@as(usize, 0), session.steps);
+    };
+}
+
+fn representationHeaderScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const leaf = module.binding(target(module, "f_0").binding);
+    const arrow = module.types.node(leaf.scheme.root);
+    const variable = module.types.list(leaf.public_variables)[0];
+    for ([_]types.Id{ types.u32_type, types.f32_type }) |scalar| {
+        const box = try session.evidence.project(&module.types, arrow.a, &.{.{ .variable = variable, .evidence = scalar }});
+        const expected = try session.evidence.intern(.function, box, box, &.{});
+        var name: [32]u8 = undefined;
+        const reference = target(module, try std.mem.print(&name, "f_{d}", .{depth}));
+        var solved = try session.bodyEvidenceFull(reference, expected, &.{}, &.{});
+        solved.deinit(allocator);
+        try std.testing.expect(session.counters.solver_constraint_visits <= depth * 24 + 128);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    }
+    const before = session.counters.solver_constraint_visits;
+    try session.prepare(target(module, "factory"));
+    const factory = (try session.cachedBindingValue(target(module, "factory"))).?;
+    try std.testing.expectEqual(evaluator.ValueKind.closure, session.valueInfo(factory).kind);
+    try std.testing.expect(session.counters.solver_constraint_visits - before <= depth * 24 + 128);
+    try std.testing.expect(session.diagnostic == null);
+}
+
+test "representation headers share live public inputs across distinct wrapper products" {
+    for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a,
+            \\type Box a is data = #Box a
+            \\entry const f_0: Box a -> Box a where { type_rep (Box a) } = fn value => value
+            \\
+        );
+        for (1..depth + 1) |i| try text.print(a, "entry const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const factory = do:\n  return f_{d}\n", .{depth});
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        const nodes = try a.dupe(core.Node, module.nodes);
+        defer a.free(nodes);
+        const frozen = try a.dupe(types.Node, module.types.nodes);
+        defer a.free(frozen);
+        const obligations = try a.dupe(core.Obligation, module.obligations);
+        defer a.free(obligations);
+        try representationHeaderScenario(a, &module, depth);
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, representationHeaderScenario, .{ &module, depth });
+        try std.testing.expectEqualDeep(nodes, module.nodes);
+        try std.testing.expectEqualDeep(frozen, module.types.nodes);
+        try std.testing.expectEqualDeep(obligations, module.obligations);
+    }
+}
+
+fn privateHeaderScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    var summarized = try evaluator.Session.init(allocator, &.{module.*});
+    defer summarized.deinit();
+    var expected: ?evaluator.Diagnostic = null;
+    for ([_]*evaluator.Session{ &ordinary, &summarized }) |session| {
+        const accepted = try session.sourceInterface(target(module, "accepted"));
+        try std.testing.expect(accepted.evidence != 0);
+        _ = session.sourceInterface(target(module, "missing")) catch |err| {
+            if (err != error.Declined) return err;
+            if (expected) |diagnostic| try std.testing.expectEqualDeep(diagnostic, session.diagnostic.?) else expected = session.diagnostic;
+            session.diagnostic = null;
+            const recovered = try session.sourceInterface(target(module, "accepted"));
+            try std.testing.expectEqual(accepted.evidence, recovered.evidence);
+            try std.testing.expectEqual(@as(usize, 0), session.steps);
+            continue;
+        };
+        return error.TestExpectedError;
+    }
+}
+
+test "mandatory headers preserve independent private field results and the missing second witness" {
+    var module = try lower(
+        \\const ignore_fields: a -> Unit where { field "left" a b, field "right" a c } = fn value => ()
+        \\const twice = fn value => do:
+        \\  let ignored = ignore_fields value
+        \\  return ignore_fields value
+        \\entry const accepted = fn (value: {left: U32, right: F32}) -> Unit => twice value
+        \\entry const missing = fn (value: {left: U32}) -> Unit => twice value
+    );
+    defer module.deinit(a);
+    const original = try a.dupe(types.Node, module.types.nodes);
+    defer a.free(original);
+    try privateHeaderScenario(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, privateHeaderScenario, .{&module});
+    try std.testing.expectEqualDeep(original, module.types.nodes);
+}
+
+fn comparisonGraphScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const generic = try session.sourceInterface(target(module, "generic"));
+    try std.testing.expect(generic.evidence == 0 and generic.pending != 0);
+    try std.testing.expect(session.principal_graph_deferred != 0);
+    for ([_][]const u8{ "integer", "floating" }) |name| {
+        const interface = try session.sourceInterface(target(module, name));
+        try std.testing.expect(interface.evidence != 0);
+        const arrow = session.evidence.node(interface.evidence);
+        try std.testing.expectEqual(types.boolean, arrow.b);
+    }
+    try std.testing.expect(session.counters.solver_constraint_visits <= depth * 96 + 256);
+    try std.testing.expect(session.counters.max_region_scopes <= depth * 4 + 8);
+    const builds = session.principal_graph_builds;
+    _ = try session.sourceInterface(target(module, "integer"));
+    try std.testing.expectEqual(builds, session.principal_graph_builds);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    var graphs = session.call_summaries.principals.valueIterator();
+    while (graphs.next()) |graph_| if (graph_.*) |graph| {
+        try std.testing.expectEqual(@as(usize, 0), graph.types.versions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), graph.types.effects.versions.items.len);
+    };
+    if (depth != 4) return;
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    const expected = try ordinary.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqual(expected.evidence, generic.evidence);
+    try std.testing.expectEqual(expected.generic, generic.generic);
+    try std.testing.expectEqual(expected.selected, generic.selected);
+    try std.testing.expect(generic.pending <= expected.pending);
+    for ([_]*evaluator.Session{ &ordinary, &session }) |checked| {
+        _ = checked.sourceInterface(target(module, "invalid")) catch |err| {
+            if (err != error.Declined) return err;
+            try std.testing.expectEqual(evaluator.Code.invalid_annotation, checked.diagnostic.?.code);
+            if (checked == &session) try std.testing.expectEqualDeep(ordinary.diagnostic, session.diagnostic);
+            continue;
+        };
+        return error.TestExpectedError;
+    }
+    ordinary.diagnostic = null;
+    session.diagnostic = null;
+    _ = session.sourceInterface(target(module, "factory")) catch |err| {
+        if (err != error.Declined) return err;
+        _ = ordinary.sourceInterface(target(module, "factory")) catch |failure| {
+            if (failure != error.Declined) return failure;
+            try std.testing.expectEqualDeep(ordinary.diagnostic, session.diagnostic);
+            ordinary.diagnostic = null;
+            session.diagnostic = null;
+            const recovered = try session.sourceInterface(target(module, "floating"));
+            try std.testing.expect(recovered.evidence != 0);
+            return;
+        };
+        return error.TestExpectedError;
+    };
+    return error.TestExpectedError;
+}
+
+fn sourceProvenGraphScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const generic = try session.sourceInterface(target(module, "generic"));
+    if (!(generic.evidence == 0 and generic.generic and generic.pending == 0)) std.debug.print("source theorem interface: {any}\n", .{generic});
+    try std.testing.expect(generic.evidence == 0 and generic.generic and generic.pending == 0);
+    for ([_][]const u8{ "integer", "floating" }) |name| {
+        const interface = try session.sourceInterface(target(module, name));
+        try std.testing.expect(interface.evidence != 0);
+    }
+    try std.testing.expect(session.counters.region_scopes <= depth * 8 + 64);
+    try std.testing.expect(session.counters.solver_constraint_visits <= depth * 256 + 256);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    var graphs = session.call_summaries.normalized_principals.valueIterator();
+    while (graphs.next()) |graph| {
+        try std.testing.expectEqual(@as(usize, 0), graph.*.types.versions.items.len);
+        try std.testing.expectEqual(@as(usize, 0), graph.*.types.effects.versions.items.len);
+    }
+    if (depth != 4) return;
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    const expected = try ordinary.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqual(expected.generic, generic.generic);
+    try std.testing.expectEqual(expected.pending, generic.pending);
+    try std.testing.expectEqual(expected.selected, generic.selected);
+    try std.testing.expectEqual(expected.evidence, generic.evidence);
+    for ([_][]const u8{ "integer", "floating" }) |name| {
+        const reference = try ordinary.sourceInterface(target(module, name));
+        const actual = try session.sourceInterface(target(module, name));
+        const expected_arrow = ordinary.evidence.node(reference.evidence);
+        const actual_arrow = session.evidence.node(actual.evidence);
+        try std.testing.expectEqual(expected_arrow.a, actual_arrow.a);
+        try std.testing.expectEqual(expected_arrow.b, actual_arrow.b);
+        try std.testing.expectEqual(expected_arrow.c, actual_arrow.c);
+    }
+}
+
+fn revealedSourceEdgeScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    const read_binding = blk: {
+        try std.testing.expectEqual(@as(usize, 2), module.associated.len);
+        break :blk module.associated[1].target.binding;
+    };
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const generic = try session.sourceInterface(target(module, "generic"));
+    var raw_parent = false;
+    var originals = session.call_summaries.principals.valueIterator();
+    while (originals.next()) |entry| {
+        const graph = entry.* orelse continue;
+        if (graph.key.target.binding != target(module, "parent").binding) continue;
+        raw_parent = true;
+        for (graph.constraints) |constraint| if (constraint.kind == .call_summary or constraint.kind == .scheme_use) {
+            try std.testing.expect(constraint.target.binding != read_binding);
+        };
+    }
+    if (!raw_parent) std.debug.print("no raw parent graph\n", .{});
+    try std.testing.expect(raw_parent);
+    {
+        try std.testing.expect(generic.generic and generic.pending == 0);
+        var checked_member = false;
+        var revealed_member = false;
+        var graphs = session.call_summaries.normalized_principals.valueIterator();
+        while (graphs.next()) |entry| {
+            const graph = entry.*;
+            if (graph.key.target.binding == read_binding) checked_member = graph.source_complete;
+            if (graph.key.target.binding == target(module, "parent").binding) for (graph.constraints) |constraint| {
+                if (constraint.kind == .call_summary and constraint.target.binding == read_binding) revealed_member = true;
+            };
+            try std.testing.expectEqual(@as(usize, 0), graph.types.versions.items.len);
+        }
+        if (!checked_member) std.debug.print("selected member was not source complete\n", .{});
+        try std.testing.expect(checked_member);
+        if (!revealed_member) std.debug.print("no normalized parent edge\n", .{});
+        try std.testing.expect(revealed_member);
+        for ([_][]const u8{ "integer", "floating" }, [_]types.Id{ types.u32_type, types.f32_type }) |name, scalar| {
+            const selected = try session.sourceInterface(target(module, name));
+            try std.testing.expect(selected.evidence != 0 and selected.pending == 0);
+            try std.testing.expectEqual(scalar, session.evidence.node(selected.evidence).b);
+        }
+        if (session.counters.region_scopes > depth * 12 + 128 or session.counters.solver_constraint_visits > depth * 512 + 512) std.debug.print("revealed edge depth={d}: {any}, graphs={d}/{d}\n", .{ depth, session.counters, session.call_summaries.principals.count(), session.call_summaries.normalized_principals.count() });
+        try std.testing.expect(session.counters.region_scopes <= depth * 12 + 128);
+        try std.testing.expect(session.counters.solver_constraint_visits <= depth * 512 + 512);
+    }
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    if (depth != 4) return;
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    const expected = try ordinary.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqual(expected.evidence, generic.evidence);
+    try std.testing.expectEqual(expected.generic, generic.generic);
+    try std.testing.expectEqual(expected.selected, generic.selected);
+    try std.testing.expectEqual(expected.pending, generic.pending);
+    try std.testing.expectEqualDeep(ordinary.diagnostic, session.diagnostic);
+}
+
+test "source result equations check newly revealed selected edges through every allocation failure" {
+    for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a,
+            \\type Seed is data = #Seed
+            \\type Box a is data = #Box a
+            \\const Seed.build: a -> Seed -> Box a = fn value => fn seed => #Box value
+            \\const f_0 = fn value => @type.call "build" value #Seed
+            \\
+        );
+        try text.appendSlice(a, "entry const parent: a -> a = fn value => (f_0 value).read\nconst Box.read: Box a -> a = fn box => case box of\n  #Box value => value\n");
+        try text.appendSlice(a, "const chain_0 = fn value => parent value\n");
+        for (1..depth + 1) |i| try text.print(a, "const chain_{d} = fn value => do:\n  let discard = chain_{d} value\n  return chain_{d} value\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const generic = fn value => chain_{d} value\nentry const integer = fn (value: U32) -> U32 => chain_{d} value\nentry const floating = fn (value: F32) -> F32 => chain_{d} value\n", .{ depth, depth, depth });
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        const frozen = try a.dupe(types.Node, module.types.nodes);
+        defer a.free(frozen);
+        try revealedSourceEdgeScenario(a, &module, depth);
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, revealedSourceEdgeScenario, .{ &module, depth });
+        try std.testing.expectEqualDeep(frozen, module.types.nodes);
+    }
+}
+
+fn sourceKnownOperandScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const generic = try session.sourceInterface(target(module, "generic"));
+    if (generic.evidence == 0 or generic.generic or generic.pending != 0) std.debug.print("known operand depth={d}: interface={any}, counters={any}, graphs={d}, normalized={d}\n", .{ depth, generic, session.counters, session.call_summaries.principals.count(), session.call_summaries.normalized_principals.count() });
+    try std.testing.expect(generic.evidence != 0 and !generic.generic and generic.pending == 0);
+    const arrow = session.evidence.node(generic.evidence);
+    try std.testing.expectEqual(types.u32_type, arrow.a);
+    try std.testing.expectEqual(types.u32_type, arrow.b);
+    if (session.counters.region_scopes > depth * 8 + 64 or session.counters.solver_constraint_visits > depth * 256 + 256) std.debug.print("known operand depth={d}: {any}\n", .{ depth, session.counters });
+    try std.testing.expect(session.counters.region_scopes <= depth * 8 + 64);
+    try std.testing.expect(session.counters.solver_constraint_visits <= depth * 256 + 256);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    if (depth != 4) return;
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    const expected = try ordinary.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqualDeep(ordinary.evidence.node(expected.evidence), arrow);
+}
+
+fn selectedSourceHeaderScenario(allocator: std.mem.Allocator, module: *const core.Module, row_failure: bool) !void {
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    var summarized = try evaluator.Session.init(allocator, &.{module.*});
+    defer summarized.deinit();
+    for ([_]*evaluator.Session{ &ordinary, &summarized }) |session| {
+        if (row_failure) {
+            const selected = try session.sourceInterface(target(module, "answer"));
+            try std.testing.expect(selected.evidence != 0);
+            const pure = try session.evidence.intern(.function, types.unit, types.u32_type, &.{});
+            try resultWitnessFailure(session, target(module, "answer"), pure);
+            try std.testing.expectEqual(evaluator.Code.effect_mismatch, session.diagnostic.?.code);
+            continue;
+        }
+        _ = session.sourceInterface(target(module, "answer")) catch |err| {
+            if (err == error.OutOfMemory) return err;
+            try std.testing.expectEqual(if (row_failure) evaluator.Code.effect_mismatch else evaluator.Code.missing_associated, session.diagnostic.?.code);
+            continue;
+        };
+        return error.TestExpectedDiagnostic;
+    }
+    try std.testing.expectEqualDeep(ordinary.diagnostic, summarized.diagnostic);
+    for ([_]*evaluator.Session{ &ordinary, &summarized }) |session| {
+        session.diagnostic = null;
+        const corrected = try session.sourceInterface(target(module, "good"));
+        try std.testing.expect(corrected.evidence != 0);
+        if (row_failure) {
+            const selected = try session.sourceInterface(target(module, "answer"));
+            var checked = try session.bodyEvidenceFull(target(module, "answer"), selected.evidence, &.{}, &.{});
+            checked.deinit(allocator);
+        }
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    }
+}
+
+test "source selected member graphs retain written header and closed caller row failures under allocation failure" {
+    for ([_]bool{ false, true }) |row_failure| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, if (row_failure)
+            \\type Tick is effect = Unit -> Unit
+            \\type Box a is data = #Box {value: a}
+            \\const Box.read: Box a -> a ! {Tick} = fn box => do:
+            \\  use Tick ()
+            \\  return box.value
+            \\const f_0 = fn box => box.read
+            \\
+        else
+            \\type Box a is data = #Box {value: a}
+            \\const Box.read: Box a -> a where { associated "add" a a a } = fn box => box.value
+            \\const f_0 = fn box => box.read
+            \\
+        );
+        for (1..5) |i| try text.print(a, "const f_{d} = fn box => do:\n  {s} ignored {s} f_{d} box\n  return f_{d} box\n", .{ i, if (row_failure) "use" else "let", if (row_failure) "<-" else "=", i - 1, i - 1 });
+        try text.appendSlice(a, "const factory = do:\n  return f_4\nentry const good = fn (value: U32) => value\n");
+        try text.appendSlice(a, if (row_failure) "entry const answer = fn () => factory (#Box {value: 21})\n" else "entry const answer = fn () => factory (#Box {value: #True})\n");
+        var module = try lowerPreludeProducer(text.items, &.{.add});
+        defer module.deinit(a);
+        try selectedSourceHeaderScenario(a, &module, row_failure);
+        try @import("allocation_failures.zig").checkAllAllocationFailures(a, selectedSourceHeaderScenario, .{ &module, row_failure });
+    }
+}
+
+fn seededSourceRowScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const generic = try session.sourceInterface(target(module, "convert"));
+    try std.testing.expect(generic.evidence == 0 and generic.pending == 0);
+    try std.testing.expect(session.call_summaries.normalized_principals.count() != 0);
+    var seeded = false;
+    var graphs = session.call_summaries.normalized_principals.valueIterator();
+    while (graphs.next()) |entry| {
+        const graph = entry.*;
+        for (graph.constraints) |constraint| if (constraint.kind == .effect_operation and constraint.solved) {
+            seeded = true;
+            // The theorem retains the operation in its public row.
+            try std.testing.expectEqual(@as(usize, 1), graph.types.rowLabels(graph.types.node(graph.root).c).len);
+        };
+    }
+    try std.testing.expect(seeded);
+    try std.testing.expect(session.counters.region_scopes <= depth * 8 + 64);
+    const correct = try session.sourceInterface(target(module, "correct"));
+    var checked = try session.bodyEvidenceFull(target(module, "convert"), correct.evidence, &.{}, &.{});
+    checked.deinit(allocator);
+    const pure = try session.evidence.intern(.function, types.u32_type, types.unit, &.{});
+    try resultWitnessFailure(&session, target(module, "convert"), pure);
+    try std.testing.expectEqual(evaluator.Code.effect_mismatch, session.diagnostic.?.code);
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    const expected = try ordinary.sourceInterface(target(module, "correct"));
+    try std.testing.expectEqualDeep(ordinary.evidence.node(expected.evidence), session.evidence.node(correct.evidence));
+    try resultWitnessFailure(&ordinary, target(module, "convert"), try ordinary.evidence.intern(.function, types.u32_type, types.unit, &.{}));
+    try std.testing.expectEqualDeep(ordinary.diagnostic, session.diagnostic);
+    session.diagnostic = null;
+    var recovered = try session.bodyEvidenceFull(target(module, "convert"), correct.evidence, &.{}, &.{});
+    recovered.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
+test "seeded source operation theorems retain escaping rows and exact pure caller failures under allocation failure" {
+    for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "type Tick is effect = Unit -> Unit\nconst f_0 = fn value => Tick ()\n");
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => do:\n  use ignored <- f_{d} value\n  return f_{d} value\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const convert = fn value => f_{d} value\nentry const correct = fn (value: U32) -> Unit => convert value\n", .{depth});
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        try seededSourceRowScenario(a, &module, depth);
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, seededSourceRowScenario, .{ &module, depth });
+    }
+}
+
+fn sourceHandlerGraphScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const generic = try session.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqual(@as(type_evidence.Id, 0), generic.evidence);
+    if (session.counters.region_scopes > depth * 8 + 64 or session.counters.solver_constraint_visits > depth * 256 + 256) std.debug.print("handler depth={d}: {any}\n", .{ depth, session.counters });
+    try std.testing.expect(session.counters.region_scopes <= depth * 8 + 64);
+    try std.testing.expect(session.counters.solver_constraint_visits <= depth * 256 + 256);
+    for ([_][]const u8{ "integer", "floating" }) |name| {
+        const selected = try session.sourceInterface(target(module, name));
+        try std.testing.expect(selected.evidence != 0 and selected.pending == 0);
+        try std.testing.expectEqual(@as(u32, 0), session.evidence.node(selected.evidence).c);
+    }
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    if (depth != 4) return;
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    const expected_generic = try ordinary.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqualDeep(expected_generic, generic);
+    for ([_][]const u8{ "integer", "floating" }) |name| {
+        const expected = try ordinary.sourceInterface(target(module, name));
+        const actual = try session.sourceInterface(target(module, name));
+        try std.testing.expectEqualDeep(ordinary.evidence.node(expected.evidence), session.evidence.node(actual.evidence));
+    }
+}
+
+test "source closed first order handler equations bound independent argument diamonds" {
+    for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a,
+            \\type Signal a is effect = { get: Unit -> a }
+            \\const unreachable: Unit -> U32 = fn () => @panic "provider called"
+            \\const f_0: a -> a = fn value => do (@effect.provider (Signal.get U32) unreachable):
+            \\  return value
+            \\
+        );
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const generic = fn value => f_{d} value\nentry const integer = fn (value: U32) -> U32 => f_{d} value\nentry const floating = fn (value: F32) -> F32 => f_{d} value\n", .{ depth, depth, depth });
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        const frozen = try a.dupe(types.Node, module.types.nodes);
+        defer a.free(frozen);
+        try sourceHandlerGraphScenario(a, &module, depth);
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, sourceHandlerGraphScenario, .{ &module, depth });
+        try std.testing.expectEqualDeep(frozen, module.types.nodes);
+    }
+}
+
+test "source known associated operand equations propagate through open summary diamonds" {
+    for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "const U32.add = fn (left: U32) => fn (right: U32) => @u32.add left right\nconst f_0 = fn value => @type.call \"add\" value (@u32.add 0 1)\n");
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => do:\n  let ignored = f_{d} value\n  return f_{d} value\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const generic = fn value => f_{d} value\n", .{depth});
+        var module = try lowerWithOptions(text.items, .{ .builtin_catalog = true });
+        defer module.deinit(a);
+        const frozen = try a.dupe(types.Node, module.types.nodes);
+        defer a.free(frozen);
+        try sourceKnownOperandScenario(a, &module, depth);
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, sourceKnownOperandScenario, .{ &module, depth });
+        try std.testing.expectEqualDeep(frozen, module.types.nodes);
+    }
+}
+
+test "source proven physical nominal merge update and fixed comparison graphs bound open diamonds" {
+    const Case = struct { declarations: []const u8 = "", leaf: []const u8, input: []const u8 = "value", result: []const u8 = "", closed: bool = false };
+    for ([_]Case{
+        .{ .leaf = "const f_0 = fn value => {left: value, right: value}.left\n" },
+        .{ .leaf = "const f_0 = fn value => @record.merge {left: value} {right: value}\n", .result = ".left" },
+        .{ .leaf = "const f_0 = fn value => do:\n  let record = {left: 0, keep: value}\n  record.left := value\n  return record.left\n" },
+        .{ .declarations = "type Box a is data = #Box {left: a, keep: a}\n", .leaf = "const f_0 = fn value => (#Box {left: value, keep: value}).left\n" },
+        .{ .declarations = "type Box a is data = #Box {left: a, keep: a}\n", .leaf = "const f_0 = fn (box: Box a) => box.left\n", .input = "(#Box {left: value, keep: value})" },
+        .{ .declarations = "type Box a is data = #Box a\nconst Box.read: Box a -> a = fn box => case box of\n  #Box value => value\n", .leaf = "const f_0 = fn (box: Box a) => box.read\n", .input = "(#Box value)" },
+        .{ .declarations = "type Count is data = #Count U32\ntype Other is data = #Other U32\n", .leaf = "const f_0 = fn ignored => @type.same #Count #Other\n", .closed = true },
+    }) |case| for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, case.declarations);
+        try text.appendSlice(a, case.leaf);
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn value => do:\n  let ignored = f_{d} value\n  return f_{d} value\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const generic = fn value => (f_{d} {s}){s}\n", .{ depth, case.input, case.result });
+        for ([_][]const u8{ "integer", "floating" }, [_][]const u8{ "U32", "F32" }) |name, input| {
+            try text.print(a, "entry const {s} = fn (value: {s}) -> {s} => (f_{d} {s}){s}\n", .{ name, input, if (case.closed) "Bool" else input, depth, case.input, case.result });
+        }
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        const frozen = try a.dupe(types.Node, module.types.nodes);
+        defer a.free(frozen);
+        sourceProvenGraphScenario(a, &module, depth) catch |err| {
+            std.debug.print("source theorem leaf at depth {d}: {s}\n", .{ depth, case.leaf });
+            return err;
+        };
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, sourceProvenGraphScenario, .{ &module, depth });
+        try std.testing.expectEqualDeep(frozen, module.types.nodes);
+    };
+}
+
+test "type comparison principal graphs bound repeated diamonds and preserve original witness failures" {
+    for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "const f_0 = fn left => fn right => @type.same left right\n");
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn left => fn right => do:\n  let ignored = f_{d} left right\n  return f_{d} left right\n", .{ i, i - 1, i - 1 });
+        try text.print(
+            a,
+            "entry const generic = fn value => f_{d} value value\n" ++
+                "entry const integer = fn (value: U32) -> Bool => f_{d} value value\n" ++
+                "entry const floating = fn (value: F32) -> Bool => f_{d} value value\n" ++
+                "entry const invalid = fn (value: U32) -> Bool => do:\n  let ignored = f_{d} value value\n  return @type.same (@panic \"uncalled witness\") value\n" ++
+                "entry const factory = do:\n  return f_{d}\n",
+            .{ depth, depth, depth, depth, depth },
+        );
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        const nodes = try a.dupe(core.Node, module.nodes);
+        defer a.free(nodes);
+        const frozen = try a.dupe(types.Node, module.types.nodes);
+        defer a.free(frozen);
+        const obligations = try a.dupe(core.Obligation, module.obligations);
+        defer a.free(obligations);
+        try comparisonGraphScenario(a, &module, depth);
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, comparisonGraphScenario, .{ &module, depth });
+        try std.testing.expectEqualDeep(nodes, module.nodes);
+        try std.testing.expectEqualDeep(frozen, module.types.nodes);
+        try std.testing.expectEqualDeep(obligations, module.obligations);
+    }
+}
+
+fn typeHeadGraphScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    const interface = try session.sourceInterface(target(module, "generic"));
+    try std.testing.expect(interface.evidence == 0 and interface.pending != 0);
+    try std.testing.expect(session.principal_graph_deferred != 0);
+    const before = session.counters.solver_constraint_visits;
+    try std.testing.expect(before <= depth * 24 + 128);
+    const leaf = module.types.node(module.binding(target(module, "f_0").binding).scheme.root);
+    const cell_node = module.types.node(leaf.b);
+    try std.testing.expectEqual(types.Tag.nominal, cell_node.tag);
+    const argument = module.types.nominalArguments(cell_node)[0];
+    try std.testing.expectEqual(types.Tag.variable, module.types.node(argument).tag);
+    for ([_]types.Id{ types.u32_type, types.f32_type }) |scalar| {
+        const cell = try session.evidence.project(&module.types, leaf.b, &.{.{ .variable = argument, .evidence = scalar }});
+        const operation = try session.evidence.effects.internOperation(types.builtin_state_read, &.{cell});
+        const row = try session.evidence.effects.internRow(&.{operation});
+        const expected = try session.evidence.internWithEffects(.function, cell, cell, row, &.{});
+        var name: [32]u8 = undefined;
+        var proof = try session.bodyEvidenceFull(target(module, try std.mem.print(&name, "f_{d}", .{depth})), expected, &.{}, &.{});
+        proof.deinit(allocator);
+    }
+    try std.testing.expect(session.counters.solver_constraint_visits - before <= depth * 96 + 256);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    if (depth != 4) return;
+    var ordinary = try evaluator.Session.init(allocator, &.{module.*});
+    defer ordinary.deinit();
+    ordinary.reuse_principal_graphs = false;
+    const baseline = try ordinary.sourceInterface(target(module, "generic"));
+    try std.testing.expectEqual(baseline.evidence, interface.evidence);
+    try std.testing.expectEqual(baseline.generic, interface.generic);
+    try std.testing.expectEqual(baseline.selected, interface.selected);
+    try std.testing.expect(interface.pending <= baseline.pending);
+    for ([_]bool{ false, true }) |wrong_row| {
+        for ([_]*evaluator.Session{ &ordinary, &session }) |checked| {
+            const cell = try checked.evidence.project(&module.types, leaf.b, &.{.{ .variable = argument, .evidence = types.u32_type }});
+            const other = try checked.evidence.project(&module.types, leaf.b, &.{.{ .variable = argument, .evidence = types.f32_type }});
+            const operation = try checked.evidence.effects.internOperation(types.builtin_state_read, &.{if (wrong_row) other else cell});
+            const row = try checked.evidence.effects.internRow(&.{operation});
+            const expected = try checked.evidence.internWithEffects(.function, if (wrong_row) cell else types.u32_type, cell, row, &.{});
+            try resultWitnessFailure(checked, target(module, "f_4"), expected);
+            try std.testing.expectEqual(if (wrong_row) evaluator.Code.effect_mismatch else evaluator.Code.type_mismatch, checked.diagnostic.?.code);
+        }
+        try std.testing.expectEqualDeep(ordinary.diagnostic, session.diagnostic);
+        ordinary.diagnostic = null;
+        session.diagnostic = null;
+    }
+    const cell = try session.evidence.project(&module.types, leaf.b, &.{.{ .variable = argument, .evidence = types.u32_type }});
+    const operation = try session.evidence.effects.internOperation(types.builtin_state_read, &.{cell});
+    const row = try session.evidence.effects.internRow(&.{operation});
+    const expected = try session.evidence.internWithEffects(.function, cell, cell, row, &.{});
+    var corrected = try session.bodyEvidenceFull(target(module, "f_4"), expected, &.{}, &.{});
+    corrected.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+}
+
+test "type head principal graphs retain structured nominal results and exact state operation arguments" {
+    for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a,
+            \\type Cell a is data = #Cell a
+            \\entry const f_0 = fn (witness: w) -> Cell a => @state.get witness
+            \\
+        );
+        for (1..depth + 1) |i| try text.print(a, "entry const f_{d} = fn witness => do:\n  use ignored <- f_{d} witness\n  return f_{d} witness\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const generic = fn witness => do:\n  use cell <- f_{d} witness\n  let #Cell value = cell\n  return value\n", .{depth});
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        const nodes = try a.dupe(core.Node, module.nodes);
+        defer a.free(nodes);
+        const frozen = try a.dupe(types.Node, module.types.nodes);
+        defer a.free(frozen);
+        const obligations = try a.dupe(core.Obligation, module.obligations);
+        defer a.free(obligations);
+        try typeHeadGraphScenario(a, &module, depth);
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, typeHeadGraphScenario, .{ &module, depth });
+        try std.testing.expectEqualDeep(nodes, module.nodes);
+        try std.testing.expectEqualDeep(frozen, module.types.nodes);
+        try std.testing.expectEqualDeep(obligations, module.obligations);
+    }
+}
+
+fn closedHeadGraphScenario(allocator: std.mem.Allocator, module: *const core.Module, depth: usize) !void {
+    var session = try evaluator.Session.init(allocator, &.{module.*});
+    defer session.deinit();
+    _ = try session.sourceInterface(target(module, "factory"));
+    try std.testing.expectEqual(@as(usize, 0), session.steps);
+    try session.prepare(target(module, "factory"));
+    const value = (try session.cachedBindingValue(target(module, "factory"))).?;
+    try std.testing.expectEqual(evaluator.ValueKind.closure, session.valueInfo(value).kind);
+    if (session.counters.region_scopes > depth * 4 + 32 or session.counters.solver_constraint_visits > depth * 16 + 128) std.debug.print("source closed witness depth={d}: {any}\n", .{ depth, session.counters });
+    try std.testing.expect(session.counters.region_scopes <= depth * 4 + 32);
+    try std.testing.expect(session.counters.solver_constraint_visits <= depth * 16 + 128);
+    try std.testing.expect(session.principal_graph_deferred != 0);
+}
+
+test "source closed state witnesses bound diamonds with unrelated unknown public inputs" {
+    for ([_][]const u8{
+        "const f_0 = fn ignored => @state.get (#Cell 0)\n",
+        "const f_0 = fn (witness: Cell a) -> Cell a => @state.get witness\n",
+    }) |leaf| for ([_]usize{ 4, 8, 16, 64 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "type Cell a is data = #Cell a\n");
+        try text.appendSlice(a, leaf);
+        for (1..depth + 1) |i| try text.print(a, "const f_{d} = fn witness => do:\n  use ignored <- f_{d} witness\n  return f_{d} witness\n", .{ i, i - 1, i - 1 });
+        try text.print(a, "entry const factory = do:\n  return f_{d}\n", .{depth});
+        var module = try lower(text.items);
+        defer module.deinit(a);
+        const frozen = try a.dupe(types.Node, module.types.nodes);
+        defer a.free(frozen);
+        try closedHeadGraphScenario(a, &module, depth);
+        if (depth == 4) try @import("allocation_failures.zig").checkAllAllocationFailures(a, closedHeadGraphScenario, .{ &module, depth });
+        try std.testing.expectEqualDeep(frozen, module.types.nodes);
     };
 }
 
@@ -499,7 +1160,12 @@ test "result principal jobs defer Never witness diagnostics to their original so
             const point = module.sourceNamePoint(target(&module, "run").binding);
             try std.testing.expectEqual(core.Span{ .start = point, .end = point }, session.diagnostic.?.span);
             try std.testing.expectEqual(@as(usize, 0), session.steps);
-            if (sharing) try std.testing.expect(session.split_declined != 0);
+            if (sharing) {
+                var declined = session.split_declined != 0;
+                var graphs = session.call_summaries.principals.valueIterator();
+                while (graphs.next()) |graph| declined = declined or graph.* == null;
+                try std.testing.expect(declined);
+            }
             continue;
         };
         return error.TestUnexpectedResult;

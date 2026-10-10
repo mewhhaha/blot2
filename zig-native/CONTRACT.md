@@ -145,12 +145,12 @@ capacity before publishing the complete classification. Source shape and
 active-recursion checks remain local to the requesting job; a cached graph
 classification does not override them. Computed values still require capture
 proofs, and predicate-free source-interface checking, selected captures and
-complete demand-body checking retain ordinary collection. Unsupported
-result-directed obligations, lexical captures and higher-order boundaries keep
-ordinary collection. Active recursive targets share their inline region. Failed
-speculative jobs publish no diagnostic; fallback preserves the caller's argument
-witness sites and deferred-member context. An independently completed callee
-proof may survive an enclosing caller's failed qualification.
+complete demand-body checking retain ordinary collection. Unsupported lexical
+captures and higher-order boundaries keep ordinary collection. Active recursive
+targets share their inline region. Failed speculative jobs publish no
+diagnostic; fallback preserves the caller's argument witness sites and
+deferred-member context. An independently completed callee proof may survive an
+enclosing caller's failed qualification.
 
 Admitted inferred first-order bodies also have bounded immutable principal
 graphs owned by that source Session. Ordered constraints and callee edges retain
@@ -161,14 +161,30 @@ nominal identities, alias relationships and operation rows. They remain unsolved
 and cannot certify a complete call or refinement receipt. Matching preserves
 exact live alias classes; a fixed effect row cannot match an open caller tail.
 Written header requirements are traversed in source order and remain mandatory
-even when a body edge is deferred. Region-local header reuse schedules required
-work; it is not a completed proof. Optional inquiries that use residual export
-retry ordinary checking on semantic failure, preserving original witness
-diagnostics. Type-head, type-comparison, handler and unsupported shapes still
-have admission limits. Description and cache publication finish every ownership
-allocation before installing a visible graph; out-of-memory never becomes a
-cached semantic decline. General admission and the later
-callback/capture/component boundaries remain implementation work.
+even when a body edge is deferred. Region-local header keys retain only public
+slots consumed by those requirements, demanding the complete public interface
+when a requirement also consumes a private binder. Open slots keep exact live
+solver identity and chronology; rollback, recycled variables and saturated
+history revoke reuse. Region-local header reuse schedules required work; it is
+not a completed proof. Optional inquiries that use residual export retry
+ordinary checking on semantic failure, preserving original witness diagnostics.
+
+Raw and source-normalized principal graphs are separate owned objects. Source
+normalization solves only immutable source equations and already-qualified
+source interfaces; it never evaluates a caller or imports a caller-selected
+implementation. Resolved type and row roots are copied into a fresh store with
+no inference history. A newly revealed selected-method edge is checked before
+its parent is published. Source dependencies follow those edges and are replayed
+when the graph is consumed. Source completeness is a parametric interface
+theorem, not a closed call judgment. Fixed source type heads, comparisons and
+closed operation/handler rows may be proved here; unknown owners and rows stay
+residual. Unsupported shapes decline without publishing a partial theorem.
+
+Description and cache publication finish every ownership allocation before
+installing a visible graph; out-of-memory never becomes a cached semantic
+decline. Cycles currently decline optional principal publication. General
+callback, lexical-capture and joint-component boundaries remain implementation
+work in tasks 005–007.
 
 Summary jobs own their solver and scratch until completion or session teardown.
 Evidence copied into the session may outlive a job; solver IDs and source

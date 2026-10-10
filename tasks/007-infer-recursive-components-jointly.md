@@ -27,6 +27,15 @@ removes native recursion for admitted acyclic jobs;
 [tests/compile_budget.test.ts](../zig-native/tests/compile_budget.test.ts)
 preserves deep-chain budgets.
 
+Task 004's source-normalization qualification found a separate frontend retry
+that did not finish for `Seed.build -> parent.read -> Box.read -> parent`, even
+with written arrows. The bounded principal-publication cycle law passes; it does
+not qualify ordinary recursive inference. Preserve and bound this direct source
+case as part of component work. The
+[durable investigation](../zig-native/CALL_SUMMARIES.md#live-headers-and-source-normalized-graphs-10-october-2026)
+records the probe and separates debug self-backend depth failures from the
+passing release LLVM gate.
+
 ## Implementation checklist
 
 - [ ] Identify recursive components using stable body/call identities and place
