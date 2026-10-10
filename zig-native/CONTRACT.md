@@ -656,8 +656,7 @@ checking. Private unsupported-source memos never become successful records.
 Portable principal candidates remain archive ordinals within an immutable Reader
 lease until full source/input/import/publication validation produces current
 evidence. Their common index preserves wire order, and its lazy construction
-releases every partial record on OOM before retry. The version-2 archive
-projection is unchanged. See
+releases every partial record on OOM before retry. See
 [the migration and qualification](SPECIALIZATION_PRINCIPAL_QUERIES.md).
 
 Successful revision inputs move into a typed source-validation record without
@@ -675,3 +674,12 @@ newest-first relocation order, exact instruction/signature/context comparisons
 and completed transitive lifetime checks. Unsealed or saturated tables decline,
 including the same-position optimizer path. Semantic interface stability never
 certifies executable consumers. See [the qualification](EXECUTABLE_QUERIES.md).
+
+Portable principal and optimizer records travel in typed sections that name one
+claim, kind, schema and interpretation version. Decoding validates every
+ordinal, evidence edge, body operand, control frame and record/input
+correspondence before exposing an owner, then rebuilds native indexes from the
+owned payload. Unknown versions or claims and corrupt or forged payloads are
+optional-cache misses; no partial record survives a failed decode. Refinement,
+specialization, local templates, source validation and executable fragments stay
+owner-local. See [portable query records](PORTABLE_QUERIES.md).

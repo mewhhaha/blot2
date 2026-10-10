@@ -1,5 +1,6 @@
 comptime {
     _ = @import("semantic_query_table.zig");
+    _ = @import("portable_query.zig");
     _ = @import("refinement_receipt.zig");
     _ = @import("selected_query.zig");
     _ = @import("principal_query.zig");

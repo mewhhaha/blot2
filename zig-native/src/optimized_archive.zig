@@ -1,16 +1,21 @@
-//! Portable optimizer captures for the dependency-cache experiment. This stores
-//! no native pointers, allocator capacities or source/evaluator owners. Loading
-//! supplies candidates only: the ordinary exact optimizer matcher must still
-//! admit each body against freshly generated code and completed lifetime facts.
+//! Portable optimizer captures and their complete query records. This stores
+//! no native pointers, allocator capacities, fingerprints or source/evaluator
+//! owners. Loading supplies candidates only: the ordinary exact optimizer
+//! matcher must still admit each body against freshly generated code and
+//! completed lifetime facts.
 const std = @import("std");
 const ir = @import("runtime_ir.zig");
 const bodies = @import("optimized_bodies.zig");
+const executable = @import("executable_query.zig");
 const lifetime = @import("wasm_lifetimes.zig");
+const wasm = @import("wasm.zig");
+const portable = @import("portable_query.zig");
 const format = @import("dependency_format.zig");
+const Tier = @import("compilation_tier.zig").Tier;
 const A = std.mem.Allocator;
-const Body = struct { locals: []ir.ValueType, instructions: []ir.Instruction };
-const Function = struct { parameters: []ir.ValueType, result: ir.ValueType, signature: u32, body: Body };
-const Entry = struct {
+pub const Body = struct { locals: []ir.ValueType, instructions: []ir.Instruction };
+pub const Function = struct { parameters: []ir.ValueType, result: ir.ValueType, signature: u32, body: Body };
+pub const Entry = struct {
     source: Function,
     parameters: []lifetime.Parameter,
     invalidates: bool,
@@ -18,18 +23,34 @@ const Entry = struct {
     output: ?Body,
     output_ready: bool,
 };
-const Snapshot = struct {
-    tier: @import("compilation_tier.zig").Tier,
-    arena: ?@import("wasm.zig").Arena,
+/// Entry ordinals name `Snapshot.entries`. Bucket fingerprints are
+/// recomputed from the decoded machine input, never trusted from the wire.
+pub const Key = struct { source: u32, tier: Tier, arena: ?wasm.Arena };
+pub const Dependencies = struct {
+    callees: []u32,
+    parameters: []lifetime.Parameter,
+    invalidates: bool,
+    owned_result_bytes: ?u32,
+};
+pub const Result = struct { function: u32 };
+pub const Record = struct { key: Key, dependencies: Dependencies, result: Result };
+pub const Section = portable.Section(.optimizer_output, Record);
+pub const Snapshot = struct {
+    tier: Tier,
+    arena: ?wasm.Arena,
     entries: []Entry,
     signatures: []ir.Signature,
     imports: []u32,
     globals: []ir.ValueType,
+    /// False for an unsealed or saturated table, which carries no records and
+    /// declines all reuse after loading.
+    sealed: bool,
+    queries: Section,
 };
-fn key(compiler: format.Digest) format.Key {
+pub fn wireKey(compiler: format.Digest) format.Key {
     // Source and dependency validity is deliberately not granted by this
     // header. Matcher compares complete machine inputs after loading.
-    return .{ .compiler = compiler, .settings = format.digest("blot-optimizer-capture-v1"), .source = @splat(0), .dependencies = @splat(0) };
+    return .{ .compiler = compiler, .settings = format.digest("blot-optimizer-capture-v2"), .source = @splat(0), .dependencies = @splat(0) };
 }
 pub fn encode(a: A, compiler: format.Digest, capture: *const bodies.Capture) format.Error![]u8 {
     const entries = try a.alloc(Entry, capture.entries.items.len);
@@ -42,21 +63,22 @@ pub fn encode(a: A, compiler: format.Digest, capture: *const bodies.Capture) for
         .output = if (entry.output) |output| .{ .locals = output.locals.items, .instructions = output.instructions.items } else null,
         .output_ready = entry.output_ready,
     };
-    const snapshot: Snapshot = .{ .tier = capture.tier, .arena = capture.arena, .entries = entries, .signatures = capture.signatures.items, .imports = capture.imports.items, .globals = capture.globals.items };
-    return format.encode(a, key(compiler), snapshot);
+    // An incomplete table certifies nothing, so none of its records persist.
+    const sealed = capture.queries_complete;
+    const records = try a.alloc(Record, if (sealed) capture.queries.records.items.len else 0);
+    defer a.free(records);
+    for (records, capture.queries.records.items[0..records.len]) |*wire, record| wire.* = .{
+        .key = .{ .source = record.key.source, .tier = record.key.tier, .arena = record.key.arena },
+        .dependencies = .{ .callees = record.dependencies.callees, .parameters = record.dependencies.parameters, .invalidates = record.dependencies.invalidates, .owned_result_bytes = record.dependencies.owned_result_bytes },
+        .result = .{ .function = record.value.function },
+    };
+    const snapshot: Snapshot = .{ .tier = capture.tier, .arena = capture.arena, .entries = entries, .signatures = capture.signatures.items, .imports = capture.imports.items, .globals = capture.globals.items, .sealed = sealed, .queries = .{ .header = portable.header(Section.claim), .records = records } };
+    return format.encode(a, wireKey(compiler), snapshot);
 }
 pub fn decode(a: A, compiler: format.Digest, bytes: []const u8) format.Error!bodies.Capture {
-    var snapshot = try format.decode(Snapshot, a, bytes, key(compiler));
+    var snapshot = try format.decode(Snapshot, a, bytes, wireKey(compiler));
     defer format.deinit(a, &snapshot);
-    for (snapshot.entries) |entry| {
-        if (entry.source.signature >= snapshot.signatures.len or entry.parameters.len != entry.source.parameters.len or (!entry.output_ready and entry.output != null)) return error.InvalidArtifact;
-        const signature = snapshot.signatures[entry.source.signature];
-        if (signature.result != entry.source.result or !std.mem.eql(ir.ValueType, signature.parameters, entry.source.parameters)) return error.InvalidArtifact;
-        if (!validTypes(entry.source.parameters) or !validTypes(entry.source.body.locals)) return error.InvalidArtifact;
-        if (entry.output) |body| if (!validTypes(body.locals)) return error.InvalidArtifact;
-    }
-    for (snapshot.imports) |signature| if (signature >= snapshot.signatures.len) return error.InvalidArtifact;
-    if (!validTypes(snapshot.globals)) return error.InvalidArtifact;
+    try validate(a, &snapshot);
     var result: bodies.Capture = .{ .allocator = a, .tier = snapshot.tier, .arena = snapshot.arena };
     errdefer result.deinit();
     try result.entries.ensureTotalCapacity(a, snapshot.entries.len);
@@ -80,9 +102,122 @@ pub fn decode(a: A, compiler: format.Digest, bytes: []const u8) format.Error!bod
     snapshot.imports = &.{};
     result.globals = .fromOwnedSlice(snapshot.globals);
     snapshot.globals = &.{};
-    try result.sealQueries();
+    if (snapshot.sealed) try seal(&result, snapshot.queries.records);
     return result;
 }
+/// Rebuild the native index in wire order from validated owned records. The
+/// table's own limits still apply; saturation leaves it unsealed and declines.
+fn seal(capture: *bodies.Capture, records: []Record) A.Error!void {
+    const a = capture.allocator;
+    for (records) |*record| {
+        var builder = executable.OptimizerTable.begin(a, .{ .source = record.key.source, .local_fingerprint = @import("runtime_body_relocation.zig").hash(capture.entries.items[record.key.source].source), .tier = record.key.tier, .arena = record.key.arena });
+        defer builder.abort();
+        builder.read(.{ .callees = record.dependencies.callees, .parameters = record.dependencies.parameters, .invalidates = record.dependencies.invalidates, .owned_result_bytes = record.dependencies.owned_result_bytes, .context_complete = true });
+        record.dependencies.callees = &.{};
+        record.dependencies.parameters = &.{};
+        builder.stage(.{ .function = record.result.function, .ready = true });
+        var candidate = builder.complete() orelse return;
+        defer candidate.abort();
+        const prepared = try capture.queries.prepare(a, &candidate) orelse return;
+        _ = capture.queries.publish(prepared, &candidate);
+    }
+    capture.queries_complete = true;
+}
+/// Every ordinal is checked before the Capture is exposed: call, import,
+/// indirect-signature, global and local operands, block types, lanes and
+/// structured control in source and output bodies, the arena's functions and
+/// globals, and each record against the exact machine input it names.
+pub fn validate(a: A, snapshot: *const Snapshot) format.Error!void {
+    const section = snapshot.queries;
+    if (section.header.version != portable.version) return error.UnsupportedVersion;
+    if (!section.admitted()) return error.SchemaMismatch;
+    var frames: std.ArrayList(bool) = .empty;
+    defer frames.deinit(a);
+    const resources: Resources = .{ .functions = snapshot.entries.len, .imports = snapshot.imports.len, .signatures = snapshot.signatures.len, .globals = snapshot.globals.len, .frames = &frames };
+    for (snapshot.signatures) |signature| if (!validTypes(signature.parameters)) return error.InvalidArtifact;
+    for (snapshot.imports) |signature| if (signature >= snapshot.signatures.len) return error.InvalidArtifact;
+    if (!validTypes(snapshot.globals)) return error.InvalidArtifact;
+    if (snapshot.arena) |arena| {
+        for ([_]u32{ arena.allocate, arena.allocate_scalar, arena.recycle, arena.reset, arena.mark, arena.collect }) |function| if (function >= resources.functions) return error.InvalidArtifact;
+        for ([_]u32{ arena.heap, arena.base, arena.static_end, arena.allocated }) |global| if (global >= resources.globals) return error.InvalidArtifact;
+    }
+    for (snapshot.entries) |entry| {
+        if (entry.source.signature >= snapshot.signatures.len or entry.parameters.len != entry.source.parameters.len or (!entry.output_ready and entry.output != null)) return error.InvalidArtifact;
+        const signature = snapshot.signatures[entry.source.signature];
+        if (signature.result != entry.source.result or !std.mem.eql(ir.ValueType, signature.parameters, entry.source.parameters)) return error.InvalidArtifact;
+        if (!validTypes(entry.source.parameters) or !validTypes(entry.source.body.locals)) return error.InvalidArtifact;
+        if (!try resources.body(a, entry.source.parameters.len, entry.source.body)) return error.InvalidArtifact;
+        if (entry.output) |body| if (!validTypes(body.locals) or !try resources.body(a, entry.source.parameters.len, body)) return error.InvalidArtifact;
+    }
+    if (!snapshot.sealed) {
+        if (section.records.len != 0) return error.InvalidArtifact;
+        return;
+    }
+    // A sealed table holds exactly one record per ready entry, in ascending
+    // source order, each equal to the facts derived from that entry.
+    var next: usize = 0;
+    for (snapshot.entries, 0..) |entry, id| {
+        if (!entry.output_ready) continue;
+        if (next == section.records.len or !recordMatches(section.records[next], snapshot, id)) return error.InvalidArtifact;
+        next += 1;
+    }
+    if (next != section.records.len) return error.InvalidArtifact;
+}
+fn recordMatches(record: Record, snapshot: *const Snapshot, id: usize) bool {
+    const entry = snapshot.entries[id];
+    if (record.key.source != id or record.result.function != id or record.key.tier != snapshot.tier or !std.meta.eql(record.key.arena, snapshot.arena)) return false;
+    const observed = record.dependencies;
+    if (observed.invalidates != entry.invalidates or observed.owned_result_bytes != entry.owned_result_bytes or observed.parameters.len != entry.parameters.len) return false;
+    for (observed.parameters, entry.parameters) |left, right| if (!std.meta.eql(left, right)) return false;
+    var cursor: usize = 0;
+    for (entry.source.body.instructions) |inst| if (inst.op == .call) {
+        if (cursor == observed.callees.len or observed.callees[cursor] != inst.operand) return false;
+        cursor += 1;
+    };
+    return cursor == observed.callees.len;
+}
+const Resources = struct {
+    functions: usize,
+    imports: usize,
+    signatures: usize,
+    globals: usize,
+    /// One entry per open frame: true while an `if` may still take `else`.
+    frames: *std.ArrayList(bool),
+    /// Mirrors the encoder's operand interpretation: structured control
+    /// closes within the body, whose final `end` the encoder appends.
+    fn body(self: Resources, a: A, parameters: usize, value: Body) A.Error!bool {
+        const locals = parameters +| value.locals.len;
+        const frames = self.frames;
+        frames.clearRetainingCapacity();
+        for (value.instructions) |inst| {
+            const valid = switch (inst.op) {
+                .block, .loop, .if_ => opens: {
+                    if (inst.operand != 0 and std.enums.fromInt(ir.ValueType, inst.operand) == null) break :opens false;
+                    try frames.append(a, inst.op == .if_);
+                    break :opens true;
+                },
+                .else_ => alternative: {
+                    if (frames.items.len == 0) break :alternative false;
+                    const open = &frames.items[frames.items.len - 1];
+                    const allowed = open.*;
+                    open.* = false;
+                    break :alternative allowed;
+                },
+                .end => frames.pop() != null,
+                .br, .br_if => inst.operand <= frames.items.len,
+                .call => inst.operand < self.functions,
+                .call_import => inst.operand < self.imports,
+                .call_indirect => inst.operand < self.signatures,
+                .global_get, .global_set => inst.operand < self.globals,
+                .local_get, .local_set, .local_tee => inst.operand < locals,
+                .i32x4_replace_lane, .i32x4_extract_lane, .f32x4_extract_lane => inst.operand < 4,
+                else => true,
+            };
+            if (!valid) return false;
+        }
+        return frames.items.len == 0;
+    }
+};
 fn validTypes(values: []const ir.ValueType) bool {
     for (values) |value| if (value == .none) return false;
     return true;

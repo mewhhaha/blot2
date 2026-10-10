@@ -87,6 +87,28 @@ entry const runtime = fn (value: U32) => @u32.add value 2
     } finally {
       await restored.dispose();
     }
+    // An unknown envelope version is an optional-cache miss for every query
+    // kind: the build compiles fresh rather than failing or reusing records.
+    const unknown = checkpoint!.slice();
+    unknown[8] ^= 0xff;
+    const versioned = await createZigProjectCompiler({
+      ...options,
+      checkpoint: unknown,
+    });
+    try {
+      const built = await versioned.build({ sources: { [entry]: source(2) } });
+      assert(built.success, JSON.stringify(built));
+      assert.deepEqual(built.bytes, expected!);
+      const principal = built.stats.principals as Record<string, number>;
+      assert.equal(principal.persisted_hits, 0);
+      assert.equal(principal.persisted_requests, 0);
+      assert.equal(
+        (built.stats.runtimeOptimization as Record<string, number>).reused,
+        0,
+      );
+    } finally {
+      await versioned.dispose();
+    }
     checkpoint![checkpoint!.length - 1] ^= 1;
     const corrupt = await createZigProjectCompiler({
       ...options,

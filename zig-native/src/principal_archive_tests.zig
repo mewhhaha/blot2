@@ -7,6 +7,7 @@ const core = @import("core.zig");
 const backend = @import("core_backend.zig");
 const identity = @import("runtime_identity.zig");
 const archive = @import("backend_checkpoint.zig");
+const principal = @import("principal_archive.zig");
 const a = std.testing.allocator;
 const compiler: [32]u8 = @splat(17);
 const source =
@@ -62,24 +63,25 @@ fn importScenario(allocator: std.mem.Allocator, fixture: *const Fixture, bytes: 
     try std.testing.expectEqualSlices(u8, expected, compiled.bytes);
 }
 
+// Decoding rejects a second record per target; the Reader still keeps the
+// oldest valid candidate first when an owner supplies such duplicates.
 fn appendInvalidDuplicate(loaded: *archive.Checkpoint) !void {
-    const original = loaded.principal.snapshot.proofs;
+    const original = loaded.principal.snapshot.queries.records;
     try std.testing.expect(original.len > 0);
     const first = original[0];
-    try std.testing.expect(first.inputs.call_publications.len > 0);
-    const Proof = @TypeOf(original[0]);
-    const proofs = try a.alloc(Proof, original.len + 1);
-    errdefer a.free(proofs);
-    var observed = try first.inputs.clone(a);
+    try std.testing.expect(first.dependencies.call_publications.len > 0);
+    const records = try a.alloc(principal.Record, original.len + 1);
+    errdefer a.free(records);
+    var observed = try first.dependencies.clone(a);
     errdefer observed.deinit(a);
-    const mappings = try a.dupe(@TypeOf(first.types[0]), first.types);
+    const mappings = try a.dupe(@TypeOf(first.result.types[0]), first.result.types);
     errdefer a.free(mappings);
-    const rows = try a.dupe(@TypeOf(first.rows[0]), first.rows);
-    @memcpy(proofs[0..original.len], original);
-    proofs[original.len] = .{ .target = first.target, .options = first.options, .inputs = observed, .types = mappings, .rows = rows };
-    proofs[original.len].inputs.call_publications[0].evidence = std.math.maxInt(u32);
+    const rows = try a.dupe(@TypeOf(first.result.rows[0]), first.result.rows);
+    @memcpy(records[0..original.len], original);
+    records[original.len] = .{ .key = first.key, .dependencies = observed, .result = .{ .types = mappings, .rows = rows } };
+    records[original.len].dependencies.call_publications[0].evidence = std.math.maxInt(u32);
     a.free(original);
-    loaded.principal.snapshot.proofs = proofs;
+    loaded.principal.snapshot.queries.records = records;
 }
 test "portable principal query duplicates retain oldest valid proof priority" {
     const bytes = try makeCheckpoint();
@@ -87,7 +89,7 @@ test "portable principal query duplicates retain oldest valid proof priority" {
     var loaded = try archive.decode(a, compiler, bytes);
     defer loaded.deinit();
     try appendInvalidDuplicate(&loaded);
-    const expected_calls = loaded.principal.snapshot.proofs[0].inputs.call_publications.len;
+    const expected_calls = loaded.principal.snapshot.queries.records[0].dependencies.call_publications.len;
     var fixture = try Fixture.init(source);
     defer fixture.deinit();
     var fresh = try fixture.emit(a, null);
@@ -110,11 +112,11 @@ test "portable principal query saturation declines optional archive reuse" {
     defer fixture.deinit();
     var session = try @import("core_eval.zig").Session.init(a, &fixture.units);
     defer session.deinit();
-    var reader: @import("principal_archive.zig").Reader = .{ .allocator = a, .archive = &loaded.principal, .units = &fixture.units, .names = fixture.names.view() };
+    var reader: principal.Reader = .{ .allocator = a, .archive = &loaded.principal, .units = &fixture.units, .names = fixture.names.view() };
     defer reader.deinit();
     reader.query_table.limits.records = 0;
-    const proof = loaded.principal.snapshot.proofs[0];
-    try std.testing.expect((try reader.lookup(&session, proof.target, proof.options)) == null);
+    const record = loaded.principal.snapshot.queries.records[0];
+    try std.testing.expect((try reader.lookup(&session, record.key.target, record.key.options)) == null);
     try std.testing.expectEqual(@as(usize, 0), reader.stats.hits);
     try std.testing.expectEqual(@as(usize, 0), reader.storage().records);
     try std.testing.expectEqual(@as(usize, 1), reader.storage().saturated);
@@ -150,7 +152,7 @@ test "portable semantic checkpoints reject source settings and malformed semanti
     try std.testing.expectEqual(@as(usize, 0), attempted.principal.persisted_hits);
     var matching = try Fixture.init(source);
     defer matching.deinit();
-    const call = loaded.principal.snapshot.proofs[0].inputs.call_publications[0];
+    const call = loaded.principal.snapshot.queries.records[0].dependencies.call_publications[0];
     loaded.principal.snapshot.evidence.nodes[call.evidence].a = std.math.maxInt(u32);
     var declined = try matching.emit(a, &loaded);
     defer declined.deinit(a);
@@ -204,9 +206,9 @@ test "portable principal results own inferred types and effect rows through rest
         if (index == 0) try @import("allocation_failures.zig").checkAllAllocationFailures(a, nonemptyImport, .{ &fixture, bytes, fresh.bytes, fresh.constant_steps });
         var loaded = try archive.decode(a, compiler, bytes);
         defer loaded.deinit();
-        for (loaded.principal.snapshot.proofs) |*proof| {
-            if (index == 0 and proof.rows.len != 0) @constCast(proof.rows)[0].variable = std.math.maxInt(u32);
-            if (index == 1 and proof.types.len != 0) @constCast(proof.types)[0].variable = std.math.maxInt(u32);
+        for (loaded.principal.snapshot.queries.records) |*record| {
+            if (index == 0 and record.result.rows.len != 0) @constCast(record.result.rows)[0].variable = std.math.maxInt(u32);
+            if (index == 1 and record.result.types.len != 0) @constCast(record.result.types)[0].variable = std.math.maxInt(u32);
         }
         var declined = try fixture.emit(a, &loaded);
         defer declined.deinit(a);
@@ -214,5 +216,195 @@ test "portable principal results own inferred types and effect rows through rest
         try std.testing.expectEqual(@as(usize, 0), declined.principal.persisted_nonempty_hits);
         try std.testing.expect(declined.principal.persisted_declines > 0);
         try std.testing.expectEqualSlices(u8, fresh.bytes, declined.bytes);
+    }
+}
+
+const format = @import("dependency_format.zig");
+const portable = @import("portable_query.zig");
+const inputs = @import("principal_inputs.zig");
+const evidence = @import("type_evidence.zig");
+fn principalRejects(expected: anyerror, snapshot: principal.Snapshot) !void {
+    const bytes = try format.encode(a, principal.wireKey(compiler), snapshot);
+    defer a.free(bytes);
+    try std.testing.expectError(expected, principal.decode(a, compiler, bytes));
+}
+fn principalAccepts(snapshot: principal.Snapshot) !void {
+    const bytes = try format.encode(a, principal.wireKey(compiler), snapshot);
+    defer a.free(bytes);
+    var accepted = try principal.decode(a, compiler, bytes);
+    accepted.deinit();
+}
+test "portable principal archives validate envelopes typed sections ordinals and graphs before exposure" {
+    const checkpoint = try makeCheckpoint();
+    defer a.free(checkpoint);
+    var loaded = try archive.decode(a, compiler, checkpoint);
+    defer loaded.deinit();
+    const owner = loaded.principal.snapshot;
+    try std.testing.expect(owner.queries.records.len > 0);
+    const first = owner.queries.records[0];
+    try std.testing.expect(first.dependencies.call_publications.len > 0);
+    const bytes = try format.encode(a, principal.wireKey(compiler), owner);
+    defer a.free(bytes);
+    try principalAccepts(owner);
+    try std.testing.expectError(error.StaleArtifact, principal.decode(a, @splat(18), bytes));
+    {
+        const older = try format.encode(a, .{ .compiler = compiler, .settings = format.digest("blot-principal-archive-v2"), .source = @splat(0), .dependencies = @splat(0) }, owner);
+        defer a.free(older);
+        try std.testing.expectError(error.StaleArtifact, principal.decode(a, compiler, older));
+    }
+    try std.testing.expectError(error.InvalidArtifact, principal.decode(a, compiler, bytes[0 .. bytes.len - 1]));
+    {
+        const copy = try a.dupe(u8, bytes);
+        defer a.free(copy);
+        copy[8] +%= 1; // envelope version
+        try std.testing.expectError(error.UnsupportedVersion, principal.decode(a, compiler, copy));
+        copy[8] -%= 1;
+        copy[172] +%= 1; // payload length
+        try std.testing.expectError(error.InvalidArtifact, principal.decode(a, compiler, copy));
+        copy[172] -%= 1;
+        copy[copy.len - 1] ^= 1; // integrity
+        try std.testing.expectError(error.InvalidArtifact, principal.decode(a, compiler, copy));
+    }
+    {
+        var copy = owner;
+        copy.queries.header.version += 1;
+        try principalRejects(error.UnsupportedVersion, copy);
+        copy.queries.header = portable.header(.optimizer_output);
+        try principalRejects(error.SchemaMismatch, copy);
+        copy.queries.header = portable.header(.principal_complete_proof);
+        copy.queries.header.schema += 1;
+        try principalRejects(error.SchemaMismatch, copy);
+        copy.queries.header = portable.header(.principal_complete_proof);
+        copy.queries.header.kind = .refinement;
+        try principalRejects(error.SchemaMismatch, copy);
+    }
+    var shape = [_]principal.Record{first};
+    var copy = owner;
+    copy.queries.records = &shape;
+    try principalAccepts(copy);
+    const nodes: u32 = @intCast(owner.evidence.nodes.len);
+    const units: u32 = @intCast(owner.modules.len);
+    const target = first.key.target;
+    for ([_]core.BindingRef{ .{ .unit = 0, .binding = target.binding }, .{ .unit = units + 1, .binding = target.binding }, .{ .unit = target.unit, .binding = 0 } }) |forged| {
+        shape[0] = first;
+        shape[0].key.target = forged;
+        try principalRejects(error.InvalidArtifact, copy);
+    }
+    shape[0] = first;
+    {
+        var mappings = [_]evidence.Mapping{ .{ .variable = 1, .evidence = 3 }, .{ .variable = 2, .evidence = 3 } };
+        shape[0].result.types = &mappings;
+        try principalAccepts(copy);
+        mappings[1].variable = 1;
+        try principalRejects(error.InvalidArtifact, copy);
+        mappings[1] = .{ .variable = 0, .evidence = 3 };
+        try principalRejects(error.InvalidArtifact, copy);
+        mappings[1] = .{ .variable = 2, .evidence = nodes };
+        try principalRejects(error.InvalidArtifact, copy);
+        mappings[1] = .{ .variable = 2, .evidence = 0 };
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0] = first;
+        const row_mappings = [_]evidence.RowMapping{.{ .variable = 0, .evidence = @intCast(owner.evidence.effects.rows.len) }};
+        shape[0].result.rows = &row_mappings;
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0] = first;
+    }
+    {
+        var reads = [_]inputs.ScalarRead{ .{ .target = target, .evidence = 3 }, .{ .target = target, .evidence = 3 } };
+        shape[0].dependencies.scalar_reads = &reads;
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0].dependencies.scalar_reads = reads[0..1];
+        try principalAccepts(copy);
+        reads[0].evidence = @import("types.zig").never + 1;
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0] = first;
+    }
+    {
+        const key = (@as(u64, target.unit) << 32) | 1;
+        var plain_reads = [_]inputs.PlainRead{.{ .key = key, .value = null }};
+        const plain_publications = [_]inputs.PlainPublication{.{ .key = key, .value = true }};
+        shape[0].dependencies.plain_publications = &plain_publications;
+        shape[0].dependencies.plain_reads = &.{};
+        // A publication without its observed prior state is missing a dependency.
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0].dependencies.plain_reads = &plain_reads;
+        try principalAccepts(copy);
+        const doubled = [_]inputs.PlainRead{ plain_reads[0], plain_reads[0] };
+        shape[0].dependencies.plain_reads = &doubled;
+        try principalRejects(error.InvalidArtifact, copy);
+        // Builtin nominal keys lie outside the source image and stay admissible.
+        const builtin = (@as(u64, std.math.maxInt(u32)) << 32) | 5;
+        plain_reads[0].key = builtin;
+        const builtin_publications = [_]inputs.PlainPublication{.{ .key = builtin, .value = true }};
+        shape[0].dependencies.plain_reads = &plain_reads;
+        shape[0].dependencies.plain_publications = &builtin_publications;
+        try principalAccepts(copy);
+        shape[0] = first;
+    }
+    {
+        const original = first.dependencies.call_publications[0];
+        var calls = [_]inputs.CallPublication{ original, original };
+        shape[0].dependencies.call_publications = &calls;
+        try principalRejects(error.InvalidArtifact, copy);
+        shape[0].dependencies.call_publications = calls[0..1];
+        for ([_]inputs.CallPublication{ .{ .target = original.target, .evidence = nodes }, .{ .target = original.target, .evidence = 0 }, .{ .target = .{ .unit = units + 1, .binding = 1 }, .evidence = original.evidence } }) |forged| {
+            calls[0] = forged;
+            try principalRejects(error.InvalidArtifact, copy);
+        }
+        shape[0] = first;
+    }
+    {
+        const repeated = [_]principal.Record{ first, first };
+        copy.queries.records = @constCast(&repeated);
+        try principalRejects(error.InvalidArtifact, copy);
+        copy.queries.records = &shape;
+    }
+    // Evidence edges point backward and stay in bounds; primitives are fixed.
+    {
+        const function = first.dependencies.call_publications[0].evidence;
+        try std.testing.expectEqual(evidence.Tag.function, owner.evidence.nodes[function].tag);
+        const forged = try a.dupe(evidence.Node, owner.evidence.nodes);
+        defer a.free(forged);
+        copy.evidence.nodes = forged;
+        try principalAccepts(copy);
+        forged[function].a = function;
+        try principalRejects(error.InvalidArtifact, copy);
+        forged[function] = owner.evidence.nodes[function];
+        forged[function].c = @intCast(owner.evidence.effects.rows.len);
+        try principalRejects(error.InvalidArtifact, copy);
+        forged[function] = owner.evidence.nodes[function];
+        forged[1].tag = .u32;
+        try principalRejects(error.InvalidArtifact, copy);
+        forged[1] = owner.evidence.nodes[1];
+        copy.evidence.nodes = owner.evidence.nodes;
+    }
+    // Builtin nominal and operation identities use the reserved unit.
+    {
+        const builtin_unit = std.math.maxInt(u32);
+        const grown_nodes = try a.alloc(evidence.Node, owner.evidence.nodes.len + 1);
+        defer a.free(grown_nodes);
+        @memcpy(grown_nodes[0..owner.evidence.nodes.len], owner.evidence.nodes);
+        grown_nodes[owner.evidence.nodes.len] = .{ .tag = .nominal, .a = builtin_unit, .b = 5, .c = @intCast(owner.evidence.extra.len) };
+        const extra = try a.alloc(u32, owner.evidence.extra.len + 1);
+        defer a.free(extra);
+        @memcpy(extra[0..owner.evidence.extra.len], owner.evidence.extra);
+        extra[owner.evidence.extra.len] = 0;
+        const Operation = @TypeOf(owner.evidence.effects.operations[0]);
+        const operations = try a.alloc(Operation, owner.evidence.effects.operations.len + 1);
+        defer a.free(operations);
+        @memcpy(operations[0..owner.evidence.effects.operations.len], owner.evidence.effects.operations);
+        operations[owner.evidence.effects.operations.len] = .{ .identity = .{ .unit = builtin_unit, .decl = 9000 }, .arguments = .{} };
+        copy.evidence.nodes = grown_nodes;
+        copy.evidence.extra = extra;
+        copy.evidence.effects.operations = operations;
+        try principalAccepts(copy);
+        copy.evidence = owner.evidence;
+    }
+    {
+        const rows = try a.dupe(@TypeOf(owner.evidence.effects.rows[0]), owner.evidence.effects.rows);
+        defer a.free(rows);
+        copy.evidence.effects.rows = rows;
+        rows[0].len = 1;
+        try principalRejects(error.InvalidArtifact, copy);
     }
 }

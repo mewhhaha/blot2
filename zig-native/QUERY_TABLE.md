@@ -10,9 +10,11 @@ principal and local source-template owners; see
 singleton source/revision validation records; see
 [its qualification](SOURCE_VALIDATION.md). Task 018 implements capture-owned
 fragment and optimizer adapters; see
-[their qualification](EXECUTABLE_QUERIES.md). Portable query serialization
-remains tasks 019–020. Existing claim-specific validation gates remain
-production proof boundaries throughout migration.
+[their qualification](EXECUTABLE_QUERIES.md). Task 019 serializes complete
+principal and optimizer records in typed, versioned sections; see
+[portable query records](PORTABLE_QUERIES.md). Broader persisted semantic graphs
+remain task 020. Existing claim-specific validation gates remain production
+proof boundaries throughout migration.
 
 ## Claims and owners
 
@@ -215,17 +217,20 @@ removing gates because storage is unified.
 ## Portable representation and compatibility
 
 Portable records go through [dependency_format.zig](src/dependency_format.zig),
-inside the owned dependency/checkpoint envelope. The current format version is 1
-with reflected schema and bounded decoding; this document does not change it.
-Task 019 round-trips every supported kind through dependency/principal and
-optimizer archive envelopes and backend checkpoints in separate processes,
-preserving each path's current error/fallback contract. Adding a query payload
-changes the schema. Use a deliberately versioned tagged payload and update the
-envelope version when wire interpretation changes; unknown versions/schema/kinds
-conservatively fall back to fresh compilation. No implicit reinterpretation of
-an older receipt as a stronger query claim is allowed. A transition reader may
-translate an old receipt only through its existing gate, then produce a fully
-owned current record.
+inside the owned dependency/checkpoint envelope. The envelope format version is
+1 with reflected schema and bounded decoding. Task 019 adds typed section
+headers and moves the principal archive to key v3, the optimizer capture to v2
+and the backend checkpoint to v2; [portable query records](PORTABLE_QUERIES.md)
+lists the represented and declined kinds. Task 019 round-trips every supported
+kind through dependency/principal and optimizer archive envelopes and backend
+checkpoints in separate processes, preserving each path's current error/fallback
+contract. Adding a query payload changes the schema. Use a deliberately
+versioned tagged payload and update the envelope version when wire
+interpretation changes; unknown versions/schema/kinds conservatively fall back
+to fresh compilation. No implicit reinterpretation of an older receipt as a
+stronger query claim is allowed. A transition reader may translate an old
+receipt only through its existing gate, then produce a fully owned current
+record.
 
 Encode stable producer/catalog identities, owned normalized source/evidence/code
 and capture graphs, ordered typed dependencies/publications, modes/options and

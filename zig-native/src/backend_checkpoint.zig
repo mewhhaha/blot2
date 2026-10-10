@@ -9,7 +9,8 @@ const format = @import("dependency_format.zig");
 const A = std.mem.Allocator;
 const Wire = struct { principal: []const u8, optimizer: []const u8 };
 fn key(compiler: format.Digest) format.Key {
-    return .{ .compiler = compiler, .settings = format.digest("blot-backend-checkpoint-v1"), .source = @splat(0), .dependencies = @splat(0) };
+    // Version two carries versioned principal and optimizer query sections.
+    return .{ .compiler = compiler, .settings = format.digest("blot-backend-checkpoint-v2"), .source = @splat(0), .dependencies = @splat(0) };
 }
 pub fn encode(a: A, compiler: format.Digest, source: *const capture.Capture) format.Error![]u8 {
     if (!source.emission.sealed) return error.InvalidArtifact;

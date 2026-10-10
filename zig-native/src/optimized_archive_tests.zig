@@ -67,3 +67,219 @@ test "portable optimizer captures reject stale compilers corrupt bytes and trunc
     bytes[bytes.len - 1] ^= 1;
     try std.testing.expectError(error.InvalidArtifact, archive.decode(a, compiler, bytes));
 }
+
+const format = @import("dependency_format.zig");
+const ir = @import("runtime_ir.zig");
+const portable = @import("portable_query.zig");
+const Body = archive.Body;
+
+// Calls, locals, a global, a typed `if`/`else` and a branch out of a block.
+fn structured(a: std.mem.Allocator) !wasm.Module {
+    var result = wasm.Module.init(a);
+    errdefer result.deinit();
+    const global = try result.addGlobal(.u32, 7, true);
+    const callee = try result.addFunction(&.{.i32}, .i32);
+    try result.emitSlice(callee, &.{ .{ .op = .local_get }, .{ .op = .i32_const, .operand = 1 }, .{ .op = .i32_add } });
+    const caller = try result.addFunction(&.{.i32}, .i32);
+    const local = try result.addLocal(caller, .i32);
+    try result.emitSlice(caller, &.{
+        .{ .op = .block },
+        .{ .op = .local_get },
+        .{ .op = .call, .operand = callee },
+        .{ .op = .local_set, .operand = local },
+        .{ .op = .local_get, .operand = local },
+        .{ .op = .br_if, .operand = 0 },
+        .{ .op = .end },
+        .{ .op = .local_get, .operand = local },
+        .{ .op = .if_, .operand = @backingInt(ir.ValueType.i32) },
+        .{ .op = .global_get, .operand = global },
+        .{ .op = .else_ },
+        .{ .op = .local_get, .operand = local },
+        .{ .op = .end },
+    });
+    return result;
+}
+fn structuredBytes(a: std.mem.Allocator) !struct { wasm: []u8, archive: []u8 } {
+    var original = try structured(a);
+    defer original.deinit();
+    var capture: bodies.Capture = .{ .allocator = a };
+    defer capture.deinit();
+    const bytes = try original.assembleWithOptions(.{ .current = &capture });
+    errdefer a.free(bytes);
+    try std.testing.expect(capture.queries_complete);
+    try std.testing.expectEqual(@as(usize, 2), capture.queries.records.items.len);
+    return .{ .wasm = bytes, .archive = try archive.encode(a, compiler, &capture) };
+}
+fn rejects(expected: anyerror, snapshot: archive.Snapshot) !void {
+    const a = std.testing.allocator;
+    const bytes = try format.encode(a, archive.wireKey(compiler), snapshot);
+    defer a.free(bytes);
+    try std.testing.expectError(expected, archive.decode(a, compiler, bytes));
+}
+
+test "portable optimizer query records rebuild the exact sealed index from validated payloads" {
+    const a = std.testing.allocator;
+    const saved = try structuredBytes(a);
+    defer a.free(saved.wasm);
+    defer a.free(saved.archive);
+    var original = try structured(a);
+    defer original.deinit();
+    var produced: bodies.Capture = .{ .allocator = a };
+    defer produced.deinit();
+    a.free(try original.assembleWithOptions(.{ .current = &produced }));
+    var loaded = try archive.decode(a, compiler, saved.archive);
+    defer loaded.deinit();
+    try std.testing.expect(loaded.queries_complete);
+    try std.testing.expectEqual(produced.queries.records.items.len, loaded.queries.records.items.len);
+    for (produced.queries.records.items, loaded.queries.records.items) |left, right| {
+        try std.testing.expectEqualDeep(left.key, right.key);
+        try std.testing.expectEqualDeep(left.value, right.value);
+        try std.testing.expectEqualSlices(u32, left.dependencies.callees, right.dependencies.callees);
+        try std.testing.expectEqualDeep(left.dependencies.parameters, right.dependencies.parameters);
+        try std.testing.expectEqual(left.dependencies.invalidates, right.dependencies.invalidates);
+        try std.testing.expectEqual(left.dependencies.owned_result_bytes, right.dependencies.owned_result_bytes);
+    }
+    // The checked-in call edge is an exact dependency of the caller's record.
+    try std.testing.expectEqualSlices(u32, &.{0}, loaded.queries.records.items[1].dependencies.callees);
+    var current: bodies.Capture = .{ .allocator = a };
+    defer current.deinit();
+    var stats: bodies.Stats = .{};
+    const reused = try original.assembleWithOptions(.{ .previous = &loaded, .current = &current, .stats = &stats });
+    defer a.free(reused);
+    try std.testing.expectEqual(@as(usize, 2), stats.reused);
+    try std.testing.expectEqualSlices(u8, saved.wasm, reused);
+}
+
+test "portable optimizer archives reject forged ordinals control structure and record sets" {
+    const a = std.testing.allocator;
+    const saved = try structuredBytes(a);
+    defer a.free(saved.wasm);
+    defer a.free(saved.archive);
+    var owner = try format.decode(archive.Snapshot, a, saved.archive, archive.wireKey(compiler));
+    defer format.deinit(a, &owner);
+    // Re-encoding the unchanged decoded payload is accepted.
+    {
+        const bytes = try format.encode(a, archive.wireKey(compiler), owner);
+        defer a.free(bytes);
+        var accepted = try archive.decode(a, compiler, bytes);
+        accepted.deinit();
+    }
+    const caller = owner.entries[1].source.body.instructions;
+    const Edit = struct { at: usize, inst: ir.Instruction };
+    const body_edits = [_]Edit{
+        .{ .at = 2, .inst = .{ .op = .call, .operand = 2 } }, // function past the capture
+        .{ .at = 3, .inst = .{ .op = .local_set, .operand = 2 } }, // local past params+locals
+        .{ .at = 9, .inst = .{ .op = .global_get, .operand = 1 } }, // global past the capture
+        .{ .at = 9, .inst = .{ .op = .call_import, .operand = 0 } }, // no imports
+        .{ .at = 9, .inst = .{ .op = .call_indirect, .operand = 9 } }, // signature past the capture
+        .{ .at = 8, .inst = .{ .op = .if_, .operand = 300 } }, // block type is not a value type
+        .{ .at = 5, .inst = .{ .op = .br_if, .operand = 2 } }, // label past the open frames
+        .{ .at = 6, .inst = .{ .op = .nop } }, // block never closes
+        .{ .at = 0, .inst = .{ .op = .nop } }, // an extra end
+        .{ .at = 8, .inst = .{ .op = .block } }, // else inside a block
+        .{ .at = 9, .inst = .{ .op = .i32x4_extract_lane, .operand = 4 } },
+    };
+    for (body_edits) |edit| {
+        const before = caller[edit.at];
+        defer caller[edit.at] = before;
+        caller[edit.at] = edit.inst;
+        try rejects(error.InvalidArtifact, owner);
+    }
+    // Outputs are validated against the same capture before any reuse.
+    {
+        var forged = [_]ir.Instruction{.{ .op = .local_get, .operand = 1 }};
+        const before = owner.entries[0].output;
+        defer owner.entries[0].output = before;
+        owner.entries[0].output = Body{ .locals = &.{}, .instructions = &forged };
+        try rejects(error.InvalidArtifact, owner);
+        forged[0] = .{ .op = .call, .operand = 5 };
+        try rejects(error.InvalidArtifact, owner);
+    }
+    {
+        const before = owner.arena;
+        defer owner.arena = before;
+        owner.arena = .{ .allocate = 0, .allocate_scalar = 0, .recycle = 0, .reset = 0, .mark = 0, .collect = 2, .heap = 0, .base = 0, .static_end = 0, .allocated = 0 };
+        try rejects(error.InvalidArtifact, owner);
+    }
+    const records = owner.queries.records;
+    try std.testing.expectEqual(@as(usize, 2), records.len);
+    const Shape = struct { records: []const archive.Record, sealed: bool = true };
+    const swapped = [_]archive.Record{ records[1], records[0] };
+    const repeated = [_]archive.Record{ records[0], records[0], records[1] };
+    for ([_]Shape{
+        .{ .records = &swapped },
+        .{ .records = &repeated },
+        .{ .records = records[0..1] },
+        .{ .records = records[1..] },
+        .{ .records = records, .sealed = false },
+    }) |shape| {
+        var copy = owner;
+        copy.queries.records = @constCast(shape.records);
+        copy.sealed = shape.sealed;
+        try rejects(error.InvalidArtifact, copy);
+    }
+    {
+        var forged = records[1];
+        var callees = [_]u32{1};
+        forged.dependencies.callees = &callees;
+        var copy = owner;
+        var shape = [_]archive.Record{ records[0], forged };
+        copy.queries.records = &shape;
+        try rejects(error.InvalidArtifact, copy);
+        shape[1] = records[1];
+        shape[1].key.tier = .development;
+        try rejects(error.InvalidArtifact, copy);
+        shape[1] = records[1];
+        shape[1].result.function = 0;
+        try rejects(error.InvalidArtifact, copy);
+        shape[1] = records[1];
+        shape[1].dependencies.invalidates = !records[1].dependencies.invalidates;
+        try rejects(error.InvalidArtifact, copy);
+    }
+    {
+        var copy = owner;
+        copy.queries.header.version += 1;
+        try rejects(error.UnsupportedVersion, copy);
+        copy.queries.header = portable.header(.principal_complete_proof);
+        try rejects(error.SchemaMismatch, copy);
+    }
+}
+
+test "portable optimizer archives keep unsealed tables unsealed and decline their reuse" {
+    const a = std.testing.allocator;
+    const saved = try structuredBytes(a);
+    defer a.free(saved.wasm);
+    defer a.free(saved.archive);
+    var owner = try format.decode(archive.Snapshot, a, saved.archive, archive.wireKey(compiler));
+    defer format.deinit(a, &owner);
+    var copy = owner;
+    copy.sealed = false;
+    copy.queries.records = &.{};
+    const bytes = try format.encode(a, archive.wireKey(compiler), copy);
+    defer a.free(bytes);
+    var loaded = try archive.decode(a, compiler, bytes);
+    defer loaded.deinit();
+    try std.testing.expect(!loaded.queries_complete);
+    try std.testing.expectEqual(@as(usize, 0), loaded.queries.records.items.len);
+    var original = try structured(a);
+    defer original.deinit();
+    var current: bodies.Capture = .{ .allocator = a };
+    defer current.deinit();
+    var stats: bodies.Stats = .{};
+    const rebuilt = try original.assembleWithOptions(.{ .previous = &loaded, .current = &current, .stats = &stats });
+    defer a.free(rebuilt);
+    try std.testing.expectEqual(@as(usize, 0), stats.reused);
+    try std.testing.expectEqualSlices(u8, saved.wasm, rebuilt);
+    // A saturated producer table also persists no records.
+    var saturated: bodies.Capture = .{ .allocator = a };
+    defer saturated.deinit();
+    saturated.queries.limits.records = 1;
+    a.free(try original.assembleWithOptions(.{ .current = &saturated }));
+    try std.testing.expect(!saturated.queries_complete);
+    const unsealed = try archive.encode(a, compiler, &saturated);
+    defer a.free(unsealed);
+    var reloaded = try archive.decode(a, compiler, unsealed);
+    defer reloaded.deinit();
+    try std.testing.expect(!reloaded.queries_complete);
+    try std.testing.expectEqual(@as(usize, 0), reloaded.queries.records.items.len);
+}
