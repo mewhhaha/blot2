@@ -53,7 +53,7 @@ for (const entry of entries) {
     caches[entry.name][variant.name] = await cacheFile(directory);
   }
 }
-type Probe = { checkpoint_bytes: number; median_ns: number; p25_ns: number; p75_ns: number; min_ns: number; requested_bytes: number; allocations: number; peak_bytes: number; principal_records: number; optimizer_records: number };
+type Probe = { checkpoint_bytes: number; median_ns: number; p25_ns: number; p75_ns: number; min_ns: number; requested_bytes: number; allocations: number; peak_bytes: number; principal_records: number; optimizer_records: number; selected_records?: number };
 const samples: Record<string, Record<string, Probe[]>> = {};
 const loads: number[][] = [];
 for (let round = 0; round < rounds; round++) {
@@ -75,14 +75,14 @@ function median(values: number[]): number {
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
-const rows = ["workload,variant,checkpoint_bytes,principal_records,optimizer_records,requested_bytes,allocations,peak_bytes,round_median_ns"];
+const rows = ["workload,variant,checkpoint_bytes,principal_records,optimizer_records,selected_records,requested_bytes,allocations,peak_bytes,round_median_ns"];
 const summary = entries.map((entry) => {
   const result: Record<string, unknown> = { workload: entry.name };
   for (const variant of variants) {
     const group = samples[entry.name][variant.name];
     const first = group[0];
-    rows.push([entry.name, variant.name, first.checkpoint_bytes, first.principal_records, first.optimizer_records, first.requested_bytes, first.allocations, first.peak_bytes, `"${JSON.stringify(group.map((s) => s.median_ns).sort((a, b) => a - b))}"`].join(","));
-    result[variant.name] = { checkpoint_bytes: first.checkpoint_bytes, principal_records: first.principal_records, optimizer_records: first.optimizer_records, requested_bytes: first.requested_bytes, allocations: first.allocations, peak_bytes: first.peak_bytes, median_ns: median(group.map((s) => s.median_ns)) };
+    rows.push([entry.name, variant.name, first.checkpoint_bytes, first.principal_records, first.optimizer_records, first.selected_records ?? 0, first.requested_bytes, first.allocations, first.peak_bytes, `"${JSON.stringify(group.map((s) => s.median_ns).sort((a, b) => a - b))}"`].join(","));
+    result[variant.name] = { checkpoint_bytes: first.checkpoint_bytes, principal_records: first.principal_records, optimizer_records: first.optimizer_records, selected_records: first.selected_records ?? 0, requested_bytes: first.requested_bytes, allocations: first.allocations, peak_bytes: first.peak_bytes, median_ns: median(group.map((s) => s.median_ns)) };
   }
   const b = result.baseline as { median_ns: number };
   const c = result.candidate as { median_ns: number };

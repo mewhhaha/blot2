@@ -196,7 +196,8 @@ const Bounds = struct {
     }
     fn parameter(self: Bounds, value: core.Parameter) BoundsError!void {
         try self.binding(value.binding, true);
-        if (value.binding != 0) try require(self.m.bindings[value.binding].kind == .parameter);
+        // Resolver continuations bind the checker's synthetic local payload.
+        if (value.binding != 0) try require(self.m.bindings[value.binding].kind == .parameter or self.m.bindings[value.binding].kind == .local);
         try self.ty(value.ty);
         try self.span(value.span);
     }

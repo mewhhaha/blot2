@@ -70,7 +70,7 @@ pub fn validate(a: A, snapshot: *const Snapshot) format.Error!void {
     if (!section.admitted()) return error.SchemaMismatch;
     const units = snapshot.modules.len;
     const evidence = snapshot.evidence.view();
-    if (!validEvidence(evidence)) return error.InvalidArtifact;
+    if (!portable.validEvidence(evidence)) return error.InvalidArtifact;
     var seen: std.AutoHashMapUnmanaged(u64, void) = .empty;
     defer seen.deinit(a);
     var targets: std.AutoHashMapUnmanaged(u64, void) = .empty;
@@ -113,61 +113,6 @@ fn validRecord(a: A, seen: *std.AutoHashMapUnmanaged(u64, void), record: Record,
     for (observed.call_publications) |call| {
         if (!validBinding(call.target, units) or call.evidence == 0 or call.evidence >= nodes) return false;
         if ((try calls.getOrPut(a, call)).found_existing) return false;
-    }
-    return true;
-}
-fn validSpan(len: usize, start: usize, count: usize) bool {
-    return start <= len and count <= len - start;
-}
-/// Every type edge names an earlier node, as hash-consed publication does;
-/// rows and operations stay in bounds. Nominal and operation identities may be
-/// builtin (unit `maxInt(u32)`); importers validate them against the receiving
-/// units, bound depth and work across the type/row spaces and reject
-/// unsupported identities.
-fn validEvidence(evidence: types.View) bool {
-    const primitives = [_]types.Tag{ .absent, .unit, .boolean, .u32, .f32, .never };
-    if (evidence.nodes.len < primitives.len) return false;
-    for (evidence.nodes[0..primitives.len], primitives) |node, tag| if (!std.meta.eql(node, types.Node{ .tag = tag })) return false;
-    const effects = evidence.effects;
-    if (effects.operations.len == 0 or effects.rows.len == 0 or effects.rows[0].len != 0) return false;
-    for (effects.operations[1..]) |operation| {
-        if (!validSpan(effects.arguments.len, operation.arguments.start, operation.arguments.len)) return false;
-        for (effects.arguments[operation.arguments.start..][0..operation.arguments.len]) |argument| if (argument == 0 or argument >= evidence.nodes.len) return false;
-    }
-    for (effects.rows[1..]) |row| {
-        if (!validSpan(effects.labels.len, row.start, row.len)) return false;
-        for (effects.labels[row.start..][0..row.len]) |label| if (label == 0 or label >= effects.operations.len) return false;
-    }
-    const rows = effects.rows.len;
-    for (evidence.nodes[primitives.len..], primitives.len..) |node, id| {
-        const child = struct {
-            fn valid(value: u32, parent: usize) bool {
-                return value != 0 and value < parent;
-            }
-        }.valid;
-        switch (node.tag) {
-            .absent, .unit, .boolean, .u32, .f32, .never => return false,
-            .array, .list, .cursor, .resolver => if (!child(node.a, id) or node.b != 0 or node.c != 0) return false,
-            .demand, .provider => if (!child(node.a, id) or node.b != 0 or node.c >= rows) return false,
-            .function => if (!child(node.a, id) or !child(node.b, id) or node.c >= rows) return false,
-            .state_provider => if (!child(node.a, id) or !child(node.b, id) or !child(node.c, id)) return false,
-            .type_constructor => if (node.a == 0 or node.b == 0 or node.c != 0) return false,
-            .product, .record => {
-                const width: usize = if (node.tag == .record) 2 else 1;
-                const count = std.math.mul(usize, node.b, width) catch return false;
-                if (node.c != 0 or !validSpan(evidence.extra.len, node.a, count)) return false;
-                for (evidence.extra[node.a..][0..count], 0..) |value, index| {
-                    if (node.tag == .record and index % 2 == 0) {
-                        if (value == 0) return false;
-                    } else if (!child(value, id)) return false;
-                }
-            },
-            .nominal => {
-                const start = @as(usize, node.c) + 1;
-                if (node.a == 0 or node.c >= evidence.extra.len or !validSpan(evidence.extra.len, start, evidence.extra[node.c])) return false;
-                for (evidence.extra[start..][0..evidence.extra[node.c]]) |value| if (!child(value, id)) return false;
-            },
-        }
     }
     return true;
 }
@@ -380,6 +325,13 @@ fn validNominal(units: []const core.Module, nominal: @import("types.zig").Nomina
     for (module.nominals) |item| if (item.identity.decl == nominal.decl and (item.identity.unit == 0 or item.identity.unit == nominal.unit)) return true;
     return false;
 }
+/// Type arguments may also name a compiler-owned State/Computation identity,
+/// exactly as the in-process importer admits; builtin effect operations and
+/// unknown generative domains still decline.
+fn validTypeNominal(units: []const core.Module, nominal: @import("types.zig").NominalIdentity) bool {
+    if (nominal.unit == std.math.maxInt(u32)) return nominal.decl != 0 and nominal.decl <= 6;
+    return validNominal(units, nominal);
+}
 // Deliberately admits the same closed family as retained principal call proofs.
 // Providers, generative identities, resolvers and type constructors are absent.
 // Importing a graph alone never publishes a callable validation certificate.
@@ -445,7 +397,7 @@ const Import = struct {
             .product, .record, .nominal => {
                 var children: []const u32 = undefined;
                 if (node.tag == .nominal) {
-                    if (!validNominal(self.units, .{ .unit = node.a, .decl = node.b }) or node.c >= self.source.extra.len) return error.InvalidEvidence;
+                    if (!validTypeNominal(self.units, .{ .unit = node.a, .decl = node.b }) or node.c >= self.source.extra.len) return error.InvalidEvidence;
                     children = try span(self.source.extra, node.c + 1, self.source.extra[node.c]);
                 } else {
                     if (node.c != 0) return error.InvalidEvidence;

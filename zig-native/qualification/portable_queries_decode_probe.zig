@@ -15,6 +15,10 @@ fn principalRecords(decoded: anytype) usize {
 fn optimizerRecords(decoded: anytype) usize {
     return if (decoded.optimizer) |owner| owner.queries.records.items.len else 0;
 }
+fn selectedRecords(decoded: anytype) usize {
+    if (comptime !@hasField(@TypeOf(decoded.*), "semantic")) return 0;
+    return if (decoded.semantic) |owner| owner.capture.metadata.specialization_queries.records.items.len else 0;
+}
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
     const args = try init.minimal.args.toSlice(arena);
@@ -27,11 +31,13 @@ pub fn main(init: std.process.Init) !void {
     const a = tracked.allocator();
     var principal_records: usize = 0;
     var optimizer_records: usize = 0;
+    var selected_records: usize = 0;
     {
         var decoded = try checkpoint.decode(a, compiler, bytes);
         defer decoded.deinit();
         principal_records = principalRecords(&decoded);
         optimizer_records = optimizerRecords(&decoded);
+        selected_records = selectedRecords(&decoded);
     }
     const once = tracked.counts;
     std.debug.assert(once.live_bytes == 0);
@@ -57,6 +63,7 @@ pub fn main(init: std.process.Init) !void {
         .peak_bytes = once.peak_bytes,
         .principal_records = principal_records,
         .optimizer_records = optimizer_records,
+        .selected_records = selected_records,
     }, .{}, &writer.interface);
     try writer.interface.writeByte('\n');
     try writer.interface.flush();

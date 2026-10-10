@@ -1,0 +1,139 @@
+{
+  "zig": "0.17.0",
+  "baseline": {
+    "revision": "501b87a (task 019 record; compiler sources of ea4a7f3)",
+    "blotc_sha256": "69e8692e88c0e49fa63e25fe3d42100dcec085ee048bb900acb2d2c2ac36f0d5",
+    "probe_sha256": "c7179663e5e00845b98951eac63b0f51963b65d7724595a38e5b989096aa0b71"
+  },
+  "candidate": {
+    "base_revision": "501b87a738809b59b104b0c536b254107c587fe4",
+    "blotc_sha256": "640c744df0e3eb10ef7f8e9189b899949bbd0baafb407c9b8cc248baa7e802f1",
+    "probe_sha256": "ee3d0ffe574862096248a7c8bd556d635ebdda0e667964a10aa8c36b626fb8af",
+    "input_files": 422,
+    "input_map_sha256": "052419dbb6c0c04e8b1c0d6d522719d0b8edec642a0eb46d897e3eb1eb22362f"
+  },
+  "drivers": {
+    "zig-native/qualification/portable_queries_restart.ts": "cd3eb7f9ccedef26dff427d6180d45b34b3967f1ffe7e0840f92c35b5ed9f689",
+    "zig-native/qualification/portable_queries_decode.ts": "2288758ae91d636bd050fd8a5af6135f642c416c30a6cfa93c30001f50b5bd01",
+    "zig-native/qualification/portable_queries_decode_probe.zig": "723d5ece24654b260e82c365a49fc905a32347a430ee6bc85ec15129f41fa011"
+  },
+  "workloads": [
+    {
+      "name": "arrays",
+      "sha256": "8d6d479d01268f822570498606731c116233a3fc08f09087290867b92d96be20"
+    },
+    {
+      "name": "ecs",
+      "sha256": "b17cd223b92414da5d99c9199f3df5628031ee48421ffbf8062299c4f01d2545"
+    },
+    {
+      "name": "generic_effects",
+      "sha256": "fc795ae6a9b90fdee36d96678c091239efa81caba5cbb997bde6477f1b3a6320"
+    },
+    {
+      "name": "host_capabilities",
+      "sha256": "bc9e0d18652450c910bc9c4fe52d2ecdc95cbab0682eeeb17f62b3ad86c53d40"
+    },
+    {
+      "name": "host_io",
+      "sha256": "52dc79e8766a0680480c9ed2aab4053a37fa871bc5c14b1b8f924f46745cd249"
+    },
+    {
+      "name": "lists",
+      "sha256": "eaa39ee23ca03acb9a950816517af92d76cfa2823628a6977f6804318a6d1859"
+    },
+    {
+      "name": "monads",
+      "sha256": "182c7185d055c448cd725082eeb55cb24074d5c6b799955b73b3a71ab15fe64e"
+    },
+    {
+      "name": "prelude",
+      "sha256": "b130352914f5c22caa30815b41d30298b2962efe36afe1c95265a94977d878d3"
+    },
+    {
+      "name": "records",
+      "sha256": "7238e4137dba2bac63875a557ef9fbca6a0daa532d90dd693387e25b41666f57"
+    },
+    {
+      "name": "requests",
+      "sha256": "69635c1d441b0860536f492226d4fd3409943cfedeae6dd431a8d1d17f19fce9"
+    },
+    {
+      "name": "scalar",
+      "sha256": "1f80d6c576df54ab6dc06b84393756c2883bb78e71996d21a242f1a2c49a364d"
+    },
+    {
+      "name": "syntax",
+      "sha256": "58fd1c60f4d2d90317b4d48404ea79dc113a23917810a3ae441c0d3f5fa4e38d"
+    },
+    {
+      "name": "tags",
+      "sha256": "09fa1f70e8b23a13564a26801dab48f081c1a00bc6f601eded0a408eee5591f3"
+    },
+    {
+      "name": "box8",
+      "sha256": "cdf42b64a928ed3f6be76aff53d585ef737a6d5464928067c055ecd87411c300"
+    },
+    {
+      "name": "types8",
+      "sha256": "89816cb7a3d05fdb7adb93645a846ee9b40bbe84cd0db275de7315e7d1443e45"
+    },
+    {
+      "name": "rows8",
+      "sha256": "7a5771d07153cdc4817ee9dba15f9692d8c20f12c32a465dd0550e71cd56cb9a"
+    },
+    {
+      "name": "rows32",
+      "sha256": "916c2891ad0e2af1f97cfc71dca9b6f2ddc9ae09f433971cdf4436b50b8326cb"
+    },
+    {
+      "name": "rows128",
+      "sha256": "32e3a4ce286f007f10cd082753caa32f3b3732a60d01558bd36446a315fc6717"
+    }
+  ],
+  "restart": {
+    "rounds": 31,
+    "geomean_median_cpu_ratio": {
+      "fresh": 0.9712136521452572,
+      "population": 0.9860988616800891,
+      "restart": 1.0398125286723954
+    },
+    "loads": [
+      [
+        22.02,
+        19.99,
+        18.84
+      ],
+      [
+        7.15,
+        14.83,
+        17.07
+      ]
+    ],
+    "problems": []
+  },
+  "decode": {
+    "rounds": 11,
+    "iterations": 200,
+    "geomean_median_ns_ratio": 1.9684585316158225,
+    "loads": [
+      [
+        7.15,
+        14.83,
+        17.07
+      ],
+      [
+        7.54,
+        14.55,
+        16.95
+      ]
+    ]
+  },
+  "machine": {
+    "cpu": "AMD Ryzen 7 3800X, 8 cores / 16 threads",
+    "governor": "schedutil",
+    "boost": true,
+    "scheduler": "SCHED_OTHER, nice 0, unpinned",
+    "contention": "Interactive desktop with concurrent heavy jobs; one-minute load 22 at start, about 7 during most rounds"
+  }
+}

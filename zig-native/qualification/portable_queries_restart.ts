@@ -125,6 +125,7 @@ interface Sample {
   persisted_declines: number;
   optimizer_reused: number;
   functions: number;
+  selected_reused: number;
 }
 // Equal-length path labels keep requested path bytes identical across
 // compilers and rounds.
@@ -162,6 +163,7 @@ async function run(variant: typeof variants[number], workload: Workload, phase: 
     persisted_declines: record.principals.persisted_declines,
     optimizer_reused: record.runtime_optimization.reused,
     functions: record.runtime_optimization.functions,
+    selected_reused: record.selected_queries?.reused ?? 0,
   };
   await Deno.remove(output);
   for (const suffix of ["", ".err", ".times"]) await Deno.remove(`${log}${suffix}`);
@@ -193,7 +195,7 @@ function median(values: number[]): number {
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
-const rows: string[] = ["workload,phase,variant,samples,cpu_us,wall_us,requested_bytes,peak_bytes,allocations,checkpoint_bytes,persisted_hits,persisted_declines,optimizer_reused,functions"];
+const rows: string[] = ["workload,phase,variant,samples,cpu_us,wall_us,requested_bytes,peak_bytes,allocations,checkpoint_bytes,persisted_hits,persisted_declines,optimizer_reused,functions,selected_reused"];
 const summary: Record<string, unknown>[] = [];
 for (const workload of workloads) {
   const digests = new Set(samples.filter((s) => s.workload === workload.name).map((s) => s.wasm));
@@ -210,7 +212,7 @@ for (const workload of workloads) {
         if (values.length !== 1) problems.push(`${workload.name}/${phase}/${variant.name}: ${String(field)} varies ${values}`);
         return values[0];
       };
-      rows.push([workload.name, phase, variant.name, group.length, `"${list("cpu_us")}"`, `"${list("wall_us")}"`, unique("requested_bytes"), unique("peak_bytes"), unique("allocations"), unique("checkpoint_bytes"), unique("persisted_hits"), unique("persisted_declines"), unique("optimizer_reused"), unique("functions")].join(","));
+      rows.push([workload.name, phase, variant.name, group.length, `"${list("cpu_us")}"`, `"${list("wall_us")}"`, unique("requested_bytes"), unique("peak_bytes"), unique("allocations"), unique("checkpoint_bytes"), unique("persisted_hits"), unique("persisted_declines"), unique("optimizer_reused"), unique("functions"), unique("selected_reused")].join(","));
       medians[variant.name] = {
         cpu_us: median(group.map((s) => s.cpu_us)),
         wall_us: median(group.map((s) => s.wall_us)),
@@ -219,6 +221,7 @@ for (const workload of workloads) {
         checkpoint_bytes: group[0].checkpoint_bytes,
         persisted_hits: group[0].persisted_hits,
         optimizer_reused: group[0].optimizer_reused,
+        selected_reused: group[0].selected_reused,
       };
     }
     if (phase === "restart") {

@@ -12,9 +12,10 @@ singleton source/revision validation records; see
 fragment and optimizer adapters; see
 [their qualification](EXECUTABLE_QUERIES.md). Task 019 serializes complete
 principal and optimizer records in typed, versioned sections; see
-[portable query records](PORTABLE_QUERIES.md). Broader persisted semantic graphs
-remain task 020. Existing claim-specific validation gates remain production
-proof boundaries throughout migration.
+[portable query records](PORTABLE_QUERIES.md). Task 020 persists a complete
+previous-revision semantic owner for selected receipts; see
+[persisted semantic artifacts](SEMANTIC_ARTIFACTS.md). Existing claim-specific
+validation gates remain production proof boundaries throughout migration.
 
 ## Claims and owners
 

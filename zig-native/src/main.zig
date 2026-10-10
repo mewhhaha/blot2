@@ -291,6 +291,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var cache_loaded = false;
     var cache_saved = false;
     var principals: @import("principal_evidence_reuse.zig").Stats = .{};
+    var selected_queries: @import("completed_specialization_query.zig").Stats = .{};
     var load_us: i64 = 0;
     var check_us: i64 = 0;
     var lower_us: i64 = 0;
@@ -418,6 +419,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         emitted_functions = compiled.emitted_functions;
         constant_steps = compiled.constant_steps;
         principals = compiled.principal;
+        selected_queries = compiled.completed_queries;
         if (compiled.diagnostic) |item| {
             try diagnostic(writer, loaded.filename(item.unit), "emit", @tagName(item.code), item.span.start, item.span.end, item.message());
             emit_us = elapsed(emit_start, io);
@@ -467,6 +469,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .emitted_functions = emitted_functions,
         .constant_steps = constant_steps,
         .principals = principals,
+        .selected_queries = selected_queries,
         .restart_cache = .{ .loaded = cache_loaded, .saved = cache_saved },
         .wasm_bytes = wasm_bytes,
         .load_us = load_us,

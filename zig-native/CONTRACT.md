@@ -681,5 +681,14 @@ ordinal, evidence edge, body operand, control frame and record/input
 correspondence before exposing an owner, then rebuilds native indexes from the
 owned payload. Unknown versions or claims and corrupt or forged payloads are
 optional-cache misses; no partial record survives a failed decode. Refinement,
-specialization, local templates, source validation and executable fragments stay
-owner-local. See [portable query records](PORTABLE_QUERIES.md).
+canonical specialization, local templates, source validation and executable
+fragments stay owner-local. See [portable query records](PORTABLE_QUERIES.md).
+
+A checkpoint may also carry a complete previous-revision semantic owner: exact
+checked Core per unit with certificate bytes, the namespace, evaluator snapshot,
+slots, field locations and completed selected receipts. Decoding validates the
+namespace, every Core graph and stamp, every snapshot ordinal and receipt before
+rebuilding a Capture whose pins name the decoded Core. It serves only as the
+query predecessor of a compile with no in-process previous revision, and the
+ordinary Gate, Importer and Plan still admit each receipt against current
+source. See [persisted semantic artifacts](SEMANTIC_ARTIFACTS.md).

@@ -48,22 +48,24 @@ pub fn digest(bytes: []const u8) Digest {
 pub fn encode(allocator: Allocator, key: Key, value: anytype) Error![]u8 {
     return encodeWithLimits(allocator, key, value, .{});
 }
+/// A counting pass sizes the payload, then one exact allocation receives the
+/// header and body. Only the returned artifact is allocated.
 pub fn encodeWithLimits(allocator: Allocator, key: Key, value: anytype, limits: Limits) Error![]u8 {
-    var body: Encoder = .{ .allocator = allocator, .limits = limits, .remaining = limits.elements };
-    defer body.bytes.deinit(allocator);
+    var counter: Encoder = .{ .limits = limits, .remaining = limits.elements };
+    try counter.value(value, 0);
+    const output = try allocator.alloc(u8, header_size + counter.len);
+    errdefer allocator.free(output);
+    var body: Encoder = .{ .out = output[header_size..], .limits = limits, .remaining = limits.elements };
     try body.value(value, 0);
-    var header: Encoder = .{ .allocator = allocator, .limits = .{ .payload_bytes = header_size }, .remaining = 1024 };
-    defer header.bytes.deinit(allocator);
-    try header.bytes.appendSlice(allocator, magic);
+    std.debug.assert(body.len == counter.len);
+    var header: Encoder = .{ .out = output[0..header_size], .limits = .{ .payload_bytes = header_size }, .remaining = 1024 };
+    try header.append(magic);
     try header.integer(u32, version);
     try header.value(schema(@TypeOf(value)), 0);
     try header.value(key, 0);
-    try header.integer(u64, @intCast(body.bytes.items.len));
-    try header.value(digest(body.bytes.items), 0);
-    std.debug.assert(header.bytes.items.len == header_size);
-    const output = try allocator.alloc(u8, header_size + body.bytes.items.len);
-    @memcpy(output[0..header_size], header.bytes.items);
-    @memcpy(output[header_size..], body.bytes.items);
+    try header.integer(u64, @intCast(counter.len));
+    try header.value(digest(output[header_size..]), 0);
+    std.debug.assert(header.len == header_size);
     return output;
 }
 
@@ -115,9 +117,10 @@ pub fn deinit(allocator: Allocator, value: anytype) void {
     }
 }
 
+/// Without `out` the encoder only counts; with it, it writes the counted bytes.
 const Encoder = struct {
-    allocator: Allocator,
-    bytes: std.ArrayList(u8) = .empty,
+    out: ?[]u8 = null,
+    len: usize = 0,
     limits: Limits,
     remaining: usize,
     fn integer(self: *Encoder, comptime T: type, number: T) Error!void {
@@ -126,8 +129,9 @@ const Encoder = struct {
         try self.append(&data);
     }
     fn append(self: *Encoder, bytes: []const u8) Error!void {
-        if (self.bytes.items.len > self.limits.payload_bytes or bytes.len > self.limits.payload_bytes - self.bytes.items.len) return error.ArtifactLimit;
-        try self.bytes.appendSlice(self.allocator, bytes);
+        if (self.len > self.limits.payload_bytes or bytes.len > self.limits.payload_bytes - self.len) return error.ArtifactLimit;
+        if (self.out) |out| @memcpy(out[self.len..][0..bytes.len], bytes);
+        self.len += bytes.len;
     }
     fn value(self: *Encoder, item: anytype, depth: usize) Error!void {
         if (depth > self.limits.depth) return error.ArtifactLimit;

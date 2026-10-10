@@ -25,8 +25,8 @@ Decoding requires the exact header. A different section version reports
 `SchemaMismatch`. The dependency format's reflected schema digest separately
 rejects any change of record shape, and its own envelope version stays 1. No
 reader reinterprets an older receipt or another claim. The backend checkpoint
-key moves to version 2, so earlier checkpoints are stale before their inner
-archives are read.
+key moved to version 2 (version 3 since task 020 adds the semantic owner), so
+earlier checkpoints are stale before their inner archives are read.
 
 Records contain validated artifact ordinals only. Native handles, positions,
 fingerprints, allocator capacity, solver IDs, Session-local template handles and
@@ -35,17 +35,18 @@ owned payloads.
 
 ## Represented and declined kinds
 
-| Query owner                                              | Portable | Reason                                                                                                  |
-| -------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
-| Principal proof with complete dynamic observations       | Yes      | Archived source image, evidence graph and observations are revalidated against the current owner        |
-| Principal exact-source proof without observations        | No       | Another process cannot re-establish its dynamic inputs                                                  |
-| Source-description and open-residual principal templates | No       | Session-local source templates, never completed proofs                                                  |
-| Refinement receipts                                      | No       | Owner-local; recomputed after restart                                                                   |
-| Selected and canonical specialization                    | No       | Their capture/evidence graphs belong to [task 020](../tasks/020-persist-complete-semantic-artifacts.md) |
-| Revision inputs and checked-Core certificates            | No       | Native validation images; dependency/interface validation reruns authoritatively                        |
-| Executable fragments                                     | No       | Reference emission pools and replay jobs that checkpoints do not own                                    |
-| Optimizer outputs of a sealed table                      | Yes      | The archive owns the complete machine inputs; the matcher still compares them with fresh code           |
-| Evaluated values                                         | Never    | A separate operational claim; no interface or source certificate authorizes it                          |
+| Query owner                                              | Portable       | Reason                                                                                           |
+| -------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------ |
+| Principal proof with complete dynamic observations       | Yes            | Archived source image, evidence graph and observations are revalidated against the current owner |
+| Principal exact-source proof without observations        | No             | Another process cannot re-establish its dynamic inputs                                           |
+| Source-description and open-residual principal templates | No             | Session-local source templates, never completed proofs                                           |
+| Refinement receipts                                      | No             | Owner-local; recomputed after restart                                                            |
+| Selected specialization                                  | Yes (task 020) | Replayed through a [persisted semantic owner](SEMANTIC_ARTIFACTS.md)                             |
+| Canonical specialization                                 | No             | Session-local plans; recomputed                                                                  |
+| Revision inputs and checked-Core certificates            | No             | Native validation images; dependency/interface validation reruns authoritatively                 |
+| Executable fragments                                     | No             | Reference emission pools and replay jobs that checkpoints do not own                             |
+| Optimizer outputs of a sealed table                      | Yes            | The archive owns the complete machine inputs; the matcher still compares them with fresh code    |
+| Evaluated values                                         | Never          | A separate operational claim; no interface or source certificate authorizes it                   |
 
 Declined kinds are simply absent from the wire and recomputed after restart.
 

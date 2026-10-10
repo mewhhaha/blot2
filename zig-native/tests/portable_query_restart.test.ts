@@ -5,7 +5,8 @@ const executable = Deno.args[0] ??
 const repo = new URL("../../", import.meta.url).pathname;
 
 // Every public example must decode its own checkpoint, including builtin
-// nominal and effect identities, and reuse the same work as the producer.
+// nominal and effect identities and its persisted semantic owner, and reuse
+// the same work as the producer.
 Deno.test("public examples restart from their own portable query checkpoints", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-portable-" });
   try {
@@ -51,6 +52,11 @@ Deno.test("public examples restart from their own portable query checkpoints", a
       const optimizer = restarted.metrics.runtime_optimization;
       assert.equal(optimizer.reused, optimizer.functions - optimizer.shared, name);
       assert.equal(restarted.metrics.principals.persisted_declines, 0, name);
+      // The persisted semantic owner replays completed selected receipts.
+      const selected = restarted.metrics.selected_queries;
+      if (populated.metrics.selected_queries.complete_records > 0) {
+        assert(selected.reused > 0, `${name}: ${JSON.stringify(selected)}`);
+      }
     }
   } finally {
     await Deno.remove(directory, { recursive: true });

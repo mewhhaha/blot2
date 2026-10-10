@@ -1953,7 +1953,10 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     }
     const recording = options.artifact_replay or options.retain_artifacts or options.previous != null or options.query_previous != null;
     const principal_previous = options.principal_previous orelse options.previous;
-    const query_previous = options.query_previous orelse options.previous;
+    // A restarted process may supply the persisted semantic owner. The same
+    // Gate, Importer and graph Plan admission run against it; an in-process
+    // previous revision always takes precedence.
+    const query_previous = options.query_previous orelse options.previous orelse if (options.checkpoint) |checkpoint| (if (checkpoint.semantic) |*owner| &owner.capture else null) else null;
     var module_stamps: code_artifacts.ModuleStamps = .{ .allocator = allocator, .current = units, .previous = if (query_previous) |old| if (old.metadata.pools) |*pools| pools else null else null, .compare_contents = true };
     defer module_stamps.deinit();
     const stamps: ?*code_artifacts.ModuleStamps = if (module_stamps.previous != null) &module_stamps else null;
@@ -2024,7 +2027,10 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
             }
         }
         if (query_state == null) {
-            query_state = .{ .allocator = allocator, .old = previous, .graph_scratch = .{ .allocator = allocator }, .gate = try @import("principal_reuse_gate.zig").Gate.initWithStamps(allocator, &previous.metadata.pools.?, units, options.identity, stamps) };
+            // Initialize the Gate before the optional: a failed initializer
+            // inside the literal would leave a non-null, partial query state.
+            const gate = try @import("principal_reuse_gate.zig").Gate.initWithStamps(allocator, &previous.metadata.pools.?, units, options.identity, stamps);
+            query_state = .{ .allocator = allocator, .old = previous, .graph_scratch = .{ .allocator = allocator }, .gate = gate };
             query_state.?.stats.gate_fresh = 1;
         }
         query_state.?.io = options.io;
