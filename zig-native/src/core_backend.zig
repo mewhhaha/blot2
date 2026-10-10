@@ -59,6 +59,14 @@ pub const Result = struct {
     module_stamps: struct { computed: usize = 0, reused: usize = 0, comparisons: usize = 0, copied: usize = 0 } = .{},
     refinements: @import("refinement_receipt.zig").Stats = .{},
     completed_queries: completed_specialization_query.Stats = .{},
+    query_tables: struct {
+        selected: @import("semantic_query_table.zig").Storage = .{},
+        principal: @import("semantic_query_table.zig").Storage = .{},
+        portable_principal: @import("semantic_query_table.zig").Storage = .{},
+        canonical: @import("semantic_query_table.zig").Storage = .{},
+        source_description: @import("semantic_query_table.zig").Storage = .{},
+        open_residual: @import("semantic_query_table.zig").Storage = .{},
+    } = .{},
     artifacts: ?ArtifactSummary = null,
     capture: ?artifact_capture.Capture = null,
     reuse: artifact_fragment.Stats = .{},
@@ -217,7 +225,7 @@ const Generator = struct {
             result.persisted_call_proofs = reader.stats.call_proofs;
             result.persisted_declines = reader.stats.declined;
         }
-        if (self.artifacts) |artifacts| result.captured = artifacts.principal_proofs.items.len;
+        if (self.artifacts) |artifacts| result.captured = artifacts.principal_queries.records.items.len;
         return result;
     }
     pub fn replayRequest(self: *Generator, request: code_artifacts.Request) Error!u32 {
@@ -2081,6 +2089,10 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     };
     result.reuse = generator.work;
     result.refinements = generator.refinement_stats;
+    result.query_tables.canonical = generator.evaluator.canonical_specializations.table.storage();
+    if (persisted_principals) |*reader| result.query_tables.portable_principal = reader.storage();
+    result.query_tables.source_description = generator.evaluator.principalQueryStorage().source_description;
+    result.query_tables.open_residual = generator.evaluator.principalQueryStorage().open_residual;
     if (retained) |state| {
         result.reuse.reused_named = state.stats.reused_named;
         result.reuse.reused_closures = state.stats.reused_closures;
@@ -2089,13 +2101,16 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         result.reuse.reused_scalar_constants = state.stats.reused_scalar_constants;
     }
     if (recording) {
-        try metadata.specialization_receipts.ensureUnusedCapacity(allocator, generator.evaluator.specialization_receipts.items.len);
-        for (generator.evaluator.specialization_receipts.items) |record| metadata.specialization_receipts.appendAssumeCapacity(try record.clone(allocator));
+        for (generator.evaluator.specialization_receipts.items) |record| {
+            try @import("selected_query.zig").remember(&metadata.specialization_queries, allocator, generator.evaluator.closureInfo(record.input), try record.clone(allocator));
+        }
         // Records exist only for parallel semantic inference.
         if (query_state) |*state| if (options.policy.semantic_workers > 1) {
             try metadata.independent_calls.ensureUnusedCapacity(allocator, state.independent_calls.items.len);
             for (state.independent_calls.items) |record| metadata.independent_calls.appendAssumeCapacity(try record.clone(allocator));
         };
+        result.query_tables.selected = metadata.specialization_queries.storage();
+        result.query_tables.principal = metadata.principal_queries.storage();
         try metadata.capturePoolsWithStamps(&generator, options.identity, stamps);
         result.counters = generator.evaluator.counters;
         // Publish validation only with this candidate's owned artifact pools.

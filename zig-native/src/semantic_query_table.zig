@@ -63,6 +63,16 @@ pub fn Handle(comptime kind_: Kind) type {
     };
 }
 
+pub const Storage = struct {
+    inspected_positions: usize = 0,
+    inspected_dependencies: usize = 0,
+    lookup_declines: usize = 0,
+    records: usize = 0,
+    payload_bytes: usize = 0,
+    capacity_bytes: usize = 0,
+    saturated: usize = 0,
+};
+
 /// Both traversal directions share one bounded index. Links are positions,
 /// never pointers into a growing record array. Duplicate keys retain their
 /// own observations and explicit insertion order.
@@ -144,6 +154,9 @@ pub fn Table(comptime Adapter: type) type {
         owned_bytes: usize = 0,
         capacity_bytes: usize = 0,
         saturated: usize = 0,
+        pub fn storage(self: *const Self) Storage {
+            return .{ .records = self.records.items.len, .payload_bytes = self.owned_bytes, .capacity_bytes = self.capacity_bytes, .saturated = self.saturated };
+        }
         pub fn deinit(self: *Self, a: A) void {
             for (self.records.items) |*record| record.deinit(a);
             self.records.deinit(a);

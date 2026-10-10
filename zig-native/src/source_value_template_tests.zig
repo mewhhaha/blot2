@@ -1063,7 +1063,7 @@ test "completed specialization query replays concrete captured callback without 
     var initial = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     defer initial.deinit(a);
     try successful(&initial);
-    try std.testing.expect(initial.capture.?.metadata.specialization_receipts.items.len > 0);
+    try std.testing.expect(initial.capture.?.metadata.specialization_queries.records.items.len > 0);
     var after = try Fixture.init(source);
     defer after.deinit();
     editSchema(&after);
@@ -1100,7 +1100,7 @@ const independent_query_source = query_source ++
 fn independentQueryRead(old: *capture.Capture, target_: core.BindingRef, present: bool) !void {
     // Add a source-call premise to a real successful query. The ordinary
     // inference engine must establish it; the cached result grants no proof.
-    const record = &old.metadata.specialization_receipts.items[0];
+    const record = &old.metadata.specialization_queries.records.items[0].dependencies;
     const reads = try a.dupe(@import("specialization_receipt.zig").CallRead, &.{.{
         .unit = target_.unit,
         .binding = target_.binding,
@@ -1119,7 +1119,7 @@ fn independentQueryAttempt(fixture: *const Fixture, old: *const capture.Capture,
     // Exercise the positive scalar-input path as well as ordinary absent reads.
     _ = try g.evaluator.richValue(fixture.target("factor"));
     const input = try g.evaluator.richValue(fixture.target("callback"));
-    const expected = try queryExpected(&g, old, old.metadata.specialization_receipts.items[0].expected);
+    const expected = try queryExpected(&g, old, old.metadata.specialization_queries.records.items[0].dependencies.expected);
     const target_ = fixture.target(target_name);
     const key: eval.CallProofKey = .{ .target = .{ .unit = target_.unit - 1, .binding = target_.binding }, .evidence = expected };
     if (incoming) try g.evaluator.validated_calls.put(a, key, {});
@@ -1201,7 +1201,7 @@ fn parallelProofScenario(allocator: Allocator, fixture: *const Fixture, old: *co
     _ = try g.evaluator.richValue(fixture.target("factor"));
     var state = try @import("completed_specialization_query.zig").State.init(allocator, old, fixture.units, fixture.names.view());
     defer state.deinit();
-    const original = old.metadata.specialization_receipts.items[0].expected;
+    const original = old.metadata.specialization_queries.records.items[0].dependencies.expected;
     const maps = try state.pairedImporter();
     const actual = (try maps.importEvidence(&g, original)).?;
     var requests: [4]parallel.Request = undefined;
@@ -1385,7 +1385,7 @@ fn plainQueryKey(fixture: *const Fixture, name: []const u8) u64 {
 fn plainQueryFact(old: *capture.Capture, facts: []const @import("specialization_receipt.zig").PlainFact) !void {
     // Strengthen a real successful query with an independently justified
     // catalog premise. This isolates publication/rollback from inference order.
-    const record = &old.metadata.specialization_receipts.items[0];
+    const record = &old.metadata.specialization_queries.records.items[0].dependencies;
     const owned = try a.dupe(@import("specialization_receipt.zig").PlainFact, facts);
     a.free(record.plain_facts);
     record.plain_facts = owned;
@@ -1397,7 +1397,7 @@ fn plainQueryAttempt(fixture: *const Fixture, old: *const capture.Capture, mode:
     defer g.deinit();
     g.evaluator.options.trace_runtime_dependencies = true;
     const input = try g.evaluator.richValue(fixture.target("callback"));
-    const expected = try queryExpected(&g, old, old.metadata.specialization_receipts.items[0].expected);
+    const expected = try queryExpected(&g, old, old.metadata.specialization_queries.records.items[0].dependencies.expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, old, fixture.units, fixture.names.view());
     defer state.deinit();
     state.revalidate_plain_facts = mode != .reference;
@@ -1553,7 +1553,7 @@ fn queryAllocationFailure(allocator: Allocator, fixture: *const Fixture, old: *c
     g.evaluator.options.trace_runtime_dependencies = true;
     g.evaluator.retain_specialization_receipts = true;
     const input = try g.evaluator.richValue(fixture.target("callback"));
-    const expected = try queryExpected(&g, old, old.metadata.specialization_receipts.items[0].expected);
+    const expected = try queryExpected(&g, old, old.metadata.specialization_queries.records.items[0].dependencies.expected);
     var state = try @import("completed_specialization_query.zig").State.init(allocator, old, fixture.units, fixture.names.view());
     defer state.deinit();
     const sizes = .{ g.evaluator.values.items.len, g.evaluator.children.items.len, g.evaluator.closures.items.len, g.evaluator.type_mappings.items.len, g.evaluator.row_mappings.items.len, g.evaluator.record_layouts.items.len, g.evaluator.field_names.items.len, g.evaluator.typed_views.count(), g.evaluator.specialized_closures.count(), g.evaluator.validated_calls.count(), g.evaluator.plain_nominals.count(), g.evaluator.specialization_receipts.items.len };
@@ -1565,7 +1565,7 @@ fn queryAllocationFailure(allocator: Allocator, fixture: *const Fixture, old: *c
     };
     try std.testing.expect(selected != null);
     try std.testing.expectEqual(@as(usize, 1), state.stats.reused);
-    const ordinary = old.metadata.specialization_receipts.items[0];
+    const ordinary = old.metadata.specialization_queries.records.items[0].dependencies;
     try std.testing.expectEqual(ordinary.values_added, g.evaluator.values.items.len - sizes[0]);
     try std.testing.expectEqual(ordinary.children_added, g.evaluator.children.items.len - sizes[1]);
     g.evaluator.slots[g.evaluator.binding_offsets[0] + fixture.target("callback").binding].value = selected.?;
@@ -1595,7 +1595,7 @@ test "completed specialization query changed concrete captures and low quotas ex
     defer g.deinit();
     g.evaluator.options.trace_runtime_dependencies = true;
     const input = try g.evaluator.richValue(after.target("callback"));
-    const expected = try queryExpected(&g, &initial.capture.?, initial.capture.?.metadata.specialization_receipts.items[0].expected);
+    const expected = try queryExpected(&g, &initial.capture.?, initial.capture.?.metadata.specialization_queries.records.items[0].dependencies.expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, &initial.capture.?, after.units, after.names.view());
     defer state.deinit();
     g.evaluator.options.max_values = 8;
@@ -1623,7 +1623,7 @@ test "completed specialization query repeated fresh owners carry remapped receip
     defer transported.deinit(a);
     try successful(&transported);
     try std.testing.expectEqual(@as(usize, 1), transported.completed_queries.reused);
-    try std.testing.expectEqual(@as(usize, 1), transported.capture.?.metadata.specialization_receipts.items.len);
+    try std.testing.expectEqual(@as(usize, 1), transported.capture.?.metadata.specialization_queries.records.items.len);
     var third = try Fixture.init(query_source);
     defer third.deinit();
     var fresh = try backend.compileWithIdentity(a, third.units, third.entry, third.names.view());
@@ -1635,8 +1635,8 @@ test "completed specialization query repeated fresh owners carry remapped receip
     try std.testing.expectEqual(@as(usize, 1), reverted.completed_queries.reused);
     try std.testing.expectEqualSlices(u8, fresh.bytes, reverted.bytes);
     try std.testing.expectEqual(fresh.constant_steps, reverted.constant_steps);
-    const first_receipt = old.capture.?.metadata.specialization_receipts.items[0];
-    const third_receipt = reverted.capture.?.metadata.specialization_receipts.items[0];
+    const first_receipt = old.capture.?.metadata.specialization_queries.records.items[0].dependencies;
+    const third_receipt = reverted.capture.?.metadata.specialization_queries.records.items[0].dependencies;
     try std.testing.expectEqual(first_receipt.values_added, third_receipt.values_added);
     try std.testing.expectEqual(first_receipt.children_added, third_receipt.children_added);
 }
@@ -1653,7 +1653,7 @@ test "completed specialization query exact current expected type and cache-state
     defer g.deinit();
     g.evaluator.options.trace_runtime_dependencies = true;
     const input = try g.evaluator.richValue(after.target("callback"));
-    const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_receipts.items[0].expected);
+    const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_queries.records.items[0].dependencies.expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
     defer state.deinit();
     const wrong = try g.evaluator.evidence.intern(.function, 3, 4, &.{});
@@ -1661,7 +1661,7 @@ test "completed specialization query exact current expected type and cache-state
     try std.testing.expectError(error.Declined, g.evaluator.specializeClosure(input, wrong));
     try std.testing.expectEqual(eval.Code.type_mismatch, g.evaluator.diagnostic.?.code);
     g.evaluator.diagnostic = null;
-    const changed = &old.capture.?.metadata.specialization_receipts.items[0];
+    const changed = &old.capture.?.metadata.specialization_queries.records.items[0].dependencies;
     const saved_depth = changed.depth;
     changed.depth += 1;
     try std.testing.expect((try state.lookup(&g, input, expected)) == null);
@@ -1686,7 +1686,7 @@ test "completed specialization query declines foreign allocator and same-pointer
     defer g.deinit();
     g.evaluator.options.trace_runtime_dependencies = true;
     const input = try g.evaluator.richValue(after.target("callback"));
-    const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_receipts.items[0].expected);
+    const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_queries.records.items[0].dependencies.expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
     defer state.deinit();
     const before_values = g.evaluator.values.items.len;
@@ -1724,7 +1724,7 @@ test "completed specialization query selected values and remapped receipt surviv
     g.evaluator.options.trace_runtime_dependencies = true;
     g.evaluator.retain_specialization_receipts = true;
     const input = try g.evaluator.richValue(after.target("callback"));
-    const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_receipts.items[0].expected);
+    const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_queries.records.items[0].dependencies.expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
     var state_live = true;
     defer if (state_live) state.deinit();
@@ -1759,7 +1759,7 @@ fn pairedQueryFailure(allocator: Allocator, fixture: *const Fixture, old: *const
     g.evaluator.retain_specialization_receipts = true;
     const left = try g.evaluator.richValue(fixture.target("left"));
     const right = try g.evaluator.richValue(fixture.target("right"));
-    const expected = try queryExpected(&g, old, old.metadata.specialization_receipts.items[0].expected);
+    const expected = try queryExpected(&g, old, old.metadata.specialization_queries.records.items[0].dependencies.expected);
     var state = try @import("completed_specialization_query.zig").State.init(allocator, old, fixture.units, fixture.names.view());
     defer state.deinit();
     const left_selected = (try state.lookup(&g, left, expected)).?;
@@ -1774,10 +1774,11 @@ fn pairedQueryFailure(allocator: Allocator, fixture: *const Fixture, old: *const
     try std.testing.expectEqual(@as(usize, 2), state.stats.reused);
     try std.testing.expectEqual(@as(usize, 1), state.stats.owner_importers);
     try std.testing.expect(state.stats.plan_cache_hits > 0);
-    var buckets = state.buckets.valueIterator();
-    const ordered = buckets.next().?.items;
-    try std.testing.expectEqualSlices(usize, &.{ 0, 1 }, ordered);
-    try std.testing.expect(buckets.next() == null);
+    const table = &old.metadata.specialization_queries;
+    var ordered = table.candidates(@import("selected_query.zig").fingerprint(table.records.items[0].key.source), .oldest_first);
+    try std.testing.expectEqual(@as(?u32, 0), ordered.next());
+    try std.testing.expectEqual(@as(?u32, 1), ordered.next());
+    try std.testing.expect(ordered.next() == null);
     g.evaluator.slots[g.evaluator.binding_offsets[0] + fixture.target("left").binding].value = left_selected;
     g.evaluator.slots[g.evaluator.binding_offsets[0] + fixture.target("right").binding].value = right_selected.?;
     try std.testing.expectEqual(@as(u32, 42), (try g.evaluator.value(fixture.target("run_left"))).bits);
@@ -1790,7 +1791,7 @@ test "completed specialization query ordered bucket and warmed plan distinguish 
     var old = try backend.compileWithOptions(a, before.units, before.entry, .{ .identity = before.names.view(), .retain_artifacts = true });
     defer old.deinit(a);
     try successful(&old);
-    try std.testing.expectEqual(@as(usize, 2), old.capture.?.metadata.specialization_receipts.items.len);
+    try std.testing.expectEqual(@as(usize, 2), old.capture.?.metadata.specialization_queries.records.items.len);
     var after = try Fixture.init(paired_query_source);
     defer after.deinit();
     editSchema(&after);
@@ -1811,7 +1812,7 @@ test "completed specialization query importer cannot cross a live Generator Sess
     defer g.deinit();
     g.evaluator.options.trace_runtime_dependencies = true;
     const input = try g.evaluator.richValue(after.target("callback"));
-    const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_receipts.items[0].expected);
+    const expected = try queryExpected(&g, &old.capture.?, old.capture.?.metadata.specialization_queries.records.items[0].dependencies.expected);
     var state = try @import("completed_specialization_query.zig").State.init(a, &old.capture.?, after.units, after.names.view());
     defer state.deinit();
     try std.testing.expect((try state.lookup(&g, input, expected)) != null);
@@ -1819,7 +1820,7 @@ test "completed specialization query importer cannot cross a live Generator Sess
     defer foreign.deinit();
     foreign.evaluator.options.trace_runtime_dependencies = true;
     const other_input = try foreign.evaluator.richValue(after.target("callback"));
-    const other_expected = try queryExpected(&foreign, &old.capture.?, old.capture.?.metadata.specialization_receipts.items[0].expected);
+    const other_expected = try queryExpected(&foreign, &old.capture.?, old.capture.?.metadata.specialization_queries.records.items[0].dependencies.expected);
     const sizes = .{ foreign.evaluator.values.items.len, foreign.evaluator.children.items.len, foreign.evaluator.specialized_closures.count(), foreign.evaluator.typed_views.count() };
     try std.testing.expect((try state.lookup(&foreign, other_input, other_expected)) == null);
     try std.testing.expectEqual(sizes, .{ foreign.evaluator.values.items.len, foreign.evaluator.children.items.len, foreign.evaluator.specialized_closures.count(), foreign.evaluator.typed_views.count() });
@@ -1840,7 +1841,8 @@ fn sourceRowNoise(g: *Generator) !void {
 fn sourceRowExpected(g: *Generator, old: *const capture.Capture, input: u32, names: identity.View) !u32 {
     const current = g.evaluator.closureInfo(input);
     const snapshot = &old.metadata.pools.?.evaluator;
-    for (old.metadata.specialization_receipts.items) |record| {
+    for (old.metadata.specialization_queries.records.items) |query| {
+        const record = query.dependencies;
         const prior = snapshot.closures[snapshot.values[record.input].bits];
         if (prior.unit != current.unit or prior.identity != current.identity or prior.origin != current.origin or prior.applied != current.applied) continue;
         const before = snapshot.evidence.view().node(record.expected);
@@ -1897,7 +1899,7 @@ fn sourceRowOom(allocator: Allocator, fixture: *const Fixture, old: *const captu
     const selected_node = g.evaluator.evidence.node(g.evaluator.valueEvidence(selected.?));
     try std.testing.expectEqual(expected, g.evaluator.valueEvidence(selected.?));
     try std.testing.expect(selected_node.c != 0);
-    const old_record = old.metadata.specialization_receipts.items[0];
+    const old_record = old.metadata.specialization_queries.records.items[0].dependencies;
     try std.testing.expectEqual(old_record.values_added, g.evaluator.values.items.len - sizes[0]);
     try std.testing.expectEqual(old_record.children_added, g.evaluator.children.items.len - sizes[1]);
     try std.testing.expectEqual(@as(usize, 1), g.evaluator.specialization_receipts.items.len);
@@ -1992,7 +1994,7 @@ test "source declared effect query nonempty row and receipt survive destruction 
 
 fn rowRoot(old: *const capture.Capture) !u32 {
     const snapshot = &old.metadata.pools.?.evaluator;
-    for (old.metadata.specialization_receipts.items) |record| if (snapshot.evidence.view().node(record.expected).c != 0) return record.selected;
+    for (old.metadata.specialization_queries.records.items) |query| if (snapshot.evidence.view().node(query.dependencies.expected).c != 0) return query.value.selected;
     return error.MissingEffectfulQuery;
 }
 fn appendedSnapshotType(snapshot: *evidence.Snapshot, node: evidence.Node) !u32 {
@@ -2083,7 +2085,8 @@ test "source declared effect query structurally remaps a nominal operation argum
     const old_view = old.capture.?.metadata.pools.?.evaluator.evidence.view();
     const new_view = reused.capture.?.metadata.pools.?.evaluator.evidence.view();
     var remapped: usize = 0;
-    for (old.capture.?.metadata.specialization_receipts.items) |record| {
+    for (old.capture.?.metadata.specialization_queries.records.items) |query| {
+        const record = query.dependencies;
         const expected = old_view.node(record.expected);
         if (expected.c == 0) continue;
         const old_label = old_view.effects.rowLabels(expected.c)[0];
@@ -2392,7 +2395,7 @@ test "shared query gate keeps query Plans owned after principal teardown and dec
     g.evaluator.options.trace_runtime_dependencies = true;
     g.evaluator.retain_specialization_receipts = true;
     const input = try g.evaluator.richValue(after.target("callback"));
-    const expected = try queryExpected(&g, &initial.capture.?, initial.capture.?.metadata.specialization_receipts.items[0].expected);
+    const expected = try queryExpected(&g, &initial.capture.?, initial.capture.?.metadata.specialization_queries.records.items[0].dependencies.expected);
     var principal = try @import("principal_evidence_reuse.zig").State.init(a, &initial.capture.?, after.units, after.names.view(), null);
     const cloned = (@import("shared_query_gate.zig").share(a, &initial.capture.?.metadata.pools.?, after.units, &principal.gate)) orelse return error.ExpectedClone;
     var state: @import("completed_specialization_query.zig").State = .{ .allocator = a, .old = &initial.capture.?, .gate = cloned, .graph_scratch = .{ .allocator = a } };
@@ -2405,7 +2408,7 @@ test "shared query gate keeps query Plans owned after principal teardown and dec
     var another = try Generator.init(&after);
     defer another.deinit();
     const other_input = try another.evaluator.richValue(after.target("callback"));
-    const other_expected = try queryExpected(&another, &initial.capture.?, initial.capture.?.metadata.specialization_receipts.items[0].expected);
+    const other_expected = try queryExpected(&another, &initial.capture.?, initial.capture.?.metadata.specialization_queries.records.items[0].dependencies.expected);
     try std.testing.expect(try state.lookup(&another, other_input, other_expected) == null);
     g.evaluator.slots[g.evaluator.binding_offsets[0] + after.target("callback").binding].value = selected;
     try std.testing.expectEqual(@as(u32, 42), (try g.evaluator.value(after.target("run_value"))).bits);
@@ -2475,7 +2478,7 @@ test "checked query importer new compile detects body mutation and live State ow
         g.evaluator.options.trace_runtime_dependencies = true;
         g.evaluator.retain_specialization_receipts = true;
         const input = try g.evaluator.richValue(after.target("callback"));
-        const expected = try queryExpected(&g, &initial.capture.?, initial.capture.?.metadata.specialization_receipts.items[0].expected);
+        const expected = try queryExpected(&g, &initial.capture.?, initial.capture.?.metadata.specialization_queries.records.items[0].dependencies.expected);
         var state = try @import("completed_specialization_query.zig").State.init(a, &initial.capture.?, after.units, after.names.view());
         defer state.deinit();
         const selected = (try state.lookup(&g, input, expected)) orelse return error.ExpectedHit;
@@ -2485,7 +2488,7 @@ test "checked query importer new compile detects body mutation and live State ow
         var another = try Generator.init(&after);
         defer another.deinit();
         const other_input = try another.evaluator.richValue(after.target("callback"));
-        const other_expected = try queryExpected(&another, &initial.capture.?, initial.capture.?.metadata.specialization_receipts.items[0].expected);
+        const other_expected = try queryExpected(&another, &initial.capture.?, initial.capture.?.metadata.specialization_queries.records.items[0].dependencies.expected);
         try std.testing.expect(try state.lookup(&another, other_input, other_expected) == null);
         try std.testing.expect(try state.lookup(&g, input, expected) == null);
         g.evaluator.options.max_steps = 1;

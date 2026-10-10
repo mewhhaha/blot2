@@ -1263,13 +1263,13 @@ test "fresh principal capture serves the first edit and the edit after a depende
         }
     }
     const last_good = Stamp.read(&candidate);
-    const proofs = metadata.stamp(candidate.current.?.artifacts.metadata.principal_proofs.items);
+    const proofs = metadata.stamp(candidate.current.?.artifacts.metadata.principal_queries.records.items);
     try fixture.write("main.blot", "entry const wrong: U32 = false\n");
     var rejected = try candidate.prepareRevision(io, fixture.path, null, .{});
     defer rejected.deinit();
     try std.testing.expect(rejected == .rejected);
     try last_good.unchanged(&candidate);
-    try std.testing.expectEqualSlices(u8, &proofs, &metadata.stamp(candidate.current.?.artifacts.metadata.principal_proofs.items));
+    try std.testing.expectEqualSlices(u8, &proofs, &metadata.stamp(candidate.current.?.artifacts.metadata.principal_queries.records.items));
 }
 
 fn freshPrincipalFailure(allocator: std.mem.Allocator, fixture: *Fixture, expected: *const partial.Result) !void {

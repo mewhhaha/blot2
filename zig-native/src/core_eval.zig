@@ -232,6 +232,7 @@ const PrincipalGraph = struct {
     const RowImport = struct { source: u32, graph: types.Effects.Id };
     const Action = union(enum) { constraint: u32, alias: u32, function: u32, reference: u32 };
     key: Key,
+    allocations: @import("memory.zig").TrackedAllocator,
     types: types.Store,
     root: types.Id = 0,
     imports: []TypeImport = &.{},
@@ -259,7 +260,8 @@ const PrincipalGraph = struct {
         return count;
     }
 
-    fn deinit(self: *PrincipalGraph, allocator: Allocator) void {
+    fn deinit(self: *PrincipalGraph, backing: Allocator) void {
+        const allocator = self.allocations.allocator();
         for (self.constraints) |constraint| allocator.free(constraint.diagnostic_name);
         for (self.requirements) |constraint| allocator.free(constraint.diagnostic_name);
         allocator.free(self.constraints);
@@ -274,8 +276,305 @@ const PrincipalGraph = struct {
         allocator.free(self.dependencies);
         allocator.free(self.plain_reads);
         self.types.deinit();
+        std.debug.assert(self.allocations.counts.live_bytes == 0);
+        backing.destroy(self);
     }
 };
+
+const PrincipalClaim = enum { source_description, open_residual };
+fn PrincipalQueries(comptime claim: PrincipalClaim) type {
+    return struct {
+        const Self = @This();
+        const StoredGraph = if (claim == .source_description) ?*PrincipalGraph else *PrincipalGraph;
+        const QueryKey = struct {
+            source: PrincipalGraph.Key,
+            claim_: PrincipalClaim = claim,
+            forced: bool = false,
+            pub fn deinit(_: *QueryKey, _: Allocator) void {}
+        };
+        const Dependencies = struct {
+            sources: []core.BindingRef,
+            plain: []receipt.PlainFact,
+            has_writes: bool = false,
+            pub fn deinit(self: *Dependencies, a: Allocator) void {
+                a.free(self.sources);
+                a.free(self.plain);
+            }
+        };
+        const GraphResult = struct {
+            graph: StoredGraph,
+            pub fn deinit(self: *GraphResult, a: Allocator) void {
+                const graph = if (claim == .source_description) self.graph orelse return else self.graph;
+                graph.deinit(a);
+            }
+        };
+        const Adapter = struct {
+            pub const kind: @import("semantic_query_table.zig").Kind = .principal;
+            pub const Key = QueryKey;
+            pub const Dependencies = Self.Dependencies;
+            pub const Result = Self.GraphResult;
+            pub fn fingerprint(key: QueryKey) u64 {
+                if (key.forced) return 0;
+                var hash = std.hash.Wyhash.init(0);
+                std.hash.autoHash(&hash, key.source);
+                return hash.final();
+            }
+            pub fn complete(record: Table.Record) bool {
+                const graph = if (claim == .source_description) record.value.graph orelse return false else record.value.graph;
+                if (record.key.claim_ != claim or graph.root == 0 or !std.meta.eql(record.key.source, graph.key) or record.dependencies.sources.len != graph.dependencies.len or record.dependencies.plain.len != graph.plain_reads.len) return false;
+                for (record.dependencies.sources, graph.dependencies) |left, right| if (!std.meta.eql(left, right)) return false;
+                for (record.dependencies.plain, graph.plain_reads) |left, right| if (!std.meta.eql(left, right)) return false;
+                var has_writes = false;
+                for (record.dependencies.plain) |fact| has_writes = has_writes or !fact.read;
+                return has_writes == record.dependencies.has_writes;
+            }
+            pub fn bytes(record: Table.Record) usize {
+                const graph = if (claim == .source_description) record.value.graph orelse return 0 else record.value.graph;
+                return @sizeOf(PrincipalGraph) +| graph.allocations.counts.live_bytes +|
+                    record.dependencies.sources.len *| @sizeOf(core.BindingRef) +| record.dependencies.plain.len *| @sizeOf(receipt.PlainFact);
+            }
+        };
+        const Table = @import("semantic_query_table.zig").Table(Adapter);
+        table: Table = .{},
+        // Unsupported source descriptions are private owner-scoped work memos,
+        // never a completed principal answer or a persisted failure.
+        declines: std.AutoHashMapUnmanaged(PrincipalGraph.Key, void) = .empty,
+        owner: ?usize = null,
+        units: ?[*]const core.Module = null,
+        unit_count: usize = 0,
+        force_collision: bool = false,
+        lookup_budget: usize = 4096,
+        inspected_positions: usize = 0,
+        inspected_dependencies: usize = 0,
+        lookup_declines: usize = 0,
+        pub fn storage(self: *const Self) @import("semantic_query_table.zig").Storage {
+            var result = self.table.storage();
+            result.inspected_positions = self.inspected_positions;
+            result.inspected_dependencies = self.inspected_dependencies;
+            result.lookup_declines = self.lookup_declines;
+            return result;
+        }
+        fn inspect(self: *Self, remaining: *usize, dependency: bool) bool {
+            if (remaining.* == 0) {
+                self.lookup_declines +|= 1;
+                return false;
+            }
+            remaining.* -= 1;
+            if (dependency) self.inspected_dependencies +|= 1 else self.inspected_positions +|= 1;
+            return true;
+        }
+        pub fn deinit(self: *Self, a: Allocator) void {
+            self.table.deinit(a);
+            self.declines.deinit(a);
+        }
+        pub fn count(self: *const Self) usize {
+            return self.table.records.items.len + self.declines.count();
+        }
+        pub fn get(self: *Self, key: PrincipalGraph.Key, session: *const Session) ?StoredGraph {
+            if (self.owner != @intFromPtr(session) or self.units != session.units.ptr or self.unit_count != session.units.len) return null;
+            if (claim == .source_description and self.declines.contains(key)) return @as(StoredGraph, null);
+            var cursor = self.table.candidates(Adapter.fingerprint(.{ .source = key, .forced = self.force_collision }), .oldest_first);
+            var remaining = self.lookup_budget;
+            while (cursor.next()) |position| {
+                if (!self.inspect(&remaining, false)) return null;
+                const record = &self.table.records.items[position];
+                if (!std.meta.eql(record.key.source, key)) continue;
+                var valid = true;
+                for (record.dependencies.plain, 0..) |fact, index| {
+                    if (!self.inspect(&remaining, true)) return null;
+                    if (!fact.read) continue;
+                    var actual = session.plain_nominals.get(fact.key);
+                    if (record.dependencies.has_writes) {
+                        var prior = index;
+                        while (prior != 0) {
+                            prior -= 1;
+                            if (!self.inspect(&remaining, true)) return null;
+                            const write = record.dependencies.plain[prior];
+                            if (!write.read and write.key == fact.key) {
+                                actual = write.plain;
+                                break;
+                            }
+                        }
+                    }
+                    valid = valid and (if (fact.present) actual != null and actual.? == fact.plain else actual == null);
+                    if (!valid) break;
+                }
+                if (valid) return record.value.graph;
+            }
+            return null;
+        }
+        pub fn contains(self: *Self, key: PrincipalGraph.Key, session: *const Session) bool {
+            return self.get(key, session) != null;
+        }
+        /// Transfers a complete owned graph only after table preparation. On a
+        /// budget decline the caller still owns it and takes ordinary checking.
+        pub fn put(self: *Self, a: Allocator, key: PrincipalGraph.Key, value: StoredGraph, session: *Session) Allocator.Error!bool {
+            if (self.owner) |owner| {
+                if (owner != @intFromPtr(session) or self.units != session.units.ptr or self.unit_count != session.units.len) return false;
+            } else {
+                self.owner = @intFromPtr(session);
+                self.units = session.units.ptr;
+                self.unit_count = session.units.len;
+            }
+            const graph = if (claim == .source_description) value orelse {
+                if (self.declines.count() >= self.table.limits.records) return false;
+                try self.declines.put(a, key, {});
+                return true;
+            } else value;
+            const sources = try a.dupe(core.BindingRef, graph.dependencies);
+            errdefer a.free(sources);
+            const plain = try a.dupe(receipt.PlainFact, graph.plain_reads);
+            var has_writes = false;
+            for (plain) |fact| has_writes = has_writes or !fact.read;
+            // A builder owns copied reads, while the caller owns the graph until
+            // success. Keep its ownership out of abort on OOM/budget decline.
+            var candidate: Table.Candidate = .{ .allocator = a, .record = .{
+                .key = .{ .source = key, .forced = self.force_collision },
+                .dependencies = .{ .sources = sources, .plain = plain, .has_writes = has_writes },
+                .value = .{ .graph = value },
+            } };
+            defer if (candidate.record) |*record| a.free(record.dependencies.plain);
+            const prepared = try self.table.prepare(a, &candidate) orelse {
+                a.free(sources);
+                return false;
+            };
+            _ = self.table.publish(prepared, &candidate);
+            return true;
+        }
+        const Values = struct {
+            records: []Table.Record,
+            position: usize = 0,
+            pub fn next(self: *Values) ?*StoredGraph {
+                if (self.position == self.records.len) return null;
+                const result = &self.records[self.position].value.graph;
+                self.position += 1;
+                return result;
+            }
+        };
+        pub fn valueIterator(self: *Self) Values {
+            return .{ .records = self.table.records.items };
+        }
+        const Keys = struct {
+            records: []Table.Record,
+            position: usize = 0,
+            pub fn next(self: *Keys) ?*PrincipalGraph.Key {
+                if (self.position == self.records.len) return null;
+                const result = &self.records[self.position].key.source;
+                self.position += 1;
+                return result;
+            }
+        };
+        pub fn keyIterator(self: *Self) Keys {
+            return .{ .records = self.table.records.items };
+        }
+    };
+}
+
+fn principalQueryTestGraph(a: Allocator, key: PrincipalGraph.Key, plain: ?bool) Allocator.Error!*PrincipalGraph {
+    const graph = try a.create(PrincipalGraph);
+    graph.* = .{ .key = key, .allocations = .{ .backing = a }, .types = undefined };
+    const owned = graph.allocations.allocator();
+    graph.types = types.Store.init(owned) catch {
+        a.destroy(graph);
+        return error.OutOfMemory;
+    };
+    errdefer graph.deinit(a);
+    graph.root = types.u32_type;
+    graph.dependencies = try owned.dupe(core.BindingRef, &.{.{ .unit = 1, .binding = key.target.binding }});
+    graph.plain_reads = try owned.dupe(receipt.PlainFact, &.{.{ .key = 7, .plain = plain orelse false, .present = plain != null }});
+    return graph;
+}
+fn principalQueryTestRecord(cache: anytype, session: *Session, key: PrincipalGraph.Key, plain: ?bool) !*PrincipalGraph {
+    const a = session.allocator;
+    const graph = try principalQueryTestGraph(a, key, plain);
+    var owned = true;
+    defer if (owned) {
+        graph.deinit(a);
+    };
+    if (!try cache.put(a, key, graph, session)) return error.TestUnexpectedDecline;
+    owned = false;
+    return graph;
+}
+fn principalQueryCollisionScenario(a: Allocator) !void {
+    var session = try Session.init(a, &.{});
+    defer session.deinit();
+    var foreign = try Session.init(a, &.{});
+    defer foreign.deinit();
+    var cache: PrincipalQueries(.source_description) = .{ .force_collision = true };
+    defer cache.deinit(a);
+    var normalized: PrincipalQueries(.open_residual) = .{ .force_collision = true };
+    defer normalized.deinit(a);
+    const key: PrincipalGraph.Key = .{ .target = .{ .unit = 0, .binding = 1 }, .source_interface = true, .deferred_member = false, .options = .{} };
+    const first = try principalQueryTestRecord(&cache, &session, key, null);
+    try std.testing.expect(cache.get(key, &session).?.? == first);
+    try std.testing.expect(cache.get(key, &foreign) == null);
+    try std.testing.expect(normalized.get(key, &session) == null);
+    var unequal = key;
+    unequal.source_interface = false;
+    try std.testing.expect(cache.get(unequal, &session) == null);
+    unequal = key;
+    unequal.deferred_member = true;
+    try std.testing.expect(cache.get(unequal, &session) == null);
+    unequal = key;
+    unequal.options.max_depth = 1;
+    try std.testing.expect(cache.get(unequal, &session) == null);
+    try session.plain_nominals.put(a, 7, false);
+    try std.testing.expect(cache.get(key, &session) == null);
+    const second = try principalQueryTestRecord(&cache, &session, key, false);
+    try std.testing.expect(cache.get(key, &session).?.? == second);
+    try session.plain_nominals.put(a, 7, true);
+    try std.testing.expect(cache.get(key, &session) == null);
+    const third = try principalQueryTestRecord(&cache, &session, key, true);
+    try std.testing.expect(cache.get(key, &session).?.? == third);
+    cache.lookup_budget = 0;
+    try std.testing.expect(cache.get(key, &session) == null);
+    cache.lookup_budget = 4096;
+    try std.testing.expect(cache.get(key, &session).?.? == third);
+    const residual = try principalQueryTestRecord(&normalized, &session, key, true);
+    try std.testing.expect(normalized.get(key, &session).? == residual);
+    try std.testing.expect(cache.get(key, &session).?.? == third);
+    var declined = key;
+    declined.target.binding = 2;
+    try std.testing.expect(try cache.put(a, declined, null, &session));
+    try std.testing.expect(cache.get(declined, &session).? == null);
+    var ordered_key = key;
+    ordered_key.target.binding = 3;
+    const ordered = try principalQueryTestGraph(a, ordered_key, null);
+    var owns_ordered = true;
+    defer if (owns_ordered) {
+        ordered.deinit(a);
+    };
+    const graph_allocator = ordered.allocations.allocator();
+    graph_allocator.free(ordered.plain_reads);
+    ordered.plain_reads = &.{};
+    ordered.plain_reads = try graph_allocator.dupe(receipt.PlainFact, &.{
+        .{ .key = 9, .plain = false, .present = false },
+        .{ .key = 9, .plain = false, .read = false },
+        .{ .key = 9, .plain = false },
+    });
+    try std.testing.expect(try cache.put(a, ordered_key, ordered, &session));
+    owns_ordered = false;
+    try std.testing.expect(cache.get(ordered_key, &session).?.? == ordered);
+    try std.testing.expect(!session.plain_nominals.contains(9));
+    try session.plain_nominals.put(a, 9, false);
+    try std.testing.expect(cache.get(ordered_key, &session) == null);
+    try std.testing.expectEqual(@as(usize, 4), cache.table.records.items.len);
+    try std.testing.expectEqual(@as(usize, 1), cache.declines.count());
+    const bytes = cache.table.owned_bytes;
+    try std.testing.expect(bytes > first.allocations.counts.live_bytes + second.allocations.counts.live_bytes + third.allocations.counts.live_bytes);
+    cache.table.limits.records = 4;
+    const unexpected: ?*PrincipalGraph = principalQueryTestRecord(&cache, &session, key, true) catch |err| switch (err) {
+        error.TestUnexpectedDecline => null,
+        else => return err,
+    };
+    try std.testing.expect(unexpected == null);
+    try std.testing.expectEqual(bytes, cache.table.owned_bytes);
+    try std.testing.expect(cache.get(key, &session).?.? == third);
+}
+test "principal query templates distinguish owners claims flags plain observations and collisions under every allocation failure" {
+    try principalQueryCollisionScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, principalQueryCollisionScenario, .{});
+}
 
 const CallSummaries = struct {
     const Key = struct { target: Target, inputs: type_evidence.Id, source_interface: bool, lexical: u32 = 0, expected_result: type_evidence.Id = 0, expected_signature: type_evidence.Id = 0, deferred_member: bool = false, options: Options = .{} };
@@ -297,8 +596,8 @@ const CallSummaries = struct {
     public_requirements: std.AutoHashMapUnmanaged(Target, HeaderParts) = .empty,
     public_requirement_slots: usize = 0,
     constant_requirements: std.AutoHashMapUnmanaged(Target, void) = .empty,
-    principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, ?*PrincipalGraph) = .empty,
-    normalized_principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, *PrincipalGraph) = .empty,
+    principals: PrincipalQueries(.source_description) = .{},
+    normalized_principals: PrincipalQueries(.open_residual) = .{},
     open_principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, bool) = .empty,
     result_principals: std.AutoHashMapUnmanaged(PrincipalGraph.Key, bool) = .empty,
     draining: bool = false,
@@ -648,17 +947,7 @@ const CallSummaries = struct {
         self.public_requirements.deinit(session.allocator);
         self.constant_requirements.deinit(session.allocator);
         self.result_principals.deinit(session.allocator);
-        var principals = self.principals.valueIterator();
-        while (principals.next()) |entry| if (entry.*) |graph| {
-            graph.deinit(session.allocator);
-            session.allocator.destroy(graph);
-        };
         self.principals.deinit(session.allocator);
-        var normalized = self.normalized_principals.valueIterator();
-        while (normalized.next()) |graph| {
-            graph.*.deinit(session.allocator);
-            session.allocator.destroy(graph.*);
-        }
         self.normalized_principals.deinit(session.allocator);
         self.open_principals.deinit(session.allocator);
     }
@@ -1082,6 +1371,9 @@ pub const Session = struct {
         self.break_values.deinit(self.allocator);
         self.field_locations.deinit(self.allocator);
         self.* = undefined;
+    }
+    pub fn principalQueryStorage(self: *const Session) struct { source_description: @import("semantic_query_table.zig").Storage, open_residual: @import("semantic_query_table.zig").Storage } {
+        return .{ .source_description = self.call_summaries.principals.storage(), .open_residual = self.call_summaries.normalized_principals.storage() };
     }
     pub fn valueInfo(self: *const Session, id: ValueId) ValueInfo {
         return self.values.items[id];
@@ -6831,7 +7123,7 @@ const ClosureRegion = struct {
                 if (constraint.kind == .call_summary) {
                     if (imported_children.contains(constraint_index)) continue;
                     const child_key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = key.source_interface, .deferred_member = constraint.deferred_member, .options = key.options };
-                    const child = self.session.call_summaries.normalized_principals.get(child_key) orelse continue;
+                    const child = self.session.call_summaries.normalized_principals.get(child_key, self.session) orelse continue;
                     var child_copy: principal_type_graph.Copy = .{ .allocator = a, .source = &child.types, .destination = &region.solver, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
                     defer child_copy.deinit();
                     _ = region.admitSignature(constraint.left, try child_copy.ty(child.root, 0)) catch |err| switch (err) {
@@ -6869,16 +7161,19 @@ const ClosureRegion = struct {
         }
         for (region.scratch.constraints.items) |constraint| if (constraint.scope != scope) return null;
         for (region.solver.effects.rows.items) |row| if (row.tail == .parameter) return null;
-        var copy_meter: @import("memory.zig").TrackedAllocator = .{ .backing = a };
+        const graph = try a.create(PrincipalGraph);
+        graph.* = .{ .key = key, .allocations = .{ .backing = a }, .types = undefined };
+        graph.types = types.Store.init(graph.allocations.allocator()) catch |err| {
+            a.destroy(graph);
+            return err;
+        };
+        errdefer graph.deinit(a);
+        var copy_meter: @import("memory.zig").TrackedAllocator = .{ .backing = graph.allocations.allocator() };
         defer {
             self.session.counters.principal_copy_buffer_bytes += copy_meter.counts.allocated_bytes;
             self.session.counters.principal_copy_buffer_allocations += copy_meter.counts.allocations;
         }
         const buffers = copy_meter.allocator();
-        const graph = try a.create(PrincipalGraph);
-        errdefer a.destroy(graph);
-        graph.* = .{ .key = key, .types = try types.Store.init(a) };
-        errdefer graph.deinit(a);
         graph.untracked_reads = dependencies.unknown or dependencies.nested or dependencies.call_reads.items.len != 0 or dependencies.views.items.len != 0;
         for (region.scratch.sources.items) |source| graph.untracked_reads = graph.untracked_reads or source.owner != key.target.unit;
         graph.dependencies = try buffers.dupe(core.BindingRef, dependencies.sources.items);
@@ -6979,8 +7274,8 @@ const ClosureRegion = struct {
         return self.principalGraphForKey(key);
     }
     fn principalGraphForKey(self: *ClosureRegion, key: PrincipalGraph.Key) RegionError!?*PrincipalGraph {
-        if (self.session.call_summaries.normalized_principals.get(key)) |graph| return graph;
-        if (self.session.call_summaries.principals.get(key)) |graph| return graph;
+        if (self.session.call_summaries.normalized_principals.get(key, self.session)) |graph| return graph;
+        if (self.session.call_summaries.principals.get(key, self.session)) |graph| return graph;
         if (!self.session.summaryCharge(1)) return null;
         if (self.session.call_summaries.principals.count() >= self.session.options.max_values) return null;
         const graph = self.describePrincipal(key) catch |err| switch (err) {
@@ -6992,17 +7287,20 @@ const ClosureRegion = struct {
             const edges = owned.edgeCount();
             if (nodes > self.session.options.max_values -| self.session.principal_graph_nodes or edges > self.session.options.max_children -| self.session.principal_graph_edges) {
                 owned.deinit(self.session.allocator);
-                self.session.allocator.destroy(owned);
                 return null;
             }
         }
         errdefer if (graph) |owned| {
             owned.deinit(self.session.allocator);
-            self.session.allocator.destroy(owned);
         };
         // The visible graph appears only after every owner and index allocation
         // succeeds. Allocation failure is never retained as ineligibility.
-        try self.session.call_summaries.principals.put(self.session.allocator, key, graph);
+        if (!try self.session.call_summaries.principals.put(self.session.allocator, key, graph, self.session)) {
+            if (graph) |owned| {
+                owned.deinit(self.session.allocator);
+            }
+            return null;
+        }
         if (graph) |owned| {
             self.session.principal_graph_builds += 1;
             self.session.principal_graph_nodes += owned.nodeCount();
@@ -7130,12 +7428,17 @@ const ClosureRegion = struct {
                 if (edges > self.session.options.max_children) return error.TypeLimit;
                 if (constraint.kind != .call_summary and constraint.kind != .scheme_use) continue;
                 const key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = graph.key.source_interface, .deferred_member = constraint.deferred_member, .options = graph.key.options };
-                try pending.append(self.scratch_allocator, (try self.principalGraphForKey(key)).?);
+                const child = try self.principalGraphForKey(key) orelse {
+                    if (self.session.principal_reads) |reads| reads.invalidate(.call_read);
+                    if (self.session.receipt_tape) |tape| tape.unknown = true;
+                    continue;
+                };
+                try pending.append(self.scratch_allocator, child);
             };
         }
     }
     fn checkOpenPrincipal(self: *ClosureRegion, root: PrincipalGraph.Key) RegionError!bool {
-        if (self.session.call_summaries.normalized_principals.contains(root)) return true;
+        if (self.session.call_summaries.normalized_principals.contains(root, self.session)) return true;
         const Visit = struct { key: PrincipalGraph.Key, graph: *PrincipalGraph, next: usize = 0 };
         const a = self.scratch_allocator;
         var pending: std.ArrayList(Visit) = .empty;
@@ -7155,7 +7458,6 @@ const ClosureRegion = struct {
                 var published = false;
                 defer if (!published) {
                     normalized.deinit(self.session.allocator);
-                    self.session.allocator.destroy(normalized);
                 };
                 if (!try self.unknownPrincipalBody(normalized)) return false;
                 // Source equations can expose a selected implementation that
@@ -7167,7 +7469,7 @@ const ClosureRegion = struct {
                     edges += 1;
                     if (edges > self.session.options.max_children) return false;
                     const child: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = root.source_interface, .deferred_member = constraint.deferred_member, .options = root.options };
-                    if (self.session.call_summaries.normalized_principals.contains(child)) continue;
+                    if (self.session.call_summaries.normalized_principals.contains(child, self.session)) continue;
                     if (visited.get(child)) |done| {
                         if (!done) return false;
                         continue;
@@ -7201,7 +7503,7 @@ const ClosureRegion = struct {
                 const nodes = normalized.nodeCount();
                 const graph_edges = normalized.edgeCount();
                 if (nodes > self.session.options.max_values -| self.session.principal_graph_nodes or graph_edges > self.session.options.max_children -| self.session.principal_graph_edges) return false;
-                try self.session.call_summaries.normalized_principals.put(self.session.allocator, frame.key, normalized);
+                if (!try self.session.call_summaries.normalized_principals.put(self.session.allocator, frame.key, normalized, self.session)) return false;
                 published = true;
                 self.session.principal_graph_builds += 1;
                 self.session.principal_graph_nodes += nodes;
@@ -7222,7 +7524,7 @@ const ClosureRegion = struct {
             }
             const child: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = root.source_interface, .deferred_member = constraint.deferred_member, .options = root.options };
             const graph = try self.principalGraphForKey(child) orelse return false;
-            if (self.session.call_summaries.normalized_principals.contains(child)) continue;
+            if (self.session.call_summaries.normalized_principals.contains(child, self.session)) continue;
             if (visited.get(child)) |done| {
                 if (!done) return false; // Joint recursive inference is separate.
                 continue;
@@ -7398,7 +7700,7 @@ const ClosureRegion = struct {
             if (seen.contains(key)) continue;
             if (seen.count() >= self.session.options.max_values) return error.TypeLimit;
             try seen.put(self.scratch_allocator, key, {});
-            const graph = self.session.call_summaries.principals.get(key) orelse return true;
+            const graph = self.session.call_summaries.principals.get(key, self.session) orelse return true;
             const source = graph orelse return true;
             for ([_][]const Constraint{ source.requirements, source.constraints }) |constraints| for (constraints) |constraint| {
                 edges +|= 1;

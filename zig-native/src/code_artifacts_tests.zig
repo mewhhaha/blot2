@@ -1,4 +1,18 @@
 const std = @import("std");
+
+test "principal query records reject selected answers and preserve first source proof" {
+    const allocator = std.testing.allocator;
+    var context = @import("code_artifacts.zig").Context.init(allocator);
+    defer context.deinit();
+    const target_: @import("core.zig").BindingRef = .{ .unit = 1, .binding = 7 };
+    var selected = [_]@import("core.zig").BindingRef{target_};
+    try context.recordPrincipal(target_, .{}, .{ .types = &.{}, .rows = &.{}, .selected = &selected }, null);
+    try std.testing.expectEqual(@as(usize, 0), context.principal_queries.records.items.len);
+    try context.recordPrincipal(target_, .{}, .{ .types = &.{}, .rows = &.{} }, null);
+    try context.recordPrincipal(target_, .{ .max_depth = 2 }, .{ .types = &.{}, .rows = &.{} }, null);
+    try std.testing.expectEqual(@as(usize, 1), context.principal_queries.records.items.len);
+    try std.testing.expectEqualDeep(@import("core_eval.zig").Options{}, context.principal_queries.records.items[0].key.options);
+}
 const artifacts = @import("code_artifacts.zig");
 const core = @import("core.zig");
 const core_eval = @import("core_eval.zig");

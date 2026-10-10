@@ -169,7 +169,7 @@ retained driver exposes the exact table counters separately.
 | refinement-32  | 1282 → 1368       | 1478 → 1626        | 711,914 → 731,082          |
 | refinement-8   | 820 → 868         | 1025 → 1103        | 220,661 → 221,093          |
 
-Requested traffic increases at most **4.10%** among these fresh public controls;
+Across all 86 fresh workloads, requested traffic increases at most **4.10%**;
 some capture cases decrease slightly. The migration makes no global compiler
 allocation reduction claim.
 

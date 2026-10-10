@@ -25,6 +25,90 @@ entry const distinct: U32 -> U32 = fn value => nominal value
 `;
 }
 
+Deno.test("typed specialization and principal queries preserve imported captures through relocation failure and checkpoint restart", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const dependency = `${directory}/dep.blot`;
+  const executable = Deno.args[0] ??
+    new URL("../zig-out/bin/blotc", import.meta.url).pathname;
+  const options = {
+    executable,
+    entry,
+    prelude: null,
+    cacheDirectory: false as const,
+  };
+  const main = `import {amount, other} from "./dep"\n` + source(0)
+    .replaceAll("value: 0", "value: amount")
+    .replaceAll("value: 1", "value: other");
+  const clients: Awaited<ReturnType<typeof createZigProjectCompiler>>[] = [];
+  try {
+    clients.push(await createZigProjectCompiler(options));
+    clients.push(
+      await createZigProjectCompiler({ ...options, semanticWorkers: 4 }),
+    );
+    let restored: Record<string, string> = {};
+    let expectedBytes: Uint8Array<ArrayBuffer> | undefined;
+    for (
+      const [amount, reordered] of [[20, false], [21, false], [20, true], [
+        20,
+        false,
+      ], [20, false]] as const
+    ) {
+      const sources = {
+        [entry]: main,
+        [dependency]: `${
+          reordered ? "const untouched = fn value => value\n" : ""
+        }const amount = ${amount}\nconst other = ${amount + 1}\n${
+          reordered ? "" : "const untouched = fn value => value\n"
+        }`,
+      };
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const expected = await fresh.build({ sources });
+        ok(expected.success, JSON.stringify(expected));
+        expectedBytes = expected.bytes;
+        for (const client of clients) {
+          const result = await client.build({ sources });
+          ok(result.success, JSON.stringify(result));
+          equal(result.bytes, expected.bytes);
+          await execute(result.bytes, amount);
+        }
+      } finally {
+        await fresh.dispose();
+      }
+      restored = sources;
+    }
+    const diagnostics = [];
+    for (const client of clients) {
+      const failed = await client.build({
+        sources: { ...restored, [entry]: main + "const unused: U32 = false\n" },
+      });
+      ok(!failed.success);
+      diagnostics.push(failed.diagnostics);
+      const corrected = await client.build({ sources: restored });
+      ok(corrected.success);
+      equal(corrected.bytes, expectedBytes);
+      const checkpoint = await client.exportCheckpoint();
+      const restarted = await createZigProjectCompiler({
+        ...options,
+        checkpoint,
+      });
+      try {
+        const result = await restarted.build({ sources: restored });
+        ok(result.success);
+        equal(result.bytes, expectedBytes);
+        await execute(result.bytes, 20);
+      } finally {
+        await restarted.dispose();
+      }
+    }
+    equal(diagnostics[0], diagnostics[1]);
+  } finally {
+    await Promise.all(clients.map((client) => client.dispose()));
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 async function execute(bytes: Uint8Array<ArrayBuffer>, amount: number) {
   const guest = await instantiateGuest(bytes);
   try {

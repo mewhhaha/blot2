@@ -42,7 +42,7 @@ pub const Stats = struct {
     plan_cache_hits: usize = 0,
     graph_scratch: graph.ScratchStats = .{},
 };
-const SourceKey = struct { unit: u32, identity: u32, origin: eval.ClosureOrigin, applied: u32 };
+const selected_query = @import("selected_query.zig");
 const CachedPlan = struct { checked: bool = false, plan: ?graph.Plan = null };
 pub const State = struct {
     allocator: Allocator,
@@ -61,7 +61,6 @@ pub const State = struct {
     semantic_workers: u8 = 1,
     revalidate_plain_facts: bool = true,
     graph_scratch: graph.QueryScratch,
-    buckets: std.AutoHashMapUnmanaged(SourceKey, std.ArrayList(usize)) = .empty,
     plans: ?[]CachedPlan = null,
     semantic: ?importer.Importer = null,
     state_owner: ?usize = null,
@@ -81,35 +80,12 @@ pub const State = struct {
             for (plans) |*cached| if (cached.plan) |*plan| plan.deinit(self.allocator);
             self.allocator.free(plans);
         }
-        var buckets = self.buckets.valueIterator();
-        while (buckets.next()) |bucket| bucket.deinit(self.allocator);
-        self.buckets.deinit(self.allocator);
         self.gate.deinit();
-    }
-    fn sourceKey(value: eval.ClosureValue) SourceKey {
-        return .{ .unit = value.unit, .identity = value.identity, .origin = value.origin, .applied = value.applied };
     }
     fn index(self: *State) Allocator.Error!void {
         if (self.plans != null) return;
-        var buckets: std.AutoHashMapUnmanaged(SourceKey, std.ArrayList(usize)) = .empty;
-        errdefer {
-            var entries = buckets.valueIterator();
-            while (entries.next()) |bucket| bucket.deinit(self.allocator);
-            buckets.deinit(self.allocator);
-        }
-        const pools = &self.old.metadata.pools.?;
-        for (self.old.metadata.specialization_receipts.items, 0..) |record, position| {
-            if (record.input >= pools.evaluator.values.len) continue;
-            const value = pools.evaluator.values[record.input];
-            if (value.kind != .closure or value.bits >= pools.evaluator.closures.len) continue;
-            const entry = try buckets.getOrPut(self.allocator, sourceKey(pools.evaluator.closures[value.bits]));
-            if (!entry.found_existing) entry.value_ptr.* = .empty;
-            // Appending in original receipt order preserves first-match order.
-            try entry.value_ptr.append(self.allocator, position);
-        }
-        const plans = try self.allocator.alloc(CachedPlan, self.old.metadata.specialization_receipts.items.len);
+        const plans = try self.allocator.alloc(CachedPlan, self.old.metadata.specialization_queries.records.items.len);
         @memset(plans, .{});
-        self.buckets = buckets;
         self.plans = plans;
     }
     pub fn pairedImporter(self: *State) Allocator.Error!*importer.Importer {
@@ -130,7 +106,7 @@ pub const State = struct {
             self.stats.plan_cache_hits += 1;
             return if (cached.plan) |*plan| plan else null;
         }
-        const record = &self.old.metadata.specialization_receipts.items[position];
+        const record = &self.old.metadata.specialization_queries.records.items[position].dependencies;
         var roots: std.ArrayList(u32) = .empty;
         defer roots.deinit(self.allocator);
         try roots.appendSlice(self.allocator, &.{ record.selected, record.input });
@@ -190,10 +166,10 @@ pub const State = struct {
         self.generator_owner = @intFromPtr(g);
         self.session_owner = @intFromPtr(&g.evaluator);
         try self.index();
-        const records = self.old.metadata.specialization_receipts.items;
-        const bucket = self.buckets.get(sourceKey(current)) orelse return null;
-        for (bucket.items) |position| {
-            const record = &records[position];
+        const table = &self.old.metadata.specialization_queries;
+        var cursor = table.candidates(selected_query.fingerprint(selected_query.source(current)), .oldest_first);
+        while (cursor.next()) |position| {
+            const record = &table.records.items[position].dependencies;
             self.stats.enumerated_records += 1;
             if (record.input >= pools.evaluator.values.len or pools.evaluator.values[record.input].kind != .closure) continue;
             const old_source = pools.evaluator.closures[pools.evaluator.values[record.input].bits];

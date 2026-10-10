@@ -59,6 +59,14 @@ pub const Record = struct {
         return result;
     }
 };
+pub fn ownedBytes(record: Record) usize {
+    var total: usize = 0;
+    inline for (.{ "sources", "scalar_reads", "call_reads", "call_publications", "views", "plain_facts" }) |field| {
+        const entries = @field(record, field);
+        total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
+    }
+    return total;
+}
 pub const Tape = struct {
     sources: std.ArrayList(core.BindingRef) = .empty,
     scalar_reads: std.ArrayList(ScalarRead) = .empty,

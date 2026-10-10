@@ -10,19 +10,62 @@ const Allocator = std.mem.Allocator;
 
 pub const Mode = enum { selected, inferred, entry };
 
-const Entry = struct {
+const queries = @import("semantic_query_table.zig");
+const Key = struct {
     mode: Mode,
     input: inputs.Inputs,
-    proof: receipt.Record,
-    values: []eval.ValueInfo,
-    evidence: []u32,
-    records: []u32,
-    children: []u32,
-    fixed: []u32,
+    fingerprint_: u64,
+    expected: u32,
+    options: eval.Options,
+    depth: usize,
+    pub fn deinit(self: *Key, a: Allocator) void {
+        self.input.deinit(a);
+    }
 };
+const Replay = struct {
+    selected: u32,
+    values: []eval.ValueInfo = &.{},
+    evidence: []u32 = &.{},
+    records: []u32 = &.{},
+    children: []u32 = &.{},
+    fixed: []u32 = &.{},
+    pub fn deinit(self: *Replay, a: Allocator) void {
+        inline for (.{ "values", "evidence", "records", "children", "fixed" }) |field| a.free(@field(self, field));
+    }
+};
+pub const Adapter = struct {
+    pub const kind: queries.Kind = .specialization;
+    pub const Key = @import("canonical_specialization.zig").Key;
+    pub const Dependencies = receipt.Record;
+    pub const Result = Replay;
+    pub fn fingerprint(key_: @This().Key) u64 {
+        return key_.fingerprint_;
+    }
+    pub fn complete(record: Entry) bool {
+        const proof = record.dependencies;
+        return proof.complete and proof.steps == 0 and proof.expected == record.key.expected and proof.selected == record.value.selected and
+            proof.depth == record.key.depth and std.meta.eql(proof.options, record.key.options) and
+            proof.values_added == record.value.values.len and proof.children_added == record.value.children.len and
+            record.value.evidence.len == record.value.values.len and record.value.records.len == record.value.values.len;
+    }
+    pub fn bytes(record: Entry) usize {
+        var total = receipt.ownedBytes(record.dependencies);
+        inline for (.{ "words", "values", "mappings", "rows", "slots" }) |field| {
+            const entries = @field(record.key.input, field);
+            total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
+        }
+        inline for (.{ "values", "evidence", "records", "children", "fixed" }) |field| {
+            const entries = @field(record.value, field);
+            total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
+        }
+        return total;
+    }
+};
+pub const Table = queries.Table(Adapter);
+const Entry = Table.Record;
 
 pub const Cache = struct {
-    buckets: std.AutoHashMapUnmanaged(u64, std.ArrayList(Entry)) = .empty,
+    table: Table = .{},
     retained_words: usize = 0,
     examined_words: usize = 0,
     reused: usize = 0,
@@ -30,20 +73,7 @@ pub const Cache = struct {
     /// A collision law can exercise the exact equality path deterministically.
     force_collision: bool = false,
     pub fn deinit(self: *Cache, a: Allocator) void {
-        var iterator = self.buckets.valueIterator();
-        while (iterator.next()) |bucket| {
-            for (bucket.items) |*entry| {
-                entry.input.deinit(a);
-                entry.proof.deinit(a);
-                a.free(entry.values);
-                a.free(entry.evidence);
-                a.free(entry.records);
-                a.free(entry.children);
-                a.free(entry.fixed);
-            }
-            bucket.deinit(a);
-        }
-        self.buckets.deinit(a);
+        self.table.deinit(a);
     }
     fn hash(self: *const Cache, words: []const u64) u64 {
         return if (self.force_collision) 0 else std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(words));
@@ -81,7 +111,8 @@ pub const Cache = struct {
         const a = session.allocator;
         // Ownership always transfers, even when this optional proof declines.
         var owned_input = input;
-        defer owned_input.deinit(a);
+        var owns_input = true;
+        defer if (owns_input) owned_input.deinit(a);
         if (!proof.complete or proof.steps != 0 or session.valueEvidence(proof.selected) == 0) return;
         const size = input.words.len +| input.values.len +| input.mappings.len *| 2 +| input.rows.len *| 2 +| input.slots.len *| 3 +|
             proof.values_added *| 4 +| proof.children_added +| proof.sources.len *| 2 +| proof.scalar_reads.len *| 3 +|
@@ -92,28 +123,13 @@ pub const Cache = struct {
             // Creation and mutable demand/provider state need a stronger plan.
             else => return,
         };
-        var entry: Entry = .{
-            .mode = mode,
-            .input = undefined,
-            .proof = try proof.clone(a),
-            .values = &.{},
-            .evidence = &.{},
-            .records = &.{},
-            .children = &.{},
-            .fixed = &.{},
-        };
-        errdefer {
-            entry.proof.deinit(a);
-            a.free(entry.values);
-            a.free(entry.evidence);
-            a.free(entry.records);
-            a.free(entry.children);
-            a.free(entry.fixed);
-        }
-        entry.values = try a.dupe(eval.ValueInfo, session.values.items[proof.values_before..]);
-        entry.evidence = try a.dupe(u32, session.value_evidence.items[proof.values_before..]);
-        entry.records = try a.dupe(u32, session.value_records.items[proof.values_before..]);
-        entry.children = try a.dupe(u32, session.children.items[proof.children_before..]);
+        var result: Replay = .{ .selected = proof.selected };
+        var owns_result = true;
+        defer if (owns_result) result.deinit(a);
+        result.values = try a.dupe(eval.ValueInfo, session.values.items[proof.values_before..]);
+        result.evidence = try a.dupe(u32, session.value_evidence.items[proof.values_before..]);
+        result.records = try a.dupe(u32, session.value_records.items[proof.values_before..]);
+        result.children = try a.dupe(u32, session.children.items[proof.children_before..]);
         var fixed: std.ArrayList(u32) = .empty;
         defer fixed.deinit(a);
         for (proof.values_before..session.values.items.len) |position| {
@@ -121,27 +137,27 @@ pub const Cache = struct {
             if (session.valueInfo(id).kind == .closure and session.specialized_closures.get(.{ .value = id, .evidence = session.valueEvidence(id) }) == id)
                 try fixed.append(a, id);
         }
-        entry.fixed = try fixed.toOwnedSlice(a);
-        const bucket = try self.buckets.getOrPut(a, self.hash(input.words));
-        if (!bucket.found_existing) bucket.value_ptr.* = .empty;
-        try bucket.value_ptr.ensureUnusedCapacity(a, 1);
-        entry.input = owned_input;
-        bucket.value_ptr.appendAssumeCapacity(entry);
+        result.fixed = try fixed.toOwnedSlice(a);
+        var builder = Table.begin(a, .{ .mode = mode, .input = owned_input, .fingerprint_ = self.hash(input.words), .expected = proof.expected, .options = proof.options, .depth = proof.depth });
+        owns_input = false;
+        defer builder.abort();
+        builder.read(try proof.clone(a));
+        builder.stage(result);
+        owns_result = false;
+        var candidate = builder.complete() orelse return;
+        defer candidate.abort();
+        const prepared = try self.table.prepare(a, &candidate) orelse return;
+        _ = self.table.publish(prepared, &candidate);
         self.retained_words += size;
-        // Cancel the input defer without borrowing a growable Session slice.
-        owned_input.mappings = &.{};
-        owned_input.rows = &.{};
-        owned_input.slots = &.{};
-        owned_input.words = &.{};
-        owned_input.values = &.{};
     }
     pub fn lookup(self: *Cache, session: anytype, input: *const inputs.Inputs, expected: u32, mode: Mode) Allocator.Error!?u32 {
-        const bucket = self.buckets.get(self.hash(input.words)) orelse return null;
-        for (bucket.items) |*entry| {
-            const proof = &entry.proof;
-            if (entry.mode != mode or proof.expected != expected or proof.depth != session.depth or
+        var cursor = self.table.candidates(self.hash(input.words), .oldest_first);
+        while (cursor.next()) |position| {
+            const entry = &self.table.records.items[position];
+            const proof = &entry.dependencies;
+            if (entry.key.mode != mode or proof.expected != expected or proof.depth != session.depth or
                 !std.meta.eql(proof.options, session.options) or
-                !std.mem.eql(u64, entry.input.words, input.words)) continue;
+                !std.mem.eql(u64, entry.key.input.words, input.words)) continue;
             if (try replay(session, entry, input)) |selected| {
                 self.reused += 1;
                 session.counters.canonical_specialization_hits += 1;
@@ -165,12 +181,12 @@ fn unitIndex(session: anytype, unit: u32) ?usize {
 
 fn replay(session: anytype, entry: *const Entry, input: *const inputs.Inputs) Allocator.Error!?u32 {
     const a = session.allocator;
-    const proof = &entry.proof;
+    const proof = &entry.dependencies;
     if (proof.values_added > session.options.max_values -| session.values.items.len or
         proof.children_added > session.options.max_children -| session.children.items.len) return null;
     var anchors: std.AutoHashMapUnmanaged(u32, u32) = .empty;
     defer anchors.deinit(a);
-    for (entry.input.values, input.values) |old, current| try anchors.put(a, old, current);
+    for (entry.key.input.values, input.values) |old, current| try anchors.put(a, old, current);
     // Revalidate each observed persistent fact before allocating visible output.
     for (proof.scalar_reads) |read| {
         var owner: ?usize = null;
@@ -208,7 +224,7 @@ fn replay(session: anytype, entry: *const Entry, input: *const inputs.Inputs) Al
     };
     const before: u32 = @intCast(session.values.items.len);
     const child_before: u32 = @intCast(session.children.items.len);
-    const values = try a.dupe(eval.ValueInfo, entry.values);
+    const values = try a.dupe(eval.ValueInfo, entry.value.values);
     defer a.free(values);
     // Shared input child spans must follow the current input, just like edges.
     for (values) |*value| {
@@ -218,7 +234,7 @@ fn replay(session: anytype, entry: *const Entry, input: *const inputs.Inputs) Al
             continue;
         }
         var found = false;
-        for (entry.input.values, input.values) |old, current| {
+        for (entry.key.input.values, input.values) |old, current| {
             const old_info = session.valueInfo(old);
             if (old_info.start == value.start and old_info.len == value.len) {
                 value.start = session.valueInfo(current).start;
@@ -233,14 +249,14 @@ fn replay(session: anytype, entry: *const Entry, input: *const inputs.Inputs) Al
     try session.values.ensureUnusedCapacity(a, values.len);
     try session.value_evidence.ensureUnusedCapacity(a, values.len);
     try session.value_records.ensureUnusedCapacity(a, values.len);
-    try session.children.ensureUnusedCapacity(a, entry.children.len);
+    try session.children.ensureUnusedCapacity(a, entry.value.children.len);
     try session.typed_views.ensureUnusedCapacity(a, @intCast(proof.views.len));
     try session.validated_calls.ensureUnusedCapacity(a, @intCast(proof.call_publications.len));
     try session.plain_nominals.ensureUnusedCapacity(a, plain.count());
-    try session.specialized_closures.ensureUnusedCapacity(a, @intCast(entry.fixed.len + 2));
+    try session.specialized_closures.ensureUnusedCapacity(a, @intCast(entry.value.fixed.len + 2));
     var next: ?receipt.Record = null;
     defer if (next) |*owned| owned.deinit(a);
-    if (session.retain_specialization_receipts and entry.mode == .selected) {
+    if (session.retain_specialization_receipts and entry.key.mode == .selected) {
         try session.specialization_receipts.ensureUnusedCapacity(a, 1);
         next = try proof.clone(a);
         next.?.input = input.values[0];
@@ -253,9 +269,9 @@ fn replay(session: anytype, entry: *const Entry, input: *const inputs.Inputs) Al
         }
     }
     session.values.appendSliceAssumeCapacity(values);
-    session.value_evidence.appendSliceAssumeCapacity(entry.evidence);
-    session.value_records.appendSliceAssumeCapacity(entry.records);
-    for (entry.children) |child| session.children.appendAssumeCapacity(mapped(anchors, proof, before, child));
+    session.value_evidence.appendSliceAssumeCapacity(entry.value.evidence);
+    session.value_records.appendSliceAssumeCapacity(entry.value.records);
+    for (entry.value.children) |child| session.children.appendAssumeCapacity(mapped(anchors, proof, before, child));
     for (proof.views) |view| if (!view.existed) session.typed_views.putAssumeCapacity(.{ .value = mapped(anchors, proof, before, view.value), .evidence = view.evidence }, mapped(anchors, proof, before, view.selected));
     for (proof.call_publications) |call| {
         const key: eval.CallProofKey = .{ .target = .{ .unit = unitIndex(session, call.unit).?, .binding = call.binding }, .evidence = call.evidence };
@@ -265,9 +281,9 @@ fn replay(session: anytype, entry: *const Entry, input: *const inputs.Inputs) Al
     var facts = plain.iterator();
     while (facts.next()) |fact| session.plain_nominals.putAssumeCapacity(fact.key_ptr.*, fact.value_ptr.*);
     const selected = mapped(anchors, proof, before, proof.selected);
-    session.specialized_closures.putAssumeCapacity(.{ .value = input.values[0], .evidence = proof.expected, .entry_interface = entry.mode == .entry }, selected);
-    if (entry.mode == .selected) session.specialized_closures.putAssumeCapacity(.{ .value = selected, .evidence = proof.expected }, selected);
-    for (entry.fixed) |old| {
+    session.specialized_closures.putAssumeCapacity(.{ .value = input.values[0], .evidence = proof.expected, .entry_interface = entry.key.mode == .entry }, selected);
+    if (entry.key.mode == .selected) session.specialized_closures.putAssumeCapacity(.{ .value = selected, .evidence = proof.expected }, selected);
+    for (entry.value.fixed) |old| {
         const current = mapped(anchors, proof, before, old);
         session.specialized_closures.putAssumeCapacity(.{ .value = current, .evidence = session.valueEvidence(current) }, current);
     }

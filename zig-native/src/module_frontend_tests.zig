@@ -464,7 +464,7 @@ test "module frontend reuse rechecks a changed module with interface cutoff and 
     defer session.deinit();
     try initialize(&session, &fixture);
     const seed_stamp = artifacts.stamp(session.seed);
-    const code_stamp = artifacts.stamp(session.current.?.artifacts.metadata.principal_proofs.items);
+    const code_stamp = artifacts.stamp(session.current.?.artifacts.metadata.principal_queries.records.items);
     try fixture.write("changed.blot", edited);
     var expected = try fresh(&fixture);
     defer expected.deinit(a);
@@ -478,7 +478,7 @@ test "module frontend reuse rechecks a changed module with interface cutoff and 
     try std.testing.expectEqual(@as(usize, 1), candidate.stats.fallback.entry_cutoff.reused);
     try equal(candidate.result().?, &expected);
     try std.testing.expectEqualSlices(u8, &seed_stamp, &artifacts.stamp(session.seed));
-    try std.testing.expectEqualSlices(u8, &code_stamp, &artifacts.stamp(session.current.?.artifacts.metadata.principal_proofs.items));
+    try std.testing.expectEqualSlices(u8, &code_stamp, &artifacts.stamp(session.current.?.artifacts.metadata.principal_queries.records.items));
     try std.testing.expect(session.discard(candidate));
     for ([_][]const u8{ edited, original, edited }) |text| {
         try fixture.write("changed.blot", text);

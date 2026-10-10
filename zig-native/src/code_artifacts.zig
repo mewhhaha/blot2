@@ -277,18 +277,16 @@ pub const Context = struct {
     function_jobs: std.ArrayList(u32) = .empty,
     global_jobs: std.ArrayList(u32) = .empty,
     pools: ?Pools = null,
-    principal_proofs: std.ArrayList(PrincipalProof) = .empty,
-    specialization_receipts: std.ArrayList(@import("specialization_receipt.zig").Record) = .empty,
+    principal_queries: @import("principal_query.zig").Table = .{},
+    specialization_queries: @import("selected_query.zig").Table = .{},
     independent_calls: std.ArrayList(@import("independent_call_proof.zig").Record) = .empty,
     refinement_queries: @import("refinement_receipt.zig").Table = .{},
     pub fn init(allocator: Allocator) Context {
         return .{ .allocator = allocator };
     }
     pub fn deinit(self: *Context) void {
-        for (self.principal_proofs.items) |*proof| proof.deinit(self.allocator);
-        self.principal_proofs.deinit(self.allocator);
-        for (self.specialization_receipts.items) |*record| record.deinit(self.allocator);
-        self.specialization_receipts.deinit(self.allocator);
+        self.principal_queries.deinit(self.allocator);
+        self.specialization_queries.deinit(self.allocator);
         self.refinement_queries.deinit(self.allocator);
         for (self.independent_calls.items) |*record| record.deinit(self.allocator);
         self.independent_calls.deinit(self.allocator);
@@ -368,29 +366,29 @@ pub const Context = struct {
     /// Copies source-owned prepass facts into the unpublished candidate. The
     /// enclosing Capture owns their semantic graph only after backend success.
     pub fn recordPrincipal(self: *Context, target: core.BindingRef, options: core_eval.Options, solved: core_eval.SolvedEvidence, inputs: ?*const @import("principal_inputs.zig").Key) Allocator.Error!void {
-        for (self.principal_proofs.items) |proof| if (std.meta.eql(proof.target, target)) return;
+        if (solved.selected.len != 0) return;
+        const query = @import("principal_query.zig");
+        var cursor = self.principal_queries.candidates(query.fingerprint(target), .oldest_first);
+        while (cursor.next()) |position| if (std.meta.eql(self.principal_queries.records.items[position].key.target, target)) return;
         const mappings = try self.allocator.dupe(type_evidence.Mapping, solved.types);
-        errdefer self.allocator.free(mappings);
+        var owned = true;
+        defer if (owned) self.allocator.free(mappings);
         const rows = try self.allocator.dupe(type_evidence.RowMapping, solved.rows);
-        errdefer self.allocator.free(rows);
-        var input_key = if (inputs) |observed| try observed.clone(self.allocator) else null;
-        errdefer if (input_key) |*key| key.deinit(self.allocator);
-        try self.principal_proofs.append(self.allocator, .{ .target = target, .options = options, .types = mappings, .rows = rows, .inputs = input_key });
+        defer if (owned) self.allocator.free(rows);
+        const input_key = if (inputs) |observed| try observed.clone(self.allocator) else null;
+        var builder = query.Table.begin(self.allocator, .{ .target = target, .options = options });
+        defer builder.abort();
+        builder.read(.{ .inputs = input_key });
+        builder.stage(.{ .types = mappings, .rows = rows });
+        owned = false;
+        var candidate = builder.complete() orelse return;
+        defer candidate.abort();
+        const prepared = try self.principal_queries.prepare(self.allocator, &candidate) orelse return;
+        _ = self.principal_queries.publish(prepared, &candidate);
     }
 };
-pub const PrincipalProof = struct {
-    target: core.BindingRef,
-    options: core_eval.Options,
-    types: []type_evidence.Mapping,
-    rows: []type_evidence.RowMapping,
-    inputs: ?@import("principal_inputs.zig").Key = null,
-    fn deinit(self: *PrincipalProof, allocator: Allocator) void {
-        if (self.inputs) |*input| input.deinit(allocator);
-        allocator.free(self.types);
-        allocator.free(self.rows);
-        self.* = undefined;
-    }
-};
+pub const PrincipalProof = @import("principal_query.zig").Table.Record;
+
 pub const Scope = struct {
     context: *Context,
     id: u32,

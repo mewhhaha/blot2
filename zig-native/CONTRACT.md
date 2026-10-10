@@ -645,3 +645,17 @@ span once; no scratch type ID or temporary allocator pointer enters the result.
 Owned snapshot metering preserves the read-only copy API and returns slices
 freed by its original backing allocator. See
 [semantic allocation ownership](SEMANTIC_ALLOCATION.md).
+
+The shared query tables retain distinct selected, principal, source-description
+and open-residual claims. A completed selected receipt pins its evaluator owner;
+a principal result never includes caller-selected implementations. Local source
+templates own copied type Stores and freshly instantiate binders. Cache owner
+and units pins stay outside canonical key data. Ordered fact validation and
+bounded lookup precede every optional hit; budget exhaustion takes ordinary
+checking. Private unsupported-source memos never become successful records.
+Portable principal candidates remain archive ordinals within an immutable Reader
+lease until full source/input/import/publication validation produces current
+evidence. Their common index preserves wire order, and its lazy construction
+releases every partial record on OOM before retry. The version-2 archive
+projection is unchanged. See
+[the migration and qualification](SPECIALIZATION_PRINCIPAL_QUERIES.md).

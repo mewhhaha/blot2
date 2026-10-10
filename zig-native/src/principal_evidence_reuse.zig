@@ -181,19 +181,22 @@ pub const State = struct {
         }
         // last_inputs is consumed by the provider's record callback after
         // lookup returns. Borrow the owned proof, never a loop-local copy.
-        for (self.old.metadata.principal_proofs.items) |*proof| {
-            if (!std.meta.eql(proof.target, target)) continue;
-            if (!std.meta.eql(proof.options, options)) {
+        const table = &self.old.metadata.principal_queries;
+        var cursor = table.candidates(@import("principal_query.zig").fingerprint(target), .oldest_first);
+        while (cursor.next()) |position| {
+            const proof = &table.records.items[position];
+            if (!std.meta.eql(proof.key.target, target)) continue;
+            if (!std.meta.eql(proof.key.options, options)) {
                 self.stats.options_declined += 1;
                 return null;
             }
-            const empty = proof.types.len == 0 and proof.rows.len == 0;
+            const empty = proof.value.types.len == 0 and proof.value.rows.len == 0;
             if (!exact) {
                 if (generator.evaluator.units.ptr != self.gate.units.ptr or generator.evaluator.units.len != self.gate.units.len) {
                     self.stats.projected_empty_declines += 1;
                     return null;
                 }
-                if (empty) if (proof.inputs) |*inputs| if (inputs.matches(&generator.evaluator) and self.inputImageEqual()) {
+                if (empty) if (proof.dependencies.inputs) |*inputs| if (inputs.matches(&generator.evaluator) and self.inputImageEqual()) {
                     const current_inputs = (try self.currentInputs(generator, inputs)) orelse {
                         self.stats.projected_empty_declines += 1;
                         return null;
@@ -214,7 +217,7 @@ pub const State = struct {
             const solved: core_eval.SolvedEvidence = if (empty)
                 .{ .types = &.{}, .rows = &.{} }
             else blk: {
-                switch (try self.primitiveEvidence(generator, target.unit, proof.types, proof.rows)) {
+                switch (try self.primitiveEvidence(generator, target.unit, proof.value.types, proof.value.rows)) {
                     .solved => |facts| {
                         self.stats.primitive_hits += 1;
                         break :blk facts;
@@ -230,7 +233,7 @@ pub const State = struct {
                     self.stats.evidence_declined += 1;
                     return null;
                 }
-                break :blk (try self.graphs.?.importPrincipalEvidence(generator, target.unit, proof.types, proof.rows)) orelse {
+                break :blk (try self.graphs.?.importPrincipalEvidence(generator, target.unit, proof.value.types, proof.value.rows)) orelse {
                     self.stats.evidence_declined += 1;
                     return null;
                 };
@@ -242,7 +245,7 @@ pub const State = struct {
                 var owned = solved;
                 owned.deinit(self.allocator);
             }
-            if (proof.inputs) |*inputs| if (inputs.matches(&generator.evaluator)) if (try self.currentInputs(generator, inputs)) |current_inputs| {
+            if (proof.dependencies.inputs) |*inputs| if (inputs.matches(&generator.evaluator)) if (try self.currentInputs(generator, inputs)) |current_inputs| {
                 try current_inputs.publish(&generator.evaluator);
                 self.last_inputs = current_inputs;
                 self.stats.call_publications_replayed += current_inputs.call_publications.len;

@@ -57,7 +57,69 @@ fn importScenario(allocator: std.mem.Allocator, fixture: *const Fixture, bytes: 
     try std.testing.expect(compiled.diagnostic == null);
     try std.testing.expect(compiled.principal.persisted_hits > 0);
     try std.testing.expect(compiled.principal.persisted_call_proofs > 0);
+    try std.testing.expect(compiled.query_tables.portable_principal.records > 0);
+    try std.testing.expect(compiled.query_tables.portable_principal.inspected_positions > 0);
     try std.testing.expectEqualSlices(u8, expected, compiled.bytes);
+}
+
+fn appendInvalidDuplicate(loaded: *archive.Checkpoint) !void {
+    const original = loaded.principal.snapshot.proofs;
+    try std.testing.expect(original.len > 0);
+    const first = original[0];
+    try std.testing.expect(first.inputs.call_publications.len > 0);
+    const Proof = @TypeOf(original[0]);
+    const proofs = try a.alloc(Proof, original.len + 1);
+    errdefer a.free(proofs);
+    var observed = try first.inputs.clone(a);
+    errdefer observed.deinit(a);
+    const mappings = try a.dupe(@TypeOf(first.types[0]), first.types);
+    errdefer a.free(mappings);
+    const rows = try a.dupe(@TypeOf(first.rows[0]), first.rows);
+    @memcpy(proofs[0..original.len], original);
+    proofs[original.len] = .{ .target = first.target, .options = first.options, .inputs = observed, .types = mappings, .rows = rows };
+    proofs[original.len].inputs.call_publications[0].evidence = std.math.maxInt(u32);
+    a.free(original);
+    loaded.principal.snapshot.proofs = proofs;
+}
+test "portable principal query duplicates retain oldest valid proof priority" {
+    const bytes = try makeCheckpoint();
+    defer a.free(bytes);
+    var loaded = try archive.decode(a, compiler, bytes);
+    defer loaded.deinit();
+    try appendInvalidDuplicate(&loaded);
+    const expected_calls = loaded.principal.snapshot.proofs[0].inputs.call_publications.len;
+    var fixture = try Fixture.init(source);
+    defer fixture.deinit();
+    var fresh = try fixture.emit(a, null);
+    defer fresh.deinit(a);
+    var compiled = try fixture.emit(a, &loaded);
+    defer compiled.deinit(a);
+    try std.testing.expect(compiled.diagnostic == null);
+    try std.testing.expect(compiled.principal.persisted_hits > 0);
+    try std.testing.expectEqual(@as(usize, 0), compiled.principal.persisted_declines);
+    try std.testing.expectEqual(expected_calls, compiled.principal.persisted_call_proofs);
+    try std.testing.expectEqualSlices(u8, fresh.bytes, compiled.bytes);
+}
+
+test "portable principal query saturation declines optional archive reuse" {
+    const bytes = try makeCheckpoint();
+    defer a.free(bytes);
+    var loaded = try archive.decode(a, compiler, bytes);
+    defer loaded.deinit();
+    var fixture = try Fixture.init(source);
+    defer fixture.deinit();
+    var session = try @import("core_eval.zig").Session.init(a, &fixture.units);
+    defer session.deinit();
+    var reader: @import("principal_archive.zig").Reader = .{ .allocator = a, .archive = &loaded.principal, .units = &fixture.units, .names = fixture.names.view() };
+    defer reader.deinit();
+    reader.query_table.limits.records = 0;
+    const proof = loaded.principal.snapshot.proofs[0];
+    try std.testing.expect((try reader.lookup(&session, proof.target, proof.options)) == null);
+    try std.testing.expectEqual(@as(usize, 0), reader.stats.hits);
+    try std.testing.expectEqual(@as(usize, 0), reader.storage().records);
+    try std.testing.expectEqual(@as(usize, 1), reader.storage().saturated);
+    try std.testing.expectEqual(@as(usize, 0), session.validated_calls.count());
+    try std.testing.expectEqual(@as(usize, 0), session.plain_nominals.count());
 }
 test "portable semantic checkpoints outlive source owners and preserve inference through allocation failures" {
     const bytes = try makeCheckpoint();

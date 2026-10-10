@@ -1516,9 +1516,7 @@ test "result principal jobs defer Never witness diagnostics to their original so
             try std.testing.expectEqual(core.Span{ .start = point, .end = point }, session.diagnostic.?.span);
             try std.testing.expectEqual(@as(usize, 0), session.steps);
             if (sharing) {
-                var declined = session.split_declined != 0;
-                var graphs = session.call_summaries.principals.valueIterator();
-                while (graphs.next()) |graph| declined = declined or graph.* == null;
+                const declined = session.split_declined != 0 or session.call_summaries.principals.declines.count() != 0;
                 try std.testing.expect(declined);
             }
             continue;
@@ -5457,13 +5455,12 @@ test "canonical call observations resolve explicit nonsequential source unit ide
     }
     try std.testing.expect(session.canonical_specializations.reused != 0);
     var observed = false;
-    var buckets = session.canonical_specializations.buckets.valueIterator();
-    while (buckets.next()) |bucket| for (bucket.items) |entry| {
-        for (entry.proof.call_reads) |read| {
+    for (session.canonical_specializations.table.records.items) |entry| {
+        for (entry.dependencies.call_reads) |read| {
             try std.testing.expectEqual(@as(u32, 17), read.unit);
             observed = true;
         }
-    };
+    }
     try std.testing.expect(observed);
 }
 

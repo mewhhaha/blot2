@@ -52,7 +52,7 @@ test "principal input image retains inference while current staged literals chan
     var initial = try before.emit(.{ .retain_artifacts = true });
     defer initial.deinit(a);
     try std.testing.expect(initial.diagnostic == null);
-    try std.testing.expect(initial.capture.?.metadata.principal_proofs.items[0].inputs != null);
+    try std.testing.expect(initial.capture.?.metadata.principal_queries.records.items[0].dependencies.inputs != null);
     var fresh = try after.emit(.{ .retain_artifacts = true });
     defer fresh.deinit(a);
     var candidate = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.? });
@@ -77,7 +77,7 @@ test "principal input image does not hide staged errors or change the last good 
     var initial = try before.emit(.{ .retain_artifacts = true });
     defer initial.deinit(a);
     try std.testing.expect(initial.diagnostic == null);
-    const stamp = @import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_proofs.items);
+    const stamp = @import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_queries.records.items);
     var fresh = try after.emit(.{ .retain_artifacts = true });
     defer fresh.deinit(a);
     var candidate = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.? });
@@ -87,7 +87,7 @@ test "principal input image does not hide staged errors or change the last good 
     try std.testing.expectEqual(fresh.constant_steps, candidate.constant_steps);
     try std.testing.expect(candidate.capture == null and candidate.bytes.len == 0);
     try std.testing.expect(candidate.principal.projected_empty_hits > 0);
-    try std.testing.expectEqualSlices(u8, &stamp, &@import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_proofs.items));
+    try std.testing.expectEqualSlices(u8, &stamp, &@import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_queries.records.items));
 }
 
 test "principal input image rejects changed types collection identities and effects" {
@@ -225,10 +225,10 @@ test "principal input replay restores nominal and closed call publications acros
     var initial = try before.emit(.{ .retain_artifacts = true });
     defer initial.deinit(a);
     try std.testing.expect(initial.diagnostic == null);
-    const key = initial.capture.?.metadata.principal_proofs.items[0].inputs orelse return error.TestExpectedPrincipalInputs;
+    const key = initial.capture.?.metadata.principal_queries.records.items[0].dependencies.inputs orelse return error.TestExpectedPrincipalInputs;
     try std.testing.expect(key.call_publications.len > 0);
     try std.testing.expect(key.plain_reads.len > 0);
-    const stamp = @import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_proofs.items);
+    const stamp = @import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_queries.records.items);
     var fresh = try after.emit(.{ .retain_artifacts = true });
     defer fresh.deinit(a);
     var reused = try after.emit(.{ .retain_artifacts = true, .principal_previous = &initial.capture.? });
@@ -251,7 +251,7 @@ test "principal input replay restores nominal and closed call publications acros
     defer recovered.deinit(a);
     try std.testing.expect(recovered.principal.call_publications_replayed > 0);
     try std.testing.expectEqualSlices(u8, initial.bytes, recovered.bytes);
-    try std.testing.expectEqualSlices(u8, &stamp, &@import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_proofs.items));
+    try std.testing.expectEqualSlices(u8, &stamp, &@import("code_artifacts.zig").stamp(initial.capture.?.metadata.principal_queries.records.items));
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, replayFailure, .{ &after, &initial.capture.?, fresh.bytes });
 }
 
@@ -273,12 +273,12 @@ test "principal input replay owns read keys and preserves the prior capture at e
     defer initial.deinit(a);
     try std.testing.expect(initial.diagnostic == null);
     const old = &initial.capture.?;
-    try std.testing.expectEqual(@as(usize, 1), old.metadata.principal_proofs.items[0].inputs.?.scalar_reads.len);
-    const stamp = @import("code_artifacts.zig").stamp(old.metadata.principal_proofs.items);
+    try std.testing.expectEqual(@as(usize, 1), old.metadata.principal_queries.records.items[0].dependencies.inputs.?.scalar_reads.len);
+    const stamp = @import("code_artifacts.zig").stamp(old.metadata.principal_queries.records.items);
     var fresh = try after.emit(.{ .retain_artifacts = true });
     defer fresh.deinit(a);
     try std.testing.expect(fresh.diagnostic == null);
     try replayFailure(a, &after, old, fresh.bytes);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, replayFailure, .{ &after, old, fresh.bytes });
-    try std.testing.expectEqualSlices(u8, &stamp, &@import("code_artifacts.zig").stamp(old.metadata.principal_proofs.items));
+    try std.testing.expectEqualSlices(u8, &stamp, &@import("code_artifacts.zig").stamp(old.metadata.principal_queries.records.items));
 }
