@@ -12,20 +12,16 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   hoists the crossing-row buffer and assembles two-leaf rows with two
   constant-size copies. F32 folds are now within 0.6–1.7% of boxed at widths
   14–16 and at or below 1.006 elsewhere; the all-width gate stays open.
-- Task 004 (general principal/residual call summaries) is in progress. Commit
-  `099e700` adds owned inferred first-order graphs and bounded export of
-  all-unknown residual callee edges. Staged diamond factories share distinct
-  bodies instead of unfolding paths. The native suite, 601 guest/client tests,
-  393 public comparisons and zero-findings analyzer pass. General admission,
-  including result-directed callee edges, remains unfinished; see
-  [the qualification record](zig-native/CALL_SUMMARIES.md#owned-inferred-principal-graphs-9-october-2026).
-- The structured/result-directed milestone admits source-owned physical and
-  nominal residual relationships, preserves seeded operation rows, and keys
-  complete result expectations. The full native suite, 603 guest/client tests,
-  450 public comparisons and zero-findings analyzer pass. Task 004 stays open:
-  representation headers still repeat work, and general type-head, comparison
-  and handler admission is unfinished. See
-  [the new qualification record](zig-native/CALL_SUMMARIES.md#structured-and-result-directed-graphs-10-october-2026).
+- Task 004 (first-order principal/residual call summaries) is complete at
+  `3a8b6ee`. Exact live header keys and owned source-normalized graphs remove
+  transitive diamond work while preserving original witnesses, rows and source
+  dependencies. The full native suite, 607 guest/client tests, 509 public
+  differential cases and zero-findings analyzer pass. Fifteen-pair measurements
+  and seven-pair fresh/retained/restart comparisons qualify the artifact. Small
+  wrappers can cost more; no private gdev or general speedup is claimed. See
+  [the durable qualification](zig-native/CALL_SUMMARIES.md#live-headers-and-source-normalized-graphs-10-october-2026).
+- Task 005 (parametric callback obligations) is in progress. Callback/capture/
+  joint-component/canonical-key work remains tasks 005–008.
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -58,30 +54,27 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 004
+## Next steps for task 005
 
-Extend the owned graph representation in
-[CALL_SUMMARIES.md](zig-native/CALL_SUMMARIES.md). Current open-edge admission
-now retains source-owned physical structure and result-directed callee
-relationships. Complete result/arrow inputs receive independent fresh jobs;
-unknown destinations and witness-dependent failures retain ordinary checking.
-Next, replace allocation-based open header keys with exact region-local keys
-over only the public slots consumed by mandatory requirements. Equivalent live
-inputs currently get different wrapper product IDs, and the depth-12
-representation diamond still needs 24,616 constraint visits. Preserve private
-binder independence, effect identities/cursors, original witness order and
-rollback revocation. Then finish general type-head, type-comparison and handler
-coverage before closing task 004. `build/bench/cloud-principal-graphs/` contains
-the final `candidate-guarded/` pin, 393-case comparison, fifteen paired factory
-measurements and seven-pair fresh/retained/restart comparisons. Factory depth 12
-drops from 198.730 to 5.371 ms CPU and 19,420,315 to 4,783,635 requested bytes.
-Ordinary typed workloads keep their counters; no general compiler or private
-gdev speedup is claimed. Preserve the earlier selected-scheme pins as separate
-baselines. The latest pin is `candidate-structured-result-v2/`; its depth-12
-result diamond drops from 489.525 to 6.156 ms CPU and from 120,471,388 to
-5,327,642 requested bytes. Small operation wrappers instead cost about 11% more.
-Keep the rejected v1 pin and its failure logs separate from the passing v2
-qualification.
+Implement the callback-obligation form in
+[CALL_SUMMARIES.md](zig-native/CALL_SUMMARIES.md#higher-order-obligations-and-effects).
+Keep dedicated higher-order summary shape/evidence checks separate from the
+first-order data predicates used by dispatch and representation proof. Record
+each formal callback slot, curried invocation stage, original argument/result
+witness and latent row relationship in the owned graph. Complete callback
+interfaces can key independent jobs; executable identity, captures and provider
+observations retain their own caller checks. Unknown facts use bounded ordinary
+fallback. Do not grant closed proof status to an exported callback obligation.
+
+The task 004 pin is `candidate-live-headers/` under
+`build/bench/cloud-principal-graphs/`. Keep it and earlier pins immutable. The
+latest record includes source edges revealed only after normalization, an
+allocation-failure cycle publication law, active effect handlers, 509
+diagnostic/ Wasm comparisons and all paired samples. For task 007, retain the
+direct source `Seed.build -> parent.read -> Box.read -> parent` probe: it
+exposed frontend lowering work that did not finish even with written arrows. The
+kernel cycle law qualifies optional publication, not ordinary recursive
+inference.
 
 ## Notes
 

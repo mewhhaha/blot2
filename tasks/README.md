@@ -100,6 +100,16 @@ integer tuple regression. It remains unlanded; task [002] remains in progress.
 pins the experiment and distinguishes unavailable historical/private evidence
 from the new public-workload measurements.
 
+Commit `3a8b6ee` completes task [004] with exact live header scheduling and
+source-normalized first-order principal graphs. The native suite, 607
+guest/client tests, 509 public comparison cases and zero-findings analyzer pass.
+Representation diamonds now have bounded visits; large type-head diamonds show
+measured CPU/allocation reductions. Small wrappers and cache restart can cost
+more. Task [005] is in progress; callback, capture, component and canonical
+extensions remain open.
+[The final first-order qualification](../zig-native/CALL_SUMMARIES.md#live-headers-and-source-normalized-graphs-10-october-2026)
+retains exact pins, commands, measurements and limitations.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -320,8 +330,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [001] — Qualify list span prototype                     | Complete    | None                                   |
 | [002] — Close packed list traversal regression          | In progress | [001]                                  |
 | [003] — Specify general call summaries                  | Complete    | None                                   |
-| [004] — Summarize predicate bearing callees             | In progress | [003]                                  |
-| [005] — Summarize higher order callees                  | Pending     | [004]                                  |
+| [004] — Summarize predicate bearing callees             | Complete    | [003]                                  |
+| [005] — Summarize higher order callees                  | In progress | [004]                                  |
 | [006] — Summarize lexical closures                      | Pending     | [005]                                  |
 | [007] — Infer recursive components jointly              | Pending     | [006]                                  |
 | [008] — Canonicalize specialization keys                | Pending     | [007]                                  |

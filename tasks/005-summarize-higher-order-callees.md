@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — dedicated callback obligations and independent
+  higher-order jobs are being implemented; no completion is claimed.
 - **Dependencies:** [004](004-summarize-predicate-bearing-callees.md)
 - **Originating requirements:** PLAN: Hill 2 / the sandbox region. Sources:
   [PLAN.md](../PLAN.md).
