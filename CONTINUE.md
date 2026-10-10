@@ -71,6 +71,12 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   templates, completed semantic proofs, source validation, executable behavior
   and evaluated values distinct, with exact dependency equality and atomic
   publication.
+- Task 013 (semantic worker qualification) is complete at `4c61f25`. The full
+  LLVM native suite, 621 guest/client tests and zero-findings analyzer pass.
+  Alternating fresh/retained/restart measurements show worker CPU/wall and
+  allocation overhead; no stable threshold qualifies default enablement. Serial
+  remains the default and workers stay opt-in. See
+  [the policy distributions and pins](zig-native/SEMANTIC_WORKERS.md).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -103,31 +109,26 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 013
+## Next steps for task 015
 
-Qualify [parallel inference](tasks/013-qualify-parallel-inference.md). Keep task
-011's `candidate-allocation/` and task 012's `candidate-semantic-jobs/` pins
-immutable under `build/bench/cloud-principal-graphs/`. Task 012 compiler SHA-256
-is `c96e7679ac6173b9d3b9bb3a76d78c1904f4be6735f9419406b2390d93554466`, identity
-file SHA-256 is
-`c5880517a6eed3c8c2aea91c1a781fe2579944f9d5ca302d0b622e0deb7dfe76`, and the
-19-file source hash map is
-`b62e0c396ad50979030456be53fc2257909ab8189e237a8e458e5d2ad7336ddd`. The serial
-default and explicit `--semantic-workers 1` are separate policies. The direct
-retained client accepts `semanticWorkers: 1..16`.
+Implement [refinement query migration](tasks/015-migrate-refinement-queries.md)
+under [the approved common-table design](zig-native/QUERY_TABLE.md). Preserve
+newest-first local refinement matching and oldest-first retained matching,
+complete shape/seed/source/scalar/call/plain-data admission and allocation-free
+publication after reservation. Hashes select candidates; exact typed equality
+and the existing source/import gates still decide validity. Only task 015's
+refinement adapter is next; subsequent claim migrations remain tasks 016–020.
 
-Record alternating CPU and wall distributions at feasible worker counts on an
-idle benchmark phase, including scheduler policy, nice value, affinity and CPU
-quota. Separate coordination/job work and allocation; measure fresh compilation,
-retained population/edit/revert/no-op and restart independently. Do not
-interpret SCHED_IDLE wall noise as a speedup. Default enablement requires both
-CPU and wall improvement; otherwise document qualified opt-in costs and keep the
-serial default. The prepared fresh helper is `measure-semantic-jobs.py`; task
-011's native retained memory probe is the accounting model to extend.
-
-Task 014's design is complete; task 015 is also dependency-ready after the lower
-numbered work. Task 002 and the private application gate in task 084 remain
-blocked on absent owner-local artifacts.
+Keep task 011's `candidate-allocation/`, task 012's `candidate-semantic-jobs/`
+and task 013's `candidate-worker-policy/` pins immutable under
+`build/bench/cloud-principal-graphs/`. Task 013 compiler SHA-256 is
+`2c511afb7d3fa257f9538b534d93b175ec623e6e3656e1150ddb5ad3964679ee`; identity
+file is `07583dbd69b791c698a0f877f1a3b4ae98918fca92a8c76654e997ed98c48f07`. The
+serial default and explicit `--semantic-workers 1` remain separate policies.
+Task 013's tracked CSVs and pin manifest retain the performance baseline; its
+ignored LLVM driver measures retained allocation/CPU directly. Task 002 and the
+private application gate in task 084 remain blocked on absent owner-local
+artifacts.
 
 ## Notes
 

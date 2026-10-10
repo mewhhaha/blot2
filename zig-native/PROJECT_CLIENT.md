@@ -74,8 +74,12 @@ deterministic diagnostics and Wasm. `stats.workCounters.semantic_component_jobs`
 counts scheduled components. Small or unsupported jobs can stay serial. The
 native CLI exposes this setting as `--semantic-workers 1..16` on `build`,
 `build-project` and `serve-project`. See [SEMANTIC_JOBS.md](SEMANTIC_JOBS.md)
-for ownership, failure handling and qualification; no speedup or default change
-is claimed.
+for ownership and failure handling, and
+[SEMANTIC_WORKERS.md](SEMANTIC_WORKERS.md) for measured policy costs. The serial
+default remains unchanged. `max_semantic_component_workers` reports admitted
+batch capacity including the coordinator, rather than simultaneous execution.
+Optional profiling reports exclusive coordination, dispatch and publication wall
+clocks; the private job-time sum overlaps dispatch and must not be added to it.
 
 The CLI and native project server automatically persist restart candidates under
 `$XDG_CACHE_HOME/blot` or `$HOME/.cache/blot` on Linux,

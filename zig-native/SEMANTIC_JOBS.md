@@ -2,8 +2,8 @@
 
 Task 012 is qualified at source milestone `eb66151`
 (`eb6615122912bafb2150dd049f8fdcc644e3ea5e`). The serial default remains
-unchanged. Performance qualification and any default policy decision belong to
-task 013.
+unchanged. [Task 013's policy qualification](SEMANTIC_WORKERS.md) records the
+measured costs and keeps the private path opt-in.
 
 ## Scheduling and identity
 
@@ -151,9 +151,9 @@ timing distribution or performance qualification:
 `jobs-full-gate-v1.log` passes the full LLVM native suite and **620 guest/client
 tests** with Zig **0.17.0**. `jobs-package-v1.log` passes the package build,
 public API type checks and publish dry run; `jobs-format-v1.log` passes
-formatting. Task 013 will record alternating CPU/wall and retained allocation
-distributions before deciding any default policy; task 012 makes no timing
-claim.
+formatting. [Task 013](SEMANTIC_WORKERS.md) records subsequent alternating
+CPU/wall and retained allocation distributions; this task-012 milestone makes no
+timing claim.
 
 The historical boxed compiler and private gdev snapshot remain unavailable.
 Public qualification cannot close that external application gate. Running-job

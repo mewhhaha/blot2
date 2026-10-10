@@ -148,7 +148,7 @@ zero-findings analyzer across 295 Zig files pass. Initial and edited outputs
 execute; 77 fresh and 73 retained/restart workloads qualify the immutable pin.
 Repeated scalar/Box captures reuse proofs while rebuilding current handles;
 incomplete inputs remain conservative. Overall median CPU ratio is 0.987. Task
-[013] is next; [014] is complete and [015] is also dependency-ready.
+[015] is next; [013] and [014] are complete.
 [The canonical qualification](../zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026)
 records exact pins, measurements and remaining limits.
 
@@ -165,8 +165,18 @@ The full LLVM native suite, 620 guest/client tests, 626 six-policy public
 comparisons and zero-findings analyzer pass. Repeated retained edits,
 failed-source recovery and restart execute 648 guests / 41,208 calls. The
 [durable semantic job qualification](../zig-native/SEMANTIC_JOBS.md) records
-pins, owners and conservative fallbacks. The default remains serial; task [013]
-now qualifies timing and allocation across worker counts.
+pins, owners and conservative fallbacks.
+
+Task [013] completes worker policy qualification at `4c61f25`. The full LLVM
+native suite, 621 guest/client tests and zero-findings analyzer pass. Fifteen
+alternating rounds cover 83 fresh workloads; seven retained rounds cover eight
+workloads, 28,224 phases and 1,008 fresh/cache/restart builds. Separate
+profiling reports coordinator, dispatch, publication and overlapping private job
+costs. Workers add total CPU/wall and allocation overhead; no stable threshold
+qualifies default enablement. The serial default stays, with a qualified opt-in
+path. The [durable policy record](../zig-native/SEMANTIC_WORKERS.md) preserves
+complete distributions, hashes, environment conditions, failures/restarts and
+limitations.
 
 ## Completed foundations to preserve
 
@@ -397,7 +407,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [010] — Schedule constraints by variable                | Complete    | [009]                                  |
 | [011] — Reduce semantic allocation traffic              | Complete    | [007], [008], [010]                    |
 | [012] — Schedule independent semantic jobs              | Complete    | [007], [008], [010]                    |
-| [013] — Qualify parallel inference                      | In progress | [011], [012]                           |
+| [013] — Qualify parallel inference                      | Complete    | [011], [012]                           |
 | [014] — Specify unified query table                     | Complete    | [008]                                  |
 | [015] — Migrate refinement queries                      | Pending     | [014]                                  |
 | [016] — Migrate specialization and principal queries    | Pending     | [015]                                  |
