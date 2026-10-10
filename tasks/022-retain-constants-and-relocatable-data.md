@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [020](020-persist-complete-semantic-artifacts.md),
   [021](021-publish-transactional-revision-deltas.md)
 - **Originating requirements:** PLAN: Hill 6 / constants; earlier semantic

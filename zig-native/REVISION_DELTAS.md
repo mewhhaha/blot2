@@ -3,8 +3,9 @@
 Task 021 stops rebuilding every artifact pool field on each successful revision.
 Fields whose captured content equals the previous revision's share that
 revision's immutable allocation through a refcounted lease; only changed fields
-are copied. This record follows [the ownership contract](CONTRACT.md).
-Qualification is recorded below.
+are copied. This record follows [the ownership contract](CONTRACT.md). The
+compiler milestone is `696051e6db35a5464636131706e559092c9f37e6`; qualification
+is recorded below.
 
 ## Leased pool fields
 

@@ -213,6 +213,15 @@ less. Task [021] is ready. The
 [semantic artifact record](../zig-native/SEMANTIC_ARTIFACTS.md) lists
 represented and declined owners and remaining limits.
 
+Task [021] leases unchanged artifact pool fields across retained revisions at
+`696051e`. Captures retain the previous revision's refcounted slice when content
+is equal and copy only changed fields; failed candidates release their leases,
+commit stays allocation-free, and unread per-body pins are gone. The full LLVM
+native suite, 626 guest/client tests and zero-findings analyzer pass. Steady
+edits request 1.4–6.1% less, peak 25–98 KB less and retain 21–26 KB less, at CPU
+geomean 0.967. Task [022] is ready. See
+[revision deltas](../zig-native/REVISION_DELTAS.md).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -450,8 +459,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [018] — Migrate executable reuse queries                | Complete    | [017]                                  |
 | [019] — Serialize the query table                       | Complete    | [018]                                  |
 | [020] — Persist complete semantic artifacts             | Complete    | [019]                                  |
-| [021] — Publish transactional revision deltas           | Ready       | [017], [020]                           |
-| [022] — Retain constants and relocatable data           | Pending     | [020], [021]                           |
+| [021] — Publish transactional revision deltas           | Complete    | [017], [020]                           |
+| [022] — Retain constants and relocatable data           | Ready       | [020], [021]                           |
 | [023] — Narrow literal edit invalidation                | Pending     | [022]                                  |
 | [024] — Apply general body interface cutoff             | Pending     | [023]                                  |
 | [025] — Resolve calls before emission                   | Pending     | [008], [020]                           |

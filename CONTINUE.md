@@ -124,6 +124,11 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   measured 14–26% restart CPU cost; owner-free workloads allocate less thanks to
   exact-size encoding. Monadic libraries now pack into dependency artifacts. See
   [the record](zig-native/SEMANTIC_ARTIFACTS.md).
+- Task 021 (transactional revision deltas) is complete at `696051e`. Plain
+  artifact pool slices are refcounted leases; captures retain equal fields from
+  the previous revision and copy only changed ones; unread body pins are gone.
+  Steady edits request 1.4–6.1% less, peak 25–98 KB less, CPU geomean 0.967. See
+  [the record](zig-native/REVISION_DELTAS.md).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -159,29 +164,17 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 021
+## Next steps for task 022
 
 Continue with
-[transactional revision deltas](tasks/021-publish-transactional-revision-deltas.md).
-Every successful revision currently rebuilds all of `code_artifacts.Pools`
-(`capture()` in `src/code_artifacts.zig`): identity metadata, module pins and
-body pins, layouts, the evaluator snapshot (`copySnapshotMeasured`, the largest
-copy), substitutions, captures, bridge, field locations, operations, functions,
-serialized data, slots and provider/request state. `retained_revision.commit`
-moves the candidate's `Current` and frees the old one; only the dependency seed
-(`retained_dependency.Module` refcounts on the mixed freeze path), Gate leases
-(`shared_query_gate.share`) and unchanged-output admission are shared today.
-Measure metadata copies separately (work counters `snapshot_copy_bytes`,
-`principal_copy_buffer_bytes`), share immutable unchanged owners with explicit
-leases and bounded compaction, and keep commit allocation-free.
-
-The task-020 candidate is pinned in
-[its pins](zig-native/qualification/semantic-artifacts-pins.json): compiler
-`640c744df0e3eb10ef7f8e9189b899949bbd0baafb407c9b8cc248baa7e802f1`, binaries in
-ignored `build/bench/semantic-artifacts/`. Task 019's candidate stays in
-`build/bench/serialize-queries/`. Tasks 036 and 048 are also ready. Tasks 002,
-040–047 and 075 onward stay blocked on owner-local artifacts (task 002), and 084
-on private gdev.
+[retained constants and relocatable data](tasks/022-retain-constants-and-relocatable-data.md).
+Scalar constant admission already exists; aggregate values and serialized data
+are rebuilt each revision. Pool fields are now leases
+([revision deltas](zig-native/REVISION_DELTAS.md)): code that replaces a pool
+slice must release its lease. Task-021 binaries and probes are in ignored
+`build/bench/revision-deltas/`; task-020's in `build/bench/semantic-artifacts/`.
+Tasks 036 and 048 are also ready. Tasks 002, 040–047 and 075 onward stay blocked
+on owner-local artifacts (task 002), and 084 on private gdev.
 
 ## Notes
 
