@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — tracing component lifetimes and late selected edges;
+  no completion is claimed.
 - **Dependencies:** [006](006-summarize-lexical-closures.md)
 - **Originating requirements:** PLAN: Hills 1–3 / recursive components and depth
   limits. Sources: [PLAN.md](../PLAN.md).

@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — an owned capture-input prototype and native/guest
-  laws are prepared; compilation and qualification remain to be run.
+- **Status:** Complete — owned complete capture environments key independent
+  jobs while ordinary checking preserves incomplete and observed inputs.
 - **Dependencies:** [005](005-summarize-higher-order-callees.md)
 - **Originating requirements:** PLAN: Hill 2 / lexical closure summaries.
   Sources: [PLAN.md](../PLAN.md).
@@ -31,11 +31,11 @@ certify reusable semantic results.
 
 ## Implementation checklist
 
-- [ ] Implement typed capture inputs from task 003, including binding versions,
+- [x] Implement typed capture inputs from task 003, including binding versions,
       alias relationships, nominal/provider identities and latent effects.
-- [ ] Admit shared summaries only when complete capture evidence is known;
+- [x] Admit shared summaries only when complete capture evidence is known;
       preserve conservative behavior for staged, dynamic or unresolved captures.
-- [ ] Keep caller-selected facts out of principal schemes and ensure every
+- [x] Keep caller-selected facts out of principal schemes and ensure every
       published result owns its imported evidence.
 
 ## Validation
@@ -56,20 +56,33 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Every admitted lexical summary names and validates all captured inputs,
+- [x] Every admitted lexical summary names and validates all captured inputs,
       including alias-sensitive evidence.
-- [ ] Different capture semantics never collide; failed or unsupported capture
+- [x] Different capture semantics never collide; failed or unsupported capture
       proofs publish nothing and recovery matches fresh compilation.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `71c0f2a` on local `main`.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
+  and 610 guest/client tests. `deno task lint:zig` reports zero findings across
+  292 files. Twelve focused native laws include all-allocation failures,
+  same-session OOM retry, alias/value/provider/demand keys and bounded refusal.
+  Guest laws retain dependency/checkpoint round trips and failed-edit recovery.
+- Comparison: 587 public cases / 1,174 fresh invocations preserve ordered
+  diagnostics; only three qualified shared-Box outputs differ by exactly 12
+  static bytes per closure. Initial and edited output each pass 42 guests and
+  7,056 calls. Fifteen release pairs cover 53 workloads; seven pairs cover 52
+  fresh/retained/restart workloads with strict per-variant output consistency.
+  All binary/identity pins remain unchanged.
+- Remaining limitations: incomplete, staged, cyclic or actively observed
+  environments use ordinary checking. Some demand/provider controls add CPU
+  and allocation overhead. The largest recorded candidate region is 35.776 ms;
+  missing profiles establish no program-wide bound. General principal lexical
+  graphs, joint components and portable keys remain later work. Private gdev
+  and historical task 002 evidence are unavailable.
+- Durable record:
+  [owned lexical inputs and qualification](../zig-native/CALL_SUMMARIES.md#owned-lexical-inputs-10-october-2026)
+  preserves ownership rules, exact pins, commands, distributions and limitations.

@@ -27,9 +27,20 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   and seven-pair fresh/retained/restart batches qualify the immutable v2 pin.
   Deep predicate cases have bounded work; small controls add overhead. See
   [the durable callback qualification](zig-native/CALL_SUMMARIES.md#parametric-callback-obligations-10-october-2026).
-- Task 006 (owned lexical capture inputs) is in progress. Its prototype and
-  native/guest laws are uncommitted and have not yet been compiled or tested.
-  Joint-component and canonical-key work remains tasks 007–008.
+- Task 006 (owned lexical capture inputs) is complete at `71c0f2a`.
+  Complete ordered captures, actual aliases, values, nested bodies and
+  provider/demand identities key private jobs without global principal
+  publication. The full native suite, 610 guest/client tests, 587 public
+  comparisons and zero-findings analyzer pass. Initial/edited guest outputs,
+  fifteen-pair measurements and seven-pair retained/restart batches qualify the
+  immutable artifact. Shared Box output shrinks by 12 static bytes per closure;
+  small and demand/provider controls can add overhead. See
+  [the lexical qualification](zig-native/CALL_SUMMARIES.md#owned-lexical-inputs-10-october-2026).
+- Task 007 (joint recursive components) is in progress. The frontend currently
+  pops its Tarjan component before resolving late field/dispatch edges, so a
+  selected method can reach a complete-but-unpublished binding. Retain
+  provisional components through a bounded selection fixpoint and preserve
+  ordinary diagnostics, atomic member publication and independent children.
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -62,29 +73,25 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 006
+## Next steps for task 007
 
-Finish and qualify the owned lexical inputs in
-[CALL_SUMMARIES.md](zig-native/CALL_SUMMARIES.md#lexical-captures-and-canonical-inputs).
-The current prototype adds session-owned typed capture graphs with complete
-ordered binding slots, canonical alias ordinals, scalar/nominal identities,
-latent rows and exact provider/demand creation identities. Complete live
-environments can key independent jobs; incomplete evidence, changed memo state
-and active observation receipts retain ordinary checking. Private lexical jobs
-must not publish a capture-free global/principal proof. Compile the focused
-native laws first, then run frozen/static/retained captures, guest dependency
-and checkpoint laws, the full compiler gate and analyzer. Preserve immutable
-Core/type inputs and check failed-allocation recovery before qualification.
+Implement and qualify joint recursive components from
+[CALL_SUMMARIES.md](zig-native/CALL_SUMMARIES.md#recursive-components-and-bounded-scheduling).
+Retain the direct source `Seed.build -> parent.read -> Box.read -> parent`
+probe at `build/bench/cloud-principal-graphs/revealed-edge-recursive-frontend-probe.blot`:
+it did not finish even with written arrows. `check.zig.finishGlobal` currently
+pops/marks the group complete before `solveFields`; selected field, dispatch and
+result-dispatch bodies then cannot update its lowlinks. The optional principal
+cycle law qualifies publication only, not ordinary recursive inference.
 
-The task 005 pin is `candidate-callbacks-v2/` under
-`build/bench/cloud-principal-graphs/`; its source is commit `652f4d6` even while
-task 006 edits the worktree. Keep it, `candidate-live-headers/` and earlier pins
-immutable. The latest record includes callback stages, exact row aliases,
-mandatory source predicates, 563 diagnostic/Wasm comparisons and all paired
-samples. For task 007, retain the direct source
-`Seed.build -> parent.read -> Box.read -> parent` probe: it exposed frontend
-lowering work that did not finish even with written arrows. The kernel cycle law
-qualifies optional publication, not ordinary recursive inference.
+Keep task 006's immutable `candidate-lexical/` pin as the new baseline under
+`build/bench/cloud-principal-graphs/`, sourced from commit `71c0f2a`; earlier pins
+remain immutable. The lexical record includes exact source/binary/identity
+hashes, 587 comparisons, initial and edited executed guest checks, 53 fresh and
+52 retained/restart workloads. Add the one-million summary transition budget,
+iterative discovery/fallback scheduling, component-atomic publication, limit
+and allocation-failure recovery. Preserve annotated chains at 300/1,000,
+generic chains at 300 and existing direct/mutual/higher-order recursion laws.
 
 ## Notes
 
@@ -96,7 +103,7 @@ qualifies optional publication, not ordinary recursive inference.
   `ZIG_ANALYZER=/tmp/blot-qualified-analyzer-756bfd5/zig-out/bin/zig-analyzer`.
   Those paths refer to the original machine. In the cloud checkout, use
   `ZIG_ANALYZER=/workspace/tooling/zig-analyzer/zig-out/bin/zig-analyzer`; its
-  source is at the CI pin and it reports zero findings across 291 Zig files.
+  source is at the CI pin and it reports zero findings across 292 Zig files.
 - The cloud Deno 2.9.6 standalone runtime is cached from the official GitHub
   release with its published SHA-256 verified. The initial full gate failed only
   on the blocked `dl.deno.land` download; after caching, the complete

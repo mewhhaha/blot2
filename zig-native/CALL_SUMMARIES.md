@@ -1002,7 +1002,7 @@ Zig files, using Zig 0.17.0 and the qualified analyzer. The differential command
 `python3 build/bench/cloud-principal-graphs/compare-callbacks-v2.py` compares
 563 public cases, including 54 higher-order fixtures, in 1,126 fresh
 cache-disabled invocations. Ordered diagnostics and successful Wasm bytes match
-exactly; 380 invocations succeed. Every expected-valid callback fixture
+exactly; 380 cases (760 invocations) succeed. Every expected-valid callback fixture
 succeeds, including the predicate-bearing direct, curried, returned and
 effectful forms. All 1,122 invocations with compilation metrics report zero live
 requested bytes after teardown and no loaded restart cache. The four remaining
@@ -1152,6 +1152,86 @@ alias graphs through retained edits, rebinding snapshots, dependency bundles and
 checkpoint restoration; invalid capture/row/body edits recover to fresh output.
 
 The full Zig 0.17.0 gate passes the native suite and 610 guest/client tests;
-the analyzer reports zero findings across 292 Zig files. Fresh differential,
-executed guest and retained/restart qualification is in progress. Task 006
-completion and a general captured-workload speedup are not yet claimed.
+the analyzer reports zero findings across 292 Zig files. The code milestone is
+`71c0f2a` on local `main`.
+
+Qualification compares immutable `candidate-callbacks-v2/` and
+`candidate-lexical/` under `build/bench/cloud-principal-graphs/`. The lexical
+binary SHA-256 is
+`de8823d9a68c729a58cfbe034965a9cc03f1cb2d31a2e2bf6415abc8f59457c3`, its
+compiler identity is
+`417ab3e3222b645c4c91bf9071b49b8565629b9256c6c47d2f6e7b6695a3f82a`, and its
+five-file source patch against `5236860` is
+`d5a40a506be736d2ce849fab356d951f29545682d5ff80fa01e2e881667b6613`.
+The manifest records exact source hashes. Binary and identity pins remain
+unchanged before and after every qualification stage.
+
+`python3 build/bench/cloud-principal-graphs/compare-lexical.py` passes 587
+public cases in 1,174 cache-disabled invocations, including 24 new lexical
+fixtures. All 21 expected-valid fixtures succeed; all three invalid fixtures
+reject. There are 401 successful cases (802 invocations). Ordered diagnostics
+match exactly. All 1,170 compilation metric records have zero live requested
+bytes and no loaded restart cache; four existing paired `TypeLimit` runs have
+no metrics. Successful Wasm matches except the three explicitly qualified
+shared-aggregate fixtures at counts 8/32/128.
+
+Those exceptions preserve the actual shared capture. Previously freezing two
+slots for one Box created two aggregate views; now both slots use one view and
+the backend serializes its immutable subtree once. Each Box and record payload
+occupy 12 static bytes, so Wasm shrinks by exactly 96/384/1,536 bytes. Separate
+aggregates and all other cases retain exact bytes. This is an intentional alias
+fix, not an unexplained output waiver. `execute-lexical.ts` passes 42 baseline
+and candidate guests with 7,056 calls, checking every generated callable and
+folded result.
+
+`python3 build/bench/cloud-principal-graphs/measure-lexical.py` passes fifteen
+alternating release pairs across 53 workloads (1,590 invocations), using isolated
+child user+system CPU from `getrusage` with caches disabled. Allocation is
+cumulative requested bytes in decimal MB, not peak RSS.
+
+| Workload | Median CPU baseline / candidate (ms) | Allocation baseline / candidate (MB) | Maximum scopes baseline / candidate |
+| -------- | ----------------------------------: | -----------------------------------: | ----------------------------------: |
+| Captured callback, depth 8 | 35.459 / 34.633 | 8.402 / 8.402 | 1,025 / 1,025 |
+| Shared Box captures, 128 | 12.155 / 11.594 | 8.217 / 8.221 | 9 / 4 |
+| Separate Box captures, 128 | 12.188 / 11.751 | 8.604 / 8.912 | 9 / 7 |
+| Named scalar captures, 128 | 14.601 / 14.179 | 9.849 / 10.054 | 4 / 4 |
+| Anonymous scalar captures, 128 | 10.715 / 10.270 | 7.933 / 8.134 | 4 / 4 |
+| Nested callbacks, 128 | 16.390 / 16.253 | 11.013 / 11.431 | 5 / 5 |
+| Pending demands, 128 | 10.756 / 11.851 | 7.949 / 9.072 | 5 / 5 |
+| Local providers, 128 | 10.304 / 11.135 | 7.945 / 9.030 | 4 / 4 |
+
+The depth-8 open captured control retains ordinary work and 512 constraint
+visits. Its largest recorded candidate region is 35.776 ms (baseline 32.456 ms).
+Recorded lexical fixture regions are at most 2.6 ms. Missing region samples are
+unavailable, not zero, and establish no program-wide maximum. Demand/provider
+128 controls add approximately 10/8% CPU and 14/14% allocation in this
+prelude-enabled batch. Other 128 controls add approximately 0–4% allocation;
+small callback controls remain close to the baseline. This qualification makes
+no general captured-workload speedup claim.
+
+Seven alternating pairs pass 52 ordinary/callback/lexical workloads through
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-lexical.ts --baseline build/bench/cloud-principal-graphs/candidate-callbacks-v2/blotc --candidate build/bench/cloud-principal-graphs/candidate-lexical/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/lexical-retained`.
+Every variant's fresh/restart/population/edit/no-op hashes agree with the
+appropriate fresh source. Capture edits change executable output; alias edits
+preserve equal values while changing sharing. The 27 expected cross-compiler
+differences are limited to the six shared/separate aggregate workloads and
+their phases; unexpected problems are empty. Independently rebuilt edited
+Wasm is checked against those recorded hashes and executes another 42 guests
+with 7,056 calls (`execute-lexical-retained.ts`).
+
+In that prelude-free synthetic batch, shared128 fresh/restart CPU is 15/15 ms
+for both compilers; fresh allocation falls from 10.65 to 9.99 MiB and restart
+from 10.95 to 10.29 MiB. Named128 fresh CPU is 16→17 ms, while
+demand/provider128 is 14→14 ms and nested128 is 19→19 ms. Allocation changes
+are approximately +2.1% for named128 and +0.1–0.2% for the latter controls.
+Fan-out is 18 ms fresh / 19 ms restart for both variants. Retained process CPU
+has 10 ms accounting resolution; zeros do not mean no execution.
+
+Raw artifacts are `lexical-comparisons/report.json` and `execution.json`,
+`lexical-measurement/report.json`, and `lexical-retained/results.json`,
+`samples.jsonl` and `execution.json`, with gate/analyzer/stage logs in the same
+ignored directory. The durable results above survive cleanup of those artifacts.
+Task 006 is complete. Incomplete/staged/observed environments retain ordinary
+checking, and principal lexical graphs, joint components and portable canonical
+keys remain subsequent work. The private gdev snapshot and historical task 002
+artifacts remain unavailable.
