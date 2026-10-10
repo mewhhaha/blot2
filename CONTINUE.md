@@ -99,6 +99,13 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   allocation is unchanged and CPU near neutral; exact certificates add measured
   retained memory/allocation and about 14% CPU in positive entry-only edit
   controls. See [the qualification](zig-native/SOURCE_VALIDATION.md).
+- Task 018 (executable fragment and optimizer queries) is complete at `a604cc1`.
+  Full LLVM native execution, 623 guest/client tests, six-policy parity,
+  executed same-signature callee edits and zero analyzer findings pass. Real
+  incomplete-prefix saturation declines reuse and preserves fresh output. Fresh
+  CPU is near neutral and allocation unchanged; retained tables add measured
+  memory/allocation costs. Seventeen retained workloads plateau and tear down to
+  zero. See [the qualification](zig-native/EXECUTABLE_QUERIES.md).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -131,28 +138,37 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 018
+## Next steps for task 019
 
-Migrate
-[executable reuse queries](tasks/018-migrate-executable-reuse-queries.md) under
-[the typed query contract](zig-native/QUERY_TABLE.md). Retained artifact
-fragments and optimizer body relocation are separate adapters. Preserve full
-request/evidence/capture/staging dependencies, inlined callee and static reads,
-exact instructions/signatures/policy and transitive lifetime summaries. Keep
-existing admission/reconstruction gates and candidate order; an unchanged
-interface cannot certify an edited executable body. Portable serialization
-remains task 019.
+The current session wraps after completing task 018. The owner authorized
+pushing the completed changes to `main`; later tasks remain pending. Continue
+with [portable query serialization](tasks/019-serialize-the-query-table.md)
+under [the typed query contract](zig-native/QUERY_TABLE.md).
 
-The final task-017 baseline is `candidate-source-validation/`, source revision
+Version explicit query kinds, validity claims, portable keys and complete
+results. Rebuild native indexes from validated owned payloads; do not serialize
+native handles, pointers or allocator capacity. Preserve existing bounded,
+checksummed principal/optimizer envelopes, exact identity gates, OOM cleanup and
+fresh fallback on corrupt or incompatible checkpoints. Validate source/output
+call and resource ordinals before sealing decoded optimizer query records.
+Broader persisted semantic graphs remain task 020.
+
+The qualified task-018 candidate `candidate-executable-queries/` has source
+revision `a604cc1644d120430b0d853be9dcd9b8eab3e93f`, compiler hash
+`d6e06bd771805833dae1ea62657f188bc3c1fd3f05f39fe76a2186b85546e0a9`, identity
+`03de8c4a03bf1fa7de85fef284123ecb0b06a8254e10de2949f5a3a1f43291ef`, and a
+415-file compiler/guest input map
+`e480200caf99dd8c67096d2e29eceb64bafc54b49530f88a9e9e58c32baadea8`.
+
+The task-017 baseline is `candidate-source-validation/`, source revision
 `089efb0b9b29504513bc0808fb20992b09c53f89`, binary
 `5058f69f10640780061bb7a8cd093a9164dc789ff806ce1bc48b1ce0a9921356`, identity
 `23035481dc651f09728b2636b90d5eb1c8a78939b11896947cc396592f7c904c`, and 414-file
 source/test map
-`d2c208558cd097650d65e93710b73fa29cc2ded3496f98459588b1a7267159ae`. Keep earlier
-qualified pins immutable, including task 016's
-`candidate-specialization-principal/` and task 015's
-`candidate-refinement-query-v2/`. Task 002 and the private application gate in
-084 remain open on absent owner-local artifacts. No push is authorized.
+`d2c208558cd097650d65e93710b73fa29cc2ded3496f98459588b1a7267159ae`. Preserve all
+qualified pins, including task 016's `candidate-specialization-principal/` and
+task 015's `candidate-refinement-query-v2/`. Task 002 and the private
+application gate in 084 remain open on absent owner-local artifacts.
 
 ## Notes
 
@@ -164,7 +180,7 @@ qualified pins immutable, including task 016's
   `ZIG_ANALYZER=/tmp/blot-qualified-analyzer-756bfd5/zig-out/bin/zig-analyzer`.
   Those paths refer to the original machine. In the cloud checkout, use
   `ZIG_ANALYZER=/workspace/tooling/zig-analyzer/zig-out/bin/zig-analyzer`; its
-  source is at the CI pin and it reports zero findings across 301 Zig files.
+  source is at the CI pin and it reports zero findings across 302 Zig files.
 - The cloud Deno 2.9.6 standalone runtime is cached from the official GitHub
   release with its published SHA-256 verified. The initial full gate failed only
   on the blocked `dl.deno.land` download; after caching, the complete

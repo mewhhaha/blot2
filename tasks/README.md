@@ -148,7 +148,7 @@ zero-findings analyzer across 295 Zig files pass. Initial and edited outputs
 execute; 77 fresh and 73 retained/restart workloads qualify the immutable pin.
 Repeated scalar/Box captures reuse proofs while rebuilding current handles;
 incomplete inputs remain conservative. Overall median CPU ratio is 0.987. Task
-[018] is next; [013]–[017] are complete.
+[019] is next; [013]–[018] are complete.
 [The canonical qualification](../zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026)
 records exact pins, measurements and remaining limits.
 
@@ -177,6 +177,17 @@ qualifies default enablement. The serial default stays, with a qualified opt-in
 path. The [durable policy record](../zig-native/SEMANTIC_WORKERS.md) preserves
 complete distributions, hashes, environment conditions, failures/restarts and
 limitations.
+
+Task [018] completes bounded executable fragment and optimizer query owners at
+`a604cc1`. Exact request, body, capture, policy and transitive lifetime gates
+preserve candidate order and fresh output. The full LLVM native suite, 623
+guest/client tests, 626 six-policy comparisons and zero-findings analyzer pass.
+Same-signature callee edits execute correctly; real partial-prefix saturation
+refuses reuse. Fresh CPU is near neutral and allocation unchanged; retained
+query storage adds measured overhead. The
+[durable executable qualification](../zig-native/EXECUTABLE_QUERIES.md) retains
+pins, distributions, positive reuse, zero teardown and remaining scope. Task
+[019] remains pending for the next session.
 
 ## Completed foundations to preserve
 
@@ -412,7 +423,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [015] — Migrate refinement queries                      | Complete    | [014]                                  |
 | [016] — Migrate specialization and principal queries    | Complete    | [015]                                  |
 | [017] — Unify source and revision validation            | Complete    | [016]                                  |
-| [018] — Migrate executable reuse queries                | In progress | [017]                                  |
+| [018] — Migrate executable reuse queries                | Complete    | [017]                                  |
 | [019] — Serialize the query table                       | Pending     | [018]                                  |
 | [020] — Persist complete semantic artifacts             | Pending     | [019]                                  |
 | [021] — Publish transactional revision deltas           | Pending     | [017], [020]                           |

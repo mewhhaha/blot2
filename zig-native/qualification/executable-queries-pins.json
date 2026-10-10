@@ -976,7 +976,8 @@
         "retained_memory": "executable-queries-memory/report.json",
         "proof_memory": "executable-queries-proof-memory/report.json",
         "independent_review": "Luna read-only source/ownership, behavior, pins, CPU/storage and CSV audit passed"
-      }
+      },
+      "source_revision": "a604cc1644d120430b0d853be9dcd9b8eab3e93f"
     }
   },
   "drivers": {
@@ -1926,7 +1927,7 @@
     "measure-executable-queries.py": "bc0b5a7f07cd837095c698625ed0fd20222c99dd173e1c69816976a079352438",
     "measure-executable-queries-memory.py": "3ca1094cd21d78554516993ce6cdea03ddcc1b408bd97f0401251bc75e78f320",
     "measure-executable-queries-proof-memory.py": "2d3641e7081c5800c08d8b11892779665c2971551fd29ffd1b5e16653d0d66be",
-    "export-executable-queries.py": "7df0fca834f6484994e5162981c52c8aacab13e049048c94352d9cea67876c8f"
+    "export-executable-queries.py": "ac903060b70825ccd8e0a990a130eaf9d31316bf1883742c34c526221e02044a"
   },
   "reports": {
     "build/bench/cloud-principal-graphs/executable-queries-measurement/report.json": "18d4e43299da3b8f37ecd6196352a9319985ec1f36a4caa499dcc955648643d8",

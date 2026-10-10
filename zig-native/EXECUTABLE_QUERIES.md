@@ -2,8 +2,8 @@
 
 Task 018 adapts symbolic fragment replay and optimized machine-body relocation
 to the common complete-record table. Qualification completed on 10 October 2026
-against the task 017 compiler. The local milestone revision will be recorded
-after commit.
+against the task 017 compiler. The compiler milestone is
+`a604cc1644d120430b0d853be9dcd9b8eab3e93f`.
 
 ## Complete claims and graph owners
 
