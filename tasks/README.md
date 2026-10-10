@@ -201,6 +201,18 @@ restart. Example checkpoints grow 9.6–19.6% and in-process decode CPU rises
 [portable query record](../zig-native/PORTABLE_QUERIES.md) lists represented and
 declined kinds, measurements and remaining limits.
 
+Task [020] persists complete selected-specialization owners at `8803452`. A
+checkpoint may carry exact checked Core, the namespace, evaluator snapshot,
+slots, field locations and completed receipts; decoding validates every graph
+and ordinal before the ordinary Gate, Importer and Plan replay receipts after
+restart. Monadic libraries now pack into dependency artifacts, and artifact
+encoding uses one exact allocation. The full LLVM native suite, 626 guest/client
+tests and zero-findings analyzer pass. Seven examples replay 1–3 receipts after
+restart at a measured 14–26% restart CPU cost; owner-free workloads allocate
+less. Task [021] is ready. The
+[semantic artifact record](../zig-native/SEMANTIC_ARTIFACTS.md) lists
+represented and declined owners and remaining limits.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -437,8 +449,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [017] — Unify source and revision validation            | Complete    | [016]                                  |
 | [018] — Migrate executable reuse queries                | Complete    | [017]                                  |
 | [019] — Serialize the query table                       | Complete    | [018]                                  |
-| [020] — Persist complete semantic artifacts             | Ready       | [019]                                  |
-| [021] — Publish transactional revision deltas           | Pending     | [017], [020]                           |
+| [020] — Persist complete semantic artifacts             | Complete    | [019]                                  |
+| [021] — Publish transactional revision deltas           | Ready       | [017], [020]                           |
 | [022] — Retain constants and relocatable data           | Pending     | [020], [021]                           |
 | [023] — Narrow literal edit invalidation                | Pending     | [022]                                  |
 | [024] — Apply general body interface cutoff             | Pending     | [023]                                  |

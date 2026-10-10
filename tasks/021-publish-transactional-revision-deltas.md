@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [017](017-unify-source-and-revision-validation.md),
   [020](020-persist-complete-semantic-artifacts.md)
 - **Originating requirements:** PLAN: Hill 6 and earlier semantic compilation /

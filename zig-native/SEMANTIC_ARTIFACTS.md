@@ -5,7 +5,8 @@ previous-revision semantic owner. A restarted process can replay completed
 selected specialization receipts through the same Gate, Importer and graph Plan
 that admit an in-process previous revision. This record follows
 [portable query records](PORTABLE_QUERIES.md) and
-[the typed query contract](QUERY_TABLE.md). Qualification is recorded below.
+[the typed query contract](QUERY_TABLE.md). The compiler milestone is
+`88034529833783de881e59a0aca3e2b93fab69bb`; qualification is recorded below.
 
 ## The persisted owner
 

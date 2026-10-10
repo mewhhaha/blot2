@@ -116,6 +116,14 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   design wrongly bounded builtin nominal units (`maxInt(u32)`) by the source
   image; a public-example restart law now guards it. See
   [the record](zig-native/PORTABLE_QUERIES.md).
+- Task 020 (persisted semantic artifacts) is complete at `8803452`. Checkpoints
+  (key v3) may carry the previous revision's selected-specialization owner:
+  exact Core with certificate bytes, namespace, evaluator snapshot, slots, field
+  locations and receipts, validated at decode and replayed by the ordinary Gate,
+  Importer and Plan. Seven examples replay 1–3 receipts after restart at a
+  measured 14–26% restart CPU cost; owner-free workloads allocate less thanks to
+  exact-size encoding. Monadic libraries now pack into dependency artifacts. See
+  [the record](zig-native/SEMANTIC_ARTIFACTS.md).
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -151,28 +159,29 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 020
+## Next steps for task 021
 
 Continue with
-[complete semantic artifacts](tasks/020-persist-complete-semantic-artifacts.md)
-under [the typed query contract](zig-native/QUERY_TABLE.md) and
-[portable query records](zig-native/PORTABLE_QUERIES.md). Add each newly
-represented graph as its own typed section claim; keep declined kinds absent
-rather than partially encoded. Reconstruct owners, aliases, source and nominal
-identities on import (builtin identities use unit `maxInt(u32)`), and extend the
-public-example restart law and decode probe to every new kind.
+[transactional revision deltas](tasks/021-publish-transactional-revision-deltas.md).
+Every successful revision currently rebuilds all of `code_artifacts.Pools`
+(`capture()` in `src/code_artifacts.zig`): identity metadata, module pins and
+body pins, layouts, the evaluator snapshot (`copySnapshotMeasured`, the largest
+copy), substitutions, captures, bridge, field locations, operations, functions,
+serialized data, slots and provider/request state. `retained_revision.commit`
+moves the candidate's `Current` and frees the old one; only the dependency seed
+(`retained_dependency.Module` refcounts on the mixed freeze path), Gate leases
+(`shared_query_gate.share`) and unchanged-output admission are shared today.
+Measure metadata copies separately (work counters `snapshot_copy_bytes`,
+`principal_copy_buffer_bytes`), share immutable unchanged owners with explicit
+leases and bounded compaction, and keep commit allocation-free.
 
-The task-019 candidate is pinned in
-[the qualification pins](zig-native/qualification/portable-queries-pins.json):
-compiler `69e8692e88c0e49fa63e25fe3d42100dcec085ee048bb900acb2d2c2ac36f0d5`,
-419-file input map
-`368c0ad70739d783feaaeea84ff331e3cf70985bccb8fb957a0c12bc68e8c9ce`, binaries in
-ignored `build/bench/serialize-queries/`. Its baseline was rebuilt locally from
-`e018d8d` (`8a758ae2…`); the cloud pins for tasks 015–018
-(`candidate-executable-queries/`, `candidate-source-validation/`,
-`candidate-specialization-principal/`, `candidate-refinement-query-v2/`) are not
-on this machine. Task 002 and the private application gate in 084 remain open on
-absent owner-local artifacts.
+The task-020 candidate is pinned in
+[its pins](zig-native/qualification/semantic-artifacts-pins.json): compiler
+`640c744df0e3eb10ef7f8e9189b899949bbd0baafb407c9b8cc248baa7e802f1`, binaries in
+ignored `build/bench/semantic-artifacts/`. Task 019's candidate stays in
+`build/bench/serialize-queries/`. Tasks 036 and 048 are also ready. Tasks 002,
+040–047 and 075 onward stay blocked on owner-local artifacts (task 002), and 084
+on private gdev.
 
 ## Notes
 
