@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — general private component jobs and failure ownership
-  are being implemented; no completion is claimed.
+- **Status:** Complete — private ready components, deterministic atomic
+  publication and failure ownership are qualified; the default stays serial.
 - **Dependencies:** [007](007-infer-recursive-components-jointly.md),
   [008](008-canonicalize-specialization-keys.md),
   [010](010-schedule-constraints-by-variable.md)
@@ -28,11 +28,11 @@ counts. General component jobs still need task-level isolation.
 
 ## Implementation checklist
 
-- [ ] Schedule only independent components with immutable inputs and private
+- [x] Schedule only independent components with immutable inputs and private
       solver, scratch, importer maps and diagnostics.
-- [ ] Join every worker before source/allocator teardown and publish results in
+- [x] Join every worker before source/allocator teardown and publish results in
       deterministic source order under complete canonical keys.
-- [ ] Handle worker failure, cancellation and allocation failure without partial
+- [x] Handle worker failure, cancellation and allocation failure without partial
       publication, races in reference counts or loss of independent successful
       proofs.
 
@@ -53,20 +53,35 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Independent jobs own all mutable solver state and publish
+- [x] Independent jobs own all mutable solver state and publish
       deterministically after successful validation.
-- [ ] Single-worker equivalence, cancellation and failure ownership are
+- [x] Single-worker equivalence, cancellation and failure ownership are
       demonstrated; default parallel policy is reserved for task 013.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `eb66151` (`eb6615122912bafb2150dd049f8fdcc644e3ea5e`).
+- Validation: Zig `0.17.0`; `deno task test:compiler` passes the full LLVM
+  native suite and 620 guest/client tests; `deno task lint:zig` checks 297 files
+  with zero findings; `deno task package:check` and affected formatting checks
+  pass. Native allocation-failure, joined cancellation, mixed outcomes, lexical
+  capture and component-atomic recursive laws are included.
+- Comparison: the immutable task 011 compiler and candidate default/worker
+  counts 1, 2, 4 and 8 match all 626 public source/prelude cases (3,756
+  invocations), ordered diagnostics and Wasm, with zero live tracked bytes.
+  Corpus expectations execute in 192 guests / 10,362 calls. Repeated retained
+  population/edit/revert/no-op, failed-source correction and checkpoint restart
+  match on 27 workloads, with 2,106 successful revision samples and 648 guests /
+  41,208 calls, including edited outputs. Exact pins and allocation observations
+  are in the durable record. CPU/wall distributions and default policy are task
+  013; this task makes no timing claim.
+- Remaining limitations: currently running jobs poll cancellation at their next
+  dispatch boundary; unsupported new lexical origins, ambiguous same-owner SCCs,
+  active parent dependencies and non-positional artifact source units decline
+  safely to ordinary inference. Private gdev and the original boxed compiler are
+  still absent and remain external qualification gates. No push occurred.
+- Durable record: [SEMANTIC_JOBS.md](../zig-native/SEMANTIC_JOBS.md),
+  [ownership contract](../zig-native/CONTRACT.md) and
+  [public client options](../zig-native/PROJECT_CLIENT.md).

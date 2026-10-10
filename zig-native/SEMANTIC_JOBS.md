@@ -1,7 +1,9 @@
 # Private semantic jobs
 
-Task 012 is under qualification. The serial default remains unchanged.
-Performance qualification and any default policy decision belong to task 013.
+Task 012 is qualified at source milestone `eb66151`
+(`eb6615122912bafb2150dd049f8fdcc644e3ea5e`). The serial default remains
+unchanged. Performance qualification and any default policy decision belong to
+task 013.
 
 ## Scheduling and identity
 
@@ -113,7 +115,7 @@ identity-file SHA-256 is
 `b62e0c396ad50979030456be53fc2257909ab8189e237a8e458e5d2ad7336ddd`. The baseline
 compiler SHA-256 is
 `571c1ccab004a8659553a20b10d5eb2e4b1ad9e680999a59156bc7b66af92c36`. Source
-revision will be recorded after the local implementation milestone.
+revision is `eb6615122912bafb2150dd049f8fdcc644e3ea5e`.
 
 `jobs-comparisons/report.json` compares the baseline, candidate default, and
 explicit workers **1, 2, 4 and 8** on **626** source/prelude cases. All

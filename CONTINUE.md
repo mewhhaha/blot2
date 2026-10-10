@@ -58,6 +58,13 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   with neutral overall CPU; repeated public revisions plateau and teardown to
   zero. Small controls can add traffic. See
   [the allocation qualification](zig-native/SEMANTIC_ALLOCATION.md).
+- Task 012 (private semantic component jobs) is complete at `eb66151`. Joined
+  private solver/scratch/import owners publish whole components
+  deterministically through a staged evidence owner. The full LLVM native suite,
+  620 guest/client tests, 626 six-policy comparisons and zero-findings analyzer
+  pass. Fresh and repeated retained edits/failures/restarts preserve diagnostics
+  and Wasm, with zero fresh teardown bytes and executed original/edited outputs.
+  See [the semantic job qualification](zig-native/SEMANTIC_JOBS.md).
 - Task 014 (typed query design) is complete at `8219cf3`, with final review
   corrections at `beeae7f`. The shared table and migrations remain tasks
   015–020. [The durable design](zig-native/QUERY_TABLE.md) keeps open principal
@@ -96,33 +103,31 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 012
+## Next steps for task 013
 
-Implement
-[general private semantic jobs](tasks/012-schedule-independent-semantic-jobs.md).
-Keep `build/bench/cloud-principal-graphs/candidate-allocation/` immutable as the
-baseline. Its compiler SHA-256 is
-`571c1ccab004a8659553a20b10d5eb2e4b1ad9e680999a59156bc7b66af92c36`, identity
-`3be94f26e4252ad0a710459aaa87ac25628bdba41ad034781cc13e56a808185d`, and
-seven-file source manifest
-`ba3728c7d06708969c7a8ed1a015a908c045ee127331daa3b2449f1d33f5bef7`. Older pins
-remain unchanged. Task 011 qualifies 80 fresh workloads and 76 retained/restart
-workloads, plus direct requested-memory evidence on four repeated public graphs.
-The private application gate remains task 084.
+Qualify [parallel inference](tasks/013-qualify-parallel-inference.md). Keep task
+011's `candidate-allocation/` and task 012's `candidate-semantic-jobs/` pins
+immutable under `build/bench/cloud-principal-graphs/`. Task 012 compiler SHA-256
+is `c96e7679ac6173b9d3b9bb3a76d78c1904f4be6735f9419406b2390d93554466`, identity
+file SHA-256 is
+`c5880517a6eed3c8c2aea91c1a781fe2579944f9d5ca302d0b622e0deb7dfe76`, and the
+19-file source hash map is
+`b62e0c396ad50979030456be53fc2257909ab8189e237a8e458e5d2ad7336ddd`. The serial
+default and explicit `--semantic-workers 1` are separate policies. The direct
+retained client accepts `semanticWorkers: 1..16`.
 
-Generalize the existing closed-call proof batch to actual independent semantic
-components with immutable input snapshots, private solver/scratch/import maps
-and diagnostics. The coordinator owns SCC discovery, exact complete keys and
-atomic deterministic publication. Exported-source-interface fan-out alone does
-not complete the task. Newly discovered shared edges need conservative serial
-fallback or component restart before publication. Preserve completed independent
-proofs across other worker failures, stop dispatch on cancellation and join
-started jobs before any borrowed source or allocator is released. Worker-local
-semantic IDs require explicit remapping before parent publication. Test mixed
-results, one-versus-many equivalence, recursive components, cancellation and
-allocation failure. Default parallel enablement belongs to task 013 and needs
-both CPU and wall-time improvement. Task 014's design is complete; task 015 is
-also dependency-ready after the lower-numbered in-progress work.
+Record alternating CPU and wall distributions at feasible worker counts on an
+idle benchmark phase, including scheduler policy, nice value, affinity and CPU
+quota. Separate coordination/job work and allocation; measure fresh compilation,
+retained population/edit/revert/no-op and restart independently. Do not
+interpret SCHED_IDLE wall noise as a speedup. Default enablement requires both
+CPU and wall improvement; otherwise document qualified opt-in costs and keep the
+serial default. The prepared fresh helper is `measure-semantic-jobs.py`; task
+011's native retained memory probe is the accounting model to extend.
+
+Task 014's design is complete; task 015 is also dependency-ready after the lower
+numbered work. Task 002 and the private application gate in task 084 remain
+blocked on absent owner-local artifacts.
 
 ## Notes
 
@@ -134,7 +139,7 @@ also dependency-ready after the lower-numbered in-progress work.
   `ZIG_ANALYZER=/tmp/blot-qualified-analyzer-756bfd5/zig-out/bin/zig-analyzer`.
   Those paths refer to the original machine. In the cloud checkout, use
   `ZIG_ANALYZER=/workspace/tooling/zig-analyzer/zig-out/bin/zig-analyzer`; its
-  source is at the CI pin and it reports zero findings across 295 Zig files.
+  source is at the CI pin and it reports zero findings across 297 Zig files.
 - The cloud Deno 2.9.6 standalone runtime is cached from the official GitHub
   release with its published SHA-256 verified. The initial full gate failed only
   on the blocked `dl.deno.land` download; after caching, the complete

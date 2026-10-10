@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — worker CPU/wall and allocation qualification is
+  next; no completion or default enablement is claimed.
 - **Dependencies:** [011](011-reduce-semantic-allocation-traffic.md),
   [012](012-schedule-independent-semantic-jobs.md)
 - **Originating requirements:** PLAN: Hill 9 / default policy qualification.
