@@ -6,6 +6,7 @@ const eval = @import("core_eval.zig");
 const evidence = @import("type_evidence.zig");
 const expectation = @import("code_expectation.zig");
 const receipt = @import("specialization_receipt.zig");
+const queries = @import("semantic_query_table.zig");
 const Allocator = std.mem.Allocator;
 
 pub const Root = union(enum) { body: core.BindingRef, closure: struct { unit: u32, catalog: u32 } };
@@ -22,20 +23,54 @@ pub const Observation = struct {
         for (region.scratch.constraints.items) |constraint| self.complete = self.complete and constraint.solved;
     }
 };
-pub const Record = struct {
+pub const Key = struct {
     root: Root,
     expected: u32,
     seeds: []evidence.Mapping,
     rows: []evidence.RowMapping,
-    result: eval.SolvedEvidence,
-    facts: receipt.Record,
-    pub fn deinit(self: *Record, a: Allocator) void {
+    options: eval.Options,
+    depth: usize,
+    pub fn deinit(self: *Key, a: Allocator) void {
         a.free(self.seeds);
         a.free(self.rows);
-        self.result.deinit(a);
-        self.facts.deinit(a);
     }
 };
+pub const Adapter = struct {
+    pub const kind: queries.Kind = .refinement;
+    pub const Key = @import("refinement_receipt.zig").Key;
+    pub const Dependencies = receipt.Record;
+    pub const Result = eval.SolvedEvidence;
+    pub fn fingerprint(key: @This().Key) u64 {
+        return rootFingerprint(key.root);
+    }
+    pub fn complete(record_: Record) bool {
+        const facts = record_.dependencies;
+        return facts.complete and facts.steps == 0 and facts.values_added == 0 and facts.children_added == 0 and facts.views.len == 0 and record_.value.selected.len == 0 and std.meta.eql(record_.key.options, facts.options) and record_.key.depth == facts.depth;
+    }
+    pub fn bytes(record_: Record) usize {
+        var total: usize = 0;
+        inline for (.{ "seeds", "rows" }) |field| {
+            const entries = @field(record_.key, field);
+            total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
+        }
+        inline for (.{ "sources", "scalar_reads", "call_reads", "call_publications", "views", "plain_facts" }) |field| {
+            const entries = @field(record_.dependencies, field);
+            total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
+        }
+        inline for (.{ "types", "rows", "selected" }) |field| {
+            const entries = @field(record_.value, field);
+            total +|= entries.len *| @sizeOf(@TypeOf(entries[0]));
+        }
+        return total;
+    }
+};
+pub const Table = queries.Table(Adapter);
+pub const Record = Table.Record;
+fn rootFingerprint(root: Root) u64 {
+    var state = std.hash.Wyhash.init(0);
+    std.hash.autoHash(&state, root);
+    return state.final();
+}
 pub const Reason = enum { mode, root, source, shape, seed, scalar, call, plain, import };
 pub const Stats = struct {
     requests: usize = 0,
@@ -48,94 +83,74 @@ pub const Stats = struct {
     publications: usize = 0,
     local_requests: usize = 0,
     local_hits: usize = 0,
+    local_candidates: usize = 0,
+    indexed_positions: usize = 0,
+    retained_records: usize = 0,
+    retained_payload_bytes: usize = 0,
+    retained_capacity_bytes: usize = 0,
+    saturated: usize = 0,
     body_cutoff_hits: usize = 0,
     reasons: [@typeInfo(Reason).@"enum".field_names.len]usize = @splat(0),
 };
 
-/// Answers completed in this Generator already belong to its evidence owner.
-/// This index contains receipt positions, never pointers into growing arrays.
-pub const Memo = struct {
-    buckets: std.AutoHashMapUnmanaged(u64, usize) = .empty,
-    next: std.ArrayList(?usize) = .empty,
-    pub fn deinit(self: *Memo, a: Allocator) void {
-        self.buckets.deinit(a);
-        self.next.deinit(a);
-    }
-    fn hash(root: Root, expected: u32, seeds: []const evidence.Mapping, rows: []const evidence.RowMapping) u64 {
-        var state = std.hash.Wyhash.init(0);
-        std.hash.autoHash(&state, root);
-        std.hash.autoHash(&state, expected);
-        for (seeds) |seed| std.hash.autoHash(&state, seed);
-        for (rows) |row| std.hash.autoHash(&state, row);
-        return state.final();
-    }
-    pub fn lookup(self: *Memo, g: anytype, root: Root, expected: u32, seeds: []const evidence.Mapping, rows: []const evidence.RowMapping) Allocator.Error!?eval.SolvedEvidence {
-        const owner = g.refinement_owner orelse return null;
-        const session = &g.evaluator;
-        if (session.receipt_tape != null or session.principal_reads != null) return null;
-        g.refinement_stats.local_requests += 1;
-        const records = owner.refinement_receipts.items;
-        try self.next.ensureTotalCapacity(g.allocator, records.len);
-        while (self.next.items.len < records.len) {
-            const id = self.next.items.len;
-            const record_ = records[id];
-            if (!record_.facts.complete) {
-                self.next.appendAssumeCapacity(null);
-                continue;
-            }
-            const bucket = try self.buckets.getOrPut(g.allocator, hash(record_.root, record_.expected, record_.seeds, record_.rows));
-            self.next.appendAssumeCapacity(if (bucket.found_existing) bucket.value_ptr.* else null);
-            bucket.value_ptr.* = id;
-        }
-        var candidate = self.buckets.get(hash(root, expected, seeds, rows));
-        while (candidate) |id| {
-            candidate = self.next.items[id];
-            const record_ = &records[id];
-            const facts = &record_.facts;
-            if (!std.meta.eql(record_.root, root) or record_.expected != expected or record_.seeds.len != seeds.len or record_.rows.len != rows.len) continue;
-            var same = true;
-            for (record_.seeds, seeds) |left, right| same = same and std.meta.eql(left, right);
-            for (record_.rows, rows) |left, right| same = same and std.meta.eql(left, right);
-            if (!same or !std.meta.eql(facts.options, session.options) or facts.depth != session.depth or facts.steps != 0 or facts.values_added != 0 or facts.children_added != 0 or facts.views.len != 0) continue;
-            for (facts.scalar_reads) |read| {
-                const module = &session.units[read.target.unit - 1];
-                const body = module.body(read.target.binding).?;
-                const slot = session.slots[session.binding_offsets[read.target.unit - 1] + read.target.binding];
-                const actual = if (!body.runtime and slot.state == .complete and session.valueInfo(slot.value).kind == .scalar) session.valueEvidence(slot.value) else 0;
-                if (read.evidence != actual) {
-                    same = false;
-                    break;
-                }
-            }
-            if (!same) continue;
-            // Closed call proofs only accumulate within this immutable Session.
-            // A now-present proof may skip previously successful work; it cannot
-            // change that completed result. Publications must still be present.
-            for (facts.call_reads) |read| if (read.present and !session.validated_calls.contains(.{ .target = .{ .unit = read.unit - 1, .binding = read.binding }, .evidence = read.evidence })) {
+/// Complete records in the current Context share its immutable evidence owner.
+/// Newest-first is the legacy local priority; exact keys and facts still gate.
+pub fn lookupLocal(g: anytype, root: Root, expected: u32, seeds: []const evidence.Mapping, rows: []const evidence.RowMapping) Allocator.Error!?eval.SolvedEvidence {
+    const owner = g.refinement_owner orelse return null;
+    const session = &g.evaluator;
+    if (session.receipt_tape != null or session.principal_reads != null) return null;
+    g.refinement_stats.local_requests += 1;
+    const table = &owner.refinement_queries;
+    const records = table.records.items;
+    var cursor = table.candidates(rootFingerprint(root), .newest_first);
+    while (cursor.next()) |id| {
+        g.refinement_stats.local_candidates += 1;
+        g.refinement_stats.indexed_positions += 1;
+        const record_ = &records[id];
+        const facts = &record_.dependencies;
+        if (!std.meta.eql(record_.key.root, root) or record_.key.expected != expected or record_.key.seeds.len != seeds.len or record_.key.rows.len != rows.len) continue;
+        var same = true;
+        for (record_.key.seeds, seeds) |left, right| same = same and std.meta.eql(left, right);
+        for (record_.key.rows, rows) |left, right| same = same and std.meta.eql(left, right);
+        if (!same or !std.meta.eql(facts.options, session.options) or facts.depth != session.depth or facts.steps != 0 or facts.values_added != 0 or facts.children_added != 0 or facts.views.len != 0) continue;
+        for (facts.scalar_reads) |read| {
+            const module = &session.units[read.target.unit - 1];
+            const body = module.body(read.target.binding).?;
+            const slot = session.slots[session.binding_offsets[read.target.unit - 1] + read.target.binding];
+            const actual = if (!body.runtime and slot.state == .complete and session.valueInfo(slot.value).kind == .scalar) session.valueEvidence(slot.value) else 0;
+            if (read.evidence != actual) {
                 same = false;
                 break;
-            };
-            for (facts.call_publications) |read| if (!session.validated_calls.contains(.{ .target = .{ .unit = read.unit - 1, .binding = read.binding }, .evidence = read.evidence })) {
+            }
+        }
+        if (!same) continue;
+        // Closed call proofs only accumulate within this immutable Session.
+        // A now-present proof may skip previously successful work; it cannot
+        // change that completed result. Publications must still be present.
+        for (facts.call_reads) |read| if (read.present and !session.validated_calls.contains(.{ .target = .{ .unit = read.unit - 1, .binding = read.binding }, .evidence = read.evidence })) {
+            same = false;
+            break;
+        };
+        for (facts.call_publications) |read| if (!session.validated_calls.contains(.{ .target = .{ .unit = read.unit - 1, .binding = read.binding }, .evidence = read.evidence })) {
+            same = false;
+            break;
+        };
+        for (facts.plain_facts) |fact| {
+            const actual = session.plain_nominals.get(fact.key);
+            if ((fact.read and !fact.present) or actual == null or actual.? != fact.plain) {
                 same = false;
                 break;
-            };
-            for (facts.plain_facts) |fact| {
-                const actual = session.plain_nominals.get(fact.key);
-                if ((fact.read and !fact.present) or actual == null or actual.? != fact.plain) {
-                    same = false;
-                    break;
-                }
             }
-            if (!same) continue;
-            const result = try copyResult(g.allocator, record_.result);
-            g.refinement_stats.local_hits += 1;
-            g.refinement_stats.collected_removed += facts.collected;
-            g.refinement_stats.nodes_removed += facts.solver_nodes;
-            return result;
         }
-        return null;
+        if (!same) continue;
+        const result = try copyResult(g.allocator, record_.value);
+        g.refinement_stats.local_hits += 1;
+        g.refinement_stats.collected_removed += facts.collected;
+        g.refinement_stats.nodes_removed += facts.solver_nodes;
+        return result;
     }
-};
+    return null;
+}
 fn decline(g: anytype, reason: Reason) void {
     g.refinement_stats.reasons[@backingInt(reason)] += 1;
 }
@@ -158,8 +173,6 @@ fn localMemoScenario(a: Allocator) !void {
     };
     var g: TestGenerator = .{ .allocator = a, .refinement_owner = &context, .evaluator = try eval.Session.init(a, &.{}) };
     defer g.evaluator.deinit();
-    var memo: Memo = .{};
-    defer memo.deinit(a);
     const root: Root = .{ .body = .{ .unit = 1, .binding = 7 } };
     const call: eval.CallProofKey = .{ .target = .{ .unit = 0, .binding = 9 }, .evidence = 3 };
     var tape: receipt.Tape = .{};
@@ -170,24 +183,24 @@ fn localMemoScenario(a: Allocator) !void {
     var types = [_]evidence.Mapping{.{ .variable = 17, .evidence = 3 }};
     const result: eval.SolvedEvidence = .{ .types = &types, .rows = &.{}, .selected = &.{} };
     try record(&g, root, 3, &types, &.{}, result, &tape, .{ .regions = 1 }, g.evaluator.values.items.len, g.evaluator.children.items.len, g.evaluator.steps);
-    try std.testing.expect((try memo.lookup(&g, root, 3, &types, &.{})) == null);
+    try std.testing.expect((try lookupLocal(&g, root, 3, &types, &.{})) == null);
     try g.evaluator.validated_calls.put(a, call, {});
     try g.evaluator.plain_nominals.put(a, 19, true);
-    var hit = (try memo.lookup(&g, root, 3, &types, &.{})) orelse return error.TestUnexpectedResult;
+    var hit = (try lookupLocal(&g, root, 3, &types, &.{})) orelse return error.TestUnexpectedResult;
     defer hit.deinit(a);
     try std.testing.expectEqualDeep(result, hit);
     // Returned storage belongs to the caller; changing it cannot poison reuse.
     hit.types[0].evidence = 4;
-    var again = (try memo.lookup(&g, root, 3, &types, &.{})) orelse return error.TestUnexpectedResult;
+    var again = (try lookupLocal(&g, root, 3, &types, &.{})) orelse return error.TestUnexpectedResult;
     defer again.deinit(a);
     try std.testing.expectEqual(@as(u32, 3), again.types[0].evidence);
-    try std.testing.expect((try memo.lookup(&g, root, 3, &.{.{ .variable = 17, .evidence = 4 }}, &.{})) == null);
-    try std.testing.expect((try memo.lookup(&g, .{ .closure = .{ .unit = 1, .catalog = 7 } }, 3, &types, &.{})) == null);
+    try std.testing.expect((try lookupLocal(&g, root, 3, &.{.{ .variable = 17, .evidence = 4 }}, &.{})) == null);
+    try std.testing.expect((try lookupLocal(&g, .{ .closure = .{ .unit = 1, .catalog = 7 } }, 3, &types, &.{})) == null);
     g.evaluator.options.max_depth -= 1;
-    try std.testing.expect((try memo.lookup(&g, root, 3, &types, &.{})) == null);
+    try std.testing.expect((try lookupLocal(&g, root, 3, &types, &.{})) == null);
     g.evaluator.options.max_depth += 1;
     g.evaluator.plain_nominals.getPtr(19).?.* = false;
-    try std.testing.expect((try memo.lookup(&g, root, 3, &types, &.{})) == null);
+    try std.testing.expect((try lookupLocal(&g, root, 3, &types, &.{})) == null);
 }
 
 test "local refinement memo preserves dynamic facts identity ownership and failed allocation" {
@@ -197,6 +210,7 @@ test "local refinement memo preserves dynamic facts identity ownership and faile
 pub fn record(g: anytype, root: Root, expected: u32, seeds: []const evidence.Mapping, rows: []const evidence.RowMapping, result: eval.SolvedEvidence, tape: *receipt.Tape, observed: Observation, before_values: usize, before_children: usize, before_steps: usize) Allocator.Error!void {
     const a = g.allocator;
     const owner = g.refinement_owner orelse return;
+    defer storageStats(g, &owner.refinement_queries);
     if (root == .body) try tape.sources.append(a, root.body);
     var facts = try tape.finish(a, .{
         .input = 0,
@@ -220,16 +234,30 @@ pub fn record(g: anytype, root: Root, expected: u32, seeds: []const evidence.Map
         .views = &.{},
         .plain_facts = &.{},
     });
-    errdefer facts.deinit(a);
+    var owns_facts = true;
+    defer if (owns_facts) facts.deinit(a);
     const inputs = try a.dupe(evidence.Mapping, seeds);
-    errdefer a.free(inputs);
+    var owns_inputs = true;
+    defer if (owns_inputs) a.free(inputs);
     const input_rows = try a.dupe(evidence.RowMapping, rows);
-    errdefer a.free(input_rows);
-    var output = try copyResult(a, result);
-    errdefer output.deinit(a);
-    try owner.refinement_receipts.append(a, .{ .root = root, .expected = expected, .seeds = inputs, .rows = input_rows, .result = output, .facts = facts });
+    var builder = Table.begin(a, .{ .root = root, .expected = expected, .seeds = inputs, .rows = input_rows, .options = facts.options, .depth = facts.depth });
+    defer builder.abort();
+    owns_inputs = false;
+    builder.read(facts);
+    owns_facts = false;
+    builder.stage(try copyResult(a, result));
+    var candidate = builder.complete() orelse return;
+    defer candidate.abort();
+    const prepared = try owner.refinement_queries.prepare(a, &candidate) orelse return;
+    _ = owner.refinement_queries.publish(prepared, &candidate);
     g.refinement_stats.recorded += 1;
-    g.refinement_stats.complete += @intFromBool(facts.complete);
+    g.refinement_stats.complete += 1;
+}
+fn storageStats(g: anytype, table: *const Table) void {
+    g.refinement_stats.retained_records = table.records.items.len;
+    g.refinement_stats.retained_payload_bytes = table.owned_bytes;
+    g.refinement_stats.retained_capacity_bytes = table.capacity_bytes;
+    g.refinement_stats.saturated = table.saturated;
 }
 
 // Gate namespace equality certifies producer and symbol ordinals. Graph IDs
@@ -289,6 +317,7 @@ test "refinement receipt partial shape keys preserve holes owners collection kin
 pub fn lookup(g: anytype, root: Root, shape: expectation.View, expected: u32, seeds: []const evidence.Mapping, rows: []const evidence.RowMapping) Allocator.Error!?eval.SolvedEvidence {
     const state = g.query_state orelse return null;
     const owner = g.artifacts orelse return null;
+    defer storageStats(g, &owner.refinement_queries);
     const gate = &state.gate;
     const a = g.allocator;
     const ordinary: eval.Options = .{ .trace_runtime_dependencies = true, .retain_source_suspensions = true };
@@ -299,10 +328,14 @@ pub fn lookup(g: anytype, root: Root, shape: expectation.View, expected: u32, se
     const pools = &state.old.metadata.pools.?;
     const bridge = pools.bridge orelse return null;
     const before_shape: expectation.View = .{ .nodes = bridge.nodes, .extra = bridge.extra };
-    for (state.old.metadata.refinement_receipts.items) |*prior| {
-        if (!std.meta.eql(prior.root, root)) continue;
+    const table = &state.old.metadata.refinement_queries;
+    var cursor = table.candidates(rootFingerprint(root), .oldest_first);
+    while (cursor.next()) |position| {
+        g.refinement_stats.indexed_positions += 1;
+        const prior = &table.records.items[position];
+        if (!std.meta.eql(prior.key.root, root)) continue;
         g.refinement_stats.candidates += 1;
-        const facts = &prior.facts;
+        const facts = &prior.dependencies;
         if (!facts.complete or facts.steps != 0 or facts.values_added != 0 or facts.children_added != 0 or facts.views.len != 0 or facts.depth != g.evaluator.depth or !std.meta.eql(facts.options, g.evaluator.options)) {
             decline(g, .mode);
             continue;
@@ -322,21 +355,21 @@ pub fn lookup(g: anytype, root: Root, shape: expectation.View, expected: u32, se
             continue;
         }
         var budget: usize = 65536;
-        if (!sameShape(before_shape, prior.expected, shape, expected, 0, &budget)) {
+        if (!sameShape(before_shape, prior.key.expected, shape, expected, 0, &budget)) {
             decline(g, .shape);
             continue;
         }
-        if (seeds.len != prior.seeds.len or rows.len != prior.rows.len) {
+        if (seeds.len != prior.key.seeds.len or rows.len != prior.key.rows.len) {
             decline(g, .seed);
             continue;
         }
         const maps = try state.pairedImporter();
         if (!maps.enabled) continue;
-        for (seeds, prior.seeds) |now, old| if (now.variable != old.variable or now.evidence != try maps.importEvidence(g, old.evidence)) {
+        for (seeds, prior.key.seeds) |now, old| if (now.variable != old.variable or now.evidence != try maps.importEvidence(g, old.evidence)) {
             valid = false;
             break;
         };
-        if (valid) for (rows, prior.rows) |now, old| if (now.variable != old.variable or now.evidence != try maps.importSemanticRow(g, old.evidence)) {
+        if (valid) for (rows, prior.key.rows) |now, old| if (now.variable != old.variable or now.evidence != try maps.importSemanticRow(g, old.evidence)) {
             valid = false;
             break;
         };
@@ -396,7 +429,7 @@ pub fn lookup(g: anytype, root: Root, shape: expectation.View, expected: u32, se
         var next_facts = try facts.clone(a);
         var owns_facts = true;
         defer if (owns_facts) next_facts.deinit(a);
-        var output = try copyResult(a, prior.result);
+        var output = try copyResult(a, prior.value);
         var owns_output = true;
         defer if (owns_output) output.deinit(a);
         for (output.types) |*mapping| mapping.evidence = (try maps.importEvidence(g, mapping.evidence)) orelse {
@@ -437,12 +470,20 @@ pub fn lookup(g: anytype, root: Root, shape: expectation.View, expected: u32, se
         const next_rows = try a.dupe(evidence.RowMapping, rows);
         var owns_rows = true;
         defer if (owns_rows) a.free(next_rows);
-        var next_output = try copyResult(a, output);
-        var owns_next_output = true;
-        defer if (owns_next_output) next_output.deinit(a);
+        var builder = Table.begin(a, .{ .root = root, .expected = expected, .seeds = next_seeds, .rows = next_rows, .options = next_facts.options, .depth = next_facts.depth });
+        defer builder.abort();
+        owns_seeds = false;
+        owns_rows = false;
+        next_facts.values_before = g.evaluator.values.items.len;
+        next_facts.children_before = g.evaluator.children.items.len;
+        builder.read(next_facts);
+        owns_facts = false;
+        builder.stage(try copyResult(a, output));
+        var candidate = builder.complete() orelse continue;
+        defer candidate.abort();
+        const prepared = try owner.refinement_queries.prepare(a, &candidate) orelse continue;
         try g.evaluator.validated_calls.ensureUnusedCapacity(a, @intCast(next_facts.call_publications.len));
         try g.evaluator.plain_nominals.ensureUnusedCapacity(a, @intCast(plain.count()));
-        try owner.refinement_receipts.ensureUnusedCapacity(a, 1);
         // Every allocation/import precedes publication. Candidate ownership
         // keeps these facts and the retained receipt out of failed revisions.
         for (next_facts.call_publications) |call| {
@@ -452,13 +493,7 @@ pub fn lookup(g: anytype, root: Root, shape: expectation.View, expected: u32, se
         }
         var facts_iter = plain.iterator();
         while (facts_iter.next()) |fact| g.evaluator.plain_nominals.putAssumeCapacity(fact.key_ptr.*, fact.value_ptr.*);
-        next_facts.values_before = g.evaluator.values.items.len;
-        next_facts.children_before = g.evaluator.children.items.len;
-        owner.refinement_receipts.appendAssumeCapacity(.{ .root = root, .expected = expected, .seeds = next_seeds, .rows = next_rows, .result = next_output, .facts = next_facts });
-        owns_facts = false;
-        owns_seeds = false;
-        owns_rows = false;
-        owns_next_output = false;
+        _ = owner.refinement_queries.publish(prepared, &candidate);
         owns_output = false;
         for (facts.call_reads) |read| if (read.present) {
             g.evaluator.proofs.proof_reused += 1;

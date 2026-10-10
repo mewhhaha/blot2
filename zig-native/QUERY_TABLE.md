@@ -2,9 +2,11 @@
 
 This is the approved design for task 014 and the implementation contract for
 [015](../tasks/015-migrate-refinement-queries.md)–[020](../tasks/020-persist-complete-semantic-artifacts.md).
-It specifies a migration; the common table and portable query records are not
-implemented by this document. Existing receipts and validation gates remain the
-production proof boundaries until their replacement passes parity.
+It specifies a migration. Task 015 implements the common owned-record,
+transaction and position-index primitives for refinement; see
+[the qualified adapter](REFINEMENT_QUERIES.md). Other adapters and portable
+query records remain tasks 016–020. Existing claim-specific validation gates
+remain production proof boundaries throughout migration.
 
 ## Claims and owners
 

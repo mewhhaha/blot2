@@ -404,13 +404,13 @@ test "refinement receipt survives edits reverts rejected revisions and changed s
         try std.testing.expect(result.result.compiled.reuse.fresh_named > 0);
     }
     const stamp = Stamp.read(&session);
-    const receipts = session.current.?.artifacts.metadata.refinement_receipts.items.ptr;
+    const receipts = session.current.?.artifacts.metadata.refinement_queries.records.items.ptr;
     try fixture.write("main.blot", refinement_source ++ "\nentry const broken: U32 = false\n");
     var rejected = try session.prepareRevision(io, fixture.path, null, .{});
     defer rejected.deinit();
     try std.testing.expect(rejected == .rejected);
     try stamp.unchanged(&session);
-    try std.testing.expect(receipts == session.current.?.artifacts.metadata.refinement_receipts.items.ptr);
+    try std.testing.expect(receipts == session.current.?.artifacts.metadata.refinement_queries.records.items.ptr);
     try fixture.write("main.blot", refinement_source);
     var recovered = try session.revise(io, fixture.path, null, .{});
     defer recovered.deinit(a);

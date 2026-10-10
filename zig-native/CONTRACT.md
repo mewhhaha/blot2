@@ -531,6 +531,16 @@ their complete evaluator graph supplies the code identity, not a reusable
 principal scheme. Capture environments evaluate and store dynamic arguments once
 in source order.
 
+Refinement reuse records live in the Context-owned typed query table. Local
+lookup preserves newest-first order; retained lookup preserves oldest-first
+order. Hash buckets select positions, while exact source, shape, seed and
+dynamic fact gates decide hits. Builders own complete dependency/result slices;
+reserve all table and replay destinations before allocation-free publication.
+Explicit record, payload, buffer-capacity and lookup bounds decline optional
+reuse on saturation. Numeric handles remain scoped to their evidence/Context
+owners. See [REFINEMENT_QUERIES.md](REFINEMENT_QUERIES.md) for limits and
+qualification.
+
 A projected principal query may retain an empty type/row result across primitive
 literal edits only when its complete source input projection and recorded scalar
 type reads match. It must begin without validated-call proofs and perform no

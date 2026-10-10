@@ -127,7 +127,6 @@ const Generator = struct {
     query_state: ?*completed_specialization_query.State = null,
     refinement_owner: ?*code_artifacts.Context = null,
     refinement_stats: refinement_receipt.Stats = .{},
-    refinement_memo: refinement_receipt.Memo = .{},
     work: artifact_fragment.Stats = .{},
     module: wasm.Module,
     instances: std.AutoHashMapUnmanaged(Key, u32) = .empty,
@@ -272,7 +271,6 @@ const Generator = struct {
         return @backingInt(try (try self.representationBridge()).rowFromEvidence(@fromBackingInt(@intCast(id))));
     }
     fn deinit(self: *Generator) void {
-        self.refinement_memo.deinit(self.allocator);
         self.startup_facts.deinit(self.allocator);
         if (self.representation_bridge) |*bridge| bridge.deinit();
         self.module.deinit();
@@ -1045,7 +1043,7 @@ const Generator = struct {
     }
     fn lookupRefinement(context: *anyopaque, root: EvidenceRoot, shape: @import("code_expectation.zig").View, expected: u32, seeds: []const type_evidence.Mapping, rows: []const type_evidence.RowMapping) Allocator.Error!?core_eval.SolvedEvidence {
         const self: *Generator = @ptrCast(@alignCast(context));
-        if (try self.refinement_memo.lookup(self, root, expected, seeds, rows)) |result| return result;
+        if (try refinement_receipt.lookupLocal(self, root, expected, seeds, rows)) |result| return result;
         return refinement_receipt.lookup(self, root, shape, expected, seeds, rows);
     }
     fn recordRefinement(context: *anyopaque, record: specialization.Record) Allocator.Error!void {

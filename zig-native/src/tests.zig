@@ -1,4 +1,6 @@
 comptime {
+    _ = @import("semantic_query_table.zig");
+    _ = @import("refinement_receipt.zig");
     _ = @import("solver_worklist.zig");
     _ = @import("region_arena.zig");
     _ = @import("restart_cache.zig");

@@ -280,7 +280,7 @@ pub const Context = struct {
     principal_proofs: std.ArrayList(PrincipalProof) = .empty,
     specialization_receipts: std.ArrayList(@import("specialization_receipt.zig").Record) = .empty,
     independent_calls: std.ArrayList(@import("independent_call_proof.zig").Record) = .empty,
-    refinement_receipts: std.ArrayList(@import("refinement_receipt.zig").Record) = .empty,
+    refinement_queries: @import("refinement_receipt.zig").Table = .{},
     pub fn init(allocator: Allocator) Context {
         return .{ .allocator = allocator };
     }
@@ -289,8 +289,7 @@ pub const Context = struct {
         self.principal_proofs.deinit(self.allocator);
         for (self.specialization_receipts.items) |*record| record.deinit(self.allocator);
         self.specialization_receipts.deinit(self.allocator);
-        for (self.refinement_receipts.items) |*record| record.deinit(self.allocator);
-        self.refinement_receipts.deinit(self.allocator);
+        self.refinement_queries.deinit(self.allocator);
         for (self.independent_calls.items) |*record| record.deinit(self.allocator);
         self.independent_calls.deinit(self.allocator);
         for (self.jobs.items) |*job| job.deinit(self.allocator);
