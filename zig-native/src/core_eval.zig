@@ -328,6 +328,7 @@ const CallSummaries = struct {
         restarts: usize = 0,
         transitions: usize = 0,
         counters: @import("work_counters.zig").Counters = .{},
+        job_nanos: u64 = 0,
         pub fn deinit(self: *ComponentResult, a: Allocator) void {
             if (self.snapshot) |*snapshot_| snapshot_.deinit(a);
             a.free(self.keys);
@@ -339,6 +340,12 @@ const CallSummaries = struct {
         }
     };
     fn executeComponent(scratch: Allocator, output: Allocator, input: *const Session, component_: Component) Allocator.Error!?ComponentResult {
+        var clock = @import("backend_timing.zig").Clock.init(if (input.timing != null) input.semantic_io else null);
+        var result = try executeComponentOwned(scratch, output, input, component_);
+        if (result) |*owned| owned.job_nanos = clock.lapNanos();
+        return result;
+    }
+    fn executeComponentOwned(scratch: Allocator, output: Allocator, input: *const Session, component_: Component) Allocator.Error!?ComponentResult {
         var private = try Session.init(scratch, input.units);
         defer private.deinit();
         private.options = input.options;
@@ -438,6 +445,8 @@ const CallSummaries = struct {
     fn parallelReady(self: *CallSummaries, session: *Session) ClosureRegion.RegionError!bool {
         const io = session.semantic_io orelse return false;
         if (session.semantic_component_workers == 0 or session.receipt_tape != null or session.principal_reads != null or session.refinement_observation != null or session.summary_exhausted) return false;
+        const coordination = if (session.timing) |timing| timing.enter(.semantic_coordination) else null;
+        defer if (coordination) |scope| scope.deinit();
         const a = session.allocator;
         var ready: std.ArrayList(Component) = .empty;
         defer {
@@ -496,15 +505,21 @@ const CallSummaries = struct {
         for (ready.items) |*component_| component_.budget = budget;
         const jobs = @import("semantic_job_batch.zig");
         var cancellation: jobs.Cancellation = .{};
-        var batch = try jobs.run(ComponentResult, a, io, ready.items, session.semantic_component_workers, &cancellation, @as(*const Session, session), executeComponent);
+        var batch = blk: {
+            const dispatch = if (session.timing) |timing| timing.enter(.semantic_dispatch) else null;
+            defer if (dispatch) |scope| scope.deinit();
+            break :blk try jobs.run(ComponentResult, a, io, ready.items, session.semantic_component_workers, &cancellation, @as(*const Session, session), executeComponent);
+        };
         defer batch.deinit();
         session.counters.semantic_component_batches += 1;
         session.counters.semantic_component_jobs += ready.items.len;
+        session.counters.max_semantic_component_workers = @max(session.counters.max_semantic_component_workers, batch.workers);
         var failed = false;
         var progressed = false;
         for (ready.items, batch.outcomes) |component_, outcome| switch (outcome) {
             .out_of_memory => failed = true,
             .complete => |result| {
+                if (session.timing) |timing| timing.semantic_job_nanos +|= result.job_nanos;
                 session.counters.merge(result.counters);
                 if (!session.summaryCharge(result.transitions)) continue;
                 const snapshot_ = result.snapshot orelse continue;
@@ -520,6 +535,8 @@ const CallSummaries = struct {
                     }
                 }
                 if (!independent_sources) continue;
+                const publication = if (session.timing) |timing| timing.enter(.semantic_publication) else null;
+                defer if (publication) |scope| scope.deinit();
                 // Import into a complete private destination. A failed import
                 // cannot mutate parent evidence or publish a subset of an SCC.
                 var staged = session.evidence.clone(a) catch {

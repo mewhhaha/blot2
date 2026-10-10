@@ -135,3 +135,53 @@ Deno.test("private semantic worker counts reject invalid options before spawning
     );
   }
 });
+
+Deno.test("semantic worker profiling observes joined jobs without changing Wasm or work", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-worker-profile-" });
+  const entry = `${directory}/main.blot`;
+  try {
+    const outputs = [];
+    const counters = [];
+    for (const profileBackend of [false, true]) {
+      const compiler = await createZigProjectCompiler({
+        executable,
+        entry,
+        prelude: null,
+        cacheDirectory: false,
+        semanticWorkers: 4,
+        profileBackend,
+      });
+      try {
+        const result = await compiler.build({
+          sources: { [entry]: source(1) },
+        });
+        assert(result.success);
+        outputs.push(result.bytes);
+        counters.push(result.stats.workCounters);
+        const timing = result.stats.backendTiming as { [key: string]: unknown };
+        if (profileBackend) {
+          const work = timing.work as { [key: string]: number };
+          for (
+            const field of [
+              "semantic_coordination_us",
+              "semantic_dispatch_us",
+              "semantic_publication_us",
+              "semantic_job_sum_us",
+            ]
+          ) {
+            assert(Number.isInteger(work[field]) && work[field] >= 0, field);
+          }
+          assert(work.semantic_job_sum_us > 0);
+        } else {
+          assert(!("work" in timing));
+        }
+      } finally {
+        await compiler.dispose();
+      }
+    }
+    assert.deepEqual(outputs[0], outputs[1]);
+    assert.deepEqual(counters[0], counters[1]);
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

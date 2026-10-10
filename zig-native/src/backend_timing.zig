@@ -58,6 +58,11 @@ pub const WorkStats = struct {
     layouts_us: u64 = 0,
     evaluation_us: u64 = 0,
     inference_us: u64 = 0,
+    semantic_coordination_us: u64 = 0,
+    semantic_dispatch_us: u64 = 0,
+    semantic_publication_us: u64 = 0,
+    /// Sum of private job wall time; overlaps dispatch and is not additive.
+    semantic_job_sum_us: u64 = 0,
     /// Only the slowest recorded regions are published; empty slots are not.
     pub fn jsonStringify(self: *const WorkStats, stream: *std.json.Stringify) std.Io.Writer.Error!void {
         try stream.beginObject();
@@ -75,11 +80,12 @@ pub const WorkStats = struct {
     }
 };
 pub const Work = struct {
-    pub const Phase = enum { other, lookup, replay, specialization, constants, principals, interfaces, startup, layouts, evaluation, inference };
+    pub const Phase = enum { other, lookup, replay, specialization, constants, principals, interfaces, startup, layouts, evaluation, inference, semantic_coordination, semantic_dispatch, semantic_publication };
     clock: Clock = .{ .io = null, .previous = null },
     active: Phase = .other,
     regions: [8]Region = @splat(.{}),
     nanos: [@typeInfo(Phase).@"enum".field_names.len]u64 = @splat(0),
+    semantic_job_nanos: u64 = 0,
     pub const Scope = struct {
         owner: *Work,
         previous: Phase,
@@ -98,7 +104,7 @@ pub const Work = struct {
         self.nanos[@backingInt(self.active)] += self.clock.lapNanos();
     }
     pub fn snapshot(self: *const Work) WorkStats {
-        var result: WorkStats = .{ .regions = self.regions };
+        var result: WorkStats = .{ .regions = self.regions, .semantic_job_sum_us = self.semantic_job_nanos / std.time.ns_per_us };
         inline for (@typeInfo(Phase).@"enum".field_names) |field| {
             if (comptime !std.mem.eql(u8, field, "other")) {
                 const phase = @field(Phase, field);

@@ -5,6 +5,8 @@
 pub const Counters = struct {
     semantic_component_batches: u64 = 0,
     semantic_component_jobs: u64 = 0,
+    /// Admitted worker capacity, including the coordinator; not overlap or CPUs.
+    max_semantic_component_workers: u64 = 0,
     /// Inference regions opened (ClosureRegion lifetimes, including split children).
     inference_regions: u64 = 0,
     /// Session-local canonical requests and complete proofs reconstructed around
