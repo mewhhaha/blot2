@@ -116,14 +116,19 @@
       },
       "build_command": "zig version; deno task test:compiler",
       "qualification": {
-        "state": "in progress",
+        "state": "qualified refinement adapter",
         "full_gate": "query-table-full-gate-v2.log",
         "analyzer": "query-table-analyzer-v2.log",
         "comparisons": "query-table-comparisons/report.json",
         "retained": "query-table-retained/report.json",
         "package": "query-table-package-check-v2.log",
-        "initial_pin": "candidate-refinement-query: same native binary/identity; original TS law omitted null arguments and failed type checking"
-      }
+        "initial_pin": "candidate-refinement-query: same native binary/identity; original TS law omitted null arguments and failed type checking",
+        "focused": "query-table-focus-v6.log",
+        "fresh": "query-table-measurement/report.json",
+        "retained_memory": "query-table-memory/report.json",
+        "specific_retained": "query-table-specific-retained/report.json"
+      },
+      "source_revision": "bfcb46420c605339962a7235601e8ef3350ef423"
     }
   },
   "drivers": {
@@ -956,5 +961,6 @@
   "reports": {
     "build/bench/cloud-principal-graphs/query-table-measurement/report.json": "caa4fb9d59e39abe0dd4c5620bedf5082db13bc8b7bb412f9af386499c2395ae",
     "build/bench/cloud-principal-graphs/query-table-memory/report.json": "ece402cec9c69aab38f3cd3b2c97755daa285cac39ef0b85be4e9b361acd6967"
-  }
+  },
+  "source_revision": "bfcb46420c605339962a7235601e8ef3350ef423"
 }

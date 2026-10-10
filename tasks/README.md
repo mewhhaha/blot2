@@ -148,7 +148,7 @@ zero-findings analyzer across 295 Zig files pass. Initial and edited outputs
 execute; 77 fresh and 73 retained/restart workloads qualify the immutable pin.
 Repeated scalar/Box captures reuse proofs while rebuilding current handles;
 incomplete inputs remain conservative. Overall median CPU ratio is 0.987. Task
-[015] is next; [013] and [014] are complete.
+[016] is next; [013], [014] and [015] are complete.
 [The canonical qualification](../zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026)
 records exact pins, measurements and remaining limits.
 
@@ -409,7 +409,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [012] — Schedule independent semantic jobs              | Complete    | [007], [008], [010]                    |
 | [013] — Qualify parallel inference                      | Complete    | [011], [012]                           |
 | [014] — Specify unified query table                     | Complete    | [008]                                  |
-| [015] — Migrate refinement queries                      | Pending     | [014]                                  |
+| [015] — Migrate refinement queries                      | Complete    | [014]                                  |
 | [016] — Migrate specialization and principal queries    | Pending     | [015]                                  |
 | [017] — Unify source and revision validation            | Pending     | [016]                                  |
 | [018] — Migrate executable reuse queries                | Pending     | [017]                                  |
