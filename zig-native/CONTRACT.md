@@ -708,3 +708,17 @@ is re-serialized in the current owner through the ordinary constant path, and
 only the caller's exact root-address operands are relocated. Demand cells and
 other generative or operational values rebuild their callers. See
 [retained constants](RETAINED_CONSTANTS.md).
+
+An edited module that is not structurally equal keeps the reuse gate enabled
+only when its ordered semantic catalog is identical, including every operation
+value entry: identity, arguments, signature, witness node and witness result.
+Each entry belongs to the one declaration whose operation-value node names it;
+definition equality compares the entry and scans its witness, and the
+dependency walk follows it, so a changed provider, state initial value or
+witness dirties exactly that declaration and its transitive consumers. An
+added, removed or shifted entry still disables the gate for the program. A
+published dependency certificate shares, by lease, the previous certificate's
+image of a unit only when that image exactly matched the old pin and the
+current module is proven stream-equal to it; every other unit is re-imaged.
+Matching still walks every byte of the shared image. See
+[literal edits](LITERAL_EDITS.md).

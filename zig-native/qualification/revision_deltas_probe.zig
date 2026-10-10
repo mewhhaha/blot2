@@ -61,6 +61,8 @@ pub fn main(init: std.process.Init) !void {
                             .metadata_copied_fields = 0,
                             .reused_named = 0,
                             .reused_closures = 0,
+                            .fresh_named = 0,
+                            .fresh_closures = 0,
                             .reused_scalar_constants = 0,
                             .reused_aggregate_constants = 0,
                         }, .{}, &writer.interface);
@@ -95,6 +97,8 @@ pub fn main(init: std.process.Init) !void {
                     .metadata_copied_fields = if (@hasField(@TypeOf(counters), "metadata_copied_fields")) counters.metadata_copied_fields else 0,
                     .reused_named = reuse.reused_named,
                     .reused_closures = reuse.reused_closures,
+                    .fresh_named = reuse.fresh_named,
+                    .fresh_closures = reuse.fresh_closures,
                     .reused_scalar_constants = reuse.reused_scalar_constants,
                     .reused_aggregate_constants = if (@hasField(@TypeOf(reuse), "reused_aggregate_constants")) reuse.reused_aggregate_constants else 0,
                 }, .{}, &writer.interface);

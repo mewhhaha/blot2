@@ -30,6 +30,10 @@ pub const Gate = struct {
     /// Exact ordered namespace/structure equality, allowing only the narrowly
     /// permitted scalar value bits. This alone does not establish proof validity.
     structural_units: []const bool,
+    /// Units whose old certificate image exactly matched the old pin and whose
+    /// current module is exactly stream-equal to that pin (`proveSame`). The
+    /// old image bytes therefore equal the current module's image.
+    certified_images: []const bool,
     offsets: []const usize,
     dirty: []const bool,
     local_dirty: []const bool,
@@ -62,6 +66,9 @@ pub const Gate = struct {
         const structural_units = try allocator.alloc(bool, units.len);
         errdefer allocator.free(structural_units);
         @memset(structural_units, false);
+        const certified_images = try allocator.alloc(bool, units.len);
+        errdefer allocator.free(certified_images);
+        @memset(certified_images, false);
         const offsets = try allocator.alloc(usize, units.len + 1);
         errdefer allocator.free(offsets);
         offsets[0] = 0;
@@ -75,7 +82,7 @@ pub const Gate = struct {
         const storage = try allocator.create(Storage);
         errdefer allocator.destroy(storage);
         storage.* = .{};
-        var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .structural_units = structural_units, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
+        var result: Gate = .{ .storage = storage, .allocator = allocator, .source_pools = old, .units = units, .structural_units = structural_units, .certified_images = certified_images, .offsets = offsets, .dirty = dirty, .local_dirty = local_dirty };
 
         if (!old.project_identity or old.identity == null or names == null or old.modules.len != units.len or units.len == 0 or units.len >= std.math.maxInt(u32)) return result;
         // Artifact/query records below use one-based catalog positions. The
@@ -96,6 +103,7 @@ pub const Gate = struct {
         for (units, old.modules, 0..) |*module, pin, unit| {
             const exact = if (stamps) |checker| try checker.proveSame(pin.module, module) else false;
             structural_units[unit] = exact or moduleEqual(pin.module, module);
+            certified_images[unit] = exact;
             all_structural = all_structural and structural_units[unit];
         }
         if (!all_structural) {
@@ -128,6 +136,7 @@ pub const Gate = struct {
                 // above; the certificate also owns its original stamp.
                 result.reused_dependency_validations += 1;
             } else {
+                certified_images[unit] = false;
                 result.dependency_validations += 1;
                 if (!try validDependencies(allocator, pin.module, old_units, previous.symbols.len)) return result;
             }
@@ -306,6 +315,7 @@ pub const Gate = struct {
         self.storage.references -= 1;
         if (self.storage.references == 0) {
             self.allocator.free(self.structural_units);
+            self.allocator.free(self.certified_images);
             self.allocator.free(self.offsets);
             self.allocator.free(self.dirty);
             self.allocator.free(self.local_dirty);
@@ -324,7 +334,10 @@ pub const Gate = struct {
             if (pin.module != module) return null;
             unit.* = module;
         }
-        return try @import("dependency_certificate.zig").Certificate.capture(a, .{ .units = units, .symbol_count = self.validation_symbols }, pins, self.validation_names orelse return null);
+        // Exactly proven unchanged units copy the old certificate's image
+        // instead of re-serializing their whole graph.
+        const previous = if (self.source_pools) |old| if (old.dependency_certificate) |*certificate| certificate else null else null;
+        return try @import("dependency_certificate.zig").Certificate.captureReusing(a, .{ .units = units, .symbol_count = self.validation_symbols }, pins, self.validation_names orelse return null, previous, self.certified_images);
     }
 
     fn targetDirty(self: *const Gate, owner: usize, target: core.BindingRef) bool {
@@ -358,11 +371,14 @@ fn catalogEqual(previous: *const core.Module, current: *const core.Module) bool 
     inline for (@typeInfo(core.Module).@"struct".field_names) |name| {
         const field = @field(ModuleField, name);
         switch (field) {
-            .unit, .types, .nominals, .constructors, .associated, .operation_names, .names, .field_names, .obligations => {
+            // Operation values are an identity catalog: entries must be
+            // identical. Their witness expressions are projected by every
+            // referencing declaration's definition equality and dependency
+            // walk, so a changed witness dirties exactly its consumers.
+            .unit, .types, .nominals, .constructors, .associated, .operation_names, .names, .field_names, .obligations, .operation_values => {
                 if (!equal(@field(previous, name), @field(current, name))) return false;
             },
-            // Witness expressions require their own dependency projection.
-            .operation_values, .diagnostics => {
+            .diagnostics => {
                 if (@field(previous, name).len != 0 or @field(current, name).len != 0) return false;
             },
             .runtime_names,

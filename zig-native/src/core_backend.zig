@@ -2143,7 +2143,10 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         } else if (retained) |*state| if (state.importer.code_gate) |*checked| {
             metadata.pools.?.dependency_certificate = try checked.semantic.freezeValidation(allocator, metadata.pools.?.modules);
         };
-        if (metadata.pools.?.dependency_certificate) |*certificate| result.source_validation.retained = certificate.storage();
+        if (metadata.pools.?.dependency_certificate) |*certificate| {
+            result.source_validation.retained = certificate.storage();
+            result.source_validation.reused_images = certificate.reused_images;
+        }
         journal.seal();
         try journal.freezeFunctions(metadata.function_jobs.items);
         // These helpers capture values absent from ClosureKey. Full journal

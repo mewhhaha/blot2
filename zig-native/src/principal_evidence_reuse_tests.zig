@@ -192,7 +192,7 @@ test "principal cache replays projected inference but reevaluates changed transi
     try std.testing.expect(reused.principal.fresh_regions < fresh.principal.fresh_regions);
 }
 
-test "principal cache globally rejects real type associated catalog and provider edits with identical namespaces" {
+test "principal cache globally rejects type and associated catalog edits but keeps independent proofs across provider edits" {
     const type_prefix =
         \\entry const integer: U32 = 0
         \\entry const floating: F32 = 0.0
@@ -202,10 +202,12 @@ test "principal cache globally rejects real type associated catalog and provider
         \\const sub = fn value => value
     ;
     const provider_prefix = "type State a is effect = { get: Unit -> a, set: a -> Unit }\n";
-    const cases = [_]struct { label: []const u8, before: []const u8, after: []const u8 }{
-        .{ .label = "type", .before = type_prefix ++ "\ntype Cell is data = #Cell U32\n" ++ positive_source, .after = type_prefix ++ "\ntype Cell is data = #Cell F32\n" ++ positive_source },
-        .{ .label = "catalog", .before = associated_prefix ++ "\nconst U32.add = fn left => fn right => @u32.add left right\n" ++ positive_source, .after = associated_prefix ++ "\nconst U32.sub = fn left => fn right => @u32.add left right\n" ++ positive_source },
-        .{ .label = "provider", .before = provider_prefix ++ "const state = @effect.state (State.get U32) (State.set U32) 1\n" ++ positive_source, .after = provider_prefix ++ "const state = @effect.state (State.get U32) (State.set U32) 2\n" ++ positive_source },
+    const cases = [_]struct { label: []const u8, before: []const u8, after: []const u8, global: bool }{
+        .{ .label = "type", .before = type_prefix ++ "\ntype Cell is data = #Cell U32\n" ++ positive_source, .after = type_prefix ++ "\ntype Cell is data = #Cell F32\n" ++ positive_source, .global = true },
+        .{ .label = "catalog", .before = associated_prefix ++ "\nconst U32.add = fn left => fn right => @u32.add left right\n" ++ positive_source, .after = associated_prefix ++ "\nconst U32.sub = fn left => fn right => @u32.add left right\n" ++ positive_source, .global = true },
+        // The operation catalog is unchanged: only the provider declaration
+        // differs, so the independent `builder` proof stays reusable.
+        .{ .label = "provider", .before = provider_prefix ++ "const state = @effect.state (State.get U32) (State.set U32) 1\n" ++ positive_source, .after = provider_prefix ++ "const state = @effect.state (State.get U32) (State.set U32) 2\n" ++ positive_source, .global = false },
     };
     for (cases) |case| {
         var before = try Fixture.init(case.before);
@@ -231,8 +233,13 @@ test "principal cache globally rejects real type associated catalog and provider
         defer reused.deinit(a);
         try equalEmission(&fresh, &reused);
         try std.testing.expect(reused.principal.requests > 0);
-        try std.testing.expectEqual(@as(usize, 0), reused.principal.hits);
-        try std.testing.expect(reused.principal.changed_or_unsupported > 0);
+        if (case.global) {
+            try std.testing.expectEqual(@as(usize, 0), reused.principal.hits);
+            try std.testing.expect(reused.principal.changed_or_unsupported > 0);
+        } else {
+            try std.testing.expect(reused.principal.hits > 0);
+            try std.testing.expect(savedProof(&reused.capture.?, after.target("builder")) != null);
+        }
         try std.testing.expectEqualSlices(u8, &retained_core, &artifacts.stamp(before.units));
         try std.testing.expectEqualSlices(u8, &retained_proofs, &artifacts.stamp(old.metadata.principal_queries.records.items));
     }

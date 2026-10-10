@@ -377,12 +377,16 @@ test "principal gate rejects shared scalar IR roots and runtime scalar root edit
     }
 }
 
-test "principal gate rejects a changed state-provider initial value" {
+test "principal gate rejects a changed state-provider initial value and its consumers only" {
     const source =
         \\type State a is effect = { get: Unit -> a, set: a -> Unit }
         \\entry const schema: U32 = 7
         \\entry const state = @effect.state (State.get U32) (State.set U32) 42
         \\entry const builder = fn (value: U32) -> U32 => value
+        \\entry const consumer = fn () => do:
+        \\  let (_, old) = do state:
+        \\    return State.get U32 ()
+        \\  return old
     ;
     var before = try Fixture.init(a, &.{source});
     defer before.deinit(a);
@@ -396,7 +400,14 @@ test "principal gate rejects a changed state-provider initial value" {
     defer pinned.deinit(a);
     var gate = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer gate.deinit();
-    try std.testing.expect(!gate.enabled);
+    // The operation catalog is unchanged; the provider's initial value is
+    // projected through its own declaration and reaches only its consumers.
+    // The edited module still declines whole-module executable admission.
+    try std.testing.expect(gate.enabled);
+    try std.testing.expect(!gate.admitsPrincipal(target(&after.units[0], "state")));
+    try std.testing.expect(!gate.admitsPrincipal(target(&after.units[0], "consumer")));
+    try std.testing.expect(gate.admitsPrincipal(target(&after.units[0], "builder")));
+    try std.testing.expect(gate.admitsPrincipal(target(&after.units[0], "schema")));
     try std.testing.expect(!gate.admits(target(&after.units[0], "builder")));
 }
 
@@ -1121,4 +1132,70 @@ test "equivalent validation reuses unchanged local graphs only under equal forei
     var shortened = try Gate.init(a, &pinned.pools, after.units, after.names.view());
     defer shortened.deinit();
     try std.testing.expect(!shortened.enabled);
+}
+
+fn reusedCertificate(allocator: std.mem.Allocator, gate: *const Gate, pins: []const artifacts.ModulePin) !void {
+    var certificate = (try gate.freezeValidation(allocator, pins)).?;
+    defer certificate.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 1), certificate.reused_images);
+    // The unchanged unit shares the previous certificate's image allocation.
+    const old = &gate.source_pools.?.dependency_certificate.?.record.dependencies.modules[1];
+    const shared = certificate.record.dependencies.modules[1].lease.?;
+    try std.testing.expect(shared == old.lease.?);
+    try std.testing.expect(shared.references >= 2);
+    try std.testing.expect(certificate.record.dependencies.modules[0].lease.? != gate.source_pools.?.dependency_certificate.?.record.dependencies.modules[0].lease.?);
+    for (pins, 0..) |pin, unit| try std.testing.expect(certificate.admits(unit, pin));
+}
+
+test "published certificates share exactly proven unchanged images and recapture edited units" {
+    const consumer = "entry const dependent: U32 = schema\nentry const safe = fn (value: U32) => value\n";
+    var before = try Fixture.init(a, &.{ independent, consumer });
+    defer before.deinit(a);
+    var pinned = try Pinned.init(a, &before);
+    defer pinned.deinit(a);
+    var initial = try Gate.init(a, &pinned.pools, before.units, before.names.view());
+    defer initial.deinit();
+    pinned.pools.dependency_certificate = (try initial.freezeValidation(a, pinned.pools.modules)).?;
+    try std.testing.expectEqual(@as(usize, 0), pinned.pools.dependency_certificate.?.reused_images);
+
+    // A scalar edit keeps unit one structural but not exact; unit two is
+    // stream-equal to its pin in separate storage.
+    var current = try Fixture.init(a, &.{ independent, consumer });
+    defer current.deinit(a);
+    current.units[0].nodes[root(&current.units[0], "schema")].a = 8;
+    var current_pins = try Pinned.init(a, &current);
+    defer current_pins.deinit(a);
+    var stamps: artifacts.ModuleStamps = .{ .allocator = a, .current = current.units, .previous = &pinned.pools, .compare_contents = true };
+    defer stamps.deinit();
+    var gate = try Gate.initWithStamps(a, &pinned.pools, current.units, current.names.view(), &stamps);
+    defer gate.deinit();
+    try std.testing.expect(gate.enabled);
+    try std.testing.expectEqualSlices(bool, &.{ false, true }, gate.certified_images);
+    // The copied image must equal the current graph exactly: `admits` walks
+    // every byte against the current module.
+    try reusedCertificate(a, &gate, current_pins.pools.modules);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, reusedCertificate, .{ &gate, current_pins.pools.modules });
+
+    // Even if a caller wrongly marks the edited unit reusable, its changed
+    // stamp declines sharing and the unit is captured from current Core.
+    const Certificate = @import("dependency_certificate.zig").Certificate;
+    var units: [2]*const core.Module = .{ &current.units[0], &current.units[1] };
+    var forced = (try Certificate.captureReusing(a, .{ .units = &units, .symbol_count = current.names.view().symbols.len }, current_pins.pools.modules, current.names.view(), &pinned.pools.dependency_certificate.?, &.{ true, true })).?;
+    defer forced.deinit(a);
+    try std.testing.expectEqual(@as(usize, 1), forced.reused_images);
+    for (current_pins.pools.modules, 0..) |pin, unit| try std.testing.expect(forced.admits(unit, pin));
+
+    // A forged old certificate image is never admitted, so nothing is shared.
+    const saved = pinned.pools.dependency_certificate.?.record.dependencies.modules[1].graph.bytes[0];
+    pinned.pools.dependency_certificate.?.record.dependencies.modules[1].graph.bytes[0] ^= 1;
+    defer pinned.pools.dependency_certificate.?.record.dependencies.modules[1].graph.bytes[0] = saved;
+    var stamps_forged: artifacts.ModuleStamps = .{ .allocator = a, .current = current.units, .previous = &pinned.pools, .compare_contents = true };
+    defer stamps_forged.deinit();
+    var forged = try Gate.initWithStamps(a, &pinned.pools, current.units, current.names.view(), &stamps_forged);
+    defer forged.deinit();
+    try std.testing.expectEqualSlices(bool, &.{ false, false }, forged.certified_images);
+    var recaptured = (try forged.freezeValidation(a, current_pins.pools.modules)).?;
+    defer recaptured.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), recaptured.reused_images);
+    for (current_pins.pools.modules, 0..) |pin, unit| try std.testing.expect(recaptured.admits(unit, pin));
 }

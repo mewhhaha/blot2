@@ -6,6 +6,7 @@ const validation = @import("frozen_core_validation.zig");
 const identity = @import("runtime_identity.zig");
 const Image = @import("validation_image.zig").Image;
 const queries = @import("semantic_query_table.zig");
+const Lease = @import("pool_leases.zig").Lease;
 const A = std.mem.Allocator;
 
 const Module = struct {
@@ -13,11 +14,24 @@ const Module = struct {
     path: []u8,
     stamp: [32]u8,
     graph: Image,
+    /// Owns nonempty `graph.bytes`. Consecutive certificates share the image
+    /// of an exactly unchanged unit instead of copying it.
+    lease: ?*Lease,
     fn deinit(self: *Module, a: A) void {
         a.free(self.path);
-        self.graph.deinit(a);
+        if (self.lease) |lease| lease.release() else self.graph.deinit(a);
     }
 };
+fn leased(a: A, image: Image) A.Error!?*Lease {
+    if (image.bytes.len == 0) return null;
+    const lease = a.create(Lease) catch |err| {
+        var owned = image;
+        owned.deinit(a);
+        return err;
+    };
+    lease.* = .{ .allocator = a, .memory = image.bytes, .alignment = .@"1" };
+    return lease;
+}
 const Dependencies = struct {
     namespace: Image,
     modules: []Module,
@@ -35,6 +49,8 @@ pub const Stats = struct {
     dependency_validations: usize = 0,
     reused_dependency_validations: usize = 0,
     retained: queries.Storage = .{},
+    /// Module images copied from the previous certificate, not re-serialized.
+    reused_images: usize = 0,
     pub fn observe(self: *Stats, gate: anytype) void {
         self.dependency_validations += gate.dependency_validations;
         self.reused_dependency_validations += gate.reused_dependency_validations;
@@ -43,6 +59,7 @@ pub const Stats = struct {
 
 pub const Certificate = struct {
     record: Record,
+    reused_images: usize = 0,
 
     /// Called only after authoritative graph/dependency validation. A single
     /// immutable owner has one certificate and needs no bucket index. Optional
@@ -50,7 +67,23 @@ pub const Certificate = struct {
     pub fn capture(a: A, context: validation.Context, pins: anytype, names: identity.View) A.Error!?Certificate {
         return captureWithBudget(a, context, pins, names, (queries.Limits{}).owned_bytes);
     }
+    /// `reusable[i]` must certify that the previous certificate's image of unit
+    /// i exactly equals the current module's image; the unit, producer path
+    /// and stamp are rechecked before its bytes are copied.
+    pub fn captureReusing(a: A, context: validation.Context, pins: anytype, names: identity.View, previous: ?*const Certificate, reusable: []const bool) A.Error!?Certificate {
+        return captureReusingWithBudget(a, context, pins, names, previous, reusable, (queries.Limits{}).owned_bytes);
+    }
     pub fn captureWithBudget(a: A, context: validation.Context, pins: anytype, names: identity.View, budget: usize) A.Error!?Certificate {
+        return captureReusingWithBudget(a, context, pins, names, null, &.{}, budget);
+    }
+    fn reusedImage(previous: ?*const Certificate, reusable: []const bool, ordinal: usize, pin: anytype) ?*Lease {
+        const old = previous orelse return null;
+        if (ordinal >= reusable.len or !reusable[ordinal] or ordinal >= old.record.dependencies.modules.len) return null;
+        const module = old.record.dependencies.modules[ordinal];
+        if (module.unit != pin.unit or !std.mem.eql(u8, module.path, pin.canonical_path) or !std.mem.eql(u8, &module.stamp, &pin.stamp)) return null;
+        return module.lease;
+    }
+    pub fn captureReusingWithBudget(a: A, context: validation.Context, pins: anytype, names: identity.View, previous: ?*const Certificate, reusable: []const bool, budget: usize) A.Error!?Certificate {
         if (pins.len == 0 or pins.len != context.units.len or names.owners.len != pins.len) return null;
         var remaining = budget;
         if (pins.len > remaining / @sizeOf(Module)) return null;
@@ -64,6 +97,7 @@ pub const Certificate = struct {
         defer if (!transferred) namespace.deinit(a);
         const modules = try a.alloc(Module, pins.len);
         var initialized: usize = 0;
+        var reused: usize = 0;
         defer if (!transferred) {
             for (modules[0..initialized]) |*module| module.deinit(a);
             a.free(modules);
@@ -76,13 +110,22 @@ pub const Certificate = struct {
             const path = try a.dupe(u8, pin.canonical_path);
             var owned_path = true;
             defer if (owned_path) a.free(path);
-            const graph = try Image.capture(a, unit.*, &remaining) orelse return null;
-            module.* = .{ .unit = pin.unit, .path = path, .stamp = pin.stamp, .graph = graph };
+            var lease: ?*Lease = null;
+            if (reusedImage(previous, reusable, ordinal, pin)) |shared| {
+                if (shared.memory.len > remaining) return null;
+                remaining -= shared.memory.len;
+                reused += 1;
+                lease = shared.retain();
+            } else {
+                const captured = try Image.capture(a, unit.*, &remaining) orelse return null;
+                lease = try leased(a, captured);
+            }
+            module.* = .{ .unit = pin.unit, .path = path, .stamp = pin.stamp, .graph = .{ .bytes = if (lease) |shared| shared.memory else &.{} }, .lease = lease };
             owned_path = false;
             initialized += 1;
         }
         transferred = true;
-        return .{ .record = .{ .key = image, .dependencies = .{ .namespace = namespace, .modules = modules }, .value = .{} } };
+        return .{ .record = .{ .key = image, .dependencies = .{ .namespace = namespace, .modules = modules }, .value = .{} }, .reused_images = reused };
     }
 
     pub fn deinit(self: *Certificate, a: A) void {
