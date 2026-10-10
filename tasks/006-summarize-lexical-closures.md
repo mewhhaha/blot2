@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** In progress — an owned capture-input prototype and native/guest
+  laws are prepared; compilation and qualification remain to be run.
 - **Dependencies:** [005](005-summarize-higher-order-callees.md)
 - **Originating requirements:** PLAN: Hill 2 / lexical closure summaries.
   Sources: [PLAN.md](../PLAN.md).

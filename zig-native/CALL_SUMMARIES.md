@@ -995,34 +995,35 @@ manifest records exact source hashes. These binary and identity pins stay
 immutable through qualification.
 
 The revised pin passes `deno task test:compiler` with the full native suite and
-609 guest/client tests. `deno task lint:zig` reports zero findings across 291 Zig
-files, using Zig 0.17.0 and the qualified analyzer. The differential command
-`python3 build/bench/cloud-principal-graphs/compare-callbacks-v2.py` compares 563
-public cases, including 54 higher-order fixtures, in 1,126 fresh cache-disabled
-invocations. Ordered diagnostics and successful Wasm bytes match exactly; 380
-invocations succeed. Every expected-valid callback fixture succeeds, including
-the predicate-bearing direct, curried, returned and effectful forms. All 1,122
-invocations with compilation metrics report zero live requested bytes after
-teardown and no loaded restart cache. The four remaining invocations are the
-paired existing `TypeLimit` fixtures, which emit no compilation metrics.
+609 guest/client tests. `deno task lint:zig` reports zero findings across 291
+Zig files, using Zig 0.17.0 and the qualified analyzer. The differential command
+`python3 build/bench/cloud-principal-graphs/compare-callbacks-v2.py` compares
+563 public cases, including 54 higher-order fixtures, in 1,126 fresh
+cache-disabled invocations. Ordered diagnostics and successful Wasm bytes match
+exactly; 380 invocations succeed. Every expected-valid callback fixture
+succeeds, including the predicate-bearing direct, curried, returned and
+effectful forms. All 1,122 invocations with compilation metrics report zero live
+requested bytes after teardown and no loaded restart cache. The four remaining
+invocations are the paired existing `TypeLimit` fixtures, which emit no
+compilation metrics.
 
 Fifteen alternating release pairs measure 32 public workloads in isolated fresh
 processes with caches disabled:
 `python3 build/bench/cloud-principal-graphs/measure-callbacks-v2.py`. Child CPU
-comes from `getrusage(RUSAGE_CHILDREN)` user plus system time. Every pair asserts
-exact Wasm equality; all 960 invocations succeed. Allocation below is cumulative
-requested memory in decimal MB, not peak RSS. Both binaries and their identity
-pins are verified before and after the batch.
+comes from `getrusage(RUSAGE_CHILDREN)` user plus system time. Every pair
+asserts exact Wasm equality; all 960 invocations succeed. Allocation below is
+cumulative requested memory in decimal MB, not peak RSS. Both binaries and their
+identity pins are verified before and after the batch.
 
-| Workload | Median CPU baseline / candidate (ms) | Allocation baseline / candidate (MB) | Maximum scopes baseline / candidate | Constraint visits baseline / candidate |
-| --- | ---: | ---: | ---: | ---: |
-| Predicate direct callback, depth 12 | 12,437.728 / 6.734 | 68.93 / 5.40 | 12,287 / 3 | 16,420 / 570 |
-| Predicate curried callback, depth 12 | 13,805.074 / 7.807 | 77.13 / 5.67 | 12,287 / 3 | 16,420 / 574 |
-| Predicate returned callback, depth 12 | 13,503.277 / 7.634 | 80.28 / 5.67 | 12,287 / 3 | 16,420 / 574 |
-| Predicate effectful callback, depth 12 | 8,903.948 / 6.150 | 51.48 / 4.74 | 12,287 / 4 | 12,310 / 327 |
-| Captured callback, depth 8 | 34.424 / 34.204 | 8.36 / 8.40 | 1,025 / 1,025 | 512 / 512 |
-| First-order factory control, depth 12 | 6.568 / 6.234 | 5.60 / 5.60 | 3 / 3 | 513 / 513 |
-| Mixed source control, depth 12 | 4.953 / 5.030 | 4.10 / 4.10 | 2 / 2 | 179 / 179 |
+| Workload                               | Median CPU baseline / candidate (ms) | Allocation baseline / candidate (MB) | Maximum scopes baseline / candidate | Constraint visits baseline / candidate |
+| -------------------------------------- | -----------------------------------: | -----------------------------------: | ----------------------------------: | -------------------------------------: |
+| Predicate direct callback, depth 12    |                   12,437.728 / 6.734 |                         68.93 / 5.40 |                          12,287 / 3 |                           16,420 / 570 |
+| Predicate curried callback, depth 12   |                   13,805.074 / 7.807 |                         77.13 / 5.67 |                          12,287 / 3 |                           16,420 / 574 |
+| Predicate returned callback, depth 12  |                   13,503.277 / 7.634 |                         80.28 / 5.67 |                          12,287 / 3 |                           16,420 / 574 |
+| Predicate effectful callback, depth 12 |                    8,903.948 / 6.150 |                         51.48 / 4.74 |                          12,287 / 4 |                           12,310 / 327 |
+| Captured callback, depth 8             |                      34.424 / 34.204 |                          8.36 / 8.40 |                       1,025 / 1,025 |                              512 / 512 |
+| First-order factory control, depth 12  |                        6.568 / 6.234 |                          5.60 / 5.60 |                               3 / 3 |                              513 / 513 |
+| Mixed source control, depth 12         |                        4.953 / 5.030 |                          4.10 / 4.10 |                               2 / 2 |                              179 / 179 |
 
 Predicate-free direct/curried/returned/effectful/unused depth-12 controls were
 already cheap: their baseline CPU is 4.63–5.34 ms. Candidate CPU is 4.69–5.82
@@ -1038,3 +1039,44 @@ direct/effectful cases, record no region duration. They provide no duration or
 program-wide maximum claim. Captured regions still reach 1,025 scopes; this
 qualification does not replace task 006's explicit capture inputs or the final
 program-wide latency gate. No private gdev comparison is available.
+
+The code milestone is `652f4d6ee67ecd1aa45096bdc57e089bd082a112`. Seven
+alternating pairs also pass the ordinary compile harness:
+`deno task bench:compile --baseline build/bench/cloud-principal-graphs/candidate-live-headers/blotc --candidate build/bench/cloud-principal-graphs/candidate-callbacks-v2/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/callback-synthetic-v2`.
+Fresh CPU for monomorphic/generic chains and the ordinary diamond is 10/9/6 ms
+baseline versus 9/9/6 ms candidate; restart is 10/9/5 ms for both. Fan-out
+fresh/restart is 17/18 ms versus 19/19 ms. Its fresh allocation rises from 12.81
+to 12.88 MiB, while the other three allocation controls are unchanged. All
+deterministic ordinary work counters agree; maximum scopes remain two.
+
+The same harness extended with 27 callback workloads at depths 4/8/12 passes
+seven pairs across 31 workloads:
+`deno run --allow-all build/bench/cloud-principal-graphs/bench-compile-callbacks.ts --baseline build/bench/cloud-principal-graphs/candidate-live-headers/blotc --candidate build/bench/cloud-principal-graphs/candidate-callbacks-v2/blotc --runs 7 --workload synthetic --restart-cache --out build/bench/cloud-principal-graphs/callback-retained-v2`.
+Its baseline/candidate and fresh/restart/population/edit/no-op Wasm hashes
+agree, including independently rebuilt edited outputs. No unexpected problem
+occurs; both binary and compiler-identity pins remain unchanged. The private
+snapshot is reported missing rather than counted as a passing workload.
+
+| Predicate callback, depth 12 | Fresh CPU baseline / candidate (ms) | Restart CPU baseline / candidate (ms) |
+| ---------------------------- | ----------------------------------: | ------------------------------------: |
+| Direct                       |                          12,300 / 8 |                             7,272 / 9 |
+| Curried                      |                          13,942 / 9 |                             7,949 / 8 |
+| Returned                     |                          13,460 / 8 |                             7,923 / 9 |
+| Effectful                    |                           8,813 / 8 |                             3,554 / 8 |
+
+Predicate population and scalar-edit medians remain 8.9–13.8 seconds in the
+baseline and 0–10 ms in the candidate. Retained process accounting has 10 ms
+resolution, so a zero means below that resolution, not zero execution time.
+Predicate candidate maximum scopes are three, or four for the effectful case;
+all four have zero unresolved collections. Ordinary callback fresh/restart CPU
+is about 6–8 ms, while allocation increases approximately 6–17%. The larger
+31-workload batch also observes ordinary chain variation (monomorphic fresh
+10→13 ms, generic 9→10 ms); it establishes no ordinary-workload speedup.
+
+Raw reports are `callback-comparisons-v2/report.json`,
+`callback-measurement-v2/report.json`, `callback-synthetic-v2/results.json` and
+`callback-retained-v2/results.json`, with their logs and per-run samples in the
+same ignored qualification directory. The durable conclusions above preserve the
+qualification when those local artifacts are unavailable. Task 005 is complete;
+lexical inputs, recursive components and portable canonical keys remain tasks
+006–008.

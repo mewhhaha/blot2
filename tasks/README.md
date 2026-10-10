@@ -110,6 +110,17 @@ extensions remain open.
 [The final first-order qualification](../zig-native/CALL_SUMMARIES.md#live-headers-and-source-normalized-graphs-10-october-2026)
 retains exact pins, commands, measurements and limitations.
 
+Commit `652f4d6` completes task [005]. Dedicated callback obligations preserve
+formal slots, curried stages, exact input rows and original witnesses; complete
+interfaces key independent jobs. The native suite, 609 guest/client tests, 563
+public comparison cases and zero-findings analyzer pass. Fifteen-pair fresh
+measurements and seven-pair fresh/retained/restart batches qualify the immutable
+artifact. Deep predicate callbacks lose transitive work; small callback controls
+add overhead. Task [006] is in progress; lexical inputs, recursive components
+and canonical keys remain open.
+[The callback qualification](../zig-native/CALL_SUMMARIES.md#parametric-callback-obligations-10-october-2026)
+preserves exact pins, commands and remaining limits.
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -331,8 +342,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [002] — Close packed list traversal regression          | In progress | [001]                                  |
 | [003] — Specify general call summaries                  | Complete    | None                                   |
 | [004] — Summarize predicate bearing callees             | Complete    | [003]                                  |
-| [005] — Summarize higher order callees                  | In progress | [004]                                  |
-| [006] — Summarize lexical closures                      | Pending     | [005]                                  |
+| [005] — Summarize higher order callees                  | Complete    | [004]                                  |
+| [006] — Summarize lexical closures                      | In progress | [005]                                  |
 | [007] — Infer recursive components jointly              | Pending     | [006]                                  |
 | [008] — Canonicalize specialization keys                | Pending     | [007]                                  |
 | [009] — Cache composite type resolutions                | Complete    | None                                   |

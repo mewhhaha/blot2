@@ -20,8 +20,16 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   and seven-pair fresh/retained/restart comparisons qualify the artifact. Small
   wrappers can cost more; no private gdev or general speedup is claimed. See
   [the durable qualification](zig-native/CALL_SUMMARIES.md#live-headers-and-source-normalized-graphs-10-october-2026).
-- Task 005 (parametric callback obligations) is in progress. Callback/capture/
-  joint-component/canonical-key work remains tasks 005–008.
+- Task 005 (parametric callback obligations) is complete at `652f4d6`. Exact
+  formal callback slots/stages/rows and conditional graph actions preserve
+  caller checks. The full native suite, 609 guest/client tests, 563 public
+  comparisons and zero-findings analyzer pass. Fifteen-pair fresh measurements
+  and seven-pair fresh/retained/restart batches qualify the immutable v2 pin.
+  Deep predicate cases have bounded work; small controls add overhead. See
+  [the durable callback qualification](zig-native/CALL_SUMMARIES.md#parametric-callback-obligations-10-october-2026).
+- Task 006 (owned lexical capture inputs) is in progress. Its prototype and
+  native/guest laws are uncommitted and have not yet been compiled or tested.
+  Joint-component and canonical-key work remains tasks 007–008.
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -54,27 +62,29 @@ fold gate remains open.
    `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
    and call the function before exiting).
 
-## Next steps for task 005
+## Next steps for task 006
 
-Implement the callback-obligation form in
-[CALL_SUMMARIES.md](zig-native/CALL_SUMMARIES.md#higher-order-obligations-and-effects).
-Keep dedicated higher-order summary shape/evidence checks separate from the
-first-order data predicates used by dispatch and representation proof. Record
-each formal callback slot, curried invocation stage, original argument/result
-witness and latent row relationship in the owned graph. Complete callback
-interfaces can key independent jobs; executable identity, captures and provider
-observations retain their own caller checks. Unknown facts use bounded ordinary
-fallback. Do not grant closed proof status to an exported callback obligation.
+Finish and qualify the owned lexical inputs in
+[CALL_SUMMARIES.md](zig-native/CALL_SUMMARIES.md#lexical-captures-and-canonical-inputs).
+The current prototype adds session-owned typed capture graphs with complete
+ordered binding slots, canonical alias ordinals, scalar/nominal identities,
+latent rows and exact provider/demand creation identities. Complete live
+environments can key independent jobs; incomplete evidence, changed memo state
+and active observation receipts retain ordinary checking. Private lexical jobs
+must not publish a capture-free global/principal proof. Compile the focused
+native laws first, then run frozen/static/retained captures, guest dependency
+and checkpoint laws, the full compiler gate and analyzer. Preserve immutable
+Core/type inputs and check failed-allocation recovery before qualification.
 
-The task 004 pin is `candidate-live-headers/` under
-`build/bench/cloud-principal-graphs/`. Keep it and earlier pins immutable. The
-latest record includes source edges revealed only after normalization, an
-allocation-failure cycle publication law, active effect handlers, 509
-diagnostic/ Wasm comparisons and all paired samples. For task 007, retain the
-direct source `Seed.build -> parent.read -> Box.read -> parent` probe: it
-exposed frontend lowering work that did not finish even with written arrows. The
-kernel cycle law qualifies optional publication, not ordinary recursive
-inference.
+The task 005 pin is `candidate-callbacks-v2/` under
+`build/bench/cloud-principal-graphs/`; its source is commit `652f4d6` even while
+task 006 edits the worktree. Keep it, `candidate-live-headers/` and earlier pins
+immutable. The latest record includes callback stages, exact row aliases,
+mandatory source predicates, 563 diagnostic/Wasm comparisons and all paired
+samples. For task 007, retain the direct source
+`Seed.build -> parent.read -> Box.read -> parent` probe: it exposed frontend
+lowering work that did not finish even with written arrows. The kernel cycle law
+qualifies optional publication, not ordinary recursive inference.
 
 ## Notes
 

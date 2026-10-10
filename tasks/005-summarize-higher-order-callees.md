@@ -2,8 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — dedicated callback obligations and independent
-  higher-order jobs are being implemented; no completion is claimed.
+- **Status:** Complete — qualified parametric callback obligations and
+  independent higher-order jobs preserve exact caller obligations.
 - **Dependencies:** [004](004-summarize-predicate-bearing-callees.md)
 - **Originating requirements:** PLAN: Hill 2 / the sandbox region. Sources:
   [PLAN.md](../PLAN.md).
@@ -31,11 +31,11 @@ cover latent callback rows.
 
 ## Implementation checklist
 
-- [ ] Implement the callback-obligation form specified in task 003, including
+- [x] Implement the callback-obligation form specified in task 003, including
       generic argument/result relationships and latent effects.
-- [ ] Partition only when complete callback evidence permits it, preserving
+- [x] Partition only when complete callback evidence permits it, preserving
       callback captures and source-interface checks.
-- [ ] Distinguish unresolved or escaping callback facts from principal
+- [x] Distinguish unresolved or escaping callback facts from principal
       information and preserve the bounded conservative fallback.
 
 ## Validation
@@ -55,20 +55,33 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Valid higher-order jobs no longer require their entire transitive graph in
+- [x] Valid higher-order jobs no longer require their entire transitive graph in
       one region.
-- [ ] Callback effects and captures remain exact, and unresolved cases retain
+- [x] Callback effects and captures remain exact, and unresolved cases retain
       correct diagnostics without unbounded retry.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `652f4d6ee67ecd1aa45096bdc57e089bd082a112` on local `main`.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
+  and 609 guest/client tests. `deno task lint:zig` reports zero findings across
+  291 files. Focused native laws cover callback stages, rows, aliases, captures,
+  budgets and allocation failures. Imported guest laws exercise providers,
+  predicates, dependency/checkpoint restoration and failed-edit recovery.
+- Comparison: 563 public cases / 1,126 cache-disabled invocations have exact
+  ordered diagnostic and Wasm parity. Fifteen alternating release pairs cover 32
+  workloads; seven pairs cover four ordinary and then 31 extended
+  fresh/retained/restart workloads. All pinned hashes remain unchanged.
+  Predicate depth-12 fresh CPU falls from 8.8–13.9 seconds to 8–9 ms in the
+  extended harness; candidate maximum scopes are three or four.
+- Remaining limitations: small callback controls add CPU/allocation overhead;
+  incomplete capture observations use ordinary checking. Lexical capture inputs,
+  joint recursive components and canonical portable keys remain tasks 006–008.
+  Empty profiles supply no duration measurement. Private gdev and historical
+  task 002 artifacts remain unavailable.
+- Durable record:
+  [parametric callback qualification](../zig-native/CALL_SUMMARIES.md#parametric-callback-obligations-10-october-2026)
+  records the exact baseline/candidate identities, commands, distributions and
+  rejected capture experiment.
