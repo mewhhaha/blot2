@@ -12,6 +12,7 @@ const runtime_identity = @import("runtime_identity.zig");
 const code_expectation = @import("code_expectation.zig");
 const provider_chain = @import("provider_chain.zig");
 const structural = @import("structural.zig");
+const pool_leases = @import("pool_leases.zig");
 const Allocator = std.mem.Allocator;
 const Hash = std.crypto.hash.Blake3;
 const IdentityMetadata = runtime_identity.Metadata;
@@ -178,7 +179,6 @@ pub const RequestCell = struct { state: core_eval.ValueId, exit: core_eval.Value
 pub const RequestHandler = struct { callback: core_eval.ValueId, cell: u32, outer: provider_chain.Head };
 pub const ArrayProof = struct { unit: u32, updates: []bool };
 pub const DiscardProof = struct { unit: u32, unused: []bool };
-pub const BodyPin = struct { unit: u32, catalog: u32, body: core.Body, module_stamp: [32]u8, stamp: [32]u8 };
 pub const ModulePin = struct {
     unit: u32,
     /// Exact immutable caller-owned module, retained until replay is finished.
@@ -195,7 +195,9 @@ pub const Pools = struct {
     identity: ?IdentityMetadata = null,
     modules: []ModulePin,
     dependency_certificate: ?@import("dependency_certificate.zig").Certificate = null,
-    bodies: []BodyPin,
+    /// Fields captured equal to the previous revision share its immutable
+    /// slice; every leased field is released, never freed, by this owner.
+    leases: pool_leases.Leases = pool_leases.none,
     layouts: Layouts,
     evaluator: core_eval.Snapshot,
     rows: Substitutions,
@@ -228,35 +230,39 @@ pub const Pools = struct {
     evaluator_traced_bodies: usize,
     evaluator_traced_nodes: usize,
     pub fn deinit(self: *Pools, allocator: Allocator) void {
+        const leases = &self.leases;
+        const free = pool_leases.free;
         if (self.dependency_certificate) |*certificate| certificate.deinit(allocator);
-        if (self.identity) |*identity| identity.deinit(allocator);
+        if (self.identity) |identity| {
+            free(leases, allocator, .identity_bytes, identity.bytes);
+            free(leases, allocator, .identity_symbols, identity.symbols);
+            free(leases, allocator, .identity_owners, identity.owners);
+        }
         for (self.modules) |module| allocator.free(module.canonical_path);
         allocator.free(self.modules);
-        allocator.free(self.bodies);
-        self.layouts.deinit(allocator);
-        self.evaluator.deinit(allocator);
+        free(leases, allocator, .layout_nodes, self.layouts.nodes);
+        free(leases, allocator, .layout_extra, self.layouts.extra);
+        free(leases, allocator, .layout_operations, self.layouts.effects.operations);
+        free(leases, allocator, .layout_arguments, self.layouts.effects.arguments);
+        free(leases, allocator, .layout_rows, self.layouts.effects.rows);
+        free(leases, allocator, .layout_labels, self.layouts.effects.labels);
+        const evaluator = &self.evaluator;
+        inline for (.{ "values", "children", "closures", "value_evidence", "type_mappings", "row_mappings", "value_records", "record_layouts", "field_names", "demands" }) |name| free(leases, allocator, @field(pool_leases.Field, name), @field(evaluator, name));
+        free(leases, allocator, .evidence_nodes, evaluator.evidence.nodes);
+        free(leases, allocator, .evidence_extra, evaluator.evidence.extra);
+        free(leases, allocator, .evidence_operations, evaluator.evidence.effects.operations);
+        free(leases, allocator, .evidence_arguments, evaluator.evidence.effects.arguments);
+        free(leases, allocator, .evidence_rows, evaluator.evidence.effects.rows);
+        free(leases, allocator, .evidence_labels, evaluator.evidence.effects.labels);
         self.rows.deinit(allocator);
         self.templates.deinit(allocator);
         self.static_values.deinit(allocator);
-        allocator.free(self.captures);
+        free(leases, allocator, .captures, self.captures);
         if (self.bridge) |*bridge| bridge.deinit(allocator);
-        allocator.free(self.field_locations);
+        free(leases, allocator, .field_locations, self.field_locations);
         for (self.operations) |operation| allocator.free(operation.key);
         allocator.free(self.operations);
-        allocator.free(self.operation_relocations);
-        allocator.free(self.functions);
-        allocator.free(self.serialized);
-        allocator.free(self.runtime_globals);
-        allocator.free(self.runtime_order);
-        allocator.free(self.binding_offsets);
-        allocator.free(self.node_offsets);
-        allocator.free(self.slots);
-        allocator.free(self.visited_nodes);
-        allocator.free(self.provider_frames);
-        allocator.free(self.provider_cells);
-        allocator.free(self.request_cells);
-        allocator.free(self.request_handlers);
-        allocator.free(self.break_values);
+        inline for (.{ "operation_relocations", "functions", "serialized", "runtime_globals", "runtime_order", "binding_offsets", "node_offsets", "slots", "visited_nodes", "provider_frames", "provider_cells", "request_cells", "request_handlers", "break_values" }) |name| free(leases, allocator, @field(pool_leases.Field, name), @field(self, name));
         for (self.array_proofs) |proof| allocator.free(proof.updates);
         allocator.free(self.array_proofs);
         for (self.discard_proofs) |proof| allocator.free(proof.unused);
@@ -801,42 +807,80 @@ pub fn moduleStamp(module: *const core.Module, memo: ?*ModuleStamps) Allocator.E
 }
 
 fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity.View, memo: ?*ModuleStamps) Allocator.Error!Pools {
+    // Unchanged immutable fields of the previous revision are leased rather
+    // than copied. A failed capture releases every lease it took.
+    const previous: ?*const Pools = if (memo) |cache| cache.previous else null;
+    var shared: pool_leases.Builder = .{ .allocator = allocator, .previous = if (previous) |old| &old.leases else null };
+    errdefer shared.abort();
+    const Name = std.meta.Elem(@FieldType(runtime_identity.View, "symbols"));
     var names: ?IdentityMetadata = null;
-    if (identity) |view| names = try copyIdentity(allocator, view);
-    errdefer if (names) |*value| value.deinit(allocator);
+    if (identity) |view| {
+        const old = if (previous) |pools| pools.identity else null;
+        const bytes = try shared.dupe(.identity_bytes, u8, view.bytes, if (old) |value| value.bytes else null);
+        const symbols = try shared.dupe(.identity_symbols, Name, view.symbols, if (old) |value| value.symbols else null);
+        const owners = try shared.dupe(.identity_owners, Name, view.owners, if (old) |value| value.owners else null);
+        names = .{ .bytes = bytes, .symbols = symbols, .owners = owners };
+    }
     const modules = try allocator.alloc(ModulePin, generator.units.len);
     var module_count: usize = 0;
     errdefer {
         for (modules[0..module_count]) |module| allocator.free(module.canonical_path);
         allocator.free(modules);
     }
-    var bodies: std.ArrayList(BodyPin) = .empty;
-    errdefer bodies.deinit(allocator);
     for (generator.units, modules, 0..) |*module, *pin, index| {
         const unit: u32 = if (module.unit != 0) module.unit else @intCast(index + 1);
         const path = if (names) |*view| view.view().owner(unit) orelse "" else "";
         pin.* = .{ .unit = unit, .module = module, .canonical_path = try allocator.dupe(u8, path), .stamp = undefined };
         module_count += 1;
         pin.stamp = try moduleStamp(module, memo);
-        for (module.bodies, 0..) |body, catalog| try bodies.append(allocator, .{ .unit = unit, .catalog = @intCast(catalog), .body = body, .module_stamp = pin.stamp, .stamp = stamp(.{ pin.stamp, body }) });
     }
-    var layouts = try Layouts.capture(allocator, &generator.layouts);
-    errdefer layouts.deinit(allocator);
-    var evaluator = try generator.evaluator.copySnapshotMeasured(allocator);
-    errdefer evaluator.deinit(allocator);
+    const Effects = type_evidence.Effects;
+    const old_layouts: ?*const Layouts = if (previous) |pools| &pools.layouts else null;
+    const layout_store = &generator.layouts;
+    const layouts: Layouts = .{
+        .nodes = try shared.dupe(.layout_nodes, layout.Node, layout_store.nodes.items, if (old_layouts) |old| old.nodes else null),
+        .extra = try shared.dupe(.layout_extra, u32, layout_store.extra.items, if (old_layouts) |old| old.extra else null),
+        .effects = .{
+            .operations = try shared.dupe(.layout_operations, Effects.Operation, layout_store.effects.operations.items, if (old_layouts) |old| old.effects.operations else null),
+            .arguments = try shared.dupe(.layout_arguments, u32, layout_store.effects.arguments.items, if (old_layouts) |old| old.effects.arguments else null),
+            .rows = try shared.dupe(.layout_rows, Effects.List, layout_store.effects.rows.items, if (old_layouts) |old| old.effects.rows else null),
+            .labels = try shared.dupe(.layout_labels, Effects.Label, layout_store.effects.labels.items, if (old_layouts) |old| old.effects.labels else null),
+        },
+    };
+    const before_evaluator = shared.stats;
+    const session = &generator.evaluator;
+    const old_evaluator: ?*const core_eval.Snapshot = if (previous) |pools| &pools.evaluator else null;
+    var evaluator: core_eval.Snapshot = undefined;
+    inline for (.{ "values", "children", "closures", "value_evidence", "type_mappings", "row_mappings", "value_records", "record_layouts", "field_names", "demands" }) |name| {
+        const Item = std.meta.Elem(@FieldType(core_eval.Snapshot, name));
+        @field(evaluator, name) = try shared.dupe(@field(pool_leases.Field, name), Item, @field(session, name).items, if (old_evaluator) |old| @field(old, name) else null);
+    }
+    const evidence = &session.evidence;
+    evaluator.evidence = .{
+        .nodes = try shared.dupe(.evidence_nodes, type_evidence.Node, evidence.nodes.items, if (old_evaluator) |old| old.evidence.nodes else null),
+        .extra = try shared.dupe(.evidence_extra, type_evidence.Id, evidence.extra.items, if (old_evaluator) |old| old.evidence.extra else null),
+        .effects = .{
+            .operations = try shared.dupe(.evidence_operations, Effects.Operation, evidence.effects.operations.items, if (old_evaluator) |old| old.evidence.effects.operations else null),
+            .arguments = try shared.dupe(.evidence_arguments, u32, evidence.effects.arguments.items, if (old_evaluator) |old| old.evidence.effects.arguments else null),
+            .rows = try shared.dupe(.evidence_rows, Effects.List, evidence.effects.rows.items, if (old_evaluator) |old| old.evidence.effects.rows else null),
+            .labels = try shared.dupe(.evidence_labels, Effects.Label, evidence.effects.labels.items, if (old_evaluator) |old| old.evidence.effects.labels else null),
+        },
+    };
+    session.counters.snapshot_copy_bytes += shared.stats.copied_bytes - before_evaluator.copied_bytes;
+    session.counters.snapshot_copy_allocations += shared.stats.copied_fields - before_evaluator.copied_fields;
     var rows = try Substitutions.capture(allocator, &generator.row_keys);
     errdefer rows.deinit(allocator);
     var templates = try Substitutions.capture(allocator, &generator.template_keys);
     errdefer templates.deinit(allocator);
     var static_values = try Substitutions.capture(allocator, &generator.static_keys);
     errdefer static_values.deinit(allocator);
-    const captures = try allocator.dupe(CapturedTemplate, generator.template_catalog.items);
-    errdefer allocator.free(captures);
+    const captures = try shared.dupe(.captures, CapturedTemplate, generator.template_catalog.items, if (previous) |old| old.captures else null);
     var bridge: ?Bridge = if (generator.representation_bridge) |*store| try Bridge.capture(allocator, store) else null;
     errdefer if (bridge) |*value| value.deinit(allocator);
-    const locations = try allocator.alloc(FieldLocation, generator.evaluator.field_locations.count());
-    errdefer allocator.free(locations);
-    var fields = generator.evaluator.field_locations.iterator();
+    // Hash-map sources are ordered in a private temporary before sharing.
+    const locations = try allocator.alloc(FieldLocation, session.field_locations.count());
+    defer allocator.free(locations);
+    var fields = session.field_locations.iterator();
     var field_index: usize = 0;
     while (fields.next()) |entry| : (field_index += 1) locations[field_index] = .{ .family = entry.key_ptr.family, .tag = entry.key_ptr.tag, .name = entry.key_ptr.name, .field = entry.value_ptr.field, .len = entry.value_ptr.len };
     std.mem.sortUnstable(FieldLocation, locations, {}, struct {
@@ -846,6 +890,7 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
             return left.name < right.name;
         }
     }.less);
+    const field_locations = try shared.dupe(.field_locations, FieldLocation, locations, if (previous) |old| old.field_locations else null);
     const operations = try allocator.alloc(Operation, generator.runtime_operations.entries.items.len);
     var operation_count: usize = 0;
     errdefer {
@@ -856,14 +901,18 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
         operation.* = .{ .key = try allocator.dupe(u8, entry.key), .foreign = entry.foreign, .runtime = entry.runtime };
         operation_count += 1;
     }
-    const relocations = try allocator.alloc(OperationRelocation, generator.runtime_operations.relocations.items.len);
-    errdefer allocator.free(relocations);
-    for (generator.runtime_operations.relocations.items, relocations) |entry, *relocation| relocation.* = .{ .operation = entry.operation, .location = switch (entry.location) {
-        .instruction => |location| .{ .instruction = .{ .function = location.function, .index = location.index } },
-        .word => |address| .{ .word = address },
-    } };
+    const relocation_source = generator.runtime_operations.relocations.items;
+    const relocations = try shared.converted(.operation_relocations, OperationRelocation, relocation_source.len, relocation_source, struct {
+        fn convert(source: @TypeOf(relocation_source), index: usize) OperationRelocation {
+            const entry = source[index];
+            return .{ .operation = entry.operation, .location = switch (entry.location) {
+                .instruction => |location| .{ .instruction = .{ .function = location.function, .index = location.index } },
+                .word => |address| .{ .word = address },
+            } };
+        }
+    }.convert, if (previous) |old| old.operation_relocations else null);
     var functions: std.ArrayList(Function) = .empty;
-    errdefer functions.deinit(allocator);
+    defer functions.deinit(allocator);
     var named = generator.instances.iterator();
     while (named.next()) |entry| try functions.append(allocator, .{ .request = .{ .named = entry.key_ptr.* }, .function = entry.value_ptr.*, .result_template = generator.template_results.get(entry.key_ptr.*) });
     var closures = generator.closures.iterator();
@@ -883,39 +932,46 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
             return left.function < right.function;
         }
     }.less);
-    const serialized = try allocator.alloc(Serialized, generator.serialized.count());
-    errdefer allocator.free(serialized);
+    const owned_functions = try shared.dupe(.functions, Function, functions.items, if (previous) |old| old.functions else null);
+    const serialized_source = try allocator.alloc(Serialized, generator.serialized.count());
+    defer allocator.free(serialized_source);
     var values = generator.serialized.iterator();
     var value_index: usize = 0;
-    while (values.next()) |entry| : (value_index += 1) serialized[value_index] = .{ .value = entry.key_ptr.value, .ty = entry.key_ptr.ty, .suspension = entry.key_ptr.suspension, .address = entry.value_ptr.* };
-    const globals = try allocator.alloc(RuntimeGlobal, generator.runtime_globals.count());
-    errdefer allocator.free(globals);
+    while (values.next()) |entry| : (value_index += 1) serialized_source[value_index] = .{ .value = entry.key_ptr.value, .ty = entry.key_ptr.ty, .suspension = entry.key_ptr.suspension, .address = entry.value_ptr.* };
+    const serialized = try shared.dupe(.serialized, Serialized, serialized_source, if (previous) |old| old.serialized else null);
+    const globals_source = try allocator.alloc(RuntimeGlobal, generator.runtime_globals.count());
+    defer allocator.free(globals_source);
     var runtime_globals = generator.runtime_globals.iterator();
     var global_index: usize = 0;
-    while (runtime_globals.next()) |entry| : (global_index += 1) globals[global_index] = .{ .target = entry.key_ptr.*, .global = entry.value_ptr.global, .initializer = entry.value_ptr.initializer, .active = entry.value_ptr.active };
-    const runtime_order = try allocator.dupe(u32, generator.runtime_order.items);
-    errdefer allocator.free(runtime_order);
-    const binding_offsets = try allocator.dupe(usize, generator.evaluator.binding_offsets);
-    errdefer allocator.free(binding_offsets);
-    const node_offsets = try allocator.dupe(usize, generator.evaluator.node_offsets);
-    errdefer allocator.free(node_offsets);
-    const slots = try allocator.alloc(Slot, generator.evaluator.slots.len);
-    errdefer allocator.free(slots);
-    for (generator.evaluator.slots, slots) |from, *to| to.* = .{ .state = @intCast(@backingInt(from.state)), .traced = from.traced, .value = from.value };
-    const visited_nodes = try allocator.dupe(bool, generator.evaluator.visited_nodes);
-    errdefer allocator.free(visited_nodes);
-    const provider_frames = try allocator.dupe(provider_chain.Frame, generator.evaluator.providers.frames.items);
-    errdefer allocator.free(provider_frames);
-    const provider_cells = try allocator.dupe(provider_chain.Cell, generator.evaluator.providers.cells.items);
-    errdefer allocator.free(provider_cells);
-    const request_cells = try allocator.alloc(RequestCell, generator.evaluator.request_cells.items.len);
-    errdefer allocator.free(request_cells);
-    for (generator.evaluator.request_cells.items, request_cells) |from, *to| to.* = .{ .state = from.state, .exit = from.exit, .status = from.status };
-    const request_handlers = try allocator.alloc(RequestHandler, generator.evaluator.request_handlers.items.len);
-    errdefer allocator.free(request_handlers);
-    for (generator.evaluator.request_handlers.items, request_handlers) |from, *to| to.* = .{ .callback = from.callback, .cell = from.cell, .outer = from.outer };
-    const break_values = try allocator.dupe(core_eval.ValueId, generator.evaluator.break_values.items);
-    errdefer allocator.free(break_values);
+    while (runtime_globals.next()) |entry| : (global_index += 1) globals_source[global_index] = .{ .target = entry.key_ptr.*, .global = entry.value_ptr.global, .initializer = entry.value_ptr.initializer, .active = entry.value_ptr.active };
+    const globals = try shared.dupe(.runtime_globals, RuntimeGlobal, globals_source, if (previous) |old| old.runtime_globals else null);
+    const runtime_order = try shared.dupe(.runtime_order, u32, generator.runtime_order.items, if (previous) |old| old.runtime_order else null);
+    const binding_offsets = try shared.dupe(.binding_offsets, usize, session.binding_offsets, if (previous) |old| old.binding_offsets else null);
+    const node_offsets = try shared.dupe(.node_offsets, usize, session.node_offsets, if (previous) |old| old.node_offsets else null);
+    const slots = try shared.converted(.slots, Slot, session.slots.len, session.slots, struct {
+        fn convert(source: @TypeOf(session.slots), index: usize) Slot {
+            const from = source[index];
+            return .{ .state = @intCast(@backingInt(from.state)), .traced = from.traced, .value = from.value };
+        }
+    }.convert, if (previous) |old| old.slots else null);
+    const visited_nodes = try shared.dupe(.visited_nodes, bool, session.visited_nodes, if (previous) |old| old.visited_nodes else null);
+    const provider_frames = try shared.dupe(.provider_frames, provider_chain.Frame, session.providers.frames.items, if (previous) |old| old.provider_frames else null);
+    const provider_cells = try shared.dupe(.provider_cells, provider_chain.Cell, session.providers.cells.items, if (previous) |old| old.provider_cells else null);
+    const request_source = session.request_cells.items;
+    const request_cells = try shared.converted(.request_cells, RequestCell, request_source.len, request_source, struct {
+        fn convert(source: @TypeOf(request_source), index: usize) RequestCell {
+            const from = source[index];
+            return .{ .state = from.state, .exit = from.exit, .status = from.status };
+        }
+    }.convert, if (previous) |old| old.request_cells else null);
+    const handler_source = session.request_handlers.items;
+    const request_handlers = try shared.converted(.request_handlers, RequestHandler, handler_source.len, handler_source, struct {
+        fn convert(source: @TypeOf(handler_source), index: usize) RequestHandler {
+            const from = source[index];
+            return .{ .callback = from.callback, .cell = from.cell, .outer = from.outer };
+        }
+    }.convert, if (previous) |old| old.request_handlers else null);
+    const break_values = try shared.dupe(.break_values, core_eval.ValueId, session.break_values.items, if (previous) |old| old.break_values else null);
     const array_proofs = try allocator.alloc(ArrayProof, generator.array_proofs.count());
     var array_count: usize = 0;
     errdefer {
@@ -938,15 +994,15 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
         discard_proofs[discard_count] = .{ .unit = entry.key_ptr.*, .unused = try allocator.dupe(bool, entry.value_ptr.unused) };
         discard_count += 1;
     }
-    const owned_functions = try functions.toOwnedSlice(allocator);
-    errdefer allocator.free(owned_functions);
-    const owned_bodies = try bodies.toOwnedSlice(allocator);
-    errdefer allocator.free(owned_bodies);
+    session.counters.metadata_shared_fields += shared.stats.shared_fields;
+    session.counters.metadata_shared_bytes += shared.stats.shared_bytes;
+    session.counters.metadata_copied_fields += shared.stats.copied_fields;
+    session.counters.metadata_copied_bytes += shared.stats.copied_bytes;
     return .{
         .project_identity = identity != null,
         .identity = names,
         .modules = modules,
-        .bodies = owned_bodies,
+        .leases = shared.leases,
         .layouts = layouts,
         .evaluator = evaluator,
         .rows = rows,
@@ -954,8 +1010,8 @@ fn capture(allocator: Allocator, generator: anytype, identity: ?runtime_identity
         .static_values = static_values,
         .captures = captures,
         .bridge = bridge,
-        .field_locations = locations,
-        .field_locations_stamp = stamp(locations),
+        .field_locations = field_locations,
+        .field_locations_stamp = stamp(field_locations),
         .operations = operations,
         .operation_relocations = relocations,
         .operations_finalized = generator.runtime_operations.finalized,

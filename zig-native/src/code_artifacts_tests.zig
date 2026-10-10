@@ -513,10 +513,6 @@ fn verify(pool: *const artifacts.Pools, fixture: *const Fixture, physical: u32, 
     try std.testing.expect(pool.operations[0].key.len != 0);
     try std.testing.expectEqualSlices(u8, &artifacts.stamp(fixture.units[0]), &pool.modules[0].stamp);
     try std.testing.expectEqualSlices(u8, &artifacts.stamp(pool.field_locations), &pool.field_locations_stamp);
-    for (pool.bodies) |body| {
-        try std.testing.expectEqualSlices(u8, &pool.modules[0].stamp, &body.module_stamp);
-        try std.testing.expectEqualSlices(u8, &artifacts.stamp(.{ body.module_stamp, body.body }), &body.stamp);
-    }
 }
 test "artifact pools survive evaluator layout template identity teardown with physical catalog order and nested captures" {
     var fixture = try Fixture.init();

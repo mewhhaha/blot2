@@ -24,10 +24,16 @@ pub const Counters = struct {
     /// Subsets of the logical totals, counted only by the outer import.
     evidence_import_solver_bytes: u64 = 0,
     evidence_import_scratch_bytes: u64 = 0,
-    /// Exact allocations for owned evaluator snapshot cloning, including its
-    /// evidence snapshot; borrowed snapshots incur none of this traffic.
+    /// Bytes and fields copied for the evaluator snapshot, including its
+    /// evidence; fields leased from the previous revision incur none.
     snapshot_copy_bytes: u64 = 0,
     snapshot_copy_allocations: u64 = 0,
+    /// Artifact pool fields leased unchanged from the previous revision versus
+    /// copied into new leases, with their payload bytes.
+    metadata_shared_fields: u64 = 0,
+    metadata_shared_bytes: u64 = 0,
+    metadata_copied_fields: u64 = 0,
+    metadata_copied_bytes: u64 = 0,
     /// Durable principal copier buffers (the destination type Store is separate).
     principal_copy_buffer_bytes: u64 = 0,
     principal_copy_buffer_allocations: u64 = 0,

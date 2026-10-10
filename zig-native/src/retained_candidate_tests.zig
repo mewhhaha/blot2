@@ -1302,3 +1302,41 @@ test "fresh principal capture releases every failed first candidate and publicat
     defer expected.deinit(a);
     try @import("allocation_failures.zig").checkAllAllocationFailures(a, freshPrincipalFailure, .{ &fixture, &expected });
 }
+
+fn leasedRevisionScenario(allocator: std.mem.Allocator, session: *retained.Session, fixture: *Fixture) !void {
+    const previous_allocator = session.allocator;
+    session.allocator = allocator;
+    defer session.allocator = previous_allocator;
+    const candidate = try ready(session, fixture, .{});
+    defer candidate.deinit();
+    const counters = candidate.result().?.result.compiled.counters;
+    try std.testing.expect(counters.metadata_shared_fields > 0 and counters.metadata_copied_fields > 0);
+    candidate.discard();
+}
+test "failed leased revisions keep the published revision, its leases and its checkpoint exactly" {
+    var fixture = try Fixture.init();
+    defer fixture.deinit();
+    try fixture.write("dep.blot", unaffected_producer);
+    try fixture.write("main.blot", unaffected_query_main);
+    var session = try retained.Session.initEmpty(a, .{});
+    defer session.deinit();
+    var initial = try session.revise(io, fixture.path, null, .{});
+    defer initial.deinit(a);
+    const compiler: [32]u8 = @splat(29);
+    const checkpoint = try session.checkpointBytes(compiler);
+    defer a.free(checkpoint);
+    // An entry-only edit keeps the previous revision as the lease source.
+    try fixture.write("main.blot", unaffected_query_edit);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, leasedRevisionScenario, .{ &session, &fixture });
+    const pools = &session.current.?.artifacts.metadata.pools.?;
+    for (pools.leases.values) |lease| if (lease) |owned| try std.testing.expectEqual(@as(usize, 1), owned.references);
+    const after = try session.checkpointBytes(compiler);
+    defer a.free(after);
+    try std.testing.expectEqualSlices(u8, checkpoint, after);
+    // The same Session then commits the leased edit and releases the old owner.
+    const retry = try ready(&session, &fixture, .{});
+    defer retry.deinit();
+    try std.testing.expect(retry.result().?.result.compiled.counters.metadata_shared_fields > 0);
+    try std.testing.expect(session.commit(retry));
+    for (session.current.?.artifacts.metadata.pools.?.leases.values) |lease| if (lease) |owned| try std.testing.expectEqual(@as(usize, 1), owned.references);
+}

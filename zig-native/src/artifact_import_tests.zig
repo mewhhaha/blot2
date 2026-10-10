@@ -205,7 +205,6 @@ fn capture(g: *const Generator, fixture: *const Fixture) !artifacts.Pools {
         .project_identity = true,
         .identity = names,
         .modules = modules,
-        .bodies = &.{},
         .layouts = .{ .nodes = layouts, .extra = extra, .effects = effects },
         .evaluator = evaluator,
         .rows = rows,

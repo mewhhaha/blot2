@@ -1997,12 +1997,16 @@ fn rowRoot(old: *const capture.Capture) !u32 {
     for (old.metadata.specialization_queries.records.items) |query| if (snapshot.evidence.view().node(query.dependencies.expected).c != 0) return query.value.selected;
     return error.MissingEffectfulQuery;
 }
-fn appendedSnapshotType(snapshot: *evidence.Snapshot, node: evidence.Node) !u32 {
+/// Replaces the pool's evidence nodes with an owned array; the leased original
+/// is released, never freed directly.
+fn appendedSnapshotType(pools: *@import("code_artifacts.zig").Pools, node: evidence.Node) !u32 {
+    const snapshot = &pools.evaluator.evidence;
     const next = try a.alloc(evidence.Node, snapshot.nodes.len + 1);
     @memcpy(next[0..snapshot.nodes.len], snapshot.nodes);
     const id: u32 = @intCast(snapshot.nodes.len);
     next[id] = node;
-    a.free(snapshot.nodes);
+    @import("pool_leases.zig").free(&pools.leases, a, .evidence_nodes, snapshot.nodes);
+    pools.leases.set(.evidence_nodes, null);
     snapshot.nodes = next;
     return id;
 }
@@ -2044,9 +2048,9 @@ test "source declared effect graph rejects generated labels and provider State o
     const function = old.capture.?.metadata.pools.?.evaluator.value_evidence[root];
     // Closed headers with provider/State domains are valid semantic node kinds,
     // but cannot authorize this source-only graph transport.
-    argument.* = try appendedSnapshotType(snapshot, .{ .tag = .provider, .a = label, .b = function });
+    argument.* = try appendedSnapshotType(&old.capture.?.metadata.pools.?, .{ .tag = .provider, .a = label, .b = function });
     try expectRowDomain(&old.capture.?, &gate, root);
-    argument.* = try appendedSnapshotType(snapshot, .{ .tag = .state_provider, .a = label, .b = label, .c = 3 });
+    argument.* = try appendedSnapshotType(&old.capture.?.metadata.pools.?, .{ .tag = .state_provider, .a = label, .b = label, .c = 3 });
     try expectRowDomain(&old.capture.?, &gate, root);
     argument.* = saved_argument;
     const restored = try graph.Plan.inspectRootsWithRows(a, &old.capture.?.metadata.pools.?, &gate, &.{root}, .source_declared);

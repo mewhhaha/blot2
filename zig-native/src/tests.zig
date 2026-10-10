@@ -3,6 +3,8 @@ comptime {
     _ = @import("portable_query.zig");
     _ = @import("semantic_archive.zig");
     _ = @import("semantic_archive_tests.zig");
+    _ = @import("pool_leases.zig");
+    _ = @import("pool_lease_tests.zig");
     _ = @import("refinement_receipt.zig");
     _ = @import("selected_query.zig");
     _ = @import("principal_query.zig");

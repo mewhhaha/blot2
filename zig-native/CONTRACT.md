@@ -692,3 +692,12 @@ rebuilding a Capture whose pins name the decoded Core. It serves only as the
 query predecessor of a compile with no in-process previous revision, and the
 ordinary Gate, Importer and Plan still admit each receipt against current
 source. See [persisted semantic artifacts](SEMANTIC_ARTIFACTS.md).
+
+Artifact pool fields are leased. A capture compares each plain pool slice with
+the previous revision's leased slice and retains that lease when the content is
+equal, copying otherwise; leases are taken during candidate preparation and
+released by failed, rejected or discarded candidates, so commit stays
+allocation-free and the published revision is unchanged. Captured slices are
+immutable; a lease names one allocation, never a revision. Code that replaces a
+pool slice must release its lease, never free it. See
+[revision deltas](REVISION_DELTAS.md).

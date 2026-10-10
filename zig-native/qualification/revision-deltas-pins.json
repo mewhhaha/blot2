@@ -1,0 +1,1565 @@
+{
+  "zig": "0.17.0",
+  "baseline": {
+    "revision": "74da7e3 (task 020 record; compiler sources of 8803452)",
+    "probe_sha256": "eedc8a39f60094324e14314872228709c7e8337f3820cf12f86668c85393cbc6"
+  },
+  "candidate": {
+    "base_revision": "74da7e3726856d97385c7cb732f662c16bb6e42a",
+    "blotc_sha256": "75ad482640273a9268479580f0457349cd7b07d8743dee29edcc69f97c764096",
+    "probe_sha256": "ca291fe42848de052fe2db5e4d7f05e9c4449d8930a2ec5585c215171fbb2aaf",
+    "input_files": 424,
+    "input_map_sha256": "9141a3311973ad2b4b96ab5e40fd3badfc9a26612f1c9ad9ad9398cacaeaeabc"
+  },
+  "drivers": {
+    "zig-native/qualification/revision_deltas.ts": "b5eee6b5c5d86532f3f9a9c6a91ec18d4e546a8490494a14a436c99a764003bc",
+    "zig-native/qualification/revision_deltas_probe.zig": "2112ef190700be3dc58f6bc5cca90cabda20091403dd9809fc0bcabab122c4fa"
+  },
+  "repetitions": 21,
+  "rounds": 9,
+  "loads": [
+    [
+      8.77,
+      13.33,
+      10.45
+    ],
+    [
+      6.62,
+      12.14,
+      10.19
+    ]
+  ],
+  "geomean_cpu_ratio": {
+    "population": 0.9954807968287972,
+    "first_edit": 0.9667989506727914,
+    "first_revert": 0.9677179339230226,
+    "first_failed": 0.994685615723795,
+    "first_noop": 1.0249729062866682,
+    "edit": 0.9666323396962664,
+    "revert": 0.957920341476082,
+    "failed": 1.0092405239836584,
+    "noop": 0.9915010465334313
+  },
+  "problems": [],
+  "summary": [
+    {
+      "workload": "scalar-body",
+      "phase": "population",
+      "baseline": {
+        "cpu_ns": 6178145,
+        "requested_bytes": 4234830,
+        "peak_bytes": 1238450,
+        "retained_live_bytes": 324784,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 6510400,
+        "requested_bytes": 4185538,
+        "peak_bytes": 1238450,
+        "retained_live_bytes": 303352,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 11523
+      },
+      "cpu_ratio": 1.0537790874121602
+    },
+    {
+      "workload": "scalar-body",
+      "phase": "first_edit",
+      "baseline": {
+        "cpu_ns": 1897718,
+        "requested_bytes": 1229807,
+        "peak_bytes": 713117,
+        "retained_live_bytes": 488246,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1802731,
+        "requested_bytes": 1168080,
+        "peak_bytes": 657818,
+        "retained_live_bytes": 466814,
+        "metadata_shared_bytes": 11523,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9499467254881916
+    },
+    {
+      "workload": "scalar-body",
+      "phase": "first_revert",
+      "baseline": {
+        "cpu_ns": 1697964,
+        "requested_bytes": 1153450,
+        "peak_bytes": 876579,
+        "retained_live_bytes": 488246,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1600111,
+        "requested_bytes": 1091723,
+        "peak_bytes": 821280,
+        "retained_live_bytes": 466814,
+        "metadata_shared_bytes": 11523,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9423703918339847
+    },
+    {
+      "workload": "scalar-body",
+      "phase": "first_failed",
+      "baseline": {
+        "cpu_ns": 3634024,
+        "requested_bytes": 2818069,
+        "peak_bytes": 1324667,
+        "retained_live_bytes": 488246,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3730928,
+        "requested_bytes": 2818069,
+        "peak_bytes": 1303235,
+        "retained_live_bytes": 466814,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0266657567478916
+    },
+    {
+      "workload": "scalar-body",
+      "phase": "first_noop",
+      "baseline": {
+        "cpu_ns": 67386,
+        "requested_bytes": 47120,
+        "peak_bytes": 523067,
+        "retained_live_bytes": 488246,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 70893,
+        "requested_bytes": 47776,
+        "peak_bytes": 501635,
+        "retained_live_bytes": 466814,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0520434511619625
+    },
+    {
+      "workload": "scalar-body",
+      "phase": "edit",
+      "baseline": {
+        "cpu_ns": 1659011.5,
+        "requested_bytes": 1153450,
+        "peak_bytes": 876579,
+        "retained_live_bytes": 488246,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1561372.5,
+        "requested_bytes": 1091723,
+        "peak_bytes": 821280,
+        "retained_live_bytes": 466814,
+        "metadata_shared_bytes": 11523,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9411462789739553
+    },
+    {
+      "workload": "scalar-body",
+      "phase": "revert",
+      "baseline": {
+        "cpu_ns": 1636112.5,
+        "requested_bytes": 1153450,
+        "peak_bytes": 876579,
+        "retained_live_bytes": 488246,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1539638,
+        "requested_bytes": 1091723,
+        "peak_bytes": 821280,
+        "retained_live_bytes": 466814,
+        "metadata_shared_bytes": 11523,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9410343115158646
+    },
+    {
+      "workload": "scalar-body",
+      "phase": "failed",
+      "baseline": {
+        "cpu_ns": 3507708.5,
+        "requested_bytes": 2818069,
+        "peak_bytes": 1324667,
+        "retained_live_bytes": 488246,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3495154,
+        "requested_bytes": 2818069,
+        "peak_bytes": 1303235,
+        "retained_live_bytes": 466814,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9964208827500917
+    },
+    {
+      "workload": "scalar-body",
+      "phase": "noop",
+      "baseline": {
+        "cpu_ns": 59937.5,
+        "requested_bytes": 47120,
+        "peak_bytes": 523067,
+        "retained_live_bytes": 488246,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 60057,
+        "requested_bytes": 47776,
+        "peak_bytes": 501635,
+        "retained_live_bytes": 466814,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0019937434827946
+    },
+    {
+      "workload": "scalar-constant",
+      "phase": "population",
+      "baseline": {
+        "cpu_ns": 6441798,
+        "requested_bytes": 4234830,
+        "peak_bytes": 1238450,
+        "retained_live_bytes": 324784,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 6644330,
+        "requested_bytes": 4185538,
+        "peak_bytes": 1238450,
+        "retained_live_bytes": 303352,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 11523
+      },
+      "cpu_ratio": 1.0314402904282314
+    },
+    {
+      "workload": "scalar-constant",
+      "phase": "first_edit",
+      "baseline": {
+        "cpu_ns": 2007765,
+        "requested_bytes": 1235269,
+        "peak_bytes": 713761,
+        "retained_live_bytes": 488418,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1855752,
+        "requested_bytes": 1173710,
+        "peak_bytes": 658630,
+        "retained_live_bytes": 466986,
+        "metadata_shared_bytes": 11403,
+        "metadata_copied_bytes": 120
+      },
+      "cpu_ratio": 0.9242874539600003
+    },
+    {
+      "workload": "scalar-constant",
+      "phase": "first_revert",
+      "baseline": {
+        "cpu_ns": 1758778,
+        "requested_bytes": 1158912,
+        "peak_bytes": 877395,
+        "retained_live_bytes": 488418,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1576618,
+        "requested_bytes": 1097353,
+        "peak_bytes": 822264,
+        "retained_live_bytes": 466986,
+        "metadata_shared_bytes": 11403,
+        "metadata_copied_bytes": 120
+      },
+      "cpu_ratio": 0.8964280881384689
+    },
+    {
+      "workload": "scalar-constant",
+      "phase": "first_failed",
+      "baseline": {
+        "cpu_ns": 3637092,
+        "requested_bytes": 2818069,
+        "peak_bytes": 1324839,
+        "retained_live_bytes": 488418,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3647050,
+        "requested_bytes": 2818069,
+        "peak_bytes": 1303407,
+        "retained_live_bytes": 466986,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0027379015983098
+    },
+    {
+      "workload": "scalar-constant",
+      "phase": "first_noop",
+      "baseline": {
+        "cpu_ns": 64190,
+        "requested_bytes": 47120,
+        "peak_bytes": 523239,
+        "retained_live_bytes": 488418,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 65283,
+        "requested_bytes": 47776,
+        "peak_bytes": 501807,
+        "retained_live_bytes": 466986,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.017027574388534
+    },
+    {
+      "workload": "scalar-constant",
+      "phase": "edit",
+      "baseline": {
+        "cpu_ns": 1682180,
+        "requested_bytes": 1158912,
+        "peak_bytes": 877395,
+        "retained_live_bytes": 488418,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1626284.5,
+        "requested_bytes": 1097353,
+        "peak_bytes": 822264,
+        "retained_live_bytes": 466986,
+        "metadata_shared_bytes": 11403,
+        "metadata_copied_bytes": 120
+      },
+      "cpu_ratio": 0.9667719863510444
+    },
+    {
+      "workload": "scalar-constant",
+      "phase": "revert",
+      "baseline": {
+        "cpu_ns": 1669742,
+        "requested_bytes": 1158912,
+        "peak_bytes": 877395,
+        "retained_live_bytes": 488418,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1537443,
+        "requested_bytes": 1097353,
+        "peak_bytes": 822264,
+        "retained_live_bytes": 466986,
+        "metadata_shared_bytes": 11403,
+        "metadata_copied_bytes": 120
+      },
+      "cpu_ratio": 0.9207668010986129
+    },
+    {
+      "workload": "scalar-constant",
+      "phase": "failed",
+      "baseline": {
+        "cpu_ns": 3521929.5,
+        "requested_bytes": 2818069,
+        "peak_bytes": 1324839,
+        "retained_live_bytes": 488418,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3568958,
+        "requested_bytes": 2818069,
+        "peak_bytes": 1303407,
+        "retained_live_bytes": 466986,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0133530497984131
+    },
+    {
+      "workload": "scalar-constant",
+      "phase": "noop",
+      "baseline": {
+        "cpu_ns": 61615.5,
+        "requested_bytes": 47120,
+        "peak_bytes": 523239,
+        "retained_live_bytes": 488418,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 60694,
+        "requested_bytes": 47776,
+        "peak_bytes": 501807,
+        "retained_live_bytes": 466986,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.985044347607339
+    },
+    {
+      "workload": "ecs-literal",
+      "phase": "population",
+      "baseline": {
+        "cpu_ns": 17560220,
+        "requested_bytes": 12428817,
+        "peak_bytes": 2311106,
+        "retained_live_bytes": 1854020,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 18500123,
+        "requested_bytes": 12316281,
+        "peak_bytes": 2311106,
+        "retained_live_bytes": 1827636,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 46792
+      },
+      "cpu_ratio": 1.0535245572094198
+    },
+    {
+      "workload": "ecs-literal",
+      "phase": "first_edit",
+      "baseline": {
+        "cpu_ns": 8878959,
+        "requested_bytes": 5346148,
+        "peak_bytes": 3781433,
+        "retained_live_bytes": 1854020,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 9062476,
+        "requested_bytes": 5188644,
+        "peak_bytes": 3683697,
+        "retained_live_bytes": 1827636,
+        "metadata_shared_bytes": 43432,
+        "metadata_copied_bytes": 3360
+      },
+      "cpu_ratio": 1.0206687518210187
+    },
+    {
+      "workload": "ecs-literal",
+      "phase": "first_revert",
+      "baseline": {
+        "cpu_ns": 8634500,
+        "requested_bytes": 5346148,
+        "peak_bytes": 3781433,
+        "retained_live_bytes": 1854020,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 8832906,
+        "requested_bytes": 5188644,
+        "peak_bytes": 3683697,
+        "retained_live_bytes": 1827636,
+        "metadata_shared_bytes": 43432,
+        "metadata_copied_bytes": 3360
+      },
+      "cpu_ratio": 1.02297828478777
+    },
+    {
+      "workload": "ecs-literal",
+      "phase": "first_failed",
+      "baseline": {
+        "cpu_ns": 5618729,
+        "requested_bytes": 4480350,
+        "peak_bytes": 3178650,
+        "retained_live_bytes": 1854020,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 5706581,
+        "requested_bytes": 4480350,
+        "peak_bytes": 3152266,
+        "retained_live_bytes": 1827636,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0156355645556139
+    },
+    {
+      "workload": "ecs-literal",
+      "phase": "first_noop",
+      "baseline": {
+        "cpu_ns": 100468,
+        "requested_bytes": 77656,
+        "peak_bytes": 1907515,
+        "retained_live_bytes": 1854020,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 105448,
+        "requested_bytes": 78312,
+        "peak_bytes": 1881787,
+        "retained_live_bytes": 1827636,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0495680216586376
+    },
+    {
+      "workload": "ecs-literal",
+      "phase": "edit",
+      "baseline": {
+        "cpu_ns": 8332521.5,
+        "requested_bytes": 5346148,
+        "peak_bytes": 3781433,
+        "retained_live_bytes": 1854020,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 8330737,
+        "requested_bytes": 5188644,
+        "peak_bytes": 3683697,
+        "retained_live_bytes": 1827636,
+        "metadata_shared_bytes": 43432,
+        "metadata_copied_bytes": 3360
+      },
+      "cpu_ratio": 0.9997858391364487
+    },
+    {
+      "workload": "ecs-literal",
+      "phase": "revert",
+      "baseline": {
+        "cpu_ns": 8343989,
+        "requested_bytes": 5346148,
+        "peak_bytes": 3781433,
+        "retained_live_bytes": 1854020,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 8372037,
+        "requested_bytes": 5188644,
+        "peak_bytes": 3683697,
+        "retained_live_bytes": 1827636,
+        "metadata_shared_bytes": 43432,
+        "metadata_copied_bytes": 3360
+      },
+      "cpu_ratio": 1.0033614617660689
+    },
+    {
+      "workload": "ecs-literal",
+      "phase": "failed",
+      "baseline": {
+        "cpu_ns": 5315449,
+        "requested_bytes": 4480350,
+        "peak_bytes": 3178650,
+        "retained_live_bytes": 1854020,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 5462479,
+        "requested_bytes": 4480350,
+        "peak_bytes": 3152266,
+        "retained_live_bytes": 1827636,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0276608805765985
+    },
+    {
+      "workload": "ecs-literal",
+      "phase": "noop",
+      "baseline": {
+        "cpu_ns": 96956.5,
+        "requested_bytes": 77656,
+        "peak_bytes": 1907515,
+        "retained_live_bytes": 1854020,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 98695.5,
+        "requested_bytes": 78312,
+        "peak_bytes": 1881787,
+        "retained_live_bytes": 1827636,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0179358784609593
+    },
+    {
+      "workload": "tags-constant",
+      "phase": "population",
+      "baseline": {
+        "cpu_ns": 7298721,
+        "requested_bytes": 4731037,
+        "peak_bytes": 1243594,
+        "retained_live_bytes": 415889,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 7932675,
+        "requested_bytes": 4681425,
+        "peak_bytes": 1243594,
+        "retained_live_bytes": 394889,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 12805
+      },
+      "cpu_ratio": 1.0868582317367659
+    },
+    {
+      "workload": "tags-constant",
+      "phase": "first_edit",
+      "baseline": {
+        "cpu_ns": 2434045,
+        "requested_bytes": 1705416,
+        "peak_bytes": 931499,
+        "retained_live_bytes": 581092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 2222418,
+        "requested_bytes": 1642519,
+        "peak_bytes": 876214,
+        "retained_live_bytes": 560092,
+        "metadata_shared_bytes": 11989,
+        "metadata_copied_bytes": 816
+      },
+      "cpu_ratio": 0.9130554283096656
+    },
+    {
+      "workload": "tags-constant",
+      "phase": "first_revert",
+      "baseline": {
+        "cpu_ns": 2081303,
+        "requested_bytes": 1628041,
+        "peak_bytes": 1096702,
+        "retained_live_bytes": 581092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1951428,
+        "requested_bytes": 1565144,
+        "peak_bytes": 1041417,
+        "retained_live_bytes": 560092,
+        "metadata_shared_bytes": 11989,
+        "metadata_copied_bytes": 816
+      },
+      "cpu_ratio": 0.9375991866633546
+    },
+    {
+      "workload": "tags-constant",
+      "phase": "first_failed",
+      "baseline": {
+        "cpu_ns": 3563653,
+        "requested_bytes": 2814221,
+        "peak_bytes": 1417100,
+        "retained_live_bytes": 581092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3670363,
+        "requested_bytes": 2814221,
+        "peak_bytes": 1396100,
+        "retained_live_bytes": 560092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0299439928635028
+    },
+    {
+      "workload": "tags-constant",
+      "phase": "first_noop",
+      "baseline": {
+        "cpu_ns": 69390,
+        "requested_bytes": 48433,
+        "peak_bytes": 615858,
+        "retained_live_bytes": 581092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 71885,
+        "requested_bytes": 49089,
+        "peak_bytes": 594858,
+        "retained_live_bytes": 560092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0359561896526877
+    },
+    {
+      "workload": "tags-constant",
+      "phase": "edit",
+      "baseline": {
+        "cpu_ns": 2110708,
+        "requested_bytes": 1628041,
+        "peak_bytes": 1096702,
+        "retained_live_bytes": 581092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 2014983,
+        "requested_bytes": 1565144,
+        "peak_bytes": 1041417,
+        "retained_live_bytes": 560092,
+        "metadata_shared_bytes": 11989,
+        "metadata_copied_bytes": 816
+      },
+      "cpu_ratio": 0.9546479190868656
+    },
+    {
+      "workload": "tags-constant",
+      "phase": "revert",
+      "baseline": {
+        "cpu_ns": 2061661,
+        "requested_bytes": 1628041,
+        "peak_bytes": 1096702,
+        "retained_live_bytes": 581092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1937503,
+        "requested_bytes": 1565144,
+        "peak_bytes": 1041417,
+        "retained_live_bytes": 560092,
+        "metadata_shared_bytes": 11989,
+        "metadata_copied_bytes": 816
+      },
+      "cpu_ratio": 0.9397776841100453
+    },
+    {
+      "workload": "tags-constant",
+      "phase": "failed",
+      "baseline": {
+        "cpu_ns": 3540354.5,
+        "requested_bytes": 2814221,
+        "peak_bytes": 1417100,
+        "retained_live_bytes": 581092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3540098,
+        "requested_bytes": 2814221,
+        "peak_bytes": 1396100,
+        "retained_live_bytes": 560092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9999275496281517
+    },
+    {
+      "workload": "tags-constant",
+      "phase": "noop",
+      "baseline": {
+        "cpu_ns": 63554,
+        "requested_bytes": 48433,
+        "peak_bytes": 615858,
+        "retained_live_bytes": 581092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 62707,
+        "requested_bytes": 49089,
+        "peak_bytes": 594858,
+        "retained_live_bytes": 560092,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9866727507316613
+    },
+    {
+      "workload": "monads-literal",
+      "phase": "population",
+      "baseline": {
+        "cpu_ns": 10527603,
+        "requested_bytes": 6349625,
+        "peak_bytes": 1332000,
+        "retained_live_bytes": 737167,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 9989917,
+        "requested_bytes": 6304973,
+        "peak_bytes": 1332000,
+        "retained_live_bytes": 715175,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 18101
+      },
+      "cpu_ratio": 0.9489260755748483
+    },
+    {
+      "workload": "monads-literal",
+      "phase": "first_edit",
+      "baseline": {
+        "cpu_ns": 4884031,
+        "requested_bytes": 2751417,
+        "peak_bytes": 1754671,
+        "retained_live_bytes": 900595,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 4748253,
+        "requested_bytes": 2695264,
+        "peak_bytes": 1699186,
+        "retained_live_bytes": 878603,
+        "metadata_shared_bytes": 10781,
+        "metadata_copied_bytes": 7152
+      },
+      "cpu_ratio": 0.972199603155672
+    },
+    {
+      "workload": "monads-literal",
+      "phase": "first_revert",
+      "baseline": {
+        "cpu_ns": 4450265,
+        "requested_bytes": 2666144,
+        "peak_bytes": 1918099,
+        "retained_live_bytes": 900595,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 4424717,
+        "requested_bytes": 2602599,
+        "peak_bytes": 1855222,
+        "retained_live_bytes": 878603,
+        "metadata_shared_bytes": 17933,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9942592182712715
+    },
+    {
+      "workload": "monads-literal",
+      "phase": "first_failed",
+      "baseline": {
+        "cpu_ns": 3670866,
+        "requested_bytes": 2882043,
+        "peak_bytes": 1751335,
+        "retained_live_bytes": 900595,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3761585,
+        "requested_bytes": 2882043,
+        "peak_bytes": 1729343,
+        "retained_live_bytes": 878603,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0247132420524203
+    },
+    {
+      "workload": "monads-literal",
+      "phase": "first_noop",
+      "baseline": {
+        "cpu_ns": 62547,
+        "requested_bytes": 53318,
+        "peak_bytes": 935909,
+        "retained_live_bytes": 900595,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 74169,
+        "requested_bytes": 53974,
+        "peak_bytes": 913917,
+        "retained_live_bytes": 878603,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.1858122691735815
+    },
+    {
+      "workload": "monads-literal",
+      "phase": "edit",
+      "baseline": {
+        "cpu_ns": 4389656,
+        "requested_bytes": 2666144,
+        "peak_bytes": 1918099,
+        "retained_live_bytes": 900595,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 4317143.5,
+        "requested_bytes": 2602599,
+        "peak_bytes": 1855222,
+        "retained_live_bytes": 878603,
+        "metadata_shared_bytes": 17933,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9834810518181835
+    },
+    {
+      "workload": "monads-literal",
+      "phase": "revert",
+      "baseline": {
+        "cpu_ns": 4390393,
+        "requested_bytes": 2666144,
+        "peak_bytes": 1918099,
+        "retained_live_bytes": 900595,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 4301421.5,
+        "requested_bytes": 2602599,
+        "peak_bytes": 1855222,
+        "retained_live_bytes": 878603,
+        "metadata_shared_bytes": 17933,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9797349576677987
+    },
+    {
+      "workload": "monads-literal",
+      "phase": "failed",
+      "baseline": {
+        "cpu_ns": 3484590.5,
+        "requested_bytes": 2882043,
+        "peak_bytes": 1751335,
+        "retained_live_bytes": 900595,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3497725.5,
+        "requested_bytes": 2882043,
+        "peak_bytes": 1729343,
+        "retained_live_bytes": 878603,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0037694529672856
+    },
+    {
+      "workload": "monads-literal",
+      "phase": "noop",
+      "baseline": {
+        "cpu_ns": 62261.5,
+        "requested_bytes": 53318,
+        "peak_bytes": 935909,
+        "retained_live_bytes": 900595,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 62793,
+        "requested_bytes": 53974,
+        "peak_bytes": 913917,
+        "retained_live_bytes": 878603,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0085365755723843
+    },
+    {
+      "workload": "lists-literal",
+      "phase": "population",
+      "baseline": {
+        "cpu_ns": 11096844,
+        "requested_bytes": 6808330,
+        "peak_bytes": 1741563,
+        "retained_live_bytes": 796327,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 9727008,
+        "requested_bytes": 6696514,
+        "peak_bytes": 1741563,
+        "retained_live_bytes": 771799,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 17820
+      },
+      "cpu_ratio": 0.8765562532914764
+    },
+    {
+      "workload": "lists-literal",
+      "phase": "first_edit",
+      "baseline": {
+        "cpu_ns": 3482590,
+        "requested_bytes": 2231758,
+        "peak_bytes": 1647217,
+        "retained_live_bytes": 1033148,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3461052,
+        "requested_bytes": 2102074,
+        "peak_bytes": 1580293,
+        "retained_live_bytes": 1008620,
+        "metadata_shared_bytes": 16908,
+        "metadata_copied_bytes": 912
+      },
+      "cpu_ratio": 0.9938155223554883
+    },
+    {
+      "workload": "lists-literal",
+      "phase": "first_revert",
+      "baseline": {
+        "cpu_ns": 3046183,
+        "requested_bytes": 2119242,
+        "peak_bytes": 1884038,
+        "retained_live_bytes": 1033148,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3180085,
+        "requested_bytes": 1989558,
+        "peak_bytes": 1817114,
+        "retained_live_bytes": 1008620,
+        "metadata_shared_bytes": 16908,
+        "metadata_copied_bytes": 912
+      },
+      "cpu_ratio": 1.0439573065702226
+    },
+    {
+      "workload": "lists-literal",
+      "phase": "first_failed",
+      "baseline": {
+        "cpu_ns": 5613355,
+        "requested_bytes": 3881392,
+        "peak_bytes": 2207230,
+        "retained_live_bytes": 1033148,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 5097450,
+        "requested_bytes": 3881392,
+        "peak_bytes": 2182702,
+        "retained_live_bytes": 1008620,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9080932882384956
+    },
+    {
+      "workload": "lists-literal",
+      "phase": "first_noop",
+      "baseline": {
+        "cpu_ns": 101210,
+        "requested_bytes": 60420,
+        "peak_bytes": 1067629,
+        "retained_live_bytes": 1033148,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 97703,
+        "requested_bytes": 61076,
+        "peak_bytes": 1043101,
+        "retained_live_bytes": 1008620,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9653492737871752
+    },
+    {
+      "workload": "lists-literal",
+      "phase": "edit",
+      "baseline": {
+        "cpu_ns": 2816280.5,
+        "requested_bytes": 2119242,
+        "peak_bytes": 1884038,
+        "retained_live_bytes": 1033148,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 2662514,
+        "requested_bytes": 1989558,
+        "peak_bytes": 1817114,
+        "retained_live_bytes": 1008620,
+        "metadata_shared_bytes": 16908,
+        "metadata_copied_bytes": 912
+      },
+      "cpu_ratio": 0.9454008576205388
+    },
+    {
+      "workload": "lists-literal",
+      "phase": "revert",
+      "baseline": {
+        "cpu_ns": 2758598.5,
+        "requested_bytes": 2119242,
+        "peak_bytes": 1884038,
+        "retained_live_bytes": 1033148,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 2662063,
+        "requested_bytes": 1989558,
+        "peak_bytes": 1817114,
+        "retained_live_bytes": 1008620,
+        "metadata_shared_bytes": 16908,
+        "metadata_copied_bytes": 912
+      },
+      "cpu_ratio": 0.9650055997637931
+    },
+    {
+      "workload": "lists-literal",
+      "phase": "failed",
+      "baseline": {
+        "cpu_ns": 4765507,
+        "requested_bytes": 3881392,
+        "peak_bytes": 2207230,
+        "retained_live_bytes": 1033148,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 4789201.5,
+        "requested_bytes": 3881392,
+        "peak_bytes": 2182702,
+        "retained_live_bytes": 1008620,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0049720837677922
+    },
+    {
+      "workload": "lists-literal",
+      "phase": "noop",
+      "baseline": {
+        "cpu_ns": 90044,
+        "requested_bytes": 60420,
+        "peak_bytes": 1067629,
+        "retained_live_bytes": 1033148,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 91271,
+        "requested_bytes": 61076,
+        "peak_bytes": 1043101,
+        "retained_live_bytes": 1008620,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0136266714050908
+    },
+    {
+      "workload": "requests-body",
+      "phase": "population",
+      "baseline": {
+        "cpu_ns": 7593391,
+        "requested_bytes": 5054063,
+        "peak_bytes": 1266958,
+        "retained_live_bytes": 564997,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 7328815,
+        "requested_bytes": 5004431,
+        "peak_bytes": 1266958,
+        "retained_live_bytes": 544149,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 13875
+      },
+      "cpu_ratio": 0.9651570688247187
+    },
+    {
+      "workload": "requests-body",
+      "phase": "first_edit",
+      "baseline": {
+        "cpu_ns": 2152747,
+        "requested_bytes": 1410392,
+        "peak_bytes": 1032838,
+        "retained_live_bytes": 564997,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 2094247,
+        "requested_bytes": 1345541,
+        "peak_bytes": 975923,
+        "retained_live_bytes": 544149,
+        "metadata_shared_bytes": 13875,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9728254179427495
+    },
+    {
+      "workload": "requests-body",
+      "phase": "first_revert",
+      "baseline": {
+        "cpu_ns": 2053222,
+        "requested_bytes": 1410392,
+        "peak_bytes": 1032838,
+        "retained_live_bytes": 564997,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1929239,
+        "requested_bytes": 1345541,
+        "peak_bytes": 975923,
+        "retained_live_bytes": 544149,
+        "metadata_shared_bytes": 13875,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9396153947308182
+    },
+    {
+      "workload": "requests-body",
+      "phase": "first_failed",
+      "baseline": {
+        "cpu_ns": 3919241,
+        "requested_bytes": 2885281,
+        "peak_bytes": 1421855,
+        "retained_live_bytes": 564997,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3650845,
+        "requested_bytes": 2885281,
+        "peak_bytes": 1401007,
+        "retained_live_bytes": 544149,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9315183730727454
+    },
+    {
+      "workload": "requests-body",
+      "phase": "first_noop",
+      "baseline": {
+        "cpu_ns": 75832,
+        "requested_bytes": 51578,
+        "peak_bytes": 600397,
+        "retained_live_bytes": 564997,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 68478,
+        "requested_bytes": 52234,
+        "peak_bytes": 579549,
+        "retained_live_bytes": 544149,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9030224707247599
+    },
+    {
+      "workload": "requests-body",
+      "phase": "edit",
+      "baseline": {
+        "cpu_ns": 1975093,
+        "requested_bytes": 1410392,
+        "peak_bytes": 1032838,
+        "retained_live_bytes": 564997,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1849874,
+        "requested_bytes": 1345541,
+        "peak_bytes": 975923,
+        "retained_live_bytes": 544149,
+        "metadata_shared_bytes": 13875,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9366009600560581
+    },
+    {
+      "workload": "requests-body",
+      "phase": "revert",
+      "baseline": {
+        "cpu_ns": 1901406.5,
+        "requested_bytes": 1410392,
+        "peak_bytes": 1032838,
+        "retained_live_bytes": 564997,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 1741847,
+        "requested_bytes": 1345541,
+        "peak_bytes": 975923,
+        "retained_live_bytes": 544149,
+        "metadata_shared_bytes": 13875,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.9160834361300437
+    },
+    {
+      "workload": "requests-body",
+      "phase": "failed",
+      "baseline": {
+        "cpu_ns": 3571161.5,
+        "requested_bytes": 2885281,
+        "peak_bytes": 1421855,
+        "retained_live_bytes": 564997,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 3574349,
+        "requested_bytes": 2885281,
+        "peak_bytes": 1401007,
+        "retained_live_bytes": 544149,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0008925667461412
+    },
+    {
+      "workload": "requests-body",
+      "phase": "noop",
+      "baseline": {
+        "cpu_ns": 66956,
+        "requested_bytes": 51578,
+        "peak_bytes": 600397,
+        "retained_live_bytes": 564997,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 59947,
+        "requested_bytes": 52234,
+        "peak_bytes": 579549,
+        "retained_live_bytes": 544149,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 0.8953193141764741
+    },
+    {
+      "workload": "arrays-import",
+      "phase": "population",
+      "baseline": {
+        "cpu_ns": 9639896,
+        "requested_bytes": 6838000,
+        "peak_bytes": 1785522,
+        "retained_live_bytes": 682638,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 9304950,
+        "requested_bytes": 6728156,
+        "peak_bytes": 1785522,
+        "retained_live_bytes": 657998,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 18815
+      },
+      "cpu_ratio": 0.9652541894642847
+    },
+    {
+      "workload": "arrays-import",
+      "phase": "first_edit",
+      "baseline": {
+        "cpu_ns": 9766510,
+        "requested_bytes": 8163485,
+        "peak_bytes": 2712365,
+        "retained_live_bytes": 765135,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 9692691,
+        "requested_bytes": 8050097,
+        "peak_bytes": 2687725,
+        "retained_live_bytes": 739479,
+        "metadata_shared_bytes": 1760,
+        "metadata_copied_bytes": 18898
+      },
+      "cpu_ratio": 0.9924416193706862
+    },
+    {
+      "workload": "arrays-import",
+      "phase": "first_revert",
+      "baseline": {
+        "cpu_ns": 8658177,
+        "requested_bytes": 7203860,
+        "peak_bytes": 2551746,
+        "retained_live_bytes": 683879,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 8426817,
+        "requested_bytes": 7091440,
+        "peak_bytes": 2526090,
+        "retained_live_bytes": 659239,
+        "metadata_shared_bytes": 1760,
+        "metadata_copied_bytes": 17055
+      },
+      "cpu_ratio": 0.9732784395606604
+    },
+    {
+      "workload": "arrays-import",
+      "phase": "first_failed",
+      "baseline": {
+        "cpu_ns": 4989789,
+        "requested_bytes": 3950411,
+        "peak_bytes": 1884329,
+        "retained_live_bytes": 683879,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 5122437,
+        "requested_bytes": 3950411,
+        "peak_bytes": 1859689,
+        "retained_live_bytes": 659239,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0265838896193806
+    },
+    {
+      "workload": "arrays-import",
+      "phase": "first_noop",
+      "baseline": {
+        "cpu_ns": 103824,
+        "requested_bytes": 59184,
+        "peak_bytes": 718542,
+        "retained_live_bytes": 683879,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 105167,
+        "requested_bytes": 59840,
+        "peak_bytes": 693902,
+        "retained_live_bytes": 659239,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0129353521343814
+    },
+    {
+      "workload": "arrays-import",
+      "phase": "edit",
+      "baseline": {
+        "cpu_ns": 9167183,
+        "requested_bytes": 8163485,
+        "peak_bytes": 2713606,
+        "retained_live_bytes": 765135,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 9239713,
+        "requested_bytes": 8050097,
+        "peak_bytes": 2688966,
+        "retained_live_bytes": 739479,
+        "metadata_shared_bytes": 1760,
+        "metadata_copied_bytes": 18898
+      },
+      "cpu_ratio": 1.007911917979602
+    },
+    {
+      "workload": "arrays-import",
+      "phase": "revert",
+      "baseline": {
+        "cpu_ns": 8223873,
+        "requested_bytes": 7203860,
+        "peak_bytes": 2551746,
+        "retained_live_bytes": 683879,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 8239492,
+        "requested_bytes": 7091440,
+        "peak_bytes": 2526090,
+        "retained_live_bytes": 659239,
+        "metadata_shared_bytes": 1760,
+        "metadata_copied_bytes": 17055
+      },
+      "cpu_ratio": 1.0018992267998301
+    },
+    {
+      "workload": "arrays-import",
+      "phase": "failed",
+      "baseline": {
+        "cpu_ns": 5033760.5,
+        "requested_bytes": 3950411,
+        "peak_bytes": 1884329,
+        "retained_live_bytes": 683879,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 5171929.5,
+        "requested_bytes": 3950411,
+        "peak_bytes": 1859689,
+        "retained_live_bytes": 659239,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0274484652180016
+    },
+    {
+      "workload": "arrays-import",
+      "phase": "noop",
+      "baseline": {
+        "cpu_ns": 100193,
+        "requested_bytes": 59184,
+        "peak_bytes": 718542,
+        "retained_live_bytes": 683879,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "candidate": {
+        "cpu_ns": 103138.5,
+        "requested_bytes": 59840,
+        "peak_bytes": 693902,
+        "retained_live_bytes": 659239,
+        "metadata_shared_bytes": 0,
+        "metadata_copied_bytes": 0
+      },
+      "cpu_ratio": 1.0293982613555837
+    }
+  ],
+  "machine": {
+    "cpu": "AMD Ryzen 7 3800X, 8 cores / 16 threads",
+    "governor": "schedutil",
+    "boost": true,
+    "scheduler": "SCHED_OTHER, nice 0, unpinned",
+    "contention": "Interactive desktop; one-minute load 6.6-8.8 during the run"
+  }
+}

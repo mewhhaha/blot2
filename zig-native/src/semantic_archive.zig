@@ -291,7 +291,6 @@ fn adopt(a: A, snapshot: *Snapshot) format.Error!Archive {
         .project_identity = true,
         .identity = snapshot.identity,
         .modules = pins,
-        .bodies = &.{},
         .layouts = .{ .nodes = &.{}, .extra = &.{}, .effects = .{ .operations = &.{}, .arguments = &.{}, .rows = &.{}, .labels = &.{} } },
         .evaluator = snapshot.evaluator,
         .rows = .{ .entries = &.{}, .spans = &.{} },
