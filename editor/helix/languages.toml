@@ -6,7 +6,7 @@ file-types = ["blot"]
 roots = ["deno.json", ".git"]
 comment-token = "//"
 grammar = "blot"
-language-servers = []
+language-servers = ["blot"]
 auto-format = false
 rainbow-brackets = true
 indent = { tab-width = 2, unit = "  " }

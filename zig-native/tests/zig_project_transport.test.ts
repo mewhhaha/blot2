@@ -95,6 +95,59 @@ Deno.test("source buffers reject unsupported peers without consuming a request I
     await item.cleanup();
   }
 });
+
+Deno.test("completion captures queued sources and cancellation consumes no unsent ID", async () => {
+  const item = await fixture("completion-hold");
+  const compiler = await createZigProjectCompiler(item.options);
+  try {
+    const filename = String(item.options.entry);
+    const first = compiler.complete({ filename, position: 0, snapshot: 1, sources: { [filename]: "" } });
+    await waiting(item.log, "complete");
+    const controller = new AbortController();
+    const cancelled = compiler.complete({ filename, position: 0, snapshot: 2, signal: controller.signal });
+    controller.abort();
+    await rejects(cancelled, { name: "AbortError" });
+    const sources = { [filename]: "owned" };
+    const options = { filename, position: 0, snapshot: 3, sources };
+    const third = compiler.complete(options);
+    sources[filename] = "mutated"; options.snapshot = 99;
+    const results = await Promise.all([first, third]);
+    equal(results.map((result) => [result.revision, result.snapshot]), [[0, 1], [0, 3]]);
+    await compiler.close();
+    const rows = await logs(item.log);
+    equal(rows.filter((row) => row.kind === "complete").map((row) => row.id), [2, 3]);
+    equal(rows.filter((row) => row.kind === "completion-input").map((row) => row.text), ["", "owned"]);
+  } finally { await compiler.dispose(); await item.cleanup(); }
+});
+for (const mode of ["completion-revision", "completion-snapshot", "completion-span", "completion-kind", "completion-payload"]) {
+  Deno.test(`completion reaps a malformed peer: ${mode}`, async () => {
+    const item = await fixture(mode);
+    const compiler = await createZigProjectCompiler(item.options);
+    try {
+      const filename = String(item.options.entry);
+      await rejects(compiler.complete({ filename, position: 0, snapshot: 1, sources: { [filename]: "" } }));
+      reaped(compiler.pid);
+      await rejects(compiler.complete({ filename, position: 0, snapshot: 2 }));
+    } finally { await compiler.dispose(); await item.cleanup(); }
+  });
+}
+Deno.test("active completion cancellation rejects queued work and reaps the child", async () => {
+  const item = await fixture("completion-stall");
+  const compiler = await createZigProjectCompiler(item.options);
+  try {
+    const filename = String(item.options.entry), controller = new AbortController();
+    const first = compiler.complete({ filename, position: 0, snapshot: 1, signal: controller.signal });
+    const queued = compiler.complete({ filename, position: 0, snapshot: 2 });
+    const settled = Promise.allSettled([first, queued]);
+    await waiting(item.log, "complete"); controller.abort();
+    for (const result of await settled) {
+      equal(result.status, "rejected");
+      if (result.status === "rejected") equal(result.reason.name, "AbortError");
+    }
+    await compiler.dispose(); reaped(compiler.pid);
+    equal((await logs(item.log)).filter((row) => row.kind === "complete").map((row) => row.id), [2]);
+  } finally { await compiler.dispose(); await item.cleanup(); }
+});
 for (const mode of ["fragmented", "coalesced", "reject-first"]) {
   Deno.test(`client owns framed ${mode} replies, revisions and normal close`, async () => {
     const item = await fixture(mode);

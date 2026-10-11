@@ -3,6 +3,12 @@
 //! identity or semantic decision reads them, so a budget can assert on them
 //! without wall-time noise. A retained revision counts only the work it ran.
 pub const Counters = struct {
+    ragged_runtime_regions: u64 = 0,
+    ragged_staged_regions: u64 = 0,
+    ragged_probe_visits: u64 = 0,
+    ragged_probe_declines: u64 = 0,
+    ragged_selected: u64 = 0,
+    ragged_published_children: u64 = 0,
     demand_summary_builds: u64 = 0,
     demand_summary_hits: u64 = 0,
     demand_summary_imports: u64 = 0,

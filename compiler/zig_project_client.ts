@@ -1,3 +1,14 @@
+import {
+  captureCompletion,
+  readCompletion,
+  type ZigProjectCompletionOptions,
+  type ZigProjectCompletionResult,
+} from "./editor_completion.ts";
+export type {
+  ZigProjectCompletionItem,
+  ZigProjectCompletionOptions,
+  ZigProjectCompletionResult,
+} from "./editor_completion.ts";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -110,6 +121,9 @@ export interface ZigProjectCompiler {
   readonly pid: number;
   readonly compilerIdentity: string;
   build(options?: ZigProjectBuildOptions): Promise<ZigProjectBuildResult>;
+  complete(
+    options: ZigProjectCompletionOptions,
+  ): Promise<ZigProjectCompletionResult>;
   /** Portable candidates from the last successful revision; does not advance it. */
   exportCheckpoint(): Promise<Uint8Array<ArrayBuffer>>;
   close(): Promise<void>;
@@ -303,6 +317,7 @@ class ProjectProcess implements ZigProjectCompiler {
   #closing: Promise<void> | undefined;
   #identity = "";
   #sourceOverlays = false;
+  #editorCompletion = false;
   #nativeAssets = false;
   #entry = "";
   #checkpoints = false;
@@ -479,6 +494,9 @@ class ProjectProcess implements ZigProjectCompiler {
           ) throw new ZigProjectProtocolError("Compiler identity mismatch");
           this.#identity = hello.compilerIdentity;
           this.#sourceOverlays = capabilities.includes("source-overlays");
+          this.#editorCompletion = capabilities.includes(
+            "editor-completion-v1",
+          );
           this.#checkpoints = capabilities.includes("backend-checkpoints");
           this.#nativeAssets = open.nativeAssets !== undefined;
           this.#entry = open.entry as string;
@@ -654,7 +672,101 @@ class ProjectProcess implements ZigProjectCompiler {
     } catch (error) {
       return Promise.reject(error);
     }
-    const signal = options.signal;
+    return this.#enqueue(options.signal, async (job) => {
+      // The acknowledged revision is read here, after all prior replies.
+      const request: Record<string, unknown> = {
+        kind: "build",
+        id: this.#id(),
+        epoch: this.#epoch,
+        revision: this.#revision,
+      };
+      if (sources.length) request.sources = sources;
+      if (assetSources.length) request.assetSources = assetSources;
+      const frame = await this.#exchange(request, payload);
+      const metadata = frame.metadata,
+        revision = natural(metadata.revision, "revision");
+      if (
+        metadata.epoch !== this.#epoch ||
+        typeof metadata.success !== "boolean"
+      ) {
+        throw new ZigProjectProtocolError(
+          "Response epoch or success mismatch",
+        );
+      }
+      let value: ZigProjectBuildResult;
+      if (metadata.success) {
+        let nativeReply:
+          | Awaited<ReturnType<typeof readNativeAssetReply>>
+          | undefined;
+        let wasm = frame.payload;
+        if (this.#nativeAssets) {
+          try {
+            nativeReply = await readNativeAssetReply(
+              metadata,
+              frame.payload,
+              (message) => {
+                throw new ZigProjectProtocolError(message);
+              },
+            );
+          } catch (error) {
+            if (error instanceof Error) {
+              throw new ZigProjectProtocolError(error.message);
+            }
+            throw error;
+          }
+          wasm = nativeReply.bytes;
+        } else if (
+          ["wasmBytes", "assets", "assetStats", "assetDependencies"].some((
+            name,
+          ) => metadata[name] !== undefined)
+        ) {
+          throw new ZigProjectProtocolError(
+            "Unexpected native asset response",
+          );
+        }
+        if (
+          this.#revision === Number.MAX_SAFE_INTEGER ||
+          revision !== this.#revision + 1 || !wasm.length ||
+          !WebAssembly.validate(wasm)
+        ) {
+          throw new ZigProjectProtocolError(
+            "Invalid successful revision or Wasm payload",
+          );
+        }
+        value = {
+          success: true,
+          revision,
+          bytes: wasm,
+          stats: buildStats(metadata.stats),
+          ...nativeReply,
+        };
+      } else {
+        if (
+          revision !== this.#revision || frame.payload.length ||
+          !Array.isArray(metadata.diagnostics) ||
+          !metadata.diagnostics.length
+        ) {
+          throw new ZigProjectProtocolError(
+            "Invalid rejected build response",
+          );
+        }
+        value = {
+          success: false,
+          revision,
+          diagnostics: metadata.diagnostics.map(diagnostic),
+          attemptStats: metadata.attemptStats === null
+            ? null
+            : stats(metadata.attemptStats, "attemptStats"),
+        };
+      }
+      if (!job.cancelled) this.#revision = revision;
+      return value;
+    });
+  }
+  #enqueue<Result>(
+    signal: AbortSignal | undefined,
+    operation: (job: Job) => Promise<Result>,
+  ): Promise<Result> {
     if (signal !== undefined && !(signal instanceof AbortSignal)) {
       return Promise.reject(new TypeError("signal must be an AbortSignal"));
     }
@@ -665,7 +777,7 @@ class ProjectProcess implements ZigProjectCompiler {
       );
     }
     let job!: Job;
-    const result = new Promise<ZigProjectBuildResult>((resolve, reject) => {
+    return new Promise<Result>((resolve, reject) => {
       const onAbort = () => {
         job.cancelled = true;
         reject(abortError());
@@ -695,101 +807,12 @@ class ProjectProcess implements ZigProjectCompiler {
         }
         job.active = true;
         try {
-          // The acknowledged revision is read here, after all prior replies.
-          const request: Record<string, unknown> = {
-            kind: "build",
-            id: this.#id(),
-            epoch: this.#epoch,
-            revision: this.#revision,
-          };
-          if (sources.length) request.sources = sources;
-          if (assetSources.length) request.assetSources = assetSources;
-          const frame = await this.#exchange(request, payload);
-          const metadata = frame.metadata,
-            revision = natural(metadata.revision, "revision");
-          if (
-            metadata.epoch !== this.#epoch ||
-            typeof metadata.success !== "boolean"
-          ) {
-            throw new ZigProjectProtocolError(
-              "Response epoch or success mismatch",
-            );
-          }
-          let value: ZigProjectBuildResult;
-          if (metadata.success) {
-            let nativeReply:
-              | Awaited<ReturnType<typeof readNativeAssetReply>>
-              | undefined;
-            let wasm = frame.payload;
-            if (this.#nativeAssets) {
-              try {
-                nativeReply = await readNativeAssetReply(
-                  metadata,
-                  frame.payload,
-                  (message) => {
-                    throw new ZigProjectProtocolError(message);
-                  },
-                );
-              } catch (error) {
-                if (error instanceof Error) {
-                  throw new ZigProjectProtocolError(error.message);
-                }
-                throw error;
-              }
-              wasm = nativeReply.bytes;
-            } else if (
-              ["wasmBytes", "assets", "assetStats", "assetDependencies"].some((
-                name,
-              ) => metadata[name] !== undefined)
-            ) {
-              throw new ZigProjectProtocolError(
-                "Unexpected native asset response",
-              );
-            }
-            if (
-              this.#revision === Number.MAX_SAFE_INTEGER ||
-              revision !== this.#revision + 1 || !wasm.length ||
-              !WebAssembly.validate(wasm)
-            ) {
-              throw new ZigProjectProtocolError(
-                "Invalid successful revision or Wasm payload",
-              );
-            }
-            value = {
-              success: true,
-              revision,
-              bytes: wasm,
-              stats: buildStats(metadata.stats),
-              ...nativeReply,
-            };
-          } else {
-            if (
-              revision !== this.#revision || frame.payload.length ||
-              !Array.isArray(metadata.diagnostics) ||
-              !metadata.diagnostics.length
-            ) {
-              throw new ZigProjectProtocolError(
-                "Invalid rejected build response",
-              );
-            }
-            value = {
-              success: false,
-              revision,
-              diagnostics: metadata.diagnostics.map(diagnostic),
-              attemptStats: metadata.attemptStats === null
-                ? null
-                : stats(metadata.attemptStats, "attemptStats"),
-            };
-          }
-          if (!job.cancelled) {
-            this.#revision = revision;
-            resolve(value);
-          }
+          const value = await operation(job);
+          if (!job.cancelled) resolve(value);
         } catch (error) {
-          this.#break(
-            error instanceof Error ? error : new Error(String(error)),
-            false,
-          );
+          let failure = error;
+          if (!(failure instanceof Error)) failure = new Error(String(failure));
+          this.#break(failure as Error, false);
           await this.#shutdown(true);
           if (!job.cancelled) reject(this.#failure(error));
         } finally {
@@ -799,7 +822,111 @@ class ProjectProcess implements ZigProjectCompiler {
       });
       this.#queue = task.then(() => {}, () => {});
     });
-    return result;
+  }
+  complete(
+    options: ZigProjectCompletionOptions,
+  ): Promise<ZigProjectCompletionResult> {
+    let filename: string;
+    const ranges: {
+      path: string;
+      start: number;
+      length: number;
+      deleted: boolean;
+    }[] = [];
+    const payload: Uint8Array<ArrayBuffer>[] = [];
+    const captured = new Map<string, Uint8Array<ArrayBuffer>>();
+    try {
+      if (!this.#editorCompletion) {
+        throw new TypeError("Compiler does not support editor completion");
+      }
+      options = captureCompletion(
+        options,
+        (value) => path(value, "completion path"),
+      );
+      filename = options.filename as string;
+      let length = 0;
+      if (options.sources !== undefined) {
+        const entries = Object.entries(
+          record(options.sources, "completion sources"),
+        );
+        if (entries.length > 4096) {
+          throw new RangeError("Too many source files");
+        }
+        const names = new Set<string>();
+        for (const [raw, text] of entries) {
+          const name = path(raw, "source path");
+          if (names.has(name)) throw new TypeError("Duplicate source path");
+          names.add(name);
+          let bytes = new Uint8Array(0);
+          if (text !== null) {
+            if (typeof text !== "string" || !text.isWellFormed()) {
+              throw new TypeError("Invalid completion source");
+            }
+            bytes = new TextEncoder().encode(text);
+            captured.set(name, bytes);
+          }
+          if (bytes.length > 16 * 1024 * 1024) {
+            throw new RangeError("Source exceeds 16 MiB");
+          }
+          ranges.push({
+            path: name,
+            start: length,
+            length: bytes.length,
+            deleted: text === null,
+          });
+          length += bytes.length;
+          if (bytes.length) payload.push(bytes);
+        }
+      }
+      const source = captured.get(filename);
+      if (
+        source &&
+        (options.position > source.length ||
+          (options.position < source.length &&
+            (source[options.position] & 0xc0) === 0x80))
+      ) throw new RangeError("Invalid captured completion position");
+      const metadata = new TextEncoder().encode(
+        JSON.stringify({
+          kind: "complete",
+          id: 0xffff_ffff,
+          epoch: this.#epoch,
+          revision: Number.MAX_SAFE_INTEGER,
+          snapshot: options.snapshot,
+          filename,
+          position: options.position,
+          sources: ranges,
+        }),
+      );
+      if (
+        metadata.length > maxMetadataBytes ||
+        metadata.length + length + 8 > maxFrameBytes
+      ) throw new RangeError("Completion request exceeds protocol limit");
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    // Capture primitive fields with the buffers; caller mutation cannot steer a queued query.
+    const snapshot = options.snapshot, position = options.position;
+    return this.#enqueue(options.signal, async () => {
+      const echo = { revision: this.#revision, snapshot, filename, position };
+      const frame = await this.#exchange({
+        kind: "complete",
+        id: this.#id(),
+        epoch: this.#epoch,
+        ...echo,
+        sources: ranges,
+      }, payload);
+      return readCompletion(
+        frame.metadata,
+        echo,
+        this.#epoch,
+        frame.payload,
+        captured.get(filename),
+        diagnostic,
+        (message) => {
+          throw new ZigProjectProtocolError(message);
+        },
+      );
+    });
   }
   exportCheckpoint(): Promise<Uint8Array<ArrayBuffer>> {
     if (!this.#checkpoints) {

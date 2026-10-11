@@ -20,12 +20,15 @@ source = { path = "/projects/blot/tree-sitter-blot" }
 # <<< blot (managed by /projects/blot) <<<
 `;
 
-Deno.test("registers the public blot language with no legacy language server", () => {
+Deno.test("registers the public blot language and completion server with absolute paths", () => {
   const installed = installBlotLanguage("", options);
   ok(installed.includes('language-id = "blot"'));
   ok(installed.includes('file-types = ["blot"]'));
   ok(installed.includes('grammar = "blot"'));
-  ok(installed.includes("language-servers = []"));
+  ok(installed.includes('language-servers = ["blot"]'));
+  ok(installed.includes("[language-server.blot]"));
+  ok(installed.includes('"/projects/blot2/compiler/lsp.ts"'));
+  ok(installed.includes('"/projects/blot2/zig-native/zig-out/bin/blotc"'));
   ok(installed.includes("auto-format = false"));
   ok(installed.includes('path = "/projects/blot2/editor/tree-sitter-blot2"'));
 });
@@ -77,5 +80,10 @@ Deno.test("refuses ambiguous or unmanaged Blot registrations", () => {
   throws(
     () => installBlotLanguage('[[language]]\nname = "blot"\n', options),
     /unmanaged Blot entry/,
+  );
+  throws(
+    () =>
+      installBlotLanguage('[language-server.blot]\ncommand="other"\n', options),
+    /unmanaged Blot language server/,
   );
 });

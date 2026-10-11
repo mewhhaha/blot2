@@ -9,6 +9,12 @@ const Allocator = std.mem.Allocator;
 const PI = @import("principal_interface.zig");
 const entry_cutoff = @import("entry_frontend_cutoff.zig");
 
+pub const EditorQuery = struct {
+    unit: project.UnitId,
+    marker: check.EditorMarker,
+    budget: *@import("completion_fit.zig").Budget,
+};
+
 pub const Export = struct { name: symbols.Symbol, target: check.ExternalTarget = .{ .unit = 0, .binding = 0 }, kind: enum { value, nominal, constructor, effect_family, contract } = .value, catalog: u32 = 0 };
 pub const Module = struct {
     checked: check.Checked,
@@ -118,6 +124,7 @@ const Engine = struct {
     diagnostics: std.ArrayList(Diagnostic) = .empty,
     source_validation: bool = false,
     execution: check.PrivateExecution = .{},
+    editor: ?EditorQuery = null,
     source_modules: []?SourceModule = &.{},
     compiled_catalogs: []CompiledCatalog = &.{},
     const CompiledCatalog = struct { exports: []Export = &.{}, declarations: []check.SourceDeclaration = &.{} };
@@ -361,7 +368,11 @@ const Engine = struct {
                 }
             }
         }
-        const options: check.ModuleOptions = .{ .purity_origins = .{ .context = self.source, .lookup = moduleOrigin }, .builtin_catalog = unit == self.source.prelude_unit, .prelude_unit = self.source.prelude_unit, .inherited_fixities = inherited_fixities.items };
+        var options: check.ModuleOptions = .{ .purity_origins = .{ .context = self.source, .lookup = moduleOrigin }, .builtin_catalog = unit == self.source.prelude_unit, .prelude_unit = self.source.prelude_unit, .inherited_fixities = inherited_fixities.items };
+        if (self.editor) |query| {
+            options.max_inference_transitions = query.budget.remaining;
+            if (query.unit == unit) options.editor = query.marker;
+        }
         if (self.source_validation) {
             var validation = try check.validateModuleSource(self.allocator, tree, &self.source.symbols, headers.items, source_catalogs.items, unit, options);
             var transferred = false;
@@ -374,6 +385,14 @@ const Engine = struct {
             var checked = try check.checkModuleWithPrivateExecution(self.allocator, tree, &self.source.symbols, imports.items, catalogs.items, unit, options, self.execution);
             var transferred = false;
             defer if (!transferred) checked.deinit(self.allocator);
+            if (self.editor) |query| {
+                _ = query.budget.spend(@intCast(checked.counters.inference_steps));
+                if (checked.initializer_rejected) query.budget.exhausted = true;
+                for (checked.diagnostics) |diagnostic_| if (diagnostic_.code == .inference_budget) {
+                    query.budget.remaining = 0;
+                    query.budget.exhausted = true;
+                };
+            }
             if (checked.initializer_rejected) {
                 try self.appendDiagnostics(unit, checked.diagnostics);
                 return;
@@ -446,17 +465,23 @@ pub fn checkProject(allocator: Allocator, source: *project.Project) !CheckedProj
 /// PRIVATE execution-only project proof. Public callers remain default off;
 /// the loader, semantic options and artifact identities receive no new flags.
 pub fn checkProjectWithPrivateExecution(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution) !CheckedProject {
-    return checkProjectMode(allocator, source, execution, null);
+    return checkProjectMode(allocator, source, execution, null, null);
+}
+
+/// One request-local checker graph, with a shared work budget across modules.
+/// No retained frontend or executable body is offered or published here.
+pub fn checkProjectForEditor(allocator: Allocator, source: *project.Project, query: EditorQuery) !CheckedProject {
+    return checkProjectMode(allocator, source, .{}, null, query);
 }
 
 /// PRIVATE final-entry proof. The caller owns the previous successful Core and
 /// the same seed named by this mixed Project throughout preparation.
 pub fn checkProjectWithEntryCutoff(allocator: Allocator, source: *project.Project, previous: entry_cutoff.Previous) !CheckedProject {
-    return checkProjectMode(allocator, source, .{}, previous);
+    return checkProjectMode(allocator, source, .{}, previous, null);
 }
 
-fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous) !CheckedProject {
-    var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .execution = execution };
+fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: check.PrivateExecution, previous: ?entry_cutoff.Previous, editor: ?EditorQuery) !CheckedProject {
+    var engine: Engine = .{ .allocator = allocator, .source = source, .result = .{}, .execution = execution, .editor = editor };
     errdefer engine.result.deinit(allocator);
     defer {
         for (engine.diagnostics.items) |diagnostic| {

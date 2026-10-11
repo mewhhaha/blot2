@@ -16,8 +16,11 @@ const restart_cache = @import("restart_cache.zig");
 const native_assets = @import("native_assets.zig");
 
 const Request = struct {
-    kind: enum { open, build, close, checkpoint },
+    kind: enum { open, build, close, checkpoint, complete },
     id: u32,
+    snapshot: ?u32 = null,
+    filename: ?[]const u8 = null,
+    position: ?u32 = null,
     version: ?u32 = null,
     epoch: ?[]const u8 = null,
     revision: ?u64 = null,
@@ -356,6 +359,90 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
     }
 }
 
+fn completionFailure(a: Allocator, writer: *Io.Writer, opened: *OpenProject, request: Request, code: []const u8, message: []const u8, position: u32) !void {
+    var end = @min(message.len, 1024);
+    while (end != 0 and end < message.len and message[end] & 0xc0 == 0x80) end -= 1;
+    try reply(a, writer, .{ .kind = "complete", .id = request.id, .epoch = epoch, .revision = opened.session.revisions, .snapshot = request.snapshot.?, .filename = request.filename.?, .position = request.position.?, .success = false, .diagnostics = [_]Diagnostic{.{ .filename = request.filename.?, .stage = "complete", .code = code, .start = position, .end = position, .message = message[0..end] }} }, &.{});
+}
+fn complete(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, request: Request, sources: []const inputs.overlays.Source) !void {
+    if (request.snapshot.? == 0) return completionFailure(a, writer, opened, request, "invalid_completion", "Snapshot must be nonzero", 0);
+    var assets: ?*native_assets.Candidate = null;
+    defer if (assets) |candidate| candidate.deinit(a);
+    var merged: std.ArrayList(inputs.overlays.Source) = .empty;
+    defer merged.deinit(a);
+    if (opened.assets) |*owner| {
+        assets = owner.prepare(io, opened.entry, sources, &.{}) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.DuplicateSourcePath => return completionFailure(a, writer, opened, request, "duplicate_source", "Sources identify the same canonical file", 0),
+            else => return completionFailure(a, writer, opened, request, "completion_failed", @errorName(err), 0),
+        };
+        if (assets.?.issue) |issue_| return completionFailure(a, writer, opened, request, "completion_failed", issue_.message, 0);
+        try merged.appendSlice(a, assets.?.sources.items);
+    }
+    try merged.appendSlice(a, sources);
+    var snapshot = inputs.Snapshot.initWithSources(a, io, opened.options_owner.options, merged.items) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.DuplicateSourcePath => return completionFailure(a, writer, opened, request, "duplicate_source", "Sources identify the same canonical file", 0),
+        error.SourceLimit => return completionFailure(a, writer, opened, request, "source_limit", "Completion source acquisition limit", 0),
+        else => return completionFailure(a, writer, opened, request, "completion_failed", @errorName(err), 0),
+    };
+    defer snapshot.deinit();
+    var result = @import("editor_completion.zig").query(a, io, opened.entry, &snapshot, request.filename.?, request.position.?) catch |err| {
+        if (err == error.OutOfMemory) return error.OutOfMemory;
+        var position: u32 = 0;
+        if (err == error.InvalidPosition) {
+            if (snapshot.canonical(io, request.filename.?)) |path| {
+                if (snapshot.capturedSource(path)) |source| {
+                    position = @intCast(@min(source.len, request.position.?));
+                    while (position != 0 and position != source.len and source[position] & 0xc0 == 0x80) position -= 1;
+                }
+            } else |_| {}
+        }
+        const code = switch (err) {
+            error.InvalidPosition => "invalid_position",
+            error.InvalidCompletion => "invalid_completion",
+            error.MissingSource => "missing_source",
+            error.SourceLimit => "source_limit",
+            else => "completion_failed",
+        };
+        return completionFailure(a, writer, opened, request, code, @errorName(err), position);
+    };
+    defer result.deinit(a);
+    // A large context cannot evict already proved suggestions. Check it with
+    // the required fields first, then preserve the best bounded item prefix.
+    if (result.context) |context| {
+        const context_bytes = try std.json.Stringify.valueAlloc(a, .{ .kind = "complete", .id = request.id, .epoch = epoch, .revision = opened.session.revisions, .snapshot = request.snapshot.?, .filename = request.filename.?, .position = request.position.?, .success = true, .replace = result.replace, .context = context, .items = [_]u8{}, .truncated = true, .diagnostics = [_]u8{} }, .{});
+        defer a.free(context_bytes);
+        if (context_bytes.len > 256 * 1024) {
+            context.deinit(a);
+            result.context = null;
+            try result.noteLimit(a, request.filename.?);
+        }
+    }
+    var item_count = result.items.len;
+    var diagnostic_count = result.diagnostics.len;
+    while (true) {
+        const bytes = try std.json.Stringify.valueAlloc(a, .{ .kind = "complete", .id = request.id, .epoch = epoch, .revision = opened.session.revisions, .snapshot = request.snapshot.?, .filename = request.filename.?, .position = request.position.?, .success = true, .replace = result.replace, .context = result.context, .items = result.items[0..item_count], .truncated = result.truncated, .diagnostics = result.diagnostics[0..diagnostic_count] }, .{});
+        defer a.free(bytes);
+        if (bytes.len <= 256 * 1024) return frames.write(writer, bytes, &.{});
+        if (!result.truncated) {
+            try result.noteLimit(a, request.filename.?);
+            diagnostic_count = result.diagnostics.len;
+            continue;
+        }
+        if (diagnostic_count > 1) {
+            diagnostic_count -= 1;
+        } else if (item_count != 0) {
+            item_count -= 1;
+        } else if (result.context) |context| {
+            context.deinit(a);
+            result.context = null;
+        } else {
+            return error.FrameTooLarge;
+        }
+    }
+}
+
 /// No diagnostic/metrics text is written to stdout in serve mode.
 pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compiler: [32]u8, cache_root: ?[]const u8) !void {
     return runWithPolicy(a, io, reader, writer, compiler, cache_root, .{});
@@ -367,7 +454,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
         .protocol = "blot-zig-project",
         .version = protocol_version,
         .compilerIdentity = &identity,
-        .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "backend-checkpoints", "native-assets-v1" },
+        .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "backend-checkpoints", "native-assets-v1", "editor-completion-v1" },
         .maxFrameBytes = frames.max_frame_bytes,
     }, &.{});
     var opened: ?OpenProject = null;
@@ -381,6 +468,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
         const request = parsed.value;
         if (request.id == 0 or request.id <= last_id) return error.RequestOrder;
         last_id = request.id;
+        if (request.kind != .complete and (request.snapshot != null or request.filename != null or request.position != null)) return error.InvalidRequest;
         switch (request.kind) {
             .open => {
                 if (request.sources.len != 0 or request.assetSources.len != 0 or request.checkpoint != (frame.payload().len != 0)) return error.InvalidOpen;
@@ -392,10 +480,18 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
                 opened.?.session.policy.semantic_components = policy.semantic_components;
                 try reply(a, writer, .{ .kind = "open", .id = request.id, .epoch = epoch, .revision = 0 }, &.{});
             },
-            .build, .close, .checkpoint => {
+            .build, .close, .checkpoint, .complete => {
                 const owner = if (opened) |*value| value else return error.NotOpen;
                 if (request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.codegenTier != .optimized or request.shareMachineCode or request.codegenWorkers != 1 or request.checkpoint) return error.InvalidRequest;
                 if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.session.revisions) return error.RevisionMismatch;
+                if (request.kind == .complete) {
+                    if (request.snapshot == null or request.filename == null or request.position == null or request.filename.?.len > 4096 or !validPath(request.filename.?)) return error.InvalidCompletionRequest;
+                    if (request.assetSources.len != 0) return error.InvalidRequest;
+                    const sources = try sourceViews(a, request.sources, frame.payload());
+                    defer a.free(sources);
+                    try complete(a, io, writer, owner, request, sources);
+                    continue;
+                }
                 if (request.kind == .checkpoint) {
                     if (request.sources.len != 0 or request.assetSources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
                     const bytes = owner.session.checkpointBytes(compiler) catch |err| {

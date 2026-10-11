@@ -1,12 +1,11 @@
 # Editor completion contract
 
 This specifies [task 050](../tasks/050-implement-editor-completion.md).
-Completion, the client method and the LSP bridge below are **proposed**, not
-implemented. Current [Helix configuration](../editor/helix/languages.toml)
-supplies syntax highlighting with `language-servers = []`. Language meaning
-comes from the [guide](../compiler/guide.md), ownership from
-[CONTRACT.md](CONTRACT.md), and transport from
-[PROJECT_PROTOCOL.md](PROJECT_PROTOCOL.md).
+Completion, the client method and the LSP bridge are implemented.
+[Helix configuration](../editor/helix/languages.toml) supplies highlighting and
+the completion server. Language meaning comes from the
+[guide](../compiler/guide.md), ownership from [CONTRACT.md](CONTRACT.md), and
+transport from [PROJECT_PROTOCOL.md](PROJECT_PROTOCOL.md).
 
 ## Native request
 
@@ -24,7 +23,7 @@ the retained build, or saves a restart cache.
 | `epoch`    | string                 | required; current open epoch                                    |
 | `revision` | integer                | required; current successful build revision, including 0        |
 | `snapshot` | u32                    | required, nonzero host document-state token                     |
-| `filename` | absolute path          | required; opened entry or a reachable project source            |
+| `filename` | absolute path          | required; <=4,096 UTF-8 bytes; opened entry or reachable source |
 | `position` | u32                    | required; UTF-8 byte boundary, inclusive range 0..source length |
 | `sources`  | array of source ranges | optional, default `[]`; same fields and payload rules as build  |
 
@@ -34,7 +33,10 @@ value there is InvalidRequest. On complete, missing/null snapshot, filename or
 position is terminal InvalidCompletionRequest. Canonical JSON types are required
 of hosts; native parsing preserves version 1's documented integer and enum
 coercions. Unknown/duplicate JSON fields and malformed frames remain terminal
-protocol errors.
+protocol errors. The filename bound keeps required reply echoes inside the
+metadata budget even with JSON escaping. An over-limit filename is terminal
+InvalidCompletionRequest; the client rejects it before queueing or consuming an
+ID.
 
 For example, a complete request with no overlays and empty payload is:
 
@@ -305,7 +307,10 @@ Return a CompletionList, with isIncomplete equal to native truncated. Each item
 has label, plain-text textEdit, detail, filterText excluding a constructor's
 `#`, sortText as the three-digit zero-padded response index, and LSP kind mapped
 as value=6, function=3, type=7, constructor=4, field=5, member=2, module=9. Do
-not advertise hover, formatting, signature help, import edits or resolve.
+not advertise hover, formatting, signature help, import edits or resolve. For a
+whole `@hole` replacement, filterText starts with the typed hole name without
+`@`, followed by the insertion spelling. This keeps Helix's local filter from
+hiding valid suggestions; textEdit still replaces only the hole.
 
 The bridge translates UTF-16 line/character positions to UTF-8 offsets against
 the captured document and converts native edits back against that same copy;
@@ -460,23 +465,137 @@ buffer text. Compiler/client tests additionally check owned results after
 teardown, allocation failure cleanup, malformed peer disposal and last-good
 output preservation.
 
-## Qualification boundary
+## Scope
 
-This specification adds no executable feature. Task 050 must supply the native
-query/recovery path, conservative evidence fitting, client
-validation/cancellation, LSP bridge, installer changes and actual Helix trace.
-Initial scope excludes path/keyword/snippet completion, auto-imports, workspace
-symbol search, arbitrary syntax repair and new language visibility rules. The
-250 ms editor deadline is policy, not a demonstrated latency; measure
-fresh/retained query distributions and extra inference work against the
-language-evolution targets before claiming performance. Completion must work
-without a successful build, even for a module with no entry declaration;
-revision 0 is a required acceptance case.
+The implementation supplies the native query/recovery path, conservative
+evidence fitting, client validation/cancellation, LSP bridge, installer changes
+and actual Helix acceptance trace. Initial scope excludes path/keyword/snippet
+completion, auto-imports, workspace symbol search, arbitrary syntax repair and
+new language visibility rules. The 250 ms editor deadline is policy. The
+measured workloads below fit within it; this is not a latency guarantee for
+arbitrary projects. Completion must work without a successful build, even for a
+module with no entry declaration; revision 0 is a required acceptance case.
 
-## Specification qualification
+## Original specification qualification
 
 Implementation: `d7e2b89`. Deno formatting, seven local links/anchors and the
 JSON/TOML examples pass review. Incomplete call/member/hole, imported/shadowed
 names, generic evidence, Unicode edits, revisions, cancellation and rapid
-overlay changes have explicit acceptance transcripts. This documentation adds no
-executable feature or demonstrated latency; task 050 owns those gates.
+overlay changes have explicit acceptance transcripts. At that milestone the
+documentation supplied no executable feature or demonstrated latency; the
+implementation evidence follows below.
+
+## Implemented ownership and limits
+
+[editor_completion.zig](src/editor_completion.zig) acquires a private input
+snapshot, canonicalizes and captures each disk input once, then substitutes one
+exact-span marker. It verifies project membership even inside comments/strings.
+At most eight missing EOF closing delimiters are repaired; diagnostics map back
+to the original bytes. Ordinary checking has no marker. Queries publish no
+build, evaluator values, previous-revision owner or restart cache.
+
+The checker captures actual lexical/import/member names and the expected type at
+that marker. RHS rebinding exposes the previous binding through both its
+original name and self. The query owns its symbol pool and seeds legal implicit
+names before checking; borrowed checker pools never grow. Candidate collection
+keeps the nearest deterministic 4,096 names, then fits/ranks before retaining
+128. The context owns at most 32 visible bindings. Syntax fallback uses the
+actual enclosing lexical path and supplies unknown matches without fabricated
+expected/member types.
+
+Checking and candidate fitting share one million work units. Each normalized
+copy has at most 1,024 visits and depth 32. Expected generic variables stay
+rigid; candidate parameters are fresh. Compatible requires entailed enclosing
+requirements; unresolved associated dispatch/effect evidence stays unknown.
+Names, details, graphs and diagnostics own their bytes after teardown. Replies
+have at most 16 diagnostics and 256 KiB metadata. Limit exhaustion preserves a
+completion_limit diagnostic and marks truncated; an oversized context is removed
+before proved items. Filename admission is bounded at 4,096 UTF-8 bytes so
+required echoes fit too.
+
+[The client](../compiler/editor_completion.ts) validates complete DTOs, echoes,
+UTF-8 edits and owned diagnostic graphs. It captures overlays/options before
+queueing on the existing serial transport. Queued cancellation consumes no ID;
+active cancellation reaps the child and rejects pending work. Native assets and
+host asset-parser sources are available privately without publishing resource
+handles or build caches. Failed/incomplete queries leave successful compilation
+and its Wasm unchanged.
+
+[The bridge](../compiler/lsp.ts) owns full document snapshots and process
+generations, converts UTF-16/UTF-8 including CRLF/supplementary code points, and
+rejects stale versions/snapshots/cursors. It watches source/import roots and
+parent replacements, aborts at 250 ms from request receipt and reaps on
+teardown. Framing is independent of the native transport, bounded before
+allocation. Installer updates preserve adjacent unmanaged language configuration
+and the existing grammar/highlight/rainbow assets; they add no formatter.
+
+## Implementation measurements, 11 October 2026
+
+The measured release compiler is SHA-256
+`f3d02fee0e8886881e0dffaaebb23fa3c93b77847e68708a1d9b155b478e6c15`; Zig 0.17.0,
+Deno 2.9.7, restart caches disabled. Both ordinary comparisons and query
+measurements are pinned to CPU 6. Load averages were approximately 3.8; other
+compiler jobs remained active on other CPUs. Raw samples, source/compiler pins
+and measurement harnesses are ignored under
+`build/bench/editor-completion/measurement`.
+
+For each public query, 13 fresh native processes, 31 repeated queries and seven
+queries following a successful build use the standard prelude. The first-query
+measurement covers the request/reply, excluding spawn/open; repeated queries do
+not imply semantic cache reuse. After every sequence, rebuilding the original
+valid overlay preserves its exact Wasm.
+
+| Query            | First median / p95 ms | Repeated median / p95 ms |
+| ---------------- | --------------------- | ------------------------ |
+| Value prefix     | 3.411 / 3.637         | 2.977 / 3.289            |
+| Member           | 3.365 / 3.476         | 2.977 / 3.169            |
+| Imported alias   | 3.847 / 4.278         | 3.352 / 3.555            |
+| Generic evidence | 3.504 / 3.939         | 3.055 / 3.401            |
+| Shadowed hole    | 3.894 / 3.964         | 3.411 / 3.846            |
+| 4,200 names      | 33.682 / 50.725       | 32.819 / 36.536          |
+
+A separate ReleaseFast probe copies the frozen compiler inputs and adds only two
+counter reads, retaining query behavior and budgets. Twenty samples after one
+warmup measure 2.879–3.228 ms process CPU for value/member/import/generic
+queries, 3.109 ms for the hole and 31.666 ms for the large scope. Small queries
+consume 2,880–2,892 inference transitions; the large scope consumes 19,679 and
+exhausts the shared one-million-unit fitting budget. It returns 128
+deterministic items, unknown for unproved fits, and truncated=true. Requested
+allocation is 2.47–2.75 MB for small queries and 16.82 MB for the large scope;
+peaks are 0.83–0.90 MB and 6.23 MB. Every sample tears down to zero live
+requested bytes. Query cost is extra work; there is no retained semantic-query
+cache.
+
+Seven alternating release pairs against the qualified 028/036 compiler
+`8a7dd393ab4768eebcdf8859135345fd44700dae5c2ebb4391577d75006aa8bc` preserve
+Wasm, diagnostics and old work counters on all 13 public examples. Requested
+allocation increases 352 bytes per two-module project and 528 per three-module
+project from optional editor capture fields; all teardown counts are zero. CPU
+ratios range 0.924–0.985 on this host; no general speedup is claimed. Four
+synthetic workloads preserve exact fresh/retained Wasm through population, edit,
+revert, rejection and no-op phases. Retained CPU is mostly below the 10 ms
+process-accounting resolution. Earlier comparisons using a pre-compaction
+baseline or enabled restart caches are retained as exploratory runs and excluded
+from these conclusions.
+
+## Actual editor and gate evidence
+
+Helix 25.07.1 (3dae6a17), Deno 2.9.7 and Tree-sitter 0.27.1 were exercised with
+an isolated XDG configuration. Grammar generation/corpus/example parsing,
+installer idempotence/neighbor preservation and hx --health blot pass. The real
+PTY session left text unsaved, requested Ctrl-x, accepted an item and saved each
+public fixture. Value, member, imported alias, shadowed hole and Unicode/CRLF
+edits affect only the reported token. The held-peer race ends as valzz; the old
+reply is canceled and never inserts text. Logs and owned traces are retained in
+`build/bench/editor-completion/helix/acceptance.json`; the five ordinary
+sessions use the measured release pin, while the race deliberately uses a held
+test peer.
+
+The frozen full gate passes native laws and 788 guest/client laws, including all
+eight unchanged allocation budgets; analyzer findings are zero across 328 Zig
+files. Focused native/OOM, generic fitting, protocol echo/defaults,
+queue/disposal, active/queued cancellation, deadline, disk-watch invalidation
+and actual stdio malformed/oversized-frame recovery laws pass. The later
+filename admission bound has focused client/raw-wire validation and must pass
+the joint compiler gate before its milestone commit. Integration qualification
+is recorded separately.

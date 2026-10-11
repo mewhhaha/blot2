@@ -22,6 +22,7 @@ const request_runtime = @import("request_runtime.zig");
 const heap = @import("runtime_layout.zig");
 const function_facts = @import("function_facts.zig");
 const exact_builder = @import("exact_builder.zig");
+const ragged_builder = @import("ragged_builder.zig");
 const runtime_operations = @import("runtime_operations.zig");
 const runtime_identity = @import("runtime_identity.zig");
 const dispatch_explanation = @import("dispatch_explanation.zig");
@@ -120,6 +121,7 @@ const EvidenceRoot = refinement_receipt.Root;
 // `active` retains the original recursive initializer emission guard.
 const RuntimeSlot = struct { global: u32, initializer: u32, active: bool = true };
 const Generator = struct {
+    ragged_probe_limit: u32 = ragged_builder.probe_limit,
     work_timing: @import("backend_timing.zig").Work = .{},
     allocator: Allocator,
     units: []const core.Module,
@@ -1992,6 +1994,9 @@ pub fn compile(allocator: Allocator, units: []const core.Module, entry: u32) Err
 
 const default_artifact_replay = if (@hasDecl(@import("root"), "compiler_defaults")) @import("root").compiler_defaults.artifact_replay else false;
 pub const CompileOptions = struct {
+    /// Private differential/qualification controls, never source language limits.
+    ragged_builders: bool = true,
+    ragged_probe_limit: u32 = ragged_builder.probe_limit,
     checkpoint: ?*const @import("backend_checkpoint.zig").Checkpoint = null,
     io: ?std.Io = null,
     /// Detailed hot-region clocks are opt-in; broad phase timing stays cheap.
@@ -2052,6 +2057,9 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         journal.clock = &metadata.clock;
     }
     var generator = try Generator.init(allocator, units, if (recording) &journal else null);
+    generator.ragged_probe_limit = options.ragged_probe_limit;
+    if (!options.ragged_builders) generator.ragged_probe_limit = 0;
+    generator.evaluator.ragged_probe_limit = generator.ragged_probe_limit;
     generator.work_timing.clock = .init(if (options.profile_backend) options.io else null);
     generator.evaluator.timing = if (options.profile_backend) &generator.work_timing else null;
     // The replay gate destroys all mutable compiler state before materialization.
@@ -2708,6 +2716,7 @@ const ReturnTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanu
 const LoopTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanup.Mark };
 const Template = struct { unit: u32 = 0, node: core.Id, environment: ?u32 = null, captures: layout.Id = 0, templates: substitution_keys.Id = 0, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
 const Emitter = struct {
+    const RaggedCount = struct { plan: ragged_builder.Plan, count: u32, eligible: u32, budget: u32, limit: u32, exit: u32, cleanup: runtime_cleanup.Mark };
     const ResolverPlan = union(enum) { monad, forward, run: resolved_call.Arrow, call: resolved_call.Applied };
     const DispatchPlan = union(enum) {
         scalar: wasm.Op,
@@ -2831,6 +2840,8 @@ const Emitter = struct {
     analysis_root: core.Id = 0,
     exact_probe: bool = false,
     exact_build: ?struct { plan: exact_builder.Plan, storage: u32, index: u32, row_words: u32 } = null,
+    ragged_fill: bool = false,
+    ragged_count: ?*const RaggedCount = null,
     generator: *Generator,
     unit_id: u32,
     function_id: u32,
@@ -4800,6 +4811,20 @@ const Emitter = struct {
         const unit_ = g.unit(self.unit_id);
         const operands = unit_.children(id);
         if (operands.len > 3) return g.fail(self.unit_id, id, .unsupported);
+        if (self.ragged_count) |probe| {
+            if (probe.plan.storage.conversion == id) return self.expression(operands[0], depth + 1);
+            if (probe.plan.storage.append == id) {
+                try self.emit(.local_get, probe.count);
+                try self.emit(.i32_const, probe.limit);
+                try self.emit(.i32_ge_u, 0);
+                try self.declineRaggedCount();
+                try self.emit(.local_get, probe.count);
+                try self.emit(.i32_const, 1);
+                try self.emit(.i32_add, 0);
+                try self.emit(.local_set, probe.count);
+                return self.emit(.i32_const, 0);
+            }
+        }
         if (self.exact_build) |builder| {
             if (builder.plan.conversion == id) return self.expression(operands[0], depth + 1);
             if (builder.plan.append == id) {
@@ -4906,6 +4931,16 @@ const Emitter = struct {
             try self.emit(.i32_mul, 0);
             try self.emit(.local_set, count);
         }
+        try self.fillExactBuilder(id, plan, count, eligible, depth);
+        g.facts.stats.exact_builders += 1;
+    }
+    fn fillExactBuilder(self: *Emitter, id: core.Id, plan: exact_builder.Plan, count: u32, eligible: u32, depth: usize) Error!void {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const collection = g.layouts.node(try self.codeLayout(source.typeOf(plan.initial), source.span(id)));
+        const is_list = plan.conversion == 0;
+        const row_words = packed_layout.rowWords(&g.layouts, collection.a);
+        const stride = packed_layout.stride(row_words);
         const previous_probe = self.exact_probe;
         const previous_build = self.exact_build;
         self.exact_probe = true;
@@ -4946,7 +4981,137 @@ const Emitter = struct {
         try self.expression(id, depth + 1);
         self.labels -= 1;
         try self.emit(.end, 0);
-        g.facts.stats.exact_builders += 1;
+    }
+    const RaggedFacts = struct {
+        emitter: *const Emitter,
+        pub fn primitive(self: @This(), id: core.Id) bool {
+            if (!self.emitter.body.?.entries.contains(id)) return false;
+            const entry = self.emitter.body.?.get(id);
+            if (entry == .named) {
+                const key = entry.named.call.key;
+                if (key.count != 2 or key.parameters[0] != key.parameters[1]) return false;
+                const machine = self.emitter.generator.layouts.scalar(key.parameters[0]) orelse return false;
+                const operation = @import("primitive_operator.zig").analyzeTyped(self.emitter.generator.units, key.target, machine) orelse return false;
+                return @import("primitive_operator.zig").total(operation);
+            }
+            if (entry != .dispatch) return false;
+            if (entry.dispatch == .scalar) return true;
+            if (entry.dispatch != .selected) return false;
+            const operation = @import("primitive_operator.zig").analyze(self.emitter.generator.units, entry.dispatch.selected.key.target) orelse return false;
+            return @import("primitive_operator.zig").total(operation);
+        }
+        pub fn reference(self: @This(), id: core.Id) bool {
+            const source = self.emitter.generator.unit(self.emitter.unit_id);
+            const ref = source.reference(id);
+            if (ref.unit == 0 or ref.unit == source.unit) {
+                const binding = source.binding(ref.binding);
+                if (binding.kind == .local or binding.kind == .parameter) return !self.emitter.templates.contains(ref.binding);
+            }
+            const target = self.emitter.body.?.get(id).reference orelse return false;
+            const declaration = self.emitter.generator.unit(target.unit).body(target.binding) orelse return false;
+            // Runtime cells are initialized before guest entry; frozen values
+            // are already established during semantic preparation. Reading an
+            // existing cell executes no source behavior. Named function values
+            // still require descriptor creation and remain outside this proof.
+            return !declaration.is_function;
+        }
+        pub fn field(self: @This(), id: core.Id) bool {
+            if (!self.emitter.body.?.entries.contains(id)) return false;
+            const entry = self.emitter.body.?.get(id);
+            if (entry != .projection) return false;
+            const projection = entry.projection orelse return false;
+            return projection == .field;
+        }
+        pub fn pattern(self: @This(), id: core.Id) bool {
+            if (!self.emitter.body.?.entries.contains(id)) return false;
+            const entry = self.emitter.body.?.get(id);
+            return entry == .loop and !entry.loop.refutable;
+        }
+    };
+    fn declineRaggedCount(self: *Emitter) Error!void {
+        const probe = self.ragged_count.?;
+        try self.emit(.if_, 0);
+        self.labels += 1;
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, probe.eligible);
+        try self.cleanupTo(probe.cleanup);
+        try self.emit(.br, self.labels - 1 - probe.exit);
+        self.labels -= 1;
+        try self.emit(.end, 0);
+    }
+    fn raggedBuilder(self: *Emitter, id: core.Id, plan: ragged_builder.Plan, depth: usize) Error!void {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        for (plan.expressions[0..plan.expression_count]) |expression_| try self.raggedDependencies(expression_);
+        try self.raggedDependencies(plan.storage.value);
+        const collection = g.layouts.node(try self.codeLayout(source.typeOf(plan.storage.initial), source.span(id)));
+        const words = packed_layout.rowWords(&g.layouts, collection.a);
+        const limit = ragged_builder.maximumCount(words, plan.storage.conversion == 0).?;
+        const count = try self.temporary(.i32);
+        const eligible = try self.temporary(.i32);
+        const budget = try self.temporary(.i32);
+        try self.emit(.i32_const, 0);
+        try self.emit(.local_set, count);
+        try self.emit(.i32_const, 1);
+        try self.emit(.local_set, eligible);
+        try self.emit(.i32_const, g.ragged_probe_limit);
+        try self.emit(.local_set, budget);
+        const previous_probe = self.exact_probe;
+        const previous_count = self.ragged_count;
+        self.exact_probe = true;
+        defer {
+            self.exact_probe = previous_probe;
+            self.ragged_count = previous_count;
+        }
+        try self.emit(.block, 0);
+        const probe: RaggedCount = .{ .plan = plan, .count = count, .eligible = eligible, .budget = budget, .limit = limit, .exit = self.labels, .cleanup = self.cleanups.mark() };
+        self.ragged_count = &probe;
+        self.labels += 1;
+        try self.expression(id, depth + 1);
+        try self.emit(.drop, 0);
+        self.labels -= 1;
+        try self.emit(.end, 0);
+        self.ragged_count = previous_count;
+        const previous_fill = self.ragged_fill;
+        self.ragged_fill = true;
+        defer self.ragged_fill = previous_fill;
+        try self.fillExactBuilder(id, plan.storage, count, eligible, depth);
+        g.evaluator.counters.ragged_runtime_regions += 1;
+    }
+    fn raggedDependencies(self: *Emitter, id: core.Id) Error!void {
+        if (id == 0 or self.generator.artifacts == null) return;
+        const source = self.generator.unit(self.unit_id);
+        const n = source.node(id);
+        switch (n.tag) {
+            .scalar, .associated => {
+                const dispatch = self.body.?.get(id).dispatch;
+                if (dispatch == .selected) {
+                    const operation = @import("primitive_operator.zig").analyze(self.generator.units, dispatch.selected.key.target).?;
+                    for (operation.dependencies[0..operation.dependency_count]) |target| try self.generator.artifacts.?.readInlineBody(target);
+                }
+                try self.raggedDependencies(n.a);
+                try self.raggedDependencies(n.b);
+            },
+            .call => {
+                const key = self.body.?.get(id).named.call.key;
+                const machine = self.generator.layouts.scalar(key.parameters[0]).?;
+                const operation = @import("primitive_operator.zig").analyzeTyped(self.generator.units, key.target, machine).?;
+                for (operation.dependencies[0..operation.dependency_count]) |target| try self.generator.artifacts.?.readInlineBody(target);
+                for (source.children(id)) |child| try self.raggedDependencies(child);
+            },
+            .logical => {
+                try self.raggedDependencies(n.a);
+                try self.raggedDependencies(n.b);
+            },
+            .if_value => {
+                try self.raggedDependencies(n.a);
+                try self.raggedDependencies(n.b);
+                try self.raggedDependencies(n.c);
+            },
+            .project => try self.raggedDependencies(n.a),
+            .array_op => try self.raggedDependencies(source.children(id)[0]),
+            else => {},
+        }
     }
     fn arrayLocals(self: *Emitter, id: core.Id, op: core.ArrayOp, locals: []const u32, machines: []const wasm.ValueType, result_layout: layout.Id, input_layout: layout.Id) Error!void {
         const g = self.generator;
@@ -6956,6 +7121,13 @@ const Emitter = struct {
         const n = unit_.node(id);
         const reference = unit_.reference(id);
         if (reference.unit == 0 or reference.unit == self.unit_id) {
+            var view_index = self.row_views.items.len;
+            while (view_index != 0) {
+                view_index -= 1;
+                const view = self.row_views.items[view_index];
+                if (view.binding == reference.binding) return self.emit(.local_get, view.address);
+            }
+
             if (self.computation_values.contains(reference.binding)) {
                 const expected = try self.codeLayout(n.ty, unit_.span(id));
                 try self.checkComputationABI(reference.binding, expected, id);
@@ -7116,6 +7288,7 @@ const Emitter = struct {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         if (!self.exact_probe) if (exact_builder.analyze(unit_, id)) |plan| return self.exactBuilder(id, plan, depth);
+        if (!self.exact_probe and g.ragged_probe_limit != 0) if (ragged_builder.analyze(unit_, id, RaggedFacts{ .emitter = self })) |plan| return self.raggedBuilder(id, plan, depth);
         const join = self.resolvedPlan(id).join;
         try self.emit(.block, @backingInt(join.result.?));
         try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .cleanup = self.cleanups.mark() });
@@ -7127,6 +7300,20 @@ const Emitter = struct {
         try self.emit(.end, 0);
     }
     fn expression(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        if (self.ragged_count) |probe| {
+            if (id == probe.plan.storage.initial) {
+                var opcode: wasm.Op = .i32_const;
+                if (try self.scalar(id) == .f32) opcode = .f32_const;
+                return self.emit(opcode, 0);
+            }
+            try self.emit(.local_get, probe.budget);
+            try self.emit(.i32_eqz, 0);
+            try self.declineRaggedCount();
+            try self.emit(.local_get, probe.budget);
+            try self.emit(.i32_const, 1);
+            try self.emit(.i32_sub, 0);
+            try self.emit(.local_set, probe.budget);
+        }
         const previous_root = self.analysis_root;
         if (previous_root == 0) self.analysis_root = id;
         defer self.analysis_root = previous_root;
@@ -7226,6 +7413,14 @@ const Emitter = struct {
             switch (n.tag) {
                 .suite => if (try self.suite(statement, depth + 1)) return true,
                 .bind => {
+                    if (self.ragged_count) |probe| if (n.a == probe.plan.payload_binding) {
+                        var opcode: wasm.Op = .i32_const;
+                        if (try self.scalar(n.b) == .f32) opcode = .f32_const;
+                        try self.emit(opcode, 0);
+                        try self.save(n.a, statement);
+                        continue;
+                    };
+
                     if (self.smallCollectionCandidate(n.b)) {
                         if (function_facts.privateBinding(unit_, self.analysis_root, n.a)) if (try self.captureSmallCollection(n.b, depth)) |values| {
                             try self.small_values.put(g.allocator, n.a, values);
@@ -7242,6 +7437,22 @@ const Emitter = struct {
                         continue;
                     }
                     const value_node = unit_.node(n.b);
+                    if (value_node.tag == .reference) {
+                        const ref = unit_.reference(n.b);
+                        var view_index = self.row_views.items.len;
+                        var borrowed = false;
+                        while (view_index != 0) {
+                            view_index -= 1;
+                            var view = self.row_views.items[view_index];
+                            if (view.binding != ref.binding or (ref.unit != 0 and ref.unit != self.unit_id)) continue;
+                            view.binding = n.a;
+                            try self.row_views.append(g.allocator, view);
+                            borrowed = true;
+                            break;
+                        }
+                        if (borrowed) continue;
+                    }
+
                     if (value_node.tag == .reference) {
                         const reference = unit_.reference(n.b);
                         if (reference.unit == 0 or reference.unit == self.unit_id) if (self.templates.get(reference.binding)) |retained| {
@@ -7348,7 +7559,9 @@ const Emitter = struct {
         return walk;
     }
     fn loopRowView(self: *Emitter, id: core.Id, span: ?[3]u32, end: u32) Error!?RowView {
-        if (span == null) return null;
+        var private = self.ragged_count != null;
+        if (self.ragged_fill and self.exact_build != null) private = true;
+        if (span == null and !private) return null;
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const loop = source.loopInfo(id);
@@ -7358,7 +7571,7 @@ const Emitter = struct {
         const words = packed_layout.collectionRowWords(&g.layouts, collection);
         if (words == 0) return null;
         if (pattern.tag == .bind) {
-            if (!row_projection_uses.check(source, loop.body, pattern.a, &g.layouts, g.layouts.node(collection).a)) return null;
+            if (!private and !row_projection_uses.check(source, loop.body, pattern.a, &g.layouts, g.layouts.node(collection).a)) return null;
         } else if (pattern.tag == .product) {
             const children = source.patternChildren(loop.pattern);
             if (children.len != words) return null;
@@ -7370,7 +7583,7 @@ const Emitter = struct {
         const view: RowView = .{ .binding = if (pattern.tag == .bind) pattern.a else 0, .row = g.layouts.node(collection).a, .owner = try self.temporary(.i32), .offset = try self.temporary(.i32), .address = try self.temporary(.i32), .next_address = try self.temporary(.i32), .limit_address = try self.temporary(.i32), .scratch = try self.temporary(.i32) };
         try self.emit(.i32_const, 0);
         try self.emit(.local_set, view.scratch);
-        if (words > 1) {
+        if (span != null and words > 1) {
             // A crossing row uses one private scalar buffer per nonempty loop
             // activation, released on every exit. Allocating it before the
             // loop keeps calls off the per-leaf path, so engines need not
@@ -7447,7 +7660,10 @@ const Emitter = struct {
             }
         }
         const list_walk = try self.loopListWalk(array_local, end, list_span != null);
-        const row_view = try self.loopRowView(id, list_span, end);
+        const borrowed_view = try self.loopRowView(id, list_span, end);
+        var row_view: ?RowView = null;
+        var array_view: ?RowView = null;
+        if (list_span != null) row_view = borrowed_view else array_view = borrowed_view;
         // A floor belongs to this activation. Earlier allocations are pinned
         // and traced. Collect after allocation traffic proportional to the
         // arena, so a small cursor does not repeatedly trace a large snapshot.
@@ -7486,6 +7702,13 @@ const Emitter = struct {
             const collection = try self.codeLayout(source.typeOf(metadata.first), source.span(metadata.first));
             const words = packed_layout.collectionRowWords(&g.layouts, collection);
             try self.readListRowView(array_local, counter, words, list_span.?, view, list_walk);
+        } else if (array_view) |view| {
+            const collection = try self.codeLayout(source.typeOf(metadata.first), source.span(metadata.first));
+            const words = packed_layout.collectionRowWords(&g.layouts, collection);
+            try self.arrayAddress(array_local, counter, packed_layout.stride(words));
+            try self.emit(.i32_const, 4);
+            try self.emit(.i32_add, 0);
+            try self.emit(.local_set, view.address);
         } else if (metadata.pattern != 0) {
             var element = counter;
             if (metadata.kind == .array) {
@@ -7548,7 +7771,7 @@ const Emitter = struct {
             try self.emit(.loop, 0);
             self.labels += 1;
         }
-        if (row_view) |view| try self.bindRowViewPattern(id, metadata.pattern, view);
+        if (borrowed_view) |view| try self.bindRowViewPattern(id, metadata.pattern, view);
         if (!try self.suite(metadata.body, depth + 1)) {
             // Push every predecessor before changing any iteration slot.
             for (carries) |carry| {

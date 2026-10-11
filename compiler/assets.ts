@@ -1,6 +1,11 @@
 /** Typed, dependency-tracked asset modules. No file format is privileged by Zig. */
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  captureCompletion,
+  type ZigProjectCompletionOptions,
+  type ZigProjectCompletionResult,
+} from "./editor_completion.ts";
 import type {
   ZigProjectBuildOptions,
   ZigProjectBuildResult,
@@ -417,9 +422,17 @@ export async function withAssetImports(
     queue = result.catch(() => {});
     return result;
   };
-  async function build(
+  function prepare(
     options: ZigProjectBuildOptions,
-  ): Promise<ZigProjectBuildResult> {
+  ): Promise<ZigProjectBuildResult>;
+  function prepare(
+    options: ZigProjectBuildOptions,
+    completion: ZigProjectCompletionOptions & { filename: string },
+  ): Promise<ZigProjectCompletionResult>;
+  async function prepare(
+    options: ZigProjectBuildOptions,
+    completion?: ZigProjectCompletionOptions & { filename: string },
+  ): Promise<ZigProjectBuildResult | ZigProjectCompletionResult> {
     if (closed) throw new Error("Asset compiler is closed");
     options.signal?.throwIfAborted();
     const snapshots = new Map<string, Uint8Array<ArrayBuffer>>();
@@ -614,6 +627,14 @@ export async function withAssetImports(
         throw new RangeError("Generated asset sources exceed 64 MiB");
       }
       options.signal?.throwIfAborted();
+      if (completion) {
+        nativeStarted = true;
+        return await compiler.complete({
+          ...completion,
+          signal: options.signal,
+          sources,
+        });
+      }
       // Digests and manifest copies precede native publication. Callers can
       // watch every input, including optional files, using this same snapshot.
       const dependencies = new Map<string, Uint8Array<ArrayBuffer> | null>();
@@ -650,6 +671,30 @@ export async function withAssetImports(
     } catch (error) {
       options.signal?.throwIfAborted();
       if (closed || nativeStarted) throw error;
+      if (completion) {
+        let message = String(error);
+        if (error instanceof Error) message = error.message;
+        const bytes = encoder.encode(message);
+        let end = Math.min(bytes.length, 1024);
+        while (end < bytes.length && (bytes[end] & 0xc0) === 0x80) end--;
+        message = new TextDecoder().decode(bytes.subarray(0, end));
+        return {
+          success: false,
+          revision,
+          snapshot: completion.snapshot,
+          filename: completion.filename,
+          position: completion.position,
+          diagnostics: [{
+            filename: completion.filename,
+            stage: "complete",
+            code: "completion_failed",
+            start: 0,
+            end: 0,
+            message,
+            offset_encoding: "utf8_bytes",
+          }],
+        };
+      }
       return {
         success: false,
         revision,
@@ -754,7 +799,7 @@ export async function withAssetImports(
         return new Promise<ZigProjectBuildResult>((resolve, reject) => {
           const abort = () => reject(signal.reason);
           signal.addEventListener("abort", abort, { once: true });
-          enqueue(() => build(copied)).then(
+          enqueue(() => prepare(copied)).then(
             (result) => {
               signal.removeEventListener("abort", abort);
               resolve(result);
@@ -764,6 +809,39 @@ export async function withAssetImports(
               reject(error);
             },
           );
+        });
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    },
+    complete(options) {
+      try {
+        if (closed) throw new Error("Asset compiler is closed");
+        const copied = captureCompletion(
+          options,
+          (value) => localPath(value, Deno.cwd()),
+        );
+        let signal = lifetime.signal;
+        if (copied.signal) {
+          signal = AbortSignal.any([copied.signal, lifetime.signal]);
+        }
+        signal.throwIfAborted();
+        // Preparation is private. Only a successful build publishes its cache,
+        // revision, resources or manifest; completion merely reads the snapshot.
+        return new Promise<ZigProjectCompletionResult>((resolve, reject) => {
+          const abort = () => reject(signal.reason);
+          signal.addEventListener("abort", abort, { once: true });
+          enqueue(() => prepare({ sources: copied.sources, signal }, copied))
+            .then(
+              (result) => {
+                signal.removeEventListener("abort", abort);
+                resolve(result);
+              },
+              (error) => {
+                signal.removeEventListener("abort", abort);
+                reject(error);
+              },
+            );
         });
       } catch (error) {
         return Promise.reject(error);

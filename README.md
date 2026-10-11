@@ -91,9 +91,11 @@ backends and old compiler-coupled ECS prototype have been removed. The previous
 working tree, including uncommitted changes, is preserved locally under
 `build/zig-only-migration/`; committed history remains in Git.
 
-## Helix highlighting
+## Helix
 
-`deno task helix:install` generates and installs the Tree-sitter grammar and
-highlighting. The formatter uses the Baba grammar; compilation uses the native
-Zig frontend. `DESIGN.md` records language proposals, while the language guide
-and executable tests define supported behavior.
+`deno task helix:install` installs the Tree-sitter grammar, highlighting and the
+completion server. In insert mode, Ctrl-x requests suggestions from the current
+buffers; accepting one replaces only the typed token. The server uses Deno and
+the native compiler, with a 250 ms request deadline. It supplies completion;
+formatting remains a separate task. `DESIGN.md` records proposals, while the
+language guide and executable tests define supported behavior.

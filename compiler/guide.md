@@ -78,7 +78,11 @@ enclosing binding's generic requirements. Record fields, nominal identities,
 effect arguments, repeated effect labels and open row tails remain explicit. The
 graph shares repeated types and bounds its size; `truncated` signals omitted
 detail. These are diagnostic-local identities, not reusable type witnesses.
-Editor completion is subsequent work; failed dispatch is explained below.
+Editor completion uses the same checked types and scope in a private query; it
+does not build Wasm or replace a successful revision. Helix Ctrl-x requests
+suggestions from unsaved buffers. See the
+[completion contract](../zig-native/EDITOR_COMPLETION.md). Failed dispatch is
+explained below.
 
 ```text
 const unfinished = fn (value: U32) -> F32 => @hole

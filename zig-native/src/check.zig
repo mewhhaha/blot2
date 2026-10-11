@@ -26,7 +26,35 @@ pub const ModuleOrigins = struct {
         return allocator.dupe(u8, "main");
     }
 };
-pub const ModuleOptions = struct { purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: usize = 1_000_000 };
+/// A request-local cursor marker. Numeric facts in EditorCapture are owned by
+/// the returned Checked region; callers must never publish them as artifacts.
+pub const EditorMarker = struct { span: ast.Span, kind: @import("completion_probe.zig").Kind, prefix: []const u8 = "" };
+pub const EditorName = struct {
+    name: symbols.Symbol,
+    kind: enum { value, function, type_, constructor, field, member, module },
+    scheme: T.Scheme = .{},
+    distance: u32 = 0,
+    identity: Identity = .{ .unit = 0, .decl = 0 },
+    external: ?ExternalTarget = null,
+    ambiguous: bool = false,
+    receiver: bool = false,
+};
+pub const EditorCapture = struct {
+    names: []EditorName = &.{},
+    kind: @import("completion_probe.zig").Kind,
+    node: ast.Id,
+    scope: T.List,
+    visible: T.List = .{},
+    visible_names: T.List = .{},
+    scope_names: T.List = .{},
+    type_scope: T.List = .{},
+    truncated: bool = false,
+    owner: BindingId,
+    receiver: T.Id = 0,
+    namespace: symbols.Symbol = 0,
+    context: ?@import("hole_diagnostics.zig").Snapshot = null,
+};
+pub const ModuleOptions = struct { editor: ?EditorMarker = null, purity_origins: ModuleOrigins = .{}, builtin_catalog: bool = false, prelude_unit: u32 = 0, inherited_fixities: []const ImportedFixity = &.{}, max_inference_transitions: usize = 1_000_000 };
 /// Private differential control. This changes execution, never semantic module
 /// options or any retained-artifact key. Ordinary public entrypoints leave it off.
 pub const AliasGlobalStats = struct { attempts: usize = 0, admitted: usize = 0, declined: usize = 0, frames: usize = 0, peak_frames: usize = 0 };
@@ -363,6 +391,7 @@ pub const RequestArm = struct { node: ast.Id, loop: ast.Id, operation: T.Effects
 pub const RequestLoop = struct { node: ast.Id, computation: ast.Id, value_type: T.Id, result_type: T.Id, state_type: T.Id, action_type: T.Id, arms: T.List, completion: ast.Id, complete_pattern: ast.Id, complete_suite: ast.Id, complete_state_bindings: T.List, carried: T.List, return_scope: ast.Id };
 pub const RequestControl = struct { node: ast.Id, loop: ast.Id, kind: enum { reply, cancel, break_ }, value_type: T.Id, bindings: T.List = .{}, target_scope: ast.Id };
 pub const Checked = struct {
+    editor: ?EditorCapture = null,
     iterator_bodies: []ast.Id = &.{},
     initializer_rejected: bool = false,
     computations: []Computation = &.{},
@@ -438,6 +467,10 @@ pub const Checked = struct {
         return if (origin == 0) span else tree.span(origin);
     }
     pub fn deinit(self: *Checked, allocator: Allocator) void {
+        if (self.editor) |editor| {
+            allocator.free(editor.names);
+            if (editor.context) |context| context.deinit(allocator);
+        }
         allocator.free(self.iterator_bodies);
         allocator.free(self.computations);
         allocator.free(self.request_loops);
@@ -534,6 +567,8 @@ const Qualified = struct { namespace: symbols.Symbol, member: symbols.Symbol };
 const QualifiedResolution = struct { namespace: symbols.Symbol, binding: BindingId };
 const OperatorOverride = struct { target: symbols.Symbol, named: bool, external: ?ExternalTarget = null };
 const Engine = struct {
+    editor_marker: ?EditorMarker = null,
+    editor_capture: ?EditorCapture = null,
     scratch_pool: region_arena.Pool,
     pending_arena: ?*region_arena.Arena = null,
     active_aliases: std.AutoHashMapUnmanaged(u32, void) = .empty,
@@ -2909,6 +2944,13 @@ const Engine = struct {
         };
     }
     fn nominalAnnotation(self: *Engine, head: ast.Id, arguments: []const ast.Id, source: ast.Id) T.Error!T.Id {
+        if (self.editorAt(head)) {
+            for (arguments) |argument| _ = try self.annotation(argument);
+            const result = try self.captureEditor(head, 0, self.catalogKey(self.tree.node(head).a).namespace);
+            self.editor_capture.?.kind = .type_;
+            self.expr_types[head] = result;
+            return result;
+        }
         const name = self.tree.node(head).a;
         if (std.mem.eql(u8, self.pool.get(name), "Array") or std.mem.eql(u8, self.pool.get(name), "List") or std.mem.eql(u8, self.pool.get(name), "Cursor")) {
             if (arguments.len == 0) {
@@ -3150,6 +3192,8 @@ const Engine = struct {
         var binding = self.lookup(root) orelse self.globals.get(root);
         if (binding == null) {
             const member = parts.next().?;
+            if (self.editorAt(id) and parts.peek() == null and self.isNamespace(root))
+                return try self.captureEditor(id, 0, root);
             if (self.pool.lookup(member)) |symbol| binding = self.qualified.get(.{ .namespace = root, .member = symbol });
         }
         const target = binding orelse return null;
@@ -3161,6 +3205,8 @@ const Engine = struct {
         defer types_.deinit(self.allocator);
         try types_.append(self.allocator, ty);
         while (parts.next()) |part| {
+            if (self.editorAt(id) and parts.peek() == null)
+                return try self.captureEditor(id, ty, 0);
             const symbol = self.pool.lookup(part) orelse {
                 try self.diagnostic(.unknown_field, id);
                 return try self.types.fresh();
@@ -3181,6 +3227,9 @@ const Engine = struct {
         try self.row_sources.put(self.allocator, self.types.row(latent).tail.variable, id);
         defer self.ambient = saved_ambient;
         const input = try self.types.fresh();
+        if (self.editorAt(id)) {
+            return self.types.functionWithEffects(input, try self.captureEditor(id, input, 0), latent);
+        }
         const binding = try self.addBinding(.{ .name = 0, .declaration = id, .owner = self.owner, .kind = .parameter, .ty = input });
         self.resolved[id] = binding;
         var path: std.ArrayList(T.Id) = .empty;
@@ -3667,6 +3716,13 @@ const Engine = struct {
         self.depth += 1;
         defer self.depth -= 1;
         const node = self.tree.node(id);
+        if (node.tag == .type_name and self.editorAt(id)) {
+            const key = self.catalogKey(node.a);
+            const result = try self.captureEditor(id, 0, key.namespace);
+            self.editor_capture.?.kind = .type_;
+            self.expr_types[id] = result;
+            return result;
+        }
         switch (node.tag) {
             .type_name => {
                 const name = self.pool.get(node.a);
@@ -5254,6 +5310,7 @@ const Engine = struct {
     }
     fn intrinsic(self: *Engine, id: ast.Id, name: symbols.Symbol) T.Error!T.Id {
         const text = self.pool.get(name);
+        if (self.editorAt(id)) return self.captureEditor(id, 0, 0);
         if (@import("simd_intrinsics.zig").lookup(text)) |op| {
             const element = if (op.floating) T.f32_type else T.u32_type;
             const input = try self.types.product(&.{ element, element, element, element });
@@ -5264,25 +5321,9 @@ const Engine = struct {
             return self.types.function(input, if (op.arity == 1) output else try self.types.function(input, output));
         }
         if (std.mem.eql(u8, text, "@hole")) {
-            // Nearest visible bindings first; the 33rd entry only signals
-            // truncation. Avoid copying or repeatedly searching a large scope.
-            var scope: [33]u32 = undefined;
-            var count: usize = 0;
-            var index = self.env.items.len;
-            while (index != 0 and count != scope.len) {
-                index -= 1;
-                const entry = self.env.items[index];
-                var shadowed = false;
-                for (scope[0..count]) |binding| if (self.bindings.items[binding].name == entry.name) {
-                    shadowed = true;
-                    break;
-                };
-                if (!shadowed) {
-                    scope[count] = entry.binding;
-                    count += 1;
-                }
-            }
-            try self.holes.append(self.allocator, .{ .node = id, .scope = try self.types.saveList(scope[0..count]), .owner = self.current });
+            if (self.editorAt(id)) return self.captureEditor(id, 0, 0);
+            const scope = try self.holeScope();
+            try self.holes.append(self.allocator, .{ .node = id, .scope = scope, .owner = self.current });
             return self.types.fresh();
         }
         if (std.mem.eql(u8, text, "@requests") or std.mem.eql(u8, text, "@computation")) {
@@ -5367,6 +5408,8 @@ const Engine = struct {
             .string => try self.types.fresh(),
             .group => try self.expression(node.a),
             .name => blk: {
+                if (self.editorAt(id) and self.editor_marker.?.kind == .expression)
+                    break :blk try self.captureEditor(id, 0, 0);
                 if (self.lookup(node.a)) |binding| {
                     self.resolved[id] = binding;
                     break :blk try self.instantiate(binding, id);
@@ -5388,11 +5431,25 @@ const Engine = struct {
                         break :blk try self.globalReference(binding, id);
                     if (try self.typeConstructorValue(.{ .namespace = base.a, .member = node.b })) |ty| break :blk ty;
                 }
+                if (self.editorAt(id)) {
+                    var namespace: symbols.Symbol = 0;
+                    var receiver: T.Id = 0;
+                    if (base.tag == .name and self.lookup(base.a) == null and self.isNamespace(base.a)) {
+                        namespace = base.a;
+                    } else {
+                        receiver = try self.expression(node.a);
+                    }
+                    break :blk try self.captureEditor(id, receiver, namespace);
+                }
                 const projected = try self.projectField(try self.expression(node.a), node.b, id, false, null);
                 self.projection_resolved[id] = projected.projection;
                 break :blk projected.ty;
             },
             .constructor_ref => blk: {
+                if (self.editorAt(id)) {
+                    const key = self.catalogKey(node.a);
+                    break :blk try self.captureEditor(id, 0, key.namespace);
+                }
                 const ctor = self.constructor_names.get(self.catalogKey(node.a)) orelse {
                     try self.diagnostic(.unknown_constructor, id);
                     break :blk try self.types.fresh();
@@ -7390,9 +7447,95 @@ const Engine = struct {
             if (changed) try self.solveFields();
         }
     }
+    pub fn sourceEditorProbe(self: *const Engine, id: ast.Id) bool {
+        return self.editorAt(id);
+    }
+    fn editorAt(self: *const Engine, id: ast.Id) bool {
+        const marker = self.editor_marker orelse return false;
+        const span = self.tree.span(id);
+        return span.start <= marker.span.start and span.end == marker.span.end;
+    }
+    fn isNamespace(self: *const Engine, name: symbols.Symbol) bool {
+        inline for (.{ "qualified", "nominal_names", "constructor_names", "contract_names", "effect_family_names", "effect_operation_names" }) |map| {
+            var keys = @field(self, map).keyIterator();
+            while (keys.next()) |key| if (key.namespace == name) return true;
+        }
+        return false;
+    }
+    fn captureEditor(self: *Engine, id: ast.Id, receiver: T.Id, namespace: symbols.Symbol) T.Error!T.Id {
+        if (self.editor_capture) |previous| if (previous.node == id and self.expr_types[id] != 0)
+            return self.expr_types[id];
+        var scope_bindings: [33]u32 = undefined;
+        var scope_names: [33]u32 = undefined;
+        var scope_count: usize = 0;
+        var visible: std.ArrayList(u32) = .empty;
+        defer visible.deinit(self.allocator);
+        var visible_names: std.ArrayList(u32) = .empty;
+        defer visible_names.deinit(self.allocator);
+        var seen: std.AutoHashMapUnmanaged(symbols.Symbol, void) = .empty;
+        defer seen.deinit(self.allocator);
+        var truncated = false;
+        var index = self.env.items.len;
+        while (index != 0) {
+            index -= 1;
+            const entry = self.env.items[index];
+            if (entry.name == 0) continue;
+            const unique = try seen.getOrPut(self.allocator, entry.name);
+            if (unique.found_existing) continue;
+            if (scope_count < scope_bindings.len) {
+                scope_bindings[scope_count] = entry.binding;
+                scope_names[scope_count] = entry.name;
+                scope_count += 1;
+            }
+            if (!std.mem.startsWith(u8, self.pool.get(entry.name), self.editor_marker.?.prefix)) continue;
+            if (visible.items.len == 4096) {
+                truncated = true;
+                break;
+            }
+            try visible.append(self.allocator, entry.binding);
+            try visible_names.append(self.allocator, entry.name);
+        }
+        var type_scope: std.ArrayList(u32) = .empty;
+        defer type_scope.deinit(self.allocator);
+        var type_index = self.type_env.items.len;
+        while (type_index != 0) {
+            type_index -= 1;
+            const entry = self.type_env.items[type_index];
+            try type_scope.appendSlice(self.allocator, &.{ entry.name, entry.ty });
+        }
+        const scope = try self.types.saveList(scope_bindings[0..scope_count]);
+        try self.holes.append(self.allocator, .{ .node = id, .scope = scope, .owner = self.current });
+        self.editor_capture = .{ .kind = self.editor_marker.?.kind, .node = id, .scope = scope, .scope_names = try self.types.saveList(scope_names[0..scope_count]), .visible = try self.types.saveList(visible.items), .visible_names = try self.types.saveList(visible_names.items), .type_scope = try self.types.saveList(type_scope.items), .truncated = truncated, .owner = self.current, .receiver = receiver, .namespace = namespace };
+        return self.types.fresh();
+    }
+    fn holeScope(self: *Engine) T.Error!T.List {
+        var scope: [33]u32 = undefined;
+        var count: usize = 0;
+        var index = self.env.items.len;
+        while (index != 0 and count != scope.len) {
+            index -= 1;
+            const entry = self.env.items[index];
+            var shadowed = false;
+            for (scope[0..count]) |binding| if (self.bindings.items[binding].name == entry.name) {
+                shadowed = true;
+                break;
+            };
+            if (!shadowed) {
+                scope[count] = entry.binding;
+                count += 1;
+            }
+        }
+        return self.types.saveList(scope[0..count]);
+    }
     fn finishHoles(self: *Engine) T.Error!void {
         const display = @import("type_display.zig");
         for (self.holes.items) |hole| {
+            if (self.editor_capture) |*capture| if (capture.node == hole.node) {
+                if (capture.context != null) continue;
+                capture.names = try @import("completion_names.zig").capture(self, capture, self.identityOf(capture.receiver));
+                capture.context = try @import("hole_diagnostics.zig").buildNamed(self, hole.node, hole.scope, hole.owner, self.types.list(capture.scope_names));
+                continue;
+            };
             var bytes: std.ArrayList(u8) = .empty;
             defer bytes.deinit(self.allocator);
             try display.text(self, &bytes, "Unfilled expression; expected: ");
@@ -8017,6 +8160,7 @@ fn rejectExhaustedBudget(allocator: Allocator, pool: *const symbols.Pool, unit: 
 fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool, execution: PrivateExecution, exhaustion: *BudgetExhaustion) !Checked {
     if (!source_validation and hasNumericFailure(tree)) return rejectNumericSource(allocator, tree, pool, imports, catalogs, unit, options);
     var engine: Engine = .{
+        .editor_marker = options.editor,
         .budget_exhaustion = exhaustion,
         .scratch_pool = .init(allocator),
         .execution = execution,
@@ -8038,6 +8182,10 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     defer engine.pending_queue.deinit(allocator);
     errdefer engine.types.deinit();
     defer engine.holes.deinit(allocator);
+    errdefer if (engine.editor_capture) |capture| {
+        allocator.free(capture.names);
+        if (capture.context) |context| context.deinit(allocator);
+    };
     defer engine.active_aliases.deinit(allocator);
     defer {
         deinitDiagnosticPayloads(allocator, engine.source_header_diagnostics);
@@ -8418,7 +8566,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     errdefer allocator.free(body_closed_rows);
     const merges = try engine.merges.toOwnedSlice(allocator);
     errdefer allocator.free(merges);
-    var checked: Checked = .{ .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.external_targets.count(), .counters = counters: {
+    var checked: Checked = .{ .editor = engine.editor_capture, .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.external_targets.count(), .counters = counters: {
         var counters = engine.counters;
         counters.inference_steps = engine.inference_transitions;
         break :counters counters;

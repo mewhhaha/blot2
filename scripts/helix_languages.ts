@@ -1,9 +1,12 @@
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 
 export function installBlotLanguage(
   existing: string,
   options: { readonly repository: string; readonly definition: string },
 ): string {
+  if (!isAbsolute(options.repository)) {
+    throw new Error("Helix requires an absolute repository path.");
+  }
   const openingMarkers = [
     ...existing.matchAll(/^# >>> blot \(managed by (.+)\) >>>\r?$/gm),
   ];
@@ -32,6 +35,9 @@ export function installBlotLanguage(
       "languages.toml has an unmanaged Blot entry; move it into the managed block before installing.",
     );
   }
+  if (/^\s*\[language-server\.blot\]\s*(?:#.*)?$/m.test(outside)) {
+    throw new Error("languages.toml has an unmanaged Blot language server.");
+  }
   if (/^# <<< blot \(managed by .+\) <<<\r?$/m.test(outside)) {
     throw new Error(
       "languages.toml has a Blot closing marker without its opening marker.",
@@ -41,6 +47,23 @@ export function installBlotLanguage(
   const newline = existing.includes("\r\n") ? "\r\n" : "\n";
   const block = [
     `# >>> blot (managed by ${options.repository}) >>>`,
+    "[language-server.blot]",
+    'command = "deno"',
+    `args = ${
+      JSON.stringify([
+        "run",
+        "--allow-read",
+        "--allow-run",
+        join(options.repository, "compiler", "lsp.ts"),
+        "--compiler",
+        join(options.repository, "zig-native", "zig-out", "bin", "blotc"),
+        "--prelude",
+        join(options.repository, "std", "prelude.blot"),
+        "--std-root",
+        join(options.repository, "std"),
+      ])
+    }`,
+    "",
     options.definition.trimEnd(),
     "",
     "[[grammar]]",

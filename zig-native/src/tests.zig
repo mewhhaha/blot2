@@ -1,4 +1,5 @@
 comptime {
+    _ = @import("ragged_builder_tests.zig");
     _ = @import("native_asset_readers.zig");
     _ = @import("native_asset_wgsl.zig");
     _ = @import("native_assets.zig");
@@ -327,4 +328,8 @@ test {
     _ = @import("core_dispatch_tests.zig");
     _ = @import("retained_catalog_tests.zig");
     _ = @import("startup_emission_facts_tests.zig");
+    _ = @import("editor_completion.zig");
+    _ = @import("completion_probe.zig");
+    _ = @import("completion_fit.zig");
+    _ = @import("completion_check_tests.zig");
 }

@@ -165,7 +165,8 @@ const health = await new Deno.Command("hx", {
 }).output();
 const report = new TextDecoder().decode(health.stdout);
 const required = [
-  "Configured language servers: None",
+  "Configured language servers:",
+  "deno",
   "Configured formatter: None",
   "Tree-sitter parser: ✓",
   "Highlight queries: ✓",
@@ -179,4 +180,6 @@ if (!health.success || required.some((line) => !report.includes(line))) {
   );
 }
 console.log(report.trimEnd());
-console.log("Restart Helix to use the new Blot highlighting for .blot files.");
+console.log(
+  "Restart Helix to use Blot completion. In insert mode, Ctrl-x requests suggestions.",
+);

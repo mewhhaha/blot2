@@ -128,6 +128,8 @@ fn Validator(comptime Context: type) type {
             return false;
         }
         fn name(self: *Self, symbol: symbols.Symbol, id: ast.Id, point: u32) T.Error!void {
+            if (comptime @hasDecl(@TypeOf(self.context.*), "sourceEditorProbe"))
+                if (self.context.sourceEditorProbe(id)) return;
             if (!self.local(symbol) and !try self.context.sourceValueExists(symbol)) self.fail(.unknown_value, id, point, symbol);
         }
         fn bind(self: *Self, symbol: symbols.Symbol) T.Error!void {
@@ -413,6 +415,10 @@ fn Validator(comptime Context: type) type {
             }
         }
         fn walk(self: *Self, id: ast.Id, depth: usize) T.Error!void {
+            if (id != 0) if (comptime @hasDecl(@TypeOf(self.context.*), "sourceEditorProbe")) {
+                const tag = self.tree.node(id).tag;
+                if ((tag == .name or tag == .constructor_ref or tag == .intrinsic) and self.context.sourceEditorProbe(id)) return;
+            };
             if (id == 0 or self.issue != null or self.annotationsStopped()) return;
             if (depth >= 1024) {
                 self.fail(.nesting_limit, id, self.tree.span(id).start, 0);

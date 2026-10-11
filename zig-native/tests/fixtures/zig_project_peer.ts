@@ -40,6 +40,7 @@ const hello = {
   capabilities: ["project-build", "utf8_bytes", "abort-disposes-process"],
   maxFrameBytes: 67108864,
 };
+if (mode.startsWith("completion")) hello.capabilities.push("source-buffers-v1", "editor-completion-v1");
 if (mode === "startup-stall") {
   await Deno.stdin.read(new Uint8Array(1));
   Deno.exit();
@@ -72,10 +73,12 @@ while (true) {
   const header = await exact(8),
     view = new DataView(header.buffer),
     length = view.getUint32(0, true);
-  if (view.getUint32(4, true) !== 0) {
+  const payloadLength = view.getUint32(4, true);
+  if (payloadLength !== 0 && !mode.startsWith("completion")) {
     throw new Error("Unexpected request payload");
   }
   const request = JSON.parse(new TextDecoder().decode(await exact(length)));
+  const payload = await exact(payloadLength);
   await Deno.writeTextFile(log, JSON.stringify(request) + "\n", {
     append: true,
   });
@@ -97,6 +100,25 @@ while (true) {
       }),
     );
     break;
+  }
+  if (request.kind === "complete") {
+    builds++;
+    if (mode === "completion-hold" && builds === 1) await new Promise((resolve) => setTimeout(resolve, 150));
+    if (mode === "completion-stall") await new Promise((resolve) => setTimeout(resolve, 60_000));
+    const result = {
+      kind: "complete", id: request.id, epoch: "epoch", revision,
+      snapshot: request.snapshot, filename: request.filename, position: request.position,
+      success: true, replace: { start: request.position, end: request.position }, context: null,
+      items: [{ label: "value", insertText: "value", kind: "value", detail: "U32", match: "exact" }],
+      truncated: false, diagnostics: [],
+    };
+    if (mode === "completion-revision") result.revision++;
+    if (mode === "completion-snapshot") result.snapshot++;
+    if (mode === "completion-span") result.replace.end = 0xffff_ffff;
+    if (mode === "completion-kind") result.items[0].kind = "snippet";
+    await Deno.writeTextFile(log, JSON.stringify({ kind: "completion-input", text: new TextDecoder().decode(payload) }) + "\n", { append: true });
+    await write(frame(result, mode === "completion-payload" ? wasm : undefined));
+    continue;
   }
   builds++;
   if (mode === "hold" && builds === 1) {

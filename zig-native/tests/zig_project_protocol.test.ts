@@ -125,6 +125,7 @@ async function host() {
     "source-overlays",
     "backend-checkpoints",
     "native-assets-v1",
+    "editor-completion-v1",
   ]);
   return {
     entry,
@@ -474,6 +475,192 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
     } finally {
       await restored.cleanup();
     }
+  } finally {
+    await peer.cleanup();
+  }
+});
+
+Deno.test("wire completion is source-only bounded recoverable and leaves retained builds untouched", async () => {
+  const peer = await host();
+  try {
+    await peer.open({ prelude: null });
+    const original = await peer.send({
+      kind: "build",
+      id: 2,
+      epoch: "1",
+      revision: 0,
+    });
+    equal(original.metadata.success, true);
+    let id = 2;
+    const query = async (marked: string) => {
+      const cursor = marked.indexOf("<cursor>");
+      ok(cursor >= 0);
+      const payload = encoder.encode(marked.replace("<cursor>", ""));
+      const next = ++id;
+      const reply = await peer.send({
+        kind: "complete",
+        id: next,
+        epoch: "1",
+        revision: 1,
+        snapshot: next,
+        filename: peer.entry,
+        position: encoder.encode(marked.slice(0, cursor)).length,
+        sources: [{ path: peer.entry, start: 0, length: payload.length }],
+      }, payload);
+      fields(reply.metadata, [
+        "kind",
+        "id",
+        "epoch",
+        "revision",
+        "snapshot",
+        "filename",
+        "position",
+        "success",
+        "replace",
+        "context",
+        "items",
+        "truncated",
+        "diagnostics",
+      ]);
+      equal(reply.metadata.revision, 1);
+      equal(reply.metadata.snapshot, next);
+      equal(reply.metadata.filename, peer.entry);
+      equal(reply.payload.length, 0);
+      ok(encoder.encode(JSON.stringify(reply.metadata)).length <= 256 * 1024);
+      return reply.metadata;
+    };
+    const source = "// 雪\nconst work = fn (value: U32) -> U32 => va<cursor>";
+    const first = await query(source);
+    equal(
+      first.items.map((
+        item: Metadata,
+      ) => [item.insertText, item.kind, item.match]),
+      [["value", "value", "exact"]],
+    );
+    equal(first.context.nodes[first.context.expected].kind, "u32");
+    fields(first.items[0], ["label", "insertText", "kind", "detail", "match"]);
+    const scope = await query(
+      "const work = fn (value: U32) -> U32 => do:\n  let original = value\n  value := #True\n  return @ho<cursor>le",
+    );
+    equal(
+      scope.items.filter((item: Metadata) =>
+        ["value", "original"].includes(item.insertText)
+      ).map((item: Metadata) => [item.insertText, item.match]),
+      [["original", "exact"], ["value", "incompatible"]],
+    );
+    equal(scope.replace.end - scope.replace.start, 5);
+    const broken = await query(
+      "const good = 42\nconst bad = (\nconst invented = 3\nconst work = goo<cursor>",
+    );
+    equal(broken.context, null);
+    equal(broken.items.map((item: Metadata) => [item.insertText, item.match]), [
+      ["good", "unknown"],
+    ]);
+    ok(broken.diagnostics.length > 0);
+    const comment = await query("const bad = (\n// goo<cursor>");
+    equal(comment.items, []);
+    equal(comment.context, null);
+    equal(comment.diagnostics, []);
+    const text = encoder.encode("雪");
+    const invalid = await peer.send({
+      kind: "complete",
+      id: ++id,
+      epoch: "1",
+      revision: 1,
+      snapshot: id,
+      filename: peer.entry,
+      position: 1,
+      sources: [{ path: peer.entry, start: 0, length: text.length }],
+    }, text);
+    equal(invalid.metadata.success, false);
+    equal(invalid.metadata.diagnostics[0].code, "invalid_position");
+    equal(invalid.metadata.diagnostics[0].start, 0);
+    const missing = await peer.send({
+      kind: "complete",
+      id: ++id,
+      epoch: "1",
+      revision: 1,
+      snapshot: id,
+      filename: peer.entry + ".missing",
+      position: 0,
+    });
+    equal(missing.metadata.success, false);
+    equal(missing.metadata.diagnostics[0].code, "missing_source");
+    const final = await peer.send({
+      kind: "build",
+      id: ++id,
+      epoch: "1",
+      revision: 1,
+    });
+    equal(final.metadata.success, true);
+    equal(final.metadata.revision, 2);
+    equal(final.payload, original.payload);
+    await peer.send({ kind: "close", id: ++id, epoch: "1", revision: 2 });
+    await peer.ended(0);
+  } finally {
+    await peer.cleanup();
+  }
+});
+Deno.test("wire completion rejects over-limit UTF-8 filename echoes before querying", async () => {
+  const peer = await host();
+  try {
+    await peer.open();
+    await peer.writer.write(wire({
+      kind: "complete",
+      id: 2,
+      epoch: "1",
+      revision: 0,
+      snapshot: 1,
+      filename: "/" + "雪".repeat(1366),
+      position: 0,
+    }));
+    await peer.ended(1, "InvalidCompletionRequest");
+  } finally {
+    await peer.cleanup();
+  }
+});
+
+for (const field of ["snapshot", "filename", "position"]) {
+  Deno.test(`wire completion fields are forbidden on build when ${field} is non-null`, async () => {
+    const peer = await host();
+    try {
+      await peer.open();
+      let value: string | number = 0;
+      if (field === "filename") value = peer.entry;
+      await peer.writer.write(
+        wire({ kind: "build", id: 2, epoch: "1", revision: 0, [field]: value }),
+      );
+      await peer.ended(1, "InvalidRequest");
+    } finally {
+      await peer.cleanup();
+    }
+  });
+}
+
+Deno.test("wire accepts null completion defaults on ordinary requests", async () => {
+  const peer = await host();
+  try {
+    await peer.open({ snapshot: null, filename: null, position: null });
+    const built = await peer.send({
+      kind: "build",
+      id: 2,
+      epoch: "1",
+      revision: 0,
+      snapshot: null,
+      filename: null,
+      position: null,
+    });
+    equal(built.metadata.success, true);
+    await peer.send({
+      kind: "close",
+      id: 3,
+      epoch: "1",
+      revision: 1,
+      snapshot: null,
+      filename: null,
+      position: null,
+    });
+    await peer.ended(0);
   } finally {
     await peer.cleanup();
   }

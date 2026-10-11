@@ -528,9 +528,20 @@ finite generators. Bounds cannot read region binders, allocate, trap or perform
 effects. The intermediate list must never escape or be observed. Admitted
 regions allocate their final List or Array directly; count overflow uses the
 ordinary path with its original failure order. Reference storage is cleared
-before element evaluation. Ragged/filtered/effectful regions remain ordinary
-builders. Production packed collections use the flat-row rule above; the
-recursive packed scalar-row planner remains a separate fixture.
+before element evaluation. Effectful regions remain ordinary builders.
+Production packed collections use the flat-row rule above; the recursive packed
+scalar-row planner remains a separate fixture.
+
+`ragged_builder` admits dependent bounds and filters using already selected
+operation facts and bounded capture-free primitive forwarding spines. Exact body
+dependencies invalidate changed adapters. A count probe borrows immutable inputs
+and uses bounded traversal scratch; exhaustion resumes ordinary building.
+Runtime filling reuses final-storage allocation and ownership. Staged counting
+publishes no values and consumes no source fuel; ordinary filling preserves
+every source charge, reserves exact private child handles and publishes once.
+Neither scratch pointers nor borrowed interior row views enter published values.
+See [Ragged builders](RAGGED_BUILDERS.md) and its
+[qualification](RAGGED_BUILDERS_QUALIFICATION.md).
 
 Executable fragment validity records each inlined source body and every static
 value root. Exact source/catalog dependencies and complete

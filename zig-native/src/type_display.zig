@@ -5,7 +5,10 @@ const T = @import("types.zig");
 
 pub fn append(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id) T.Error!void {
     var budget: usize = 256;
-    try render(engine, bytes, ty, 0, &budget);
+    try appendBounded(engine, bytes, ty, &budget);
+}
+pub fn appendBounded(engine: anytype, bytes: *std.ArrayList(u8), ty: T.Id, budget: *usize) T.Error!void {
+    try render(engine, bytes, ty, 0, budget);
 }
 pub fn text(engine: anytype, bytes: *std.ArrayList(u8), value: []const u8) T.Error!void {
     const limit = 8192;

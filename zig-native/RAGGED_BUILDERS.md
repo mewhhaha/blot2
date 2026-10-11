@@ -17,8 +17,8 @@ order. Duplicate only control expressions proved pure, total, deterministic and
 allocation-free. The initial implementation also requires a pure, total,
 allocation-free payload. Unsupported totality is a decline, including a pure
 function with unknown termination or traps. Effect operations, demand
-forcing/creation, callable creation/invocation, provider/control boundaries and
-intermediate builder observations keep ordinary construction.
+forcing/creation, callable creation, unproved invocation, provider/control
+boundaries and intermediate builder observations keep ordinary construction.
 
 This deliberately gives task 043 a smaller admission than a general two-pass
 builder. It extends [exact_builder](src/exact_builder.zig) to dependent bounds
@@ -57,8 +57,13 @@ handwritten loops and lowered comprehensions must satisfy the same proof:
 The initial expression subset consists of constants, immutable value references,
 known primitive scalar operations, short-circuit Bool operations, scalar
 conditionals, qualifier binds, checked immutable field projections and intrinsic
-collection length. Operands must themselves qualify. Only checked primitive
-dispatch qualifies: overloaded source methods, named calls and indirect calls
+collection length. Operands must themselves qualify. Analysis receives already
+selected operation facts. A bounded, capture-free spine of at most eight
+two-parameter source adapters qualifies when each body only forwards its two
+parameters, possibly reversed, and ends in one checked primitive. This admits
+ordinary typed `+`, `*` and `>` despite their source dispatch Core nodes. Every
+adapter body becomes an exact dependency; a stable type edit must invalidate the
+proof. Arbitrary overloaded bodies, other named calls and indirect calls
 decline. U32 addition, subtraction and multiplication retain wrapping source
 arithmetic. Integer division/remainder, potentially trapping numeric
 conversions, indexing, cursor value/advance, allocation and unknown operations
@@ -149,14 +154,14 @@ controls, never unreachable subsequent qualifiers.
 These are internal operation contracts, not required Zig names or a new public
 builder object. Reuse existing traversal, storage and cleanup operations.
 
-| Operation                                          | Result and obligation                                                                                                           |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `analyze(module, root, checked_layout)`            | Optional bounded `Plan`: Core IDs, aliases, ordered qualifiers, payload, result conversion and layout evidence                  |
-| `count(plan, entry, probe_budget, storage_limits)` | `eligible { length, words, bytes }` or `declined`; no source failure or publication; existing scratch-allocation OOM propagates |
-| `begin_private(layout, size)`                      | One private final-storage owner or the existing allocation failure; all reference slots are safe before any write               |
-| `fill(plan, entry, private)`                       | Ordinary source-order traversal, payload evaluated once per selected leaf; monotonically advancing row index                    |
-| `finish(private)`                                  | Verify written count equals counted length, freeze and transfer a complete immutable result                                     |
-| `discard(private)`                                 | Allocation-free cleanup of only owned private storage; never release borrowed captured children                                 |
+| Operation                                               | Result and obligation                                                                                                           |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `analyze(module, root, selected_facts, checked_layout)` | Optional bounded `Plan`: Core IDs, aliases, ordered qualifiers, payload, result conversion and layout evidence                  |
+| `count(plan, entry, probe_budget, storage_limits)`      | `eligible { length, words, bytes }` or `declined`; no source failure or publication; existing scratch-allocation OOM propagates |
+| `begin_private(layout, size)`                           | One private final-storage owner or the existing allocation failure; all reference slots are safe before any write               |
+| `fill(plan, entry, private)`                            | Ordinary source-order traversal, payload evaluated once per selected leaf; monotonically advancing row index                    |
+| `finish(private)`                                       | Verify written count equals counted length, freeze and transfer a complete immutable result                                     |
+| `discard(private)`                                      | Allocation-free cleanup of only owned private storage; never release borrowed captured children                                 |
 
 The plan borrows immutable Core only inside its compile owner. It stores no
 solver IDs, source/frame pointers or scratch pointers in durable artifacts. Task
@@ -210,11 +215,12 @@ Before staged fill, reserve one exact private buffer of `length` child handles
 and account every reserved slot against `Options.max_children`, including other
 live private reservations. Source payload evaluation keeps its ordinary frame,
 steps, depth and scalar-value accounting. Suppressed append/conversion nodes
-retain ordinary logical source-step charges; the prepass charges only the probe
-budget. If this accounting cannot be preserved for a shape, decline. Copying
-fewer collection children can improve storage-budget feasibility, as with
-existing private collection optimizations; no previously successful source may
-acquire a new count-pass `constant_fuel` failure.
+retain ordinary logical source-step charges, including applications through
+proved scalar wrappers; the prepass charges only the probe budget. If this
+accounting cannot be preserved for a shape, decline. Copying fewer collection
+children can improve storage-budget feasibility, as with existing private
+collection optimizations; no previously successful source may acquire a new
+count-pass `constant_fuel` failure.
 
 The private carry is frame-qualified and cannot enter a snapshot, capture,
 import template or semantic cache. At finish reserve publication capacity before

@@ -247,6 +247,9 @@ const Builder = struct {
 };
 
 pub fn build(engine: anytype, source: ast.Id, scope: T.List, owner: u32) T.Error!Snapshot {
+    return buildNamed(engine, source, scope, owner, &.{});
+}
+pub fn buildNamed(engine: anytype, source: ast.Id, scope: T.List, owner: u32, scope_names: []const u32) T.Error!Snapshot {
     var builder: Builder = .{ .allocator = engine.allocator };
     defer builder.deinit();
     _ = try builder.addNode(.{ .kind = .truncated });
@@ -258,7 +261,9 @@ pub fn build(engine: anytype, source: ast.Id, scope: T.List, owner: u32) T.Error
         const binding = engine.bindings.items[engine.types.list(scope)[i]];
         const ty = try builder.typeNode(engine, binding.ty, 0);
         const requirements = try builder.predicates(engine, binding.scheme);
-        const name = try builder.saveName(engine.pool.get(binding.name));
+        var symbol = binding.name;
+        if (i < scope_names.len) symbol = scope_names[i];
+        const name = try builder.saveName(engine.pool.get(symbol));
         errdefer builder.allocator.free(name);
         try builder.scope.append(builder.allocator, .{ .name = name, .type = ty, .requirements = requirements });
     }

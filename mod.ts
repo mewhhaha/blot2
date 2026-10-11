@@ -47,6 +47,9 @@ export type {
   ZigProjectBuildStats,
   ZigProjectCompiler,
   ZigProjectCompilerOptions,
+  ZigProjectCompletionItem,
+  ZigProjectCompletionOptions,
+  ZigProjectCompletionResult,
   ZigProjectDiagnostic,
   ZigProjectSourceLocation,
 } from "./compiler/zig_project_client.ts";
@@ -173,6 +176,7 @@ export async function createCompiler(
         return compiler.compilerIdentity;
       },
       build: (buildOptions) => compiler.build(buildOptions),
+      complete: (completionOptions) => compiler.complete(completionOptions),
       exportCheckpoint: () => compiler.exportCheckpoint(),
       async close() {
         try {

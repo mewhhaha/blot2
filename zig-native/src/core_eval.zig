@@ -18,6 +18,9 @@ const scope_components = @import("scope_components.zig");
 const runtime_identity = @import("runtime_identity.zig");
 const dispatch_explanation = @import("dispatch_explanation.zig");
 const Allocator = std.mem.Allocator;
+const ragged = @import("ragged_builder.zig");
+const ragged_count = @import("eval_ragged_count.zig");
+const primitive_operator = @import("primitive_operator.zig");
 const collection_growth = @import("eval_collection_growth.zig");
 pub const Value = scalar_ops.Value;
 pub const ValueId = u32;
@@ -288,6 +291,16 @@ pub const CodeProjection = struct {
 };
 pub const ProofStats = struct { proof_published: usize = 0, proof_reused: usize = 0 };
 pub const DiagnosticContext = struct { identity: ?runtime_identity.View = null, entry: u32 = 0, prelude: u32 = 0, source_mode: bool = false };
+const RaggedRegion = struct {
+    owner: usize,
+    frame: *Frame,
+    plan: ragged.Plan,
+    original: ValueId = 0,
+    children: []ValueId,
+    written: usize = 0,
+    published: ?ValueId = null,
+    reserved: bool = true,
+};
 const IndexedRegion = struct {
     owner: usize,
     frame: *Frame,
@@ -1351,6 +1364,9 @@ pub const Session = struct {
     children: std.ArrayList(ValueId) = .empty,
     collection_buffers: collection_growth.Store = .{},
     indexed_region: ?*IndexedRegion = null,
+    ragged_region: ?*RaggedRegion = null,
+    ragged_probe_limit: usize = ragged.probe_limit,
+    ragged_reserved_children: usize = 0,
     closures: std.ArrayList(ClosureValue) = .empty,
     demands: std.ArrayList(Demand) = .empty,
     source_suspensions: std.ArrayList(SourceSuspension) = .empty,
@@ -2151,7 +2167,7 @@ pub const Session = struct {
         return id;
     }
     fn makeAggregate(self: *Session, owner: usize, source: core.Id, kind: ValueKind, nominal: u64, tag: u32, children_: []const ValueId) Error!ValueId {
-        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or children_.len > self.options.max_children -| self.children.items.len or children_.len > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
+        if (self.values.items.len >= self.options.max_values or self.values.items.len >= std.math.maxInt(ValueId) or children_.len > self.options.max_children -| self.children.items.len -| self.ragged_reserved_children or children_.len > std.math.maxInt(u32) - self.children.items.len) return self.failNode(owner, source, .constant_fuel);
         // Both allocations precede mutation, so failed growth leaves every
         // published handle and child span valid.
         try self.values.ensureUnusedCapacity(self.allocator, 1);
@@ -2835,6 +2851,244 @@ pub const Session = struct {
         }
         return self.projectType(owner, id, node.ty, mappings.items, rows.items);
     }
+    const RaggedFacts = struct {
+        session: *Session,
+        owner: usize,
+        frame: *Frame,
+        module: *const core.Module,
+        operations: [256]struct { id: core.Id, operation: primitive_operator.Operation } = undefined,
+        operation_count: usize = 0,
+        fields: [256]core.Id = undefined,
+        field_count: usize = 0,
+        remaining: usize = 256,
+
+        fn prepare(self: *@This(), id: core.Id) Error!bool {
+            if (id == 0) return true;
+            if (self.remaining == 0) return false;
+            self.remaining -= 1;
+            const n = self.module.node(id);
+            switch (n.tag) {
+                .scalar, .associated, .call => {
+                    if (try self.selected(id)) |operation_| {
+                        self.operations[self.operation_count] = .{ .id = id, .operation = operation_ };
+                        self.operation_count += 1;
+                    }
+                    if (n.tag == .call) {
+                        for (self.module.children(id)) |child| if (!try self.prepare(child)) return false;
+                        return true;
+                    }
+                    return try self.prepare(n.a) and try self.prepare(n.b);
+                },
+                .project => {
+                    const projection = self.module.projection(n.b);
+                    const evidence = try self.session.projectType(self.owner, id, self.module.typeOf(n.a), self.frame.mappings.items, self.frame.row_mappings.items);
+                    if (self.module.projectionVariants(n.b).len != 0 or (evidence != 0 and self.session.evidence.node(evidence).tag == .record and projection.field != 0)) {
+                        self.fields[self.field_count] = id;
+                        self.field_count += 1;
+                    }
+                    return self.prepare(n.a);
+                },
+                .logical => return try self.prepare(n.a) and try self.prepare(n.b),
+                .if_value, .if_stmt => return try self.prepare(n.a) and try self.prepare(n.b) and try self.prepare(n.c),
+                .bind => return self.prepare(n.b),
+                .return_ => return self.prepare(n.a),
+                .block, .suite, .array, .array_op => {
+                    for (self.module.children(id)) |child| if (!try self.prepare(child)) return false;
+                },
+                .loop => {
+                    const info = self.module.loopInfo(id);
+                    return try self.prepare(info.first) and try self.prepare(info.end) and try self.prepare(info.body);
+                },
+                else => {},
+            }
+            return true;
+        }
+        fn selected(self: *@This(), id: core.Id) Error!?primitive_operator.Operation {
+            const n = self.module.node(id);
+            if (n.tag == .scalar and n.c == 0) return .{ .op = n.op };
+            const session = self.session;
+            var first = n.a;
+            var second = n.b;
+            if (n.tag == .call) {
+                const args = self.module.children(id);
+                if (args.len != 2) return null;
+                first = args[0];
+                second = args[1];
+            }
+            const left = try session.projectType(self.owner, id, self.module.typeOf(first), self.frame.mappings.items, self.frame.row_mappings.items);
+            const right = try session.projectType(self.owner, id, self.module.typeOf(second), self.frame.mappings.items, self.frame.row_mappings.items);
+            if (left == 0 or left != right) return null;
+            const tag = session.evidence.node(left).tag;
+            if (tag != .u32 and tag != .f32 and tag != .boolean) return null;
+            if (n.tag == .call) {
+                var machine: @import("wasm.zig").Scalar = .u32;
+                if (tag == .f32) machine = .f32;
+                if (tag == .boolean) machine = .bool;
+                var target_ = self.module.call(id).target;
+                if (target_.unit == 0) target_.unit = session.unitId(self.owner);
+                return primitive_operator.analyzeTyped(session.units, target_, machine);
+            }
+            var member: u32 = 0;
+            if (n.tag == .associated) member = n.c;
+            const identity = session.evidenceIdentity(left) orelse return null;
+            if (try session.associatedTarget(session.unitId(self.owner), identity, member, Session.operator(n.op))) |target_| return primitive_operator.analyze(session.units, target_);
+            if (member != 0 or n.op == .none) return null;
+            return .{ .op = n.op };
+        }
+        pub fn operation(self: @This(), id: core.Id) ?primitive_operator.Operation {
+            for (self.operations[0..self.operation_count]) |entry| if (entry.id == id) return entry.operation;
+            return null;
+        }
+        pub fn primitive(self: @This(), id: core.Id) bool {
+            return primitive_operator.total(self.operation(id) orelse return false);
+        }
+        fn existing(self: @This(), ref: core.BindingRef) ?ValueId {
+            var target_ = ref;
+            if (target_.unit == 0) target_.unit = self.session.unitId(self.owner);
+            const resolved = primitive_operator.resolve(self.session.units, target_) orelse return null;
+            const owner_ = self.session.findUnit(resolved.unit, null) orelse return null;
+            const stored = self.session.slot(.{ .unit = owner_, .binding = resolved.binding });
+            if (stored.state != .complete) return null;
+            return stored.value;
+        }
+        pub fn reference(self: @This(), id: core.Id) bool {
+            const ref = self.module.reference(id);
+            if (ref.unit == 0 or ref.unit == self.module.unit) {
+                const kind = self.module.binding(ref.binding).kind;
+                if (kind == .local or kind == .parameter) return true;
+            }
+            return self.existing(ref) != null;
+        }
+        pub fn field(self: @This(), id: core.Id) bool {
+            for (self.fields[0..self.field_count]) |field_id| if (field_id == id) return true;
+            return false;
+        }
+        fn irrefutable(self: @This(), id: core.PatternId, remaining: usize) bool {
+            if (id == 0) return true;
+            if (remaining == 0) return false;
+            switch (self.module.pattern(id).tag) {
+                .bind, .wildcard => return true,
+                .product => {
+                    for (self.module.patternChildren(id)) |child| if (!self.irrefutable(child, remaining - 1)) return false;
+                    return true;
+                },
+                else => return false,
+            }
+        }
+        pub fn pattern(self: @This(), id: core.Id) bool {
+            return self.irrefutable(self.module.loopInfo(id).pattern, 16);
+        }
+        pub fn constantType(self: @This(), id: core.Id) ?@import("wasm.zig").Scalar {
+            return switch (self.module.types.node(self.module.typeOf(id)).tag) {
+                .unit => .unit,
+                .u32 => .u32,
+                .f32 => .f32,
+                .boolean => .bool,
+                else => null,
+            };
+        }
+        pub fn scalar(self: @This(), value_: ValueId) ?Value {
+            return self.session.valueScalar(value_);
+        }
+        pub fn lookup(self: @This(), ref: core.BindingRef) ?ragged_count.Value {
+            if (ref.unit == 0 or ref.unit == self.module.unit) {
+                if (self.frame.values.get(ref.binding)) |existing_value| return .{ .borrowed = existing_value };
+            }
+            return .{ .borrowed = self.existing(ref) orelse return null };
+        }
+        pub fn children(self: @This(), value_: ValueId) []const ValueId {
+            return self.session.valueChildren(value_);
+        }
+        pub fn length(self: @This(), value_: ValueId) ?u32 {
+            const info = self.session.valueInfo(value_);
+            if (info.kind != .array and info.kind != .list) return null;
+            return info.len;
+        }
+        pub fn project(self: @This(), id: core.Id, value_: ValueId) ?ragged_count.Value {
+            const session = self.session;
+            const projection = self.module.projection(self.module.node(id).b);
+            const info = session.valueInfo(value_);
+            if (info.kind == .record) {
+                for (session.recordFieldNames(value_), 0..) |name, index| if (name == projection.field) return .{ .borrowed = session.valueChildren(value_)[index] };
+                return null;
+            }
+            var container = value_;
+            var field_: ?u32 = null;
+            const variants = self.module.projectionVariants(self.module.node(id).b);
+            if (info.kind == .nominal) {
+                if (info.len != 1) return null;
+                container = session.valueChildren(value_)[0];
+                for (variants) |variant| if (variant.tag == info.bits) {
+                    field_ = variant.field;
+                    break;
+                };
+            } else if (projection.nominal.decl == 0 and variants.len == 1) field_ = variants[0].field;
+            const field_index = field_ orelse return null;
+            const payload = session.valueInfo(container);
+            if ((payload.kind != .product and payload.kind != .record) or field_index >= payload.len) return null;
+            return .{ .borrowed = session.valueChildren(container)[field_index] };
+        }
+    };
+    fn blockChildren(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
+        const module = &self.units[owner];
+        for (module.children(id)) |child| {
+            const outcome = try self.expression(owner, child, frame);
+            if (outcome != .value) {
+                if (module.node(id).tag == .block and outcome == .returning and outcome.returning.target == id) return .{ .value = outcome.returning.value };
+                return outcome;
+            }
+        }
+        return .{ .value = 0 };
+    }
+    fn raggedBlock(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!?Flow {
+        const module = &self.units[owner];
+        const body = module.children(id);
+        if (body.len < 3 or module.node(body[0]).tag != .bind) return null;
+        const initial = module.node(body[0]).b;
+        if (module.node(initial).tag != .array or module.children(initial).len != 0) return null;
+        var facts: RaggedFacts = .{ .session = self, .owner = owner, .frame = frame, .module = module };
+        const diagnostic = self.diagnostic;
+        const prepared = facts.prepare(id) catch |err| switch (err) {
+            error.Declined => {
+                // Speculative evidence limits cannot diagnose unreached source.
+                self.diagnostic = diagnostic;
+                return null;
+            },
+            else => return err,
+        };
+        if (!prepared) return null;
+        const plan = ragged.analyze(module, id, facts) orelse return null;
+        const available = @min(@as(usize, 4_194_303), self.options.max_children -| self.children.items.len);
+        var probe: ragged_count.Counter(RaggedFacts) = .{ .adapter = facts, .plan = plan, .remaining = self.ragged_probe_limit, .limit = @intCast(available) };
+        const count = probe.run();
+        self.counters.ragged_probe_visits += probe.visits;
+        if (count == null) {
+            self.counters.ragged_probe_declines += 1;
+            return null;
+        }
+        const children_ = try self.allocator.alloc(ValueId, count.?);
+        defer self.allocator.free(children_);
+        var region: RaggedRegion = .{ .owner = owner, .frame = frame, .plan = plan, .children = children_ };
+        self.ragged_reserved_children += count.?;
+        defer if (region.reserved) {
+            self.ragged_reserved_children -= count.?;
+        };
+        self.ragged_region = &region;
+        defer self.ragged_region = null;
+        const outcome = try self.blockChildren(owner, id, frame);
+        if (outcome != .value) return outcome;
+        std.debug.assert(region.written == children_.len);
+        var result = outcome.value;
+        if (region.published == null and count.? != 0) {
+            self.ragged_reserved_children -= count.?;
+            region.reserved = false;
+            result = try self.makeAggregate(owner, id, .list, 0, 0, children_);
+        }
+        self.counters.ragged_staged_regions += 1;
+        self.counters.ragged_selected += count.?;
+        self.counters.ragged_published_children += count.?;
+        return .{ .value = result };
+    }
     fn expressionInner(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
         if (self.principal_reads) |reads| reads.invalidate(.evaluate);
         if (id == 0) return .{ .value = 0 };
@@ -2868,7 +3122,13 @@ pub const Session = struct {
                 }
                 return .{ .value = try self.constant(resolved) };
             },
-            .product, .record, .array => return self.aggregate(owner, id, frame),
+            .product, .record, .array => {
+                const outcome = try self.aggregate(owner, id, frame);
+                if (self.ragged_region) |region| if (region.owner == owner and region.frame == frame and region.plan.storage.initial == id and outcome == .value) {
+                    region.original = outcome.value;
+                };
+                return outcome;
+            },
             .record_merge => return self.recordMerge(owner, id, frame),
             .array_op => return self.arrayOperation(owner, id, frame),
             .closure => {
@@ -3134,14 +3394,10 @@ pub const Session = struct {
                 return .{ .value = 0 };
             },
             .block, .suite => {
-                for (module.children(id)) |child| {
-                    const outcome = try self.expression(owner, child, frame);
-                    if (outcome != .value) {
-                        if (n.tag == .block and outcome == .returning and outcome.returning.target == id) return .{ .value = outcome.returning.value };
-                        return outcome;
-                    }
+                if (n.tag == .block and self.ragged_region == null and self.indexed_region == null and self.ragged_probe_limit != 0) {
+                    if (try self.raggedBlock(owner, id, frame)) |outcome| return outcome;
                 }
-                return .{ .value = 0 };
+                return self.blockChildren(owner, id, frame);
             },
             .bind => {
                 const outcome = try self.expression(owner, n.b, frame);
@@ -3298,6 +3554,22 @@ pub const Session = struct {
             if (outcome != .value) return outcome;
             values[index] = outcome.value;
         }
+        if (self.ragged_region) |region| if (region.owner == owner and region.frame == frame) {
+            if (id == region.plan.storage.append) {
+                std.debug.assert(region.written < region.children.len);
+                region.children[region.written] = values[1];
+                region.written += 1;
+                return .{ .value = region.original };
+            }
+            if (id == region.plan.storage.conversion) {
+                std.debug.assert(region.written == region.children.len);
+                self.ragged_reserved_children -= region.children.len;
+                region.reserved = false;
+                const published = try self.makeAggregate(owner, id, .array, 0, 0, region.children);
+                region.published = published;
+                return .{ .value = published };
+            }
+        };
         return .{ .value = try self.arrayValues(owner, id, operation, values[0..arity], frame.providers) };
     }
     fn extendCollection(self: *Session, owner: usize, source: core.Id, original: ValueId, value_: ValueId, front: bool) Error!ValueId {
