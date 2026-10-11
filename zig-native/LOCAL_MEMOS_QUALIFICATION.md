@@ -127,3 +127,16 @@ retries and terminal failures of persistent demands.
 
 The qualification establishes structured local lowering and the measured hill;
 it does not claim universal cell elimination or universal timing improvements.
+
+## Integrated qualification (12 October 2026)
+
+The final compiler/client gate and source/binary pins are in
+[the persistent-root qualification](PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
+Reference memos reserve a caller-frame owner before entering a callee loop and
+publish their first result into it before readiness. Iteration retirement can
+then remove the original owner while later forces share the cached value.
+Forwarding uses the existing caller link; no extra parent pointer is stored on
+Emitters. The allocation-pressure law proves actual object retirement and exact
+Array contents, then verifies zero roots/leases after reset. The earlier cost
+tables retain their isolated binary pins and are not substituted for final
+integration measurements.

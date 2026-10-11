@@ -90,3 +90,13 @@ Direct source:
 The package exports the manager at `@mewhhaha/blot/bpm` and its API at
 `@mewhhaha/blot/packages`. YAML uses
 [Deno's standard parser](https://jsr.io/@std/yaml).
+
+## Qualification
+
+Local milestone `2798ff9` passes twelve package/CLI laws, standalone public API
+checks and the full compiler gate (844 guest/client laws). Tests use local Git
+repositories and cover lock/update/frozen behavior, clean cache validation,
+transitive exports, manifest errors and explicit/omitted preludes. A warm single
+Git-package cache resolves in a 2.721 ms median over 31 runs (2.095–4.846 ms),
+without network access. Raw package evidence is ignored under
+`build/bench/joint-029-032-037-bpm/`; no package was published.

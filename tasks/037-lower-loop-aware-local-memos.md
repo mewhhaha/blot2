@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete — local implementation `2798ff9`.
 - **Dependencies:** [036](036-summarize-demand-control-flow.md)
 - **Originating requirements:** DEMANDS: Local memo scope, loops and acceptance
   checks. Sources: [Demand evaluation](../zig-native/DEMANDS.md).
@@ -22,11 +22,11 @@ still use runtime cells.
 
 ## Implementation checklist
 
-- [ ] Lower never/once/repeated local uses according to task 036 with explicit
+- [x] Lower never/once/repeated local uses according to task 036 with explicit
       joins, initialization states and result slots.
-- [ ] Create one memo outside a loop for an outside creation and reset for each
+- [x] Create one memo outside a loop for an outside creation and reset for each
       inside creation; preserve alias sharing and first-demand scope.
-- [ ] Handle zero iterations, early exits and cancellation without speculative
+- [x] Handle zero iterations, early exits and cancellation without speculative
       evaluation or partial result publication.
 
 ## Validation
@@ -46,19 +46,32 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Local memo lifetime matches dynamic creation in all branch/loop cases.
-- [ ] Evaluation occurs only at the first executed demand and normal completion
+- [x] Local memo lifetime matches dynamic creation in all branch/loop cases.
+- [x] Evaluation occurs only at the first executed demand and normal completion
       is the only shared-result publication.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `2798ff9` (joint 029/032/037 compiler and bpm milestone).
+- Implementation: Bounded structured local-demand proofs place ready/result
+  state in dynamic creation scope, preserve alias sharing and force-site
+  cleanup, and root managed cached results across loops.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native
+  suite, 844 guest/client laws and all eight unchanged allocation budgets.
+  `deno task lint:zig` checks 339 files with zero findings. Focused execution,
+  OOM, archive/checkpoint, unchanged-Core and failed-edit recovery laws pass.
+- Comparison: seven alternating release pairs over 13 public examples and four
+  synthetic workloads. Old semantic counters match; each compiler's output is
+  stable and fresh/retained/restart parity holds. Ownership helpers
+  intentionally change public Wasm. Peak deltas and teardown live bytes are
+  zero; CPU is mixed. Exact pins, distributions and isolated runtime costs are
+  retained in the
+  [shared qualification](../zig-native/PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
+- Remaining limitations: Captured/returned pending demands, unknown callbacks,
+  providers inside the callee, demand-valued joins/carries and exhausted or
+  recursive proofs retain ordinary cells. Known callback elimination belongs
+  to 038.
+- Durable record:
+  [LOCAL_MEMOS_QUALIFICATION](../zig-native/LOCAL_MEMOS_QUALIFICATION.md).

@@ -59,9 +59,10 @@ cover relocation and portable captures. A portable import/table fixture survives
 destruction of both its producing module and encoded bytes before shifted-index
 reuse. Tests compare retained output instructions after failed candidates.
 
-Root owns the required full compiler/analyzer gate for the combined 029/037
-integration. Completion and its final source/binary pins are recorded after that
-gate; the isolated focused pass is not the full qualification.
+The final 029/032/037 integration passes the mandatory full compiler/analyzer
+gate. Exact source/binary pins, shared measurements and remaining limits are in
+[the integrated qualification](PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
+The isolated measurements below describe their earlier executable pin.
 
 ## Measurement pins and limits
 

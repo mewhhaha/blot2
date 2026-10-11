@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete — local implementation `2798ff9`.
 - **Dependencies:** [018](018-migrate-executable-reuse-queries.md),
   [028](028-make-emission-consume-resolved-bodies.md)
 - **Originating requirements:** PLAN: Earlier semantic compilation / stable
@@ -25,11 +25,11 @@ existing relocation proofs.
 
 ## Implementation checklist
 
-- [ ] Replace positional identities in stored keys with stable symbolic bodies
+- [x] Replace positional identities in stored keys with stable symbolic bodies
       and complete callee/signature/lifetime dependencies.
-- [ ] Relocate direct calls and table/global references on owned output copies
+- [x] Relocate direct calls and table/global references on owned output copies
       during final assembly, validating cycles and consistent mappings.
-- [ ] Decline ambiguous or exhausted relocation proofs and preserve separate
+- [x] Decline ambiguous or exhausted relocation proofs and preserve separate
       public Wasm identities.
 
 ## Validation
@@ -49,20 +49,31 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Incidental function-index changes no longer invalidate otherwise identical
+- [x] Incidental function-index changes no longer invalidate otherwise identical
       optimized bodies.
-- [ ] Final relocation remains exact and rejects changed or ambiguous semantic
+- [x] Final relocation remains exact and rejects changed or ambiguous semantic
       targets.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `2798ff9` (joint 029/032/037 compiler and bpm milestone).
+- Implementation: Normalized body/tier keys, exact bounded graph proofs and
+  owned output relocation remove incidental positions from reuse identity.
+  Portable v3 captures own complete reference, role and lifetime facts.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native
+  suite, 844 guest/client laws and all eight unchanged allocation budgets.
+  `deno task lint:zig` checks 339 files with zero findings. Focused execution,
+  OOM, archive/checkpoint, unchanged-Core and failed-edit recovery laws pass.
+- Comparison: seven alternating release pairs over 13 public examples and four
+  synthetic workloads. Old semantic counters match; each compiler's output is
+  stable and fresh/retained/restart parity holds. Ownership helpers
+  intentionally change public Wasm. Peak deltas and teardown live bytes are
+  zero; CPU is mixed. Exact pins, distributions and isolated runtime costs are
+  retained in the
+  [shared qualification](../zig-native/PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
+- Remaining limitations: Changed semantic targets, conflicting maps, incomplete
+  captures and exhausted proofs decline. Public identities remain separate;
+  physical machine-body sharing is unchanged.
+- Durable record: [SYMBOLIC_BODY_REUSE](../zig-native/SYMBOLIC_BODY_REUSE.md).

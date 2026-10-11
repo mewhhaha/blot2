@@ -606,16 +606,16 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [026] — Resolve structured control flow                 | Complete    | —                                      |
 | [027] — Represent ownership in resolved ir              | Complete    | —                                      |
 | [028] — Make emission consume resolved bodies           | Complete    | [027]                                  |
-| [029] — Remove function indices from reuse keys         | Ready       | [018], [028]                           |
+| [029] — Remove function indices from reuse keys         | Complete    | [018], [028]                           |
 | [030] — Specify shared and cyclic ownership             | Complete    | [027]                                  |
 | [031] — Implement shared reference counting             | Complete    | [030]                                  |
-| [032] — Own escaping values and persistent roots        | In progress | [031]                                  |
-| [033] — Own suspended effects and cancellation          | Pending     | [032]                                  |
+| [032] — Own escaping values and persistent roots        | Complete    | [031]                                  |
+| [033] — Own suspended effects and cancellation          | Ready       | [032]                                  |
 | [034] — Reclaim cyclic ownership                        | Pending     | [033]                                  |
 | [035] — Remove the tracing runtime                      | Pending     | [034]                                  |
 | [036] — Summarize demand control flow                   | Complete    | [007], [014]                           |
-| [037] — Lower loop aware local memos                    | Ready       | [036]                                  |
-| [038] — Eliminate demands through known callbacks       | Pending     | [037], [032]                           |
+| [037] — Lower loop aware local memos                    | Complete    | [036]                                  |
+| [038] — Eliminate demands through known callbacks       | Ready       | [037], [032]                           |
 | [039] — Guarantee and explain demand lowering           | Pending     | [038], [033]                           |
 | [040] — Fuse packed row producers and consumers         | Pending     | [002], [027]                           |
 | [041] — Broaden numeric simd                            | Pending     | [040]                                  |

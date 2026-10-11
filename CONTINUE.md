@@ -9,10 +9,10 @@ below, then take ready tasks in the order given under "Next work". Use Zig
 commit (task file, README index, durable record under `zig-native/`). Nothing is
 pushed; keep it that way unless the owner authorizes it.
 
-## State on 11 October 2026
+## Qualified state
 
-Latest compiler implementation on local `main`: `2226d50`. Qualified today, each
-with a durable record:
+Latest compiler implementation on local `main`: `2798ff9`. Qualified milestones,
+each with a durable record:
 
 | Task                                           | Implementation       | Record                                                       |
 | ---------------------------------------------- | -------------------- | ------------------------------------------------------------ |
@@ -38,7 +38,7 @@ Tasks added today: 094 (locate specialization failures at the caller's use), 095
 forwarding does not type-check; one law skipped), 099 (compiler crash on long
 stage chains).
 
-## Current work
+## Current work (12 October 2026)
 
 The owner explicitly requested continuing until the entire task program is done.
 The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
@@ -88,17 +88,47 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
    identity, public semantic/ABI/private executable views and wrapper-erasure
    laws are settled. 052 is ready; no new visibility behavior is implemented.
 
+8. **029/032/037 and bpm are complete at `2798ff9`.** The corrected staged tree
+   `6064c8e2d114bfb39ab3c78d5c0b295f51f1be15` passes the full native gate, 844
+   guest/client laws, all eight unchanged allocation budgets and zero analyzer
+   findings across 339 files. Release SHA-256 starts `b8023659`. Seven
+   alternating public/synthetic pairs preserve semantic counters and
+   fresh/retained/restart parity; public CPU ratios are 0.990–1.011 and peak
+   deltas are zero. Ownership helpers intentionally change public Wasm. The
+   failed `9142c5f0…` candidate remains separate. Durable final evidence is in
+   PERSISTENT_ROOTS, SYMBOLIC_BODY_REUSE and LOCAL_MEMOS_QUALIFICATION.
+9. **052 is prepared for integration, not complete.** Its compiler patch and
+   fast-release pins are under `build/bench/module-abstraction/`; 37 focused
+   native/OOM and 31 executed-Wasm laws pass. Joint ownership integration is in
+   `/var/tmp/blot2-joint-opaque-052`: 32 ownership/language laws and the
+   regenerated host/editor tooling checks pass. Tooling inputs are under
+   `build/bench/module-abstraction/tooling/`. The reviewed 054 contract draft
+   remains under `build/bench/associated-contract/`; no 055 implementation has
+   begun.
+
+## bpm tangent
+
+The owner requested Git packages, caching, `blot.json`, package exports in
+`blot-workspace.yaml`, and an optional prelude. Their explicit choice is:
+**omitted prelude means no prelude**. The committed manager supports local/Git
+dependencies, transitive exports, exact lock pins, frozen installs, updates and
+clean-cache validation. Twelve focused package/CLI laws, standalone API checks
+and the full compiler gate pass. No package is published. See
+[packages](compiler/packages.md).
+
 ## Next work
 
-Continue 032, 029, 037 and the remaining ready tasks. Root's 029 delta is in
-`/var/tmp/blot2-symbolic-body-reuse`, over the frozen 043/050 source, with
-focused native/OOM/archive laws passing; its release build, measurements and
-full joint qualification remain unfinished. 037 is in
-`/var/tmp/blot2-ragged-builders` and 002's fused-directory candidate in
-`/var/tmp/blot2-traversal-aligned-limit`. Neither is complete. 028's read-only
-architecture map is `build/bench/resolved-bodies/design.md`. Still open: 024 and
-093; 002's current traversal gates; 086's value-template boundary. The full
-inventory is in ignored `build/bench/program/remaining.md`.
+Integrate 052 and its regenerated tooling for the next shared gate. 033's
+preserved work is in `/var/tmp/blot2-suspended-033`; corrected release costs
+show material host-call overhead, so its owner is subtracting proven scalar stub
+frame work before final qualification. 002's active tree is
+`/var/tmp/blot2-traversal-002-joint`; all-width/lifecycle release gates remain
+open, and failed candidates stay pinned. Root's bounded lexical callback work
+for 038 is in `/var/tmp/blot2-known-callback-memos-038`: native/OOM and eight
+executed laws cover polymorphism, snapshots, strong retirement, fallback cells,
+imports, stable-type edits and checkpoint/failure recovery. Final qualification
+and measurements remain. 024 is moving to an owned per-body frontend result
+boundary; 093 and 086's value-template boundary remain open. Nothing is pushed.
 
 ## Waiting on the owner
 

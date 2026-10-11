@@ -41,12 +41,12 @@ A local lifetime summary transfers a single allocation only when its result has
 no owning fields or embedded aliases. Loading a closure environment borrows the
 child; freeing its descriptor before the indirect call would destroy that child.
 Returned owning graphs instead remain in counted frame slots until consumption
-and frame retirement. This restriction does not select tracing fallback.
-A checked owning field whose child lacks local allocation provenance also keeps
-its parent alive through consumption. Scalar replacement retains aggregates
-with owning fields until it can publish equivalent counted roots for their
-children. Scalar-only snapshots still use scalar replacement, including
-pointer-looking integers.
+and frame retirement. This restriction does not select tracing fallback. A
+checked owning field whose child lacks local allocation provenance also keeps
+its parent alive through consumption. Scalar replacement retains aggregates with
+owning fields until it can publish equivalent counted roots for their children.
+Scalar-only snapshots still use scalar replacement, including pointer-looking
+integers.
 
 Scope directives name locals even though they have no machine stack effect.
 Inlining relocates those IDs, including packed slot/value pairs. Scalar
@@ -240,4 +240,69 @@ iterations with small recycled Arrays and large allocation pressure. It checks
 mode 2 admission, exact contents, at least two retired objects per iteration,
 zero roots/leases after raw reset, and independent guest calls. This additional
 owner publication belongs to the joint integration, not the measured isolated
-executable pin above. The combined full gate and release costs remain required.
+executable pin above. The combined full gate and release comparison are recorded
+below.
+
+## Integrated qualification (12 October 2026)
+
+Local implementation `2798ff9` combines 029, 032 and 037 with the bpm client.
+The frozen incoming revision is `1ad8f15f0cfaba16ec06482fd03f7f8f4f53525f`; its
+qualified staged tree is `6064c8e2d114bfb39ab3c78d5c0b295f51f1be15`. The Fast /
+LLVM release uses Zig 0.17.0 and `deno task build:compiler`. Its executable
+SHA-256 is `b802365944a69db01df83442db960a8fd7b717828f7cbb1ac5aba2b661d80d17`
+(40,334,040 bytes); compiler identity is
+`235678a0c5e11747e6562a85e6da53d8627b791d7a267e6534f716d41e2b31a1`.
+
+`deno task test:compiler` passes the complete Safe / LLVM native suite and 844
+executed-Wasm/client laws, including all eight unchanged compile-allocation
+budgets. The pinned analyzer checks 339 Zig files with zero findings. Focused
+integration adds 41 symbolic/memo/root native laws, 19 ownership/OOM laws and 17
+executed persistent-root/local-memo laws. Deno checking, formatting,
+standalone-host compilation and `deno publish --dry-run --allow-dirty` pass;
+nothing is published or pushed.
+
+Carry owners now belong to the existing active loop targets. Their slices own
+only reference-carry entries; scalar emitters carry no root-map allocation. The
+first integration attempts exceeded the fanout allocation budget through
+metadata added to every Emitter. Removing that redundant storage restores the
+unchanged budget. The failed/interrupted candidates remain distinct from the
+qualified executable above. The first budget-passing integration still failed
+one native and twenty guest laws; it is not qualification evidence. The final
+corrections derive arena-helper admission from the runtime fields, decline
+single-allocation lifetime summaries for returned owning graphs, relocate
+scope-local directives with inlined locals, preserve owning SROA fields and
+unknown-child parent provenance, and retain borrowed AVL pivots until their new
+parent edge publishes. Existing failed laws are unchanged. Ninety-six affected
+executed laws pass, including new repeated curried/State/rotation retirement
+checks. These fixes add neither a blanket tracing fallback nor a budget change.
+
+Seven alternating CPU-7 release pairs over 13 public examples produce 182 rows.
+Diagnostics, constant work, code instances, callable wrappers and the previous
+prepared/role counters match. Each compiler emits stable bytes across repeats;
+032 intentionally adds ownership helpers, so cross-compiler Wasm differs in 12
+examples. Scalar Wasm is identical. Requested allocation changes by −18,717 to
+201,912 bytes; peak deltas are zero and teardown live bytes are zero. CPU median
+ratios span 0.990–1.011 at load 1.17; no general speedup is claimed.
+
+Seven alternating pairs over four synthetic workloads include fresh processes,
+cache restart, population, first/later edits and no-op. Cross-compiler bytes and
+each compiler's fresh/retained/restart bytes are identical, with no unexpected
+problems. Fresh CPU medians match; restart ratios span 1.000–1.050. The retained
+process clock has 10 ms resolution, so many small phases cannot establish a
+timing change. These combined measurements do not attribute a cost to one
+isolated task.
+
+Raw pins, harnesses, distributions, failed attempts and gate logs are retained
+in ignored `build/bench/joint-029-032-037-bpm/`. Public reproduction uses its
+`compare_public.py`; synthetic reproduction uses
+`deno task bench:compile
+--workload synthetic --runs 7 --restart-cache --allow-wasm-diff`.
+Baseline is `build/bench/symbolic-body-reuse/blotc-baseline` (SHA-256
+`272f028932b0cc563049fe7e5f6f51139304f0ae4cf7213351fd55f5f5f7a127`); qualified
+candidate is `corrected/blotc-candidate` in the joint evidence directory. The
+corrected public and synthetic samples are under `corrected/`.
+
+The isolated runtime measurements above remain tied to their original pins. In
+particular, the +46.7% short reference-Array batch cost is material. Host and
+JSPI roots (033), cycles (034), tracing removal and its final CPU/memory gates
+(035) remain open. Completing 032 does not qualify those later tasks.

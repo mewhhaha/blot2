@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — isolated implementation; no completion is claimed.
+- **Status:** Complete — local implementation `2798ff9`.
 - **Dependencies:** [031](031-implement-shared-reference-counting.md)
 - **Originating requirements:** PLAN: Earlier programs / escaping ownership;
   DEMANDS: Effects and lifetime. Sources: [PLAN.md](../PLAN.md),
@@ -24,11 +24,11 @@ escaping cases.
 
 ## Implementation checklist
 
-- [ ] Transfer or retain roots across returned values, captured environments,
+- [x] Transfer or retain roots across returned values, captured environments,
       persistent aggregates and module initialization.
-- [ ] Keep demand captures and completed results alive until their last owner
+- [x] Keep demand captures and completed results alive until their last owner
       releases them, preserving once-per-creation sharing.
-- [ ] Define entry/exit and arena-reset ownership using task 030 without
+- [x] Define entry/exit and arena-reset ownership using task 030 without
       expanding the public guest ABI implicitly.
 
 ## Validation
@@ -48,20 +48,33 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] All supported escape and persistent-root boundaries have explicit
+- [x] All supported escape and persistent-root boundaries have explicit
       ownership operations.
-- [ ] Surviving values remain valid across calls and resets, with no premature
+- [x] Surviving values remain valid across calls and resets, with no premature
       release or unbounded discarded roots.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `2798ff9` (joint 029/032/037 compiler and bpm milestone).
+- Implementation: Explicit ABI-3 invocation boundaries, module owner tables,
+  typed frame/result/carry owners and iteration retirement own supported
+  synchronous escaping values. Managed local memos keep a caller-frame owner
+  across callee iterations.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native
+  suite, 844 guest/client laws and all eight unchanged allocation budgets.
+  `deno task lint:zig` checks 339 files with zero findings. Focused execution,
+  OOM, archive/checkpoint, unchanged-Core and failed-edit recovery laws pass.
+- Comparison: seven alternating release pairs over 13 public examples and four
+  synthetic workloads. Old semantic counters match; each compiler's output is
+  stable and fresh/retained/restart parity holds. Ownership helpers
+  intentionally change public Wasm. Peak deltas and teardown live bytes are
+  zero; CPU is mixed. Exact pins, distributions and isolated runtime costs are
+  retained in the
+  [shared qualification](../zig-native/PERSISTENT_ROOTS.md#integrated-qualification-12-october-2026).
+- Remaining limitations: Whole-module admission preserves complete tracing for
+  unknown/host/import shapes. Host/JSPI ownership, cycles and tracing removal
+  belong to 033–035. The isolated reference-Array batch costs +46.7%; memory
+  retirement does not return Wasm pages to the OS.
+- Durable record: [PERSISTENT_ROOTS](../zig-native/PERSISTENT_ROOTS.md).
