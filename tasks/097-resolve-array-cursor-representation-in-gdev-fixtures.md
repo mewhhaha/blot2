@@ -2,8 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — representation fix qualified; full reported-fixture
-  compilation remains open.
+- **Status:** Complete.
 - **Dependencies:** None.
 - **Originating requirements:** reported on 11 October 2026 by the gdev session:
   16 gdev tests fail to compile. Sources: that session's report.
@@ -63,32 +62,34 @@ before the local milestone commit.
 
 ## Acceptance criteria
 
-- [ ] The reported fixtures compile, with a public regression law.
+- [x] The reported fixtures compile, with a public regression law.
 - [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Implementation: `f2b41b4`. Named/closure queries copy partial physical shapes;
-  compatible holes and unknown rows reconcile without defaulting language types.
-- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
-  and 651 guest/client tests.
-  `ZIG_ANALYZER=build/tools/zig-analyzer/zig-out/bin/zig-analyzer deno task lint:zig`
-  reports zero findings across 315 files. Allocation-failure coverage is
-  included.
-- gdev: 472 passing checks/traps/expected rejections across 54 regular modules;
-  duplicate blocked app/sandbox fixtures pass all ten checks. The split-hauling
-  module now reports `inference_budget` after [099] (`5340ef2`) and remains
-  uncompiled. These results do not claim all originally reported fixtures
-  compile.
+- Implementations: `f2b41b4` preserves partial physical shapes without
+  defaulting language types; `881c6ab` parks pending selections until their
+  unknown receiver changes, removing retries that exhausted inference on the
+  remaining fixture.
+- Validation: Zig 0.17.0; full native suite and 690 guest/client tests pass.
+  Analyzer: zero findings across 318 files, including three unregistered asset
+  files under development. Native step-bound and executed-Wasm
+  rejection/recovery laws qualify the public reduction.
+- gdev: all 472 cases across 54 current regular modules pass; the remaining
+  blocked split-hauling module compiles and passes 12 exports/25 assertions.
+  Formerly blocked app/sandbox cases are in the regular suite. This qualifies
+  the current checkout, whose fixture layout changed after the original report.
 - Comparison: all 13 public examples, four synthetic workloads and frozen gdev
-  preserve Wasm bytes. Three paired gdev runs show no established CPU
-  improvement.
-- Remaining limitation: complete the outstanding fixture compilation
-  qualification; retain this task's open acceptance criterion until that
-  evidence exists.
-- Durable record:
-  [partial collection layouts](../zig-native/PARTIAL_COLLECTIONS.md), including
-  binary pins and paired samples.
+  preserve Wasm bytes. Public 51-stage inference steps fall 974,824 → 269,363;
+  obligations/type nodes remain unchanged. Three paired gdev samples establish
+  no general CPU improvement.
+- Remaining limitations: generic-chain type/obligation growth remains quadratic;
+  101 stages still reject under the unchanged one-million-step inference budget.
+  Requested/peak allocation rises slightly from queue watches.
+- Durable records:
+  [partial collection layouts](../zig-native/PARTIAL_COLLECTIONS.md) and
+  [pending selections](../zig-native/PENDING_SELECTIONS.md), with executable
+  pins and paired samples.
 
 [099]: 099-survive-long-stage-chains-without-crashing.md

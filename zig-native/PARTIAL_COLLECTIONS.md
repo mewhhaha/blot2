@@ -54,3 +54,13 @@ still exited with signal 11, before emission. Task 099's `5340ef2` fixes export
 handling of empty catalogs after inference budget exhaustion. The fixture now
 reports `inference_budget` and remains uncompiled; task 097 retains that open
 compilation qualification.
+
+## Completed fixture gate
+
+The remaining fixture gate is completed by `881c6ab`. Pending selections sleep
+on unknown receivers instead of retrying while unrelated stages settle. The
+current regular suite passes 472 cases across 54 modules, and the remaining
+blocked module compiles and passes all 12 exports/25 assertions.
+[PENDING_SELECTIONS.md](PENDING_SELECTIONS.md) records the public step-bound
+law, byte/diagnostic identity, complete compiler qualification and remaining
+quadratic type growth. No semantic default or budget increase was added.

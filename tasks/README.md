@@ -650,7 +650,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [094] — Locate specialization failures at their use     | Ready       | [048]                                  |
 | [095] — Specify and version the project protocol        | Complete    | None                                   |
 | [096] — Compile typed asset imports natively            | Ready       | [095]                                  |
-| [097] — Resolve array cursor representation in gdev     | In progress | None                                   |
+| [097] — Resolve array cursor representation in gdev     | Complete    | None                                   |
 | [098] — Type-check recursive demand forwarding          | Ready       | None                                   |
 | [099] — Survive long stage chains without crashing      | Complete    | None                                   |
 | [999] — Remove tasks and plan                           | Pending     | All [001]–[099], plus every added task |

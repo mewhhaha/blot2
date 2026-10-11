@@ -58,3 +58,12 @@ This fixes crash handling. Large unresolved callback chains can still exceed
 inference's existing work budget. Their cost and general summary admission are
 separate compiler work; no compile-time speedup is claimed. Task 097 remains
 open until its outstanding reported-fixture compilation is qualified.
+
+## Scheduling follow-up
+
+Task 097's `881c6ab` removes unsuccessful selection retries. The same public
+51-stage control now takes 269,363 steps; 100 stages compile and 101 still
+reject without crashing. The executable budget regression now uses that
+boundary. The blocked fixture compiles and executes successfully; task 097's
+fixture gate is complete. See [PENDING_SELECTIONS.md](PENDING_SELECTIONS.md).
+The earlier measurements above remain the historical qualification of `5340ef2`.
