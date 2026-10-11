@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier semantic compilation / complete
   backend separation. Sources: [PLAN.md](../PLAN.md).

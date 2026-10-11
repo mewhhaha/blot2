@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete at `c226967`.
 - **Dependencies:** [026](026-resolve-structured-control-flow.md)
 - **Originating requirements:** PLAN: Earlier semantic compilation / resolved
   ownership. Sources: [PLAN.md](../PLAN.md).
@@ -24,11 +24,11 @@ words; task 026 provides explicit edges.
 
 ## Implementation checklist
 
-- [ ] Attach typed allocation and field roles from checked layouts, including
+- [x] Attach typed allocation and field roles from checked layouts, including
       shared/owned pointers, scalar payloads and allocation bases.
-- [ ] Represent transfers, borrows, escapes and cleanup on each
+- [x] Represent transfers, borrows, escapes and cleanup on each
       normal/exceptional edge, retaining conservative unknown cases.
-- [ ] Preserve aliases, persistent collection snapshots, cyclic groups and
+- [x] Preserve aliases, persistent collection snapshots, cyclic groups and
       suspended payload lifetimes.
 
 ## Validation
@@ -48,20 +48,47 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Ownership roles come from checked layouts and explicit operations, never
+- [x] Ownership roles come from checked layouts and explicit operations, never
       raw machine-word types.
-- [ ] Every admitted transfer/cleanup has a valid edge and alias proof; unknown
+- [x] Every admitted transfer/cleanup has a valid edge and alias proof; unknown
       ownership remains conservative.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `c226967` ("Carry ownership roles from checked layouts into runtime
+  IR").
+- Change: [runtime_ir.zig](../zig-native/src/runtime_ir.zig) adds roles (scalar,
+  reference, value, unknown), per-function parameter roles and an `ownership`
+  annotation op whose runs give each constant-size allocation's word roles. The
+  emitter derives both from checked layouts and the runtime structures' role
+  tables; the journal records parameter roles and both replays restore them. The
+  encoder drops annotations, and size heuristics and machine-code sharing ignore
+  them. The lifetime pass treats only non-scalar `i32` parameters as candidate
+  addresses, lets a scalar word never carry a followed reference, and counts
+  contrary stores as `role_conflicts`.
+- Edges: releases stay on the control-flow edges the lifetime plan chooses,
+  transfers are owned-result summaries, borrows are parameter extents, unproved
+  values escape to arena policy, and structured exits discharge scoped cleanup
+  (task 026); unknown roles stay conservative.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
+  and 647 guest/client tests; `deno task lint:zig` reports zero findings. Native
+  laws cover annotation runs and their boundaries, scalar words and scalar
+  parameters in the lifetime pass, encoding and journal replay; a process law
+  covers template captures, constructor cells, records, arrays and request loops
+  through edits with zero conflicts, and fails when the capture environment rule
+  is reverted. Seventeen source files whose inline tests were never registered,
+  including the lifetime pass's own ownership laws, now run in the native suite;
+  one stale demand law is skipped pending task
+  [098](098-type-check-recursive-demand-forwarding.md).
+- Comparison: every public example, the synthetic corpus in every phase and gdev
+  emit byte-identical Wasm (gdev SHA-256 `3158216b…def0`, 840,534 bytes) with
+  zero role conflicts; gdev annotates 4,318 allocations and gives 1,873
+  functions parameter roles. The conflict counter first exposed captured
+  templates stored under a unit placeholder role, which changed gdev by 52 bytes
+  until the capture rule was fixed.
+- Remaining limitations: roles do not drive reference counting yet (tasks
+  030–035); `value` words still need their checked type at each use; runtime
+  helpers' functions and allocations carry no roles.
+- Durable record: [ownership roles](../zig-native/OWNERSHIP_ROLES.md).

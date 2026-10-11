@@ -96,7 +96,10 @@
   [092](092-format-current-syntax.md), [093](093-close-the-gdev-edit-gap.md),
   [094](094-locate-specialization-failures-at-their-use.md),
   [095](095-specify-and-version-the-project-protocol.md),
-  [096](096-compile-typed-asset-imports-natively.md)
+  [096](096-compile-typed-asset-imports-natively.md),
+  [097](097-resolve-array-cursor-representation-in-gdev-fixtures.md),
+  [098](098-type-check-recursive-demand-forwarding.md),
+  [099](099-survive-long-stage-chains-without-crashing.md)
 - **Originating requirements:** Approved task manifest / final conditional
   cleanup. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the

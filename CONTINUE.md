@@ -209,6 +209,16 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   loops and request-loop edges are planned before their instructions, with
   byte-identical output; 027 is ready. See
   [the record](zig-native/RESOLVED_FLOW.md).
+- Task 027 (ownership roles) is complete at `c226967`: parameter roles and
+  allocation word-role annotations from checked layouts reach the lifetime pass,
+  with byte-identical output and zero role conflicts; 17 test files that were
+  never registered now run. See [the record](zig-native/OWNERSHIP_ROLES.md).
+- The owner's pen migration (relayed by the gdev session, gdev
+  `PEN_MIGRATION.md`) added tasks 095 (versioned project protocol) and 096
+  (native typed asset imports). The gdev session reported a fixture failure at
+  `Array.iter` that reproduces back to `f7be6e7`; it is reducing a repro, filed
+  as task 097. gdev links `../blot2` and runs `generated/compiler/blotc.gz`,
+  which every `deno task test:compiler` repacks from the working tree build.
 - A separate session (bun-desktop, since renamed pen: checkout `~/src/pen`,
   command `pen`; gdev's build is unchanged) offered an unapplied wasm
   name-section patch at `/var/tmp/blot2-names.patch` (14 files, always on, +5%
@@ -253,10 +263,10 @@ fold gate remains open.
 Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
 the remaining work is per-body frontend rechecking and stable Core IDs, which
 needs its own design before implementation. Ready tasks in numeric order are
-[027](tasks/027-represent-ownership-in-resolved-ir.md), 036, 049,
+[028](tasks/028-make-emission-consume-resolved-bodies.md), 036, 049,
 [086](tasks/086-retain-constant-evaluation-across-revisions.md) and
-[094](tasks/094-locate-specialization-failures-at-their-use.md); 086 needs a
-fresh gdev profile and then a design decision (see above).
+[094](tasks/094-locate-specialization-failures-at-their-use.md), 095 and 097;
+086 needs a fresh gdev profile and then a design decision (see above).
 [093](tasks/093-close-the-gdev-edit-gap.md) is in progress with the remaining
 measured gdev edit gap. The retained probe
 `zig-native/qualification/revision_deltas_probe.zig` and its driver measure
