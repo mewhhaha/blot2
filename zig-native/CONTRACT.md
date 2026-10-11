@@ -306,6 +306,10 @@ tracing can be removed.
 roots, suspension, iterative destruction, cycle reclamation and the measured
 transition gates for replacing this tracing path.
 
+[Ragged builders](RAGGED_BUILDERS.md) specifies bounded count/fill admission,
+direct final storage, ownership and ordinary fallback for dependent or filtered
+collection construction.
+
 Ownership roles come from checked layouts, never from machine types. The emitter
 records each created function's parameter roles and precedes each constant-size
 allocation with an `ownership` annotation run giving its word roles
