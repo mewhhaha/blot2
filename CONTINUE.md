@@ -197,6 +197,9 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
 - Task 090 (pending checks) is complete at `7589df2`: effect operations and open
   uses of settled callees sleep on their types in the shared solver worklist; a
   300-closure record checks in 1.67 s (was 3.67 s).
+- Task 025 (resolved calls) is complete at `29aaa98`: every source call is
+  prepared before its instructions (keys, wrappers, closure arrows) with
+  byte-identical output; 026 is ready.
 - A separate session (bun-desktop) offered an unapplied wasm name-section patch
   at `/var/tmp/blot2-names.patch` (14 files, always on, +5% Wasm, gate green on
   `a488ba2`); applying it is the owner's decision.
@@ -240,7 +243,7 @@ fold gate remains open.
 Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
 the remaining work is per-body frontend rechecking and stable Core IDs, which
 needs its own design before implementation. Ready tasks in numeric order are
-[025](tasks/025-resolve-calls-before-emission.md), 036, 048,
+[026](tasks/026-resolve-structured-control-flow.md), 036, 048,
 [086](tasks/086-retain-constant-evaluation-across-revisions.md); 086 needs a
 fresh gdev profile and then a design decision (see above).
 [093](tasks/093-close-the-gdev-edit-gap.md) is in progress with the remaining

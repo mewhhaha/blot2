@@ -298,6 +298,13 @@ callees wait for their types. A 300-closure record checks in 1.67 s instead of
 3.67 s, and late operator uses take about 13 steps each instead of 165. See
 [frontend pending checks](../zig-native/INDEXED_SOLVER.md#frontend-pending-checks-11-october-2026).
 
+Task [025] prepares every source call before its instructions at `29aaa98`:
+plans carry specialization keys, callable wrappers and the semantic arrows of
+applied closures, and indirect signatures come from the callee's type. Output is
+byte-identical on the examples, the synthetic corpus and gdev. Task [026] is
+ready; [036] and [048] were already ready. See
+[resolved calls](../zig-native/RESOLVED_CALLS.md).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -539,8 +546,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [022] — Retain constants and relocatable data           | Complete    | [020], [021]                           |
 | [023] — Narrow literal edit invalidation                | Complete    | [022]                                  |
 | [024] — Apply general body interface cutoff             | In progress | [023]                                  |
-| [025] — Resolve calls before emission                   | Ready       | [008], [020]                           |
-| [026] — Resolve structured control flow                 | Pending     | [025]                                  |
+| [025] — Resolve calls before emission                   | Complete    | —                                      |
+| [026] — Resolve structured control flow                 | Ready       | [025]                                  |
 | [027] — Represent ownership in resolved ir              | Pending     | [026]                                  |
 | [028] — Make emission consume resolved bodies           | Pending     | [027]                                  |
 | [029] — Remove function indices from reuse keys         | Pending     | [018], [028]                           |
@@ -550,7 +557,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [033] — Own suspended effects and cancellation          | Pending     | [032]                                  |
 | [034] — Reclaim cyclic ownership                        | Pending     | [033]                                  |
 | [035] — Remove the tracing runtime                      | Pending     | [034]                                  |
-| [036] — Summarize demand control flow                   | Pending     | [007], [014]                           |
+| [036] — Summarize demand control flow                   | Ready       | [007], [014]                           |
 | [037] — Lower loop aware local memos                    | Pending     | [036]                                  |
 | [038] — Eliminate demands through known callbacks       | Pending     | [037], [032]                           |
 | [039] — Guarantee and explain demand lowering           | Pending     | [038], [033]                           |
@@ -562,7 +569,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [045] — Implement rolling reductions                    | Pending     | [044]                                  |
 | [046] — Implement composable summary trees              | Pending     | [045]                                  |
 | [047] — Eliminate generic iterator state                | Pending     | [040], [027]                           |
-| [048] — Explain dispatch and evidence                   | Pending     | [004], [005]                           |
+| [048] — Explain dispatch and evidence                   | Ready       | [004], [005]                           |
 | [049] — Specify editor completion                       | Pending     | [048]                                  |
 | [050] — Implement editor completion                     | Pending     | [049]                                  |
 | [051] — Specify module abstraction                      | Pending     | [020]                                  |

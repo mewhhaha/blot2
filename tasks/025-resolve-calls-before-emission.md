@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete at `29aaa98`.
 - **Dependencies:** [008](008-canonicalize-specialization-keys.md),
   [020](020-persist-complete-semantic-artifacts.md)
 - **Originating requirements:** PLAN: Earlier semantic compilation / resolved
@@ -26,12 +26,12 @@ call/layout knowledge.
 
 ## Implementation checklist
 
-- [ ] Add a resolved call representation with target/body identity, direct or
+- [x] Add a resolved call representation with target/body identity, direct or
       indirect signature, complete evidence, captures, effects and source
       origins.
-- [ ] Resolve semantic obligations during preparation with explicit owned
+- [x] Resolve semantic obligations during preparation with explicit owned
       results, retaining conservative staged/open-row handling.
-- [ ] Give unresolved calls authoritative diagnostics before emission and
+- [x] Give unresolved calls authoritative diagnostics before emission and
       preserve evaluation order and argument witness sites.
 
 ## Validation
@@ -51,20 +51,35 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Prepared calls contain everything emission needs for call selection and
+- [x] Prepared calls contain everything emission needs for call selection and
       signature checking.
-- [ ] No call semantics are guessed from machine types or selected anew by
+- [x] No call semantics are guessed from machine types or selected anew by
       instruction emission.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commits: `b0c9168` ("Prepare named, operator, resolver and closure calls
+  before emission") and `29aaa98` ("Prepare static closure applications and
+  count prepared calls").
+- Change: [resolved_call.zig](../zig-native/src/resolved_call.zig) plans carry
+  each call's specialization key or callable wrapper, consumed arguments and the
+  semantic arrows of closures applied afterwards; static closure plans carry
+  closure identity, captured values and specialized mappings. Every source call
+  is prepared before its first instruction, and indirect signatures come from
+  the callee's arrow. Function creation stays where emission reaches it.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
+  and 641 guest/client tests; `deno task lint:zig` reports zero findings across
+  311 files; a process law executes each call shape and checks prepared-call
+  counters. The existing allocation-failure sweeps of backend emission
+  (`request_backend_tests.zig`, `core_operation_evidence_tests.zig`) run
+  preparation wherever their programs reach it; no sweep was added for plans.
+- Comparison: every public example, the synthetic corpus in every phase and gdev
+  emit byte-identical Wasm before and after; no performance change was intended
+  or measured.
+- Remaining limitations: plans are transient per call (stored resolved bodies
+  are tasks 026–028); named over-application is prepared but unreachable from
+  current lowering; partial and recovered known calls are prepared only for
+  inlining.
+- Durable record: [resolved calls](../zig-native/RESOLVED_CALLS.md).

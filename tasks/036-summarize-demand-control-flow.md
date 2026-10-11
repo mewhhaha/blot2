@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [007](007-infer-recursive-components-jointly.md),
   [014](014-specify-unified-query-table.md)
 - **Originating requirements:** DEMANDS: Compiler plan and retained

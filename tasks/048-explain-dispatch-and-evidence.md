@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [004](004-summarize-predicate-bearing-callees.md),
   [005](005-summarize-higher-order-callees.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 1 / explainable

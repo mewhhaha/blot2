@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [025](025-resolve-calls-before-emission.md)
 - **Originating requirements:** PLAN: Earlier semantic compilation / resolved
   control flow. Sources: [PLAN.md](../PLAN.md).
