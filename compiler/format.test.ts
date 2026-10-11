@@ -92,3 +92,68 @@ const value=f {y:2.0,x:40}
   equal(formatted.includes("@record.merge left right"), true);
   equal(formatted.includes("combine point { x: y }"), true);
 });
+
+Deno.test("formatter accepts nominal record patterns and spaces named operators", async () => {
+  const source = `type Vec2 is data = #Vec2 { x: F32, y: F32 }
+const plus=fn left=>fn right=>left+right
+const length=fn value=>do:
+    let #Vec2 {x,y:height}=value
+    return x+height
+const first=fn value=>case value of
+    #Some (#Vec2 {x}) => x
+    _ => 0.0
+const sum=fn ()=>20 \`plus\` 22
+`;
+  const formatted = await formatSource(source);
+  equal(await formatSource(formatted), formatted);
+  equal(formatted.includes("let #Vec2 { x, y: height } = value"), true);
+  equal(formatted.includes("#Some (#Vec2 { x }) => x"), true);
+  equal(formatted.includes("20 `plus` 22"), true);
+});
+
+// Every public example and std module formats idempotently, and the formatted
+// sources compile to the same Wasm as the originals.
+Deno.test("formatter keeps public examples and std modules compiling to identical Wasm", async () => {
+  const executable = Deno.args[0];
+  const repo = new URL("../", import.meta.url).pathname;
+  const formatted: Record<string, string> = {};
+  const examples: string[] = [];
+  for (const directory of ["examples", "std"]) {
+    for await (const entry of Deno.readDir(`${repo}${directory}`)) {
+      if (!entry.isFile || !entry.name.endsWith(".blot")) continue;
+      const path = `${repo}${directory}/${entry.name}`;
+      const once = await formatSource(await Deno.readTextFile(path));
+      equal(await formatSource(once), once, path);
+      formatted[path] = once;
+      if (directory === "examples") examples.push(path);
+    }
+  }
+  if (!executable) return;
+  const { createZigProjectCompiler } = await import(
+    "./zig_project_client.ts"
+  );
+  const prelude = `${repo}std/prelude.blot`;
+  const stdRoot = `${repo}std`;
+  for (const entry of examples.sort()) {
+    const options = {
+      executable,
+      entry,
+      prelude,
+      stdRoot,
+      cacheDirectory: false as const,
+    };
+    const original = await createZigProjectCompiler(options);
+    const rewritten = await createZigProjectCompiler(options);
+    try {
+      const expected = await original.build();
+      const actual = await rewritten.build({ sources: formatted });
+      equal(actual.success, expected.success, entry);
+      if (actual.success && expected.success) {
+        equal(actual.bytes, expected.bytes, entry);
+      }
+    } finally {
+      await original.dispose();
+      await rewritten.dispose();
+    }
+  }
+});

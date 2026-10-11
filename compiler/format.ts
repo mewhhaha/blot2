@@ -213,9 +213,10 @@ export async function formatSource(source: string): Promise<string> {
         }
       }
       if (node.kind === "named_operator") {
-        for (const child of nested) {
-          if (child.text === "`") tightAfter.add(Number(child.offset));
-        }
+        // Only the opening backtick hugs the name; the right operand keeps
+        // its space after the closing one.
+        const opening = nested.find((child) => child.text === "`");
+        if (opening) tightAfter.add(Number(opening.offset));
       }
     }
     const lexed = frontend.lex(source);

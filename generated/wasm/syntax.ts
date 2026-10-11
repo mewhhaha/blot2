@@ -306,6 +306,7 @@ export type RuleName =
   | "boolean_constructor_pattern"
   | "value_pattern"
   | "constructor_pattern"
+  | "constructor_payload"
   | "qualified_constructor"
   | "pattern_group"
   | "record_pattern"
@@ -869,9 +870,12 @@ export interface ValuePatternCursor extends RuleCursorBase<"value_pattern"> {
 export interface ConstructorPatternCursor extends RuleCursorBase<"constructor_pattern"> {
   field(name: "fields"): RecordPatternCursor | null;
   field(name: "name"): TokenCursor<"named", "TYPE_IDENT"> | QualifiedConstructorCursor;
-  field(name: "payload"): PatternCursor | null;
+  field(name: "payload"): ConstructorPayloadCursor | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface ConstructorPayloadCursor extends RuleCursorBase<"constructor_payload"> {
 }
 
 export interface QualifiedConstructorCursor extends RuleCursorBase<"qualified_constructor"> {
@@ -1147,6 +1151,7 @@ export type AnyRuleCursor =
   | BooleanConstructorPatternCursor
   | ValuePatternCursor
   | ConstructorPatternCursor
+  | ConstructorPayloadCursor
   | QualifiedConstructorCursor
   | PatternGroupCursor
   | RecordPatternCursor

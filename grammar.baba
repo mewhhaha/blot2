@@ -90,7 +90,9 @@ pattern_row = (patterns:pattern ("," patterns:pattern)*) ;
 pattern = (IDENT | INTEGER | constructor_pattern | pattern_group | record_pattern | value_pattern | boolean_constructor_pattern) ;
 boolean_constructor_pattern = ("#" value:("True" | "False")) ;
 value_pattern = ("^" name:qualified_name) ;
-constructor_pattern = ("#" name:(TYPE_IDENT | qualified_constructor) (fields:record_pattern | payload:pattern)?) ;
+constructor_pattern = ("#" name:(TYPE_IDENT | qualified_constructor) (fields:record_pattern | payload:constructor_payload)?) ;
+// Braces after a constructor always name its fields, never a record payload.
+constructor_payload = (IDENT | INTEGER | constructor_pattern | pattern_group | value_pattern | boolean_constructor_pattern) ;
 qualified_constructor = (((IDENT | TYPE_IDENT) ".")+ TYPE_IDENT) ;
 pattern_group = ("(" (value:pattern ("," value:pattern)*)? ")") ;
 record_pattern = ("{" (fields:record_pattern_field ("," fields:record_pattern_field)* ","?)? "}") ;

@@ -621,6 +621,12 @@
         "boundary": {
           "kind": "root"
         }
+      },
+      {
+        "rule": "constructor_payload",
+        "boundary": {
+          "kind": "root"
+        }
       }
     ],
     "semantics": {
