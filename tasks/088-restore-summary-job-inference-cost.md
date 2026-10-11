@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete at `86db5b1`; the residual gap to `f7be6e7` is task
+  [093](093-close-the-gdev-edit-gap.md).
 - **Dependencies:** [085](085-gate-principal-graph-sharing-on-payoff.md)
 - **Originating requirements:** discovered while qualifying task
   [085](085-gate-principal-graph-sharing-on-payoff.md); PLAN: Hill 6 / cheap
@@ -31,9 +32,9 @@ owner's machine.
 
 ## Implementation checklist
 
-- [ ] Bisect the region and inference growth with deterministic counters and
+- [x] Bisect the region and inference growth with deterministic counters and
       paired CPU, and profile the extra regions.
-- [ ] Remove the overhead where summary jobs do not pay, keeping equal
+- [x] Remove the overhead where summary jobs do not pay, keeping equal
       judgments, diagnostics and the qualified summary workloads' benefits.
 
 ## Validation
@@ -47,19 +48,40 @@ before the local milestone commit.
 
 ## Acceptance criteria
 
-- [ ] The source of the region/inference growth is identified with evidence.
-- [ ] Measured inference on gdev drops without regressing the qualified summary
+- [x] The source of the region/inference growth is identified with evidence.
+- [x] Measured inference on gdev drops without regressing the qualified summary
       workloads, or the remaining cost is justified explicitly.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `86db5b19821ace11f5d4d6b9047fec4c0ca87f5e` ("Keep principal input keys
+  through recorded summary work").
+- Cause: with sharing off, `652f4d6` raised regions per edit from 601 to 1,768
+  because consumed callback-input job results counted as unrecorded call reads,
+  so `sandbox`'s principal lost its input key; `71c0f2a` added 100–130 ms CPU
+  through a lexical capture scan that projected every region scope per closure.
+  With sharing on, foreign graph sources and memo facts decided by detached
+  graph descriptions also dropped the key.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
+  and 635 guest/client tests; `deno task lint:zig` reports zero findings across
+  310 files. Native laws (`core_eval.zig`, `core_eval_tests.zig`) and process
+  laws (`tests/summary_job_principal_reuse.test.ts`,
+  `tests/lexical_capture_scan.test.ts`) each fail against their mutant.
+- Comparison: baseline `6275e38` (SHA-256 `3762f868…cb0a`), candidate SHA-256
+  `73a2dec7…453f`, `f7be6e7` SHA-256 `b8898fa6…e940`. Five gdev pairs: retained
+  edits 780 → 570 ms CPU (0.73×), inference 448 → 240 ms, regions 2,026 → 1,034;
+  cold builds 1,260 → 1,170 ms. `f7be6e7` edits: 400 ms, inference 199 ms.
+  Diamonds and public examples keep identical counters; the synthetic corpus has
+  CPU ratio 1.000 with identical Wasm.
+- Remaining limitations: gdev edits cost 1.43× `f7be6e7` (inference +30 ms, and
+  lookup, capture and prepare timers +92 ms), now task
+  [093](093-close-the-gdev-edit-gap.md). Non-source-complete graphs and jobs
+  finished outside a recording still drop principal keys.
+- Durable record:
+  [summary-job cost](../zig-native/CALL_SUMMARIES.md#summary-job-cost-11-october-2026),
+  [CONTRACT.md](../zig-native/CONTRACT.md),
+  [pins](../zig-native/qualification/summary-job-cost-pins.json),
+  [gdev CSV](../zig-native/qualification/summary-job-cost-gdev.csv) and
+  [public results](../zig-native/qualification/summary-job-cost-public.jsonl).

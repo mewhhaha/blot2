@@ -162,7 +162,22 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   publishing a constant slot and its fuel from a receipt, which crosses the
   documented value-template boundary ("does not publish constant slots ... or
   skip source fuel"); that design needs the owner's agreement first. Agent
-  scratch data is in ignored `build/bench/consttime/`.
+  scratch data is in ignored `build/bench/consttime/`. That profile predates
+  task 088 and must be measured again.
+- Task 088 (summary-job cost) is complete at `86db5b1`: summary jobs drained
+  under a principal recorder, foreign graph sources and memo facts decided by
+  detached graph descriptions no longer drop `sandbox`'s input key, and lexical
+  capture selection projects only reachable scopes. gdev retained edits 780 →
+  570 ms CPU (inference 448 → 240 ms); `f7be6e7` is still 400 ms, now task 093.
+  See
+  [the record](zig-native/CALL_SUMMARIES.md#summary-job-cost-11-october-2026).
+  Bisect worktrees and binaries are in ignored `build/bench/summary-growth/`;
+  candidate scripts, pins and logs in `build/bench/summary-fix/`.
+- A gdev session reported four issues, filed as tasks 089–092: inference budget
+  exhaustion reported without a position, checker pending checks rescanned every
+  pass, compile-time evaluation depth counted per nested expression, and the
+  formatter rejecting current syntax (confirmed on `examples/ecs.blot` and
+  `examples/syntax.blot`).
 - A separate session (bun-desktop) offered an unapplied wasm name-section patch
   at `/var/tmp/blot2-names.patch` (14 files, always on, +5% Wasm, gate green on
   `a488ba2`); applying it is the owner's decision.
@@ -207,10 +222,10 @@ Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
 the remaining work is per-body frontend rechecking and stable Core IDs, which
 needs its own design before implementation. Ready tasks in numeric order are
 [025](tasks/025-resolve-calls-before-emission.md), 036, 048,
-[086](tasks/086-retain-constant-evaluation-across-revisions.md), and
-[088](tasks/088-restore-summary-job-inference-cost.md); 086 carries the largest
-measured cost on gdev (entry-constant evaluation) but needs a design decision
-first (see above), then 088. The retained probe
+[086](tasks/086-retain-constant-evaluation-across-revisions.md) and 089–093; 086
+needs a fresh gdev profile and then a design decision (see above), and
+[093](tasks/093-close-the-gdev-edit-gap.md) carries the remaining measured gdev
+edit gap. The retained probe
 `zig-native/qualification/revision_deltas_probe.zig` and its driver measure
 edit/revert/rejected/no-op phases against an earlier tree; task-024 binaries are
 in ignored `build/bench/body-cutoff/`, and the pinned analyzer is built in

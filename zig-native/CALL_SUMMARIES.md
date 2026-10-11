@@ -1629,3 +1629,103 @@ committed (870k µs).
   inference regions grew from 433 to about 1,700 per edit across the later
   summary-job commits (`652f4d6`, `71c0f2a` and successors); that is separate
   work.
+
+## Summary-job cost (11 October 2026)
+
+Task 088 restores most of the retained-edit inference that later summary-job
+commits added on a large generic program. The compiler milestone is
+`86db5b19821ace11f5d4d6b9047fec4c0ca87f5e`.
+
+### Finding
+
+A bisect on the frozen gdev copy with principal-graph sharing disabled put the
+growth in two commits. `652f4d6` raised inference regions per edit from 601 to
+1,768: admitting function-typed arguments to independent jobs made the `sandbox`
+constant's principal region consume callback-input job results (ecs `get`). A
+consumed job result counted as an unrecorded call read unless the job had
+published a first-order validated call, so the region lost its dynamic-input
+key, was re-inferred on every edit and reopened about 1,000 jobs. `71c0f2a`
+added 100–130 ms CPU per edit without new regions: for every closure added to a
+region, lexical capture selection projected every scope the region held
+(`deferLexicalBody` was 12.9% of edit CPU).
+
+With sharing on, the default, two more rules dropped the same key. A consumed
+principal graph whose description collected a source scope from another unit
+counted as an untracked read. A plain-nominal memo fact that a graph
+description decided inside the region, with the recorder detached, was later
+replayed as an input present before the region, so the key never matched on the
+next edit.
+
+### Rules
+
+- Summary jobs record the serial of the principal recorder attached while they
+  ran. A job drained under the consuming region's recorder sent its reads,
+  publications and consumed jobs there, so its result is recorded work; a job
+  finished elsewhere is still an unrecorded call read.
+- Graphs keep foreign source scopes separate from untracked reads. Principal
+  input keys compare every module's source image, so foreign sources do not
+  reject them; source receipts, which admit sources per binding, still treat
+  such graphs as unknown.
+- A graph description reports its nominal memo reads and publications to the
+  recorder it detached, in order.
+- Lexical capture selection projects only the scopes of values reachable from
+  the closure's captures, and capture-free closures, which have no key, skip
+  it. A new work counter, `lexical_interface_projections`, records the scopes
+  projected.
+
+[The contract](CONTRACT.md) states these rules.
+
+### Qualification
+
+- Zig 0.17.0 before every build batch. `deno task test:compiler` passes the full
+  LLVM native suite and 635 guest/client tests; `deno task lint:zig` reports
+  zero findings across 310 files.
+- [A process law](tests/summary_job_principal_reuse.test.ts) extends the public
+  ecs example with a constant whose principal region drains witness-callback
+  jobs. Restarting from the restart cache replays its principal, which needs a
+  complete input key (`persisted_hits`), and literal edits, a failure and
+  recovery match fresh builds. With the old job rule the key is dropped and
+  there is no persisted hit.
+- Native laws: a principal recorder attached to source-interface inquiries over
+  a nominal diamond records each memo fact a graph description decided as an
+  absent input plus a publication, which hold on an empty memo
+  (`core_eval_tests.zig`); it fails without forwarding. A graph with foreign
+  sources keeps the recorder eligible but marks the receipt tape unknown, and an
+  untracked graph still rejects both (`core_eval.zig`); it fails if foreign
+  sources reject the recorder.
+- [A process law](tests/lexical_capture_scan.test.ts) builds tables of 8, 32
+  and 96 closures, with scalar and with shared aggregate captures: at most four
+  projections per closure. The old scan projected 36, 528 and 4,656 scopes for
+  the scalar tables.
+- Measurements, pinned in [the pins](qualification/summary-job-cost-pins.json):
+  five alternating pairs on the frozen gdev copy against the current compiler
+  and three against `f7be6e7`, before summary jobs
+  ([CSV](qualification/summary-job-cost-gdev.csv)), at load 1.6–3.2; five
+  repetitions of generated diamonds and public examples
+  ([results](qualification/summary-job-cost-public.jsonl)); and the synthetic
+  `bench:compile` corpus, five pairs.
+
+| gdev, medians of edits 2–4   | `f7be6e7` | Before (`6275e38`) | Candidate |
+| ---------------------------- | --------: | -----------------: | --------: |
+| Retained edit CPU            |    400 ms |             780 ms |    570 ms |
+| Inference per edit           |    199 ms |             448 ms |    240 ms |
+| Inference regions per edit   |       433 |              2,026 |     1,034 |
+| Fresh named functions        |       264 |                102 |       102 |
+| Cold build CPU               |  1,480 ms |           1,260 ms |  1,170 ms |
+
+Every pair favoured the candidate (edits 0.73× the current compiler). Diamonds
+and public examples keep identical work counters and CPU within noise. The
+synthetic corpus measures a CPU ratio of 1.000 in every phase, with Wasm
+identical between compilers and retained builds equal to fresh ones.
+
+### Remaining scope
+
+- Edits still cost 1.43× `f7be6e7` on gdev. Per edit, inference is 30 ms higher
+  (1,034 versus 433 regions; the residual regions were not attributed). The
+  backend's lookup (+46 ms), capture (+21 ms) and prepare (+25 ms) timers grew
+  alongside reuse that regenerates 102 instead of 264 functions; they were not
+  profiled further.
+- Principal regions that consume non-source-complete graphs still drop their
+  key, as do jobs finished outside the consuming recording.
+- The inference behind task 086's `sandbox` measurement has largely moved into
+  this replayed principal; that task's profile needs re-measuring.

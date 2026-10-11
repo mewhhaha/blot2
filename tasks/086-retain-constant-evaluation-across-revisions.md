@@ -42,6 +42,11 @@ explicitly excludes today ("does not publish constant slots, callable
 certificates, or skip source fuel"). Changing that boundary needs the owner's
 agreement before implementation.
 
+Task 088 (`86db5b1`) later let `sandbox`'s principal region replay from its
+recorded inputs: a gdev literal edit now costs about 570 ms CPU with 240 ms of
+inference in total. The constant-evaluation profile above predates that change
+and must be measured again before this design.
+
 ## Implementation checklist
 
 - [ ] Record each constant's exact value dependencies (source bodies, reads,

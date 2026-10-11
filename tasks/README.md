@@ -263,6 +263,16 @@ the gate compares obligations without spans. gdev comment edits drop from about
 0.94 s to under 10 ms; literal edits are unchanged. See
 [trivia-only edits](../zig-native/TRIVIA_EDITS.md).
 
+Task [088] keeps principal input keys through recorded summary work at
+`86db5b1`: jobs drained under a recorder, foreign graph sources and memo facts
+decided by graph descriptions no longer drop the `sandbox` constant's key, and
+lexical capture selection projects only reachable scopes. gdev retained edits
+drop from 780 to 570 ms CPU (inference 448 → 240 ms); the remaining gap to
+`f7be6e7` is task [093]. A gdev session's reports added tasks [089]–[092]
+(budget diagnostics, incremental pending checks, evaluation depth and the
+formatter). See
+[summary-job cost](../zig-native/CALL_SUMMARIES.md#summary-job-cost-11-october-2026).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -563,12 +573,17 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [081] — Finalize durable documentation                  | Pending     | [080]                                  |
 | [082] — Qualify the remote analyzer workflow            | Pending     | [081]                                  |
 | [083] — Review and clean old build artifacts            | Pending     | [081]                                  |
-| [084] — Qualify the complete program                    | Pending     | [082], [083], [085]–[088]              |
+| [084] — Qualify the complete program                    | Pending     | [082], [083], [085]–[093]              |
 | [085] — Gate principal-graph sharing on payoff          | Complete    | —                                      |
 | [086] — Retain constant evaluation across revisions     | Ready       | [023]                                  |
 | [087] — Skip rebuilds for trivia-only edits             | Complete    | —                                      |
-| [088] — Restore summary-job inference cost              | Ready       | [085]                                  |
-| [999] — Remove tasks and plan                           | Pending     | All [001]–[088], plus every added task |
+| [088] — Restore summary-job inference cost              | Complete    | —                                      |
+| [089] — Report inference budget exhaustion              | Ready       | None                                   |
+| [090] — Make pending-check solving incremental          | Ready       | None                                   |
+| [091] — Bound compile-time evaluation by call depth     | Ready       | None                                   |
+| [092] — Format current Blot syntax                      | Ready       | None                                   |
+| [093] — Close the gdev edit gap                         | Ready       | [088]                                  |
+| [999] — Remove tasks and plan                           | Pending     | All [001]–[093], plus every added task |
 
 ## Coverage matrix
 
@@ -583,7 +598,8 @@ obligations remain part of applicable tasks and final qualification.
 | PLAN hill 4: canonical body/evidence keys including captures and value-dependent inputs                       | [008]                                                  |
 | PLAN hill 5: composite resolution across unrelated writes, history, rollback and physical edits               | [009]                                                  |
 | PLAN hill 5: variable-indexed constraints and alias fixed-point worklists                                     | [010]                                                  |
-| PLAN hill 6: changed-only metadata, retained constants, literal invalidation and body/interface cutoff        | [020]–[024], [086], [087], [088]                       |
+| PLAN hill 5: incremental checker pending checks, reported from gdev                                           | [090]                                                  |
+| PLAN hill 6: changed-only metadata, retained constants, literal invalidation and body/interface cutoff        | [020]–[024], [086]–[088], [093]                        |
 | PLAN hill 7: semantic graph sharing and under-100-MB cumulative requested allocation                          | [011], [085], [084]                                    |
 | PLAN hill 9: isolated workers, deterministic publication and CPU/wall-qualified default                       | [012], [013]                                           |
 | PLAN hill 12: typed query design, dependency recording and exact fingerprints/early cutoff                    | [014]                                                  |
@@ -638,6 +654,7 @@ obligations remain part of applicable tasks and final qualification.
 | Demand acceptance: persistent arrays/closures and roots across guest calls                                    | [032], [033], [038], [039]                             |
 | Demand acceptance: request yield/return/break, cancellation retry, trap/host exception and recursive force    | [033], [037], [039]                                    |
 | Demand reuse: body changes with unchanged types, exact captures/effects, failed revisions and recovery        | [018], [024], [036], [039]                             |
+| Reported from gdev: positioned budget diagnostics, evaluation depth by calls, current-syntax formatting       | [089], [091], [092]                                    |
 | Shared gates: no name recognition; chronological semantics, diagnostic order and immutable atomic publication | [084]                                                  |
 | Final performance: cold ~500 ms; literal <30 ms; body <100 ms; largest region <50 ms; allocation <100 MB      | [084]                                                  |
 | Final qualification: every semantic/runtime/language/tooling and external gate, follow-ups before cleanup     | [082], [083], [084]                                    |
@@ -664,7 +681,7 @@ follow-up work before [999].
 
 ## Planning-directory validation
 
-For this documentation change, verify exactly 001–088 plus 999, unique numbered
+For this documentation change, verify exactly 001–093 plus 999, unique numbered
 filenames, all seven required sections, concrete unchecked acceptance criteria,
 existing relative links/anchors, and exact manifest dependencies forming an
 acyclic graph. Check that every task is indexed and every open source
@@ -766,4 +783,9 @@ external gate or durable-documentation obligation remains open.
 [086]: 086-retain-constant-evaluation-across-revisions.md
 [087]: 087-skip-rebuilds-for-trivia-only-edits.md
 [088]: 088-restore-summary-job-inference-cost.md
+[089]: 089-report-inference-budget-exhaustion.md
+[090]: 090-make-pending-check-solving-incremental.md
+[091]: 091-bound-evaluation-by-call-depth.md
+[092]: 092-format-current-syntax.md
+[093]: 093-close-the-gdev-edit-gap.md
 [999]: 999-remove-tasks-and-plan.md

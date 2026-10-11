@@ -1,0 +1,36 @@
+{
+  "zig": "0.17.0",
+  "binaries": {
+    "main": {
+      "revision": "6275e38 (compiler sources of eaf02d7)",
+      "sha256": "3762f8689abec19f256291f2323616ec31acb9786eff724e9d777fcdf111cb0a"
+    },
+    "candidate": {
+      "revision": "86db5b19821ace11f5d4d6b9047fec4c0ca87f5e",
+      "sha256": "73a2dec749347c9320da93d4182a0d4a3f5f56bacb617be31cd53927e673453f"
+    },
+    "before_summary_jobs": {
+      "revision": "f7be6e7",
+      "sha256": "b8898fa63dd0cdf9e49646d998050e539d1e20d55c2ce75be4d9b8be3040e940"
+    }
+  },
+  "gdev": {
+    "workload": "frozen gdev copy; retained edits of one top-level scalar constant; cold build then four edits",
+    "harness": "local, not committed (it names private gdev source)",
+    "current_pairs": 5,
+    "before_summary_job_pairs": 3,
+    "loads": [
+      1.78,
+      3.18
+    ]
+  },
+  "public": {
+    "script": "zig-native/qualification/principal_payoff.py",
+    "repetitions": 5,
+    "results": "zig-native/qualification/summary-job-cost-public.jsonl"
+  },
+  "synthetic": {
+    "command": "deno task bench:compile --baseline MAIN --candidate CANDIDATE --runs 5 --workload synthetic",
+    "result": "CPU ratio 1.000 in every measured phase; Wasm identical between compilers; fresh equals retained"
+  }
+}
