@@ -58,6 +58,11 @@ pub const Counters = struct {
     solver_constraint_visits: u64 = 0,
     /// Type nodes visited by occurs checks in region solvers.
     occurs_steps: u64 = 0,
+    /// Owned principal graphs described, imported into a region instead of
+    /// collecting the body, and open callee edges retained unsolved.
+    principal_graph_builds: u64 = 0,
+    principal_graph_imports: u64 = 0,
+    principal_graph_deferred: u64 = 0,
     pub fn merge(self: *Counters, other: Counters) void {
         inline for (@typeInfo(Counters).@"struct".field_names) |name| {
             if (comptime @import("std").mem.startsWith(u8, name, "max_")) {

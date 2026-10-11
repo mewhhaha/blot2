@@ -1546,3 +1546,85 @@ allocation qualification is claimed: the frozen private workload remains
 unavailable. Allocation attribution and remaining redundant copies continue in
 task 011; canonical local proofs remain Session-owned and do not replace
 portable query validation or the unified table planned in task 014.
+
+## Open-principal payoff (11 October 2026)
+
+Task 085 removes most of the retained-edit cost that `099e700` added to a large
+generic program while keeping its diamond benefit.
+
+### Finding
+
+A separate session bisected a 2.3× retained-edit slowdown on the frozen gdev
+copy (`632b461` to the task-023 compiler) to `099e700`; disabling
+`Session.reuse_principal_graphs` restored that commit's cost. On the current
+compiler, paired gdev edits cost about 1.13× with sharing on versus off
+(inference 582k versus 474k µs per edit at load 10). New work counters
+(`principal_graph_builds`, `principal_graph_imports`,
+`principal_graph_deferred`) and timers showed that describing, importing and
+checking graphs cost only 20–25 ms per edit. A gdb sampling profile placed about
+70 ms of the rest in `ClosureRegion.solveDataAliases` → `transferDataFacts` →
+`closedDataShape` → `types.Store.resolve` inside `principalEvidence`: alias
+types stayed open, so each resolve re-walked its subtree (`resolveDepth` calls
+in `solveDataAliases` rose from 0.44M to 4.41M per edit).
+
+Ablations located the cause. Limiting graph imports to source-interface
+inquiries cut imports from 341 to 5 per edit with no measurable effect, and
+disabling result graphs recovered only part of it. Disabling
+`retainOpenPrincipal` restored the sharing-off cost but made the factory diamond
+exponential again, because the diamond's benefit comes from retained open edges,
+not from imports (it imports no graph).
+
+### Rule
+
+`retainOpenPrincipal` now keeps an edge open only when the callee's normalized
+call graph has at least twice as many call paths as distinct bodies
+(`openPrincipalPays`, saturating, counting only call-summary edges). Ordinary
+collection collects a callee once per call path; retention costs one graph per
+distinct body and leaves later solving open. A tree of callees is therefore
+collected ordinarily, while shared callees whose paths multiply, as in a
+diamond, keep the residual edge. Both choices produce equal judgments, so the
+rule changes cost only; the decision is cached with the session's existing
+open-principal answer.
+
+### Qualification
+
+- Zig 0.17.0 before every build batch. `deno task test:compiler` passes the full
+  LLVM native suite and 632 guest/client tests; `deno task lint:zig` reports
+  zero findings across 310 files.
+- A native law (`core_eval_tests.zig`) compares source interfaces with and
+  without sharing for callee chains and diamonds at depths 6 and 8: judgments
+  agree, chains retain no open edge, diamonds do, and the new counters equal the
+  Session counters. It fails with the old unconditional retention. The existing
+  diamond, structured-residual and operation-row laws pass unchanged.
+- Measurements, pinned in [the pins](qualification/principal-payoff-pins.json):
+  six alternating triples of the frozen gdev copy
+  ([CSV](qualification/principal-payoff-gdev.csv)) and five repetitions of
+  generated diamonds and public examples
+  ([results](qualification/principal-payoff-public.jsonl), produced by
+  [principal_payoff.py](qualification/principal_payoff.py)).
+
+| Workload                     | Sharing as committed | Candidate |        Sharing off |
+| ---------------------------- | -------------------: | --------: | -----------------: |
+| gdev retained edit, per pair |   1.11 × (1.02–1.12) |    1.00 × | 0.99 × (0.94–1.00) |
+| gdev cold build, median      |              2005 ms |   2075 ms |            2095 ms |
+| Factory diamond, depth 12    |              13.5 ms |   13.5 ms |          1630.2 ms |
+| Factory diamond, depth 8     |              12.7 ms |   12.7 ms |            23.3 ms |
+| Public examples, cold        |         10.7–25.4 ms |  same ±1% |           same ±3% |
+
+gdev ratios are against the candidate within each triple; load was 17.7–23.3, so
+absolute gdev times are inflated (edit medians 1395, 1280 and 1275 ms). Per edit
+the candidate keeps 118 graph builds and 342 imports, retains no open edge, and
+its inference (752k µs) matches sharing off (744k µs) rather than sharing as
+committed (870k µs).
+
+### Remaining scope
+
+- Graph descriptions and imports still run where eligible (118 and 342 per gdev
+  edit); they cost a few milliseconds, and restricting imports showed no gain.
+- Why retained open edges make alias solving re-walk open types was not fixed;
+  the rule avoids that cost where retention does not pay, and diamonds still pay
+  it.
+- With sharing off, gdev inference is still about twice that of `f7be6e7`, and
+  inference regions grew from 433 to about 1,700 per edit across the later
+  summary-job commits (`652f4d6`, `71c0f2a` and successors); that is separate
+  work.

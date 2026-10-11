@@ -168,6 +168,10 @@ solver identity and chronology; rollback, recycled variables and saturated
 history revoke reuse. Region-local header reuse schedules required work; it is
 not a completed proof. Optional inquiries that use residual export retry
 ordinary checking on semantic failure, preserving original witness diagnostics.
+A residual edge is exported only when the callee's normalized call graph has at
+least twice as many call paths as distinct bodies; a callee tree is collected
+ordinarily. Both choices give equal judgments, so this is a cost policy, not a
+semantic rule.
 
 Raw and source-normalized principal graphs are separate owned objects. Source
 normalization solves only immutable source equations and already-qualified
@@ -713,15 +717,14 @@ An edited module that is not structurally equal keeps the reuse gate enabled
 only when its ordered semantic catalog is identical, including every operation
 value entry: identity, arguments, signature, witness node and witness result.
 Each entry belongs to the one declaration whose operation-value node names it;
-definition equality compares the entry and scans its witness, and the
-dependency walk follows it, so a changed provider, state initial value or
-witness dirties exactly that declaration and its transitive consumers. An
-added, removed or shifted entry still disables the gate for the program. A
-published dependency certificate shares, by lease, the previous certificate's
-image of a unit only when that image exactly matched the old pin and the
-current module is proven stream-equal to it; every other unit is re-imaged.
-Matching still walks every byte of the shared image. See
-[literal edits](LITERAL_EDITS.md).
+definition equality compares the entry and scans its witness, and the dependency
+walk follows it, so a changed provider, state initial value or witness dirties
+exactly that declaration and its transitive consumers. An added, removed or
+shifted entry still disables the gate for the program. A published dependency
+certificate shares, by lease, the previous certificate's image of a unit only
+when that image exactly matched the old pin and the current module is proven
+stream-equal to it; every other unit is re-imaged. Matching still walks every
+byte of the shared image. See [literal edits](LITERAL_EDITS.md).
 
 A refinement receipt rooted in an edited module may replay when its root is
 admitted by its own declaration: a body root by the declaration's exact
@@ -729,7 +732,7 @@ projection and identity, and a closure root when the gate recorded that such an
 admitted declaration's exact projection reaches that closure catalog entry. The
 receipt's facts still carry the interface cutoff: collected sources must be
 exact, consumed call judgments need only unchanged identities and must already
-hold in the new session. Retained executable fragments keep the transitive
-dirty set, so executable callers of a changed body always regenerate. Hygienic
-loop names are numbered within their top-level declaration. See
+hold in the new session. Retained executable fragments keep the transitive dirty
+set, so executable callers of a changed body always regenerate. Hygienic loop
+names are numbered within their top-level declaration. See
 [body interface cutoff](BODY_CUTOFF.md).

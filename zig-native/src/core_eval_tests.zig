@@ -338,6 +338,38 @@ test "open principal diamond inquiry grows with distinct bodies and edges" {
     };
 }
 
+test "open principal retention declines callee trees and keeps diamonds with equal judgments" {
+    // Depths stay small enough for the unshared comparison session, whose
+    // diamond collection grows exponentially.
+    for ([_]usize{ 1, 2 }) |calls| for ([_]usize{ 6, 8 }) |depth| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "const f_0 = fn value => @type.call \"add\" value value\n");
+        // One call per body is a chain: ordinary collection is linear. Two
+        // calls double the paths at every level: retention avoids that.
+        for (1..depth + 1) |i| {
+            if (calls == 1) try text.print(a, "const f_{d} = fn value => f_{d} value\n", .{ i, i - 1 }) else try text.print(a, "const f_{d} = fn value => f_{d} (f_{d} value)\n", .{ i, i - 1, i - 1 });
+        }
+        try text.print(a, "entry const generic = fn value => f_{d} value\n", .{depth});
+        var module = try lowerPreludeProducer(text.items, &.{.add});
+        defer module.deinit(a);
+        var ordinary = try evaluator.Session.init(a, &.{module});
+        defer ordinary.deinit();
+        ordinary.reuse_principal_graphs = false;
+        var session = try evaluator.Session.init(a, &.{module});
+        defer session.deinit();
+        const expected = try ordinary.sourceInterface(target(&module, "generic"));
+        const result = try session.sourceInterface(target(&module, "generic"));
+        try std.testing.expectEqual(expected.evidence, result.evidence);
+        try std.testing.expectEqual(expected.generic, result.generic);
+        try std.testing.expectEqual(calls == 2, session.principal_graph_deferred != 0);
+        try std.testing.expectEqual(session.principal_graph_deferred, session.counters.principal_graph_deferred);
+        try std.testing.expectEqual(session.principal_graph_builds, session.counters.principal_graph_builds);
+        try std.testing.expectEqual(session.principal_graph_imports, session.counters.principal_graph_imports);
+        try std.testing.expectEqual(@as(usize, 0), session.steps);
+    };
+}
+
 test "source owned array record and nominal skeletons keep open diamonds bounded" {
     for ([_][]const u8{ "#[value.first]", "{result: value.first}", "#Box value.first" }) |leaf| {
         for ([_]usize{ 8, 16, 64 }) |depth| {

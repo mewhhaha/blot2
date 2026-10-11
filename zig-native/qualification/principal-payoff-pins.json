@@ -1,0 +1,48 @@
+{
+  "zig": "0.17.0",
+  "binaries": {
+    "on": {
+      "revision": "a488ba2 sources plus work counters (sharing as committed)",
+      "sha256": "c05c2420f78436f758e182c50d9d6d6327f77908adb13effe2a941e95da986eb"
+    },
+    "candidate": {
+      "revision": "this milestone",
+      "sha256": "4397b60bfb80641650882748eb112f99e83686d97ef679a26c9c77e963720051"
+    },
+    "off": {
+      "revision": "on, with Session.reuse_principal_graphs defaulting to false",
+      "sha256": "435b7d54c196902493b0192ae9693895a6bfbe35172958621cdf65f110a364bb"
+    }
+  },
+  "candidate_inputs": {
+    "base_revision": "a488ba2fd3c5d05d83d8504d748e9d13b0e3d265",
+    "input_files": 430,
+    "input_map_sha256": "583afbd6d9a20a9d88480abdc3d52e76acc45f299a8e738c647937cbd4818fe6"
+  },
+  "gdev": {
+    "workload": "frozen gdev copy used by the 099e700 bisect; retained edits of one top-level scalar constant; cold build then four edits, edits 2-4 compared",
+    "harness": "local, not committed (it names private gdev source)",
+    "repetitions": 6,
+    "loads": [
+      [
+        "17.66",
+        "20.40",
+        "23.28"
+      ],
+      [
+        "22.70",
+        "19.92",
+        "22.63"
+      ]
+    ]
+  },
+  "public": {
+    "script": "zig-native/qualification/principal_payoff.py",
+    "command": "principal_payoff.py 5 on=... candidate=... off=...",
+    "repetitions": 5
+  },
+  "machine": {
+    "cpu": "AMD Ryzen 7 3800X, 8 cores / 16 threads",
+    "contention": "interactive desktop with other sessions building; gdev load 17.7-23.3"
+  }
+}

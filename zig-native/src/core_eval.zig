@@ -6275,6 +6275,7 @@ const ClosureRegion = struct {
             if (unknown and try self.retainOpenPrincipal(.{ .target = use.target, .scope = use.scope, .node = use.node, .left = try copy.ty(binding.scheme.root, 0), .result = 0, .deferred_member = use.deferred_member })) {
                 self.principal_only_used = true;
                 self.session.principal_graph_deferred += 1;
+                self.session.counters.principal_graph_deferred += 1;
                 copy.deinit();
                 return .open;
             }
@@ -6702,6 +6703,7 @@ const ClosureRegion = struct {
             if (constraint.solved or constraint.kind != .call_summary) continue;
             if (constraint.lexical_key == 0 and allow_remaining and try self.retainOpenPrincipal(constraint)) {
                 self.session.principal_graph_deferred += 1;
+                self.session.counters.principal_graph_deferred += 1;
                 self.principal_only_used = true;
                 const key: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = self.source_interface, .deferred_member = constraint.deferred_member, .options = self.session.options };
                 if ((try self.principalGraphForKey(key)).?.source_complete) {
@@ -7303,6 +7305,7 @@ const ClosureRegion = struct {
         }
         if (graph) |owned| {
             self.session.principal_graph_builds += 1;
+            self.session.counters.principal_graph_builds += 1;
             self.session.principal_graph_nodes += owned.nodeCount();
             self.session.principal_graph_edges += owned.edgeCount();
         }
@@ -7370,7 +7373,7 @@ const ClosureRegion = struct {
         var graph = try self.principalGraphForKey(key) orelse return false;
         if (!self.session.call_summaries.open_principals.contains(key) and self.session.call_summaries.open_principals.count() >= self.session.options.max_values) return false;
         const ready = self.session.call_summaries.open_principals.get(key) orelse ready: {
-            const checked = try self.checkOpenPrincipal(key);
+            const checked = try self.checkOpenPrincipal(key) and try self.openPrincipalPays(key);
             try self.session.call_summaries.open_principals.put(self.session.allocator, key, checked);
             break :ready checked;
         };
@@ -7436,6 +7439,42 @@ const ClosureRegion = struct {
                 try pending.append(self.scratch_allocator, child);
             };
         }
+    }
+    /// Ordinary collection collects a callee body once per call path, while a
+    /// retained open edge costs one normalized graph per distinct body plus
+    /// solving that stays open longer. Retention pays only when shared callees
+    /// multiply the paths, as in a diamond; a tree collects ordinarily. Both
+    /// choices give the same judgments. `root`'s graph is normalized.
+    fn openPrincipalPays(self: *ClosureRegion, root: PrincipalGraph.Key) RegionError!bool {
+        const a = self.scratch_allocator;
+        const PathFrame = struct { key: PrincipalGraph.Key, expanded: bool };
+        var paths: std.AutoHashMapUnmanaged(PrincipalGraph.Key, u64) = .empty;
+        defer paths.deinit(a);
+        var pending: std.ArrayList(PathFrame) = .empty;
+        defer pending.deinit(a);
+        try pending.append(a, .{ .key = root, .expanded = false });
+        while (pending.pop()) |frame| {
+            if (!frame.expanded and paths.contains(frame.key)) continue;
+            const graph = self.session.call_summaries.normalized_principals.get(frame.key, self.session) orelse return true;
+            if (!frame.expanded) {
+                if (paths.count() >= self.session.options.max_values) return true;
+                try pending.append(a, .{ .key = frame.key, .expanded = true });
+                for ([_][]const Constraint{ graph.requirements, graph.constraints }) |constraints| for (constraints) |constraint| {
+                    if (constraint.kind != .call_summary) continue;
+                    const child: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = root.source_interface, .deferred_member = constraint.deferred_member, .options = root.options };
+                    if (!paths.contains(child)) try pending.append(a, .{ .key = child, .expanded = false });
+                };
+                continue;
+            }
+            var total: u64 = 1;
+            for ([_][]const Constraint{ graph.requirements, graph.constraints }) |constraints| for (constraints) |constraint| {
+                if (constraint.kind != .call_summary) continue;
+                const child: PrincipalGraph.Key = .{ .target = constraint.target, .source_interface = root.source_interface, .deferred_member = constraint.deferred_member, .options = root.options };
+                total +|= paths.get(child) orelse return true;
+            };
+            try paths.put(a, frame.key, total);
+        }
+        return paths.get(root).? >= 2 *| @as(u64, paths.count());
     }
     fn checkOpenPrincipal(self: *ClosureRegion, root: PrincipalGraph.Key) RegionError!bool {
         if (self.session.call_summaries.normalized_principals.contains(root, self.session)) return true;
@@ -7506,6 +7545,7 @@ const ClosureRegion = struct {
                 if (!try self.session.call_summaries.normalized_principals.put(self.session.allocator, frame.key, normalized, self.session)) return false;
                 published = true;
                 self.session.principal_graph_builds += 1;
+                self.session.counters.principal_graph_builds += 1;
                 self.session.principal_graph_nodes += nodes;
                 self.session.principal_graph_edges += graph_edges;
                 visited.getPtr(frame.key).?.* = true;
@@ -7778,6 +7818,7 @@ const ClosureRegion = struct {
             },
         };
         self.session.principal_graph_imports += 1;
+        self.session.counters.principal_graph_imports += 1;
     }
     fn collect(self: *ClosureRegion, scope: u32, body: core.Id) RegionError!void {
         return self.collectWithExit(scope, body, .{});
