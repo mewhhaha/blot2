@@ -1,0 +1,15 @@
+phase,variant,samples,median_cpu_ms,median_wall_ms
+fresh,baseline,7,1420.0,1439.31110399717
+fresh,candidate,7,1350.0,1366.5190350002376
+noop,baseline,7,10.0,7.8141220001270995
+noop,candidate,7,10.0,7.4262030102545395
+edit,baseline,7,620.0,623.9143849961692
+edit,candidate,7,630.0,645.6878859899007
+revert,baseline,7,580.0,597.8629070013994
+revert,candidate,7,550.0,549.7963230009191
+rejected,baseline,7,350.0,349.03127398865763
+rejected,candidate,7,330.0,326.6861070005689
+recovery,baseline,7,0.0,8.20962298894301
+recovery,candidate,7,10.0,7.793853001203388
+fresh-edit,baseline,7,1340.0,1375.9635769965826
+fresh-edit,candidate,7,1410.0,1430.5060409969883

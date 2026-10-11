@@ -116,3 +116,11 @@ malformed secondary locations.
   first. A closure region's result conflict carries no explanation.
 - Emit-stage spellings are module-qualified and omit shapes without a source
   name, such as records; checker spellings are bare names.
+
+## Integrated qualification (11 October 2026)
+
+Implementation `b068dc9` passes the complete native gate, 763 guest/client laws,
+all eight unchanged compile-allocation laws and the 323-file zero-findings
+analyzer. Shared release parity, current gdev execution, artifact pins and mixed
+CPU/allocation measurements are in the
+[resolved-body qualification](RESOLVED_BODIES.md#qualification-11-october-2026).

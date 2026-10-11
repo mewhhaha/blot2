@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete.
 - **Dependencies:** None.
 - **Originating requirements:** found while completing task 027, when
   `demand_inline_tests.zig` first joined the native suite; demand forwarding
@@ -29,10 +29,10 @@ ran before its file was registered.
 
 ## Implementation checklist
 
-- [ ] Find why the recursive reference loses the callee's demand mode during
+- [x] Find why the recursive reference loses the callee's demand mode during
       checking, and keep the demand mode for recursive and mutually recursive
       uses.
-- [ ] Re-enable the skipped law and add an executed recursive forwarding law.
+- [x] Re-enable the skipped law and add an executed recursive forwarding law.
 
 ## Validation
 
@@ -45,18 +45,28 @@ before the local milestone commit.
 
 ## Acceptance criteria
 
-- [ ] Recursive demand forwarding checks, runs and declines the bounded inline
+- [x] Recursive demand forwarding checks, runs and declines the bounded inline
       proof.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `b068dc9` (joint compiler boundary for 028/036/094/098).
+- Validation: Zig 0.17.0, Deno 2.9.7; `deno task test:compiler` passes the
+  complete native gate and 763 guest/client laws. `deno task lint:zig` with
+  `ZIG_ANALYZER=build/tools/zig-analyzer/zig-out/bin/zig-analyzer`: 323 files,
+  zero findings. All eight unchanged compile-allocation laws pass.
+- Comparison: seven alternating release pairs preserve successful Wasm, constant
+  steps, code instances and old prepared-shape counters across 13 public
+  examples, synthetic fresh/retained/restart phases and native-asset
+  edit/revert/rejection/recovery. Nine CLI diagnostic cases match after optional
+  `related`/`details` null-versus-absent normalization. Current captured gdev:
+  55 modules, 482 fixture cases, 1,460 assertions; split hauling: 12 exports, 25
+  assertions. CPU is mixed; no overall compiler speedup is claimed.
+- Remaining limitations: Provisional demand modes cover direct recursive lambda
+  spines only. This does not broaden recursive inline-proof eligibility or
+  change recursive-force policy.
+- Durable record: [DEMANDS.md](../zig-native/DEMANDS.md) and the shared
+  [qualification](../zig-native/RESOLVED_BODIES.md#qualification-11-october-2026),
+  including exact compiler/input/harness hashes and median distributions.

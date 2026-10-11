@@ -395,3 +395,11 @@ Focused development qualification used Zig 0.17.0, safe native tests with the
 no-LLVM backend, six guest laws, and a zero-findings analyzer. Combined release
 qualification and final artifact identities are recorded with the compiler
 milestone before completion is claimed.
+
+## Integrated qualification (11 October 2026)
+
+Implementation `b068dc9` passes the complete native gate, 763 guest/client laws,
+all eight unchanged compile-allocation laws and the 323-file zero-findings
+analyzer. Shared release parity, current gdev execution, artifact pins and mixed
+CPU/allocation measurements are in the
+[resolved-body qualification](RESOLVED_BODIES.md#qualification-11-october-2026).

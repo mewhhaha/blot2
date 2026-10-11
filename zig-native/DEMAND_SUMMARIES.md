@@ -104,3 +104,11 @@ timings include source checking and emission and have no timing baseline here;
 only the focused Wasm probes above compare baseline and candidate. Raw samples
 and generated workloads are in the isolated worktree's ignored
 `build/bench/demand-summary/{measure.ts,measurements.json,size.ts,sizes.json}`.
+
+## Integrated qualification (11 October 2026)
+
+Implementation `b068dc9` passes the complete native gate, 763 guest/client laws,
+all eight unchanged compile-allocation laws and the 323-file zero-findings
+analyzer. Shared release parity, current gdev execution, artifact pins and mixed
+CPU/allocation measurements are in the
+[resolved-body qualification](RESOLVED_BODIES.md#qualification-11-october-2026).

@@ -11,7 +11,7 @@ pushed; keep it that way unless the owner authorizes it.
 
 ## State on 11 October 2026
 
-Latest compiler implementation on local `main`: `0c5be56`. Qualified today, each
+Latest compiler implementation on local `main`: `b068dc9`. Qualified today, each
 with a durable record:
 
 | Task                                           | Implementation       | Record                                                       |
@@ -61,19 +61,30 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
    Current gdev passes all 472 regular cases and 12 split-hauling exports.
    Resource handles and tunables are covered separately by public laws. See
    NATIVE_ASSETS for reader limitations and measured host/child CPU.
-5. Next implementations are isolated from the qualified main tree:
-   `/var/tmp/blot2-resolved-body` (028), `/var/tmp/blot2-demand-summary` (036),
-   `/var/tmp/blot2-specialization-origin` (094), and
-   `/var/tmp/blot2-recursive-demand` (098). None is merged or claimed complete.
-   Review and integrate before a joint compiler gate. The latter restores the
-   skipped recursive-demand law; six focused guest laws and native/OOM laws
-   pass.
+5. **028/036/094/098 are complete at `b068dc9`.** The full native gate and 763
+   guest/client laws pass, including all eight unchanged allocation budgets.
+   Analyzer: 323 files, zero findings. Seven alternating release pairs preserve
+   Wasm, diagnostics and old semantic counters across public, synthetic and
+   native-asset phases. CPU is mixed; no overall speedup is claimed. Candidate
+   SHA-256 starts `8a7dd393`; durable pins and medians are linked from
+   RESOLVED_BODIES. Current captured gdev: 55 modules, 482 fixture cases and
+   1,460 assertions; split hauling: 12 exports and 25 assertions.
+6. Reviewed specifications 030 and 042 are isolated in
+   `/var/tmp/blot2-ownership-design` and `/var/tmp/blot2-ragged-design`. Their
+   implementations are under qualification in `/var/tmp/blot2-shared-rc` (031)
+   and `/var/tmp/blot2-ragged-builders` (043). Root's private editor probes,
+   generic evidence fitting and shared project-query budget are in
+   `/var/tmp/blot2-editor-completion` (050); protocol/client/LSP remain
+   unfinished. None is qualified or complete. The current gdev corpus has moved
+   to pen settings with native asset roots `src` and `devtools`; the ignored
+   fixture harness now matches those roots. Its captured-input sweep passes;
+   early attempts with the obsolete one-root harness are failures, not compiler
+   regressions.
 
 ## Next work
 
-Review/integrate 028 (emission consumes resolved bodies; 025–027 plans are
-transient per construct), 036, 094, 098 and remaining ready tasks. 049 is
-already specified in parallel. 028's read-only architecture map is
+Record the reviewed 030/042 specifications and continue 031, 043, 050, 029, 037
+and the remaining ready tasks. 028's read-only architecture map is
 `build/bench/resolved-bodies/design.md`. Still open: 024 and 093; 002's current
 traversal gates; 086's value-template boundary. The full inventory is in ignored
 `build/bench/program/remaining.md`.

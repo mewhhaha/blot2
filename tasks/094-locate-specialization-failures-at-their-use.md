@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete.
 - **Dependencies:** [048](048-explain-dispatch-and-evidence.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 1 / explainable
   inference; found while completing task 048. Sources:
@@ -29,12 +29,12 @@ diagnostics to a call site.
 
 ## Implementation checklist
 
-- [ ] Carry the outermost entry-project use through specialization and report
+- [x] Carry the outermost entry-project use through specialization and report
       obligation and dispatch failures there, keeping the callee's span as
       secondary context in the published diagnostic.
-- [ ] Keep diagnostic ordering, codes and explanations unchanged, and keep
+- [x] Keep diagnostic ordering, codes and explanations unchanged, and keep
       failures that belong to the callee itself located in the callee.
-- [ ] Extend the client schema for the secondary location with defensive
+- [x] Extend the client schema for the secondary location with defensive
       decoding.
 
 ## Validation
@@ -52,18 +52,30 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] A specialization failure caused by a caller's types points at the caller's
+- [x] A specialization failure caused by a caller's types points at the caller's
       expression in the user's file, with the callee location available.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `b068dc9` (joint compiler boundary for 028/036/094/098).
+- Validation: Zig 0.17.0, Deno 2.9.7; `deno task test:compiler` passes the
+  complete native gate and 763 guest/client laws. `deno task lint:zig` with
+  `ZIG_ANALYZER=build/tools/zig-analyzer/zig-out/bin/zig-analyzer`: 323 files,
+  zero findings. All eight unchanged compile-allocation laws pass.
+- Comparison: seven alternating release pairs preserve successful Wasm, constant
+  steps, code instances and old prepared-shape counters across 13 public
+  examples, synthetic fresh/retained/restart phases and native-asset
+  edit/revert/rejection/recovery. Nine CLI diagnostic cases match after optional
+  `related`/`details` null-versus-absent normalization. Current captured gdev:
+  55 modules, 482 fixture cases, 1,460 assertions; split hauling: 12 exports, 25
+  assertions. CPU is mixed; no overall compiler speedup is claimed.
+- Remaining limitations: Computed indirect callbacks retain their definition
+  location when no source-owned caller origin is available. Successful-dispatch
+  editor explanations remain task 050.
+- Durable record:
+  [DISPATCH_EXPLANATIONS.md](../zig-native/DISPATCH_EXPLANATIONS.md) and the
+  shared
+  [qualification](../zig-native/RESOLVED_BODIES.md#qualification-11-october-2026),
+  including exact compiler/input/harness hashes and median distributions.

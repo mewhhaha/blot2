@@ -344,6 +344,14 @@ planned before they are emitted. Output is byte-identical on the examples, the
 synthetic corpus and gdev; [027] is ready. See
 [resolved structured flow](../zig-native/RESOLVED_FLOW.md).
 
+Tasks [028], [036], [094] and [098] share qualified compiler implementation
+`b068dc9`: source-owned body preparation, versioned demand summaries, caller-use
+specialization locations and recursive demand forwarding. The complete native
+gate and 763 guest/client laws pass; analyzer: 323 files, zero findings. All
+eight compile-allocation budgets remain unchanged. Seven release pairs preserve
+Wasm and semantic counters; CPU is mixed. Tasks [029] and [037] are ready. See
+[resolved bodies](../zig-native/RESOLVED_BODIES.md#qualification-11-october-2026).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -588,16 +596,16 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [025] — Resolve calls before emission                   | Complete    | —                                      |
 | [026] — Resolve structured control flow                 | Complete    | —                                      |
 | [027] — Represent ownership in resolved ir              | Complete    | —                                      |
-| [028] — Make emission consume resolved bodies           | Ready       | [027]                                  |
-| [029] — Remove function indices from reuse keys         | Pending     | [018], [028]                           |
+| [028] — Make emission consume resolved bodies           | Complete    | [027]                                  |
+| [029] — Remove function indices from reuse keys         | Ready       | [018], [028]                           |
 | [030] — Specify shared and cyclic ownership             | Pending     | [027]                                  |
 | [031] — Implement shared reference counting             | Pending     | [030]                                  |
 | [032] — Own escaping values and persistent roots        | Pending     | [031]                                  |
 | [033] — Own suspended effects and cancellation          | Pending     | [032]                                  |
 | [034] — Reclaim cyclic ownership                        | Pending     | [033]                                  |
 | [035] — Remove the tracing runtime                      | Pending     | [034]                                  |
-| [036] — Summarize demand control flow                   | Ready       | [007], [014]                           |
-| [037] — Lower loop aware local memos                    | Pending     | [036]                                  |
+| [036] — Summarize demand control flow                   | Complete    | [007], [014]                           |
+| [037] — Lower loop aware local memos                    | Ready       | [036]                                  |
 | [038] — Eliminate demands through known callbacks       | Pending     | [037], [032]                           |
 | [039] — Guarantee and explain demand lowering           | Pending     | [038], [033]                           |
 | [040] — Fuse packed row producers and consumers         | Pending     | [002], [027]                           |
@@ -654,11 +662,11 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [091] — Bound compile-time evaluation by call depth     | Complete    | —                                      |
 | [092] — Format current Blot syntax                      | Complete    | —                                      |
 | [093] — Close the gdev edit gap                         | In progress | [088]                                  |
-| [094] — Locate specialization failures at their use     | Ready       | [048]                                  |
+| [094] — Locate specialization failures at their use     | Complete    | [048]                                  |
 | [095] — Specify and version the project protocol        | Complete    | None                                   |
 | [096] — Compile typed asset imports natively            | Complete    | [095]                                  |
 | [097] — Resolve array cursor representation in gdev     | Complete    | None                                   |
-| [098] — Type-check recursive demand forwarding          | Ready       | None                                   |
+| [098] — Type-check recursive demand forwarding          | Complete    | None                                   |
 | [099] — Survive long stage chains without crashing      | Complete    | None                                   |
 | [999] — Remove tasks and plan                           | Pending     | All [001]–[099], plus every added task |
 

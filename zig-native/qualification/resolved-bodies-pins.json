@@ -1,0 +1,223 @@
+{
+  "date": "2026-10-11",
+  "baseline_revision": "0c5be56",
+  "candidate_parent": "d9172ec",
+  "compiler_gate": {
+    "native": "passed",
+    "guest_client_passed": 763,
+    "guest_client_failed": 0
+  },
+  "pairs": 7,
+  "tools": {
+    "zig": "0.17.0",
+    "deno": "2.9.7"
+  },
+  "compilers": [
+    {
+      "name": "baseline",
+      "executable": "/home/jacobt/src/blot2/build/bench/native-assets/blotc-qualified",
+      "sha256": "3829910fe42565c754d78f3437a873d218ef0f2c17206cb2263f8f8d3c5fd47b"
+    },
+    {
+      "name": "candidate",
+      "executable": "/home/jacobt/src/blot2/build/bench/resolved-bodies/blotc-compact-candidate",
+      "sha256": "8a7dd393ab4768eebcdf8859135345fd44700dae5c2ebb4391577d75006aa8bc"
+    }
+  ],
+  "harnesses": {
+    "build/bench/resolved-bodies/paired_native.py": "6abc3728efa0632e50564ddca7dc4fa82f544d993ab796cdd47c827506ab90e8",
+    "build/bench/resolved-bodies/compare_release.py": "0e22c0e3fe138fc15cc0712f40177c84089e0f1ec4ad78acd1af71bdfd39c644",
+    "build/bench/resolved-bodies/compare_diagnostics.py": "4e649508605ca407f317f367e2495f4f8f2b2ae38460a6c648e31b268250c4df",
+    "build/bench/native-assets/gdev_fixture.ts": "095682385633a745792bc7a477e2f09c0ce2831bf0c2a58f4724856fbf902142"
+  },
+  "library": {
+    "std/array.blot": "4249597a969b0ece36dbd5f9ff49bce97792790f6c8b8b8d477354c799be9a25",
+    "std/iter.blot": "a45af2b410fca7c90db1900b58904ecd0d1426ce1837d7448b6265d1266fb8cd",
+    "std/list.blot": "0bce7387816a3cc329184ab6dc3fd444208fcea993ea14cb4584c15ba4fa6ffd",
+    "std/path.blot": "6a4bef549556f2b021e1f11314480f0c07b906c80d339d73e3f818adcd983747",
+    "std/prelude.blot": "623fc88e58bacbd98ac9b0eeed8f8fbb792f44339fe8e1d7c24366e553e2d789",
+    "std/simd.blot": "ea49522b1ec05c45eaf9a6d19bf1023cff9a91dbe211589d872d00a9d98599c8",
+    "std/vector.blot": "e713c9d8a3e1fb0fb7a06f5001c1972d83248d20e0706aaab06ce4450dfe2a34"
+  },
+  "public_inputs": {
+    "examples/arrays.blot": "8d6d479d01268f822570498606731c116233a3fc08f09087290867b92d96be20",
+    "examples/ecs.blot": "b17cd223b92414da5d99c9199f3df5628031ee48421ffbf8062299c4f01d2545",
+    "examples/generic_effects.blot": "fc795ae6a9b90fdee36d96678c091239efa81caba5cbb997bde6477f1b3a6320",
+    "examples/host_capabilities.blot": "bc9e0d18652450c910bc9c4fe52d2ecdc95cbab0682eeeb17f62b3ad86c53d40",
+    "examples/host_io.blot": "52dc79e8766a0680480c9ed2aab4053a37fa871bc5c14b1b8f924f46745cd249",
+    "examples/lists.blot": "eaa39ee23ca03acb9a950816517af92d76cfa2823628a6977f6804318a6d1859",
+    "examples/monads.blot": "182c7185d055c448cd725082eeb55cb24074d5c6b799955b73b3a71ab15fe64e",
+    "examples/prelude.blot": "b130352914f5c22caa30815b41d30298b2962efe36afe1c95265a94977d878d3",
+    "examples/records.blot": "7238e4137dba2bac63875a557ef9fbca6a0daa532d90dd693387e25b41666f57",
+    "examples/requests.blot": "69635c1d441b0860536f492226d4fd3409943cfedeae6dd431a8d1d17f19fce9",
+    "examples/scalar.blot": "1f80d6c576df54ab6dc06b84393756c2883bb78e71996d21a242f1a2c49a364d",
+    "examples/syntax.blot": "58fd1c60f4d2d90317b4d48404ea79dc113a23917810a3ae441c0d3f5fa4e38d",
+    "examples/tags.blot": "09fa1f70e8b23a13564a26801dab48f081c1a00bc6f601eded0a408eee5591f3"
+  },
+  "frozen_native_source_sha256": "763a6d92959ec728f850f275e474e5802b55cb04de2df1a67051ce7a10f74147",
+  "frozen_native_edit_sha256": "c9c8c9a8b0000a6530cea620fcf60858084c6f5d680be0b94b0be1614c5dc512",
+  "current_capture_manifest_sha256": "0d8048ed28fea4a09a5e7aa2ddd1704cd6e6832936bf0219c9741f55bf80b879",
+  "native_load": {
+    "start": "12.32 24.12 22.92 5/2526 2184637",
+    "end": "7.93 20.68 21.81 4/2637 2187502"
+  },
+  "synthetic_host": {
+    "deno": "2.9.7",
+    "os": "linux",
+    "cpus": 16,
+    "load_start": 6.99365234375,
+    "load_end": 6.75390625
+  },
+  "synthetic_medians": {
+    "chain_mono_128": {
+      "fresh": {
+        "baseline_cpu_s": 0.019,
+        "candidate_cpu_s": 0.017,
+        "ratio": 0.8947368421052633
+      },
+      "restart": {
+        "baseline_cpu_s": 0.02,
+        "candidate_cpu_s": 0.02,
+        "ratio": 1
+      },
+      "population": {
+        "baseline_cpu_s": 0.01,
+        "candidate_cpu_s": 0.01,
+        "ratio": 1
+      },
+      "first_edit": {
+        "baseline_cpu_s": 0.01,
+        "candidate_cpu_s": 0.01,
+        "ratio": 1
+      },
+      "subsequent_edit": {
+        "baseline_cpu_s": 0.01,
+        "candidate_cpu_s": 0.01,
+        "ratio": 1
+      },
+      "noop": {
+        "baseline_cpu_s": 0,
+        "candidate_cpu_s": 0,
+        "ratio": null
+      }
+    },
+    "chain_generic_64": {
+      "fresh": {
+        "baseline_cpu_s": 0.015,
+        "candidate_cpu_s": 0.017,
+        "ratio": 1.1333333333333335
+      },
+      "restart": {
+        "baseline_cpu_s": 0.017,
+        "candidate_cpu_s": 0.015,
+        "ratio": 0.8823529411764705
+      },
+      "population": {
+        "baseline_cpu_s": 0.01,
+        "candidate_cpu_s": 0.01,
+        "ratio": 1
+      },
+      "first_edit": {
+        "baseline_cpu_s": 0.01,
+        "candidate_cpu_s": 0.01,
+        "ratio": 1
+      },
+      "subsequent_edit": {
+        "baseline_cpu_s": 0.01,
+        "candidate_cpu_s": 0.01,
+        "ratio": 1
+      },
+      "noop": {
+        "baseline_cpu_s": 0,
+        "candidate_cpu_s": 0,
+        "ratio": null
+      }
+    },
+    "diamond_8": {
+      "fresh": {
+        "baseline_cpu_s": 0.008,
+        "candidate_cpu_s": 0.008,
+        "ratio": 1
+      },
+      "restart": {
+        "baseline_cpu_s": 0.008,
+        "candidate_cpu_s": 0.008,
+        "ratio": 1
+      },
+      "population": {
+        "baseline_cpu_s": 0,
+        "candidate_cpu_s": 0,
+        "ratio": null
+      },
+      "first_edit": {
+        "baseline_cpu_s": 0,
+        "candidate_cpu_s": 0,
+        "ratio": null
+      },
+      "subsequent_edit": {
+        "baseline_cpu_s": 0,
+        "candidate_cpu_s": 0,
+        "ratio": null
+      },
+      "noop": {
+        "baseline_cpu_s": 0,
+        "candidate_cpu_s": 0,
+        "ratio": null
+      }
+    },
+    "fanout_128": {
+      "fresh": {
+        "baseline_cpu_s": 0.028,
+        "candidate_cpu_s": 0.026,
+        "ratio": 0.9285714285714285
+      },
+      "restart": {
+        "baseline_cpu_s": 0.033,
+        "candidate_cpu_s": 0.025,
+        "ratio": 0.7575757575757576
+      },
+      "population": {
+        "baseline_cpu_s": 0.02,
+        "candidate_cpu_s": 0.02,
+        "ratio": 1
+      },
+      "first_edit": {
+        "baseline_cpu_s": 0.02,
+        "candidate_cpu_s": 0.02,
+        "ratio": 1
+      },
+      "subsequent_edit": {
+        "baseline_cpu_s": 0.02,
+        "candidate_cpu_s": 0.02,
+        "ratio": 1
+      },
+      "noop": {
+        "baseline_cpu_s": 0,
+        "candidate_cpu_s": 0,
+        "ratio": null
+      }
+    }
+  },
+  "synthetic_unexpected_problems": [],
+  "conditions": "Native gate, other release builds and unrelated local processes overlapped. CPU sampling for retained native phases has 10 ms quantization. CPU results are mixed; no overall compiler speedup claimed.",
+  "current_fixture_results": {
+    "modules": 55,
+    "cases": 482,
+    "assertions": 1460,
+    "all_passed": true,
+    "asset_roots": [
+      "src",
+      "devtools"
+    ]
+  },
+  "implementation": "b068dc9",
+  "analyzer": {
+    "files": 323,
+    "findings": 0
+  },
+  "captured_split_hauling": {
+    "exports": 12,
+    "assertions": 25,
+    "all_passed": true
+  }
+}

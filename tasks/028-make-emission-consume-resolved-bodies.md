@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete.
 - **Dependencies:** [027](027-represent-ownership-in-resolved-ir.md)
 - **Originating requirements:** PLAN: Earlier semantic compilation / complete
   backend separation. Sources: [PLAN.md](../PLAN.md).
@@ -22,11 +22,11 @@ planning, layout conversion, selection, serialization and instruction emission.
 
 ## Implementation checklist
 
-- [ ] Route every supported body through owned resolved preparation and restrict
+- [x] Route every supported body through owned resolved preparation and restrict
       emission to encoding resolved operations.
-- [ ] Keep planning, layout, static serialization and ownership responsibilities
+- [x] Keep planning, layout, static serialization and ownership responsibilities
       explicit; resolve errors with source origins before emission.
-- [ ] Remove duplicate selection paths only after parity across staged/accessor
+- [x] Remove duplicate selection paths only after parity across staged/accessor
       and request cases; retain documented unsupported diagnostics.
 
 ## Validation
@@ -46,19 +46,30 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Instruction emission performs no semantic callee/evidence selection.
-- [ ] All production paths use resolved bodies with equivalent behavior and
+- [x] Instruction emission performs no semantic callee/evidence selection.
+- [x] All production paths use resolved bodies with equivalent behavior and
       explicit ownership; obsolete branches are removed.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `b068dc9` (joint compiler boundary for 028/036/094/098).
+- Validation: Zig 0.17.0, Deno 2.9.7; `deno task test:compiler` passes the
+  complete native gate and 763 guest/client laws. `deno task lint:zig` with
+  `ZIG_ANALYZER=build/tools/zig-analyzer/zig-out/bin/zig-analyzer`: 323 files,
+  zero findings. All eight unchanged compile-allocation laws pass.
+- Comparison: seven alternating release pairs preserve successful Wasm, constant
+  steps, code instances and old prepared-shape counters across 13 public
+  examples, synthetic fresh/retained/restart phases and native-asset
+  edit/revert/rejection/recovery. Nine CLI diagnostic cases match after optional
+  `related`/`details` null-versus-absent normalization. Current captured gdev:
+  55 modules, 482 fixture cases, 1,460 assertions; split hauling: 12 exports, 25
+  assertions. CPU is mixed; no overall compiler speedup is claimed.
+- Remaining limitations: Body plans remain Generator-local. Encoding still owns
+  machine layout, static evaluation/serialization and lazy wrapper reservation;
+  synthetic helper functions encode directly.
+- Durable record: [RESOLVED_BODIES.md](../zig-native/RESOLVED_BODIES.md) and the
+  shared
+  [qualification](../zig-native/RESOLVED_BODIES.md#qualification-11-october-2026),
+  including exact compiler/input/harness hashes and median distributions.

@@ -48,3 +48,54 @@ counts and Wasm against the preceding compiler. Debug development timings cannot
 establish a release performance improvement; preparing copied maps and factory
 descriptions adds work whose CPU and allocation cost needs release
 qualification.
+
+## Qualification (11 October 2026)
+
+Implementation `b068dc9` jointly qualifies 028, 036, 094 and 098. Zig 0.17.0 and
+Deno 2.9.7 pass `deno task test:compiler`: the complete native gate and 763
+guest/client laws. The pinned zig-analyzer checks 323 files with zero findings.
+Every-allocation-failure/frozen-Core laws pass, including source-less constraint
+origins, and all eight compile-allocation budgets remain unchanged.
+
+[Artifact and input pins](qualification/resolved-bodies-pins.json) identify the
+preceding qualified `0c5be56` compiler (`3829910f…47b`) and candidate
+(`8a7dd393…a8bc`), harnesses, library/public input hashes and captured private
+corpus hashes. Private source and raw logs remain in ignored
+`build/bench/resolved-bodies/`; only hashes and aggregate results are recorded.
+
+Seven alternating release pairs cover all 13 public examples, four synthetic
+workloads through fresh/restart/population/first-edit/subsequent-edit/no-op, and
+native typed assets through
+fresh/no-op/edit/revert/rejection/recovery/fresh-edit. Successful Wasm, constant
+steps, code instances and existing prepared-shape counters match. Native assets
+preserve exact snapshots and dependency identities, 34 unchanged asset reuses
+and last-good revisions after rejection. Nine failed CLI cases preserve status,
+codes, source spans, messages and explanations; the comparison normalizes only
+optional `related`/`details` absent versus null. Independent project-wire laws
+also pass, including absent `related` on ordinary diagnostics and defensive
+decoding of secondary locations.
+
+The captured current gdev corpus uses both `src` and `devtools` asset roots: 55
+modules, 482 fixture cases and 1,460 assertions pass. Its blocked split-hauling
+module passes all 12 exports and 25 assertions. Earlier one-root fixture
+failures omitted required inputs; the corrected capture records both roots. This
+corpus is distinct from task 002's missing historical manifest.
+
+[Public medians](qualification/resolved-bodies-public.csv) record CPU, wall
+time, requested allocation, peak allocation and zero live allocation. Requested
+bytes fall in 11 of 13 examples; arrays increase 0.24% and monads increase 3.1%.
+CPU ratios range from 0.939 to 1.023. These mixed measurements overlap unrelated
+host work and establish no overall speedup.
+
+[Native-asset medians](qualification/resolved-bodies-native.csv) retain all
+seven phases: fresh CPU 1,420 → 1,350 ms, edit 620 → 630 ms, revert 580 → 550 ms
+and fresh edited process 1,340 → 1,410 ms. No-op/recovery CPU is quantized at 10
+ms. Synthetic fresh CPU is 19 → 17 ms (monomorphic chain), 15 → 17 ms (generic
+chain), 8 → 8 ms (diamond) and 28 → 26 ms (fanout); retained samples share that
+10 ms quantization. Pins record raw load conditions and phase medians.
+
+Compact tagged payload storage avoids allocating the largest plan variant for
+every hash bucket. Per-variant ownership transfers only after capacity succeeds;
+preparation reacquires payload pointers after recursion. The pre-compaction
+integration failed three unchanged allocation budgets and is preserved as failed
+evidence, rather than presented as a qualified compiler.
