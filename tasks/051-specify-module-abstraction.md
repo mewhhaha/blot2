@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Complete — specification qualified locally; nothing pushed.
 - **Dependencies:** [020](020-persist-complete-semantic-artifacts.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 2 / module
   abstraction. Sources:
@@ -24,13 +24,13 @@ not.
 
 ## Implementation checklist
 
-- [ ] Settle source syntax and compatibility for visibility, opaque
+- [x] Settle source syntax and compatibility for visibility, opaque
       declarations, construction/destruction access and selective re-exports.
-- [ ] Define nominal identity and what importers may observe, including aliases,
+- [x] Define nominal identity and what importers may observe, including aliases,
       associated members and type/effect relationships.
-- [ ] Specify portable interfaces and private-implementation cutoff behavior
+- [x] Specify portable interfaces and private-implementation cutoff behavior
       without leaking representation through archives.
-- [ ] Document positive/negative module examples and zero-cost-wrapper
+- [x] Document positive/negative module examples and zero-cost-wrapper
       obligations for later qualification.
 
 ## Validation
@@ -47,20 +47,25 @@ change.
 
 ## Acceptance criteria
 
-- [ ] A durable module specification settles syntax, semantics, representation,
+- [x] A durable module specification settles syntax, semantics, representation,
       diagnostics and compatibility.
-- [ ] Tasks 052–053 have explicit privacy laws and observable cutoff/erasure
+- [x] Tasks 052–053 have explicit privacy laws and observable cutoff/erasure
       criteria.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `879a508`.
+- Validation: Deno 2.9.7; `deno fmt --no-config --check` passes the module
+  specification and ownership contract. All 25 local links/anchors resolve.
+  Examples were reviewed against the current guide: direct/namespace imports,
+  two forwarding hops, same-spelled identities, private constructors and
+  source/dependency/checkpoint edit decisions have explicit positive/negative
+  laws. Proposed syntax is labelled and was not treated as executable evidence.
+- Comparison: documentation only; no runtime or compiler cost change is claimed.
+- Remaining limitations: 052 implements syntax, public/private interfaces and
+  opaque storage; 053 qualifies cutoff behavior and wrapper erasure. Private
+  executable archives remain compiler-owned and validated, outside the public
+  semantic view.
+- Durable record: [MODULE_ABSTRACTION](../zig-native/MODULE_ABSTRACTION.md).

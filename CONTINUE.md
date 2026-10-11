@@ -85,6 +85,11 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
    captured-input sweep passes; early attempts with the obsolete one-root
    harness are failures, not compiler regressions.
 
+7. **051 is complete at `879a508`** (MODULE_ABSTRACTION). Public-by-default
+   compatibility, selective forwarding, private constructors, stable opaque
+   identity, public semantic/ABI/private executable views and wrapper-erasure
+   laws are settled. 052 is ready; no new visibility behavior is implemented.
+
 ## Next work
 
 Continue 032, 043, 050, 029, 037 and the remaining ready tasks. 028's read-only

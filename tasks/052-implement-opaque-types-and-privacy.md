@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — module abstraction contract qualified; no completion is
+  claimed.
 - **Dependencies:** [051](051-specify-module-abstraction.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 2 / opacity and
   privacy. Sources: [Language evolution](../zig-native/LANGUAGE_EVOLUTION.md).

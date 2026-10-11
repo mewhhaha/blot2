@@ -619,8 +619,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [048] — Explain dispatch and evidence                   | Complete    | —                                      |
 | [049] — Specify editor completion                       | Complete    | [048]                                  |
 | [050] — Implement editor completion                     | Ready       | [049]                                  |
-| [051] — Specify module abstraction                      | Pending     | [020]                                  |
-| [052] — Implement opaque types and privacy              | Pending     | [051]                                  |
+| [051] — Specify module abstraction                      | Complete    | [020]                                  |
+| [052] — Implement opaque types and privacy              | Ready       | [051]                                  |
 | [053] — Qualify module cutoffs and wrapper erasure      | Pending     | [052], [024]                           |
 | [054] — Specify associated types and implementations    | Pending     | [052]                                  |
 | [055] — Implement associated type members               | Pending     | [054]                                  |
