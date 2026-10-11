@@ -101,10 +101,10 @@ client: close     server: close, then exits 0
   or their decimal strings: `kind` tags are open 0, build 1, close 2, checkpoint
   3; `codegenTier` tags are optimized 0 and development 1. Booleans, arrays and
   objects are not coerced to integers. Optional fields may be left out. Replies
-  are written with Zig's defaults too, so an optional field with no value
-  appears as `null` rather than being left out. The reference client ignores
-  reply fields it does not read. Hosts should ignore unknown reply fields;
-  incompatible request or reply changes require a new version.
+  normally write an optional field with no value as `null`. A diagnostic's
+  `related` field is omitted when there is no secondary location. The reference
+  client ignores reply fields it does not read. Hosts should ignore unknown
+  reply fields; incompatible request or reply changes require a new version.
 
 ## hello
 
@@ -342,20 +342,28 @@ byte offsets, null `utf16`/`details` and `attemptStats:null`; native sessions
 retain the same rejection metadata shape and empty payload. `attemptStats` is an
 object, or null when no attempt counters survived (a failed preparation).
 
-| Diagnostic field  | Type                   | Meaning                                                                                                        |
-| ----------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `filename`        | string                 | the file it is in, else the entry                                                                              |
-| `stage`           | string                 | where it was found (below)                                                                                     |
-| `code`            | string                 | a stable name for the problem                                                                                  |
-| `start`, `end`    | integers, start ≤ end  | UTF-8 byte offsets in `filename`                                                                               |
-| `message`         | string                 | for people                                                                                                     |
-| `offset_encoding` | `"utf8_bytes"`         |                                                                                                                |
-| `utf16`           | `{start, end}` or null | the same span in UTF-16 code units; set only for frontend diagnostics that carry a publication, null otherwise |
-| `details`         | null or object         | below                                                                                                          |
+| Diagnostic field  | Type                   | Meaning                                                                                                                         |
+| ----------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `filename`        | string                 | the file it is in, else the entry                                                                                               |
+| `stage`           | string                 | where it was found (below)                                                                                                      |
+| `code`            | string                 | a stable name for the problem                                                                                                   |
+| `start`, `end`    | integers, start ≤ end  | UTF-8 byte offsets in `filename`                                                                                                |
+| `message`         | string                 | for people                                                                                                                      |
+| `offset_encoding` | `"utf8_bytes"`         |                                                                                                                                 |
+| `utf16`           | `{start, end}` or null | the same span in UTF-16 code units; set only for frontend diagnostics that carry a publication, null otherwise                  |
+| `related`         | object or null         | original callee location: `{filename, start, end, offset_encoding: "utf8_bytes"}` for a caller-dependent specialization failure |
+| `details`         | null or object         | below                                                                                                                           |
 
 `stage` values the code uses are `parse`, `parse-project`, `load`, `check`,
 `check-project`, `lower`, `emit`, `asset` and `build-project`. The set is not
 defined as closed; hosts should treat an unknown stage as text.
+
+`related` is optional and omitted when there is no secondary location. Hosts
+also accept null. Its filename is a nonempty, well-formed string without NUL;
+its offsets are nonnegative safe integers with start ≤ end. The reference client
+rejects malformed coordinates and copies only those four fields. The primary
+location remains the outermost caller use whose types caused the failure; a
+concrete failure inside a callee stays at its own operation.
 
 `details` is `null` except in two cases:
 

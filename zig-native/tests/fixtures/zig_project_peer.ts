@@ -151,7 +151,25 @@ while (true) {
     }
     break;
   }
-  const failure = mode === "invalid-hole" ||
+  function relatedLocation(): unknown {
+    const location: Record<string, unknown> = {
+      filename: "/library.blot",
+      start: 3,
+      end: 7,
+      offset_encoding: "utf8_bytes",
+      unknown: "discarded",
+    };
+    if (mode === "related-inverted") location.end = 2;
+    if (mode === "related-negative") location.start = -1;
+    if (mode === "related-fractional") location.end = 3.5;
+    if (mode === "related-encoding") location.offset_encoding = "utf16";
+    if (mode === "related-filename") location.filename = "";
+    if (mode === "related-nul") location.filename = "bad\0path";
+    if (mode === "related-surrogate") location.filename = "\ud800";
+    if (mode === "related-array") return [];
+    return location;
+  }
+  const failure = mode.startsWith("related-") || mode === "invalid-hole" ||
     mode === "reject-first" && builds === 1 ||
     mode === "failed-revision" || mode === "reject-payload" ||
     mode === "missing-offset";
@@ -179,6 +197,7 @@ while (true) {
         message: "fixture rejection",
         offset_encoding: mode === "missing-offset" ? "utf16" : "utf8_bytes",
         utf16: { start: 1, end: 2 },
+        related: relatedLocation(),
         ...(mode === "invalid-hole"
           ? {
             details: {

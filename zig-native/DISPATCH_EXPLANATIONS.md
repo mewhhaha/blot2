@@ -54,11 +54,11 @@ Explanations change no selection, no selection order and no reported diagnostic.
 - [Native laws](src/dispatch_explanation_tests.zig) check, for each stage that
   reports it: receiver lookup that ignores an argument's member, left before
   right with `incompatible` and `no_member`, an identical right owner listed
-  once, result dispatch, a selected left member whose result conflicts while
-  the right member would fit, and a generic callback. A 300-byte type name is
-  cut to 256 bytes on a UTF-8 boundary and marked truncated. An
-  allocation-failure sweep covers checker and backend explanations; a mutant
-  that lists an identical right owner fails the law.
+  once, result dispatch, a selected left member whose result conflicts while the
+  right member would fit, and a generic callback. A 300-byte type name is cut to
+  256 bytes on a UTF-8 boundary and marked truncated. An allocation-failure
+  sweep covers checker and backend explanations; a mutant that lists an
+  identical right owner fails the law.
 - [A process law](tests/dispatch_explanation.test.ts) checks `1 + 2.5` and
   `#True + #False` through the CLI with the standard prelude; a project server
   session that fails on an imported type without `add`, explains a selected
@@ -71,14 +71,42 @@ Explanations change no selection, no selection order and no reported diagnostic.
   work beyond recording which side a dispatch selected, so no timing comparison
   was run.
 
+## Specialization source locations
+
+A failed dispatch or obligation resolved from caller types uses the outermost
+entry-project call or operator as its primary location. `related` preserves the
+callee filename and UTF-8 byte span. A concrete operation inside a library stays
+at that library's operation; its implementation can still appear as related
+context. Codes, messages, candidate ordering and explanations are unchanged.
+
+The evaluator scopes the caller origin around invocation and inference. Source
+scopes and replayed principal actions retain numeric provenance outside semantic
+and executable cache keys. Nested generic calls inherit it; a concrete library
+use starts its own origin. Anonymous callback parameters record whether their
+input was inferred before the checker concretized it, so an input chosen by the
+caller remains distinguishable from a written fixed type. The same flag belongs
+to extracted named parameters and survives the reflected dependency codec,
+module stamps and exact body projections. Concrete callback operations retain
+their definition location.
+
+The backend copies both locations and scopes source requests separately from
+specialization keys. CLI and project serializers resolve owned unit coordinates
+to filenames; the project result owns both filename strings after preparation is
+released. The reference client accepts an optional `related` source object,
+rejects malformed filenames and byte ranges, and drops unknown fields.
+
+Regression laws live in
+[specialization_origin_tests.zig](src/specialization_origin_tests.zig),
+[specialization_origin.test.ts](tests/specialization_origin.test.ts), the
+existing dispatch laws and project transport laws. They cover generic callbacks,
+nested calls, result-selected obligations, concrete body failures, compiled
+dependency callbacks, fresh CLI and retained project rejection/recovery, and
+malformed secondary locations.
+
 ## Remaining scope
 
 - Explanations accompany diagnostics only. There is no editor query that shows
   why a successful dispatch chose its member.
-- Failures found while specializing are still located at the callee's
-  `@type.call`, for operators inside `std/prelude`, not at the user's operator.
-  Task [094](../tasks/094-locate-specialization-failures-at-their-use.md) moves
-  them.
 - A user-written `@type.call` whose result conflicts later is reported at the
   conflicting annotation without an explanation; the checker explains result
   conflicts only for dispatch it solves as a pending obligation, which includes

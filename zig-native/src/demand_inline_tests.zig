@@ -50,9 +50,6 @@ test "demand forwarding bounds nested proofs and preserves immutable Core under 
 }
 
 test "recursive demand forwarding declines its bounded inline proof" {
-    // The checker rejects recursive demand-forwarding functions (task 098);
-    // this law never ran until its file joined the native suite.
-    if (true) return error.SkipZigTest;
     const a = std.testing.allocator;
     var module = try lower(a,
         \\const recursive: ~U32 -> U32 = fn ~(value: U32) => recursive (@demand value)
@@ -63,4 +60,31 @@ test "recursive demand forwarding declines its bounded inline proof" {
         if (body.parameters.len == 0) continue;
         try std.testing.expect(demand.Plan.init(&module, body) == null);
     }
+}
+
+test "recursive demand headers preserve inferred curried and mutual forwarding" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{
+        "const recursive = fn ~(value: U32) => recursive (@demand value)\nentry const unused = 42\n",
+        "const recursive = fn ~value => recursive (@demand value)\nentry const unused = 42\n",
+        "const recursive = fn (count: U32) => fn ~(value: U32) => if @u32.eq count 0 then @demand value else recursive (@u32.sub count 1) (@demand value)\nentry const run = fn (count: U32) => recursive count 42\n",
+        "const even = fn (count: U32) => fn ~value => if @u32.eq count 0 then @demand value else odd (@u32.sub count 1) (@demand value)\nconst odd = fn (count: U32) => fn ~value => if @u32.eq count 0 then @demand value else even (@u32.sub count 1) (@demand value)\nentry const run = fn (count: U32) => even count 42\n",
+        "const even: U32 -> ~U32 -> U32 = fn count => fn ~value => if @u32.eq count 0 then @demand value else odd (@u32.sub count 1) (@demand value)\nconst odd: U32 -> ~U32 -> U32 = fn count => fn ~value => if @u32.eq count 0 then @demand value else even (@u32.sub count 1) (@demand value)\nentry const run = fn (count: U32) => even count 42\n",
+    }) |source| {
+        var module = try lower(a, source);
+        defer module.deinit(a);
+        try emit(a, &module);
+    }
+}
+
+fn recursiveHeaderOwnership(a: std.mem.Allocator) !void {
+    var module = try lower(a,
+        \\const recursive = fn ~value => recursive (@demand value)
+        \\entry const unused = 42
+    );
+    defer module.deinit(a);
+}
+
+test "recursive demand provisional headers release every allocation failure" {
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, recursiveHeaderOwnership, .{});
 }

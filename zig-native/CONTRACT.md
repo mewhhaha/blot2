@@ -20,6 +20,13 @@ Evaluator records retain slot names beside their values; every projection
 matches names rather than assuming an annotation's field order. Merge results
 intern their ordered name spans, so repeated updates do not grow shape metadata.
 
+Specialization diagnostic provenance consists of owned unit IDs and byte spans,
+scoped to the current requesting use. It never participates in semantic or
+executable cache keys. Secondary filenames are copied before a project
+preparation is released. An inferred-parameter bit retains source provenance
+after callback inputs have been concretized; dependency schemas and exact body
+stamps include this bit.
+
 AST IDs, type IDs and instruction IDs are 32-bit indexes into contiguous owned
 tables. Lists are spans in side arrays. There are no per-character nodes,
 semantic linked lists or persistent tree maps in hot mutable state.
@@ -38,11 +45,10 @@ Ordinary selected named and closure queries also copy partial physical shapes
 when semantic export cannot represent them. Those queries publish no semantic
 receipt. Reconciliation fills erased positions and unknown rows while rejecting
 conflicting known heads, physical slots and effect rows; it never defaults a
-language type.
-Small bodies inline with inherited cleanups, and larger or deeply composed
-bodies use private functions. Runtime arguments evaluate once in their original
-order. Private functions have ordinary invocation-local cleanup and provider
-scopes.
+language type. Small bodies inline with inherited cleanups, and larger or deeply
+composed bodies use private functions. Runtime arguments evaluate once in their
+original order. Private functions have ordinary invocation-local cleanup and
+provider scopes.
 
 Individual compilations use owned arrays and explicit deinitialization, not an
 unbounded arena of obsolete inference versions. Published syntax/typed bodies
@@ -296,16 +302,16 @@ work budget and conservatively declines wider proofs. Dynamic shared/cyclic
 ownership and reclamation of escaping effect payloads remain required before
 tracing can be removed.
 
-Ownership roles come from checked layouts, never from machine types. The
-emitter records each created function's parameter roles and precedes each
-constant-size allocation with an `ownership` annotation run giving its word
-roles (`runtime_ir.Ownership`). Annotations are never encoded, never count as
-code for size heuristics or machine-code sharing, and describe an allocation
-only when their terminator directly precedes its size constant. The lifetime
-pass treats only non-scalar `i32` parameters as candidate addresses, and a
-tracked allocation stored into a scalar word escapes and counts as a
-`role_conflict`; correct emission produces none. Unknown roles stay
-conservative. A captured closure template's word is its environment pointer.
+Ownership roles come from checked layouts, never from machine types. The emitter
+records each created function's parameter roles and precedes each constant-size
+allocation with an `ownership` annotation run giving its word roles
+(`runtime_ir.Ownership`). Annotations are never encoded, never count as code for
+size heuristics or machine-code sharing, and describe an allocation only when
+their terminator directly precedes its size constant. The lifetime pass treats
+only non-scalar `i32` parameters as candidate addresses, and a tracked
+allocation stored into a scalar word escapes and counts as a `role_conflict`;
+correct emission produces none. Unknown roles stay conservative. A captured
+closure template's word is its environment pointer.
 
 Private provider heads and State/request cell IDs never enter source values or
 closures. `runtime_cleanup.Stack` records their releases at construction and
@@ -623,11 +629,11 @@ recover semantic structure by reparsing source.
 `ModuleOptions.max_inference_transitions` (1,000,000 steps by default).
 Exhausting it rejects the module with one `inference_budget` diagnostic at the
 innermost declaration being inferred (a solved field's owner, else the active
-global, else the top-level declaration), naming that declaration and the
-budget. The partially inferred engine is discarded; no other diagnostic from
-that module is kept. Rejected modules may have empty declaration catalogs;
-project export handling must preserve the diagnostic without assuming sentinel
-entries exist. The budget is not a project or CLI setting.
+global, else the top-level declaration), naming that declaration and the budget.
+The partially inferred engine is discarded; no other diagnostic from that module
+is kept. Rejected modules may have empty declaration catalogs; project export
+handling must preserve the diagnostic without assuming sentinel entries exist.
+The budget is not a project or CLI setting.
 
 ## Semantic and backend boundaries
 
@@ -674,8 +680,8 @@ inference; speculative rollback frees the payloads of the diagnostics it drops.
 The evaluator records a plain `DispatchRecord` inside its diagnostic, so copied
 and restored diagnostics carry it without ownership. Its evidence names the
 failing Session's store, and the backend spells it into `Result.explanation`
-before that store is released. Explanations never change selection, its order
-or which diagnostic is reported.
+before that store is released. Explanations never change selection, its order or
+which diagnostic is reported.
 
 The CLI, native checks and executed-Wasm tests are the production gates.
 Validate all declarations, including unused ones. Keep effects, staging, guest

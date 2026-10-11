@@ -3,7 +3,7 @@
 //! match is never a successful semantic answer. No active solver ID is stored.
 const std = @import("std");
 const A = std.mem.Allocator;
-pub const Kind = enum { refinement, specialization, principal, source_validation, executable };
+pub const Kind = enum { refinement, specialization, principal, source_validation, executable, demand_summary };
 pub const Order = enum { oldest_first, newest_first };
 pub const Limits = struct {
     records: usize = 4096,

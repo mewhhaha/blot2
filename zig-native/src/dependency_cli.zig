@@ -304,10 +304,8 @@ pub fn work(io: Io, a: std.mem.Allocator, writer: *Io.Writer, create: bool, entr
         rejected = true;
     }
     if (result.compiled.diagnostic) |issue| {
-        if (result.compiled.explanation) |explanation|
-            try emit(writer, .{ .kind = "diagnostic", .filename = composed.diagnostic_filename orelse entry_identity, .stage = "emit", .unit = issue.unit, .code = @tagName(issue.code), .start = issue.span.start, .end = issue.span.end, .message = issue.message(), .details = .{ .explanation = explanation } })
-        else
-            try emit(writer, .{ .kind = "diagnostic", .filename = composed.diagnostic_filename orelse entry_identity, .stage = "emit", .unit = issue.unit, .code = @tagName(issue.code), .start = issue.span.start, .end = issue.span.end, .message = issue.message() });
+        const related = if (issue.related) |location| @import("diagnostic_location.zig").Location.init(composed.related_filename orelse return error.MissingRelatedFilename, location.span) else null;
+        try emit(writer, .{ .kind = "diagnostic", .filename = composed.diagnostic_filename orelse entry_identity, .stage = "emit", .unit = issue.unit, .code = @tagName(issue.code), .start = issue.span.start, .end = issue.span.end, .message = issue.message(), .related = related, .details = if (result.compiled.explanation) |explanation| .{ .explanation = explanation } else null });
         rejected = true;
     }
     if (rejected) return false;

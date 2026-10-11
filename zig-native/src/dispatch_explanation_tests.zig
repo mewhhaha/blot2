@@ -106,7 +106,7 @@ fn explainUnderFailures(allocator: Allocator, source: []const u8) !void {
     if (try explain(allocator, source, &checked_stage, &code)) |value| value.deinit(allocator);
 }
 test "dispatch explanations own their text through every allocation failure" {
-    for ([_]usize{ 0, 1, 5 }) |index| try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, explainUnderFailures, .{cases[index].source});
+    for ([_]usize{ 0, 1, 5, 6 }) |index| try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, explainUnderFailures, .{cases[index].source});
 }
 
 test "dispatch explanations cut long type spellings and mark truncation" {

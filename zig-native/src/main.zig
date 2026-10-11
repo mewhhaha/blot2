@@ -83,9 +83,9 @@ fn diagnostic(writer: *Io.Writer, filename: []const u8, stage: []const u8, code:
     try std.json.Stringify.value(.{ .kind = "diagnostic", .filename = filename, .stage = stage, .code = code, .start = start, .end = end, .message = message }, .{}, writer);
     try writer.writeByte('\n');
 }
-fn emitDiagnostic(writer: *Io.Writer, filename: []const u8, item: backend.Diagnostic, explanation: ?@import("dispatch_explanation.zig").Explanation) !void {
-    const value = explanation orelse return diagnostic(writer, filename, "emit", @tagName(item.code), item.span.start, item.span.end, item.message());
-    try std.json.Stringify.value(.{ .kind = "diagnostic", .filename = filename, .stage = "emit", .code = @tagName(item.code), .start = item.span.start, .end = item.span.end, .message = item.message(), .details = .{ .explanation = value } }, .{}, writer);
+fn emitDiagnostic(writer: *Io.Writer, filename: []const u8, related_filename: []const u8, item: backend.Diagnostic, explanation: ?@import("dispatch_explanation.zig").Explanation) !void {
+    const related = if (item.related) |location| @import("diagnostic_location.zig").Location.init(related_filename, location.span) else null;
+    try std.json.Stringify.value(.{ .kind = "diagnostic", .filename = filename, .stage = "emit", .code = @tagName(item.code), .start = item.span.start, .end = item.span.end, .message = item.message(), .related = related, .details = if (explanation) |value| .{ .explanation = value } else null }, .{}, writer);
     try writer.writeByte('\n');
 }
 fn frontendDiagnostic(writer: *Io.Writer, filename: []const u8, stage: []const u8, source: []const u8, publication: syntax_diagnostics.Publication, details: anytype) !void {
@@ -242,7 +242,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         stats.constant_steps = compiled.constant_steps;
         stats.principals = compiled.principal;
         if (compiled.diagnostic) |item| {
-            try emitDiagnostic(writer, filename, item, compiled.explanation);
+            try emitDiagnostic(writer, filename, filename, item, compiled.explanation);
             break :compilation false;
         }
         stats.wasm_bytes = compiled.bytes.len;
@@ -430,7 +430,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         principals = compiled.principal;
         selected_queries = compiled.completed_queries;
         if (compiled.diagnostic) |item| {
-            try emitDiagnostic(writer, loaded.filename(item.unit), item, compiled.explanation);
+            try emitDiagnostic(writer, loaded.filename(item.unit), if (item.related) |location| loaded.filename(location.unit) else "", item, compiled.explanation);
             emit_us = elapsed(emit_start, io);
             break :compilation false;
         }

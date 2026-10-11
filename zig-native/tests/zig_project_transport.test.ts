@@ -251,6 +251,14 @@ for (
     "reject-payload",
     "missing-offset",
     "invalid-hole",
+    "related-inverted",
+    "related-negative",
+    "related-fractional",
+    "related-encoding",
+    "related-filename",
+    "related-nul",
+    "related-surrogate",
+    "related-array",
     "source-fuel",
     "missing-work",
     "fractional-work",
@@ -415,5 +423,23 @@ Deno.test("already aborted and unsupported build options do not advance IDs or r
     } finally {
       await item.cleanup();
     }
+  }
+});
+
+Deno.test("client copies only valid related source coordinates", async () => {
+  const item = await fixture("related-valid");
+  const compiler = await createZigProjectCompiler(item.options);
+  try {
+    const result = await compiler.build();
+    ok(!result.success);
+    equal(result.diagnostics[0].related, {
+      filename: "/library.blot",
+      start: 3,
+      end: 7,
+      offset_encoding: "utf8_bytes",
+    });
+  } finally {
+    await compiler.dispose();
+    await item.cleanup();
   }
 });

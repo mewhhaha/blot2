@@ -160,6 +160,8 @@ Deno.test("dispatch over a compiled dependency's type is explained", async () =>
       const built = await compiler.build();
       ok(!built.success);
       equal(built.diagnostics[0].code, "missing_associated");
+      equal(built.diagnostics[0].filename, entry);
+      ok(built.diagnostics[0].related?.filename.endsWith("prelude.blot"));
       const explanation = built.diagnostics[0].explanation;
       ok(explanation, JSON.stringify(built.diagnostics[0]));
       equal(explanation.candidates.map((item) => item.outcome), [

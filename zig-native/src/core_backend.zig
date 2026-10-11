@@ -13,6 +13,7 @@ const substitution_keys = @import("substitution_keys.zig");
 const provider_chain = @import("provider_chain.zig");
 const layout = @import("layout.zig");
 const resolved_call = @import("resolved_call.zig");
+const resolved_body = @import("resolved_body.zig");
 const packed_layout = @import("packed_layout.zig");
 const row_projection_uses = @import("row_projection_uses.zig");
 const list_traversal = @import("list_traversal.zig");
@@ -51,6 +52,7 @@ pub const Diagnostic = struct {
     detail: []const u8 = &.{},
     /// Candidates of the failed dispatch this diagnostic reports.
     dispatch: ?core_eval.DispatchRecord = null,
+    related: ?core_eval.SourceLocation = null,
     pub fn message(self: Diagnostic) []const u8 {
         return self.code.message(self.detail);
     }
@@ -127,6 +129,7 @@ const Generator = struct {
     persisted_principals: ?*@import("principal_archive.zig").Reader = null,
     principal_stats: principal_evidence_reuse.Stats = .{},
     query_state: ?*completed_specialization_query.State = null,
+    demand_owner: ?*code_artifacts.Context = null,
     refinement_owner: ?*code_artifacts.Context = null,
     refinement_stats: refinement_receipt.Stats = .{},
     work: artifact_fragment.Stats = .{},
@@ -343,6 +346,19 @@ const Generator = struct {
     fn fail(self: *Generator, unit_id: u32, node: core.Id, code: Code) Error {
         return self.decline(unit_id, self.unit(unit_id).span(node), code);
     }
+    fn failSpecialization(self: *Generator, unit_id: u32, node: core.Id, code: Code) Error {
+        const fresh = self.diagnostic == null;
+        const failure = self.fail(unit_id, node, code);
+        if (fresh and core_eval.callerDependentUse(self.unit(unit_id), node)) if (self.evaluator.specialization_origin) |origin| {
+            const diagnostic_ = &self.diagnostic.?;
+            if (unit_id != origin.unit or !std.meta.eql(diagnostic_.span, origin.span)) {
+                diagnostic_.related = .{ .unit = unit_id, .span = diagnostic_.span };
+                diagnostic_.unit = origin.unit;
+                diagnostic_.span = origin.span;
+            }
+        };
+        return failure;
+    }
     /// The ownership role of a value with checked layout `id`. Every
     /// aggregate, collection, closure, demand and provider is a heap
     /// reference or zero; scalars never are.
@@ -377,7 +393,10 @@ const Generator = struct {
             const fresh = self.diagnostic == null;
             const result = self.decline(item.unit, public_span, code);
             if (self.diagnostic) |*diagnostic_| diagnostic_.detail = item.detail;
-            if (fresh) self.diagnostic.?.dispatch = item.dispatch;
+            if (fresh) {
+                self.diagnostic.?.dispatch = item.dispatch;
+                self.diagnostic.?.related = item.related;
+            }
             return result;
         }
         return self.decline(1, .{ .start = 0, .end = 0 }, .constant_expression);
@@ -829,7 +848,7 @@ const Generator = struct {
                     const concrete = self.fromEvidence(mapping.evidence) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(metadata.unit, .{ .start = 0, .end = 0 }, .unresolved_type);
                     try self.mapType(metadata.unit, &mappings, mapping.variable, concrete, .{ .start = 0, .end = 0 });
                 }
-                function_id = try self.operationFunction(.{ .operation = try self.operationToken(metadata.unit, metadata.identity, mappings.items, rows.items, .{ .start = 0, .end = 0 }), .ty = ty });
+                function_id = try self.operationFunction(.{ .operation = try self.runtimeOperation(try self.operationLabel(metadata.unit, metadata.identity, mappings.items, rows.items, .{ .start = 0, .end = 0 }), metadata.unit, .{ .start = 0, .end = 0 }), .ty = ty });
             },
         }
         var words: std.ArrayList(u32) = .empty;
@@ -901,7 +920,7 @@ const Generator = struct {
         defer emitter.deinit();
         if (metadata.parameter.binding != 0) try emitter.locals.put(self.allocator, metadata.parameter.binding, 1);
         for (bindings, captured) |binding, actual| try emitter.static_values.put(self.allocator, binding, actual);
-        try emitter.expression(metadata.body, 0);
+        try emitter.bodyExpression(metadata.body, 0, false);
         if (source.types.node(source.typeOf(metadata.body)).tag == .never) try emitter.emit(.unreachable_, 0);
         self.startup_facts.complete(function_id);
         return function_id;
@@ -1247,11 +1266,11 @@ const Generator = struct {
             } else try emitter.locals.put(self.allocator, parameter.binding, @intCast(index));
         };
         if (key.template_result) {
-            try emitter.templateExpression(@backingInt(resolved.root), 0);
+            try emitter.bodyExpression(@backingInt(resolved.root), 0, true);
             const template = emitter.result_template orelse return self.fail(unit_id, body.root, .unresolved_type);
             try self.template_results.put(self.allocator, key, template);
         } else {
-            try emitter.expression(@backingInt(resolved.root), 0);
+            try emitter.bodyExpression(@backingInt(resolved.root), 0, false);
             if (source.types.node(source.typeOf(body.root)).tag == .never) try emitter.emit(.unreachable_, 0);
         }
         if (scope) |*actor| try actor.solved(resolved.mappings.items, resolved.rows.items, self.template_keys.get(key.templates));
@@ -1313,7 +1332,7 @@ const Generator = struct {
         try self.refineMappings(target.unit, .{ .body = target }, expected, &mappings, &rows, body.span);
         var emitter: Emitter = .{ .generator = self, .unit_id = target.unit, .function_id = slot.initializer, .mappings = mappings.items, .row_mappings = rows.items };
         defer emitter.deinit();
-        try emitter.expression(body.root, 0);
+        try emitter.bodyExpression(body.root, 0, false);
         try emitter.emit(.global_set, slot.global);
         self.runtime_globals.getPtr(target).?.active = false;
         self.startup_facts.complete(slot.initializer);
@@ -1412,6 +1431,36 @@ const Generator = struct {
         errdefer allocator.free(owned_values);
         return .{ .binding = binding, .unit = template.unit, .node = template.node, .mappings = template.evidence, .rows = owned_rows, .values = owned_values, .captures = try children.toOwnedSlice(allocator), .computation = template.computation };
     }
+    fn resolveClosureMappings(self: *Generator, key: ClosureKey, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping)) Error!void {
+        const source = self.unit(key.unit);
+        const metadata = source.closures[key.catalog];
+        const captures = source.extra[metadata.captures.start..][0..metadata.captures.len];
+        const fn_type = self.layouts.node(key.ty);
+        for (self.row_keys.get(key.rows)) |mapping| {
+            const concrete = self.rowFromEvidence(mapping.value) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.fail(key.unit, metadata.body, .unresolved_type);
+            try rows.append(self.allocator, .{ .variable = mapping.variable, .row = concrete });
+        }
+        if (key.evidence != 0) {
+            const words = self.evaluator.evidence.children(key.evidence);
+            var index: usize = 0;
+            while (index < words.len) : (index += 2) {
+                const concrete = self.fromEvidence(words[index + 1]) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.fail(key.unit, metadata.body, .unresolved_type);
+                try self.mapType(key.unit, mappings, words[index], concrete, source.span(metadata.body));
+            }
+        }
+        for (captures, 0..) |binding, index| if (self.capturedTemplate(key.templates, binding) == null) {
+            try self.mapType(key.unit, mappings, source.binding(binding).ty, self.layouts.children(key.captures)[index], source.span(metadata.body));
+        };
+        try self.mapType(key.unit, mappings, metadata.parameter.ty, fn_type.a, metadata.parameter.span);
+        try self.mapType(key.unit, mappings, source.typeOf(metadata.body), fn_type.b, source.span(metadata.body));
+        if (metadata.function_type != 0) try self.mapTypeDepth(key.unit, mappings, rows, metadata.function_type, key.ty, source.span(metadata.body), 0);
+        var hint_arena = std.heap.ArenaAllocator.init(self.allocator);
+        defer hint_arena.deinit();
+        var hints: std.ArrayList(core_eval.RetainedCapture) = .empty;
+        for (captures) |binding| if (self.capturedTemplate(key.templates, binding)) |template| try hints.append(hint_arena.allocator(), try self.retainedCapture(hint_arena.allocator(), binding, template, 0));
+        if (key.parameter_template != 0) try hints.append(hint_arena.allocator(), try self.retainedCapture(hint_arena.allocator(), metadata.parameter.binding, self.template_catalog.items[key.parameter_template - 1], 0));
+        try self.refineMappingsCaptures(key.unit, .{ .closure = .{ .unit = key.unit, .catalog = key.catalog } }, key.ty, mappings, rows, source.span(metadata.body), hints.items);
+    }
     fn closureFunction(self: *Generator, key: ClosureKey) Error!u32 {
         var scope: ?code_artifacts.Scope = if (self.artifacts) |context| try context.enter(.{ .closure = key }) else null;
         defer if (scope) |*actor| actor.deinit();
@@ -1447,30 +1496,7 @@ const Generator = struct {
         var rows: std.ArrayList(RowMapping) = .empty;
         defer rows.deinit(self.allocator);
         defer mappings.deinit(self.allocator);
-        for (self.row_keys.get(key.rows)) |mapping| {
-            const concrete = self.rowFromEvidence(mapping.value) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.fail(key.unit, metadata.body, .unresolved_type);
-            try rows.append(self.allocator, .{ .variable = mapping.variable, .row = concrete });
-        }
-        if (key.evidence != 0) {
-            const words = self.evaluator.evidence.children(key.evidence);
-            var index: usize = 0;
-            while (index < words.len) : (index += 2) {
-                const concrete = self.fromEvidence(words[index + 1]) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.fail(key.unit, metadata.body, .unresolved_type);
-                try self.mapType(key.unit, &mappings, words[index], concrete, source.span(metadata.body));
-            }
-        }
-        for (captures, 0..) |binding, index| if (self.capturedTemplate(key.templates, binding) == null) {
-            try self.mapType(key.unit, &mappings, source.binding(binding).ty, self.layouts.children(key.captures)[index], source.span(metadata.body));
-        };
-        try self.mapType(key.unit, &mappings, metadata.parameter.ty, fn_type.a, metadata.parameter.span);
-        try self.mapType(key.unit, &mappings, source.typeOf(metadata.body), fn_type.b, source.span(metadata.body));
-        if (metadata.function_type != 0) try self.mapTypeDepth(key.unit, &mappings, &rows, metadata.function_type, key.ty, source.span(metadata.body), 0);
-        var hint_arena = std.heap.ArenaAllocator.init(self.allocator);
-        defer hint_arena.deinit();
-        var hints: std.ArrayList(core_eval.RetainedCapture) = .empty;
-        for (captures) |binding| if (self.capturedTemplate(key.templates, binding)) |template| try hints.append(hint_arena.allocator(), try self.retainedCapture(hint_arena.allocator(), binding, template, 0));
-        if (key.parameter_template != 0) try hints.append(hint_arena.allocator(), try self.retainedCapture(hint_arena.allocator(), metadata.parameter.binding, self.template_catalog.items[key.parameter_template - 1], 0));
-        try self.refineMappingsCaptures(key.unit, .{ .closure = .{ .unit = key.unit, .catalog = key.catalog } }, key.ty, &mappings, &rows, source.span(metadata.body), hints.items);
+        try self.resolveClosureMappings(key, &mappings, &rows);
         var emitter: Emitter = .{ .generator = self, .unit_id = key.unit, .function_id = function_id, .provider_local = 2, .mappings = mappings.items, .row_mappings = rows.items, .factory_template = key.template_result };
         defer emitter.deinit();
         if (metadata.parameter.binding != 0) {
@@ -1495,11 +1521,11 @@ const Generator = struct {
             } else try emitter.locals.put(self.allocator, binding, local);
         }
         if (key.template_result) {
-            try emitter.templateExpression(metadata.body, 0);
+            try emitter.bodyExpression(metadata.body, 0, true);
             const template = emitter.result_template orelse return self.fail(key.unit, metadata.body, .unresolved_type);
             try self.closure_template_results.put(self.allocator, key, template);
         } else {
-            try emitter.expression(metadata.body, 0);
+            try emitter.bodyExpression(metadata.body, 0, false);
             if (source.types.node(source.typeOf(metadata.body)).tag == .never) try emitter.emit(.unreachable_, 0);
         }
         // Generic static fields may retain erased layouts. Their complete
@@ -1721,7 +1747,7 @@ const Generator = struct {
         try self.module.demandResource(.operation, operation, operation <= previous_count);
         return operation;
     }
-    fn operationToken(self: *Generator, unit_id: u32, catalog: u32, mappings: []const Mapping, rows: []const RowMapping, span: core.Span) Error!runtime_operations.Id {
+    fn operationLabel(self: *Generator, unit_id: u32, catalog: u32, mappings: []const Mapping, rows: []const RowMapping, span: core.Span) Error!type_evidence.Effects.Label {
         const source = self.unit(unit_id);
         if (catalog >= source.operation_values.len) return self.decline(unit_id, span, .unsupported);
         const operation = source.operation_values[catalog];
@@ -1733,9 +1759,9 @@ const Generator = struct {
             try arguments.append(self.allocator, actual);
         }
         const semantic_label = self.evaluator.evidence.effects.internOperation(operation.identity, arguments.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-        return self.runtimeOperation(semantic_label, unit_id, span);
+        return semantic_label;
     }
-    fn operationLayoutToken(self: *Generator, operation_type: layout.Id, unit_id: u32, span: core.Span) Error!runtime_operations.Id {
+    fn operationLayoutLabel(self: *Generator, operation_type: layout.Id, unit_id: u32, span: core.Span) Error!type_evidence.Effects.Label {
         const operation = self.layouts.node(operation_type);
         if (operation.tag != .nominal) return self.decline(unit_id, span, .unresolved_type);
         var arguments: std.ArrayList(type_evidence.Id) = .empty;
@@ -1747,9 +1773,9 @@ const Generator = struct {
             try arguments.append(self.allocator, actual);
         }
         const semantic_label = self.evaluator.evidence.effects.internOperation(.{ .unit = operation.a, .decl = operation.b }, arguments.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-        return self.runtimeOperation(semantic_label, unit_id, span);
+        return semantic_label;
     }
-    fn requestOperation(self: *Generator, unit_id: u32, label: types.Effects.Label, mappings: []const Mapping, rows: []const RowMapping, span: core.Span) Error!runtime_operations.Id {
+    fn requestLabel(self: *Generator, unit_id: u32, label: types.Effects.Label, mappings: []const Mapping, rows: []const RowMapping, span: core.Span) Error!type_evidence.Effects.Label {
         const source = self.unit(unit_id);
         const operation = source.types.operation(label);
         var arguments: std.ArrayList(type_evidence.Id) = .empty;
@@ -1760,7 +1786,7 @@ const Generator = struct {
             try arguments.append(self.allocator, actual);
         }
         const semantic_label = self.evaluator.evidence.effects.internOperation(operation.identity, arguments.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
-        return self.runtimeOperation(semantic_label, unit_id, span);
+        return semantic_label;
     }
     fn operationFunction(self: *Generator, key: OperationKey) Error!u32 {
         var scope: ?code_artifacts.Scope = if (self.artifacts) |context| try context.enter(.{ .operation = key }) else null;
@@ -2030,6 +2056,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
     generator.evaluator.timing = if (options.profile_backend) &generator.work_timing else null;
     // The replay gate destroys all mutable compiler state before materialization.
     if (recording) generator.artifacts = &metadata;
+    generator.demand_owner = &metadata;
     generator.refinement_owner = &metadata;
     var generator_alive = true;
     defer if (generator_alive) generator.deinit();
@@ -2043,6 +2070,7 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
         if (previous.emission.sealed and previous.metadata.pools != null) {
             retained = try artifact_fragment.State.initWithStamps(allocator, previous, units, options.identity, options.cached_units, stamps);
             generator.retained = &retained.?;
+            if (retained.?.importer.code_gate) |*gate| try @import("demand_summary.zig").retain(allocator, &metadata.demand_summaries, &previous.metadata.demand_summaries, gate, &generator.evaluator.counters);
         }
     }
     var principal_state: ?principal_evidence_reuse.State = null;
@@ -2680,9 +2708,123 @@ const ReturnTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanu
 const LoopTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanup.Mark };
 const Template = struct { unit: u32 = 0, node: core.Id, environment: ?u32 = null, captures: layout.Id = 0, templates: substitution_keys.Id = 0, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
 const Emitter = struct {
+    const ResolverPlan = union(enum) { monad, forward, run: resolved_call.Arrow, call: resolved_call.Applied };
+    const DispatchPlan = union(enum) {
+        scalar: wasm.Op,
+        simd: layout.Id,
+        selected: struct { key: Key, call: resolved_call.Applied },
+    };
+    const TemplatePreparation = struct {
+        metadata: Template,
+        capture_types: []layout.Id,
+        capture_roles: []ir.Role,
+        static_key: ?ClosureKey = null,
+        fn deinit(self: *TemplatePreparation, a: Allocator) void {
+            a.free(self.capture_types);
+            a.free(self.capture_roles);
+        }
+    };
+    const FieldPlan = struct {
+        index: u32,
+        projection: core.Projection,
+        variants: std.ArrayList(core.ProjectionVariant) = .empty,
+        slots: std.ArrayList(u32) = .empty,
+        fn deinit(self: *FieldPlan, a: Allocator) void {
+            self.variants.deinit(a);
+            self.slots.deinit(a);
+        }
+    };
+    const ProjectionPlan = union(enum) {
+        field: FieldPlan,
+        member: struct { direct: Key, wrapper: CallableKey },
+        fn deinit(self: *ProjectionPlan, a: Allocator) void {
+            switch (self.*) {
+                .field => |*field| field.deinit(a),
+                .member => {},
+            }
+        }
+    };
+    const FactoryPlan = struct {
+        callee: union(enum) { named: Key, closure: ClosureKey },
+        admitted: [max_parameters]bool = @splat(false),
+        result: Template,
+    };
+    const DemandPlan = struct { uses: [max_parameters]u8 };
+    const NamedPlan = struct {
+        call: resolved_call.Named,
+        demand: ?DemandPlan = null,
+        factory: ?FactoryPlan = null,
+        fn deinit(self: *NamedPlan, a: Allocator) void {
+            self.call.deinit(a);
+        }
+    };
+    const SourceCall = struct { key: Key, arguments: [max_parameters]core.Id, count: usize };
+    const ApplyPlan = struct {
+        factory: ?FactoryPlan = null,
+        static_closure: ?StaticClosurePlan = null,
+        partial: ?SourceCall = null,
+        known: ?SourceCall = null,
+        arrow: ?resolved_call.Arrow = null,
+        never: bool = false,
+        fn deinit(self: *ApplyPlan, a: Allocator) void {
+            if (self.static_closure) |*closure_| closure_.deinit(a);
+        }
+    };
+    const ProviderPlan = struct { ty: layout.Node, read: type_evidence.Effects.Label, write: ?type_evidence.Effects.Label = null };
+    const Plan = union(enum) {
+        operation: struct { ty: layout.Id, label: type_evidence.Effects.Label },
+        provider: ProviderPlan,
+        projection: ?ProjectionPlan,
+        update_locations: []FieldPlan,
+        pattern: ?[]StaticBinding,
+        template: TemplatePreparation,
+        reference: ?core.BindingRef,
+        named: NamedPlan,
+        application: ApplyPlan,
+        resolver: ResolverPlan,
+        dispatch: DispatchPlan,
+        comparison: bool,
+        result_member: CallableKey,
+        join: resolved_flow.Join,
+        match: resolved_flow.Match,
+        loop: resolved_flow.Loop,
+        exit: resolved_flow.SymbolicExit,
+        request: resolved_flow.RequestLoop,
+        pub fn deinit(self: *Plan, a: Allocator) void {
+            switch (self.*) {
+                .request => |request| a.free(request.operations),
+                .pattern => |bindings| if (bindings) |owned| a.free(owned),
+                .template => |*metadata| metadata.deinit(a),
+                .projection => |*projection_| if (projection_.*) |*prepared| prepared.deinit(a),
+                .update_locations => |locations| {
+                    for (locations) |*place| place.deinit(a);
+                    a.free(locations);
+                },
+                .named => |*plan| plan.deinit(a),
+                .application => |*application| application.deinit(a),
+                .resolver => |*plan| switch (plan.*) {
+                    .call => |*call| call.deinit(a),
+                    else => {},
+                },
+                .dispatch => |*plan| switch (plan.*) {
+                    .selected => |*selected| selected.call.deinit(a),
+                    else => {},
+                },
+                else => {},
+            }
+            self.* = undefined;
+        }
+    };
+    const Body = resolved_body.Body(Plan);
+
     const RowView = struct { binding: core.BindingId, row: layout.Id, owner: u32, offset: u32, address: u32, next_address: u32, limit_address: u32, scratch: u32 };
     const LayoutEntry = struct { ty: types.Id = 0, value: layout.Id = 0 };
     const SmallCollection = struct { values: [function_facts.small_limit]u32 = undefined, len: usize = 0, machine: wasm.ValueType = .i32 };
+    body: ?*const Body = null,
+    preparation_depth: u16 = 0,
+    preparing: bool = false,
+    planned_returns: std.ArrayList(struct { node: core.Id, template_result: bool }) = .empty,
+    planned_loops: std.ArrayList(core.Id) = .empty,
     small_values: std.AutoHashMapUnmanaged(core.BindingId, SmallCollection) = .empty,
     row_views: std.ArrayList(RowView) = .empty,
     small_result: ?struct { root: core.Id, value: *SmallCollection } = null,
@@ -2714,6 +2856,350 @@ const Emitter = struct {
     // Source owner and mappings are immutable for this emitter's lifetime.
     // Cache only completed root conversions, preserving recursive work limits.
     layout_cache: [32]LayoutEntry = @splat(.{}),
+
+    fn resolvedPlan(self: *Emitter, id: core.Id) Plan {
+        const counters = &self.generator.evaluator.counters;
+        counters.resolved_plan_reads += 1;
+        const prepared = self.body.?.get(id);
+        switch (prepared) {
+            .join => counters.prepared_joins += 1,
+            .match => {
+                counters.prepared_joins += 1;
+                counters.prepared_matches += 1;
+            },
+            .loop => counters.prepared_loops += 1,
+            .exit => counters.prepared_exits += 1,
+            .request => {
+                counters.prepared_exits += 2;
+                counters.prepared_request_loops += 1;
+            },
+            else => {},
+        }
+        return prepared;
+    }
+    /// Every source-body route enters here after its exact capture bindings
+    /// exist. Preparation owns decisions; encoding alone owns runtime locals,
+    /// labels, environments and the original lazy function-index order.
+    fn prepareBody(self: *Emitter, root: core.Id, depth: usize, template: bool) Error!Body {
+        const g = self.generator;
+        if (self.preparation_depth >= 256) return g.fail(self.unit_id, root, .complexity);
+        var body = try Body.init(g.allocator, self.unit_id, root, self.mappings, self.row_mappings);
+        errdefer body.deinit(g.allocator);
+        body.rows_evidence = try g.rowMappingEvidence(self.row_mappings);
+        var preparer: Emitter = .{ .generator = g, .unit_id = self.unit_id, .function_id = self.function_id, .mappings = body.mappings, .row_mappings = body.rows, .factory_template = self.factory_template, .preparation_depth = self.preparation_depth + 1, .preparing = true };
+        defer preparer.deinit();
+        preparer.locals = try self.locals.clone(g.allocator);
+        preparer.templates = try self.templates.clone(g.allocator);
+        preparer.static_values = try self.static_values.clone(g.allocator);
+        try preparer.prepareNode(&body, root, depth, template);
+        g.evaluator.counters.resolved_bodies += 1;
+        g.evaluator.counters.resolved_plan_entries += body.entries.count();
+        return body;
+    }
+    fn bodyExpression(self: *Emitter, root: core.Id, depth: usize, template: bool) Error!void {
+        var body = try self.prepareBody(root, depth, template);
+        defer body.deinit(self.generator.allocator);
+        const previous = self.body;
+        self.body = &body;
+        defer self.body = previous;
+        if (template) try self.templateExpression(root, depth) else try self.expression(root, depth);
+    }
+    fn prepareNode(self: *Emitter, body: *Body, id: core.Id, depth: usize, template: bool) Error!void {
+        std.debug.assert(self.preparing);
+        if (id == 0 or body.entries.contains(id)) return;
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        if (depth >= 1024) return g.fail(self.unit_id, id, .complexity);
+        const n = source.node(id);
+        var entry: ?Plan = switch (n.tag) {
+            .operation_value => .{ .operation = .{ .ty = try self.codeLayout(n.ty, source.span(id)), .label = try g.operationLabel(self.unit_id, n.a, self.mappings, self.row_mappings, source.span(id)) } },
+            .effect_provider, .state_provider => .{ .provider = try self.prepareProvider(id) },
+            .effect_reflection => return g.fail(self.unit_id, id, .backend_const_only),
+            .pattern_bind => .{ .pattern = try self.prepareStaticPattern(id) },
+            .closure, .suspend_ => .{ .template = try self.prepareTemplate(id) },
+            .reference => .{ .reference = try self.prepareReference(id) },
+            .project => .{ .projection = try self.prepareProjection(id) },
+            .update => .{ .update_locations = try self.prepareUpdateLocations(id) },
+            .call => .{ .named = try self.prepareNamedCall(id) },
+            .apply => .{ .application = try self.prepareApplication(id) },
+            .scalar, .associated => .{ .dispatch = try self.resolveDispatch(id) },
+            .type_same => .{ .comparison = try self.prepareTypeComparison(id) },
+            .result_associated => .{ .result_member = try self.prepareResultAssociated(id) },
+            .resolver_op => .{ .resolver = try self.prepareResolver(id) },
+            .block, .if_value => .{ .join = try self.prepareJoin(id, if (template) .template else .value) },
+            .if_stmt => .{ .join = try self.prepareJoin(id, .statement) },
+            .match => .{ .match = try self.prepareMatch(id) },
+            .loop => .{ .loop = try self.prepareLoop(id) },
+            .request_loop => .{ .request = try self.prepareRequestLoop(id) },
+            .return_ => .{ .exit = try self.prepareReturn(id, .return_, n.b) },
+            .break_ => .{ .exit = try self.prepareBreak(id) },
+            else => null,
+        };
+        if (entry) |*owned| {
+            body.put(g.allocator, id, owned.*) catch |err| {
+                owned.deinit(g.allocator);
+                return err;
+            };
+        }
+        switch (n.tag) {
+            .block => {
+                try self.planned_returns.append(g.allocator, .{ .node = id, .template_result = template });
+                defer _ = self.planned_returns.pop();
+                for (source.children(id)) |child| {
+                    try self.prepareNode(body, child, depth + 1, false);
+                    const tag = source.node(child).tag;
+                    if (tag == .return_ or tag == .break_ or source.types.node(source.typeOf(child)).tag == .never) break;
+                }
+            },
+            .suite, .product, .record, .array, .array_op, .call => for (source.children(id)) |child| {
+                try self.prepareNode(body, child, depth + 1, false);
+                if (n.tag == .suite and (source.node(child).tag == .return_ or source.node(child).tag == .break_ or source.types.node(source.typeOf(child)).tag == .never)) break;
+            },
+            .bind => {
+                try self.prepareNode(body, n.b, depth + 1, false);
+                if (try self.describeComputation(body, n.b, depth + 1)) |metadata| {
+                    try self.templates.put(g.allocator, n.a, metadata);
+                    return;
+                }
+                const value = source.node(n.b);
+                if (value.tag == .closure or value.tag == .primitive_function or value.tag == .constructor_function) {
+                    const metadata = if (value.tag == .closure) body.get(n.b).template.metadata else Template{ .unit = self.unit_id, .node = n.b };
+                    try self.templates.put(g.allocator, n.a, metadata);
+                } else if (value.tag == .computation and source.node(value.a).tag == .closure) {
+                    var metadata = body.get(value.a).template.metadata;
+                    metadata.computation = true;
+                    try self.templates.put(g.allocator, n.a, metadata);
+                } else if (value.tag == .reference and self.templates.get(source.reference(n.b).binding) != null) {
+                    try self.templates.put(g.allocator, n.a, self.templates.get(source.reference(n.b).binding).?);
+                } else try self.locals.put(g.allocator, n.a, 0);
+            },
+            .pattern_bind => {
+                if (body.get(id).pattern) |bindings| {
+                    for (bindings) |binding| try self.static_values.put(g.allocator, binding.binding, binding.value);
+                    return;
+                }
+                try self.preparePattern(body, n.a, depth + 1);
+                try self.prepareNode(body, n.b, depth + 1, false);
+                try self.prepareNode(body, n.c, depth + 1, false);
+            },
+            .return_ => try self.prepareNode(body, n.a, depth + 1, body.get(id).exit.template_result),
+            .break_ => for (source.breakValues(id)) |child| try self.prepareNode(body, child, depth + 1, false),
+            .loop => {
+                const loop = source.loopInfo(id);
+                try self.prepareNode(body, loop.first, depth + 1, false);
+                try self.prepareNode(body, loop.end, depth + 1, false);
+                try self.planned_loops.append(g.allocator, id);
+                defer _ = self.planned_loops.pop();
+                try self.preparePattern(body, loop.pattern, depth + 1);
+                try self.prepareNode(body, loop.body, depth + 1, false);
+            },
+            .request_loop => {
+                const request = source.requestLoopInfo(id);
+                try self.prepareNode(body, request.computation, depth + 1, false);
+                for (source.requestArms(id)) |arm| try self.prepareNode(body, arm.callback, depth + 1, false);
+                try self.planned_loops.append(g.allocator, id);
+                defer _ = self.planned_loops.pop();
+                try self.preparePattern(body, request.completion_pattern, depth + 1);
+                try self.prepareNode(body, request.completion_body, depth + 1, false);
+            },
+            .match => {
+                for (source.matchInputs(id)) |child| try self.prepareNode(body, child, depth + 1, false);
+                for (source.matchArms(id)) |arm| {
+                    for (source.armRows(arm)) |row| for (source.rowPatterns(row)) |pattern_id| try self.preparePattern(body, pattern_id, depth + 1);
+                    try self.prepareNode(body, arm.guard, depth + 1, false);
+                    try self.prepareNode(body, arm.body, depth + 1, false);
+                }
+            },
+            .update => {
+                const metadata = source.updateInfo(id);
+                try self.prepareNode(body, metadata.root, depth + 1, false);
+                for (source.updateSelectors(id)) |selector| if (selector.kind == .index) try self.prepareNode(body, selector.index, depth + 1, false);
+                try self.prepareNode(body, metadata.value, depth + 1, false);
+            },
+            .resolver_op => {
+                try self.prepareNode(body, source.resolverInfo(id).resolver, depth + 1, false);
+                for (source.resolverArguments(id)) |child| try self.prepareNode(body, child, depth + 1, false);
+            },
+            .if_value, .if_stmt => {
+                try self.prepareNode(body, n.a, depth + 1, false);
+                try self.prepareNode(body, n.b, depth + 1, template);
+                try self.prepareNode(body, n.c, depth + 1, template);
+            },
+            .scalar, .associated, .logical, .type_same, .apply, .record_merge, .handle => {
+                try self.prepareNode(body, n.a, depth + 1, false);
+                try self.prepareNode(body, n.b, depth + 1, false);
+            },
+            .project, .force, .result_associated, .computation => try self.prepareNode(body, n.a, depth + 1, false),
+            .construct, .effect_provider => try self.prepareNode(body, n.b, depth + 1, false),
+            .state_provider => {
+                try self.prepareNode(body, n.b, depth + 1, false);
+                try self.prepareNode(body, n.c, depth + 1, false);
+            },
+            .request_decision => {
+                try self.prepareNode(body, n.b, depth + 1, false);
+                try self.prepareNode(body, n.c, depth + 1, false);
+            },
+            else => {},
+        }
+        if (n.tag == .call or n.tag == .apply) {
+            const factory = try self.prepareFactory(body, id);
+            if (n.tag == .call) body.getPtr(.named, id).factory = factory else body.getPtr(.application, id).factory = factory;
+        }
+    }
+
+    fn preparePattern(self: *Emitter, body: *Body, id: core.PatternId, depth: usize) Error!void {
+        if (id == 0) return;
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        if (depth >= 1024) return g.fail(self.unit_id, body.root, .complexity);
+        const pattern = source.pattern(id);
+        switch (pattern.tag) {
+            .value => try self.prepareNode(body, pattern.a, depth + 1, false),
+            .bind => if (pattern.a != 0) try self.locals.put(g.allocator, pattern.a, 0),
+            .product => for (source.patternChildren(id)) |child| try self.preparePattern(body, child, depth + 1),
+            .constructor, .record_payload => try self.preparePattern(body, pattern.b, depth + 1),
+            else => {},
+        }
+    }
+    fn describeCallable(self: *Emitter, body: *const Body, id: core.Id) Error!?Template {
+        const source = self.generator.unit(self.unit_id);
+        const node = source.node(id);
+        if (node.tag == .closure or node.tag == .suspend_) return body.get(id).template.metadata;
+        if (node.tag == .primitive_function or node.tag == .constructor_function) return .{ .unit = self.unit_id, .node = id };
+        if (node.tag != .reference) return null;
+        const reference = source.reference(id);
+        if (reference.unit == 0 or reference.unit == self.unit_id) {
+            if (self.templates.get(reference.binding)) |metadata| return metadata;
+            const kind = source.binding(reference.binding).kind;
+            if (kind != .global and kind != .external) return null;
+        }
+        return .{ .unit = self.unit_id, .node = id };
+    }
+    fn describeComputation(self: *Emitter, body: *const Body, id: core.Id, depth: usize) Error!?Template {
+        if (id == 0) return null;
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        if (depth >= 1024) return g.fail(self.unit_id, id, .complexity);
+        const node = source.node(id);
+        switch (node.tag) {
+            .computation => {
+                var metadata = try self.describeCallable(body, node.a) orelse return null;
+                metadata.computation = true;
+                return metadata;
+            },
+            .reference => {
+                const reference = source.reference(id);
+                if (reference.unit == 0 or reference.unit == self.unit_id) if (self.templates.get(reference.binding)) |metadata| if (metadata.computation) return metadata;
+                return null;
+            },
+            .call => return if (body.get(id).named.factory) |factory| factory.result else null,
+            .apply => return if (body.get(id).application.factory) |factory| factory.result else null,
+            .block => {
+                for (source.children(id)) |statement| {
+                    const value = source.node(statement);
+                    if (value.tag == .return_ and value.b == id) return self.describeComputation(body, value.a, depth + 1);
+                }
+                return null;
+            },
+            .if_value => {
+                const left = try self.describeComputation(body, node.b, depth + 1) orelse return null;
+                const right = try self.describeComputation(body, node.c, depth + 1) orelse return null;
+                if (try g.captureTemplate(left) != try g.captureTemplate(right)) return g.fail(self.unit_id, id, .unresolved_type);
+                return left;
+            },
+            else => return null,
+        }
+    }
+    fn prepareFactory(self: *Emitter, body: *const Body, id: core.Id) Error!?FactoryPlan {
+        std.debug.assert(self.preparing);
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const node = source.node(id);
+        const result_type = source.types.node(node.ty);
+        if (result_type.tag != .nominal or result_type.a != std.math.maxInt(u32) or result_type.b != 5) return null;
+        if (self.preparation_depth >= 256) return g.fail(self.unit_id, id, .complexity);
+        var admitted: [max_parameters]bool = @splat(false);
+        var callee: @FieldType(FactoryPlan, "callee") = undefined;
+        var owner: u32 = undefined;
+        var root: core.Id = undefined;
+        var mappings: std.ArrayList(Mapping) = .empty;
+        var rows: std.ArrayList(RowMapping) = .empty;
+        defer mappings.deinit(g.allocator);
+        defer rows.deinit(g.allocator);
+        var preparer: Emitter = .{ .generator = g, .unit_id = 0, .function_id = self.function_id, .mappings = &.{}, .factory_template = true, .preparation_depth = self.preparation_depth + 1, .preparing = true };
+        defer preparer.deinit();
+        if (node.tag == .call) {
+            const call = source.call(id);
+            var key = body.get(id).named.call.key;
+            if (key.count != call.arguments.len or self.computationAction(key.result) == null) return null;
+            const producer = g.unit(key.target.unit);
+            const definition = producer.body(key.target.binding) orelse return null;
+            if (!definition.is_function or definition.parameters.len != key.count) return null;
+            for (call.arguments, 0..) |argument, i| admitted[i] = self.isCallableTemplate(argument);
+            if (!self.factoryTemplateResult(key.target.unit, definition.root, producer.bodyParameters(definition), admitted[0..key.count], 0)) return null;
+            var entries: std.ArrayList(substitution_keys.Entry) = .empty;
+            defer entries.deinit(g.allocator);
+            for (call.arguments, producer.bodyParameters(definition), 0..) |argument, parameter, i| {
+                if (admitted[i]) {
+                    key.parameters[i] = try self.sourceArgumentLayout(key.parameters[i], try self.codeLayout(source.typeOf(argument), source.span(argument)), 0);
+                    const metadata = try self.describeCallable(body, argument) orelse return g.fail(self.unit_id, argument, .unresolved_type);
+                    try entries.append(g.allocator, .{ .variable = parameter.binding, .value = try g.captureTemplate(metadata) });
+                    try preparer.templates.put(g.allocator, parameter.binding, metadata);
+                } else if (parameter.binding != 0) try preparer.locals.put(g.allocator, parameter.binding, 0);
+            }
+            key.templates = g.template_keys.intern(entries.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity);
+            key.template_result = true;
+            var service = try g.specializer();
+            var resolved = service.named(key) catch |err| return g.specializationFailure(service, err);
+            defer resolved.deinit(g.allocator);
+            try mappings.appendSlice(g.allocator, resolved.mappings.items);
+            try rows.appendSlice(g.allocator, resolved.rows.items);
+            callee = .{ .named = key };
+            owner = key.target.unit;
+            root = definition.root;
+        } else {
+            if (!self.isCallableTemplate(node.a)) return null;
+            const factory = try self.describeCallable(body, node.a) orelse return null;
+            owner = factory.unit;
+            if (owner == 0) owner = self.unit_id;
+            const producer = g.unit(owner);
+            const factory_node = producer.node(factory.node);
+            if (factory_node.tag != .closure) return null;
+            const metadata = producer.closures[factory_node.a];
+            admitted[0] = self.isCallableTemplate(node.b);
+            if (!self.factoryTemplateResult(owner, metadata.body, &.{metadata.parameter}, admitted[0..1], 0)) return null;
+            var ty = try self.codeLayout(source.typeOf(node.a), source.span(id));
+            if (admitted[0]) {
+                const arrow = g.layouts.node(ty);
+                ty = try g.internLayoutWithEffects(.function, try self.sourceArgumentLayout(arrow.a, try self.codeLayout(source.typeOf(node.b), source.span(node.b)), 0), arrow.b, arrow.c, &.{});
+            }
+            var key: ClosureKey = .{ .unit = owner, .catalog = factory_node.a, .ty = ty, .captures = factory.captures, .templates = factory.templates, .evidence = factory.evidence, .rows = factory.rows, .template_result = true };
+            if (admitted[0]) {
+                const argument = try self.describeCallable(body, node.b) orelse return g.fail(self.unit_id, node.b, .unresolved_type);
+                key.parameter_template = try g.captureTemplate(argument);
+                try preparer.templates.put(g.allocator, metadata.parameter.binding, argument);
+            } else if (metadata.parameter.binding != 0) try preparer.locals.put(g.allocator, metadata.parameter.binding, 0);
+            try g.resolveClosureMappings(key, &mappings, &rows);
+            for (producer.extra[metadata.captures.start..][0..metadata.captures.len], 0..) |binding, index| {
+                if (g.capturedTemplate(key.templates, binding)) |captured| {
+                    try preparer.templates.put(g.allocator, binding, .{ .unit = captured.unit, .node = captured.node, .environment = if (captured.has_environment) 0 else null, .captures = captured.captures, .templates = captured.templates, .computation = captured.computation, .evidence = captured.evidence, .rows = captured.rows });
+                } else {
+                    _ = index;
+                    try preparer.locals.put(g.allocator, binding, 0);
+                }
+            }
+            callee = .{ .closure = key };
+            root = metadata.body;
+        }
+        preparer.unit_id = owner;
+        preparer.mappings = mappings.items;
+        preparer.row_mappings = rows.items;
+        var prepared = try Body.init(g.allocator, owner, root, mappings.items, rows.items);
+        defer prepared.deinit(g.allocator);
+        try preparer.prepareNode(&prepared, root, 0, true);
+        const result = try preparer.describeComputation(&prepared, root, 0) orelse return g.fail(owner, root, .unresolved_type);
+        return .{ .callee = callee, .admitted = admitted, .result = result };
+    }
 
     fn codeLayout(self: *Emitter, ty: types.Id, span: core.Span) Error!layout.Id {
         const g = self.generator;
@@ -2768,17 +3254,87 @@ const Emitter = struct {
         return true;
     }
 
-    fn inlineDemandCall(self: *Emitter, key: Key, arguments: []const core.Id, depth: usize) Error!bool {
+    fn demandSummary(self: *Emitter, target: core.BindingRef) Error!?*const @import("demand_summary.zig").Summary {
+        std.debug.assert(self.preparing);
+        const demand = @import("demand_summary.zig");
+        const g = self.generator;
+        const owner = g.demand_owner orelse return null;
+        const table = &owner.demand_summaries;
+        const key = demand.keyFor(g.units, target, .{});
+        var cursor = table.candidates(demand.fingerprint(key), .oldest_first);
+        while (cursor.next()) |position| {
+            const record = &table.records.items[position];
+            if (!std.meta.eql(record.key, key)) continue;
+            g.evaluator.counters.demand_summary_hits += 1;
+            return &record.value;
+        }
+        const analysis = try demand.analyzeCached(g.allocator, g.units, target, key.limits, &g.evaluator.counters, table);
+        const installed = try demand.insert(g.allocator, table, key, analysis.dependencies, analysis.summary) orelse return null;
+        return &table.records.items[installed].value;
+    }
+
+    fn prepareDemandCall(self: *Emitter, key: Key, arguments: []const core.Id) Error!?DemandPlan {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const source = g.unit(key.target.unit);
-        const body = source.body(key.target.binding) orelse return false;
-        if (arguments.len != key.count or body.parameters.len != key.count) return false;
-        const plan = @import("demand_inline.zig").Plan.init(source, body) orelse return false;
+        const body = source.body(key.target.binding) orelse return null;
+        if (arguments.len != key.count or body.parameters.len != key.count) return null;
+        var has_demand = false;
+        for (source.bodyParameters(body)) |parameter| if (source.types.node(parameter.ty).tag == .demand) {
+            has_demand = true;
+        };
+        if (!has_demand) return null;
+        const shape = @import("demand_inline.zig").Plan.init(source, body) orelse {
+            _ = try self.demandSummary(key.target);
+            return null;
+        };
+        var uses = shape.uses;
+        if (try self.demandSummary(key.target)) |facts| {
+            var summary_uses: [max_parameters]u8 = @splat(0);
+            var known = true;
+            for (source.bodyParameters(body), 0..) |parameter, i| {
+                if (source.types.node(parameter.ty).tag != .demand) continue;
+                const fact = facts.parameter(i);
+                if (fact.outcome() == .escaping) return null;
+                if (fact.outcome() == .unknown) known = false;
+                summary_uses[i] = fact.count;
+            }
+            if (known) uses = summary_uses;
+        }
         const caller = g.unit(self.unit_id);
         for (arguments, 0..) |argument, i| {
-            if (self.hasErasedType(key.parameters[i], 0)) return false;
-            if (g.layouts.node(key.parameters[i]).tag == .demand and caller.node(argument).tag != .suspend_) return false;
+            if (self.hasErasedType(key.parameters[i], 0)) return null;
+            if (g.layouts.node(key.parameters[i]).tag == .demand and caller.node(argument).tag != .suspend_) return null;
         }
+        var mappings: std.ArrayList(Mapping) = .empty;
+        var rows: std.ArrayList(RowMapping) = .empty;
+        defer mappings.deinit(g.allocator);
+        defer rows.deinit(g.allocator);
+        for (source.bodyParameters(body), 0..) |parameter, i| try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
+        try g.mapTypeDepth(key.target.unit, &mappings, &rows, source.typeOf(body.root), key.result, body.span, 0);
+        if (!try self.demandCallShapes(key.target.unit, &shape, mappings.items, rows.items, 0)) return null;
+        if (g.artifacts) |artifacts| {
+            try artifacts.readInlineBody(key.target);
+            if (g.demand_owner) |owner| {
+                const demand = @import("demand_summary.zig");
+                const summary_key = demand.keyFor(g.units, key.target, .{});
+                var cursor = owner.demand_summaries.candidates(demand.fingerprint(summary_key), .oldest_first);
+                while (cursor.next()) |position| {
+                    const record = &owner.demand_summaries.records.items[position];
+                    if (!std.meta.eql(record.key, summary_key)) continue;
+                    for (record.dependencies.bodies) |dependency| try artifacts.readInlineBody(dependency);
+                    break;
+                }
+            }
+        }
+        return .{ .uses = uses };
+    }
+    fn inlineDemandCall(self: *Emitter, key: Key, arguments: []const core.Id, prepared: ?DemandPlan, depth: usize) Error!bool {
+        const plan = prepared orelse return false;
+        const g = self.generator;
+        const source = g.unit(key.target.unit);
+        const body = source.body(key.target.binding).?;
+        const caller = g.unit(self.unit_id);
         var mappings: std.ArrayList(Mapping) = .empty;
         var rows: std.ArrayList(RowMapping) = .empty;
         defer mappings.deinit(g.allocator);
@@ -2787,8 +3343,6 @@ const Emitter = struct {
             try g.mapTypeDepth(key.target.unit, &mappings, &rows, parameter.ty, key.parameters[i], body.span, 0);
         }
         try g.mapTypeDepth(key.target.unit, &mappings, &rows, source.typeOf(body.root), key.result, body.span, 0);
-        if (!try self.demandCallShapes(key.target.unit, &plan, mappings.items, rows.items, 0)) return false;
-        if (g.artifacts) |artifacts| try artifacts.readInlineBody(key.target);
         var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels };
         defer emitter.deinit();
         var demands: [max_parameters]InlineDemand = undefined;
@@ -2802,9 +3356,10 @@ const Emitter = struct {
                 if (parameter.binding != 0) try emitter.locals.put(g.allocator, parameter.binding, local);
                 continue;
             }
-            if (plan.uses[i] == 0) continue;
+            const uses = plan.uses[i];
+            if (uses == 0) continue;
             const machine = g.layouts.machine(ty.a);
-            const memo = plan.uses[i] > 1;
+            const memo = uses > 1;
             demands[count] = .{
                 .binding = parameter.binding,
                 .caller = self,
@@ -2822,7 +3377,7 @@ const Emitter = struct {
             count += 1;
         }
         emitter.inline_demands = demands[0..count];
-        try emitter.expression(body.root, depth + 1);
+        try emitter.bodyExpression(body.root, depth + 1, false);
         return true;
     }
 
@@ -2848,7 +3403,7 @@ const Emitter = struct {
             const saved_labels = demand.caller.labels;
             demand.caller.labels = self.labels;
             defer demand.caller.labels = saved_labels;
-            try demand.caller.expression(demand.expression, depth + 1);
+            try demand.caller.bodyExpression(demand.expression, depth + 1, false);
             if (demand.ready) |ready| {
                 try self.emit(.local_set, demand.value.?);
                 try self.emit(.i32_const, 1);
@@ -2883,7 +3438,7 @@ const Emitter = struct {
             var emitter: Emitter = .{ .generator = g, .unit_id = plan.target.unit, .function_id = self.function_id, .provider_local = self.provider_local, .mappings = mappings.items, .row_mappings = rows.items, .cleanups = .{ .parent = &self.cleanups }, .labels = self.labels, .owned_edit = if (try g.ownsArrayUpdate(self.unit_id, id)) plan.edit else null };
             defer emitter.deinit();
             for (producer.bodyParameters(body), 0..) |parameter, i| if (parameter.binding != 0) try emitter.locals.put(g.allocator, parameter.binding, values[i]);
-            try emitter.expression(body.root, depth + 1);
+            try emitter.bodyExpression(body.root, depth + 1, false);
             return true;
         }
         const order = plan.positions;
@@ -2976,6 +3531,9 @@ const Emitter = struct {
             }
         }
         const remaining = if (captured != null) &.{} else arguments[key.count..];
+        var prepared_body = try emitter.prepareBody(body.root, depth + 1, false);
+        defer prepared_body.deinit(g.allocator);
+        emitter.body = &prepared_body;
         if (remaining.len != 0 and try emitter.saturatedAssociated(body.root, self, remaining, depth)) return true;
         try emitter.expression(body.root, depth + 1);
         var ty = key.result;
@@ -3010,11 +3568,10 @@ const Emitter = struct {
         const source = g.unit(self.unit_id);
         const node = source.node(id);
         if (node.tag != .associated or node.op != .none or extra.len + 2 > max_parameters) return false;
-        const left = try self.codeLayout(source.typeOf(node.a), source.span(id));
-        const right = try self.codeLayout(source.typeOf(node.b), source.span(id));
-        const result = try self.codeLayout(node.ty, source.span(id));
-        const identity = self.dispatchIdentity(left) orelse return false;
-        var key = (try self.dispatchCandidate(id, identity, .none, node.c, left, right, result)) orelse return false;
+        const selected = self.resolvedPlan(id).dispatch;
+        if (selected != .selected) return false;
+        var key = selected.selected.key;
+        const result = key.result;
         const body = g.unit(key.target.unit).body(key.target.binding) orelse return false;
         if (!body.is_function or body.parameters.len != extra.len + 2) return false;
         var result_type = result;
@@ -3146,7 +3703,7 @@ const Emitter = struct {
         const source = g.unit(key.target.unit);
         const body = source.body(key.target.binding).?;
         if (supplied == key.count) {
-            try self.expression(body.root, depth + 1);
+            try self.bodyExpression(body.root, depth + 1, false);
             if (source.types.node(source.typeOf(body.root)).tag == .never) try self.emit(.unreachable_, 0);
             return;
         }
@@ -3189,32 +3746,33 @@ const Emitter = struct {
         g.startup_facts.active = caller;
         try self.descriptor(function_id, environment);
     }
-    fn partialStaticCall(self: *Emitter, id: core.Id, depth: usize) Error!bool {
+    fn preparePartialStaticCall(self: *Emitter, id: core.Id) Error!?SourceCall {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const source = g.unit(self.unit_id);
         var reversed: [max_parameters]core.Id = undefined;
         var count: usize = 0;
         var root = id;
         while (source.node(root).tag == .apply) {
-            if (count == max_parameters) return false;
+            if (count == max_parameters) return null;
             const node = source.node(root);
             reversed[count] = node.b;
             count += 1;
             root = node.a;
         }
-        if (source.node(root).tag != .reference) return false;
+        if (source.node(root).tag != .reference) return null;
         const reference = source.reference(root);
         if (reference.unit == 0 or reference.unit == self.unit_id) {
-            if (self.locals.contains(reference.binding) or self.templates.contains(reference.binding) or self.static_values.contains(reference.binding)) return false;
+            if (self.locals.contains(reference.binding) or self.templates.contains(reference.binding) or self.static_values.contains(reference.binding)) return null;
             const kind = source.binding(reference.binding).kind;
-            if (kind != .global and kind != .external) return false;
+            if (kind != .global and kind != .external) return null;
         }
         const target = try g.normalize(self.unit_id, reference);
-        const body = g.unit(target.unit).body(target.binding) orelse return false;
-        if (!body.is_function or count >= body.parameters.len) return false;
+        const body = g.unit(target.unit).body(target.binding) orelse return null;
+        if (!body.is_function or count >= body.parameters.len) return null;
         const key = try g.signature(target, source.typeOf(root), self.unit_id, self.mappings, self.row_mappings, source.span(id), false);
         std.mem.reverse(core.Id, reversed[0..count]);
-        return self.inlineStaticCall(key, reversed[0..count], depth);
+        return .{ .key = key, .arguments = reversed, .count = count };
     }
 
     fn operationConstant(self: *Emitter, operation: runtime_operations.Id) Error!void {
@@ -3225,6 +3783,8 @@ const Emitter = struct {
         };
     }
     fn deinit(self: *Emitter) void {
+        self.planned_returns.deinit(self.generator.allocator);
+        self.planned_loops.deinit(self.generator.allocator);
         self.row_views.deinit(self.generator.allocator);
         self.small_values.deinit(self.generator.allocator);
         self.locals.deinit(self.generator.allocator);
@@ -3236,6 +3796,7 @@ const Emitter = struct {
         self.computation_values.deinit(self.generator.allocator);
     }
     fn emit(self: *Emitter, op: wasm.Op, operand: u32) Error!void {
+        std.debug.assert(!self.preparing);
         try self.generator.module.emit(self.function_id, .{ .op = op, .operand = operand });
         if (op == .call or op == .call_indirect or op == .call_import) {
             if (self.generator.request_owner) |owner| try request_runtime.guard(&self.generator.module, self.function_id, owner, &self.cleanups);
@@ -3255,6 +3816,7 @@ const Emitter = struct {
         return self.generator.layouts.scalar(try self.codeLayout(unit_.typeOf(id), unit_.span(id))) orelse .pointer;
     }
     fn temporary(self: *Emitter, machine: wasm.ValueType) Error!u32 {
+        std.debug.assert(!self.preparing);
         return self.generator.module.addLocal(self.function_id, machine);
     }
     fn capture(self: *Emitter, id: core.Id, depth: usize) Error!u32 {
@@ -3343,7 +3905,7 @@ const Emitter = struct {
                     }
                     return;
                 }
-                const target = try g.normalize(self.unit_id, reference);
+                const target = self.resolvedPlan(id).reference.?;
                 const body = g.unit(target.unit).body(target.binding) orelse return g.fail(self.unit_id, id, .unsupported);
                 if (body.runtime and !body.is_function) {
                     _ = try g.runtimeGlobal(target);
@@ -3548,17 +4110,93 @@ const Emitter = struct {
         }
         return g.fail(self.unit_id, id, .unresolved_type);
     }
+    fn prepareField(self: *Emitter, id: core.Id, index: u32, sizes: bool) Error!FieldPlan {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        var result: FieldPlan = .{ .index = index, .projection = source.projection(index) };
+        errdefer result.deinit(g.allocator);
+        const variants = source.projectionVariants(index);
+        if (result.projection.field != 0 or variants.len == 0) {
+            result.projection = try self.resolveProjection(result.projection, &result.variants, id);
+        } else try result.variants.appendSlice(g.allocator, variants);
+        if (sizes) for (result.variants.items) |variant| {
+            const slots = if (result.projection.nominal.decl != 0) try self.payloadSlots(result.projection, variant.tag, id) else g.layouts.node(try self.codeLayout(result.projection.source_type, source.span(id))).b;
+            if (slots > std.math.maxInt(u32) / 4) return g.fail(self.unit_id, id, .complexity);
+            try result.slots.append(g.allocator, slots);
+        };
+        return result;
+    }
+    fn prepareUpdateLocations(self: *Emitter, id: core.Id) Error![]FieldPlan {
+        std.debug.assert(self.preparing);
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        var fields: std.ArrayList(FieldPlan) = .empty;
+        defer fields.deinit(g.allocator);
+        errdefer for (fields.items) |*field| field.deinit(g.allocator);
+        const selectors = source.updateSelectors(id);
+        if (selectors.len == 0) {
+            for (source.updatePath(id)) |index| {
+                var field = try self.prepareField(id, index, true);
+                fields.append(g.allocator, field) catch |err| {
+                    field.deinit(g.allocator);
+                    return err;
+                };
+            }
+        } else for (selectors) |selector| if (selector.kind == .field) {
+            var field = try self.prepareField(id, selector.projection, true);
+            fields.append(g.allocator, field) catch |err| {
+                field.deinit(g.allocator);
+                return err;
+            };
+        };
+        return fields.toOwnedSlice(g.allocator);
+    }
+    fn fieldPlan(self: *Emitter, id: core.Id, index: u32) *const FieldPlan {
+        const prepared = self.resolvedPlan(id);
+        switch (prepared) {
+            .projection => return &self.body.?.getConstPtr(.projection, id).*.?.field,
+            .update_locations => |locations| {
+                for (locations) |*place| if (place.index == index) return place;
+                unreachable;
+            },
+            else => unreachable,
+        }
+    }
+    fn prepareProjection(self: *Emitter, id: core.Id) Error!?ProjectionPlan {
+        std.debug.assert(self.preparing);
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const node = source.node(id);
+        if (source.types.node(source.typeOf(node.a)).tag == .never) return null;
+        const metadata = source.projection(node.b);
+        if (source.projectionVariants(node.b).len != 0) return .{ .field = try self.prepareField(id, node.b, false) };
+        const previous = g.diagnostic;
+        var field = self.prepareField(id, node.b, false) catch |err| switch (err) {
+            error.Declined => declined: {
+                g.diagnostic = previous;
+                break :declined null;
+            },
+            else => return err,
+        };
+        errdefer if (field) |*owned| owned.deinit(g.allocator);
+        const concrete = try self.codeLayout(metadata.source_type, source.span(id));
+        const method = try self.memberTarget(id, metadata.field, concrete);
+        if (field != null and method != null) return g.fail(self.unit_id, id, .ambiguous_member);
+        if (field) |owned| return .{ .field = owned };
+        const target = method orelse return g.fail(self.unit_id, id, .missing_member);
+        const result = try self.codeLayout(node.ty, source.span(id));
+        const full = try g.internLayout(.function, concrete, result, &.{});
+        const signature = try self.dispatchCallableLayout(id, full);
+        var direct: Key = .{ .target = target, .count = 1, .result = result };
+        direct.parameters[0] = concrete;
+        direct.effects[0] = g.layouts.node(signature).c;
+        return .{ .member = .{ .direct = direct, .wrapper = .{ .target = target, .ty = signature } } };
+    }
     fn location(self: *Emitter, owner: u32, projection_index: u32, id: core.Id, need_size: bool) Error!Location {
         const g = self.generator;
-        const unit_ = g.unit(self.unit_id);
-        var projection = unit_.projection(projection_index);
-        var inferred_variants: std.ArrayList(core.ProjectionVariant) = .empty;
-        defer inferred_variants.deinit(g.allocator);
-        var variants = unit_.projectionVariants(projection_index);
-        if (projection.field != 0 or variants.len == 0) {
-            projection = try self.resolveProjection(projection, &inferred_variants, id);
-            variants = inferred_variants.items;
-        }
+        const prepared = self.fieldPlan(id, projection_index);
+        const projection = prepared.projection;
+        const variants = prepared.variants.items;
         const wrapped = projection.nominal.decl != 0;
         const container = if (wrapped) try self.temporary(.i32) else owner;
         const offset = try self.temporary(.i32);
@@ -3582,7 +4220,7 @@ const Emitter = struct {
             try self.emit(.i32_const, variant.field * 4);
             try self.emit(.local_set, offset);
             if (size) |size_local| {
-                const slots = if (wrapped) try self.payloadSlots(projection, variant.tag, id) else g.layouts.node(try self.codeLayout(projection.source_type, unit_.span(id))).b;
+                const slots = prepared.slots.items[0];
                 if (slots > std.math.maxInt(u32) / 4) return g.fail(self.unit_id, id, .complexity);
                 try self.emit(.i32_const, slots * 4);
                 try self.emit(.local_set, size_local);
@@ -3591,7 +4229,7 @@ const Emitter = struct {
         }
         try self.emit(.i32_const, std.math.maxInt(u32));
         try self.emit(.local_set, offset);
-        for (variants) |variant| {
+        for (variants, 0..) |variant, variant_index| {
             if (wrapped) {
                 try self.emit(.local_get, owner);
                 try self.emit(.i32_load, 0);
@@ -3603,10 +4241,7 @@ const Emitter = struct {
             try self.emit(.i32_const, variant.field * 4);
             try self.emit(.local_set, offset);
             if (size) |size_local| {
-                const slots = if (wrapped) try self.payloadSlots(projection, variant.tag, id) else blk: {
-                    const concrete = try self.codeLayout(projection.source_type, unit_.span(id));
-                    break :blk g.layouts.node(concrete).b;
-                };
+                const slots = prepared.slots.items[variant_index];
                 if (slots > std.math.maxInt(u32) / 4) return g.fail(self.unit_id, id, .complexity);
                 try self.emit(.i32_const, slots * 4);
                 try self.emit(.local_set, size_local);
@@ -3646,41 +4281,17 @@ const Emitter = struct {
             try self.expression(n.a, depth + 1);
             return;
         }
-        const metadata = unit_.projection(n.b);
-        if (unit_.projectionVariants(n.b).len == 0) {
-            var variants: std.ArrayList(core.ProjectionVariant) = .empty;
-            defer variants.deinit(g.allocator);
-            const previous = g.diagnostic;
-            const field_available = available: {
-                _ = self.resolveProjection(metadata, &variants, id) catch |err| switch (err) {
-                    error.Declined => {
-                        g.diagnostic = previous;
-                        break :available false;
-                    },
-                    else => return err,
-                };
-                break :available true;
-            };
-            const concrete = try self.codeLayout(metadata.source_type, unit_.span(id));
-            const method = try self.memberTarget(id, metadata.field, concrete);
-            if (field_available and method != null) return g.fail(self.unit_id, id, .ambiguous_member);
-            if (!field_available) {
-                const target = method orelse return g.fail(self.unit_id, id, .missing_member);
-                const result = try self.codeLayout(n.ty, unit_.span(id));
-                const full = try g.internLayout(.function, concrete, result, &.{});
-                const signature = try self.dispatchCallableLayout(id, full);
-                var direct: Key = .{ .target = target, .count = 1, .result = result };
-                direct.parameters[0] = concrete;
-                direct.effects[0] = g.layouts.node(signature).c;
-                if (try self.inlineNamedCall(direct, &.{n.a}, depth)) return;
-                const wrapper = try g.callable(.{ .target = target, .ty = signature });
-                const receiver = try self.capture(n.a, depth);
-                try self.emit(.i32_const, 0);
-                try self.emit(.local_get, receiver);
-                try self.providerHead();
-                try self.emit(.call, wrapper);
-                return;
-            }
+        const prepared = self.resolvedPlan(id).projection.?;
+        if (prepared == .member) {
+            const member = prepared.member;
+            if (try self.inlineNamedCall(member.direct, &.{n.a}, depth)) return;
+            const wrapper = try g.callable(member.wrapper);
+            const receiver = try self.capture(n.a, depth);
+            try self.emit(.i32_const, 0);
+            try self.emit(.local_get, receiver);
+            try self.providerHead();
+            try self.emit(.call, wrapper);
+            return;
         }
         if (try self.packedProjection(id, depth)) return;
         if (unit_.node(n.a).tag == .reference) {
@@ -3946,7 +4557,7 @@ const Emitter = struct {
             return result;
         }
         const call = source.call(id);
-        const key = try g.signature(call.target, call.callee_type, self.unit_id, self.mappings, self.row_mappings, source.span(id), false);
+        const key = self.resolvedPlan(id).named.call.key;
         const producer = g.unit(key.target.unit);
         const body = producer.body(key.target.binding) orelse return null;
         if (producer.node(body.root).tag != .array or producer.children(body.root).len > function_facts.small_limit or call.arguments.len != key.count) return null;
@@ -5218,18 +5829,11 @@ const Emitter = struct {
         }
         try self.emit(.local_get, address);
     }
-    fn newTemplate(self: *Emitter, id: core.Id) Error!Template {
+    fn prepareTemplate(self: *Emitter, id: core.Id) Error!TemplatePreparation {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const n = unit_.node(id);
-        if (n.tag == .reference) {
-            const reference = unit_.reference(id);
-            if (reference.unit == 0 or reference.unit == self.unit_id) {
-                if (self.templates.get(reference.binding)) |template| return template;
-            }
-            return .{ .unit = self.unit_id, .node = id };
-        }
-        if (n.tag == .constructor_function or n.tag == .primitive_function) return .{ .unit = self.unit_id, .node = id };
         const captures = if (n.tag == .suspend_) unit_.suspensionCaptures(id) else unit_.closureCaptures(id);
         var capture_types: std.ArrayList(layout.Id) = .empty;
         defer capture_types.deinit(g.allocator);
@@ -5247,21 +5851,54 @@ const Emitter = struct {
         }
         const capture_layout = try g.internLayout(.product, 0, 0, capture_types.items);
         const capture_roles = try self.layoutRoles(g.allocator, capture_types.items);
-        defer g.allocator.free(capture_roles);
+        errdefer g.allocator.free(capture_roles);
         // A captured template is stored as its environment pointer, while its
         // layout slot holds the unit placeholder.
         for (captures, capture_roles) |binding, *role| if (self.templates.contains(binding)) {
             role.* = .reference;
         };
+        const metadata: Template = .{ .unit = self.unit_id, .node = id, .environment = if (captures.len == 0) null else 0, .captures = capture_layout, .templates = g.template_keys.intern(templates.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity), .evidence = if (self.factory_template) try g.mappingEvidence(self.mappings) else 0, .rows = if (self.factory_template) try g.rowMappingEvidence(self.row_mappings) else 0 };
+        var static_key: ?ClosureKey = null;
+        if (n.tag == .closure and self.static_values.count() != 0) {
+            var values: std.ArrayList(substitution_keys.Entry) = .empty;
+            defer values.deinit(g.allocator);
+            var static_types: std.ArrayList(layout.Id) = .empty;
+            defer static_types.deinit(g.allocator);
+            for (captures) |binding| {
+                if (self.static_values.get(binding)) |value| try values.append(g.allocator, .{ .variable = binding, .value = value });
+                try static_types.append(g.allocator, try self.codeLayout(unit_.binding(binding).ty, unit_.span(id)));
+            }
+            if (values.items.len != 0) static_key = .{ .unit = self.unit_id, .catalog = n.a, .ty = try self.codeLayout(unit_.typeOf(id), unit_.span(id)), .captures = try g.internLayout(.product, 0, 0, static_types.items), .templates = metadata.templates, .static_values = g.static_keys.intern(values.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity) };
+        }
+        return .{ .metadata = metadata, .capture_types = try capture_types.toOwnedSlice(g.allocator), .capture_roles = capture_roles, .static_key = static_key };
+    }
+    fn newTemplate(self: *Emitter, id: core.Id) Error!Template {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const n = unit_.node(id);
+        if (n.tag == .reference) {
+            const reference = unit_.reference(id);
+            if (reference.unit == 0 or reference.unit == self.unit_id) {
+                if (self.templates.get(reference.binding)) |template| return template;
+            }
+            return .{ .unit = self.unit_id, .node = id };
+        }
+        if (n.tag == .constructor_function or n.tag == .primitive_function) return .{ .unit = self.unit_id, .node = id };
+        const captures = if (n.tag == .suspend_) unit_.suspensionCaptures(id) else unit_.closureCaptures(id);
+        const prepared = self.resolvedPlan(id).template;
+        const capture_types = prepared.capture_types;
+        const capture_roles = prepared.capture_roles;
         const environment = if (captures.len == 0) null else try self.allocate(@intCast(captures.len * 4), .{ .words = capture_roles });
-        for (captures, capture_types.items, 0..) |binding, capture_type, index| {
+        for (captures, capture_types, 0..) |binding, capture_type, index| {
             try self.emit(.local_get, environment.?);
             if (self.locals.get(binding)) |local| try self.emit(.local_get, local) else if (self.templates.get(binding)) |template| {
                 if (template.environment) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
             } else return g.fail(self.unit_id, id, .unsupported);
             try self.emit(if (g.layouts.machine(capture_type) == .f32) .f32_store else .i32_store, @intCast(index * 4));
         }
-        return .{ .unit = self.unit_id, .node = id, .environment = environment, .captures = capture_layout, .templates = g.template_keys.intern(templates.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity), .evidence = if (self.factory_template) try g.mappingEvidence(self.mappings) else 0, .rows = if (self.factory_template) try g.rowMappingEvidence(self.row_mappings) else 0 };
+        var metadata = prepared.metadata;
+        metadata.environment = environment;
+        return metadata;
     }
     fn computationAction(self: *Emitter, ty: layout.Id) ?layout.Id {
         const layouts = &self.generator.layouts;
@@ -5427,96 +6064,51 @@ const Emitter = struct {
             template.computation = true;
             return template;
         }
-        if (n.tag == .apply) {
-            const result_type = source.types.node(n.ty);
-            if (result_type.tag != .nominal or result_type.a != std.math.maxInt(u32) or result_type.b != 5 or !self.isCallableTemplate(n.a)) return null;
-            const factory = try self.callableTemplate(n.a) orelse return null;
-            const owner = if (factory.unit == 0) self.unit_id else factory.unit;
-            const producer = g.unit(owner);
-            const factory_node = producer.node(factory.node);
-            if (factory_node.tag != .closure) return null;
-            const metadata = producer.closures[factory_node.a];
-            const admitted = self.isCallableTemplate(n.b);
-            if (!self.factoryTemplateResult(owner, metadata.body, &.{metadata.parameter}, &.{admitted}, 0)) return null;
-            var ty = try self.codeLayout(source.typeOf(n.a), source.span(id));
-            if (admitted) {
-                const arrow = g.layouts.node(ty);
-                const actual = try self.codeLayout(source.typeOf(n.b), source.span(n.b));
-                ty = try g.internLayoutWithEffects(.function, try self.sourceArgumentLayout(arrow.a, actual, 0), arrow.b, arrow.c, &.{});
-            }
-            var key: ClosureKey = .{ .unit = owner, .catalog = factory_node.a, .ty = ty, .captures = factory.captures, .templates = factory.templates, .evidence = factory.evidence, .rows = factory.rows, .template_result = true };
-            const argument = try self.temporary((try self.scalar(n.b)).machine());
-            if (admitted) {
-                const argument_node = source.node(n.b);
-                var retained: ?Template = null;
-                if (argument_node.tag == .reference) {
-                    const reference = source.reference(n.b);
-                    if (reference.unit == 0 or reference.unit == self.unit_id) retained = self.templates.get(reference.binding);
-                }
-                const template = retained orelse try self.callableTemplate(n.b) orelse return g.fail(self.unit_id, n.b, .unresolved_type);
-                key.parameter_template = try g.captureTemplate(template);
-                if (template.environment) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
-            } else try self.expression(n.b, 0);
-            try self.emit(.local_set, argument);
-            const function_id = try g.closureFunction(key);
-            const retained_id = g.closure_template_results.get(key) orelse return g.fail(self.unit_id, id, .unresolved_type);
-            const retained = g.template_catalog.items[retained_id - 1];
-            if (factory.environment) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
-            try self.emit(.local_get, argument);
-            try self.providerHead();
-            try self.emit(.call, function_id);
-            const environment = try self.temporary(.i32);
-            try self.emit(.local_set, environment);
-            return .{ .unit = retained.unit, .node = retained.node, .environment = if (retained.has_environment) environment else null, .captures = retained.captures, .templates = retained.templates, .computation = true, .evidence = retained.evidence, .rows = retained.rows };
-        }
-        if (n.tag != .call) return null;
-        const result_type = source.types.node(n.ty);
-        if (result_type.tag != .nominal or result_type.a != std.math.maxInt(u32) or result_type.b != 5) return null;
-        const call = source.call(id);
-        var key = try g.signature(call.target, call.callee_type, self.unit_id, self.mappings, self.row_mappings, source.span(id), false);
-        if (key.count != call.arguments.len or self.computationAction(key.result) == null) return null;
-        const producer = g.unit(key.target.unit);
-        const body = producer.body(key.target.binding) orelse return null;
-        if (!body.is_function or body.parameters.len != key.count) return null;
-        var admitted: [max_parameters]bool = @splat(false);
-        for (call.arguments, 0..) |argument, index| admitted[index] = self.isCallableTemplate(argument);
-        if (!self.factoryTemplateResult(key.target.unit, body.root, producer.bodyParameters(body), admitted[0..key.count], 0)) return null;
-        for (call.arguments, 0..) |argument, index| if (admitted[index]) {
-            const actual = try self.codeLayout(source.typeOf(argument), source.span(argument));
-            key.parameters[index] = try self.sourceArgumentLayout(key.parameters[index], actual, 0);
+        const plan = switch (n.tag) {
+            .apply => self.resolvedPlan(id).application.factory orelse return null,
+            .call => self.resolvedPlan(id).named.factory orelse return null,
+            else => return null,
         };
         var arguments: [max_parameters]u32 = undefined;
-        var entries: std.ArrayList(substitution_keys.Entry) = .empty;
-        defer entries.deinit(g.allocator);
-        // Construct argument snapshots in source order, once. Ordinary argument
-        // expressions may perform effects and must precede later snapshots.
-        for (call.arguments, producer.bodyParameters(body), 0..) |argument, parameter, index| {
-            if (admitted[index]) {
+        var environment: ?u32 = null;
+        const operands = if (n.tag == .apply) &.{n.b} else source.call(id).arguments;
+        if (n.tag == .apply) {
+            const factory = try self.callableTemplate(n.a) orelse return g.fail(self.unit_id, n.a, .unresolved_type);
+            environment = factory.environment;
+        }
+        for (operands, 0..) |argument, index| {
+            if (n.tag == .apply) arguments[index] = try self.temporary((try self.scalar(argument)).machine());
+            if (plan.admitted[index]) {
                 const argument_node = source.node(argument);
                 var retained: ?Template = null;
                 if (argument_node.tag == .reference) {
                     const reference = source.reference(argument);
                     if (reference.unit == 0 or reference.unit == self.unit_id) retained = self.templates.get(reference.binding);
                 }
-                const template = retained orelse try self.callableTemplate(argument) orelse return g.fail(self.unit_id, argument, .unresolved_type);
-                try entries.append(g.allocator, .{ .variable = parameter.binding, .value = try g.captureTemplate(template) });
-                arguments[index] = try self.temporary(.i32);
-                if (template.environment) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
+                const metadata = retained orelse try self.callableTemplate(argument) orelse return g.fail(self.unit_id, argument, .unresolved_type);
+                if (n.tag != .apply) arguments[index] = try self.temporary(.i32);
+                if (metadata.environment) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
+                try self.emit(.local_set, arguments[index]);
+            } else if (n.tag == .apply) {
+                try self.expression(argument, 0);
                 try self.emit(.local_set, arguments[index]);
             } else arguments[index] = try self.capture(argument, 0);
         }
-        key.templates = g.template_keys.intern(entries.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity);
-        key.template_result = true;
-        const function_id = try g.function(key);
-        const retained_id = g.template_results.get(key) orelse return g.fail(self.unit_id, id, .unresolved_type);
-        // Copy numeric metadata before expression emission can grow its owner.
-        const retained = g.template_catalog.items[retained_id - 1];
-        for (arguments[0..key.count]) |argument| try self.emit(.local_get, argument);
+        const function_id = switch (plan.callee) {
+            .named => |key| try g.function(key),
+            .closure => |key| try g.closureFunction(key),
+        };
+        if (n.tag == .apply) {
+            if (environment) |local| try self.emit(.local_get, local) else try self.emit(.i32_const, 0);
+        }
+        for (arguments[0..operands.len]) |argument| try self.emit(.local_get, argument);
         try self.providerHead();
         try self.emit(.call, function_id);
-        const environment = try self.temporary(.i32);
-        try self.emit(.local_set, environment);
-        return .{ .unit = retained.unit, .node = retained.node, .environment = if (retained.has_environment) environment else null, .captures = retained.captures, .templates = retained.templates, .computation = true, .evidence = retained.evidence, .rows = retained.rows };
+        const result_environment = try self.temporary(.i32);
+        try self.emit(.local_set, result_environment);
+        var result = plan.result;
+        if (result.environment != null) result.environment = result_environment;
+        return result;
     }
     fn publishTemplate(self: *Emitter, template: Template, source: core.Id) Error!void {
         const g = self.generator;
@@ -5534,7 +6126,7 @@ const Emitter = struct {
         switch (n.tag) {
             .computation, .reference, .call, .apply => try self.publishTemplate(try self.computationTemplate(id) orelse return g.fail(self.unit_id, id, .unresolved_type), id),
             .block => {
-                const join = try self.prepareJoin(id, .template);
+                const join = self.resolvedPlan(id).join;
                 try self.emit(.block, @backingInt(join.result.?));
                 try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .cleanup = self.cleanups.mark(), .template_result = true });
                 self.labels += 1;
@@ -5545,7 +6137,7 @@ const Emitter = struct {
                 try self.emit(.end, 0);
             },
             .if_value => {
-                const join = try self.prepareJoin(id, .template);
+                const join = self.resolvedPlan(id).join;
                 try self.expression(n.a, depth + 1);
                 try self.emit(.if_, @backingInt(join.result.?));
                 self.labels += 1;
@@ -5573,7 +6165,7 @@ const Emitter = struct {
             const demanded = g.layouts.node(ty);
             if (demanded.tag != .demand) return g.fail(self.unit_id, template.node, .unresolved_type);
             const fn_type = try g.internLayoutWithEffects(.function, 1, demanded.a, demanded.c, &.{});
-            const function_id = try g.closureFunction(.{ .unit = owner, .catalog = n.a, .ty = fn_type, .captures = template.captures, .templates = template.templates, .evidence = template.evidence, .rows = if (template.rows != 0) template.rows else if (owner == self.unit_id) try g.rowMappingEvidence(self.row_mappings) else 0 });
+            const function_id = try g.closureFunction(.{ .unit = owner, .catalog = n.a, .ty = fn_type, .captures = template.captures, .templates = template.templates, .evidence = template.evidence, .rows = if (template.rows != 0) template.rows else if (owner == self.unit_id) self.body.?.rows_evidence else 0 });
             try self.demandDescriptor(function_id, template.environment);
             return;
         }
@@ -5600,45 +6192,17 @@ const Emitter = struct {
         try self.templateValue(template, try self.codeLayout(unit_.typeOf(id), unit_.span(id)));
     }
     fn closureWithStaticCaptures(self: *Emitter, id: core.Id) Error!bool {
-        if (self.static_values.count() == 0) return false;
         const g = self.generator;
         const source = g.unit(self.unit_id);
-        const node = source.node(id);
-        if (node.tag != .closure) return false;
+        const prepared = self.resolvedPlan(id).template;
+        const key = prepared.static_key orelse return false;
         const captures = source.closureCaptures(id);
-        const retained = for (captures) |binding| {
-            if (self.static_values.contains(binding)) break true;
-        } else false;
-        if (!retained) return false;
-        if (captures.len > std.math.maxInt(u32) / 4) return g.fail(self.unit_id, id, .complexity);
-        const ty = try self.codeLayout(source.typeOf(id), source.span(id));
-        var capture_types: std.ArrayList(layout.Id) = .empty;
-        defer capture_types.deinit(g.allocator);
-        var static_values: std.ArrayList(substitution_keys.Entry) = .empty;
-        defer static_values.deinit(g.allocator);
-        var templates: std.ArrayList(substitution_keys.Entry) = .empty;
-        defer templates.deinit(g.allocator);
-        for (captures) |binding| {
-            if (self.static_values.get(binding)) |value| {
-                try static_values.append(g.allocator, .{ .variable = binding, .value = value });
-            } else if (self.templates.get(binding)) |template| {
-                try templates.append(g.allocator, .{ .variable = binding, .value = try g.captureTemplate(template) });
-            }
-            try capture_types.append(g.allocator, try self.codeLayout(source.binding(binding).ty, source.span(id)));
-        }
-        const key: ClosureKey = .{
-            .unit = self.unit_id,
-            .catalog = node.a,
-            .ty = ty,
-            .captures = try g.internLayout(.product, 0, 0, capture_types.items),
-            .templates = g.template_keys.intern(templates.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity),
-            .static_values = g.static_keys.intern(static_values.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity),
-        };
+        const capture_types = g.layouts.children(key.captures);
         const function_id = try g.closureFunction(key);
-        const capture_roles = try self.layoutRoles(g.allocator, capture_types.items);
+        const capture_roles = try self.layoutRoles(g.allocator, capture_types);
         defer g.allocator.free(capture_roles);
         const environment = try self.allocate(@intCast(captures.len * 4), .{ .words = capture_roles });
-        for (captures, capture_types.items, 0..) |binding, concrete, index| {
+        for (captures, capture_types, 0..) |binding, concrete, index| {
             try self.emit(.local_get, environment);
             if (self.static_values.contains(binding)) {
                 try self.emit(.i32_const, 0);
@@ -5781,7 +6345,9 @@ const Emitter = struct {
         defer self.cleanups.restore(checkpoint);
         const g = self.generator;
         const source = g.unit(self.unit_id);
-        const plan = try self.prepareRequestLoop(id);
+        const plan = self.resolvedPlan(id).request;
+        const exited = try self.bindExit(plan.exited);
+        const exit_label = self.labels;
         const metadata = source.requestLoopInfo(id);
         const carries = plan.broken.carries;
         const computation = try self.capture(metadata.computation, depth);
@@ -5806,11 +6372,11 @@ const Emitter = struct {
         const provider = try self.temporary(.i32);
         try self.emit(.local_get, outer);
         try self.emit(.local_set, provider);
-        for (plan.arms) |arm| {
+        for (plan.arms, plan.operations) |arm, operation| {
             const callback = try self.capture(arm.callback, depth);
             const frame = try self.allocatePrivate(@sizeOf(request_runtime.Frame), .heap(request_runtime.Frame));
             try self.emit(.local_get, frame);
-            try self.operationConstant(try g.requestOperation(self.unit_id, arm.operation, self.mappings, self.row_mappings, source.span(id)));
+            try self.operationConstant(try g.runtimeOperation(operation, self.unit_id, source.span(id)));
             try self.emit(.i32_store, heap.offset(heap.RequestFrame, "operation"));
             try self.emit(.local_get, frame);
             try self.emit(.local_get, callback);
@@ -5846,9 +6412,8 @@ const Emitter = struct {
         try self.emit(.local_set, state);
         // The runner opens no structured labels. The exit scope's cleanup mark
         // follows the cell and frames, which the loop's own close releases.
-        std.debug.assert(self.labels == plan.broken.label);
-        var broken = plan.broken;
-        broken.cleanup = self.cleanups.mark();
+        std.debug.assert(self.labels == exit_label);
+        const broken = plan.broken.bind(exit_label, self.cleanups.mark());
         try self.emit(.block, 0);
         self.labels += 1;
         try self.loop_targets.append(g.allocator, .{ .node = id, .label = broken.label, .cleanup = broken.cleanup });
@@ -5860,7 +6425,7 @@ const Emitter = struct {
         self.labels += 1;
         try self.emit(.local_get, cell);
         try self.emit(if (result_machine == .f32) .f32_load else .i32_load, heap.offset(heap.RequestCell, "exit"));
-        try self.takeExit(plan.exited);
+        try self.takeExit(exited);
         self.labels -= 1;
         try self.emit(.end, 0);
         try self.emit(.local_get, cell);
@@ -5972,6 +6537,7 @@ const Emitter = struct {
         }
     };
     fn prepareStaticClosure(self: *Emitter, id: core.Id) Error!?StaticClosurePlan {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const node = source.node(id);
@@ -6031,14 +6597,13 @@ const Emitter = struct {
         // The caller's frozen argument signature retains known effect labels
         // beside its open tails. These live hints disable semantic receipts.
         try g.refineAccessorMappings(header.unit, header.identity, ty, &plan.mappings, &plan.rows, producer.span(metadata.body), hints);
-        g.evaluator.counters.prepared_static_closures += 1;
         return plan;
     }
     fn staticApply(self: *Emitter, id: core.Id, depth: usize) Error!bool {
         const g = self.generator;
         const node = g.unit(self.unit_id).node(id);
-        var plan = try self.prepareStaticClosure(id) orelse return false;
-        defer plan.deinit(g.allocator);
+        const plan = self.resolvedPlan(id).application.static_closure orelse return false;
+        g.evaluator.counters.prepared_static_closures += 1;
         const header = plan.header;
         const producer = g.unit(header.unit);
         const metadata = producer.closures[header.identity];
@@ -6068,28 +6633,42 @@ const Emitter = struct {
         defer emitter.deinit();
         if (metadata.parameter.binding != 0) try emitter.locals.put(g.allocator, metadata.parameter.binding, argument);
         for (bindings, plan.captured) |binding, actual| try emitter.static_values.put(g.allocator, binding, actual);
-        try emitter.expression(metadata.body, depth + 1);
+        try emitter.bodyExpression(metadata.body, depth + 1, false);
         return true;
+    }
+    fn prepareApplication(self: *Emitter, id: core.Id) Error!ApplyPlan {
+        std.debug.assert(self.preparing);
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const node = source.node(id);
+        if (source.types.node(source.typeOf(node.a)).tag == .never) return .{ .never = true };
+        var result: ApplyPlan = .{};
+        errdefer result.deinit(g.allocator);
+        result.static_closure = try self.prepareStaticClosure(id);
+        if (result.static_closure != null) return result;
+        result.partial = try self.preparePartialStaticCall(id);
+        if (@import("known_call.zig").resolve(g.units, self.unit_id, id)) |known| if (known.signature != 0) {
+            const key = try g.signature(known.target, known.signature, self.unit_id, self.mappings, self.row_mappings, source.span(id), false);
+            if (key.count == known.count) result.known = .{ .key = key, .arguments = known.arguments, .count = known.count };
+        };
+        result.arrow = try self.prepareIndirect(node.a, id);
+        return result;
     }
     fn apply(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const n = unit_.node(id);
-        if (unit_.types.node(unit_.typeOf(n.a)).tag == .never) {
+        const prepared = self.resolvedPlan(id).application;
+        if (prepared.never) {
             try self.expression(n.a, depth + 1);
             try self.emit(.unreachable_, 0);
             return;
         }
         if (try self.staticApply(id, depth)) return;
-        if (try self.partialStaticCall(id, depth)) return;
-        if (@import("known_call.zig").resolve(g.units, self.unit_id, id)) |known| {
-            if (known.signature != 0) {
-                const key = try g.signature(known.target, known.signature, self.unit_id, self.mappings, self.row_mappings, unit_.span(id), false);
-                if (key.count == known.count) {
-                    if (try self.inlineCollectionEdit(id, key, depth)) return;
-                    if (try self.inlineNamedCall(key, known.arguments[0..known.count], depth)) return;
-                }
-            }
+        if (prepared.partial) |partial| if (try self.inlineStaticCall(partial.key, partial.arguments[0..partial.count], depth)) return;
+        if (prepared.known) |known| {
+            if (try self.inlineCollectionEdit(id, known.key, depth)) return;
+            if (try self.inlineNamedCall(known.key, known.arguments[0..known.count], depth)) return;
         }
         if (self.static_values.count() == 0 and self.isCallableTemplate(n.a)) {
             const template = (try self.callableTemplate(n.a)).?;
@@ -6102,7 +6681,8 @@ const Emitter = struct {
             try self.emit(.call, function);
             return;
         }
-        const arrow = try self.prepareIndirect(n.a, id);
+        const arrow = prepared.arrow.?;
+        g.evaluator.counters.prepared_indirect_calls += 1;
         const callee = try self.capture(n.a, depth);
         const argument = try self.capture(n.b, depth);
         const signature = try g.module.internType(&.{ .i32, g.layouts.machine(arrow.parameter), .i32 }, g.layouts.machine(arrow.result));
@@ -6114,15 +6694,27 @@ const Emitter = struct {
         try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
         try self.emit(.call_indirect, signature);
     }
+    fn prepareProvider(self: *Emitter, id: core.Id) Error!ProviderPlan {
+        std.debug.assert(self.preparing);
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const n = source.node(id);
+        const ty = g.layouts.node(try self.codeLayout(n.ty, source.span(id)));
+        if (n.tag == .effect_provider) {
+            if (ty.tag != .provider) return g.fail(self.unit_id, id, .unresolved_type);
+            return .{ .ty = ty, .read = try g.operationLayoutLabel(ty.a, self.unit_id, source.span(id)) };
+        }
+        if (ty.tag != .state_provider) return g.fail(self.unit_id, id, .unresolved_type);
+        return .{ .ty = ty, .read = try g.operationLayoutLabel(ty.a, self.unit_id, source.span(id)), .write = try g.operationLayoutLabel(ty.b, self.unit_id, source.span(id)) };
+    }
     fn providerValue(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const n = source.node(id);
-        const concrete = try self.codeLayout(n.ty, source.span(id));
-        const ty = g.layouts.node(concrete);
+        const prepared = self.resolvedPlan(id).provider;
+        const ty = prepared.ty;
         if (n.tag == .effect_provider) {
-            if (ty.tag != .provider) return g.fail(self.unit_id, id, .unresolved_type);
-            const token = try g.operationLayoutToken(ty.a, self.unit_id, source.span(id));
+            const token = try g.runtimeOperation(prepared.read, self.unit_id, source.span(id));
             const implementation = try self.capture(n.b, depth);
             const provider = try self.allocate(@sizeOf(provider_chain.Provider), .heap(provider_chain.Provider));
             try self.emit(.local_get, provider);
@@ -6133,9 +6725,8 @@ const Emitter = struct {
             try self.emit(.i32_store, @offsetOf(provider_chain.Provider, "implementation"));
             try self.emit(.local_get, provider);
         } else {
-            if (ty.tag != .state_provider) return g.fail(self.unit_id, id, .unresolved_type);
-            const read = try g.operationLayoutToken(ty.a, self.unit_id, source.span(id));
-            const write = try g.operationLayoutToken(ty.b, self.unit_id, source.span(id));
+            const read = try g.runtimeOperation(prepared.read, self.unit_id, source.span(id));
+            const write = try g.runtimeOperation(prepared.write.?, self.unit_id, source.span(id));
             const initial = try self.capture(n.c, depth);
             const provider = try self.allocate(@sizeOf(provider_chain.StateProvider), .heap(provider_chain.StateProvider));
             try self.emit(.local_get, provider);
@@ -6249,11 +6840,10 @@ const Emitter = struct {
             error.OutOfMemory => return error.OutOfMemory,
             error.NotFunction => return g.fail(self.unit_id, id, .unresolved_type),
         };
-        g.evaluator.counters.prepared_resolver_calls += 1;
-        g.evaluator.counters.prepared_extra_applications += plan.extra.items.len;
         return plan;
     }
-    fn resolverOperation(self: *Emitter, id: core.Id, depth: usize) Error!void {
+    fn prepareResolver(self: *Emitter, id: core.Id) Error!ResolverPlan {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const metadata = unit_.resolverInfo(id);
@@ -6268,8 +6858,7 @@ const Emitter = struct {
         const provider = g.layouts.node(provider_type);
         // Everything the operation selects is prepared before its first
         // instruction, including the resolver expression's.
-        const Prepared = union(enum) { monad, forward, run: resolved_call.Arrow, call: resolved_call.Applied };
-        var prepared: Prepared = if (metadata.operation == .monad) monad: {
+        return if (metadata.operation == .monad) monad: {
             if (provider.tag != .type_constructor) return g.fail(self.unit_id, id, .type_constructor_required);
             break :monad .monad;
         } else operation: {
@@ -6280,16 +6869,20 @@ const Emitter = struct {
                 else => .{ .call = try self.prepareResolverCall(id, provider) },
             };
         };
-        defer switch (prepared) {
-            .call => |*plan| plan.deinit(g.allocator),
-            else => {},
-        };
+    }
+    fn resolverOperation(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const metadata = unit_.resolverInfo(id);
+        const arguments = unit_.resolverArguments(id);
+        const prepared = self.resolvedPlan(id).resolver;
         try self.expression(metadata.resolver, depth + 1);
         try self.emit(.drop, 0);
         switch (prepared) {
             .monad => try self.emit(.i32_const, 0),
             .forward => try self.expression(arguments[0], depth + 1),
             .run => |arrow| {
+                g.evaluator.counters.prepared_indirect_calls += 1;
                 const action = try self.capture(arguments[0], depth);
                 const signature = try g.module.internType(&.{ .i32, g.layouts.machine(arrow.parameter), .i32 }, g.layouts.machine(arrow.result));
                 try self.emit(.local_get, action);
@@ -6301,6 +6894,8 @@ const Emitter = struct {
                 try self.emit(.call_indirect, signature);
             },
             .call => |plan| {
+                g.evaluator.counters.prepared_resolver_calls += 1;
+                g.evaluator.counters.prepared_extra_applications += plan.extra.items.len;
                 switch (plan.callee) {
                     .direct => |key| {
                         const function = try g.function(key);
@@ -6320,6 +6915,17 @@ const Emitter = struct {
                 try self.applyExtra(arguments[plan.consumed..], plan.extra.items, depth);
             },
         }
+    }
+    fn prepareReference(self: *Emitter, id: core.Id) Error!?core.BindingRef {
+        std.debug.assert(self.preparing);
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const reference = source.reference(id);
+        if (reference.unit == 0 or reference.unit == self.unit_id) {
+            const kind = source.binding(reference.binding).kind;
+            if (kind != .global and kind != .external) return null;
+        }
+        return try g.normalize(self.unit_id, reference);
     }
     fn emitReference(self: *Emitter, id: core.Id) Error!void {
         const g = self.generator;
@@ -6345,7 +6951,7 @@ const Emitter = struct {
                 return;
             }
         }
-        const normalized = try g.normalize(self.unit_id, reference);
+        const normalized = self.resolvedPlan(id).reference.?;
         if (g.unit(normalized.unit).body(normalized.binding)) |body| {
             if (body.runtime and !body.is_function) {
                 try self.emit(.global_get, try g.runtimeGlobal(normalized));
@@ -6353,7 +6959,7 @@ const Emitter = struct {
             }
         }
         if (unit_.types.node(n.ty).tag == .function) {
-            const target = try g.normalize(self.unit_id, reference);
+            const target = self.resolvedPlan(id).reference.?;
             const ty = try self.codeLayout(n.ty, unit_.span(id));
             if (g.unit(target.unit).body(target.binding).?.is_function) {
                 try self.descriptor(try g.callable(.{ .target = target, .ty = ty }), null);
@@ -6363,15 +6969,23 @@ const Emitter = struct {
             }
             return;
         }
-        const value = try g.constant(try g.normalize(self.unit_id, reference), try self.codeLayout(n.ty, unit_.span(id)));
+        const value = try g.constant(self.resolvedPlan(id).reference.?, try self.codeLayout(n.ty, unit_.span(id)));
         try g.emitValue(self.function_id, value);
     }
     /// Selects a named call's specialization and the closures its further
     /// arguments apply, before emitting any of its instructions.
-    fn prepareNamedCall(self: *Emitter, id: core.Id) Error!resolved_call.Named {
+    fn prepareNamedCall(self: *Emitter, id: core.Id) Error!NamedPlan {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const call = unit_.call(id);
+        const previous_origin = g.evaluator.specialization_origin;
+        if (self.unit_id == g.evaluator.diagnostic_context.entry) {
+            if (previous_origin == null) g.evaluator.specialization_origin = .{ .unit = self.unit_id, .span = unit_.span(id) };
+        } else if (!core_eval.callerDependentUse(unit_, id)) {
+            g.evaluator.specialization_origin = .{ .unit = self.unit_id, .span = unit_.span(id) };
+        }
+        defer g.evaluator.specialization_origin = previous_origin;
         var plan: resolved_call.Named = .{ .key = try g.signature(call.target, call.callee_type, self.unit_id, self.mappings, self.row_mappings, unit_.span(id), false) };
         errdefer plan.deinit(g.allocator);
         if (plan.key.count > call.arguments.len) return g.fail(self.unit_id, id, .unsupported);
@@ -6379,28 +6993,35 @@ const Emitter = struct {
             error.OutOfMemory => return error.OutOfMemory,
             error.NotFunction => return g.fail(self.unit_id, id, .unresolved_type),
         };
-        g.evaluator.counters.prepared_named_calls += 1;
-        g.evaluator.counters.prepared_extra_applications += plan.extra.items.len;
-        return plan;
+        return .{ .call = plan, .demand = try self.prepareDemandCall(plan.key, call.arguments) };
     }
     /// A closure applied through its table entry, typed by the callee.
     fn prepareIndirect(self: *Emitter, callee: core.Id, id: core.Id) Error!resolved_call.Arrow {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const node = g.layouts.node(try self.codeLayout(unit_.typeOf(callee), unit_.span(id)));
         if (node.tag != .function) return g.fail(self.unit_id, id, .unresolved_type);
-        g.evaluator.counters.prepared_indirect_calls += 1;
         return .{ .parameter = node.a, .result = node.b, .row = node.c };
     }
     fn emitNamedCall(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const call = unit_.call(id);
-        var plan = try self.prepareNamedCall(id);
-        defer plan.deinit(g.allocator);
+        const previous_origin = g.evaluator.specialization_origin;
+        if (self.unit_id == g.evaluator.diagnostic_context.entry) {
+            if (previous_origin == null) g.evaluator.specialization_origin = .{ .unit = self.unit_id, .span = unit_.span(id) };
+        } else if (!core_eval.callerDependentUse(unit_, id)) {
+            g.evaluator.specialization_origin = .{ .unit = self.unit_id, .span = unit_.span(id) };
+        }
+        defer g.evaluator.specialization_origin = previous_origin;
+        const prepared = self.resolvedPlan(id).named;
+        const plan = prepared.call;
+        g.evaluator.counters.prepared_named_calls += 1;
+        g.evaluator.counters.prepared_extra_applications += plan.extra.items.len;
         const key = plan.key;
         if (try self.inlineCollectionEdit(id, key, depth)) return;
-        if (try self.inlineDemandCall(key, call.arguments, depth)) return;
+        if (try self.inlineDemandCall(key, call.arguments, prepared.demand, depth)) return;
         if (try self.inlineStaticCall(key, call.arguments, depth)) return;
         if (try self.inlineNamedCall(key, call.arguments, depth)) return;
         const function_id = try g.function(key);
@@ -6409,7 +7030,8 @@ const Emitter = struct {
         try self.emit(.call, function_id);
         try self.applyExtra(call.arguments[key.count..], plan.extra.items, depth);
     }
-    fn emitTypeComparison(self: *Emitter, id: core.Id, depth: usize) Error!void {
+    fn prepareTypeComparison(self: *Emitter, id: core.Id) Error!bool {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const n = unit_.node(id);
@@ -6421,21 +7043,32 @@ const Emitter = struct {
         while (g.layouts.node(right).tag == .function) right = g.layouts.node(right).b;
         const left_evidence = g.toEvidence(left) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .unresolved_type);
         const right_evidence = g.toEvidence(right) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .unresolved_type);
+        return left_evidence == right_evidence;
+    }
+    fn emitTypeComparison(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const n = self.generator.unit(self.unit_id).node(id);
+        const equal = self.resolvedPlan(id).comparison;
         try self.expression(n.a, depth + 1);
         try self.emit(.drop, 0);
         try self.expression(n.b, depth + 1);
         try self.emit(.drop, 0);
-        try self.emit(.i32_const, @intFromBool(left_evidence == right_evidence));
+        try self.emit(.i32_const, @intFromBool(equal));
     }
-    fn emitResultAssociated(self: *Emitter, id: core.Id, depth: usize) Error!void {
+    fn prepareResultAssociated(self: *Emitter, id: core.Id) Error!CallableKey {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const n = unit_.node(id);
         const expected = try self.codeLayout(n.ty, unit_.span(id));
-        const target = try self.memberTarget(id, n.b, expected) orelse return g.fail(self.unit_id, id, .missing_associated);
+        const target = try self.memberTarget(id, n.b, expected) orelse return g.failSpecialization(self.unit_id, id, .missing_associated);
         const input = try self.codeLayout(unit_.typeOf(n.a), unit_.span(id));
         const full = try g.internLayout(.function, input, expected, &.{});
-        const wrapper = try g.callable(.{ .target = target, .ty = try self.dispatchCallableLayout(id, full) });
+        return .{ .target = target, .ty = try self.dispatchCallableLayout(id, full) };
+    }
+    fn emitResultAssociated(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const n = g.unit(self.unit_id).node(id);
+        const wrapper = try g.callable(self.resolvedPlan(id).result_member);
         const argument = try self.capture(n.a, depth);
         try self.emit(.i32_const, 0);
         try self.emit(.local_get, argument);
@@ -6460,7 +7093,7 @@ const Emitter = struct {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         if (!self.exact_probe) if (exact_builder.analyze(unit_, id)) |plan| return self.exactBuilder(id, plan, depth);
-        const join = try self.prepareJoin(id, .value);
+        const join = self.resolvedPlan(id).join;
         try self.emit(.block, @backingInt(join.result.?));
         try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .cleanup = self.cleanups.mark() });
         self.labels += 1;
@@ -6489,9 +7122,9 @@ const Emitter = struct {
             .effect_reflection => return g.fail(self.unit_id, id, .backend_const_only),
             .handle => try self.effectHandle(id, depth),
             .operation_value => {
-                const ty = try self.codeLayout(n.ty, unit_.span(id));
-                const token = try g.operationToken(self.unit_id, n.a, self.mappings, self.row_mappings, unit_.span(id));
-                try self.descriptor(try g.operationFunction(.{ .operation = token, .ty = ty }), null);
+                const prepared = self.resolvedPlan(id).operation;
+                const token = try g.runtimeOperation(prepared.label, self.unit_id, unit_.span(id));
+                try self.descriptor(try g.operationFunction(.{ .operation = token, .ty = prepared.ty }), null);
             },
             .type_constructor => try self.emit(.i32_const, 0),
             .resolver_op => try self.resolverOperation(id, depth),
@@ -6522,7 +7155,7 @@ const Emitter = struct {
             .logical => try self.emitLogical(id, depth),
             .call => try self.emitNamedCall(id, depth),
             .if_value => {
-                const join = try self.prepareJoin(id, .value);
+                const join = self.resolvedPlan(id).join;
                 try self.expression(n.a, depth + 1);
                 try self.emit(.if_, @backingInt(join.result.?));
                 self.labels += 1;
@@ -6616,7 +7249,7 @@ const Emitter = struct {
                 },
                 .pattern_bind => try self.patternBinding(statement, depth + 1),
                 .loop => {
-                    const loop = try self.prepareLoop(statement);
+                    const loop = self.resolvedPlan(statement).loop;
                     try self.loopStatement(loop, depth + 1);
                     if (loop.diverges) {
                         try self.emit(.unreachable_, 0);
@@ -6633,13 +7266,13 @@ const Emitter = struct {
                     try self.emit(.drop, 0);
                 },
                 .return_ => {
-                    const exit = try self.prepareReturn(statement, .return_, n.b);
+                    const exit = try self.bindExit(self.resolvedPlan(statement).exit);
                     if (exit.template_result) try self.templateExpression(exit.value, depth + 1) else try self.expression(exit.value, depth + 1);
                     try self.takeExit(exit);
                     return true;
                 },
                 .if_stmt => {
-                    const join = try self.prepareJoin(statement, .statement);
+                    const join = self.resolvedPlan(statement).join;
                     try self.expression(n.a, depth + 1);
                     try self.emit(.if_, 0);
                     self.labels += 1;
@@ -7011,7 +7644,7 @@ const Emitter = struct {
         try self.emit(.local_set, cadence);
     }
     fn breakStatement(self: *Emitter, id: core.Id, depth: usize) Error!void {
-        const exit = try self.prepareBreak(id);
+        const exit = try self.bindExit(self.resolvedPlan(id).exit);
         for (exit.values) |value| try self.expression(value, depth + 1);
         var index = exit.carries.len;
         while (index != 0) {
@@ -7022,28 +7655,38 @@ const Emitter = struct {
     }
     /// Selects the block a `return` (or a request handler's return) leaves,
     /// before any instruction of the edge.
-    fn prepareReturn(self: *Emitter, source: core.Id, kind: resolved_flow.Exit.Kind, block: core.Id) Error!resolved_flow.Exit {
+    fn prepareReturn(self: *Emitter, source: core.Id, kind: resolved_flow.Exit.Kind, block: core.Id) Error!resolved_flow.SymbolicExit {
+        std.debug.assert(self.preparing);
         const g = self.generator;
-        const target = for (self.return_targets.items) |target| {
+        const target = for (self.planned_returns.items) |target| {
             if (target.node == block) break target;
         } else return g.fail(self.unit_id, source, .unsupported);
-        g.evaluator.counters.prepared_exits += 1;
         const value = if (kind == .return_) g.unit(self.unit_id).node(source).a else 0;
-        return .{ .kind = kind, .source = source, .target = block, .label = target.label, .cleanup = target.cleanup, .template_result = target.template_result, .value = value };
+        return .{ .kind = kind, .source = source, .target = block, .template_result = target.template_result, .value = value };
     }
     /// Selects the loop a `break` leaves and the carries its values replace.
-    fn prepareBreak(self: *Emitter, id: core.Id) Error!resolved_flow.Exit {
+    fn prepareBreak(self: *Emitter, id: core.Id) Error!resolved_flow.SymbolicExit {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const loop = source.node(id).a;
-        const target = for (self.loop_targets.items) |target| {
-            if (target.node == loop) break target;
+        for (self.planned_loops.items) |target| {
+            if (target == loop) break;
         } else return g.fail(self.unit_id, id, .unsupported);
         const carries = if (source.node(loop).tag == .request_loop) source.requestLoopCarries(loop) else source.loopCarries(loop);
         const values = source.breakValues(id);
         if (values.len != carries.len) return g.fail(self.unit_id, id, .unsupported);
-        g.evaluator.counters.prepared_exits += 1;
-        return .{ .kind = .break_, .source = id, .target = loop, .label = target.label, .cleanup = target.cleanup, .values = values, .carries = carries };
+        return .{ .kind = .break_, .source = id, .target = loop, .values = values, .carries = carries };
+    }
+    /// Symbolic edges retain the source target; encoding binds only its
+    /// machine label and invocation-local cleanup boundary.
+    fn bindExit(self: *Emitter, symbolic: resolved_flow.SymbolicExit) Error!resolved_flow.Exit {
+        if (symbolic.kind == .return_ or symbolic.kind == .request_return) {
+            for (self.return_targets.items) |target| if (target.node == symbolic.target) return symbolic.bind(target.label, target.cleanup);
+        } else {
+            for (self.loop_targets.items) |target| if (target.node == symbolic.target) return symbolic.bind(target.label, target.cleanup);
+        }
+        return self.generator.fail(self.unit_id, symbolic.source, .unsupported);
     }
     /// Discharges the cleanup of every scope the exit leaves, then branches.
     fn takeExit(self: *Emitter, exit: resolved_flow.Exit) Error!void {
@@ -7053,9 +7696,9 @@ const Emitter = struct {
     }
     const JoinKind = enum { value, template, statement, match_statement };
     fn prepareJoin(self: *Emitter, id: core.Id, kind: JoinKind) Error!resolved_flow.Join {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const source = g.unit(self.unit_id);
-        g.evaluator.counters.prepared_joins += 1;
         return switch (kind) {
             .value => .{ .node = id, .result = (try self.scalar(id)).machine(), .merges = &.{} },
             // A callable template's value is its i32 handle.
@@ -7066,35 +7709,39 @@ const Emitter = struct {
         };
     }
     fn prepareMatch(self: *Emitter, id: core.Id) Error!resolved_flow.Match {
+        std.debug.assert(self.preparing);
         const source = self.generator.unit(self.unit_id);
         const metadata = source.matchInfo(id);
         const join = try self.prepareJoin(id, if (metadata.statement) .match_statement else .value);
-        self.generator.evaluator.counters.prepared_matches += 1;
         return .{ .join = join, .inputs = source.matchInputs(id), .arms = source.matchArms(id), .statement = metadata.statement };
     }
     fn prepareLoop(self: *Emitter, id: core.Id) Error!resolved_flow.Loop {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const metadata = source.loopInfo(id);
-        g.evaluator.counters.prepared_loops += 1;
         return .{ .node = id, .kind = metadata.kind, .carries = source.loopCarries(id), .refutable = metadata.pattern != 0 and !plainBindingPattern(source, metadata.pattern, 0), .diverges = metadata.kind == .forever and !metadata.can_exit };
     }
     /// Selects every edge out of a request loop before its first instruction.
     /// Its own exit label is the next one the loop opens.
     fn prepareRequestLoop(self: *Emitter, id: core.Id) Error!resolved_flow.RequestLoop {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const metadata = source.requestLoopInfo(id);
         const exited = try self.prepareReturn(id, .request_return, metadata.return_target);
-        g.evaluator.counters.prepared_exits += 1;
-        g.evaluator.counters.prepared_request_loops += 1;
+        const arms = source.requestArms(id);
+        const operations = try g.allocator.alloc(type_evidence.Effects.Label, arms.len);
+        errdefer g.allocator.free(operations);
+        for (arms, operations) |arm, *operation| operation.* = try g.requestLabel(self.unit_id, arm.operation, self.mappings, self.row_mappings, source.span(id));
         return .{
             .node = id,
-            .arms = source.requestArms(id),
+            .arms = arms,
+            .operations = operations,
             .exited = exited,
             // The cleanup mark is bound when the exit scope opens, after the
             // cell and handler frames this loop allocates.
-            .broken = .{ .kind = .request_break, .source = id, .target = id, .label = self.labels, .cleanup = self.cleanups.mark(), .carries = source.requestLoopCarries(id) },
+            .broken = .{ .kind = .request_break, .source = id, .target = id, .carries = source.requestLoopCarries(id) },
             .completion_pattern = metadata.completion_pattern,
             .completion_body = metadata.completion_body,
         };
@@ -7199,17 +7846,15 @@ const Emitter = struct {
             error.OutOfMemory => return error.OutOfMemory,
             error.NotFunction => return g.fail(self.unit_id, id, .unresolved_type),
         };
-        g.evaluator.counters.prepared_dispatch_calls += 1;
-        g.evaluator.counters.prepared_extra_applications += plan.extra.items.len;
         return plan;
     }
-    fn dispatchCall(self: *Emitter, id: core.Id, key: Key, depth: usize) Error!void {
+    fn dispatchCall(self: *Emitter, id: core.Id, key: Key, plan: resolved_call.Applied, depth: usize) Error!void {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const node = source.node(id);
         const arguments = [_]core.Id{ node.a, node.b };
-        var plan = try self.prepareDispatch(id, key);
-        defer plan.deinit(g.allocator);
+        g.evaluator.counters.prepared_dispatch_calls += 1;
+        g.evaluator.counters.prepared_extra_applications += plan.extra.items.len;
         switch (plan.callee) {
             .direct => |direct| {
                 if (direct.count == key.count and try self.inlineNamedCall(direct, arguments[0..direct.count], depth)) return;
@@ -7245,22 +7890,18 @@ const Emitter = struct {
             try self.emit(.call_indirect, try g.module.internType(&.{ .i32, g.layouts.machine(arrow.parameter), .i32 }, g.layouts.machine(arrow.result)));
         }
     }
-    fn dispatchScalar(self: *Emitter, id: core.Id, depth: usize) Error!void {
+    fn resolveDispatch(self: *Emitter, id: core.Id) Error!DispatchPlan {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const value = unit_.node(id);
         if (value.tag == .scalar and (value.c == 0 or value.b == 0)) {
             const input = try self.codeLayout(unit_.typeOf(value.a), unit_.span(id));
             if (g.layouts.node(input).tag == .product) {
-                var operands: [2]u32 = undefined;
-                operands[0] = try self.capture(value.a, depth);
-                if (value.b != 0) operands[1] = try self.capture(value.b, depth);
-                return self.simdLocals(value.op, operands[0..if (value.b == 0) @as(usize, 1) else 2], input);
+                return .{ .simd = input };
             }
             const opcode = scalar_ops.opcode(value.op, try self.scalar(value.a)) orelse return g.fail(self.unit_id, id, .unsupported);
-            try self.expression(value.a, depth + 1);
-            if (value.b != 0) try self.expression(value.b, depth + 1);
-            return self.emit(opcode, 0);
+            return .{ .scalar = opcode };
         }
         const operation: types.Operator = switch (value.op) {
             .add => .add,
@@ -7288,24 +7929,43 @@ const Emitter = struct {
         const result = try self.codeLayout(value.ty, unit_.span(id));
         const left_identity = self.dispatchIdentity(left);
         if (left_identity) |identity| if (try self.dispatchCandidate(id, identity, operation, member, left, right, result)) |key| {
-            return self.dispatchCall(id, key, depth);
+            return .{ .selected = .{ .key = key, .call = try self.prepareDispatch(id, key) } };
         };
         if (left == right) if (g.layouts.scalar(left)) |scalar_type| {
             const admitted = scalar_type == .u32 or scalar_type == .f32 or (scalar_type == .bool and (operation == .equal or operation == .not_equal));
             if (admitted) if (scalar_ops.opcode(value.op, scalar_type)) |opcode| {
                 const comparison = operation == .equal or operation == .not_equal or operation == .less or operation == .less_equal or operation == .greater or operation == .greater_equal;
                 if (result != (if (comparison) types.boolean else left)) return g.fail(self.unit_id, id, .unresolved_type);
-                try self.expression(value.a, depth + 1);
-                try self.expression(value.b, depth + 1);
-                return self.emit(opcode, 0);
+                return .{ .scalar = opcode };
             };
         };
         if (self.dispatchIdentity(right)) |identity| if (left_identity == null or left_identity.?.unit != identity.unit or left_identity.?.decl != identity.decl) {
             if (try self.dispatchCandidate(id, identity, operation, member, left, right, result)) |key| {
-                return self.dispatchCall(id, key, depth);
+                return .{ .selected = .{ .key = key, .call = try self.prepareDispatch(id, key) } };
             }
         };
-        return g.fail(self.unit_id, id, .unsupported);
+        return g.failSpecialization(self.unit_id, id, .unsupported);
+    }
+    fn dispatchScalar(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const value = self.generator.unit(self.unit_id).node(id);
+        switch (self.resolvedPlan(id).dispatch) {
+            .scalar => |opcode| {
+                try self.expression(value.a, depth + 1);
+                if (value.b != 0) try self.expression(value.b, depth + 1);
+                try self.emit(opcode, 0);
+            },
+            .simd => |input| {
+                var operands: [2]u32 = undefined;
+                operands[0] = try self.capture(value.a, depth);
+                var count: usize = 1;
+                if (value.b != 0) {
+                    operands[1] = try self.capture(value.b, depth);
+                    count = 2;
+                }
+                try self.simdLocals(value.op, operands[0..count], input);
+            },
+            .selected => |selected| try self.dispatchCall(id, selected.key, selected.call, depth),
+        }
     }
     fn patternMachine(self: *Emitter, ty: types.Id, span: core.Span) Error!wasm.ValueType {
         return (try self.generator.scalarWithRows(self.unit_id, ty, self.mappings, self.row_mappings, span)).machine();
@@ -7406,7 +8066,7 @@ const Emitter = struct {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         if (depth >= 1024) return g.fail(self.unit_id, id, .complexity);
-        const plan = try self.prepareMatch(id);
+        const plan = self.resolvedPlan(id).match;
         const join = plan.join;
         var storage_buffer: [128]u8 align(@alignOf(usize)) = undefined;
         var storage: std.heap.BufferFirstAllocator = .init(&storage_buffer, g.allocator);
@@ -7531,20 +8191,25 @@ const Emitter = struct {
             else => return false,
         }
     }
-    fn staticPatternBinding(self: *Emitter, id: core.Id) Error!bool {
+    fn prepareStaticPattern(self: *Emitter, id: core.Id) Error!?[]StaticBinding {
+        std.debug.assert(self.preparing);
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const n = source.node(id);
         // Concrete values use ordinary runtime loads. This path retains only
         // a constant whose polymorphic children cannot yet have one layout.
         if (g.layouts.fromType(source, source.typeOf(n.b), self.mappings)) |ty| {
-            if (!self.hasErasedType(ty, 0)) return false;
+            if (!self.hasErasedType(ty, 0)) return null;
         } else |err| if (err == error.OutOfMemory) return error.OutOfMemory;
-        const value = try self.staticReference(n.b) orelse return false;
+        const value = try self.staticReference(n.b) orelse return null;
         var bindings: std.ArrayList(StaticBinding) = .empty;
         defer bindings.deinit(g.allocator);
-        if (!try self.staticPattern(n.a, value, &bindings, 0)) return false;
-        for (bindings.items) |binding| try self.static_values.put(g.allocator, binding.binding, binding.value);
+        if (!try self.staticPattern(n.a, value, &bindings, 0)) return null;
+        return try bindings.toOwnedSlice(g.allocator);
+    }
+    fn staticPatternBinding(self: *Emitter, id: core.Id) Error!bool {
+        const bindings = self.resolvedPlan(id).pattern orelse return false;
+        for (bindings) |binding| try self.static_values.put(self.generator.allocator, binding.binding, binding.value);
         return true;
     }
     fn patternBinding(self: *Emitter, id: core.Id, depth: usize) Error!void {

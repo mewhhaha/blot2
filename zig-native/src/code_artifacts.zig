@@ -283,6 +283,7 @@ pub const Context = struct {
     function_jobs: std.ArrayList(u32) = .empty,
     global_jobs: std.ArrayList(u32) = .empty,
     pools: ?Pools = null,
+    demand_summaries: @import("demand_summary.zig").Table = .{},
     principal_queries: @import("principal_query.zig").Table = .{},
     specialization_queries: @import("selected_query.zig").Table = .{},
     independent_calls: std.ArrayList(@import("independent_call_proof.zig").Record) = .empty,
@@ -291,6 +292,7 @@ pub const Context = struct {
         return .{ .allocator = allocator };
     }
     pub fn deinit(self: *Context) void {
+        self.demand_summaries.deinit(self.allocator);
         self.principal_queries.deinit(self.allocator);
         self.specialization_queries.deinit(self.allocator);
         self.refinement_queries.deinit(self.allocator);

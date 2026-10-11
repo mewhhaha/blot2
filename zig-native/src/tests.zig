@@ -301,7 +301,9 @@ test {
     _ = @import("check_shared_scheme_tests.zig");
     _ = @import("dispatch_explanation.zig");
     _ = @import("dispatch_explanation_tests.zig");
+    _ = @import("specialization_origin_tests.zig");
     _ = @import("resolved_flow.zig");
+    _ = @import("resolved_body.zig");
     _ = @import("runtime_ir.zig");
     _ = @import("backend_timing.zig");
     _ = @import("code_artifacts.zig");
@@ -312,6 +314,7 @@ test {
     _ = @import("wasm_lifetimes.zig");
     _ = @import("code_expectation.zig");
     _ = @import("demand_inline_tests.zig");
+    _ = @import("demand_summary_tests.zig");
     _ = @import("substitution_keys.zig");
     _ = @import("validation_image.zig");
     _ = @import("semantic_job_batch.zig");

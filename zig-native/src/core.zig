@@ -45,7 +45,8 @@ pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less,
 /// effect_provider a=operation,b=callback; state_provider a=read,b=write,c=initial.
 /// handle a=provider,b=inner expression,c=optional HandleEffects catalog index+1.
 pub const Node = struct { tag: Tag, op: Op = .none, ty: T.Id = 0, a: u32 = 0, b: u32 = 0, c: u32 = 0 };
-pub const Parameter = struct { binding: BindingId, ty: T.Id, span: Span };
+/// Keep source inference provenance after callback inputs are concretized.
+pub const Parameter = struct { binding: BindingId, ty: T.Id, span: Span, inferred: bool = false };
 pub const Binding = struct { initializer: Id = 0, kind: checked_types.Kind, ty: T.Id, scheme: T.Scheme, public_variables: T.List = .{}, public_rows: T.List = .{}, has_explicit: bool = false, body_id: BodyId = 0, target: BindingRef, span: Span };
 pub const RuntimeName = struct { binding: BindingId, point: u32 };
 /// Original declaration reads survive executable branch/value elimination.
@@ -1263,7 +1264,7 @@ const Builder = struct {
     }
     fn closureExpression(self: *Builder, source: ast.Id, ty: T.Id, depth: usize) Error!Id {
         const syntax = self.tree.node(source);
-        const parameter: Parameter = .{ .binding = self.checked.resolved[syntax.a], .ty = try self.typeOf(syntax.a), .span = self.checked.diagnosticSpan(self.tree, syntax.a) };
+        const parameter: Parameter = .{ .binding = self.checked.resolved[syntax.a], .ty = try self.typeOf(syntax.a), .span = self.checked.diagnosticSpan(self.tree, syntax.a), .inferred = self.tree.parameter(syntax.a).annotation == 0 and !self.tree.parameter(syntax.a).is_unit };
         const previous = self.return_target;
         self.return_target = 0;
         const body = self.expression(syntax.b, depth + 1) catch |err| {
@@ -2659,7 +2660,7 @@ const Builder = struct {
             const function = declaration.attributes.len == 0 and self.tree.node(source).tag == .lambda;
             while (declaration.attributes.len == 0 and self.tree.node(source).tag == .lambda) {
                 const lambda = self.tree.node(source);
-                try self.parameters.append(self.allocator, .{ .binding = self.checked.resolved[lambda.a], .ty = try self.typeOf(lambda.a), .span = self.tree.span(lambda.a) });
+                try self.parameters.append(self.allocator, .{ .binding = self.checked.resolved[lambda.a], .ty = try self.typeOf(lambda.a), .span = self.tree.span(lambda.a), .inferred = self.tree.parameter(lambda.a).annotation == 0 and !self.tree.parameter(lambda.a).is_unit });
                 source = self.unwrap(lambda.b);
             }
             const root = try self.taggedExpression(self.tree.list(declaration.attributes), source, 0);

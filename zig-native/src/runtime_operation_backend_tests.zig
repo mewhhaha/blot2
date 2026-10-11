@@ -193,3 +193,36 @@ test "project emission requires complete actual owners and independently solves 
     try std.testing.expectError(error.InvalidFunctionReference, backend.compileWithIdentity(a, &.{unowned}, 1, names.view()));
     try std.testing.expectError(error.InvalidFunctionReference, backend.compileWithIdentity(a, &.{ module, module }, 1, names.view()));
 }
+
+test "resolved bodies prepare calls fields evidence closures and exits without mutating frozen Core" {
+    const source =
+        \\const bump = fn (value: U32) => @u32.add value 1
+        \\entry const answer = fn (value: U32) => do:
+        \\  let row = { value, flag: #True }
+        \\  let read = fn () => bump row.value
+        \\  let count = 0
+        \\  for index in 0..value:
+        \\    count := @u32.add self 1
+        \\  if @type.same 0 1:
+        \\    return read ()
+        \\  return count
+    ;
+    var module = try lower(a, source);
+    defer module.deinit(a);
+    const nodes = try a.dupe(core.Node, module.nodes);
+    defer a.free(nodes);
+    const type_nodes = try a.dupe(types.Node, module.types.nodes);
+    defer a.free(type_nodes);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emitResolvedBody, .{&module});
+    try std.testing.expectEqualDeep(nodes, module.nodes);
+    try std.testing.expectEqualDeep(type_nodes, module.types.nodes);
+}
+fn emitResolvedBody(allocator: std.mem.Allocator, module: *const core.Module) !void {
+    var result = try backend.compile(allocator, &.{module.*}, 1);
+    defer result.deinit(allocator);
+    try std.testing.expectEqual(@as(?backend.Diagnostic, null), result.diagnostic);
+    try std.testing.expect(result.counters.resolved_bodies > 0);
+    try std.testing.expect(result.counters.resolved_plan_entries > 0);
+    try std.testing.expect(result.counters.resolved_plan_reads > 0);
+    try std.testing.expect(result.bytes.len > 8);
+}

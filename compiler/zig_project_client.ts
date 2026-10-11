@@ -38,6 +38,12 @@ export interface ZigProjectBuildStats extends ZigProjectStats {
   cachedModules: number;
   attemptStats: ZigProjectStats;
 }
+export interface ZigProjectSourceLocation {
+  filename: string;
+  start: number;
+  end: number;
+  offset_encoding: "utf8_bytes";
+}
 export interface ZigProjectDiagnostic {
   filename: string;
   stage: string;
@@ -51,6 +57,8 @@ export interface ZigProjectDiagnostic {
   hole?: TypedHoleDiagnostic;
   /** Present when dispatch failed: the candidates it considered and why. */
   explanation?: DispatchExplanation;
+  /** Original callee location for a caller-dependent specialization failure. */
+  related?: ZigProjectSourceLocation | null;
   details?: unknown;
 }
 export type ZigProjectBuildResult =
@@ -225,6 +233,20 @@ function diagnostic(value: unknown): ZigProjectDiagnostic {
     if (
       natural(utf16.start, "UTF-16 start") > natural(utf16.end, "UTF-16 end")
     ) throw new ZigProjectProtocolError("Invalid UTF-16 range");
+  }
+  if (object.related != null) {
+    const location = record(object.related, "related location");
+    const filename = location.filename;
+    if (
+      typeof filename !== "string" || !filename.length ||
+      filename.includes("\0") || !filename.isWellFormed()
+    ) throw new ZigProjectProtocolError("Invalid related filename");
+    const start = natural(location.start, "related start");
+    const end = natural(location.end, "related end");
+    if (start > end || location.offset_encoding !== "utf8_bytes") {
+      throw new ZigProjectProtocolError("Invalid related offsets");
+    }
+    object.related = { filename, start, end, offset_encoding: "utf8_bytes" };
   }
   // These convenience fields are derived only from the validated wire payload.
   delete object.hole;

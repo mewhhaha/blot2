@@ -19,12 +19,14 @@ const entry_cutoff = @import("entry_frontend_cutoff.zig");
 pub const Result = struct {
     result: consumer.Result,
     diagnostic_filename: ?[]u8 = null,
+    related_filename: ?[]u8 = null,
     source_bytes: usize = 0,
     fresh_modules: usize = 0,
     cached_modules: usize = 0,
     pub fn deinit(self: *Result, a: Allocator) void {
         self.result.deinit(a);
         if (self.diagnostic_filename) |path| a.free(path);
+        if (self.related_filename) |path| a.free(path);
         self.* = undefined;
     }
 };
@@ -112,11 +114,17 @@ pub const Prepared = struct {
         var compiled = try backend.compileWithOptions(a, self.units, self.entry, actual);
         errdefer compiled.deinit(a);
         var filename: ?[]u8 = null;
+        errdefer if (filename) |path| a.free(path);
+        var related_filename: ?[]u8 = null;
         if (compiled.diagnostic) |issue| {
             if (issue.unit == 0 or issue.unit > self.paths.len) return error.InvalidUnit;
             filename = try a.dupe(u8, self.paths[issue.unit - 1]);
+            if (issue.related) |location| {
+                if (location.unit == 0 or location.unit > self.paths.len) return error.InvalidUnit;
+                related_filename = try a.dupe(u8, self.paths[location.unit - 1]);
+            }
         }
-        return .{ .result = .{ .compiled = compiled, .stats = self.stats }, .diagnostic_filename = filename, .source_bytes = self.source_bytes, .fresh_modules = self.units.len - self.cachedCount(), .cached_modules = self.cachedCount() };
+        return .{ .result = .{ .compiled = compiled, .stats = self.stats }, .diagnostic_filename = filename, .related_filename = related_filename, .source_bytes = self.source_bytes, .fresh_modules = self.units.len - self.cachedCount(), .cached_modules = self.cachedCount() };
     }
 };
 

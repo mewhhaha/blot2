@@ -3,6 +3,20 @@
 //! identity or semantic decision reads them, so a budget can assert on them
 //! without wall-time noise. A retained revision counts only the work it ran.
 pub const Counters = struct {
+    demand_summary_builds: u64 = 0,
+    demand_summary_hits: u64 = 0,
+    demand_summary_imports: u64 = 0,
+    demand_summary_dependency_checks: u64 = 0,
+    demand_summary_nodes: u64 = 0,
+    demand_summary_edges: u64 = 0,
+    demand_summary_iterations: u64 = 0,
+    demand_summary_declines: u64 = 0,
+    demand_summary_never: u64 = 0,
+    demand_summary_once: u64 = 0,
+    demand_summary_repeated: u64 = 0,
+    demand_summary_unknown: u64 = 0,
+    demand_summary_escaping: u64 = 0,
+
     semantic_component_batches: u64 = 0,
     semantic_component_jobs: u64 = 0,
     /// Admitted worker capacity, including the coordinator; not overlap or CPUs.
@@ -67,6 +81,9 @@ pub const Counters = struct {
     lexical_interface_projections: u64 = 0,
     /// Calls selected before emission, by shape, and the closures applied to
     /// arguments past a selected callee's parameters.
+    resolved_bodies: u64 = 0,
+    resolved_plan_entries: u64 = 0,
+    resolved_plan_reads: u64 = 0,
     prepared_named_calls: u64 = 0,
     prepared_dispatch_calls: u64 = 0,
     prepared_resolver_calls: u64 = 0,

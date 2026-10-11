@@ -5176,8 +5176,54 @@ const Engine = struct {
     }
     fn preparedGlobalReference(self: *Engine, binding: BindingId, id: ast.Id) T.Error!T.Id {
         if (self.bindings.items[binding].kind == .global and self.bindings.items[binding].scheme.root == 0) try self.qualification_uses.append(self.allocator, .{ .scope = self.qualification_scope, .owner = self.current, .target = binding, .source = id });
+        try self.recursiveDemandShape(binding, id);
         self.resolved[id] = binding;
         return self.instantiate(binding, id);
+    }
+    /// An active recursive declaration has no scheme yet. Its lambda header
+    /// still determines argument evaluation mode; expose only that monomorphic
+    /// shape before a recursive application can assume its arguments are eager.
+    fn recursiveDemandShape(self: *Engine, binding: BindingId, id: ast.Id) T.Error!void {
+        const item = self.bindings.items[binding];
+        if (item.kind != .global or item.scheme.root != 0) return;
+        const state = self.global_states.get(binding) orelse return;
+        if (!state.on_stack or self.types.node(try self.types.resolve(item.ty, 0)).tag != .variable) return;
+        var cursor = self.tree.valueDecl(item.declaration).body;
+        var demanded = false;
+        while (true) {
+            const node = self.tree.node(cursor);
+            if (node.tag == .group) {
+                cursor = node.a;
+                continue;
+            }
+            if (node.tag != .lambda) break;
+            const parameter = self.tree.parameter(node.a);
+            demanded = demanded or parameter.demanded;
+            cursor = node.b;
+        }
+        if (!demanded) return;
+        var parameters: std.ArrayList(bool) = .empty;
+        defer parameters.deinit(self.allocator);
+        cursor = self.tree.valueDecl(item.declaration).body;
+        while (true) {
+            const node = self.tree.node(cursor);
+            if (node.tag == .group) {
+                cursor = node.a;
+                continue;
+            }
+            if (node.tag != .lambda) break;
+            try parameters.append(self.allocator, self.tree.parameter(node.a).demanded);
+            cursor = node.b;
+        }
+        var shape = try self.types.fresh();
+        var index = parameters.items.len;
+        while (index > 0) {
+            index -= 1;
+            var input = try self.types.fresh();
+            if (parameters.items[index]) input = try self.types.demandWithEffects(input, try self.types.freshEffects());
+            shape = try self.types.functionWithEffects(input, shape, try self.types.freshEffects());
+        }
+        try self.constrain(item.ty, shape, id);
     }
     fn intrinsicArity(name: []const u8) ?usize {
         if (@import("simd_intrinsics.zig").lookup(name)) |op| return op.arity;

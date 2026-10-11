@@ -167,6 +167,23 @@ const Diagnostic = struct {
     offset_encoding: []const u8 = "utf8_bytes",
     utf16: ?ast.Span = null,
     details: ?IssueDetails = null,
+    related: ?@import("diagnostic_location.zig").Location = null,
+
+    pub fn jsonStringify(self: Diagnostic, stream: *std.json.Stringify) std.Io.Writer.Error!void {
+        try stream.beginObject();
+        inline for (@typeInfo(Diagnostic).@"struct".field_names) |name| {
+            if (comptime std.mem.eql(u8, name, "related")) {
+                if (self.related) |related| {
+                    try stream.objectField(name);
+                    try stream.write(related);
+                }
+            } else {
+                try stream.objectField(name);
+                try stream.write(@field(self, name));
+            }
+        }
+        try stream.endObject();
+    }
 };
 /// Forwarded diagnostic details: a frontend publication's JSON or the
 /// backend's dispatch explanation.
@@ -195,6 +212,7 @@ fn issue(result: *const partial.Result, entry: []const u8) !Diagnostic {
     if (result.result.compiled.diagnostic) |d| return .{
         .filename = filename,
         .stage = "emit",
+        .related = if (d.related) |location| @import("diagnostic_location.zig").Location.init(result.related_filename orelse return error.MissingRelatedFilename, location.span) else null,
         .code = @tagName(d.code),
         .start = d.span.start,
         .end = d.span.end,

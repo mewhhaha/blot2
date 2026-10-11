@@ -1,8 +1,6 @@
-//! Structured control flow prepared before its instructions. Wasm emission
-//! encodes these plans; it no longer searches for exit targets, derives join
-//! result types or decides which cleanup an exit runs while emitting. Labels
-//! are relative Wasm depths at the exit point. Plans borrow Core slices and
-//! are dropped after their construct is emitted.
+//! Structured flow beside immutable Core. Symbolic edges belong to an owned
+//! resolved body; emission binds their source scope to invocation-local labels
+//! and cleanups. Core lists remain immutable borrows pinned by that body.
 const std = @import("std");
 const core = @import("core.zig");
 const runtime_cleanup = @import("runtime_cleanup.zig");
@@ -45,6 +43,32 @@ pub const Exit = struct {
     }
 };
 
+/// A semantic edge has no machine label or runtime cleanup handle. Its source
+/// target names the scope that encoding must bind before emitting a branch.
+pub const SymbolicExit = struct {
+    kind: Exit.Kind,
+    source: core.Id,
+    target: core.Id,
+    template_result: bool = false,
+    value: core.Id = 0,
+    values: []const core.Id = &.{},
+    carries: []const core.LoopCarry = &.{},
+    pub fn bind(self: SymbolicExit, label: u32, cleanup: runtime_cleanup.Mark) Exit {
+        return .{ .kind = self.kind, .source = self.source, .target = self.target, .label = label, .cleanup = cleanup, .template_result = self.template_result, .value = self.value, .values = self.values, .carries = self.carries };
+    }
+};
+
+/// Request edges keep source scopes; their invocation binds runtime labels.
+pub const RequestLoop = struct {
+    node: core.Id,
+    arms: []const core.RequestArm,
+    operations: []const @import("type_evidence.zig").Effects.Label,
+    exited: SymbolicExit,
+    broken: SymbolicExit,
+    completion_pattern: core.PatternId,
+    completion_body: core.Id,
+};
+
 /// Arms that rejoin with a value or with updated local versions.
 pub const Join = struct {
     node: core.Id,
@@ -80,28 +104,22 @@ pub const Loop = struct {
     diverges: bool,
 };
 
-/// The edges by which a request computation leaves its loop. Yields run the
-/// handler arms inside the runner; cancellation unwinds every cleanup of the
-/// function there. The remaining statuses are decided after the runner.
-pub const RequestLoop = struct {
-    node: core.Id,
-    /// Operations whose yields run these handler callbacks, innermost last.
-    arms: []const core.RequestArm,
-    /// A handler returned from the enclosing block with the cell's exit value.
-    exited: Exit,
-    /// A handler broke out of the loop; its state holds these carries.
-    broken: Exit,
-    /// The computation completed; its value must match this pattern before
-    /// the completion body runs. A failed match traps.
-    completion_pattern: core.PatternId,
-    completion_body: core.Id,
-};
-
 test "exit plans name targets, depths and carries independently of emission" {
     const carries = [_]core.LoopCarry{.{ .incoming = 1, .iteration = 2, .backedge = 3, .outgoing = 4 }};
     const values = [_]core.Id{7};
-    const exit: Exit = .{ .kind = .break_, .source = 9, .target = 5, .label = 2, .cleanup = @enumFromInt(0), .values = &values, .carries = &carries };
+    const exit: Exit = .{ .kind = .break_, .source = 9, .target = 5, .label = 2, .cleanup = @fromBackingInt(@intCast(0)), .values = &values, .carries = &carries };
     try std.testing.expectEqual(exit.values.len, exit.carries.len);
     try std.testing.expectEqual(@as(u32, 1), exit.depthAt(4));
     try std.testing.expectEqual(@as(core.BindingId, 4), exit.carries[0].outgoing);
+}
+
+test "symbolic exits acquire distinct labels and cleanup scopes per invocation" {
+    const symbolic: SymbolicExit = .{ .kind = .return_, .source = 7, .target = 3, .value = 9 };
+    const first = symbolic.bind(2, @fromBackingInt(4));
+    const second = symbolic.bind(5, @fromBackingInt(8));
+    try std.testing.expectEqual(symbolic.target, first.target);
+    try std.testing.expectEqual(symbolic.value, second.value);
+    try std.testing.expectEqual(@as(u32, 1), first.depthAt(4));
+    try std.testing.expectEqual(@as(u32, 0), second.depthAt(6));
+    try std.testing.expect(first.cleanup != second.cleanup);
 }

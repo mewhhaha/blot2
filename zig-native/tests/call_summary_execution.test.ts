@@ -831,12 +831,14 @@ Deno.test("failed summary jobs retain leaf diagnostics beyond the former depth l
     ) {
       const diagnostics = [];
       for (const depth of [0, 300]) {
+        let argument = "#True";
+        if (leaf.includes("@u32")) argument = "0";
+        const use = `f_${depth} ${argument}`;
+        const source = chain(leaf, depth) +
+          `entry const answer = fn () => ${use}\n`;
         await Deno.writeTextFile(
           input,
-          chain(leaf, depth) +
-            `entry const answer = fn () => f_${depth} ${
-              leaf.includes("@u32") ? "0" : "#True"
-            }\n`,
+          source,
         );
         const result = await new Deno.Command(executable, {
           args: [
@@ -862,7 +864,19 @@ Deno.test("failed summary jobs retain leaf diagnostics beyond the former depth l
             .live_bytes,
           0,
         );
-        diagnostics.push(errors);
+        if (!leaf.includes("@u32")) {
+          const start = source.lastIndexOf(use);
+          assert.equal(errors.length, 1);
+          assert.equal(errors[0].code, "missing_associated");
+          assert.equal(errors[0].start, start);
+          assert.equal(errors[0].end, start + use.length);
+          assert.equal(errors[0].related.filename, prelude);
+          diagnostics.push(
+            errors.map((issue) => ({ ...issue, start: 0, end: 0 })),
+          );
+        } else {
+          diagnostics.push(errors);
+        }
       }
       assert.deepEqual(diagnostics[1], diagnostics[0]);
     }

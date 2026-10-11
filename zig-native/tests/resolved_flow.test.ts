@@ -94,7 +94,12 @@ entry const counted = fn (v: U32) -> U32 => count_until_zero (@computation (fn (
 Deno.test("prepared structured flow executes and follows edits", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-resolved-flow-" });
   const entry = `${directory}/main.blot`;
-  const options = { executable, entry, prelude, cacheDirectory: false as const };
+  const options = {
+    executable,
+    entry,
+    prelude,
+    cacheDirectory: false as const,
+  };
   const retained = await createZigProjectCompiler(options);
   try {
     for (const offset of [0, 10, 0]) {
@@ -126,6 +131,9 @@ Deno.test("prepared structured flow executes and follows edits", async () => {
         const counters = expected.stats.workCounters as Record<string, number>;
         for (
           const kind of [
+            "resolved_bodies",
+            "resolved_plan_entries",
+            "resolved_plan_reads",
             "prepared_exits",
             "prepared_exit_cleanups",
             "prepared_joins",

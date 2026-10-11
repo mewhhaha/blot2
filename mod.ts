@@ -48,6 +48,7 @@ export type {
   ZigProjectCompiler,
   ZigProjectCompilerOptions,
   ZigProjectDiagnostic,
+  ZigProjectSourceLocation,
 } from "./compiler/zig_project_client.ts";
 export {
   GuestError,

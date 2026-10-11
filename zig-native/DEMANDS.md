@@ -224,6 +224,13 @@ not require these exact byte counts forever.
 
 ## Compiler plan
 
+[Owned, versioned demand-use summaries](DEMAND_SUMMARIES.md) are implemented in
+retained artifact queries. They join dynamic branch counts, preserve aliases and
+creation scopes, record conservative capture/provider/request barriers, and
+schedule recursive call components to a bounded fixed point. Exact consumed body
+admission protects reuse across edits. The existing bounded Plan remains the
+lowering proof; broad loop and local memo lowering is a separate stage.
+
 Compute conservative demand-use summaries once per retained checked body. Record
 whether each demand can be unused, read once, read repeatedly, forwarded, or
 escape, along with the control-flow regions of its reads and relevant
@@ -358,3 +365,33 @@ existing gdev cold, first-edit, later-edit, no-op, and recovery measurements.
 Keep the approximately 500 ms cold and under 100 ms incremental targets; report
 distributions and any regression rather than extrapolating from this small
 predicate.
+
+## Recursive forwarding (11 October 2026)
+
+A recursive global has no completed scheme while its component is being checked.
+Previously, its first recursive application could constrain the unknown arrow as
+eager before the declaration's demand parameter was checked. The later demand
+arrow then conflicted with that provisional eager arrow.
+
+For an active recursive global whose type is still an unresolved variable, the
+checker now exposes the declaration's direct lambda spine as a monomorphic arrow
+shape. Only parameter demand modes are copied; parameter types, result types and
+effects remain fresh variables. Ordinary annotation and body checking still
+resolve them, and recursive-component completion still publishes the scheme.
+Eager-only declarations take the existing path without allocating this header.
+No caller annotation environment or completed scheme is borrowed.
+
+Annotated, inferred, shorthand, curried and mutually recursive forwarding are
+covered by native laws. The previously skipped bounded-inline-proof law runs
+again: recursive forwarding checks, but its recursive body remains ineligible
+for that acyclic proof. Allocation-failure testing covers provisional header
+ownership. Executed guest laws terminate through base cases for recursion counts
+0, 1, 2, 9 and 32, cover annotated/inferred mutual forwarding, reject an unused
+ill-typed recursive body, and compare retained edit/revert/rejection/recovery
+with fresh bytes and execution. This change does not alter demand memoization,
+recursive-force completion policy or inline-proof eligibility.
+
+Focused development qualification used Zig 0.17.0, safe native tests with the
+no-LLVM backend, six guest laws, and a zero-findings analyzer. Combined release
+qualification and final artifact identities are recorded with the compiler
+milestone before completion is claimed.

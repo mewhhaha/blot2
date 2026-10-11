@@ -148,6 +148,52 @@ pub const DispatchRecord = struct {
         return self.candidates[0..self.len];
     }
 };
+pub const SourceLocation = struct { unit: u32, span: core.Span };
+
+/// Source variables are the only positions a caller can substitute.
+pub fn callerDependent(source: *const core.Types, ty: types.Id, depth: usize) bool {
+    if (ty == 0 or depth >= 256) return false;
+    const n = source.node(ty);
+    switch (n.tag) {
+        .variable => return true,
+        .function, .provider => return callerDependent(source, n.a, depth + 1) or callerDependent(source, n.b, depth + 1),
+        .array, .list, .cursor, .demand, .resolver => return callerDependent(source, n.a, depth + 1),
+        .state_provider => return callerDependent(source, n.a, depth + 1) or callerDependent(source, n.b, depth + 1) or callerDependent(source, n.c, depth + 1),
+        .product => for (source.list(.{ .start = n.a, .len = n.b })) |child| {
+            if (callerDependent(source, child, depth + 1)) return true;
+        },
+        .record => for (0..n.b) |index| {
+            if (callerDependent(source, source.recordField(n, index).ty, depth + 1)) return true;
+        },
+        .nominal => for (source.nominalArguments(n)) |child| {
+            if (callerDependent(source, child, depth + 1)) return true;
+        },
+        else => {},
+    }
+    return false;
+}
+
+pub fn callerDependentUse(module: *const core.Module, id: core.Id) bool {
+    const node = module.node(id);
+    switch (node.tag) {
+        .call => for (module.children(id)) |argument| {
+            if (callerDependent(&module.types, module.typeOf(argument), 0)) return true;
+        },
+        .apply => return callerDependent(&module.types, module.typeOf(node.b), 0),
+        .associated, .scalar => return callerDependent(&module.types, module.typeOf(node.a), 0) or callerDependent(&module.types, module.typeOf(node.b), 0),
+        .project => return callerDependent(&module.types, module.typeOf(node.a), 0),
+        .result_associated => return callerDependent(&module.types, node.ty, 0),
+        else => {},
+    }
+    return false;
+}
+
+fn obligationDependent(source: *const core.Types, obligation: core.Obligation) bool {
+    if (obligation.kind == .dispatch) return callerDependent(source, obligation.ty, 0) or callerDependent(source, obligation.other, 0);
+    if (obligation.kind == .result_dispatch) return callerDependent(source, obligation.result, 0);
+    return callerDependent(source, obligation.ty, 0) or callerDependent(source, obligation.other, 0) or callerDependent(source, obligation.result, 0);
+}
+
 pub const Diagnostic = struct {
     unit: u32,
     span: core.Span,
@@ -155,6 +201,7 @@ pub const Diagnostic = struct {
     detail: []const u8 = "",
     /// Tag application has already selected its public source invocation.
     tag_origin: bool = false,
+    related: ?SourceLocation = null,
     dispatch: ?DispatchRecord = null,
     pub fn message(self: Diagnostic) []const u8 {
         return self.code.message(self.detail);
@@ -1280,6 +1327,8 @@ pub const Session = struct {
     /// Borrowed only during emission. Core owns the low-level API fallback;
     /// project origin policy is explicit and belongs to the current consumer.
     diagnostic_context: DiagnosticContext = .{},
+    /// Request-scoped provenance; never participates in specialization identity.
+    specialization_origin: ?SourceLocation = null,
     body_recipes: body_recipe.Cache = .{},
     proofs: ProofStats = .{},
     validated_calls: std.AutoHashMapUnmanaged(CallProofKey, void) = .empty,
@@ -2271,6 +2320,26 @@ pub const Session = struct {
     }
     fn failNode(self: *Session, owner: usize, id: core.Id, code: Code) Error {
         return self.fail(owner, self.units[owner].span(id), code);
+    }
+    pub fn anchorSpecialization(self: *Session, origin: ?SourceLocation) void {
+        const use = origin orelse return;
+        const issue = if (self.diagnostic) |*item| item else return;
+        switch (issue.code) {
+            .missing_associated, .ambiguous_associated, .ambiguous_operator, .missing_member, .missing_field, .ambiguous_qualified, .type_mismatch, .effect_mismatch, .invalid_provider, .type_constructor_required => {},
+            else => return,
+        }
+        if (issue.related != null or (issue.unit == use.unit and std.meta.eql(issue.span, use.span))) return;
+        issue.related = .{ .unit = issue.unit, .span = issue.span };
+        issue.unit = use.unit;
+        issue.span = use.span;
+    }
+    fn invocationOrigin(self: *Session, owner: usize, source: core.Id, dependent: bool) ?SourceLocation {
+        if (self.unitId(owner) == self.diagnostic_context.entry) {
+            if (self.specialization_origin) |origin| return origin;
+            return .{ .unit = self.unitId(owner), .span = self.units[owner].span(source) };
+        }
+        if (dependent) return self.specialization_origin;
+        return .{ .unit = self.unitId(owner), .span = self.units[owner].span(source) };
     }
     fn failDispatch(self: *Session, owner: usize, id: core.Id, code: Code, record: DispatchRecord) Error {
         const fresh = self.diagnostic == null;
@@ -3934,6 +4003,8 @@ pub const Session = struct {
     }
     fn dispatch(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
         const n = self.units[owner].node(id);
+        const dependent = callerDependent(&self.units[owner].types, self.units[owner].typeOf(n.a), 0) or callerDependent(&self.units[owner].types, self.units[owner].typeOf(n.b), 0);
+        errdefer if (dependent) self.anchorSpecialization(self.specialization_origin);
         const left_type = try self.projectType(owner, id, self.units[owner].typeOf(n.a), frame.mappings.items, frame.row_mappings.items);
         const right_type = try self.projectType(owner, id, self.units[owner].typeOf(n.b), frame.mappings.items, frame.row_mappings.items);
         const expected = try self.projectType(owner, id, n.ty, frame.mappings.items, frame.row_mappings.items);
@@ -3983,6 +4054,7 @@ pub const Session = struct {
     fn resultDispatch(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
         const module = &self.units[owner];
         const n = module.node(id);
+        errdefer if (callerDependent(&module.types, n.ty, 0)) self.anchorSpecialization(self.specialization_origin);
         const input = try self.projectType(owner, id, module.typeOf(n.a), frame.mappings.items, frame.row_mappings.items);
         const expected = try self.projectType(owner, id, n.ty, frame.mappings.items, frame.row_mappings.items);
         const preflight: ?Selection = if (input != 0 and expected != 0) try self.resultSelection(owner, id, n.b, input, expected) else null;
@@ -4034,6 +4106,9 @@ pub const Session = struct {
     fn validateBody(self: *Session, owner: usize, body: *const core.Body, frame: *Frame) Error!void {
         try self.validateScheme(owner, body.root, body.scheme, frame, false);
         for (self.units[owner].obligations[body.scheme.obligations.start..][0..body.scheme.obligations.len]) |obligation| {
+            const source_types = &self.units[owner].types;
+            const dependent = obligationDependent(source_types, obligation);
+            errdefer if (dependent) self.anchorSpecialization(self.specialization_origin);
             if (obligation.kind == .type_head) {
                 var actual = try self.projectType(owner, body.root, obligation.ty, frame.mappings.items, frame.row_mappings.items);
                 if (actual == 0) continue;
@@ -4085,7 +4160,10 @@ pub const Session = struct {
             if (obligation.kind == .result_dispatch) {
                 const input = try self.projectType(owner, body.root, obligation.ty, frame.mappings.items, frame.row_mappings.items);
                 const expected = try self.projectType(owner, body.root, obligation.result, frame.mappings.items, frame.row_mappings.items);
-                if (input != 0 and expected != 0) _ = try self.resultSelection(owner, body.root, obligation.name, input, expected);
+                if (input != 0 and expected != 0) _ = self.resultSelection(owner, body.root, obligation.name, input, expected) catch |err| {
+                    if (err == error.Declined and self.diagnostic != null) self.diagnostic.?.span = obligation.span;
+                    return err;
+                };
                 continue;
             }
             if (obligation.kind != .dispatch) continue;
@@ -4107,6 +4185,9 @@ pub const Session = struct {
         const body = module.body(resolved.binding) orelse return self.failNode(owner, source, .unsupported);
         const parameters = module.bodyParameters(body);
         if (!body.is_function or arguments.len != parameters.len) return self.failNode(owner, source, .unsupported);
+        const previous_origin = self.specialization_origin;
+        self.specialization_origin = self.invocationOrigin(owner, source, callerDependentUse(&self.units[owner], source));
+        defer self.specialization_origin = previous_origin;
         var callee: Frame = .{ .providers = head };
         defer callee.deinit(self.allocator);
         try callee.mappings.appendSlice(self.allocator, seeds);
@@ -4673,7 +4754,7 @@ const ClosureRegion = struct {
             self.frames.deinit(allocator);
         }
     };
-    const Source = struct { binding: core.BindingId = 0, value: ValueId, owner: usize, root: types.Id = 0, body: core.Id = 0, closed_rows: types.List = .{}, body_collected: bool = false };
+    const Source = struct { origin: ?SourceLocation = null, binding: core.BindingId = 0, value: ValueId, owner: usize, root: types.Id = 0, body: core.Id = 0, closed_rows: types.List = .{}, body_collected: bool = false };
     const Import = struct { scope: u32, ty: types.Id };
     const RowImport = struct { scope: u32, row: types.Effects.Id };
     const LabelImport = struct { scope: u32, label: types.Effects.Label };
@@ -4698,7 +4779,7 @@ const ClosureRegion = struct {
     const DefinitionKey = struct { owner: usize, node: core.Id };
     const CandidateKey = struct { caller: u32, node: core.Id, target: Target };
     const ConstraintKind = enum { binary, field, result_dispatch, resolver, resolver_shape, effect_operation, effect_handler, type_head, type_compare, physical_field, receiver, update, type_rep, effect_rep, invocation, collection, record_merge, call_summary, scheme_use, callback_use };
-    const Constraint = struct { lexical_key: u32 = 0, callback_slot: u32 = 0, callback_stage: u32 = 0, callback_interface: bool = false, target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
+    const Constraint = struct { use_node: core.Id = 0, origin: ?SourceLocation = null, lexical_key: u32 = 0, callback_slot: u32 = 0, callback_stage: u32 = 0, callback_interface: bool = false, target: Target = .{ .unit = 0, .binding = 0 }, arguments: core.List = .{}, explicit: bool = false, qualification_span: ?core.Span = null, qualification_unit: u32 = 0, diagnostic_name: []const u8 = &.{}, span: ?core.Span = null, row_carrier: bool = false, source_selection: bool = false, scope: u32, node: core.Id, left: types.Id, right: types.Id = 0, result: types.Id, signature: types.Id = 0, identity: types.NominalIdentity = .{ .unit = 0, .decl = 0 }, op: types.Operator = .none, member: u32 = 0, projection: u32 = 0, kind: ConstraintKind = .binary, writable: bool = false, deferred_member: bool = false, principal_only: bool = false, solved: bool = false };
     const Worklists = struct {
         constraints: @import("solver_worklist.zig").Queue = .{},
         aliases: @import("solver_worklist.zig").Queue = .{},
@@ -4709,7 +4790,9 @@ const ClosureRegion = struct {
             self.* = undefined;
         }
     };
+    const CallbackOriginUse = struct { owner: usize, span: core.Span, origin: SourceLocation, parameter: core.BindingId = 0 };
     const Scratch = struct {
+        callback_origins: std.ArrayList(CallbackOriginUse) = .empty,
         projection_cache: @import("projection_cache.zig").Cache = .{},
         evidence_import_cache: @import("evidence_import_cache.zig").Cache = .{},
         closed_source_cache: @import("closed_source_types.zig").Cache = .{},
@@ -4767,6 +4850,8 @@ const ClosureRegion = struct {
     profile_output_types: usize = 0,
     profile_output_rows: usize = 0,
     session: *Session,
+    current_origin: ?SourceLocation = null,
+    current_use: core.Id = 0,
     scratch: Scratch = .{},
     scratch_allocator: Allocator,
     timing: ?@import("backend_timing.zig").Work.Scope = null,
@@ -4806,7 +4891,7 @@ const ClosureRegion = struct {
         const arena = try session.region_arena_pool.take(session.allocator);
         errdefer session.region_arena_pool.give(arena);
         const allocator = arena.scratchAllocator();
-        var region: ClosureRegion = .{ .session = session, .timing = timing, .solver = try types.Store.initWithOptions(solver_allocator orelse arena.solverAllocator(), .{ .closed_graphs = true }), .scratch_allocator = allocator, .arena = arena };
+        var region: ClosureRegion = .{ .session = session, .current_origin = session.specialization_origin, .timing = timing, .solver = try types.Store.initWithOptions(solver_allocator orelse arena.solverAllocator(), .{ .closed_graphs = true }), .scratch_allocator = allocator, .arena = arena };
         region.scratch.projection_cache.allocator = allocator;
         region.occurs_base = region.solver.occurs_steps;
         if (session.inquiry_regions == 0 and session.semantic_job_budget == null) {
@@ -4850,6 +4935,36 @@ const ClosureRegion = struct {
         self.session.region_arena_pool.give(self.arena);
         self.scratch = undefined;
     }
+    fn callbackUseOrigin(self: *ClosureRegion, owner: usize, id: core.Id) ?SourceLocation {
+        if (id == 0) return null;
+        const module = &self.session.units[owner];
+        const use_span = module.span(id);
+        const node = module.node(id);
+        for (self.scratch.callback_origins.items) |callback| {
+            if (callback.owner != owner or callback.span.start > use_span.start or callback.span.end < use_span.end) continue;
+            if (node.tag == .call) {
+                for (module.children(id)) |argument| if (parameterOperand(module, argument, callback.parameter, 0)) return callback.origin;
+            } else switch (node.tag) {
+                .associated, .scalar => if (parameterOperand(module, node.a, callback.parameter, 0) or parameterOperand(module, node.b, callback.parameter, 0)) return callback.origin,
+                .project => if (parameterOperand(module, node.a, callback.parameter, 0)) return callback.origin,
+                else => {},
+            }
+        }
+        return null;
+    }
+    fn parameterOperand(module: *const core.Module, id: core.Id, binding: core.BindingId, depth: usize) bool {
+        if (id == 0 or depth >= 256) return false;
+        const node = module.node(id);
+        if (node.tag == .reference) {
+            const reference = module.reference(id);
+            if (reference.unit != 0 and reference.unit != module.unit) return false;
+            if (reference.binding == binding) return true;
+            const source = module.binding(reference.binding);
+            if (source.kind == .local and source.initializer != 0) return parameterOperand(module, source.initializer, binding, depth + 1);
+        }
+        if (node.tag == .project) return parameterOperand(module, node.a, binding, depth + 1);
+        return false;
+    }
     fn failDispatchConstraint(self: *ClosureRegion, constraint: Constraint, code: Code, record: DispatchRecord) Error {
         const fresh = self.session.diagnostic == null;
         const result = self.failConstraint(constraint, code);
@@ -4859,7 +4974,30 @@ const ClosureRegion = struct {
         return result;
     }
     fn failConstraint(self: *ClosureRegion, constraint: Constraint, code: Code) Error {
-        const owner = self.scratch.sources.items[constraint.scope].owner;
+        const source = self.scratch.sources.items[constraint.scope];
+        const owner = source.owner;
+        const module = &self.session.units[owner];
+        var dependent = false;
+        if (constraint.span) |span| {
+            for (module.obligations) |obligation| if (std.meta.eql(span, obligation.span)) {
+                dependent = obligationDependent(&module.types, obligation);
+                break;
+            };
+        } else if (constraint.node != 0) {
+            const node = module.node(constraint.node);
+            switch (node.tag) {
+                .associated, .scalar => dependent = callerDependent(&module.types, module.typeOf(node.a), 0) or callerDependent(&module.types, module.typeOf(node.b), 0),
+                .project => dependent = callerDependent(&module.types, module.typeOf(node.a), 0),
+                .result_associated => dependent = callerDependent(&module.types, node.ty, 0),
+                else => {},
+            }
+        }
+        var use_origin = constraint.origin orelse source.origin;
+        if (self.callbackUseOrigin(owner, constraint.node)) |callback_origin| {
+            dependent = true;
+            use_origin = callback_origin;
+        }
+        defer if (dependent) self.session.anchorSpecialization(use_origin);
         if (code == .missing_field and constraint.explicit) if (constraint.qualification_span) |qualification| {
             const origin = if (constraint.qualification_unit == 0) owner else self.session.findUnit(constraint.qualification_unit, null) orelse owner;
             return self.session.fail(origin, .{ .start = qualification.start, .end = qualification.start }, code);
@@ -5964,7 +6102,40 @@ const ClosureRegion = struct {
         return scope;
     }
     fn collectCall(self: *ClosureRegion, caller: u32, reference: core.BindingRef, callee_type: types.Id, arguments: []const core.Id) RegionError!void {
-        const target_ = try self.session.external(try self.session.target(self.scratch.sources.items[caller].owner, reference));
+        const caller_owner = self.scratch.sources.items[caller].owner;
+        if (!self.building_principal) if (self.current_origin) |origin| {
+            const caller_module = &self.session.units[caller_owner];
+            for (arguments) |argument| {
+                if (caller_module.types.node(caller_module.typeOf(argument)).tag != .function) continue;
+                var argument_owner = caller_owner;
+                var callback = argument;
+                var parameter: core.BindingId = 0;
+                if (caller_module.node(argument).tag == .reference) {
+                    const target = try self.session.external(try self.session.target(caller_owner, caller_module.reference(argument)));
+                    argument_owner = target.unit;
+                    const producer = &self.session.units[target.unit];
+                    if (producer.body(target.binding)) |body| {
+                        callback = body.root;
+                        for (producer.bodyParameters(body)) |input| if (input.inferred) {
+                            parameter = input.binding;
+                            break;
+                        };
+                    } else continue;
+                }
+                const producer = &self.session.units[argument_owner];
+                if (producer.node(callback).tag == .closure) {
+                    const closure = producer.closure(callback);
+                    if (closure.parameter.inferred) parameter = closure.parameter.binding;
+                } else {
+                    for (producer.closures) |closure| if (closure.body == callback and closure.parameter.inferred) {
+                        parameter = closure.parameter.binding;
+                        break;
+                    };
+                }
+                if (parameter != 0) try self.scratch.callback_origins.append(self.scratch_allocator, .{ .owner = argument_owner, .span = producer.span(callback), .origin = origin, .parameter = parameter });
+            }
+        };
+        const target_ = try self.session.external(try self.session.target(caller_owner, reference));
         const module = &self.session.units[target_.unit];
         const binding = module.binding(target_.binding);
         const definition = module.body(target_.binding);
@@ -6536,6 +6707,7 @@ const ClosureRegion = struct {
         self.scratch.sources.items[scope].body_collected = true;
     }
     fn bodyEdge(self: *ClosureRegion, caller: u32, callee: u32) RegionError!void {
+        self.scratch.sources.items[callee].origin = self.current_origin;
         const before = self.component_work;
         if (try self.scratch.components.add(self.scratch_allocator, caller, callee, self.scratch.sources.items.len, &self.component_work, self.session.options.max_children)) self.work_revision +|= 1;
         _ = self.session.summaryCharge(self.component_work - before);
@@ -7221,7 +7393,10 @@ const ClosureRegion = struct {
             }
         }
     }
-    fn appendConstraint(self: *ClosureRegion, constraint: Constraint) RegionError!void {
+    fn appendConstraint(self: *ClosureRegion, original_constraint: Constraint) RegionError!void {
+        var constraint = original_constraint;
+        if (constraint.use_node == 0) constraint.use_node = self.current_use;
+        if (self.building_principal) constraint.origin = null else constraint.origin = self.current_origin;
         const index = self.scratch.constraints.items.len;
         try self.scratch.constraints.append(self.scratch_allocator, constraint);
         if (self.building_principal) try self.scratch.principal_actions.append(self.scratch_allocator, .{ .constraint = @intCast(index) });
@@ -7972,6 +8147,23 @@ const ClosureRegion = struct {
             .function => |index| try self.appendFunction(try copy.ty(graph.functions[index], 0)),
             .constraint => |index| {
                 const original = graph.constraints[index];
+                const previous_origin = self.current_origin;
+                const previous_use = self.current_use;
+                self.current_use = original.use_node;
+                self.current_origin = source.origin;
+                if (original.use_node != 0 and original.kind == .call_summary) {
+                    const caller_module = &self.session.units[source.owner];
+                    if (self.session.unitId(source.owner) == self.session.diagnostic_context.entry and self.current_origin == null) {
+                        self.current_origin = .{ .unit = self.session.unitId(source.owner), .span = caller_module.span(original.use_node) };
+                    } else if (self.session.unitId(source.owner) != self.session.diagnostic_context.entry) {
+                        var dependent = false;
+                        for (graph.arguments[original.arguments.start..][0..original.arguments.len]) |argument| dependent = dependent or callerDependent(&caller_module.types, caller_module.typeOf(argument), 0);
+                        if (!dependent) self.current_origin = .{ .unit = self.session.unitId(source.owner), .span = caller_module.span(original.use_node) };
+                    }
+                }
+                if (self.callbackUseOrigin(source.owner, original.use_node)) |origin| self.current_origin = origin;
+                defer self.current_use = previous_use;
+                defer self.current_origin = previous_origin;
                 if (original.kind == .call_summary) {
                     if (original.source_selection) {
                         var constraint = original;
@@ -8065,6 +8257,23 @@ const ClosureRegion = struct {
         return work;
     }
     fn collectNode(self: *ClosureRegion, scope: u32, id: core.Id, work: *body_recipe.Walk) RegionError!void {
+        const previous_use = self.current_use;
+        self.current_use = id;
+        defer self.current_use = previous_use;
+        const previous_origin = self.current_origin;
+        self.current_origin = self.scratch.sources.items[scope].origin;
+        const owner = self.scratch.sources.items[scope].owner;
+        const module_ = &self.session.units[owner];
+        const node_ = module_.node(id);
+        if (node_.tag == .call or node_.tag == .apply or node_.tag == .associated or node_.tag == .result_associated) {
+            if (self.session.unitId(owner) == self.session.diagnostic_context.entry and self.current_origin == null) {
+                self.current_origin = .{ .unit = self.session.unitId(owner), .span = module_.span(id) };
+            } else if (self.session.unitId(owner) != self.session.diagnostic_context.entry) {
+                if (!callerDependentUse(module_, id)) self.current_origin = .{ .unit = self.session.unitId(owner), .span = module_.span(id) };
+            }
+        }
+        if (self.callbackUseOrigin(owner, id)) |origin| self.current_origin = origin;
+        defer self.current_origin = previous_origin;
         const module = &self.session.units[self.scratch.sources.items[scope].owner];
         const n = module.node(id);
         if (self.building_principal) {
@@ -8559,6 +8768,11 @@ const ClosureRegion = struct {
     fn attemptConstraint(self: *ClosureRegion, index: usize, fallback: bool) RegionError!SummaryProgress {
         try self.schedulingTransition();
         const constraint = self.scratch.constraints.items[index];
+        const previous_origin = self.current_origin;
+        self.current_origin = constraint.origin;
+        if (self.current_origin == null and constraint.scope < self.scratch.sources.items.len)
+            self.current_origin = self.scratch.sources.items[constraint.scope].origin;
+        defer self.current_origin = previous_origin;
         if (constraint.kind == .callback_use) {
             // Check the interface relationship, not the callback's executable
             // identity. Its latent row is the exact row of this arrow and
@@ -8881,7 +9095,7 @@ const ClosureRegion = struct {
         const reference = (try self.session.associatedTarget(self.session.unitId(source.owner), identity, constraint.member, .none)) orelse {
             var record: DispatchRecord = .{ .member = constraint.member };
             record.add(.destination, try self.project(constraint.result), .no_member);
-            return self.session.failDispatch(source.owner, constraint.node, .missing_associated, record);
+            return self.failDispatchConstraint(constraint, .missing_associated, record);
         };
         const target_ = try self.session.target(null, reference);
         const scope = try self.callableScope(target_);
@@ -8895,6 +9109,7 @@ const ClosureRegion = struct {
         return true;
     }
     fn collectSelected(self: *ClosureRegion, caller: u32, scope: u32, target_: Target) RegionError!void {
+        self.scratch.sources.items[scope].origin = self.current_origin;
         // This path runs only after a candidate has been admitted. Record even
         // when its body instance was already collected in this region.
         try self.selectedTarget(target_);
@@ -8970,7 +9185,7 @@ const ClosureRegion = struct {
     fn typeScope(self: *ClosureRegion, owner: usize) RegionError!u32 {
         if (self.scratch.sources.items.len >= self.session.options.max_values or self.scratch.sources.items.len >= std.math.maxInt(u32)) return error.TypeLimit;
         const scope: u32 = @intCast(self.scratch.sources.items.len);
-        try self.scratch.sources.append(self.scratch_allocator, .{ .value = 0, .owner = owner });
+        try self.scratch.sources.append(self.scratch_allocator, .{ .value = 0, .owner = owner, .origin = self.current_origin });
         return scope;
     }
     fn callableScope(self: *ClosureRegion, target_: Target) RegionError!u32 {
