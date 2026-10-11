@@ -6722,9 +6722,10 @@ const Engine = struct {
     /// informative enough to resolve.
     fn solveFieldsFrom(self: *Engine, start: usize) T.Error!void {
         // Ready work runs in index order. A write wakes later work in this pass
-        // and earlier work in the next, as a full scan would retry it. Only an
-        // effect operation sleeps on its argument and signature types; every
-        // other kind is retried each pass, as before.
+        // and earlier work in the next, as a full scan would retry it. An
+        // effect operation sleeps on its argument and signature types, and an
+        // open use of a settled callee on its instance types; every other
+        // kind is retried each pass, as before.
         var progress = true;
         while (progress) {
             progress = false;
@@ -6764,9 +6765,19 @@ const Engine = struct {
                     self.pending_queue.complete(i);
                 } else if (after.value.kind == .effect_operation and !after.suspended) {
                     try self.pending_queue.watch(self.allocator, &self.types, i, &.{ after.value.other, after.value.signature }, false, false);
+                } else if (after.value.kind == .callee_use and !after.suspended and self.calleeSettled(after.value.identity.decl)) {
+                    // An open use waits only on its instance types once the
+                    // callee's summary can no longer change.
+                    try self.pending_queue.watch(self.allocator, &self.types, i, &.{after.value.ty}, false, false);
                 } else self.pending_queue.requeue(i);
             }
         }
+    }
+    fn calleeSettled(self: *const Engine, binding: BindingId) bool {
+        if (binding >= self.bindings.items.len) return false;
+        if (self.bindings.items[binding].kind == .external) return true;
+        const state = self.global_states.get(binding) orelse return false;
+        return state.state == .complete and !state.on_stack;
     }
     /// Mirrors the pending list in the work queue: new obligations are ready,
     /// and a list shrunk by rollback drops its stale entries and watches.
