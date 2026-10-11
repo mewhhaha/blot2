@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [048](048-explain-dispatch-and-evidence.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 1 / editor
   completion. Sources:

@@ -89,7 +89,12 @@
   [085](085-gate-principal-graph-sharing-on-payoff.md),
   [086](086-retain-constant-evaluation-across-revisions.md),
   [087](087-skip-rebuilds-for-trivia-only-edits.md),
-  [088](088-restore-summary-job-inference-cost.md)
+  [088](088-restore-summary-job-inference-cost.md),
+  [089](089-report-inference-budget-exhaustion.md),
+  [090](090-make-pending-check-solving-incremental.md),
+  [091](091-bound-evaluation-by-call-depth.md),
+  [092](092-format-current-syntax.md), [093](093-close-the-gdev-edit-gap.md),
+  [094](094-locate-specialization-failures-at-their-use.md)
 - **Originating requirements:** Approved task manifest / final conditional
   cleanup. Sources: [PLAN.md](../PLAN.md).
 - **Execution:** Follow the

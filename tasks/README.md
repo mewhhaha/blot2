@@ -305,6 +305,15 @@ byte-identical on the examples, the synthetic corpus and gdev. Task [026] is
 ready; [036] and [048] were already ready. See
 [resolved calls](../zig-native/RESOLVED_CALLS.md).
 
+Task [048] explains failed dispatch at `67e7912`: diagnostics carry the
+operator, member and each candidate type in selection order with why it was
+rejected, or that it was selected and its result conflicted. The CLI, project
+server and client schema carry it with bounds and defensive decoding. It was
+taken ahead of [026] as the smaller step. Specialization failures are still
+located inside the callee, often `std/prelude`; task [094] moves them to the
+caller's use. [049] is ready. See
+[dispatch explanations](../zig-native/DISPATCH_EXPLANATIONS.md).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -569,8 +578,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [045] — Implement rolling reductions                    | Pending     | [044]                                  |
 | [046] — Implement composable summary trees              | Pending     | [045]                                  |
 | [047] — Eliminate generic iterator state                | Pending     | [040], [027]                           |
-| [048] — Explain dispatch and evidence                   | Ready       | [004], [005]                           |
-| [049] — Specify editor completion                       | Pending     | [048]                                  |
+| [048] — Explain dispatch and evidence                   | Complete    | —                                      |
+| [049] — Specify editor completion                       | Ready       | [048]                                  |
 | [050] — Implement editor completion                     | Pending     | [049]                                  |
 | [051] — Specify module abstraction                      | Pending     | [020]                                  |
 | [052] — Implement opaque types and privacy              | Pending     | [051]                                  |
@@ -605,7 +614,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [081] — Finalize durable documentation                  | Pending     | [080]                                  |
 | [082] — Qualify the remote analyzer workflow            | Pending     | [081]                                  |
 | [083] — Review and clean old build artifacts            | Pending     | [081]                                  |
-| [084] — Qualify the complete program                    | Pending     | [082], [083], [085]–[093]              |
+| [084] — Qualify the complete program                    | Pending     | [082], [083], [085]–[094]              |
 | [085] — Gate principal-graph sharing on payoff          | Complete    | —                                      |
 | [086] — Retain constant evaluation across revisions     | Ready       | [023]                                  |
 | [087] — Skip rebuilds for trivia-only edits             | Complete    | —                                      |
@@ -615,7 +624,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [091] — Bound compile-time evaluation by call depth     | Complete    | —                                      |
 | [092] — Format current Blot syntax                      | Complete    | —                                      |
 | [093] — Close the gdev edit gap                         | In progress | [088]                                  |
-| [999] — Remove tasks and plan                           | Pending     | All [001]–[093], plus every added task |
+| [094] — Locate specialization failures at their use     | Ready       | [048]                                  |
+| [999] — Remove tasks and plan                           | Pending     | All [001]–[094], plus every added task |
 
 ## Coverage matrix
 
@@ -657,7 +667,7 @@ obligations remain part of applicable tasks and final qualification.
 | Collections: composable summaries, queries and persistent updates                                             | [044], [046]                                           |
 | Collections: generic iterator step/cursor elimination and effect/pull-order preservation                      | [047]                                                  |
 | Collections: distinct List/Array types, no public List indexing, snapshots and fallback representations       | [001], [002], [040], [041], [043], [045], [046], [047] |
-| Language 1: dispatch/selected evidence explanations beyond existing typed holes                               | [048]                                                  |
+| Language 1: dispatch/selected evidence explanations beyond existing typed holes                               | [048], [094]                                           |
 | Language 1: editor completion API, overlays, cancellation, ranking and actual integration                     | [049], [050]                                           |
 | Language 2: opaque types, construction access, exports/re-exports and representation privacy                  | [051], [052]                                           |
 | Language 2: nominal identity, separate compilation, private cutoff and zero-cost wrappers                     | [051], [052], [053]                                    |
@@ -713,7 +723,7 @@ follow-up work before [999].
 
 ## Planning-directory validation
 
-For this documentation change, verify exactly 001–093 plus 999, unique numbered
+For this documentation change, verify exactly 001–094 plus 999, unique numbered
 filenames, all seven required sections, concrete unchecked acceptance criteria,
 existing relative links/anchors, and exact manifest dependencies forming an
 acyclic graph. Check that every task is indexed and every open source
@@ -820,4 +830,5 @@ external gate or durable-documentation obligation remains open.
 [091]: 091-bound-evaluation-by-call-depth.md
 [092]: 092-format-current-syntax.md
 [093]: 093-close-the-gdev-edit-gap.md
+[094]: 094-locate-specialization-failures-at-their-use.md
 [999]: 999-remove-tasks-and-plan.md

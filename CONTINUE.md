@@ -200,9 +200,15 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
 - Task 025 (resolved calls) is complete at `29aaa98`: every source call is
   prepared before its instructions (keys, wrappers, closure arrows) with
   byte-identical output; 026 is ready.
-- A separate session (bun-desktop) offered an unapplied wasm name-section patch
-  at `/var/tmp/blot2-names.patch` (14 files, always on, +5% Wasm, gate green on
-  `a488ba2`); applying it is the owner's decision.
+- Task 048 (dispatch explanations) is complete at `67e7912`, taken ahead of 026
+  as the smaller step: failed dispatch diagnostics list each candidate type in
+  selection order with why it failed, through the CLI, server and client. Their
+  location is still the callee (often `std/prelude`), filed as task 094; 049 is
+  ready. See [the record](zig-native/DISPATCH_EXPLANATIONS.md).
+- A separate session (bun-desktop, since renamed pen: checkout `~/src/pen`,
+  command `pen`; gdev's build is unchanged) offered an unapplied wasm
+  name-section patch at `/var/tmp/blot2-names.patch` (14 files, always on, +5%
+  Wasm, gate green on `a488ba2`); applying it is the owner's decision.
 - Cloud follow-up: a loop counter in storage words passed the native suite, 599
   guest/client tests and the pinned analyzer, but repeated release batches did
   not establish an F32 improvement and regressed a U32 tuple shape. It is
@@ -243,8 +249,9 @@ fold gate remains open.
 Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
 the remaining work is per-body frontend rechecking and stable Core IDs, which
 needs its own design before implementation. Ready tasks in numeric order are
-[026](tasks/026-resolve-structured-control-flow.md), 036, 048,
-[086](tasks/086-retain-constant-evaluation-across-revisions.md); 086 needs a
+[026](tasks/026-resolve-structured-control-flow.md), 036, 049,
+[086](tasks/086-retain-constant-evaluation-across-revisions.md) and
+[094](tasks/094-locate-specialization-failures-at-their-use.md); 086 needs a
 fresh gdev profile and then a design decision (see above).
 [093](tasks/093-close-the-gdev-edit-gap.md) is in progress with the remaining
 measured gdev edit gap. The retained probe
