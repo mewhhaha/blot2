@@ -302,6 +302,10 @@ work budget and conservatively declines wider proofs. Dynamic shared/cyclic
 ownership and reclamation of escaping effect payloads remain required before
 tracing can be removed.
 
+[Shared and cyclic ownership](SHARED_OWNERSHIP.md) specifies typed counting,
+roots, suspension, iterative destruction, cycle reclamation and the measured
+transition gates for replacing this tracing path.
+
 Ownership roles come from checked layouts, never from machine types. The emitter
 records each created function's parameter roles and precedes each constant-size
 allocation with an `ownership` annotation run giving its word roles
