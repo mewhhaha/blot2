@@ -1,300 +1,149 @@
 # Continue here
 
-Work follows [tasks/README.md](tasks/README.md): pick the lowest-numbered ready
-or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
-`deno task lint:zig` before each compiler commit.
+Work follows [tasks/README.md](tasks/README.md): finish the in-progress item
+below, then take ready tasks in the order given under "Next work". Use Zig
+0.17.0 (`zig version` before each build batch). Before every compiler commit run
+`deno task test:compiler` and
+`ZIG_ANALYZER=build/tools/zig-analyzer/zig-out/bin/zig-analyzer deno task lint:zig`
+(zero findings required). Each task gets an implementation commit and a record
+commit (task file, README index, durable record under `zig-native/`). Nothing is
+pushed; keep it that way unless the owner authorizes it.
 
-## State on 10 October 2026
+## State on 11 October 2026
 
-- Task 010 (variable-indexed solver worklists) is complete: `352b3ff`, closed in
-  `6a4271c`.
-- Task 002 (packed List F32 fold regression) is in progress. Commit `65dccda`
-  hoists the crossing-row buffer and assembles two-leaf rows with two
-  constant-size copies. F32 folds are now within 0.6–1.7% of boxed at widths
-  14–16 and at or below 1.006 elsewhere; the all-width gate stays open.
-- Task 004 (first-order principal/residual call summaries) is complete at
-  `3a8b6ee`. Exact live header keys and owned source-normalized graphs remove
-  transitive diamond work while preserving original witnesses, rows and source
-  dependencies. The full native suite, 607 guest/client tests, 509 public
-  differential cases and zero-findings analyzer pass. Fifteen-pair measurements
-  and seven-pair fresh/retained/restart comparisons qualify the artifact. Small
-  wrappers can cost more; no private gdev or general speedup is claimed. See
-  [the durable qualification](zig-native/CALL_SUMMARIES.md#live-headers-and-source-normalized-graphs-10-october-2026).
-- Task 005 (parametric callback obligations) is complete at `652f4d6`. Exact
-  formal callback slots/stages/rows and conditional graph actions preserve
-  caller checks. The full native suite, 609 guest/client tests, 563 public
-  comparisons and zero-findings analyzer pass. Fifteen-pair fresh measurements
-  and seven-pair fresh/retained/restart batches qualify the immutable v2 pin.
-  Deep predicate cases have bounded work; small controls add overhead. See
-  [the durable callback qualification](zig-native/CALL_SUMMARIES.md#parametric-callback-obligations-10-october-2026).
-- Task 006 (owned lexical capture inputs) is complete at `71c0f2a`. Complete
-  ordered captures, actual aliases, values, nested bodies and provider/demand
-  identities key private jobs without global principal publication. The full
-  native suite, 610 guest/client tests, 587 public comparisons and zero-findings
-  analyzer pass. Initial/edited guest outputs, fifteen-pair measurements and
-  seven-pair retained/restart batches qualify the immutable artifact. Shared Box
-  output shrinks by 12 static bytes per closure; small and demand/provider
-  controls can add overhead. See
-  [the lexical qualification](zig-native/CALL_SUMMARIES.md#owned-lexical-inputs-10-october-2026).
-- Task 007 (joint recursive components) is complete at `4f898b0`. Exact body
-  edges, component-atomic publication and heap scheduling bound both frontend
-  and ordinary Core inference. The full native suite, 615 guest/client tests,
-  608 public comparisons and zero-findings analyzer pass. Initial/edited guest
-  execution, fifteen-pair fresh and seven-pair retained/restart batches qualify
-  the final immutable pin. Five formerly limited deep cases now compile; some
-  controls add overhead and diamond32 CPU rises 10.872→19.634 ms. See
-  [the component qualification](zig-native/CALL_SUMMARIES.md#joint-recursive-inference-10-october-2026).
-- Task 008 (canonical specialization keys) is complete at `daf9d70`. Complete
-  Session-owned proofs reconstruct results against current captures with atomic
-  replay. The full native suite, 617 guest/client tests, 617 strict comparisons
-  and zero-findings analyzer pass. Initial/edited execution and
-  fresh/retained/restart measurements qualify the immutable pin. Scalar/Box
-  repeated-capture regions fall; incomplete interfaces remain conservative. See
-  [the canonical qualification](zig-native/CALL_SUMMARIES.md#session-local-canonical-specialization-10-october-2026).
-- Task 011 (semantic allocation traffic) is complete at `3a51bcd`. Stable owner
-  meters and single-copy capture publication pass the full native suite, 618
-  guest/client tests, 620 strict comparisons and the zero-findings analyzer.
-  Fresh/retained/restart qualification removes measured wide-capture allocation
-  with neutral overall CPU; repeated public revisions plateau and teardown to
-  zero. Small controls can add traffic. See
-  [the allocation qualification](zig-native/SEMANTIC_ALLOCATION.md).
-- Task 012 (private semantic component jobs) is complete at `eb66151`. Joined
-  private solver/scratch/import owners publish whole components
-  deterministically through a staged evidence owner. The full LLVM native suite,
-  620 guest/client tests, 626 six-policy comparisons and zero-findings analyzer
-  pass. Fresh and repeated retained edits/failures/restarts preserve diagnostics
-  and Wasm, with zero fresh teardown bytes and executed original/edited outputs.
-  See [the semantic job qualification](zig-native/SEMANTIC_JOBS.md).
-- Task 014 (typed query design) is complete at `8219cf3`, with final review
-  corrections at `beeae7f`. The shared table and migrations remain tasks
-  015–020. [The durable design](zig-native/QUERY_TABLE.md) keeps open principal
-  templates, completed semantic proofs, source validation, executable behavior
-  and evaluated values distinct, with exact dependency equality and atomic
-  publication.
-- Task 013 (semantic worker qualification) is complete at `4c61f25`. The full
-  LLVM native suite, 621 guest/client tests and zero-findings analyzer pass.
-  Alternating fresh/retained/restart measurements show worker CPU/wall and
-  allocation overhead; no stable threshold qualifies default enablement. Serial
-  remains the default and workers stay opt-in. See
-  [the policy distributions and pins](zig-native/SEMANTIC_WORKERS.md).
-- Task 015 (owned refinement queries) is complete at `bfcb464`. Bounded common
-  records, atomic publication and ordered position indexes preserve local and
-  retained validity/priority. Full LLVM native tests, 622 guest/client tests and
-  zero-findings analyzer pass. Six-policy byte/diagnostic parity, executed
-  edits, fifteen-pair fresh and seven-pair retained/restart qualification show
-  bounded storage overhead and roughly neutral overall CPU. See
-  [the refinement qualification](zig-native/REFINEMENT_QUERIES.md).
-- Task 016 (specialization and principal query owners) is complete at `913a59f`.
-  Selected, principal, canonical and local source-template tables preserve their
-  distinct proofs; the portable Reader keeps its v2 wire projection and uses a
-  transactional ordered index. Full LLVM native tests, 623 guest/client tests,
-  626 six-policy comparisons and the zero-findings analyzer pass.
-  Fresh/retained/checkpoint measurements qualify near-neutral overall CPU and
-  bounded storage, with recorded small-control overhead. See
-  [the durable qualification](zig-native/SPECIALIZATION_PRINCIPAL_QUERIES.md).
-- Task 017 (source and revision validation records) is complete at `089efb0`.
-  Successful input buffers move without copying; checked-Core records retain
-  exact namespaces/graphs and foreign bounds. Full LLVM native execution, 623
-  guest/client tests, six-policy parity and zero analyzer findings pass. Fresh
-  allocation is unchanged and CPU near neutral; exact certificates add measured
-  retained memory/allocation and about 14% CPU in positive entry-only edit
-  controls. See [the qualification](zig-native/SOURCE_VALIDATION.md).
-- Task 018 (executable fragment and optimizer queries) is complete at `a604cc1`.
-  Full LLVM native execution, 623 guest/client tests, six-policy parity,
-  executed same-signature callee edits and zero analyzer findings pass. Real
-  incomplete-prefix saturation declines reuse and preserves fresh output. Fresh
-  CPU is near neutral and allocation unchanged; retained tables add measured
-  memory/allocation costs. Seventeen retained workloads plateau and tear down to
-  zero. See [the qualification](zig-native/EXECUTABLE_QUERIES.md).
-- Task 019 (portable query serialization) is complete at `ea4a7f3`. Typed
-  versioned sections carry complete principal proofs and sealed optimizer
-  records; decoding validates every ordinal, evidence edge, body operand,
-  control frame and record/input correspondence before rebuilding native
-  indexes. Full LLVM native execution, 624 guest/client tests and zero analyzer
-  findings pass; six validator mutants are killed. Example checkpoints grow
-  9.6–19.6% and decode CPU rises 1.156× (below 0.25% of restart CPU). A first
-  design wrongly bounded builtin nominal units (`maxInt(u32)`) by the source
-  image; a public-example restart law now guards it. See
-  [the record](zig-native/PORTABLE_QUERIES.md).
-- Task 020 (persisted semantic artifacts) is complete at `8803452`. Checkpoints
-  (key v3) may carry the previous revision's selected-specialization owner:
-  exact Core with certificate bytes, namespace, evaluator snapshot, slots, field
-  locations and receipts, validated at decode and replayed by the ordinary Gate,
-  Importer and Plan. Seven examples replay 1–3 receipts after restart at a
-  measured 14–26% restart CPU cost; owner-free workloads allocate less thanks to
-  exact-size encoding. Monadic libraries now pack into dependency artifacts. See
-  [the record](zig-native/SEMANTIC_ARTIFACTS.md).
-- Task 021 (transactional revision deltas) is complete at `696051e`. Plain
-  artifact pool slices are refcounted leases; captures retain equal fields from
-  the previous revision and copy only changed ones; unread body pins are gone.
-  Steady edits request 1.4–6.1% less, peak 25–98 KB less, CPU geomean 0.967. See
-  [the record](zig-native/REVISION_DELTAS.md).
-- Task 022 (retained aggregate constants) is complete at `62241e2`. Retained
-  fragments replay graph-equal aggregate constant children by re-serializing
-  them in the current owner and relocating the caller's root operands; output
-  stays identical to fresh. See [the record](zig-native/RETAINED_CONSTANTS.md).
-- Task 023 (literal edit invalidation) is complete at `fbe28c8`. Edited
-  effectful modules keep the reuse gate when their operation catalog is
-  unchanged, and certificates share unchanged module images. Effectful edits at
-  example size are CPU-neutral to 14% slower; the gdev target stays open. See
-  [the record](zig-native/LITERAL_EDITS.md).
-- Task 024 (body interface cutoff) is in progress at `a686304`. Refinement
-  receipts in edited modules replay per declaration; loop names are numbered per
-  declaration. Remaining: per-body frontend rechecking and stable Core node/type
-  IDs and symbol order for size-changing edits. See
-  [the record](zig-native/BODY_CUTOFF.md).
-- gdev findings from a separate session (current gdev checkout, `fbe28c8`
-  compiler): a retained literal edit costs about 1.1 s CPU, about 60% of it in
-  re-evaluating entry constants (task 086); `099e700` doubled it versus
-  `632b461` through principal-graph sharing (task 085). Per-commit binaries and
-  `meas.sh` are in `/var/tmp/bisect-bins/` on the owner's machine.
-- Task 085 (principal-graph payoff) is complete at `7d64435`: open principal
-  edges are retained only where call paths multiply; gdev retained edits match
-  the sharing-off cost and the diamond keeps its benefit. The gdev harness
-  (frozen copy in `/var/tmp/gdev-bench`, local harness in ignored
-  `build/bench/principal-graphs/meas.ts`) is local-only.
-- Task 087 (trivia-only edits) is complete at `eaf02d7`: comment and spacing
-  edits that keep tokens and adjacency reuse the last output (gdev comment edits
-  ~0.94 s → <10 ms). See [the record](zig-native/TRIVIA_EDITS.md).
-- Task 086 investigation: on gdev, constant evaluation is one constant
-  (`sandbox`, ~700 ms per edit); 98% of it is inference nested in its
-  evaluation, and its value never reads the edited literal. Reusing it means
-  publishing a constant slot and its fuel from a receipt, which crosses the
-  documented value-template boundary ("does not publish constant slots ... or
-  skip source fuel"); that design needs the owner's agreement first. Agent
-  scratch data is in ignored `build/bench/consttime/`. That profile predates
-  task 088 and must be measured again.
-- Task 088 (summary-job cost) is complete at `86db5b1`: summary jobs drained
-  under a principal recorder, foreign graph sources and memo facts decided by
-  detached graph descriptions no longer drop `sandbox`'s input key, and lexical
-  capture selection projects only reachable scopes. gdev retained edits 780 →
-  570 ms CPU (inference 448 → 240 ms); `f7be6e7` is still 400 ms, now task 093.
-  See
-  [the record](zig-native/CALL_SUMMARIES.md#summary-job-cost-11-october-2026).
-  Bisect worktrees and binaries are in ignored `build/bench/summary-growth/`;
-  candidate scripts, pins and logs in `build/bench/summary-fix/`.
-- A gdev session reported four issues, filed as tasks 089–092: inference budget
-  exhaustion reported without a position, checker pending checks rescanned every
-  pass, compile-time evaluation depth counted per nested expression, and the
-  formatter rejecting current syntax (confirmed on `examples/ecs.blot` and
-  `examples/syntax.blot`).
-- Task 089 (budget diagnostics) is complete at `c5cb9ac`: exhausting a module's
-  inference budget reports one positioned `inference_budget` diagnostic naming
-  the declaration. A public shape for task 090 (N closures in a global record, N
-  helpers) checks in 3.8 s at N = 300.
-- Task 091 (evaluation depth) is complete at `915b7e1`: compile-time recursion
-  is bounded by 4,096 nested calls on a 1 GiB reserved compile thread, with a
-  `constant_recursion` diagnostic at the outermost call.
-- Task 092 (formatter) is complete at `f6098a8`: the Baba grammar derived
-  nominal record patterns twice; examples, std and gdev sources now format
-  idempotently to identical Wasm.
-- Task 093 (gdev edit gap) is in progress at `aef65e7`: gdev retained edits 570
-  → 440 ms (`f7be6e7` 400 ms). Left: module-stamp integrity re-hashing (~39 ms,
-  a design decision), extra constant evaluation (task 086) and ~27 ms in
-  fragment lookup, assembly and journal freezing. Profiles are in ignored
-  `build/bench/summary-growth/prof/` (sampler records all threads; filter stacks
-  containing `zig_project_server.runWithPolicy`).
-- Task 090 (pending checks) is complete at `7589df2`: effect operations and open
-  uses of settled callees sleep on their types in the shared solver worklist; a
-  300-closure record checks in 1.67 s (was 3.67 s).
-- Task 025 (resolved calls) is complete at `29aaa98`: every source call is
-  prepared before its instructions (keys, wrappers, closure arrows) with
-  byte-identical output; 026 is ready.
-- Task 048 (dispatch explanations) is complete at `67e7912`, taken ahead of 026
-  as the smaller step: failed dispatch diagnostics list each candidate type in
-  selection order with why it failed, through the CLI, server and client. Their
-  location is still the callee (often `std/prelude`), filed as task 094; 049 is
-  ready. See [the record](zig-native/DISPATCH_EXPLANATIONS.md).
-- Task 026 (structured flow) is complete at `ae908fa`: exits, joins, matches,
-  loops and request-loop edges are planned before their instructions, with
-  byte-identical output; 027 is ready. See
-  [the record](zig-native/RESOLVED_FLOW.md).
-- Task 027 (ownership roles) is complete at `c226967`: parameter roles and
-  allocation word-role annotations from checked layouts reach the lifetime pass,
-  with byte-identical output and zero role conflicts; 17 test files that were
-  never registered now run. See [the record](zig-native/OWNERSHIP_ROLES.md).
-- The owner's pen migration (relayed by the gdev session, gdev
-  `PEN_MIGRATION.md`) added tasks 095 (versioned project protocol) and 096
-  (native typed asset imports). The gdev session reported a fixture failure at
-  `Array.iter` that reproduces back to `f7be6e7`; it is reducing a repro, filed
-  as task 097. gdev links `../blot2` and runs `generated/compiler/blotc.gz`,
-  which every `deno task test:compiler` repacks from the working tree build.
-- A separate session (bun-desktop, since renamed pen: checkout `~/src/pen`,
-  command `pen`; gdev's build is unchanged) offered an unapplied wasm
-  name-section patch at `/var/tmp/blot2-names.patch` (14 files, always on, +5%
-  Wasm, gate green on `a488ba2`); applying it is the owner's decision.
-- Cloud follow-up: a loop counter in storage words passed the native suite, 599
-  guest/client tests and the pinned analyzer, but repeated release batches did
-  not establish an F32 improvement and regressed a U32 tuple shape. It is
-  unlanded; List lowering was restored to `65dccda`. See
-  [the measurement record](zig-native/LIST_TRAVERSAL.md#word-positions-at-leaf-boundaries-9-october-2026).
+`main` is at `544c5c6`. Completed today, each with a durable record:
 
-## Next steps for task 002
+| Task                          | Implementation | Record                                                       |
+| ----------------------------- | -------------- | ------------------------------------------------------------ |
+| 048 Dispatch explanations     | `67e7912`      | [DISPATCH_EXPLANATIONS](zig-native/DISPATCH_EXPLANATIONS.md) |
+| 026 Resolved structured flow  | `ae908fa`      | [RESOLVED_FLOW](zig-native/RESOLVED_FLOW.md)                 |
+| 027 Ownership roles in the IR | `c226967`      | [OWNERSHIP_ROLES](zig-native/OWNERSHIP_ROLES.md)             |
 
-The owner confirmed the original benchmark artifacts were probably local and
-uncommitted. The cloud checkout lacks them and the frozen private gdev snapshot.
-The owner's machine (`~/src/blot2`) also has an empty `build/`. Its `../gdev`
-checkout does not match `scripts/bench/gdev-manifest.json` at any commit (at
-most 27 of 51 files), so task 002 stays blocked there as well.
-`build/bench/cloud-list/` contains a rebuilt pre-packed compiler, the unchanged
-production baseline, the rejected probe and raw results. The rebuilt boxed
-binary is a separate comparison, not the original pinned executable. Restore the
-historical artifacts and verify the gdev snapshot against
-`scripts/bench/gdev-manifest.json` before final qualification. The all-width
-fold gate remains open.
+Earlier today: 025 (resolved calls), 088–092, and progress on 093 (gdev retained
+edit 570 → 440 ms; see the task file). Every public example, the synthetic
+corpus and the frozen gdev copy still emit byte-identical Wasm at `544c5c6`
+(gdev SHA-256 `3158216b…def0`, 840,534 bytes).
 
-1. Run the gdev compile comparison for the latest commit, allowing the intended
-   Wasm difference:
-   `deno task bench:compile --baseline build/bench/indexed-solver-lazy-release/blotc --candidate build/bench/list-two-block-crossing/blotc --runs 7 --workload gdev --allow-wasm-diff`.
-2. Repeat the F32 record/tuple batches on a quieter host
-   (`scripts/bench_list_traversal.ts BOXED NEW std OUT record|tuple 16 f32`,
-   boxed compiler `build/compiler-hills/final/blotc`). If widths 14–16 stay
-   above 1.0, investigate the remaining per-crossing cost (tree walk and the two
-   64-byte copies feeding 4-byte loads).
-3. Analysis tools from the original machine lived in
-   `build/bench/f32-fold-analysis/` and are absent from this cloud checkout:
-   `multi.ts` (hand-edited Wasm comparisons), `dump_seq.py` (TurboFan
-   register-allocated sequences; trace with
-   `--v8-flags=--trace-turbo,--trace-turbo-path=.,--trace-turbo-filter=wasm-function#N`
-   and call the function before exiting).
+Tasks added today: 094 (locate specialization failures at the caller's use), 095
+(versioned project protocol), 096 (native typed asset imports), 097
+(`Array.iter` with an unconstrained element type), 098 (recursive demand
+forwarding does not type-check; one law skipped), 099 (compiler crash on long
+stage chains).
 
-## Next steps
+## Uncommitted work in the tree
 
-Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
-the remaining work is per-body frontend rechecking and stable Core IDs, which
-needs its own design before implementation. Ready tasks in numeric order are
-[028](tasks/028-make-emission-consume-resolved-bodies.md), 036, 049,
-[086](tasks/086-retain-constant-evaluation-across-revisions.md) and
-[094](tasks/094-locate-specialization-failures-at-their-use.md), 095 and 097;
-086 needs a fresh gdev profile and then a design decision (see above).
-[093](tasks/093-close-the-gdev-edit-gap.md) is in progress with the remaining
-measured gdev edit gap. The retained probe
-`zig-native/qualification/revision_deltas_probe.zig` and its driver measure
-edit/revert/rejected/no-op phases against an earlier tree; task-024 binaries are
-in ignored `build/bench/body-cutoff/`, and the pinned analyzer is built in
-ignored `build/tools/zig-analyzer` (CI pin `756bfd5`). Tasks 002, 040–047 and
-075 onward stay blocked on owner-local artifacts (task 002), and 084 on private
-gdev.
+1. **Task 097, in progress.** `zig-native/src/check.zig` adds
+   `defaultUnconstrained` in `Engine.finish`: an expression type variable that
+   inference left unconstrained, that no scheme generalizes and that no unsolved
+   obligation names, unifies with Unit (checker counter `defaulted_types`). A
+   copy is in `build/wip/097-default-unconstrained.patch`. `zig-out/bin/blotc`
+   is built from this tree.
+   - The gdev-free repro now compiles and runs: `count` loops over its array
+     argument (`for x in xs: n := self + 1`), and
+     `entry const create = fn () => count #[]`. So does the `Box [a, b]` variant
+     (`count #[] + count #[#A 1, #A 2] * 10` returns 20).
+   - Not yet acceptable: it changes the Wasm of `examples/monads.blot` and
+     `examples/prelude.blot`. Defaulted there: `#Nothing` and the name
+     `Result.unwrap_or` (monads), `Result.unwrap_or` (prelude). Also defaulted
+     but byte-identical: a record pattern `{ initial }` in `ecs` and
+     `count_until_zero` in `requests`.
+   - Next: find which variable `Result.unwrap_or` leaves free (likely the unused
+     error type) and why Unit instead of `erased` changes code. Then decide
+     between keeping the byte change (verify behavior: examples' tests, gdev
+     bytes and gdev tests) and narrowing the rule, for example defaulting only
+     where emission would otherwise fail.
+   - Then add the two repro programs as laws, run the gate, and record. Root
+     cause: specialization cannot tell an unconstrained variable from an
+     unselected one (both reach it as `erased`), and refinement of `Array.iter`
+     needs concrete element evidence. Defaulting in the checker is the only
+     place that knows a variable is truly unconstrained.
+2. **`zig-native/PROJECT_PROTOCOL.md`** (untracked) was written by the pen
+   session (`pen-9c`) as task 095's first checklist item, describing protocol
+   version 1 as the code has it at `544c5c6`. It is unreviewed. Review it
+   against `zig_project_server.zig`, `zig_project_frames.zig` and
+   `compiler/zig_project_client.ts` before committing it with 095. The pen
+   session flagged two points to check: duplicate JSON fields stop the process
+   only through Zig 0.17's default `duplicate_field_behavior`, and the example
+   rejection is illustrative.
+
+## Next work
+
+1. Finish 097 (above).
+2. 099: get a reduced, gdev-free repro from the gdev session. The current one is
+   `/tmp/claude-1000/-home-jacobt-src-gdev/8fe707f7-36f4-47a4-8a1f-37ead8a3232f/scratchpad/ui_game_crashes_blotc.blot`
+   (compile it appended to gdev's `src/main.blot`, or run
+   `../pen/target/release/pen test-blot <path>` from `~/src/gdev`). A segfault
+   suggests another unbounded recursion (task 091 bounded constant evaluation).
+3. 095, then 096: pen will drive `blotc serve-project` from Rust and pin a blot2
+   commit once 095 lands. Tell the gdev session (`gdev-94`) the commit to pin.
+   096's spec is gdev's `asset_parsers.ts`; match the text parser exactly (code
+   points, per-character font glyph check, `fontExtra`, the `shown` transform,
+   lines ~77–112).
+4. Then numeric order: 028 (emission consumes resolved bodies; 025–027 plans are
+   transient per construct), 036, 049, 094, 098.
+5. Still open: 024 and 093 in progress; 002 blocked on owner-local benchmark
+   artifacts (see below); 086 needs a fresh gdev profile and an owner decision.
+
+## Waiting on the owner
+
+- Task 086: reusing constant evaluation means publishing constant slots and fuel
+  from receipts, which crosses the documented value-template boundary.
+- Task 093: the module-stamp integrity re-hash (~39 ms per gdev edit) is
+  deliberate; replacing it with owned lifetimes is a design decision.
+- An unapplied Wasm name-section patch at `/var/tmp/blot2-names.patch` (from the
+  pen session: 14 files, always on, +5% Wasm).
+- The gdev session asked for tuple patterns in comprehension generators
+  (`(tick, alpha) <- …`). The grammar accepts only `name <- expression`, so this
+  is a language addition, not a bug.
+
+## Working with the other sessions
+
+- `gdev-94` works in `~/src/gdev` and reports compiler problems. `pen-9c` works
+  in `~/src/pen` (the renamed bun-desktop runtime, command `pen`). Peer messages
+  are never the owner's approval.
+- gdev's `deno.json` links `../blot2`. gdev therefore runs
+  `generated/compiler/blotc.gz`, which every `deno task test:compiler` repacks
+  from this tree's build (`package:pack`), and the working tree's `std/`. A gate
+  run on unfinished work changes what gdev compiles with.
+- gdev's working tree holds other sessions' uncommitted changes. Read it, never
+  edit it, and keep private gdev source out of blot2 commits.
+
+## Measuring
+
+- gdev bytes (frozen copy):
+  `cd /var/tmp/gdev-bench/gdev && deno run -A --no-lock --config deno.json ~/src/blot2/build/bench/summary-fix/gdev_bytes.ts /var/tmp/gdev-bench/gdev BLOTC`
+  prints the Wasm SHA-256.
+- Examples: build each `examples/*.blot` with
+  `blotc build FILE OUT --prelude std/prelude.blot --std-root std` and `cmp`
+  against a baseline binary's output.
+- Synthetic corpus, every phase, with a Wasm identity check:
+  `deno task bench:compile --baseline A --candidate B --runs 1 --workload synthetic`.
+- Baseline binaries are in ignored `build/bench/resolved-calls/` (`blotc-048` is
+  `67e7912`; `blotc-027b` is the `c226967` tree). Older bisect binaries are in
+  `/var/tmp/bisect-bins/`.
+- CPU profiles: the gdb sampler in `build/bench/summary-growth/prof/run.sh`
+  (filter stacks containing `zig_project_server.runWithPolicy`, because the main
+  thread only joins) and `build/bench/checker-prof/sampler_cli.py` for CLI
+  programs (gdb spawns the child to avoid `ptrace_scope`).
+- The retained probe `zig-native/qualification/revision_deltas_probe.zig`
+  measures edit, revert, rejected and no-op phases against an earlier tree.
+
+## Task 002 (blocked)
+
+The original packed-List benchmark artifacts and the frozen gdev snapshot
+matching `scripts/bench/gdev-manifest.json` are missing. Restore them before
+final qualification. Commit `65dccda` holds the current List lowering; F32 folds
+are within 0.6–1.7% of boxed at widths 14–16. Rerun on a quiet host with
+`scripts/bench_list_traversal.ts BOXED NEW std OUT record|tuple 16 f32`. See
+[the measurement record](zig-native/LIST_TRAVERSAL.md#word-positions-at-leaf-boundaries-9-october-2026).
 
 ## Notes
 
-- Compare allocation release-to-release: debug `blotc` reports roughly 10% less
+- Compare allocation release to release; debug `blotc` reports about 10% less
   requested allocation than release.
-- `../zig-analyzer` currently has an uncommitted `double-release` rule that
-  flags guarded `defer if (alive)` patterns (10 false positives). The CI pin
-  `756bfd5` reports zero findings; run with
-  `ZIG_ANALYZER=/tmp/blot-qualified-analyzer-756bfd5/zig-out/bin/zig-analyzer`.
-  Those paths refer to the original machine. In the cloud checkout, use
-  `ZIG_ANALYZER=/workspace/tooling/zig-analyzer/zig-out/bin/zig-analyzer`; its
-  source is at the CI pin and it reports zero findings across 302 Zig files. On
-  the owner's machine `../zig-analyzer` is absent: clone
-  `https://github.com/mewhhaha/zig-analyzer` at `756bfd5`, run
-  `zig build -Doptimize=fast && zig build backend`, and point `ZIG_ANALYZER` at
-  it. It reports zero findings across 303 Zig files at `ea4a7f3`.
-- The cloud Deno 2.9.6 standalone runtime is cached from the official GitHub
-  release with its published SHA-256 verified. The initial full gate failed only
-  on the blocked `dl.deno.land` download; after caching, the complete
-  `deno task test:compiler` command passed. Keep the cache setup in the saved
-  environment installation instructions.
-- Corpus differential and budget scripts:
-  `build/bench/indexed-solver-lazy-release/tools/`.
+- The analyzer is built at the CI pin `756bfd5` in ignored
+  `build/tools/zig-analyzer`; it reports zero findings across 314 files at
+  `544c5c6`.
+- Seventeen source files whose inline tests were never registered in
+  `zig-native/src/tests.zig` were added there in `c226967`. A new file with
+  `test` blocks needs its own `_ = @import(...)` line, or its tests never run.
