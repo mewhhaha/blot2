@@ -257,6 +257,12 @@ public examples are unchanged. gdev measurements also added task [087]
 growth since `f7be6e7`). See
 [open-principal payoff](../zig-native/CALL_SUMMARIES.md#open-principal-payoff-11-october-2026).
 
+Task [087] reuses the last output for trivia-only edits at `eaf02d7`: sources
+with the same tokens and adjacency publish the previous successful build, and
+the gate compares obligations without spans. gdev comment edits drop from about
+0.94 s to under 10 ms; literal edits are unchanged. See
+[trivia-only edits](../zig-native/TRIVIA_EDITS.md).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -560,7 +566,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [084] — Qualify the complete program                    | Pending     | [082], [083], [085]–[088]              |
 | [085] — Gate principal-graph sharing on payoff          | Complete    | —                                      |
 | [086] — Retain constant evaluation across revisions     | Ready       | [023]                                  |
-| [087] — Skip rebuilds for trivia-only edits             | Ready       | —                                      |
+| [087] — Skip rebuilds for trivia-only edits             | Complete    | —                                      |
 | [088] — Restore summary-job inference cost              | Ready       | [085]                                  |
 | [999] — Remove tasks and plan                           | Pending     | All [001]–[088], plus every added task |
 

@@ -3,7 +3,8 @@
 Task 087 makes an edit that changes only comments or spacing publish the last
 output instead of rebuilding. A separate session measured gdev's dev loop: a
 comment edit cost the full retained build (about 1.05 s) and emitted
-byte-identical Wasm. The compiler milestone is recorded below.
+byte-identical Wasm. The compiler milestone is
+`eaf02d7f90a2cf741ab06cb77dc4855a1e39bdfb`.
 
 ## Rule
 

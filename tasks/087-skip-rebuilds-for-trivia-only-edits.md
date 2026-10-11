@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete — local milestone `eaf02d7`.
 - **Dependencies:** none.
 - **Originating requirements:** discovered while qualifying task
   [085](085-gate-principal-graph-sharing-on-payoff.md); PLAN: Hill 6 / cheap
@@ -27,12 +27,12 @@ downstream.
 
 ## Implementation checklist
 
-- [ ] Decide which source changes are trivia (comments, whitespace that does not
+- [x] Decide which source changes are trivia (comments, whitespace that does not
       change layout-sensitive structure) and prove the token stream otherwise
       identical, including indentation-significant blocks.
-- [ ] Reuse the previous output and retained artifacts while updating every
+- [x] Reuse the previous output and retained artifacts while updating every
       source position that diagnostics, debug names and later edits read.
-- [ ] Keep diagnostics, failed-revision rollback and fresh/retained equality
+- [x] Keep diagnostics, failed-revision rollback and fresh/retained equality
       exact.
 
 ## Validation
@@ -47,19 +47,40 @@ before the local milestone commit.
 
 ## Acceptance criteria
 
-- [ ] Trivia-only edits avoid backend work while later diagnostics carry the
+- [x] Trivia-only edits avoid backend work while later diagnostics carry the
       current positions.
-- [ ] Layout-changing whitespace still rebuilds.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Layout-changing whitespace still rebuilds.
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `eaf02d7f90a2cf741ab06cb77dc4855a1e39bdfb` (compiler milestone).
+- Implementation: a source is trivia-equal to the last compiled one when both
+  lex cleanly to the same token tags, spellings and adjacency (layout tokens
+  included) within size limits. When every input is byte- or trivia-equal, the
+  settings and canonical entry match and the last revision compiled, the
+  retained session publishes the last output and keeps its state. Positions are
+  not patched: a reused successful revision exposes none, and the next real edit
+  recompiles from the new sources. The reuse gate now compares obligations
+  without their diagnostic spans, so shifted positions no longer disable reuse
+  program-wide.
+- Validation: Zig 0.17.0 before every build batch. `deno task test:compiler`
+  passes the full LLVM native suite and 633 guest/client tests;
+  `deno task
+  lint:zig` reports zero findings across 310 files. Native laws
+  classify trivia, layout and adjacency edits (with an allocation sweep) and
+  check retained reuse; a gate law (failing with exact obligation comparison)
+  keeps the catalog across shifted spans; a process-level law compares bytes and
+  diagnostics with fresh builds through trivia, real, failing and recovered
+  edits on three examples.
+- Comparison: three pairs on the frozen gdev copy at load 2–4: comment-only
+  edits 930–950 ms (then ~710 ms) → 0–10 ms; the first literal edit after a
+  comment edit costs 1010–1040 ms versus ~825 ms for a plain literal edit, which
+  is unchanged. Baseline `b822ccf` (sources of `7d64435`).
+- Remaining limitations: a layout or adjacency change is a real edit; the first
+  real edit after trivia diffs against the pre-trivia sources, so declarations
+  after shifted positions rebuild (about 200 ms more on gdev).
+- Durable record: [trivia-only edits](../zig-native/TRIVIA_EDITS.md),
+  [distributions](../zig-native/qualification/trivia-edits-gdev.csv) and
+  [pins](../zig-native/qualification/trivia-edits-pins.json).
