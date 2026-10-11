@@ -83,6 +83,11 @@ fn diagnostic(writer: *Io.Writer, filename: []const u8, stage: []const u8, code:
     try std.json.Stringify.value(.{ .kind = "diagnostic", .filename = filename, .stage = stage, .code = code, .start = start, .end = end, .message = message }, .{}, writer);
     try writer.writeByte('\n');
 }
+fn emitDiagnostic(writer: *Io.Writer, filename: []const u8, item: backend.Diagnostic, explanation: ?@import("dispatch_explanation.zig").Explanation) !void {
+    const value = explanation orelse return diagnostic(writer, filename, "emit", @tagName(item.code), item.span.start, item.span.end, item.message());
+    try std.json.Stringify.value(.{ .kind = "diagnostic", .filename = filename, .stage = "emit", .code = @tagName(item.code), .start = item.span.start, .end = item.span.end, .message = item.message(), .details = .{ .explanation = value } }, .{}, writer);
+    try writer.writeByte('\n');
+}
 fn frontendDiagnostic(writer: *Io.Writer, filename: []const u8, stage: []const u8, source: []const u8, publication: syntax_diagnostics.Publication, details: anytype) !void {
     try std.json.Stringify.value(.{
         .kind = "diagnostic",
@@ -180,6 +185,8 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
             for (checked.diagnostics) |item| {
                 if (item.hole) |hole| {
                     try frontendDiagnostic(writer, filename, "check", source, .{ .cause = .native_detail, .code = @tagName(item.code), .span = item.span, .message = item.message() }, .{ .hole = hole });
+                } else if (item.explanation) |explanation| {
+                    try frontendDiagnostic(writer, filename, "check", source, .{ .cause = .native_detail, .code = @tagName(item.code), .span = item.span, .message = item.message() }, .{ .explanation = explanation });
                 } else if (item.purity) |witness| {
                     try purityDiagnostic(allocator, writer, filename, "check", source, @tagName(item.code), item.span, &names, "main", witness);
                 } else if (item.code == .module_loader_required or item.numeric_literal != null) {
@@ -235,7 +242,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         stats.constant_steps = compiled.constant_steps;
         stats.principals = compiled.principal;
         if (compiled.diagnostic) |item| {
-            try diagnostic(writer, filename, "emit", @tagName(item.code), item.span.start, item.span.end, item.message());
+            try emitDiagnostic(writer, filename, item, compiled.explanation);
             break :compilation false;
         }
         stats.wasm_bytes = compiled.bytes.len;
@@ -350,6 +357,8 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
                 try frontendDiagnostic(writer, path, "check-project", unit_.source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message() }, @as([]const checker.Diagnostic, &.{detail}));
             } else if (item.hole) |hole| {
                 try frontendDiagnostic(writer, path, "check-project", loaded.unit(item.unit).source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message() }, .{ .hole = hole });
+            } else if (item.explanation) |explanation| {
+                try frontendDiagnostic(writer, path, "check-project", loaded.unit(item.unit).source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message() }, .{ .explanation = explanation });
             } else if (item.numeric_literal) |detail| {
                 const unit_ = loaded.unit(item.unit);
                 try frontendDiagnostic(writer, path, "check-project", unit_.source, .{ .cause = .native_detail, .code = item.codeName(), .span = item.span, .message = item.message(), .actual_token = detail.actual_token }, @as([]const @import("ast.zig").NumericFault, &.{detail}));
@@ -421,7 +430,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         principals = compiled.principal;
         selected_queries = compiled.completed_queries;
         if (compiled.diagnostic) |item| {
-            try diagnostic(writer, loaded.filename(item.unit), "emit", @tagName(item.code), item.span.start, item.span.end, item.message());
+            try emitDiagnostic(writer, loaded.filename(item.unit), item, compiled.explanation);
             emit_us = elapsed(emit_start, io);
             break :compilation false;
         }

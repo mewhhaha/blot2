@@ -23,6 +23,7 @@ const function_facts = @import("function_facts.zig");
 const exact_builder = @import("exact_builder.zig");
 const runtime_operations = @import("runtime_operations.zig");
 const runtime_identity = @import("runtime_identity.zig");
+const dispatch_explanation = @import("dispatch_explanation.zig");
 const owned_arrays = @import("owned_arrays.zig");
 const artifact_emitter = @import("artifact_emitter.zig");
 const code_artifacts = @import("code_artifacts.zig");
@@ -46,6 +47,8 @@ pub const Diagnostic = struct {
     span: core.Span,
     code: Code,
     detail: []const u8 = &.{},
+    /// Candidates of the failed dispatch this diagnostic reports.
+    dispatch: ?core_eval.DispatchRecord = null,
     pub fn message(self: Diagnostic) []const u8 {
         return self.code.message(self.detail);
     }
@@ -82,10 +85,13 @@ pub const Result = struct {
     emitted_functions: usize = 0,
     constant_steps: usize = 0,
     owned_message: []u8 = &.{},
+    /// Owned, spelled candidates of a failed dispatch `diagnostic` reports.
+    explanation: ?dispatch_explanation.Explanation = null,
     startup_observation: ?startup_emission_facts.Snapshot = null,
     pub fn deinit(self: *Result, allocator: Allocator) void {
         allocator.free(self.bytes);
         allocator.free(self.owned_message);
+        if (self.explanation) |explanation| explanation.deinit(allocator);
         if (self.capture) |*capture| capture.deinit();
         if (self.startup_observation) |*observation| observation.deinit(allocator);
         self.* = .{};
@@ -363,11 +369,27 @@ const Generator = struct {
             // Reference panic diagnostics name the constant phase, with no
             // declaration offset. Preserve its detail and producer owner.
             const public_span: core.Span = if (code == .const_panic and !item.tag_origin) .{ .start = 0, .end = 0 } else item.span;
+            const fresh = self.diagnostic == null;
             const result = self.decline(item.unit, public_span, code);
             if (self.diagnostic) |*diagnostic_| diagnostic_.detail = item.detail;
+            if (fresh) self.diagnostic.?.dispatch = item.dispatch;
             return result;
         }
         return self.decline(1, .{ .start = 0, .end = 0 }, .constant_expression);
+    }
+    /// Spells a failed dispatch's candidates while their evidence is live.
+    /// Types without a source name keep a null operand.
+    fn explainDispatch(self: *Generator, record: core_eval.DispatchRecord) Allocator.Error!dispatch_explanation.Explanation {
+        var builder: dispatch_explanation.Builder = .{ .allocator = self.allocator };
+        defer builder.deinit();
+        for (record.items()) |candidate| {
+            var display: EntryDisplay = .{ .generator = self };
+            defer display.text.deinit(self.allocator);
+            const spelled = candidate.operand != 0 and try display.ty(candidate.operand, 16);
+            builder.add(candidate.side, if (spelled) try builder.own(&display.text) else null, candidate.outcome);
+        }
+        const named = if (record.member == 0) null else if (self.evaluator.diagnostic_context.identity) |identity| identity.symbol(record.member) else null;
+        return builder.finish(dispatch_explanation.operatorSymbol(record.op), named orelse dispatch_explanation.operatorMember(record.op));
     }
     fn constant(self: *Generator, target: core.BindingRef, ty: layout.Id) Error!Value {
         const timing = self.work_timing.enter(.constants);
@@ -2060,7 +2082,9 @@ pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entr
             const owned_message = try allocator.dupe(u8, detail);
             if (diagnostic_) |*item| item.detail = owned_message;
             errdefer allocator.free(owned_message);
-            return .{ .counters = generator.evaluator.counters, .principal = generator.principalStats(), .diagnostic = diagnostic_, .owned_message = owned_message, .startup_observation = if (options.observe_startup) try generator.startup_facts.capture(allocator, &generator.module) else null, .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps };
+            const explanation = if (diagnostic_) |item| if (item.dispatch) |record| try generator.explainDispatch(record) else null else null;
+            errdefer if (explanation) |value| value.deinit(allocator);
+            return .{ .counters = generator.evaluator.counters, .principal = generator.principalStats(), .diagnostic = diagnostic_, .owned_message = owned_message, .explanation = explanation, .startup_observation = if (options.observe_startup) try generator.startup_facts.capture(allocator, &generator.module) else null, .code_instances = generator.codeCount(), .callable_wrappers = generator.wrapperCount(), .emitted_functions = generator.module.functions.items.len, .constant_steps = generator.evaluator.steps };
         },
         else => return err,
     };

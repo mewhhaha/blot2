@@ -235,3 +235,83 @@ export function readTypedHole(value: unknown): TypedHoleDiagnostic {
   }
   return value as TypedHoleDiagnostic;
 }
+
+/** Where dispatch looked: operands in order, a built-in scalar operation,
+ * a result-directed destination, or a member access receiver. */
+export type DispatchSide =
+  | "left"
+  | "builtin"
+  | "right"
+  | "destination"
+  | "receiver";
+export type DispatchOutcome =
+  | "unknown_operand"
+  | "no_member"
+  | "incompatible"
+  | "unsupported_scalar"
+  | "result_mismatch";
+export interface DispatchCandidate {
+  side: DispatchSide;
+  /** The candidate's type as diagnostics spell it; null for unnamed shapes. */
+  operand: string | null;
+  outcome: DispatchOutcome;
+}
+/** Candidates a failed dispatch considered, in the order it considered them. */
+export interface DispatchExplanation {
+  /** Operator symbol such as `+`, when the member implements one. */
+  operation: string | null;
+  /** Member name such as `add` or `from`, when known. */
+  member: string | null;
+  candidates: DispatchCandidate[];
+  truncated: boolean;
+}
+const sides = new Set<DispatchSide>([
+  "left",
+  "builtin",
+  "right",
+  "destination",
+  "receiver",
+]);
+const outcomes = new Set<DispatchOutcome>([
+  "unknown_operand",
+  "no_member",
+  "incompatible",
+  "unsupported_scalar",
+  "result_mismatch",
+]);
+/** Copies only validated fields from a compiler peer's explanation. */
+export function readDispatchExplanation(value: unknown): DispatchExplanation {
+  const fail = (): never => {
+    throw new TypeError("Invalid dispatch explanation");
+  };
+  const object = (v: unknown): Record<string, unknown> =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? v as Record<string, unknown>
+      : fail();
+  const encoder = new TextEncoder();
+  const text = (v: unknown): string | null => {
+    if (v === null) return null;
+    if (typeof v !== "string" || !v.isWellFormed()) fail();
+    if (encoder.encode(v as string).length > 256) fail();
+    return v as string;
+  };
+  const explanation = object(value);
+  const raw = explanation.candidates;
+  if (!Array.isArray(raw) || raw.length > 4) fail();
+  if (typeof explanation.truncated !== "boolean") fail();
+  return {
+    operation: text(explanation.operation),
+    member: text(explanation.member),
+    candidates: (raw as unknown[]).map((item) => {
+      const candidate = object(item);
+      if (!sides.has(candidate.side as DispatchSide)) fail();
+      if (!outcomes.has(candidate.outcome as DispatchOutcome)) fail();
+      return {
+        side: candidate.side as DispatchSide,
+        operand: text(candidate.operand),
+        outcome: candidate.outcome as DispatchOutcome,
+      };
+    }),
+    truncated: explanation.truncated as boolean,
+  };
+}

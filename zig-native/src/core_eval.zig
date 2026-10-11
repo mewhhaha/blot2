@@ -16,6 +16,7 @@ const principal_type_graph = @import("principal_type_graph.zig");
 const lexical_capture_inputs = @import("lexical_capture_inputs.zig");
 const scope_components = @import("scope_components.zig");
 const runtime_identity = @import("runtime_identity.zig");
+const dispatch_explanation = @import("dispatch_explanation.zig");
 const Allocator = std.mem.Allocator;
 const collection_growth = @import("eval_collection_growth.zig");
 pub const Value = scalar_ops.Value;
@@ -127,6 +128,26 @@ pub const Options = struct {
     retain_source_suspensions: bool = false,
 };
 pub const Code = @import("diagnostic_code.zig").Code;
+/// The candidates of a failed dispatch in the order selection considered
+/// them. It is plain data so copied and restored diagnostics carry it; its
+/// evidence names the failing session's store, so the backend spells it
+/// before that session is released.
+pub const DispatchRecord = struct {
+    pub const Candidate = struct { side: dispatch_explanation.Side, operand: type_evidence.Id, outcome: dispatch_explanation.Outcome };
+    op: types.Operator = .none,
+    member: u32 = 0,
+    /// Unused slots stay defined so diagnostics compare and copy as values.
+    candidates: [3]Candidate = @splat(.{ .side = .left, .operand = 0, .outcome = .no_member }),
+    len: u8 = 0,
+    pub fn add(self: *DispatchRecord, side: dispatch_explanation.Side, operand: type_evidence.Id, outcome: dispatch_explanation.Outcome) void {
+        if (self.len == self.candidates.len) return;
+        self.candidates[self.len] = .{ .side = side, .operand = operand, .outcome = outcome };
+        self.len += 1;
+    }
+    pub fn items(self: *const DispatchRecord) []const Candidate {
+        return self.candidates[0..self.len];
+    }
+};
 pub const Diagnostic = struct {
     unit: u32,
     span: core.Span,
@@ -134,6 +155,7 @@ pub const Diagnostic = struct {
     detail: []const u8 = "",
     /// Tag application has already selected its public source invocation.
     tag_origin: bool = false,
+    dispatch: ?DispatchRecord = null,
     pub fn message(self: Diagnostic) []const u8 {
         return self.code.message(self.detail);
     }
@@ -2243,6 +2265,32 @@ pub const Session = struct {
     fn failNode(self: *Session, owner: usize, id: core.Id, code: Code) Error {
         return self.fail(owner, self.units[owner].span(id), code);
     }
+    fn failDispatch(self: *Session, owner: usize, id: core.Id, code: Code, record: DispatchRecord) Error {
+        const fresh = self.diagnostic == null;
+        const result = self.failNode(owner, id, code);
+        if (fresh) self.diagnostic.?.dispatch = record;
+        return result;
+    }
+    /// Rebuilds, from catalogs alone, why binary candidates were rejected:
+    /// the left owner, a built-in scalar operation for an unnamed operator,
+    /// then a right owner other than the left one.
+    fn rejectedCandidates(self: *Session, owner: usize, op: types.Operator, member: u32, left: type_evidence.Id, right: type_evidence.Id, include_right: bool) Error!DispatchRecord {
+        var record: DispatchRecord = .{ .op = op, .member = member };
+        const left_identity = self.evidenceIdentity(left);
+        record.add(.left, left, try self.ownerOutcome(owner, left_identity, op, member));
+        if (member == 0 and left != 0 and left == right) switch (self.evidence.node(left).tag) {
+            .u32, .f32, .boolean => record.add(.builtin, left, .unsupported_scalar),
+            else => {},
+        };
+        const right_identity = self.evidenceIdentity(right);
+        const same = left_identity != null and right_identity != null and std.meta.eql(left_identity.?, right_identity.?);
+        if (include_right and !same) record.add(.right, right, try self.ownerOutcome(owner, right_identity, op, member));
+        return record;
+    }
+    fn ownerOutcome(self: *Session, owner: usize, identity: ?types.NominalIdentity, op: types.Operator, member: u32) Error!dispatch_explanation.Outcome {
+        const declared = identity orelse return .no_member;
+        return if (try self.associatedTarget(self.unitId(owner), declared, member, op) != null) .incompatible else .no_member;
+    }
     fn slot(self: *Session, location: Target) *Slot {
         return &self.slots[self.binding_offsets[location.unit] + location.binding];
     }
@@ -3828,7 +3876,7 @@ pub const Session = struct {
         }
         return null;
     }
-    fn candidate(self: *Session, owner: usize, source: core.Id, identity: types.NominalIdentity, op: types.Operator, member: u32, left: type_evidence.Id, right: type_evidence.Id, expected: type_evidence.Id) Error!?Selection {
+    fn candidate(self: *Session, owner: usize, source: core.Id, identity: types.NominalIdentity, op: types.Operator, member: u32, left: type_evidence.Id, right: type_evidence.Id, expected: type_evidence.Id, side: dispatch_explanation.Side) Error!?Selection {
         if (try self.associatedTarget(self.unitId(owner), identity, member, op)) |method| {
             const resolved = try self.target(null, method);
             const module = &self.units[resolved.unit];
@@ -3844,7 +3892,11 @@ pub const Session = struct {
             if (!try self.matchType(owner, source, resolved.unit, first.a, left, &mappings, &row_mappings) or !try self.matchType(owner, source, resolved.unit, second.a, right, &mappings, &row_mappings)) return null;
             // Operand admission chooses the method. A result mismatch belongs
             // to this chosen use, and must never select the other receiver.
-            if (expected != 0 and !try self.matchType(owner, source, resolved.unit, second.b, expected, &mappings, &row_mappings)) return self.failNode(owner, source, .type_mismatch);
+            if (expected != 0 and !try self.matchType(owner, source, resolved.unit, second.b, expected, &mappings, &row_mappings)) {
+                var record = if (side == .right) try self.rejectedCandidates(owner, op, member, left, right, false) else DispatchRecord{ .op = op, .member = member };
+                record.add(side, if (side == .right) right else left, .result_mismatch);
+                return self.failDispatch(owner, source, .type_mismatch, record);
+            }
             const result = try self.projectType(resolved.unit, body.root, second.b, mappings.items, row_mappings.items);
             if (result == 0) return self.failNode(owner, source, .unsupported);
             return .{ .target = resolved, .full_type = try self.projectType(resolved.unit, body.root, body.scheme.root, mappings.items, row_mappings.items), .result = result };
@@ -3853,20 +3905,25 @@ pub const Session = struct {
     }
     fn select(self: *Session, owner: usize, source: core.Id, op: types.Operator, member: u32, left: type_evidence.Id, right: type_evidence.Id, expected: type_evidence.Id) Error!Selection {
         const left_identity = self.evidenceIdentity(left);
-        if (left_identity) |identity| if (try self.candidate(owner, source, identity, op, member, left, right, expected)) |chosen| return chosen;
+        if (left_identity) |identity| if (try self.candidate(owner, source, identity, op, member, left, right, expected, .left)) |chosen| return chosen;
         if (member == 0 and left != 0 and left == right) {
             const scalar = self.evidence.node(left).tag;
             const comparison = op == .equal or op == .not_equal or op == .less or op == .less_equal or op == .greater or op == .greater_equal;
             if (op != .none and (scalar == .u32 or scalar == .f32 or (scalar == .boolean and (op == .equal or op == .not_equal)))) {
                 const result = if (comparison) types.boolean else left;
-                if (expected != 0 and expected != result) return self.failNode(owner, source, .type_mismatch);
+                if (expected != 0 and expected != result) {
+                    var record: DispatchRecord = .{ .op = op, .member = member };
+                    record.add(.left, left, try self.ownerOutcome(owner, left_identity, op, member));
+                    record.add(.builtin, left, .result_mismatch);
+                    return self.failDispatch(owner, source, .type_mismatch, record);
+                }
                 return .{ .result = result };
             }
         }
         if (self.evidenceIdentity(right)) |identity| if (left_identity == null or !std.meta.eql(left_identity.?, identity)) {
-            if (try self.candidate(owner, source, identity, op, member, left, right, expected)) |chosen| return chosen;
+            if (try self.candidate(owner, source, identity, op, member, left, right, expected, .right)) |chosen| return chosen;
         };
-        return self.failNode(owner, source, if (member == 0) .ambiguous_operator else .missing_associated);
+        return self.failDispatch(owner, source, if (member == 0) .ambiguous_operator else .missing_associated, try self.rejectedCandidates(owner, op, member, left, right, true));
     }
     fn dispatch(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
         const n = self.units[owner].node(id);
@@ -3890,22 +3947,31 @@ pub const Session = struct {
         return .{ .value = try self.makeScalar(owner, id, result) };
     }
     fn resultSelection(self: *Session, owner: usize, source: core.Id, member: u32, input: type_evidence.Id, expected: type_evidence.Id) Error!Selection {
-        if (expected == 0) return self.failNode(owner, source, .ambiguous_associated);
-        const identity = self.evidenceIdentity(expected) orelse return self.failNode(owner, source, .missing_associated);
+        var record: DispatchRecord = .{ .member = member };
+        if (expected == 0) {
+            record.add(.destination, 0, .unknown_operand);
+            return self.failDispatch(owner, source, .ambiguous_associated, record);
+        }
+        const identity = self.evidenceIdentity(expected) orelse {
+            record.add(.destination, expected, .no_member);
+            return self.failDispatch(owner, source, .missing_associated, record);
+        };
         if (try self.associatedTarget(self.unitId(owner), identity, member, .none)) |method| {
             const target_ = try self.target(null, method);
             const module = &self.units[target_.unit];
             const body = module.body(target_.binding) orelse return self.failNode(owner, source, .unsupported);
             const arrow = module.types.node(body.scheme.root);
-            if (arrow.tag != .function) return self.failNode(owner, source, .type_mismatch);
+            record.add(.destination, expected, .incompatible);
+            if (arrow.tag != .function) return self.failDispatch(owner, source, .type_mismatch, record);
             var mappings: std.ArrayList(type_evidence.Mapping) = .empty;
             var row_mappings: std.ArrayList(type_evidence.RowMapping) = .empty;
             defer row_mappings.deinit(self.allocator);
             defer mappings.deinit(self.allocator);
-            if (!try self.matchType(owner, source, target_.unit, arrow.a, input, &mappings, &row_mappings) or !try self.matchType(owner, source, target_.unit, arrow.b, expected, &mappings, &row_mappings)) return self.failNode(owner, source, .type_mismatch);
+            if (!try self.matchType(owner, source, target_.unit, arrow.a, input, &mappings, &row_mappings) or !try self.matchType(owner, source, target_.unit, arrow.b, expected, &mappings, &row_mappings)) return self.failDispatch(owner, source, .type_mismatch, record);
             return .{ .target = target_, .full_type = try self.projectType(target_.unit, body.root, body.scheme.root, mappings.items, row_mappings.items), .result = expected };
         }
-        return self.failNode(owner, source, .missing_associated);
+        record.add(.destination, expected, .no_member);
+        return self.failDispatch(owner, source, .missing_associated, record);
     }
     fn resultDispatch(self: *Session, owner: usize, id: core.Id, frame: *Frame) Error!Flow {
         const module = &self.units[owner];
@@ -4775,6 +4841,14 @@ const ClosureRegion = struct {
         counters.max_scratch_live_bytes = @max(counters.max_scratch_live_bytes, self.arena.scratch_meter.counts.peak_bytes);
         self.session.region_arena_pool.give(self.arena);
         self.scratch = undefined;
+    }
+    fn failDispatchConstraint(self: *ClosureRegion, constraint: Constraint, code: Code, record: DispatchRecord) Error {
+        const fresh = self.session.diagnostic == null;
+        const result = self.failConstraint(constraint, code);
+        if (fresh) if (self.session.diagnostic) |*diagnostic| {
+            diagnostic.dispatch = record;
+        };
+        return result;
     }
     fn failConstraint(self: *ClosureRegion, constraint: Constraint, code: Code) Error {
         const owner = self.scratch.sources.items[constraint.scope].owner;
@@ -8783,13 +8857,20 @@ const ClosureRegion = struct {
         if (right) |identity| if (left == null or !std.meta.eql(left.?, identity)) {
             if (try self.binaryCandidate(constraint, identity)) return true;
         };
-        if (try self.project(constraint.left) == 0 or try self.project(constraint.right) == 0) return false;
-        return self.failConstraint(constraint, if (constraint.member == 0) .ambiguous_operator else .missing_associated);
+        const left_evidence = try self.project(constraint.left);
+        const right_evidence = try self.project(constraint.right);
+        if (left_evidence == 0 or right_evidence == 0) return false;
+        const owner = self.scratch.sources.items[constraint.scope].owner;
+        return self.failDispatchConstraint(constraint, if (constraint.member == 0) .ambiguous_operator else .missing_associated, try self.session.rejectedCandidates(owner, constraint.op, constraint.member, left_evidence, right_evidence, true));
     }
     fn resultConstraint(self: *ClosureRegion, constraint: Constraint) RegionError!bool {
         const identity = try self.identityOf(constraint.result) orelse return false;
         const source = self.scratch.sources.items[constraint.scope];
-        const reference = (try self.session.associatedTarget(self.session.unitId(source.owner), identity, constraint.member, .none)) orelse return self.session.failNode(source.owner, constraint.node, .missing_associated);
+        const reference = (try self.session.associatedTarget(self.session.unitId(source.owner), identity, constraint.member, .none)) orelse {
+            var record: DispatchRecord = .{ .member = constraint.member };
+            record.add(.destination, try self.project(constraint.result), .no_member);
+            return self.session.failDispatch(source.owner, constraint.node, .missing_associated, record);
+        };
         const target_ = try self.session.target(null, reference);
         const scope = try self.callableScope(target_);
         const signature = self.scratch.sources.items[scope].root;

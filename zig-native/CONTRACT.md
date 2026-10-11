@@ -649,6 +649,16 @@ storage or live inference tables. Capture the nearest 32 unshadowed bindings,
 with one additional binding indicating truncation, without quadratic scope
 lookup.
 
+Dispatch explanations (`dispatch_explanation.zig`) own their operation, member
+and operand strings. The checker attaches one to the diagnostic it has just
+appended, built from member tables and resolved operand types without further
+inference; speculative rollback frees the payloads of the diagnostics it drops.
+The evaluator records a plain `DispatchRecord` inside its diagnostic, so copied
+and restored diagnostics carry it without ownership. Its evidence names the
+failing Session's store, and the backend spells it into `Result.explanation`
+before that store is released. Explanations never change selection, its order
+or which diagnostic is reported.
+
 The CLI, native checks and executed-Wasm tests are the production gates.
 Validate all declarations, including unused ones. Keep effects, staging, guest
 ABI and fresh-versus-retained output checks intact during performance changes.

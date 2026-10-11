@@ -1,5 +1,10 @@
 import { throws } from "node:assert/strict";
-import { readTypedHole, type TypedHoleDiagnostic } from "./type_diagnostics.ts";
+import { deepStrictEqual as equal } from "node:assert/strict";
+import {
+  readDispatchExplanation,
+  readTypedHole,
+  type TypedHoleDiagnostic,
+} from "./type_diagnostics.ts";
 
 Deno.test("hole readers reject cycles, dangling edges, overlapping spans and unbounded payloads", () => {
   const basic = (): TypedHoleDiagnostic => ({
@@ -51,5 +56,55 @@ Deno.test("hole readers reject cycles, dangling edges, overlapping spans and unb
     const hole = basic();
     mutate(hole);
     throws(() => readTypedHole(hole), /Invalid typed-hole diagnostic/);
+  }
+});
+
+Deno.test("dispatch explanation readers copy known fields and reject malformed peers", () => {
+  const valid = () => ({
+    operation: "+",
+    member: "add",
+    candidates: [
+      { side: "left", operand: "main::Box", outcome: "incompatible" },
+      { side: "right", operand: null, outcome: "no_member" },
+    ],
+    truncated: false,
+  });
+  const extra = { ...valid(), injected: true };
+  (extra.candidates[0] as Record<string, unknown>).hidden = 1;
+  equal(readDispatchExplanation(extra), valid());
+  for (
+    const mutate of [
+      (value: Record<string, unknown>) => {
+        value.candidates = "left";
+      },
+      (value: Record<string, unknown>) => {
+        value.candidates = Array(5).fill(valid().candidates[0]);
+      },
+      (value: Record<string, unknown>) => {
+        (value.candidates as Record<string, unknown>[])[0].side = "argument";
+      },
+      (value: Record<string, unknown>) => {
+        (value.candidates as Record<string, unknown>[])[0].outcome = "chosen";
+      },
+      (value: Record<string, unknown>) => {
+        (value.candidates as Record<string, unknown>[])[0].operand = 7;
+      },
+      (value: Record<string, unknown>) => {
+        value.member = "雪".repeat(100);
+      },
+      (value: Record<string, unknown>) => {
+        value.operation = "\ud800";
+      },
+      (value: Record<string, unknown>) => {
+        delete value.truncated;
+      },
+    ]
+  ) {
+    const value = valid() as unknown as Record<string, unknown>;
+    mutate(value);
+    throws(() => readDispatchExplanation(value), TypeError);
+  }
+  for (const value of [null, [], "explanation", 7]) {
+    throws(() => readDispatchExplanation(value), TypeError);
   }
 });

@@ -1,6 +1,11 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readTypedHole, type TypedHoleDiagnostic } from "./type_diagnostics.ts";
+import {
+  type DispatchExplanation,
+  readDispatchExplanation,
+  readTypedHole,
+  type TypedHoleDiagnostic,
+} from "./type_diagnostics.ts";
 import {
   type AssetBuildStats,
   type AssetDependency,
@@ -33,6 +38,8 @@ export interface ZigProjectDiagnostic {
   utf16?: { start: number; end: number } | null;
   /** Present for @hole on compiler versions publishing semantic snapshots. */
   hole?: TypedHoleDiagnostic;
+  /** Present when dispatch failed: the candidates it considered and why. */
+  explanation?: DispatchExplanation;
   details?: unknown;
 }
 export type ZigProjectBuildResult =
@@ -191,13 +198,26 @@ function diagnostic(value: unknown): ZigProjectDiagnostic {
       natural(utf16.start, "UTF-16 start") > natural(utf16.end, "UTF-16 end")
     ) throw new ZigProjectProtocolError("Invalid UTF-16 range");
   }
-  // This convenience field is derived only from the validated wire payload.
+  // These convenience fields are derived only from the validated wire payload.
   delete object.hole;
+  delete object.explanation;
   if (object.code === "typed_hole" && object.details != null) {
     try {
       object.hole = readTypedHole(record(object.details, "hole details").hole);
     } catch {
       throw new ZigProjectProtocolError("Invalid typed-hole diagnostic");
+    }
+  }
+  if (
+    object.details != null && typeof object.details === "object" &&
+    "explanation" in object.details
+  ) {
+    try {
+      object.explanation = readDispatchExplanation(
+        (object.details as Record<string, unknown>).explanation,
+      );
+    } catch {
+      throw new ZigProjectProtocolError("Invalid dispatch explanation");
     }
   }
   return object as unknown as ZigProjectDiagnostic;

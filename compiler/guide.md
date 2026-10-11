@@ -78,7 +78,7 @@ enclosing binding's generic requirements. Record fields, nominal identities,
 effect arguments, repeated effect labels and open row tails remain explicit. The
 graph shares repeated types and bounds its size; `truncated` signals omitted
 detail. These are diagnostic-local identities, not reusable type witnesses.
-Editor completion and implementation-selection explanations are subsequent work.
+Editor completion is subsequent work; failed dispatch is explained below.
 
 ```text
 const unfinished = fn (value: U32) -> F32 => @hole
@@ -307,6 +307,22 @@ then `witness`. `tail.contains` is a bound function; `values.length` is
 `Array.length values`. This lookup never falls back to an argument's type. A
 lexical receiver shadows a same-named module namespace. Ordinary qualified names
 such as `Array.get` and `geometry.Point.add` still work.
+
+When dispatch fails, the diagnostic explains it. The client returns
+`diagnostic.explanation` (CLI JSON: `details.explanation`): the operator, the
+member looked up, and each candidate in the order dispatch considered it. A
+candidate has a `side` (`left`, `builtin`, `right`, `destination` for
+`@type.result`, or `receiver`), the type's spelling and an `outcome`:
+`unknown_operand`, `no_member`, `incompatible` (the member rejects these
+operands), `unsupported_scalar`, or `result_mismatch` (selected, but its result
+conflicts with the expected type, so no later candidate was tried). A right type
+equal to the left is not listed twice. Explanations hold at most four candidates
+and 256 bytes per spelling; `truncated` marks cut detail.
+
+```text
+entry const answer = fn () => 1 + 2.5
+// missing_associated; `+` (add): left U32 incompatible, right F32 incompatible
+```
 
 Named constructor fields support `point.x`. A field must exist on every
 constructor of its type; use a pattern when a field is variant-specific. A field

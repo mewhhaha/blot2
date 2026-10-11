@@ -210,6 +210,10 @@ pub fn work(io: Io, a: std.mem.Allocator, writer: *Io.Writer, create: bool, entr
                 try frontend(a, writer, filename, issue.unit, "check-project", source.unit(issue.unit).source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .hole = hole });
                 return false;
             }
+            if (issue.explanation) |explanation| {
+                try frontend(a, writer, filename, issue.unit, "check-project", source.unit(issue.unit).source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message() }, .{ .explanation = explanation });
+                return false;
+            }
             if (issue.numeric_literal) |detail| {
                 try frontend(a, writer, filename, issue.unit, "check-project", source.unit(issue.unit).source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message(), .actual_token = detail.actual_token }, @as([]const @import("ast.zig").NumericFault, &.{detail}));
                 return false;
@@ -300,7 +304,10 @@ pub fn work(io: Io, a: std.mem.Allocator, writer: *Io.Writer, create: bool, entr
         rejected = true;
     }
     if (result.compiled.diagnostic) |issue| {
-        try emit(writer, .{ .kind = "diagnostic", .filename = composed.diagnostic_filename orelse entry_identity, .stage = "emit", .unit = issue.unit, .code = @tagName(issue.code), .start = issue.span.start, .end = issue.span.end, .message = issue.message() });
+        if (result.compiled.explanation) |explanation|
+            try emit(writer, .{ .kind = "diagnostic", .filename = composed.diagnostic_filename orelse entry_identity, .stage = "emit", .unit = issue.unit, .code = @tagName(issue.code), .start = issue.span.start, .end = issue.span.end, .message = issue.message(), .details = .{ .explanation = explanation } })
+        else
+            try emit(writer, .{ .kind = "diagnostic", .filename = composed.diagnostic_filename orelse entry_identity, .stage = "emit", .unit = issue.unit, .code = @tagName(issue.code), .start = issue.span.start, .end = issue.span.end, .message = issue.message() });
         rejected = true;
     }
     if (rejected) return false;

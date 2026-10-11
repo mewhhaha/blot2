@@ -22,6 +22,9 @@ pub const Publication = struct {
     expected_token: ?token.Tag,
     actual_token: ?token.Tag,
     details_json: []u8,
+    /// The project server forwards these details: a hole snapshot or a
+    /// dispatch explanation, whose client schemas decode them defensively.
+    forwarded: bool = false,
 };
 pub const Details = struct {
     bytes: []const u8,
@@ -64,7 +67,9 @@ pub fn publishedDiagnostic(allocator: Allocator, unit: u32, stage: []const u8, s
     errdefer result.deinit(allocator);
     // Publish the optional payload only after all fallible ownership exists.
     const details_json = try std.json.Stringify.valueAlloc(allocator, details, .{});
-    result.publication = .{ .utf16 = publication.utf16(source), .cause = publication.cause, .expected_token = publication.expected_token, .actual_token = publication.actual_token, .details_json = details_json };
+    const Details_ = @TypeOf(details);
+    const forwarded = comptime @typeInfo(Details_) == .@"struct" and (@hasField(Details_, "hole") or @hasField(Details_, "explanation"));
+    result.publication = .{ .utf16 = publication.utf16(source), .cause = publication.cause, .expected_token = publication.expected_token, .actual_token = publication.actual_token, .details_json = details_json, .forwarded = forwarded };
     return result;
 }
 pub const Result = struct {
@@ -145,6 +150,7 @@ pub fn compile(allocator: Allocator, source: []const u8, pool: *symbols.Pool, de
     if (checked.diagnostics.len != 0) {
         const item = checked.diagnostics[0];
         if (item.hole) |hole| return .{ .compiled = .{}, .stats = .{ .syntax_nodes = tree.nodes.items.len - 1, .body_elaborations = checked.body_elaborations, .body_lowerings = 0, .imported_schemes = checked.imported_schemes }, .diagnostic = try publishedDiagnostic(allocator, 1, "check", source, .{ .cause = .native_detail, .code = @tagName(item.code), .span = item.span, .message = item.message() }, .{ .hole = hole }) };
+        if (item.explanation) |explanation| return .{ .compiled = .{}, .stats = .{ .syntax_nodes = tree.nodes.items.len - 1, .body_elaborations = checked.body_elaborations, .body_lowerings = 0, .imported_schemes = checked.imported_schemes }, .diagnostic = try publishedDiagnostic(allocator, 1, "check", source, .{ .cause = .native_detail, .code = @tagName(item.code), .span = item.span, .message = item.message() }, .{ .explanation = explanation }) };
         if (item.symbol == 0) return rejected(allocator, "check", @tagName(item.code), item.span, item.message());
         const message = try allocator.print("{s}{s}{s}", .{ item.message(), if (item.code == .unknown_intrinsic or item.code == .unknown_record_field) " " else ": ", pool.get(item.symbol) });
         defer allocator.free(message);

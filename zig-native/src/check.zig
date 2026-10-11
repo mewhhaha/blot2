@@ -6,6 +6,7 @@ const region_arena = @import("region_arena.zig");
 const ast = @import("ast.zig");
 const symbols = @import("symbols.zig");
 const T = @import("types.zig");
+const dispatch_explanation = @import("dispatch_explanation.zig");
 const P = @import("parameter_patterns.zig");
 const loop_targets = @import("loop_targets.zig");
 const source_operators = @import("source_operators.zig");
@@ -219,6 +220,8 @@ pub const Diagnostic = struct {
     /// borrowed source pool; project/source validation can have another owner.
     detail: ?[]const u8 = null,
     hole: ?@import("hole_diagnostics.zig").Snapshot = null,
+    /// Owned candidates of a failed operator or associated dispatch.
+    explanation: ?dispatch_explanation.Explanation = null,
     pub fn message(self: Diagnostic) []const u8 {
         if (self.detail) |detail| return detail;
         if (self.type_application) |application| return switch (application) {
@@ -593,6 +596,8 @@ const Engine = struct {
     /// projection of the use's instantiation. Values are owned slices.
     callee_memo: std.StringHashMapUnmanaged(CalleeOutcome) = .empty,
     mark_depth: u32 = 0,
+    /// The candidate the latest successful `dispatch` selected.
+    dispatch_side: dispatch_explanation.Side = .left,
     expansion_serial: u32 = 0,
     expansion_depth: u32 = 0,
     qualification_scope: ast.Id = 0,
@@ -766,6 +771,7 @@ const Engine = struct {
         defer {
             self.mark_depth -= 1;
             self.types.rollback(point);
+            deinitDiagnosticPayloads(self.allocator, self.diagnostics.items[diagnostic_count..]);
             self.diagnostics.shrinkRetainingCapacity(diagnostic_count);
             self.type_env.shrinkRetainingCapacity(type_names);
             self.row_env.shrinkRetainingCapacity(row_names);
@@ -1234,6 +1240,7 @@ const Engine = struct {
             .waiting => return null,
             .selected => |choice| {
                 if (direct) self.resolved[source] = choice.binding;
+                self.dispatch_side = .left;
                 return choice.ty;
             },
         };
@@ -1245,8 +1252,10 @@ const Engine = struct {
             const integer = operator == .rem or operator == .bit_and or operator == .bit_or or operator == .bit_xor or operator == .shift_left or operator == .shift_right;
             if (an.tag == .boolean and !equality or an.tag == .f32 and integer) {
                 try self.diagnostic(.ambiguous_operator, source);
+                try self.explainDispatch(a, b, member, operator, true);
                 return try self.types.fresh();
             }
+            self.dispatch_side = .builtin;
             return if (comparison) T.boolean else a;
         }
         if (self.identityOf(b)) |identity| switch (try self.tryAssociated(identity, member, operator, a, b, source)) {
@@ -1254,12 +1263,74 @@ const Engine = struct {
             .waiting => return null,
             .selected => |choice| {
                 if (direct) self.resolved[source] = choice.binding;
+                self.dispatch_side = .right;
                 return choice.ty;
             },
         };
         if (member != 0) return null;
         try self.diagnostic(.ambiguous_operator, source);
+        try self.explainDispatch(a, b, member, operator, false);
         return try self.types.fresh();
+    }
+    /// Explains the dispatch whose diagnostic was just appended, from the
+    /// member tables and operand types alone. Dispatch tried the left
+    /// operand's owner, then (for an operator without a member name) the
+    /// built-in scalar operation, then a different right owner.
+    fn explainDispatch(self: *Engine, left: T.Id, right: T.Id, member: symbols.Symbol, operator: T.Operator, scalar_rejected: bool) T.Error!void {
+        var builder: dispatch_explanation.Builder = .{ .allocator = self.allocator };
+        defer builder.deinit();
+        try self.explainOperand(&builder, .left, left, member, operator);
+        if (scalar_rejected) {
+            builder.add(.builtin, null, .unsupported_scalar);
+        } else if (!try self.sameOwner(left, right)) try self.explainOperand(&builder, .right, right, member, operator);
+        try self.attachExplanation(&builder, member, operator);
+    }
+    /// Explains a selected binary member whose result just conflicted with
+    /// its use. Candidates before the selected one are listed as rejected.
+    fn explainSelected(self: *Engine, left: T.Id, right: T.Id, member: symbols.Symbol, operator: T.Operator, side: dispatch_explanation.Side) T.Error!void {
+        var builder: dispatch_explanation.Builder = .{ .allocator = self.allocator };
+        defer builder.deinit();
+        if (side == .right) try self.explainOperand(&builder, .left, left, member, operator);
+        builder.add(side, try self.spellType(&builder, if (side == .right) right else left), .result_mismatch);
+        try self.attachExplanation(&builder, member, operator);
+    }
+    fn explainResult(self: *Engine, destination: T.Id, member: symbols.Symbol) T.Error!void {
+        var builder: dispatch_explanation.Builder = .{ .allocator = self.allocator };
+        defer builder.deinit();
+        try self.explainOperand(&builder, .destination, destination, member, .none);
+        try self.attachExplanation(&builder, member, .none);
+    }
+    /// Member access searches its receiver's owner only.
+    fn explainReceiver(self: *Engine, receiver: T.Id, member: symbols.Symbol) T.Error!void {
+        var builder: dispatch_explanation.Builder = .{ .allocator = self.allocator };
+        defer builder.deinit();
+        builder.add(.receiver, try self.spellType(&builder, receiver), .no_member);
+        try self.attachExplanation(&builder, member, .none);
+    }
+    fn attachExplanation(self: *Engine, builder: *dispatch_explanation.Builder, member: symbols.Symbol, operator: T.Operator) T.Error!void {
+        const spelled = if (member != 0) self.pool.get(member) else dispatch_explanation.operatorMember(operator);
+        const explanation = try builder.finish(dispatch_explanation.operatorSymbol(operator), spelled);
+        const issue = &self.diagnostics.items[self.diagnostics.items.len - 1];
+        if (issue.explanation) |old| old.deinit(self.allocator);
+        issue.explanation = explanation;
+    }
+    fn sameOwner(self: *Engine, left: T.Id, right: T.Id) T.Error!bool {
+        const a = self.identityOf(try self.types.resolve(left, 0)) orelse return false;
+        const b = self.identityOf(try self.types.resolve(right, 0)) orelse return false;
+        return std.meta.eql(a, b);
+    }
+    fn spellType(self: *Engine, builder: *dispatch_explanation.Builder, ty: T.Id) T.Error![]u8 {
+        var bytes: std.ArrayList(u8) = .empty;
+        defer bytes.deinit(self.allocator);
+        try @import("type_display.zig").append(self, &bytes, try self.types.resolve(ty, 0));
+        return builder.own(&bytes);
+    }
+    fn explainOperand(self: *Engine, builder: *dispatch_explanation.Builder, side: dispatch_explanation.Side, ty: T.Id, member: symbols.Symbol, operator: T.Operator) T.Error!void {
+        const resolved = try self.types.resolve(ty, 0);
+        const outcome: dispatch_explanation.Outcome = if (self.types.node(resolved).tag == .variable)
+            .unknown_operand
+        else if (self.identityOf(resolved)) |identity| (if ((if (member == 0) self.associated_ops.get(.{ .identity = identity, .operator = operator }) else self.associated_members.get(.{ .identity = identity, .member = member })) != null) .incompatible else .no_member) else .no_member;
+        builder.add(side, try self.spellType(builder, resolved), outcome);
     }
     fn resultDispatch(self: *Engine, input: T.Id, expected: T.Id, member: symbols.Symbol, source: ast.Id, direct: bool) T.Error!?T.Id {
         const destination = try self.types.resolve(expected, 0);
@@ -3044,6 +3115,7 @@ const Engine = struct {
             }
         } else if (result == 0) {
             try self.diagnostic(if (writable) .missing_field else .missing_member, source);
+            if (!writable) try self.explainReceiver(ty, name);
             return .{ .ty = try self.types.fresh(), .projection = 0 };
         }
         const projection: u32 = @intCast(self.projection_catalog.items.len);
@@ -6932,7 +7004,10 @@ const Engine = struct {
             try self.dispatch(owner, constraint.other, constraint.name, constraint.operator, constraint.source, pending.direct);
         self.pending.items[i].suspended = false;
         if (selected) |result| {
+            const diagnostics = self.diagnostics.items.len;
             try self.constrain(constraint.result, result, constraint.source);
+            if (constraint.kind == .dispatch and self.diagnostics.items.len != diagnostics and self.dispatch_side != .builtin)
+                try self.explainSelected(owner, constraint.other, constraint.name, constraint.operator, self.dispatch_side);
             self.pending.items[i].solved = true;
             progress = true;
         }
@@ -7324,10 +7399,12 @@ const Engine = struct {
             if (pending.value.kind == .result_dispatch) {
                 const destination = try self.types.resolve(pending.value.result, 0);
                 try self.diagnostic(if (self.types.node(destination).tag == .variable) .ambiguous_associated else .missing_associated, pending.value.source);
+                try self.explainResult(destination, pending.value.name);
                 continue;
             }
             if (pending.value.kind == .dispatch) {
                 try self.diagnostic(if (pending.value.name == 0) .ambiguous_operator else .missing_associated, pending.value.source);
+                try self.explainDispatch(pending.value.ty, pending.value.other, pending.value.name, pending.value.operator, false);
                 continue;
             }
             if (tag == .u32 or (tag == .f32 and pending.value.kind != .integer) or (tag == .boolean and pending.value.kind == .equality)) continue;
@@ -7693,6 +7770,7 @@ fn deinitDiagnosticPayloads(allocator: Allocator, diagnostics: []const Diagnosti
         if (diagnostic.purity) |witness| witness.deinit(allocator);
         if (diagnostic.detail) |detail| allocator.free(detail);
         if (diagnostic.hole) |hole| hole.deinit(allocator);
+        if (diagnostic.explanation) |explanation| explanation.deinit(allocator);
     }
 }
 fn cloneDiagnostics(allocator: Allocator, diagnostics: []const Diagnostic) ![]Diagnostic {
@@ -7707,10 +7785,12 @@ fn cloneDiagnostics(allocator: Allocator, diagnostics: []const Diagnostic) ![]Di
         target.detail = null;
         target.purity = null;
         target.hole = null;
+        target.explanation = null;
         initialized += 1;
         if (diagnostic.purity) |witness| target.purity = try witness.clone(allocator);
         if (diagnostic.detail) |detail| target.detail = try allocator.dupe(u8, detail);
         if (diagnostic.hole) |hole| target.hole = try hole.clone(allocator);
+        if (diagnostic.explanation) |explanation| target.explanation = try explanation.clone(allocator);
     }
     return result;
 }

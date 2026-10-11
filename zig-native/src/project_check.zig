@@ -34,6 +34,7 @@ pub const Diagnostic = struct {
     purity: ?check.PurityWitness = null,
     detail: ?[]const u8 = null,
     hole: ?@import("hole_diagnostics.zig").Snapshot = null,
+    explanation: ?@import("dispatch_explanation.zig").Explanation = null,
     source: ?project.Diagnostic = null,
 
     pub fn codeName(self: Diagnostic) []const u8 {
@@ -81,6 +82,7 @@ pub const CheckedProject = struct {
             if (diagnostic.purity) |witness| witness.deinit(allocator);
             if (diagnostic.detail) |detail| allocator.free(detail);
             if (diagnostic.hole) |hole| hole.deinit(allocator);
+            if (diagnostic.explanation) |explanation| explanation.deinit(allocator);
         }
         allocator.free(self.diagnostics);
         self.* = .{};
@@ -391,6 +393,8 @@ const Engine = struct {
             errdefer if (detail) |text| self.allocator.free(text);
             const hole = if (diagnostic_.hole) |value| try value.clone(self.allocator) else null;
             errdefer if (hole) |value| value.deinit(self.allocator);
+            const explanation = if (diagnostic_.explanation) |value| try value.clone(self.allocator) else null;
+            errdefer if (explanation) |value| value.deinit(self.allocator);
             try self.diagnostics.append(self.allocator, .{
                 .unit = unit,
                 .span = diagnostic_.span,
@@ -404,6 +408,7 @@ const Engine = struct {
                 .purity = purity,
                 .detail = detail,
                 .hole = hole,
+                .explanation = explanation,
             });
         }
     }
@@ -458,6 +463,7 @@ fn checkProjectMode(allocator: Allocator, source: *project.Project, execution: c
             if (diagnostic.purity) |witness| witness.deinit(allocator);
             if (diagnostic.detail) |detail| allocator.free(detail);
             if (diagnostic.hole) |hole| hole.deinit(allocator);
+            if (diagnostic.explanation) |explanation| explanation.deinit(allocator);
         }
         engine.diagnostics.deinit(allocator);
     }

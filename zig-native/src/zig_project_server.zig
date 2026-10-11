@@ -151,7 +151,19 @@ const Diagnostic = struct {
     message: []const u8,
     offset_encoding: []const u8 = "utf8_bytes",
     utf16: ?ast.Span = null,
-    details: ?@import("dependency_consumer.zig").Details = null,
+    details: ?IssueDetails = null,
+};
+/// Forwarded diagnostic details: a frontend publication's JSON or the
+/// backend's dispatch explanation.
+const IssueDetails = union(enum) {
+    bytes: []const u8,
+    explanation: *const @import("dispatch_explanation.zig").Explanation,
+    pub fn jsonStringify(self: IssueDetails, writer: anytype) !void {
+        switch (self) {
+            .bytes => |bytes| try (@import("dependency_consumer.zig").Details{ .bytes = bytes }).jsonStringify(writer),
+            .explanation => |explanation| try writer.write(.{ .explanation = explanation.* }),
+        }
+    }
 };
 fn issue(result: *const partial.Result, entry: []const u8) !Diagnostic {
     const filename = result.diagnostic_filename orelse entry;
@@ -163,7 +175,7 @@ fn issue(result: *const partial.Result, entry: []const u8) !Diagnostic {
         .end = d.end,
         .message = d.message,
         .utf16 = if (d.publication) |publication| publication.utf16 else null,
-        .details = if (d.publication) |publication| if (std.mem.eql(u8, d.code, "typed_hole")) .{ .bytes = publication.details_json } else null else null,
+        .details = if (d.publication) |publication| if (publication.forwarded) .{ .bytes = publication.details_json } else null else null,
     };
     if (result.result.compiled.diagnostic) |d| return .{
         .filename = filename,
@@ -172,6 +184,7 @@ fn issue(result: *const partial.Result, entry: []const u8) !Diagnostic {
         .start = d.span.start,
         .end = d.span.end,
         .message = d.message(),
+        .details = if (result.result.compiled.explanation) |*explanation| .{ .explanation = explanation } else null,
     };
     return error.MissingRejectionDiagnostic;
 }
