@@ -6,6 +6,10 @@ language behavior. Frozen reference fixtures are test data, not runtime
 dependencies. No generated semantic functions or boxed `Value` runtime may be
 imported into this compiler.
 
+[Module abstraction](MODULE_ABSTRACTION.md) specifies the public/private views,
+opaque identities, storage contracts and exact cutoff laws required by tasks
+052–053. It adds no executable visibility feature.
+
 ## Storage and ownership
 
 Source bytes are immutable UTF-8. Tokens refer to byte ranges. Identifiers use
