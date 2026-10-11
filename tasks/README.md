@@ -286,6 +286,12 @@ Task [092] makes the formatter accept nominal record patterns at `f6098a8`: the
 grammar no longer derives `#Vec2 { x, y }` twice. Every public example, std
 module and frozen gdev source formats idempotently to identical Wasm.
 
+Task [093] is in progress at `aef65e7`: an old-signature index, a reused value
+match scratch and a separate dependency-certificate budget (gdev's images
+exceeded the shared 16 MiB) cut gdev retained edits from 570 to 440 ms against
+400 ms at `f7be6e7`. See
+[retained edit cost](../zig-native/RETAINED_EDIT_COST.md).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -595,7 +601,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [090] — Make pending-check solving incremental          | Ready       | None                                   |
 | [091] — Bound compile-time evaluation by call depth     | Complete    | —                                      |
 | [092] — Format current Blot syntax                      | Complete    | —                                      |
-| [093] — Close the gdev edit gap                         | Ready       | [088]                                  |
+| [093] — Close the gdev edit gap                         | In progress | [088]                                  |
 | [999] — Remove tasks and plan                           | Pending     | All [001]–[093], plus every added task |
 
 ## Coverage matrix

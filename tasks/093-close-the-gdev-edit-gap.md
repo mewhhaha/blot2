@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** In progress — milestone `aef65e7`; no completion is claimed.
 - **Dependencies:** [088](088-restore-summary-job-inference-cost.md)
 - **Originating requirements:** discovered while qualifying task
   [088](088-restore-summary-job-inference-cost.md), whose outcome asked for
@@ -27,9 +27,19 @@ residual regions were not attributed. The backend's lookup (+46 ms), capture
 instead of 264 functions. Principal regions that consume non-source-complete
 graphs, or jobs finished outside their recording, still drop their input keys.
 
+## Progress
+
+Milestone `aef65e7` cuts gdev retained edits from 570 to 440 ms (`f7be6e7`: 400
+ms) by indexing old signatures, matching retained values through a reused
+scratch, and giving dependency certificates their own budget so gdev keeps them.
+See [retained edit cost](../zig-native/RETAINED_EDIT_COST.md). Remaining: about
+39 ms of module-stamp integrity checks (a design decision), 26 ms of extra
+constant evaluation (task 086's area) and about 27 ms in fragment lookup,
+assembly and journal freezing.
+
 ## Implementation checklist
 
-- [ ] Attribute the residual inference regions and the lookup, capture and
+- [x] Attribute the residual inference regions and the lookup, capture and
       prepare growth with deterministic counters and a profile.
 - [ ] Remove the costs that do not pay for themselves on gdev, keeping equal
       judgments, diagnostics and fresh/retained byte equality.

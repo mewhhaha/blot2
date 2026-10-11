@@ -188,6 +188,12 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
 - Task 092 (formatter) is complete at `f6098a8`: the Baba grammar derived
   nominal record patterns twice; examples, std and gdev sources now format
   idempotently to identical Wasm.
+- Task 093 (gdev edit gap) is in progress at `aef65e7`: gdev retained edits 570
+  → 440 ms (`f7be6e7` 400 ms). Left: module-stamp integrity re-hashing (~39 ms,
+  a design decision), extra constant evaluation (task 086) and ~27 ms in
+  fragment lookup, assembly and journal freezing. Profiles are in ignored
+  `build/bench/summary-growth/prof/` (sampler records all threads; filter stacks
+  containing `zig_project_server.runWithPolicy`).
 - A separate session (bun-desktop) offered an unapplied wasm name-section patch
   at `/var/tmp/blot2-names.patch` (14 files, always on, +5% Wasm, gate green on
   `a488ba2`); applying it is the owner's decision.
@@ -232,10 +238,10 @@ Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
 the remaining work is per-body frontend rechecking and stable Core IDs, which
 needs its own design before implementation. Ready tasks in numeric order are
 [025](tasks/025-resolve-calls-before-emission.md), 036, 048,
-[086](tasks/086-retain-constant-evaluation-across-revisions.md), 090 and 093;
-086 needs a fresh gdev profile and then a design decision (see above), and
-[093](tasks/093-close-the-gdev-edit-gap.md) carries the remaining measured gdev
-edit gap. The retained probe
+[086](tasks/086-retain-constant-evaluation-across-revisions.md) and 090; 086
+needs a fresh gdev profile and then a design decision (see above).
+[093](tasks/093-close-the-gdev-edit-gap.md) is in progress with the remaining
+measured gdev edit gap. The retained probe
 `zig-native/qualification/revision_deltas_probe.zig` and its driver measure
 edit/revert/rejected/no-op phases against an earlier tree; task-024 binaries are
 in ignored `build/bench/body-cutoff/`, and the pinned analyzer is built in
