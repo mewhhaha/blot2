@@ -314,6 +314,13 @@ located inside the callee, often `std/prelude`; task [094] moves them to the
 caller's use. [049] is ready. See
 [dispatch explanations](../zig-native/DISPATCH_EXPLANATIONS.md).
 
+Task [026] prepares structured flow before its instructions at `ae908fa`: exits
+name their target, label, cleanup scope, values and carries; joins, matches,
+loops and request loops (yield arms, exited, broken and completion edges) are
+planned before they are emitted. Output is byte-identical on the examples, the
+synthetic corpus and gdev; [027] is ready. See
+[resolved structured flow](../zig-native/RESOLVED_FLOW.md).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -556,8 +563,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [023] — Narrow literal edit invalidation                | Complete    | [022]                                  |
 | [024] — Apply general body interface cutoff             | In progress | [023]                                  |
 | [025] — Resolve calls before emission                   | Complete    | —                                      |
-| [026] — Resolve structured control flow                 | Ready       | [025]                                  |
-| [027] — Represent ownership in resolved ir              | Pending     | [026]                                  |
+| [026] — Resolve structured control flow                 | Complete    | —                                      |
+| [027] — Represent ownership in resolved ir              | Ready       | [026]                                  |
 | [028] — Make emission consume resolved bodies           | Pending     | [027]                                  |
 | [029] — Remove function indices from reuse keys         | Pending     | [018], [028]                           |
 | [030] — Specify shared and cyclic ownership             | Pending     | [027]                                  |

@@ -205,6 +205,10 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   selection order with why it failed, through the CLI, server and client. Their
   location is still the callee (often `std/prelude`), filed as task 094; 049 is
   ready. See [the record](zig-native/DISPATCH_EXPLANATIONS.md).
+- Task 026 (structured flow) is complete at `ae908fa`: exits, joins, matches,
+  loops and request-loop edges are planned before their instructions, with
+  byte-identical output; 027 is ready. See
+  [the record](zig-native/RESOLVED_FLOW.md).
 - A separate session (bun-desktop, since renamed pen: checkout `~/src/pen`,
   command `pen`; gdev's build is unchanged) offered an unapplied wasm
   name-section patch at `/var/tmp/blot2-names.patch` (14 files, always on, +5%
@@ -249,7 +253,7 @@ fold gate remains open.
 Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
 the remaining work is per-body frontend rechecking and stable Core IDs, which
 needs its own design before implementation. Ready tasks in numeric order are
-[026](tasks/026-resolve-structured-control-flow.md), 036, 049,
+[027](tasks/027-represent-ownership-in-resolved-ir.md), 036, 049,
 [086](tasks/086-retain-constant-evaluation-across-revisions.md) and
 [094](tasks/094-locate-specialization-failures-at-their-use.md); 086 needs a
 fresh gdev profile and then a design decision (see above).

@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete at `ae908fa`.
 - **Dependencies:** [025](025-resolve-calls-before-emission.md)
 - **Originating requirements:** PLAN: Earlier semantic compilation / resolved
   control flow. Sources: [PLAN.md](../PLAN.md).
@@ -24,11 +24,11 @@ exits. Task 025 supplies resolved calls.
 
 ## Implementation checklist
 
-- [ ] Represent branch values, local versions, loop carries and exit targets
+- [x] Represent branch values, local versions, loop carries and exit targets
       before emission, with source spans and evaluation order.
-- [ ] Make request yield/completion/cancellation edges explicit and record
+- [x] Make request yield/completion/cancellation edges explicit and record
       cleanup obligations on the actual exiting scopes.
-- [ ] Preserve nested inlining, pattern failure paths and dominance without
+- [x] Preserve nested inlining, pattern failure paths and dominance without
       changing return/break meaning.
 
 ## Validation
@@ -48,20 +48,39 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Every supported structured edge and cleanup target is represented before
+- [x] Every supported structured edge and cleanup target is represented before
       instruction emission.
-- [ ] Control-flow execution, dominance and cancellation behavior match the
+- [x] Control-flow execution, dominance and cancellation behavior match the
       current language contract.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `ae908fa` ("Prepare structured flow before emission").
+- Change: [resolved_flow.zig](../zig-native/src/resolved_flow.zig) plans exits
+  (`return`, `break`, a request handler's return and break) with their target
+  construct and label, the target scope's cleanup mark, values in source order
+  and the carries they replace; joins with their result type and per-arm local
+  versions; matches with inputs, arms and row/guard fallthrough; loops with
+  carries, refutable patterns and divergence; and request loops with their yield
+  arms and exited, broken and completion edges. Each is prepared before its
+  construct's first instruction, and `takeExit` discharges exactly the cleanup
+  above the target scope's mark.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
+  and 646 guest/client tests; `deno task lint:zig` reports zero findings across
+  314 files. A process law executes joins with rebinding merges, a guarded
+  `case`, nested loops with two carries, zero iterations, `break`, `return` from
+  a loop and request loops whose handlers yield, return and break, with retained
+  builds equal to fresh ones and every plan shape counted; a mutant that assigns
+  `break` carries in source order fails it. The existing request, JSPI and
+  allocation-failure suites run unchanged.
+- Comparison: every public example, the synthetic corpus in every phase and gdev
+  emit byte-identical Wasm (gdev SHA-256 `3158216b…def0`, 840,534 bytes); no
+  performance change was intended or measured.
+- Remaining limitations: plans are transient per construct (task 028 stores
+  resolved bodies); exact builders and internal traversal blocks have no plans;
+  the cleanup actions an exit discharges are created during emission, so an exit
+  fixes its target scope before its value and discharges what is recorded when
+  it branches.
+- Durable record: [resolved structured flow](../zig-native/RESOLVED_FLOW.md).

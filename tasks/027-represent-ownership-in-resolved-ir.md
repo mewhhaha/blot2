@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — no completion is claimed.
 - **Dependencies:** [026](026-resolve-structured-control-flow.md)
 - **Originating requirements:** PLAN: Earlier semantic compilation / resolved
   ownership. Sources: [PLAN.md](../PLAN.md).
