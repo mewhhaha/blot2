@@ -24,6 +24,11 @@ async function runtime(bytes?: Uint8Array<ArrayBuffer>) {
       Number((exports[name] as CallableFunction)(...args)) >>> 0,
     count: (name: string) =>
       Number((exports[`blot:rc_${name}`] as WebAssembly.Global).value),
+    roots: () => Number((exports.roots as WebAssembly.Global).value),
+    heap: () => Number((exports.heap as WebAssembly.Global).value) >>> 0,
+    setHeap: (value: number) => {
+      (exports.heap as WebAssembly.Global).value = value | 0;
+    },
     word: (address: number) =>
       new DataView(memory.buffer).getUint32(address, true),
     put: (address: number, value: number) =>
@@ -210,7 +215,7 @@ entry const trapped = fn (value: U32) => do:
   let copied = @array.from_list values
   return copied[501][0]
 `;
-Deno.test("source reference Arrays and persistent Lists preserve versions and retire counted tracer leases at reset", async () => {
+Deno.test("source reference Arrays and persistent Lists preserve versions and retire typed invocation roots", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   try {
@@ -226,7 +231,7 @@ Deno.test("source reference Arrays and persistent Lists preserve versions and re
         const result = await compiler.build({ sources: { [entry]: source } });
         assert(result.success, JSON.stringify(result));
         const r = await runtime(result.bytes);
-        assert.equal(r.mode[1], 1, JSON.stringify(r.mode));
+        assert.deepEqual(r.mode, [2, 2, 0]);
         assert.equal(r.call("array_group", 41), 83);
         assert.equal(r.count("leases"), 0);
         assert(r.count("destroyed") > 0);
@@ -237,11 +242,14 @@ Deno.test("source reference Arrays and persistent Lists preserve versions and re
         assert.equal(r.count("leases"), 0);
         for (const name of ["arrays", "lists"]) {
           for (const value of [41, 7, 41]) {
+            const before = r.count("destroyed");
             assert.equal(r.call(name, value), 3 * value + 21);
+            assert(r.count("destroyed") > before);
+            assert.equal(r.count("roots"), 0);
             assert(r.count("retains") > 0);
             const retired = r.count("destroyed");
             r.call(name, 0);
-            assert(r.count("destroyed") > retired);
+            assert.equal(r.count("destroyed"), retired);
             assert.equal(r.count("leases"), 0);
           }
         }
@@ -252,4 +260,91 @@ Deno.test("source reference Arrays and persistent Lists preserve versions and re
   } finally {
     await Deno.remove(directory, { recursive: true });
   }
+});
+
+Deno.test("private roots move fresh returns and retain borrowed children before closing frames", async () => {
+  const r = await runtime();
+  r.call("root_enter");
+  r.call("root_open");
+  const child = r.call("root_allocate", 4, 0);
+  r.call("store_word", child, child, 42);
+  const parent = r.call("root_allocate", 4, 1);
+  r.call("store_word", parent, parent, child);
+  assert.equal(r.roots(), 2);
+  r.call("root_close", parent);
+  assert.equal(r.roots(), 1);
+  assert.equal(r.count("leases"), 1);
+  r.call("root_open");
+  r.call("root_close", child);
+  assert.equal(r.roots(), 2);
+  assert.equal(r.word(child - 16), 2);
+  r.call("reset", 0);
+  assert.equal(r.word(child), 42);
+  r.call("root_leave", 0);
+  assert.equal(r.roots(), 0);
+  assert.equal(r.count("leases"), 0);
+  assert.equal(r.count("destroyed"), 2);
+  r.call("root_leave", 2);
+});
+
+Deno.test("private root pages preserve module roots and retire nested failed invocations", async () => {
+  const r = await runtime();
+  const persistent = r.call("root_allocate", 4, 0);
+  r.call("store_word", persistent, persistent, 42);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    r.call("root_enter");
+    r.call("root_open");
+    for (let index = 0; index < 1024; index++) r.call("root_allocate", 4, 0);
+    r.call("root_open");
+    for (let index = 0; index < 1024; index++) r.call("root_allocate", 4, 0);
+    r.call("root_leave", 1);
+    assert.equal(r.roots(), 1);
+    assert.equal(r.count("leases"), 1);
+    r.call("reset", 0);
+    assert.equal(r.word(persistent), 42);
+  }
+  r.call("root_leave", 2);
+  assert.equal(r.roots(), 0);
+  assert.equal(r.count("leases"), 0);
+  assert.equal(r.count("destroyed"), 6145);
+});
+
+Deno.test("private roots clear original slots when local lifetime release consumes them", async () => {
+  const r = await runtime();
+  r.call("root_enter");
+  const value = r.call("root_allocate", 4, 0);
+  assert.equal(r.roots(), 1);
+  r.call("release_lease", value);
+  assert.equal(r.roots(), 0);
+  r.call("root_leave", 0);
+  assert.equal(r.count("destroyed"), 1);
+  assert.throws(() => r.call("root_leave", 0), WebAssembly.RuntimeError);
+  assert.throws(() => r.call("root_leave", 3), WebAssembly.RuntimeError);
+  r.call("root_enter");
+  assert.throws(() => r.call("root_enter"), WebAssembly.RuntimeError);
+  assert.throws(() => r.call("root_leave", 2), WebAssembly.RuntimeError);
+  r.call("root_leave", 1);
+});
+
+Deno.test("failed invocation frame reservation retires its empty prefix without touching module owners", async () => {
+  const r = await runtime();
+  const persistent = r.call("root_allocate", 4, 0);
+  r.put(persistent, 42);
+  // Leave one slot in the page. enter reserves that result slot before the
+  // marker requires growth; the private allocator seam then forces overflow.
+  for (let index = 0; index < 339; index++) r.call("root_reserve");
+  const heap = r.heap();
+  r.setHeap(0xfffffff0);
+  assert.throws(() => r.call("root_enter"), WebAssembly.RuntimeError);
+  r.setHeap(heap);
+  r.call("root_leave", 1);
+  assert.equal(r.roots(), 1);
+  assert.equal(r.count("leases"), 1);
+  assert.equal(r.word(persistent), 42);
+  r.call("root_enter");
+  r.call("root_leave", 0);
+  assert.equal(r.roots(), 1);
+  r.call("root_leave", 2);
+  assert.equal(r.roots(), 0);
+  assert.equal(r.count("leases"), 0);
 });

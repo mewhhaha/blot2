@@ -13,12 +13,16 @@ pub const Walk = struct { storage: u32, top: u32, limit: u32, node: u32 };
 pub fn initialize(module: *wasm.Module, function: u32, source: u32, walk: Walk) Error!void {
     try module.emitSlice(function, &.{
         .{ .op = .local_get, .operand = walk.storage },
-        .{ .op = .local_get, .operand = source },
-        .{ .op = .i32_store },
         .{ .op = .local_get, .operand = walk.storage },
         .{ .op = .local_get, .operand = source },
+        .{ .op = .call, .operand = module.arena.?.store_word },
+        .{ .op = .local_get, .operand = walk.storage },
+        .{ .op = .local_get, .operand = walk.storage },
+        .{ .op = .i32_const, .operand = 4 },
+        .{ .op = .i32_add },
+        .{ .op = .local_get, .operand = source },
         .{ .op = .i32_load, .operand = heap.offset(heap.ListDescriptor, "root") },
-        .{ .op = .i32_store, .operand = 4 },
+        .{ .op = .call, .operand = module.arena.?.store_word },
         .{ .op = .local_get, .operand = walk.storage },
         .{ .op = .i32_const, .operand = 8 },
         .{ .op = .i32_add },
@@ -32,19 +36,20 @@ pub fn initialize(module: *wasm.Module, function: u32, source: u32, walk: Walk) 
 
 fn descend(module: *wasm.Module, function: u32, walk: Walk) Error!void {
     try module.emitSlice(function, &.{
-        .{ .op = .block },                                                      .{ .op = .loop },
-        .{ .op = .local_get, .operand = walk.node },                            .{ .op = .i32_load, .operand = heap.offset(heap.ListNode, "height") },
-        .{ .op = .i32_eqz },                                                    .{ .op = .br_if, .operand = 1 },
-        .{ .op = .local_get, .operand = walk.top },                             .{ .op = .local_get, .operand = walk.limit },
-        .{ .op = .i32_ge_u },                                                   .{ .op = .if_ },
-        .{ .op = .unreachable_ },                                               .{ .op = .end },
-        .{ .op = .local_get, .operand = walk.top },                             .{ .op = .local_get, .operand = walk.node },
-        .{ .op = .i32_load, .operand = heap.offset(heap.ListBranch, "right") }, .{ .op = .i32_store },
-        .{ .op = .local_get, .operand = walk.top },                             .{ .op = .i32_const, .operand = 4 },
-        .{ .op = .i32_add },                                                    .{ .op = .local_set, .operand = walk.top },
-        .{ .op = .local_get, .operand = walk.node },                            .{ .op = .i32_load, .operand = heap.offset(heap.ListBranch, "left") },
-        .{ .op = .local_set, .operand = walk.node },                            .{ .op = .br, .operand = 0 },
-        .{ .op = .end },                                                        .{ .op = .end },
+        .{ .op = .block },                                                     .{ .op = .loop },
+        .{ .op = .local_get, .operand = walk.node },                           .{ .op = .i32_load, .operand = heap.offset(heap.ListNode, "height") },
+        .{ .op = .i32_eqz },                                                   .{ .op = .br_if, .operand = 1 },
+        .{ .op = .local_get, .operand = walk.top },                            .{ .op = .local_get, .operand = walk.limit },
+        .{ .op = .i32_ge_u },                                                  .{ .op = .if_ },
+        .{ .op = .unreachable_ },                                              .{ .op = .end },
+        .{ .op = .local_get, .operand = walk.storage },                        .{ .op = .local_get, .operand = walk.top },
+        .{ .op = .local_get, .operand = walk.node },                           .{ .op = .i32_load, .operand = heap.offset(heap.ListBranch, "right") },
+        .{ .op = .call, .operand = module.arena.?.store_word },                .{ .op = .local_get, .operand = walk.top },
+        .{ .op = .i32_const, .operand = 4 },                                   .{ .op = .i32_add },
+        .{ .op = .local_set, .operand = walk.top },                            .{ .op = .local_get, .operand = walk.node },
+        .{ .op = .i32_load, .operand = heap.offset(heap.ListBranch, "left") }, .{ .op = .local_set, .operand = walk.node },
+        .{ .op = .br, .operand = 0 },                                          .{ .op = .end },
+        .{ .op = .end },
     });
 }
 

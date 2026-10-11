@@ -330,11 +330,36 @@ cleanup calls bypass cancellation guards. Demand forcing registers a reset only
 on its cancellation path. Releasing private storage does not release its
 payload: callbacks, State values and demand memo results may outlive that scope.
 
+Admitted local demands use the prepared dynamic use counts: never/once need no
+memo slots; repeated uses share a ready bit and typed result local. Reset both
+at each call-site execution, outside any callee loop. Reference-only aliases
+borrow that same state. Commit the result before setting ready, only after
+normal completion. Encoding borrows the lexical emitter for deferred bindings,
+with a flattened snapshot of force-site cleanup obligations; the snapshot owns
+its action array and preserves cancellation order without a parent cycle.
+Managed memo results join the typed roots of forever-loop collection, including
+active enclosing admitted calls. Emitter parent links and inline-demand slices
+are synchronous stack borrows and never enter retained plans, Core or runtime
+values. Unknown use summaries keep the bounded preparation proof; escaping
+summaries and incomplete admission retain ordinary cells.
+
 All optimizer passes use `runtime_ir` opcode/call contracts. New opcodes require
 an exhaustive stack/effect definition; there is no fallback binary arity. Memory
 word types do not prove pointer roles. `runtime_pipeline` owns at most the input
 and next transformed body, releasing the input after a successful replacement;
 failure must not mutate the retained function or fragment.
+
+[Persistent roots](PERSISTENT_ROOTS.md) adds checked result roles and entry
+status without widening `runtime_ir.Function`. Scope annotations lower only on
+the whole-module admitted route. Each allocation's counted lease belongs to one
+journal slot; moves preserve that owner and copied slots retain independently.
+Lease retirement clears the slot/header links before releasing. The reserved
+cycle link cannot serve both the journal and a cycle queue simultaneously.
+Checked globals and mutable static reference fields publish through one typed
+module owner table. Scalar fields never add edges. Optimizer context includes
+root mode and owner-table geometry; start bodies cannot reuse an old table size.
+ABI 3 private entry/leave hooks preserve the public value set and copy numeric
+results before leave. Host/JSPI graphs keep tracing until 033 qualifies them.
 
 Optimized body captures own their inputs and outputs. Reuse requires exact local
 instructions and types, called bodies, call signatures, arena roles and

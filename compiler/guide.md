@@ -584,7 +584,10 @@ nonmoving tracing collector in linear memory, without the Wasm GC extension.
 Forever loops collect according to allocation traffic, retaining their carries,
 providers and earlier reachable objects. The guest API resets temporary arena
 storage between completed invocations while preserving module initialization
-values. General ownership-based reclamation is still being implemented.
+values. Checked synchronous modules also use counted invocation, loop and module
+roots for returned/captured values and strong demand memos. Unknown layouts and
+host graphs retain the complete tracing fallback; tracing still reclaims cycles.
+See `zig-native/PERSISTENT_ROOTS.md` for the transition.
 
 Direct `array.replace`, `list.append` and `list.prepend` calls preserve this
 ownership optimization, including aliases and source wrappers whose body passes
@@ -1023,13 +1026,14 @@ Not yet executable: collection patterns, general text, F64, general type-valued
 computation, and exposed continuation values. Do not infer availability from
 editor highlighting or design examples.
 
-Hosts use `compiler/guest.ts` and guest ABI 2. Numeric arrays cross as copied
-typed arrays; host callbacks are explicit scalar or numeric-array capabilities.
-Async capabilities suspend a guest invocation without discarding its local
-state. Records, general arrays and persistent guest handles are not host ABI
-values yet. There are no implicit window/filesystem/network imports. For details
-read `compiler/guest-abi.md`, `compiler/effects-and-io.md`,
-`compiler/README.md`, and `std/README.md`.
+Hosts use `compiler/guest.ts` and guest ABI 2 or 3. ABI 3 adds private
+invocation ownership hooks while preserving the same host value types. Numeric
+arrays cross as copied typed arrays; host callbacks are explicit scalar or
+numeric-array capabilities. Async capabilities suspend a guest invocation
+without discarding its local state. Records, general arrays and persistent guest
+handles are not host ABI values yet. There are no implicit
+window/filesystem/network imports. For details read `compiler/guest-abi.md`,
+`compiler/effects-and-io.md`, `compiler/README.md`, and `std/README.md`.
 
 ## Selectors, conversion, and type witnesses
 
@@ -1096,14 +1100,17 @@ Recursive forcing fails. If a Wasm trap or host exception interrupts a demand,
 that demand remains terminal: later attempts fail without running its expression
 again. Other entry calls remain usable.
 
-Known, fully applied small expression functions composed of parameter reads,
-primitive scalar operations, conditionals and demands can use branches and local
-values without a heap cell. This includes the prelude's `&&` and `||`, aliases,
-equivalent user functions and acyclic forwarding through other small functions
-in the same module. Repeated reads, including forwarded reads, share one result
-at the first demand; a new call starts a new cache. Escaping demands and more
-complex bodies retain the shared runtime cell. Evaluation order, capture
-versions and first-demand providers are the same in both cases.
+Known, fully applied small functions can use branches and local values without a
+heap cell. Admitted bodies include primitive scalar and collection operations,
+conditionals, local aliases and structured range, collection and forever loops.
+This includes the prelude's `&&` and `||`, equivalent user functions and acyclic
+forwarding through other small functions in the same module. A memo created
+outside a callee loop survives all its iterations; a call inside a loop creates
+fresh state on each execution. Aliases share the first normally completed
+result. Zero iterations and unchosen branches perform no demand. Escaping
+demands, provider changes, arbitrary callbacks and bodies outside the bounded
+proof retain the shared runtime cell. Evaluation order, capture versions and
+first-demand providers are the same in both cases.
 
 ## Pattern alternatives and layout
 

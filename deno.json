@@ -2,7 +2,9 @@
   "tasks": {
     "build:compiler": "deno run --allow-read --allow-write --allow-run=zig scripts/build_compiler.ts",
     "build:compiler:dev": "cd zig-native && zig build install -Doptimize=debug -fincremental --prefix zig-out-dev",
-    "blot": "deno run --allow-read --allow-write --allow-run compiler/cli.ts",
+    "blot": "deno run --allow-read --allow-write --allow-run --allow-env=HOME,XDG_CACHE_HOME,BPM_CACHE_DIR compiler/cli.ts",
+    "bpm": "deno run --allow-read --allow-write --allow-run=git --allow-env=HOME,XDG_CACHE_HOME,BPM_CACHE_DIR compiler/bpm.ts",
+    "test:bpm": "deno test --allow-read --allow-write --allow-run compiler/packages.test.ts compiler/cli_packages.test.ts compiler/bpm.test.ts -- zig-native/zig-out/bin/blotc",
     "generate:parser": "deno run --allow-read=. --allow-write=generated scripts/generate_parser.ts",
     "generate": "deno task generate:parser",
     "generate:editor": "cd editor/tree-sitter-blot2 && tree-sitter generate --abi 14 --js-runtime native",
@@ -38,6 +40,8 @@
   "exports": {
     ".": "./mod.ts",
     "./cli": "./compiler/installed_cli.ts",
+    "./bpm": "./compiler/bpm.ts",
+    "./packages": "./compiler/packages.ts",
     "./guest": "./compiler/guest.ts",
     "./zig-project": "./compiler/zig_project_client.ts",
     "./format": "./compiler/format.ts"
@@ -51,6 +55,9 @@
       "compiler/guest.ts",
       "compiler/guide.md",
       "compiler/installed_cli.ts",
+      "compiler/bpm.ts",
+      "compiler/packages.ts",
+      "compiler/packages.md",
       "compiler/packaged_native.ts",
       "compiler/zig_project_client.ts",
       "compiler/editor_completion.ts",
@@ -70,7 +77,8 @@
       "generated/wasm/parser.plan",
       "generated/wasm/parser.wasm",
       "generated/wasm/syntax.ts",
-      "std/*.blot"
+      "std/*.blot",
+      "blot-workspace.yaml"
     ]
   }
 }

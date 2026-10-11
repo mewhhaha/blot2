@@ -21,11 +21,17 @@ deno task blot guide
 deno task test
 ```
 
-The executable is `zig-native/zig-out/bin/blotc`. The Deno CLI supplies the
-standard prelude by default; the raw executable requires
-`--prelude std/prelude.blot --std-root std`. `deno task build:compiler:dev`
-enables Zig's incremental compiler build in `zig-native/zig-out-dev` for
-development. Release measurements use `deno task build:compiler`.
+The executable is `zig-native/zig-out/bin/blotc`. Projects can declare Git or
+local dependencies in `blot.json`; `deno task bpm install PROJECT` caches their
+locked revisions. Packages declare exports in `blot-workspace.yaml`. A manifest
+project selects its prelude explicitly; omission means no prelude. See
+[bpm](compiler/packages.md).
+
+Without a manifest, the Deno CLI supplies the standard prelude by default; the
+raw executable requires `--prelude std/prelude.blot --std-root std`.
+`deno task build:compiler:dev` enables Zig's incremental compiler build in
+`zig-native/zig-out-dev` for development. Release measurements use
+`deno task build:compiler`.
 
 ## Project API
 

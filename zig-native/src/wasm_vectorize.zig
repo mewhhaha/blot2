@@ -30,7 +30,7 @@ const Plan = struct {
         for (instructions) |inst| {
             // Ownership annotations are not code and cost no budget.
             if (inst.op == .ownership) continue;
-            if (self.budget == 0) return null;
+            if (inst.table_reference or self.budget == 0) return null;
             self.budget -= 1;
             const result: ?Id = switch (inst.op) {
                 .local_get => if (inst.operand < initial.len and locals[inst.operand] != none) locals[inst.operand] else return null,

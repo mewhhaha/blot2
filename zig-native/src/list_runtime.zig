@@ -5,7 +5,7 @@
 const std = @import("std");
 const wasm = @import("wasm.zig");
 const heap = @import("runtime_layout.zig");
-const Error = std.mem.Allocator.Error || error{ModuleTooLarge};
+const Error = std.mem.Allocator.Error || error{ ModuleTooLarge, InvalidGlobalReference };
 pub const Runtime = struct {
     new: u32,
     address: u32,
@@ -214,6 +214,7 @@ fn emitRotate(c: Code, r: Runtime, comptime leftward: bool) Error!void {
     const opposite = if (leftward) n.left else n.right;
     try c.set(node, .{ .call, r.own, node, owner });
     try c.set(pivot, .{ .call, r.own, .{ .load, node, side }, owner });
+    try @import("root_runtime.zig").retainBorrow(c, c.module.arena.?, pivot);
     try store(c, node, side, .{ .load, pivot, opposite });
     try store(c, pivot, opposite, .{ .call, r.refresh, node });
     try c.value(.{ .call, r.refresh, pivot });
@@ -632,6 +633,9 @@ fn staticDescriptorKind(module: *wasm.Module, length: u32, leaves: []const u32, 
     const root = try staticTree(module, leaves);
     std.debug.assert(root.count == length);
     const address = try module.dataObject(heap.ListDescriptor{ .length = length, .root = root.address, .cached_leaf = 0, .cached_base = 0, .scalar_elements = if (scalar_elements) 2 else 0, .immutable = 1 });
+    try module.staticField(address + d.cached_leaf, .reference);
+    try module.staticField(address + d.cached_base, .scalar);
+    try module.staticField(address + d.immutable, .scalar);
     if (root.address != 0) try module.dataReference(address + d.root, .{ .role = .static_address, .value = root.address });
     return address;
 }

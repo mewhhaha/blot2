@@ -94,7 +94,28 @@ const Analysis = struct {
     fn scan(self: *Analysis, module: *const w.Module, function: *const w.Function, instructions: []const w.Instruction) !void {
         for (instructions, 0..) |inst, at| {
             switch (inst.op) {
-                .i32_const => try self.push(.{ .constant = inst.operand }),
+                .ownership => {
+                    const scope: ir.Ownership = @bitCast(inst.operand);
+                    if (scope.kind != .scope) continue;
+                    switch (scope.chunk) {
+                        2, 5, 6 => self.escape(.{ .id = scope.roles + 1 }),
+                        3 => {
+                            self.constants[scope.roles] = null;
+                            self.constant_scopes[scope.roles] = null;
+                            self.escape(.{ .id = scope.roles + 1 });
+                        },
+                        4 => {
+                            self.escape(.{ .id = (scope.roles & 8191) + 1 });
+                            self.escape(.{ .id = (scope.roles >> 13) + 1 });
+                        },
+                        else => {},
+                    }
+                },
+                .i32_const => {
+                    var value: Value = .{};
+                    if (!inst.table_reference) value.constant = inst.operand;
+                    try self.push(value);
+                },
                 .f32_const, .global_get, .memory_size, .host_ref_null, .host_ref_size => try self.push(.{}),
                 .local_get => {
                     // A constant assignment in one arm does not dominate the
@@ -159,7 +180,14 @@ const Analysis = struct {
                     if (callee.ownership == .allocate or callee.ownership == .allocate_scalar) {
                         const size = self.pop();
                         if (size.constant != null and size.constant.? != 0 and size.constant.? <= 64 and size.constant.? % 4 == 0) {
-                            const id = try self.add(false, size.constant.?);
+                            var owns_fields = false;
+                            if (callee.ownership != .allocate_scalar) {
+                                const roles = ir.allocationAnnotations(instructions, at);
+                                if (roles.len != 0) for (0..size.constant.? / 4) |word| {
+                                    if (ir.Ownership.wordRole(roles, word) != .scalar) owns_fields = true;
+                                };
+                            }
+                            const id = try self.add(owns_fields, size.constant.?);
                             self.events[at].allocation = id;
                             try self.push(.{ .id = id });
                         } else {
@@ -325,7 +353,7 @@ fn pass(a: A, module: *const w.Module, function: *const w.Function, locals: []co
     defer a.free(writes);
     @memset(writes, false);
     for (instructions, 0..) |inst, i| if (inst.op == .local_set or inst.op == .local_tee) {
-        const value: ?u32 = if (i != 0 and instructions[i - 1].op == .i32_const) instructions[i - 1].operand else null;
+        const value: ?u32 = if (i != 0 and instructions[i - 1].op == .i32_const and !instructions[i - 1].table_reference) instructions[i - 1].operand else null;
         if (!writes[inst.operand]) constants[inst.operand] = value else if (constants[inst.operand] != value) constants[inst.operand] = null;
         writes[inst.operand] = true;
     };
@@ -474,4 +502,31 @@ test "scalar replacement declines incomplete initialization and stores after an 
         try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = if (scenario == 1) alias else p }, .{ .op = .i32_load, .operand = 4 } });
         try std.testing.expect(try run(a, &module, &module.functions.items[f]) == null);
     }
+}
+
+fn owningFields(a: A) !void {
+    for ([_]ir.Role{ .scalar, .reference }) |role| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const function = try module.addTypedFunction(&.{.i32}, .i32, role);
+        const parent = try module.addLocal(function, .i32);
+        var buffer: [ir.max_annotations]ir.Instruction = undefined;
+        try module.emitSlice(function, ir.annotations(&.{role}, .scalar, &buffer));
+        try module.emitSlice(function, &.{
+            .{ .op = .i32_const, .operand = 4 },      .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = parent },
+            .{ .op = .local_get, .operand = parent }, .{ .op = .local_get },                       .{ .op = .i32_store },
+            .{ .op = .local_get, .operand = parent }, .{ .op = .i32_load },
+        });
+        var replacement = try run(a, &module, &module.functions.items[function]);
+        defer if (replacement) |*body| body.deinit(a);
+        // Eliding an owning word needs an equivalent root for its child.
+        // A scalar snapshot, including pointer-looking bits, needs none.
+        try std.testing.expectEqual(role == .scalar, replacement != null);
+        if (replacement) |body| for (body.instructions.items) |inst| try std.testing.expect(inst.op != .call);
+    }
+}
+test "scalar replacement preserves checked owning fields until equivalent roots exist through OOM" {
+    try owningFields(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, owningFields, .{});
 }

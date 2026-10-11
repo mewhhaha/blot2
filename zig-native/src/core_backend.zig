@@ -577,6 +577,8 @@ const Generator = struct {
             const cached = self.evaluator.suspensionCached(id);
             const cached_word = if (cached) |value| try self.serialize(value, demanded.a, depth + 1) else 0;
             const address = try self.module.dataObject(heap.Demand{ .function = function_id, .environment = environment, .status = if (cached != null) .ready else .pending, .cached = cached_word });
+            try self.module.staticField(address + heap.offset(heap.Demand, "status"), .scalar);
+            try self.module.staticField(address + heap.offset(heap.Demand, "cached"), self.layoutRole(demanded.a));
             try self.module.dataReference(address, .{ .role = .table_function, .value = function_id });
             try self.module.dataReference(address + 4, .{ .role = .static_address, .value = environment });
             if (cached) |value| try self.dataValueReference(address + heap.offset(heap.Demand, "cached"), value, cached_word);
@@ -910,7 +912,7 @@ const Generator = struct {
         defer self.instance_depth -= 1;
         if (self.artifacts) |artifacts| artifacts.requireFreshCode();
         const arrow = self.layouts.node(ty);
-        const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b));
+        const function_id = try self.module.addTypedFunction(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b), self.layoutRole(arrow.b));
         try self.setParameterRoles(function_id, self.closureRoles(arrow.a));
         try self.static_closures.append(self.allocator, function_id);
         self.work.fresh_closures += 1;
@@ -1199,7 +1201,7 @@ const Generator = struct {
         var parameters: [max_parameters + 1]wasm.ValueType = undefined;
         for (key.parameters[0..key.count], 0..) |item, i| parameters[i] = self.layouts.machine(item);
         parameters[key.count] = .i32;
-        const function_id = try self.module.addFunction(parameters[0 .. key.count + 1], self.layouts.machine(key.result));
+        const function_id = try self.module.addTypedFunction(parameters[0 .. key.count + 1], self.layouts.machine(key.result), self.layoutRole(key.result));
         var roles: [max_parameters + 1]ir.Role = undefined;
         for (key.parameters[0..key.count], 0..) |item, i| roles[i] = self.layoutRole(item);
         roles[key.count] = .reference;
@@ -1303,7 +1305,7 @@ const Generator = struct {
         const expected = try self.codeLayout(target.unit, body.scheme.root, &.{}, body.span);
         const scalar_ = self.layouts.scalar(expected) orelse .pointer;
         const global = try self.module.addGlobal(scalar_, 0, true);
-        const initializer = try self.module.addFunction(&.{}, .none);
+        const initializer = try self.module.addTypedFunction(&.{}, .none, .scalar);
         try self.runtime_globals.put(self.allocator, target, .{ .global = global, .initializer = initializer });
         try self.startup_facts.event(self.allocator, .{ .kind = .cell_registration, .target = global, .unit = target.unit, .identity = target.binding, .auxiliary = initializer });
         // A partial type inquiry cannot license reads of pending storage.
@@ -1344,8 +1346,9 @@ const Generator = struct {
     fn initializeRuntime(self: *Generator) Error!void {
         var slots = self.runtime_globals.iterator();
         while (slots.next()) |slot| if (slot.value_ptr.active) return error.InvalidGlobalReference;
-        if (self.runtime_order.items.len == 0) return;
-        const start = try self.module.addFunction(&.{}, .none);
+        if (self.runtime_order.items.len == 0 and self.module.static_fields.items.len == 0) return;
+        try self.module.finishStaticFields();
+        const start = try self.module.addTypedFunction(&.{}, .none, .scalar);
         for (self.runtime_order.items) |initializer| try self.module.emit(start, .{ .op = .call, .operand = initializer });
         if (self.module.arena) |arena| {
             try self.module.emit(start, .{ .op = .global_get, .operand = arena.heap });
@@ -1486,7 +1489,7 @@ const Generator = struct {
         if (self.instance_depth >= 256) return self.fail(key.unit, metadata.body, .complexity);
         self.instance_depth += 1;
         defer self.instance_depth -= 1;
-        const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(fn_type.a), .i32 }, self.layouts.machine(fn_type.b));
+        const function_id = try self.module.addTypedFunction(&.{ .i32, self.layouts.machine(fn_type.a), .i32 }, self.layouts.machine(fn_type.b), self.layoutRole(fn_type.b));
         try self.setParameterRoles(function_id, self.closureRoles(fn_type.a));
         try self.closures.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
@@ -1551,7 +1554,7 @@ const Generator = struct {
             if (key.applied != 0) return self.decline(key.target.unit, body.span, .unsupported);
             const arrow = self.layouts.node(key.ty);
             if (arrow.tag != .function) return self.decline(key.target.unit, body.span, .unresolved_type);
-            const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b));
+            const function_id = try self.module.addTypedFunction(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b), self.layoutRole(arrow.b));
             try self.setParameterRoles(function_id, self.closureRoles(arrow.a));
             try self.callables.put(self.allocator, key, function_id);
             if (scope) |*actor| try actor.reserve(function_id);
@@ -1588,7 +1591,7 @@ const Generator = struct {
             ty = n.b;
         }
         direct.result = ty;
-        const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(current.a), .i32 }, self.layouts.machine(current.b));
+        const function_id = try self.module.addTypedFunction(&.{ .i32, self.layouts.machine(current.a), .i32 }, self.layouts.machine(current.b), self.layoutRole(current.b));
         try self.setParameterRoles(function_id, self.closureRoles(current.a));
         try self.callables.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
@@ -1632,7 +1635,7 @@ const Generator = struct {
         }
         const fn_type = self.layouts.node(key.ty);
         if (fn_type.tag != .function) return self.decline(key.unit, .{ .start = 0, .end = 0 }, .unresolved_type);
-        const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(fn_type.a), .i32 }, .i32);
+        const function_id = try self.module.addTypedFunction(&.{ .i32, self.layouts.machine(fn_type.a), .i32 }, .i32, .reference);
         try self.setParameterRoles(function_id, self.closureRoles(fn_type.a));
         try self.constructor_functions.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
@@ -1641,7 +1644,7 @@ const Generator = struct {
         const metadata = self.unit(key.unit).constructor(key.catalog);
         const payload_type = self.unit(key.unit).types.node(metadata.payload);
         const record_local = if (payload_type.tag == .record and payload_type.b == 1) blk: {
-            const record = try emitter.allocate(4, .{ .words = &.{.value} });
+            const record = try emitter.allocate(4, .{ .words = &.{self.layoutRole(fn_type.a)} });
             try emitter.emit(.local_get, record);
             try emitter.emit(.local_get, 1);
             try emitter.emit(if (self.layouts.machine(fn_type.a) == .f32) .f32_store else .i32_store, 0);
@@ -1680,7 +1683,7 @@ const Generator = struct {
             ty = arrow.b;
         }
         if (self.primitive_functions.count() >= 65536) return self.fail(key.unit, 0, .complexity);
-        const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(current.a), .i32 }, self.layouts.machine(current.b));
+        const function_id = try self.module.addTypedFunction(&.{ .i32, self.layouts.machine(current.a), .i32 }, self.layouts.machine(current.b), self.layoutRole(current.b));
         try self.setParameterRoles(function_id, self.closureRoles(current.a));
         try self.primitive_functions.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
@@ -1801,7 +1804,7 @@ const Generator = struct {
         if (arrow.tag != .function) return self.decline(1, .{ .start = 0, .end = 0 }, .unresolved_type);
         const argument_machine = self.layouts.machine(arrow.a);
         const result_machine = self.layouts.machine(arrow.b);
-        const function_id = try self.module.addFunction(&.{ .i32, argument_machine, .i32 }, result_machine);
+        const function_id = try self.module.addTypedFunction(&.{ .i32, argument_machine, .i32 }, result_machine, self.layoutRole(arrow.b));
         try self.setParameterRoles(function_id, self.closureRoles(arrow.a));
         try self.operation_functions.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
@@ -1866,8 +1869,8 @@ const Generator = struct {
         if (arrow.b == types.unit) {
             try emitter.emit(.local_get, frame);
             try emitter.emit(.i32_load, @offsetOf(provider_chain.Frame, "target"));
-            try emitter.emit(.local_get, 1);
-            try emitter.emit(if (argument_machine == .f32) .f32_store else .i32_store, @offsetOf(provider_chain.Cell, "value"));
+            try emitter.emit(.local_set, implementation);
+            try emitter.storeTypedWord(implementation, @offsetOf(provider_chain.Cell, "value"), 1, self.layouts.scalar(arrow.a) orelse .pointer, 0);
             try emitter.emit(.i32_const, 0);
         } else try emitter.emit(.unreachable_, 0);
         try emitter.emit(.else_, 0);
@@ -1913,7 +1916,7 @@ const Generator = struct {
         }
         const callback = self.hostCallback(ty) orelse return self.decline(1, .{ .start = 0, .end = 0 }, .entry_type);
         const imported = try self.module.importHostCallback(callback);
-        const function_id = try self.module.addFunction(&.{ .i32, callback.parameter.machine(), .i32 }, callback.result.machine());
+        const function_id = try self.module.addTypedFunction(&.{ .i32, callback.parameter.machine(), .i32 }, callback.result.machine(), callback.result.role());
         try self.setParameterRoles(function_id, ir.packParameterRoles(&.{ .reference, callback.parameter.role(), .reference }));
         try self.host_functions.put(self.allocator, ty, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
@@ -1930,7 +1933,7 @@ const Generator = struct {
         const stub = try self.hostFunction(parameter);
         const arena = try self.module.ensureArena();
         const references = try self.module.ensureHostReferences();
-        const wrapper = try self.module.addFunction(&.{.externref}, result.machine());
+        const wrapper = try self.module.addTypedFunction(&.{.externref}, result.machine(), result.role());
         var emitter: Emitter = .{ .generator = self, .unit_id = 1, .function_id = wrapper, .mappings = &.{} };
         defer emitter.deinit();
         if (self.request_owner) |owner| {
@@ -1968,7 +1971,7 @@ const Generator = struct {
         return wrapper;
     }
     fn entryFunction(self: *Generator, target: u32, parameter: Scalar, result: Scalar) Error!u32 {
-        const wrapper = try self.module.addFunction(&.{parameter.machine()}, result.machine());
+        const wrapper = try self.module.addTypedFunction(&.{parameter.machine()}, result.machine(), result.role());
         try self.setParameterRoles(wrapper, ir.packParameterRoles(&.{parameter.role()}));
         if (self.request_owner) |owner| {
             try self.module.emit(wrapper, .{ .op = .i32_const });
@@ -2713,7 +2716,8 @@ fn generate(g: *Generator, entry: u32, unit_order: []const u32) Error!void {
 }
 
 const ReturnTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanup.Mark, template_result: bool = false };
-const LoopTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanup.Mark };
+const CarryRoot = struct { iteration: core.BindingId, outgoing: core.BindingId, slot: u32 };
+const LoopTarget = struct { node: core.Id, label: u32, cleanup: runtime_cleanup.Mark, roots: []const CarryRoot = &.{} };
 const Template = struct { unit: u32 = 0, node: core.Id, environment: ?u32 = null, captures: layout.Id = 0, templates: substitution_keys.Id = 0, computation: bool = false, evidence: u32 = 0, rows: substitution_keys.Id = 0 };
 const Emitter = struct {
     const RaggedCount = struct { plan: ragged_builder.Plan, count: u32, eligible: u32, budget: u32, limit: u32, exit: u32, cleanup: runtime_cleanup.Mark };
@@ -3231,7 +3235,14 @@ const Emitter = struct {
         expression: core.Id,
         value: ?u32 = null,
         ready: ?u32 = null,
+        root_slot: ?u32 = null,
         machine: wasm.ValueType,
+        role: ir.Role,
+
+        fn root(self: InlineDemand) ?u32 {
+            if (self.role == .scalar) return null;
+            return self.value;
+        }
     };
 
     // Every forwarded call must keep its demand arguments as local expressions.
@@ -3368,20 +3379,42 @@ const Emitter = struct {
                 continue;
             }
             const uses = plan.uses[i];
-            if (uses == 0) continue;
             const machine = g.layouts.machine(ty.a);
             const memo = uses > 1;
+            var memo_value: ?u32 = null;
+            var memo_ready: ?u32 = null;
+            var memo_root: ?u32 = null;
+            if (memo) {
+                memo_value = try self.temporary(machine);
+                memo_ready = try self.temporary(.i32);
+                if (g.layoutRole(ty.a) == .reference) {
+                    // A first force inside a callee iteration must survive
+                    // that iteration. Reserve its owner in the caller frame.
+                    memo_root = try self.temporary(.i32);
+                    try self.rootDirective(3, memo_root.?);
+                }
+            }
             demands[count] = .{
                 .binding = parameter.binding,
                 .caller = self,
                 .expression = caller.closures[caller.node(argument).a].body,
-                .value = if (memo) try self.temporary(machine) else null,
-                .ready = if (memo) try self.temporary(.i32) else null,
+                .value = memo_value,
+                .ready = memo_ready,
+                .root_slot = memo_root,
                 .machine = machine,
+                .role = g.layoutRole(ty.a),
             };
             // The call may occur inside a loop; Wasm local initialization alone
             // would incorrectly share a result across successive invocations.
             if (demands[count].ready) |ready| {
+                if (demands[count].role != .scalar) {
+                    if (machine == .f32) {
+                        try self.emit(.f32_const, 0);
+                    } else {
+                        try self.emit(.i32_const, 0);
+                    }
+                    try self.emit(.local_set, demands[count].value.?);
+                }
                 try self.emit(.i32_const, 0);
                 try self.emit(.local_set, ready);
             }
@@ -3392,14 +3425,32 @@ const Emitter = struct {
         return true;
     }
 
+    fn memoParent(self: *const Emitter) ?*const Emitter {
+        if (self.inline_demands.len == 0) return null;
+        return self.inline_demands[0].caller;
+    }
+
+    fn inlineDemandBinding(self: *const Emitter, binding: core.BindingId) ?*const InlineDemand {
+        const source = self.generator.unit(self.unit_id);
+        var current = binding;
+        for (0..64) |_| {
+            for (self.inline_demands) |*demand| if (demand.binding == current) return demand;
+            const initializer = source.binding(current).initializer;
+            if (initializer == 0 or source.node(initializer).tag != .reference) return null;
+            const reference = source.reference(initializer);
+            if (reference.unit != 0 and reference.unit != self.unit_id) return null;
+            current = reference.binding;
+        }
+        return null;
+    }
+
     fn inlineDemand(self: *Emitter, id: core.Id, depth: usize) Error!bool {
         const source = self.generator.unit(self.unit_id);
         const operand = source.node(id).a;
         if (source.node(operand).tag != .reference) return false;
         const reference = source.reference(operand);
         if (reference.unit != 0 and reference.unit != self.unit_id) return false;
-        for (self.inline_demands) |demand| {
-            if (demand.binding != reference.binding) continue;
+        if (self.inlineDemandBinding(reference.binding)) |demand| {
             if (demand.ready) |ready| {
                 try self.emit(.local_get, ready);
                 try self.emit(.if_, @backingInt(demand.machine));
@@ -3407,16 +3458,26 @@ const Emitter = struct {
                 try self.emit(.local_get, demand.value.?);
                 try self.emit(.else_, 0);
             }
-            // The caller emits the deferred expression in its lexical scope,
-            // at the current branch depth and with the force-site providers.
-            // demand_inline excludes handlers, so no intervening private cleanup
-            // scopes exist between this emitter and the lexical caller.
+            // Preserve creation-time binding versions while borrowing the
+            // force site's provider, labels and cancellation obligations. The
+            // snapshot includes callee loop scratch, without a parent cycle.
+            const inherited = try self.cleanups.snapshot(self.generator.allocator);
+            const saved_cleanups = demand.caller.cleanups;
+            demand.caller.cleanups = inherited;
+            defer {
+                demand.caller.cleanups.deinit(self.generator.allocator);
+                demand.caller.cleanups = saved_cleanups;
+            }
             const saved_labels = demand.caller.labels;
             demand.caller.labels = self.labels;
             defer demand.caller.labels = saved_labels;
+            const saved_provider = demand.caller.provider_local;
+            demand.caller.provider_local = self.provider_local;
+            defer demand.caller.provider_local = saved_provider;
             try demand.caller.bodyExpression(demand.expression, depth + 1, false);
             if (demand.ready) |ready| {
                 try self.emit(.local_set, demand.value.?);
+                if (demand.root_slot) |slot| try self.rootDirective(4, slot | (demand.value.? << 13));
                 try self.emit(.i32_const, 1);
                 try self.emit(.local_set, ready);
                 try self.emit(.local_get, demand.value.?);
@@ -3719,7 +3780,9 @@ const Emitter = struct {
             return;
         }
         const result_machine = if (supplied + 1 == key.count) g.layouts.machine(key.result) else .i32;
-        const function_id = try g.module.addFunction(&.{ .i32, g.layouts.machine(key.parameters[supplied]), .i32 }, result_machine);
+        var result_role: ir.Role = .reference;
+        if (supplied + 1 == key.count) result_role = g.layoutRole(key.result);
+        const function_id = try g.module.addTypedFunction(&.{ .i32, g.layouts.machine(key.parameters[supplied]), .i32 }, result_machine, result_role);
         try g.setParameterRoles(function_id, g.closureRoles(key.parameters[supplied]));
         try g.static_closures.append(g.allocator, function_id);
         g.work.fresh_closures += 1;
@@ -4467,7 +4530,7 @@ const Emitter = struct {
             if (place.array_scalar != null and place.row_words == 0) try self.storeCollectionWord(container, false, changed_scalar.machine(), 0) else try self.storeElement(changed_scalar.machine(), 0, place.row_words);
             if (place.wrapped) {
                 // A copy of a constructor cell: its tag, then its payload.
-                const wrapper = if (reuse) place.owner else try self.allocate(8, .{ .words = &.{ .scalar, .value } });
+                const wrapper = if (reuse) place.owner else try self.allocate(8, .{ .words = &.{ .scalar, .reference } });
                 if (!reuse) {
                     try self.emit(.local_get, wrapper);
                     try self.emit(.local_get, place.owner);
@@ -6003,7 +6066,8 @@ const Emitter = struct {
         try self.emit(.local_get, address);
     }
     fn demandDescriptor(self: *Emitter, function_id: u32, environment: ?u32) Error!void {
-        const address = try self.allocate(@sizeOf(heap.Demand), .heap(heap.Demand));
+        const cached_role = self.generator.module.functions.items[function_id].result_role;
+        const address = try self.allocate(@sizeOf(heap.Demand), .{ .words = &.{ .scalar, .reference, .scalar, cached_role } });
         try self.emit(.local_get, address);
         try self.referenceConstant(function_id, .table_function);
         try self.emit(.i32_store, heap.offset(heap.Demand, "function"));
@@ -6651,6 +6715,7 @@ const Emitter = struct {
         const g = self.generator;
         const n = g.unit(self.unit_id).node(id);
         const demand = try self.capture(n.a, depth);
+        const arena = try g.module.ensureArena();
         const result = try self.scalar(id);
         const cached = try self.temporary(result.machine());
         try self.emit(.local_get, demand);
@@ -6668,9 +6733,7 @@ const Emitter = struct {
         try self.emit(.if_, 0);
         try self.emit(.unreachable_, 0);
         try self.emit(.end, 0);
-        try self.emit(.local_get, demand);
-        try self.emit(.i32_const, 1);
-        try self.emit(.i32_store, heap.offset(heap.Demand, "status"));
+        try self.storeTypedWord(demand, heap.offset(heap.Demand, "status"), null, .u32, 1);
         try self.emit(.local_get, demand);
         try self.emit(.i32_load, heap.offset(heap.Demand, "environment"));
         try self.emit(.i32_const, 0);
@@ -6685,13 +6748,8 @@ const Emitter = struct {
             try self.cleanups.append(g.allocator, .{ .reset_demand = @fromBackingInt(@intCast(demand)) });
             try request_runtime.guard(&g.module, self.function_id, owner, &self.cleanups);
         }
-        try self.emit(.local_get, demand);
-        try self.emit(.local_get, cached);
-        try self.emit(if (result == .f32) .f32_store else .i32_store, heap.offset(heap.Demand, "cached"));
-        try self.emit(.local_get, demand);
-        try self.emit(.i32_const, 2);
-        try self.emit(.i32_store, heap.offset(heap.Demand, "status"));
-        const arena = try g.module.ensureArena();
+        try self.storeTypedWord(demand, heap.offset(heap.Demand, "cached"), cached, result, 0);
+        try self.storeTypedWord(demand, heap.offset(heap.Demand, "status"), null, .u32, 2);
         try self.emit(.local_get, demand);
         try self.emit(.global_get, arena.base);
         try self.emit(.i32_lt_u, 0);
@@ -6702,6 +6760,18 @@ const Emitter = struct {
         self.labels -= 1;
         try self.emit(.end, 0);
         try self.emit(.local_get, cached);
+    }
+    fn storeTypedWord(self: *Emitter, demand: u32, offset: u32, local: ?u32, scalar_: Scalar, literal: u32) Error!void {
+        const arena = try self.generator.module.ensureArena();
+        try self.emit(.local_get, demand);
+        try self.emit(.local_get, demand);
+        try self.emit(.i32_const, offset);
+        try self.emit(.i32_add, 0);
+        if (local) |value| {
+            try self.emit(.local_get, value);
+            if (scalar_ == .f32) try self.emit(.i32_reinterpret_f32, 0);
+        } else try self.emit(.i32_const, literal);
+        try self.emit(.call, arena.store_word);
     }
     // A selected getter may accept data containing an unobserved callback row.
     // Its ABI is concrete even though that nested row has no closed semantic
@@ -6916,7 +6986,7 @@ const Emitter = struct {
             const read = try g.runtimeOperation(prepared.read, self.unit_id, source.span(id));
             const write = try g.runtimeOperation(prepared.write.?, self.unit_id, source.span(id));
             const initial = try self.capture(n.c, depth);
-            const provider = try self.allocate(@sizeOf(provider_chain.StateProvider), .heap(provider_chain.StateProvider));
+            const provider = try self.allocate(@sizeOf(provider_chain.StateProvider), .{ .words = &.{ .scalar, .scalar, g.layoutRole(ty.c) } });
             try self.emit(.local_get, provider);
             try self.operationConstant(read);
             try self.emit(.i32_store, @offsetOf(provider_chain.StateProvider, "read"));
@@ -6966,7 +7036,7 @@ const Emitter = struct {
             try self.expression(n.b, depth + 1);
         } else if (ty.tag == .state_provider) {
             const state_machine = g.layouts.machine(ty.c);
-            const cell = try self.allocatePrivate(@sizeOf(provider_chain.Cell), .heap(provider_chain.Cell));
+            const cell = try self.allocatePrivate(@sizeOf(provider_chain.Cell), .{ .words = &.{g.layoutRole(ty.c)} });
             try self.emit(.local_get, cell);
             try self.emit(.local_get, provider);
             try self.emit(if (state_machine == .f32) .f32_load else .i32_load, @offsetOf(provider_chain.StateProvider, "initial"));
@@ -7393,6 +7463,29 @@ const Emitter = struct {
             break :local result;
         };
         try self.emit(.local_set, local);
+        if (self.carryRoot(binding)) |slot| try self.rootDirective(4, slot | (local << 13));
+    }
+    fn carryRoot(self: *const Emitter, binding: core.BindingId) ?u32 {
+        var index = self.loop_targets.items.len;
+        while (index != 0) {
+            index -= 1;
+            for (self.loop_targets.items[index].roots) |root| {
+                if (root.iteration == binding or root.outgoing == binding) return root.slot;
+            }
+        }
+        return null;
+    }
+    fn rootDirective(self: *Emitter, operation: u4, operand: u32) Error!void {
+        if (operand > std.math.maxInt(u26)) {
+            try self.rootDirective(15, 0);
+            return;
+        }
+        const scope: ir.Ownership = .{ .kind = .scope, .chunk = operation, .roles = @intCast(operand) };
+        try self.emit(.ownership, @bitCast(scope));
+    }
+    fn openRootScope(self: *Emitter) Error!void {
+        try self.rootDirective(0, 0);
+        try self.cleanups.append(self.generator.allocator, .{ .root_scope = {} });
     }
     fn suite(self: *Emitter, id: core.Id, depth: usize) Error!bool {
         const previous_root = self.analysis_root;
@@ -7421,6 +7514,7 @@ const Emitter = struct {
                         continue;
                     };
 
+                    if (self.inlineDemandBinding(n.a) != null) continue;
                     if (self.smallCollectionCandidate(n.b)) {
                         if (function_facts.privateBinding(unit_, self.analysis_root, n.a)) if (try self.captureSmallCollection(n.b, depth)) |values| {
                             try self.small_values.put(g.allocator, n.a, values);
@@ -7545,8 +7639,8 @@ const Emitter = struct {
         try self.emit(.local_set, walk.storage);
         try self.emit(.local_get, end);
         try self.emit(.if_, 0);
-        // Traversal caches keep their own representation.
-        const storage = try self.allocate(list_traversal.bytes, .{});
+        // The descriptor owns the tree; pending path words borrow its nodes.
+        const storage = try self.allocate(list_traversal.bytes, .{ .words = &.{.reference}, .rest = .scalar });
         try self.emit(.local_get, storage);
         try self.emit(.i32_const, 0);
         try self.emit(.i32_const, list_traversal.bytes);
@@ -7622,6 +7716,7 @@ const Emitter = struct {
         const id = plan.node;
         const metadata = source.loopInfo(id);
         const carries = plan.carries;
+        if (!plan.roots) try self.rootDirective(15, 0);
         const cleanup_mark = self.cleanups.mark();
         defer self.cleanups.restore(cleanup_mark);
         const view_count = self.row_views.items.len;
@@ -7676,6 +7771,22 @@ const Emitter = struct {
             try self.emit(.local_set, local);
             try self.collectionBudget(cadence.?, budget.?);
         }
+        var roots: std.ArrayList(CarryRoot) = .empty;
+        defer roots.deinit(g.allocator);
+        for (carries, 0..) |carry, index| {
+            var role = ir.Role.unknown;
+            if (plan.roots) role = @fromBackingInt(@as(u2, @truncate(plan.carry_roles >> @intCast(index * 2))));
+            if (role == .reference) {
+                const slot = try self.temporary(.i32);
+                if (slot > 8191) try self.rootDirective(15, 0);
+                try self.rootDirective(3, slot);
+                try roots.append(g.allocator, .{ .iteration = carry.iteration, .outgoing = carry.outgoing, .slot = slot });
+            }
+        }
+        const exit_label = self.labels;
+        const target_count = self.loop_targets.items.len;
+        defer self.loop_targets.shrinkRetainingCapacity(target_count);
+        try self.loop_targets.append(g.allocator, .{ .node = id, .label = exit_label, .cleanup = self.cleanups.mark(), .roots = roots.items });
         for (carries) |carry| {
             const incoming = self.locals.get(carry.incoming) orelse return g.fail(self.unit_id, id, .unsupported);
             try self.emit(.local_get, incoming);
@@ -7686,9 +7797,7 @@ const Emitter = struct {
             try self.save(carry.outgoing, id);
         }
         try self.emit(.block, 0);
-        const exit_label = self.labels;
         self.labels += 1;
-        try self.loop_targets.append(g.allocator, .{ .node = id, .label = exit_label, .cleanup = self.cleanups.mark() });
         try self.emit(.loop, 0);
         const head_label = self.labels;
         self.labels += 1;
@@ -7697,6 +7806,13 @@ const Emitter = struct {
             try self.emit(.local_get, end);
             try self.emit(.i32_ge_u, 0);
             try self.emit(.br_if, self.labels - 1 - exit_label);
+        }
+        const outer_cleanup = self.cleanups.mark();
+        try self.openRootScope();
+        for (carries, 0..) |carry, index| {
+            var role = ir.Role.unknown;
+            if (plan.roots) role = @fromBackingInt(@as(u2, @truncate(plan.carry_roles >> @intCast(index * 2))));
+            if (role == .reference) try self.rootDirective(5, self.locals.get(carry.iteration).?);
         }
         if (row_view) |view| {
             const collection = try self.codeLayout(source.typeOf(metadata.first), source.span(metadata.first));
@@ -7766,10 +7882,17 @@ const Emitter = struct {
                 try self.emit(.end, 0);
             }
         }
+        const inner_cleanup = self.cleanups.mark();
         const row_label = self.labels;
         if (row_view != null) {
             try self.emit(.loop, 0);
             self.labels += 1;
+            try self.openRootScope();
+            for (carries, 0..) |carry, index| {
+                var role = ir.Role.unknown;
+                if (plan.roots) role = @fromBackingInt(@as(u2, @truncate(plan.carry_roles >> @intCast(index * 2))));
+                if (role == .reference) try self.rootDirective(5, self.locals.get(carry.iteration).?);
+            }
         }
         if (borrowed_view) |view| try self.bindRowViewPattern(id, metadata.pattern, view);
         if (!try self.suite(metadata.body, depth + 1)) {
@@ -7787,6 +7910,7 @@ const Emitter = struct {
                 try self.emit(.local_get, self.locals.get(carry.iteration).?);
                 try self.save(carry.outgoing, id);
             }
+            if (row_view == null) try self.cleanupTo(outer_cleanup);
             if (floor) |local| try self.collectLoopCarries(id, carries, local, cadence.?, budget.?);
             if (metadata.kind != .forever and row_view == null) {
                 try self.emit(.local_get, counter);
@@ -7808,7 +7932,9 @@ const Emitter = struct {
                 try self.emit(.i32_const, bytes);
                 try self.emit(.i32_add, 0);
                 try self.emit(.local_set, view.next_address);
+                try self.cleanupTo(inner_cleanup);
                 try self.emit(.br_if, self.labels - 1 - row_label);
+                self.cleanups.restore(inner_cleanup);
                 // The address now denotes the first unconsumed logical row.
                 // Recover its index only at a leaf boundary; the inner loop
                 // needs no per-row integer counter.
@@ -7825,6 +7951,7 @@ const Emitter = struct {
                 try self.emit(.i32_div_u, 0);
                 try self.emit(.local_set, counter);
             }
+            if (row_view != null) try self.cleanupTo(outer_cleanup);
             try self.emit(.br, self.labels - 1 - head_label);
         }
         if (row_view != null) {
@@ -7836,6 +7963,7 @@ const Emitter = struct {
         self.labels -= 1;
         _ = self.loop_targets.pop();
         try self.emit(.end, 0);
+        self.cleanups.restore(outer_cleanup);
         try self.cleanupTo(cleanup_mark);
     }
     fn collectLoopCarries(self: *Emitter, id: core.Id, carries: []const core.LoopCarry, floor: u32, cadence: u32, budget: u32) Error!void {
@@ -7851,11 +7979,27 @@ const Emitter = struct {
         self.labels += 1;
         // Carried scalars must not become references merely because their bits
         // resemble addresses. The dynamic provider head is a reference slot.
-        const roles = try g.allocator.alloc(ir.Role, carries.len + 1);
+        var memo_count: usize = 0;
+        var scope: ?*const Emitter = self;
+        while (scope) |emitter| : (scope = emitter.memoParent()) {
+            for (emitter.inline_demands) |demand| if (demand.root() != null) {
+                memo_count += 1;
+            };
+        }
+        if (memo_count >= std.math.maxInt(u32) / 4 - carries.len) return g.fail(self.unit_id, id, .complexity);
+        const roles = try g.allocator.alloc(ir.Role, carries.len + memo_count + 1);
         defer g.allocator.free(roles);
         const source = g.unit(self.unit_id);
         for (carries, 0..) |carry, index| roles[index] = g.layoutRole(try self.codeLayout(source.binding(carry.iteration).ty, source.span(id)));
-        roles[carries.len] = .reference;
+        var position = carries.len;
+        scope = self;
+        while (scope) |emitter| : (scope = emitter.memoParent()) {
+            for (emitter.inline_demands) |demand| if (demand.root() != null) {
+                roles[position] = demand.role;
+                position += 1;
+            };
+        }
+        roles[position] = .reference;
         const root = try self.allocate(@intCast(roles.len * 4), .{ .words = roles });
         for (carries, 0..) |carry, index| {
             const value = self.locals.get(carry.iteration) orelse return g.fail(self.unit_id, id, .unsupported);
@@ -7865,14 +8009,30 @@ const Emitter = struct {
             try self.emit(.local_get, value);
             try self.emit(if (machine == .f32) .f32_store else .i32_store, @intCast(index * 4));
         }
+        position = carries.len;
+        scope = self;
+        while (scope) |emitter| : (scope = emitter.memoParent()) {
+            for (emitter.inline_demands) |demand| if (demand.root()) |value| {
+                try self.emit(.local_get, root);
+                try self.emit(.local_get, value);
+                if (demand.machine == .f32) {
+                    try self.emit(.f32_store, @intCast(position * 4));
+                } else {
+                    try self.emit(.i32_store, @intCast(position * 4));
+                }
+                position += 1;
+            };
+        }
         try self.emit(.local_get, root);
         try self.providerHead();
-        try self.emit(.i32_store, @intCast(carries.len * 4));
+        try self.emit(.i32_store, @intCast(position * 4));
         try self.emit(.local_get, root);
         try self.emit(.local_get, floor);
         try self.emit(.i32_const, 0);
         try self.emit(.call, arena.collect);
         try self.emit(.drop, 0);
+        try self.emit(.local_get, root);
+        try self.emit(.call, arena.recycle);
         try self.collectionBudget(cadence, budget);
         self.labels -= 1;
         try self.emit(.end, 0);
@@ -7914,7 +8074,8 @@ const Emitter = struct {
             if (target.node == block) break target;
         } else return g.fail(self.unit_id, source, .unsupported);
         const value = if (kind == .return_) g.unit(self.unit_id).node(source).a else 0;
-        return .{ .kind = kind, .source = source, .target = block, .template_result = target.template_result, .value = value };
+        const role = if (value != 0 and !target.template_result) g.layoutRole(try self.codeLayout(g.unit(self.unit_id).typeOf(value), g.unit(self.unit_id).span(value))) else ir.Role.scalar;
+        return .{ .kind = kind, .source = source, .target = block, .template_result = target.template_result, .value = value, .result_role = role };
     }
     /// Selects the loop a `break` leaves and the carries its values replace.
     fn prepareBreak(self: *Emitter, id: core.Id) Error!resolved_flow.SymbolicExit {
@@ -7942,8 +8103,15 @@ const Emitter = struct {
     }
     /// Discharges the cleanup of every scope the exit leaves, then branches.
     fn takeExit(self: *Emitter, exit: resolved_flow.Exit) Error!void {
-        self.generator.evaluator.counters.prepared_exit_cleanups += self.cleanups.since(exit.cleanup).len;
-        try self.cleanupTo(exit.cleanup);
+        for (self.cleanups.since(exit.cleanup)) |action| {
+            if (action != .root_scope) self.generator.evaluator.counters.prepared_exit_cleanups += 1;
+        }
+        if (exit.result_role == .reference) {
+            const result = try self.temporary(.i32);
+            try self.emit(.local_set, result);
+            try self.cleanups.emitToResult(&self.generator.module, @fromBackingInt(@intCast(self.function_id)), exit.cleanup, result);
+            try self.emit(.local_get, result);
+        } else try self.cleanupTo(exit.cleanup);
         try self.emit(.br, exit.depthAt(self.labels));
     }
     const JoinKind = enum { value, template, statement, match_statement };
@@ -7972,7 +8140,15 @@ const Emitter = struct {
         const g = self.generator;
         const source = g.unit(self.unit_id);
         const metadata = source.loopInfo(id);
-        return .{ .node = id, .kind = metadata.kind, .carries = source.loopCarries(id), .refutable = metadata.pattern != 0 and !plainBindingPattern(source, metadata.pattern, 0), .diverges = metadata.kind == .forever and !metadata.can_exit };
+        const carries = source.loopCarries(id);
+        var roots = carries.len <= 32;
+        var roles: u64 = 0;
+        for (carries, 0..) |carry, index| {
+            const role = g.layoutRole(try self.codeLayout(source.binding(carry.iteration).ty, source.span(id)));
+            if (role != .scalar and role != .reference) roots = false;
+            if (index < 32) roles |= @as(u64, @backingInt(role)) << @intCast(index * 2);
+        }
+        return .{ .node = id, .kind = metadata.kind, .carries = carries, .carry_roles = roles, .roots = roots, .refutable = metadata.pattern != 0 and !plainBindingPattern(source, metadata.pattern, 0), .diverges = metadata.kind == .forever and !metadata.can_exit };
     }
     /// Selects every edge out of a request loop before its first instruction.
     /// Its own exit label is the next one the loop opens.

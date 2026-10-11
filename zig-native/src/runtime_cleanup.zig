@@ -10,11 +10,24 @@ const heap = @import("runtime_layout.zig");
 const A = std.mem.Allocator;
 
 pub const Mark = enum(usize) { _ };
-pub const Action = union(enum) { release: ir.LocalId, release_if_nonzero: ir.LocalId, reset_demand: ir.LocalId };
+pub const Action = union(enum) { release: ir.LocalId, release_if_nonzero: ir.LocalId, reset_demand: ir.LocalId, root_scope: void };
 pub const Stack = struct {
     parent: ?*const Stack = null,
     actions: std.ArrayList(Action) = .empty,
 
+    /// Snapshot the active force-site obligations before borrowing a lexical
+    /// emitter. Flattening avoids a parent cycle when that emitter is already
+    /// an ancestor of the force site.
+    pub fn snapshot(self: *const Stack, a: A) A.Error!Stack {
+        var result: Stack = .{};
+        errdefer result.deinit(a);
+        try result.inherit(a, self);
+        return result;
+    }
+    fn inherit(self: *Stack, a: A, source: *const Stack) A.Error!void {
+        if (source.parent) |parent| try self.inherit(a, parent);
+        try self.actions.appendSlice(a, source.actions.items);
+    }
     pub fn deinit(self: *Stack, a: A) void {
         self.actions.deinit(a);
     }
@@ -32,11 +45,14 @@ pub const Stack = struct {
         try self.actions.append(a, action);
     }
     pub fn emitTo(self: *const Stack, module: *wasm.Module, function: ir.FunctionId, checkpoint: Mark) A.Error!void {
+        try self.emitToResult(module, function, checkpoint, null);
+    }
+    pub fn emitToResult(self: *const Stack, module: *wasm.Module, function: ir.FunctionId, checkpoint: Mark, result: ?u32) A.Error!void {
         var index = self.actions.items.len;
         std.debug.assert(@backingInt(checkpoint) <= index);
         while (index > @backingInt(checkpoint)) {
             index -= 1;
-            try emit(self.actions.items[index], module, function);
+            try emit(self.actions.items[index], module, function, result);
         }
     }
     pub fn emitAll(self: *const Stack, module: *wasm.Module, function: ir.FunctionId) A.Error!void {
@@ -44,9 +60,13 @@ pub const Stack = struct {
         if (self.parent) |parent| try parent.emitAll(module, function);
     }
 };
-fn emit(action: Action, module: *wasm.Module, function: ir.FunctionId) A.Error!void {
+fn emit(action: Action, module: *wasm.Module, function: ir.FunctionId, result: ?u32) A.Error!void {
     const id = @backingInt(function);
     switch (action) {
+        .root_scope => {
+            const scope: ir.Ownership = .{ .kind = .scope, .chunk = if (result != null) 2 else 1, .roles = @intCast(result orelse 0) };
+            try module.emit(id, .{ .op = .ownership, .operand = @bitCast(scope) });
+        },
         .release => |local| {
             try module.emit(id, .{ .op = .local_get, .operand = @backingInt(local) });
             try module.emit(id, .{ .op = .call, .operand = module.arena.?.recycle });

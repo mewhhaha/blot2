@@ -32,6 +32,7 @@ pub const Exit = struct {
     template_result: bool = false,
     /// A `return`'s value, evaluated before the edge.
     value: core.Id = 0,
+    result_role: @import("runtime_ir.zig").Role = .scalar,
     /// A `break`'s values, evaluated in source order before the edge.
     values: []const core.Id = &.{},
     /// Loop carries the values replace, assigned last to first.
@@ -51,10 +52,11 @@ pub const SymbolicExit = struct {
     target: core.Id,
     template_result: bool = false,
     value: core.Id = 0,
+    result_role: @import("runtime_ir.zig").Role = .scalar,
     values: []const core.Id = &.{},
     carries: []const core.LoopCarry = &.{},
     pub fn bind(self: SymbolicExit, label: u32, cleanup: runtime_cleanup.Mark) Exit {
-        return .{ .kind = self.kind, .source = self.source, .target = self.target, .label = label, .cleanup = cleanup, .template_result = self.template_result, .value = self.value, .values = self.values, .carries = self.carries };
+        return .{ .kind = self.kind, .source = self.source, .target = self.target, .label = label, .cleanup = cleanup, .template_result = self.template_result, .value = self.value, .result_role = self.result_role, .values = self.values, .carries = self.carries };
     }
 };
 
@@ -98,6 +100,8 @@ pub const Loop = struct {
     /// Each carry enters as `incoming`, iterates as `iteration`, returns on
     /// the backedge as `backedge` and leaves as `outgoing` on every exit.
     carries: []const core.LoopCarry,
+    carry_roles: u64 = 0,
+    roots: bool = true,
     /// The element pattern tests at runtime and traps when it fails.
     refutable: bool,
     /// A `forever` loop without a `break` never reaches the code after it.

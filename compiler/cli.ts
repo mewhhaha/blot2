@@ -1,6 +1,7 @@
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { extractStandardLibrary } from "./packaged_native.ts";
+import { resolveProject } from "./packages.ts";
 
 const usage = `Usage: blot guide | fmt SOURCE [--check]
        blot check ENTRY [project options]
@@ -82,23 +83,48 @@ export async function runCli(
       console.error(usage);
       return 2;
     }
-    if (
-      Deno.build.standalone &&
-      (!options.includes("--prelude") || !options.includes("--std-root"))
-    ) library = await extractStandardLibrary();
-    const standardRoot = library?.path ??
-      fileURLToPath(new URL("../std/", import.meta.url));
-    if (!options.includes("--prelude")) {
-      options.push(
-        "--prelude",
-        join(standardRoot, "prelude.blot"),
-      );
-    }
-    if (!options.includes("--std-root")) {
-      options.push(
-        "--std-root",
-        standardRoot,
-      );
+    const packageProject = await resolveProject(filename);
+    if (packageProject) {
+      const explicitPrelude = options.includes("--prelude");
+      const explicitStdRoot = options.includes("--std-root");
+      const explicitAliases = new Set<string>();
+      for (let i = 0; i < options.length; i++) {
+        if (options[i] !== "--alias") continue;
+        const separator = options[i + 1].indexOf("=");
+        if (separator >= 0) {
+          explicitAliases.add(options[i + 1].slice(0, separator));
+        }
+        i++;
+      }
+      if (!explicitPrelude) {
+        options.push("--prelude", packageProject.prelude ?? "none");
+      }
+      for (
+        const [prefix, directory] of Object.entries(packageProject.imports)
+      ) {
+        if (explicitAliases.has(prefix)) continue;
+        if (prefix === "std/" && explicitStdRoot) continue;
+        options.push("--alias", `${prefix}=${directory}`);
+      }
+    } else {
+      if (
+        Deno.build.standalone &&
+        (!options.includes("--prelude") || !options.includes("--std-root"))
+      ) library = await extractStandardLibrary();
+      const standardRoot = library?.path ??
+        fileURLToPath(new URL("../std/", import.meta.url));
+      if (!options.includes("--prelude")) {
+        options.push(
+          "--prelude",
+          join(standardRoot, "prelude.blot"),
+        );
+      }
+      if (!options.includes("--std-root")) {
+        options.push(
+          "--std-root",
+          standardRoot,
+        );
+      }
     }
     if (command === "build") {
       destination ??= `build/${basename(filename, ".blot")}.wasm`;

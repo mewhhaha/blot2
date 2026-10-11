@@ -5,6 +5,10 @@ the tracer. [The ownership design](SHARED_OWNERSHIP.md) remains the
 specification for persistent roots, suspension and complete cycle collection in
 032–035.
 
+The synchronous root extension is documented in
+[Persistent roots](PERSISTENT_ROOTS.md). The qualification below records the 031
+boundary and remains the baseline for its additional costs.
+
 ## Representation and operations
 
 The nonmoving Wasm32 header occupies 32 bytes. It contains physical/requested

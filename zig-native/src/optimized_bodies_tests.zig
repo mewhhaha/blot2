@@ -96,7 +96,7 @@ test "executable optimizer queries preserve source ordering and omit skipped phy
     defer a.free(bytes);
     try std.testing.expect(old.queries_complete);
     try std.testing.expectEqual(@as(usize, 1), old.queries.records.items.len);
-    try std.testing.expectEqual(@as(u32, 0), old.queries.records.items[0].key.source);
+    try std.testing.expectEqual(@as(u32, 0), old.queries.records.items[0].value.function);
     try std.testing.expect(old.queries.records.items[0].value.ready);
     try std.testing.expect(!old.entries.items[1].output_ready and !old.entries.items[2].output_ready);
     var current: retained.Capture = .{ .allocator = a };
@@ -261,5 +261,229 @@ test "development tier keeps lifetime cleanup and rejects optimized body capture
     const back = try module.assembleWithOptions(.{ .previous = &next, .current = &restored, .stats = &stats });
     defer a.free(back);
     try std.testing.expectEqualSlices(u8, optimized, back);
+    try std.testing.expectEqual(@as(usize, 0), stats.reused);
+}
+
+fn movedResources(a: std.mem.Allocator, inserted: bool, changed_import: bool) !wasm.Module {
+    var module = wasm.Module.init(a);
+    errdefer module.deinit();
+    if (inserted) {
+        const extra = try module.addFunction(&.{.f32}, .f32);
+        try module.emit(extra, .{ .op = .local_get });
+        _ = try module.importFunction("other", "unused", &.{}, .none);
+        _ = try module.addGlobal(.f32, 0x3f800000, false);
+    }
+    const arena = try module.ensureArena();
+    const global = try module.addGlobal(.u32, 11, false);
+    var name: []const u8 = "identity";
+    if (changed_import) name = "changed";
+    const imported = try module.importFunction("host", name, &.{.i32}, .i32);
+    const target = try module.addFunction(&.{.i32}, .i32);
+    try module.emitSlice(target, &.{ .{ .op = .local_get }, .{ .op = .i32_const, .operand = 7 }, .{ .op = .i32_add } });
+    const caller = try module.addFunction(&.{.i32}, .i32);
+    const object = try module.addLocal(caller, .i32);
+    try module.emitSlice(caller, &.{
+        .{ .op = .i32_const, .operand = 8 },          .{ .op = .call, .operand = arena.allocate },
+        .{ .op = .local_set, .operand = object },     .{ .op = .local_get, .operand = object },
+        .{ .op = .local_get },                        .{ .op = .i32_store },
+        .{ .op = .local_get, .operand = object },     .{ .op = .i32_load },
+        .{ .op = .call_import, .operand = imported }, .{ .op = .global_get, .operand = global },
+        .{ .op = .i32_add },
+    });
+    try module.emitReference(caller, .{ .op = .i32_const, .operand = target }, .table_function);
+    try module.emit(caller, .{ .op = .call_indirect, .operand = module.functions.items[target].signature });
+    try module.exportFunction(target, "target", .u32, .u32);
+    try module.exportFunction(caller, "caller", .u32, .u32);
+    return module;
+}
+fn symbolicResources(a: std.mem.Allocator) !void {
+    var original = try movedResources(a, false, false);
+    defer original.deinit();
+    var old: retained.Capture = .{ .allocator = a };
+    defer old.deinit();
+    a.free(try original.assembleWithOptions(.{ .current = &old }));
+    const original_caller = original.functions.items.len - 1;
+    const original_output = old.output(original_caller) orelse return error.TestUnexpectedResult;
+    const saved = try a.dupe(wasm.Instruction, original_output.instructions.items);
+    defer a.free(saved);
+    for ([_]bool{ false, true }) |changed| {
+        var moved = try movedResources(a, true, changed);
+        defer moved.deinit();
+        var current: retained.Capture = .{ .allocator = a };
+        defer current.deinit();
+        var stats: retained.Stats = .{};
+        const reused = try moved.assembleWithOptions(.{ .previous = &old, .current = &current, .stats = &stats });
+        defer a.free(reused);
+        const fresh = try moved.assemble();
+        defer a.free(fresh);
+        try std.testing.expectEqualSlices(u8, fresh, reused);
+        var matcher = try retained.Matcher.init(a, &old, &current);
+        defer matcher.deinit();
+        const caller = moved.functions.items.len - 1;
+        try std.testing.expectEqual(!changed, matcher.matches(caller));
+        try std.testing.expect(matcher.matches(caller - 1));
+        if (!changed) try std.testing.expectEqual(original.functions.items.len, stats.reused);
+        for (saved, old.output(original_caller).?.instructions.items) |before, after| try std.testing.expectEqualDeep(before, after);
+    }
+}
+test "symbolic optimized bodies relocate imports signatures globals tables and runtime helpers on owned copies" {
+    try symbolicResources(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, symbolicResources, .{});
+}
+
+test "symbolic reuse survives insertion removal and reordering of unrelated resources" {
+    const a = std.testing.allocator;
+    // 0: no extra resource; 1: prefix; 2: suffix. The three transitions
+    // exercise insertion, reordering and removal without changing exports.
+    for (0..3) |phase| {
+        var before = try movedResources(a, phase == 1, false);
+        defer before.deinit();
+        var after = try movedResources(a, phase == 0, false);
+        defer after.deinit();
+        var suffix: ?*wasm.Module = null;
+        if (phase == 1) suffix = &after;
+        if (phase == 2) suffix = &before;
+        if (suffix) |module| {
+            const extra = try module.addFunction(&.{.f32}, .f32);
+            try module.emit(extra, .{ .op = .local_get });
+            _ = try module.importFunction("other", "unused", &.{}, .none);
+            _ = try module.addGlobal(.f32, 0x3f800000, false);
+        }
+        var old: retained.Capture = .{ .allocator = a };
+        defer old.deinit();
+        a.free(try before.assembleWithOptions(.{ .current = &old }));
+        var current: retained.Capture = .{ .allocator = a };
+        defer current.deinit();
+        var stats: retained.Stats = .{};
+        const reused = try after.assembleWithOptions(.{ .previous = &old, .current = &current, .stats = &stats });
+        defer a.free(reused);
+        const fresh = try after.assemble();
+        defer a.free(fresh);
+        try std.testing.expectEqualSlices(u8, fresh, reused);
+        try std.testing.expectEqual(@min(before.functions.items.len, after.functions.items.len), stats.reused);
+        var matcher = try retained.Matcher.init(a, &old, &current);
+        defer matcher.deinit();
+        for (after.exports.items) |exported| try std.testing.expect(matcher.matches(exported.index));
+    }
+}
+
+test "symbolic positional shortcut checks transitive external facts and introduced cleanup helpers" {
+    const a = std.testing.allocator;
+    for (0..3) |change| {
+        var module = try movedResources(a, false, false);
+        defer module.deinit();
+        const caller = module.exports.items[1].index;
+        const outer = try module.addFunction(&.{.i32}, .i32);
+        try module.emitSlice(outer, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = caller } });
+        var old: retained.Capture = .{ .allocator = a };
+        defer old.deinit();
+        a.free(try module.assembleWithOptions(.{ .current = &old }));
+        const saved = try a.dupe(wasm.Instruction, old.output(caller).?.instructions.items);
+        defer a.free(saved);
+        switch (change) {
+            0 => module.imports.items[0].name[0] = 'j',
+            1 => module.globals.items[module.globals.items.len - 1].bits += 1,
+            2 => {
+                const recycle = module.arena.?.recycle;
+                try std.testing.expect(for (saved) |inst| {
+                    if (inst.op == .call and inst.operand == recycle) break true;
+                } else false);
+                try module.emit(recycle, .{ .op = .nop });
+            },
+            else => unreachable,
+        }
+        var current: retained.Capture = .{ .allocator = a };
+        defer current.deinit();
+        const reused = try module.assembleWithOptions(.{ .previous = &old, .current = &current });
+        defer a.free(reused);
+        const fresh = try module.assemble();
+        defer a.free(fresh);
+        try std.testing.expectEqualSlices(u8, fresh, reused);
+        var matcher = try retained.Matcher.init(a, &old, &current);
+        defer matcher.deinit();
+        try std.testing.expect(!matcher.matches(caller));
+        if (change != 2) try std.testing.expect(!matcher.matches(outer));
+        for (saved, old.output(caller).?.instructions.items) |before, after| try std.testing.expectEqualDeep(before, after);
+    }
+}
+
+test "symbolic relocation rejects conflicting maps and exhausted proofs" {
+    const relocation = @import("runtime_body_relocation.zig");
+    const a = std.testing.allocator;
+    var walk: relocation.Walk = .{};
+    defer walk.deinit(a);
+    try std.testing.expect(try walk.add(a, .function, 1, 2));
+    try std.testing.expect(!try walk.add(a, .function, 1, 3));
+    try std.testing.expect(!try walk.add(a, .function, 3, 2));
+    // Equal integer indices in distinct namespaces never alias each other.
+    try std.testing.expect(try walk.add(a, .global, 1, 3));
+    walk.clear();
+    walk.remaining = 1;
+    try std.testing.expect(try walk.add(a, .function, 1, 2));
+    try std.testing.expect(!try walk.add(a, .function, 1, 2));
+    walk.clear();
+    try std.testing.expect(!try walk.add(a, .function, 1, 2));
+}
+
+fn duplicateTargets(a: std.mem.Allocator, split: bool) !wasm.Module {
+    var module = wasm.Module.init(a);
+    errdefer module.deinit();
+    const first = try module.addFunction(&.{.i32}, .i32);
+    try module.emit(first, .{ .op = .local_get });
+    var second = first;
+    if (split) {
+        second = try module.addFunction(&.{.i32}, .i32);
+        try module.emit(second, .{ .op = .local_get });
+    }
+    const caller = try module.addFunction(&.{.i32}, .i32);
+    try module.emitSlice(caller, &.{ .{ .op = .local_get }, .{ .op = .call, .operand = first }, .{ .op = .call, .operand = second } });
+    try module.exportFunction(first, "first", .u32, .u32);
+    if (split) try module.exportFunction(second, "second", .u32, .u32);
+    try module.exportFunction(caller, "caller", .u32, .u32);
+    return module;
+}
+test "symbolic body graph declines a split target while keeping duplicate public functions separate" {
+    const a = std.testing.allocator;
+    var original = try duplicateTargets(a, false);
+    defer original.deinit();
+    var old: retained.Capture = .{ .allocator = a };
+    defer old.deinit();
+    a.free(try original.assembleWithOptions(.{ .current = &old }));
+    var split = try duplicateTargets(a, true);
+    defer split.deinit();
+    var current: retained.Capture = .{ .allocator = a };
+    defer current.deinit();
+    var stats: retained.Stats = .{};
+    const reused = try split.assembleWithOptions(.{ .previous = &old, .current = &current, .stats = &stats });
+    defer a.free(reused);
+    const fresh = try split.assemble();
+    defer a.free(fresh);
+    try std.testing.expectEqualSlices(u8, fresh, reused);
+    try std.testing.expectEqual(@as(usize, 2), stats.reused);
+    var matcher = try retained.Matcher.init(a, &old, &current);
+    defer matcher.deinit();
+    try std.testing.expect(matcher.matches(0) and matcher.matches(1));
+    try std.testing.expect(!matcher.matches(2));
+}
+
+test "symbolic optimizer inputs include checked parameter roles even when encoded bodies are equal" {
+    const a = std.testing.allocator;
+    var module = wasm.Module.init(a);
+    defer module.deinit();
+    const id = try module.addFunction(&.{.i32}, .i32);
+    try module.emit(id, .{ .op = .local_get });
+    try module.setParameterRoles(id, @import("runtime_ir.zig").packParameterRoles(&.{.scalar}));
+    var old: retained.Capture = .{ .allocator = a };
+    defer old.deinit();
+    a.free(try module.assembleWithOptions(.{ .current = &old }));
+    try module.setParameterRoles(id, @import("runtime_ir.zig").packParameterRoles(&.{.reference}));
+    var current: retained.Capture = .{ .allocator = a };
+    defer current.deinit();
+    var stats: retained.Stats = .{};
+    const reused = try module.assembleWithOptions(.{ .previous = &old, .current = &current, .stats = &stats });
+    defer a.free(reused);
+    const fresh = try module.assemble();
+    defer a.free(fresh);
+    try std.testing.expectEqualSlices(u8, fresh, reused);
     try std.testing.expectEqual(@as(usize, 0), stats.reused);
 }

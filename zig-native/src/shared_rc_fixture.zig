@@ -7,6 +7,11 @@ pub fn main(init: std.process.Init) !void {
     var module = wasm.Module.init(init.gpa);
     defer module.deinit();
     const arena = try module.ensureArena();
+    module.globals.items[arena.root_enabled].bits = 1;
+    inline for (.{ "root_allocate", "root_reserve", "root_open", "root_close", "root_enter", "root_leave" }) |name|
+        try module.exportFunction(@field(arena, name), name, .u32, .u32);
+    try module.exportGlobal(arena.root_count, "roots");
+    try module.exportGlobal(arena.heap, "heap");
     const noop = try module.addFunction(&.{.i32}, .none);
     try module.exportFunction(noop, "noop", .u32, .u32);
     inline for (.{ "allocate_typed", "retain", "release", "release_lease", "store_word", "copy_words", "reset" }) |name|

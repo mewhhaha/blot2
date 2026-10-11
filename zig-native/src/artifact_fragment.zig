@@ -311,8 +311,8 @@ pub const State = struct {
                 if (operand.value >= self.old.emission.functions.len) break :blk false;
                 const function = self.old.emission.functions[operand.value];
                 if (self.staticHelper(function, owner)) break :blk true;
-                if (function.owner == 0) break :blk switch (function.role) {
-                    .arena_allocate, .arena_allocate_scalar, .arena_recycle, .arena_reset, .arena_mark, .arena_collect, .arena_allocate_typed, .arena_retain, .arena_release, .arena_release_lease, .arena_retire, .arena_free, .arena_store_word, .arena_copy_words, .arena_decrement, .host_retain, .host_release, .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut => true,
+                if (function.owner == 0) break :blk arenaFunction(function.role) or switch (function.role) {
+                    .host_retain, .host_release, .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut => true,
                     else => false,
                 };
                 break :blk try self.importer.importRequest(g, self.old.metadata.jobs.items[function.owner - 1].request) != null;
@@ -411,6 +411,7 @@ pub const State = struct {
                 .data => |item| if (item.bytes.len % 4 != 0) return false,
                 .operation_symbol => |item| if (!try self.importer.admitOperation(g, item.id)) return false,
                 .demand => |item| if (item.kind == .operation and !try self.importer.admitOperation(g, item.id)) return false,
+                .mutable_static, .static_field => {},
                 .export_, .start, .public_arena => return false,
                 else => {},
             }
@@ -482,6 +483,20 @@ pub const State = struct {
             else => error.InvalidFunctionReference,
         };
     }
+    fn arenaFunction(role: emitter.FunctionRole) bool {
+        inline for (Arena.function_fields) |field| {
+            if (role == @field(emitter.FunctionRole, "arena_" ++ field)) return true;
+        }
+        return false;
+    }
+    fn ensureRuntimeFunction(self: *State, g: anytype, role: emitter.FunctionRole) Error!void {
+        if (arenaFunction(role)) return self.ensureArena(g);
+        switch (role) {
+            .host_retain, .host_release => try self.ensureHost(g),
+            .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut => try self.ensureLists(g),
+            else => return error.InvalidFunctionReference,
+        }
+    }
     fn resolveFunction(self: *State, g: anytype, id: u32) Error!u32 {
         if (id >= self.functions.len) return error.InvalidFunctionReference;
         if (self.functions[id] != absent) return self.functions[id];
@@ -491,12 +506,7 @@ pub const State = struct {
             self.functions[id] = try g.replayRequest(request);
             return self.functions[id];
         }
-        switch (function_.role) {
-            .arena_allocate, .arena_allocate_scalar, .arena_recycle, .arena_reset, .arena_mark, .arena_collect, .arena_allocate_typed, .arena_retain, .arena_release, .arena_release_lease, .arena_retire, .arena_free, .arena_store_word, .arena_copy_words, .arena_decrement => try self.ensureArena(g),
-            .host_retain, .host_release => try self.ensureHost(g),
-            .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut => try self.ensureLists(g),
-            else => return error.InvalidFunctionReference,
-        }
+        try self.ensureRuntimeFunction(g, function_.role);
         return self.functions[id];
     }
     fn importFunction(self: *State, g: anytype, id: u32) Error!u32 {
@@ -571,19 +581,14 @@ pub const State = struct {
                 .function => |item| {
                     const fact = self.old.emission.functions[item.id];
                     if (fact.owner != 0) {
-                        const actual = try g.module.addFunctionForSignature(try self.signature(g, item.signature));
+                        const actual = try g.module.addTypedFunctionForSignature(try self.signature(g, item.signature), item.result_role);
                         self.functions[item.id] = actual;
                         try g.publishRetained(request, actual);
                     } else if (self.staticHelper(fact, record.owner)) {
-                        const actual = try g.module.addFunctionForSignature(try self.signature(g, item.signature));
+                        const actual = try g.module.addTypedFunctionForSignature(try self.signature(g, item.signature), item.result_role);
                         self.functions[item.id] = actual;
                         try g.publishRetainedStatic(actual);
-                    } else switch (fact.role) {
-                        .arena_allocate, .arena_allocate_scalar, .arena_recycle, .arena_reset, .arena_mark, .arena_collect, .arena_allocate_typed, .arena_retain, .arena_release, .arena_release_lease, .arena_retire, .arena_free, .arena_store_word, .arena_copy_words, .arena_decrement => try self.ensureArena(g),
-                        .host_retain, .host_release => try self.ensureHost(g),
-                        .list_new, .list_address, .list_copy, .list_push, .list_set, .list_from_array, .list_to_array, .list_chunk_new, .list_edit, .list_branch, .list_own, .list_insert, .list_replace, .list_refresh, .list_rotate_left, .list_rotate_right, .list_balance, .list_concat, .list_slice, .list_join, .list_cut => try self.ensureLists(g),
-                        else => return error.InvalidFunctionReference,
-                    }
+                    } else try self.ensureRuntimeFunction(g, fact.role);
                 },
                 .local => |item| if (self.old.emission.functions[item.function].owner != 0 or self.staticHelper(self.old.emission.functions[item.function], record.owner)) {
                     _ = try g.module.addLocal(try self.resolveFunction(g, item.function), item.ty);
@@ -628,6 +633,8 @@ pub const State = struct {
                     else => {},
                 },
                 .global_bits => {}, // staticBytes updates the shared arena end.
+                .mutable_static => g.module.mutable_static = true,
+                .static_field => |item| try g.module.staticField(try self.resolveAddress(item.address), item.role),
                 .export_, .start, .public_arena => return error.InvalidFunctionReference,
             }
         }

@@ -172,12 +172,24 @@ pub const Summaries = struct {
                 // An embedded alias (including a self/back edge) could escape
                 // through a later shallow copy in the caller. Such results
                 // need an ownership-graph summary before callers may free them.
+                // Outgoing fields also outlive a load: the borrowed child can
+                // remain on the operand stack after its parent was last read.
                 var embedded = false;
                 for (state.references.items) |reference| if (reference.child.owner == state.result_owner) {
                     embedded = true;
                     break;
                 };
-                if (!result.parameter and !result.escaped and !embedded) summary.owned_result_bytes = result.size;
+                var owns_fields = result.references != absent;
+                if (result.rc_mask) |mask| owns_fields = owns_fields or mask != 0;
+                if (result.annotations != absent) {
+                    const roles = function.instructions.items[result.annotations..][0..result.annotation_count];
+                    // One word beyond the bounded explicit run checks its rest role.
+                    const checked = @min(result.size / 4, 16 * ir.Ownership.words_per_chunk + 1);
+                    for (0..checked) |word| {
+                        if (ir.Ownership.wordRole(roles, word) != .scalar) owns_fields = true;
+                    }
+                }
+                if (!result.parameter and !result.escaped and !embedded and !owns_fields) summary.owned_result_bytes = result.size;
             }
         }
         summary.state = .done;
@@ -406,7 +418,28 @@ const Analysis = struct {
         for (function.instructions.items, 0..) |inst, index| {
             self.at = @intCast(index);
             switch (inst.op) {
-                .i32_const => try self.push(.{ .constant = inst.operand }),
+                .ownership => {
+                    const scope: ir.Ownership = @bitCast(inst.operand);
+                    if (scope.kind != .scope) continue;
+                    switch (scope.chunk) {
+                        // Published/moved aliases outlive the local allocation group.
+                        2, 5, 6 => try self.escape(self.locals[scope.roles]),
+                        3 => {
+                            try self.escape(self.locals[scope.roles]);
+                            self.locals[scope.roles] = .{};
+                        },
+                        4 => {
+                            try self.use(self.locals[scope.roles & 8191]);
+                            try self.escape(self.locals[scope.roles >> 13]);
+                        },
+                        else => {},
+                    }
+                },
+                .i32_const => {
+                    var value: Value = .{};
+                    if (!inst.table_reference) value.constant = inst.operand;
+                    try self.push(value);
+                },
                 .f32_const, .global_get, .memory_size, .host_ref_null, .host_ref_size => try self.push(.{}),
                 .local_get => {
                     var value = self.locals[inst.operand];
@@ -468,6 +501,13 @@ const Analysis = struct {
                     const address = self.pop();
                     const reference = if (inst.op == .i32_load) self.field(address, inst.operand) else null;
                     try self.memory(address, inst.operand, ir.fixed(inst.op).bytes, .read, reference orelse absent);
+                    if (inst.op == .i32_load and reference == null and address.owner != 0) {
+                        const parent = self.allocations.items[address.owner - 1];
+                        const offset = std.math.add(u32, address.offset, inst.operand) catch absent;
+                        if ((parent.rc_mask != null and @import("runtime_layout.zig").referenceWord(parent.rc_mask.?, offset / 4)) or
+                            (parent.annotations != absent and ir.Ownership.wordRole(self.instructions[parent.annotations..][0..parent.annotation_count], offset / 4) != .scalar))
+                            try self.escape(address);
+                    }
                     try self.push(if (reference) |id| self.references.items[id].child else .{});
                 },
                 .i32_store, .f32_store, .v128_store => {
@@ -489,6 +529,9 @@ const Analysis = struct {
                     const target = self.pop();
                     if (inst.op == .memory_copy and target.owner != 0) {
                         try self.rc_writes.append(self.a, .{ .at = self.at, .owner = target.owner, .kind = .copy });
+                    } else if (inst.op == .memory_fill and target.owner != 0 and source.constant == 0 and target.offset == 0 and bytes.constant == self.allocations.items[target.owner - 1].size and self.allocations.items[target.owner - 1].accesses == absent and !self.allocations.items[target.owner - 1].escaped) {
+                        // Clearing an untouched fresh object cannot remove an
+                        // owning edge. Later fills remain outside this proof.
                     } else self.rc_valid = false;
                     try self.memory(target, 0, bytes.constant, .write, absent);
                 },
@@ -1061,6 +1104,48 @@ test "capturing an argument in a private record is not a borrowed-parameter summ
     try std.testing.expect((try summaries.get(factory)).parameters[0].escapes);
 }
 
+fn returnedGraph(a: A) !void {
+    for (0..3) |scenario| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const factory = try module.addTypedFunction(&.{.i32}, .i32, .reference);
+        try module.setParameterRoles(factory, ir.packParameterRoles(&.{.reference}));
+        const parent = try module.addLocal(factory, .i32);
+        const child = try module.addLocal(factory, .i32);
+        if (scenario == 1) try module.emitSlice(factory, &.{
+            .{ .op = .i32_const, .operand = 4 },               .{ .op = .i32_const },
+            .{ .op = .call, .operand = arena.allocate_typed }, .{ .op = .local_set, .operand = child },
+        });
+        try module.emitSlice(factory, &.{
+            .{ .op = .i32_const, .operand = 8 },               .{ .op = .i32_const, .operand = if (scenario == 0) 0 else 2 },
+            .{ .op = .call, .operand = arena.allocate_typed }, .{ .op = .local_set, .operand = parent },
+            .{ .op = .local_get, .operand = parent },          .{ .op = if (scenario == 0) .i32_const else .local_get, .operand = if (scenario == 1) child else 0 },
+            .{ .op = .i32_store, .operand = 4 },               .{ .op = .local_get, .operand = parent },
+        });
+        const consumer = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+        try module.setParameterRoles(consumer, ir.packParameterRoles(&.{.reference}));
+        const object = try module.addLocal(consumer, .i32);
+        try module.emitSlice(consumer, &.{
+            .{ .op = .local_get },                    .{ .op = .call, .operand = factory }, .{ .op = .local_set, .operand = object },
+            .{ .op = .local_get, .operand = object }, .{ .op = .i32_load, .operand = 4 },   .{ .op = .i32_load },
+        });
+        var summaries = try Summaries.init(a, &module);
+        defer summaries.deinit();
+        const summary = try summaries.get(factory);
+        if (scenario == 0) try std.testing.expectEqual(@as(?u32, 8), summary.owned_result_bytes) else try std.testing.expectEqual(@as(?u32, null), summary.owned_result_bytes);
+        var plan = try analyzeWithSummaries(a, &module, &module.functions.items[consumer], &summaries);
+        defer plan.deinit(a);
+        // Scalar pointer-looking words still allow one-allocation ownership.
+        // Owning child fields must not retire while their loaded borrow runs.
+        try std.testing.expectEqual(@as(usize, if (scenario == 0) 1 else 0), plan.releases.items.len);
+    }
+}
+test "fresh-result summaries preserve owning child borrows through later consumption and OOM" {
+    try returnedGraph(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, returnedGraph, .{});
+}
+
 test "fresh-result summaries do not hide an embedded self alias from later shallow copies" {
     const a = std.testing.allocator;
     var module = w.Module.init(a);
@@ -1219,7 +1304,7 @@ pub fn rcPlan(a: A, module: *const w.Module, function: *const w.Function, summar
     defer state.deinit();
     try state.scan(module, function);
     plan.admitted = state.valid and state.rc_valid;
-    for (state.allocations.items) |owner| {
+    for (state.allocations.items) |*owner| {
         const inst = function.instructions.items[owner.definition];
         if (inst.op != .call or !module.arena.?.isAllocation(inst.operand)) continue;
         var mask: u32 = 0;
@@ -1247,6 +1332,7 @@ pub fn rcPlan(a: A, module: *const w.Module, function: *const w.Function, summar
                 }
             }
         }
+        owner.rc_mask = mask;
         try plan.allocations.append(a, .{ .at = owner.definition, .mask = mask });
     }
     // Every raw allocation is accounted for, including unknown dynamic sizes.
@@ -1256,7 +1342,11 @@ pub fn rcPlan(a: A, module: *const w.Module, function: *const w.Function, summar
     };
     if (calls != plan.allocations.items.len) plan.admitted = false;
     for (state.rc_writes.items) |write| {
-        const local = state.allocations.items[write.owner - 1].local;
+        const owner = state.allocations.items[write.owner - 1];
+        // A checked all-scalar allocation owns no payload edges. Preserve its
+        // original stores/copies instead of checking reference fields again.
+        if (owner.rc_mask == 0) continue;
+        const local = owner.local;
         if (local == absent) {
             plan.admitted = false;
             continue;
@@ -1292,4 +1382,31 @@ pub fn runRc(a: A, module: *const w.Module, function: *const w.Function, summari
         } else try out.instructions.append(a, inst);
     }
     return out;
+}
+
+fn opaqueChild(a: A) !void {
+    for ([_]u32{ 0, 1 }) |mask| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const function = try module.addTypedFunction(&.{.i32}, .i32, .scalar);
+        try module.setParameterRoles(function, ir.packParameterRoles(&.{.reference}));
+        const parent = try module.addLocal(function, .i32);
+        try module.emitSlice(function, &.{
+            .{ .op = .i32_const, .operand = 4 },               .{ .op = .i32_const, .operand = mask },
+            .{ .op = .call, .operand = arena.allocate_typed }, .{ .op = .local_set, .operand = parent },
+            .{ .op = .local_get, .operand = parent },          .{ .op = .local_get },
+            .{ .op = .i32_store },                             .{ .op = .local_get, .operand = parent },
+            .{ .op = .i32_load },                              .{ .op = .i32_load },
+        });
+        var plan = try analyze(a, &module, &module.functions.items[function]);
+        defer plan.deinit(a);
+        // The borrowed child has no allocation provenance in this frame.
+        // Releasing its owning parent at the first load would invalidate it.
+        try std.testing.expectEqual(@as(usize, if (mask == 0) 1 else 0), plan.releases.items.len);
+    }
+}
+test "typed opaque child loads keep owning parents alive through consumption and OOM" {
+    try opaqueChild(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, opaqueChild, .{});
 }

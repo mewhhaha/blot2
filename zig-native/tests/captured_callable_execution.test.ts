@@ -135,3 +135,41 @@ Deno.test("retained callable rejects captured-wrong-input", async () => {
 Deno.test("retained callable rejects captured-unknown-source", async () => {
   await compileExpectedFailure("const make = fn value => fn other => value\nconst ignored = make (fn value => value)\nentry const answer = fn () => ignored 1\n", "entry_type", undefined, { prelude: "none" });
 });
+
+Deno.test("curried callable environments stay owned until consumption and retire after each invocation", async () => {
+  await compileAndRun(
+    `
+type Box is data = #Box { value: U32 }
+const Box.plus = fn box => fn delta => @u32.add box.value delta
+const invoke: a -> U32 where { receiver "plus" a Unit (U32 -> U32) } = fn box => do:
+  let bound = box.plus
+  return bound 1
+entry const answer = fn (value: U32) => invoke (#Box { value: value })
+`,
+    (_guest, bytes) => {
+      const module = new WebAssembly.Module(bytes);
+      const manifest = new Uint8Array(
+        WebAssembly.Module.customSections(module, "blot:ownership")[0],
+      );
+      equal(manifest.join(","), "2,2,0");
+      const raw = new WebAssembly.Instance(module).exports;
+      const count = (name: string) =>
+        Number((raw[`blot:rc_${name}`] as WebAssembly.Global).value);
+      const answer = raw.answer as CallableFunction;
+      for (let index = 0; index < 64; index++) equal(answer(41), 42);
+      const retired = count("destroyed");
+      for (let index = 0; index < 2048; index++) {
+        equal(answer(index), index + 1);
+        equal(count("roots"), 0);
+        equal(count("leases"), 0);
+      }
+      if (count("destroyed") < retired + 2048 * 4) {
+        throw new Error(
+          "Callable graphs did not retire",
+        );
+      }
+      (raw["blot:ownership_leave"] as CallableFunction)(2);
+    },
+    { prelude: "none", asynchronous: false },
+  );
+});

@@ -25,6 +25,96 @@ fn emit(a: std.mem.Allocator, module: *const core.Module) !void {
     try std.testing.expect(result.bytes.len > 8);
 }
 
+test "local memo proof admits structured loops and aliases without mutating Core" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\const sum = fn (count: U32) => fn ~(value: U32) => do:
+        \\  let first = value
+        \\  let second = first
+        \\  let total = 0
+        \\  for i in 0..count:
+        \\    if @u32.eq i 1:
+        \\      total := @u32.add self (@demand second)
+        \\    else:
+        \\      total := @u32.add self (@demand first)
+        \\  return total
+        \\entry const run = fn (count: U32) => sum count 21
+    );
+    defer module.deinit(a);
+    var admitted = false;
+    for (module.bodies) |*body| if (demand.Plan.init(&module, body)) |plan| {
+        admitted = true;
+        try std.testing.expectEqual(@as(u8, 2), plan.uses[1]);
+    };
+    try std.testing.expect(admitted);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}
+
+test "local memo structured proof retains conservative escape and provider fallback" {
+    const a = std.testing.allocator;
+    for ([_][]const u8{
+        "const delay = fn ~(value: U32) => do:\n  return value\nentry const run = 42\n",
+        "const keep = fn ~(value: U32) => { callback: fn () => @demand value }\nentry const run = 42\n",
+        "type Tick is effect = { read: Unit -> U32 }\nconst scoped = fn ~(value: U32) => do (@effect.provider Tick.read (fn () => 1)):\n  return @demand value\nentry const run = 42\n",
+    }) |source| {
+        var module = try lower(a, source);
+        defer module.deinit(a);
+        for (module.bodies) |*body| {
+            if (body.parameters.len == 0) continue;
+            try std.testing.expect(demand.Plan.init(&module, body) == null);
+        }
+    }
+}
+
+test "local memo structured proof exhaustion preserves ordinary emission" {
+    const a = std.testing.allocator;
+    var text: std.ArrayList(u8) = .empty;
+    defer text.deinit(a);
+    try text.appendSlice(a, "const many = fn ~(value: U32) => do:\n  let total = @demand value\n");
+    for (0..100) |_| try text.appendSlice(a, "  total := @u32.add self 1\n");
+    try text.appendSlice(a, "  return total\nentry const run = fn (value: U32) => many value\n");
+    var module = try lower(a, text.items);
+    defer module.deinit(a);
+    for (module.bodies) |*body| try std.testing.expect(demand.Plan.init(&module, body) == null);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    try emit(a, &module);
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}
+
+test "local memo List cleanup snapshots and managed loop roots release every allocation failure" {
+    const a = std.testing.allocator;
+    var module = try lower(a,
+        \\const walk = fn (rows: List U32) => fn ~(value: U32) => do:
+        \\  let total = 0
+        \\  for row in rows:
+        \\    total := @u32.add self (@u32.add row (@demand value))
+        \\  return total
+        \\const cache = fn (count: U32) => fn ~(value: Array U32) => do:
+        \\  let i = 0
+        \\  for ever:
+        \\    let pressure = @array.fill 1024 i
+        \\    let cached = @demand value
+        \\    i := @u32.add (@array.get pressure 0) 1
+        \\    if @u32.eq i count:
+        \\      return cached
+        \\entry const lists = fn (count: U32) => walk (@list.fill count 42) 21
+        \\entry const arrays = fn (count: U32) => cache count #[21, 22, 23]
+    );
+    defer module.deinit(a);
+    var admitted: usize = 0;
+    for (module.bodies) |*body| if (demand.Plan.init(&module, body) != null) {
+        admitted += 1;
+    };
+    try std.testing.expectEqual(@as(usize, 2), admitted);
+    const before = @import("core_snapshot_tests.zig").stamp(module);
+    try emit(a, &module);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
+    try std.testing.expectEqual(before, @import("core_snapshot_tests.zig").stamp(module));
+}
+
 test "demand forwarding bounds nested proofs and preserves immutable Core under allocation failure" {
     const a = std.testing.allocator;
     var module = try lower(a,

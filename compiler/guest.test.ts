@@ -529,3 +529,53 @@ Deno.test("array ABI rejects malformed guest pointers and length headers", async
     guest.dispose();
   }
 });
+
+function rootAbiModule(
+  enterType = [96, 0, 0],
+  leaveType = [96, 1, 127, 0],
+  enterBody = [0, 11],
+  leaveBody = [0, 11],
+): WebAssembly.Module {
+  const counters = ["leases", "retains", "releases", "destroyed", "roots"];
+  return wasm(
+    section(1, [2, ...enterType, ...leaveType]),
+    section(3, [2, 0, 1]),
+    section(6, [5, ...counters.flatMap(() => [127, 1, 65, 0, 11])]),
+    section(7, [
+      7,
+      ...name("blot:ownership_enter"),
+      0,
+      0,
+      ...name("blot:ownership_leave"),
+      0,
+      1,
+      ...counters.flatMap((
+        counter,
+        index,
+      ) => [...name(`blot:rc_${counter}`), 3, index]),
+    ]),
+    section(10, [
+      2,
+      ...leb(enterBody.length),
+      ...enterBody,
+      ...leb(leaveBody.length),
+      ...leaveBody,
+    ]),
+    manifest([3, 0, 0]),
+    section(0, [...name("blot:ownership"), 2, 2, 0]),
+  );
+}
+Deno.test("ABI v3 validates both ownership signatures before entering the guest", async () => {
+  const guest = await instantiateGuest(rootAbiModule());
+  equal(guest.abi.version, 3);
+  guest.dispose();
+  for (
+    const module of [
+      rootAbiModule([96, 1, 127, 0]),
+      rootAbiModule([96, 0, 1, 127], undefined, [0, 65, 0, 11]),
+      rootAbiModule(undefined, [96, 0, 0]),
+      rootAbiModule(undefined, [96, 1, 125, 0]),
+      rootAbiModule(undefined, [96, 1, 127, 1, 127], undefined, [0, 65, 0, 11]),
+    ]
+  ) await rejects(() => instantiateGuest(module), errorCode("invalid_abi"));
+});

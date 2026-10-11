@@ -150,10 +150,22 @@ pub const Role = enum(u2) {
 /// pass removed the allocation, an annotation describes nothing.
 pub const Ownership = packed struct(u32) {
     pub const words_per_chunk = 13;
-    pub const Kind = enum(u2) { words, rest, _ };
+    pub const Kind = enum(u2) { words, rest, scope, _ };
     kind: Kind,
     chunk: u4 = 0,
     roles: u26 = 0,
+
+    /// Scope operands refer to locals even though they have no machine stack effect.
+    pub fn relocated(self: Ownership, base: u32) Ownership {
+        var result = self;
+        if (self.kind != .scope) return result;
+        switch (self.chunk) {
+            2, 3, 5, 6 => result.roles = @intCast(self.roles + base),
+            4 => result.roles = @intCast((self.roles & 8191) + base + ((self.roles >> 13) + base) * 8192),
+            else => {},
+        }
+        return result;
+    }
 
     pub fn role(self: Ownership, index: usize) Role {
         return @fromBackingInt(@intCast(@as(u2, @truncate(self.roles >> @intCast(index * 2)))));
@@ -232,6 +244,9 @@ pub const SignatureId = enum(u32) { _ };
 pub const Instruction = struct {
     op: Op,
     operand: u32 = 0,
+    /// A table slot is a symbolic function target, never an integer literal.
+    /// This flag occupies existing padding in the eight-byte instruction.
+    table_reference: bool = false,
 
     pub fn callee(self: Instruction) FunctionId {
         std.debug.assert(self.op == .call);
@@ -250,6 +265,10 @@ pub const Signature = struct { parameters: []ValueType, result: ValueType };
 pub const Function = struct {
     parameters: []ValueType,
     result: ValueType,
+    /// Checked language result, independently of the machine result type.
+    result_role: Role = .unknown,
+    /// Public invocation wrapper, with its own outer ownership frame.
+    entry: bool = false,
     signature: u32,
     /// Parameter roles from checked layouts, two bits per parameter (see
     /// `parameterRole`). Zero leaves every parameter unknown.
@@ -370,7 +389,7 @@ pub fn call(module: *const @import("wasm.zig").Module, inst: Instruction) Call {
             if (module.arena) |arena| {
                 if (inst.operand == arena.allocate) result.ownership = .allocate;
                 if (inst.operand == arena.allocate_scalar) result.ownership = .allocate_scalar;
-                if (inst.operand == arena.allocate_typed) result.ownership = .allocate_typed;
+                if (inst.operand == arena.allocate_typed or inst.operand == arena.root_allocate) result.ownership = .allocate_typed;
                 if (inst.operand == arena.recycle) result.ownership = .release;
                 if (inst.operand == arena.collect or inst.operand == arena.reset) result.ownership = .collect;
             }
@@ -474,4 +493,8 @@ test "parameter roles pack two bits per parameter" {
     try std.testing.expectEqual(Role.unknown, function.parameterRole(40));
     function.parameter_roles = 0;
     try std.testing.expectEqual(Role.unknown, function.parameterRole(0));
+}
+
+test "symbolic table references retain the compact instruction footprint" {
+    try std.testing.expectEqual(@as(usize, 8), @sizeOf(Instruction));
 }

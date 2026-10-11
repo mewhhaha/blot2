@@ -125,6 +125,7 @@ fn releaseLease(c: Code, a: w.Arena) Error!void {
     const p: Local = .{ .id = 0 };
     const head = try dynamic(c, a);
     try c.trap(.{ .i32_eqz, .{ .i32_and, .{ .load, head, f.flags }, lease } });
+    try @import("root_runtime.zig").detach(c, a, head);
     try c.store(head, f.flags, .{ .i32_and, .{ .load, head, f.flags }, ~lease });
     try c.value(.{ .i32_sub, .{ .global, a.rc_leases }, 1 });
     try c.op(.global_set, a.rc_leases);
@@ -178,8 +179,26 @@ fn store(c: Code, a: w.Arena) Error!void {
     const old = try c.temp();
     try c.when(.{ .global, a.rc_enabled });
     try c.when(.{ .i32_lt_u, parent, .{ .global, a.static_end } });
-    // Reserved empty descriptors permit only idempotent metadata writes.
-    // Other static mutable roots force whole-module tracing admission.
+    // Static mutable fields have checked roles and permanent owner-table
+    // slots. All other static storage permits only idempotent writes.
+    try c.when(.{ .global, a.root_enabled });
+    const index = try c.temp();
+    const field = try c.temp();
+    const slot = try c.temp();
+    try c.set(index, 0);
+    try c.loop(.{ .i32_lt_u, index, .{ .global, a.root_static_count } });
+    try c.set(field, .{ .load, .{ .cell, .{ .global, a.root_static_map }, index, 0 }, 0 });
+    try c.when(.{ .i32_eq, .{ .i32_and, field, ~@as(u32, 3) }, address });
+    try c.when(.{ .i32_eq, .{ .i32_and, field, 3 }, @backingInt(@import("runtime_ir.zig").Role.reference) });
+    try c.set(slot, .{ .cell, .{ .global, a.root_globals }, .{ .i32_add, .{ .global, a.root_global_count }, index }, 0 });
+    try c.value(.{ .call, a.store_word, .{ .global, a.root_globals }, slot, value });
+    try c.end();
+    try c.store(address, 0, value);
+    try c.op(.return_, 0);
+    try c.end();
+    try c.set(index, .{ .i32_add, index, 1 });
+    try c.again();
+    try c.end();
     try c.trap(.{ .i32_ne, .{ .load, address, 0 }, value });
     try c.op(.return_, 0);
     try c.end();

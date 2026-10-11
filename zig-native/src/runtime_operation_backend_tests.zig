@@ -254,6 +254,6 @@ fn emitTypedCollections(allocator: std.mem.Allocator, module: *const core.Module
     defer result.deinit(allocator);
     try std.testing.expectEqual(@as(?backend.Diagnostic, null), result.diagnostic);
     const marker = "blot:ownership";
-    const offset = std.mem.find(u8, result.bytes, marker) orelse return error.TestExpectedOwnershipManifest;
-    try std.testing.expectEqual(@as(u8, 1), result.bytes[offset + marker.len + 1]);
+    const offset = std.mem.findLast(u8, result.bytes, marker) orelse return error.TestExpectedOwnershipManifest;
+    try std.testing.expectEqualSlices(u8, &.{ 2, 2, 0 }, result.bytes[offset + marker.len ..][0..3]);
 }

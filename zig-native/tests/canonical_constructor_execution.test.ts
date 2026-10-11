@@ -134,3 +134,24 @@ Deno.test("canonical generic constructors preserve independent quantified State 
   }
  },{asynchronous});
 });
+
+Deno.test("typed State results retain final nominal children through cleanup and retire invocation graphs", async () => {
+  await compileAndRun(stateSource, (_guest, bytes) => {
+    const module = new WebAssembly.Module(bytes);
+    const manifest = new Uint8Array(WebAssembly.Module.customSections(module, "blot:ownership")[0]);
+    equal(manifest.join(","), "2,2,0");
+    const raw = new WebAssembly.Instance(module).exports;
+    const count = (name: string) => Number((raw[`blot:rc_${name}`] as WebAssembly.Global).value);
+    const roots = count("roots"), leases = count("leases"), retired = count("destroyed");
+    for (let value = 0; value < 1024; value++) {
+      equal((raw.unsigned_state as CallableFunction)(value), 2 * (value + 1));
+      equal((raw.floating_state as CallableFunction)(value + 0.25), 2 * (value + 1.25));
+      equal(count("roots"), roots);
+      equal(count("leases"), leases);
+    }
+    if (count("destroyed") <= retired + 2048) throw new Error("State graphs did not retire");
+    (raw["blot:ownership_leave"] as CallableFunction)(2);
+    equal(count("roots"), 0);
+    equal(count("leases"), 0);
+  });
+});

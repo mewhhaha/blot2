@@ -366,7 +366,7 @@ fn collect(module: *wasm.Module, arena: wasm.Arena) Error!void {
     const slot = try module.addLocal(arena.collect, .i32);
     const limit = try module.addLocal(arena.collect, .i32);
     const size = try module.addLocal(arena.collect, .i32);
-    const code = [_]wasm.Instruction{
+    const clamp_floor = [_]wasm.Instruction{
         .{ .op = .local_get, .operand = floor },
         .{ .op = .global_get, .operand = arena.base },
         .{ .op = .i32_lt_u },
@@ -374,6 +374,8 @@ fn collect(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .global_get, .operand = arena.base },
         .{ .op = .local_set, .operand = floor },
         .{ .op = .end },
+    };
+    const prefix = [_]wasm.Instruction{
         .{ .op = .i32_const, .operand = 4 },
         .{ .op = .i32_load },
         .{ .op = .local_set, .operand = head },
@@ -479,6 +481,8 @@ fn collect(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .i32_const, .operand = 8 },
         .{ .op = .i32_const, .operand = 0 },
         .{ .op = .i32_store },
+    };
+    const static_mark = [_]wasm.Instruction{
         .{ .op = .i32_const, .operand = 256 },
         .{ .op = .local_set, .operand = slot },
         .{ .op = .block },
@@ -500,6 +504,8 @@ fn collect(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .br, .operand = 0 },
         .{ .op = .end },
         .{ .op = .end },
+    };
+    const suffix = [_]wasm.Instruction{
         .{ .op = .i32_const, .operand = 4 },
         .{ .op = .i32_load },
         .{ .op = .local_set, .operand = head },
@@ -529,6 +535,9 @@ fn collect(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .local_get, .operand = count },
         .{ .op = .call, .operand = arena.mark },
         .{ .op = .drop },
+        .{ .op = .local_get, .operand = index },
+        .{ .op = .local_get, .operand = count },
+        .{ .op = .call, .operand = arena.root_mark },
         .{ .op = .block },
         .{ .op = .loop },
         .{ .op = .i32_const, .operand = 8 },
@@ -559,7 +568,20 @@ fn collect(module: *wasm.Module, arena: wasm.Arena) Error!void {
         .{ .op = .i32_ge_u },
         .{ .op = .br_if, .operand = 1 },
     };
-    try module.emitSlice(arena.collect, &code);
+    try module.emitSlice(arena.collect, &.{
+        .{ .op = .global_get, .operand = arena.root_enabled },
+        .{ .op = .if_ },
+        .{ .op = .global_get, .operand = arena.static_end },
+        .{ .op = .local_set, .operand = floor },
+        .{ .op = .else_ },
+    });
+    try module.emitSlice(arena.collect, &clamp_floor);
+    try module.emit(arena.collect, .{ .op = .end });
+    try module.emitSlice(arena.collect, &prefix);
+    try module.emitSlice(arena.collect, &.{ .{ .op = .global_get, .operand = arena.root_enabled }, .{ .op = .i32_eqz }, .{ .op = .if_ } });
+    try module.emitSlice(arena.collect, &static_mark);
+    try module.emit(arena.collect, .{ .op = .end });
+    try module.emitSlice(arena.collect, &suffix);
     const trace_code: @import("runtime_code.zig").Code = .{ .module = module, .function = arena.collect };
     try trace_code.value(.{ .i32_and, .{ .load, @import("runtime_code.zig").Local{ .id = head }, heap.offset(heap.ArenaHeader, "flags") }, @import("shared_rc.zig").counted });
     try trace_code.op(.if_, 0x7f);

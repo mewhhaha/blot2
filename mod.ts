@@ -198,3 +198,9 @@ export async function createCompiler(
     throw error;
   }
 }
+export {
+  installPackages,
+  type PackageOptions,
+  type PackageProject,
+  resolveProject,
+} from "./compiler/packages.ts";

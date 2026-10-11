@@ -220,8 +220,13 @@ fn validRecord(record: Record, snapshot: *const Snapshot) format.Error!void {
     const nodes = evaluator.evidence.nodes.len;
     const key = record.key;
     const proof = record.dependencies;
-    try require(key.input != 0 and key.input < values and evaluator.values[key.input].kind == .closure);
-    try require(record.result.selected < values and key.expected != 0 and key.expected < nodes and evaluator.evidence.nodes[key.expected].tag == .function);
+    try require(key.input != 0 and key.input < values);
+    const expected_kind: @import("type_evidence.zig").Tag = switch (evaluator.values[key.input].kind) {
+        .closure => .function,
+        .suspension => .demand,
+        else => return error.InvalidArtifact,
+    };
+    try require(record.result.selected < values and key.expected != 0 and key.expected < nodes and evaluator.evidence.nodes[key.expected].tag == expected_kind);
     try require(proof.values_before <= values and proof.values_added <= values - proof.values_before);
     try require(proof.children_before <= evaluator.children.len and proof.children_added <= evaluator.children.len - proof.children_before);
     for (proof.sources) |source| try require(validBinding(snapshot.units, source));

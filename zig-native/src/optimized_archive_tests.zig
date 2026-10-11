@@ -52,6 +52,61 @@ test "portable optimizer captures outlive producers and preserve exact per-body 
     try scenario(std.testing.allocator);
     try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, scenario, .{});
 }
+
+fn symbolicModule(a: std.mem.Allocator, shifted: bool) !wasm.Module {
+    var result = wasm.Module.init(a);
+    errdefer result.deinit();
+    if (shifted) {
+        const extra = try result.addFunction(&.{.f32}, .f32);
+        try result.emit(extra, .{ .op = .local_get });
+        _ = try result.importFunction("other", "unused", &.{}, .none);
+        _ = try result.addGlobal(.f32, 0x3f800000, false);
+    }
+    const imported = try result.importFunction("host", "identity", &.{.i32}, .i32);
+    const global = try result.addGlobal(.u32, 7, false);
+    const target = try result.addFunction(&.{.i32}, .i32);
+    try result.emit(target, .{ .op = .local_get });
+    const caller = try result.addFunction(&.{.i32}, .i32);
+    try result.emitSlice(caller, &.{ .{ .op = .local_get }, .{ .op = .call_import, .operand = imported }, .{ .op = .global_get, .operand = global }, .{ .op = .i32_add } });
+    try result.emitReference(caller, .{ .op = .i32_const, .operand = target }, .table_function);
+    try result.emit(caller, .{ .op = .call_indirect, .operand = result.functions.items[target].signature });
+    return result;
+}
+fn symbolicArchiveBytes(a: std.mem.Allocator) ![]u8 {
+    var original = try symbolicModule(a, false);
+    defer original.deinit();
+    var capture: bodies.Capture = .{ .allocator = a };
+    defer capture.deinit();
+    a.free(try original.assembleWithOptions(.{ .current = &capture }));
+    return archive.encode(a, compiler, &capture);
+}
+fn symbolicArchiveScenario(a: std.mem.Allocator) !void {
+    // Both the producing module and archive bytes die before relocation.
+    var loaded = blk: {
+        const bytes = try symbolicArchiveBytes(a);
+        defer a.free(bytes);
+        break :blk try archive.decode(a, compiler, bytes);
+    };
+    defer loaded.deinit();
+    try std.testing.expectEqualStrings("host", loaded.imports.items[0].module);
+    try std.testing.expectEqualStrings("identity", loaded.imports.items[0].name);
+    try std.testing.expect(loaded.entries.items[1].source.instructions.items[4].table_reference);
+    var moved = try symbolicModule(a, true);
+    defer moved.deinit();
+    var current: bodies.Capture = .{ .allocator = a };
+    defer current.deinit();
+    var stats: bodies.Stats = .{};
+    const reused = try moved.assembleWithOptions(.{ .previous = &loaded, .current = &current, .stats = &stats });
+    defer a.free(reused);
+    const fresh = try moved.assemble();
+    defer a.free(fresh);
+    try std.testing.expectEqualSlices(u8, fresh, reused);
+    try std.testing.expectEqual(@as(usize, 2), stats.reused);
+}
+test "portable optimizer captures own symbolic imports globals and table references through relocation failures" {
+    try symbolicArchiveScenario(std.testing.allocator);
+    try @import("allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, symbolicArchiveScenario, .{});
+}
 test "portable optimizer captures reject stale compilers corrupt bytes and truncated owners" {
     const a = std.testing.allocator;
     var original = try module(a);
@@ -178,6 +233,8 @@ test "portable optimizer archives reject forged ordinals control structure and r
         .{ .at = 0, .inst = .{ .op = .nop } }, // an extra end
         .{ .at = 8, .inst = .{ .op = .block } }, // else inside a block
         .{ .at = 9, .inst = .{ .op = .i32x4_extract_lane, .operand = 4 } },
+        .{ .at = 9, .inst = .{ .op = .i32_const, .operand = 2, .table_reference = true } },
+        .{ .at = 9, .inst = .{ .op = .local_get, .table_reference = true } },
     };
     for (body_edits) |edit| {
         const before = caller[edit.at];
@@ -198,7 +255,9 @@ test "portable optimizer archives reject forged ordinals control structure and r
     {
         const before = owner.arena;
         defer owner.arena = before;
-        owner.arena = .{ .allocate = 0, .allocate_scalar = 0, .recycle = 0, .reset = 0, .mark = 0, .collect = 2, .heap = 0, .base = 0, .static_end = 0, .allocated = 0, .rc_enabled = 0, .rc_leases = 0, .rc_retains = 0, .rc_releases = 0, .rc_destroyed = 0, .allocate_typed = 0, .retain = 0, .release = 0, .release_lease = 0, .retire = 0, .free = 0, .store_word = 0, .copy_words = 0, .decrement = 0 };
+        var invalid_arena = std.mem.zeroes(wasm.Arena);
+        invalid_arena.collect = 2;
+        owner.arena = invalid_arena;
         try rejects(error.InvalidArtifact, owner);
     }
     const records = owner.queries.records;
@@ -282,4 +341,36 @@ test "portable optimizer archives keep unsealed tables unsealed and decline thei
     defer reloaded.deinit();
     try std.testing.expect(!reloaded.queries_complete);
     try std.testing.expectEqual(@as(usize, 0), reloaded.queries.records.items.len);
+}
+
+test "portable optimizer preserves checked results without widening machine bodies" {
+    const a = std.testing.allocator;
+    const MachineFunction = struct { parameters: []ir.ValueType, result: ir.ValueType, signature: u32, parameter_roles: u64, annotations: u32, locals: std.ArrayList(ir.ValueType), instructions: std.ArrayList(ir.Instruction) };
+    try std.testing.expectEqual(@sizeOf(MachineFunction), @sizeOf(ir.Function));
+    var original = wasm.Module.init(a);
+    defer original.deinit();
+    const callee = try original.addTypedFunction(&.{}, .i32, .scalar);
+    try original.emit(callee, .{ .op = .i32_const });
+    const caller = try original.addTypedFunction(&.{}, .i32, .scalar);
+    try original.emitSlice(caller, &.{ .{ .op = .call, .operand = callee }, .{ .op = .drop }, .{ .op = .i32_const, .operand = 42 } });
+    var capture: bodies.Capture = .{ .allocator = a };
+    defer capture.deinit();
+    const first = try original.assembleWithOptions(.{ .current = &capture });
+    defer a.free(first);
+    const bytes = try archive.encode(a, compiler, &capture);
+    defer a.free(bytes);
+    var loaded = try archive.decode(a, compiler, bytes);
+    defer loaded.deinit();
+    try std.testing.expectEqual(ir.Role.scalar, loaded.entries.items[callee].source.result_role);
+    original.functions.items[callee].result_role = .reference;
+    var current: bodies.Capture = .{ .allocator = a };
+    defer current.deinit();
+    var stats: bodies.Stats = .{};
+    const revised = try original.assembleWithOptions(.{ .previous = &loaded, .current = &current, .stats = &stats });
+    defer a.free(revised);
+    try std.testing.expectEqual(@as(usize, 0), stats.reused);
+    const fresh = try original.assemble();
+    defer a.free(fresh);
+    try std.testing.expectEqualSlices(u8, fresh, revised);
+    try std.testing.expectEqualSlices(u8, first, revised);
 }

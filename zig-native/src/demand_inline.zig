@@ -1,6 +1,6 @@
 //! A bounded, name-independent admission proof for local demand evaluation.
-//! These expression bodies cannot store or return a pending demand, enter a
-//! provider, or revisit a demand in a loop. Fully applied local calls may forward
+//! These structured bodies cannot store or return a pending demand or enter a
+//! provider. Local reads may repeat across loops. Fully applied calls may forward
 //! it through another admitted body, within the same shared node budget.
 const core = @import("core.zig");
 pub const max_parameters = 16;
@@ -24,7 +24,8 @@ pub const Plan = struct {
         }
         if (!has_demand) return null;
         var plan: Plan = .{ .remaining = remaining };
-        return if (plan.visit(module, body, body.root)) plan else null;
+        if (!plan.visit(module, body, body.root)) return null;
+        return plan;
     }
     fn call(self: *Plan, module: *const core.Module, body: *const core.Body, id: core.Id) bool {
         const target = module.call(id);
@@ -52,13 +53,27 @@ pub const Plan = struct {
         return true;
     }
     fn parameter(module: *const core.Module, body: *const core.Body, id: core.Id) ?usize {
-        if (module.node(id).tag != .reference) return null;
-        const reference = module.reference(id);
-        if (reference.unit != 0 and reference.unit != module.unit) return null;
-        for (module.bodyParameters(body), 0..) |item, i| {
-            if (item.binding != 0 and item.binding == reference.binding) return i;
+        var expression = id;
+        for (0..64) |_| {
+            if (module.node(expression).tag != .reference) return null;
+            const reference = module.reference(expression);
+            if (reference.unit != 0 and reference.unit != module.unit) return null;
+            for (module.bodyParameters(body), 0..) |item, i| {
+                if (item.binding != 0 and item.binding == reference.binding) return i;
+            }
+            expression = module.binding(reference.binding).initializer;
+            if (expression == 0) return null;
         }
         return null;
+    }
+    fn addBinding(self: *Plan, module: *const core.Module, id: core.BindingId) bool {
+        if (id == 0) return true;
+        if (module.types.node(module.binding(id).ty).tag == .demand) return false;
+        for (self.bindings[0..self.binding_count]) |known| if (known == id) return true;
+        if (self.binding_count == self.bindings.len) return false;
+        self.bindings[self.binding_count] = id;
+        self.binding_count += 1;
+        return true;
     }
     fn pattern(self: *Plan, module: *const core.Module, body: *const core.Body, id: core.PatternId) bool {
         if (self.remaining == 0) return false;
@@ -84,7 +99,8 @@ pub const Plan = struct {
         };
     }
     fn visit(self: *Plan, module: *const core.Module, body: *const core.Body, id: core.Id) bool {
-        if (self.remaining == 0 or id == 0) return false;
+        if (id == 0) return true;
+        if (self.remaining == 0) return false;
         self.remaining -= 1;
         const node = module.node(id);
         return switch (node.tag) {
@@ -99,7 +115,14 @@ pub const Plan = struct {
             },
             .project => self.visit(module, body, node.a),
             .construct => node.b == 0 or self.visit(module, body, node.b),
-            .product, .record => blk: {
+            .product, .record, .array => blk: {
+                for (module.children(id)) |child| if (!self.visit(module, body, child)) break :blk false;
+                break :blk true;
+            },
+            .array_op => blk: {
+                // Generation invokes an arbitrary callback. Other primitive
+                // collection operations only consume their completed inputs.
+                if (module.arrayOperation(id) == .generate) break :blk false;
                 for (module.children(id)) |child| if (!self.visit(module, body, child)) break :blk false;
                 break :blk true;
             },
@@ -122,6 +145,37 @@ pub const Plan = struct {
                 if (module.types.node(module.bodyParameters(body)[index].ty).tag != .demand) break :blk false;
                 self.uses[index] = @min(2, self.uses[index] +| self.multiplier);
                 break :blk true;
+            },
+            .bind => blk: {
+                if (module.types.node(module.typeOf(node.b)).tag == .demand) {
+                    const index = parameter(module, body, node.b) orelse break :blk false;
+                    break :blk module.types.node(module.bodyParameters(body)[index].ty).tag == .demand;
+                }
+                break :blk self.visit(module, body, node.b) and self.addBinding(module, node.a);
+            },
+            .block, .suite => blk: {
+                for (module.children(id)) |child| if (!self.visit(module, body, child)) break :blk false;
+                break :blk true;
+            },
+            .return_ => self.visit(module, body, node.a),
+            .break_ => blk: {
+                for (module.breakValues(id)) |value| if (!self.visit(module, body, value)) break :blk false;
+                break :blk true;
+            },
+            .if_stmt => blk: {
+                if (!self.visit(module, body, node.a) or !self.visit(module, body, node.b) or !self.visit(module, body, node.c)) break :blk false;
+                for (module.branchMerges(id)) |merge| if (!self.addBinding(module, merge.result)) break :blk false;
+                break :blk true;
+            },
+            .loop => blk: {
+                const loop = module.loopInfo(id);
+                if (!self.visit(module, body, loop.first) or !self.visit(module, body, loop.end)) break :blk false;
+                if (loop.pattern != 0 and !self.pattern(module, body, loop.pattern)) break :blk false;
+                for (module.loopCarries(id)) |carry| if (!self.addBinding(module, carry.iteration) or !self.addBinding(module, carry.outgoing)) break :blk false;
+                const multiplier = self.multiplier;
+                self.multiplier = 2;
+                defer self.multiplier = multiplier;
+                break :blk self.visit(module, body, loop.body);
             },
             .call => self.call(module, body, id),
             .if_value => self.visit(module, body, node.a) and self.visit(module, body, node.b) and self.visit(module, body, node.c),

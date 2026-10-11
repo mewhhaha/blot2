@@ -37,7 +37,7 @@ export interface GuestConstant {
 }
 
 export interface GuestAbi {
-  readonly version: 2;
+  readonly version: 2 | 3;
   readonly functions: readonly GuestFunction[];
   readonly constants: readonly GuestConstant[];
 }
@@ -181,7 +181,7 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   const reader = new AbiReader(new Uint8Array(sections[0]));
   const version = reader.count();
-  if (version !== 2) {
+  if (version !== 2 && version !== 3) {
     throw new GuestError(
       "invalid_abi",
       `Unsupported guest ABI version ${version}`,
@@ -197,6 +197,11 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     }
     exports.set(name, kind);
   };
+  if (version === 3) {
+    declare("blot:ownership_enter", "function");
+    declare("blot:ownership_leave", "function");
+    declare("blot:rc_roots", "global");
+  }
   const functionCount = reader.count();
   for (let index = 0; index < functionCount; index++) {
     const name = reader.name();
@@ -233,14 +238,19 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   if (ownership.length === 1) {
     const state = new Uint8Array(ownership[0]);
     if (
-      state.length !== 3 || state[0] !== 1 || state[1] > 1 || state[2] > 7 ||
-      (state[1] === 1) !== (state[2] === 0)
+      state.length !== 3 || (state[0] !== 1 && state[0] !== 2) ||
+      state[1] > state[0] || state[2] > 7 ||
+      (state[1] !== 0) !== (state[2] === 0) ||
+      (version === 3) !== (state[0] === 2 && state[1] === 2)
     ) throw new GuestError("invalid_abi", "Invalid ownership section");
     if (state[2] !== 1) {
       for (const counter of ["leases", "retains", "releases", "destroyed"]) {
         declare(`blot:rc_${counter}`, "global");
       }
     }
+  }
+  if (version === 3 && ownership.length !== 1) {
+    throw new GuestError("invalid_abi", "Missing root ownership section");
   }
   if (
     actualExports.length !== exports.size ||
@@ -616,6 +626,66 @@ export async function instantiateGuest(
     "blot:host/1": imports,
   });
 
+  let ownership: { enter(): void; leave(outcome: number): void } | undefined;
+  if (abi.version === 3) {
+    const enter = instance.exports["blot:ownership_enter"];
+    const leave = instance.exports["blot:ownership_leave"];
+    if (typeof enter !== "function" || typeof leave !== "function") {
+      throw new GuestError("invalid_abi", "Missing ownership exports");
+    }
+    // The Wasm linker checks exact export signatures without invoking them.
+    const validator = new WebAssembly.Module(
+      new Uint8Array([
+        0,
+        97,
+        115,
+        109,
+        1,
+        0,
+        0,
+        0,
+        1,
+        8,
+        2,
+        96,
+        0,
+        0,
+        96,
+        1,
+        127,
+        0,
+        2,
+        13,
+        2,
+        1,
+        111,
+        1,
+        101,
+        0,
+        0,
+        1,
+        111,
+        1,
+        108,
+        0,
+        1,
+      ]),
+    );
+    try {
+      new WebAssembly.Instance(validator, { o: { e: enter, l: leave } });
+    } catch (cause) {
+      throw new GuestError(
+        "invalid_abi",
+        "Invalid ownership export signatures",
+        { cause },
+      );
+    }
+    ownership = {
+      enter: enter as () => void,
+      leave: leave as (outcome: number) => void,
+    };
+  }
+  let entered = false;
   const memory = instance.exports["blot:memory"];
   const allocate = instance.exports["blot:allocate"];
   const reset = instance.exports["blot:reset"];
@@ -741,6 +811,8 @@ export async function instantiateGuest(
     }
     running = true;
     try {
+      entered = ownership !== undefined;
+      ownership?.enter();
       arena?.reset(0);
       if (typeof fn.parameter === "string" && isArrayType(fn.parameter)) {
         if (!arena) throw new Error("Validated array export has no arena");
@@ -752,12 +824,16 @@ export async function instantiateGuest(
       }
       return { fn, value, exported };
     } catch (cause) {
-      finish();
+      finish(1);
       throw cause;
     }
   }
-  function finish(): void {
+  function finish(outcome: number): void {
     try {
+      if (entered) {
+        ownership!.leave(outcome);
+        entered = false;
+      }
       arena?.reset(0);
     } finally {
       active = undefined;
@@ -787,22 +863,28 @@ export async function instantiateGuest(
         );
       }
       const { fn, value, exported } = begin(name, argument, false);
+      let outcome = 1;
       try {
-        return fromWasm(fn.result, exported(value));
+        const result = fromWasm(fn.result, exported(value));
+        outcome = 0;
+        return result;
       } finally {
-        finish();
+        finish(outcome);
       }
     },
     async callAsync(name, argument) {
       const integration = requireAsync();
       const { fn, value, exported } = begin(name, argument, true);
+      let outcome = 1;
       try {
-        return fromWasm(
+        const result = fromWasm(
           fn.result,
           await integration.promising(exported)(value),
         );
+        outcome = 0;
+        return result;
       } finally {
-        finish();
+        finish(outcome);
       }
     },
     read(name) {
@@ -823,6 +905,7 @@ export async function instantiateGuest(
     dispose() {
       if (lifetime.disposed) return;
       idle();
+      ownership?.leave(2);
       lifetime.disposed = true;
       callbacks = new WeakMap();
     },

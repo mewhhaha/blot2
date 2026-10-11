@@ -37,13 +37,25 @@ const Entry = struct {
     }
 };
 
+pub const Import = struct {
+    module: []u8,
+    name: []u8,
+    signature: u32,
+    fn deinit(self: Import, a: A) void {
+        a.free(self.module);
+        a.free(self.name);
+    }
+};
+
 pub const Capture = struct {
     allocator: A,
+    roots: bool = false,
+    root_slots: u32 = 0,
     tier: @import("compilation_tier.zig").Tier = .optimized,
     entries: std.ArrayList(Entry) = .empty,
     signatures: std.ArrayList(ir.Signature) = .empty,
-    imports: std.ArrayList(u32) = .empty,
-    globals: std.ArrayList(ir.ValueType) = .empty,
+    imports: std.ArrayList(Import) = .empty,
+    globals: std.ArrayList(wasm.Global) = .empty,
     arena: ?wasm.Arena = null,
     queries: executable.OptimizerTable = .{},
     queries_complete: bool = false,
@@ -54,6 +66,7 @@ pub const Capture = struct {
         for (self.signatures.items) |signature| self.allocator.free(signature.parameters);
         self.entries.deinit(self.allocator);
         self.signatures.deinit(self.allocator);
+        for (self.imports.items) |item| item.deinit(self.allocator);
         self.imports.deinit(self.allocator);
         self.globals.deinit(self.allocator);
         self.* = .{ .allocator = self.allocator };
@@ -77,9 +90,14 @@ pub const Capture = struct {
         try self.signatures.ensureTotalCapacity(self.allocator, module.signatures.items.len);
         for (module.signatures.items) |signature| self.signatures.appendAssumeCapacity(.{ .parameters = try self.allocator.dupe(ir.ValueType, signature.parameters), .result = signature.result });
         try self.imports.ensureTotalCapacity(self.allocator, module.imports.items.len);
-        for (module.imports.items) |item| self.imports.appendAssumeCapacity(item.signature);
+        for (module.imports.items) |item| {
+            const namespace = try self.allocator.dupe(u8, item.module);
+            errdefer self.allocator.free(namespace);
+            const name = try self.allocator.dupe(u8, item.name);
+            self.imports.appendAssumeCapacity(.{ .module = namespace, .name = name, .signature = item.signature });
+        }
         try self.globals.ensureTotalCapacity(self.allocator, module.globals.items.len);
-        for (module.globals.items) |global| self.globals.appendAssumeCapacity(global.scalar.machine());
+        self.globals.appendSliceAssumeCapacity(module.globals.items);
     }
 
     pub fn recordOutput(self: *Capture, id: usize, body_result: ?ir.Body) A.Error!void {
@@ -100,7 +118,7 @@ pub const Capture = struct {
         while (first < end) {
             const middle = first + (end - first) / 2;
             const record = &self.queries.records.items[middle];
-            if (record.key.source < id) first = middle + 1 else if (record.key.source > id) end = middle else return record;
+            if (record.value.function < id) first = middle + 1 else if (record.value.function > id) end = middle else return record;
         }
         return null;
     }
@@ -112,7 +130,7 @@ pub const Capture = struct {
         for (self.entries.items, 0..) |entry, id| {
             if (!entry.output_ready) continue;
             var call_count: usize = 0;
-            for (entry.source.instructions.items) |inst| if (inst.op == .call) {
+            for (entry.source.instructions.items) |inst| if (inst.op == .call or inst.table_reference) {
                 call_count += 1;
             };
             const bytes_needed = executable.dependencyBytes(u32, call_count, lifetimes.Parameter, entry.parameters.len) orelse {
@@ -123,13 +141,13 @@ pub const Capture = struct {
                 self.queries.saturated +|= 1;
                 return;
             }
-            var builder = executable.OptimizerTable.begin(self.allocator, .{ .source = @intCast(id), .local_fingerprint = @import("runtime_body_relocation.zig").hash(entry.source), .tier = self.tier });
+            var builder = executable.OptimizerTable.begin(self.allocator, .{ .local_fingerprint = @import("runtime_body_relocation.zig").hash(entry.source), .tier = self.tier });
             defer builder.abort();
             const callees = try self.allocator.alloc(u32, call_count);
             var transferred = false;
             defer if (!transferred) self.allocator.free(callees);
             var cursor: usize = 0;
-            for (entry.source.instructions.items) |inst| if (inst.op == .call) {
+            for (entry.source.instructions.items) |inst| if (inst.op == .call or inst.table_reference) {
                 callees[cursor] = inst.operand;
                 cursor += 1;
             };
@@ -144,12 +162,13 @@ pub const Capture = struct {
         self.queries_complete = true;
     }
     pub fn bytes(self: *const Capture) usize {
-        var count = self.entries.items.len * @sizeOf(Entry) + self.signatures.items.len * @sizeOf(ir.Signature) + self.imports.items.len * 4 + self.globals.items.len;
+        var count = self.entries.items.len * @sizeOf(Entry) + self.signatures.items.len * @sizeOf(ir.Signature) + self.imports.items.len * @sizeOf(Import) + self.globals.items.len * @sizeOf(wasm.Global);
         for (self.entries.items) |entry| {
             count += entry.source.parameters.len + entry.source.locals.items.len + entry.source.instructions.items.len * @sizeOf(ir.Instruction) + entry.parameters.len * @sizeOf(lifetimes.Parameter);
             if (entry.output) |body| count += body.locals.items.len + body.instructions.items.len * @sizeOf(ir.Instruction);
         }
         for (self.signatures.items) |signature| count += signature.parameters.len;
+        for (self.imports.items) |item| count += item.module.len + item.name.len;
         return count + self.queries.owned_bytes + self.queries.capacity_bytes;
     }
 };
@@ -166,13 +185,13 @@ pub const Matcher = struct {
     pub fn init(a: A, old: *const Capture, current: *const Capture) A.Error!Matcher {
         const same = try a.alloc(bool, current.entries.items.len);
         errdefer a.free(same);
-        for (same, current.entries.items, 0..) |*match, entry, id| match.* = id < old.entries.items.len and @import("runtime_function_key.zig").equal(old.entries.items[id].source, entry.source);
+        for (same, current.entries.items, 0..) |*match, entry, id| match.* = id < old.entries.items.len and samePosition(old.entries.items[id].source, entry.source);
         const relocated = try a.alloc(?ir.Body, current.entries.items.len);
         errdefer a.free(relocated);
         @memset(relocated, null);
         const prior_ids = try a.alloc(?usize, current.entries.items.len);
         @memset(prior_ids, null);
-        var self: Matcher = .{ .allocator = a, .old = old, .current = current, .same = same, .arena_same = old.tier == current.tier and std.meta.eql(old.arena, current.arena), .relocated = relocated, .prior_ids = prior_ids };
+        var self: Matcher = .{ .allocator = a, .old = old, .current = current, .same = same, .arena_same = old.tier == current.tier and old.roots == current.roots and old.root_slots == current.root_slots and (old.arena != null) == (current.arena != null), .relocated = relocated, .prior_ids = prior_ids };
         errdefer {
             for (relocated) |*body| if (body.*) |*owned| owned.deinit(a);
             a.free(prior_ids);
@@ -186,35 +205,34 @@ pub const Matcher = struct {
         self.allocator.free(self.prior_ids);
         self.allocator.free(self.same);
     }
+    fn samePosition(before: ir.Function, after: ir.Function) bool {
+        if (!@import("runtime_body_relocation.zig").equalLocal(before, after)) return false;
+        for (before.instructions.items, after.instructions.items) |left, right| if (left.operand != right.operand) return false;
+        return true;
+    }
     fn signatureSame(self: *const Matcher, before: u32, after: u32) bool {
         if (before >= self.old.signatures.items.len or after >= self.current.signatures.items.len) return false;
         const left = self.old.signatures.items[before];
         const right = self.current.signatures.items[after];
         return left.result == right.result and std.mem.eql(ir.ValueType, left.parameters, right.parameters);
     }
-    fn matchesPosition(self: *const Matcher, id: usize) bool {
-        if (!self.arena_same or !self.same[id] or !self.old.entries.items[id].output_ready) return false;
+    fn matchesPosition(self: *const Matcher, walk: *@import("runtime_body_relocation.zig").Walk, id: usize) bool {
+        if (!self.arena_same or !std.meta.eql(self.old.arena, self.current.arena) or !self.same[id] or self.old.entries.items[id].source.parameter_roles != self.current.entries.items[id].source.parameter_roles or !self.old.entries.items[id].output_ready) return false;
         const record = self.old.queryAt(id) orelse return false;
         if (record.key.tier != self.current.tier) return false;
         if (!self.summarySame(record.dependencies, self.current.entries.items[id])) return false;
-        for (self.current.entries.items[id].source.instructions.items) |inst| switch (inst.op) {
-            .call => {
-                // Vectorization reads the callee body. Lifetime analysis reads
-                // its completed borrow/fresh-result summary, including facts
-                // derived transitively from otherwise unchanged callees.
-                if (inst.operand >= self.same.len or !self.same[inst.operand]) return false;
-                const before = self.old.entries.items[inst.operand];
-                const after = self.current.entries.items[inst.operand];
-                if (before.invalidates != after.invalidates or before.owned_result_bytes != after.owned_result_bytes or before.parameters.len != after.parameters.len) return false;
-                for (before.parameters, after.parameters) |left, right| if (!std.meta.eql(left, right)) return false;
-            },
-            .call_import => {
-                if (inst.operand >= self.old.imports.items.len or inst.operand >= self.current.imports.items.len or !self.signatureSame(self.old.imports.items[inst.operand], self.current.imports.items[inst.operand])) return false;
-            },
-            .call_indirect => if (!self.signatureSame(inst.operand, inst.operand)) return false,
-            .global_get, .global_set => if (inst.operand >= self.old.globals.items.len or inst.operand >= self.current.globals.items.len or self.old.globals.items[inst.operand] != self.current.globals.items[inst.operand]) return false,
-            else => {},
-        };
+        if (self.old.output(id)) |body| {
+            if (!walk.spend(body.instructions.items.len)) return false;
+            for (body.instructions.items) |inst| {
+                const kind = @import("runtime_body_relocation.zig").referenceKind(inst) orelse continue;
+                switch (kind) {
+                    .function => if (inst.operand >= self.same.len or !self.same[inst.operand]) return false,
+                    .import_ => if (!self.importSame(inst.operand, inst.operand)) return false,
+                    .signature => if (!self.signatureSame(inst.operand, inst.operand)) return false,
+                    .global => if (!self.globalSame(inst.operand, inst.operand)) return false,
+                }
+            }
+        }
         return true;
     }
     fn summarySame(_: *const Matcher, before: executable.OptimizerDependencies, after: Entry) bool {
@@ -228,42 +246,144 @@ pub const Matcher = struct {
     pub fn output(self: *const Matcher, id: usize) ?ir.Body {
         return self.relocated[id] orelse self.old.output(self.prior_ids[id].?);
     }
-    fn externalFactsSame(self: *const Matcher, function: ir.Function) bool {
-        for (function.instructions.items) |inst| switch (inst.op) {
-            .call_import => if (inst.operand >= self.old.imports.items.len or inst.operand >= self.current.imports.items.len or !self.signatureSame(self.old.imports.items[inst.operand], self.current.imports.items[inst.operand])) return false,
-            .call_indirect => if (!self.signatureSame(inst.operand, inst.operand)) return false,
-            .global_get, .global_set => if (inst.operand >= self.old.globals.items.len or inst.operand >= self.current.globals.items.len or self.old.globals.items[inst.operand] != self.current.globals.items[inst.operand]) return false,
-            else => {},
-        };
-        return true;
+    fn importSame(self: *const Matcher, before: u32, after: u32) bool {
+        if (before >= self.old.imports.items.len or after >= self.current.imports.items.len) return false;
+        const left = self.old.imports.items[before];
+        const right = self.current.imports.items[after];
+        return std.mem.eql(u8, left.module, right.module) and std.mem.eql(u8, left.name, right.name) and self.signatureSame(left.signature, right.signature);
     }
-    fn graphSame(self: *const Matcher, walk: *@import("runtime_body_relocation.zig").Walk, before: usize, after: usize) A.Error!bool {
+    fn globalSame(self: *const Matcher, before: u32, after: u32) bool {
+        return before < self.old.globals.items.len and after < self.current.globals.items.len and std.meta.eql(self.old.globals.items[before], self.current.globals.items[after]);
+    }
+    fn arenaRole(comptime fields: anytype, arena: ?wasm.Arena, id: u32) ?usize {
+        const value = arena orelse return null;
+        inline for (fields, 0..) |field, index| if (@field(value, field) == id) return index;
+        return null;
+    }
+    fn referenceSame(self: *const Matcher, walk: *@import("runtime_body_relocation.zig").Walk, kind: @import("runtime_body_relocation.zig").Kind, before: u32, after: u32) A.Error!bool {
+        switch (kind) {
+            .function => if (arenaRole(wasm.Arena.function_fields, self.old.arena, before) != arenaRole(wasm.Arena.function_fields, self.current.arena, after)) return false,
+            .import_ => {
+                if (!self.importSame(before, after)) return false;
+                if (!try walk.add(self.allocator, .signature, self.old.imports.items[before].signature, self.current.imports.items[after].signature)) return false;
+            },
+            .signature => if (!self.signatureSame(before, after)) return false,
+            .global => {
+                if (!self.globalSame(before, after)) return false;
+                if (arenaRole(wasm.Arena.global_fields, self.old.arena, before) != arenaRole(wasm.Arena.global_fields, self.current.arena, after)) return false;
+            },
+        }
+        return walk.add(self.allocator, kind, before, after);
+    }
+    fn drainGraph(self: *const Matcher, walk: *@import("runtime_body_relocation.zig").Walk) A.Error!bool {
         const relocation = @import("runtime_body_relocation.zig");
-        walk.clear();
-        if (!try walk.add(self.allocator, @intCast(before), @intCast(after))) return false;
         while (walk.pending.pop()) |pair| {
             if (pair.before >= self.old.entries.items.len or pair.after >= self.current.entries.items.len) return false;
             const left = self.old.entries.items[pair.before];
             const right = self.current.entries.items[pair.after];
-            if (!relocation.equalLocal(left.source, right.source) or !self.externalFactsSame(right.source)) return false;
+            if (!try self.referenceSame(walk, .signature, left.source.signature, right.source.signature)) return false;
+            if (!walk.spend(left.source.instructions.items.len +| left.source.parameters.len +| left.source.locals.items.len) or !relocation.equalLocal(left.source, right.source)) return false;
             if (left.invalidates != right.invalidates or left.owned_result_bytes != right.owned_result_bytes or left.parameters.len != right.parameters.len) return false;
             for (left.parameters, right.parameters) |l, r| if (!std.meta.eql(l, r)) return false;
-            for (left.source.instructions.items, right.source.instructions.items) |l, r| if (l.op == .call) {
-                if (!try walk.add(self.allocator, l.operand, r.operand)) return false;
-            };
+            for (left.source.instructions.items, right.source.instructions.items) |l, r| {
+                if (relocation.referenceKind(l)) |kind| if (!try self.referenceSame(walk, kind, l.operand, r.operand)) return false;
+            }
         }
         return true;
     }
+    fn graphSame(self: *const Matcher, walk: *@import("runtime_body_relocation.zig").Walk, before: usize, after: usize) A.Error!bool {
+        walk.clear();
+        if (!try self.referenceSame(walk, .function, @intCast(before), @intCast(after))) return false;
+        return self.drainGraph(walk);
+    }
+    /// Passes may introduce named runtime helpers. Prove their complete input
+    /// graphs as well; an ordinal coincidence cannot authorize cleanup reuse.
+    fn outputReferences(self: *const Matcher, walk: *@import("runtime_body_relocation.zig").Walk, body: ir.Body) A.Error!bool {
+        const relocation = @import("runtime_body_relocation.zig");
+        for (body.instructions.items) |inst| {
+            const kind = relocation.referenceKind(inst) orelse continue;
+            if (!walk.spend(1)) return false;
+            if (walk.get(kind, inst.operand) != null) continue;
+            if (kind != .function) return false;
+            const old_arena = self.old.arena orelse return false;
+            const new_arena = self.current.arena orelse return false;
+            var found = false;
+            inline for (wasm.Arena.function_fields) |field| {
+                if (@field(old_arena, field) == inst.operand) {
+                    if (!try self.referenceSame(walk, .function, inst.operand, @field(new_arena, field))) return false;
+                    found = true;
+                }
+            }
+            if (!found) return false;
+        }
+        return self.drainGraph(walk);
+    }
+    /// Positional equality is only a shortcut after complete transitive facts
+    /// settle. Changed imports/globals or ownership facts invalidate callers,
+    /// including recursive components, even when all numeric operands stayed.
+    fn preparePositions(self: *Matcher, walk: *@import("runtime_body_relocation.zig").Walk) void {
+        if (!std.meta.eql(self.old.arena, self.current.arena)) {
+            @memset(self.same, false);
+            return;
+        }
+        for (self.current.entries.items, self.same, 0..) |entry, *same, id| {
+            if (!same.*) continue;
+            const before = self.old.entries.items[id];
+            if (!walk.spend(entry.source.instructions.items.len +| before.parameters.len)) {
+                @memset(self.same, false);
+                return;
+            }
+            if (before.invalidates != entry.invalidates or before.owned_result_bytes != entry.owned_result_bytes or before.parameters.len != entry.parameters.len) {
+                same.* = false;
+                continue;
+            }
+            for (before.parameters, entry.parameters) |left, right| {
+                if (!std.meta.eql(left, right)) same.* = false;
+            }
+            for (entry.source.instructions.items) |inst| switch (inst.op) {
+                .call_import => if (!self.importSame(inst.operand, inst.operand)) {
+                    same.* = false;
+                },
+                .call_indirect => if (!self.signatureSame(inst.operand, inst.operand)) {
+                    same.* = false;
+                },
+                .global_get, .global_set => if (!self.globalSame(inst.operand, inst.operand)) {
+                    same.* = false;
+                },
+                else => {},
+            };
+        }
+        var changed = true;
+        while (changed) {
+            changed = false;
+            for (self.current.entries.items, self.same) |entry, *same| {
+                if (!same.*) continue;
+                if (!walk.spend(entry.source.instructions.items.len +| 1)) {
+                    @memset(self.same, false);
+                    return;
+                }
+                for (entry.source.instructions.items) |inst| {
+                    if (inst.op != .call and !inst.table_reference) continue;
+                    if (inst.operand >= self.same.len or !self.same[inst.operand]) {
+                        same.* = false;
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
     fn findRelocations(self: *Matcher) A.Error!void {
         const relocation = @import("runtime_body_relocation.zig");
+        var walk: relocation.Walk = .{};
+        defer walk.deinit(self.allocator);
+        self.preparePositions(&walk);
         var missing = false;
         for (self.prior_ids, 0..) |*prior, id| {
-            if (self.matchesPosition(id)) prior.* = id else missing = true;
+            if (self.matchesPosition(&walk, id)) prior.* = id else missing = true;
         }
         if (!missing) return;
         if (!self.old.queries_complete) return;
-        var walk: relocation.Walk = .{};
-        defer walk.deinit(self.allocator);
         for (self.current.entries.items, self.prior_ids, 0..) |entry, *prior, id| {
             if (prior.* != null) continue;
             var candidates = self.old.queries.candidates(relocation.hash(entry.source), .newest_first);
@@ -278,18 +398,10 @@ pub const Matcher = struct {
                     var relocated = try cloneBody(self.allocator, body);
                     var owns = true;
                     defer if (owns) relocated.deinit(self.allocator);
-                    var valid = true;
-                    for (relocated.instructions.items) |*inst| if (inst.op == .call) {
-                        if (walk.targets.get(inst.operand)) |target| {
-                            inst.operand = target;
-                        } else if (self.current.arena == null or inst.operand != self.current.arena.?.recycle) {
-                            // Cleanup may introduce recycle; every other direct
-                            // call must be justified by the checked body graph.
-                            valid = false;
-                            break;
-                        }
-                    };
-                    if (!valid) continue;
+                    if (!try self.outputReferences(&walk, body)) continue;
+                    for (relocated.instructions.items) |*inst| {
+                        if (relocation.referenceKind(inst.*)) |kind| inst.operand = walk.get(kind, inst.operand).?;
+                    }
                     self.relocated[id] = relocated;
                     owns = false;
                 }
@@ -310,5 +422,5 @@ fn cloneFunction(a: A, source: ir.Function) A.Error!ir.Function {
     const parameters = try a.dupe(ir.ValueType, source.parameters);
     errdefer a.free(parameters);
     const body = try cloneBody(a, .{ .locals = source.locals, .instructions = source.instructions });
-    return .{ .parameters = parameters, .result = source.result, .signature = source.signature, .parameter_roles = source.parameter_roles, .annotations = source.annotations, .locals = body.locals, .instructions = body.instructions };
+    return .{ .parameters = parameters, .result = source.result, .result_role = source.result_role, .entry = source.entry, .signature = source.signature, .parameter_roles = source.parameter_roles, .annotations = source.annotations, .locals = body.locals, .instructions = body.instructions };
 }

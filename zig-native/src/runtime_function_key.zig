@@ -29,6 +29,7 @@ pub fn hash(function: ir.Function) u64 {
         if (inst.op == .ownership) continue;
         std.hash.autoHash(&state, inst.op);
         std.hash.autoHash(&state, inst.operand);
+        std.hash.autoHash(&state, inst.table_reference);
     }
     return state.final();
 }

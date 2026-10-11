@@ -67,8 +67,7 @@ pub fn fragmentFingerprint(request: artifacts.Request) u64 {
 }
 
 pub const OptimizerKey = struct {
-    /// The complete machine input belongs to Capture.entries[source].
-    source: u32,
+    /// Symbolic local shape; Capture owns the exact body and target graph.
     local_fingerprint: u64,
     tier: @import("compilation_tier.zig").Tier,
     // Capture owns the exact Arena shared by every record. Matcher compares
@@ -104,7 +103,7 @@ const OptimizerAdapter = struct {
         return key.local_fingerprint;
     }
     pub fn complete(record: OptimizerTable.Record) bool {
-        return record.value.ready and record.dependencies.context_complete and record.key.source == record.value.function;
+        return record.value.ready and record.dependencies.context_complete;
     }
     pub fn bytes(record: OptimizerTable.Record) usize {
         return dependencyBytes(u32, record.dependencies.callees.len, lifetime.Parameter, record.dependencies.parameters.len) orelse std.math.maxInt(usize);

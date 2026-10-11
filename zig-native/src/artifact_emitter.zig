@@ -11,7 +11,7 @@ pub const Event = union(enum) {
     demand: struct { kind: ResourceKind, id: u32, hit: bool },
     operation_symbol: struct { id: u32, key: Span, foreign: bool },
     signature: struct { id: u32, parameters: Span, result: wasm.ValueType },
-    function: struct { id: u32, signature: u32 },
+    function: struct { id: u32, signature: u32, result_role: @import("runtime_ir.zig").Role = .unknown },
     /// Parameter roles from checked layouts (`ir.Function.parameter_roles`).
     parameter_roles: struct { function: u32, roles: u64 },
     import_: struct { id: u32, module: Span, name: Span, signature: u32 },
@@ -26,11 +26,13 @@ pub const Event = union(enum) {
     lists: @import("list_runtime.zig").Runtime,
     export_: struct { name: Span, index: u32, parameter: wasm.Scalar, result: wasm.Scalar, global: bool, callback: ?wasm.Callback },
     public_arena: void,
+    mutable_static: void,
+    static_field: struct { address: u32, role: @import("runtime_ir.zig").Role },
     start: u32,
 };
 pub const Record = struct { sequence: u64, owner: u32, event: Event };
 pub const SymbolicInstruction = struct { op: wasm.Op, operand: Operand };
-pub const FunctionRole = enum { job, arena_allocate, arena_allocate_scalar, arena_recycle, arena_reset, arena_mark, arena_collect, arena_allocate_typed, arena_retain, arena_release, arena_release_lease, arena_retire, arena_free, arena_store_word, arena_copy_words, arena_decrement, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, list_concat, list_slice, list_join, list_cut, static_closure };
+pub const FunctionRole = enum { job, arena_allocate, arena_allocate_scalar, arena_recycle, arena_reset, arena_mark, arena_collect, arena_allocate_typed, arena_retain, arena_release, arena_release_lease, arena_retire, arena_free, arena_store_word, arena_copy_words, arena_decrement, arena_root_allocate, arena_root_reserve, arena_root_pop, arena_root_open, arena_root_close, arena_root_mark, arena_root_enter, arena_root_leave, arena_root_store, arena_root_public_allocate, arena_root_public_reset, host_retain, host_release, output_export, runtime_initializer, module_start, unknown, list_new, list_address, list_copy, list_push, list_set, list_from_array, list_to_array, list_chunk_new, list_edit, list_branch, list_own, list_insert, list_replace, list_refresh, list_rotate_left, list_rotate_right, list_balance, list_concat, list_slice, list_join, list_cut, static_closure };
 pub const FunctionArtifact = struct { owner: u32, resource_owner: u32, role: FunctionRole, signature: u32, creation_sequence: u64, locals: Span, instructions: Span };
 const Operation = struct { key: Span, foreign: bool };
 pub const Recorder = struct {
@@ -232,7 +234,7 @@ pub const Recorder = struct {
             },
             .function => |item| {
                 const signature_ = module.signatures.items[try replay.get(replay.signatures.items, item.signature)];
-                const actual = try module.addFunction(signature_.parameters, signature_.result);
+                const actual = try module.addTypedFunction(signature_.parameters, signature_.result, item.result_role);
                 try replay.put(&replay.functions, item.id, actual);
             },
             .import_ => |item| {
@@ -244,7 +246,7 @@ pub const Recorder = struct {
                 _ = try module.addLocal(try replay.get(replay.functions.items, item.function), item.ty);
             },
             .parameter_roles => |item| try module.setParameterRoles(try replay.get(replay.functions.items, item.function), item.roles),
-            .instruction => |item| try module.emit(try replay.get(replay.functions.items, item.function), .{ .op = item.op, .operand = try replay.resolve(item.operand) }),
+            .instruction => |item| try module.emitReference(try replay.get(replay.functions.items, item.function), .{ .op = item.op, .operand = try replay.resolve(item.operand) }, item.operand.role),
             .global => |item| {
                 const actual = try module.addGlobal(item.scalar, try replay.resolve(item.bits), item.mutable);
                 try replay.put(&replay.globals, item.id, actual);
@@ -277,9 +279,13 @@ pub const Recorder = struct {
             .export_ => |item| {
                 const name = try module.allocator.dupe(u8, self.slice(item.name));
                 errdefer module.allocator.free(name);
-                try module.exports.append(module.allocator, .{ .name = name, .index = try replay.get(if (item.global) replay.globals.items else replay.functions.items, item.index), .parameter = item.parameter, .result = item.result, .global = item.global, .callback = item.callback });
+                const index = try replay.get(if (item.global) replay.globals.items else replay.functions.items, item.index);
+                try module.exports.append(module.allocator, .{ .name = name, .index = index, .parameter = item.parameter, .result = item.result, .global = item.global, .callback = item.callback });
+                if (!item.global) module.functions.items[index].entry = true;
             },
             .public_arena => module.public_arena = true,
+            .mutable_static => module.mutable_static = true,
+            .static_field => |item| try module.staticField(item.address, item.role),
             .start => |id| module.start = try replay.get(replay.functions.items, id),
         };
     }
