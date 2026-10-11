@@ -110,25 +110,7 @@ const ConstructorKey = code_artifacts.ConstructorKey;
 const PrimitiveKey = code_artifacts.PrimitiveKey;
 const OperationKey = code_artifacts.OperationKey;
 const SerializedKey = struct { value: core_eval.ValueId, ty: layout.Id, suspension: bool = false };
-const StaticCodeProjection = struct {
-    generator: *Generator,
-    mappings: *std.ArrayList(Mapping),
-    fn mapping(context: *anyopaque, solver: *types.Store, variable: types.Id, root: types.Id) (types.Error || error{UnresolvedType})!void {
-        const self: *@This() = @ptrCast(@alignCast(context));
-        for (self.mappings.items) |entry| if (entry.variable == variable and entry.layout != layout.erased) return;
-        const concrete = self.generator.layouts.fromSolver(solver, root) catch |err| return switch (err) {
-            error.OutOfMemory => error.OutOfMemory,
-            error.TypeMismatch => error.TypeMismatch,
-            error.UnresolvedType => error.UnresolvedType,
-            error.LayoutLimit => error.TypeLimit,
-        };
-        for (self.mappings.items) |*entry| if (entry.variable == variable) {
-            entry.layout = concrete;
-            return;
-        };
-        try self.mappings.append(self.generator.allocator, .{ .variable = variable, .layout = concrete });
-    }
-};
+const StaticCodeProjection = specialization.PhysicalProjection;
 const specialization = @import("specialization.zig");
 const refinement_receipt = @import("refinement_receipt.zig");
 const EvidenceRoot = refinement_receipt.Root;
@@ -1146,7 +1128,7 @@ const Generator = struct {
         service.refineMappingsCaptures(unit_id, root, expected, mappings, rows, span, captures) catch |err| return self.specializationFailure(service, err);
     }
     fn refineAccessorMappings(self: *Generator, unit_id: u32, catalog: u32, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span, captures: []const core_eval.RetainedCapture) Error!void {
-        var projection: StaticCodeProjection = .{ .generator = self, .mappings = mappings };
+        var projection: StaticCodeProjection = .{ .allocator = self.allocator, .layouts = &self.layouts, .mappings = mappings };
         var service = try self.specializer();
         service.code_projection = .{ .context = &projection, .mapping = StaticCodeProjection.mapping };
         service.refineMappingsCaptures(unit_id, .{ .closure = .{ .unit = unit_id, .catalog = catalog } }, expected, mappings, rows, span, captures) catch |err| return self.specializationFailure(service, err);

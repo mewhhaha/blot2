@@ -1,4 +1,5 @@
 comptime {
+    _ = @import("unconstrained_collection_tests.zig");
     _ = @import("semantic_query_table.zig");
     _ = @import("portable_query.zig");
     _ = @import("semantic_archive.zig");

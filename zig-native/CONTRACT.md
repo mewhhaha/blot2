@@ -34,6 +34,11 @@ retain their exact checks. These live hints disable semantic receipts and
 executable fragment reuse. They never enter a dependency archive or certify
 erased type positions. A synchronous projection copies partial physical shapes
 out of the solved region without retaining solver IDs; open rows stay unknown.
+Ordinary selected named and closure queries also copy partial physical shapes
+when semantic export cannot represent them. Those queries publish no semantic
+receipt. Reconciliation fills erased positions and unknown rows while rejecting
+conflicting known heads, physical slots and effect rows; it never defaults a
+language type.
 Small bodies inline with inherited cleanups, and larger or deeply composed
 bodies use private functions. Runtime arguments evaluate once in their original
 order. Private functions have ordinary invocation-local cleanup and provider

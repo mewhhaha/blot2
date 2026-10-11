@@ -51,6 +51,55 @@ pub const Store = struct {
             else => &.{},
         };
     }
+    /// Reconcile two physical views of one type. Holes add no facts; known
+    /// heads, storage slots and effect rows must still agree.
+    pub fn mergePartial(self: *Store, left: Id, right: Id) Error!Id {
+        var budget: usize = 1_000_000;
+        return self.mergePartialDepth(left, right, 0, &budget);
+    }
+    fn mergePartialDepth(self: *Store, left: Id, right: Id, depth: usize, budget: *usize) Error!Id {
+        if (depth >= 1024 or budget.* == 0) return error.LayoutLimit;
+        budget.* -= 1;
+        if (left == right or right == erased) return left;
+        if (left == erased) return right;
+        const a = self.node(left);
+        const b = self.node(right);
+        if (a.tag != b.tag) return error.TypeMismatch;
+        switch (a.tag) {
+            .array, .list, .cursor, .resolver => return self.intern(a.tag, try self.mergePartialDepth(a.a, b.a, depth + 1, budget), 0, &.{}),
+            .function, .demand, .provider => {
+                var row = a.c;
+                if (row == unknown_row) row = b.c;
+                if (b.c != unknown_row and row != b.c) return error.TypeMismatch;
+                const input = try self.mergePartialDepth(a.a, b.a, depth + 1, budget);
+                var output: Id = 0;
+                if (a.tag == .function) output = try self.mergePartialDepth(a.b, b.b, depth + 1, budget);
+                return self.internWithEffects(a.tag, input, output, row, &.{});
+            },
+            .state_provider => return self.internStateProvider(try self.mergePartialDepth(a.a, b.a, depth + 1, budget), try self.mergePartialDepth(a.b, b.b, depth + 1, budget), try self.mergePartialDepth(a.c, b.c, depth + 1, budget)),
+            .product, .record, .nominal => {
+                if (a.tag == .nominal and (a.a != b.a or a.b != b.b)) return error.TypeMismatch;
+                const count = self.children(left).len;
+                if (count != self.children(right).len) return error.TypeMismatch;
+                var buffer: [256]u8 align(@alignOf(u32)) = undefined;
+                var scratch: std.heap.BufferFirstAllocator = .init(&buffer, self.allocator);
+                var values: std.ArrayList(u32) = .empty;
+                defer values.deinit(scratch.allocator());
+                for (0..count) |index| {
+                    const first = self.children(left)[index];
+                    const second = self.children(right)[index];
+                    var value = first;
+                    if (a.tag == .record and index % 2 == 0) {
+                        if (first != second) return error.TypeMismatch;
+                    } else value = try self.mergePartialDepth(first, second, depth + 1, budget);
+                    try values.append(scratch.allocator(), value);
+                }
+                if (a.tag == .nominal) return self.intern(.nominal, a.a, a.b, values.items);
+                return self.intern(a.tag, 0, 0, values.items);
+            },
+            else => return error.TypeMismatch,
+        }
+    }
     pub fn machine(self: *const Store, id: Id) wasm.ValueType {
         return if (self.node(id).tag == .f32) .f32 else .i32;
     }
@@ -616,6 +665,10 @@ fn solverLayoutScenario(allocator: Allocator) !void {
     const argument = layouts.effects.view().operationArguments(labels[0])[0];
     try std.testing.expectEqualSlices(u32, &.{types.f32_type}, layouts.children(argument));
     const closed_evidence = try layouts.toEvidence(&semantic, closed);
+    try std.testing.expectEqual(closed, try layouts.mergePartial(initial, closed));
+    try std.testing.expectEqual(closed, try layouts.mergePartial(closed, initial));
+    const pure_callback = try layouts.internWithEffects(.function, layouts.node(closed_callback).a, layouts.node(closed_callback).b, 0, &.{});
+    try std.testing.expectError(error.TypeMismatch, layouts.mergePartial(closed_callback, pure_callback));
 
     source.rollback(point);
     try std.testing.expectEqual(initial, try layouts.fromSolver(&source, shape));
@@ -623,6 +676,7 @@ fn solverLayoutScenario(allocator: Allocator) !void {
     try source.unifyEffects(tail, 0);
     const different = try layouts.fromSolver(&source, shape);
     try std.testing.expect(closed != different);
+    try std.testing.expectError(error.TypeMismatch, layouts.mergePartial(closed, different));
     source.deinit();
     source_alive = false;
     // The region can disappear and recycle every numeric solver ID; copied

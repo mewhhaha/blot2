@@ -1745,10 +1745,13 @@ pub const Session = struct {
         return solved.types;
     }
     pub fn bodyEvidencePartialFull(self: *Session, reference: core.BindingRef, expectations: code_expectation.View, expected: code_expectation.Id, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping) Error!SolvedEvidence {
+        return self.bodyEvidencePartialFullCode(reference, expectations, expected, seeds, row_seeds, null);
+    }
+    pub fn bodyEvidencePartialFullCode(self: *Session, reference: core.BindingRef, expectations: code_expectation.View, expected: code_expectation.Id, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, projection: ?CodeProjection) Error!SolvedEvidence {
         const target_ = try self.external(try self.target(null, reference));
         const module = &self.units[target_.unit];
         const body = module.body(target_.binding) orelse return self.fail(target_.unit, module.binding(target_.binding).span, .unsupported);
-        return self.solveEvidenceOwned(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .code = .{ .view = expectations, .id = expected } }, seeds, row_seeds);
+        return self.solveEvidenceOwnedCode(target_.unit, body.root, module.binding(target_.binding).ty, body.closed_rows, body.scheme, .{ .code = .{ .view = expectations, .id = expected } }, seeds, row_seeds, projection);
     }
     /// Copy only completed primitive inputs into a fresh, independently owned
     /// probe for these same immutable units. No rich semantic IDs are copied.
@@ -2002,8 +2005,12 @@ pub const Session = struct {
         return solved.types;
     }
     fn solveEvidenceOwned(self: *Session, owner: usize, body: core.Id, root: types.Id, closed_rows: types.List, scheme: types.Scheme, expected: ClosureRegion.Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping) Error!SolvedEvidence {
+        return self.solveEvidenceOwnedCode(owner, body, root, closed_rows, scheme, expected, seeds, row_seeds, null);
+    }
+    fn solveEvidenceOwnedCode(self: *Session, owner: usize, body: core.Id, root: types.Id, closed_rows: types.List, scheme: types.Scheme, expected: ClosureRegion.Expected, seeds: []const type_evidence.Mapping, row_seeds: []const type_evidence.RowMapping, projection: ?CodeProjection) Error!SolvedEvidence {
         var region = ClosureRegion.init(self) catch return error.OutOfMemory;
         defer region.deinit();
+        region.code_projection = projection;
         return region.bodyEvidenceFull(owner, body, root, closed_rows, scheme, expected, seeds, row_seeds) catch |err| {
             if (err == error.OutOfMemory or !region.principal_only_used) return self.evidenceFailure(owner, self.units[owner].span(body), err);
             // Complete and partial code queries have the same witness-order
@@ -2013,7 +2020,7 @@ pub const Session = struct {
             const sharing = self.reuse_principal_graphs;
             self.reuse_principal_graphs = false;
             defer self.reuse_principal_graphs = sharing;
-            return self.solveEvidenceOwned(owner, body, root, closed_rows, scheme, expected, seeds, row_seeds);
+            return self.solveEvidenceOwnedCode(owner, body, root, closed_rows, scheme, expected, seeds, row_seeds, projection);
         };
     }
     fn evidenceFailure(self: *Session, owner: usize, span: core.Span, err: ClosureRegion.RegionError) Error {
@@ -4785,6 +4792,7 @@ const ClosureRegion = struct {
     result_summary_job: bool = false,
     principal_result_job: bool = false,
     code_expectation_remaining: usize = 0,
+    code_projection: ?CodeProjection = null,
     /// Pooled solvers keep their occurs counter; this region owns the delta.
     occurs_base: u64 = 0,
     importing_evidence: bool = false,
@@ -5154,6 +5162,10 @@ const ClosureRegion = struct {
         // publication guard rejects remaining obligations and admits the same
         // closed first-order arrows as ordinary body evidence.
         try self.publishValidatedCalls();
+        if (self.code_projection) |consumer| for (self.scratch.variables.items) |variable| {
+            if (variable.source.scope != scope or try self.project(variable.region) != 0) continue;
+            try consumer.mapping(consumer.context, &self.solver, variable.source.ty, variable.region);
+        };
         return self.exportSolved(scope);
     }
     fn closureEvidence(self: *ClosureRegion, owner: usize, closure: core.ClosureInfo, expected: Expected, seeds: []const type_evidence.Mapping) RegionError![]type_evidence.Mapping {

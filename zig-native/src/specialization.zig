@@ -44,6 +44,27 @@ pub const ResolvedBody = struct {
         self.rows.deinit(a);
     }
 };
+pub const PhysicalProjection = struct {
+    allocator: Allocator,
+    layouts: *layout.Store,
+    mappings: *std.ArrayList(Mapping),
+    pub fn mapping(context: *anyopaque, solver: *types.Store, variable: types.Id, root: types.Id) (types.Error || error{UnresolvedType})!void {
+        const self: *@This() = @ptrCast(@alignCast(context));
+        for (self.mappings.items) |entry| if (entry.variable == variable and entry.layout != layout.erased) return;
+        const concrete = self.layouts.fromSolver(solver, root) catch |err| return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.TypeMismatch => error.TypeMismatch,
+            error.UnresolvedType => error.UnresolvedType,
+            error.LayoutLimit => error.TypeLimit,
+        };
+        if (concrete == layout.erased) return;
+        for (self.mappings.items) |*entry| if (entry.variable == variable) {
+            entry.layout = concrete;
+            return;
+        };
+        try self.mappings.append(self.allocator, .{ .variable = variable, .layout = concrete });
+    }
+};
 pub const Service = struct {
     timing: ?*@import("backend_timing.zig").Work = null,
     allocator: Allocator,
@@ -118,6 +139,10 @@ pub const Service = struct {
         return self.refineMappingsCaptures(unit_id, root, expected, mappings, rows, span, &.{});
     }
     pub fn refineMappingsCaptures(self: *Service, unit_id: u32, root: EvidenceRoot, expected: layout.Id, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), span: core.Span, captures: []const core_eval.RetainedCapture) Error!void {
+        var shapes: std.ArrayList(Mapping) = .empty;
+        defer shapes.deinit(self.allocator);
+        var partial: PhysicalProjection = .{ .allocator = self.allocator, .layouts = self.layouts, .mappings = &shapes };
+        const projection = self.code_projection orelse core_eval.CodeProjection{ .context = &partial, .mapping = PhysicalProjection.mapping };
         const timing = if (self.timing) |work| work.enter(.specialization) else null;
         defer if (timing) |scope| scope.deinit();
         self.refinement_stats.requests += 1;
@@ -162,15 +187,17 @@ pub const Service = struct {
             const before_children = self.evaluator.children.items.len;
             const before_steps = self.evaluator.steps;
             var output = switch (root) {
-                .body => |target| self.evaluator.bodyEvidencePartialFull(target, bridge.partialView(), result, seeds.items, row_seeds.items),
-                .closure => |closure_| self.evaluator.closureEvidencePartialCapturesCode(closure_.unit, closure_.catalog, bridge.partialView(), result, seeds.items, row_seeds.items, captures, self.code_projection),
+                .body => |target| self.evaluator.bodyEvidencePartialFullCode(target, bridge.partialView(), result, seeds.items, row_seeds.items, projection),
+                .closure => |closure_| self.evaluator.closureEvidencePartialCapturesCode(closure_.unit, closure_.catalog, bridge.partialView(), result, seeds.items, row_seeds.items, captures, projection),
             } catch |err| switch (err) {
                 error.RequestUnwind => return self.evaluationFailure(),
                 error.Declined => return self.evaluationFailure(),
                 error.OutOfMemory => return error.OutOfMemory,
             };
             errdefer output.deinit(self.allocator);
-            if (enabled) try self.cache.?.record(self.cache.?.context, .{ .root = root, .expected = result, .seeds = seeds.items, .rows = row_seeds.items, .result = output, .tape = &tape, .observed = observation, .before_values = before_values, .before_children = before_children, .before_steps = before_steps });
+            // Physical holes carry no semantic proof. Queries needing their
+            // projected shapes rebuild instead of publishing an incomplete receipt.
+            if (enabled and shapes.items.len == 0) try self.cache.?.record(self.cache.?.context, .{ .root = root, .expected = result, .seeds = seeds.items, .rows = row_seeds.items, .result = output, .tape = &tape, .observed = observation, .before_values = before_values, .before_children = before_children, .before_steps = before_steps });
             break :fresh output;
         };
         defer solved.deinit(self.allocator);
@@ -198,6 +225,7 @@ pub const Service = struct {
             };
             if (!found) try rows.append(self.allocator, .{ .variable = mapping.variable, .row = concrete });
         }
+        for (shapes.items) |shape| try self.mapTypeDepth(unit_id, mappings, rows, shape.variable, shape.layout, span, 0);
     }
     pub fn mapTypeDepth(self: *Service, unit_id: u32, mappings: *std.ArrayList(Mapping), rows: ?*std.ArrayList(RowMapping), ty: types.Id, concrete: layout.Id, span: core.Span, depth: usize) Error!void {
         if (depth >= 1024) return self.decline(unit_id, span, .complexity);
@@ -207,8 +235,7 @@ pub const Service = struct {
         if (n.tag == .never) return;
         if (n.tag == .variable) {
             for (mappings.items) |*mapping| if (mapping.variable == ty) {
-                if (mapping.layout == layout.erased) mapping.layout = concrete;
-                if (concrete != layout.erased and mapping.layout != concrete) return self.decline(unit_id, span, .unresolved_type);
+                mapping.layout = self.layouts.mergePartial(mapping.layout, concrete) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else self.decline(unit_id, span, .unresolved_type);
                 return;
             };
             try mappings.append(self.allocator, .{ .variable = ty, .layout = concrete });
