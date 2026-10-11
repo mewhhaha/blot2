@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — protocol dependency qualified; no completion is claimed.
+- **Status:** Complete — implementation `0c5be56` is qualified.
 - **Dependencies:** [095](095-specify-and-version-the-project-protocol.md)
 - **Originating requirements:** the owner's decision of 11 October 2026, relayed
   by the gdev session and recorded in gdev's `PEN_MIGRATION.md` ("Decisions",
@@ -28,12 +28,12 @@ constants, through `wgsl_reflect`).
 
 ## Implementation checklist
 
-- [ ] Specify each asset kind's Blot interface and errors from
+- [x] Specify each asset kind's Blot interface and errors from
       `asset_parsers.ts`, including asset handles, content snapshots and
       dependency reporting.
-- [ ] Implement the readers natively, with bounded, positioned diagnostics, and
+- [x] Implement the readers natively, with bounded, positioned diagnostics, and
       track asset files as build inputs so retained builds invalidate exactly.
-- [ ] Extend the protocol specification (task 095) for asset roots, snapshots
+- [x] Extend the protocol specification (task 095) for asset roots, snapshots
       and dependencies; keep the TypeScript path working until hosts move.
 
 ## Validation
@@ -48,18 +48,39 @@ before the local milestone commit.
 
 ## Acceptance criteria
 
-- [ ] gdev's typed asset imports compile through `blotc` with no host parsers,
+- [x] gdev's typed asset imports compile through `blotc` with no host parsers,
       matching the TypeScript results.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `0c5be56`.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
+  and 743 guest/client tests. Analyzer: 318 files, zero findings. All 37
+  independent raw-wire cases pass. Reader/session laws sweep allocation
+  failures; client laws validate ownership and malformed replies. Formatting,
+  typechecking and the package publish dry run pass. Current gdev passes 472
+  regular cases across 54 modules and 12 split-hauling exports/25 assertions
+  through native imports.
+- Comparison: exact generated-source parity for all 33 current private shaders,
+  73 public WGSL probes and 16 JSON/catalog/text/tunable modules. Three paired
+  frozen-game runs match Wasm, snapshots and dependency digests through source
+  and asset edits, rejection and recovery. One asset edit reparses one module
+  and reuses 33; unchanged inputs reuse all 34. Frozen Wasm remains 840,534
+  bytes, SHA-256
+  `3158216b0b7cb072245d9aa149887a39bbadbc305430569ae3e033818e3edef0`. All 13
+  public examples, four synthetic workloads in every fresh/retained phase, and
+  five ordered diagnostic probes preserve the preceding compiler's outputs. CPU
+  distributions and exact pins are in the durable record.
+- Remaining limitations: the frozen game has no resource handles or tunables
+  input; public laws qualify those interfaces separately. Complex matrix,
+  packing and struct-result WGSL constant builtins reject explicitly. The pinned
+  reflector's observed scalar quirks are preserved and documented. Unchanged
+  disk inputs are still acquired and hashed. Loaded-host timings do not
+  establish a general compiler speedup. Private source/assets stay outside
+  commits.
+- Durable record: [native assets](../zig-native/NATIVE_ASSETS.md),
+  [protocol](../zig-native/PROJECT_PROTOCOL.md),
+  [distributions](../zig-native/qualification/native-assets.csv) and
+  [pins](../zig-native/qualification/native-assets-pins.json).

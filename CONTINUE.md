@@ -11,16 +11,21 @@ pushed; keep it that way unless the owner authorizes it.
 
 ## State on 11 October 2026
 
-Latest compiler implementation on local `main`: `5340ef2`. Qualified today, each
+Latest compiler implementation on local `main`: `0c5be56`. Qualified today, each
 with a durable record:
 
-| Task                                              | Implementation | Record                                                       |
-| ------------------------------------------------- | -------------- | ------------------------------------------------------------ |
-| 048 Dispatch explanations                         | `67e7912`      | [DISPATCH_EXPLANATIONS](zig-native/DISPATCH_EXPLANATIONS.md) |
-| 026 Resolved structured flow                      | `ae908fa`      | [RESOLVED_FLOW](zig-native/RESOLVED_FLOW.md)                 |
-| 027 Ownership roles in the IR                     | `c226967`      | [OWNERSHIP_ROLES](zig-native/OWNERSHIP_ROLES.md)             |
-| 097 Partial collection shapes (open fixture gate) | `f2b41b4`      | [PARTIAL_COLLECTIONS](zig-native/PARTIAL_COLLECTIONS.md)     |
-| 099 Stage-chain rejection                         | `5340ef2`      | [STAGE_CHAIN_REJECTION](zig-native/STAGE_CHAIN_REJECTION.md) |
+| Task                                           | Implementation       | Record                                                       |
+| ---------------------------------------------- | -------------------- | ------------------------------------------------------------ |
+| 048 Dispatch explanations                      | `67e7912`            | [DISPATCH_EXPLANATIONS](zig-native/DISPATCH_EXPLANATIONS.md) |
+| 026 Resolved structured flow                   | `ae908fa`            | [RESOLVED_FLOW](zig-native/RESOLVED_FLOW.md)                 |
+| 027 Ownership roles in the IR                  | `c226967`            | [OWNERSHIP_ROLES](zig-native/OWNERSHIP_ROLES.md)             |
+| 097 Partial collection shapes and fixture gate | `f2b41b4`, `881c6ab` | [PENDING_SELECTIONS](zig-native/PENDING_SELECTIONS.md)       |
+| 099 Stage-chain rejection                      | `5340ef2`            | [STAGE_CHAIN_REJECTION](zig-native/STAGE_CHAIN_REJECTION.md) |
+| 096 Native typed asset imports                 | `0c5be56`            | [NATIVE_ASSETS](zig-native/NATIVE_ASSETS.md)                 |
+
+095 is implemented at `4eabecb`
+([PROJECT_PROTOCOL](zig-native/PROJECT_PROTOCOL.md)); 049 at `d7e2b89`
+([EDITOR_COMPLETION](zig-native/EDITOR_COMPLETION.md)).
 
 Earlier today: 025 (resolved calls), 088–092, and progress on 093 (gdev retained
 edit 570 → 440 ms; see the task file). Every public example, the synthetic
@@ -35,48 +40,43 @@ stage chains).
 
 ## Current work
 
-1. **Task 097's representation fix is committed at `f2b41b4`.** The broad
-   checker default was rejected; its patches remain in `build/wip/`. Partial
-   physical shapes preserve generic reuse without semantic defaults. Full native
-   suite, 651 guest/client tests and zero analyzer findings pass. The 54-module
-   regular gdev suite passes all 472 cases; blocked app/sandbox pass ten checks.
-   All public examples, synthetic phases and frozen gdev preserve Wasm bytes.
-   [PARTIAL_COLLECTIONS](zig-native/PARTIAL_COLLECTIONS.md) records the
-   evidence. Task 097 remains open for complete reported-fixture qualification:
-   the blocked split-hauling module now reports `inference_budget`; it remains
-   uncompiled.
-2. **`zig-native/PROJECT_PROTOCOL.md`** (untracked) was written by the pen
-   session (`pen-9c`) as task 095's first checklist item, describing protocol
-   version 1 as the code has it at `544c5c6`. A read-only audit found
-   corrections still needed before committing it with 095. It was compared
-   against `zig_project_server.zig`, `zig_project_frames.zig` and
-   `compiler/zig_project_client.ts`. The pen session flagged two points to
-   check: duplicate JSON fields stop the process only through Zig 0.17's default
-   `duplicate_field_behavior`, and the example rejection is illustrative.
+The owner explicitly requested continuing until the entire task program is done.
+The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
+
+1. 097 is complete: the remaining blocked split-hauling module compiles and
+   passes 12 exports/25 assertions. The current regular gdev suite passes all
+   472 cases across 54 modules. Public stage-chain steps drop from 974,824 to
+   269,363 with identical type graphs/Wasm; 100 stages compile, 101 reject under
+   the unchanged inference budget. See PENDING_SELECTIONS.
+2. 095 is complete: explicit version-one admission and independent raw-wire
+   conformance. The jointly qualified compiler gate passes native tests and 690
+   guest/client tests. Analyzer is zero across 318 files, including three
+   unregistered 096 files under development.
+3. 049's durable completion contract is complete; 050 is ready. The contract
+   describes a proposed native query and Helix LSP bridge, not an existing
+   feature.
+4. **096 is complete at `0c5be56`.** Full native/compiler gate: 743 guest/client
+   tests; analyzer: 318 files, zero findings. Native imports match the frozen
+   game's Wasm/snapshots/dependencies through source/asset edits and recovery.
+   Current gdev passes all 472 regular cases and 12 split-hauling exports.
+   Resource handles and tunables are covered separately by public laws. See
+   NATIVE_ASSETS for reader limitations and measured host/child CPU.
+5. Next implementations are isolated from the qualified main tree:
+   `/var/tmp/blot2-resolved-body` (028), `/var/tmp/blot2-demand-summary` (036),
+   `/var/tmp/blot2-specialization-origin` (094), and
+   `/var/tmp/blot2-recursive-demand` (098). None is merged or claimed complete.
+   Review and integrate before a joint compiler gate. The latter restores the
+   skipped recursive-demand law; six focused guest laws and native/OOM laws
+   pass.
 
 ## Next work
 
-1. Finish 097's reported-fixture compilation gate. The representation fix passes
-   every regular gdev module and blocked app/sandbox; split hauling still
-   exceeds the existing module inference budget. Public cost reduction:
-   `zig-native/tests/stage_chain_budget.test.ts`, 64 callback fields and stage
-   links. A 51-link control takes 974,824 inference steps; 52 links exceed one
-   million. Do not close 097 merely because the former crash is now diagnosed.
-2. 095, then 096: pen will drive `blotc serve-project` from Rust and pin a blot2
-   commit once 095 lands. The draft was audited read-only: hello advertises
-   version 1 and the TypeScript client checks it, but `open` carries no client
-   version. Add explicit client-version admission and an independent raw-wire
-   conformance test; existing fake-peer tests only prove client-side version
-   rejection. The audit also found draft inaccuracies around absent/default open
-   fields, duplicate overlays and stats validation; notes are in ignored
-   `build/bench/project-protocol/audit.md`. Tell the gdev session (`gdev-94`)
-   the commit to pin. 096's spec is gdev's `asset_parsers.ts`; match the text
-   parser exactly (code points, per-character font glyph check, `fontExtra`, the
-   `shown` transform, lines ~77–112).
-3. Then numeric order: 028 (emission consumes resolved bodies; 025–027 plans are
-   transient per construct), 036, 049, 094, 098.
-4. Still open: 024 and 093 in progress; 002 blocked on owner-local benchmark
-   artifacts (see below); 086 needs a fresh gdev profile and an owner decision.
+Review/integrate 028 (emission consumes resolved bodies; 025–027 plans are
+transient per construct), 036, 094, 098 and remaining ready tasks. 049 is
+already specified in parallel. 028's read-only architecture map is
+`build/bench/resolved-bodies/design.md`. Still open: 024 and 093; 002's current
+traversal gates; 086's value-template boundary. The full inventory is in ignored
+`build/bench/program/remaining.md`.
 
 ## Waiting on the owner
 
@@ -122,12 +122,14 @@ stage chains).
 - The retained probe `zig-native/qualification/revision_deltas_probe.zig`
   measures edit, revert, rejected and no-op phases against an earlier tree.
 
-## Task 002 (blocked)
+## Task 002 (legacy restoration waived)
 
 The original packed-List benchmark artifacts and the frozen gdev snapshot
-matching `scripts/bench/gdev-manifest.json` are missing. Restore them before
-final qualification. Commit `65dccda` holds the current List lowering; F32 folds
-are within 0.6–1.7% of boxed at widths 14–16. Rerun on a quiet host with
+matching `scripts/bench/gdev-manifest.json` are missing. On 11 October the owner
+waived restoring legacy artifacts. Qualify current reproducible workloads;
+correctness and all-width performance remain required. Commit `65dccda` holds
+the current List lowering; F32 folds are within 0.6–1.7% of boxed at widths
+14–16. Rerun on a quiet host with
 `scripts/bench_list_traversal.ts BOXED NEW std OUT record|tuple 16 f32`. See
 [the measurement record](zig-native/LIST_TRAVERSAL.md#word-positions-at-leaf-boundaries-9-october-2026).
 
@@ -142,8 +144,10 @@ are within 0.6–1.7% of boxed at widths 14–16. Rerun on a quiet host with
   `zig-native/src/tests.zig` were added there in `c226967`. A new file with
   `test` blocks needs its own `_ = @import(...)` line, or its tests never run.
 
-- Test-iteration experiment: safe no-LLVM test compilation took 8.1 seconds, but
-  the fallback-Core recursion law emitted a stack SIGSEGV. The experiment was
-  stopped, with no aggregate pass count; the default build is unchanged. Details
-  and executable/source pins: ignored
-  `build/bench/test-iteration/iteration-findings.md`.
+- Test iteration: no-LLVM native compilation is about 8 seconds, and the cached
+  1,279-test artifact passes (1,278 plus one skip) with a 256 MiB stack. Its
+  full execution takes 16m47s; keep the faster-executing LLVM default. Direct
+  cached LLVM and no-LLVM fallback laws overflow their default 16 MiB stack but
+  pass at 256 MiB. A measured `Compile.stack_size` focused-test option is a
+  possible side quest; it is not implemented. Exact pins and per-test records
+  are ignored under `build/bench/test-iteration/`.

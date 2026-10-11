@@ -319,6 +319,13 @@ The owner decided on 11 October 2026, relayed by the gdev session (gdev's
 typed asset imports move into `blotc`: tasks [095] (a written, versioned project
 protocol) and [096] (native asset imports) record that work.
 
+Task [096] implements native JSON/catalog/text/tunables, WGSL reflection and
+binary references at `0c5be56`. The compiler gate passes 743 guest/client tests;
+the current game passes all 472 regular cases and 12 split-hauling exports.
+Paired host/native builds preserve Wasm, snapshots and dependencies through
+source/asset edits and recovery. See
+[native assets](../zig-native/NATIVE_ASSETS.md).
+
 Task [027] carries ownership roles from checked layouts into the runtime IR at
 `c226967`: functions record parameter roles and constant-size allocations an
 annotation run of word roles, which the encoder drops and the lifetime pass uses
@@ -649,7 +656,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [093] — Close the gdev edit gap                         | In progress | [088]                                  |
 | [094] — Locate specialization failures at their use     | Ready       | [048]                                  |
 | [095] — Specify and version the project protocol        | Complete    | None                                   |
-| [096] — Compile typed asset imports natively            | Ready       | [095]                                  |
+| [096] — Compile typed asset imports natively            | Complete    | [095]                                  |
 | [097] — Resolve array cursor representation in gdev     | Complete    | None                                   |
 | [098] — Type-check recursive demand forwarding          | Ready       | None                                   |
 | [099] — Survive long stage chains without crashing      | Complete    | None                                   |
