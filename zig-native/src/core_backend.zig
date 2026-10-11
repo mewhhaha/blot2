@@ -12,6 +12,7 @@ const layout_bridge = @import("layout_bridge.zig");
 const substitution_keys = @import("substitution_keys.zig");
 const provider_chain = @import("provider_chain.zig");
 const layout = @import("layout.zig");
+const resolved_call = @import("resolved_call.zig");
 const packed_layout = @import("packed_layout.zig");
 const row_projection_uses = @import("row_projection_uses.zig");
 const list_traversal = @import("list_traversal.zig");
@@ -5960,9 +5961,10 @@ const Emitter = struct {
             try self.emit(.call, function);
             return;
         }
+        const arrow = try self.prepareIndirect(n.a, id);
         const callee = try self.capture(n.a, depth);
         const argument = try self.capture(n.b, depth);
-        const signature = try g.module.internType(&.{ .i32, (try self.scalar(n.b)).machine(), .i32 }, (try self.scalar(id)).machine());
+        const signature = try g.module.internType(&.{ .i32, g.layouts.machine(arrow.parameter), .i32 }, g.layouts.machine(arrow.result));
         try self.emit(.local_get, callee);
         try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
         try self.emit(.local_get, argument);
@@ -6065,40 +6067,12 @@ const Emitter = struct {
         } else return g.fail(self.unit_id, id, .invalid_provider);
         try self.cleanupTo(checkpoint);
     }
-    fn resolverOperation(self: *Emitter, id: core.Id, depth: usize) Error!void {
+    /// Selects a resolver method's target and how it consumes the arguments.
+    fn prepareResolverCall(self: *Emitter, id: core.Id, provider: layout.Node) Error!resolved_call.Applied {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const metadata = unit_.resolverInfo(id);
         const arguments = unit_.resolverArguments(id);
-        const arity: usize = switch (metadata.operation) {
-            .monad => 0,
-            .pure, .forward, .run => 1,
-            .bind, .iterate => 2,
-        };
-        if (arguments.len != arity) return g.fail(self.unit_id, id, .unsupported);
-        const provider_type = try self.codeLayout(unit_.typeOf(metadata.resolver), unit_.span(id));
-        const provider = g.layouts.node(provider_type);
-        try self.expression(metadata.resolver, depth + 1);
-        try self.emit(.drop, 0);
-        if (metadata.operation == .monad) {
-            if (provider.tag != .type_constructor) return g.fail(self.unit_id, id, .type_constructor_required);
-            try self.emit(.i32_const, 0);
-            return;
-        }
-        if (provider.tag != .resolver) return g.fail(self.unit_id, id, .invalid_provider);
-        if (metadata.operation == .forward) return self.expression(arguments[0], depth + 1);
-        if (metadata.operation == .run) {
-            const action = try self.capture(arguments[0], depth);
-            const signature = try g.module.internType(&.{ .i32, .i32, .i32 }, (try self.scalar(id)).machine());
-            try self.emit(.local_get, action);
-            try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
-            try self.emit(.i32_const, 0);
-            try self.providerHead();
-            try self.emit(.local_get, action);
-            try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
-            try self.emit(.call_indirect, signature);
-            return;
-        }
         const token = g.layouts.node(provider.a);
         if (token.tag != .type_constructor) return g.fail(self.unit_id, id, .invalid_provider);
         const identity: types.NominalIdentity = .{ .unit = token.a, .decl = token.b };
@@ -6112,7 +6086,7 @@ const Emitter = struct {
         }
         if (metadata.method_type != 0) ty = try self.codeLayout(metadata.method_type, unit_.span(id));
         const body = g.unit(target.unit).body(target.binding) orelse return g.fail(self.unit_id, id, .unsupported);
-        var consumed: usize = 0;
+        var plan: resolved_call.Applied = undefined;
         if (body.parameters.len != 0 and body.parameters.len <= arguments.len and body.parameters.len <= max_parameters) {
             var key: Key = .{ .target = target, .count = @intCast(body.parameters.len) };
             for (0..body.parameters.len) |index| {
@@ -6123,35 +6097,84 @@ const Emitter = struct {
                 ty = arrow.b;
             }
             key.result = ty;
-            const function = try g.function(key);
-            for (arguments[0..body.parameters.len]) |argument| try self.expression(argument, depth + 1);
-            try self.providerHead();
-            try self.emit(.call, function);
-            consumed = body.parameters.len;
+            plan = .{ .callee = .{ .direct = key }, .consumed = body.parameters.len };
         } else {
-            const wrapper = try g.callable(.{ .target = target, .ty = ty });
-            const value = try self.capture(arguments[0], depth);
-            try self.emit(.i32_const, 0);
-            try self.emit(.local_get, value);
-            try self.providerHead();
-            try self.emit(.call, wrapper);
+            plan = .{ .callee = .{ .wrapper = .{ .target = target, .ty = ty } }, .consumed = 1 };
             ty = g.layouts.node(ty).b;
-            consumed = 1;
         }
-        for (arguments[consumed..]) |argument| {
-            const arrow = g.layouts.node(ty);
-            if (arrow.tag != .function) return g.fail(self.unit_id, id, .unresolved_type);
-            const function = try self.temporary(.i32);
-            try self.emit(.local_set, function);
-            const value = try self.capture(argument, depth);
-            try self.emit(.local_get, function);
-            try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
-            try self.emit(.local_get, value);
-            try self.providerHead();
-            try self.emit(.local_get, function);
-            try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
-            try self.emit(.call_indirect, try g.module.internType(&.{ .i32, g.layouts.machine(arrow.a), .i32 }, g.layouts.machine(arrow.b)));
-            ty = arrow.b;
+        errdefer plan.deinit(g.allocator);
+        _ = resolved_call.arrows(g.allocator, &g.layouts, ty, arguments.len - plan.consumed, &plan.extra) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.NotFunction => return g.fail(self.unit_id, id, .unresolved_type),
+        };
+        return plan;
+    }
+    fn resolverOperation(self: *Emitter, id: core.Id, depth: usize) Error!void {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const metadata = unit_.resolverInfo(id);
+        const arguments = unit_.resolverArguments(id);
+        const arity: usize = switch (metadata.operation) {
+            .monad => 0,
+            .pure, .forward, .run => 1,
+            .bind, .iterate => 2,
+        };
+        if (arguments.len != arity) return g.fail(self.unit_id, id, .unsupported);
+        const provider_type = try self.codeLayout(unit_.typeOf(metadata.resolver), unit_.span(id));
+        const provider = g.layouts.node(provider_type);
+        // Everything the operation selects is prepared before its first
+        // instruction, including the resolver expression's.
+        const Prepared = union(enum) { monad, forward, run: resolved_call.Arrow, call: resolved_call.Applied };
+        var prepared: Prepared = if (metadata.operation == .monad) monad: {
+            if (provider.tag != .type_constructor) return g.fail(self.unit_id, id, .type_constructor_required);
+            break :monad .monad;
+        } else operation: {
+            if (provider.tag != .resolver) return g.fail(self.unit_id, id, .invalid_provider);
+            break :operation switch (metadata.operation) {
+                .forward => .forward,
+                .run => .{ .run = try self.prepareIndirect(arguments[0], id) },
+                else => .{ .call = try self.prepareResolverCall(id, provider) },
+            };
+        };
+        defer switch (prepared) {
+            .call => |*plan| plan.deinit(g.allocator),
+            else => {},
+        };
+        try self.expression(metadata.resolver, depth + 1);
+        try self.emit(.drop, 0);
+        switch (prepared) {
+            .monad => try self.emit(.i32_const, 0),
+            .forward => try self.expression(arguments[0], depth + 1),
+            .run => |arrow| {
+                const action = try self.capture(arguments[0], depth);
+                const signature = try g.module.internType(&.{ .i32, g.layouts.machine(arrow.parameter), .i32 }, g.layouts.machine(arrow.result));
+                try self.emit(.local_get, action);
+                try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
+                try self.emit(.i32_const, 0);
+                try self.providerHead();
+                try self.emit(.local_get, action);
+                try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
+                try self.emit(.call_indirect, signature);
+            },
+            .call => |plan| {
+                switch (plan.callee) {
+                    .direct => |key| {
+                        const function = try g.function(key);
+                        for (arguments[0..key.count]) |argument| try self.expression(argument, depth + 1);
+                        try self.providerHead();
+                        try self.emit(.call, function);
+                    },
+                    .wrapper => |callable_key| {
+                        const wrapper = try g.callable(callable_key);
+                        const value = try self.capture(arguments[0], depth);
+                        try self.emit(.i32_const, 0);
+                        try self.emit(.local_get, value);
+                        try self.providerHead();
+                        try self.emit(.call, wrapper);
+                    },
+                }
+                try self.applyExtra(arguments[plan.consumed..], plan.extra.items, depth);
+            },
         }
     }
     fn emitReference(self: *Emitter, id: core.Id) Error!void {
@@ -6199,12 +6222,36 @@ const Emitter = struct {
         const value = try g.constant(try g.normalize(self.unit_id, reference), try self.codeLayout(n.ty, unit_.span(id)));
         try g.emitValue(self.function_id, value);
     }
+    /// Selects a named call's specialization and the closures its further
+    /// arguments apply, before emitting any of its instructions.
+    fn prepareNamedCall(self: *Emitter, id: core.Id) Error!resolved_call.Named {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const call = unit_.call(id);
+        var plan: resolved_call.Named = .{ .key = try g.signature(call.target, call.callee_type, self.unit_id, self.mappings, self.row_mappings, unit_.span(id), false) };
+        errdefer plan.deinit(g.allocator);
+        if (plan.key.count > call.arguments.len) return g.fail(self.unit_id, id, .unsupported);
+        _ = resolved_call.arrows(g.allocator, &g.layouts, plan.key.result, call.arguments.len - plan.key.count, &plan.extra) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.NotFunction => return g.fail(self.unit_id, id, .unresolved_type),
+        };
+        return plan;
+    }
+    /// A closure applied through its table entry, typed by the callee.
+    fn prepareIndirect(self: *Emitter, callee: core.Id, id: core.Id) Error!resolved_call.Arrow {
+        const g = self.generator;
+        const unit_ = g.unit(self.unit_id);
+        const node = g.layouts.node(try self.codeLayout(unit_.typeOf(callee), unit_.span(id)));
+        if (node.tag != .function) return g.fail(self.unit_id, id, .unresolved_type);
+        return .{ .parameter = node.a, .result = node.b, .row = node.c };
+    }
     fn emitNamedCall(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         const call = unit_.call(id);
-        const key = try g.signature(call.target, call.callee_type, self.unit_id, self.mappings, self.row_mappings, unit_.span(id), false);
-        if (key.count > call.arguments.len) return g.fail(self.unit_id, id, .unsupported);
+        var plan = try self.prepareNamedCall(id);
+        defer plan.deinit(g.allocator);
+        const key = plan.key;
         if (try self.inlineCollectionEdit(id, key, depth)) return;
         if (try self.inlineDemandCall(key, call.arguments, depth)) return;
         if (try self.inlineStaticCall(key, call.arguments, depth)) return;
@@ -6213,23 +6260,7 @@ const Emitter = struct {
         for (call.arguments[0..key.count]) |argument| try self.expression(argument, depth + 1);
         try self.providerHead();
         try self.emit(.call, function_id);
-        var ty = key.result;
-        for (call.arguments[key.count..]) |argument| {
-            const fn_type = g.layouts.node(ty);
-            if (fn_type.tag != .function) return g.fail(self.unit_id, id, .unresolved_type);
-            const callee = try self.temporary(.i32);
-            try self.emit(.local_set, callee);
-            const value = try self.capture(argument, depth);
-            const signature = try g.module.internType(&.{ .i32, g.layouts.machine(fn_type.a), .i32 }, g.layouts.machine(fn_type.b));
-            try self.emit(.local_get, callee);
-            try self.emit(.i32_load, heap.offset(heap.Closure, "environment"));
-            try self.emit(.local_get, value);
-            try self.providerHead();
-            try self.emit(.local_get, callee);
-            try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
-            try self.emit(.call_indirect, signature);
-            ty = fn_type.b;
-        }
+        try self.applyExtra(call.arguments[key.count..], plan.extra.items, depth);
     }
     fn emitTypeComparison(self: *Emitter, id: core.Id, depth: usize) Error!void {
         const g = self.generator;
@@ -6919,16 +6950,15 @@ const Emitter = struct {
         }
         return null;
     }
-    fn dispatchCall(self: *Emitter, id: core.Id, key: Key, depth: usize) Error!void {
+    /// Splits a selected operator method between its direct parameters (or a
+    /// callable wrapper) and the closures applied to the remaining operands.
+    fn prepareDispatch(self: *Emitter, id: core.Id, key: Key) Error!resolved_call.Applied {
         const g = self.generator;
-        const source = g.unit(self.unit_id);
-        const node = source.node(id);
-        const arguments = [_]core.Id{ node.a, node.b };
         const body = g.unit(key.target.unit).body(key.target.binding) orelse return g.fail(self.unit_id, id, .unsupported);
         // A selected method can return a function before or after consuming both operands.
         const arity = if (body.is_function) body.parameters.len else key.count;
+        var plan: resolved_call.Applied = undefined;
         var ty = key.result;
-        var consumed: usize = 0;
         if (arity != 0 and arity <= key.count) {
             var direct: Key = .{ .target = key.target, .count = @intCast(arity) };
             @memcpy(direct.parameters[0..arity], key.parameters[0..arity]);
@@ -6939,12 +6969,7 @@ const Emitter = struct {
                 ty = try g.internLayoutWithEffects(.function, key.parameters[reverse], ty, key.effects[reverse], &.{});
             }
             direct.result = ty;
-            if (arity == key.count and try self.inlineNamedCall(direct, arguments[0..arity], depth)) return;
-            const function = try g.function(direct);
-            for (arguments[0..arity]) |argument| try self.expression(argument, depth + 1);
-            try self.providerHead();
-            try self.emit(.call, function);
-            consumed = arity;
+            plan = .{ .callee = .{ .direct = direct }, .consumed = arity };
         } else {
             var full = key.result;
             var reverse: usize = key.count;
@@ -6952,18 +6977,46 @@ const Emitter = struct {
                 reverse -= 1;
                 full = try g.internLayoutWithEffects(.function, key.parameters[reverse], full, key.effects[reverse], &.{});
             }
-            const wrapper = try g.callable(.{ .target = key.target, .ty = full });
-            const argument = try self.capture(arguments[0], depth);
-            try self.emit(.i32_const, 0);
-            try self.emit(.local_get, argument);
-            try self.providerHead();
-            try self.emit(.call, wrapper);
+            plan = .{ .callee = .{ .wrapper = .{ .target = key.target, .ty = full } }, .consumed = 1 };
             ty = g.layouts.node(full).b;
-            consumed = 1;
         }
-        for (arguments[consumed..]) |argument| {
-            const arrow = g.layouts.node(ty);
-            if (arrow.tag != .function) return g.fail(self.unit_id, id, .unresolved_type);
+        errdefer plan.deinit(g.allocator);
+        _ = resolved_call.arrows(g.allocator, &g.layouts, ty, 2 - plan.consumed, &plan.extra) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.NotFunction => return g.fail(self.unit_id, id, .unresolved_type),
+        };
+        return plan;
+    }
+    fn dispatchCall(self: *Emitter, id: core.Id, key: Key, depth: usize) Error!void {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const node = source.node(id);
+        const arguments = [_]core.Id{ node.a, node.b };
+        var plan = try self.prepareDispatch(id, key);
+        defer plan.deinit(g.allocator);
+        switch (plan.callee) {
+            .direct => |direct| {
+                if (direct.count == key.count and try self.inlineNamedCall(direct, arguments[0..direct.count], depth)) return;
+                const function = try g.function(direct);
+                for (arguments[0..direct.count]) |argument| try self.expression(argument, depth + 1);
+                try self.providerHead();
+                try self.emit(.call, function);
+            },
+            .wrapper => |callable_key| {
+                const wrapper = try g.callable(callable_key);
+                const argument = try self.capture(arguments[0], depth);
+                try self.emit(.i32_const, 0);
+                try self.emit(.local_get, argument);
+                try self.providerHead();
+                try self.emit(.call, wrapper);
+            },
+        }
+        try self.applyExtra(arguments[plan.consumed..], plan.extra.items, depth);
+    }
+    /// Applies each returned closure to its argument through the planned arrow.
+    fn applyExtra(self: *Emitter, arguments: []const core.Id, extra: []const resolved_call.Arrow, depth: usize) Error!void {
+        const g = self.generator;
+        for (arguments, extra) |argument, arrow| {
             const callee = try self.temporary(.i32);
             try self.emit(.local_set, callee);
             const value = try self.capture(argument, depth);
@@ -6973,8 +7026,7 @@ const Emitter = struct {
             try self.providerHead();
             try self.emit(.local_get, callee);
             try self.emit(.i32_load, heap.offset(heap.Closure, "function"));
-            try self.emit(.call_indirect, try g.module.internType(&.{ .i32, g.layouts.machine(arrow.a), .i32 }, g.layouts.machine(arrow.b)));
-            ty = arrow.b;
+            try self.emit(.call_indirect, try g.module.internType(&.{ .i32, g.layouts.machine(arrow.parameter), .i32 }, g.layouts.machine(arrow.result)));
         }
     }
     fn dispatchScalar(self: *Emitter, id: core.Id, depth: usize) Error!void {
