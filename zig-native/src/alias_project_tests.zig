@@ -48,8 +48,12 @@ fn jsonEqual(left: anytype, right: anytype) !void {
 }
 fn stateEqual(left: *const check.Checked, right: *const check.Checked) !void {
     inline for (@typeInfo(check.Checked).@"struct".field_names) |name| {
-        if (comptime !std.mem.eql(u8, name, "types") and !std.mem.eql(u8, name, "parameter_patterns")) try jsonEqual(@field(left, name), @field(right, name));
+        if (comptime !std.mem.eql(u8, name, "types") and !std.mem.eql(u8, name, "parameter_patterns") and !std.mem.eql(u8, name, "counters")) try jsonEqual(@field(left, name), @field(right, name));
     }
+    // Forwarding may take fewer budgeted steps; every other counter is state.
+    var left_counters = left.counters;
+    left_counters.inference_steps = right.counters.inference_steps;
+    try jsonEqual(left_counters, right.counters);
     inline for (.{ "nodes", "extra", "variables", "versions", "operations" }) |name| try jsonEqual(@field(left.types, name).items, @field(right.types, name).items);
     inline for (.{ "rows", "labels", "variables", "versions" }) |name| try jsonEqual(@field(left.types.effects, name).items, @field(right.types.effects, name).items);
     try std.testing.expectEqual(left.types.effects.next_position, right.types.effects.next_position);

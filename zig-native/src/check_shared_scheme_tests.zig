@@ -252,6 +252,34 @@ test "frontend recursive component transition limit bounds unresolved selected w
     try std.testing.expect(exhausted > 4);
 }
 
+// A global record of closures performing an unhandled effect operation puts
+// one pending operation check per closure into every helper that uses it. Such
+// a check sleeps until its argument or signature types change, so inference
+// steps stay proportional to the checks rather than checks times passes.
+test "pending effect operations wait for their types instead of rescanning" {
+    for ([_]usize{ 16, 48 }) |count| {
+        var text: std.ArrayList(u8) = .empty;
+        defer text.deinit(a);
+        try text.appendSlice(a, "type Probe a is effect = { ask: Unit -> a }\nconst app = { ");
+        for (0..count) |index| try text.print(a, "{s}f{d}: fn () => Probe.ask ()", .{ if (index == 0) "" else ", ", index });
+        try text.appendSlice(a, " }\n");
+        for (0..count) |index| try text.print(a, "const use_{d} = fn () => do:\n  let handlers = app\n  use value <- handlers.f{d} ()\n  return value\n", .{ index, index });
+        var tokens = try lexer.lex(a, text.items);
+        defer tokens.deinit(a);
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(a);
+        var tree = try parser.parse(a, text.items, tokens.tokens.items, &pool);
+        defer tree.deinit(a);
+        var checked = try check.checkModuleWithOptions(a, &tree, &pool, &.{}, &.{}, 1, .{});
+        defer checked.deinit(a);
+        try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+        const counters = checked.counters;
+        try std.testing.expect(counters.obligations_appended >= count * count);
+        if (counters.inference_steps > 2 * counters.obligations_appended) std.debug.print("count={d}: {any}\n", .{ count, counters });
+        try std.testing.expect(counters.inference_steps <= 2 * counters.obligations_appended);
+    }
+}
+
 const header =
     \\infixl 60 (+) = _fixity_add
     \\const _fixity_add = fn left => fn right => @type.call "add" left right

@@ -44,6 +44,27 @@ pub const Queue = struct {
     fn enqueue(self: *Queue, index: usize) void {
         if (!self.entries.items[index].done) self.ready.items[index / 64] |= @as(u64, 1) << @intCast(index % 64);
     }
+    /// Ready again on the next pass from an earlier start; the current pass
+    /// has already moved past it.
+    pub fn requeue(self: *Queue, index: usize) void {
+        self.enqueue(index);
+    }
+    /// Drops entries at and after `len`, with their watches, when the owner's
+    /// list shrinks. Later additions start fresh and ready.
+    pub fn truncate(self: *Queue, len: usize) void {
+        if (len >= self.entries.items.len) return;
+        for (len..self.entries.items.len) |index| {
+            self.clearWatches(index);
+            const entry = self.entries.items[index];
+            if (!entry.done) {
+                self.remaining -= 1;
+                self.required -= @intFromBool(entry.required);
+            }
+            if (entry.waiting) self.waiting -= 1;
+            self.ready.items[index / 64] &= ~(@as(u64, 1) << @intCast(index % 64));
+        }
+        self.entries.shrinkRetainingCapacity(len);
+    }
     pub fn wakeAll(self: *Queue) void {
         for (self.entries.items, 0..) |entry, index| if (!entry.done) self.enqueue(index);
     }

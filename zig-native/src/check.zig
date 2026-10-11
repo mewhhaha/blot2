@@ -505,6 +505,8 @@ pub const Counters = struct {
     memo_hits: u64 = 0,
     memo_misses: u64 = 0,
     memo_declined: u64 = 0,
+    /// Budgeted inference steps (`ModuleOptions.max_inference_transitions`).
+    inference_steps: u64 = 0,
 
     pub fn add(self: *Counters, other: Counters) void {
         inline for (@typeInfo(Counters).@"struct".field_names) |name| {
@@ -584,6 +586,8 @@ const Engine = struct {
     merges: std.ArrayList(Merge) = .empty,
     obligations: std.ArrayList(T.Obligation) = .empty,
     pending: std.ArrayList(PendingObligation) = .empty,
+    /// Ready bits and type watches for `pending`, by the same index.
+    pending_queue: @import("solver_worklist.zig").Queue = .{},
     counters: Counters = .{},
     /// Closed outcomes of shared scheme uses, keyed by callee and the closed
     /// projection of the use's instantiation. Values are owned slices.
@@ -6717,173 +6721,211 @@ const Engine = struct {
     /// expands at its own chronological position, when its instantiation is
     /// informative enough to resolve.
     fn solveFieldsFrom(self: *Engine, start: usize) T.Error!void {
+        // Ready work runs in index order. A write wakes later work in this pass
+        // and earlier work in the next, as a full scan would retry it. Only an
+        // effect operation sleeps on its argument and signature types; every
+        // other kind is retried each pass, as before.
         var progress = true;
         while (progress) {
             progress = false;
-            var i: usize = start;
-            while (i < self.pending.items.len) : (i += 1) {
+            var cursor: usize = start;
+            while (true) {
                 // Yield to the heap driver before retrying a field whose
                 // selected body is queued. Its result remains an ordinary
                 // obligation until the dependency has an inferred signature.
                 if (self.selected_globals.items.len != 0) return;
+                try self.syncPendingQueue();
+                const i = self.pending_queue.take(cursor) orelse break;
+                cursor = i + 1;
                 const pending = self.pending.items[i];
-                if (pending.solved or pending.suspended) continue;
+                if (pending.solved) {
+                    self.pending_queue.complete(i);
+                    continue;
+                }
+                if (pending.suspended) {
+                    self.pending_queue.requeue(i);
+                    continue;
+                }
                 if (pending.wait_target != 0) {
                     // A child's local scheme can invoke this solver while its
                     // body is still active. Do not turn this caller's waited-on
                     // field into that child's recursive receiver placeholder.
-                    if (self.global_states.get(pending.wait_target).?.state != .complete) continue;
+                    if (self.global_states.get(pending.wait_target).?.state != .complete) {
+                        self.pending_queue.requeue(i);
+                        continue;
+                    }
                     self.pending.items[i].wait_target = 0;
                 }
-                const saved_owner = self.dependency_owner;
-                self.dependency_owner = pending.owner;
-                defer self.dependency_owner = saved_owner;
-                try self.inferenceTransition();
-                const constraint = pending.value;
-                if (constraint.kind == .callee_use) {
-                    if (try self.resolveUse(i)) progress = true;
-                    continue;
-                }
-                if (constraint.kind == .record_merge) {
-                    const result = self.types.mergeRecords(constraint.ty, constraint.other) catch |err| switch (err) {
-                        error.TypeMismatch => {
-                            try self.diagnostic(.type_mismatch, constraint.source);
-                            self.pending.items[i].solved = true;
-                            progress = true;
-                            continue;
-                        },
-                        else => return err,
-                    };
-                    if (result) |ty| {
-                        try self.constrain(ty, constraint.result, constraint.source);
-                        self.pending.items[i].solved = true;
-                        progress = true;
-                    }
-                    continue;
-                }
-                if (constraint.kind == .collection) {
-                    const owner = self.types.node(try self.types.resolve(constraint.ty, 0));
-                    if (owner.tag == .variable) continue;
-                    if (owner.tag == .array or owner.tag == .list) {
-                        try self.constrain(owner.a, constraint.result, constraint.source);
-                    } else try self.diagnostic(.type_mismatch, constraint.source);
-                    self.pending.items[i].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .monad_factory) {
-                    const token = self.types.node(try self.types.resolve(constraint.ty, 0));
-                    if (token.tag == .variable) continue;
-                    if (token.tag != .type_constructor) try self.diagnostic(.type_constructor_required, constraint.source);
-                    self.pending.items[i].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .resolver_dispatch) {
-                    self.pending.items[i].suspended = true;
-                    const selected = try self.resolverDispatch(pending);
-                    self.pending.items[i].suspended = false;
-                    if (selected) {
-                        self.pending.items[i].solved = true;
-                        progress = true;
-                    }
-                    continue;
-                }
-                if (constraint.kind == .type_head) {
-                    const head = try self.witnessResult(constraint.ty);
-                    if (self.types.node(try self.types.resolve(head, 0)).tag == .variable) continue;
-                    try self.constrain(head, constraint.result, constraint.source);
-                    self.pending.items[i].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .effect_handler) {
-                    const extended = self.types.node(try self.types.resolve(constraint.signature, 0));
-                    const residual = self.types.node(try self.types.resolve(constraint.other, 0));
-                    if (extended.tag != .function or residual.tag != .function) return error.TypeLimit;
-                    if (try self.handlerEquation(constraint.ty, extended.c, residual.c, constraint.source)) {
-                        self.pending.items[i].solved = true;
-                        progress = true;
-                    }
-                    continue;
-                }
-                if (constraint.kind == .effect_operation) {
-                    const arguments = try self.types.resolve(constraint.other, 0);
-                    if (!try self.types.equalClosed(arguments, arguments)) continue;
-                    const pack = self.types.node(arguments);
-                    if (pack.tag != .product) return error.TypeLimit;
-                    const owned_arguments = try self.allocator.dupe(T.Id, self.types.list(.{ .start = pack.a, .len = pack.b }));
-                    defer self.allocator.free(owned_arguments);
-                    const signature = self.types.node(try self.types.resolve(constraint.signature, 0));
-                    if (signature.tag != .function) return error.TypeLimit;
-                    const label = try self.types.internOperation(constraint.identity, owned_arguments);
-                    // A handler or explicit type context has already supplied
-                    // this exact label. Discharge only that established fact;
-                    // inferred generic operations never insert their own label.
-                    for (self.types.rowLabels(signature.c)) |known| if (known == label) {
-                        self.pending.items[i].solved = true;
-                        progress = true;
-                        break;
-                    };
-                    continue;
-                }
-                if (constraint.kind == .resolver_shape) {
-                    const owner = self.types.node(try self.types.resolve(constraint.ty, 0));
-                    if (owner.tag == .variable) continue;
-                    if (owner.tag != .resolver) {
-                        try self.diagnostic(.invalid_provider, constraint.source);
-                    } else {
-                        const token = self.types.node(try self.types.resolve(owner.a, 0));
-                        if (token.tag == .variable) continue;
-                        if (token.tag != .type_constructor) {
-                            try self.diagnostic(.type_constructor_required, constraint.source);
-                        } else {
-                            const identity: Identity = .{ .unit = token.a, .decl = token.b };
-                            const nominal_ = self.nominalIndex(identity) orelse return error.TypeLimit;
-                            // A shaped parameter such as Result [value,error]
-                            // occupies one applied slot, despite two leaf vars.
-                            const arguments = try self.allocator.alloc(T.Id, self.nominals.items[nominal_].parameters.len);
-                            defer self.allocator.free(arguments);
-                            for (arguments) |*argument| argument.* = try self.types.fresh();
-                            try self.constrain(constraint.result, try self.types.nominal(identity, arguments), constraint.source);
-                        }
-                    }
-                    self.pending.items[i].solved = true;
-                    progress = true;
-                    continue;
-                }
-                if (constraint.kind == .update) {
-                    if (try self.updatedFieldType(constraint.ty, constraint.name, constraint.other, constraint.source)) |updated| {
-                        try self.constrain(constraint.result, updated, constraint.source);
-                        self.pending.items[i].solved = true;
-                        progress = true;
-                    }
-                    continue;
-                }
-                if (constraint.kind != .field and constraint.kind != .writable_field and constraint.kind != .dispatch and constraint.kind != .result_dispatch) continue;
-                const saved_ambient = self.ambient;
-                if (constraint.signature != 0) self.ambient = self.types.node(try self.types.resolve(constraint.signature, 0)).c;
-                defer self.ambient = saved_ambient;
-                const owner = try self.types.resolve(if (constraint.kind == .result_dispatch) constraint.result else constraint.ty, 0);
-                if (self.types.node(owner).tag == .variable) continue;
-                // A candidate can demand another source body, whose scheme
-                // construction recursively enters this solver. Hide only this
-                // in-flight obligation, keeping all other chronological work.
-                self.pending.items[i].suspended = true;
-                const selected: ?T.Id = if (constraint.kind == .field or constraint.kind == .writable_field)
-                    (try self.projectField(owner, constraint.name, constraint.source, constraint.kind == .writable_field, pending)).ty
-                else if (constraint.kind == .result_dispatch)
-                    try self.resultDispatch(constraint.ty, owner, constraint.name, constraint.source, pending.direct)
-                else
-                    try self.dispatch(owner, constraint.other, constraint.name, constraint.operator, constraint.source, pending.direct);
-                self.pending.items[i].suspended = false;
-                if (selected) |result| {
-                    try self.constrain(constraint.result, result, constraint.source);
-                    self.pending.items[i].solved = true;
-                    progress = true;
-                }
+                if (try self.attemptPending(i, pending)) progress = true;
+                try self.syncPendingQueue();
+                if (i >= self.pending.items.len) continue;
+                const after = self.pending.items[i];
+                if (after.solved) {
+                    self.pending_queue.complete(i);
+                } else if (after.value.kind == .effect_operation and !after.suspended) {
+                    try self.pending_queue.watch(self.allocator, &self.types, i, &.{ after.value.other, after.value.signature }, false, false);
+                } else self.pending_queue.requeue(i);
             }
         }
+    }
+    /// Mirrors the pending list in the work queue: new obligations are ready,
+    /// and a list shrunk by rollback drops its stale entries and watches.
+    fn syncPendingQueue(self: *Engine) T.Error!void {
+        self.pending_queue.truncate(self.pending.items.len);
+        while (self.pending_queue.entries.items.len < self.pending.items.len) try self.pending_queue.add(self.allocator, true);
+        self.pending_queue.observe(&self.types);
+    }
+    /// One attempt at a pending obligation; true when it made progress.
+    fn attemptPending(self: *Engine, i: usize, pending: PendingObligation) T.Error!bool {
+        var progress = false;
+        const saved_owner = self.dependency_owner;
+        self.dependency_owner = pending.owner;
+        defer self.dependency_owner = saved_owner;
+        try self.inferenceTransition();
+        const constraint = pending.value;
+        if (constraint.kind == .callee_use) {
+            if (try self.resolveUse(i)) progress = true;
+            return progress;
+        }
+        if (constraint.kind == .record_merge) {
+            const result = self.types.mergeRecords(constraint.ty, constraint.other) catch |err| switch (err) {
+                error.TypeMismatch => {
+                    try self.diagnostic(.type_mismatch, constraint.source);
+                    self.pending.items[i].solved = true;
+                    progress = true;
+                    return progress;
+                },
+                else => return err,
+            };
+            if (result) |ty| {
+                try self.constrain(ty, constraint.result, constraint.source);
+                self.pending.items[i].solved = true;
+                progress = true;
+            }
+            return progress;
+        }
+        if (constraint.kind == .collection) {
+            const owner = self.types.node(try self.types.resolve(constraint.ty, 0));
+            if (owner.tag == .variable) return progress;
+            if (owner.tag == .array or owner.tag == .list) {
+                try self.constrain(owner.a, constraint.result, constraint.source);
+            } else try self.diagnostic(.type_mismatch, constraint.source);
+            self.pending.items[i].solved = true;
+            progress = true;
+            return progress;
+        }
+        if (constraint.kind == .monad_factory) {
+            const token = self.types.node(try self.types.resolve(constraint.ty, 0));
+            if (token.tag == .variable) return progress;
+            if (token.tag != .type_constructor) try self.diagnostic(.type_constructor_required, constraint.source);
+            self.pending.items[i].solved = true;
+            progress = true;
+            return progress;
+        }
+        if (constraint.kind == .resolver_dispatch) {
+            self.pending.items[i].suspended = true;
+            const selected = try self.resolverDispatch(pending);
+            self.pending.items[i].suspended = false;
+            if (selected) {
+                self.pending.items[i].solved = true;
+                progress = true;
+            }
+            return progress;
+        }
+        if (constraint.kind == .type_head) {
+            const head = try self.witnessResult(constraint.ty);
+            if (self.types.node(try self.types.resolve(head, 0)).tag == .variable) return progress;
+            try self.constrain(head, constraint.result, constraint.source);
+            self.pending.items[i].solved = true;
+            progress = true;
+            return progress;
+        }
+        if (constraint.kind == .effect_handler) {
+            const extended = self.types.node(try self.types.resolve(constraint.signature, 0));
+            const residual = self.types.node(try self.types.resolve(constraint.other, 0));
+            if (extended.tag != .function or residual.tag != .function) return error.TypeLimit;
+            if (try self.handlerEquation(constraint.ty, extended.c, residual.c, constraint.source)) {
+                self.pending.items[i].solved = true;
+                progress = true;
+            }
+            return progress;
+        }
+        if (constraint.kind == .effect_operation) {
+            const arguments = try self.types.resolve(constraint.other, 0);
+            if (!try self.types.equalClosed(arguments, arguments)) return progress;
+            const pack = self.types.node(arguments);
+            if (pack.tag != .product) return error.TypeLimit;
+            const owned_arguments = try self.allocator.dupe(T.Id, self.types.list(.{ .start = pack.a, .len = pack.b }));
+            defer self.allocator.free(owned_arguments);
+            const signature = self.types.node(try self.types.resolve(constraint.signature, 0));
+            if (signature.tag != .function) return error.TypeLimit;
+            const label = try self.types.internOperation(constraint.identity, owned_arguments);
+            // A handler or explicit type context has already supplied
+            // this exact label. Discharge only that established fact;
+            // inferred generic operations never insert their own label.
+            for (self.types.rowLabels(signature.c)) |known| if (known == label) {
+                self.pending.items[i].solved = true;
+                progress = true;
+                break;
+            };
+            return progress;
+        }
+        if (constraint.kind == .resolver_shape) {
+            const owner = self.types.node(try self.types.resolve(constraint.ty, 0));
+            if (owner.tag == .variable) return progress;
+            if (owner.tag != .resolver) {
+                try self.diagnostic(.invalid_provider, constraint.source);
+            } else {
+                const token = self.types.node(try self.types.resolve(owner.a, 0));
+                if (token.tag == .variable) return progress;
+                if (token.tag != .type_constructor) {
+                    try self.diagnostic(.type_constructor_required, constraint.source);
+                } else {
+                    const identity: Identity = .{ .unit = token.a, .decl = token.b };
+                    const nominal_ = self.nominalIndex(identity) orelse return error.TypeLimit;
+                    // A shaped parameter such as Result [value,error]
+                    // occupies one applied slot, despite two leaf vars.
+                    const arguments = try self.allocator.alloc(T.Id, self.nominals.items[nominal_].parameters.len);
+                    defer self.allocator.free(arguments);
+                    for (arguments) |*argument| argument.* = try self.types.fresh();
+                    try self.constrain(constraint.result, try self.types.nominal(identity, arguments), constraint.source);
+                }
+            }
+            self.pending.items[i].solved = true;
+            progress = true;
+            return progress;
+        }
+        if (constraint.kind == .update) {
+            if (try self.updatedFieldType(constraint.ty, constraint.name, constraint.other, constraint.source)) |updated| {
+                try self.constrain(constraint.result, updated, constraint.source);
+                self.pending.items[i].solved = true;
+                progress = true;
+            }
+            return progress;
+        }
+        if (constraint.kind != .field and constraint.kind != .writable_field and constraint.kind != .dispatch and constraint.kind != .result_dispatch) return progress;
+        const saved_ambient = self.ambient;
+        if (constraint.signature != 0) self.ambient = self.types.node(try self.types.resolve(constraint.signature, 0)).c;
+        defer self.ambient = saved_ambient;
+        const owner = try self.types.resolve(if (constraint.kind == .result_dispatch) constraint.result else constraint.ty, 0);
+        if (self.types.node(owner).tag == .variable) return progress;
+        // A candidate can demand another source body, whose scheme
+        // construction recursively enters this solver. Hide only this
+        // in-flight obligation, keeping all other chronological work.
+        self.pending.items[i].suspended = true;
+        const selected: ?T.Id = if (constraint.kind == .field or constraint.kind == .writable_field)
+            (try self.projectField(owner, constraint.name, constraint.source, constraint.kind == .writable_field, pending)).ty
+        else if (constraint.kind == .result_dispatch)
+            try self.resultDispatch(constraint.ty, owner, constraint.name, constraint.source, pending.direct)
+        else
+            try self.dispatch(owner, constraint.other, constraint.name, constraint.operator, constraint.source, pending.direct);
+        self.pending.items[i].suspended = false;
+        if (selected) |result| {
+            try self.constrain(constraint.result, result, constraint.source);
+            self.pending.items[i].solved = true;
+            progress = true;
+        }
+        return progress;
     }
     /// Resolves one shared scheme use. It stays a use while every observable
     /// variable is still open. Once some are closed and the rest are plain
@@ -7841,6 +7883,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
         .prelude_unit = options.prelude_unit,
     };
     defer engine.scratch_pool.deinit();
+    defer engine.pending_queue.deinit(allocator);
     errdefer engine.types.deinit();
     defer engine.holes.deinit(allocator);
     defer engine.active_aliases.deinit(allocator);
@@ -8223,7 +8266,11 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     errdefer allocator.free(body_closed_rows);
     const merges = try engine.merges.toOwnedSlice(allocator);
     errdefer allocator.free(merges);
-    var checked: Checked = .{ .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.external_targets.count(), .counters = engine.counters };
+    var checked: Checked = .{ .iterator_bodies = engine.iterator_bodies, .computations = computations, .request_loops = request_loops, .request_arms = request_arms, .request_controls = request_controls, .reflections = reflections, .tag_origins = engine.tag_origins, .effect_runners = effect_runners, .effect_runner_ids = engine.effect_runner_ids, .provider_blocks = provider_blocks, .provider_block_ids = engine.provider_block_ids, .body_closed_rows = body_closed_rows, .lambda_closed_rows = engine.lambda_closed_rows, .dispatch_signatures = engine.dispatch_signatures, .effect_families = effect_families, .effect_templates = effect_templates, .operation_uses = operation_uses, .operation_refs = engine.operation_refs, .resolver_completions = resolver_completions, .resolver_loops = resolver_loops, .resolver_loop_ids = engine.resolver_loop_ids, .resolver_blocks = resolver_blocks, .resolver_ops = resolver_ops, .resolver_joins = resolver_joins, .resolver_block_ids = engine.resolver_block_ids, .resolver_op_ids = engine.resolver_op_ids, .resolver_join_ids = engine.resolver_join_ids, .demand_calls = engine.demand_calls, .demand_types = engine.demand_types, .demand_binary_left_types = engine.demand_binary_left_types, .demand_binary_left = engine.demand_binary_left, .loop_carries = loop_carries, .loop_ranges = engine.loop_ranges, .loop_exits = loop_exits, .unit = unit, .associated = associated, .nominals = nominals, .contracts = contracts, .contract_predicates = contract_predicates, .constructors = constructors, .constructor_resolved = engine.constructor_resolved, .projections = engine.projections, .access_paths = engine.access_paths, .access_nodes = engine.access_nodes, .access_types = engine.access_types, .projection_resolved = engine.projection_resolved, .projection_catalog = projection_catalog, .rebindings = engine.rebindings, .types = engine.types, .parameter_patterns = engine.parameter_patterns, .expr_types = engine.expr_types, .resolved = engine.resolved, .bindings = bindings, .merges = merges, .obligations = obligations, .diagnostics = diagnostics, .body_elaborations = engine.body_elaborations, .imported_schemes = if (source_validation) 0 else engine.external_targets.count(), .counters = counters: {
+        var counters = engine.counters;
+        counters.inference_steps = engine.inference_transitions;
+        break :counters counters;
+    } };
     if (!source_validation and engine.initializer_rejected) {
         var rejected = try rejectedSource(allocator, checked.diagnostics);
         rejected.initializer_rejected = true;

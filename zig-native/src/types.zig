@@ -976,9 +976,12 @@ pub const Store = struct {
                     if (decisions) |recorded| if (!has(recorded.items, tail.variable)) try recorded.append(self.allocator, tail.variable);
                     effect_row = self.effects.row(self.rowLabels(effect_row), .closed) catch |err| return effectError(err);
                 }
+                // These lists only answer membership. Copying the inherited set
+                // needs no per-item search; deduplicating it was quadratic in
+                // its size at every nested function.
                 var nested: std.ArrayList(u32) = .empty;
                 defer nested.deinit(self.allocator);
-                try self.unionInto(&nested, protected);
+                try nested.appendSlice(self.allocator, protected);
                 try self.unionInto(&nested, parameter_free);
                 const closed_tail = self.effects.node(effect_row).tail;
                 if (closed_tail == .variable) try self.unionInto(&nested, &.{closed_tail.variable});
@@ -987,7 +990,7 @@ pub const Store = struct {
             .product, .record => {
                 var protected_siblings: std.ArrayList(u32) = .empty;
                 defer protected_siblings.deinit(self.allocator);
-                try self.unionInto(&protected_siblings, protected);
+                try protected_siblings.appendSlice(self.allocator, protected);
                 for (0..value.b) |i| {
                     const child = if (value.tag == .record) self.recordField(value, i).ty else self.extra.items[value.a + i];
                     try self.covariantInputs(child, &protected_siblings, depth + 1);
