@@ -217,6 +217,8 @@ test "late selected recursive components keep their placeholder until all scheme
     }
 }
 
+// Exhausting the module's inference budget rejects the module with one
+// diagnostic at the declaration being inferred, naming it and the budget.
 test "frontend recursive component transition limit bounds unresolved selected work" {
     var tokens = try lexer.lex(a, late_recursive_source);
     defer tokens.deinit(a);
@@ -224,7 +226,30 @@ test "frontend recursive component transition limit bounds unresolved selected w
     defer pool.deinit(a);
     var tree = try parser.parse(a, late_recursive_source, tokens.tokens.items, &pool);
     defer tree.deinit(a);
-    try std.testing.expectError(error.TypeLimit, check.checkModuleWithOptions(a, &tree, &pool, &.{}, &.{}, 1, .{ .max_inference_transitions = 0 }));
+    var limit: usize = 0;
+    var exhausted: usize = 0;
+    while (true) : (limit += 1) {
+        var checked = try check.checkModuleWithOptions(a, &tree, &pool, &.{}, &.{}, 1, .{ .max_inference_transitions = limit });
+        defer checked.deinit(a);
+        if (checked.diagnostics.len == 0) break;
+        try std.testing.expectEqual(@as(usize, 1), checked.diagnostics.len);
+        const issue = checked.diagnostics[0];
+        try std.testing.expectEqual(check.Code.inference_budget, issue.code);
+        var expected: std.ArrayList(u8) = .empty;
+        defer expected.deinit(a);
+        try expected.print(a, "budget of {d} steps while checking `", .{limit});
+        try std.testing.expect(std.mem.find(u8, issue.message(), expected.items) != null);
+        // The span is a declaration of the named value.
+        const named = for (tree.roots.items) |root| {
+            if (tree.node(root).tag != .value_decl) continue;
+            const span = tree.span(root);
+            if (span.start == issue.span.start and span.end == issue.span.end) break pool.get(tree.valueDecl(root).name);
+        } else return error.TestUnexpectedResult;
+        try std.testing.expect(std.mem.find(u8, issue.message(), named) != null);
+        exhausted += 1;
+        try std.testing.expect(limit < 100_000);
+    }
+    try std.testing.expect(exhausted > 4);
 }
 
 const header =

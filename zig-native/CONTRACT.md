@@ -599,6 +599,14 @@ Lambda fields must expose parameter, annotations, and body. Declaration fields
 must expose name, annotations, body and export modifier. No consumer should
 recover semantic structure by reparsing source.
 
+`check.zig` bounds each module's inference with
+`ModuleOptions.max_inference_transitions` (1,000,000 steps by default).
+Exhausting it rejects the module with one `inference_budget` diagnostic at the
+innermost declaration being inferred (a solved field's owner, else the active
+global, else the top-level declaration), naming that declaration and the
+budget. The partially inferred engine is discarded; no other diagnostic from
+that module is kept. The budget is not a project or CLI setting.
+
 ## Semantic and backend boundaries
 
 `types.zig`: an owned compact type table and chronological constraints with

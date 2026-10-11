@@ -201,7 +201,7 @@ pub const LoopCarry = struct { node: ast.Id, incoming: BindingId, iteration: Bin
 pub const LoopExit = struct { node: ast.Id, loop: ast.Id, bindings: T.List };
 pub const ClosedRow = struct { owner: BindingId, variable: u32 };
 pub const Merge = struct { node: ast.Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
-pub const Code = enum { unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity };
+pub const Code = enum { unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, unknown_rebinding, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget };
 pub const PurityWitness = @import("purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
@@ -319,6 +319,7 @@ pub const Diagnostic = struct {
             .return_outside_block => "Return requires an enclosing do block in this function",
             .unknown_rebinding => if (self.symbol != 0) ":= requires an existing local binding" else "Rebinding requires an existing lexical name",
             .nesting_limit => "Semantic nesting exceeds the compiler limit",
+            .inference_budget => "Type inference exceeded this module's work budget",
             .constructor_marker => "Record constructors require # before the name",
             .unknown_constructor => if (self.symbol != 0) "unknown record constructor" else "Unknown data constructor",
             .unknown_field => "This value has no such named field",
@@ -535,6 +536,11 @@ const Engine = struct {
     execution: PrivateExecution = .{},
     inference_limit: usize = 1_000_000,
     inference_transitions: usize = 0,
+    /// Where the module's inference budget ran out. The engine is discarded
+    /// with its error; this record outlives it to position the diagnostic.
+    budget_exhaustion: ?*BudgetExhaustion = null,
+    /// The top-level declaration whose inference is under way.
+    root_global: BindingId = 0,
     /// Body checking may finish before late selected dependencies stabilize.
     /// These members retain their recursive placeholders until publication.
     finishing_group: []const BindingId = &.{},
@@ -4664,8 +4670,20 @@ const Engine = struct {
         self.traceGlobal(.finished, binding);
     }
     fn inferenceTransition(self: *Engine) T.Error!void {
-        if (self.inference_transitions >= self.inference_limit) return error.TypeLimit;
+        if (self.inference_transitions >= self.inference_limit) {
+            self.exhaustBudget();
+            return error.TypeLimit;
+        }
         self.inference_transitions += 1;
+    }
+    /// Records the innermost declaration being inferred: a solved field's
+    /// owner, else the active global, else the declaration being checked.
+    fn exhaustBudget(self: *Engine) void {
+        const record = self.budget_exhaustion orelse return;
+        if (record.exhausted) return;
+        const binding = self.dependency_owner orelse if (self.active.items.len != 0) self.active.items[self.active.items.len - 1] else if (self.current != 0) self.current else self.root_global;
+        const declaration = if (binding < self.bindings.items.len) self.bindings.items[binding].declaration else 0;
+        record.* = .{ .exhausted = true, .name = if (binding < self.bindings.items.len) self.bindings.items[binding].name else 0, .node = declaration, .span = if (declaration != 0) self.tree.span(declaration) else .{ .start = 0, .end = 0 } };
     }
     fn componentLow(self: *Engine, start: usize, binding: BindingId) u32 {
         var low = self.global_states.get(binding).?.low;
@@ -4853,7 +4871,10 @@ const Engine = struct {
         diagnostic_at: ?usize = null,
     };
     fn scheduledFrame(self: *Engine, binding: BindingId, before: ?Global, owner: BindingId, diagnostic_at: ?usize) T.Error!ScheduledGlobal {
-        const references = try global_references.discover(self.allocator, self.tree, self.bindings.items[binding].declaration, .{ .context = self, .self_name = self.self_name, .resolve = discoveryReference }, &self.inference_transitions, self.inference_limit);
+        const references = global_references.discover(self.allocator, self.tree, self.bindings.items[binding].declaration, .{ .context = self, .self_name = self.self_name, .resolve = discoveryReference }, &self.inference_transitions, self.inference_limit) catch |err| {
+            if (err == error.TypeLimit and self.inference_transitions >= self.inference_limit) self.exhaustBudget();
+            return err;
+        };
         errdefer self.allocator.free(references);
         const diagnostic_start = self.diagnostics.items.len;
         const frame = try self.beginGlobal(binding);
@@ -6714,10 +6735,10 @@ const Engine = struct {
                     if (self.global_states.get(pending.wait_target).?.state != .complete) continue;
                     self.pending.items[i].wait_target = 0;
                 }
-                try self.inferenceTransition();
                 const saved_owner = self.dependency_owner;
                 self.dependency_owner = pending.owner;
                 defer self.dependency_owner = saved_owner;
+                try self.inferenceTransition();
                 const constraint = pending.value;
                 if (constraint.kind == .callee_use) {
                     if (try self.resolveUse(i)) progress = true;
@@ -7779,9 +7800,30 @@ pub fn validateModuleSource(allocator: Allocator, tree: *const ast.Tree, pool: *
 fn checkInternal(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool) !Checked {
     return checkInternalExecution(allocator, tree, pool, imports, headers, catalogs, source_catalogs, unit, allow_imports, options, source_validation, .{});
 }
+const BudgetExhaustion = struct { exhausted: bool = false, name: symbols.Symbol = 0, node: ast.Id = 0, span: ast.Span = .{ .start = 0, .end = 0 } };
 fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool, execution: PrivateExecution) !Checked {
+    var exhaustion: BudgetExhaustion = .{};
+    return checkEngine(allocator, tree, pool, imports, headers, catalogs, source_catalogs, unit, allow_imports, options, source_validation, execution, &exhaustion) catch |err| {
+        if (err != error.TypeLimit or !exhaustion.exhausted) return err;
+        return rejectExhaustedBudget(allocator, pool, unit, options.max_inference_transitions, exhaustion);
+    };
+}
+/// The partially inferred engine is gone; the module is rejected with one
+/// diagnostic that names the budget and the declaration that exhausted it.
+fn rejectExhaustedBudget(allocator: Allocator, pool: *const symbols.Pool, unit: u32, limit: usize, exhaustion: BudgetExhaustion) !Checked {
+    const detail = if (exhaustion.name != 0)
+        try allocator.print("Type inference exceeded this module's budget of {d} steps while checking `{s}`", .{ limit, pool.get(exhaustion.name) })
+    else
+        try allocator.print("Type inference exceeded this module's budget of {d} steps", .{limit});
+    defer allocator.free(detail);
+    var rejected = try rejectedSource(allocator, &.{.{ .code = .inference_budget, .span = exhaustion.span, .node = exhaustion.node, .symbol = exhaustion.name, .detail = detail }});
+    rejected.unit = unit;
+    return rejected;
+}
+fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, unit: u32, allow_imports: bool, options: ModuleOptions, source_validation: bool, execution: PrivateExecution, exhaustion: *BudgetExhaustion) !Checked {
     if (!source_validation and hasNumericFailure(tree)) return rejectNumericSource(allocator, tree, pool, imports, catalogs, unit, options);
     var engine: Engine = .{
+        .budget_exhaustion = exhaustion,
         .scratch_pool = .init(allocator),
         .execution = execution,
         .inference_limit = options.max_inference_transitions,
@@ -8099,7 +8141,11 @@ fn checkInternalExecution(allocator: Allocator, tree: *const ast.Tree, pool: *sy
         };
     }
     if (!engine.source_validation and tree.diagnostics.items.len == 0 and source_issue == null) {
-        for (tree.roots.items) |id| if (tree.node(id).tag == .value_decl and engine.resolved[id] != 0) try engine.inferGlobal(engine.resolved[id]);
+        for (tree.roots.items) |id| if (tree.node(id).tag == .value_decl and engine.resolved[id] != 0) {
+            engine.root_global = engine.resolved[id];
+            try engine.inferGlobal(engine.resolved[id]);
+        };
+        engine.root_global = 0;
         // A known entry resolver cannot omit a source protocol method. Do not
         // instantiate unrelated latent closure predicates here: their exact
         // operand evidence belongs to the demanded retained body instance.
