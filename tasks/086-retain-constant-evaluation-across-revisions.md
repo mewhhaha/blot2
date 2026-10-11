@@ -28,6 +28,20 @@ whether 0% or 90% of named functions were reused, consistent with evaluation
 rather than code generation dominating. Task 022 already replays graph-equal
 constant children of retained fragments but re-serializes them.
 
+An instrumented copy of the task-085 compiler on the frozen gdev copy (11
+October 2026) evaluated 594 constants per retained literal edit in about 700 ms.
+One entry constant, `sandbox` in the main module, took 99.4% of that, and 98% of
+its time was inference nested in its evaluation rather than value evaluation
+(about 15 ms). Its value never read the edited constant; it reaches it only
+through function constants that compile-time evaluation does not apply. The
+other 593 constants took under 5 ms together. Reusing `sandbox` therefore means
+publishing a constant slot and its fuel from a validated receipt, which the
+value-template boundary in
+[source_value_template.zig](../zig-native/src/source_value_template.zig)
+explicitly excludes today ("does not publish constant slots, callable
+certificates, or skip source fuel"). Changing that boundary needs the owner's
+agreement before implementation.
+
 ## Implementation checklist
 
 - [ ] Record each constant's exact value dependencies (source bodies, reads,
