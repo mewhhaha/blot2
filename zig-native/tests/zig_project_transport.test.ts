@@ -131,6 +131,7 @@ for (const mode of ["fragmented", "coalesced", "reject-first"]) {
       await dispose;
       const records = await logs(item.log);
       equal(records[0].command, "serve-project");
+      equal(records.find((row) => row.kind === "open").version, 1);
       equal(
         records.filter((row) => row.kind === "build").map((row) =>
           row.revision
@@ -253,6 +254,8 @@ for (
     "source-fuel",
     "missing-work",
     "fractional-work",
+    "invalid-stats-object",
+    "invalid-stats-boolean",
     "truncated-header",
     "truncated-metadata",
     "truncated-payload",

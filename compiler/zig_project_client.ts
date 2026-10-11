@@ -176,8 +176,23 @@ function buildStats(value: unknown): ZigProjectBuildStats {
   ) {
     natural(object[field], `stats ${field}`);
   }
-  stats(object.frontend, "stats frontend");
-  stats(object.attemptStats, "stats attemptStats");
+  for (
+    const field of [
+      "frontend",
+      "backend",
+      "optimization",
+      "runtimeOptimization",
+      "backendTiming",
+      "workCounters",
+      "principals",
+      "refinements",
+      "selectedQueries",
+      "attemptStats",
+    ]
+  ) stats(object[field], `stats ${field}`);
+  if (typeof object.restartCacheLoaded !== "boolean") {
+    throw new ZigProjectProtocolError("Invalid stats restartCacheLoaded");
+  }
   return object as ZigProjectBuildStats;
 }
 function diagnostic(value: unknown): ZigProjectDiagnostic {
@@ -436,6 +451,7 @@ class ProjectProcess implements ZigProjectCompiler {
           const response = await this.#exchange({
             kind: "open",
             id: this.#id(),
+            version: 1,
             ...open,
           }, checkpoint ? [checkpoint] : []);
           if (
@@ -888,7 +904,9 @@ export async function createZigProjectCompiler(
     );
   }
   if (
-    new TextEncoder().encode(JSON.stringify({ kind: "open", id: 1, ...open }))
+    new TextEncoder().encode(
+      JSON.stringify({ kind: "open", id: 1, version: 1, ...open }),
+    )
       .length > maxMetadataBytes
   ) throw new RangeError("Open metadata exceeds 1 MiB");
   const cacheEnvironment: Record<string, string> = {};

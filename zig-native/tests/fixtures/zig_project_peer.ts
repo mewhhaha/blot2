@@ -213,11 +213,24 @@ while (true) {
             ? {}
             : { nativeWorkSteps: mode === "fractional-work" ? 0.5 : builds }),
           frontend: {},
+          backend: {},
+          optimization: {},
+          runtimeOptimization: {},
+          backendTiming: {},
+          workCounters: {},
+          principals: {},
+          refinements: {},
+          selectedQueries: {},
+          restartCacheLoaded: false,
           sourceBytes: 0,
           freshModules: 0,
           cachedModules: 0,
           attemptStats: {},
           nested: { marker: builds },
+          ...(mode === "invalid-stats-object" ? { backend: [] } : {}),
+          ...(mode === "invalid-stats-boolean"
+            ? { restartCacheLoaded: 0 }
+            : {}),
         },
       }, mode === "invalid-wasm" ? Uint8Array.of(1, 2, 3) : wasm),
     );}

@@ -17,6 +17,7 @@ const restart_cache = @import("restart_cache.zig");
 const Request = struct {
     kind: enum { open, build, close, checkpoint },
     id: u32,
+    version: ?u32 = null,
     epoch: ?[]const u8 = null,
     revision: ?u64 = null,
     entry: ?[]const u8 = null,
@@ -31,6 +32,7 @@ const Request = struct {
     checkpoint: bool = false,
     sources: []const SourceRange = &.{},
 };
+const request_parse_options: std.json.ParseOptions = .{ .allocate = .alloc_always, .duplicate_field_behavior = .@"error", .ignore_unknown_fields = false };
 const SourceRange = struct { path: []const u8, start: u32, length: u32, deleted: bool = false };
 
 fn sourceViews(a: Allocator, ranges: []const SourceRange, payload: []const u8) ![]inputs.overlays.Source {
@@ -49,6 +51,7 @@ fn sourceViews(a: Allocator, ranges: []const SourceRange, payload: []const u8) !
     };
     return sources;
 }
+const protocol_version = 1;
 const epoch = "1"; // Channel-local: a process permits one open and no reopening.
 
 test "source overlay ranges partition payload before allocating or preparing a revision" {
@@ -69,6 +72,7 @@ fn validPath(path: []const u8) bool {
     return path.len != 0 and std.Io.Dir.path.isAbsolute(path) and std.mem.findScalar(u8, path, 0) == null;
 }
 fn validateOpen(request: Request) !project.Options {
+    if (request.version == null or request.version.? != protocol_version) return error.VersionMismatch;
     if (request.codegenWorkers == 0 or request.codegenWorkers > 16) return error.InvalidOpen;
     if (request.entry == null or !validPath(request.entry.?) or request.epoch != null or request.revision != null) return error.InvalidOpen;
     for ([_]?[]const u8{ request.prelude, request.stdRoot, request.dependencies }) |path| if (path) |p| {
@@ -263,7 +267,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
     try reply(a, writer, .{
         .kind = "hello",
         .protocol = "blot-zig-project",
-        .version = 1,
+        .version = protocol_version,
         .compilerIdentity = &identity,
         .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "backend-checkpoints" },
         .maxFrameBytes = frames.max_frame_bytes,
@@ -274,7 +278,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
     while (try frames.readRequestFrame(a, reader)) |frame_value| {
         var frame = frame_value;
         defer frame.deinit(a);
-        const parsed = try std.json.parseFromSlice(Request, a, frame.metadata(), .{ .allocate = .alloc_always });
+        const parsed = try std.json.parseFromSlice(Request, a, frame.metadata(), request_parse_options);
         defer parsed.deinit();
         const request = parsed.value;
         if (request.id == 0 or request.id <= last_id) return error.RequestOrder;
@@ -292,7 +296,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
             },
             .build, .close, .checkpoint => {
                 const owner = if (opened) |*value| value else return error.NotOpen;
-                if (request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.codegenTier != .optimized or request.shareMachineCode or request.codegenWorkers != 1 or request.checkpoint) return error.InvalidRequest;
+                if (request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.codegenTier != .optimized or request.shareMachineCode or request.codegenWorkers != 1 or request.checkpoint) return error.InvalidRequest;
                 if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.session.revisions) return error.RevisionMismatch;
                 if (request.kind == .checkpoint) {
                     if (request.sources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
@@ -319,4 +323,14 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
             },
         }
     }
+}
+
+test "project open requires the exact public protocol version" {
+    const a = std.testing.allocator;
+    for ([_]?u32{ null, 0, 2, std.math.maxInt(u32) }) |version| {
+        try std.testing.expectError(error.VersionMismatch, validateOpen(.{ .kind = .open, .id = 1, .entry = "/main.blot", .version = version }));
+    }
+    _ = try validateOpen(.{ .kind = .open, .id = 1, .entry = "/main.blot", .version = protocol_version });
+    try std.testing.expectError(error.DuplicateField, std.json.parseFromSlice(Request, a, "{\"kind\":\"open\",\"id\":1,\"id\":2}", request_parse_options));
+    try std.testing.expectError(error.UnknownField, std.json.parseFromSlice(Request, a, "{\"kind\":\"open\",\"id\":1,\"unknown\":0}", request_parse_options));
 }
