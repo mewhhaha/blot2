@@ -2,7 +2,8 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** In progress — representation fix qualified; full reported-fixture
+  compilation remains open.
 - **Dependencies:** None.
 - **Originating requirements:** reported on 11 October 2026 by the gdev session:
   16 gdev tests fail to compile. Sources: that session's report.
@@ -48,9 +49,9 @@ prelude's `from`, which may be the same gap.
 ## Implementation checklist
 
 - [x] Reduce the failure to a public repro without gdev source.
-- [ ] Find why specialization reaches the cursor without concrete representation
+- [x] Find why specialization reaches the cursor without concrete representation
       evidence and fix the compiler, not the program.
-- [ ] Add a regression law for the reduced program.
+- [x] Add a regression law for the reduced program.
 
 ## Validation
 
@@ -63,16 +64,30 @@ before the local milestone commit.
 ## Acceptance criteria
 
 - [ ] The reported fixtures compile, with a public regression law.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `f2b41b4`. Named/closure queries copy partial physical shapes;
+  compatible holes and unknown rows reconcile without defaulting language types.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
+  and 651 guest/client tests.
+  `ZIG_ANALYZER=build/tools/zig-analyzer/zig-out/bin/zig-analyzer deno task lint:zig`
+  reports zero findings across 315 files. Allocation-failure coverage is
+  included.
+- gdev: 472 passing checks/traps/expected rejections across 54 regular modules;
+  duplicate blocked app/sandbox fixtures pass all ten checks. The split-hauling
+  module remains blocked by the distinct budget-exhaustion crash in [099]. These
+  results do not claim all originally reported fixtures compile.
+- Comparison: all 13 public examples, four synthetic workloads and frozen gdev
+  preserve Wasm bytes. Three paired gdev runs show no established CPU
+  improvement.
+- Remaining limitation: complete the outstanding fixture qualification after
+  [099]; retain this task's open acceptance criterion until that evidence
+  exists.
+- Durable record:
+  [partial collection layouts](../zig-native/PARTIAL_COLLECTIONS.md), including
+  binary pins and paired samples.
+
+[099]: 099-survive-long-stage-chains-without-crashing.md

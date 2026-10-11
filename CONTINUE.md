@@ -32,31 +32,15 @@ stage chains).
 
 ## Uncommitted work in the tree
 
-1. **Task 097, in progress.** `zig-native/src/check.zig` adds
-   `defaultUnconstrained` in `Engine.finish`: an expression type variable that
-   inference left unconstrained, that no scheme generalizes and that no unsolved
-   obligation names, unifies with Unit (checker counter `defaulted_types`). A
-   copy is in `build/wip/097-default-unconstrained.patch`. `zig-out/bin/blotc`
-   is built from this tree.
-   - The gdev-free repro now compiles and runs: `count` loops over its array
-     argument (`for x in xs: n := self + 1`), and
-     `entry const create = fn () => count #[]`. So does the `Box [a, b]` variant
-     (`count #[] + count #[#A 1, #A 2] * 10` returns 20).
-   - Not yet acceptable: it changes the Wasm of `examples/monads.blot` and
-     `examples/prelude.blot`. Defaulted there: `#Nothing` and the name
-     `Result.unwrap_or` (monads), `Result.unwrap_or` (prelude). Also defaulted
-     but byte-identical: a record pattern `{ initial }` in `ecs` and
-     `count_until_zero` in `requests`.
-   - Next: find which variable `Result.unwrap_or` leaves free (likely the unused
-     error type) and why Unit instead of `erased` changes code. Then decide
-     between keeping the byte change (verify behavior: examples' tests, gdev
-     bytes and gdev tests) and narrowing the rule, for example defaulting only
-     where emission would otherwise fail.
-   - Then add the two repro programs as laws, run the gate, and record. Root
-     cause: specialization cannot tell an unconstrained variable from an
-     unselected one (both reach it as `erased`), and refinement of `Array.iter`
-     needs concrete element evidence. Defaulting in the checker is the only
-     place that knows a variable is truly unconstrained.
+1. **Task 097's representation fix is committed at `f2b41b4`.** The broad
+   checker default was rejected; its patches remain in `build/wip/`. Partial
+   physical shapes preserve generic reuse without semantic defaults. Full native
+   suite, 651 guest/client tests and zero analyzer findings pass. The 54-module
+   regular gdev suite passes all 472 cases; blocked app/sandbox pass ten checks.
+   All public examples, synthetic phases and frozen gdev preserve Wasm bytes.
+   [PARTIAL_COLLECTIONS](zig-native/PARTIAL_COLLECTIONS.md) records the
+   evidence. Task 097 remains open for complete reported-fixture qualification:
+   the blocked split-hauling module hits task 099's inference-budget crash.
 2. **`zig-native/PROJECT_PROTOCOL.md`** (untracked) was written by the pen
    session (`pen-9c`) as task 095's first checklist item, describing protocol
    version 1 as the code has it at `544c5c6`. It is unreviewed. Review it
@@ -69,11 +53,13 @@ stage chains).
 ## Next work
 
 1. Finish 097 (above).
-2. 099: get a reduced, gdev-free repro from the gdev session. The current one is
-   `/tmp/claude-1000/-home-jacobt-src-gdev/8fe707f7-36f4-47a4-8a1f-37ead8a3232f/scratchpad/ui_game_crashes_blotc.blot`
-   (compile it appended to gdev's `src/main.blot`, or run
-   `../pen/target/release/pen test-blot <path>` from `~/src/gdev`). A segfault
-   suggests another unbounded recursion (task 091 bounded constant evaluation).
+2. 099: public reduction is in ignored `build/bench/long-stage-chains/`. A
+   holder with 64 callbacks and 51 stage links compiles (974,824 inference
+   steps); 52 links exhaust the one-million-step budget and crash. CLI and
+   server Gdb traces point to `project_check.Engine.moduleExports`: rejected
+   checker results have empty declaration catalogs, but export loops slice them
+   with `[1..]`. Preserve the existing positioned `inference_budget` diagnostic
+   by safely skipping sentinel indices in all three catalog loops.
 3. 095, then 096: pen will drive `blotc serve-project` from Rust and pin a blot2
    commit once 095 lands. Tell the gdev session (`gdev-94`) the commit to pin.
    096's spec is gdev's `asset_parsers.ts`; match the text parser exactly (code
