@@ -57,6 +57,11 @@ pub const Stats = struct {
     }
 };
 
+/// Images cover every module of the program, so they get their own budget
+/// rather than one query table's. A 60-file game's images are about 16.4 MB;
+/// over budget, the certificate is dropped and every later edit revalidates.
+pub const owned_bytes: usize = 64 * 1024 * 1024;
+
 pub const Certificate = struct {
     record: Record,
     reused_images: usize = 0,
@@ -65,13 +70,13 @@ pub const Certificate = struct {
     /// immutable owner has one certificate and needs no bucket index. Optional
     /// oversized images decline retention; subsequent validation runs normally.
     pub fn capture(a: A, context: validation.Context, pins: anytype, names: identity.View) A.Error!?Certificate {
-        return captureWithBudget(a, context, pins, names, (queries.Limits{}).owned_bytes);
+        return captureWithBudget(a, context, pins, names, owned_bytes);
     }
     /// `reusable[i]` must certify that the previous certificate's image of unit
     /// i exactly equals the current module's image; the unit, producer path
     /// and stamp are rechecked before its bytes are copied.
     pub fn captureReusing(a: A, context: validation.Context, pins: anytype, names: identity.View, previous: ?*const Certificate, reusable: []const bool) A.Error!?Certificate {
-        return captureReusingWithBudget(a, context, pins, names, previous, reusable, (queries.Limits{}).owned_bytes);
+        return captureReusingWithBudget(a, context, pins, names, previous, reusable, owned_bytes);
     }
     pub fn captureWithBudget(a: A, context: validation.Context, pins: anytype, names: identity.View, budget: usize) A.Error!?Certificate {
         return captureReusingWithBudget(a, context, pins, names, null, &.{}, budget);

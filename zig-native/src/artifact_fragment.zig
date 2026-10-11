@@ -13,6 +13,7 @@ const Arena = wasm.Arena;
 const ListRuntime = @import("list_runtime.zig").Runtime;
 const HostReferences = wasm.HostReferences;
 const absent = std.math.maxInt(u32);
+const value_template = @import("source_value_template.zig");
 const Error = Allocator.Error || error{ InvalidFunctionReference, InvalidGlobalReference, ModuleTooLarge, Declined };
 const Address = struct { original: u32, actual: u32, len: u32, owner: u32 };
 pub const Stats = struct { candidates: usize = 0, reused_named: usize = 0, reused_closures: usize = 0, fresh_named: usize = 0, fresh_closures: usize = 0, refinement_regions: usize = 0, declined: usize = 0, reused_scalar_constants: usize = 0, reused_aggregate_constants: usize = 0 };
@@ -28,6 +29,8 @@ pub const State = struct {
     blocked: []bool,
     functions: []u32,
     signatures: []u32,
+    /// First old emission record declaring each signature ID, or absent.
+    signature_records: []u32,
     imports: []u32,
     globals: []u32,
     addresses: std.ArrayList(Address) = .empty,
@@ -42,6 +45,9 @@ pub const State = struct {
     aggregate_constants: std.AutoHashMapUnmanaged(u32, AggregateConstant) = .empty,
     /// Old aggregate root address to its current serialization, exact only.
     constant_addresses: std.ArrayList(Address) = .empty,
+    /// Reused value-match buffers, bound to the live generator on first use.
+    /// Heap-owned so its bound address stays fixed.
+    match_scratch: ?*value_template.QueryScratch = null,
 
     pub fn init(a: Allocator, old: *const capture.Capture, units: []const core.Module, names: ?identity.View, cached: usize) Allocator.Error!State {
         return initWithStamps(a, old, units, names, cached, null);
@@ -112,9 +118,17 @@ pub const State = struct {
         errdefer a.free(functions);
         const signatures = try slots(a, signature_count);
         errdefer a.free(signatures);
+        const signature_records = try slots(a, signature_count);
+        errdefer a.free(signature_records);
+        for (old.emission.records.items, 0..) |record, index| switch (record.event) {
+            .signature => |item| if (signature_records[item.id] == absent) {
+                signature_records[item.id] = @intCast(index);
+            },
+            else => {},
+        };
         const imports = try slots(a, import_count);
         errdefer a.free(imports);
-        return .{ .allocator = a, .old = old, .importer = graphs, .starts = starts, .ends = ends, .blocked = blocked, .functions = functions, .signatures = signatures, .imports = imports, .globals = try slots(a, global_count), .arena = arena, .lists = lists, .host = host, .enabled = selection_stable, .serialized_roots = roots };
+        return .{ .allocator = a, .old = old, .importer = graphs, .starts = starts, .ends = ends, .blocked = blocked, .functions = functions, .signatures = signatures, .signature_records = signature_records, .imports = imports, .globals = try slots(a, global_count), .arena = arena, .lists = lists, .host = host, .enabled = selection_stable, .serialized_roots = roots };
     }
     pub fn deinit(self: *State) void {
         self.importer.deinit();
@@ -123,6 +137,11 @@ pub const State = struct {
         self.allocator.free(self.blocked);
         self.allocator.free(self.functions);
         self.allocator.free(self.signatures);
+        self.allocator.free(self.signature_records);
+        if (self.match_scratch) |scratch| {
+            scratch.deinit();
+            self.allocator.destroy(scratch);
+        }
         self.allocator.free(self.imports);
         self.allocator.free(self.globals);
         self.addresses.deinit(self.allocator);
@@ -166,15 +185,10 @@ pub const State = struct {
         if (slot.state != .complete) return null;
         const gate = if (self.importer.code_gate) |*owned| &owned.semantic else return null;
         if (!gate.enabled) return null;
-        const inspection = try @import("source_value_template.zig").Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, gate, &.{job.value.?.value}, .source_declared);
+        const inspection = try value_template.Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, gate, &.{job.value.?.value}, .source_declared);
         var plan = inspection.plan orelse return null;
         defer plan.deinit(self.allocator);
-        const anchors = try self.allocator.alloc(u32, self.old.metadata.pools.?.evaluator.values.len);
-        defer self.allocator.free(anchors);
-        @memset(anchors, 0);
-        const same = plan.matchInto(g, &self.importer, job.value.?.value, slot.value, anchors) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else null;
-        if (!same) return null;
-        if (!try self.importer.recordValueAnchors(anchors)) return null;
+        if (!try self.matchValues(g, &plan, job.value.?.value, slot.value)) return null;
         const ty = (try self.importer.importLayout(g, request.ty)) orelse return null;
         const admitted: AggregateConstant = .{ .request = .{ .constant = .{ .target = .{ .unit = unit, .binding = request.target.binding }, .ty = ty } }, .root = root };
         try self.aggregate_constants.put(self.allocator, id, admitted);
@@ -322,17 +336,27 @@ pub const State = struct {
         const target: core.BindingRef = .{ .unit = self.importer.unit_map[read.target.unit - 1], .binding = read.target.binding };
         if (target.unit == 0) return false;
         const current = g.evaluator.richValue(target) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
-        const inspection = try @import("source_value_template.zig").Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, gate, &.{read.value}, .source_declared);
+        const inspection = try value_template.Plan.inspectRootsWithRows(self.allocator, &self.old.metadata.pools.?, gate, &.{read.value}, .source_declared);
         var plan = inspection.plan orelse return false;
         defer plan.deinit(self.allocator);
-        const anchors = try self.allocator.alloc(u32, self.old.metadata.pools.?.evaluator.values.len);
-        defer self.allocator.free(anchors);
-        @memset(anchors, 0);
-        const same = plan.matchInto(g, &self.importer, read.value, current, anchors) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
-        if (!same) return false;
-        if (!try self.importer.recordValueAnchors(anchors)) return false;
+        if (!try self.matchValues(g, &plan, read.value, current)) return false;
         try self.static_matches.put(self.allocator, read, current);
         return true;
+    }
+    /// Matches an old value graph against a current value and records the
+    /// correspondence. The scratch touches only matched entries, where a fresh
+    /// map per read cleared and scanned every old and current value.
+    fn matchValues(self: *State, g: anytype, plan: *const value_template.Plan, old_root: u32, current_root: u32) Allocator.Error!bool {
+        const scratch = self.match_scratch orelse created: {
+            const owned = try self.allocator.create(value_template.QueryScratch);
+            owned.* = .{ .allocator = g.evaluator.allocator };
+            self.match_scratch = owned;
+            break :created owned;
+        };
+        const anchors = scratch.begin(plan, g) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        const same = plan.matchIntoWithScratch(g, &self.importer, old_root, current_root, anchors, scratch) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
+        if (!same) return false;
+        return self.importer.recordValueAnchorIds(scratch.anchors.items, scratch.anchor_ids.items);
     }
     fn staticHelper(self: *const State, function: emitter.FunctionArtifact, owner: u32) bool {
         return function.role == .static_closure and owner != 0 and function.resource_owner == owner and !self.blocked[owner - 1] and self.old.metadata.jobs.items[owner - 1].hasStaticValues();
@@ -400,15 +424,15 @@ pub const State = struct {
     fn signature(self: *State, g: anytype, id: u32) Error!u32 {
         if (id >= self.signatures.len) return error.InvalidFunctionReference;
         if (self.signatures[id] != absent) return self.signatures[id];
-        for (self.old.emission.records.items) |record| switch (record.event) {
-            .signature => |item| if (item.id == id) {
-                const actual = try g.module.internType(self.old.emission.parameters.items[item.parameters.start..][0..item.parameters.len], item.result);
-                self.signatures[id] = actual;
-                return actual;
-            },
-            else => {},
+        const position = self.signature_records[id];
+        if (position == absent) return error.InvalidFunctionReference;
+        const item = switch (self.old.emission.records.items[position].event) {
+            .signature => |value| value,
+            else => return error.InvalidFunctionReference,
         };
-        return error.InvalidFunctionReference;
+        const actual = try g.module.internType(self.old.emission.parameters.items[item.parameters.start..][0..item.parameters.len], item.result);
+        self.signatures[id] = actual;
+        return actual;
     }
     fn ensureArena(self: *State, g: anytype) Error!void {
         const old = self.arena orelse return error.InvalidFunctionReference;

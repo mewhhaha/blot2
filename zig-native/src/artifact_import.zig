@@ -298,6 +298,23 @@ pub const Importer = struct {
     }
     /// Merge only a correspondence already proved by source_value_template.
     /// Conflicting alias relationships decline rather than overwrite a proof.
+    /// `recordValueAnchors` for a sparse correspondence. `ids` lists every
+    /// nonzero entry of `anchors`; it is sorted so the anchors are recorded in
+    /// the same order as a full scan.
+    pub fn recordValueAnchorIds(self: *Importer, anchors: []const u32, ids: []u32) Allocator.Error!bool {
+        if (anchors.len != self.old.evaluator.values.len) return false;
+        std.mem.sortUnstable(u32, ids, {}, std.sort.asc(u32));
+        for (ids) |old| {
+            const current = anchors[old];
+            if (current == 0) continue;
+            if (self.value_anchors.get(old)) |known| if (known != current) return false;
+        }
+        for (ids) |old| {
+            const current = anchors[old];
+            if (current != 0) try self.value_anchors.put(self.allocator, old, current);
+        }
+        return true;
+    }
     pub fn recordValueAnchors(self: *Importer, anchors: []const u32) Allocator.Error!bool {
         if (anchors.len != self.old.evaluator.values.len) return false;
         for (anchors, 0..) |current, old| if (current != 0) {
