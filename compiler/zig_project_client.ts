@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   type DispatchExplanation,
@@ -14,6 +14,17 @@ import {
   type CompiledAsset,
   withAssetImports,
 } from "./assets.ts";
+
+import {
+  captureNativeAssets,
+  type NativeAssetOptions,
+  readNativeAssetReply,
+} from "./native_assets.ts";
+export type {
+  NativeAssetImport,
+  NativeAssetKind,
+  NativeAssetOptions,
+} from "./native_assets.ts";
 
 export const maxFrameBytes = 64 * 1024 * 1024;
 const maxMetadataBytes = 1024 * 1024;
@@ -84,6 +95,8 @@ export interface ZigProjectCompilerOptions {
   startupTimeoutMs?: number;
   expectedCompilerIdentity?: string;
   assets?: AssetImports;
+  /** Parse captured external inputs directly in the native compiler. */
+  nativeAssets?: NativeAssetOptions;
 }
 export interface ZigProjectCompiler {
   readonly pid: number;
@@ -268,6 +281,8 @@ class ProjectProcess implements ZigProjectCompiler {
   #closing: Promise<void> | undefined;
   #identity = "";
   #sourceOverlays = false;
+  #nativeAssets = false;
+  #entry = "";
   #checkpoints = false;
   #epoch = "";
   #revision = 0;
@@ -443,6 +458,15 @@ class ProjectProcess implements ZigProjectCompiler {
           this.#identity = hello.compilerIdentity;
           this.#sourceOverlays = capabilities.includes("source-overlays");
           this.#checkpoints = capabilities.includes("backend-checkpoints");
+          this.#nativeAssets = open.nativeAssets !== undefined;
+          this.#entry = open.entry as string;
+          if (
+            this.#nativeAssets && !capabilities.includes("native-assets-v1")
+          ) {
+            throw new ZigProjectProtocolError(
+              "Compiler does not support native assets",
+            );
+          }
           if (checkpoint && !this.#checkpoints) {
             throw new ZigProjectProtocolError(
               "Compiler does not support checkpoints",
@@ -519,44 +543,61 @@ class ProjectProcess implements ZigProjectCompiler {
   build(
     options: ZigProjectBuildOptions = {},
   ): Promise<ZigProjectBuildResult> {
-    const sources: {
+    type Range = {
       path: string;
       start: number;
       length: number;
       deleted: boolean;
-    }[] = [];
+    };
+    const sources: Range[] = [];
+    const assetSources: Range[] = [];
     const payload: Uint8Array<ArrayBuffer>[] = [];
     try {
-      keys(record(options, "build options"), ["signal", "sources"], "build");
-      if (options.sources !== undefined) {
-        const entries = Object.entries(record(options.sources, "sources"));
+      keys(record(options, "build options"), [
+        "signal",
+        "sources",
+        "assetSources",
+      ], "build");
+      if (options.assetSources !== undefined && !this.#nativeAssets) {
+        throw new TypeError(
+          "assetSources requires a native asset session or parser wrapper",
+        );
+      }
+      let start = 0;
+      const capture = (value: unknown, ranges: Range[], rawAssets: boolean) => {
+        if (value === undefined) return;
+        const entries = Object.entries(record(value, "source overlays"));
         if (entries.length > 4096) {
           throw new RangeError("Too many source files");
         }
-        if (entries.length && !this.#sourceOverlays) {
+        if (!rawAssets && entries.length && !this.#sourceOverlays) {
           throw new TypeError("Compiler does not support source overlays");
         }
         const names = new Set<string>();
-        let start = 0;
         for (const [raw, contents] of entries) {
-          const name = path(raw, "source path");
+          let name = path(raw, "source path");
+          if (rawAssets) name = resolve(dirname(this.#entry), raw);
           if (names.has(name)) throw new TypeError("Duplicate source path");
           names.add(name);
-          if (
-            contents !== null &&
-            (typeof contents !== "string" || !contents.isWellFormed())
-          ) {
-            throw new TypeError(
-              "Source contents must be a well-formed string or null",
-            );
+          let bytes = new Uint8Array(0);
+          if (contents !== null) {
+            if (typeof contents === "string") {
+              if (!rawAssets && !contents.isWellFormed()) {
+                throw new TypeError(
+                  "Source contents must be a well-formed string or null",
+                );
+              }
+              bytes = new TextEncoder().encode(contents);
+            } else if (rawAssets && contents instanceof Uint8Array) {
+              bytes = new Uint8Array(contents);
+            } else {
+              throw new TypeError("Invalid source overlay contents");
+            }
           }
-          const bytes = contents === null
-            ? new Uint8Array(0)
-            : new TextEncoder().encode(contents);
           if (bytes.length > 16 * 1024 * 1024) {
             throw new RangeError("Source exceeds 16 MiB limit");
           }
-          sources.push({
+          ranges.push({
             path: name,
             start,
             length: bytes.length,
@@ -568,23 +609,25 @@ class ProjectProcess implements ZigProjectCompiler {
           }
           if (bytes.length) payload.push(bytes);
         }
-        // Reserve the largest request ID/revision before queueing, so invalid
-        // caller input cannot consume an ID or terminate a healthy process.
-        const metadata = new TextEncoder().encode(
-          JSON.stringify({
-            kind: "build",
-            id: 0xffff_ffff,
-            epoch: this.#epoch,
-            revision: Number.MAX_SAFE_INTEGER,
-            sources,
-          }),
-        );
-        if (
-          metadata.length > maxMetadataBytes ||
-          metadata.length + start + 8 > maxFrameBytes
-        ) {
-          throw new RangeError("Source request exceeds protocol limit");
-        }
+      };
+      capture(options.sources, sources, false);
+      capture(options.assetSources, assetSources, true);
+      // Reserve maximum ID/revision spelling before queueing. Invalid input
+      // cannot consume an ID or terminate the healthy process.
+      const worstRequest: Record<string, unknown> = {
+        kind: "build",
+        id: 0xffff_ffff,
+        epoch: this.#epoch,
+        revision: Number.MAX_SAFE_INTEGER,
+      };
+      if (sources.length) worstRequest.sources = sources;
+      if (assetSources.length) worstRequest.assetSources = assetSources;
+      const metadata = new TextEncoder().encode(JSON.stringify(worstRequest));
+      if (
+        metadata.length > maxMetadataBytes ||
+        metadata.length + start + 8 > maxFrameBytes
+      ) {
+        throw new RangeError("Source request exceeds protocol limit");
       }
     } catch (error) {
       return Promise.reject(error);
@@ -631,13 +674,15 @@ class ProjectProcess implements ZigProjectCompiler {
         job.active = true;
         try {
           // The acknowledged revision is read here, after all prior replies.
-          const frame = await this.#exchange({
+          const request: Record<string, unknown> = {
             kind: "build",
             id: this.#id(),
             epoch: this.#epoch,
             revision: this.#revision,
-            ...(sources.length ? { sources } : {}),
-          }, payload);
+          };
+          if (sources.length) request.sources = sources;
+          if (assetSources.length) request.assetSources = assetSources;
+          const frame = await this.#exchange(request, payload);
           const metadata = frame.metadata,
             revision = natural(metadata.revision, "revision");
           if (
@@ -650,10 +695,39 @@ class ProjectProcess implements ZigProjectCompiler {
           }
           let value: ZigProjectBuildResult;
           if (metadata.success) {
+            let nativeReply:
+              | Awaited<ReturnType<typeof readNativeAssetReply>>
+              | undefined;
+            let wasm = frame.payload;
+            if (this.#nativeAssets) {
+              try {
+                nativeReply = await readNativeAssetReply(
+                  metadata,
+                  frame.payload,
+                  (message) => {
+                    throw new ZigProjectProtocolError(message);
+                  },
+                );
+              } catch (error) {
+                if (error instanceof Error) {
+                  throw new ZigProjectProtocolError(error.message);
+                }
+                throw error;
+              }
+              wasm = nativeReply.bytes;
+            } else if (
+              ["wasmBytes", "assets", "assetStats", "assetDependencies"].some((
+                name,
+              ) => metadata[name] !== undefined)
+            ) {
+              throw new ZigProjectProtocolError(
+                "Unexpected native asset response",
+              );
+            }
             if (
               this.#revision === Number.MAX_SAFE_INTEGER ||
-              revision !== this.#revision + 1 || !frame.payload.length ||
-              !WebAssembly.validate(frame.payload)
+              revision !== this.#revision + 1 || !wasm.length ||
+              !WebAssembly.validate(wasm)
             ) {
               throw new ZigProjectProtocolError(
                 "Invalid successful revision or Wasm payload",
@@ -662,8 +736,9 @@ class ProjectProcess implements ZigProjectCompiler {
             value = {
               success: true,
               revision,
-              bytes: frame.payload,
+              bytes: wasm,
               stats: buildStats(metadata.stats),
+              ...nativeReply,
             };
           } else {
             if (
@@ -813,10 +888,15 @@ export async function createZigProjectCompiler(
     "startupTimeoutMs",
     "expectedCompilerIdentity",
     "assets",
+    "nativeAssets",
   ], "compiler");
   const executable = path(options.executable, "executable"),
     entry = path(options.entry, "entry");
   const assets = captureAssetImports(options.assets);
+  if (options.assets !== undefined && options.nativeAssets !== undefined) {
+    throw new TypeError("assets and nativeAssets cannot be used together");
+  }
+  const nativeAssets = captureNativeAssets(options.nativeAssets, entry);
   if (
     options.checkpoint !== undefined &&
     !(options.checkpoint instanceof Uint8Array)
@@ -876,7 +956,7 @@ export async function createZigProjectCompiler(
         return { prefix, root: path(root, "import root") };
       },
     );
-  const open = {
+  const open: Record<string, unknown> = {
     entry,
     prelude: nullablePath(options.prelude, "prelude"),
     stdRoot: nullablePath(options.stdRoot, "stdRoot"),
@@ -890,6 +970,7 @@ export async function createZigProjectCompiler(
       ? { codegenWorkers: options.codegenWorkers }
       : {}),
   };
+  if (nativeAssets !== undefined) open.nativeAssets = nativeAssets;
   const timeout = options.startupTimeoutMs ?? 30_000;
   if (!Number.isInteger(timeout) || timeout < 1 || timeout > 300_000) {
     throw new RangeError("startupTimeoutMs must be 1..300000");

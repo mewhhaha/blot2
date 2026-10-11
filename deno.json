@@ -55,6 +55,7 @@
       "compiler/zig_project_client.ts",
       "compiler/type_diagnostics.ts",
       "compiler/assets.ts",
+      "compiler/native_assets.ts",
       "compiler/format.ts",
       "compiler/syntax.ts",
       "compiler/postfix_syntax.ts",

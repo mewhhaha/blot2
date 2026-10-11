@@ -13,7 +13,9 @@ implemented by this repository:
   `createCompiler` and `createZigProjectCompiler`
   ([PROJECT_CLIENT.md](PROJECT_CLIENT.md));
 - making it a versioned public contract with conformance tests:
-  [task 095](../tasks/095-specify-and-version-the-project-protocol.md).
+  [task 095](../tasks/095-specify-and-version-the-project-protocol.md);
+- native typed imports and resource snapshots:
+  [NATIVE_ASSETS.md](NATIVE_ASSETS.md).
 
 Where the server and the reference client differ, both are stated. Example IDs
 and revisions are illustrative; replies always echo the request ID and use the
@@ -52,12 +54,12 @@ default is serial.
 
 Every message, in either direction, is one frame:
 
-| Bytes      | Contents                                                   |
-| ---------- | ---------------------------------------------------------- |
-| 0..4       | metadata length `M`, unsigned 32-bit little-endian         |
-| 4..8       | payload length `P`, unsigned 32-bit little-endian          |
-| 8..8+M     | metadata: one JSON object, UTF-8                           |
-| 8+M..8+M+P | payload: raw bytes (source text, Wasm or checkpoint bytes) |
+| Bytes      | Contents                                                          |
+| ---------- | ----------------------------------------------------------------- |
+| 0..4       | metadata length `M`, unsigned 32-bit little-endian                |
+| 4..8       | payload length `P`, unsigned 32-bit little-endian                 |
+| 8..8+M     | metadata: one JSON object, UTF-8                                  |
+| 8+M..8+M+P | payload: raw bytes (sources/assets, Wasm/resources or checkpoint) |
 
 - `M` is from 1 to 1,048,576, and `8 + M + P` is at most 67,108,864
   (`maxFrameBytes`).
@@ -130,15 +132,17 @@ under the identity that made them.
 | `abort-disposes-process` | there is no cancel request: a host cancels by killing the process |
 | `source-overlays`        | a build may carry `sources`                                       |
 | `backend-checkpoints`    | an open may carry a checkpoint, and `checkpoint` requests work    |
+| `native-assets-v1`       | native readers, asset overlays and owned content snapshots        |
 
-The reference client does five checks on the hello:
+The reference client checks the hello:
 
 - `protocol`, `version` and `maxFrameBytes` match exactly;
 - the identity has the right form;
 - the first three capabilities are present;
 - the identity is the one the caller asked for, if it asked
   (`expectedCompilerIdentity`);
-- with no `source-overlays`, it refuses builds that carry `sources`.
+- with no `source-overlays`, it refuses builds that carry `sources`;
+- with no `native-assets-v1`, it refuses an open configured with `nativeAssets`.
 
 It allows 30 s by default (1 to 300 s) for the hello and the open together.
 
@@ -159,12 +163,18 @@ It allows 30 s by default (1 to 300 s) for the hello and the open together.
 | `shareMachineCode` | boolean                          | prototype; default false                                                   |
 | `codegenWorkers`   | integer 1..16                    | default 1                                                                  |
 | `checkpoint`       | boolean                          | true exactly when the payload holds checkpoint bytes                       |
+| `nativeAssets`     | object or null                   | optional native input configuration; absent/null disables it               |
 
 - **Paths.** Every path is absolute, non-empty and free of NUL bytes.
 - **`imports`.** Each `prefix` is non-empty, ends in `/`, has no NUL and is
   unique; each `root` is a path.
+- **`nativeAssets`.** Requires `native-assets-v1`; `{}` enables an empty native
+  session. `imports` and `roots` default to `[]`. Import definitions, discovery,
+  paths and reader-specific fields are specified in
+  [NATIVE_ASSETS.md](NATIVE_ASSETS.md#open-and-acquire-inputs).
 - **Other fields:** `epoch` and `revision` must be absent or `null`; `sources`
-  must be absent or `[]`. Arrays and booleans do not accept `null`.
+  and `assetSources` must be absent or `[]`. Arrays and booleans do not accept
+  `null`.
 - **Defaults:** `imports` defaults to `[]`, `checkpoint` to `false`; optional
   paths default to `null`. All optional configuration fields may be omitted.
 - **Payload.** Checkpoint bytes from an earlier `checkpoint` reply when
@@ -182,21 +192,26 @@ its canonical settings; every revision still resolves paths again.
 
 ## build
 
-| Field      | Type                                       | Rule                 |
-| ---------- | ------------------------------------------ | -------------------- |
-| `kind`     | `"build"`                                  |                      |
-| `id`       | integer                                    | see Session          |
-| `epoch`    | string                                     | from the open reply  |
-| `revision` | integer                                    | the current revision |
-| `sources`  | array of `{path, start, length, deleted?}` | optional overlays    |
+| Field          | Type                                       | Rule                                                   |
+| -------------- | ------------------------------------------ | ------------------------------------------------------ |
+| `kind`         | `"build"`                                  |                                                        |
+| `id`           | integer                                    | see Session                                            |
+| `epoch`        | string                                     | from the open reply                                    |
+| `revision`     | integer                                    | the current revision                                   |
+| `sources`      | array of `{path, start, length, deleted?}` | optional overlays                                      |
+| `assetSources` | array of `{path, start, length, deleted?}` | optional raw asset overlays; requires a native session |
 
-The payload is the overlays' bytes, one after another, in the order of
-`sources`.
+The payload contains source ranges followed by `assetSources` ranges. Each array
+retains its own order; together they partition the whole payload. `assetSources`
+defaults to `[]`, rejects null, and carries raw bytes rather than requiring
+UTF-8. These overrides use the same per-build disk/deletion rules as sources.
+Their full schema is in [NATIVE_ASSETS.md](NATIVE_ASSETS.md#build-payload).
 
 A build, checkpoint or close may carry the open's fields only at their defaults
 (absent, `null`, `false`, `[]`, `"optimized"`, `codegenWorkers` 1, `checkpoint`
 false); any other value stops the process with `InvalidRequest`. `version` must
-be absent or `null` after open.
+be absent or `null` after open. `nativeAssets` must also be absent or `null`; an
+empty object is still an open-only configuration.
 
 **Source overlays.** `sources` is a complete override for this build only; the
 next build does not inherit it.
@@ -211,9 +226,10 @@ The rules (any break stops the process):
 - Each `path` is absolute, non-empty and NUL-free. `start` and `length` are
   unsigned 32-bit integers; `deleted` is a boolean, default `false`. `sources`
   defaults to `[]` and does not accept `null`.
-- The ranges cover the payload exactly, in order. The first `start` is 0, each
-  next one is the previous `start + length`, and the payload's length equals the
-  sum of the lengths.
+- Source ranges cover the payload prefix exactly, in order. The first `start` is
+  0; each next is the previous `start + length`. With no asset ranges, this
+  prefix is the whole payload. Otherwise the first asset range starts exactly at
+  its end, and asset ranges cover all remaining bytes.
 - A deleted entry has `length` 0.
 - Every range is valid UTF-8.
 
@@ -233,8 +249,9 @@ Paths are made canonical, symbolic links included, so one module has one
 identity whether it comes from disk or an overlay. The compiler never writes
 source files.
 
-**Success.** The payload is the compiled Wasm module. The server does not check
-it; the reference client rejects an empty or invalid one.
+**Success.** In a source-only session, the payload is the compiled Wasm module
+and the metadata shape below is unchanged. The server does not validate Wasm;
+the reference client rejects an empty or invalid module.
 
 ```json
 {
@@ -264,6 +281,17 @@ it; the reference client rejects an empty or invalid one.
 ```
 
 `revision` is the previous revision plus one.
+
+A native session (including an empty `nativeAssets` object) adds four required
+fields: `wasmBytes`, `assets`, `assetDependencies`, and `assetStats`. The
+payload is a Wasm prefix of `wasmBytes` bytes followed by contiguous resource
+ranges. `assets` entries are `{id,path,mediaType,sha256,start,length}` with IDs
+`1..N`; `assetDependencies` entries are `{path,sha256}`; `assetStats` is
+`{parsed,reused,inputBytes,generatedBytes}`. Exact ordering, digest and snapshot
+ownership rules are in [NATIVE_ASSETS.md](NATIVE_ASSETS.md#successful-snapshot).
+Both compiler and asset candidates commit only after the whole reply has been
+encoded and bounded; a rejection preserves both previous successful owners and
+the revision.
 
 `stats` holds these fields:
 
@@ -309,8 +337,10 @@ source is ASCII, so its byte and UTF-16 offsets coincide:
 ```
 
 `revision` is unchanged. The server sends exactly one diagnostic; the reference
-client requires at least one. `attemptStats` is an object, or null when no
-attempt counters survived (a failed preparation).
+client requires at least one. Native reader failures use `stage:"asset"`, input
+byte offsets, null `utf16`/`details` and `attemptStats:null`; native sessions
+retain the same rejection metadata shape and empty payload. `attemptStats` is an
+object, or null when no attempt counters survived (a failed preparation).
 
 | Diagnostic field  | Type                   | Meaning                                                                                                        |
 | ----------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -324,8 +354,8 @@ attempt counters survived (a failed preparation).
 | `details`         | null or object         | below                                                                                                          |
 
 `stage` values the code uses are `parse`, `parse-project`, `load`, `check`,
-`check-project`, `lower`, `emit` and `build-project`. The set is not defined as
-closed; hosts should treat an unknown stage as text.
+`check-project`, `lower`, `emit`, `asset` and `build-project`. The set is not
+defined as closed; hosts should treat an unknown stage as text.
 
 `details` is `null` except in two cases:
 
@@ -444,9 +474,11 @@ stops reading, prints `blotc: <ErrorName>` to stderr and exits 1:
 - a missing, null or incompatible open `version` (`VersionMismatch`);
 - an `id` out of order (`RequestOrder`);
 - a request before open (`NotOpen`) or a second open (`AlreadyOpen`);
-- an invalid open (`InvalidOpen`);
-- an open-only field with a non-default value on a later request, or `sources`
-  or a payload on `checkpoint` or `close` (`InvalidRequest`);
+- an invalid open (`InvalidOpen`), native configuration (`InvalidNativeAssets`)
+  or native configuration count (`AssetLimit`);
+- an open-only field with a non-default value on a later request, nonempty
+  `assetSources` in a source-only session, or source/asset ranges or a payload
+  on `checkpoint` or `close` (`InvalidRequest`);
 - a missing or wrong epoch or revision (`RevisionMismatch`), or a build at
   revision 2^53 − 1 (`RevisionLimit`);
 - bad overlay ranges (`InvalidSources`), or more than 4,096 overlays
@@ -474,20 +506,19 @@ restart cache, or a checkpoint taken earlier, makes the new one's first build
 warm. A build still waiting in the host's own queue can simply be dropped,
 because it was never sent.
 
-## Typed asset imports are a host layer
+## Typed asset imports
 
-Nothing in the wire protocol knows about assets. `@mewhhaha/blot`'s `assets`
-option ([compiler/assets.md](../compiler/assets.md)) works like this:
+With `native-assets-v1`, the compiler parses configured JSON, catalog, text,
+tunables and WGSL inputs and captures reference resources itself. A host sends
+`nativeAssets` at open and optional raw `assetSources` at build. See
+[NATIVE_ASSETS.md](NATIVE_ASSETS.md) for reader interfaces, discovery, budgets,
+errors, retained ownership and supported WGSL reflection.
 
-- before each build, it runs the host's parser functions (JSON, shader
-  reflection and the like);
-- it sends the Blot modules they generate as source overlays, at the virtual
-  paths the `assets` map names;
-- it keeps the resulting manifest (asset IDs, bytes and digests) on the host
-  side.
-
-A host that wants the same imports must generate the same modules;
-`compiler/assets.ts` is the reference.
+The existing host `assets` option ([compiler/assets.md](../compiler/assets.md))
+still runs custom parser functions, sends their generated Blot as source
+overlays, and retains its own resource manifest. It uses source-only replies.
+The reference client requires a caller to choose either `assets` or
+`nativeAssets` for one session.
 
 ## Versioning
 
@@ -506,7 +537,7 @@ against any compiler with
 `deno test --allow-read --allow-write --allow-run
 zig-native/tests/zig_project_protocol.test.ts -- /absolute/path/to/blotc`.
 
-## Qualification, 11 October 2026
+## Source-only qualification, 11 October 2026
 
 Implementation revision: `4eabecb`. Zig 0.17.0. The full compiler gate passes
 the native suite and 690 guest/client tests. Zero analyzer findings are required
@@ -530,5 +561,6 @@ and ownership rules remain specified.
 Protocol admission adds no compilation pass. Public examples, synthetic
 fresh/retained phases and frozen gdev preserve Wasm bytes in the shared
 [qualification candidate](PENDING_SELECTIONS.md). These short measurements do
-not establish a protocol throughput improvement. The final pinned executable has
-SHA-256 `b4daa696f19692489ac75bc46f9114cf86b7714777099280af2323f78c21c3ff`.
+not establish a protocol throughput improvement. The pinned executable for that
+qualification has SHA-256
+`b4daa696f19692489ac75bc46f9114cf86b7714777099280af2323f78c21c3ff`.

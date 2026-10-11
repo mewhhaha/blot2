@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-11",
+  "baseline_revision": "544d715",
+  "candidate_parent": "544d715",
+  "pins": {
+    "build/bench/native-assets/blotc-qualified": "3829910fe42565c754d78f3437a873d218ef0f2c17206cb2263f8f8d3c5fd47b",
+    "build/bench/stage-sharing/blotc-parked-qualified": "b4daa696f19692489ac75bc46f9114cf86b7714777099280af2323f78c21c3ff",
+    "build/bench/native-assets/measure.ts": "53668627a9d03623a1a8e9eed0ad8289a5160f66e17fab74535fe302ed7c2634",
+    "compiler/assets.ts": "269dcb7e6299825629daaaa5e8a03c0afac1f52903445bcaf4951473f1034867",
+    "/var/tmp/gdev-bench/gdev/asset_parsers.ts": "13cccd0dccb54f2de0e1d25b7454230710c67f60d383db30f12a451c0dadc52c"
+  },
+  "library": {
+    "std/array.blot": "4249597a969b0ece36dbd5f9ff49bce97792790f6c8b8b8d477354c799be9a25",
+    "std/iter.blot": "a45af2b410fca7c90db1900b58904ecd0d1426ce1837d7448b6265d1266fb8cd",
+    "std/list.blot": "0bce7387816a3cc329184ab6dc3fd444208fcea993ea14cb4584c15ba4fa6ffd",
+    "std/path.blot": "6a4bef549556f2b021e1f11314480f0c07b906c80d339d73e3f818adcd983747",
+    "std/prelude.blot": "623fc88e58bacbd98ac9b0eeed8f8fbb792f44339fe8e1d7c24366e553e2d789",
+    "std/simd.blot": "ea49522b1ec05c45eaf9a6d19bf1023cff9a91dbe211589d872d00a9d98599c8",
+    "std/vector.blot": "e713c9d8a3e1fb0fb7a06f5001c1972d83248d20e0706aaab06ce4450dfe2a34"
+  },
+  "frozen_source_manifest_sha256": "5bb6d76ba10efe314d5fa795581c58c9e6d4ccc632baa0962e3591a814deed73",
+  "frozen_source_files": 62,
+  "compiler_identity": "369c16576eb05fe5f1a0b535d712003b4fe290f995215c5499558d4ba77def0b",
+  "pairs": 3,
+  "phases": [
+    "fresh",
+    "noop",
+    "source-edit",
+    "source-revert",
+    "asset-edit",
+    "asset-revert",
+    "rejected-json",
+    "recovery"
+  ],
+  "frozen_modules": 34,
+  "current_private_reader_corpus": {
+    "wgsl": 33,
+    "json_kinds": 3
+  },
+  "frozen_wasm_sha256": "3158216b0b7cb072245d9aa149887a39bbadbc305430569ae3e033818e3edef0",
+  "asset_edit_wasm_sha256": "e4d7f555323e88708a2db0a0fe42d78f3a6212a5c7d4b999c0cf4fc11647f6ce",
+  "resource_handles": 0,
+  "asset_dependencies": 34,
+  "synthetic_unexpected_problems": [],
+  "tools": {
+    "zig": "0.17.0",
+    "deno": "deno 2.9.7 (stable, release, x86_64-unknown-linux-gnu)\nv8 15.0.245.2-rusty\ntypescript 6.0.3"
+  },
+  "host": {
+    "platform": "Linux-7.2.9-2-cachyos-x86_64-with-glibc2.44",
+    "cpu_ticks_per_second": "100",
+    "load_at_record": "4.38 5.84 5.54 4/3604 2014537"
+  },
+  "conditions": "Pairs alternated host/native. Native test compilation and other local work overlapped; elapsed-time and broad compiler-speed claims are not qualified. Child CPU excludes host parsing; runner CPU includes it."
+}

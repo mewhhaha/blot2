@@ -13,6 +13,7 @@ const ast = @import("ast.zig");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const restart_cache = @import("restart_cache.zig");
+const native_assets = @import("native_assets.zig");
 
 const Request = struct {
     kind: enum { open, build, close, checkpoint },
@@ -31,17 +32,23 @@ const Request = struct {
     codegenWorkers: u8 = 1,
     checkpoint: bool = false,
     sources: []const SourceRange = &.{},
+    nativeAssets: ?native_assets.Options = null,
+    assetSources: []const SourceRange = &.{},
 };
 const request_parse_options: std.json.ParseOptions = .{ .allocate = .alloc_always, .duplicate_field_behavior = .@"error", .ignore_unknown_fields = false };
 const SourceRange = struct { path: []const u8, start: u32, length: u32, deleted: bool = false };
 
 fn sourceViews(a: Allocator, ranges: []const SourceRange, payload: []const u8) ![]inputs.overlays.Source {
+    return rangeViews(a, ranges, payload, 0, true);
+}
+fn rangeViews(a: Allocator, ranges: []const SourceRange, payload: []const u8, start: usize, utf8: bool) ![]inputs.overlays.Source {
     if (ranges.len > 4096) return error.SourceLimit;
-    var end: usize = 0;
+    if (start > payload.len) return error.InvalidSources;
+    var end: usize = start;
     for (ranges) |range| {
         if (!validPath(range.path) or range.start != end or range.length > payload.len -| end or (range.deleted and range.length != 0)) return error.InvalidSources;
         end += range.length;
-        if (!std.unicode.utf8ValidateSlice(payload[range.start..end])) return error.InvalidSources;
+        if (utf8 and !std.unicode.utf8ValidateSlice(payload[range.start..end])) return error.InvalidSources;
     }
     if (end != payload.len) return error.InvalidSources;
     const sources = try a.alloc(inputs.overlays.Source, ranges.len);
@@ -90,12 +97,15 @@ const OpenProject = struct {
     entry: []u8,
     options_owner: inputs.Snapshot,
     session: retained.Session,
+    assets: ?native_assets.Session = null,
     cache_file: ?restart_cache.File,
     cache_loaded: bool,
     saved_revision: usize = 0,
 
     fn init(a: Allocator, io: Io, request: Request, compiler: [32]u8, checkpoint_bytes: []const u8, cache_root: ?[]const u8) !OpenProject {
         const raw = try validateOpen(request);
+        var assets = if (request.nativeAssets) |definitions| try native_assets.Session.init(a, definitions) else null;
+        errdefer if (assets) |*owner| owner.deinit();
         const entry = try a.dupe(u8, request.entry.?);
         errdefer a.free(entry);
         var options = try inputs.Snapshot.init(a, raw);
@@ -128,7 +138,7 @@ const OpenProject = struct {
             cache_loaded = session.checkpoint != null;
         }
         session.policy.codegen_workers = request.codegenWorkers;
-        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .cache_file = cache_file, .cache_loaded = cache_loaded };
+        return .{ .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded };
     }
     fn persist(self: *OpenProject, io: Io) void {
         if (self.saved_revision == self.session.revisions) return;
@@ -139,6 +149,7 @@ const OpenProject = struct {
     }
     fn deinit(self: *OpenProject) void {
         self.session.deinit();
+        if (self.assets) |*assets| assets.deinit();
         if (self.cache_file) |*file| file.deinit();
         self.options_owner.deinit();
         self.allocator.free(self.entry);
@@ -204,10 +215,33 @@ fn operationFailure(a: Allocator, writer: *Io.Writer, opened: *OpenProject, id: 
     try reject(a, writer, id, opened.session.revisions, .{ .filename = opened.entry, .stage = "build-project", .code = code, .start = 0, .end = 0, .message = message }, attempt);
 }
 
-fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32, sources: []const inputs.overlays.Source) !void {
-    var preparation = opened.session.prepareRevisionWithSources(io, opened.entry, null, opened.options_owner.options, sources) catch |err| {
-        // No attempt counters survived this throwing path. Never substitute
-        // Session.last (which describes an earlier successful revision).
+const AssetRange = struct { id: u32, path: []const u8, mediaType: []const u8, sha256: []const u8, start: u32, length: u32 };
+const AssetDependency = struct { path: []const u8, sha256: ?[]const u8 };
+
+fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32, sources: []const inputs.overlays.Source, asset_sources: []const inputs.overlays.Source) !void {
+    var assets: ?*native_assets.Candidate = null;
+    defer if (assets) |candidate| candidate.deinit(a);
+    if (opened.assets) |*owner| {
+        assets = owner.prepare(io, opened.entry, sources, asset_sources) catch |err| {
+            return operationFailure(a, writer, opened, id, @errorName(err), "Unable to prepare native asset inputs", null);
+        };
+        if (assets.?.issue) |diagnostic| return reject(a, writer, id, opened.session.revisions, .{
+            .filename = diagnostic.filename,
+            .stage = "asset",
+            .code = diagnostic.code,
+            .start = diagnostic.start,
+            .end = diagnostic.end,
+            .message = diagnostic.message,
+        }, null);
+    }
+    var merged: std.ArrayList(inputs.overlays.Source) = .empty;
+    defer merged.deinit(a);
+    if (assets) |candidate| {
+        try merged.appendSlice(a, candidate.sources.items);
+        try merged.appendSlice(a, sources);
+    }
+    const complete_sources = if (assets != null) merged.items else sources;
+    var preparation = opened.session.prepareRevisionWithSources(io, opened.entry, null, opened.options_owner.options, complete_sources) catch |err| {
         return operationFailure(a, writer, opened, id, @errorName(err), "Compiler operation failed", null);
     };
     defer preparation.deinit();
@@ -215,45 +249,91 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
         .rejected => |*rejection| try reject(a, writer, id, opened.session.revisions, try issue(&rejection.result, opened.entry), rejection.stats),
         .ready => |candidate| {
             const result = candidate.result() orelse return error.MissingCandidateResult;
-            const metadata = std.json.Stringify.valueAlloc(a, .{
+            const stats = .{
+                .nativeWorkSteps = result.result.compiled.constant_steps,
+                .frontend = result.result.stats,
+                .backend = result.result.compiled.reuse,
+                .optimization = result.result.compiled.optimization,
+                .runtimeOptimization = result.result.compiled.runtime_optimization,
+                .backendTiming = result.result.compiled.timing,
+                .workCounters = result.result.compiled.counters,
+                .principals = result.result.compiled.principal,
+                .refinements = result.result.compiled.refinements,
+                .selectedQueries = result.result.compiled.completed_queries,
+                .restartCacheLoaded = opened.cache_loaded,
+                .sourceBytes = result.source_bytes,
+                .freshModules = result.fresh_modules,
+                .cachedModules = result.cached_modules,
+                .attemptStats = candidate.stats,
+            };
+            var assembled: std.ArrayList(u8) = .empty;
+            defer assembled.deinit(a);
+            var ranges: std.ArrayList(AssetRange) = .empty;
+            defer ranges.deinit(a);
+            var dependencies: std.ArrayList(AssetDependency) = .empty;
+            defer dependencies.deinit(a);
+            var payload_size = result.result.compiled.bytes.len;
+            if (assets) |snapshot| {
+                if (payload_size > frames.max_frame_bytes - 8) {
+                    candidate.discard();
+                    return operationFailure(a, writer, opened, id, "response_limit", "Build reply exceeds protocol limits", candidate.stats);
+                }
+                for (snapshot.resources.items) |resource| {
+                    if (resource.bytes.len > frames.max_frame_bytes - 8 - payload_size) {
+                        candidate.discard();
+                        return operationFailure(a, writer, opened, id, "response_limit", "Build reply exceeds protocol limits", candidate.stats);
+                    }
+                    payload_size += resource.bytes.len;
+                }
+                var start = result.result.compiled.bytes.len;
+                for (snapshot.resources.items) |*resource| {
+                    try ranges.append(a, .{ .id = resource.id, .path = resource.path, .mediaType = resource.mediaType, .sha256 = &resource.sha256, .start = @intCast(start), .length = @intCast(resource.bytes.len) });
+                    start += resource.bytes.len;
+                }
+                for (snapshot.dependencies.items) |*dependency| try dependencies.append(a, .{ .path = dependency.path, .sha256 = if (dependency.sha256) |*digest| digest else null });
+            }
+            const metadata = (if (assets) |snapshot| std.json.Stringify.valueAlloc(a, .{
                 .kind = "build",
                 .id = id,
                 .epoch = epoch,
                 .revision = opened.session.revisions + 1,
                 .success = true,
-                .stats = .{
-                    .nativeWorkSteps = result.result.compiled.constant_steps,
-                    .frontend = result.result.stats,
-                    .backend = result.result.compiled.reuse,
-                    .optimization = result.result.compiled.optimization,
-                    .runtimeOptimization = result.result.compiled.runtime_optimization,
-                    .backendTiming = result.result.compiled.timing,
-                    .workCounters = result.result.compiled.counters,
-                    .principals = result.result.compiled.principal,
-                    .refinements = result.result.compiled.refinements,
-                    .selectedQueries = result.result.compiled.completed_queries,
-                    .restartCacheLoaded = opened.cache_loaded,
-                    .sourceBytes = result.source_bytes,
-                    .freshModules = result.fresh_modules,
-                    .cachedModules = result.cached_modules,
-                    .attemptStats = candidate.stats,
-                },
-            }, .{}) catch |err| {
+                .stats = stats,
+                .wasmBytes = result.result.compiled.bytes.len,
+                .assets = ranges.items,
+                .assetDependencies = dependencies.items,
+                .assetStats = snapshot.stats,
+            }, .{}) else std.json.Stringify.valueAlloc(a, .{
+                .kind = "build",
+                .id = id,
+                .epoch = epoch,
+                .revision = opened.session.revisions + 1,
+                .success = true,
+                .stats = stats,
+            }, .{})) catch |err| {
                 candidate.discard();
                 return operationFailure(a, writer, opened, id, @errorName(err), "Unable to encode build reply", candidate.stats);
             };
             defer a.free(metadata);
-            frames.checkLengths(metadata.len, result.result.compiled.bytes.len) catch {
+            frames.checkLengths(metadata.len, payload_size) catch {
                 candidate.discard();
                 return operationFailure(a, writer, opened, id, "response_limit", "Build reply exceeds protocol limits", candidate.stats);
             };
-            // This transfer performs no allocation or I/O. Result bytes remain
-            // independently owned by Candidate until the complete reply is sent.
+            if (assets) |snapshot| {
+                try assembled.ensureTotalCapacity(a, payload_size);
+                assembled.appendSliceAssumeCapacity(result.result.compiled.bytes);
+                for (snapshot.resources.items) |resource| assembled.appendSliceAssumeCapacity(resource.bytes);
+            }
+            const payload = if (assets != null) assembled.items else result.result.compiled.bytes;
+            // Both owners transfer only after the entire reply has been encoded
+            // and bounded. Neither commit allocates or performs I/O.
             if (!opened.session.commit(candidate)) return error.InvalidCandidate;
-            // Seed restarts before the first reply. Later edits keep their cheap
-            // retained path; graceful close saves the latest committed revision.
+            if (assets) |snapshot| {
+                opened.assets.?.commit(snapshot);
+                assets = null;
+            }
             if (opened.session.revisions == 1) opened.persist(io);
-            try frames.write(writer, metadata, result.result.compiled.bytes);
+            try frames.write(writer, metadata, payload);
         },
     }
 }
@@ -269,7 +349,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
         .protocol = "blot-zig-project",
         .version = protocol_version,
         .compilerIdentity = &identity,
-        .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "backend-checkpoints" },
+        .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "backend-checkpoints", "native-assets-v1" },
         .maxFrameBytes = frames.max_frame_bytes,
     }, &.{});
     var opened: ?OpenProject = null;
@@ -285,7 +365,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
         last_id = request.id;
         switch (request.kind) {
             .open => {
-                if (request.sources.len != 0 or request.checkpoint != (frame.payload().len != 0)) return error.InvalidOpen;
+                if (request.sources.len != 0 or request.assetSources.len != 0 or request.checkpoint != (frame.payload().len != 0)) return error.InvalidOpen;
                 if (opened != null) return error.AlreadyOpen;
                 // AlreadyOpen above proves the optional owns no previous session.
                 // zig-analyzer: disable-next-line overwritten-owning-value
@@ -296,10 +376,10 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
             },
             .build, .close, .checkpoint => {
                 const owner = if (opened) |*value| value else return error.NotOpen;
-                if (request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.codegenTier != .optimized or request.shareMachineCode or request.codegenWorkers != 1 or request.checkpoint) return error.InvalidRequest;
+                if (request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.codegenTier != .optimized or request.shareMachineCode or request.codegenWorkers != 1 or request.checkpoint) return error.InvalidRequest;
                 if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.session.revisions) return error.RevisionMismatch;
                 if (request.kind == .checkpoint) {
-                    if (request.sources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
+                    if (request.sources.len != 0 or request.assetSources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
                     const bytes = owner.session.checkpointBytes(compiler) catch |err| {
                         try reply(a, writer, .{ .kind = "checkpoint", .id = request.id, .epoch = epoch, .revision = owner.session.revisions, .success = false, .code = @errorName(err) }, &.{});
                         continue;
@@ -311,15 +391,20 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
                     continue;
                 }
                 if (request.kind == .close) {
-                    if (request.sources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
+                    if (request.sources.len != 0 or request.assetSources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
                     owner.persist(io);
                     try reply(a, writer, .{ .kind = "close", .id = request.id, .epoch = epoch, .revision = owner.session.revisions }, &.{});
                     return;
                 }
                 if (owner.session.revisions >= frames.max_revision) return error.RevisionLimit;
-                const sources = try sourceViews(a, request.sources, frame.payload());
+                if (request.assetSources.len != 0 and owner.assets == null) return error.InvalidRequest;
+                const source_bytes = if (request.assetSources.len != 0) request.assetSources[0].start else frame.payload().len;
+                if (source_bytes > frame.payload().len) return error.InvalidSources;
+                const sources = try sourceViews(a, request.sources, frame.payload()[0..source_bytes]);
                 defer a.free(sources);
-                try build(a, io, writer, owner, request.id, sources);
+                const asset_sources = try rangeViews(a, request.assetSources, frame.payload(), source_bytes, false);
+                defer a.free(asset_sources);
+                try build(a, io, writer, owner, request.id, sources, asset_sources);
             },
         }
     }

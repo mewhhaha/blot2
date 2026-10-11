@@ -124,6 +124,7 @@ async function host() {
     "abort-disposes-process",
     "source-overlays",
     "backend-checkpoints",
+    "native-assets-v1",
   ]);
   return {
     entry,

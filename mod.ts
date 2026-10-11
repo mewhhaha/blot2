@@ -1,6 +1,7 @@
 /** Blot's Zig project compiler and WebAssembly guest API. */
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { captureNativeAssets } from "./compiler/native_assets.ts";
 import { captureAssetImports } from "./compiler/assets.ts";
 import {
   createZigProjectCompiler,
@@ -35,6 +36,11 @@ export type {
   AssetType,
   CompiledAsset,
 } from "./compiler/assets.ts";
+export type {
+  NativeAssetImport,
+  NativeAssetKind,
+  NativeAssetOptions,
+} from "./compiler/native_assets.ts";
 export type {
   ZigProjectBuildOptions,
   ZigProjectBuildResult,
@@ -85,10 +91,17 @@ export async function createCompiler(
       throw new RangeError("Checkpoint payload exceeds protocol limits");
     }
   }
+  if (options.assets !== undefined && options.nativeAssets !== undefined) {
+    throw new TypeError("assets and nativeAssets cannot be used together");
+  }
   // Capture paths before extracting the package or starting the child process.
   const captured = {
     ...options,
     assets: captureAssetImports(options.assets),
+    nativeAssets: captureNativeAssets(
+      options.nativeAssets,
+      path(options.entry),
+    ),
     checkpoint: options.checkpoint && new Uint8Array(options.checkpoint),
     entry: path(options.entry),
     prelude: options.prelude === null

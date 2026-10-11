@@ -1,4 +1,7 @@
 comptime {
+    _ = @import("native_asset_readers.zig");
+    _ = @import("native_asset_wgsl.zig");
+    _ = @import("native_assets.zig");
     _ = @import("unconstrained_collection_tests.zig");
     _ = @import("semantic_query_table.zig");
     _ = @import("portable_query.zig");
