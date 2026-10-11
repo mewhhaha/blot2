@@ -194,6 +194,9 @@ or in-progress task. Use Zig 0.17.0, `deno task test:compiler` and
   fragment lookup, assembly and journal freezing. Profiles are in ignored
   `build/bench/summary-growth/prof/` (sampler records all threads; filter stacks
   containing `zig_project_server.runWithPolicy`).
+- Task 090 (pending checks) is complete at `7589df2`: effect operations and open
+  uses of settled callees sleep on their types in the shared solver worklist; a
+  300-closure record checks in 1.67 s (was 3.67 s).
 - A separate session (bun-desktop) offered an unapplied wasm name-section patch
   at `/var/tmp/blot2-names.patch` (14 files, always on, +5% Wasm, gate green on
   `a488ba2`); applying it is the owner's decision.
@@ -238,8 +241,8 @@ Task [024](tasks/024-apply-general-body-interface-cutoff.md) stays in progress:
 the remaining work is per-body frontend rechecking and stable Core IDs, which
 needs its own design before implementation. Ready tasks in numeric order are
 [025](tasks/025-resolve-calls-before-emission.md), 036, 048,
-[086](tasks/086-retain-constant-evaluation-across-revisions.md) and 090; 086
-needs a fresh gdev profile and then a design decision (see above).
+[086](tasks/086-retain-constant-evaluation-across-revisions.md); 086 needs a
+fresh gdev profile and then a design decision (see above).
 [093](tasks/093-close-the-gdev-edit-gap.md) is in progress with the remaining
 measured gdev edit gap. The retained probe
 `zig-native/qualification/revision_deltas_probe.zig` and its driver measure

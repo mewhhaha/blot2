@@ -292,6 +292,12 @@ exceeded the shared 16 MiB) cut gdev retained edits from 570 to 440 ms against
 400 ms at `f7be6e7`. See
 [retained edit cost](../zig-native/RETAINED_EDIT_COST.md).
 
+Task [090] runs the checker's pending obligations through the shared solver
+worklist at `7589df2`: unsettled effect operations and open uses of settled
+callees wait for their types. A 300-closure record checks in 1.67 s instead of
+3.67 s, and late operator uses take about 13 steps each instead of 165. See
+[frontend pending checks](../zig-native/INDEXED_SOLVER.md#frontend-pending-checks-11-october-2026).
+
 ## Completed foundations to preserve
 
 These are regression baselines, not new implementation tasks. Historical
@@ -598,7 +604,7 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [087] — Skip rebuilds for trivia-only edits             | Complete    | —                                      |
 | [088] — Restore summary-job inference cost              | Complete    | —                                      |
 | [089] — Report inference budget exhaustion              | Complete    | —                                      |
-| [090] — Make pending-check solving incremental          | Ready       | None                                   |
+| [090] — Make pending-check solving incremental          | Complete    | —                                      |
 | [091] — Bound compile-time evaluation by call depth     | Complete    | —                                      |
 | [092] — Format current Blot syntax                      | Complete    | —                                      |
 | [093] — Close the gdev edit gap                         | In progress | [088]                                  |

@@ -157,3 +157,79 @@ Remaining limits: regions with at most eight constraints and aliases scan them
 on every pass; body collection, rollback, physical edits, saturated clocks and
 the fallback phase wake all unresolved work; and effect-argument recovery,
 source-witness comparisons and oversized frontiers keep broad write watches.
+
+## Frontend pending checks (11 October 2026)
+
+Task 090 brings the same worklist to the checker's pending obligations. The
+milestones are `660bbe8` and `7589df2`.
+
+### Finding
+
+A gdev session reported module checks spending about 97% of their steps in
+`solveFieldsFrom`, which retried every pending check on every pass. A public
+shape reproduces the growth: a global record of N closures that perform an
+unhandled effect operation, used by N helpers. Each use instantiates the
+record's N operation checks (about 2N² obligations), so checking took 29 ms at
+N = 40, 270 ms at 120 and 3.7 s at 300. Sampled profiles showed two costs: the
+field solver retrying checks that could not progress, and covariant row
+closing copying each inherited membership list with a linear search per
+element (`types.Store.unionInto`, about 38% of samples). Operator uses
+(`callee_use`) whose operands are fixed only later were also retried on every
+pass: 128 such uses took 72,211 steps.
+
+### Rules
+
+- The pending list is mirrored by `solver_worklist.Queue`, by index. New
+  obligations are ready; a list shrunk by rollback drops stale entries and
+  watches; rollback and physical type changes wake everything.
+- An unsettled `effect_operation` sleeps on its argument and signature types,
+  effect-row tails included. An unsettled `callee_use` sleeps on its instance
+  product once its callee is imported or finished and off the inference stack.
+  Every other kind is retried each pass, as before.
+- Ready checks run in index order. The queue observes writes after every
+  attempt, so a write wakes later checks in the same pass and earlier ones in
+  the next, as the scan retried them.
+- Covariant row closing copies an inherited membership list with one append;
+  the lists only answer membership.
+- Checker counters report `inference_steps`, the budgeted steps.
+
+Sleeping was also tried for collections, monad factories, type heads, resolver
+shapes and field or dispatch owners blocked on a variable. It removed about 2%
+of steps on the public examples and none on the measured shapes, so those
+kinds keep the pass-by-pass retry.
+
+### Qualification
+
+- Zig 0.17.0 before every build batch. `deno task test:compiler` passes the full
+  LLVM native suite and 640 guest/client tests; `deno task lint:zig` reports
+  zero findings across 310 files. The alias-forwarding state law now compares
+  every checker counter except `inference_steps`, since forwarding may take
+  fewer steps.
+- A native law (`check_shared_scheme_tests.zig`) checks the closure record at
+  16 and 48 closures with at most two steps per obligation; retrying effect
+  operations every pass takes 2,276 steps for 544 obligations at 16.
+- [Process laws](tests/checker_steps.test.ts) check the closure record at 64
+  closures (at most two steps per obligation) and operator uses at 32 and 128
+  (at most 16 extra steps per added obligation). The effect-only build fails
+  the operator law; the previous compiler fails both.
+
+| `blotc check`, before → after (`aef65e7` → `7589df2`) | Time               | Steps per obligation |
+| ----------------------------------------------------- | ------------------ | -------------------: |
+| Closure record, N = 40                                | 29 → 20 ms         |                  2.2 |
+| Closure record, N = 120                               | 270 → 184 ms       |                  1.2 |
+| Closure record, N = 300                               | 3.67 → 1.67 s      |                  1.1 |
+| 128 late operator uses                                | 83 → 72 ms         |  165 → 13 (all steps) |
+
+Public examples check successfully with about 2% fewer steps. On the frozen
+gdev copy, retained edits are unchanged (440 ms) and cold builds about 2%
+faster.
+
+### Remaining scope
+
+- The closure record still creates about 2N² obligations and grows about as
+  N^2.4 in time. Each use's operation checks become that helper's own effect
+  requirements, so sharing them across uses would change judgments; what
+  remains is per-use instantiation and generalization, including
+  `schemeInto`'s scan of every pending obligation at each generalization.
+- Checks of other kinds, and uses of callees still being inferred, are retried
+  each pass.
