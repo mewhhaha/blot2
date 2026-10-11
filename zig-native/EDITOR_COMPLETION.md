@@ -596,6 +596,27 @@ eight unchanged allocation budgets; analyzer findings are zero across 328 Zig
 files. Focused native/OOM, generic fitting, protocol echo/defaults,
 queue/disposal, active/queued cancellation, deadline, disk-watch invalidation
 and actual stdio malformed/oversized-frame recovery laws pass. The later
-filename admission bound has focused client/raw-wire validation and must pass
-the joint compiler gate before its milestone commit. Integration qualification
-is recorded separately.
+filename admission bound passes focused client/raw-wire validation and the joint
+compiler gate below.
+
+## Main integration qualification (11 October 2026)
+
+Implementation `2226d50` jointly includes tasks 043 and 050 over qualified 031.
+Zig 0.17.0, Deno 2.9.7: `deno task test:compiler` passes the full native suite
+and 807 guest/client laws (6m21s guest phase), with all eight allocation budgets
+unchanged. `deno task lint:zig` with the pinned local analyzer checks 336 Zig
+files with zero findings. The staged tree remained
+`fccba545f83a668fc3c75bcfbd916c3fbebe20fe` through this gate. Release SHA-256:
+`272f028932b0cc563049fe7e5f6f51139304f0ae4cf7213351fd55f5f5f7a127`;
+compiler-identity file SHA-256:
+`15cc1fda4ca4969090b5876a2f181813e4b9ff889bc288851984d6bfe3371a96`. Ignored gate
+logs and input patches are retained in `build/bench/joint-043-050/`.
+
+The final main release repeats the six-fixture raw-wire run on CPU 6 with cache
+loading disabled: 13 first, 31 repeated and seven post-build queries per
+fixture, plus warmups. Ordinary repeated medians are 2.967–3.445 ms. The
+4,200-name fixture is 33.672 ms repeated median, 33.922 ms p95; first-query p95
+is 51.078 ms. Every query preserves the successful revision and following Wasm.
+This rerun includes the filename bound and integrated 031/043 source; the
+detailed allocation/CPU probe and actual Helix traces above retain their
+explicitly recorded earlier pin.

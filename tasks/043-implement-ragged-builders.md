@@ -2,8 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** In progress — isolated implementation and qualification; no
-  completion is claimed.
+- **Status:** Complete — qualified local implementation `2226d50`.
 - **Dependencies:** [042](042-specify-ragged-builders.md)
 - **Originating requirements:** PLAN: Earlier programs / direct ragged
   construction. Sources: [PLAN.md](../PLAN.md).
@@ -24,11 +23,11 @@ construction paths. The approved ragged design defines legal extra passes.
 
 ## Implementation checklist
 
-- [ ] Implement admitted sizing/counting, overflow checks, allocation and
+- [x] Implement admitted sizing/counting, overflow checks, allocation and
       filling with exact logical lengths.
-- [ ] Initialize reference slots safely, preserve source order and publish only
+- [x] Initialize reference slots safely, preserve source order and publish only
       complete immutable values.
-- [ ] Keep the ordinary builder for rejected shapes and ensure failures discard
+- [x] Keep the ordinary builder for rejected shapes and ensure failures discard
       private partial storage.
 
 ## Validation
@@ -48,20 +47,26 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Every admitted shape uses final storage and matches the specified
+- [x] Every admitted shape uses final storage and matches the specified
       semantics.
-- [ ] Non-admitted cases retain correct ordinary behavior and measurements show
+- [x] Non-admitted cases retain correct ordinary behavior and measurements show
       the actual cost tradeoffs.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `2226d50` (joint 043/050 implementation); this record is separate.
+- Validation: Zig 0.17.0; full native and 807 guest/client laws pass, all eight
+  allocation budgets unchanged; analyzer zero across 336 Zig files. Focused
+  native/OOM and executed-Wasm checks pass. Ordinary/runtime/staged parity,
+  overflow/fuel, snapshots, failed allocation and retained recovery laws pass.
+- Comparison: 136 runtime rows and 84 compile-phase rows compare final release
+  pairs. All twelve K>=1,000 cases pass; runtime ratios 0.028–0.458. Fresh/edit
+  add 0.708/0.702 ms, within the 2 ms allowance.
+- Remaining limitations: Bounded admission retains ordinary builders for
+  unknown/effectful/trapping shapes. Exhausted K=0 probing regresses 2.37x;
+  compiler peak is unchanged.
+- Durable record:
+  [qualification](../zig-native/RAGGED_BUILDERS_QUALIFICATION.md); exact release
+  pins, distributions and ignored evidence paths are recorded there.

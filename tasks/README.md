@@ -311,7 +311,7 @@ rejected, or that it was selected and its result conflicted. The CLI, project
 server and client schema carry it with bounds and defensive decoding. It was
 taken ahead of [026] as the smaller step. Specialization failures are still
 located inside the callee, often `std/prelude`; task [094] moves them to the
-caller's use. [049] specifies the completion contract; [050] is ready. See
+caller's use. [049] specifies the completion contract; [050] implements it. See
 [dispatch explanations](../zig-native/DISPATCH_EXPLANATIONS.md).
 
 The owner decided on 11 October 2026, relayed by the gdev session (gdev's
@@ -351,6 +351,15 @@ gate and 763 guest/client laws pass; analyzer: 323 files, zero findings. All
 eight compile-allocation budgets remain unchanged. Seven release pairs preserve
 Wasm and semantic counters; CPU is mixed. Tasks [029] and [037] are ready. See
 [resolved bodies](../zig-native/RESOLVED_BODIES.md#qualification-11-october-2026).
+
+Tasks [043] and [050] share implementation `2226d50`: bounded count/fill ragged
+builders and native completion with the client/LSP/Helix flow. The full native
+suite, 807 guest/client laws and eight unchanged allocation budgets pass;
+analyzer: 336 files, zero findings. Ragged large-case runtime ratios are
+0.028–0.458; exhausted empty probing remains a 2.37x counterexample. Completion
+repeated medians are about 3 ms, or 34 ms for 4,200 names. See
+[ragged qualification](../zig-native/RAGGED_BUILDERS_QUALIFICATION.md) and
+[editor completion](../zig-native/EDITOR_COMPLETION.md#main-integration-qualification-11-october-2026).
 
 ## Completed foundations to preserve
 
@@ -611,14 +620,14 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [040] — Fuse packed row producers and consumers         | Pending     | [002], [027]                           |
 | [041] — Broaden numeric simd                            | Pending     | [040]                                  |
 | [042] — Specify ragged builders                         | Complete    | [011], [027]                           |
-| [043] — Implement ragged builders                       | In progress | [042]                                  |
+| [043] — Implement ragged builders                       | Complete    | [042]                                  |
 | [044] — Specify rolling and summary operations          | Pending     | [040]                                  |
 | [045] — Implement rolling reductions                    | Pending     | [044]                                  |
 | [046] — Implement composable summary trees              | Pending     | [045]                                  |
 | [047] — Eliminate generic iterator state                | Pending     | [040], [027]                           |
 | [048] — Explain dispatch and evidence                   | Complete    | —                                      |
 | [049] — Specify editor completion                       | Complete    | [048]                                  |
-| [050] — Implement editor completion                     | Ready       | [049]                                  |
+| [050] — Implement editor completion                     | Complete    | [049]                                  |
 | [051] — Specify module abstraction                      | Complete    | [020]                                  |
 | [052] — Implement opaque types and privacy              | Ready       | [051]                                  |
 | [053] — Qualify module cutoffs and wrapper erasure      | Pending     | [052], [024]                           |

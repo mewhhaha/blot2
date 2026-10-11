@@ -134,3 +134,16 @@ The exhausted C=1,048,577, K=0 case costs 288.094→681.984 µs, a 2.37× regres
 (earlier batches: 2.35× and 2.42×). Counting is bounded, but does extra work
 before ordinary fallback. Broader admission or a different probe policy requires
 further measured qualification.
+
+## Main integration qualification (11 October 2026)
+
+Implementation `2226d50` jointly includes tasks 043 and 050 over qualified 031.
+Zig 0.17.0, Deno 2.9.7: `deno task test:compiler` passes the full native suite
+and 807 guest/client laws (6m21s guest phase), with all eight allocation budgets
+unchanged. `deno task lint:zig` with the pinned local analyzer checks 336 Zig
+files with zero findings. The staged tree remained
+`fccba545f83a668fc3c75bcfbd916c3fbebe20fe` through this gate. Release SHA-256:
+`272f028932b0cc563049fe7e5f6f51139304f0ae4cf7213351fd55f5f5f7a127`;
+compiler-identity file SHA-256:
+`15cc1fda4ca4969090b5876a2f181813e4b9ff889bc288851984d6bfe3371a96`. Ignored gate
+logs and input patches are retained in `build/bench/joint-043-050/`.

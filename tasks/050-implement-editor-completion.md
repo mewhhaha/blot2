@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — specification qualified; no completion is claimed.
+- **Status:** Complete — qualified local implementation `2226d50`.
 - **Dependencies:** [049](049-specify-editor-completion.md)
 - **Originating requirements:** LANGUAGE_EVOLUTION: Direction 1 / editor
   completion. Sources:
@@ -26,11 +26,11 @@ integration boundaries.
 
 ## Implementation checklist
 
-- [ ] Implement bounded completion queries against revision-aware source
+- [x] Implement bounded completion queries against revision-aware source
       overlays and expected-type/evidence information.
-- [ ] Apply specified visibility, ranking and incomplete-syntax behavior with
+- [x] Apply specified visibility, ranking and incomplete-syntax behavior with
       owned results and precise source positions.
-- [ ] Wire client/editor requests, cancellation and stale-response rejection;
+- [x] Wire client/editor requests, cancellation and stale-response rejection;
       keep failed overlays from replacing the last successful build.
 
 ## Validation
@@ -51,20 +51,26 @@ development and the scenarios below.
 
 ## Acceptance criteria
 
-- [ ] Completion works through the supported editor with the specified ranking
+- [x] Completion works through the supported editor with the specified ranking
       and revision semantics.
-- [ ] Malformed/canceled/stale requests remain safe and last-good compilation
+- [x] Malformed/canceled/stale requests remain safe and last-good compilation
       survives incomplete edits.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Commit: `2226d50` (joint 043/050 implementation); this record is separate.
+- Validation: Zig 0.17.0; full native and 807 guest/client laws pass, all eight
+  allocation budgets unchanged; analyzer zero across 336 Zig files. Focused
+  native/OOM and executed-Wasm checks pass. Editor
+  corpus/installer/protocol/client/LSP and actual Helix checks pass.
+- Comparison: Actual Helix value/member/import/hole/Unicode/race sessions pass.
+  Six-fixture wire latency, native CPU/allocation probes and seven public
+  release pairs are pinned in the durable record. Main repeated medians are
+  2.967–3.445 ms, large scope 33.672 ms.
+- Remaining limitations: No retained query cache or auto-imports. Generic
+  fitting can exhaust its shared budget and return unknown/truncated. Visibility
+  follows the current language; task 052 adds privacy.
+- Durable record: [qualification](../zig-native/EDITOR_COMPLETION.md); exact
+  release pins, distributions and ignored evidence paths are recorded there.

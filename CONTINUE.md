@@ -11,7 +11,7 @@ pushed; keep it that way unless the owner authorizes it.
 
 ## State on 11 October 2026
 
-Latest compiler implementation on local `main`: `cb41a6d`. Qualified today, each
+Latest compiler implementation on local `main`: `2226d50`. Qualified today, each
 with a durable record:
 
 | Task                                           | Implementation       | Record                                                       |
@@ -52,9 +52,9 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
    conformance. The jointly qualified compiler gate passes native tests and 690
    guest/client tests. Analyzer is zero across 318 files, including three
    unregistered 096 files under development.
-3. 049's durable completion contract is complete; 050 is ready. The contract
-   describes a proposed native query and Helix LSP bridge, not an existing
-   feature.
+3. 049's durable completion contract and 050's implementation are complete.
+   Native queries, client, LSP and actual Helix acceptance are qualified at
+   `2226d50`; see EDITOR_COMPLETION.
 4. **096 is complete at `0c5be56`.** Full native/compiler gate: 743 guest/client
    tests; analyzer: 318 files, zero findings. Native imports match the frozen
    game's Wasm/snapshots/dependencies through source/asset edits and recovery.
@@ -74,13 +74,11 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
    guest/client laws, all eight unchanged allocation budgets and zero analyzer
    findings across 327 files. Its costs and remaining memory counterexample are
    recorded in SHARED_RC. Persistent-root work (032) continues in
-   `/var/tmp/blot2-shared-rc`; 043 remains under final qualification in
-   `/var/tmp/blot2-ragged-builders`. Root's private editor probes, generic
-   evidence fitting and shared project-query budget are in
-   `/var/tmp/blot2-editor-completion` (050); protocol/client/LSP and actual
-   Helix acceptance pass; its final full gate and measurements remain
-   unfinished. 043/050 are not yet qualified or complete. The current gdev
-   corpus has moved to pen settings with native asset roots `src` and
+   `/var/tmp/blot2-shared-rc`. **043/050 are complete at `2226d50`:** joint
+   native gate, 807 guest/client laws, eight unchanged allocation budgets, zero
+   findings across 336 Zig files. Ragged and completion measurements/limits are
+   recorded in RAGGED_BUILDERS_QUALIFICATION and EDITOR_COMPLETION. The current
+   gdev corpus has moved to pen settings with native asset roots `src` and
    `devtools`; the ignored fixture harness now matches those roots. Its
    captured-input sweep passes; early attempts with the obsolete one-root
    harness are failures, not compiler regressions.
@@ -92,7 +90,12 @@ The active goal covers all remaining tasks, not just 095/097. Nothing is pushed.
 
 ## Next work
 
-Continue 032, 043, 050, 029, 037 and the remaining ready tasks. 028's read-only
+Continue 032, 029, 037 and the remaining ready tasks. Root's 029 delta is in
+`/var/tmp/blot2-symbolic-body-reuse`, over the frozen 043/050 source, with
+focused native/OOM/archive laws passing; its release build, measurements and
+full joint qualification remain unfinished. 037 is in
+`/var/tmp/blot2-ragged-builders` and 002's fused-directory candidate in
+`/var/tmp/blot2-traversal-aligned-limit`. Neither is complete. 028's read-only
 architecture map is `build/bench/resolved-bodies/design.md`. Still open: 024 and
 093; 002's current traversal gates; 086's value-template boundary. The full
 inventory is in ignored `build/bench/program/remaining.md`.
@@ -170,3 +173,12 @@ the current List lowering; F32 folds are within 0.6–1.7% of boxed at widths
   pass at 256 MiB. A measured `Compile.stack_size` focused-test option is a
   possible side quest; it is not implemented. Exact pins and per-test records
   are ignored under `build/bench/test-iteration/`.
+
+- Iteration policy: agents hand off focused native/OOM/guest checks and measured
+  evidence; root runs one required full compiler/analyzer gate on the combined
+  commit-ready batch. Use no-LLVM focused builds when execution remains short;
+  full native validation keeps LLVM. A timing pass of the cached 1,353-law LLVM
+  native suite took 298 seconds, all passed. Largest cases: typed-path OOM 82 s,
+  partial-runtime OOM 27 s, request-backend OOM 19 s. Raw timings are ignored in
+  `build/bench/joint-043-050/native-durations.json`; optimize these with
+  preserved failure coverage before adding more repeated full gates.
