@@ -648,8 +648,8 @@ Dependency numbers below link to their task files. All tasks are initially open.
 | [092] — Format current Blot syntax                      | Complete    | —                                      |
 | [093] — Close the gdev edit gap                         | In progress | [088]                                  |
 | [094] — Locate specialization failures at their use     | Ready       | [048]                                  |
-| [095] — Specify and version the project protocol        | Ready       | None                                   |
-| [096] — Compile typed asset imports natively            | Pending     | [095]                                  |
+| [095] — Specify and version the project protocol        | Complete    | None                                   |
+| [096] — Compile typed asset imports natively            | Ready       | [095]                                  |
 | [097] — Resolve array cursor representation in gdev     | In progress | None                                   |
 | [098] — Type-check recursive demand forwarding          | Ready       | None                                   |
 | [099] — Survive long stage chains without crashing      | Complete    | None                                   |

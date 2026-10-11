@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Pending — no completion is claimed.
+- **Status:** Ready — protocol dependency qualified; no completion is claimed.
 - **Dependencies:** [095](095-specify-and-version-the-project-protocol.md)
 - **Originating requirements:** the owner's decision of 11 October 2026, relayed
   by the gdev session and recorded in gdev's `PEN_MIGRATION.md` ("Decisions",

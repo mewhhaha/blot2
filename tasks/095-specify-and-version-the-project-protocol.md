@@ -2,7 +2,7 @@
 
 ## Status, dependencies, and originating requirements
 
-- **Status:** Ready — no completion is claimed.
+- **Status:** Complete.
 - **Dependencies:** None.
 - **Originating requirements:** the owner's decision of 11 October 2026, relayed
   by the gdev session and recorded in gdev's `PEN_MIGRATION.md` ("Decisions",
@@ -28,12 +28,12 @@ Nothing names a version.
 
 ## Implementation checklist
 
-- [ ] Write the specification: framing and limits, every request and reply
+- [x] Write the specification: framing and limits, every request and reply
       field, ordering and epochs, revisions, cancellation, diagnostics
       (including `details` payloads), stats, and process failure behavior.
-- [ ] Add a protocol version to the handshake or first reply; reject mismatches
+- [x] Add a protocol version to the handshake or first reply; reject mismatches
       with a defined error on both sides.
-- [ ] Make the TypeScript client and the server follow the specification
+- [x] Make the TypeScript client and the server follow the specification
       exactly, with tests that check every documented field and error.
 
 ## Validation
@@ -49,18 +49,24 @@ before the local milestone commit.
 
 ## Acceptance criteria
 
-- [ ] A host can implement the protocol from the specification alone, and a
+- [x] A host can implement the protocol from the specification alone, and a
       mismatched version fails clearly on both sides.
-- [ ] Applicable checks pass and completion evidence records remaining
+- [x] Applicable checks pass and completion evidence records remaining
       limitations honestly.
 
 ## Completion evidence
 
-- Commit: pending; record the local milestone revision.
-- Validation: not run for this task; record commands, versions, results and
-  evidence links.
-- Comparison: pending; record baseline/candidate hashes and benchmark
-  distributions, or explain why performance measurement does not apply.
-- Remaining limitations: not yet assessed; list unresolved scope explicitly.
-- Durable record: pending; link specifications/qualification outside `tasks/`
-  before cleanup.
+- Implementation: `4eabecb`; explicit client-version admission, a complete
+  protocol contract and an independent raw-wire conformance host.
+- Validation: Zig 0.17.0; `deno task test:compiler` passes the full native suite
+  and 690 guest/client tests. Analyzer: zero findings across 318 files,
+  including three unregistered asset files under development. Deno type/format
+  checks and local-link review pass.
+- Comparison: public examples, synthetic fresh/retained phases and frozen gdev
+  preserve Wasm in the jointly qualified 095/097 candidate; no protocol
+  throughput improvement is claimed.
+- Remaining limitations: raw conformance does not force native OOM, 2^53
+  revision exhaustion or a naturally oversized successful output. Existing
+  integer/enum coercions are documented and pinned; hosts emit canonical types.
+- Durable record: [project protocol](../zig-native/PROJECT_PROTOCOL.md),
+  including qualification and the final executable pin.

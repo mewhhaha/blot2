@@ -508,9 +508,9 @@ zig-native/tests/zig_project_protocol.test.ts -- /absolute/path/to/blotc`.
 
 ## Qualification, 11 October 2026
 
-Implementation revision: pending. Zig 0.17.0. The full compiler gate passes the
-native suite and 690 guest/client tests. Zero analyzer findings are required for
-the local milestone.
+Implementation revision: `4eabecb`. Zig 0.17.0. The full compiler gate passes
+the native suite and 690 guest/client tests. Zero analyzer findings are required
+for the local milestone.
 
 [The independent wire host](tests/zig_project_protocol.test.ts) imports neither
 the production client nor its frame codec. It covers version admission,
