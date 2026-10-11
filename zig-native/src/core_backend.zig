@@ -25,6 +25,7 @@ const runtime_operations = @import("runtime_operations.zig");
 const runtime_identity = @import("runtime_identity.zig");
 const dispatch_explanation = @import("dispatch_explanation.zig");
 const resolved_flow = @import("resolved_flow.zig");
+const ir = @import("runtime_ir.zig");
 const owned_arrays = @import("owned_arrays.zig");
 const artifact_emitter = @import("artifact_emitter.zig");
 const code_artifacts = @import("code_artifacts.zig");
@@ -359,6 +360,27 @@ const Generator = struct {
     }
     fn fail(self: *Generator, unit_id: u32, node: core.Id, code: Code) Error {
         return self.decline(unit_id, self.unit(unit_id).span(node), code);
+    }
+    /// The ownership role of a value with checked layout `id`. Every
+    /// aggregate, collection, closure, demand and provider is a heap
+    /// reference or zero; scalars never are.
+    fn layoutRole(self: *const Generator, id: layout.Id) ir.Role {
+        const n = self.layouts.node(id);
+        return switch (n.tag) {
+            .unit, .boolean, .u32, .f32, .never, .type_constructor => .scalar,
+            .product, .record, .array, .list, .cursor, .function, .demand, .provider, .state_provider => .reference,
+            // Compiler-defined nominals keep their own representations.
+            .nominal => if (n.a == std.math.maxInt(u32)) .value else .reference,
+            .invalid, .erased, .resolver => .value,
+        };
+    }
+    fn setParameterRoles(self: *Generator, function_id: u32, roles: u64) Error!void {
+        try self.module.setParameterRoles(function_id, roles);
+        self.evaluator.counters.parameter_role_functions += 1;
+    }
+    /// Roles of a closure body's (environment, argument, provider) parameters.
+    fn closureRoles(self: *const Generator, argument: layout.Id) u64 {
+        return ir.packParameterRoles(&.{ .reference, self.layoutRole(argument), .reference });
     }
     fn evaluationFailure(self: *Generator) Error {
         if (self.evaluator.diagnostic) |item| {
@@ -886,6 +908,7 @@ const Generator = struct {
         if (self.artifacts) |artifacts| artifacts.requireFreshCode();
         const arrow = self.layouts.node(ty);
         const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b));
+        try self.setParameterRoles(function_id, self.closureRoles(arrow.a));
         try self.static_closures.append(self.allocator, function_id);
         self.work.fresh_closures += 1;
         try self.startup_facts.request(self.allocator, function_id, .anonymous, header.unit, header.identity, false);
@@ -1174,6 +1197,10 @@ const Generator = struct {
         for (key.parameters[0..key.count], 0..) |item, i| parameters[i] = self.layouts.machine(item);
         parameters[key.count] = .i32;
         const function_id = try self.module.addFunction(parameters[0 .. key.count + 1], self.layouts.machine(key.result));
+        var roles: [max_parameters + 1]ir.Role = undefined;
+        for (key.parameters[0..key.count], 0..) |item, i| roles[i] = self.layoutRole(item);
+        roles[key.count] = .reference;
+        try self.setParameterRoles(function_id, ir.packParameterRoles(roles[0 .. key.count + 1]));
         try self.instances.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
         try self.startup_facts.request(self.allocator, function_id, .named, unit_id, key.target.binding, false);
@@ -1427,6 +1454,7 @@ const Generator = struct {
         self.instance_depth += 1;
         defer self.instance_depth -= 1;
         const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(fn_type.a), .i32 }, self.layouts.machine(fn_type.b));
+        try self.setParameterRoles(function_id, self.closureRoles(fn_type.a));
         try self.closures.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
         try self.startup_facts.request(self.allocator, function_id, .anonymous, key.unit, key.catalog, false);
@@ -1514,6 +1542,7 @@ const Generator = struct {
             const arrow = self.layouts.node(key.ty);
             if (arrow.tag != .function) return self.decline(key.target.unit, body.span, .unresolved_type);
             const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(arrow.a), .i32 }, self.layouts.machine(arrow.b));
+            try self.setParameterRoles(function_id, self.closureRoles(arrow.a));
             try self.callables.put(self.allocator, key, function_id);
             if (scope) |*actor| try actor.reserve(function_id);
             const global = if (body.runtime) try self.runtimeGlobal(key.target) else null;
@@ -1550,6 +1579,7 @@ const Generator = struct {
         }
         direct.result = ty;
         const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(current.a), .i32 }, self.layouts.machine(current.b));
+        try self.setParameterRoles(function_id, self.closureRoles(current.a));
         try self.callables.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
         var emitter: Emitter = .{ .generator = self, .unit_id = key.target.unit, .function_id = function_id, .provider_local = 2, .mappings = &.{} };
@@ -1564,7 +1594,9 @@ const Generator = struct {
             try emitter.providerHead();
             try emitter.emit(.call, target_function);
         } else {
-            const environment = try emitter.allocate((key.applied + 1) * 4);
+            const environment_roles = try emitter.layoutRoles(self.allocator, direct.parameters[0 .. key.applied + 1]);
+            defer self.allocator.free(environment_roles);
+            const environment = try emitter.allocate((key.applied + 1) * 4, .{ .words = environment_roles });
             for (direct.parameters[0..key.applied], 0..) |parameter, index| {
                 const floating = self.layouts.machine(parameter) == .f32;
                 try emitter.emit(.local_get, environment);
@@ -1591,6 +1623,7 @@ const Generator = struct {
         const fn_type = self.layouts.node(key.ty);
         if (fn_type.tag != .function) return self.decline(key.unit, .{ .start = 0, .end = 0 }, .unresolved_type);
         const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(fn_type.a), .i32 }, .i32);
+        try self.setParameterRoles(function_id, self.closureRoles(fn_type.a));
         try self.constructor_functions.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
         var emitter: Emitter = .{ .generator = self, .unit_id = key.unit, .function_id = function_id, .provider_local = 2, .mappings = &.{} };
@@ -1598,13 +1631,14 @@ const Generator = struct {
         const metadata = self.unit(key.unit).constructor(key.catalog);
         const payload_type = self.unit(key.unit).types.node(metadata.payload);
         const record_local = if (payload_type.tag == .record and payload_type.b == 1) blk: {
-            const record = try emitter.allocate(4);
+            const record = try emitter.allocate(4, .{ .words = &.{.value} });
             try emitter.emit(.local_get, record);
             try emitter.emit(.local_get, 1);
             try emitter.emit(if (self.layouts.machine(fn_type.a) == .f32) .f32_store else .i32_store, 0);
             break :blk record;
         } else if (payload_type.tag == .record) try emitter.recordRepresentation(payload_type, 1, true) else null;
-        const address = try emitter.allocate(8);
+        // A constructor cell is its tag, then its boxed record or argument.
+        const address = try emitter.allocate(8, .{ .words = &.{ .scalar, if (record_local != null) .reference else self.layoutRole(fn_type.a) } });
         try emitter.emit(.local_get, address);
         try emitter.emit(.i32_const, metadata.tag);
         try emitter.emit(.i32_store, 0);
@@ -1637,6 +1671,7 @@ const Generator = struct {
         }
         if (self.primitive_functions.count() >= 65536) return self.fail(key.unit, 0, .complexity);
         const function_id = try self.module.addFunction(&.{ .i32, self.layouts.machine(current.a), .i32 }, self.layouts.machine(current.b));
+        try self.setParameterRoles(function_id, self.closureRoles(current.a));
         try self.primitive_functions.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
         var emitter: Emitter = .{ .generator = self, .unit_id = key.unit, .function_id = function_id, .provider_local = 2, .mappings = &.{} };
@@ -1668,7 +1703,9 @@ const Generator = struct {
                 .array => try emitter.arrayLocals(0, metadata.array_op, locals[0..metadata.arity], machines[0..metadata.arity], ty, parameters[0]),
             }
         } else {
-            const environment = try emitter.allocate((key.applied + 1) * 4);
+            const environment_roles = try emitter.layoutRoles(self.allocator, parameters[0 .. key.applied + 1]);
+            defer self.allocator.free(environment_roles);
+            const environment = try emitter.allocate((key.applied + 1) * 4, .{ .words = environment_roles });
             for (parameters[0..key.applied], 0..) |parameter, index| {
                 const floating = self.layouts.machine(parameter) == .f32;
                 try emitter.emit(.local_get, environment);
@@ -1755,6 +1792,7 @@ const Generator = struct {
         const argument_machine = self.layouts.machine(arrow.a);
         const result_machine = self.layouts.machine(arrow.b);
         const function_id = try self.module.addFunction(&.{ .i32, argument_machine, .i32 }, result_machine);
+        try self.setParameterRoles(function_id, self.closureRoles(arrow.a));
         try self.operation_functions.put(self.allocator, key, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
         var emitter: Emitter = .{ .generator = self, .unit_id = 1, .function_id = function_id, .provider_local = 2, .mappings = &.{} };
@@ -1866,6 +1904,7 @@ const Generator = struct {
         const callback = self.hostCallback(ty) orelse return self.decline(1, .{ .start = 0, .end = 0 }, .entry_type);
         const imported = try self.module.importHostCallback(callback);
         const function_id = try self.module.addFunction(&.{ .i32, callback.parameter.machine(), .i32 }, callback.result.machine());
+        try self.setParameterRoles(function_id, ir.packParameterRoles(&.{ .reference, callback.parameter.role(), .reference }));
         try self.host_functions.put(self.allocator, ty, function_id);
         if (scope) |*actor| try actor.reserve(function_id);
         // The descriptor environment is a retained externref table index. It is
@@ -1900,7 +1939,8 @@ const Generator = struct {
         try emitter.emit(.local_get, 0);
         try emitter.emit(.call, references.retain);
         try emitter.emit(.local_set, handle);
-        const descriptor = try emitter.allocate(8);
+        // A table function index, then a host reference table handle.
+        const descriptor = try emitter.allocate(8, .{ .words = &.{ .scalar, .scalar } });
         try emitter.emit(.local_get, descriptor);
         try emitter.referenceConstant(stub, .table_function);
         try emitter.emit(.i32_store, 0);
@@ -1919,6 +1959,7 @@ const Generator = struct {
     }
     fn entryFunction(self: *Generator, target: u32, parameter: Scalar, result: Scalar) Error!u32 {
         const wrapper = try self.module.addFunction(&.{parameter.machine()}, result.machine());
+        try self.setParameterRoles(wrapper, ir.packParameterRoles(&.{parameter.role()}));
         if (self.request_owner) |owner| {
             try self.module.emit(wrapper, .{ .op = .i32_const });
             try self.module.emit(wrapper, .{ .op = .global_set, .operand = owner });
@@ -2886,7 +2927,7 @@ const Emitter = struct {
     // only the small emission continuation on the native stack.
     fn prepareNamedInline(self: *Emitter, key: Key, arguments: []const core.Id, captured: ?[]const u32, small_result: ?*SmallCollection, mappings: *std.ArrayList(Mapping), rows: *std.ArrayList(RowMapping), borrowed_collections: *u16) Error!?*Emitter {
         const g = self.generator;
-        if (self.inline_depth >= 6 or g.module.functions.items[self.function_id].instructions.items.len > 4096 or (if (captured) |values| values.len != key.count else arguments.len < key.count) or key.templates != 0 or key.template_result) return null;
+        if (self.inline_depth >= 6 or g.module.functions.items[self.function_id].codeLength() > 4096 or (if (captured) |values| values.len != key.count else arguments.len < key.count) or key.templates != 0 or key.template_result) return null;
         const source = g.unit(key.target.unit);
         const body = source.body(key.target.binding) orelse return null;
         const facts = try g.facts.get(g.allocator, g.units, key.target);
@@ -3129,12 +3170,15 @@ const Emitter = struct {
         }
         const result_machine = if (supplied + 1 == key.count) g.layouts.machine(key.result) else .i32;
         const function_id = try g.module.addFunction(&.{ .i32, g.layouts.machine(key.parameters[supplied]), .i32 }, result_machine);
+        try g.setParameterRoles(function_id, g.closureRoles(key.parameters[supplied]));
         try g.static_closures.append(g.allocator, function_id);
         g.work.fresh_closures += 1;
         try g.startup_facts.request(g.allocator, function_id, .named, key.target.unit, key.target.binding, false);
         var emitter: Emitter = .{ .generator = g, .unit_id = key.target.unit, .function_id = function_id, .provider_local = 2, .mappings = self.mappings, .row_mappings = self.row_mappings };
         defer emitter.deinit();
-        const environment = try self.allocate(@intCast(supplied * 4));
+        const environment_roles = try emitter.layoutRoles(g.allocator, key.parameters[0..supplied]);
+        defer g.allocator.free(environment_roles);
+        const environment = try self.allocate(@intCast(supplied * 4), .{ .words = environment_roles });
         const parameters = source.bodyParameters(body);
         for (parameters[0..supplied], 0..) |parameter, index| {
             const value = self.static_values.get(parameter.binding);
@@ -3237,20 +3281,53 @@ const Emitter = struct {
         try self.emit(.local_set, local);
         return local;
     }
-    fn allocate(self: *Emitter, bytes: u32) Error!u32 {
-        return self.allocateStorage(bytes, false);
+    /// Word roles of a fresh allocation from checked layouts. Words past
+    /// `words` take `rest`.
+    const AllocationRoles = struct {
+        words: []const ir.Role = &.{},
+        rest: ir.Role = .unknown,
+        const scalar: AllocationRoles = .{ .rest = .scalar };
+        /// Roles of a runtime heap structure, from its role table.
+        fn heap(comptime T: type) AllocationRoles {
+            const table = comptime table: {
+                var result: [T.roles.len]ir.Role = undefined;
+                for (T.roles, 0..) |role, index| result[index] = switch (role) {
+                    .scalar, .table_function, .owner_token => .scalar,
+                    .reference => .reference,
+                    .value => .value,
+                };
+                break :table result;
+            };
+            return .{ .words = &table };
+        }
+    };
+    fn allocate(self: *Emitter, bytes: u32, roles: AllocationRoles) Error!u32 {
+        return self.allocateStorage(bytes, false, roles);
     }
-    fn allocatePrivate(self: *Emitter, bytes: u32) Error!u32 {
-        const local = try self.allocate(bytes);
+    fn allocatePrivate(self: *Emitter, bytes: u32, roles: AllocationRoles) Error!u32 {
+        const local = try self.allocate(bytes, roles);
         try self.cleanups.append(self.generator.allocator, .{ .release = @fromBackingInt(@intCast(local)) });
         return local;
+    }
+    /// Precedes an allocation's constant size with its word roles.
+    fn annotateAllocation(self: *Emitter, roles: AllocationRoles) Error!void {
+        var buffer: [ir.max_annotations]ir.Instruction = undefined;
+        for (ir.annotations(roles.words, roles.rest, &buffer)) |annotation| try self.emit(annotation.op, annotation.operand);
+        self.generator.evaluator.counters.allocation_role_runs += 1;
+    }
+    /// Roles of words holding values of these checked layouts, in order.
+    fn layoutRoles(self: *Emitter, scratch: Allocator, layouts: []const layout.Id) Error![]ir.Role {
+        const roles = try scratch.alloc(ir.Role, layouts.len);
+        for (layouts, roles) |item, *role| role.* = self.generator.layoutRole(item);
+        return roles;
     }
     fn cleanupTo(self: *Emitter, checkpoint: runtime_cleanup.Mark) Error!void {
         try self.cleanups.emitTo(&self.generator.module, @fromBackingInt(@intCast(self.function_id)), checkpoint);
     }
-    fn allocateStorage(self: *Emitter, bytes: u32, scalar_payload: bool) Error!u32 {
+    fn allocateStorage(self: *Emitter, bytes: u32, scalar_payload: bool, roles: AllocationRoles) Error!u32 {
         const arena = try self.generator.module.ensureArena();
         const local = try self.temporary(.i32);
+        try self.annotateAllocation(if (scalar_payload) .scalar else roles);
         try self.emit(.i32_const, bytes);
         try self.emit(.call, if (scalar_payload) arena.allocate_scalar else arena.allocate);
         try self.emit(.local_set, local);
@@ -3321,7 +3398,10 @@ const Emitter = struct {
         const fields = g.layouts.children(result_type);
         if (left_fields.len == 0 or right_fields.len == 0) return self.emit(.local_get, if (left_fields.len == 0) right else left);
         if (fields.len / 2 > std.math.maxInt(u32) / 4) return g.fail(self.unit_id, id, .complexity);
-        const result = try self.allocate(@intCast(fields.len * 2));
+        const merged_roles = try g.allocator.alloc(ir.Role, fields.len / 2);
+        defer g.allocator.free(merged_roles);
+        for (merged_roles, 0..) |*role, field| role.* = g.layoutRole(fields[field * 2 + 1]);
+        const result = try self.allocate(@intCast(fields.len * 2), .{ .words = merged_roles });
         var a: usize = 0;
         var b: usize = 0;
         var out: usize = 0;
@@ -3351,11 +3431,17 @@ const Emitter = struct {
         defer locals.deinit(scratch_allocator);
         // Evaluating first keeps source order independent of canonical storage.
         for (children) |child| try locals.append(scratch_allocator, try self.capture(child, depth));
-        const address = try self.allocate(@intCast(children.len * 4));
         const record = unit_.node(id).tag == .record;
         const destinations = if (record) unit_.recordDestinations(id) else &.{};
         const physical = if (record) try @import("record_order.zig").destinations(scratch_allocator, unit_.types, unit_.types.node(unit_.typeOf(id)), &g.layouts.record_names) else &.{};
         defer scratch_allocator.free(physical);
+        const slot_roles = try scratch_allocator.alloc(ir.Role, children.len);
+        defer scratch_allocator.free(slot_roles);
+        for (children, 0..) |child, index| {
+            const declared = if (record) destinations[index] else index;
+            slot_roles[if (physical.len == 0) declared else physical[declared]] = g.layoutRole(try self.codeLayout(unit_.typeOf(child), unit_.span(child)));
+        }
+        const address = try self.allocate(@intCast(children.len * 4), .{ .words = slot_roles });
         for (children, locals.items, 0..) |child, value, index| {
             const declared = if (record) destinations[index] else index;
             const slot = if (physical.len == 0) declared else physical[declared];
@@ -3375,7 +3461,13 @@ const Emitter = struct {
         defer scratch.allocator().free(order);
         if (order.len == 0) return value;
         if (record.b > std.math.maxInt(u32) / 4) return g.decline(self.unit_id, .{ .start = 0, .end = 0 }, .complexity);
-        const address = try self.allocate(record.b * 4);
+        const field_roles = try scratch.allocator().alloc(ir.Role, record.b);
+        defer scratch.allocator().free(field_roles);
+        for (order, 0..) |physical, declared| {
+            const field = g.unit(self.unit_id).types.recordField(record, declared);
+            field_roles[if (into_record) physical else declared] = g.layoutRole(try self.codeLayout(field.ty, .{ .start = 0, .end = 0 }));
+        }
+        const address = try self.allocate(record.b * 4, .{ .words = field_roles });
         for (order, 0..) |physical, declared| {
             const source: u32 = if (into_record) @intCast(declared) else physical;
             const target: u32 = if (into_record) physical else @intCast(declared);
@@ -3395,7 +3487,8 @@ const Emitter = struct {
             const record = unit_.types.node(unit_.constructor(n.a).payload);
             if (record.tag != .record or record.b == 0 or payload == null) return self.generator.fail(self.unit_id, id, .unsupported);
             if (record.b == 1) {
-                const address = try self.allocate(4);
+                const field = unit_.types.recordField(record, 0);
+                const address = try self.allocate(4, .{ .words = &.{if (floating) .scalar else self.generator.layoutRole(try self.codeLayout(field.ty, unit_.span(id)))} });
                 try self.emit(.local_get, address);
                 try self.emit(.local_get, payload.?);
                 try self.emit(if (floating) .f32_store else .i32_store, 0);
@@ -3403,7 +3496,9 @@ const Emitter = struct {
             } else payload = try self.recordRepresentation(record, payload.?, true);
             floating = false;
         }
-        const address = try self.allocate(8);
+        // A constructor cell is its tag, then its payload or zero.
+        const payload_role: ir.Role = if (n.c != 0) .reference else if (n.b == 0) .scalar else self.generator.layoutRole(try self.codeLayout(unit_.typeOf(n.b), unit_.span(n.b)));
+        const address = try self.allocate(8, .{ .words = &.{ .scalar, payload_role } });
         try self.emit(.local_get, address);
         try self.emit(.i32_const, unit_.constructor(n.a).tag);
         try self.emit(.i32_store, 0);
@@ -3766,7 +3861,8 @@ const Emitter = struct {
             try self.emit(.local_get, changed);
             try self.storeElement(changed_scalar.machine(), 0, place.row_words);
             if (place.wrapped) {
-                const wrapper = if (reuse) place.owner else try self.allocate(8);
+                // A copy of a constructor cell: its tag, then its payload.
+                const wrapper = if (reuse) place.owner else try self.allocate(8, .{ .words = &.{ .scalar, .value } });
                 if (!reuse) {
                     try self.emit(.local_get, wrapper);
                     try self.emit(.local_get, place.owner);
@@ -3937,7 +4033,8 @@ const Emitter = struct {
         }
         const stride = packed_layout.stride(row_words);
         if (children.len > (std.math.maxInt(u32) - 4) / stride) return g.fail(self.unit_id, id, .complexity);
-        const address = try self.allocateStorage(@intCast(children.len * stride + 4), scalar_elements or row_words != 0);
+        // A length word, then the elements.
+        const address = try self.allocateStorage(@intCast(children.len * stride + 4), scalar_elements or row_words != 0, .{ .words = &.{.scalar}, .rest = g.layoutRole(collection_layout.a) });
         try self.emit(.local_get, address);
         try self.emit(.i32_const, @intCast(children.len));
         try self.emit(.i32_store, 0);
@@ -3963,7 +4060,7 @@ const Emitter = struct {
         if (row_words == 0) return self.emit(if (machine == .f32) .f32_load else .i32_load, offset);
         const source = try self.temporary(.i32);
         try self.emit(.local_set, source);
-        const row = try self.allocateStorage(row_words * 4, true);
+        const row = try self.allocateStorage(row_words * 4, true, .scalar);
         for (0..row_words) |i| {
             const field: u32 = @intCast(i * 4);
             try self.emit(.local_get, row);
@@ -4523,7 +4620,7 @@ const Emitter = struct {
             try self.emit(.local_set, field);
         }
         try self.emit(.end, 0);
-        const row = try self.allocateStorage(words * 4, true);
+        const row = try self.allocateStorage(words * 4, true, .scalar);
         for (fields[0..words], 0..) |field, i| {
             try self.emit(.local_get, row);
             try self.emit(.local_get, field);
@@ -4798,7 +4895,7 @@ const Emitter = struct {
         if (cache != null) try self.emit(.end, 0);
         // Resolve conditional leaf reads before initializing the row, so the
         // ordinary scalar replacement proof sees complete dominating stores.
-        const row = try self.allocateStorage(words * 4, true);
+        const row = try self.allocateStorage(words * 4, true, .scalar);
         for (fields[0..words], 0..) |field, i| {
             try self.emit(.local_get, row);
             try self.emit(.local_get, field);
@@ -4979,7 +5076,7 @@ const Emitter = struct {
             try self.emit(.end, 0);
             try self.emit(.end, 0);
         }
-        const address = try self.allocate(@sizeOf(heap.Cursor));
+        const address = try self.allocate(@sizeOf(heap.Cursor), .heap(heap.Cursor));
         inline for (.{ "collection", "index", "leaf", "base" }, .{ source, index, leaf, base }) |name, value| {
             try self.emit(.local_get, address);
             try self.emit(.local_get, value);
@@ -5035,7 +5132,7 @@ const Emitter = struct {
         for (fields) |field| if (field != fields[0]) return self.generator.fail(self.unit_id, 0, .unsupported);
         const scalar_op = scalar_ops.opcode(op, scalar_type) orelse return self.generator.fail(self.unit_id, 0, .unsupported);
         const vector_op = @import("runtime_ir.zig").lift(scalar_op) orelse return self.generator.fail(self.unit_id, 0, .unsupported);
-        const address = try self.allocateStorage(16, true);
+        const address = try self.allocateStorage(16, true, .scalar);
         try self.emit(.local_get, address);
         for (operands) |operand| {
             try self.emit(.local_get, operand);
@@ -5115,7 +5212,7 @@ const Emitter = struct {
         try self.emit(.local_get, address);
     }
     fn descriptor(self: *Emitter, function_id: u32, environment: ?u32) Error!void {
-        const address = try self.allocate(@sizeOf(heap.Closure));
+        const address = try self.allocate(@sizeOf(heap.Closure), .heap(heap.Closure));
         try self.emit(.local_get, address);
         try self.referenceConstant(function_id, .table_function);
         try self.emit(.i32_store, heap.offset(heap.Closure, "function"));
@@ -5125,7 +5222,7 @@ const Emitter = struct {
         try self.emit(.local_get, address);
     }
     fn demandDescriptor(self: *Emitter, function_id: u32, environment: ?u32) Error!void {
-        const address = try self.allocate(@sizeOf(heap.Demand));
+        const address = try self.allocate(@sizeOf(heap.Demand), .heap(heap.Demand));
         try self.emit(.local_get, address);
         try self.referenceConstant(function_id, .table_function);
         try self.emit(.i32_store, heap.offset(heap.Demand, "function"));
@@ -5167,7 +5264,14 @@ const Emitter = struct {
             }
         }
         const capture_layout = try g.internLayout(.product, 0, 0, capture_types.items);
-        const environment = if (captures.len == 0) null else try self.allocate(@intCast(captures.len * 4));
+        const capture_roles = try self.layoutRoles(g.allocator, capture_types.items);
+        defer g.allocator.free(capture_roles);
+        // A captured template is stored as its environment pointer, while its
+        // layout slot holds the unit placeholder.
+        for (captures, capture_roles) |binding, *role| if (self.templates.contains(binding)) {
+            role.* = .reference;
+        };
+        const environment = if (captures.len == 0) null else try self.allocate(@intCast(captures.len * 4), .{ .words = capture_roles });
         for (captures, capture_types.items, 0..) |binding, capture_type, index| {
             try self.emit(.local_get, environment.?);
             if (self.locals.get(binding)) |local| try self.emit(.local_get, local) else if (self.templates.get(binding)) |template| {
@@ -5549,7 +5653,9 @@ const Emitter = struct {
             .static_values = g.static_keys.intern(static_values.items) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else g.fail(self.unit_id, id, .complexity),
         };
         const function_id = try g.closureFunction(key);
-        const environment = try self.allocate(@intCast(captures.len * 4));
+        const capture_roles = try self.layoutRoles(g.allocator, capture_types.items);
+        defer g.allocator.free(capture_roles);
+        const environment = try self.allocate(@intCast(captures.len * 4), .{ .words = capture_roles });
         for (captures, capture_types.items, 0..) |binding, concrete, index| {
             try self.emit(.local_get, environment);
             if (self.static_values.contains(binding)) {
@@ -5576,7 +5682,7 @@ const Emitter = struct {
         try self.emit(.local_get, frame);
         try self.emit(.i32_load, heap.offset(heap.RequestFrame, "target"));
         try self.emit(.local_set, callback);
-        const pair = try self.allocate(@sizeOf(heap.Pair));
+        const pair = try self.allocate(@sizeOf(heap.Pair), .heap(heap.Pair));
         try self.emit(.local_get, pair);
         try self.emit(.local_get, argument);
         try self.emit(if (argument_machine == .f32) .f32_store else .i32_store, heap.offset(heap.Pair, "first"));
@@ -5632,7 +5738,7 @@ const Emitter = struct {
         const node = g.unit(self.unit_id).node(id);
         const payload = if (node.b != 0) try self.capture(node.b, depth) else null;
         const state = if (node.c != 0) try self.capture(node.c, depth) else null;
-        const decision = try self.allocate(@sizeOf(heap.Decision));
+        const decision = try self.allocate(@sizeOf(heap.Decision), .heap(heap.Decision));
         try self.emit(.local_get, decision);
         try self.emit(.i32_const, node.a);
         try self.emit(.i32_store, heap.offset(heap.Decision, "kind"));
@@ -5670,7 +5776,9 @@ const Emitter = struct {
         const child_types = try self.generator.allocator.dupe(layout.Id, self.generator.layouts.children(ty));
         defer self.generator.allocator.free(child_types);
         if (child_types.len != carries.len) return self.generator.fail(self.unit_id, id, .unresolved_type);
-        const state = try self.allocate(@intCast(carries.len * 4));
+        const state_roles = try self.layoutRoles(self.generator.allocator, child_types);
+        defer self.generator.allocator.free(state_roles);
+        const state = try self.allocate(@intCast(carries.len * 4), .{ .words = state_roles });
         for (carries, child_types, 0..) |carry, child_type, index| {
             try self.emit(.local_get, state);
             try self.requestStateValue(id, carry.incoming, child_type);
@@ -5700,7 +5808,7 @@ const Emitter = struct {
         const state_machine = g.layouts.machine(state_layout);
         const value_machine = (try g.scalarWithRows(self.unit_id, metadata.value_type, self.mappings, self.row_mappings, source.span(id))).machine();
         const result_machine = (try g.scalarWithRows(self.unit_id, metadata.result_type, self.mappings, self.row_mappings, source.span(id))).machine();
-        const cell = try self.allocatePrivate(@sizeOf(request_runtime.Cell));
+        const cell = try self.allocatePrivate(@sizeOf(request_runtime.Cell), .heap(request_runtime.Cell));
         try self.emit(.local_get, cell);
         try self.emit(.i32_const, 0);
         try self.emit(.i32_store, heap.offset(heap.RequestCell, "status"));
@@ -5718,7 +5826,7 @@ const Emitter = struct {
         try self.emit(.local_set, provider);
         for (plan.arms) |arm| {
             const callback = try self.capture(arm.callback, depth);
-            const frame = try self.allocatePrivate(@sizeOf(request_runtime.Frame));
+            const frame = try self.allocatePrivate(@sizeOf(request_runtime.Frame), .heap(request_runtime.Frame));
             try self.emit(.local_get, frame);
             try self.operationConstant(try g.requestOperation(self.unit_id, arm.operation, self.mappings, self.row_mappings, source.span(id)));
             try self.emit(.i32_store, heap.offset(heap.RequestFrame, "operation"));
@@ -5955,7 +6063,7 @@ const Emitter = struct {
         const bindings = producer.extra[metadata.captures.start..][0..metadata.captures.len];
         const argument = try self.capture(node.b, depth);
         // Inlining depends on the code emitted so far, so emission decides it.
-        const inline_body = self.inline_depth < 6 and g.module.functions.items[self.function_id].instructions.items.len <= 4096 and @import("inline_body.zig").cost(producer, metadata.body) != null;
+        const inline_body = self.inline_depth < 6 and g.module.functions.items[self.function_id].codeLength() <= 4096 and @import("inline_body.zig").cost(producer, metadata.body) != null;
         if (!inline_body) {
             const function_id = try g.capturedClosureFunction(header, plan.ty, plan.captured, plan.mappings.items, plan.rows.items);
             try self.emit(.i32_const, 0);
@@ -6034,7 +6142,7 @@ const Emitter = struct {
             if (ty.tag != .provider) return g.fail(self.unit_id, id, .unresolved_type);
             const token = try g.operationLayoutToken(ty.a, self.unit_id, source.span(id));
             const implementation = try self.capture(n.b, depth);
-            const provider = try self.allocate(@sizeOf(provider_chain.Provider));
+            const provider = try self.allocate(@sizeOf(provider_chain.Provider), .heap(provider_chain.Provider));
             try self.emit(.local_get, provider);
             try self.operationConstant(token);
             try self.emit(.i32_store, @offsetOf(provider_chain.Provider, "operation"));
@@ -6047,7 +6155,7 @@ const Emitter = struct {
             const read = try g.operationLayoutToken(ty.a, self.unit_id, source.span(id));
             const write = try g.operationLayoutToken(ty.b, self.unit_id, source.span(id));
             const initial = try self.capture(n.c, depth);
-            const provider = try self.allocate(@sizeOf(provider_chain.StateProvider));
+            const provider = try self.allocate(@sizeOf(provider_chain.StateProvider), .heap(provider_chain.StateProvider));
             try self.emit(.local_get, provider);
             try self.operationConstant(read);
             try self.emit(.i32_store, @offsetOf(provider_chain.StateProvider, "read"));
@@ -6061,7 +6169,7 @@ const Emitter = struct {
         }
     }
     fn providerFrame(self: *Emitter, provider: u32, operation_offset: u32, target: u32, outer: ?u32, kind: provider_chain.Kind) Error!u32 {
-        const frame = try self.allocatePrivate(@sizeOf(provider_chain.Frame));
+        const frame = try self.allocatePrivate(@sizeOf(provider_chain.Frame), .heap(provider_chain.Frame));
         try self.emit(.local_get, frame);
         try self.emit(.local_get, provider);
         try self.emit(.i32_load, operation_offset);
@@ -6097,7 +6205,7 @@ const Emitter = struct {
             try self.expression(n.b, depth + 1);
         } else if (ty.tag == .state_provider) {
             const state_machine = g.layouts.machine(ty.c);
-            const cell = try self.allocatePrivate(@sizeOf(provider_chain.Cell));
+            const cell = try self.allocatePrivate(@sizeOf(provider_chain.Cell), .heap(provider_chain.Cell));
             try self.emit(.local_get, cell);
             try self.emit(.local_get, provider);
             try self.emit(if (state_machine == .f32) .f32_load else .i32_load, @offsetOf(provider_chain.StateProvider, "initial"));
@@ -6106,7 +6214,8 @@ const Emitter = struct {
             self.provider_local = try self.providerFrame(provider, @offsetOf(provider_chain.StateProvider, "read"), cell, write, .state_read);
             const result = try self.capture(n.b, depth);
             const result_machine = (try self.scalar(n.b)).machine();
-            const pair = try self.allocate(8);
+            // The final state, then the result.
+            const pair = try self.allocate(8, .{ .words = &.{ g.layoutRole(ty.c), g.layoutRole(try self.codeLayout(g.unit(self.unit_id).typeOf(n.b), g.unit(self.unit_id).span(n.b))) } });
             try self.emit(.local_get, pair);
             try self.emit(.local_get, cell);
             try self.emit(if (state_machine == .f32) .f32_load else .i32_load, @offsetOf(provider_chain.Cell, "value"));
@@ -6587,7 +6696,8 @@ const Emitter = struct {
         try self.emit(.local_set, walk.storage);
         try self.emit(.local_get, end);
         try self.emit(.if_, 0);
-        const storage = try self.allocate(list_traversal.bytes);
+        // Traversal caches keep their own representation.
+        const storage = try self.allocate(list_traversal.bytes, .{});
         try self.emit(.local_get, storage);
         try self.emit(.i32_const, 0);
         try self.emit(.i32_const, list_traversal.bytes);
@@ -6629,7 +6739,7 @@ const Emitter = struct {
             // spill loop-carried values around a rarely taken allocation.
             try self.emit(.local_get, end);
             try self.emit(.if_, 0);
-            const scratch = try self.allocateStorage(words * 8, true);
+            const scratch = try self.allocateStorage(words * 8, true, .scalar);
             try self.emit(.local_get, scratch);
             try self.emit(.local_set, view.scratch);
             try self.emit(.end, 0);
@@ -6878,7 +6988,8 @@ const Emitter = struct {
         try self.emit(.i32_ge_u, 0);
         try self.emit(.if_, 0);
         self.labels += 1;
-        const root = try self.allocate(@intCast((carries.len + 1) * 4));
+        // Collection roots: each carried word may be a reference.
+        const root = try self.allocate(@intCast((carries.len + 1) * 4), .{ .rest = .value });
         for (carries, 0..) |carry, index| {
             const value = self.locals.get(carry.iteration) orelse return g.fail(self.unit_id, id, .unsupported);
             const function_ = &g.module.functions.items[self.function_id];

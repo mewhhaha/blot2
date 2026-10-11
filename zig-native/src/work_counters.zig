@@ -79,6 +79,10 @@ pub const Counters = struct {
     prepared_loops: u64 = 0,
     prepared_matches: u64 = 0,
     prepared_request_loops: u64 = 0,
+    /// Allocations annotated with word roles from checked layouts.
+    allocation_role_runs: u64 = 0,
+    /// Functions given parameter roles from checked layouts.
+    parameter_role_functions: u64 = 0,
     pub fn merge(self: *Counters, other: Counters) void {
         inline for (@typeInfo(Counters).@"struct".field_names) |name| {
             if (comptime @import("std").mem.startsWith(u8, name, "max_")) {

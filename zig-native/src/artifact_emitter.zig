@@ -12,6 +12,8 @@ pub const Event = union(enum) {
     operation_symbol: struct { id: u32, key: Span, foreign: bool },
     signature: struct { id: u32, parameters: Span, result: wasm.ValueType },
     function: struct { id: u32, signature: u32 },
+    /// Parameter roles from checked layouts (`ir.Function.parameter_roles`).
+    parameter_roles: struct { function: u32, roles: u64 },
     import_: struct { id: u32, module: Span, name: Span, signature: u32 },
     local: struct { function: u32, ty: wasm.ValueType },
     instruction: struct { function: u32, op: wasm.Op, operand: Operand },
@@ -238,6 +240,7 @@ pub const Recorder = struct {
             .local => |item| {
                 _ = try module.addLocal(try replay.get(replay.functions.items, item.function), item.ty);
             },
+            .parameter_roles => |item| try module.setParameterRoles(try replay.get(replay.functions.items, item.function), item.roles),
             .instruction => |item| try module.emit(try replay.get(replay.functions.items, item.function), .{ .op = item.op, .operand = try replay.resolve(item.operand) }),
             .global => |item| {
                 const actual = try module.addGlobal(item.scalar, try replay.resolve(item.bits), item.mutable);

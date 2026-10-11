@@ -17,6 +17,9 @@ pub const Stats = struct {
     workers: usize = 1,
     parallel_jobs: usize = 0,
     retained_bytes: usize = 0,
+    /// Stores that contradict an allocation's checked word roles (see
+    /// `wasm_lifetimes.Summaries.role_conflicts`).
+    role_conflicts: usize = 0,
 };
 const Entry = struct {
     source: ir.Function,
@@ -307,5 +310,5 @@ fn cloneFunction(a: A, source: ir.Function) A.Error!ir.Function {
     const parameters = try a.dupe(ir.ValueType, source.parameters);
     errdefer a.free(parameters);
     const body = try cloneBody(a, .{ .locals = source.locals, .instructions = source.instructions });
-    return .{ .parameters = parameters, .result = source.result, .signature = source.signature, .locals = body.locals, .instructions = body.instructions };
+    return .{ .parameters = parameters, .result = source.result, .signature = source.signature, .parameter_roles = source.parameter_roles, .annotations = source.annotations, .locals = body.locals, .instructions = body.instructions };
 }

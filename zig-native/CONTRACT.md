@@ -291,6 +291,17 @@ work budget and conservatively declines wider proofs. Dynamic shared/cyclic
 ownership and reclamation of escaping effect payloads remain required before
 tracing can be removed.
 
+Ownership roles come from checked layouts, never from machine types. The
+emitter records each created function's parameter roles and precedes each
+constant-size allocation with an `ownership` annotation run giving its word
+roles (`runtime_ir.Ownership`). Annotations are never encoded, never count as
+code for size heuristics or machine-code sharing, and describe an allocation
+only when their terminator directly precedes its size constant. The lifetime
+pass treats only non-scalar `i32` parameters as candidate addresses, and a
+tracked allocation stored into a scalar word escapes and counts as a
+`role_conflict`; correct emission produces none. Unknown roles stay
+conservative. A captured closure template's word is its environment pointer.
+
 Private provider heads and State/request cell IDs never enter source values or
 closures. `runtime_cleanup.Stack` records their releases at construction and
 tracks a checkpoint at each return/break target. A normal exit emits its suffix;

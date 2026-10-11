@@ -126,6 +126,12 @@ pub const Module = struct {
         try self.functions.append(self.allocator, .{ .parameters = self.signatures.items[signature].parameters, .result = self.signatures.items[signature].result, .signature = signature });
         return id;
     }
+    /// Records parameter roles from checked layouts; replay restores them.
+    pub fn setParameterRoles(self: *Module, id: u32, roles: u64) !void {
+        if (roles == 0) return;
+        if (self.artifacts) |journal| try journal.append(.{ .parameter_roles = .{ .function = id, .roles = roles } });
+        self.functions.items[id].parameter_roles = roles;
+    }
     pub fn importFunction(self: *Module, namespace: []const u8, name: []const u8, parameters: []const ValueType, result: ValueType) !u32 {
         const signature = try self.internType(parameters, result);
         for (self.imports.items, 0..) |item, index| if (std.mem.eql(u8, item.module, namespace) and std.mem.eql(u8, item.name, name)) {
@@ -166,6 +172,7 @@ pub const Module = struct {
         if (self.artifacts) |journal| try journal.append(.{ .instruction = .{ .function = id, .op = instruction.op, .operand = .{ .role = role, .value = instruction.operand } } });
         try self.functions.items[id].instructions.append(self.allocator, instruction);
         if (instruction.op == .call_indirect) self.indirect = true;
+        if (instruction.op == .ownership) self.functions.items[id].annotations += 1;
     }
     pub fn emitSlice(self: *Module, id: u32, instructions: []const Instruction) !void {
         for (instructions) |instruction| try self.emit(id, instruction);
@@ -516,6 +523,7 @@ pub const Module = struct {
             var passes = try @import("runtime_pipeline.zig").Session.init(self.allocator, self);
             defer passes.deinit();
             passes.tier = options.tier;
+            if (options.stats) |stats| stats.role_conflicts = passes.summaries.role_conflicts;
             if (options.current) |current| try current.recordInputs(self, &passes.summaries);
             var matcher: ?@import("optimized_bodies.zig").Matcher = if (options.previous != null and options.current != null) try .init(self.allocator, options.previous.?, options.current.?) else null;
             defer if (matcher) |*matches| matches.deinit();
@@ -661,6 +669,8 @@ pub const Bytes = struct {
     }
 };
 fn encodeInstruction(bytes: *Bytes, inst: Instruction, functions: usize, globals: usize, signatures: usize, imports: u32) !void {
+    // Ownership annotations are analysis facts, not code.
+    if (inst.op == .ownership) return;
     if (@import("wasm_simd_ops.zig").code(inst.op)) |opcode| {
         try bytes.byte(0xfd);
         try bytes.uleb(opcode);
@@ -679,6 +689,7 @@ fn encodeInstruction(bytes: *Bytes, inst: Instruction, functions: usize, globals
     }
     const code: u8 = switch (inst.op) {
         .unreachable_ => 0x00,
+        .ownership => unreachable,
         .nop => 0x01,
         .block => 0x02,
         .loop => 0x03,

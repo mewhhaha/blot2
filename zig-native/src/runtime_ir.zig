@@ -17,6 +17,13 @@ pub const Scalar = enum(u8) {
     pub fn machine(self: Scalar) ValueType {
         return if (self == .f32) .f32 else .i32;
     }
+    /// Arrays and pointers cross the ABI as heap references.
+    pub fn role(self: Scalar) Role {
+        return switch (self) {
+            .unit, .u32, .bool, .f32 => .scalar,
+            .array_u32, .array_f32, .pointer => .reference,
+        };
+    }
 };
 pub const Op = enum(u8) {
     unreachable_,
@@ -120,7 +127,105 @@ pub const Op = enum(u8) {
     f32x4_div,
     f32x4_convert_i32x4_u,
     i32x4_trunc_sat_f32x4_u,
+    /// Ownership facts from checked layouts (`Ownership`). It has no stack
+    /// effect, is never encoded, and is not code for size heuristics.
+    ownership,
 };
+/// What a 32-bit word or parameter may hold, from its checked layout.
+pub const Role = enum(u2) {
+    /// No layout fact; analyses stay conservative.
+    unknown,
+    /// Never a heap reference, whatever its machine type.
+    scalar,
+    /// A heap reference or zero.
+    reference,
+    /// A word whose layout admits both, such as an erased payload.
+    value,
+};
+/// The operand of `.ownership`. A run of annotations immediately before an
+/// allocation's `i32_const size; call allocate` gives the roles of its words:
+/// `words` annotations cover `words_per_chunk` words each, chunks 0, 1, ... in
+/// order, and a final `rest` annotation, always present, ends the run with the
+/// number of explicitly described words and one role for every later word. Anywhere else, for example where a
+/// pass removed the allocation, an annotation describes nothing.
+pub const Ownership = packed struct(u32) {
+    pub const words_per_chunk = 13;
+    pub const Kind = enum(u2) { words, rest, _ };
+    kind: Kind,
+    chunk: u4 = 0,
+    roles: u26 = 0,
+
+    pub fn role(self: Ownership, index: usize) Role {
+        return @enumFromInt(@as(u2, @truncate(self.roles >> @intCast(index * 2))));
+    }
+    /// Words a `rest` annotation's run describes explicitly.
+    pub fn explicitWords(self: Ownership) usize {
+        return self.roles >> 2;
+    }
+    /// The role of word `word` in the annotation run `run`, which ends with
+    /// its `rest` annotation.
+    pub fn wordRole(run: []const Instruction, word: usize) Role {
+        if (run.len == 0) return .unknown;
+        const terminator: Ownership = @bitCast(run[run.len - 1].operand);
+        if (terminator.kind != .rest) return .unknown;
+        if (word >= terminator.explicitWords()) return terminator.role(0);
+        for (run[0 .. run.len - 1]) |instruction| {
+            const annotation: Ownership = @bitCast(instruction.operand);
+            const first = @as(usize, annotation.chunk) * words_per_chunk;
+            if (annotation.kind == .words and word >= first and word < first + words_per_chunk) return annotation.role(word - first);
+        }
+        return .unknown;
+    }
+};
+/// The most annotations one allocation's run needs.
+pub const max_annotations = 17;
+/// The annotation run for an allocation whose first words have `words` roles
+/// and whose remaining words have `rest`. Words past 16 chunks are unknown.
+pub fn annotations(words: []const Role, rest: Role, out: *[max_annotations]Instruction) []Instruction {
+    const chunks = (words.len + Ownership.words_per_chunk - 1) / Ownership.words_per_chunk;
+    var count: usize = 0;
+    for (0..@min(chunks, 16)) |chunk| {
+        const slice = words[chunk * Ownership.words_per_chunk ..][0..@min(Ownership.words_per_chunk, words.len - chunk * Ownership.words_per_chunk)];
+        var roles: u26 = 0;
+        for (slice, 0..) |item, index| roles |= @as(u26, @backingInt(item)) << @intCast(index * 2);
+        const operand: Ownership = .{ .kind = .words, .chunk = @intCast(chunk), .roles = roles };
+        out[count] = .{ .op = .ownership, .operand = @bitCast(operand) };
+        count += 1;
+    }
+    // Words past 16 chunks are unknown: the run then describes 16 chunks and
+    // leaves every later word unknown.
+    const explicit: u26 = @intCast(@min(words.len, 16 * Ownership.words_per_chunk));
+    const terminator: Ownership = .{ .kind = .rest, .roles = (explicit << 2) | @as(u26, if (chunks > 16) 0 else @backingInt(rest)) };
+    out[count] = .{ .op = .ownership, .operand = @bitCast(terminator) };
+    return out[0 .. count + 1];
+}
+/// The annotation run describing the allocation call at `at`: a `rest`
+/// annotation immediately before its `i32_const` size, preceded by that run's
+/// `words` chunks counting down to chunk 0. Anything else describes nothing.
+pub fn allocationAnnotations(instructions: []const Instruction, at: usize) []const Instruction {
+    if (at < 2 or instructions[at - 1].op != .i32_const) return &.{};
+    const end = at - 1;
+    if (instructions[end - 1].op != .ownership or @as(Ownership, @bitCast(instructions[end - 1].operand)).kind != .rest) return &.{};
+    var start = end - 1;
+    if (start == 0 or instructions[start - 1].op != .ownership) return instructions[start..end];
+    const highest: Ownership = @bitCast(instructions[start - 1].operand);
+    if (highest.kind != .words) return instructions[start..end];
+    var chunk: u4 = highest.chunk;
+    while (true) {
+        if (start == 0 or instructions[start - 1].op != .ownership) return &.{};
+        const annotation: Ownership = @bitCast(instructions[start - 1].operand);
+        if (annotation.kind != .words or annotation.chunk != chunk) return &.{};
+        start -= 1;
+        if (chunk == 0) return instructions[start..end];
+        chunk -= 1;
+    }
+}
+/// Instructions that are code, excluding ownership annotations.
+pub fn codeLength(instructions: []const Instruction) usize {
+    var count: usize = 0;
+    for (instructions) |instruction| count += @intFromBool(instruction.op != .ownership);
+    return count;
+}
 pub const FunctionId = enum(u32) { _ };
 pub const LocalId = enum(u32) { _ };
 pub const SignatureId = enum(u32) { _ };
@@ -146,13 +251,33 @@ pub const Function = struct {
     parameters: []ValueType,
     result: ValueType,
     signature: u32,
+    /// Parameter roles from checked layouts, two bits per parameter (see
+    /// `parameterRole`). Zero leaves every parameter unknown.
+    parameter_roles: u64 = 0,
+    /// Ownership annotations among `instructions`, which are not code.
+    annotations: u32 = 0,
     locals: std.ArrayList(ValueType) = .empty,
     instructions: std.ArrayList(Instruction) = .empty,
     pub fn deinit(self: *Function, allocator: Allocator) void {
         self.locals.deinit(allocator);
         self.instructions.deinit(allocator);
     }
+    /// Instructions that are code, as size heuristics count them.
+    pub fn codeLength(self: *const Function) usize {
+        return self.instructions.items.len - self.annotations;
+    }
+    pub fn parameterRole(self: *const Function, index: usize) Role {
+        if (index >= 32) return .unknown;
+        return @enumFromInt(@as(u2, @truncate(self.parameter_roles >> @intCast(index * 2))));
+    }
 };
+/// Packs parameter roles for `Function.parameter_roles`; parameters past the
+/// 32nd stay unknown.
+pub fn packParameterRoles(roles: []const Role) u64 {
+    var result: u64 = 0;
+    for (roles[0..@min(roles.len, 32)], 0..) |role, index| result |= @as(u64, @backingInt(role)) << @intCast(index * 2);
+    return result;
+}
 
 /// Mutable output of one pass; retained input bodies stay immutable.
 pub const Body = struct {
@@ -189,7 +314,7 @@ fn memory(value: ValueType, store: bool) Contract {
 pub fn fixed(op: Op) Contract {
     return switch (op) {
         .unreachable_ => .{ .effect = .trap, .may_trap = true },
-        .nop => .{},
+        .nop, .ownership => .{},
         .block, .loop, .else_, .end, .br, .return_ => .{ .effect = .control },
         .if_, .br_if => signature(&.{.i32}, .none, .control),
         .call, .call_import, .call_indirect => .{ .effect = .call, .may_trap = true },
@@ -308,4 +433,44 @@ pub fn lift(op: Op) ?Op {
         .i32_trunc_sat_f32_u => .i32x4_trunc_sat_f32x4_u,
         else => null,
     };
+}
+
+test "ownership runs describe only the allocation they precede" {
+    var buffer: [max_annotations]Instruction = undefined;
+    var words: [15]Role = undefined;
+    for (&words, 0..) |*role, index| role.* = if (index % 2 == 0) .scalar else .reference;
+    const run = annotations(&words, .value, &buffer);
+    try std.testing.expectEqual(@as(usize, 3), run.len);
+    var body: std.ArrayList(Instruction) = .empty;
+    defer body.deinit(std.testing.allocator);
+    // An orphaned run, left by a removed allocation, sits directly before
+    // the next allocation's own run and must not leak into it.
+    var orphan: [max_annotations]Instruction = undefined;
+    try body.appendSlice(std.testing.allocator, annotations(&.{ .reference, .reference }, .unknown, &orphan));
+    try body.appendSlice(std.testing.allocator, run);
+    try body.appendSlice(std.testing.allocator, &.{ .{ .op = .i32_const, .operand = 64 }, .{ .op = .call, .operand = 3 } });
+    const found = allocationAnnotations(body.items, body.items.len - 1);
+    try std.testing.expectEqual(run.len, found.len);
+    for (words, 0..) |role, index| try std.testing.expectEqual(role, Ownership.wordRole(found, index));
+    try std.testing.expectEqual(Role.value, Ownership.wordRole(found, 15));
+    try std.testing.expectEqual(@as(usize, 2), codeLength(body.items));
+    // A run separated from the size by other code describes nothing.
+    const separated = [_]Instruction{ run[run.len - 1], .{ .op = .local_get, .operand = 0 }, .{ .op = .i32_const, .operand = 8 }, .{ .op = .call, .operand = 3 } };
+    try std.testing.expectEqual(@as(usize, 0), allocationAnnotations(&separated, 3).len);
+    // A run missing its first chunk describes nothing.
+    const truncated = [_]Instruction{ run[1], run[2], .{ .op = .i32_const, .operand = 8 }, .{ .op = .call, .operand = 3 } };
+    try std.testing.expectEqual(@as(usize, 0), allocationAnnotations(&truncated, 3).len);
+    try std.testing.expectEqual(@as(usize, 3), codeLength(&separated));
+    try std.testing.expectEqual(@as(usize, 2), codeLength(&truncated));
+}
+
+test "parameter roles pack two bits per parameter" {
+    var function: Function = .{ .parameters = &.{}, .result = .none, .signature = 0, .parameter_roles = packParameterRoles(&.{ .reference, .scalar, .value }) };
+    try std.testing.expectEqual(Role.reference, function.parameterRole(0));
+    try std.testing.expectEqual(Role.scalar, function.parameterRole(1));
+    try std.testing.expectEqual(Role.value, function.parameterRole(2));
+    try std.testing.expectEqual(Role.unknown, function.parameterRole(3));
+    try std.testing.expectEqual(Role.unknown, function.parameterRole(40));
+    function.parameter_roles = 0;
+    try std.testing.expectEqual(Role.unknown, function.parameterRole(0));
 }

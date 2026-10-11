@@ -584,6 +584,9 @@ pub const State = struct {
                 .local => |item| if (self.old.emission.functions[item.function].owner != 0 or self.staticHelper(self.old.emission.functions[item.function], record.owner)) {
                     _ = try g.module.addLocal(try self.resolveFunction(g, item.function), item.ty);
                 },
+                .parameter_roles => |item| if (self.old.emission.functions[item.function].owner != 0 or self.staticHelper(self.old.emission.functions[item.function], record.owner)) {
+                    try g.module.setParameterRoles(try self.resolveFunction(g, item.function), item.roles);
+                },
                 .instruction => |item| if (self.old.emission.functions[item.function].owner != 0 or self.staticHelper(self.old.emission.functions[item.function], record.owner)) {
                     const target = try self.resolveFunction(g, item.function);
                     if (item.operand.role == .operation) {

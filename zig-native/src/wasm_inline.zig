@@ -8,7 +8,7 @@ const A = std.mem.Allocator;
 
 fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
     const arena = module.arena orelse return false;
-    if (body.result != .i32 or body.instructions.items.len > 96 or body.instructions.items.len == 0) return false;
+    if (body.result != .i32 or body.codeLength() > 96 or body.codeLength() == 0) return false;
     if (body.parameters.len > 64 or body.locals.items.len > 64 - body.parameters.len) return false;
     const count = body.parameters.len + body.locals.items.len;
     var defined: [64]bool = @splat(false);
@@ -42,7 +42,7 @@ fn admitted(module: *const wasm.Module, body: *const ir.Function) bool {
 }
 
 pub fn run(a: A, module: *const wasm.Module, source: *const ir.Function) A.Error!?ir.Body {
-    if (module.arena == null or source.instructions.items.len > 4096) return null;
+    if (module.arena == null or ir.codeLength(source.instructions.items) > 4096) return null;
     var selected = false;
     for (source.instructions.items) |inst| if (inst.op == .call and admitted(module, &module.functions.items[inst.operand])) {
         selected = true;
@@ -52,8 +52,10 @@ pub fn run(a: A, module: *const wasm.Module, source: *const ir.Function) A.Error
     var result: ir.Body = .{};
     errdefer result.deinit(a);
     try result.locals.appendSlice(a, source.locals.items);
+    // Ownership annotations are copied but are not code for this budget.
+    var code: usize = 0;
     for (source.instructions.items) |inst| {
-        if (inst.op == .call and result.instructions.items.len < 4096 and admitted(module, &module.functions.items[inst.operand])) {
+        if (inst.op == .call and code < 4096 and admitted(module, &module.functions.items[inst.operand])) {
             const callee = &module.functions.items[inst.operand];
             const base: u32 = @intCast(source.parameters.len + result.locals.items.len);
             try result.locals.appendSlice(a, callee.parameters);
@@ -63,12 +65,16 @@ pub fn run(a: A, module: *const wasm.Module, source: *const ir.Function) A.Error
                 parameter -= 1;
                 try result.instructions.append(a, .{ .op = .local_set, .operand = base + @as(u32, @intCast(parameter)) });
             }
+            code += callee.parameters.len + callee.codeLength();
             for (callee.instructions.items) |instruction| {
                 var copy = instruction;
                 if (copy.op == .local_get or copy.op == .local_set or copy.op == .local_tee) copy.operand += base;
                 try result.instructions.append(a, copy);
             }
-        } else try result.instructions.append(a, inst);
+        } else {
+            code += @intFromBool(inst.op != .ownership);
+            try result.instructions.append(a, inst);
+        }
     }
     return result;
 }

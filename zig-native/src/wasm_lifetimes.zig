@@ -30,6 +30,9 @@ const Allocation = struct {
     segment: u32 = 0,
     references: u32 = absent,
     accesses: u32 = absent,
+    /// The ownership annotation run giving this allocation's word roles.
+    annotations: u32 = absent,
+    annotation_count: u32 = 0,
 };
 const Use = struct { at: u32, previous: u32 };
 const Reference = struct {
@@ -96,6 +99,9 @@ pub const Summaries = struct {
     parameters: []Parameter,
     depth: u32 = 0,
     prepared: bool = false,
+    /// Allocations stored into a word whose checked role is scalar, over
+    /// every emitted body. Emission from checked layouts never does this.
+    role_conflicts: usize = 0,
 
     pub fn init(a: A, module: *const w.Module) !Summaries {
         const functions = try a.alloc(Summary, module.functions.items.len);
@@ -141,10 +147,11 @@ pub const Summaries = struct {
         const function = &self.module.functions.items[id];
         var state = try Analysis.init(self.a, self, function, .parameters);
         defer state.deinit();
-        // Machine i32 parameters are symbolic addresses during this proof.
-        // Arithmetic/returning one makes that parameter ineligible for borrowing.
+        // Parameters that may hold a reference are symbolic addresses during
+        // this proof: their checked role is a reference, or unknown for an
+        // i32 word. Arithmetic/returning one makes it ineligible for borrowing.
         for (function.parameters, 0..) |parameter, index| {
-            if (parameter != .i32) continue;
+            if (!mayReference(function, parameter, index)) continue;
             try state.allocations.append(self.a, .{ .size = std.math.maxInt(u32), .region = 0, .last_region = 0, .definition = 0, .last = 0, .parameter = true });
             state.locals[index] = .{ .owner = @intCast(state.allocations.items.len) };
         }
@@ -152,7 +159,7 @@ pub const Summaries = struct {
         if (state.valid) {
             var owner: usize = 0;
             for (function.parameters, 0..) |parameter, index| {
-                if (parameter != .i32) continue;
+                if (!mayReference(function, parameter, index)) continue;
                 const value = state.allocations.items[owner];
                 summary.parameters[index] = .{ .escapes = value.escaped or value.returned, .bytes = value.required };
                 owner += 1;
@@ -177,8 +184,14 @@ pub const Summaries = struct {
     }
 };
 
+/// Only an i32 word can be an address. A scalar role from the checked layout
+/// rules it out; reference, value and unknown roles keep it a candidate.
+fn mayReference(function: *const w.Function, parameter: w.ValueType, index: usize) bool {
+    return parameter == .i32 and function.parameterRole(index) != .scalar;
+}
 const Analysis = struct {
     a: A,
+    instructions: []const ir.Instruction = &.{},
     summaries: *Summaries,
     mode: enum { temporaries, parameters },
     locals: []Value,
@@ -306,6 +319,13 @@ const Analysis = struct {
             return;
         };
         const parent = &self.allocations.items[address.owner - 1];
+        // A word the checked layout makes scalar cannot keep a reference the
+        // analysis could follow: the stored allocation escapes instead.
+        if (parent.annotations != absent and (start % 4 != 0 or ir.Ownership.wordRole(self.instructions[parent.annotations..][0..parent.annotation_count], start / 4) == .scalar)) {
+            if (self.mode == .parameters) self.summaries.role_conflicts += 1;
+            try self.escape(value);
+            return;
+        }
         const id: u32 = @intCast(self.references.items.len);
         try self.references.append(self.a, .{ .parent = address.owner, .child = value, .offset = start, .at = self.at, .scope = if (self.controls.items.len == 0) 0 else self.controls.items[self.controls.items.len - 1].identity, .region = self.region, .previous = parent.references });
         parent.references = id;
@@ -378,6 +398,7 @@ const Analysis = struct {
         self.invalidates = true;
     }
     fn scan(self: *Analysis, module: *const w.Module, function: *const w.Function) A.Error!void {
+        self.instructions = function.instructions.items;
         for (function.instructions.items, 0..) |inst, index| {
             self.at = @intCast(index);
             switch (inst.op) {
@@ -455,7 +476,16 @@ const Analysis = struct {
                     if (callee.ownership == .allocate or callee.ownership == .allocate_scalar) {
                         const bytes = self.pop();
                         try self.escape(bytes);
-                        if (bytes.constant != null and bytes.constant.? > 0) try self.allocation(bytes.constant.?) else try self.push(.{});
+                        if (bytes.constant != null and bytes.constant.? > 0) {
+                            try self.allocation(bytes.constant.?);
+                            // The run ends just before the size constant.
+                            const roles = ir.allocationAnnotations(function.instructions.items, index);
+                            if (roles.len != 0) {
+                                const owner = &self.allocations.items[self.allocations.items.len - 1];
+                                owner.annotations = @intCast(index - 1 - roles.len);
+                                owner.annotation_count = @intCast(roles.len);
+                            }
+                        } else try self.push(.{});
                     } else {
                         const summary = try self.summaries.get(inst.operand);
                         for (0..callee.parameters.len) |argument| {
@@ -1028,4 +1058,71 @@ test "very wide cyclic records decline a proof whose overlap work exceeds the bu
     var plan = try analyze(a, &module, &module.functions.items[f]);
     defer plan.deinit(a);
     try std.testing.expectEqual(@as(usize, 0), plan.releases.items.len);
+}
+
+/// Releases planned for a parent holding a child at word 0, with the parent's
+/// word 0 annotated `role`, or not annotated at all.
+fn wordRoleReleases(a: A, role: ?ir.Role) !usize {
+    var module = w.Module.init(a);
+    defer module.deinit();
+    const arena = try module.ensureArena();
+    const f = try module.addFunction(&.{.i32}, .i32);
+    const parent = try module.addLocal(f, .i32);
+    const child = try module.addLocal(f, .i32);
+    var buffer: [ir.max_annotations]ir.Instruction = undefined;
+    if (role) |word| try module.emitSlice(f, ir.annotations(&.{word}, .value, &buffer));
+    try module.emitSlice(f, &.{ .{ .op = .i32_const, .operand = 128 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = parent } });
+    try module.emitSlice(f, &.{ .{ .op = .i32_const, .operand = 128 }, .{ .op = .call, .operand = arena.allocate }, .{ .op = .local_set, .operand = child } });
+    try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = parent }, .{ .op = .local_get, .operand = child }, .{ .op = .i32_store } });
+    try module.emitSlice(f, &.{ .{ .op = .local_get, .operand = parent }, .{ .op = .i32_load }, .{ .op = .i32_load, .operand = 124 } });
+    var plan = try analyze(a, &module, &module.functions.items[f]);
+    defer plan.deinit(a);
+    return plan.releases.items.len;
+}
+test "a word the checked layout makes scalar never carries a followed reference" {
+    const a = std.testing.allocator;
+    const unknown = try wordRoleReleases(a, null);
+    // Parent and child form one released group through the reference word.
+    try std.testing.expectEqual(@as(usize, 2), unknown);
+    try std.testing.expectEqual(unknown, try wordRoleReleases(a, .reference));
+    try std.testing.expectEqual(unknown, try wordRoleReleases(a, .value));
+    // A scalar word cannot hold the child: it escapes and is not released.
+    try std.testing.expectEqual(@as(usize, 1), try wordRoleReleases(a, .scalar));
+}
+
+test "parameters whose checked role is scalar are never borrowed addresses" {
+    const a = std.testing.allocator;
+    for ([_]ir.Role{ .unknown, .reference, .scalar }) |role| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        _ = try module.ensureArena();
+        const reader = try module.addFunction(&.{.i32}, .i32);
+        try module.setParameterRoles(reader, ir.packParameterRoles(&.{role}));
+        try module.emitSlice(reader, &.{ .{ .op = .local_get, .operand = 0 }, .{ .op = .i32_load, .operand = 4 } });
+        var summaries = try Summaries.init(a, &module);
+        defer summaries.deinit();
+        const parameter = (try summaries.get(reader)).parameters[0];
+        // A reference or unknown i32 is proved to be borrowed for 8 bytes; a
+        // scalar keeps the conservative default and is never an address.
+        try std.testing.expectEqual(role == .scalar, parameter.escapes);
+        try std.testing.expectEqual(@as(u32, if (role == .scalar) 0 else 8), parameter.bytes);
+    }
+}
+
+test "ownership annotations are not encoded" {
+    const a = std.testing.allocator;
+    var bytes: [2][]u8 = undefined;
+    for (0..2) |annotated| {
+        var module = w.Module.init(a);
+        defer module.deinit();
+        const arena = try module.ensureArena();
+        const f = try module.addFunction(&.{}, .i32);
+        var buffer: [ir.max_annotations]ir.Instruction = undefined;
+        if (annotated == 1) try module.emitSlice(f, ir.annotations(&.{ .scalar, .reference }, .unknown, &buffer));
+        try module.emitSlice(f, &.{ .{ .op = .i32_const, .operand = 8 }, .{ .op = .call, .operand = arena.allocate } });
+        try std.testing.expectEqual(@as(usize, 2), module.functions.items[f].codeLength());
+        bytes[annotated] = try module.assemble();
+    }
+    defer for (bytes) |item| a.free(item);
+    try std.testing.expectEqualSlices(u8, bytes[0], bytes[1]);
 }

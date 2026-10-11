@@ -20,6 +20,13 @@ fn scenario(allocator: std.mem.Allocator) !void {
     const operation = try symbols.intern(proof.view(), label);
     const parent = try original.addFunction(&.{}, .i32);
     const child = try original.addFunction(&.{}, .i32);
+    // Ownership facts replay with the function they describe.
+    const ir = @import("runtime_ir.zig");
+    const typed = try original.addFunction(&.{ .i32, .f32 }, .none);
+    const typed_roles = ir.packParameterRoles(&.{ .reference, .scalar });
+    try original.setParameterRoles(typed, typed_roles);
+    var annotations: [ir.max_annotations]wasm.Instruction = undefined;
+    try original.emitSlice(typed, ir.annotations(&.{.reference}, .unknown, &annotations));
     _ = try original.addLocal(parent, .i32);
     try symbols.emit(&original, child, operation);
     try original.emit(parent, .{ .op = .call, .operand = child });
@@ -54,6 +61,9 @@ fn scenario(allocator: std.mem.Allocator) !void {
     var replayed = try journal.materialize(allocator);
     defer replayed.deinit();
     try std.testing.expectEqual(expected_count, replayed.functions.items.len);
+    try std.testing.expectEqual(typed_roles, replayed.functions.items[typed].parameter_roles);
+    try std.testing.expectEqual(@as(u32, 2), replayed.functions.items[typed].annotations);
+    try std.testing.expectEqual(@as(usize, 0), replayed.functions.items[typed].codeLength());
     try std.testing.expectEqualSlices(u8, expected_data, replayed.data.items);
     const actual = try replayed.assemble();
     defer allocator.free(actual);

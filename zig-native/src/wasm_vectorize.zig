@@ -28,6 +28,8 @@ const Plan = struct {
         var stack: [256]Id = undefined;
         var len: usize = 0;
         for (instructions) |inst| {
+            // Ownership annotations are not code and cost no budget.
+            if (inst.op == .ownership) continue;
             if (self.budget == 0) return null;
             self.budget -= 1;
             const result: ?Id = switch (inst.op) {
