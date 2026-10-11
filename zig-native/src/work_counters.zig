@@ -73,6 +73,12 @@ pub const Counters = struct {
     prepared_indirect_calls: u64 = 0,
     prepared_static_closures: u64 = 0,
     prepared_extra_applications: u64 = 0,
+    prepared_exits: u64 = 0,
+    prepared_exit_cleanups: u64 = 0,
+    prepared_joins: u64 = 0,
+    prepared_loops: u64 = 0,
+    prepared_matches: u64 = 0,
+    prepared_request_loops: u64 = 0,
     pub fn merge(self: *Counters, other: Counters) void {
         inline for (@typeInfo(Counters).@"struct".field_names) |name| {
             if (comptime @import("std").mem.startsWith(u8, name, "max_")) {

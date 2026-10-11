@@ -24,6 +24,7 @@ const exact_builder = @import("exact_builder.zig");
 const runtime_operations = @import("runtime_operations.zig");
 const runtime_identity = @import("runtime_identity.zig");
 const dispatch_explanation = @import("dispatch_explanation.zig");
+const resolved_flow = @import("resolved_flow.zig");
 const owned_arrays = @import("owned_arrays.zig");
 const artifact_emitter = @import("artifact_emitter.zig");
 const code_artifacts = @import("code_artifacts.zig");
@@ -5447,7 +5448,8 @@ const Emitter = struct {
         switch (n.tag) {
             .computation, .reference, .call, .apply => try self.publishTemplate(try self.computationTemplate(id) orelse return g.fail(self.unit_id, id, .unresolved_type), id),
             .block => {
-                try self.emit(.block, @backingInt(wasm.ValueType.i32));
+                const join = try self.prepareJoin(id, .template);
+                try self.emit(.block, @backingInt(join.result.?));
                 try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .cleanup = self.cleanups.mark(), .template_result = true });
                 self.labels += 1;
                 const terminated = try self.suite(id, depth + 1);
@@ -5457,8 +5459,9 @@ const Emitter = struct {
                 try self.emit(.end, 0);
             },
             .if_value => {
+                const join = try self.prepareJoin(id, .template);
                 try self.expression(n.a, depth + 1);
-                try self.emit(.if_, @backingInt(wasm.ValueType.i32));
+                try self.emit(.if_, @backingInt(join.result.?));
                 self.labels += 1;
                 try self.templateExpression(n.b, depth + 1);
                 try self.emit(.else_, 0);
@@ -5688,8 +5691,9 @@ const Emitter = struct {
         defer self.cleanups.restore(checkpoint);
         const g = self.generator;
         const source = g.unit(self.unit_id);
+        const plan = try self.prepareRequestLoop(id);
         const metadata = source.requestLoopInfo(id);
-        const carries = source.requestLoopCarries(id);
+        const carries = plan.broken.carries;
         const computation = try self.capture(metadata.computation, depth);
         const state_layout = try self.codeLayout(metadata.state_type, source.span(id));
         const initial = try self.requestState(id, carries, state_layout);
@@ -5712,7 +5716,7 @@ const Emitter = struct {
         const provider = try self.temporary(.i32);
         try self.emit(.local_get, outer);
         try self.emit(.local_set, provider);
-        for (source.requestArms(id)) |arm| {
+        for (plan.arms) |arm| {
             const callback = try self.capture(arm.callback, depth);
             const frame = try self.allocatePrivate(@sizeOf(request_runtime.Frame));
             try self.emit(.local_get, frame);
@@ -5750,26 +5754,23 @@ const Emitter = struct {
         try self.emit(.local_get, cell);
         try self.emit(if (state_machine == .f32) .f32_load else .i32_load, heap.offset(heap.RequestCell, "state"));
         try self.emit(.local_set, state);
+        // The runner opens no structured labels. The exit scope's cleanup mark
+        // follows the cell and frames, which the loop's own close releases.
+        std.debug.assert(self.labels == plan.broken.label);
+        var broken = plan.broken;
+        broken.cleanup = self.cleanups.mark();
         try self.emit(.block, 0);
-        const exit_label = self.labels;
         self.labels += 1;
-        try self.loop_targets.append(g.allocator, .{ .node = id, .label = exit_label, .cleanup = self.cleanups.mark() });
+        try self.loop_targets.append(g.allocator, .{ .node = id, .label = broken.label, .cleanup = broken.cleanup });
         try self.emit(.local_get, cell);
         try self.emit(.i32_load, heap.offset(heap.RequestCell, "status"));
         try self.emit(.i32_const, @backingInt(request_runtime.Status.exited));
         try self.emit(.i32_eq, 0);
         try self.emit(.if_, 0);
         self.labels += 1;
-        var return_target: ?ReturnTarget = null;
-        for (self.return_targets.items) |target| if (target.node == metadata.return_target) {
-            return_target = target;
-            break;
-        };
-        const parent_return = return_target orelse return g.fail(self.unit_id, id, .unsupported);
         try self.emit(.local_get, cell);
         try self.emit(if (result_machine == .f32) .f32_load else .i32_load, heap.offset(heap.RequestCell, "exit"));
-        try self.cleanupTo(parent_return.cleanup);
-        try self.emit(.br, self.labels - 1 - parent_return.label);
+        try self.takeExit(plan.exited);
         self.labels -= 1;
         try self.emit(.end, 0);
         try self.emit(.local_get, cell);
@@ -5784,15 +5785,16 @@ const Emitter = struct {
             if (carries.len > 1) try self.emit(if (ty == .f32) .f32_load else .i32_load, @intCast(index * 4));
             try self.save(carry.outgoing, id);
         }
-        try self.emit(.br, self.labels - 1 - exit_label);
+        std.debug.assert(self.cleanups.since(broken.cleanup).len == 0);
+        try self.takeExit(broken);
         self.labels -= 1;
         try self.emit(.end, 0);
         try self.requestBindState(id, state, source.requestCompletionBindings(id));
         try self.emit(.block, 0);
         const pattern_failure = self.labels;
         self.labels += 1;
-        try self.matchPattern(id, metadata.completion_pattern, value, pattern_failure, depth + 1);
-        _ = try self.suite(metadata.completion_body, depth + 1);
+        try self.matchPattern(id, plan.completion_pattern, value, pattern_failure, depth + 1);
+        _ = try self.suite(plan.completion_body, depth + 1);
         try self.emit(.unreachable_, 0);
         self.labels -= 1;
         try self.emit(.end, 0);
@@ -6367,11 +6369,12 @@ const Emitter = struct {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         if (!self.exact_probe) if (exact_builder.analyze(unit_, id)) |plan| return self.exactBuilder(id, plan, depth);
-        try self.emit(.block, @backingInt((try self.scalar(id)).machine()));
+        const join = try self.prepareJoin(id, .value);
+        try self.emit(.block, @backingInt(join.result.?));
         try self.return_targets.append(g.allocator, .{ .node = id, .label = self.labels, .cleanup = self.cleanups.mark() });
         self.labels += 1;
         const terminated = try self.suite(id, depth + 1);
-        if (terminated) try self.emit(.unreachable_, 0) else try self.emit(if (try self.scalar(id) == .f32) .f32_const else .i32_const, 0);
+        if (terminated) try self.emit(.unreachable_, 0) else try self.emit(if (join.result.? == .f32) .f32_const else .i32_const, 0);
         self.labels -= 1;
         _ = self.return_targets.pop();
         try self.emit(.end, 0);
@@ -6428,8 +6431,9 @@ const Emitter = struct {
             .logical => try self.emitLogical(id, depth),
             .call => try self.emitNamedCall(id, depth),
             .if_value => {
+                const join = try self.prepareJoin(id, .value);
                 try self.expression(n.a, depth + 1);
-                try self.emit(.if_, @backingInt((try self.scalar(id)).machine()));
+                try self.emit(.if_, @backingInt(join.result.?));
                 self.labels += 1;
                 try self.expression(n.b, depth + 1);
                 try self.emit(.else_, 0);
@@ -6521,9 +6525,9 @@ const Emitter = struct {
                 },
                 .pattern_bind => try self.patternBinding(statement, depth + 1),
                 .loop => {
-                    try self.loopStatement(statement, depth + 1);
-                    const loop = unit_.loopInfo(statement);
-                    if (loop.kind == .forever and !loop.can_exit) {
+                    const loop = try self.prepareLoop(statement);
+                    try self.loopStatement(loop, depth + 1);
+                    if (loop.diverges) {
                         try self.emit(.unreachable_, 0);
                         return true;
                     }
@@ -6538,28 +6542,23 @@ const Emitter = struct {
                     try self.emit(.drop, 0);
                 },
                 .return_ => {
-                    var return_target: ?ReturnTarget = null;
-                    for (self.return_targets.items) |target| if (target.node == n.b) {
-                        return_target = target;
-                        break;
-                    };
-                    const target = return_target orelse return g.fail(self.unit_id, statement, .unsupported);
-                    if (target.template_result) try self.templateExpression(n.a, depth + 1) else try self.expression(n.a, depth + 1);
-                    try self.cleanupTo(target.cleanup);
-                    try self.emit(.br, self.labels - 1 - target.label);
+                    const exit = try self.prepareReturn(statement, .return_, n.b);
+                    if (exit.template_result) try self.templateExpression(exit.value, depth + 1) else try self.expression(exit.value, depth + 1);
+                    try self.takeExit(exit);
                     return true;
                 },
                 .if_stmt => {
+                    const join = try self.prepareJoin(statement, .statement);
                     try self.expression(n.a, depth + 1);
                     try self.emit(.if_, 0);
                     self.labels += 1;
                     const then_returns = try self.suite(n.b, depth + 1);
-                    if (!then_returns) try self.mergeBranch(statement, true);
+                    if (!then_returns) try self.mergeBranch(join, true);
                     var else_returns = false;
-                    if (n.c != 0 or unit_.branchMerges(statement).len != 0) {
+                    if (join.else_arm) {
                         try self.emit(.else_, 0);
                         if (n.c != 0) else_returns = try self.suite(n.c, depth + 1);
-                        if (!else_returns) try self.mergeBranch(statement, false);
+                        if (!else_returns) try self.mergeBranch(join, false);
                     }
                     self.labels -= 1;
                     try self.emit(.end, 0);
@@ -6656,11 +6655,12 @@ const Emitter = struct {
             try self.save(binding.a, id);
         }
     }
-    fn loopStatement(self: *Emitter, id: core.Id, depth: usize) Error!void {
+    fn loopStatement(self: *Emitter, plan: resolved_flow.Loop, depth: usize) Error!void {
         const g = self.generator;
         const source = g.unit(self.unit_id);
+        const id = plan.node;
         const metadata = source.loopInfo(id);
-        const carries = source.loopCarries(id);
+        const carries = plan.carries;
         const cleanup_mark = self.cleanups.mark();
         defer self.cleanups.restore(cleanup_mark);
         const view_count = self.row_views.items.len;
@@ -6774,7 +6774,7 @@ const Emitter = struct {
                 if (small == null and !(is_list and words != 0)) try self.readElement(machine, if (is_list) 0 else 4, packed_layout.arrayRowWords(&g.layouts, array_type));
                 try self.emit(.local_set, element);
             }
-            if (plainBindingPattern(source, metadata.pattern, 0)) {
+            if (!plan.refutable) {
                 // These patterns cannot branch. Their definitions dominate
                 // the loop body, including scalar replacement of local rows.
                 try self.matchPattern(id, metadata.pattern, element, self.labels, depth + 1);
@@ -6918,26 +6918,93 @@ const Emitter = struct {
         try self.emit(.local_set, cadence);
     }
     fn breakStatement(self: *Emitter, id: core.Id, depth: usize) Error!void {
-        const g = self.generator;
-        const source = g.unit(self.unit_id);
-        const target = source.node(id).a;
-        var selected: ?LoopTarget = null;
-        for (self.loop_targets.items) |loop_target| if (loop_target.node == target) {
-            selected = loop_target;
-            break;
-        };
-        const exit_target = selected orelse return g.fail(self.unit_id, id, .unsupported);
-        const carries = if (source.node(target).tag == .request_loop) source.requestLoopCarries(target) else source.loopCarries(target);
-        const values = source.breakValues(id);
-        if (values.len != carries.len) return g.fail(self.unit_id, id, .unsupported);
-        for (values) |value| try self.expression(value, depth + 1);
-        var index = carries.len;
+        const exit = try self.prepareBreak(id);
+        for (exit.values) |value| try self.expression(value, depth + 1);
+        var index = exit.carries.len;
         while (index != 0) {
             index -= 1;
-            try self.save(carries[index].outgoing, id);
+            try self.save(exit.carries[index].outgoing, id);
         }
-        try self.cleanupTo(exit_target.cleanup);
-        try self.emit(.br, self.labels - 1 - exit_target.label);
+        try self.takeExit(exit);
+    }
+    /// Selects the block a `return` (or a request handler's return) leaves,
+    /// before any instruction of the edge.
+    fn prepareReturn(self: *Emitter, source: core.Id, kind: resolved_flow.Exit.Kind, block: core.Id) Error!resolved_flow.Exit {
+        const g = self.generator;
+        const target = for (self.return_targets.items) |target| {
+            if (target.node == block) break target;
+        } else return g.fail(self.unit_id, source, .unsupported);
+        g.evaluator.counters.prepared_exits += 1;
+        const value = if (kind == .return_) g.unit(self.unit_id).node(source).a else 0;
+        return .{ .kind = kind, .source = source, .target = block, .label = target.label, .cleanup = target.cleanup, .template_result = target.template_result, .value = value };
+    }
+    /// Selects the loop a `break` leaves and the carries its values replace.
+    fn prepareBreak(self: *Emitter, id: core.Id) Error!resolved_flow.Exit {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const loop = source.node(id).a;
+        const target = for (self.loop_targets.items) |target| {
+            if (target.node == loop) break target;
+        } else return g.fail(self.unit_id, id, .unsupported);
+        const carries = if (source.node(loop).tag == .request_loop) source.requestLoopCarries(loop) else source.loopCarries(loop);
+        const values = source.breakValues(id);
+        if (values.len != carries.len) return g.fail(self.unit_id, id, .unsupported);
+        g.evaluator.counters.prepared_exits += 1;
+        return .{ .kind = .break_, .source = id, .target = loop, .label = target.label, .cleanup = target.cleanup, .values = values, .carries = carries };
+    }
+    /// Discharges the cleanup of every scope the exit leaves, then branches.
+    fn takeExit(self: *Emitter, exit: resolved_flow.Exit) Error!void {
+        self.generator.evaluator.counters.prepared_exit_cleanups += self.cleanups.since(exit.cleanup).len;
+        try self.cleanupTo(exit.cleanup);
+        try self.emit(.br, exit.depthAt(self.labels));
+    }
+    const JoinKind = enum { value, template, statement, match_statement };
+    fn prepareJoin(self: *Emitter, id: core.Id, kind: JoinKind) Error!resolved_flow.Join {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        g.evaluator.counters.prepared_joins += 1;
+        return switch (kind) {
+            .value => .{ .node = id, .result = (try self.scalar(id)).machine(), .merges = &.{} },
+            // A callable template's value is its i32 handle.
+            .template => .{ .node = id, .result = .i32, .merges = &.{} },
+            .statement => .{ .node = id, .result = null, .merges = source.branchMerges(id), .else_arm = source.node(id).c != 0 or source.branchMerges(id).len != 0 },
+            // A statement match's arms leave Unit on its result block.
+            .match_statement => .{ .node = id, .result = (try self.scalar(id)).machine(), .merges = source.branchMerges(id) },
+        };
+    }
+    fn prepareMatch(self: *Emitter, id: core.Id) Error!resolved_flow.Match {
+        const source = self.generator.unit(self.unit_id);
+        const metadata = source.matchInfo(id);
+        const join = try self.prepareJoin(id, if (metadata.statement) .match_statement else .value);
+        self.generator.evaluator.counters.prepared_matches += 1;
+        return .{ .join = join, .inputs = source.matchInputs(id), .arms = source.matchArms(id), .statement = metadata.statement };
+    }
+    fn prepareLoop(self: *Emitter, id: core.Id) Error!resolved_flow.Loop {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const metadata = source.loopInfo(id);
+        g.evaluator.counters.prepared_loops += 1;
+        return .{ .node = id, .kind = metadata.kind, .carries = source.loopCarries(id), .refutable = metadata.pattern != 0 and !plainBindingPattern(source, metadata.pattern, 0), .diverges = metadata.kind == .forever and !metadata.can_exit };
+    }
+    /// Selects every edge out of a request loop before its first instruction.
+    /// Its own exit label is the next one the loop opens.
+    fn prepareRequestLoop(self: *Emitter, id: core.Id) Error!resolved_flow.RequestLoop {
+        const g = self.generator;
+        const source = g.unit(self.unit_id);
+        const metadata = source.requestLoopInfo(id);
+        const exited = try self.prepareReturn(id, .request_return, metadata.return_target);
+        g.evaluator.counters.prepared_exits += 1;
+        g.evaluator.counters.prepared_request_loops += 1;
+        return .{
+            .node = id,
+            .arms = source.requestArms(id),
+            .exited = exited,
+            // The cleanup mark is bound when the exit scope opens, after the
+            // cell and handler frames this loop allocates.
+            .broken = .{ .kind = .request_break, .source = id, .target = id, .label = self.labels, .cleanup = self.cleanups.mark(), .carries = source.requestLoopCarries(id) },
+            .completion_pattern = metadata.completion_pattern,
+            .completion_body = metadata.completion_body,
+        };
     }
     fn dispatchIdentity(self: *Emitter, concrete: layout.Id) ?types.NominalIdentity {
         const value = self.generator.layouts.node(concrete);
@@ -7246,15 +7313,15 @@ const Emitter = struct {
         const g = self.generator;
         const unit_ = g.unit(self.unit_id);
         if (depth >= 1024) return g.fail(self.unit_id, id, .complexity);
-        const metadata = unit_.matchInfo(id);
+        const plan = try self.prepareMatch(id);
+        const join = plan.join;
         var storage_buffer: [128]u8 align(@alignOf(usize)) = undefined;
         var storage: std.heap.BufferFirstAllocator = .init(&storage_buffer, g.allocator);
         const scratch = storage.allocator();
         var inputs: std.ArrayList(u32) = .empty;
         defer inputs.deinit(scratch);
-        const source_inputs = unit_.matchInputs(id);
-        try inputs.ensureTotalCapacityPrecise(scratch, @min(source_inputs.len, 16));
-        for (source_inputs) |input| {
+        try inputs.ensureTotalCapacityPrecise(scratch, @min(plan.inputs.len, 16));
+        for (plan.inputs) |input| {
             if (unit_.types.node(unit_.typeOf(input)).tag == .never) {
                 try self.expression(input, depth + 1);
                 try self.emit(.unreachable_, 0);
@@ -7265,11 +7332,11 @@ const Emitter = struct {
             try self.emit(.local_set, local);
             try inputs.append(scratch, local);
         }
-        try self.emit(.block, @backingInt((try self.scalar(id)).machine()));
+        try self.emit(.block, @backingInt(join.result.?));
         const result_label = self.labels;
         self.labels += 1;
-        var all_terminate = metadata.statement;
-        for (unit_.matchArms(id), 0..) |arm, arm_index| {
+        var all_terminate = plan.statement;
+        for (plan.arms, 0..) |arm, arm_index| {
             try self.emit(.block, 0);
             const next_arm = self.labels;
             self.labels += 1;
@@ -7287,14 +7354,14 @@ const Emitter = struct {
                     // A rejected guard advances to the next source arm.
                     try self.emit(.br_if, self.labels - 1 - next_arm);
                 }
-                const terminated = if (metadata.statement) try self.suite(arm.body, depth + 1) else terminated: {
+                const terminated = if (plan.statement) try self.suite(arm.body, depth + 1) else terminated: {
                     try self.expression(arm.body, depth + 1);
                     break :terminated false;
                 };
                 all_terminate = all_terminate and terminated;
                 if (!terminated) {
-                    if (metadata.statement) {
-                        try self.mergeBranch(id, arm_index == 0);
+                    if (plan.statement) {
+                        try self.mergeBranch(join, arm_index == 0);
                         try self.emit(.i32_const, 0);
                     }
                     try self.emit(.br, self.labels - 1 - result_label);
@@ -7411,13 +7478,13 @@ const Emitter = struct {
         self.labels -= 1;
         try self.emit(.end, 0);
     }
-    fn mergeBranch(self: *Emitter, id: core.Id, left: bool) Error!void {
+    fn mergeBranch(self: *Emitter, join: resolved_flow.Join, left: bool) Error!void {
         const g = self.generator;
-        for (g.unit(self.unit_id).branchMerges(id)) |merge| {
+        for (join.merges) |merge| {
             const binding = if (left) merge.then_binding else merge.else_binding;
-            const local = self.locals.get(binding) orelse return g.fail(self.unit_id, id, .unsupported);
+            const local = self.locals.get(binding) orelse return g.fail(self.unit_id, join.node, .unsupported);
             try self.emit(.local_get, local);
-            try self.save(merge.result, id);
+            try self.save(merge.result, join.node);
         }
     }
 };

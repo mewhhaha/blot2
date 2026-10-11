@@ -24,6 +24,10 @@ pub const Stack = struct {
     pub fn restore(self: *Stack, checkpoint: Mark) void {
         self.actions.shrinkRetainingCapacity(@backingInt(checkpoint));
     }
+    /// The obligations of scopes opened after `checkpoint`, oldest first.
+    pub fn since(self: *const Stack, checkpoint: Mark) []const Action {
+        return self.actions.items[@backingInt(checkpoint)..];
+    }
     pub fn append(self: *Stack, a: A, action: Action) A.Error!void {
         try self.actions.append(a, action);
     }

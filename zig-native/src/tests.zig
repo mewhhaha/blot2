@@ -297,6 +297,7 @@ test {
     _ = @import("check_shared_scheme_tests.zig");
     _ = @import("dispatch_explanation.zig");
     _ = @import("dispatch_explanation_tests.zig");
+    _ = @import("resolved_flow.zig");
     _ = @import("core_dispatch_tests.zig");
     _ = @import("retained_catalog_tests.zig");
     _ = @import("startup_emission_facts_tests.zig");
