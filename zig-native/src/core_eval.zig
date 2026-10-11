@@ -247,7 +247,11 @@ const PrincipalGraph = struct {
     source_complete: bool = false,
     dependencies: []core.BindingRef = &.{},
     plain_reads: []receipt.PlainFact = &.{},
+    /// Dynamic reads that neither consumer can replay.
     untracked_reads: bool = false,
+    /// Collected source scopes outside the target's unit. Principal input
+    /// keys compare every module's source image; source receipts do not.
+    foreign_sources: bool = false,
 
     fn nodeCount(self: *const PrincipalGraph) usize {
         return self.types.nodes.items.len + self.types.effects.rows.items.len + self.types.operations.items.len;
@@ -484,6 +488,35 @@ fn principalQueryTestGraph(a: Allocator, key: PrincipalGraph.Key, plain: ?bool) 
     graph.plain_reads = try owned.dupe(receipt.PlainFact, &.{.{ .key = 7, .plain = plain orelse false, .present = plain != null }});
     return graph;
 }
+// Principal input keys compare every module's source image, so a graph that
+// collected source scopes from another unit reads nothing they miss. Source
+// receipts admit sources per binding and still treat such a graph as unknown.
+test "recorded principal regions keep input keys over foreign graph sources" {
+    const a = std.testing.allocator;
+    var session = try Session.init(a, &.{});
+    defer session.deinit();
+    var region = try ClosureRegion.init(&session);
+    defer region.deinit();
+    const graph = try principalQueryTestGraph(a, .{ .target = .{ .unit = 0, .binding = 1 }, .source_interface = false, .deferred_member = false, .options = .{} }, true);
+    defer graph.deinit(a);
+    graph.foreign_sources = true;
+    for ([_]bool{ false, true }) |untracked| {
+        graph.untracked_reads = untracked;
+        var reads: principal_inputs.Recorder = .{ .eligible = true, .max_reads = 8, .serial = 1 };
+        defer reads.deinit(a);
+        var tape: receipt.Tape = .{};
+        defer tape.deinit(a);
+        session.principal_reads = &reads;
+        session.receipt_tape = &tape;
+        defer {
+            session.principal_reads = null;
+            session.receipt_tape = null;
+        }
+        try region.principalDependencies(graph, false);
+        try std.testing.expectEqual(!untracked, reads.eligible);
+        try std.testing.expect(tape.unknown);
+    }
+}
 fn principalQueryTestRecord(cache: anytype, session: *Session, key: PrincipalGraph.Key, plain: ?bool) !*PrincipalGraph {
     const a = session.allocator;
     const graph = try principalQueryTestGraph(a, key, plain);
@@ -579,7 +612,9 @@ test "principal query templates distinguish owners claims flags plain observatio
 const CallSummaries = struct {
     const Key = struct { target: Target, inputs: type_evidence.Id, source_interface: bool, lexical: u32 = 0, expected_result: type_evidence.Id = 0, expected_signature: type_evidence.Id = 0, deferred_member: bool = false, options: Options = .{} };
     const JobState = enum { queued, running, waiting, complete, declined };
-    const Job = struct { key: Key, state: JobState = .queued, region: ?*ClosureRegion = null, scope: ?u32 = null, result: type_evidence.Id = 0 };
+    /// `recorded` names the principal input recorder that was attached while
+    /// the job ran, or zero. Its reads and publications went to that recorder.
+    const Job = struct { key: Key, state: JobState = .queued, region: ?*ClosureRegion = null, scope: ?u32 = null, result: type_evidence.Id = 0, recorded: u64 = 0 };
     const HeaderParts = struct { mask: []bool, has_private: bool = false };
     keys: std.AutoHashMapUnmanaged(Key, usize) = .empty,
     jobs: std.ArrayList(Job) = .empty,
@@ -1009,6 +1044,7 @@ const CallSummaries = struct {
         }
         job.result = result;
         job.state = if (result == 0) .declined else .complete;
+        job.recorded = if (session.principal_reads) |reads| reads.serial else 0;
         if (result == 0) session.split_declined += 1 else session.split_accepted += 1;
         // A job can enqueue children while collecting or solving. Remove its
         // own frame without discarding any independently scheduled work.
@@ -1210,7 +1246,11 @@ pub const Session = struct {
     refinement_observation: ?*@import("refinement_receipt.zig").Observation = null,
     principal_provider: ?PrincipalProvider = null,
     principal_regions: usize = 0,
+    principal_recordings: u64 = 0,
     principal_reads: ?*principal_inputs.Recorder = null,
+    /// The recorder a detached principal-graph description still reports
+    /// plain-nominal memo reads and publications to.
+    principal_plain_reads: ?*principal_inputs.Recorder = null,
     owned_diagnostic_message: []u8 = &.{},
     /// Borrowed only during emission. Core owns the low-level API fallback;
     /// project origin policy is explicit and belongs to the current consumer.
@@ -2513,7 +2553,8 @@ pub const Session = struct {
             return solved;
         };
         if (self.principal_provider != null) self.principal_regions += 1;
-        var reads: principal_inputs.Recorder = .{ .eligible = self.validated_calls.count() == 0, .max_reads = self.options.max_values };
+        self.principal_recordings += 1;
+        var reads: principal_inputs.Recorder = .{ .eligible = self.validated_calls.count() == 0, .max_reads = self.options.max_values, .serial = self.principal_recordings };
         defer reads.deinit(self.allocator);
         const previous_reads = self.principal_reads;
         const recording = self.principal_provider != null;
@@ -5158,7 +5199,8 @@ const ClosureRegion = struct {
     fn plainNominal(self: *ClosureRegion, unit_id: u32, decl: u32, depth: usize) RegionError!bool {
         if (depth >= self.session.options.max_type_depth) return false;
         const key = (@as(u64, unit_id) << 32) | decl;
-        if (self.session.principal_reads) |reads| try reads.plainRead(self.session.allocator, key, self.session.plain_nominals.get(key));
+        const plain_reads = self.session.principal_reads orelse self.session.principal_plain_reads;
+        if (plain_reads) |reads| try reads.plainRead(self.session.allocator, key, self.session.plain_nominals.get(key));
         if (self.session.plain_nominals.get(key)) |known| {
             if (self.session.receipt_tape) |tape| try tape.plain_facts.append(self.session.allocator, .{ .key = key, .plain = known });
             return known;
@@ -5178,7 +5220,7 @@ const ClosureRegion = struct {
             }
         }
         if (self.session.receipt_tape) |tape| try tape.plain_facts.append(self.session.allocator, .{ .key = key, .plain = plain, .read = false });
-        if (self.session.principal_reads) |reads| try reads.plainPublish(self.session.allocator, key, plain);
+        if (plain_reads) |reads| try reads.plainPublish(self.session.allocator, key, plain);
         try self.session.plain_nominals.put(self.session.allocator, key, plain);
         return plain;
     }
@@ -5708,12 +5750,29 @@ const ClosureRegion = struct {
         // Their current ordinary path retains the complete source/capture proof.
         if (self.session.receipt_tape != null or self.session.principal_reads != null or self.session.refinement_observation != null) return false;
         if (self.session.lexical_inputs.examined_words >= self.session.options.max_children) return false;
+        // The key never admits an empty environment, and it reads interfaces
+        // only for values reachable from the captures. Views of unrelated
+        // values cannot enter it, so only reachable scopes are projected.
+        if (self.session.valueInfo(value).len == 0) return false;
+        var reachable: std.AutoHashMapUnmanaged(ValueId, void) = .empty;
+        defer reachable.deinit(self.scratch_allocator);
+        var pending: std.ArrayList(ValueId) = .empty;
+        defer pending.deinit(self.scratch_allocator);
+        try pending.appendSlice(self.scratch_allocator, self.session.valueChildren(value));
+        while (pending.pop()) |current| {
+            if (self.session.lexical_inputs.interface_visits >= self.session.options.max_children or reachable.count() >= self.session.options.max_values) return false;
+            self.session.lexical_inputs.interface_visits += 1;
+            if (current >= self.session.values.items.len) return false;
+            if ((try reachable.getOrPut(self.scratch_allocator, current)).found_existing) continue;
+            try pending.appendSlice(self.scratch_allocator, self.session.valueChildren(current));
+        }
         var selected: lexical_capture_inputs.Interfaces = .empty;
         defer selected.deinit(self.scratch_allocator);
         for (self.scratch.sources.items) |capture| {
             if (self.session.lexical_inputs.interface_visits >= self.session.options.max_children) return false;
             self.session.lexical_inputs.interface_visits += 1;
-            if (capture.value == 0 or capture.root == 0) continue;
+            if (capture.value == 0 or capture.root == 0 or !reachable.contains(capture.value)) continue;
+            self.session.counters.lexical_interface_projections += 1;
             const actual = try self.project(capture.root);
             if (actual == 0) continue;
             if (selected.get(capture.value)) |prior| {
@@ -6667,7 +6726,9 @@ const ClosureRegion = struct {
                     try tape.sources.append(self.session.allocator, target);
                     try tape.call_reads.append(self.session.allocator, .{ .unit = target.unit, .binding = target.binding, .evidence = entry.result, .present = true });
                 };
-                if (!self.source_interface) if (self.session.principal_reads) |reads| if (!reads.calls_seen.contains(.{ .target = target, .evidence = entry.result })) reads.invalidate(.call_read);
+                // A job drained under this recorder is part of the recorded
+                // region: its reads, publications and consumed jobs are here.
+                if (!self.source_interface) if (self.session.principal_reads) |reads| if ((entry.recorded == 0 or entry.recorded != reads.serial) and !reads.calls_seen.contains(.{ .target = target, .evidence = entry.result })) reads.invalidate(.call_read);
                 _ = try self.admitSignature(constraint.left, try self.importEvidence(entry.result, 0));
                 self.scratch.constraints.items[index].solved = true;
                 self.session.counters.call_memo_hits += 1;
@@ -7074,15 +7135,22 @@ const ClosureRegion = struct {
         const a = self.session.allocator;
         const tape = self.session.receipt_tape;
         const reads = self.session.principal_reads;
+        const plain_reads = self.session.principal_plain_reads;
         const observation = self.session.refinement_observation;
         var dependencies: receipt.Tape = .{};
         defer dependencies.deinit(a);
         self.session.receipt_tape = &dependencies;
         self.session.principal_reads = null;
+        // Plain-nominal memo entries are session state this description
+        // reads and fills inside the caller's recorded region. They reach
+        // the caller's recorder in order; replaying the finished graph's
+        // facts later would mistake its own publications for prior inputs.
+        self.session.principal_plain_reads = reads orelse plain_reads;
         self.session.refinement_observation = null;
         defer {
             self.session.receipt_tape = tape;
             self.session.principal_reads = reads;
+            self.session.principal_plain_reads = plain_reads;
             self.session.refinement_observation = observation;
         }
         // Collection and solving are speculative source inquiries. Neither may
@@ -7177,7 +7245,7 @@ const ClosureRegion = struct {
         }
         const buffers = copy_meter.allocator();
         graph.untracked_reads = dependencies.unknown or dependencies.nested or dependencies.call_reads.items.len != 0 or dependencies.views.items.len != 0;
-        for (region.scratch.sources.items) |source| graph.untracked_reads = graph.untracked_reads or source.owner != key.target.unit;
+        for (region.scratch.sources.items) |source| graph.foreign_sources = graph.foreign_sources or source.owner != key.target.unit;
         graph.dependencies = try buffers.dupe(core.BindingRef, dependencies.sources.items);
         graph.plain_reads = try buffers.dupe(receipt.PlainFact, dependencies.plain_facts.items);
         var copy: principal_type_graph.NormalizedCopy = .{ .allocator = buffers, .source = &region.solver, .destination = &graph.types, .max_depth = self.session.options.max_type_depth, .max_nodes = self.session.options.max_values };
@@ -7415,10 +7483,10 @@ const ClosureRegion = struct {
             if (seen.contains(graph.key)) continue;
             if (seen.count() >= self.session.options.max_values) return error.TypeLimit;
             try seen.put(self.scratch_allocator, graph.key, {});
-            if (graph.untracked_reads) {
-                if (self.session.principal_reads) |reads| reads.invalidate(.call_read);
-                if (self.session.receipt_tape) |tape| tape.unknown = true;
-            }
+            if (graph.untracked_reads) if (self.session.principal_reads) |reads| reads.invalidate(.call_read);
+            if (graph.untracked_reads or graph.foreign_sources) if (self.session.receipt_tape) |tape| {
+                tape.unknown = true;
+            };
             if (self.session.receipt_tape) |tape| try tape.sources.appendSlice(self.session.allocator, graph.dependencies);
             for (graph.plain_reads) |fact| {
                 const actual = self.session.plain_nominals.get(fact.key);

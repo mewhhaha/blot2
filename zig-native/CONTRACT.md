@@ -214,6 +214,8 @@ revision keys remain separate work. Scalar bits, nested executable bodies,
 provider creation identities and pending demand identities participate in key
 equality. Unsupported, cyclic or incomplete graphs retain ordinary collection.
 Aggregate examined-word/interface-visit budgets include declined admissions.
+Interface selection projects only the scopes of values reachable from the
+closure's captures; a capture-free closure has no key.
 
 Each lexical job imports those inputs into a private solver and exports only a
 complete session-owned arrow. Its owner still checks executable captured values.
@@ -555,6 +557,16 @@ owner, with source-defined nominal/effect identities checked. Reserve all memo
 capacity before publication. The projected query certifies no runtime or staged
 value: ordinary evaluation still runs and reports errors. Executable admission
 uses its own source and captured-value checks.
+
+The recorded region includes the independent summary jobs it drains: their
+reads, publications and consumed jobs pass through the same recorder, so their
+results are recorded work even when they publish no validated call. A job
+finished outside that recording is an unrecorded call read. A principal-graph
+description detaches the recorder but still reports its nominal memo reads and
+publications to it in order. Source scopes a graph collected from another unit
+are not dynamic reads for this key, which compares every module's source image;
+source receipts admit sources per binding and still treat such a graph as
+unknown.
 
 Effect unification walks immutable label-span views. A left remainder keeps its
 chronological cursor; extracting a right label resets that cursor just as

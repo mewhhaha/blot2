@@ -68,6 +68,8 @@ pub const Reason = enum(u4) { unsupported, runtime_source, call_read, call_publi
 pub const Recorder = struct {
     rejected: u16 = 0,
     eligible: bool,
+    /// Session-unique and nonzero for a recorder attached to a session.
+    serial: u64 = 0,
     max_reads: usize,
     reads: std.ArrayList(ScalarRead) = .empty,
     seen: std.AutoHashMapUnmanaged(u64, u32) = .empty,

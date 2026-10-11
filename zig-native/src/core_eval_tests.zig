@@ -394,6 +394,56 @@ test "source owned array record and nominal skeletons keep open diamonds bounded
     }
 }
 
+// A principal-graph description runs with the caller's recorder detached,
+// but the plain-nominal memo it fills is session state. Those facts reach the
+// recorder in order, so a nominal first decided inside the description is a
+// publication of the recorded region rather than an input present before it.
+test "recorded principal regions observe plain memo facts from graph descriptions" {
+    var text: std.ArrayList(u8) = .empty;
+    defer text.deinit(a);
+    // Only the described callees mention Box. The recorded region first sees
+    // Box through their graphs, after a description decided it.
+    try text.appendSlice(a,
+        \\type Box a is data = #Box a
+        \\const open_box = fn (box: Box a) -> a => case box of
+        \\  #Box inner => inner
+        \\const f_0 = fn value => open_box (#Box value.first)
+        \\
+    );
+    for (1..9) |i| try text.print(a, "const f_{d} = fn value => do:\n  let ignored = f_{d} value\n  return f_{d} value\n", .{ i, i - 1, i - 1 });
+    try text.appendSlice(a, "entry const factory = do:\n  return f_8\n");
+    var module = try lower(text.items);
+    defer module.deinit(a);
+    var session = try evaluator.Session.init(a, &.{module});
+    defer session.deinit();
+    var reads: @import("principal_inputs.zig").Recorder = .{ .eligible = true, .max_reads = 1024, .serial = 1 };
+    defer reads.deinit(a);
+    session.principal_reads = &reads;
+    _ = try session.sourceInterface(target(&module, "factory"));
+    session.principal_reads = null;
+    try std.testing.expect(session.principal_graph_builds != 0);
+    try std.testing.expect(session.plain_nominals.count() != 0);
+    // Facts recorded before a later rejection are still in order.
+    var facts = session.plain_nominals.iterator();
+    while (facts.next()) |fact| {
+        const read = for (reads.plain_reads.items) |read| {
+            if (read.key == fact.key_ptr.*) break read;
+        } else return error.TestUnexpectedResult;
+        try std.testing.expectEqual(@as(?bool, null), read.value);
+        const published = for (reads.plain_publications.items) |publication| {
+            if (publication.key == fact.key_ptr.*) break publication;
+        } else return error.TestUnexpectedResult;
+        try std.testing.expectEqual(fact.value_ptr.*, published.value);
+    }
+    // These observations hold on an empty memo and leave the same facts.
+    const observed: @import("principal_inputs.zig").Key = .{ .scalar_reads = &.{}, .plain_reads = reads.plain_reads.items, .plain_publications = reads.plain_publications.items };
+    var replay = try evaluator.Session.init(a, &.{module});
+    defer replay.deinit();
+    try std.testing.expect(observed.matches(&replay));
+    try observed.publish(&replay);
+    try std.testing.expectEqual(session.plain_nominals.count(), replay.plain_nominals.count());
+}
+
 test "source owned structured residuals preserve independent concrete interfaces" {
     for ([_]struct { leaf: []const u8, select: []const u8 }{
         .{ .leaf = "#[value.first]", .select = "result[0]" },
